@@ -36,48 +36,209 @@ void unsigned_loop(unsigned lb, unsigned ub, unsigned step) {
       sum += i;
 }
 
+// CHECK: %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"(i32* @sum), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.FIRSTPRIVATE"(i32* %lb.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %ub.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %step.addr), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 (i32*)* @compute_lb, i32* %lb.addr), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 (i32*)* @compute_ub, i32* %ub.addr), "QUAL.OSS.LOOP.STEP"(i32 (i32*)* @compute_step, i32* %step.addr), "QUAL.OSS.LOOP.TYPE"(i64 0, i64 1, i64 1, i64 1, i64 1) ]
+// CHECK: %5 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"(i32* @sum), "QUAL.OSS.PRIVATE"(i32* %i1), "QUAL.OSS.FIRSTPRIVATE"(i32* %lb.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %ub.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %step.addr), "QUAL.OSS.LOOP.IND.VAR"(i32* %i1), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 (i32*)* @compute_lb.1, i32* %lb.addr), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 (i32*)* @compute_ub.2, i32* %ub.addr), "QUAL.OSS.LOOP.STEP"(i32 (i32*)* @compute_step.3, i32* %step.addr), "QUAL.OSS.LOOP.TYPE"(i64 1, i64 1, i64 1, i64 1, i64 1) ]
+// CHECK: %9 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"(i32* @sum), "QUAL.OSS.PRIVATE"(i32* %i3), "QUAL.OSS.FIRSTPRIVATE"(i32* %ub.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %lb.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %step.addr), "QUAL.OSS.LOOP.IND.VAR"(i32* %i3), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 (i32*)* @compute_lb.4, i32* %ub.addr), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 (i32*)* @compute_ub.5, i32* %lb.addr), "QUAL.OSS.LOOP.STEP"(i32 (i32*)* @compute_step.6, i32* %step.addr), "QUAL.OSS.LOOP.TYPE"(i64 2, i64 1, i64 1, i64 1, i64 1) ]
+// CHECK: %13 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"(i32* @sum), "QUAL.OSS.PRIVATE"(i32* %i5), "QUAL.OSS.FIRSTPRIVATE"(i32* %ub.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %lb.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %step.addr), "QUAL.OSS.LOOP.IND.VAR"(i32* %i5), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 (i32*)* @compute_lb.7, i32* %ub.addr), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 (i32*)* @compute_ub.8, i32* %lb.addr), "QUAL.OSS.LOOP.STEP"(i32 (i32*)* @compute_step.9, i32* %step.addr), "QUAL.OSS.LOOP.TYPE"(i64 3, i64 1, i64 1, i64 1, i64 1) ]
 
-// CHECK: %1 = load i32, i32* %lb.addr, align 4
-// CHECK-NEXT: %2 = load i32, i32* %ub.addr, align 4
-// CHECK-NEXT: %3 = load i32, i32* %step.addr, align 4
-// CHECK-NEXT: %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"(i32* @sum), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 %1), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 %2), "QUAL.OSS.LOOP.STEP"(i32 %3), "QUAL.OSS.LOOP.TYPE"(i64 0, i64 1, i64 1, i64 1, i64 1), "QUAL.OSS.CAPTURED"(i32 %1, i32 %2, i32 %3) ]
+// CHECK: define internal i32 @compute_lb(i32* %lb)
+// CHECK: entry:
+// CHECK-NEXT:   %lb.addr = alloca i32*, align 8
+// CHECK-NEXT:   store i32* %lb, i32** %lb.addr, align 8
+// CHECK-NEXT:   %0 = load i32, i32* %lb, align 4
+// CHECK-NEXT:   ret i32 %0
+// CHECK-NEXT: }
 
-// CHECK: %8 = load i32, i32* %lb.addr, align 4
-// CHECK-NEXT: %9 = load i32, i32* %ub.addr, align 4
-// CHECK-NEXT: %10 = load i32, i32* %step.addr, align 4
-// CHECK-NEXT: %11 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"(i32* @sum), "QUAL.OSS.PRIVATE"(i32* %i1), "QUAL.OSS.LOOP.IND.VAR"(i32* %i1), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 %8), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 %9), "QUAL.OSS.LOOP.STEP"(i32 %10), "QUAL.OSS.LOOP.TYPE"(i64 1, i64 1, i64 1, i64 1, i64 1), "QUAL.OSS.CAPTURED"(i32 %8, i32 %9, i32 %10) ]
+// CHECK: define internal i32 @compute_ub(i32* %ub)
+// CHECK: entry:
+// CHECK-NEXT:   %ub.addr = alloca i32*, align 8
+// CHECK-NEXT:   store i32* %ub, i32** %ub.addr, align 8
+// CHECK-NEXT:   %0 = load i32, i32* %ub, align 4
+// CHECK-NEXT:   ret i32 %0
+// CHECK-NEXT: }
 
-// CHECK: %15 = load i32, i32* %ub.addr, align 4
-// CHECK-NEXT: %16 = load i32, i32* %lb.addr, align 4
-// CHECK-NEXT: %17 = load i32, i32* %step.addr, align 4
-// CHECK-NEXT: %sub = sub nsw i32 0, %17
-// CHECK-NEXT: %18 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"(i32* @sum), "QUAL.OSS.PRIVATE"(i32* %i3), "QUAL.OSS.LOOP.IND.VAR"(i32* %i3), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 %15), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 %16), "QUAL.OSS.LOOP.STEP"(i32 %sub), "QUAL.OSS.LOOP.TYPE"(i64 2, i64 1, i64 1, i64 1, i64 1), "QUAL.OSS.CAPTURED"(i32 %15, i32 %16, i32 %sub) ]
+// CHECK: define internal i32 @compute_step(i32* %step)
+// CHECK: entry:
+// CHECK-NEXT:   %step.addr = alloca i32*, align 8
+// CHECK-NEXT:   store i32* %step, i32** %step.addr, align 8
+// CHECK-NEXT:   %0 = load i32, i32* %step, align 4
+// CHECK-NEXT:   ret i32 %0
+// CHECK-NEXT: }
 
-// CHECK: %22 = load i32, i32* %ub.addr, align 4
-// CHECK-NEXT: %23 = load i32, i32* %lb.addr, align 4
-// CHECK-NEXT: %24 = load i32, i32* %step.addr, align 4
-// CHECK-NEXT: %sub6 = sub nsw i32 0, %24
-// CHECK-NEXT: %25 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"(i32* @sum), "QUAL.OSS.PRIVATE"(i32* %i5), "QUAL.OSS.LOOP.IND.VAR"(i32* %i5), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 %22), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 %23), "QUAL.OSS.LOOP.STEP"(i32 %sub6), "QUAL.OSS.LOOP.TYPE"(i64 3, i64 1, i64 1, i64 1, i64 1), "QUAL.OSS.CAPTURED"(i32 %22, i32 %23, i32 %sub6) ]
+// CHECK: define internal i32 @compute_lb.1(i32* %lb)
+// CHECK: entry:
+// CHECK-NEXT:   %lb.addr = alloca i32*, align 8
+// CHECK-NEXT:   store i32* %lb, i32** %lb.addr, align 8
+// CHECK-NEXT:   %0 = load i32, i32* %lb, align 4
+// CHECK-NEXT:   ret i32 %0
+// CHECK-NEXT: }
 
-// CHECK: %1 = load i32, i32* %lb.addr, align 4
-// CHECK-NEXT: %2 = load i32, i32* %ub.addr, align 4
-// CHECK-NEXT: %3 = load i32, i32* %step.addr, align 4
-// CHECK-NEXT: %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"(i32* @sum), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 %1), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 %2), "QUAL.OSS.LOOP.STEP"(i32 %3), "QUAL.OSS.LOOP.TYPE"(i64 0, i64 0, i64 0, i64 0, i64 0), "QUAL.OSS.CAPTURED"(i32 %1, i32 %2, i32 %3) ]
+// CHECK: define internal i32 @compute_ub.2(i32* %ub)
+// CHECK: entry:
+// CHECK-NEXT:   %ub.addr = alloca i32*, align 8
+// CHECK-NEXT:   store i32* %ub, i32** %ub.addr, align 8
+// CHECK-NEXT:   %0 = load i32, i32* %ub, align 4
+// CHECK-NEXT:   ret i32 %0
+// CHECK-NEXT: }
 
-// CHECK: %8 = load i32, i32* %lb.addr, align 4
-// CHECK-NEXT: %9 = load i32, i32* %ub.addr, align 4
-// CHECK-NEXT: %10 = load i32, i32* %step.addr, align 4
-// CHECK-NEXT: %11 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"(i32* @sum), "QUAL.OSS.PRIVATE"(i32* %i1), "QUAL.OSS.LOOP.IND.VAR"(i32* %i1), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 %8), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 %9), "QUAL.OSS.LOOP.STEP"(i32 %10), "QUAL.OSS.LOOP.TYPE"(i64 1, i64 0, i64 0, i64 0, i64 0), "QUAL.OSS.CAPTURED"(i32 %8, i32 %9, i32 %10) ]
+// CHECK: define internal i32 @compute_step.3(i32* %step)
+// CHECK: entry:
+// CHECK-NEXT:   %step.addr = alloca i32*, align 8
+// CHECK-NEXT:   store i32* %step, i32** %step.addr, align 8
+// CHECK-NEXT:   %0 = load i32, i32* %step, align 4
+// CHECK-NEXT:   ret i32 %0
+// CHECK-NEXT: }
 
-// CHECK: %15 = load i32, i32* %ub.addr, align 4
-// CHECK-NEXT: %16 = load i32, i32* %lb.addr, align 4
-// CHECK-NEXT: %17 = load i32, i32* %step.addr, align 4
-// CHECK-NEXT: %sub = sub i32 0, %17
-// CHECK-NEXT: %18 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"(i32* @sum), "QUAL.OSS.PRIVATE"(i32* %i3), "QUAL.OSS.LOOP.IND.VAR"(i32* %i3), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 %15), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 %16), "QUAL.OSS.LOOP.STEP"(i32 %sub), "QUAL.OSS.LOOP.TYPE"(i64 2, i64 0, i64 0, i64 0, i64 0), "QUAL.OSS.CAPTURED"(i32 %15, i32 %16, i32 %sub) ]
+// CHECK: define internal i32 @compute_lb.4(i32* %ub)
+// CHECK: entry:
+// CHECK-NEXT:   %ub.addr = alloca i32*, align 8
+// CHECK-NEXT:   store i32* %ub, i32** %ub.addr, align 8
+// CHECK-NEXT:   %0 = load i32, i32* %ub, align 4
+// CHECK-NEXT:   ret i32 %0
+// CHECK-NEXT: }
 
-// CHECK: %22 = load i32, i32* %ub.addr, align 4
-// CHECK-NEXT: %23 = load i32, i32* %lb.addr, align 4
-// CHECK-NEXT: %24 = load i32, i32* %step.addr, align 4
-// CHECK-NEXT: %sub6 = sub i32 0, %24
-// CHECK-NEXT: %25 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"(i32* @sum), "QUAL.OSS.PRIVATE"(i32* %i5), "QUAL.OSS.LOOP.IND.VAR"(i32* %i5), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 %22), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 %23), "QUAL.OSS.LOOP.STEP"(i32 %sub6), "QUAL.OSS.LOOP.TYPE"(i64 3, i64 0, i64 0, i64 0, i64 0), "QUAL.OSS.CAPTURED"(i32 %22, i32 %23, i32 %sub6) ]
+// CHECK: define internal i32 @compute_ub.5(i32* %lb)
+// CHECK: entry:
+// CHECK-NEXT:   %lb.addr = alloca i32*, align 8
+// CHECK-NEXT:   store i32* %lb, i32** %lb.addr, align 8
+// CHECK-NEXT:   %0 = load i32, i32* %lb, align 4
+// CHECK-NEXT:   ret i32 %0
+// CHECK-NEXT: }
+
+// CHECK: define internal i32 @compute_step.6(i32* %step)
+// CHECK: entry:
+// CHECK-NEXT:   %step.addr = alloca i32*, align 8
+// CHECK-NEXT:   store i32* %step, i32** %step.addr, align 8
+// CHECK-NEXT:   %0 = load i32, i32* %step, align 4
+// CHECK-NEXT:   %sub = sub nsw i32 0, %0
+// CHECK-NEXT:   ret i32 %sub
+// CHECK-NEXT: }
+
+// CHECK: define internal i32 @compute_lb.7(i32* %ub)
+// CHECK: entry:
+// CHECK-NEXT:   %ub.addr = alloca i32*, align 8
+// CHECK-NEXT:   store i32* %ub, i32** %ub.addr, align 8
+// CHECK-NEXT:   %0 = load i32, i32* %ub, align 4
+// CHECK-NEXT:   ret i32 %0
+// CHECK-NEXT: }
+
+// CHECK: define internal i32 @compute_ub.8(i32* %lb)
+// CHECK: entry:
+// CHECK-NEXT:   %lb.addr = alloca i32*, align 8
+// CHECK-NEXT:   store i32* %lb, i32** %lb.addr, align 8
+// CHECK-NEXT:   %0 = load i32, i32* %lb, align 4
+// CHECK-NEXT:   ret i32 %0
+// CHECK-NEXT: }
+
+// CHECK: define internal i32 @compute_step.9(i32* %step)
+// CHECK: entry:
+// CHECK-NEXT:   %step.addr = alloca i32*, align 8
+// CHECK-NEXT:   store i32* %step, i32** %step.addr, align 8
+// CHECK-NEXT:   %0 = load i32, i32* %step, align 4
+// CHECK-NEXT:   %sub = sub nsw i32 0, %0
+// CHECK-NEXT:   ret i32 %sub
+// CHECK-NEXT: }
+
+// CHECK: %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"(i32* @sum), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.FIRSTPRIVATE"(i32* %lb.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %ub.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %step.addr), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 (i32*)* @compute_lb.10, i32* %lb.addr), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 (i32*)* @compute_ub.11, i32* %ub.addr), "QUAL.OSS.LOOP.STEP"(i32 (i32*)* @compute_step.12, i32* %step.addr), "QUAL.OSS.LOOP.TYPE"(i64 0, i64 0, i64 0, i64 0, i64 0) ]
+// CHECK: %5 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"(i32* @sum), "QUAL.OSS.PRIVATE"(i32* %i1), "QUAL.OSS.FIRSTPRIVATE"(i32* %lb.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %ub.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %step.addr), "QUAL.OSS.LOOP.IND.VAR"(i32* %i1), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 (i32*)* @compute_lb.13, i32* %lb.addr), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 (i32*)* @compute_ub.14, i32* %ub.addr), "QUAL.OSS.LOOP.STEP"(i32 (i32*)* @compute_step.15, i32* %step.addr), "QUAL.OSS.LOOP.TYPE"(i64 1, i64 0, i64 0, i64 0, i64 0) ]
+// CHECK: %9 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"(i32* @sum), "QUAL.OSS.PRIVATE"(i32* %i3), "QUAL.OSS.FIRSTPRIVATE"(i32* %ub.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %lb.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %step.addr), "QUAL.OSS.LOOP.IND.VAR"(i32* %i3), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 (i32*)* @compute_lb.16, i32* %ub.addr), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 (i32*)* @compute_ub.17, i32* %lb.addr), "QUAL.OSS.LOOP.STEP"(i32 (i32*)* @compute_step.18, i32* %step.addr), "QUAL.OSS.LOOP.TYPE"(i64 2, i64 0, i64 0, i64 0, i64 0) ]
+// CHECK: %13 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"(i32* @sum), "QUAL.OSS.PRIVATE"(i32* %i5), "QUAL.OSS.FIRSTPRIVATE"(i32* %ub.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %lb.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %step.addr), "QUAL.OSS.LOOP.IND.VAR"(i32* %i5), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 (i32*)* @compute_lb.19, i32* %ub.addr), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 (i32*)* @compute_ub.20, i32* %lb.addr), "QUAL.OSS.LOOP.STEP"(i32 (i32*)* @compute_step.21, i32* %step.addr), "QUAL.OSS.LOOP.TYPE"(i64 3, i64 0, i64 0, i64 0, i64 0) ]
+
+// CHECK: define internal i32 @compute_lb.10(i32* %lb)
+// CHECK: entry:
+// CHECK-NEXT:   %lb.addr = alloca i32*, align 8
+// CHECK-NEXT:   store i32* %lb, i32** %lb.addr, align 8
+// CHECK-NEXT:   %0 = load i32, i32* %lb, align 4
+// CHECK-NEXT:   ret i32 %0
+// CHECK-NEXT: }
+
+// CHECK: define internal i32 @compute_ub.11(i32* %ub)
+// CHECK: entry:
+// CHECK-NEXT:   %ub.addr = alloca i32*, align 8
+// CHECK-NEXT:   store i32* %ub, i32** %ub.addr, align 8
+// CHECK-NEXT:   %0 = load i32, i32* %ub, align 4
+// CHECK-NEXT:   ret i32 %0
+// CHECK-NEXT: }
+
+// CHECK: define internal i32 @compute_step.12(i32* %step)
+// CHECK: entry:
+// CHECK-NEXT:   %step.addr = alloca i32*, align 8
+// CHECK-NEXT:   store i32* %step, i32** %step.addr, align 8
+// CHECK-NEXT:   %0 = load i32, i32* %step, align 4
+// CHECK-NEXT:   ret i32 %0
+// CHECK-NEXT: }
+
+// CHECK: define internal i32 @compute_lb.13(i32* %lb)
+// CHECK: entry:
+// CHECK-NEXT:   %lb.addr = alloca i32*, align 8
+// CHECK-NEXT:   store i32* %lb, i32** %lb.addr, align 8
+// CHECK-NEXT:   %0 = load i32, i32* %lb, align 4
+// CHECK-NEXT:   ret i32 %0
+// CHECK-NEXT: }
+
+// CHECK: define internal i32 @compute_ub.14(i32* %ub)
+// CHECK: entry:
+// CHECK-NEXT:   %ub.addr = alloca i32*, align 8
+// CHECK-NEXT:   store i32* %ub, i32** %ub.addr, align 8
+// CHECK-NEXT:   %0 = load i32, i32* %ub, align 4
+// CHECK-NEXT:   ret i32 %0
+// CHECK-NEXT: }
+
+// CHECK: define internal i32 @compute_step.15(i32* %step)
+// CHECK: entry:
+// CHECK-NEXT:   %step.addr = alloca i32*, align 8
+// CHECK-NEXT:   store i32* %step, i32** %step.addr, align 8
+// CHECK-NEXT:   %0 = load i32, i32* %step, align 4
+// CHECK-NEXT:   ret i32 %0
+// CHECK-NEXT: }
+
+// CHECK: define internal i32 @compute_lb.16(i32* %ub)
+// CHECK: entry:
+// CHECK-NEXT:   %ub.addr = alloca i32*, align 8
+// CHECK-NEXT:   store i32* %ub, i32** %ub.addr, align 8
+// CHECK-NEXT:   %0 = load i32, i32* %ub, align 4
+// CHECK-NEXT:   ret i32 %0
+// CHECK-NEXT: }
+
+// CHECK: define internal i32 @compute_ub.17(i32* %lb)
+// CHECK: entry:
+// CHECK-NEXT:   %lb.addr = alloca i32*, align 8
+// CHECK-NEXT:   store i32* %lb, i32** %lb.addr, align 8
+// CHECK-NEXT:   %0 = load i32, i32* %lb, align 4
+// CHECK-NEXT:   ret i32 %0
+// CHECK-NEXT: }
+
+// CHECK: define internal i32 @compute_step.18(i32* %step)
+// CHECK: entry:
+// CHECK-NEXT:   %step.addr = alloca i32*, align 8
+// CHECK-NEXT:   store i32* %step, i32** %step.addr, align 8
+// CHECK-NEXT:   %0 = load i32, i32* %step, align 4
+// CHECK-NEXT:   %sub = sub i32 0, %0
+// CHECK-NEXT:   ret i32 %sub
+// CHECK-NEXT: }
+
+// CHECK: define internal i32 @compute_lb.19(i32* %ub)
+// CHECK: entry:
+// CHECK-NEXT:   %ub.addr = alloca i32*, align 8
+// CHECK-NEXT:   store i32* %ub, i32** %ub.addr, align 8
+// CHECK-NEXT:   %0 = load i32, i32* %ub, align 4
+// CHECK-NEXT:   ret i32 %0
+// CHECK-NEXT: }
+
+// CHECK: define internal i32 @compute_ub.20(i32* %lb)
+// CHECK: entry:
+// CHECK-NEXT:   %lb.addr = alloca i32*, align 8
+// CHECK-NEXT:   store i32* %lb, i32** %lb.addr, align 8
+// CHECK-NEXT:   %0 = load i32, i32* %lb, align 4
+// CHECK-NEXT:   ret i32 %0
+// CHECK-NEXT: }
+
+// CHECK: define internal i32 @compute_step.21(i32* %step)
+// CHECK: entry:
+// CHECK-NEXT:   %step.addr = alloca i32*, align 8
+// CHECK-NEXT:   store i32* %step, i32** %step.addr, align 8
+// CHECK-NEXT:   %0 = load i32, i32* %step, align 4
+// CHECK-NEXT:   %sub = sub i32 0, %0
+// CHECK-NEXT:   ret i32 %sub
+// CHECK-NEXT: }
 

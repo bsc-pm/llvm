@@ -1561,11 +1561,11 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
   }
 }
 
-void CGOmpSsRuntime::EmitWrapperCallBundle(
-    std::string Name, std::string FuncName,
+void CGOmpSsRuntime::BuildWrapperCallBundleList(
+    std::string FuncName,
     CodeGenFunction &CGF, const Expr *E, QualType Q,
     llvm::function_ref<void(CodeGenFunction &, Optional<llvm::Value *>)> Body,
-    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+    SmallVectorImpl<llvm::Value *> &List) {
 
   OSSExprInfoGathering CallVisitor(CGF);
   CallVisitor.Visit(E);
@@ -1585,7 +1585,6 @@ void CGOmpSsRuntime::EmitWrapperCallBundle(
     FuncName, "",
     Body);
 
-  SmallVector<llvm::Value *, 4> List;
   List.push_back(Func);
   for (const auto &p : CallVisitor.getInvolvedVarList()) {
     LValue LV = p.second;
@@ -1603,7 +1602,16 @@ void CGOmpSsRuntime::EmitWrapperCallBundle(
   if (CallVisitor.hasThis()) {
     List.push_back(CGF.LoadCXXThisAddress().getPointer());
   }
+}
 
+void CGOmpSsRuntime::EmitWrapperCallBundle(
+    std::string Name, std::string FuncName,
+    CodeGenFunction &CGF, const Expr *E, QualType Q,
+    llvm::function_ref<void(CodeGenFunction &, Optional<llvm::Value *>)> Body,
+    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+
+  SmallVector<llvm::Value *, 4> List;
+  BuildWrapperCallBundleList(FuncName, CGF, E, Q, Body, List);
   TaskInfo.emplace_back(Name, List);
 }
 
@@ -1620,7 +1628,6 @@ void CGOmpSsRuntime::EmitScalarWrapperCallBundle(
   };
   EmitWrapperCallBundle(
     Name, FuncName, CGF, E, E->getType(), Body, TaskInfo);
-
 }
 
 void CGOmpSsRuntime::EmitIgnoredWrapperCallBundle(
@@ -2375,15 +2382,17 @@ static void EmitLoopType(const OSSLoopDataTy &LoopData, CodeGenFunction &CGF,
   // LE → <=   → 1
   // GT → >    → 2
   // GE → >=   → 3
-  int IsLessOp = !*LoopData.TestIsLessOp * 2;
-  int IsStrictOp = !LoopData.TestIsStrictOp * 1;
-  int LoopCmp = IsLessOp + IsStrictOp;
-  List.push_back(llvm::ConstantInt::getSigned(CGF.Int64Ty, LoopCmp));
-  List.push_back(llvm::ConstantInt::getSigned(CGF.Int64Ty, LoopData.IndVar->getType()->isSignedIntegerOrEnumerationType()));
-  List.push_back(llvm::ConstantInt::getSigned(CGF.Int64Ty, LoopData.LB->getType()->isSignedIntegerOrEnumerationType()));
-  List.push_back(llvm::ConstantInt::getSigned(CGF.Int64Ty, LoopData.UB->getType()->isSignedIntegerOrEnumerationType()));
-  List.push_back(llvm::ConstantInt::getSigned(CGF.Int64Ty, LoopData.Step->getType()->isSignedIntegerOrEnumerationType()));
-  // TODO: missing step increment/decrement
+  for (unsigned i = 0; i < LoopData.NumCollapses; ++i) {
+    int IsLessOp = !*LoopData.TestIsLessOp [i]* 2;
+    int IsStrictOp = !LoopData.TestIsStrictOp [i]* 1;
+    int LoopCmp = IsLessOp + IsStrictOp;
+    List.push_back(llvm::ConstantInt::getSigned(CGF.Int64Ty, LoopCmp));
+    List.push_back(llvm::ConstantInt::getSigned(CGF.Int64Ty, LoopData.IndVar[i]->getType()->isSignedIntegerOrEnumerationType()));
+    List.push_back(llvm::ConstantInt::getSigned(CGF.Int64Ty, LoopData.LB[i]->getType()->isSignedIntegerOrEnumerationType()));
+    List.push_back(llvm::ConstantInt::getSigned(CGF.Int64Ty, LoopData.UB[i]->getType()->isSignedIntegerOrEnumerationType()));
+    List.push_back(llvm::ConstantInt::getSigned(CGF.Int64Ty, LoopData.Step[i]->getType()->isSignedIntegerOrEnumerationType()));
+    // TODO: missing step increment/decrement
+  }
   TaskInfo.emplace_back(getBundleStr(OSSB_loop_type), List);
 }
 
@@ -2533,16 +2542,49 @@ void CGOmpSsRuntime::EmitDirectiveData(
   }
 
   if (!LoopData.empty()) {
-    TaskInfo.emplace_back(getBundleStr(OSSB_loop_indvar), CGF.EmitLValue(LoopData.IndVar).getPointer(CGF));
-    llvm::Value *LB = CGF.EmitScalarExpr(LoopData.LB);
-    TaskInfo.emplace_back(getBundleStr(OSSB_loop_lowerbound), LB);
-    CapturedList.push_back(LB);
-    llvm::Value *UB = CGF.EmitScalarExpr(LoopData.UB);
-    TaskInfo.emplace_back(getBundleStr(OSSB_loop_upperbound), UB);
-    CapturedList.push_back(UB);
-    llvm::Value *Step = CGF.EmitScalarExpr(LoopData.Step);
-    TaskInfo.emplace_back(getBundleStr(OSSB_loop_step), Step);
-    CapturedList.push_back(Step);
+    SmallVector<llvm::Value *> IndVarList;
+    SmallVector<llvm::Value *> LBList;
+    SmallVector<llvm::Value *> UBList;
+    SmallVector<llvm::Value *> StepList;
+    SmallVector<llvm::Value *> LTypeList;
+    for (unsigned i = 0; i < LoopData.NumCollapses; ++i) {
+      IndVarList.push_back(CGF.EmitLValue(LoopData.IndVar[i]).getPointer(CGF));
+      {
+        auto Body = [&LoopData, i](CodeGenFunction &NewCGF, Optional<llvm::Value *>) {
+          llvm::Value *V = NewCGF.EmitScalarExpr(LoopData.LB[i]);
+
+          Address RetAddr = NewCGF.ReturnValue;
+          NewCGF.Builder.CreateStore(V, RetAddr);
+        };
+        BuildWrapperCallBundleList(
+          "compute_lb", CGF, LoopData.LB[i], LoopData.LB[i]->getType(), Body, LBList);
+      }
+      {
+        auto Body = [&LoopData, i](CodeGenFunction &NewCGF, Optional<llvm::Value *>) {
+          llvm::Value *V = NewCGF.EmitScalarExpr(LoopData.UB[i]);
+
+          Address RetAddr = NewCGF.ReturnValue;
+          NewCGF.Builder.CreateStore(V, RetAddr);
+        };
+        BuildWrapperCallBundleList(
+          "compute_ub", CGF, LoopData.UB[i], LoopData.UB[i]->getType(), Body, UBList);
+      }
+      {
+        auto Body = [&LoopData, i](CodeGenFunction &NewCGF, Optional<llvm::Value *>) {
+          llvm::Value *V = NewCGF.EmitScalarExpr(LoopData.Step[i]);
+
+          Address RetAddr = NewCGF.ReturnValue;
+          NewCGF.Builder.CreateStore(V, RetAddr);
+        };
+        BuildWrapperCallBundleList(
+          "compute_step", CGF, LoopData.Step[i], LoopData.Step[i]->getType(), Body, StepList);
+      }
+    }
+    TaskInfo.emplace_back(getBundleStr(OSSB_loop_indvar), IndVarList);
+    TaskInfo.emplace_back(getBundleStr(OSSB_loop_lowerbound), LBList);
+    TaskInfo.emplace_back(getBundleStr(OSSB_loop_upperbound), UBList);
+    TaskInfo.emplace_back(getBundleStr(OSSB_loop_step), StepList);
+
     if (LoopData.Chunksize) {
       llvm::Value *V = CGF.EmitScalarExpr(LoopData.Chunksize);
       CapturedList.push_back(V);
@@ -3000,7 +3042,18 @@ void CGOmpSsRuntime::emitLoopCall(CodeGenFunction &CGF,
   CodeGenFunction::LexicalScope ForScope(CGF, cast<ForStmt>(D.getAssociatedStmt())->getSourceRange());
 
   // Emit for-init before task entry
-  CGF.EmitStmt(cast<ForStmt>(D.getAssociatedStmt())->getInit());
+  const Stmt *Body = D.getAssociatedStmt();
+  for (size_t i = 0; i < D.getNumCollapses(); ++i) {
+    const ForStmt *For = cast<ForStmt>(Body);
+    CGF.EmitStmt(For->getInit());
+    Body = For->getBody();
+    if (i + 1 < D.getNumCollapses()) {
+      for (const Stmt *Child : Body->children()) {
+        if ((Body = dyn_cast<ForStmt>(Child)))
+          break;
+      }
+    }
+  }
 
   // Push Task Stack
   TaskStack.push_back(TaskContext());
@@ -3020,7 +3073,7 @@ void CGOmpSsRuntime::emitLoopCall(CodeGenFunction &CGF,
   // The point of exit cannot be a branch out of the structured block.
   // longjmp() and throw() must not violate the entry/exit criteria.
   CGF.EHStack.pushTerminate();
-  CGF.EmitStmt(cast<ForStmt>(D.getAssociatedStmt())->getBody());
+  CGF.EmitStmt(Body);
   CGF.EHStack.popTerminate();
 
   // TODO: do we need this? we're pushing a terminate...

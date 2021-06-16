@@ -80,8 +80,10 @@ private:
     OmpSsDirectiveKind Directive = OSSD_unknown;
     Scope *CurScope = nullptr;
     CXXThisExpr *ThisExpr = nullptr;
-    const ValueDecl *LoopICVDecl = nullptr;
-    const Expr *LoopICVExpr = nullptr;
+    SmallVector<const ValueDecl *, 2> LoopICVDecls;
+    SmallVector<const Expr *, 2> LoopICVExprs;
+    unsigned AssociatedLoops = 1;
+    unsigned SeenAssociatedLoops = 0;
     SourceLocation ConstructLoc;
     SharingMapTy(OmpSsDirectiveKind DKind,
                  Scope *CurScope, SourceLocation Loc)
@@ -162,12 +164,36 @@ public:
   CXXThisExpr *getThisExpr() const {
     return isStackEmpty() ? nullptr : Stack.back().ThisExpr;
   }
-  const ValueDecl *getCurrentLoopICVDecl() const {
-    return isStackEmpty() ? nullptr : Stack.back().LoopICVDecl;
+  ArrayRef<const ValueDecl *> getCurrentLoopICVDecls() const {
+    ArrayRef<const ValueDecl *> Ret;
+    if (!isStackEmpty())
+      Ret = Stack.back().LoopICVDecls;
+    return Ret;
   }
 
-  const Expr *getCurrentLoopICVExpr() const {
-    return isStackEmpty() ? nullptr : Stack.back().LoopICVExpr;
+  ArrayRef<const Expr *> getCurrentLoopICVExprs() const {
+    ArrayRef<const Expr *> Ret;
+    if (!isStackEmpty())
+      Ret = Stack.back().LoopICVExprs;
+    return Ret;
+  }
+
+  /// Set collapse value for the region.
+  void setAssociatedLoops(unsigned Val) {
+    Stack.back().AssociatedLoops = Val;
+  }
+  /// Return collapse value for region.
+  unsigned getAssociatedLoops() const {
+    return isStackEmpty() ? 0 : Stack.back().AssociatedLoops;
+  }
+
+  /// Set collapse value for the region.
+  void setSeenAssociatedLoops(unsigned Val) {
+    Stack.back().SeenAssociatedLoops = Val;
+  }
+  /// Return collapse value for region.
+  unsigned getSeenAssociatedLoops() const {
+    return isStackEmpty() ? 0 : Stack.back().SeenAssociatedLoops;
   }
 
   // Get the current scope. This is null when instantiating templates
@@ -278,9 +304,8 @@ void DSAStackTy::addDSA(const ValueDecl *D, const Expr *E, OmpSsClauseKind A,
 void DSAStackTy::addLoopControlVariable(const ValueDecl *D, const Expr *E) {
   D = getCanonicalDecl(D);
   assert(!isStackEmpty() && "Data-sharing attributes stack is empty");
-  assert(!Stack.back().LoopICVDecl && "This directive already has a loop control variable");
-  Stack.back().LoopICVDecl = D;
-  Stack.back().LoopICVExpr = E;
+  Stack.back().LoopICVDecls.push_back(D);
+  Stack.back().LoopICVExprs.push_back(E);
 }
 
 const DSAStackTy::DSAVarData DSAStackTy::getTopDSA(ValueDecl *D,
@@ -718,6 +743,7 @@ public:
       : Stack(S), SemaRef(SemaRef), ErrorFound(false) {}
 
 };
+
 } // namespace
 
 static VarDecl *buildVarDecl(Sema &SemaRef, SourceLocation Loc, QualType Type,
@@ -758,6 +784,12 @@ void Sema::DestroyDataSharingAttributesStackOmpSs() { delete DSAStack; }
 
 OmpSsDirectiveKind Sema::GetCurrentOmpSsDirective() const {
   return DSAStack->getCurrentDirective();
+}
+
+bool Sema::IsEndOfTaskloop() const {
+  unsigned AssociatedLoops = DSAStack->getAssociatedLoops();
+  unsigned SeenAssociatedLoops = DSAStack->getSeenAssociatedLoops();
+  return AssociatedLoops == SeenAssociatedLoops;
 }
 
 void Sema::StartOmpSsDSABlock(OmpSsDirectiveKind DKind,
@@ -1347,20 +1379,8 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
   if (AStmt && !CurContext->isDependentContext()) {
     // Check default data sharing attributes for referenced variables.
     DSAAttrChecker DSAChecker(DSAStack, *this);
-    Stmt *S = AStmt;
 
-    if (isOmpSsLoopDirective(Kind)) {
-      auto *For = dyn_cast_or_null<ForStmt>(AStmt);
-      if (!For) {
-        Diag(AStmt->getBeginLoc(), diag::err_oss_not_for)
-          << getOmpSsDirectiveName(Kind);
-        return StmtError();
-      }
-      assert((For && For->getBody()) && "No loop body.");
-      S = For->getBody();
-    }
-
-    DSAChecker.Visit(S);
+    DSAChecker.Visit(AStmt);
     if (DSAChecker.isErrorFound())
       ErrorFound = true;
 
@@ -1502,9 +1522,6 @@ class OmpSsIterationSpaceChecker {
   /// Checks if the provide statement depends on the loop counter.
   // true if depends on the loop counter
   bool doesDependOnLoopCounter(const Stmt *S, bool IsInitializer);
-  /// Original condition required for checking of the exit condition for
-  /// non-rectangular loop.
-  Expr *Condition = nullptr;
 
 public:
   OmpSsIterationSpaceChecker(Sema &SemaRef, DSAStackTy &Stack,
@@ -1675,13 +1692,16 @@ class LoopCounterRefChecker final
   DSAStackTy &Stack;
   const ValueDecl *CurLCDecl = nullptr;
   bool IsInitializer = true;
+  bool EmitDiags = true;
   bool checkDecl(const Expr *E, const ValueDecl *VD) {
     if (getCanonicalDecl(VD) == getCanonicalDecl(CurLCDecl)) {
-      SemaRef.Diag(E->getExprLoc(), diag::err_oss_stmt_depends_on_loop_counter)
-          << (IsInitializer ? 0 : 1);
-      return false;
+      if (EmitDiags) {
+        SemaRef.Diag(E->getExprLoc(), diag::err_oss_stmt_depends_on_loop_counter)
+            << (IsInitializer ? 0 : 1);
+      }
+      return true;
     }
-    return true;
+    return false;
   }
 
 public:
@@ -1705,10 +1725,11 @@ public:
       Res = (Child && Visit(Child)) || Res;
     return Res;
   }
-  explicit LoopCounterRefChecker(Sema &SemaRef, DSAStackTy &Stack,
-                                 const ValueDecl *CurLCDecl, bool IsInitializer)
+  explicit LoopCounterRefChecker(
+    Sema &SemaRef, DSAStackTy &Stack,
+    const ValueDecl *CurLCDecl, bool IsInitializer, bool EmitDiags)
       : SemaRef(SemaRef), Stack(Stack), CurLCDecl(CurLCDecl),
-        IsInitializer(IsInitializer) {}
+        IsInitializer(IsInitializer), EmitDiags(EmitDiags) {}
 };
 } // namespace
 
@@ -1716,8 +1737,9 @@ bool
 OmpSsIterationSpaceChecker::doesDependOnLoopCounter(const Stmt *S,
                                                      bool IsInitializer) {
   // Check for the non-rectangular loops.
-  LoopCounterRefChecker LoopStmtChecker(SemaRef, Stack, LCDecl, IsInitializer);
-  return !LoopStmtChecker.Visit(S);
+  LoopCounterRefChecker LoopStmtChecker(
+    SemaRef, Stack, LCDecl, IsInitializer, /*EmitDiags=*/true);
+  return LoopStmtChecker.Visit(S);
 }
 
 bool OmpSsIterationSpaceChecker::checkAndSetInit(Stmt *S, bool EmitDiags) {
@@ -1831,7 +1853,6 @@ bool OmpSsIterationSpaceChecker::checkAndSetCond(Expr *S) {
         << LCDecl;
     return true;
   }
-  Condition = S;
   S = getExprAsWritten(S);
   SourceLocation CondLoc = S->getBeginLoc();
   if (auto *BO = dyn_cast<BinaryOperator>(S)) {
@@ -2002,8 +2023,10 @@ void Sema::ActOnOmpSsLoopInitialization(SourceLocation ForLoc, Stmt *Init) {
   assert(Init && "Expected loop in canonical form.");
 
   OmpSsDirectiveKind DKind = DSAStack->getCurrentDirective();
-
-  if (isOmpSsLoopDirective(DKind) && !DSAStack->getCurrentLoopICVDecl()) {
+  unsigned AssociatedLoops = DSAStack->getAssociatedLoops();
+  unsigned SeenAssociatedLoops = DSAStack->getSeenAssociatedLoops();
+  if (AssociatedLoops > SeenAssociatedLoops &&
+      isOmpSsLoopDirective(DKind)) {
     OmpSsIterationSpaceChecker ISC(*this, *DSAStack, ForLoc);
     if (!ISC.checkAndSetInit(Init, /*EmitDiags=*/false)) {
       if (ValueDecl *D = ISC.getLoopDecl()) {
@@ -2026,54 +2049,215 @@ void Sema::ActOnOmpSsLoopInitialization(SourceLocation ForLoc, Stmt *Init) {
         }
       }
     }
+    DSAStack->setSeenAssociatedLoops(SeenAssociatedLoops + 1);
   }
 }
+
+namespace {
+class OSSDepOnTriangularCollapse final : public StmtVisitor<OSSDepOnTriangularCollapse, void> {
+  Sema &SemaRef;
+  DSAStackTy *Stack;
+  ArrayRef<OSSLoopDirective::HelperExprs> B;
+  bool ErrorFound = false;
+  bool IsNonRectangular = false;
+public:
+
+  void VisitOSSMultiDepExpr(OSSMultiDepExpr *E) {
+    Visit(E->getDepExpr());
+
+    for (size_t i = 0; i < E->getDepInits().size(); ++i) {
+      Visit(E->getDepInits()[i]);
+      if (E->getDepSizes()[i])
+        Visit(E->getDepSizes()[i]);
+      if (E->getDepSteps()[i])
+        Visit(E->getDepSteps()[i]);
+    }
+  }
+
+  void VisitOSSArrayShapingExpr(OSSArrayShapingExpr *E) {
+    Visit(E->getBase());
+
+    for (Expr *S : E->getShapes())
+      Visit(S);
+  }
+
+  void VisitOSSArraySectionExpr(OSSArraySectionExpr *E) {
+    Visit(E->getBase());
+
+    if (E->getLowerBound())
+      Visit(E->getLowerBound());
+    if (E->getLengthUpper())
+      Visit(E->getLengthUpper());
+  }
+
+  void VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
+    Visit(E->getBase());
+    Visit(E->getIdx());
+  }
+
+  void VisitUnaryOperator(UnaryOperator *E) {
+    Visit(E->getSubExpr());
+  }
+
+  void VisitMemberExpr(MemberExpr *E) {
+    Visit(E->getBase());
+  }
+
+  void VisitDeclRefExpr(DeclRefExpr *E) {
+    if (E->isTypeDependent() || E->isValueDependent() ||
+        E->containsUnexpandedParameterPack() || E->isInstantiationDependent())
+      return;
+    if (E->isNonOdrUse() == NOUR_Unevaluated)
+      return;
+    if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
+      VD = VD->getCanonicalDecl();
+
+      for (size_t i = 0; i < B.size(); ++i) {
+        ValueDecl *IndVarVD = cast<DeclRefExpr>(B[i].IndVar)->getDecl();
+        if (IsNonRectangular && VD == IndVarVD) {
+          SemaRef.Diag(E->getBeginLoc(), diag::err_oss_nonrectangular_loop_iter_dep);
+          ErrorFound = true;
+        }
+      }
+    }
+  }
+
+  void VisitClause(OSSClause *Clause) {
+    for (Stmt *Child : Clause->children()) {
+      if (Child)
+        Visit(Child);
+    }
+  }
+
+  void VisitStmt(Stmt *S) {
+    for (Stmt *C : S->children()) {
+      if (C)
+        Visit(C);
+    }
+  }
+
+  bool isErrorFound() const { return ErrorFound; }
+
+  OSSDepOnTriangularCollapse(Sema &SemaRef, DSAStackTy *S, const SmallVectorImpl<OSSLoopDirective::HelperExprs> &B)
+      : SemaRef(SemaRef), Stack(S), B(B), ErrorFound(false) {
+
+    for (size_t i = 1; i < B.size(); ++i) {
+      for (size_t j = 0; j < i; ++j) {
+        ValueDecl *VD = cast<DeclRefExpr>(B[j].IndVar)->getDecl();
+        if (LoopCounterRefChecker(
+            SemaRef, *Stack, VD, /*IsInitializer=*/true, /*EmitDiags=*/false).Visit(B[i].LB)) {
+          IsNonRectangular = true;
+          return;
+        }
+        if (LoopCounterRefChecker(
+            SemaRef, *Stack, VD, /*IsInitializer=*/true, /*EmitDiags=*/false).Visit(B[i].UB)) {
+          IsNonRectangular = true;
+          return;
+        }
+        if (LoopCounterRefChecker(
+            SemaRef, *Stack, VD, /*IsInitializer=*/true, /*EmitDiags=*/false).Visit(B[i].Step)) {
+          // TODO: error here. it is not valid
+        }
+      }
+    }
+  }
+
+};
+} // namespace
 
 static bool checkOmpSsLoop(
     OmpSsDirectiveKind DKind, Stmt *AStmt,
     Sema &SemaRef, DSAStackTy &Stack,
-    OSSLoopDirective::HelperExprs &B) {
+    SmallVectorImpl<OSSLoopDirective::HelperExprs> &B) {
+
+  bool HasErrors = false;
+  bool IsDependent = false;
+
+  QualType LoopTy;
 
   // OmpSs [2.9.1, Canonical Loop Form]
   //   for (init-expr; test-expr; incr-expr) structured-block
-  auto *For = cast<ForStmt>(AStmt);
-  OmpSsIterationSpaceChecker ISC(SemaRef, Stack, For->getForLoc());
+  auto *For = dyn_cast_or_null<ForStmt>(AStmt);
+  unsigned TotalLoops = Stack.getAssociatedLoops();
+  for (unsigned i = 0; i < TotalLoops; ++i) {
+    if (!For) {
+      SemaRef.Diag(AStmt->getBeginLoc(), diag::err_oss_not_for)
+          << (TotalLoops != 1) << getOmpSsDirectiveName(DKind)
+          << TotalLoops << i;
+      return true;
+    }
+    // Perfect nesting check.
+    //   More than one child and one of them is not a ForStmt
+    if (i + 1 < TotalLoops) {
+      const Stmt *NotFor = nullptr;
+      int j = 0;
+      for (const Stmt *Child  : For->getBody()->children()) {
+        if (!NotFor && !isa<ForStmt>(Child)) {
+          NotFor = Child;
+        }
+        ++j;
+      }
+      if (NotFor && j > 1) {
+        SemaRef.Diag(NotFor->getBeginLoc(), diag::err_oss_perfect_for_nesting);
+        return true;
+      }
+    }
+    OmpSsIterationSpaceChecker ISC(SemaRef, Stack, For->getForLoc());
 
-  // Check init.
-  Stmt *Init = For->getInit();
-  if (ISC.checkAndSetInit(Init))
-    return true;
+    // Check init.
+    Stmt *Init = For->getInit();
+    if (ISC.checkAndSetInit(Init))
+      return true;
 
-  bool HasErrors = false;
+    // Check loop variable's type.
+    if (ValueDecl *LCDecl = ISC.getLoopDecl()) {
+      // OmpSs [2.6, Canonical Loop Form]
+      // Var is one of the following:
+      //   A variable of signed or unsigned integer type.
+      QualType VarType = LCDecl->getType().getNonReferenceType();
+      if (!VarType->isDependentType() && !VarType->isIntegerType()) {
+        SemaRef.Diag(Init->getBeginLoc(), diag::err_oss_loop_variable_type);
+        HasErrors = true;
+      }
 
-  // Check loop variable's type.
-  if (ValueDecl *LCDecl = ISC.getLoopDecl()) {
-    // OmpSs [2.6, Canonical Loop Form]
-    // Var is one of the following:
-    //   A variable of signed or unsigned integer type.
-    QualType VarType = LCDecl->getType().getNonReferenceType();
-    if (!VarType->isDependentType() && !VarType->isIntegerType()) {
-      SemaRef.Diag(Init->getBeginLoc(), diag::err_oss_loop_variable_type);
-      HasErrors = true;
+      if (!LCDecl->getType()->isDependentType()) {
+        if (LoopTy.isNull()) {
+          LoopTy = LCDecl->getType().getCanonicalType();
+        } else if (i > 0 && LoopTy != LCDecl->getType().getCanonicalType()) {
+          SemaRef.Diag(LCDecl->getBeginLoc(), diag::err_oss_collapse_same_loop_type)
+            << LoopTy << LCDecl->getType().getCanonicalType();
+          HasErrors = true;
+        }
+      }
+
+      // Check test-expr.
+      HasErrors |= ISC.checkAndSetCond(For->getCond());
+
+      // Check incr-expr.
+      HasErrors |= ISC.checkAndSetInc(For->getInc());
     }
 
-    // Check test-expr.
-    HasErrors |= ISC.checkAndSetCond(For->getCond());
+    B[i].IndVar = ISC.getLoopDeclRefExpr();
+    B[i].LB = ISC.getLoopLowerBoundExpr();
+    B[i].UB = ISC.getLoopUpperBoundExpr();
+    B[i].Step = ISC.getLoopStepExpr();
+    B[i].TestIsLessOp = ISC.getLoopIsLessOp();
+    B[i].TestIsStrictOp = ISC.getLoopIsStrictOp();
 
-    // Check incr-expr.
-    HasErrors |= ISC.checkAndSetInc(For->getInc());
+    if (ISC.dependent() || SemaRef.CurContext->isDependentContext())
+      IsDependent = true;
+
+    // Try to find the next For
+    ForStmt *TmpFor = For;
+    For = nullptr;
+    for (Stmt *Child : TmpFor->getBody()->children()) {
+      if ((For = dyn_cast_or_null<ForStmt>(Child)))
+        break;
+    }
   }
 
-  B.IndVar = ISC.getLoopDeclRefExpr();
-  B.LB = ISC.getLoopLowerBoundExpr();
-  B.UB = ISC.getLoopUpperBoundExpr();
-  B.Step = ISC.getLoopStepExpr();
-  B.TestIsLessOp = ISC.getLoopIsLessOp();
-  B.TestIsStrictOp = ISC.getLoopIsStrictOp();
-
-  if (ISC.dependent() || SemaRef.CurContext->isDependentContext() || HasErrors)
+  if (IsDependent || HasErrors)
     return HasErrors;
-
   return false;
 }
 
@@ -2082,9 +2266,10 @@ StmtResult Sema::ActOnOmpSsTaskForDirective(
     SourceLocation StartLoc, SourceLocation EndLoc) {
   if (!AStmt)
     return StmtError();
-  OSSLoopDirective::HelperExprs B;
+  SmallVector<OSSLoopDirective::HelperExprs> B(DSAStack->getAssociatedLoops());
   if (checkOmpSsLoop(OSSD_task_for, AStmt, *this, *DSAStack, B))
     return StmtError();
+
   return OSSTaskForDirective::Create(Context, StartLoc, EndLoc, Clauses, AStmt, B);
 }
 
@@ -2093,9 +2278,19 @@ StmtResult Sema::ActOnOmpSsTaskLoopDirective(
     SourceLocation StartLoc, SourceLocation EndLoc) {
   if (!AStmt)
     return StmtError();
-  OSSLoopDirective::HelperExprs B;
+  SmallVector<OSSLoopDirective::HelperExprs> B(DSAStack->getAssociatedLoops());
   if (checkOmpSsLoop(OSSD_taskloop, AStmt, *this, *DSAStack, B))
     return StmtError();
+
+  OSSDepOnTriangularCollapse OSSDepOnCollapse(*this, DSAStack, B);
+  for (auto *Clause : Clauses) {
+    if (isa<OSSDependClause>(Clause) || isa<OSSReductionClause>(Clause)) {
+      OSSDepOnCollapse.VisitClause(Clause);
+    }
+    if (OSSDepOnCollapse.isErrorFound())
+      return StmtError();
+  }
+
   return OSSTaskLoopDirective::Create(Context, StartLoc, EndLoc, Clauses, AStmt, B);
 }
 
@@ -2104,9 +2299,19 @@ StmtResult Sema::ActOnOmpSsTaskLoopForDirective(
     SourceLocation StartLoc, SourceLocation EndLoc) {
   if (!AStmt)
     return StmtError();
-  OSSLoopDirective::HelperExprs B;
+  SmallVector<OSSLoopDirective::HelperExprs> B(DSAStack->getAssociatedLoops());
   if (checkOmpSsLoop(OSSD_taskloop_for, AStmt, *this, *DSAStack, B))
     return StmtError();
+
+  OSSDepOnTriangularCollapse OSSDepOnCollapse(*this, DSAStack, B);
+  for (auto *Clause : Clauses) {
+    if (isa<OSSDependClause>(Clause) || isa<OSSReductionClause>(Clause)) {
+      OSSDepOnCollapse.VisitClause(Clause);
+    }
+    if (OSSDepOnCollapse.isErrorFound())
+      return StmtError();
+  }
+
   return OSSTaskLoopForDirective::Create(Context, StartLoc, EndLoc, Clauses, AStmt, B);
 }
 
@@ -3791,6 +3996,32 @@ ExprResult Sema::CheckIsConstCharPtrConvertibleExpr(Expr *E) {
   return E;
 }
 
+ExprResult Sema::VerifyPositiveIntegerConstant(
+    Expr *E, OmpSsClauseKind CKind, bool StrictlyPositive) {
+  if (!E)
+    return ExprError();
+  if (E->isValueDependent() || E->isTypeDependent() ||
+      E->isInstantiationDependent() || E->containsUnexpandedParameterPack())
+    return E;
+  llvm::APSInt Result;
+  ExprResult ICE =
+      VerifyIntegerConstantExpression(E, &Result, /*FIXME*/ AllowFold);
+  if (ICE.isInvalid())
+    return ExprError();
+  if ((StrictlyPositive && !Result.isStrictlyPositive()) ||
+      (!StrictlyPositive && !Result.isNonNegative())) {
+    Diag(E->getExprLoc(), diag::err_oss_negative_expression_in_clause)
+        << getOmpSsClauseName(CKind) << (StrictlyPositive ? 1 : 0)
+        << E->getSourceRange();
+    return ExprError();
+  }
+  if (CKind == OSSC_collapse && DSAStack->getAssociatedLoops() == 1) {
+    DSAStack->setAssociatedLoops(Result.getExtValue());
+    DSAStack->setSeenAssociatedLoops(0);
+  }
+  return ICE;
+}
+
 OSSClause *Sema::ActOnOmpSsIfClause(Expr *Condition,
                                     SourceLocation StartLoc,
                                     SourceLocation LParenLoc,
@@ -3901,6 +4132,19 @@ OSSClause *Sema::ActOnOmpSsGrainsizeClause(
   return new (Context) OSSGrainsizeClause(Res.get(), StartLoc, LParenLoc, EndLoc);
 }
 
+OSSClause *Sema::ActOnOmpSsCollapseClause(
+    Expr *E, SourceLocation StartLoc,
+    SourceLocation LParenLoc, SourceLocation EndLoc) {
+  // The parameter of the collapse clause must be a constant
+  // positive integer expression.
+  ExprResult NumForLoopsResult =
+      VerifyPositiveIntegerConstant(E, OSSC_collapse, /*StrictlyPositive=*/true);
+  if (NumForLoopsResult.isInvalid())
+    return nullptr;
+  return new (Context)
+      OSSCollapseClause(NumForLoopsResult.get(), StartLoc, LParenLoc, EndLoc);
+}
+
 OSSClause *Sema::ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind, Expr *Expr,
                                             SourceLocation StartLoc,
                                             SourceLocation LParenLoc,
@@ -3930,6 +4174,9 @@ OSSClause *Sema::ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind, Expr *Expr,
     break;
   case OSSC_grainsize:
     Res = ActOnOmpSsGrainsizeClause(Expr, StartLoc, LParenLoc, EndLoc);
+    break;
+  case OSSC_collapse:
+    Res = ActOnOmpSsCollapseClause(Expr, StartLoc, LParenLoc, EndLoc);
     break;
   default:
     llvm_unreachable("Clause is not allowed.");

@@ -118,14 +118,15 @@ struct OSSTaskDataTy final {
 };
 
 struct OSSLoopDataTy final {
-  const Expr *IndVar = nullptr;
-  const Expr *LB = nullptr;
-  const Expr *UB = nullptr;
-  const Expr *Step = nullptr;
+  Expr *const *IndVar = nullptr;
+  Expr *const *LB = nullptr;
+  Expr *const *UB = nullptr;
+  Expr *const *Step = nullptr;
   const Expr *Chunksize = nullptr;
   const Expr *Grainsize = nullptr;
-  llvm::Optional<bool> TestIsLessOp;
-  bool TestIsStrictOp;
+  unsigned NumCollapses;
+  llvm::Optional<bool> *TestIsLessOp;
+  bool *TestIsStrictOp;
   bool empty() const {
     return !IndVar &&
           !LB && !UB && !Step;
@@ -172,7 +173,15 @@ private:
   // List of OmpSs-2 specific metadata to be added to llvm.module.flags
   SmallVector<llvm::Metadata *, 4> MetadataList;
 
-  // This is used by cost/priority/onready clauses to build a bundle with the form
+  // List of the with the form
+  // (func_ptr, arg0, arg1... argN)
+  void BuildWrapperCallBundleList(
+    std::string FuncName,
+    CodeGenFunction &CGF, const Expr *E, QualType Q,
+    llvm::function_ref<void(CodeGenFunction &, Optional<llvm::Value *>)> Body,
+    SmallVectorImpl<llvm::Value *> &List);
+
+  // Builds a bundle of the with the form
   // (func_ptr, arg0, arg1... argN)
   void EmitWrapperCallBundle(
     std::string Name, std::string FuncName,
@@ -180,7 +189,7 @@ private:
     llvm::function_ref<void(CodeGenFunction &, Optional<llvm::Value *>)> Body,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
 
-  // This is used by cost/priority clauses to build a bundle with the form
+  // This is used by cost/priority/onready clauses to build a bundle with the form
   // (func_ptr, arg0, arg1... argN)
   void EmitScalarWrapperCallBundle(
     std::string Name, std::string FuncName,

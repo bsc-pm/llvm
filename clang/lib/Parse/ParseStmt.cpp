@@ -2074,22 +2074,30 @@ StmtResult Parser::ParseForStatement(SourceLocation *TrailingElseLoc) {
         // Gather InductionVar if we are a loop clause
         Actions.ActOnOmpSsLoopInitialization(ForLoc, FirstPart.get());
         // In nested loops we only have to parse clauses when there're late tokens
-        if (isOmpSsTaskLoopDirective(DKind) && !OSSLateParsedToks.empty()) {
-          // Parse late clause tokens
-          OSSFNContextRAII FnContext(*this, DG);
-          PP.EnterToken(Tok, /*IsReinject*/ true);
-          PP.EnterTokenStream(OSSLateParsedToks, /*DisableMacroExpansion=*/true,
-                              /*IsReinject*/ true);
+        if (isOmpSsTaskLoopDirective(DKind) && Actions.IsEndOfTaskloop()) {
+          if (!OSSLateParsedToks.empty()) {
+            // Parse late clause tokens
+            OSSFNContextRAII FnContext(*this, DG);
+            PP.EnterToken(Tok, /*IsReinject*/ true);
+            PP.EnterTokenStream(OSSLateParsedToks, /*DisableMacroExpansion=*/true,
+                                /*IsReinject*/ true);
 
-          // Consume the previously pushed token.
-          ConsumeAnyToken(/*ConsumeCodeCompletionTok=*/true);
-          ConsumeAnyToken(/*ConsumeCodeCompletionTok=*/true);
+            // Consume the previously pushed token.
+            ConsumeAnyToken(/*ConsumeCodeCompletionTok=*/true);
+            ConsumeAnyToken(/*ConsumeCodeCompletionTok=*/true);
 
-          SourceLocation EndLoc;
-          StackClauses.back() = ParseOmpSsClauses(DKind, EndLoc);
+            SourceLocation EndLoc;
+            StackClauses.back() = ParseOmpSsClauses(DKind, EndLoc);
+            OSSLateParsedToks.clear();
+          }
         }
+        // else {
+        //   We're in a taskloop but we have not reached the innermost loop, do nothing
+        // }
+      } else {
+        // Not usable loop, clear
+        OSSLateParsedToks.clear();
       }
-      OSSLateParsedToks.clear();
     }
   }
 

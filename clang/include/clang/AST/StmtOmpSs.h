@@ -386,18 +386,20 @@ class OSSLoopDirective : public OSSExecutableDirective {
   /// \param NumClauses Number of clauses.
   ///
   /// The Induction variable of the loop directive
-  Expr *IndVarExpr;
+  Expr **IndVarExpr;
   /// The lower bound of the loop directive
-  Expr *LowerBoundExpr;
+  Expr **LowerBoundExpr;
   /// The upper bound of the loop directive
-  Expr *UpperBoundExpr;
+  Expr **UpperBoundExpr;
   /// The step of the loop directive
-  Expr *StepExpr;
+  Expr **StepExpr;
   /// The type of comparison used in the loop (<, <=, >=, >)
   /// NOTE: optional is used to handle the != eventually
-  llvm::Optional<bool> TestIsLessOp;
+  llvm::Optional<bool>* TestIsLessOp;
   /// The type of comparison is strict (<, >)
-  bool TestIsStrictOp;
+  bool* TestIsStrictOp;
+  /// The number of collapsed loops
+  unsigned NumCollapses;
 protected:
   /// Build instance of loop directive of class \a Kind.
   ///
@@ -410,42 +412,43 @@ protected:
   template <typename T>
   OSSLoopDirective(const T *That, StmtClass SC, OmpSsDirectiveKind Kind,
                    SourceLocation StartLoc, SourceLocation EndLoc,
-                   unsigned NumClauses)
-      : OSSExecutableDirective(That, SC, Kind, StartLoc, EndLoc, NumClauses, 1)
+                   unsigned NumClauses, unsigned NumCollapses)
+      : OSSExecutableDirective(That, SC, Kind, StartLoc, EndLoc, NumClauses, 1),
+        NumCollapses(NumCollapses)
         {}
 
   /// Sets the iteration variable used in the loop.
   ///
   /// \param IV The induction variable expression.
   ///
-  void setIterationVariable(Expr *IV) { IndVarExpr = IV; }
+  void setIterationVariable(Expr **IV) { IndVarExpr = IV; }
   /// Sets the lower bound used in the loop.
   ///
   /// \param LB The lower bound expression.
   ///
-  void setLowerBound(Expr *LB) { LowerBoundExpr = LB; }
+  void setLowerBound(Expr **LB) { LowerBoundExpr = LB; }
   /// Sets the upper bound used in the loop.
   ///
   /// \param UB The upper bound expression.
   ///
-  void setUpperBound(Expr *LB) { UpperBoundExpr = LB; }
+  void setUpperBound(Expr **LB) { UpperBoundExpr = LB; }
   /// Sets the step used in the loop.
   ///
   /// \param Step The step expression.
   ///
-  void setStep(Expr *Step) { StepExpr = Step; }
+  void setStep(Expr **Step) { StepExpr = Step; }
   /// Sets the loop comparison type.
   ///
   /// \param IsLessOp True if is < or <=. false otherwise
   ///
-  void setIsLessOp(llvm::Optional<bool> IsLessOp) {
+  void setIsLessOp(llvm::Optional<bool> *IsLessOp) {
     TestIsLessOp = IsLessOp;
   }
   /// Sets if the loop comparison type is strict.
   ///
   /// \param IsStrict True < or >. false otherwise
   ///
-  void setIsStrictOp(bool IsStrictOp) { TestIsStrictOp = IsStrictOp; }
+  void setIsStrictOp(bool *IsStrictOp) { TestIsStrictOp = IsStrictOp; }
 
 public:
   struct HelperExprs {
@@ -458,17 +461,19 @@ public:
   };
 
   /// Returns the induction variable expression of the loop.
-  Expr *getIterationVariable() const { return IndVarExpr; }
+  Expr **getIterationVariable() const { return IndVarExpr; }
   /// Returns the lower bound expression of the loop.
-  Expr *getLowerBound() const { return LowerBoundExpr; }
+  Expr **getLowerBound() const { return LowerBoundExpr; }
   /// Returns the upper bound expression of the loop.
-  Expr *getUpperBound() const { return UpperBoundExpr; }
+  Expr **getUpperBound() const { return UpperBoundExpr; }
   /// Returns the step expression of the loop.
-  Expr *getStep() const { return StepExpr; }
+  Expr **getStep() const { return StepExpr; }
   /// Returns True is the loop comparison type is < or <=.
-  llvm::Optional<bool> getIsLessOp() const { return TestIsLessOp; }
+  llvm::Optional<bool> *getIsLessOp() const { return TestIsLessOp; }
   /// Returns True is the loop comparison type is < or >.
-  bool getIsStrictOp() const { return TestIsStrictOp; }
+  bool *getIsStrictOp() const { return TestIsStrictOp; }
+
+  unsigned getNumCollapses() const { return NumCollapses; }
 
   static bool classof(const Stmt *T) {
     return T->getStmtClass() == OSSTaskForDirectiveClass ||
@@ -485,9 +490,10 @@ class OSSTaskForDirective : public OSSLoopDirective {
   /// \param EndLoc Ending location of the directive.
   /// \param NumClauses Number of clauses.
   ///
-  OSSTaskForDirective(SourceLocation StartLoc, SourceLocation EndLoc, unsigned NumClauses)
+  OSSTaskForDirective(SourceLocation StartLoc, SourceLocation EndLoc, unsigned NumClauses,
+                      unsigned NumCollapses)
       : OSSLoopDirective(this, OSSTaskForDirectiveClass, OSSD_task_for,
-                         StartLoc, EndLoc, NumClauses) {}
+                         StartLoc, EndLoc, NumClauses, NumCollapses) {}
 
   /// Build an empty directive.
   ///
@@ -495,7 +501,7 @@ class OSSTaskForDirective : public OSSLoopDirective {
   ///
   explicit OSSTaskForDirective(unsigned NumClauses)
       : OSSLoopDirective(this, OSSTaskForDirectiveClass, OSSD_task_for,
-                         SourceLocation(), SourceLocation(), NumClauses) {}
+                         SourceLocation(), SourceLocation(), NumClauses, 0) {}
 
 public:
   /// Creates directive with a list of \a Clauses.
@@ -511,7 +517,7 @@ public:
                                   SourceLocation EndLoc,
                                   ArrayRef<OSSClause *> Clauses,
                                   Stmt *AStmt,
-                                  const HelperExprs &Exprs);
+                                  const SmallVectorImpl<HelperExprs> &Exprs);
 
   /// Creates an empty directive with the place for \a NumClauses
   /// clauses.
@@ -535,9 +541,10 @@ class OSSTaskLoopDirective : public OSSLoopDirective {
   /// \param EndLoc Ending location of the directive.
   /// \param NumClauses Number of clauses.
   ///
-  OSSTaskLoopDirective(SourceLocation StartLoc, SourceLocation EndLoc, unsigned NumClauses)
+  OSSTaskLoopDirective(SourceLocation StartLoc, SourceLocation EndLoc, unsigned NumClauses,
+                       unsigned NumCollapses)
       : OSSLoopDirective(this, OSSTaskLoopDirectiveClass, OSSD_taskloop,
-                         StartLoc, EndLoc, NumClauses) {}
+                         StartLoc, EndLoc, NumClauses, NumCollapses) {}
 
   /// Build an empty directive.
   ///
@@ -545,7 +552,7 @@ class OSSTaskLoopDirective : public OSSLoopDirective {
   ///
   explicit OSSTaskLoopDirective(unsigned NumClauses)
       : OSSLoopDirective(this, OSSTaskLoopDirectiveClass, OSSD_taskloop,
-                         SourceLocation(), SourceLocation(), NumClauses) {}
+                         SourceLocation(), SourceLocation(), NumClauses, 0) {}
 
 public:
   /// Creates directive with a list of \a Clauses.
@@ -561,7 +568,7 @@ public:
                                   SourceLocation EndLoc,
                                   ArrayRef<OSSClause *> Clauses,
                                   Stmt *AStmt,
-                                  const HelperExprs &Exprs);
+                                  const SmallVectorImpl<HelperExprs> &Exprs);
 
   /// Creates an empty directive with the place for \a NumClauses
   /// clauses.
@@ -585,9 +592,10 @@ class OSSTaskLoopForDirective : public OSSLoopDirective {
   /// \param EndLoc Ending location of the directive.
   /// \param NumClauses Number of clauses.
   ///
-  OSSTaskLoopForDirective(SourceLocation StartLoc, SourceLocation EndLoc, unsigned NumClauses)
+  OSSTaskLoopForDirective(SourceLocation StartLoc, SourceLocation EndLoc, unsigned NumClauses,
+                          unsigned NumCollapses)
       : OSSLoopDirective(this, OSSTaskLoopForDirectiveClass, OSSD_taskloop_for,
-                         StartLoc, EndLoc, NumClauses) {}
+                         StartLoc, EndLoc, NumClauses, NumCollapses) {}
 
   /// Build an empty directive.
   ///
@@ -595,7 +603,7 @@ class OSSTaskLoopForDirective : public OSSLoopDirective {
   ///
   explicit OSSTaskLoopForDirective(unsigned NumClauses)
       : OSSLoopDirective(this, OSSTaskLoopForDirectiveClass, OSSD_taskloop_for,
-                         SourceLocation(), SourceLocation(), NumClauses) {}
+                         SourceLocation(), SourceLocation(), NumClauses, 0) {}
 
 public:
   /// Creates directive with a list of \a Clauses.
@@ -611,7 +619,7 @@ public:
                                   SourceLocation EndLoc,
                                   ArrayRef<OSSClause *> Clauses,
                                   Stmt *AStmt,
-                                  const HelperExprs &Exprs);
+                                  const SmallVectorImpl<HelperExprs> &Exprs);
 
   /// Creates an empty directive with the place for \a NumClauses
   /// clauses.

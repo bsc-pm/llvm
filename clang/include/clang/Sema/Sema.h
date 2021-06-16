@@ -11364,7 +11364,12 @@ public:
   CheckSignedIntegerValue(Expr *ValExpr);
   ExprResult
   CheckIsConstCharPtrConvertibleExpr(Expr *E);
+  ExprResult
+  VerifyPositiveIntegerConstant(Expr *E,
+                                OmpSsClauseKind CKind,
+                                bool StrictlyPositive);
   OmpSsDirectiveKind GetCurrentOmpSsDirective() const;
+  bool IsEndOfTaskloop() const;
   /// Called on start of new data sharing attribute block.
   void StartOmpSsDSABlock(OmpSsDirectiveKind K,
                           Scope *CurScope,
@@ -11585,6 +11590,11 @@ public:
   OSSClause *ActOnOmpSsGrainsizeClause(Expr *E, SourceLocation StartLoc,
                                        SourceLocation LParenLoc,
                                        SourceLocation EndLoc);
+
+  /// Called on well-formed 'collapse' clause.
+  OSSClause *ActOnOmpSsCollapseClause(Expr *E, SourceLocation StartLoc,
+                                      SourceLocation LParenLoc,
+                                      SourceLocation EndLoc);
 
   OSSClause *ActOnOmpSsClause(OmpSsClauseKind Kind, SourceLocation StartLoc,
                               SourceLocation EndLoc);

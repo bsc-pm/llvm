@@ -11244,7 +11244,14 @@ def err_oss_non_pod_reduction : Error<
 def err_oss_loop_cannot_use_stmt : Error<
   "'%0' statement cannot be used in OmpSs-2 for loop">;
 def err_oss_not_for : Error<
-  "statement after '#pragma oss %0' must be a for loop">;
+  "%select{statement after '#pragma oss %1' must be a for loop|"
+  "expected %2 for loops after '#pragma oss %1', but found only %3}0">;
+def err_oss_perfect_for_nesting : Error<
+  "not enough perfectly nested loops">;
+def err_oss_collapse_same_loop_type : Error<
+  "expected loop iterator type to be %0 instead of %1">;
+def err_oss_nonrectangular_loop_iter_dep : Error<
+  "unsupported dependencies over iterators of a non-rectangular loop">;
 def err_oss_loop_incr_not_compatible : Error<
   "increment expression must cause %0 to %select{decrease|increase}1 "
   "on each iteration of OmpSs-2 for loop">;

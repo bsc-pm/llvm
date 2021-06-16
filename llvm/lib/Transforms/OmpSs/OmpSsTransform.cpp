@@ -398,6 +398,120 @@ struct OmpSs {
       return DepCallee;
     }
   };
+
+  // Four each iterator compute the normalized bounds [0, ub) handling
+  // outer iterator usage in the current one
+  void ComputeLoopBounds(Module &M, const DirectiveLoopInfo &LoopInfo, Instruction *InsertPt,
+                         SmallVectorImpl<Value *> &UBounds) {
+    IRBuilder<> IRB(InsertPt);
+    for (size_t i = 0; i < LoopInfo.LBound.size(); ++i) {
+      // Set ub/lb of referenced iterators based on the loop type
+      // for (int i = 0; i < 100; ++i)
+      //   for (int j = i; j > 0; --j)  replaces i by ub(i)-1
+
+      // First determite the pessimistic lb/ub. A pessimistic bound
+      // is the lower/upper executable iteration. That is,
+      // in a '<' the upper bound will be ubound - 1, whereas
+      // in a '<= the upper bound will be ubound.
+      SmallVector<Value *> PessimistLB(i);
+      SmallVector<Value *> PessimistUB(i);
+      for (size_t j = 0; j < i; ++j) {
+        switch (LoopInfo.LoopType[j]) {
+        case DirectiveLoopInfo::LE:
+          PessimistLB[j] = LoopInfo.LBound[j].Result;
+          PessimistUB[j] = LoopInfo.UBound[j].Result;
+          break;
+        case DirectiveLoopInfo::LT:
+          PessimistLB[j] = LoopInfo.LBound[j].Result;
+          PessimistUB[j] =
+            IRB.CreateSub(
+              LoopInfo.UBound[j].Result,
+              ConstantInt::get(
+                LoopInfo.UBound[j].Result->getType(), 1));
+          break;
+        case DirectiveLoopInfo::GT:
+          PessimistLB[j] =
+            IRB.CreateAdd(
+              LoopInfo.UBound[j].Result,
+              ConstantInt::get(
+                LoopInfo.UBound[j].Result->getType(), 1));
+          PessimistUB[j] = LoopInfo.LBound[j].Result;
+          break;
+        case DirectiveLoopInfo::GE:
+          PessimistLB[j] = LoopInfo.UBound[j].Result;
+          PessimistUB[j] = LoopInfo.LBound[j].Result;
+          break;
+        default:
+          llvm_unreachable("unexpected loop type");
+        }
+      }
+      // Once we have the pessimistic bounds compute the current
+      // bounds based on the loop type. That is, in a '>' the lower bound
+      // will be the pessimistic ubound
+      if (LoopInfo.LoopType[i] == DirectiveLoopInfo::GT
+          || LoopInfo.LoopType[i] == DirectiveLoopInfo::GE) {
+        for (size_t j = 0; j < i; ++j)
+          IRB.CreateStore(PessimistUB[j], LoopInfo.IndVar[j]);
+        LoopInfo.LBound[i].Result = IRB.CreateCall(LoopInfo.LBound[i].Fun, LoopInfo.LBound[i].Args);
+        for (size_t j = 0; j < i; ++j)
+          IRB.CreateStore(PessimistLB[j], LoopInfo.IndVar[j]);
+        LoopInfo.UBound[i].Result = IRB.CreateCall(LoopInfo.UBound[i].Fun, LoopInfo.UBound[i].Args);
+      } else {
+        for (size_t j = 0; j < i; ++j)
+          IRB.CreateStore(PessimistLB[j], LoopInfo.IndVar[j]);
+        LoopInfo.LBound[i].Result = IRB.CreateCall(LoopInfo.LBound[i].Fun, LoopInfo.LBound[i].Args);
+        for (size_t j = 0; j < i; ++j)
+          IRB.CreateStore(PessimistUB[j], LoopInfo.IndVar[j]);
+        LoopInfo.UBound[i].Result = IRB.CreateCall(LoopInfo.UBound[i].Fun, LoopInfo.UBound[i].Args);
+      }
+
+
+      // Step is not allowed to depend on other iterators
+      LoopInfo.Step[i].Result = IRB.CreateCall(LoopInfo.Step[i].Fun, LoopInfo.Step[i].Args);
+
+      // <      0, (ub - 1 - lb) / step + 1
+      // <=     0, (ub - lb)     / step + 1
+      // >      0, (ub + 1 - lb) / step + 1
+      // >=     0, (ub - lb)     / step + 1
+      Type *IndVarTy = LoopInfo.IndVar[i]->getType()->getPointerElementType();
+      auto p = buildInstructionSignDependent(
+        IRB, M, LoopInfo.UBound[i].Result, LoopInfo.LBound[i].Result, LoopInfo.UBoundSigned[i], LoopInfo.LBoundSigned[i],
+        [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+          return IRB.CreateSub(LHS, RHS);
+        });
+      Value *RegisterUpperB = p.first;
+
+      switch (LoopInfo.LoopType[i]) {
+      case DirectiveLoopInfo::LT:
+        RegisterUpperB = IRB.CreateSub(RegisterUpperB, ConstantInt::get(RegisterUpperB->getType(), 1));
+        break;
+      case DirectiveLoopInfo::GT:
+        RegisterUpperB = IRB.CreateAdd(RegisterUpperB, ConstantInt::get(RegisterUpperB->getType(), 1));
+        break;
+      case DirectiveLoopInfo::LE:
+      case DirectiveLoopInfo::GE:
+        break;
+      default:
+        llvm_unreachable("unexpected loop type");
+      }
+      p = buildInstructionSignDependent(
+        IRB, M, RegisterUpperB, LoopInfo.Step[i].Result, p.second, LoopInfo.Step[i].Result,
+        [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+          if (NewOpSigned)
+            return IRB.CreateSDiv(LHS, RHS);
+          return IRB.CreateUDiv(LHS, RHS);
+        });
+      RegisterUpperB = IRB.CreateAdd(p.first, ConstantInt::get(p.first->getType(), 1));
+
+      RegisterUpperB =
+        createZSExtOrTrunc(
+          IRB, RegisterUpperB,
+          Nanos6LoopBounds::getInstance(M).getType()->getElementType(1), p.second);
+
+      UBounds[i] = RegisterUpperB;
+    }
+  }
+
   Nanos6MultidepFactory MultidepFactory;
 
   FunctionCallee CreateTaskFuncCallee;
@@ -409,23 +523,13 @@ struct OmpSs {
   FunctionCallee RegisterAssertFuncCallee;
   FunctionCallee RegisterCtorAssertFuncCallee;
 
-  // Data used to build final code.
-  // We use Instructions instead of BasicBlocks because
-  // BasicBlock pointers/iterators are invalidated after
-  // splitBasicBlock
-  struct FinalBodyInfo {
-    Instruction *CloneEntry;
-    Instruction *CloneExit;
-    DirectiveInfo *DirInfo;
-  };
-  // For each directive have all inner directives in final context.
-  using FinalBodyInfoMap = DenseMap<DirectiveInfo *, SmallVector<FinalBodyInfo, 4>>;
-
   // This is a hack to move some instructions to its corresponding functions
   // at the end of the pass.
   // For example, this is used to move allocas to its corresponding
   // function entry.
   SmallVector<Instruction *, 4> PostMoveInstructions;
+
+  SmallVector<Instruction *> CollapseStuff;
 
   // Signed extension of V to type Ty
   static Value *createZSExtOrTrunc(IRBuilder<> &IRB, Value *V, Type *Ty, bool Signed) {
@@ -495,29 +599,32 @@ struct OmpSs {
     }
   }
 
+  // Build a loop containing Single Entry Single Exit region Entry/Exit
+  // and returns the LoopEntry and LoopExit
   void buildLoopForTaskImpl(Module &M, Function &F, Instruction *Entry,
                         Instruction *Exit, const DirectiveLoopInfo &LoopInfo,
-                        BasicBlock *&LoopEntryBB, BasicBlock *&BodyBB) {
+                        Instruction *&LoopEntryI, Instruction *&LoopExitI,
+                        size_t LInfoIndex = 0) {
 
     IRBuilder<> IRB(Entry);
-    Type *IndVarTy = LoopInfo.IndVar->getType()->getPointerElementType();
+    Type *IndVarTy = LoopInfo.IndVar[LInfoIndex]->getType()->getPointerElementType();
 
-    IRB.CreateStore(createZSExtOrTrunc(IRB, LoopInfo.LBound, IndVarTy, LoopInfo.LBoundSigned), LoopInfo.IndVar);
+    IRB.CreateStore(createZSExtOrTrunc(IRB, LoopInfo.LBound[LInfoIndex].Result, IndVarTy, LoopInfo.LBoundSigned[LInfoIndex]), LoopInfo.IndVar[LInfoIndex]);
 
-    BasicBlock *CondBB = IRB.saveIP().getBlock()->splitBasicBlock(IRB.saveIP().getPoint());
+    BasicBlock *CondBB = Entry->getParent()->splitBasicBlock(Entry);
     CondBB->setName("for.cond");
 
     // The new entry is the start of the loop
-    LoopEntryBB = CondBB->getUniquePredecessor();
+    LoopEntryI = &CondBB->getUniquePredecessor()->front();
 
     IRB.SetInsertPoint(Entry);
 
-    Value *IndVarVal = IRB.CreateLoad(LoopInfo.IndVar);
+    Value *IndVarVal = IRB.CreateLoad(LoopInfo.IndVar[LInfoIndex]);
     Value *LoopCmp = nullptr;
-    switch (LoopInfo.LoopType) {
+    switch (LoopInfo.LoopType[LInfoIndex]) {
     case DirectiveLoopInfo::LT:
       LoopCmp = buildInstructionSignDependent(
-        IRB, M, IndVarVal, LoopInfo.UBound, LoopInfo.IndVarSigned, LoopInfo.UBoundSigned,
+        IRB, M, IndVarVal, LoopInfo.UBound[LInfoIndex].Result, LoopInfo.IndVarSigned[LInfoIndex], LoopInfo.UBoundSigned[LInfoIndex],
         [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
           if (NewOpSigned)
             return IRB.CreateICmpSLT(LHS, RHS);
@@ -526,7 +633,7 @@ struct OmpSs {
       break;
     case DirectiveLoopInfo::LE:
       LoopCmp = buildInstructionSignDependent(
-        IRB, M, IndVarVal, LoopInfo.UBound, LoopInfo.IndVarSigned, LoopInfo.UBoundSigned,
+        IRB, M, IndVarVal, LoopInfo.UBound[LInfoIndex].Result, LoopInfo.IndVarSigned[LInfoIndex], LoopInfo.UBoundSigned[LInfoIndex],
         [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
           if (NewOpSigned)
             return IRB.CreateICmpSLE(LHS, RHS);
@@ -535,7 +642,7 @@ struct OmpSs {
       break;
     case DirectiveLoopInfo::GT:
       LoopCmp = buildInstructionSignDependent(
-        IRB, M, IndVarVal, LoopInfo.UBound, LoopInfo.IndVarSigned, LoopInfo.UBoundSigned,
+        IRB, M, IndVarVal, LoopInfo.UBound[LInfoIndex].Result, LoopInfo.IndVarSigned[LInfoIndex], LoopInfo.UBoundSigned[LInfoIndex],
         [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
           if (NewOpSigned)
             return IRB.CreateICmpSGT(LHS, RHS);
@@ -544,7 +651,7 @@ struct OmpSs {
       break;
     case DirectiveLoopInfo::GE:
       LoopCmp = buildInstructionSignDependent(
-        IRB, M, IndVarVal, LoopInfo.UBound, LoopInfo.IndVarSigned, LoopInfo.UBoundSigned,
+        IRB, M, IndVarVal, LoopInfo.UBound[LInfoIndex].Result, LoopInfo.IndVarSigned[LInfoIndex], LoopInfo.UBoundSigned[LInfoIndex],
         [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
           if (NewOpSigned)
             return IRB.CreateICmpSGE(LHS, RHS);
@@ -554,26 +661,39 @@ struct OmpSs {
     default:
       llvm_unreachable("unexpected loop type");
     }
-    BodyBB = IRB.saveIP().getBlock()->splitBasicBlock(IRB.saveIP().getPoint());
-    BodyBB->setName("for.body");
+
+    BasicBlock *BodyBB = Entry->getParent()->splitBasicBlock(Entry);
+    BasicBlock *CollapseBB = BodyBB;
+    for (size_t i = 0; i < LoopInfo.LBound.size(); ++i) {
+      CollapseBB = CollapseBB->splitBasicBlock(Entry);
+      CollapseStuff.push_back(&CollapseBB->getUniquePredecessor()->front());
+    }
+    CollapseBB->setName("for.body");
+
+    BasicBlock *EndBB = BasicBlock::Create(M.getContext(), "for.end", &F);
+    IRB.SetInsertPoint(EndBB);
+    IRB.CreateBr(Exit->getParent()->getUniqueSuccessor());
+
+    // The new exit is the end of the loop
+    LoopExitI = &EndBB->front();
 
     // Replace default br. by a conditional br. to task.body or task end
     Instruction *OldTerminator = CondBB->getTerminator();
     IRB.SetInsertPoint(OldTerminator);
-    IRB.CreateCondBr(LoopCmp, BodyBB, Exit->getParent()->getUniqueSuccessor());
+    IRB.CreateCondBr(LoopCmp, BodyBB, EndBB);
     OldTerminator->eraseFromParent();
 
     BasicBlock *IncrBB = BasicBlock::Create(M.getContext(), "for.incr", &F);
 
     // Add a br. to for.cond
     IRB.SetInsertPoint(IncrBB);
-    IndVarVal = IRB.CreateLoad(LoopInfo.IndVar);
+    IndVarVal = IRB.CreateLoad(LoopInfo.IndVar[LInfoIndex]);
     auto p = buildInstructionSignDependent(
-      IRB, M, IndVarVal, LoopInfo.Step, LoopInfo.IndVarSigned, LoopInfo.StepSigned,
+      IRB, M, IndVarVal, LoopInfo.Step[LInfoIndex].Result, LoopInfo.IndVarSigned[LInfoIndex], LoopInfo.StepSigned[LInfoIndex],
       [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
         return IRB.CreateAdd(LHS, RHS);
       });
-    IRB.CreateStore(createZSExtOrTrunc(IRB, p.first, IndVarTy, p.second), LoopInfo.IndVar);
+    IRB.CreateStore(createZSExtOrTrunc(IRB, p.first, IndVarTy, p.second), LoopInfo.IndVar[LInfoIndex]);
     IRB.CreateBr(CondBB);
 
     // Replace task end br. by a br. to for.incr
@@ -582,13 +702,25 @@ struct OmpSs {
     OldTerminator->setSuccessor(0, IncrBB);
   }
 
-  BasicBlock *buildLoopForTask(
+  Instruction *buildLoopForTask(
       Module &M, Function &F, Instruction *Entry,
       Instruction *Exit, const DirectiveLoopInfo &LoopInfo) {
-    BasicBlock *EntryBB = nullptr;
-    BasicBlock *LoopEntryBB = nullptr;
-    buildLoopForTaskImpl(M, F, Entry, Exit, LoopInfo, LoopEntryBB, EntryBB);
-    return LoopEntryBB;
+    Instruction *LoopEntryI = nullptr;
+    Instruction *LoopExitI = nullptr;
+    for (int i = LoopInfo.LBound.size() - 1; i >= 0; --i) {
+      IRBuilder<> IRB(Entry);
+      LoopInfo.LBound[i].Result = IRB.CreateCall(LoopInfo.LBound[i].Fun, LoopInfo.LBound[i].Args);
+      LoopInfo.UBound[i].Result = IRB.CreateCall(LoopInfo.UBound[i].Fun, LoopInfo.UBound[i].Args);
+      LoopInfo.Step[i].Result = IRB.CreateCall(LoopInfo.Step[i].Fun, LoopInfo.Step[i].Args);
+
+      buildLoopForTaskImpl(M, F, Entry, Exit, LoopInfo, LoopEntryI, LoopExitI, i);
+      Entry = LoopEntryI;
+      Exit = LoopExitI;
+    }
+    // FIXME: when building the original loop in final mode remove collapse blocks.
+    // I have to add a bool parameter or something to avoid this
+    CollapseStuff.clear();
+    return LoopEntryI;
   }
 
   void buildLoopForMultiDep(
@@ -753,8 +885,8 @@ struct OmpSs {
   void unpackDepCallToRTImpl(
       Module &M, const DependInfo *DepInfo,
       const DirectiveReductionsInitCombInfo &DRI,
-      Function *F, Value *IndVar,
-      Value *NewIndVarLBound, Value *NewIndVarUBound, bool IsTaskLoop,
+      Function *F, const DirectiveLoopInfo &LoopInfo,
+      ArrayRef<Value *> NewIndVarLBound, ArrayRef<Value *> NewIndVarUBound, bool IsTaskLoop,
       CallInst *& CallComputeDepStart, CallInst *& CallComputeDepEnd,
       CallInst *& RegisterDepCall) {
 
@@ -766,10 +898,12 @@ struct OmpSs {
     CallComputeDepStart = BBBuilder.CreateCall(ComputeDepFun, DepInfo->Args);
     CallComputeDepEnd = BBBuilder.CreateCall(ComputeDepFun, DepInfo->Args);
     if (IsTaskLoop) {
-      assert(NewIndVarLBound && NewIndVarUBound &&
+      assert(!NewIndVarLBound.empty() && !NewIndVarUBound.empty() &&
         "Expected new lb/up in taskloop dependency");
-      CallComputeDepStart->replaceUsesOfWith(IndVar, NewIndVarLBound);
-      CallComputeDepEnd->replaceUsesOfWith(IndVar, NewIndVarUBound);
+      for (size_t i = 0; i < LoopInfo.LBound.size(); ++i) {
+        CallComputeDepStart->replaceUsesOfWith(LoopInfo.IndVar[i], NewIndVarLBound[i]);
+        CallComputeDepEnd->replaceUsesOfWith(LoopInfo.IndVar[i], NewIndVarUBound[i]);
+      }
     }
     StructType *ComputeDepTy = cast<StructType>(ComputeDepFun->getReturnType());
 
@@ -811,28 +945,28 @@ struct OmpSs {
   void unpackDepCallToRT(
       Module &M, const DependInfo *DepInfo,
       const DirectiveReductionsInitCombInfo &DRI,
-      Function *F, Value *IndVar, Value *NewIndVarLBound, Value *NewIndVarUBound,
+      Function *F, const DirectiveLoopInfo &LoopInfo, ArrayRef<Value *> NewIndVarLBound, ArrayRef<Value *> NewIndVarUBound,
       bool IsTaskLoop) {
 
     CallInst *CallComputeDepStart;
     CallInst *CallComputeDepEnd;
     CallInst *RegisterDepCall;
     unpackDepCallToRTImpl(
-      M, DepInfo, DRI, F, IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop,
+      M, DepInfo, DRI, F, LoopInfo, NewIndVarLBound, NewIndVarUBound, IsTaskLoop,
       CallComputeDepStart, CallComputeDepEnd, RegisterDepCall);
   }
 
   void unpackMultiRangeCall(
       Module &M, const MultiDependInfo *MultiDepInfo,
       const DirectiveReductionsInitCombInfo &DRI,
-      Function *F, Value *IndVar, Value *NewIndVarLBound, Value *NewIndVarUBound,
+      Function *F, const DirectiveLoopInfo &LoopInfo, ArrayRef<Value *> NewIndVarLBound, ArrayRef<Value *> NewIndVarUBound,
       bool IsTaskLoop) {
 
     CallInst *CallComputeDepStart;
     CallInst *CallComputeDepEnd;
     CallInst *RegisterDepCall;
     unpackDepCallToRTImpl(
-      M, MultiDepInfo, DRI, F, IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop,
+      M, MultiDepInfo, DRI, F, LoopInfo, NewIndVarLBound, NewIndVarUBound, IsTaskLoop,
       CallComputeDepStart, CallComputeDepEnd, RegisterDepCall);
 
     // Build a BasicBlock conatining the compute_dep call and the dep. registration
@@ -840,22 +974,26 @@ struct OmpSs {
     Instruction *AfterRegisterDepCall = RegisterDepCall->getNextNode();
     AfterRegisterDepCall->getParent()->splitBasicBlock(AfterRegisterDepCall);
 
-    Function *ComputeMultiDepFun = MultiDepInfo->ComputeMultiDepFun;
     auto Args = MultiDepInfo->Args;
 
+    // Build multidep loop based on loop iterators lower bound
     if (IsTaskLoop) {
-      std::replace(Args.begin(), Args.end(), IndVar, NewIndVarLBound);
+      for (size_t i = 0; i < LoopInfo.IndVar.size(); i++)
+        std::replace(Args.begin(), Args.end(), LoopInfo.IndVar[i], NewIndVarLBound[i]);
     }
 
-    buildLoopForMultiDep(
-        M, *F, CallComputeDepStart, RegisterDepCall,
-        MultiDepInfo);
+    DenseMap<Value *, Value *> IndToRemap;
+    for (size_t i = 0; i < MultiDepInfo->Iters.size(); i++) {
+      Value *IndVar = MultiDepInfo->Iters[i];
+      buildLoopForMultiDepImpl(
+        M, *F, CallComputeDepStart, RegisterDepCall, IndVar, i, MultiDepInfo->ComputeMultiDepFun,
+        Args, IndToRemap);
+    }
   }
-
 
   void unpackDepsCallToRT(
       Module &M, const DirectiveInfo &DirInfo, Function *F,
-      bool IsTaskLoop, Value *NewIndVarLBound, Value *NewIndVarUBound) {
+      bool IsTaskLoop, ArrayRef<Value *> NewIndVarLBound, ArrayRef<Value *> NewIndVarUBound) {
 
     const DirectiveEnvironment &DirEnv = DirInfo.DirEnv;
     const DirectiveLoopInfo &LoopInfo = DirEnv.LoopInfo;
@@ -865,16 +1003,19 @@ struct OmpSs {
     for (auto &DepInfo : DependsInfo.List) {
       if (auto *MultiDepInfo = dyn_cast<MultiDependInfo>(DepInfo.get())) {
         // Multideps using loop iterator are assumed to be discrete
-        if (multidepUsesLoopIter(LoopInfo, *MultiDepInfo))
-          NewIndVarUBound = NewIndVarLBound;
-
-        unpackMultiRangeCall(
-          M, MultiDepInfo, DRI, F,
-          LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop);
+        if (IsTaskLoop && multidepUsesLoopIter(LoopInfo, *MultiDepInfo)) {
+          unpackMultiRangeCall(
+            M, MultiDepInfo, DRI, F,
+            LoopInfo, NewIndVarLBound, NewIndVarLBound, IsTaskLoop);
+        } else {
+          unpackMultiRangeCall(
+            M, MultiDepInfo, DRI, F,
+            LoopInfo, NewIndVarLBound, NewIndVarUBound, IsTaskLoop);
+        }
       } else {
         unpackDepCallToRT(
           M, DepInfo.get(), DRI, F,
-          LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop);
+          LoopInfo, NewIndVarLBound, NewIndVarUBound, IsTaskLoop);
       }
     }
   }
@@ -888,8 +1029,8 @@ struct OmpSs {
     // add the terminator so IRBuilder inserts just before it
     F->getEntryBlock().getInstList().push_back(ReturnInst::Create(M.getContext()));
 
-    Value *NewIndVarLBound = nullptr;
-    Value *NewIndVarUBound = nullptr;
+    SmallVector<Value *, 2> NewIndVarLBounds;
+    SmallVector<Value *, 2> NewIndVarUBounds;
 
     const DirectiveEnvironment &DirEnv = DirInfo.DirEnv;
     const DirectiveLoopInfo &LoopInfo = DirEnv.LoopInfo;
@@ -897,7 +1038,7 @@ struct OmpSs {
     bool IsTaskLoop = DirEnv.isOmpSsTaskLoopDirective();
 
     if (IsTaskLoop) {
-      Type *IndVarTy = LoopInfo.IndVar->getType()->getPointerElementType();
+      Type *IndVarTy = LoopInfo.IndVar[0]->getType()->getPointerElementType();
 
       IRBuilder<> IRB(&Entry.front());
       Value *LoopBounds = &*(F->arg_end() - 2);
@@ -915,36 +1056,75 @@ struct OmpSs {
       UBoundField = IRB.CreateZExtOrTrunc(UBoundField, IndVarTy);
       UBoundField = IRB.CreateSub(UBoundField, ConstantInt::get(IndVarTy, 1), "ub");
 
-      NewIndVarLBound = IRB.CreateAlloca(IndVarTy, nullptr, LoopInfo.IndVar->getName() + ".lb");
-      NewIndVarUBound = IRB.CreateAlloca(IndVarTy, nullptr, LoopInfo.IndVar->getName() + ".ub");
+      SmallVector<Value *> NormalizedUBs(LoopInfo.UBound.size());
+      // This is used for nanos6_create_loop
+      // NOTE: all values have nanos6 upper_bound type
+      ComputeLoopBounds(M, LoopInfo, &Entry.back(), NormalizedUBs);
 
-      auto p = buildInstructionSignDependent(
-        IRB, M, LoopInfo.Step, LBoundField, LoopInfo.StepSigned, LoopInfo.IndVarSigned,
-        [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
-          return IRB.CreateMul(LHS, RHS);
-        });
-      p = buildInstructionSignDependent(
-        IRB, M, p.first, LoopInfo.LBound, p.second, LoopInfo.LBoundSigned,
-        [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
-          return IRB.CreateAdd(LHS, RHS);
-        });
-      IRB.CreateStore(createZSExtOrTrunc(IRB, p.first, IndVarTy, p.second), NewIndVarLBound);
+      for (size_t i = 0; i < LoopInfo.LBound.size(); ++i) {
+        Value *NewIndVarLBound = IRB.CreateAlloca(IndVarTy, nullptr, LoopInfo.IndVar[i]->getName() + ".lb");
+        Value *NewIndVarUBound = IRB.CreateAlloca(IndVarTy, nullptr, LoopInfo.IndVar[i]->getName() + ".ub");
 
-      p = buildInstructionSignDependent(
-        IRB, M, LoopInfo.Step, UBoundField, LoopInfo.StepSigned, LoopInfo.IndVarSigned,
-        [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
-          return IRB.CreateMul(LHS, RHS);
-        });
-      p = buildInstructionSignDependent(
-        IRB, M, p.first, LoopInfo.LBound, p.second, LoopInfo.LBoundSigned,
-        [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
-          return IRB.CreateAdd(LHS, RHS);
-        });
-      IRB.CreateStore(createZSExtOrTrunc(IRB, p.first, IndVarTy, p.second), NewIndVarUBound);
+        auto f = [](Module &M, IRBuilder<> &IRB, ArrayRef<Value *> NormalizedUBs, const DirectiveLoopInfo &LoopInfo, int i, Value *Val, Type *Ty, Value *Storage) {
+          // NOTE: NormalizedUBs values are nanos6_register_loop upper_bound type
+          Value *Niters = ConstantInt::get(Nanos6LoopBounds::getInstance(M).getType()->getElementType(1), 1);
+          for (size_t j = i + 1; j < LoopInfo.LBound.size(); ++j)
+            Niters = IRB.CreateMul(Niters, NormalizedUBs[j]);
+
+          // TMP = (LB|UB)/ProductUBs(i+1..n)
+          auto pTmp = buildInstructionSignDependent(
+            IRB, M, Val, Niters, Ty, /*RHSSigned=*/false,
+            [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+              if (NewOpSigned)
+                return IRB.CreateSDiv(LHS, RHS);
+              return IRB.CreateUDiv(LHS, RHS);
+            });
+
+          // TMP * Step
+          auto p = buildInstructionSignDependent(
+            IRB, M, pTmp.first, LoopInfo.Step[i].Result, pTmp.second, LoopInfo.StepSigned[i],
+            [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+              return IRB.CreateMul(LHS, RHS);
+            });
+
+          // (TMP * Step) + OrigLBound
+          auto pBodyIndVar = buildInstructionSignDependent(
+            IRB, M, p.first, LoopInfo.LBound[i].Result, p.second, LoopInfo.LBoundSigned[i],
+            [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+              return IRB.CreateAdd(LHS, RHS);
+            });
+
+          // TMP*ProductUBs(i+1..n)
+          p = buildInstructionSignDependent(
+            IRB, M, pTmp.first, Niters, pTmp.second, /*RHSSigned=*/false,
+            [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+              return IRB.CreateMul(LHS, RHS);
+            });
+
+          // LoopInfo - TMP*ProductUBs(i+1..n)
+          auto pLoopIndVar = buildInstructionSignDependent(
+            IRB, M, Val, p.first, Ty, p.second,
+            [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+              return IRB.CreateSub(LHS, RHS);
+            });
+
+          // (LB|UB) = LoopInfo - TMP*ProductUBs(i+1..n)
+          Val = pLoopIndVar.first;
+          // BodyIndVar(i) = (TMP * Step) + OrigLBound
+          IRB.CreateStore(createZSExtOrTrunc(IRB, pBodyIndVar.first, Ty, pBodyIndVar.second), Storage);
+          return Val;
+        };
+
+        LBoundField = f(M, IRB, NormalizedUBs, LoopInfo, i, LBoundField, IndVarTy, NewIndVarLBound);
+        UBoundField = f(M, IRB, NormalizedUBs, LoopInfo, i, UBoundField, IndVarTy, NewIndVarUBound);
+
+        NewIndVarLBounds.push_back(NewIndVarLBound);
+        NewIndVarUBounds.push_back(NewIndVarUBound);
+      }
     }
 
     // Insert RT call before replacing uses
-    unpackDepsCallToRT(M, DirInfo, F, IsTaskLoop, NewIndVarLBound, NewIndVarUBound);
+    unpackDepsCallToRT(M, DirInfo, F, IsTaskLoop, NewIndVarLBounds, NewIndVarUBounds);
 
     for (BasicBlock &BB : *F) {
       for (Instruction &I : BB) {
@@ -1574,42 +1754,69 @@ struct OmpSs {
     DirInfo.Entry->eraseFromParent();
   }
 
+  Value *mapValue(Value *V, ValueToValueMapTy &VMap) {
+    // Remap the value if necessary.
+    ValueToValueMapTy::iterator I = VMap.find(V);
+    if (I != VMap.end())
+      return I->second;
+    return V;
+  }
+
+  void rewriteDirInfoForFinal(
+      DirectiveLoopInfo &LoopInfo, ValueToValueMapTy &VMap) {
+    for (size_t i = 0; i < LoopInfo.LBound.size(); ++i) {
+      LoopInfo.IndVar[i] = mapValue(LoopInfo.IndVar[i], VMap);
+      for (size_t j = 0; j < LoopInfo.LBound[i].Args.size(); ++j)
+        LoopInfo.LBound[i].Args[j] = mapValue(LoopInfo.LBound[i].Args[j], VMap);
+      for (size_t j = 0; j < LoopInfo.UBound[i].Args.size(); ++j)
+        LoopInfo.UBound[i].Args[j] = mapValue(LoopInfo.UBound[i].Args[j], VMap);
+      for (size_t j = 0; j < LoopInfo.Step[i].Args.size(); ++j)
+        LoopInfo.Step[i].Args[j] = mapValue(LoopInfo.Step[i].Args[j], VMap);
+    }
+  }
+
   // This must be called before erasing original entry/exit
   void buildFinalCondCFG(
-      Module &M, Function &F, ArrayRef<FinalBodyInfo> FinalInfos) {
+      Module &M, Function &F, const DirectiveInfo &DirInfo, ValueToValueMapTy &FinalInfo) {
     // Lower final inner tasks
 
-    // Skip first since its the current task
-    for (size_t i = 1; i < FinalInfos.size(); ++i) {
+    // Process all the inner directives before
+    for (size_t i = 0; i < DirInfo.InnerDirectiveInfos.size(); ++i) {
+      const DirectiveInfo &InnerDirInfo = *DirInfo.InnerDirectiveInfos[i];
       // Build loop for taskloop/taskfor
-      bool IsLoop = FinalInfos[i].DirInfo->DirEnv.isOmpSsLoopDirective();
+      bool IsLoop = InnerDirInfo.DirEnv.isOmpSsLoopDirective();
+      Instruction *OrigEntryI = InnerDirInfo.Entry;
+      Instruction *OrigExitI = InnerDirInfo.Exit;
+      Instruction *CloneEntryI = cast<Instruction>(FinalInfo.lookup(OrigEntryI));
+      Instruction *CloneExitI = cast<Instruction>(FinalInfo.lookup(OrigExitI));
       if (IsLoop) {
-        const DirectiveLoopInfo &LoopInfo = FinalInfos[i].DirInfo->DirEnv.LoopInfo;
-        buildLoopForTask(M, F, FinalInfos[i].CloneEntry, FinalInfos[i].CloneExit, LoopInfo);
+        DirectiveLoopInfo FinalLoopInfo = InnerDirInfo.DirEnv.LoopInfo;
+        rewriteDirInfoForFinal(FinalLoopInfo, FinalInfo);
+        buildLoopForTask(M, F, CloneEntryI, CloneExitI, FinalLoopInfo);
       }
-      FinalInfos[i].CloneExit->eraseFromParent();
-      FinalInfos[i].CloneEntry->eraseFromParent();
     }
 
-    BasicBlock *OrigEntryBB = FinalInfos[0].DirInfo->Entry->getParent();
-    BasicBlock *OrigExitBB = FinalInfos[0].DirInfo->Exit->getParent()->getUniqueSuccessor();
+    Instruction *OrigEntryI = DirInfo.Entry;
+    Instruction *OrigExitI = DirInfo.Exit;
+    Instruction *CloneEntryI = cast<Instruction>(FinalInfo.lookup(OrigEntryI));
+    Instruction *CloneExitI = cast<Instruction>(FinalInfo.lookup(OrigExitI));
 
-    BasicBlock *CloneEntryBB = FinalInfos[0].CloneEntry->getParent();
-    bool IsLoop = FinalInfos[0].DirInfo->DirEnv.isOmpSsLoopDirective();
+    Instruction *NewCloneEntryI = CloneEntryI;
+    bool IsLoop = DirInfo.DirEnv.isOmpSsLoopDirective();
     if (IsLoop) {
-      const DirectiveLoopInfo &LoopInfo = FinalInfos[0].DirInfo->DirEnv.LoopInfo;
-      CloneEntryBB = buildLoopForTask(M, F, FinalInfos[0].CloneEntry, FinalInfos[0].CloneExit, LoopInfo);
+      DirectiveLoopInfo FinalLoopInfo = DirInfo.DirEnv.LoopInfo;
+      rewriteDirInfoForFinal(FinalLoopInfo, FinalInfo);
+      NewCloneEntryI = buildLoopForTask(M, F, CloneEntryI, CloneExitI, FinalLoopInfo);
     }
 
-    FinalInfos[0].CloneExit->eraseFromParent();
-    FinalInfos[0].CloneEntry->eraseFromParent();
+    BasicBlock *OrigEntryBB = OrigEntryI->getParent();
+    BasicBlock *OrigExitBB = OrigExitI->getParent()->getUniqueSuccessor();
 
     OrigExitBB->setName("final.end");
-    assert(OrigEntryBB->getSinglePredecessor());
     BasicBlock *FinalCondBB = BasicBlock::Create(M.getContext(), "final.cond", &F);
 
-    BasicBlock *CopyEntryBB = CloneEntryBB;
-    CopyEntryBB->setName("final.then");
+    BasicBlock *NewCloneEntryBB = NewCloneEntryI->getParent();
+    NewCloneEntryBB->setName("final.then");
 
     // We are now just before the branch to task body
     Instruction *EntryBBTerminator = OrigEntryBB->getSinglePredecessor()->getTerminator();
@@ -1623,8 +1830,109 @@ struct OmpSs {
     IRB.SetInsertPoint(FinalCondBB);
     // if (nanos6_in_final())
     Value *Cond = IRB.CreateICmpNE(IRB.CreateCall(TaskInFinalFuncCallee, {}), IRB.getInt32(0));
-    IRB.CreateCondBr(Cond, CopyEntryBB, OrigEntryBB);
+    IRB.CreateCondBr(Cond, NewCloneEntryBB, OrigEntryBB);
 
+  }
+
+  void buildFinalCodes(
+      Module &M, Function &F, DirectiveFunctionInfo &DirectiveFuncInfo) {
+
+    // TODO: Avoid using a fixed array
+    ValueToValueMapTy FinalInfo[500];
+    if (DirectiveFuncInfo.PostOrder.size() > 500)
+      llvm_unreachable("Exceeded final info elements");
+
+    // First sweep to clone BBs
+    for (size_t i = 0; i < DirectiveFuncInfo.PostOrder.size(); ++i) {
+      DirectiveInfo &DirInfo = *DirectiveFuncInfo.PostOrder[i];
+
+      // Skip non task directives
+      if (!DirInfo.DirEnv.isOmpSsTaskDirective())
+        continue;
+
+      // 1. Split BB
+      BasicBlock *EntryBB = DirInfo.Entry->getParent();
+      EntryBB = EntryBB->splitBasicBlock(DirInfo.Entry);
+
+      BasicBlock *ExitBB = DirInfo.Exit->getParent();
+      ExitBB = ExitBB->splitBasicBlock(DirInfo.Exit->getNextNode());
+
+      SmallVector<BasicBlock*, 8> Worklist;
+      SmallPtrSet<BasicBlock*, 8> Visited;
+      DenseMap<BasicBlock *, BasicBlock *> CopyBBs;
+      ValueToValueMapTy &VMap = FinalInfo[i];
+
+      // 2. Clone BBs between entry and exit (is there any function/util to do this?)
+      Worklist.push_back(EntryBB);
+      Visited.insert(EntryBB);
+
+      CopyBBs[EntryBB] = CloneBasicBlock(EntryBB, VMap, ".clone", &F);
+      VMap[EntryBB] = CopyBBs[EntryBB];
+      while (!Worklist.empty()) {
+        auto WIt = Worklist.begin();
+        BasicBlock *BB = *WIt;
+        Worklist.erase(WIt);
+
+        for (auto It = succ_begin(BB); It != succ_end(BB); ++It) {
+          if (!Visited.count(*It) && *It != ExitBB) {
+            Worklist.push_back(*It);
+            Visited.insert(*It);
+
+            CopyBBs[*It] = CloneBasicBlock(*It, VMap, ".clone", &F);
+            VMap[*It] = CopyBBs[*It];
+          }
+        }
+      }
+
+      // 2. Rewrite ops and branches to cloned ones.
+      //    Intrinsic exit is mapped to the original entry, so before removing it
+      //    we must to map it to the cloned entry.
+      for (auto &p : CopyBBs) {
+        BasicBlock *& CopyBB = p.second;
+        for (BasicBlock::iterator II = CopyBB->begin(), E = CopyBB->end(); II != E;) {
+          Instruction &I = *II++;
+          // Remove OmpSs-2 intrinsics directive_marker. Cloned entries/exits will be removed
+          // when building final stuff
+          if (auto *IIntr = dyn_cast<IntrinsicInst>(&I)) {
+            Intrinsic::ID IID = IIntr->getIntrinsicID();
+            if (IID == Intrinsic::directive_marker) {
+              IIntr->eraseFromParent();
+              continue;
+            }
+          }
+          RemapInstruction(&I, VMap, RF_NoModuleLevelChanges | RF_IgnoreMissingLocals);
+        }
+      }
+    }
+
+    for (size_t i = 0; i < DirectiveFuncInfo.PostOrder.size(); ++i) {
+      DirectiveInfo &DirInfo = *DirectiveFuncInfo.PostOrder[i];
+      const DirectiveEnvironment &DirEnv = DirInfo.DirEnv;
+      if (DirEnv.isOmpSsTaskDirective())
+        buildFinalCondCFG(M, F, DirInfo, FinalInfo[i]);
+    }
+
+    // Erase cloned intrinsics
+    for (size_t i = 0; i < DirectiveFuncInfo.PostOrder.size(); ++i) {
+      DirectiveInfo &DirInfo = *DirectiveFuncInfo.PostOrder[i];
+      const DirectiveEnvironment &DirEnv = DirInfo.DirEnv;
+      if (DirEnv.isOmpSsTaskDirective()) {
+        Instruction *OrigEntryI = DirInfo.Entry;
+        Instruction *OrigExitI = DirInfo.Exit;
+        Instruction *CloneEntryI = cast<Instruction>(FinalInfo[i].lookup(OrigEntryI));
+        Instruction *CloneExitI = cast<Instruction>(FinalInfo[i].lookup(OrigExitI));
+        CloneExitI->eraseFromParent();
+        CloneEntryI->eraseFromParent();
+        for (size_t j = 0; j < DirInfo.InnerDirectiveInfos.size(); ++j) {
+          OrigEntryI = DirInfo.InnerDirectiveInfos[j]->Entry;
+          OrigExitI = DirInfo.InnerDirectiveInfos[j]->Exit;
+          CloneEntryI = cast<Instruction>(FinalInfo[i].lookup(OrigEntryI));
+          CloneExitI = cast<Instruction>(FinalInfo[i].lookup(OrigExitI));
+          CloneExitI->eraseFromParent();
+          CloneEntryI->eraseFromParent();
+        }
+      }
+    }
   }
 
   Function *createDestroyArgsOlFunc(
@@ -1804,8 +2112,9 @@ struct OmpSs {
   bool multidepUsesLoopIter(
       const DirectiveLoopInfo &LoopInfo,const MultiDependInfo& MultiDepInfo) {
     for (const auto *V : MultiDepInfo.Args) {
-      if (V == LoopInfo.IndVar)
-        return true;
+      for (size_t i = 0; i < LoopInfo.IndVar.size(); ++i)
+        if (V == LoopInfo.IndVar[i])
+          return true;
     }
     return false;
   }
@@ -1948,14 +2257,41 @@ struct OmpSs {
     return TaskFlagsVar;
   }
 
+  static void computeBBsBetweenEntryExit(
+      SetVector<Instruction *> &TaskBBs,
+      Instruction *Entry, Instruction *Exit) {
+
+    SmallVector<BasicBlock*, 8> Worklist;
+    SmallPtrSet<BasicBlock*, 8> Visited;
+
+    BasicBlock *ExitBB = Exit->getParent();
+
+    // 2. Gather BB between entry and exit (is there any function/util to do this?)
+    Worklist.push_back(Entry->getParent());
+    Visited.insert(Entry->getParent());
+    TaskBBs.insert(&Entry->getParent()->front());
+    while (!Worklist.empty()) {
+      auto WIt = Worklist.begin();
+      BasicBlock *BB = *WIt;
+      Worklist.erase(WIt);
+
+      for (auto It = succ_begin(BB); It != succ_end(BB); ++It) {
+        if (!Visited.count(*It) && *It != ExitBB) {
+          Worklist.push_back(*It);
+          Visited.insert(*It);
+          TaskBBs.insert(&It->front());
+        }
+      }
+    }
+  }
+
   void lowerTask(const DirectiveInfo &DirInfo,
                  Function &F,
                  size_t taskNum,
-                 Module &M,
-                 FinalBodyInfoMap &FinalBodyInfo) {
+                 Module &M) {
 
     const DirectiveEnvironment &DirEnv = DirInfo.DirEnv;
-    const DirectiveLoopInfo LoopInfo = DirInfo.DirEnv.LoopInfo;
+    const DirectiveLoopInfo &LoopInfo = DirInfo.DirEnv.LoopInfo;
 
     DebugLoc DLoc = DirInfo.Entry->getDebugLoc();
     unsigned Line = DLoc.getLine();
@@ -1969,69 +2305,9 @@ struct OmpSs {
     if (!DirEnv.DeclSourceStringRef.empty())
       Nanos6TaskDeclSourceStr = IRBuilder<>(DirInfo.Entry).CreateGlobalStringPtr(DirEnv.DeclSourceStringRef);
 
-    buildFinalCondCFG(M, F, FinalBodyInfo.lookup(&DirInfo));
-
-    BasicBlock *EntryBB = DirInfo.Entry->getParent();
-    BasicBlock *ExitBB = DirInfo.Exit->getParent()->getUniqueSuccessor();
-
-
     // In loop constructs this will be the starting loop BB
-    BasicBlock *NewEntryBB = EntryBB;
-    DirectiveLoopInfo NewLoopInfo = LoopInfo;
-    if (!LoopInfo.empty()) {
-      Type *IndVarTy = LoopInfo.IndVar->getType()->getPointerElementType();
-
-      IRBuilder<> IRB(DirInfo.Entry);
-
-      // Use tmp variables to be replaced by what comes from nanos6. This fixes
-      // the problem when bounds or step are constants
-      NewLoopInfo.LBound = IRB.CreateAlloca(IndVarTy, nullptr, "lb.tmp.addr");
-      IRB.CreateStore(createZSExtOrTrunc(IRB, LoopInfo.LBound, IndVarTy, LoopInfo.LBoundSigned), NewLoopInfo.LBound);
-      NewLoopInfo.LBound = IRB.CreateLoad(NewLoopInfo.LBound);
-      NewLoopInfo.LBoundSigned = LoopInfo.IndVarSigned;
-
-      NewLoopInfo.UBound = IRB.CreateAlloca(IndVarTy, nullptr, "ub.tmp.addr");
-      IRB.CreateStore(createZSExtOrTrunc(IRB, LoopInfo.UBound, IndVarTy, LoopInfo.UBoundSigned), NewLoopInfo.UBound);
-      NewLoopInfo.UBound = IRB.CreateLoad(NewLoopInfo.UBound);
-      NewLoopInfo.UBoundSigned = LoopInfo.IndVarSigned;
-
-      // unpacked_task_region loops are always step 1
-      NewLoopInfo.Step = IRB.CreateAlloca(IndVarTy, nullptr, "step.tmp.addr");
-      IRB.CreateStore(ConstantInt::get(IndVarTy, 1), NewLoopInfo.Step);
-      NewLoopInfo.Step = IRB.CreateLoad(NewLoopInfo.Step);
-      NewLoopInfo.StepSigned = LoopInfo.IndVarSigned;
-
-      NewLoopInfo.IndVar =
-        IRB.CreateAlloca(IndVarTy, nullptr, "loop." + LoopInfo.IndVar->getName());
-      // unpacked_task_region loops are always SLT
-      NewLoopInfo.LoopType = DirectiveLoopInfo::LT;
-      buildLoopForTaskImpl(M, F, DirInfo.Entry, DirInfo.Exit, NewLoopInfo, NewEntryBB, EntryBB);
-    }
-
-    DirInfo.Exit->eraseFromParent();
-    DirInfo.Entry->eraseFromParent();
-
-    SetVector<BasicBlock *> TaskBBs;
-    SmallVector<BasicBlock*, 8> Worklist;
-    SmallPtrSet<BasicBlock*, 8> Visited;
-
-    // 2. Gather BB between entry and exit (is there any function/util to do this?)
-    Worklist.push_back(NewEntryBB);
-    Visited.insert(NewEntryBB);
-    TaskBBs.insert(NewEntryBB);
-    while (!Worklist.empty()) {
-      auto WIt = Worklist.begin();
-      BasicBlock *BB = *WIt;
-      Worklist.erase(WIt);
-
-      for (auto It = succ_begin(BB); It != succ_end(BB); ++It) {
-        if (!Visited.count(*It) && *It != ExitBB) {
-          Worklist.push_back(*It);
-          Visited.insert(*It);
-          TaskBBs.insert(*It);
-        }
-      }
-    }
+    Instruction *NewEntryI = DirInfo.Entry;
+    Instruction *NewExitI = &DirInfo.Exit->getParent()->getUniqueSuccessor()->front();
 
     // Create nanos6_task_args_* START
     SmallVector<Type *, 4> TaskArgsMemberTy;
@@ -2072,6 +2348,45 @@ struct OmpSs {
 
     Function *OlOnreadyFuncVar =
       createOnreadyOlFunc(M, F, taskNum, TaskArgsToStructIdxMap, TaskArgsTy, DirInfo, TaskTypeList, TaskNameList);
+
+    DirectiveLoopInfo NewLoopInfo = LoopInfo;
+    SmallVector<Value *> NormalizedUBs(LoopInfo.UBound.size());
+    if (!LoopInfo.empty()) {
+
+      // This is used for nanos6_create_loop
+      // NOTE: all values have nanos6 upper_bound type
+      ComputeLoopBounds(M, LoopInfo, DirInfo.Entry, NormalizedUBs);
+
+      IRBuilder<> IRB(DirInfo.Entry);
+
+      Type *IndVarTy = LoopInfo.IndVar[0]->getType()->getPointerElementType();
+      // Non collapsed loops build a loop using the original type
+      NewLoopInfo.LBoundSigned[0] = LoopInfo.IndVarSigned[0];
+      NewLoopInfo.UBoundSigned[0] = LoopInfo.IndVarSigned[0];
+      NewLoopInfo.StepSigned[0] = LoopInfo.IndVarSigned[0];
+      if (LoopInfo.LBound.size() > 1) {
+        // Collapsed loops build a loop using size_t type to avoid overflows
+        IndVarTy = IRB.getInt64Ty();
+        NewLoopInfo.LBoundSigned[0] = 0;
+        NewLoopInfo.UBoundSigned[0] = 0;
+        NewLoopInfo.StepSigned[0] = 0;
+      }
+      // In reality we do not need this except for buildind the loop here.
+      // These values will be replaced by nanos6 bounds
+      NewLoopInfo.LBound[0].Result = createZSExtOrTrunc(IRB, LoopInfo.LBound[0].Result, IndVarTy, LoopInfo.LBoundSigned[0]);
+      NewLoopInfo.UBound[0].Result = createZSExtOrTrunc(IRB, LoopInfo.UBound[0].Result, IndVarTy, LoopInfo.UBoundSigned[0]);
+      // unpacked_task_region loops are always step 1
+      NewLoopInfo.Step[0].Result = ConstantInt::get(IndVarTy, 1);
+
+      NewLoopInfo.IndVar[0] = IRB.CreateAlloca(IndVarTy, nullptr, "loop");
+      // unpacked_task_region loops are always SLT
+      NewLoopInfo.LoopType[0] = DirectiveLoopInfo::LT;
+      buildLoopForTaskImpl(M, F, DirInfo.Entry, DirInfo.Exit, NewLoopInfo, NewEntryI, NewExitI);
+    }
+
+    SetVector<Instruction *> TaskBBs;
+    computeBBsBetweenEntryExit(TaskBBs, NewEntryI, NewExitI);
+
 
     // 3. Create Nanos6 task data structures info
     GlobalVariable *TaskInvInfoVar =
@@ -2194,15 +2509,16 @@ struct OmpSs {
     registerTaskInfo(M, TaskInfoVar);
 
     auto rewriteUsesBrAndGetOmpSsUnpackFunc
-      = [&M, &LoopInfo, &EntryBB, &NewLoopInfo, &UnpackTaskFuncVar, &TaskArgsToStructIdxMap](BasicBlock *header,
-                                            BasicBlock *newRootNode,
-                                            BasicBlock *newHeader,
-                                            Function *oldFunction,
-                                            const SetVector<BasicBlock *> &Blocks) {
+      = [&M, &LoopInfo, &DirInfo, &NewLoopInfo,
+         &NormalizedUBs, &UnpackTaskFuncVar, &TaskArgsToStructIdxMap,
+         this]
+           (BasicBlock *header, BasicBlock *newRootNode, BasicBlock *newHeader,
+            Function *oldFunction, const SetVector<BasicBlock *> &Blocks) {
       UnpackTaskFuncVar->getBasicBlockList().push_back(newRootNode);
 
       if (!LoopInfo.empty()) {
-        Type *IndVarTy = LoopInfo.IndVar->getType()->getPointerElementType();
+        Type *OrigIndVarTy = LoopInfo.IndVar[0]->getType()->getPointerElementType();
+        Type *NewIndVarTy = NewLoopInfo.IndVar[0]->getType()->getPointerElementType();
 
         IRBuilder<> IRB(&header->front());
         Value *LoopBounds = &*(UnpackTaskFuncVar->arg_end() - 2);
@@ -2212,39 +2528,146 @@ struct OmpSs {
         Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
         Value *LBoundField = IRB.CreateGEP(LoopBounds, Idx, "lb_gep");
         LBoundField = IRB.CreateLoad(LBoundField);
-        LBoundField = IRB.CreateZExtOrTrunc(LBoundField, IndVarTy, "lb");
+        LBoundField = IRB.CreateZExtOrTrunc(LBoundField, NewIndVarTy, "lb");
 
         Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 1);
         Value *UBoundField = IRB.CreateGEP(LoopBounds, Idx, "ub_gep");
         UBoundField = IRB.CreateLoad(UBoundField);
-        UBoundField = IRB.CreateZExtOrTrunc(UBoundField, IndVarTy, "ub");
+        UBoundField = IRB.CreateZExtOrTrunc(UBoundField, NewIndVarTy, "ub");
 
         // Replace loop bounds of the indvar, loop cond. and loop incr.
-        if (isReplaceableValue(NewLoopInfo.LBound)) {
-          rewriteUsesInBlocksWithPred(
-            NewLoopInfo.LBound, LBoundField,
-            [&Blocks](Instruction *I) { return Blocks.count(I->getParent()); });
-        }
-        if (isReplaceableValue(NewLoopInfo.UBound)) {
-          rewriteUsesInBlocksWithPred(
-            NewLoopInfo.UBound, UBoundField,
-            [&Blocks](Instruction *I) { return Blocks.count(I->getParent()); });
-        }
+        // NOTE: incr. does not need to be replaced because all loops have step 1.
+        rewriteUsesInBlocksWithPred(
+          NewLoopInfo.LBound[0].Result, LBoundField,
+          [&Blocks](Instruction *I) { return Blocks.count(I->getParent()); });
+        rewriteUsesInBlocksWithPred(
+          NewLoopInfo.UBound[0].Result, UBoundField,
+          [&Blocks](Instruction *I) { return Blocks.count(I->getParent()); });
 
-        // Now we can set BodyIndVar = (LoopIndVar * Step) + OrigLBound
-        IRBuilder<> LoopBodyIRB(&EntryBB->front());
-        Value *NormVal = LoopBodyIRB.CreateLoad(NewLoopInfo.IndVar);
-        auto p = buildInstructionSignDependent(
-          LoopBodyIRB, M, NormVal, LoopInfo.Step, NewLoopInfo.IndVarSigned, LoopInfo.StepSigned,
-          [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
-            return IRB.CreateMul(LHS, RHS);
-          });
-        p = buildInstructionSignDependent(
-          LoopBodyIRB, M, p.first, LoopInfo.LBound, p.second, LoopInfo.LBoundSigned,
-          [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
-            return IRB.CreateAdd(LHS, RHS);
-          });
-        LoopBodyIRB.CreateStore(createZSExtOrTrunc(LoopBodyIRB, p.first, IndVarTy, p.second), LoopInfo.IndVar);
+        // Now we can set
+        // TMP = LoopIndVar/ProductUBs(i+1..n)
+        // LoopIndVar = LoopIndVar - TMP*PProductUBs(i+1..n)
+        // BodyIndVar(i) = (TMP * Step) + OrigLBound
+        Value *NormVal = nullptr;
+        for (size_t i = 0; i < LoopInfo.LBound.size(); ++i) {
+          Instruction *Entry = &DirInfo.Entry->getParent()->front();
+          if (i < CollapseStuff.size())
+            Entry = CollapseStuff[i];
+
+          IRBuilder<> LoopBodyIRB(Entry);
+          if (!i)
+            NormVal = LoopBodyIRB.CreateLoad(NewLoopInfo.IndVar[0]);
+
+          // NOTE: NormalizedUBs values are nanos6_register_loop upper_bound type
+          Value *Niters = ConstantInt::get(Nanos6LoopBounds::getInstance(M).getType()->getElementType(1), 1);
+          for (size_t j = i + 1; j < LoopInfo.LBound.size(); ++j)
+            Niters = LoopBodyIRB.CreateMul(Niters, NormalizedUBs[j]);
+
+          // TMP = LoopIndVar/ProductUBs(i+1..n)
+          auto pTmp = buildInstructionSignDependent(
+            LoopBodyIRB, M, NormVal, Niters, NewLoopInfo.IndVarSigned[0], /*RHSSigned=*/false,
+            [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+              if (NewOpSigned)
+                return IRB.CreateSDiv(LHS, RHS);
+              return IRB.CreateUDiv(LHS, RHS);
+            });
+
+          // TMP * Step
+          auto p = buildInstructionSignDependent(
+            LoopBodyIRB, M, pTmp.first, LoopInfo.Step[i].Result, pTmp.second, LoopInfo.StepSigned[i],
+            [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+              return IRB.CreateMul(LHS, RHS);
+            });
+
+          // (TMP * Step) + OrigLBound
+          auto pBodyIndVar = buildInstructionSignDependent(
+            LoopBodyIRB, M, p.first, LoopInfo.LBound[i].Result, p.second, LoopInfo.LBoundSigned[i],
+            [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+              return IRB.CreateAdd(LHS, RHS);
+            });
+
+          // TMP*ProductUBs(i+1..n)
+          p = buildInstructionSignDependent(
+            LoopBodyIRB, M, pTmp.first, Niters, pTmp.second, /*RHSSigned=*/false,
+            [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+              return IRB.CreateMul(LHS, RHS);
+            });
+
+          // LoopInfo - TMP*ProductUBs(i+1..n)
+          auto pLoopIndVar = buildInstructionSignDependent(
+            LoopBodyIRB, M, NormVal, p.first, NewLoopInfo.IndVarSigned[0], p.second,
+            [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+              return IRB.CreateSub(LHS, RHS);
+            });
+
+          // LoopIndVar = LoopInfo - TMP*ProductUBs(i+1..n)
+          NormVal = pLoopIndVar.first;
+
+          // BodyIndVar(i) = (TMP * Step) + OrigLBound
+          LoopBodyIRB.CreateStore(createZSExtOrTrunc(LoopBodyIRB, pBodyIndVar.first, OrigIndVarTy, pBodyIndVar.second), LoopInfo.IndVar[i]);
+
+          // Only if there is more than one iterator
+          if (CollapseStuff.size() > 1) {
+            // Create a check to skip unwanted iterations due to collapse guess
+            Instruction *UBoundResult = LoopBodyIRB.CreateCall(LoopInfo.UBound[i].Fun, LoopInfo.UBound[i].Args);
+
+            Instruction *IndVarVal = LoopBodyIRB.CreateLoad(LoopInfo.IndVar[i]);
+            Value *LoopCmp = nullptr;
+            switch (LoopInfo.LoopType[i]) {
+            case DirectiveLoopInfo::LT:
+              LoopCmp = buildInstructionSignDependent(
+                LoopBodyIRB, M, IndVarVal, UBoundResult, LoopInfo.IndVarSigned[i], LoopInfo.UBoundSigned[i],
+                [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+                  if (NewOpSigned)
+                    return IRB.CreateICmpSLT(LHS, RHS);
+                  return IRB.CreateICmpULT(LHS, RHS);
+                }).first;
+              break;
+            case DirectiveLoopInfo::LE:
+              LoopCmp = buildInstructionSignDependent(
+                LoopBodyIRB, M, IndVarVal, UBoundResult, LoopInfo.IndVarSigned[i], LoopInfo.UBoundSigned[i],
+                [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+                  if (NewOpSigned)
+                    return IRB.CreateICmpSLE(LHS, RHS);
+                  return IRB.CreateICmpULE(LHS, RHS);
+                }).first;
+              break;
+            case DirectiveLoopInfo::GT:
+              LoopCmp = buildInstructionSignDependent(
+                LoopBodyIRB, M, IndVarVal, UBoundResult, LoopInfo.IndVarSigned[i], LoopInfo.UBoundSigned[i],
+                [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+                  if (NewOpSigned)
+                    return IRB.CreateICmpSGT(LHS, RHS);
+                  return IRB.CreateICmpUGT(LHS, RHS);
+                }).first;
+              break;
+            case DirectiveLoopInfo::GE:
+              LoopCmp = buildInstructionSignDependent(
+                LoopBodyIRB, M, IndVarVal, UBoundResult, LoopInfo.IndVarSigned[i], LoopInfo.UBoundSigned[i],
+                [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+                  if (NewOpSigned)
+                    return IRB.CreateICmpSGE(LHS, RHS);
+                  return IRB.CreateICmpUGE(LHS, RHS);
+                }).first;
+              break;
+            default:
+              llvm_unreachable("unexpected loop type");
+            }
+
+            // The IncrBB is the successor of BodyBB
+            BasicBlock *BodyBB = DirInfo.Exit->getParent();
+            Instruction *IncrBBI = &BodyBB->getUniqueSuccessor()->front();
+
+            // Next iterator computation or BodyBB
+            BasicBlock *NextBB = CollapseStuff[i]->getParent()->getUniqueSuccessor();
+
+            // Replace the branch
+            Instruction *Terminator = Entry->getParent()->getTerminator();
+            LoopBodyIRB.SetInsertPoint(Terminator);
+            LoopBodyIRB.CreateCondBr(LoopCmp, NextBB, IncrBBI->getParent());
+            Terminator->eraseFromParent();
+          }
+        }
       }
 
       // Create an iterator to name all of the arguments we inserted.
@@ -2400,57 +2823,28 @@ struct OmpSs {
       };
 
       if (DirEnv.isOmpSsLoopDirective()) {
-        // <      0, (ub - 1 - lb) / step + 1
-        // <=     0, (ub - lb)     / step + 1
-        // >      0, (ub + 1 - lb) / step + 1
-        // >=     0, (ub - lb)     / step + 1
-        Type *IndVarTy = DirEnv.LoopInfo.IndVar->getType()->getPointerElementType();
-        Value *RegisterLowerB = ConstantInt::get(IndVarTy, 0);
+        SmallVector<Value *> NormalizedUBs(LoopInfo.UBound.size());
+        ComputeLoopBounds(M, LoopInfo, &*IRB.saveIP().getPoint(), NormalizedUBs);
 
-        auto p = buildInstructionSignDependent(
-          IRB, M, DirEnv.LoopInfo.UBound, DirEnv.LoopInfo.LBound, DirEnv.LoopInfo.UBoundSigned, DirEnv.LoopInfo.LBoundSigned,
-          [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
-            return IRB.CreateSub(LHS, RHS);
-          });
-        Value *RegisterUpperB = p.first;
+        Value *Niters = ConstantInt::get(Nanos6LoopBounds::getInstance(M).getType()->getElementType(1), 1);
+        for (size_t i = 0; i < LoopInfo.LBound.size(); ++i)
+          Niters = IRB.CreateMul(Niters, NormalizedUBs[i]);
 
-        Value *RegisterGrainsize = ConstantInt::get(IndVarTy, 0);
+        Value *RegisterGrainsize =
+          ConstantInt::get(
+            Nanos6LoopBounds::getInstance(M).getType()->getElementType(2), 0);
         if (DirEnv.LoopInfo.Grainsize)
           RegisterGrainsize = DirEnv.LoopInfo.Grainsize;
-        Value *RegisterChunksize = ConstantInt::get(IndVarTy, 0);
+
+        Value *RegisterChunksize =
+          ConstantInt::get(
+            Nanos6LoopBounds::getInstance(M).getType()->getElementType(3), 0);
         if (DirEnv.LoopInfo.Chunksize)
           RegisterChunksize = DirEnv.LoopInfo.Chunksize;
 
-        switch (DirEnv.LoopInfo.LoopType) {
-        case DirectiveLoopInfo::LT:
-          RegisterUpperB = IRB.CreateSub(RegisterUpperB, ConstantInt::get(RegisterUpperB->getType(), 1));
-          break;
-        case DirectiveLoopInfo::GT:
-          RegisterUpperB = IRB.CreateAdd(RegisterUpperB, ConstantInt::get(RegisterUpperB->getType(), 1));
-          break;
-        case DirectiveLoopInfo::LE:
-        case DirectiveLoopInfo::GE:
-          break;
-        default:
-          llvm_unreachable("unexpected loop type");
-        }
-        p = buildInstructionSignDependent(
-          IRB, M, RegisterUpperB, DirEnv.LoopInfo.Step, p.second, DirEnv.LoopInfo.Step,
-          [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
-            if (NewOpSigned)
-              return IRB.CreateSDiv(LHS, RHS);
-            return IRB.CreateUDiv(LHS, RHS);
-          });
-        RegisterUpperB = IRB.CreateAdd(p.first, ConstantInt::get(p.first->getType(), 1));
-
-        CreateDirectiveArgs.push_back(
-          createZSExtOrTrunc(
-              IRB, RegisterLowerB,
-              Nanos6LoopBounds::getInstance(M).getType()->getElementType(0), /*Signed=*/false));
-        CreateDirectiveArgs.push_back(
-          createZSExtOrTrunc(
-            IRB, RegisterUpperB,
-            Nanos6LoopBounds::getInstance(M).getType()->getElementType(1), p.second));
+        Value *RegisterLowerB = ConstantInt::get(Nanos6LoopBounds::getInstance(M).getType()->getElementType(0), 0);
+        CreateDirectiveArgs.push_back(RegisterLowerB);
+        CreateDirectiveArgs.push_back(Niters);
         CreateDirectiveArgs.push_back(
           createZSExtOrTrunc(
             IRB, RegisterGrainsize,
@@ -2610,8 +3004,16 @@ struct OmpSs {
 
     // 4. Extract region the way we want
     CodeExtractorAnalysisCache CEAC(F);
-    CodeExtractor CE(TaskBBs.getArrayRef(), rewriteUsesBrAndGetOmpSsUnpackFunc, emitOmpSsCaptureAndSubmitTask);
+    SmallVector<BasicBlock *> TaskBBs1;
+    for (auto *I : TaskBBs)
+      TaskBBs1.push_back(I->getParent());
+    CodeExtractor CE(TaskBBs1, rewriteUsesBrAndGetOmpSsUnpackFunc, emitOmpSsCaptureAndSubmitTask);
     CE.extractCodeRegion(CEAC);
+
+    DirInfo.Exit->eraseFromParent();
+    DirInfo.Entry->eraseFromParent();
+    // FIXME: CollapseStuff should be local to task
+    CollapseStuff.clear();
   }
 
   void buildNanos6Types(Module &M) {
@@ -2779,94 +3181,17 @@ struct OmpSs {
     for (auto *F : Functs) {
       DirectiveFunctionInfo &DirectiveFuncInfo = LookupDirectiveFunctionInfo(*F).getFuncInfo();
 
-      FinalBodyInfoMap FinalBodyInfo;
-
-      // First sweep to clone BBs
-      for (DirectiveInfo *pDirInfo : DirectiveFuncInfo.PostOrder) {
-        DirectiveInfo &DirInfo = *pDirInfo;
-
-        // Skip non task directives
-        if (!DirInfo.DirEnv.isOmpSsTaskDirective())
-          continue;
-
-        // 1. Split BB
-        BasicBlock *EntryBB = DirInfo.Entry->getParent();
-        EntryBB = EntryBB->splitBasicBlock(DirInfo.Entry);
-
-        BasicBlock *ExitBB = DirInfo.Exit->getParent();
-        ExitBB = ExitBB->splitBasicBlock(DirInfo.Exit->getNextNode());
-
-        SmallVector<BasicBlock*, 8> Worklist;
-        SmallPtrSet<BasicBlock*, 8> Visited;
-        DenseMap<BasicBlock *, BasicBlock *> CopyBBs;
-        ValueToValueMapTy VMap;
-
-        // 2. Clone BBs between entry and exit (is there any function/util to do this?)
-        Worklist.push_back(EntryBB);
-        Visited.insert(EntryBB);
-
-        CopyBBs[EntryBB] = CloneBasicBlock(EntryBB, VMap, ".clone", F);
-        VMap[EntryBB] = CopyBBs[EntryBB];
-        while (!Worklist.empty()) {
-          auto WIt = Worklist.begin();
-          BasicBlock *BB = *WIt;
-          Worklist.erase(WIt);
-
-          for (auto It = succ_begin(BB); It != succ_end(BB); ++It) {
-            if (!Visited.count(*It) && *It != ExitBB) {
-              Worklist.push_back(*It);
-              Visited.insert(*It);
-
-              CopyBBs[*It] = CloneBasicBlock(*It, VMap, ".clone", F);
-              VMap[*It] = CopyBBs[*It];
-            }
-          }
-        }
-
-        Instruction *OrigEntry = DirInfo.Entry;
-        Instruction *OrigExit = DirInfo.Exit;
-        Instruction *CloneEntry = cast<Instruction>(VMap[OrigEntry]);
-        Instruction *CloneExit = cast<Instruction>(VMap[OrigExit]);
-        FinalBodyInfo[&DirInfo].push_back({CloneEntry, CloneExit, &DirInfo});
-        for (DirectiveInfo *InnerTI : DirInfo.InnerDirectiveInfos) {
-          OrigEntry = InnerTI->Entry;
-          OrigExit = InnerTI->Exit;
-          CloneEntry = cast<Instruction>(VMap[OrigEntry]);
-          CloneExit = cast<Instruction>(VMap[OrigExit]);
-          FinalBodyInfo[&DirInfo].push_back({CloneEntry, CloneExit, &DirInfo});
-        }
-
-        // 2. Rewrite ops and branches to cloned ones.
-        //    Intrinsic exit is mapped to the original entry, so before removing it
-        //    we must to map it to the cloned entry.
-        for (auto &p : CopyBBs) {
-          BasicBlock *& CopyBB = p.second;
-          for (BasicBlock::iterator II = CopyBB->begin(), E = CopyBB->end(); II != E;) {
-            Instruction &I = *II++;
-            // Remove OmpSs-2 intrinsics directive_marker. Cloned entries/exits will be removed
-            // when building final stuff
-            if (auto *IIntr = dyn_cast<IntrinsicInst>(&I)) {
-              Intrinsic::ID IID = IIntr->getIntrinsicID();
-              if (IID == Intrinsic::directive_marker) {
-                IIntr->eraseFromParent();
-                continue;
-              }
-            }
-            RemapInstruction(&I, VMap, RF_NoModuleLevelChanges | RF_IgnoreMissingLocals);
-          }
-        }
-      }
-
+      buildFinalCodes(M, *F, DirectiveFuncInfo);
       size_t taskNum = 0;
-      for (DirectiveInfo *pDirInfo : DirectiveFuncInfo.PostOrder) {
-        DirectiveInfo &DirInfo = *pDirInfo;
+      for (size_t i = 0; i < DirectiveFuncInfo.PostOrder.size(); ++i) {
+        DirectiveInfo &DirInfo = *DirectiveFuncInfo.PostOrder[i];
         const DirectiveEnvironment &DirEnv = DirInfo.DirEnv;
         if (DirEnv.isOmpSsTaskwaitDirective())
           lowerTaskwait(DirInfo, M);
         else if (DirEnv.isOmpSsReleaseDirective())
           lowerRelease(DirInfo, M);
         else if (DirEnv.isOmpSsTaskDirective())
-          lowerTask(DirInfo, *F, taskNum++, M, FinalBodyInfo);
+          lowerTask(DirInfo, *F, taskNum++, M);
       }
 
     }

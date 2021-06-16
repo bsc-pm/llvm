@@ -157,27 +157,35 @@ struct DirectiveLoopInfo {
     GT, // >
     GE, // >=
   };
+  struct BoundInfo {
+    Function *Fun = nullptr;
+    // The arguments of the call to function.
+    SmallVector<Value *, 4> Args;
+    // Used by transformation to store the result value
+    mutable Value *Result = nullptr;
+  };
+
   // The type of the loop to build. (i.e. LT, LE,...)
-  int64_t LoopType = -1;
+  SmallVector<int64_t> LoopType;
   // Signedness of the induction var.
-  int64_t IndVarSigned = -1;
+  SmallVector<int64_t> IndVarSigned;
   // Signedness of the lower bound.
-  int64_t LBoundSigned = -1;
+  SmallVector<int64_t> LBoundSigned;
   // Signedness of the upper bound.
-  int64_t UBoundSigned = -1;
+  SmallVector<int64_t> UBoundSigned;
   // Signedness of the step.
-  int64_t StepSigned = -1;
-  Value *IndVar = nullptr;
-  Value *LBound = nullptr;
-  Value *UBound = nullptr;
-  Value *Step = nullptr;
+  SmallVector<int64_t> StepSigned;
+  SmallVector<Value *> IndVar;
+  SmallVector<BoundInfo> LBound;
+  SmallVector<BoundInfo> UBound;
+  SmallVector<BoundInfo> Step;
   Value *Chunksize = nullptr;
   Value *Grainsize = nullptr;
   bool empty() const {
-    return !IndVar && !LBound &&
-           !UBound && !Step &&
-           LoopType == -1 && IndVarSigned == -1 &&
-           LBoundSigned == -1 && UBoundSigned == -1;
+    return IndVar.empty() && LBound.empty() &&
+           UBound.empty() && Step.empty() &&
+           LoopType.empty() && IndVarSigned.empty() &&
+           LBoundSigned.empty() && UBoundSigned.empty();
   }
 };
 

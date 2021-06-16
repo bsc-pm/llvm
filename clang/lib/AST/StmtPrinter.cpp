@@ -718,6 +718,12 @@ void OSSClausePrinter::VisitOSSGrainsizeClause(OSSGrainsizeClause *Node) {
   OS << ")";
 }
 
+void OSSClausePrinter::VisitOSSCollapseClause(OSSCollapseClause *Node) {
+  OS << "collapse(";
+  Node->getNumForLoops()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
 void OSSClausePrinter::VisitOSSWaitClause(OSSWaitClause *Node) {
   OS << "wait";
 }

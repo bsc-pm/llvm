@@ -333,42 +333,59 @@ void DirectiveEnvironment::gatherNonPODCopyInfo(OperandBundleDef &OB) {
 }
 
 void DirectiveEnvironment::gatherLoopTypeInfo(OperandBundleDef &OB) {
-  assert(LoopInfo.LoopType == -1 && "Only allowed one OperandBundle with this Id");
-  assert(LoopInfo.IndVarSigned == -1 && "Only allowed one OperandBundle with this Id");
-  assert(LoopInfo.LBoundSigned == -1 && "Only allowed one OperandBundle with this Id");
-  assert(LoopInfo.UBoundSigned == -1 && "Only allowed one OperandBundle with this Id");
-  assert(LoopInfo.StepSigned == -1 && "Only allowed one OperandBundle with this Id");
-  assert(OB.input_size() == 5 && "Expected loop type and indvar, lb, ub, step signedness");
+  assert(LoopInfo.LoopType.empty() && "Only allowed one OperandBundle with this Id");
+  assert(LoopInfo.IndVarSigned.empty() && "Only allowed one OperandBundle with this Id");
+  assert(LoopInfo.LBoundSigned.empty() && "Only allowed one OperandBundle with this Id");
+  assert(LoopInfo.UBoundSigned.empty() && "Only allowed one OperandBundle with this Id");
+  assert(LoopInfo.StepSigned.empty() && "Only allowed one OperandBundle with this Id");
+  assert(OB.input_size()%5 == 0 && "Expected loop type and indvar, lb, ub, step signedness");
 
-  LoopInfo.LoopType = cast<ConstantInt>(OB.inputs()[0])->getSExtValue();
-  LoopInfo.IndVarSigned = cast<ConstantInt>(OB.inputs()[1])->getSExtValue();
-  LoopInfo.LBoundSigned = cast<ConstantInt>(OB.inputs()[2])->getSExtValue();
-  LoopInfo.UBoundSigned = cast<ConstantInt>(OB.inputs()[3])->getSExtValue();
-  LoopInfo.StepSigned = cast<ConstantInt>(OB.inputs()[4])->getSExtValue();
+  for (size_t i = 0; i < OB.input_size()/5; i++) {
+    LoopInfo.LoopType.push_back(cast<ConstantInt>(OB.inputs()[i*5 + 0])->getSExtValue());
+    LoopInfo.IndVarSigned.push_back(cast<ConstantInt>(OB.inputs()[i*5 + 1])->getSExtValue());
+    LoopInfo.LBoundSigned.push_back(cast<ConstantInt>(OB.inputs()[i*5 + 2])->getSExtValue());
+    LoopInfo.UBoundSigned.push_back(cast<ConstantInt>(OB.inputs()[i*5 + 3])->getSExtValue());
+    LoopInfo.StepSigned.push_back(cast<ConstantInt>(OB.inputs()[i*5 + 4])->getSExtValue());
+  }
 }
 
 void DirectiveEnvironment::gatherLoopIndVarInfo(OperandBundleDef &OB) {
-  assert(!LoopInfo.IndVar && "Only allowed one OperandBundle with this Id");
-  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
-  LoopInfo.IndVar = OB.inputs()[0];
+  assert(LoopInfo.IndVar.empty() && "Only allowed one OperandBundle with this Id");
+  for (size_t i = 0; i < OB.input_size(); i++)
+    LoopInfo.IndVar.push_back(OB.inputs()[i]);
 }
 
 void DirectiveEnvironment::gatherLoopLowerBoundInfo(OperandBundleDef &OB) {
-  assert(!LoopInfo.LBound && "Only allowed one OperandBundle with this Id");
-  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
-  LoopInfo.LBound = OB.inputs()[0];
+  assert(LoopInfo.LBound.empty() && "Only allowed one OperandBundle with this Id");
+  for (size_t i = 0; i < OB.input_size(); i++) {
+    if (auto *F = dyn_cast<Function>(OB.inputs()[i])) {
+      LoopInfo.LBound.emplace_back();
+      LoopInfo.LBound.back().Fun = F;
+    } else
+      LoopInfo.LBound.back().Args.push_back(OB.inputs()[i]);
+  }
 }
 
 void DirectiveEnvironment::gatherLoopUpperBoundInfo(OperandBundleDef &OB) {
-  assert(!LoopInfo.UBound && "Only allowed one OperandBundle with this Id");
-  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
-  LoopInfo.UBound = OB.inputs()[0];
+  assert(LoopInfo.UBound.empty() && "Only allowed one OperandBundle with this Id");
+  for (size_t i = 0; i < OB.input_size(); i++) {
+    if (auto *F = dyn_cast<Function>(OB.inputs()[i])) {
+      LoopInfo.UBound.emplace_back();
+      LoopInfo.UBound.back().Fun = F;
+    } else
+      LoopInfo.UBound.back().Args.push_back(OB.inputs()[i]);
+  }
 }
 
 void DirectiveEnvironment::gatherLoopStepInfo(OperandBundleDef &OB) {
-  assert(!LoopInfo.Step && "Only allowed one OperandBundle with this Id");
-  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
-  LoopInfo.Step = OB.inputs()[0];
+  assert(LoopInfo.Step.empty() && "Only allowed one OperandBundle with this Id");
+  for (size_t i = 0; i < OB.input_size(); i++) {
+    if (auto *F = dyn_cast<Function>(OB.inputs()[i])) {
+      LoopInfo.Step.emplace_back();
+      LoopInfo.Step.back().Fun = F;
+    } else
+      LoopInfo.Step.back().Args.push_back(OB.inputs()[i]);
+  }
 }
 
 void DirectiveEnvironment::gatherLoopChunksizeInfo(OperandBundleDef &OB) {
@@ -514,6 +531,25 @@ void DirectiveEnvironment::verifyNonPODInfo() {
 void DirectiveEnvironment::verifyLoopInfo() {
   if (isOmpSsLoopDirective() && LoopInfo.empty())
     llvm_unreachable("LoopInfo is missing some information");
+  for (size_t i = 0; i < LoopInfo.IndVar.size(); ++i) {
+    if (!valueInDSABundles(DSAInfo, LoopInfo.IndVar[i]))
+      llvm_unreachable("Loop induction variable has no associated DSA");
+    for (size_t j = 0; j < LoopInfo.LBound[i].Args.size(); ++j) {
+      if (!valueInDSABundles(DSAInfo, LoopInfo.LBound[i].Args[j])
+          && !valueInCapturedBundle(CapturedInfo, LoopInfo.LBound[i].Args[j]))
+        llvm_unreachable("Loop lbound argument value has no associated DSA or capture");
+    }
+    for (size_t j = 0; j < LoopInfo.UBound[i].Args.size(); ++j) {
+      if (!valueInDSABundles(DSAInfo, LoopInfo.UBound[i].Args[j])
+          && !valueInCapturedBundle(CapturedInfo, LoopInfo.UBound[i].Args[j]))
+        llvm_unreachable("Loop ubound argument value has no associated DSA or capture");
+    }
+    for (size_t j = 0; j < LoopInfo.Step[i].Args.size(); ++j) {
+      if (!valueInDSABundles(DSAInfo, LoopInfo.Step[i].Args[j])
+          && !valueInCapturedBundle(CapturedInfo, LoopInfo.Step[i].Args[j]))
+        llvm_unreachable("Loop step argument value has no associated DSA or capture");
+    }
+  }
 }
 
 void DirectiveEnvironment::verifyMultiDependInfo() {

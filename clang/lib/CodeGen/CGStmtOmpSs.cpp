@@ -238,6 +238,7 @@ static void AddLoopData(const OSSLoopDirective &S, OSSLoopDataTy &LoopData) {
   LoopData.Step = S.getStep();
   LoopData.TestIsLessOp = S.getIsLessOp();
   LoopData.TestIsStrictOp = S.getIsStrictOp();
+  LoopData.NumCollapses = S.getNumCollapses();
   AddChunksizeLoopData(S, LoopData.Chunksize);
   AddGrainsizeLoopData(S, LoopData.Grainsize);
 }

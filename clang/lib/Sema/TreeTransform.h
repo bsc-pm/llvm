@@ -1680,6 +1680,17 @@ public:
       Condition, StartLoc, LParenLoc, EndLoc);
   }
 
+  /// Build a new OmpSs 'collapse' clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSCollapseClause(Expr *Num, SourceLocation StartLoc,
+                                      SourceLocation LParenLoc,
+                                      SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsCollapseClause(Num, StartLoc, LParenLoc,
+                                              EndLoc);
+  }
+
   /// Build a new OmpSs 'depend' pseudo clause.
   ///
   /// By default, performs semantic analysis to build the new OmpSs clause.
@@ -10648,6 +10659,16 @@ OSSClause *TreeTransform<Derived>::TransformOSSGrainsizeClause(OSSGrainsizeClaus
     return nullptr;
   return getDerived().RebuildOSSGrainsizeClause(
     E.get(), C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSCollapseClause(OSSCollapseClause *C) {
+  ExprResult E = getDerived().TransformExpr(C->getNumForLoops());
+  if (E.isInvalid())
+    return nullptr;
+  return getDerived().RebuildOSSCollapseClause(
+      E.get(), C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
 }
 
 template <typename Derived>

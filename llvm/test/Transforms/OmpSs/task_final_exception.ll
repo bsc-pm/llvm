@@ -38,42 +38,42 @@ define dso_local i32 @main() #1 personality i8* bitcast (i32 (...)* @__gxx_perso
 ; CHECK-LABEL: @main(
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[S:%.*]] = alloca [[STRUCT_S:%.*]], align 4
-; CHECK-NEXT:    call void @_ZN1SC2Ev(%struct.S* [[S]]), [[DBG8:!dbg !.*]]
-; CHECK-NEXT:    [[TMP0:%.*]] = alloca %nanos6_task_args_main0*, align 8, [[DBG9:!dbg !.*]]
-; CHECK-NEXT:    [[TMP1:%.*]] = alloca i8*, align 8, [[DBG9]]
-; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, [[DBG9]]
-; CHECK-NEXT:    br label [[FINAL_COND:%.*]], [[DBG9]]
+; CHECK-NEXT:    call void @_ZN1SC2Ev(%struct.S* [[S]]), !dbg [[DBG8:![0-9]+]]
+; CHECK-NEXT:    [[TMP0:%.*]] = alloca %nanos6_task_args_main0*, align 8, !dbg [[DBG9:![0-9]+]]
+; CHECK-NEXT:    [[TMP1:%.*]] = alloca i8*, align 8, !dbg [[DBG9]]
+; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG9]]
+; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg [[DBG9]]
 ; CHECK:       codeRepl:
-; CHECK-NEXT:    [[TMP2:%.*]] = bitcast %nanos6_task_args_main0** [[TMP0]] to i8**, [[DBG9]]
-; CHECK-NEXT:    store i64 0, i64* [[NUM_DEPS]], align 8, [[DBG9]]
-; CHECK-NEXT:    [[TMP3:%.*]] = load i64, i64* [[NUM_DEPS]], align 8, [[DBG9]]
-; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_main0, %nanos6_task_invocation_info_t* @task_invocation_info_main0, i64 16, i8** [[TMP2]], i8** [[TMP1]], i64 0, i64 [[TMP3]]), [[DBG9]]
-; CHECK-NEXT:    [[TMP4:%.*]] = load %nanos6_task_args_main0*, %nanos6_task_args_main0** [[TMP0]], align 8, [[DBG9]]
-; CHECK-NEXT:    [[TMP5:%.*]] = bitcast %nanos6_task_args_main0* [[TMP4]] to i8*, [[DBG9]]
-; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, i8* [[TMP5]], i64 16, [[DBG9]]
-; CHECK-NEXT:    [[GEP_S:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN0:%.*]], %nanos6_task_args_main0* [[TMP4]], i32 0, i32 0, [[DBG9]]
-; CHECK-NEXT:    call void @oss_copy_ctor_ZN1SC1ERKS_(%struct.S* [[S]], %struct.S* [[GEP_S]], i64 1), [[DBG9]]
-; CHECK-NEXT:    [[TMP6:%.*]] = load i8*, i8** [[TMP1]], align 8, [[DBG9]]
-; CHECK-NEXT:    call void @nanos6_submit_task(i8* [[TMP6]]), [[DBG9]]
-; CHECK-NEXT:    br label [[FINAL_END:%.*]], [[DBG9]]
+; CHECK-NEXT:    [[TMP2:%.*]] = bitcast %nanos6_task_args_main0** [[TMP0]] to i8**, !dbg [[DBG9]]
+; CHECK-NEXT:    store i64 0, i64* [[NUM_DEPS]], align 8, !dbg [[DBG9]]
+; CHECK-NEXT:    [[TMP3:%.*]] = load i64, i64* [[NUM_DEPS]], align 8, !dbg [[DBG9]]
+; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_main0, %nanos6_task_invocation_info_t* @task_invocation_info_main0, i64 16, i8** [[TMP2]], i8** [[TMP1]], i64 0, i64 [[TMP3]]), !dbg [[DBG9]]
+; CHECK-NEXT:    [[TMP4:%.*]] = load %nanos6_task_args_main0*, %nanos6_task_args_main0** [[TMP0]], align 8, !dbg [[DBG9]]
+; CHECK-NEXT:    [[TMP5:%.*]] = bitcast %nanos6_task_args_main0* [[TMP4]] to i8*, !dbg [[DBG9]]
+; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, i8* [[TMP5]], i64 16, !dbg [[DBG9]]
+; CHECK-NEXT:    [[GEP_S:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN0:%.*]], %nanos6_task_args_main0* [[TMP4]], i32 0, i32 0, !dbg [[DBG9]]
+; CHECK-NEXT:    call void @oss_copy_ctor_ZN1SC1ERKS_(%struct.S* [[S]], %struct.S* [[GEP_S]], i64 1), !dbg [[DBG9]]
+; CHECK-NEXT:    [[TMP6:%.*]] = load i8*, i8** [[TMP1]], align 8, !dbg [[DBG9]]
+; CHECK-NEXT:    call void @nanos6_submit_task(i8* [[TMP6]]), !dbg [[DBG9]]
+; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG9]]
 ; CHECK:       final.end:
-; CHECK-NEXT:    call void @_ZN1SD2Ev(%struct.S* [[S]]) [[ATTR1:#.*]], [[DBG10:!dbg !.*]]
-; CHECK-NEXT:    ret i32 0, [[DBG10]]
+; CHECK-NEXT:    call void @_ZN1SD2Ev(%struct.S* [[S]]) #[[ATTR1:[0-9]+]], !dbg [[DBG10:![0-9]+]]
+; CHECK-NEXT:    ret i32 0, !dbg [[DBG10]]
 ; CHECK:       final.then:
 ; CHECK-NEXT:    invoke void @_Z3fooRK1S(%struct.S* dereferenceable(4) [[S]])
-; CHECK-NEXT:    to label [[INVOKE_CONT_CLONE:%.*]] unwind label [[TERMINATE_LPAD_CLONE:%.*]], [[DBG11:!dbg !.*]]
+; CHECK-NEXT:    to label [[INVOKE_CONT_CLONE:%.*]] unwind label [[TERMINATE_LPAD_CLONE:%.*]], !dbg [[DBG11:![0-9]+]]
 ; CHECK:       invoke.cont.clone:
-; CHECK-NEXT:    br label [[FINAL_END]], [[DBG10]]
+; CHECK-NEXT:    br label [[FINAL_END]], !dbg [[DBG10]]
 ; CHECK:       terminate.lpad.clone:
 ; CHECK-NEXT:    [[TMP7:%.*]] = landingpad { i8*, i32 }
-; CHECK-NEXT:    catch i8* null, [[DBG11]]
-; CHECK-NEXT:    [[TMP8:%.*]] = extractvalue { i8*, i32 } [[TMP7]], 0, [[DBG11]]
-; CHECK-NEXT:    call void @__clang_call_terminate(i8* [[TMP8]]) [[ATTR2:#.*]], [[DBG11]]
-; CHECK-NEXT:    unreachable, [[DBG11]]
+; CHECK-NEXT:    catch i8* null, !dbg [[DBG11]]
+; CHECK-NEXT:    [[TMP8:%.*]] = extractvalue { i8*, i32 } [[TMP7]], 0, !dbg [[DBG11]]
+; CHECK-NEXT:    call void @__clang_call_terminate(i8* [[TMP8]]) #[[ATTR2:[0-9]+]], !dbg [[DBG11]]
+; CHECK-NEXT:    unreachable, !dbg [[DBG11]]
 ; CHECK:       final.cond:
-; CHECK-NEXT:    [[TMP9:%.*]] = call i32 @nanos6_in_final(), [[DBG9]]
-; CHECK-NEXT:    [[TMP10:%.*]] = icmp ne i32 [[TMP9]], 0, [[DBG9]]
-; CHECK-NEXT:    br i1 [[TMP10]], label [[FINAL_THEN:%.*]], label [[CODEREPL:%.*]], [[DBG9]]
+; CHECK-NEXT:    [[TMP9:%.*]] = call i32 @nanos6_in_final(), !dbg [[DBG9]]
+; CHECK-NEXT:    [[TMP10:%.*]] = icmp ne i32 [[TMP9]], 0, !dbg [[DBG9]]
+; CHECK-NEXT:    br i1 [[TMP10]], label [[FINAL_THEN:%.*]], label [[CODEREPL:%.*]], !dbg [[DBG9]]
 ;
 entry:
   %s = alloca %struct.S, align 4
@@ -129,14 +129,14 @@ declare void @__clang_call_terminate(i8* %0)
 
 ; CHECK: define internal void @nanos6_unpacked_task_region_main0(%struct.S* %s, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) !dbg !12 {
 ; CHECK: newFuncRoot:
-; CHECK-NEXT:  br label %0, !dbg !13
+; CHECK-NEXT:  br label %0
 ; CHECK: .exitStub:                                        ; preds = %invoke.cont
 ; CHECK-NEXT:  ret void
 ; CHECK: 0:                                                ; preds = %newFuncRoot
 ; CHECK-NEXT:   invoke void @_Z3fooRK1S(%struct.S* dereferenceable(4) %s)
-; CHECK-NEXT:           to label %invoke.cont unwind label %terminate.lpad, !dbg !13
+; CHECK-NEXT:           to label %invoke.cont unwind label %terminate.lpad
 ; CHECK: invoke.cont:                                      ; preds = %0
-; CHECK-NEXT:   br label %.exitStub, !dbg !14
+; CHECK-NEXT:   br label %.exitStub
 ; CHECK: terminate.lpad:                                   ; preds = %0
 ; CHECK-NEXT:   %1 = landingpad { i8*, i32 }
 ; CHECK-NEXT:           catch i8* null
@@ -174,3 +174,4 @@ attributes #5 = { noreturn nounwind }
 !11 = !DILocation(line: 14, column: 13, scope: !9)
 !12 = !DILocation(line: 15, column: 5, scope: !9)
 !13 = !DILocation(line: 16, column: 1, scope: !9)
+

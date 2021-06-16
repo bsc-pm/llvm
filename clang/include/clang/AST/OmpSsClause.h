@@ -616,6 +616,74 @@ public:
   }
 };
 
+/// This represents 'collapse' clause in the
+/// '#pragma oss {task for|taskloop|taskloop for}' directive.
+/// directive.
+///
+/// \code
+/// #pragma oss taskloop collapse(3)
+/// \endcode
+/// In this example directive '#pragma oss taskloop' has clause 'collapse'
+/// with single expression '3'.
+/// The parameter must be a constant positive integer expression, it specifies
+/// the number of nested loops that should be collapsed into a single iteration
+/// space.
+class OSSCollapseClause : public OSSClause {
+  friend class OSSClauseReader;
+
+  /// Location of '('.
+  SourceLocation LParenLoc;
+
+  /// Number of for-loops.
+  Stmt *NumForLoops = nullptr;
+
+  /// Set the number of associated for-loops.
+  void setNumForLoops(Expr *Num) { NumForLoops = Num; }
+
+public:
+  /// Build 'collapse' clause.
+  ///
+  /// \param Num Expression associated with this clause.
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param EndLoc Ending location of the clause.
+  OSSCollapseClause(Expr *Num, SourceLocation StartLoc,
+                    SourceLocation LParenLoc, SourceLocation EndLoc)
+      : OSSClause(OSSC_collapse, StartLoc, EndLoc),
+        LParenLoc(LParenLoc), NumForLoops(Num) {}
+
+  /// Build an empty clause.
+  explicit OSSCollapseClause()
+      : OSSClause(OSSC_collapse, SourceLocation(),
+                  SourceLocation()) {}
+
+  /// Sets the location of '('.
+  void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
+
+  /// Returns the location of '('.
+  SourceLocation getLParenLoc() const { return LParenLoc; }
+
+  /// Return the number of associated for-loops.
+  Expr *getNumForLoops() const { return cast_or_null<Expr>(NumForLoops); }
+
+  child_range children() { return child_range(&NumForLoops, &NumForLoops + 1); }
+
+  const_child_range children() const {
+    return const_child_range(&NumForLoops, &NumForLoops + 1);
+  }
+
+  child_range used_children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+  const_child_range used_children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == OSSC_collapse;
+  }
+};
+
 /// This represents 'default' clause in the '#pragma oss ...' directive.
 ///
 /// \code

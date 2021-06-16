@@ -299,6 +299,7 @@ static bool parseDeclareTaskClauses(
       break;
     case OSSC_chunksize:
     case OSSC_grainsize:
+    case OSSC_collapse:
     case OSSC_weakconcurrent:
     case OSSC_reduction:
     case OSSC_weakreduction:
@@ -611,6 +612,16 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
     Actions.StartOmpSsDSABlock(DKind, Actions.getCurScope(), Loc);
 
     if (isOmpSsTaskLoopDirective(DKind)) {
+      // User may write this:
+      // #pragma oss taskloop collapse(2)
+      // for (...) {
+      //   #pragma oss taskloop
+      //   for (...) {}
+      // }
+      // Diagnostic will be emited in Sema, so ignore
+      // tokens of the previous taskloop
+      OSSLateParsedToks.clear();
+
       // in taskloop we parse clauses later
       OSSLateParsedToks.push_back(Tok);
       ConsumeToken();
@@ -620,6 +631,46 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
       }
       OSSLateParsedToks.push_back(Tok);
       ConsumeAnyToken();
+
+     // TODO: make a function of this.
+     // Parse only collapse clauses. Only the first value (if valid)
+     // will be recorded in Stack
+#if 1
+      // Parse late clause tokens
+      PP.EnterToken(Tok, /*IsReinject*/ true);
+      PP.EnterTokenStream(OSSLateParsedToks, /*DisableMacroExpansion=*/true,
+                          /*IsReinject*/ true);
+
+      // Consume the previously pushed token.
+      ConsumeAnyToken(/*ConsumeCodeCompletionTok=*/true);
+      ConsumeAnyToken(/*ConsumeCodeCompletionTok=*/true);
+
+      while (Tok.isNot(tok::annot_pragma_ompss_end)) {
+        OmpSsClauseKind CKind = getOmpSsClauseKind(PP.getSpelling(Tok));
+        SourceLocation Loc = ConsumeToken();
+        if (CKind != OSSC_collapse) {
+          SkipUntil(tok::annot_pragma_ompss_end, tok::identifier, StopBeforeMatch);
+          continue;
+        }
+
+        SourceLocation LLoc = Tok.getLocation();
+        SourceLocation RLoc;
+
+        // Supress diagnostics here. Errors will be handled later
+        Diags.setSuppressAllDiagnostics(true);
+
+        ExprResult Val = ParseOmpSsParensExpr(getOmpSsClauseName(CKind), RLoc);
+        if (!Val.isInvalid())
+          Actions.VerifyPositiveIntegerConstant(Val.get(), OSSC_collapse, /*StrictlyPositive=*/true);
+
+        Diags.setSuppressAllDiagnostics(false);
+
+        // Skip ',' if any.
+        if (Tok.is(tok::comma))
+          ConsumeToken();
+      }
+      ConsumeAnnotationToken();
+#endif
 
     } else {
       ConsumeToken();
@@ -761,6 +812,7 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
   case OSSC_onready:
   case OSSC_chunksize:
   case OSSC_grainsize:
+  case OSSC_collapse:
     if (!FirstClause) {
       Diag(Tok, diag::err_oss_more_one_clause)
           << getOmpSsDirectiveName(DKind) << getOmpSsClauseName(CKind) << 0;
