@@ -352,7 +352,14 @@ fi
 # Flags for lit
 ################################################################################
 
-CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_LIT_ARGS=-sv --xunit-xml-output=xunit.xml")
+LIT_ARGS="-DLLVM_LIT_ARGS=-sv --xunit-xml-output=xunit.xml"
+
+if [ -n "${LLVM_LIT_THREADS}" ];
+then
+  LIT_ARGS+=" --threads=${LLVM_LIT_THREADS}"
+fi
+
+CMAKE_INVOCATION_EXTRA_FLAGS+=("${LIT_ARGS}")
 
 ################################################################################
 # Sanitizer build
