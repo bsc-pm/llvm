@@ -402,6 +402,15 @@ def shl_ashr_to_sext_inreg : GICombineRule<
     [{ return Helper.matchAshrShlToSextInreg(*${root}, ${info}); }]),
   (apply [{ return Helper.applyAshShlToSextInreg(*${root}, ${info});}])
 >;
+
+// Fold and(and(x, C1), C2) -> C1&C2 ? and(x, C1&C2) : 0
+def overlapping_and: GICombineRule <
+  (defs root:$root, build_fn_matchinfo:$info),
+  (match (wip_match_opcode G_AND):$root,
+         [{ return Helper.matchOverlappingAnd(*${root}, ${info}); }]),
+  (apply [{ return Helper.applyBuildFn(*${root}, ${info}); }])
+>;
+
 // Fold (x & y) -> x or (x & y) -> y when (x & y) is known to equal x or equal y.
 def redundant_and: GICombineRule <
   (defs root:$root, register_matchinfo:$matchinfo),
@@ -628,6 +637,15 @@ def bitfield_extract_from_and : GICombineRule<
 
 def funnel_shift_combines : GICombineGroup<[funnel_shift_to_rotate]>;
 
+def bitfield_extract_from_sext_inreg : GICombineRule<
+  (defs root:$root, build_fn_matchinfo:$info),
+  (match (wip_match_opcode G_SEXT_INREG):$root,
+    [{ return Helper.matchBitfieldExtractFromSExtInReg(*${root}, ${info}); }]),
+  (apply [{ return Helper.applyBuildFn(*${root}, ${info}); }])>;
+
+def form_bitfield_extract : GICombineGroup<[bitfield_extract_from_sext_inreg,
+                                            bitfield_extract_from_and]>;
+
 // FIXME: These should use the custom predicate feature once it lands.
 def undef_combines : GICombineGroup<[undef_to_fp_zero, undef_to_int_zero,
                                      undef_to_negative_one,
@@ -643,7 +661,8 @@ def identity_combines : GICombineGroup<[select_same_val, right_identity_zero,
                                         i2p_to_p2i, anyext_trunc_fold,
                                         fneg_fneg_fold, right_identity_one]>;
 
-def const_combines : GICombineGroup<[constant_fp_op, const_ptradd_to_i2p]>;
+def const_combines : GICombineGroup<[constant_fp_op, const_ptradd_to_i2p,
+                                     overlapping_and]>;
 
 def known_bits_simplifications : GICombineGroup<[
   redundant_and, redundant_sext_inreg, redundant_or, urem_pow2_to_mask,
@@ -670,7 +689,7 @@ def all_combines : GICombineGroup<[trivial_combines, insert_vec_elt_combines,
     unmerge_zext_to_zext, trunc_ext_fold, trunc_shl,
     const_combines, xor_of_and_with_same_reg, ptr_add_with_zero,
     shift_immed_chain, shift_of_shifted_logic_chain, load_or_combine,
-    div_rem_to_divrem, funnel_shift_combines, bitfield_extract_from_and]>;
+    div_rem_to_divrem, funnel_shift_combines, form_bitfield_extract]>;
 
 // A combine group used to for prelegalizer combiners at -O0. The combines in
 // this group have been selected based on experiments to balance code size and

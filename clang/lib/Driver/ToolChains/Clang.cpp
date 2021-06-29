@@ -344,7 +344,7 @@ static void getTargetFeatures(const Driver &D, const llvm::Triple &Triple,
   case llvm::Triple::aarch64:
   case llvm::Triple::aarch64_32:
   case llvm::Triple::aarch64_be:
-    aarch64::getAArch64TargetFeatures(D, Triple, Args, Features);
+    aarch64::getAArch64TargetFeatures(D, Triple, Args, Features, ForAS);
     break;
   case llvm::Triple::x86:
   case llvm::Triple::x86_64:
@@ -799,6 +799,20 @@ static void addPGOAndCoverageFlags(const ToolChain &TC, Compilation &C,
     D.Diag(diag::err_drv_argument_not_allowed_with)
         << CSPGOGenerateArg->getSpelling() << PGOGenerateArg->getSpelling();
     PGOGenerateArg = nullptr;
+  }
+
+  if (TC.getTriple().isOSAIX()) {
+    if (PGOGenerateArg)
+      if (!D.isUsingLTO(false /*IsDeviceOffloadAction */) ||
+          D.getLTOMode() != LTOK_Full)
+        D.Diag(clang::diag::err_drv_argument_only_allowed_with)
+            << PGOGenerateArg->getSpelling() << "-flto";
+    if (ProfileGenerateArg)
+      D.Diag(diag::err_drv_unsupported_opt_for_target)
+          << ProfileGenerateArg->getSpelling() << TC.getTriple().str();
+    if (Arg *ProfileSampleUseArg = getLastProfileSampleUseArg(Args))
+      D.Diag(diag::err_drv_unsupported_opt_for_target)
+          << ProfileSampleUseArg->getSpelling() << TC.getTriple().str();
   }
 
   if (ProfileGenerateArg) {
@@ -2052,7 +2066,7 @@ static void SetRISCVSmallDataLimit(const ToolChain &TC, const ArgList &Args,
       D.Diag(diag::warn_drv_unsupported_sdata);
     }
   } else if (Args.getLastArgValue(options::OPT_mcmodel_EQ)
-                 .equals_lower("large") &&
+                 .equals_insensitive("large") &&
              (Triple.getArch() == llvm::Triple::riscv64)) {
     // Not support linker relaxation for RV64 with large code model.
     SmallDataLimit = "0";
@@ -3275,7 +3289,8 @@ static void RenderOpenCLOptions(const ArgList &Args, ArgStringList &CmdArgs,
       CmdArgs.push_back(Args.MakeArgString(A->getOption().getPrefixedName()));
 
   // Only add the default headers if we are compiling OpenCL sources.
-  if ((types::isOpenCL(InputType) || Args.hasArg(options::OPT_cl_std_EQ)) &&
+  if ((types::isOpenCL(InputType) ||
+       (Args.hasArg(options::OPT_cl_std_EQ) && types::isSrcFile(InputType))) &&
       !Args.hasArg(options::OPT_cl_no_stdinc)) {
     CmdArgs.push_back("-finclude-default-header");
     CmdArgs.push_back("-fdeclare-opencl-builtins");
@@ -4826,13 +4841,17 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     if (A->getOption().getID() == options::OPT_mabi_EQ_vec_extabi)
       CmdArgs.push_back("-mabi=vec-extabi");
     else
-      D.Diag(diag::err_aix_default_altivec_abi);
+      CmdArgs.push_back("-mabi=vec-default");
   }
 
   if (Arg *A = Args.getLastArg(options::OPT_Wframe_larger_than_EQ)) {
     StringRef v = A->getValue();
-    CmdArgs.push_back("-mllvm");
-    CmdArgs.push_back(Args.MakeArgString("-warn-stack-size=" + v));
+    // FIXME: Validate the argument here so we don't produce meaningless errors
+    // about -fwarn-stack-size=.
+    if (v.empty())
+      D.Diag(diag::err_drv_missing_argument) << A->getSpelling() << 1;
+    else
+      CmdArgs.push_back(Args.MakeArgString("-fwarn-stack-size=" + v));
     A->claim();
   }
 
@@ -5658,11 +5677,14 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
 
   Args.AddLastArg(CmdArgs, options::OPT_ftlsmodel_EQ);
 
+  if (Args.hasFlag(options::OPT_fno_operator_names,
+                   options::OPT_foperator_names, false))
+    CmdArgs.push_back("-fno-operator-names");
+
   // Forward -f (flag) options which we can pass directly.
   Args.AddLastArg(CmdArgs, options::OPT_femit_all_decls);
   Args.AddLastArg(CmdArgs, options::OPT_fheinous_gnu_extensions);
   Args.AddLastArg(CmdArgs, options::OPT_fdigraphs, options::OPT_fno_digraphs);
-  Args.AddLastArg(CmdArgs, options::OPT_fno_operator_names);
   Args.AddLastArg(CmdArgs, options::OPT_femulated_tls,
                   options::OPT_fno_emulated_tls);
 
@@ -5714,13 +5736,6 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
       if (Args.hasFlag(options::OPT_fopenmp_cuda_mode,
                        options::OPT_fno_openmp_cuda_mode, /*Default=*/false))
         CmdArgs.push_back("-fopenmp-cuda-mode");
-
-      // When in OpenMP offloading mode with NVPTX target, forward
-      // cuda-parallel-target-regions flag
-      if (Args.hasFlag(options::OPT_fopenmp_cuda_parallel_target_regions,
-                       options::OPT_fno_openmp_cuda_parallel_target_regions,
-                       /*Default=*/true))
-        CmdArgs.push_back("-fopenmp-cuda-parallel-target-regions");
 
       // When in OpenMP offloading mode with NVPTX target, check if full runtime
       // is required.
@@ -6325,7 +6340,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   // -finput_charset=UTF-8 is default. Reject others
   if (Arg *inputCharset = Args.getLastArg(options::OPT_finput_charset_EQ)) {
     StringRef value = inputCharset->getValue();
-    if (!value.equals_lower("utf-8"))
+    if (!value.equals_insensitive("utf-8"))
       D.Diag(diag::err_drv_invalid_value) << inputCharset->getAsString(Args)
                                           << value;
   }
@@ -6333,7 +6348,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   // -fexec_charset=UTF-8 is default. Reject others
   if (Arg *execCharset = Args.getLastArg(options::OPT_fexec_charset_EQ)) {
     StringRef value = execCharset->getValue();
-    if (!value.equals_lower("utf-8"))
+    if (!value.equals_insensitive("utf-8"))
       D.Diag(diag::err_drv_invalid_value) << execCharset->getAsString(Args)
                                           << value;
   }
@@ -7159,8 +7174,6 @@ void Clang::AddClangCLArgs(const ArgList &Args, types::ID InputType,
     if (types::isCXX(InputType))
       CmdArgs.push_back("-fcxx-exceptions");
     CmdArgs.push_back("-fexceptions");
-    if (EH.Asynch)
-      CmdArgs.push_back("-fasync-exceptions");
   }
   if (types::isCXX(InputType) && EH.Synch && EH.NoUnwindC)
     CmdArgs.push_back("-fexternc-nounwind");
@@ -7262,17 +7275,17 @@ void Clang::AddClangCLArgs(const ArgList &Args, types::ID InputType,
     StringRef GuardArgs = A->getValue();
     // The only valid options are "cf", "cf,nochecks", "cf-", "ehcont" and
     // "ehcont-".
-    if (GuardArgs.equals_lower("cf")) {
+    if (GuardArgs.equals_insensitive("cf")) {
       // Emit CFG instrumentation and the table of address-taken functions.
       CmdArgs.push_back("-cfguard");
-    } else if (GuardArgs.equals_lower("cf,nochecks")) {
+    } else if (GuardArgs.equals_insensitive("cf,nochecks")) {
       // Emit only the table of address-taken functions.
       CmdArgs.push_back("-cfguard-no-checks");
-    } else if (GuardArgs.equals_lower("ehcont")) {
+    } else if (GuardArgs.equals_insensitive("ehcont")) {
       // Emit EH continuation table.
       CmdArgs.push_back("-ehcontguard");
-    } else if (GuardArgs.equals_lower("cf-") ||
-               GuardArgs.equals_lower("ehcont-")) {
+    } else if (GuardArgs.equals_insensitive("cf-") ||
+               GuardArgs.equals_insensitive("ehcont-")) {
       // Do nothing, but we might want to emit a security warning in future.
     } else {
       D.Diag(diag::err_drv_invalid_value) << A->getSpelling() << GuardArgs;

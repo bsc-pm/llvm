@@ -395,6 +395,7 @@ class MIParser {
   MachineFunction &MF;
   SMDiagnostic &Error;
   StringRef Source, CurrentSource;
+  SMRange SourceRange;
   MIToken Token;
   PerFunctionMIParsingState &PFS;
   /// Maps from slot numbers to function's unnamed basic blocks.
@@ -403,6 +404,8 @@ class MIParser {
 public:
   MIParser(PerFunctionMIParsingState &PFS, SMDiagnostic &Error,
            StringRef Source);
+  MIParser(PerFunctionMIParsingState &PFS, SMDiagnostic &Error,
+           StringRef Source, SMRange SourceRange);
 
   /// \p SkipChar gives the number of characters to skip before looking
   /// for the next token.
@@ -428,6 +431,10 @@ public:
   bool parseStandaloneRegister(Register &Reg);
   bool parseStandaloneStackObject(int &FI);
   bool parseStandaloneMDNode(MDNode *&Node);
+  bool parseMachineMetadata();
+  bool parseMDTuple(MDNode *&MD, bool IsDistinct);
+  bool parseMDNodeVector(SmallVectorImpl<Metadata *> &Elts);
+  bool parseMetadata(Metadata *&MD);
 
   bool
   parseBasicBlockDefinition(DenseMap<unsigned, MachineBasicBlock *> &MBBSlots);
@@ -472,6 +479,7 @@ public:
   bool parseMetadataOperand(MachineOperand &Dest);
   bool parseCFIOffset(int &Offset);
   bool parseCFIRegister(Register &Reg);
+  bool parseCFIAddressSpace(unsigned &AddressSpace);
   bool parseCFIEscapeValues(std::string& Values);
   bool parseCFIOperand(MachineOperand &Dest);
   bool parseIRBlock(BasicBlock *&BB, const Function &F);
@@ -549,6 +557,10 @@ private:
   /// parseStringConstant
   ///   ::= StringConstant
   bool parseStringConstant(std::string &Result);
+
+  /// Map the location in the MI string to the corresponding location specified
+  /// in `SourceRange`.
+  SMLoc mapSMLoc(StringRef::iterator Loc);
 };
 
 } // end anonymous namespace
@@ -557,6 +569,11 @@ MIParser::MIParser(PerFunctionMIParsingState &PFS, SMDiagnostic &Error,
                    StringRef Source)
     : MF(PFS.MF), Error(Error), Source(Source), CurrentSource(Source), PFS(PFS)
 {}
+
+MIParser::MIParser(PerFunctionMIParsingState &PFS, SMDiagnostic &Error,
+                   StringRef Source, SMRange SourceRange)
+    : MF(PFS.MF), Error(Error), Source(Source), CurrentSource(Source),
+      SourceRange(SourceRange), PFS(PFS) {}
 
 void MIParser::lex(unsigned SkipChar) {
   CurrentSource = lexMIToken(
@@ -581,6 +598,13 @@ bool MIParser::error(StringRef::iterator Loc, const Twine &Msg) {
                        Loc - Source.data(), SourceMgr::DK_Error, Msg.str(),
                        Source, None, None);
   return true;
+}
+
+SMLoc MIParser::mapSMLoc(StringRef::iterator Loc) {
+  assert(SourceRange.isValid() && "Invalid source range");
+  assert(Loc >= Source.data() && Loc <= (Source.data() + Source.size()));
+  return SMLoc::getFromPointer(SourceRange.Start.getPointer() +
+                               (Loc - Source.data()));
 }
 
 typedef function_ref<bool(StringRef::iterator Loc, const Twine &)>
@@ -1158,6 +1182,7 @@ bool MIParser::parseStandaloneMDNode(MDNode *&Node) {
     if (parseMDNode(Node))
       return true;
   } else if (Token.is(MIToken::md_diexpr)) {
+    // FIXME: This should be driven off of the UNIQUED property in Metadata.def
     if (parseDIExpression(Node))
       return true;
   } else if (Token.is(MIToken::md_dilocation)) {
@@ -1167,6 +1192,130 @@ bool MIParser::parseStandaloneMDNode(MDNode *&Node) {
     return error("expected a metadata node");
   if (Token.isNot(MIToken::Eof))
     return error("expected end of string after the metadata node");
+  return false;
+}
+
+bool MIParser::parseMachineMetadata() {
+  lex();
+  if (Token.isNot(MIToken::exclaim))
+    return error("expected a metadata node");
+
+  lex();
+  if (Token.isNot(MIToken::IntegerLiteral) || Token.integerValue().isSigned())
+    return error("expected metadata id after '!'");
+  unsigned ID = 0;
+  if (getUnsigned(ID))
+    return true;
+  lex();
+  if (expectAndConsume(MIToken::equal))
+    return true;
+  bool IsDistinct = Token.is(MIToken::kw_distinct);
+  if (IsDistinct)
+    lex();
+  if (Token.isNot(MIToken::exclaim))
+    return error("expected a metadata node");
+  lex();
+
+  MDNode *MD;
+  if (parseMDTuple(MD, IsDistinct))
+    return true;
+
+  auto FI = PFS.MachineForwardRefMDNodes.find(ID);
+  if (FI != PFS.MachineForwardRefMDNodes.end()) {
+    FI->second.first->replaceAllUsesWith(MD);
+    PFS.MachineForwardRefMDNodes.erase(FI);
+
+    assert(PFS.MachineMetadataNodes[ID] == MD && "Tracking VH didn't work");
+  } else {
+    if (PFS.MachineMetadataNodes.count(ID))
+      return error("Metadata id is already used");
+    PFS.MachineMetadataNodes[ID].reset(MD);
+  }
+
+  return false;
+}
+
+bool MIParser::parseMDTuple(MDNode *&MD, bool IsDistinct) {
+  SmallVector<Metadata *, 16> Elts;
+  if (parseMDNodeVector(Elts))
+    return true;
+  MD = (IsDistinct ? MDTuple::getDistinct
+                   : MDTuple::get)(MF.getFunction().getContext(), Elts);
+  return false;
+}
+
+bool MIParser::parseMDNodeVector(SmallVectorImpl<Metadata *> &Elts) {
+  if (Token.isNot(MIToken::lbrace))
+    return error("expected '{' here");
+  lex();
+
+  if (Token.is(MIToken::rbrace)) {
+    lex();
+    return false;
+  }
+
+  do {
+    Metadata *MD;
+    if (parseMetadata(MD))
+      return true;
+
+    Elts.push_back(MD);
+
+    if (Token.isNot(MIToken::comma))
+      break;
+    lex();
+  } while (true);
+
+  if (Token.isNot(MIToken::rbrace))
+    return error("expected end of metadata node");
+  lex();
+
+  return false;
+}
+
+// ::= !42
+// ::= !"string"
+bool MIParser::parseMetadata(Metadata *&MD) {
+  if (Token.isNot(MIToken::exclaim))
+    return error("expected '!' here");
+  lex();
+
+  if (Token.is(MIToken::StringConstant)) {
+    std::string Str;
+    if (parseStringConstant(Str))
+      return true;
+    MD = MDString::get(MF.getFunction().getContext(), Str);
+    return false;
+  }
+
+  if (Token.isNot(MIToken::IntegerLiteral) || Token.integerValue().isSigned())
+    return error("expected metadata id after '!'");
+
+  SMLoc Loc = mapSMLoc(Token.location());
+
+  unsigned ID = 0;
+  if (getUnsigned(ID))
+    return true;
+  lex();
+
+  auto NodeInfo = PFS.IRSlots.MetadataNodes.find(ID);
+  if (NodeInfo != PFS.IRSlots.MetadataNodes.end()) {
+    MD = NodeInfo->second.get();
+    return false;
+  }
+  // Check machine metadata.
+  NodeInfo = PFS.MachineMetadataNodes.find(ID);
+  if (NodeInfo != PFS.MachineMetadataNodes.end()) {
+    MD = NodeInfo->second.get();
+    return false;
+  }
+  // Forward reference.
+  auto &FwdRef = PFS.MachineForwardRefMDNodes[ID];
+  FwdRef = std::make_pair(
+      MDTuple::getTemporary(MF.getFunction().getContext(), None), Loc);
+  PFS.MachineMetadataNodes[ID].reset(FwdRef.first.get());
+  MD = FwdRef.first.get();
+
   return false;
 }
 
@@ -1728,7 +1877,7 @@ bool MIParser::parseLowLevelType(StringRef::iterator Loc, LLT &Ty) {
     return error(Loc, "expected <M x sN> or <M x pA> for vector type");
   lex();
 
-  Ty = LLT::vector(NumElements, Ty);
+  Ty = LLT::fixed_vector(NumElements, Ty);
   return false;
 }
 
@@ -2012,8 +2161,11 @@ bool MIParser::parseMDNode(MDNode *&Node) {
   if (getUnsigned(ID))
     return true;
   auto NodeInfo = PFS.IRSlots.MetadataNodes.find(ID);
-  if (NodeInfo == PFS.IRSlots.MetadataNodes.end())
-    return error(Loc, "use of undefined metadata '!" + Twine(ID) + "'");
+  if (NodeInfo == PFS.IRSlots.MetadataNodes.end()) {
+    NodeInfo = PFS.MachineMetadataNodes.find(ID);
+    if (NodeInfo == PFS.MachineMetadataNodes.end())
+      return error(Loc, "use of undefined metadata '!" + Twine(ID) + "'");
+  }
   lex();
   Node = NodeInfo->second.get();
   return false;
@@ -2174,6 +2326,7 @@ bool MIParser::parseMetadataOperand(MachineOperand &Dest) {
     if (parseMDNode(Node))
       return true;
   } else if (Token.is(MIToken::md_diexpr)) {
+    // FIXME: This should be driven off of the UNIQUED property in Metadata.def
     if (parseDIExpression(Node))
       return true;
   }
@@ -2207,6 +2360,16 @@ bool MIParser::parseCFIRegister(Register &Reg) {
   return false;
 }
 
+bool MIParser::parseCFIAddressSpace(unsigned &AddressSpace) {
+  if (Token.isNot(MIToken::IntegerLiteral))
+    return error("expected a cfi address space literal");
+  if (Token.integerValue().isSigned())
+    return error("expected an unsigned integer (cfi address space)");
+  AddressSpace = Token.integerValue().getZExtValue();
+  lex();
+  return false;
+}
+
 bool MIParser::parseCFIEscapeValues(std::string &Values) {
   do {
     if (Token.isNot(MIToken::HexLiteral))
@@ -2227,6 +2390,7 @@ bool MIParser::parseCFIOperand(MachineOperand &Dest) {
   lex();
   int Offset;
   Register Reg;
+  unsigned AddressSpace;
   unsigned CFIIndex;
   switch (Kind) {
   case MIToken::kw_cfi_same_value:
@@ -2272,6 +2436,14 @@ bool MIParser::parseCFIOperand(MachineOperand &Dest) {
       return true;
     CFIIndex =
         MF.addFrameInst(MCCFIInstruction::cfiDefCfa(nullptr, Reg, Offset));
+    break;
+  case MIToken::kw_cfi_llvm_def_aspace_cfa:
+    if (parseCFIRegister(Reg) || expectAndConsume(MIToken::comma) ||
+        parseCFIOffset(Offset) || expectAndConsume(MIToken::comma) ||
+        parseCFIAddressSpace(AddressSpace))
+      return true;
+    CFIIndex = MF.addFrameInst(MCCFIInstruction::createLLVMDefAspaceCfa(
+        nullptr, Reg, Offset, AddressSpace));
     break;
   case MIToken::kw_cfi_remember_state:
     CFIIndex = MF.addFrameInst(MCCFIInstruction::createRememberState(nullptr));
@@ -2620,6 +2792,7 @@ bool MIParser::parseMachineOperand(const unsigned OpCode, const unsigned OpIdx,
   case MIToken::kw_cfi_adjust_cfa_offset:
   case MIToken::kw_cfi_escape:
   case MIToken::kw_cfi_def_cfa:
+  case MIToken::kw_cfi_llvm_def_aspace_cfa:
   case MIToken::kw_cfi_register:
   case MIToken::kw_cfi_remember_state:
   case MIToken::kw_cfi_restore:
@@ -3256,6 +3429,11 @@ bool llvm::parseStackObjectReference(PerFunctionMIParsingState &PFS,
 bool llvm::parseMDNode(PerFunctionMIParsingState &PFS,
                        MDNode *&Node, StringRef Src, SMDiagnostic &Error) {
   return MIParser(PFS, Error, Src).parseStandaloneMDNode(Node);
+}
+
+bool llvm::parseMachineMetadata(PerFunctionMIParsingState &PFS, StringRef Src,
+                                SMRange SrcRange, SMDiagnostic &Error) {
+  return MIParser(PFS, Error, Src, SrcRange).parseMachineMetadata();
 }
 
 bool MIRFormatter::parseIRValue(StringRef Src, MachineFunction &MF,

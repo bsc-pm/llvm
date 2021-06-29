@@ -2651,7 +2651,7 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       ParmRef =
         ImplicitCastExpr::Create(Ctx, ParmRef->getType(), CK_LValueToRValue,
                                  ParmRef, /*BasePath=*/nullptr,
-                                 VK_RValue, FPOptionsOverride());
+                                 VK_PRValue, FPOptionsOverride());
       FirstprivateCopies.push_back(ParmRef);
     } else {
       // We want to pass references as shared so task can modify the original value
@@ -2897,7 +2897,7 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
 
     CXXMemberCallExpr *NewCXXE = CXXMemberCallExpr::Create(
         Ctx, const_cast<MemberExpr *>(ME), ParmCopies, Ctx.VoidTy,
-        VK_RValue, SourceLocation(), FPOptionsOverride());
+        VK_PRValue, SourceLocation(), FPOptionsOverride());
 
     RV = CGF.EmitCXXMemberCallExpr(NewCXXE, ReturnValue);
   } else {
@@ -2906,7 +2906,7 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
 
     CallExpr *NewCE = CallExpr::Create(
         Ctx, const_cast<Expr *>(CE->getCallee()), ParmCopies,
-        Ctx.VoidTy, VK_RValue, SourceLocation(), FPOptionsOverride());
+        Ctx.VoidTy, VK_PRValue, SourceLocation(), FPOptionsOverride());
 
     RV = CGF.EmitCall(CE->getCallee()->getType(), callee, NewCE, ReturnValue);
   }

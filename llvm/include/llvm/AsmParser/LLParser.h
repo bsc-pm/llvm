@@ -301,7 +301,6 @@ namespace llvm {
     bool parseTargetDefinition();
     bool parseModuleAsm();
     bool parseSourceFileName();
-    bool parseDepLibs(); // FIXME: Remove in 4.0.
     bool parseUnnamedType();
     bool parseNamedType();
     bool parseDeclare();
@@ -533,7 +532,8 @@ namespace llvm {
     template <class ParserTy> bool parseMDFieldsImplBody(ParserTy ParseField);
     template <class ParserTy>
     bool parseMDFieldsImpl(ParserTy ParseField, LocTy &ClosingLoc);
-    bool parseSpecializedMDNode(MDNode *&N, bool IsDistinct = false);
+    bool parseSpecializedMDNode(MDNode *&N, bool IsDistinct = false,
+                                LocTy DistinctLoc = LocTy());
 
 #define HANDLE_SPECIALIZED_MDNODE_LEAF(CLASS)                                  \
   bool parse##CLASS(MDNode *&Result, bool IsDistinct);

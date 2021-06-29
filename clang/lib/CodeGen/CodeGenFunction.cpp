@@ -893,6 +893,9 @@ void CodeGenFunction::StartFunction(GlobalDecl GD, QualType RetTy,
   if (D && D->hasAttr<CFICanonicalJumpTableAttr>())
     Fn->addFnAttr("cfi-canonical-jump-table");
 
+  if (D && D->hasAttr<NoProfileFunctionAttr>())
+    Fn->addFnAttr(llvm::Attribute::NoProfile);
+
   if (getLangOpts().OpenCL) {
     // Add metadata for a kernel function.
     if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(D))
@@ -1049,6 +1052,10 @@ void CodeGenFunction::StartFunction(GlobalDecl GD, QualType RetTy,
         << "-mpacked-stack";
     Fn->addFnAttr("packed-stack");
   }
+
+  if (CGM.getCodeGenOpts().WarnStackSize != UINT_MAX)
+    Fn->addFnAttr("warn-stack-size",
+                  std::to_string(CGM.getCodeGenOpts().WarnStackSize));
 
   if (RetTy->isVoidType()) {
     // Void type; nothing to return.
@@ -1297,8 +1304,14 @@ void CodeGenFunction::GenerateCode(GlobalDecl GD, llvm::Function *Fn,
   QualType ResTy = BuildFunctionArgList(GD, Args);
 
   // Check if we should generate debug info for this function.
-  if (FD->hasAttr<NoDebugAttr>())
-    DebugInfo = nullptr; // disable debug info indefinitely for this function
+  if (FD->hasAttr<NoDebugAttr>()) {
+    // Clear non-distinct debug info that was possibly attached to the function
+    // due to an earlier declaration without the nodebug attribute
+    if (Fn)
+      Fn->setSubprogram(nullptr);
+    // Disable debug info indefinitely for this function
+    DebugInfo = nullptr;
+  }
 
   // The function might not have a body if we're generating thunks for a
   // function declaration.

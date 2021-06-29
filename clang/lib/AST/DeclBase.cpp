@@ -785,6 +785,7 @@ unsigned Decl::getIdentifierNamespaceForKind(Kind DeclKind) {
 
     case Using:
     case UsingPack:
+    case UsingEnum:
       return IDNS_Using;
 
     case ObjCProtocol:

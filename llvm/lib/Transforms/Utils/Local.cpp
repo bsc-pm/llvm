@@ -1133,12 +1133,6 @@ bool llvm::TryToSimplifyUncondBranchFromEmptyBlock(BasicBlock *BB,
       for (BasicBlock *Pred : predecessors(BB))
         Pred->getTerminator()->setMetadata(LoopMDKind, LoopMD);
 
-  // For AutoFDO, since BB is going to be removed, we won't be able to sample
-  // it. To avoid assigning a zero weight for BB, move all its pseudo probes
-  // into Succ and mark them dangling. This should allow the counts inference a
-  // chance to get a more reasonable weight for BB.
-  moveAndDanglePseudoProbes(BB, &*Succ->getFirstInsertionPt());
-
   // Everything that jumped to BB now goes to Succ.
   BB->replaceAllUsesWith(Succ);
   if (!Succ->hasName()) Succ->takeName(BB);
@@ -1754,7 +1748,11 @@ void llvm::salvageDebugInfoForDbgValues(
     } else if (isa<DbgValueInst>(DII) &&
                DII->getNumVariableLocationOps() + AdditionalValues.size() <=
                    MaxDebugArgs) {
-      DII->addVariableLocationOps(AdditionalValues, SalvagedExpr);
+      // TODO: Uncomment the line below and delete the two beneath it to enable
+      // salvaging of dbg.values with multiple location operands.
+      // DII->addVariableLocationOps(AdditionalValues, SalvagedExpr);
+      Value *Undef = UndefValue::get(I.getOperand(0)->getType());
+      DII->replaceVariableLocationOp(I.getOperand(0), Undef);
     } else {
       // Do not salvage using DIArgList for dbg.addr/dbg.declare, as it is
       // currently only valid for stack value expressions.
@@ -1782,7 +1780,7 @@ bool getSalvageOpsForGEP(GetElementPtrInst *GEP, const DataLayout &DL,
                          SmallVectorImpl<Value *> &AdditionalValues) {
   unsigned BitWidth = DL.getIndexSizeInBits(GEP->getPointerAddressSpace());
   // Rewrite a GEP into a DIExpression.
-  SmallDenseMap<Value *, APInt, 8> VariableOffsets;
+  MapVector<Value *, APInt> VariableOffsets;
   APInt ConstantOffset(BitWidth, 0);
   if (!GEP->collectOffset(DL, BitWidth, VariableOffsets, ConstantOffset))
     return false;
@@ -2812,19 +2810,13 @@ void llvm::hoistAllInstructionsInto(BasicBlock *DomBlock, Instruction *InsertPt,
   // encode predicated DIExpressions that yield different results on different
   // code paths.
 
-  // A hoisted conditional probe should be treated as dangling so that it will
-  // not be over-counted when the samples collected on the non-conditional path
-  // are counted towards the conditional path. We leave it for the counts
-  // inference algorithm to figure out a proper count for a danglng probe.
-  moveAndDanglePseudoProbes(BB, InsertPt);
-
   for (BasicBlock::iterator II = BB->begin(), IE = BB->end(); II != IE;) {
     Instruction *I = &*II;
     I->dropUnknownNonDebugMetadata();
     if (I->isUsedByMetadata())
       dropDebugUsers(*I);
-    if (isa<DbgInfoIntrinsic>(I)) {
-      // Remove DbgInfo Intrinsics.
+    if (I->isDebugOrPseudoInst()) {
+      // Remove DbgInfo and pseudo probe Intrinsics.
       II = I->eraseFromParent();
       continue;
     }

@@ -37,6 +37,7 @@
 #include "mlir/IR/Types.h"
 #include "mlir/Interfaces/VectorInterfaces.h"
 
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -539,11 +540,8 @@ generateTransferOpSlices(Type shapedElementType, VectorType vectorType,
   //   'vector<2x1x2x4xf32>'. The memref rank is 3, and the effective
   //   vector rank is 4 - 2 = 2, and so 'indexOffset' = 3 - 2 = 1.
   //
-  unsigned vectorRank = vectorType.getRank();
-  if (auto sourceVectorElementType = shapedElementType.dyn_cast<VectorType>()) {
-    assert(vectorRank >= sourceVectorElementType.getRank());
-    vectorRank -= sourceVectorElementType.getRank();
-  }
+  if (auto sourceVectorElementType = shapedElementType.dyn_cast<VectorType>())
+    assert(vectorType.getRank() >= sourceVectorElementType.getRank());
   auto isBroadcast = [](AffineExpr expr) {
     if (auto constExpr = expr.dyn_cast<AffineConstantExpr>())
       return constExpr.getValue() == 0;
@@ -2416,7 +2414,7 @@ static Value createSubViewIntersection(OpBuilder &b,
 ///      memref.cast %A: memref<A...> to compatibleMemRefType
 ///      scf.yield %view, ... : compatibleMemRefType, index, index
 ///    } else {
-///      %2 = linalg.fill(%alloc, %pad)
+///      %2 = linalg.fill(%pad, %alloc)
 ///      %3 = subview %view [...][...][...]
 ///      linalg.copy(%3, %alloc)
 ///      memref.cast %alloc: memref<B...> to compatibleMemRefType
@@ -2443,7 +2441,7 @@ createFullPartialLinalgCopy(OpBuilder &b, vector::TransferReadOp xferOp,
         b.create<scf::YieldOp>(loc, viewAndIndices);
       },
       [&](OpBuilder &b, Location loc) {
-        b.create<linalg::FillOp>(loc, alloc, xferOp.padding());
+        b.create<linalg::FillOp>(loc, xferOp.padding(), alloc);
         // Take partial subview of memref which guarantees no dimension
         // overflows.
         Value memRefSubView = createSubViewIntersection(
@@ -2845,6 +2843,20 @@ Optional<mlir::vector::DistributeOps> mlir::vector::distributPointwiseVectorOp(
   return ops;
 }
 
+/// Converts TransferRead op used by ExtractMap op into a smaller dimension
+/// TransferRead.
+/// Example:
+/// ```
+/// %a = vector.transfer_read %A[%c0, %c0, %c0], %cf0:
+///   memref<64x64x64xf32>, vector<64x4x32xf32>
+/// %e = vector.extract_map %a[%id] : vector<64x4x32xf32> to vector<2x4x1xf32>
+/// ```
+/// to:
+/// ```
+/// %id1 = affine.apply affine_map<()[s0] -> (s0 * 2)> (%id)
+/// %e = vector.transfer_read %A[%id1, %c0, %id1], %cf0 :
+///   memref<64x64x64xf32>, vector<2x4x1xf32>
+/// ```
 struct TransferReadExtractPattern
     : public OpRewritePattern<vector::TransferReadOp> {
   TransferReadExtractPattern(MLIRContext *context)
@@ -2861,18 +2873,23 @@ struct TransferReadExtractPattern
       return failure();
 
     SmallVector<Value, 4> indices(read.indices().begin(), read.indices().end());
-    AffineMap map = extract.map();
+    AffineMap indexMap = extract.map().compose(read.permutation_map());
     unsigned idCount = 0;
     ImplicitLocOpBuilder lb(read.getLoc(), rewriter);
-    for (auto expr : map.getResults()) {
+    for (auto it :
+         llvm::zip(indexMap.getResults(), extract.map().getResults())) {
       AffineExpr d0, d1;
       bindDims(read.getContext(), d0, d1);
-      unsigned pos = expr.cast<AffineDimExpr>().getPosition();
+      auto indexExpr = std::get<0>(it).dyn_cast<AffineDimExpr>();
+      if (!indexExpr)
+        continue;
+      unsigned indexPos = indexExpr.getPosition();
+      unsigned vectorPos = std::get<1>(it).cast<AffineDimExpr>().getPosition();
       auto scale = getAffineConstantExpr(
-          extract.getResultType().getDimSize(pos), read.getContext());
-      indices[pos] =
-          makeComposedAffineApply(rewriter, read.getLoc(), d0 + scale * d1,
-                                  {indices[pos], extract.ids()[idCount++]});
+          extract.getResultType().getDimSize(vectorPos), read.getContext());
+      indices[indexPos] = makeComposedAffineApply(
+          rewriter, read.getLoc(), d0 + scale * d1,
+          {indices[indexPos], extract.ids()[idCount++]});
     }
     Value newRead = lb.create<vector::TransferReadOp>(
         extract.getType(), read.source(), indices, read.permutation_map(),
@@ -2898,18 +2915,24 @@ struct TransferWriteInsertPattern
       return failure();
     SmallVector<Value, 4> indices(write.indices().begin(),
                                   write.indices().end());
-    AffineMap map = insert.map();
+    AffineMap indexMap = insert.map().compose(write.permutation_map());
     unsigned idCount = 0;
     Location loc = write.getLoc();
-    for (auto expr : map.getResults()) {
+    for (auto it :
+         llvm::zip(indexMap.getResults(), insert.map().getResults())) {
       AffineExpr d0, d1;
       bindDims(write.getContext(), d0, d1);
-      unsigned pos = expr.cast<AffineDimExpr>().getPosition();
+      auto indexExpr = std::get<0>(it).dyn_cast<AffineDimExpr>();
+      if (!indexExpr)
+        continue;
+      unsigned indexPos = indexExpr.getPosition();
+      unsigned vectorPos = std::get<1>(it).cast<AffineDimExpr>().getPosition();
       auto scale = getAffineConstantExpr(
-          insert.getSourceVectorType().getDimSize(pos), write.getContext());
-      indices[pos] =
+          insert.getSourceVectorType().getDimSize(vectorPos),
+          write.getContext());
+      indices[indexPos] =
           makeComposedAffineApply(rewriter, loc, d0 + scale * d1,
-                                  {indices[pos], insert.ids()[idCount++]});
+                                  {indices[indexPos], insert.ids()[idCount++]});
     }
     rewriter.create<vector::TransferWriteOp>(
         loc, insert.vector(), write.source(), indices, write.permutation_map(),
@@ -3893,42 +3916,33 @@ struct InnerDimReductionConversion
     auto loc = multiReductionOp.getLoc();
     auto srcRank = multiReductionOp.getSourceVectorType().getRank();
 
-    auto reductionDims = llvm::to_vector<4>(
-        llvm::map_range(multiReductionOp.reduction_dims().cast<ArrayAttr>(),
-                        [](Attribute attr) -> int64_t {
-                          return attr.cast<IntegerAttr>().getInt();
-                        }));
-    llvm::sort(reductionDims);
-
-    int64_t reductionSize = multiReductionOp.reduction_dims().size();
-
-    // Fails if already inner most reduction.
-    bool innerMostReduction = true;
-    for (int i = 0; i < reductionSize; ++i) {
-      if (reductionDims[reductionSize - i - 1] != srcRank - i - 1) {
-        innerMostReduction = false;
-      }
+    // Separate reduction and parallel dims
+    auto reductionDimsRange =
+        multiReductionOp.reduction_dims().getAsValueRange<IntegerAttr>();
+    auto reductionDims = llvm::to_vector<4>(llvm::map_range(
+        reductionDimsRange, [](APInt a) { return a.getZExtValue(); }));
+    llvm::SmallDenseSet<int64_t> reductionDimsSet(reductionDims.begin(),
+                                                  reductionDims.end());
+    int64_t reductionSize = reductionDims.size();
+    SmallVector<int64_t, 4> parallelDims;
+    for (int64_t i = 0; i < srcRank; i++) {
+      if (!reductionDimsSet.contains(i))
+        parallelDims.push_back(i);
     }
-    if (innerMostReduction)
+
+    // Add transpose only if inner-most dimensions are not reductions
+    if (parallelDims ==
+        llvm::to_vector<4>(llvm::seq<int64_t>(0, parallelDims.size())))
       return failure();
 
-    // Permutes the indices so reduction dims are inner most dims.
-    SmallVector<int64_t> indices;
-    for (int i = 0; i < srcRank; ++i) {
-      indices.push_back(i);
-    }
-    int ir = reductionSize - 1;
-    int id = srcRank - 1;
-    while (ir >= 0) {
-      std::swap(indices[reductionDims[ir--]], indices[id--]);
-    }
-
-    // Sets inner most dims as reduction.
+    SmallVector<int64_t, 4> indices;
+    indices.append(parallelDims.begin(), parallelDims.end());
+    indices.append(reductionDims.begin(), reductionDims.end());
+    auto transposeOp = rewriter.create<vector::TransposeOp>(loc, src, indices);
     SmallVector<bool> reductionMask(srcRank, false);
     for (int i = 0; i < reductionSize; ++i) {
       reductionMask[srcRank - i - 1] = true;
     }
-    auto transposeOp = rewriter.create<vector::TransposeOp>(loc, src, indices);
     rewriter.replaceOpWithNewOp<vector::MultiDimReductionOp>(
         multiReductionOp, transposeOp.result(), reductionMask,
         multiReductionOp.kind());

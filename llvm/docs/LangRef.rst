@@ -601,10 +601,11 @@ Non-integral pointer types represent pointers that have an *unspecified* bitwise
 representation; that is, the integral representation may be target dependent or
 unstable (not backed by a fixed integer).
 
-``inttoptr`` instructions converting integers to non-integral pointer types are
-ill-typed, and so are ``ptrtoint`` instructions converting values of
-non-integral pointer types to integers.  Vector versions of said instructions
-are ill-typed as well.
+``inttoptr`` and ``ptrtoint`` instructions converting integers to non-integral
+pointer types or vice versa are implementation defined, and subject to likely
+future revision in semantics. Vector versions of said instructions are as well.
+Users of non-integral-pointer types are advised not to design around current
+semantics as they may very well change in the nearish future.
 
 .. _globalvars:
 
@@ -1634,7 +1635,11 @@ example:
     memory on it's behalf.  As a result, perhaps surprisingly, a ``nofree``
     function can return a pointer to a previously deallocated memory object.
 ``noimplicitfloat``
-    This attributes disables implicit floating-point instructions.
+    Disallows implicit floating-point code. This inhibits optimizations that
+    use floating-point code and floating-point/SIMD/vector registers for
+    operations that are not nominally floating-point. LLVM instructions that
+    perform floating-point operations or require access to floating-point
+    registers may still cause floating-point code to be generated.
 ``noinline``
     This attribute indicates that the inliner should never inline this
     function in any situation. This attribute may not be used together
@@ -1917,7 +1922,8 @@ example:
     A function with the ``ssp`` attribute but without the ``alwaysinline``
     attribute cannot be inlined into a function without a
     ``ssp/sspreq/sspstrong`` attribute. If inlined, the caller will get the
-    ``ssp`` attribute.
+    ``ssp`` attribute. ``call``, ``invoke``, and ``callbr`` instructions with
+    the ``alwaysinline`` attribute force inlining.
 ``sspstrong``
     This attribute indicates that the function should emit a stack smashing
     protector. This attribute causes a strong heuristic to be used when
@@ -1945,7 +1951,9 @@ example:
     A function with the ``sspstrong`` attribute but without the
     ``alwaysinline`` attribute cannot be inlined into a function without a
     ``ssp/sspstrong/sspreq`` attribute. If inlined, the caller will get the
-    ``sspstrong`` attribute unless the ``sspreq`` attribute exists.
+    ``sspstrong`` attribute unless the ``sspreq`` attribute exists.  ``call``,
+    ``invoke``, and ``callbr`` instructions with the ``alwaysinline`` attribute
+    force inlining.
 ``sspreq``
     This attribute indicates that the function should *always* emit a stack
     smashing protector. This overrides the ``ssp`` and ``sspstrong`` function
@@ -1965,7 +1973,8 @@ example:
     A function with the ``sspreq`` attribute but without the ``alwaysinline``
     attribute cannot be inlined into a function without a
     ``ssp/sspstrong/sspreq`` attribute. If inlined, the caller will get the
-    ``sspreq`` attribute.
+    ``sspreq`` attribute.  ``call``, ``invoke``, and ``callbr`` instructions
+    with the ``alwaysinline`` attribute force inlining.
 
 ``strictfp``
     This attribute indicates that the function was called from a scope that
@@ -2047,6 +2056,12 @@ example:
     function does not satisfy this contract, the behavior is undefined.  This
     attribute does not apply transitively to callees, but does apply to call
     sites within the function. Note that `willreturn` implies `mustprogress`.
+``"warn-stack-size"="<threshold>"``
+    This attribute sets a threshold to emit diagnostics once the frame size is
+    known should the frame size exceed the specified value.  It takes one
+    required integer value, which should be a non-negative integer, and less
+    than `UINT_MAX`.  It's unspecified which threshold will be used when
+    duplicate definitions are linked together with differing values.
 ``vscale_range(<min>[, <max>])``
     This attribute indicates the minimum and maximum vscale value for the given
     function. A value of 0 means unbounded. If the optional max value is omitted
@@ -2087,7 +2102,7 @@ attributes are supported:
     determined by the rules of the Vector Function ABI (VFABI)
     specifications of the target. For Arm and X86, the VFABI can be
     found at https://github.com/ARM-software/abi-aa and
-    https://software.intel.com/en-us/articles/vector-simd-function-abi,
+    https://software.intel.com/content/www/us/en/develop/download/vector-simd-function-abi.html,
     respectively.
 
     For X86 and Arm targets, the values of the tokens in the standard
@@ -2395,8 +2410,10 @@ A ``"clang.arc.attachedcall`` operand bundle on a call indicates the call is
 implicitly followed by a marker instruction and a call to an ObjC runtime
 function that uses the result of the call. If the argument passed to the operand
 bundle is 0, ``@objc_retainAutoreleasedReturnValue`` is called. If 1 is passed,
-``@objc_unsafeClaimAutoreleasedReturnValue`` is called. A call with this bundle
-implicitly uses its return value.
+``@objc_unsafeClaimAutoreleasedReturnValue`` is called. The return value of a
+call with this bundle is used by a call to ``@llvm.objc.clang.arc.noop.use``
+unless the called function's return type is void, in which case the operand
+bundle is ignored.
 
 The operand bundle is needed to ensure the call is immediately followed by the
 marker instruction or the ObjC runtime call in the final output.
@@ -3320,10 +3337,12 @@ are target-specific.
 Note that LLVM does not permit pointers to void (``void*``) nor does it
 permit pointers to labels (``label*``). Use ``i8*`` instead.
 
-LLVM is in the process of transitioning to opaque pointers. Opaque pointers do
-not have a pointee type. Rather, instructions interacting through pointers
-specify the type of the underlying memory they are interacting with. Opaque
-pointers are still in the process of being worked on and are not complete.
+LLVM is in the process of transitioning to
+`opaque pointers <OpaquePointers.html#opaque-pointers>`_.
+Opaque pointers do not have a pointee type. Rather, instructions
+interacting through pointers specify the type of the underlying memory
+they are interacting with. Opaque pointers are still in the process of
+being worked on and are not complete.
 
 :Syntax:
 
@@ -3825,7 +3844,7 @@ cleared low bit. However, in the ``%C`` example, the optimizer is
 allowed to assume that the '``undef``' operand could be the same as
 ``%Y``, allowing the whole '``select``' to be eliminated.
 
-.. code-block:: text
+.. code-block:: llvm
 
       %A = xor undef, undef
 
@@ -3900,7 +3919,7 @@ predicates, such as Correlated Value Propagation and Global Value Numbering.
 In case of switch instruction, the branch condition should be frozen, otherwise
 it is undefined behavior.
 
-.. code-block:: text
+.. code-block:: llvm
 
     Unsafe:
       br undef, BB1, BB2 ; UB
@@ -5075,21 +5094,22 @@ metadata nodes are related to debug info.
 DICompileUnit
 """""""""""""
 
-``DICompileUnit`` nodes represent a compile unit. The ``enums:``,
-``retainedTypes:``, ``globals:``, ``imports:`` and ``macros:`` fields are tuples
-containing the debug info to be emitted along with the compile unit, regardless
-of code optimizations (some nodes are only emitted if there are references to
-them from instructions). The ``debugInfoForProfiling:`` field is a boolean
-indicating whether or not line-table discriminators are updated to provide
-more-accurate debug info for profiling results.
+``DICompileUnit`` nodes represent a compile unit. ``DICompileUnit`` nodes must
+be ``distinct``. The ``enums:``, ``retainedTypes:``, ``globals:``, ``imports:``
+and ``macros:`` fields are tuples containing the debug info to be emitted along
+with the compile unit, regardless of code optimizations (some nodes are only
+emitted if there are references to them from instructions). The
+``debugInfoForProfiling:`` field is a boolean indicating whether or not
+line-table discriminators are updated to provide more-accurate debug info for
+profiling results.
 
 .. code-block:: text
 
-    !0 = !DICompileUnit(language: DW_LANG_C99, file: !1, producer: "clang",
-                        isOptimized: true, flags: "-O2", runtimeVersion: 2,
-                        splitDebugFilename: "abc.debug", emissionKind: FullDebug,
-                        enums: !2, retainedTypes: !3, globals: !4, imports: !5,
-                        macros: !6, dwoId: 0x0abcd)
+    !0 = distinct !DICompileUnit(language: DW_LANG_C99, file: !1, producer: "clang",
+                                 isOptimized: true, flags: "-O2", runtimeVersion: 2,
+                                 splitDebugFilename: "abc.debug", emissionKind: FullDebug,
+                                 enums: !2, retainedTypes: !3, globals: !4, imports: !5,
+                                 macros: !6, dwoId: 0x0abcd)
 
 Compile unit descriptors provide the root scope for objects declared in a
 specific compilation unit. File descriptors are defined using this scope.  These
@@ -5500,12 +5520,14 @@ DIExpression
 """"""""""""
 
 ``DIExpression`` nodes represent expressions that are inspired by the DWARF
-expression language. They are used in :ref:`debug intrinsics<dbg_intrinsics>`
-(such as ``llvm.dbg.declare`` and ``llvm.dbg.value``) to describe how the
-referenced LLVM variable relates to the source language variable. Debug
-intrinsics are interpreted left-to-right: start by pushing the value/address
-operand of the intrinsic onto a stack, then repeatedly push and evaluate
-opcodes from the DIExpression until the final variable description is produced.
+expression language. ``DIExpression`` nodes must not be ``distinct``, and are
+canonically printed inline at each use. They are used in :ref:`debug
+intrinsics<dbg_intrinsics>` (such as ``llvm.dbg.declare`` and
+``llvm.dbg.value``) to describe how the referenced LLVM variable relates to the
+source language variable. Debug intrinsics are interpreted left-to-right: start
+by pushing the value/address operand of the intrinsic onto a stack, then
+repeatedly push and evaluate opcodes from the DIExpression until the final
+variable description is produced.
 
 The current supported opcode vocabulary is limited:
 
@@ -5583,23 +5605,23 @@ The current supported opcode vocabulary is limited:
 
     IR for "*ptr = 4;"
     --------------
-    call void @llvm.dbg.value(metadata i32 4, metadata !17, metadata !20)
+    call void @llvm.dbg.value(metadata i32 4, metadata !17,
+                              metadata !DIExpression(DW_OP_LLVM_implicit_pointer)))
     !17 = !DILocalVariable(name: "ptr1", scope: !12, file: !3, line: 5,
                            type: !18)
     !18 = !DIDerivedType(tag: DW_TAG_pointer_type, baseType: !19, size: 64)
     !19 = !DIBasicType(name: "int", size: 32, encoding: DW_ATE_signed)
-    !20 = !DIExpression(DW_OP_LLVM_implicit_pointer))
 
     IR for "**ptr = 4;"
     --------------
-    call void @llvm.dbg.value(metadata i32 4, metadata !17, metadata !21)
+    call void @llvm.dbg.value(metadata i32 4, metadata !17,
+                              metadata !DIExpression(DW_OP_LLVM_implicit_pointer,
+                                                     DW_OP_LLVM_implicit_pointer)))
     !17 = !DILocalVariable(name: "ptr1", scope: !12, file: !3, line: 5,
                            type: !18)
     !18 = !DIDerivedType(tag: DW_TAG_pointer_type, baseType: !19, size: 64)
     !19 = !DIDerivedType(tag: DW_TAG_pointer_type, baseType: !20, size: 64)
     !20 = !DIBasicType(name: "int", size: 32, encoding: DW_ATE_signed)
-    !21 = !DIExpression(DW_OP_LLVM_implicit_pointer,
-                        DW_OP_LLVM_implicit_pointer))
 
 DWARF specifies three kinds of simple location descriptions: Register, memory,
 and implicit location descriptions.  Note that a location description is
@@ -5640,12 +5662,13 @@ valid debug intrinsic.
 DIArgList
 """"""""""""
 
-``DIArgList`` nodes hold a list of constant or SSA value references. These are
-used in :ref:`debug intrinsics<dbg_intrinsics>` (currently only in
+``DIArgList`` nodes hold a list of constant or SSA value references.
+``DIArgList`` must not be ``distinct``, must only be used as an argument to a
+function call, and must appear inline at each use. ``DIArgList`` may refer to
+function-local values of the containing function. ``DIArgList`` nodes are used
+in :ref:`debug intrinsics<dbg_intrinsics>` (currently only in
 ``llvm.dbg.value``) in combination with a ``DIExpression`` that uses the
-``DW_OP_LLVM_arg`` operator. Because a DIArgList may refer to local values
-within a function, it must only be used as a function argument, must always be
-inlined, and cannot appear in named metadata.
+``DW_OP_LLVM_arg`` operator.
 
 .. code-block:: text
 
@@ -13644,13 +13667,16 @@ This is an overloaded intrinsic. You can use ``llvm.powi`` on any
 floating-point or vector of floating-point type. Not all targets support
 all types however.
 
+Generally, the only supported type for the exponent is the one matching
+with the C type ``int``.
+
 ::
 
-      declare float     @llvm.powi.f32(float  %Val, i32 %power)
-      declare double    @llvm.powi.f64(double %Val, i32 %power)
-      declare x86_fp80  @llvm.powi.f80(x86_fp80  %Val, i32 %power)
-      declare fp128     @llvm.powi.f128(fp128 %Val, i32 %power)
-      declare ppc_fp128 @llvm.powi.ppcf128(ppc_fp128  %Val, i32 %power)
+      declare float     @llvm.powi.f32.i32(float  %Val, i32 %power)
+      declare double    @llvm.powi.f64.i16(double %Val, i16 %power)
+      declare x86_fp80  @llvm.powi.f80.i32(x86_fp80  %Val, i32 %power)
+      declare fp128     @llvm.powi.f128.i32(fp128 %Val, i32 %power)
+      declare ppc_fp128 @llvm.powi.ppcf128.i32(ppc_fp128  %Val, i32 %power)
 
 Overview:
 """""""""
@@ -18224,6 +18250,252 @@ Examples:
       %also.r = select <4 x i1> %mask, <4 x i32> %t, <4 x i32> undef
 
 
+.. _int_vp_fadd:
+
+'``llvm.vp.fadd.*``' Intrinsics
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Syntax:
+"""""""
+This is an overloaded intrinsic.
+
+::
+
+      declare <16 x float>  @llvm.vp.fadd.v16f32 (<16 x float> <left_op>, <16 x float> <right_op>, <16 x i1> <mask>, i32 <vector_length>)
+      declare <vscale x 4 x float>  @llvm.vp.fadd.nxv4f32 (<vscale x 4 x float> <left_op>, <vscale x 4 x float> <right_op>, <vscale x 4 x i1> <mask>, i32 <vector_length>)
+      declare <256 x double>  @llvm.vp.fadd.v256f64 (<256 x double> <left_op>, <256 x double> <right_op>, <256 x i1> <mask>, i32 <vector_length>)
+
+Overview:
+"""""""""
+
+Predicated floating-point addition of two vectors of floating-point values.
+
+
+Arguments:
+""""""""""
+
+The first two operands and the result have the same vector of floating-point type. The
+third operand is the vector mask and has the same number of elements as the
+result vector type. The fourth operand is the explicit vector length of the
+operation.
+
+Semantics:
+""""""""""
+
+The '``llvm.vp.fadd``' intrinsic performs floating-point addition (:ref:`add <i_fadd>`)
+of the first and second vector operand on each enabled lane.  The result on
+disabled lanes is undefined.  The operation is performed in the default
+floating-point environment.
+
+Examples:
+"""""""""
+
+.. code-block:: llvm
+
+      %r = call <4 x float> @llvm.vp.fadd.v4f32(<4 x float> %a, <4 x float> %b, <4 x i1> %mask, i32 %evl)
+      ;; For all lanes below %evl, %r is lane-wise equivalent to %also.r
+
+      %t = fadd <4 x float> %a, %b
+      %also.r = select <4 x i1> %mask, <4 x float> %t, <4 x float> undef
+
+
+.. _int_vp_fsub:
+
+'``llvm.vp.fsub.*``' Intrinsics
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Syntax:
+"""""""
+This is an overloaded intrinsic.
+
+::
+
+      declare <16 x float>  @llvm.vp.fsub.v16f32 (<16 x float> <left_op>, <16 x float> <right_op>, <16 x i1> <mask>, i32 <vector_length>)
+      declare <vscale x 4 x float>  @llvm.vp.fsub.nxv4f32 (<vscale x 4 x float> <left_op>, <vscale x 4 x float> <right_op>, <vscale x 4 x i1> <mask>, i32 <vector_length>)
+      declare <256 x double>  @llvm.vp.fsub.v256f64 (<256 x double> <left_op>, <256 x double> <right_op>, <256 x i1> <mask>, i32 <vector_length>)
+
+Overview:
+"""""""""
+
+Predicated floating-point subtraction of two vectors of floating-point values.
+
+
+Arguments:
+""""""""""
+
+The first two operands and the result have the same vector of floating-point type. The
+third operand is the vector mask and has the same number of elements as the
+result vector type. The fourth operand is the explicit vector length of the
+operation.
+
+Semantics:
+""""""""""
+
+The '``llvm.vp.fsub``' intrinsic performs floating-point subtraction (:ref:`add <i_fsub>`)
+of the first and second vector operand on each enabled lane.  The result on
+disabled lanes is undefined.  The operation is performed in the default
+floating-point environment.
+
+Examples:
+"""""""""
+
+.. code-block:: llvm
+
+      %r = call <4 x float> @llvm.vp.fsub.v4f32(<4 x float> %a, <4 x float> %b, <4 x i1> %mask, i32 %evl)
+      ;; For all lanes below %evl, %r is lane-wise equivalent to %also.r
+
+      %t = fsub <4 x float> %a, %b
+      %also.r = select <4 x i1> %mask, <4 x float> %t, <4 x float> undef
+
+
+.. _int_vp_fmul:
+
+'``llvm.vp.fmul.*``' Intrinsics
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Syntax:
+"""""""
+This is an overloaded intrinsic.
+
+::
+
+      declare <16 x float>  @llvm.vp.fmul.v16f32 (<16 x float> <left_op>, <16 x float> <right_op>, <16 x i1> <mask>, i32 <vector_length>)
+      declare <vscale x 4 x float>  @llvm.vp.fmul.nxv4f32 (<vscale x 4 x float> <left_op>, <vscale x 4 x float> <right_op>, <vscale x 4 x i1> <mask>, i32 <vector_length>)
+      declare <256 x double>  @llvm.vp.fmul.v256f64 (<256 x double> <left_op>, <256 x double> <right_op>, <256 x i1> <mask>, i32 <vector_length>)
+
+Overview:
+"""""""""
+
+Predicated floating-point multiplication of two vectors of floating-point values.
+
+
+Arguments:
+""""""""""
+
+The first two operands and the result have the same vector of floating-point type. The
+third operand is the vector mask and has the same number of elements as the
+result vector type. The fourth operand is the explicit vector length of the
+operation.
+
+Semantics:
+""""""""""
+
+The '``llvm.vp.fmul``' intrinsic performs floating-point multiplication (:ref:`add <i_fmul>`)
+of the first and second vector operand on each enabled lane.  The result on
+disabled lanes is undefined.  The operation is performed in the default
+floating-point environment.
+
+Examples:
+"""""""""
+
+.. code-block:: llvm
+
+      %r = call <4 x float> @llvm.vp.fmul.v4f32(<4 x float> %a, <4 x float> %b, <4 x i1> %mask, i32 %evl)
+      ;; For all lanes below %evl, %r is lane-wise equivalent to %also.r
+
+      %t = fmul <4 x float> %a, %b
+      %also.r = select <4 x i1> %mask, <4 x float> %t, <4 x float> undef
+
+
+.. _int_vp_fdiv:
+
+'``llvm.vp.fdiv.*``' Intrinsics
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Syntax:
+"""""""
+This is an overloaded intrinsic.
+
+::
+
+      declare <16 x float>  @llvm.vp.fdiv.v16f32 (<16 x float> <left_op>, <16 x float> <right_op>, <16 x i1> <mask>, i32 <vector_length>)
+      declare <vscale x 4 x float>  @llvm.vp.fdiv.nxv4f32 (<vscale x 4 x float> <left_op>, <vscale x 4 x float> <right_op>, <vscale x 4 x i1> <mask>, i32 <vector_length>)
+      declare <256 x double>  @llvm.vp.fdiv.v256f64 (<256 x double> <left_op>, <256 x double> <right_op>, <256 x i1> <mask>, i32 <vector_length>)
+
+Overview:
+"""""""""
+
+Predicated floating-point division of two vectors of floating-point values.
+
+
+Arguments:
+""""""""""
+
+The first two operands and the result have the same vector of floating-point type. The
+third operand is the vector mask and has the same number of elements as the
+result vector type. The fourth operand is the explicit vector length of the
+operation.
+
+Semantics:
+""""""""""
+
+The '``llvm.vp.fdiv``' intrinsic performs floating-point division (:ref:`add <i_fdiv>`)
+of the first and second vector operand on each enabled lane.  The result on
+disabled lanes is undefined.  The operation is performed in the default
+floating-point environment.
+
+Examples:
+"""""""""
+
+.. code-block:: llvm
+
+      %r = call <4 x float> @llvm.vp.fdiv.v4f32(<4 x float> %a, <4 x float> %b, <4 x i1> %mask, i32 %evl)
+      ;; For all lanes below %evl, %r is lane-wise equivalent to %also.r
+
+      %t = fdiv <4 x float> %a, %b
+      %also.r = select <4 x i1> %mask, <4 x float> %t, <4 x float> undef
+
+
+.. _int_vp_frem:
+
+'``llvm.vp.frem.*``' Intrinsics
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Syntax:
+"""""""
+This is an overloaded intrinsic.
+
+::
+
+      declare <16 x float>  @llvm.vp.frem.v16f32 (<16 x float> <left_op>, <16 x float> <right_op>, <16 x i1> <mask>, i32 <vector_length>)
+      declare <vscale x 4 x float>  @llvm.vp.frem.nxv4f32 (<vscale x 4 x float> <left_op>, <vscale x 4 x float> <right_op>, <vscale x 4 x i1> <mask>, i32 <vector_length>)
+      declare <256 x double>  @llvm.vp.frem.v256f64 (<256 x double> <left_op>, <256 x double> <right_op>, <256 x i1> <mask>, i32 <vector_length>)
+
+Overview:
+"""""""""
+
+Predicated floating-point remainder of two vectors of floating-point values.
+
+
+Arguments:
+""""""""""
+
+The first two operands and the result have the same vector of floating-point type. The
+third operand is the vector mask and has the same number of elements as the
+result vector type. The fourth operand is the explicit vector length of the
+operation.
+
+Semantics:
+""""""""""
+
+The '``llvm.vp.frem``' intrinsic performs floating-point remainder (:ref:`add <i_frem>`)
+of the first and second vector operand on each enabled lane.  The result on
+disabled lanes is undefined.  The operation is performed in the default
+floating-point environment.
+
+Examples:
+"""""""""
+
+.. code-block:: llvm
+
+      %r = call <4 x float> @llvm.vp.frem.v4f32(<4 x float> %a, <4 x float> %b, <4 x i1> %mask, i32 %evl)
+      ;; For all lanes below %evl, %r is lane-wise equivalent to %also.r
+
+      %t = frem <4 x float> %a, %b
+      %also.r = select <4 x i1> %mask, <4 x float> %t, <4 x float> undef
+
+
+
 .. _int_get_active_lane_mask:
 
 '``llvm.get.active.lane.mask.*``' Intrinsics
@@ -21189,6 +21461,42 @@ element is true, the following rules apply to the first element:
 
 If the function's return value's second element is false, the value of the
 first element is undefined.
+
+
+'``llvm.arithmetic.fence``' Intrinsic
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Syntax:
+"""""""
+
+::
+
+      declare <type>
+      @llvm.arithmetic.fence(<type> <op>)
+
+Overview:
+"""""""""
+
+The purpose of the ``llvm.arithmetic.fence`` intrinsic
+is to prevent the optimizer from performaing fast-math optimizations,
+particularly reassociation,
+between the argument and the expression that contains the argument.
+It can be used to preserve the parentheses in the source language.
+
+Arguments:
+""""""""""
+
+The ``llvm.arithmetic.fence`` intrinsic takes only one argument.
+The argument and the return value are floating-point numbers,
+or vector floating-point numbers, of the same type.
+
+Semantics:
+""""""""""
+
+This intrinsic returns the value of its operand. The optimizer can optimize
+the argument, but the optimizer cannot hoist any component of the operand
+to the containing context, and the optimizer cannot move the calculation of
+any expression in the containing context into the operand.
 
 
 '``llvm.donothing``' Intrinsic

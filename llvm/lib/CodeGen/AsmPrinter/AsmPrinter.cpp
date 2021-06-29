@@ -1332,6 +1332,10 @@ void AsmPrinter::emitFunctionBody() {
       case TargetOpcode::PSEUDO_PROBE:
         emitPseudoProbe(MI);
         break;
+      case TargetOpcode::ARITH_FENCE:
+        if (isVerbose())
+          OutStreamer->emitRawComment("ARITH_FENCE");
+        break;
       default:
         emitInstruction(&MI);
         if (CanDoExtraAnalysis) {
@@ -2305,6 +2309,11 @@ void AsmPrinter::emitXXStructorList(const DataLayout &DL, const Constant *List,
   preprocessXXStructorList(DL, List, Structors);
   if (Structors.empty())
     return;
+
+  // Emit the structors in reverse order if we are using the .ctor/.dtor
+  // initialization scheme.
+  if (!TM.Options.UseInitArray)
+    std::reverse(Structors.begin(), Structors.end());
 
   const Align Align = DL.getPointerPrefAlignment();
   for (Structor &S : Structors) {

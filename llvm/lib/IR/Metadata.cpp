@@ -195,16 +195,22 @@ bool MetadataTracking::isReplaceable(const Metadata &MD) {
   return ReplaceableMetadataImpl::isReplaceable(MD);
 }
 
-SmallVector<Metadata *, 4> ReplaceableMetadataImpl::getAllArgListUsers() {
-  SmallVector<Metadata *, 4> MDUsers;
+SmallVector<Metadata *> ReplaceableMetadataImpl::getAllArgListUsers() {
+  SmallVector<std::pair<OwnerTy, uint64_t> *> MDUsersWithID;
   for (auto Pair : UseMap) {
     OwnerTy Owner = Pair.second.first;
     if (!Owner.is<Metadata *>())
       continue;
     Metadata *OwnerMD = Owner.get<Metadata *>();
     if (OwnerMD->getMetadataID() == Metadata::DIArgListKind)
-      MDUsers.push_back(OwnerMD);
+      MDUsersWithID.push_back(&UseMap[Pair.first]);
   }
+  llvm::sort(MDUsersWithID, [](auto UserA, auto UserB) {
+    return UserA->second < UserB->second;
+  });
+  SmallVector<Metadata *> MDUsers;
+  for (auto UserWithID : MDUsersWithID)
+    MDUsers.push_back(UserWithID->first.get<Metadata *>());
   return MDUsers;
 }
 
@@ -666,6 +672,7 @@ MDNode *MDNode::replaceWithPermanentImpl() {
 #define HANDLE_MDNODE_LEAF_UNIQUABLE(CLASS)                                    \
   case CLASS##Kind:                                                            \
     break;
+#define HANDLE_MDNODE_LEAF_UNIQUED(CLASS) HANDLE_MDNODE_LEAF_UNIQUABLE(CLASS)
 #include "llvm/IR/Metadata.def"
   }
 
@@ -806,6 +813,7 @@ MDNode *MDNode::uniquify() {
     dispatchRecalculateHash(SubclassThis, ShouldRecalculateHash);              \
     return uniquifyImpl(SubclassThis, getContext().pImpl->CLASS##s);           \
   }
+#define HANDLE_MDNODE_LEAF_UNIQUED(CLASS) HANDLE_MDNODE_LEAF_UNIQUABLE(CLASS)
 #include "llvm/IR/Metadata.def"
   }
 }
@@ -818,6 +826,7 @@ void MDNode::eraseFromStore() {
   case CLASS##Kind:                                                            \
     getContext().pImpl->CLASS##s.erase(cast<CLASS>(this));                     \
     break;
+#define HANDLE_MDNODE_LEAF_UNIQUED(CLASS) HANDLE_MDNODE_LEAF_UNIQUABLE(CLASS)
 #include "llvm/IR/Metadata.def"
   }
 }

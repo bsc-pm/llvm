@@ -780,7 +780,7 @@ public:
             I->eraseFromParent();
           if (A->use_empty())
             cast<Instruction>(A)->eraseFromParent();
-          if (B->use_empty())
+          if (A != B && B->use_empty())
             cast<Instruction>(B)->eraseFromParent();
         }
       }
@@ -1537,9 +1537,10 @@ public:
                          getFastMathFlags(MatMul));
 
       FusedInsts.insert(MatMul);
-      FusedInsts.insert(cast<Instruction>(Transpose));
-      if (Transpose->hasOneUse())
+      if (Transpose->hasOneUse()) {
+        FusedInsts.insert(cast<Instruction>(Transpose));
         ToRemove.push_back(cast<Instruction>(Transpose));
+      }
       finalizeLowering(MatMul, Result, Builder);
       // TODO: add a fake entry for the folded instruction so that this is
       // included in the expression in the remark.
@@ -1840,7 +1841,7 @@ public:
           return;
         }
         IntrinsicInst *II = dyn_cast<IntrinsicInst>(CI);
-        write(StringRef(Intrinsic::getName(II->getIntrinsicID(), {}))
+        write(Intrinsic::getBaseName(II->getIntrinsicID())
                   .drop_front(StringRef("llvm.matrix.").size()));
         write(".");
         std::string Tmp;

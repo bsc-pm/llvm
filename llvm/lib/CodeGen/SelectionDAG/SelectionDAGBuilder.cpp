@@ -1942,7 +1942,7 @@ void SelectionDAGBuilder::visitRet(const ReturnInst &I) {
 
       bool NeedsRegBlock = TLI.functionArgumentNeedsConsecutiveRegisters(
           I.getOperand(0)->getType(), F->getCallingConv(),
-          /*IsVarArg*/ false);
+          /*IsVarArg*/ false, DL);
 
       ISD::NodeType ExtendKind = ISD::ANY_EXTEND;
       if (F->getAttributes().hasAttribute(AttributeList::ReturnIndex,
@@ -6292,6 +6292,12 @@ void SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I,
                              getValue(I.getArgOperand(0)),
                              getValue(I.getArgOperand(1)), Flags));
     return;
+  case Intrinsic::arithmetic_fence: {
+    setValue(&I, DAG.getNode(ISD::ARITH_FENCE, sdl,
+                             getValue(I.getArgOperand(0)).getValueType(),
+                             getValue(I.getArgOperand(0)), Flags));
+    return;
+  }
   case Intrinsic::fma:
     setValue(&I, DAG.getNode(
                      ISD::FMA, sdl, getValue(I.getArgOperand(0)).getValueType(),
@@ -9441,7 +9447,7 @@ TargetLowering::LowerCallTo(TargetLowering::CallLoweringInfo &CLI) const {
     CLI.IsTailCall = false;
   } else {
     bool NeedsRegBlock = functionArgumentNeedsConsecutiveRegisters(
-        CLI.RetTy, CLI.CallConv, CLI.IsVarArg);
+        CLI.RetTy, CLI.CallConv, CLI.IsVarArg, DL);
     for (unsigned I = 0, E = RetTys.size(); I != E; ++I) {
       ISD::ArgFlagsTy Flags;
       if (NeedsRegBlock) {
@@ -9501,7 +9507,7 @@ TargetLowering::LowerCallTo(TargetLowering::CallLoweringInfo &CLI) const {
     if (Args[i].IsByVal)
       FinalType = cast<PointerType>(Args[i].Ty)->getElementType();
     bool NeedsRegBlock = functionArgumentNeedsConsecutiveRegisters(
-        FinalType, CLI.CallConv, CLI.IsVarArg);
+        FinalType, CLI.CallConv, CLI.IsVarArg, DL);
     for (unsigned Value = 0, NumValues = ValueVTs.size(); Value != NumValues;
          ++Value) {
       EVT VT = ValueVTs[Value];
@@ -10052,7 +10058,7 @@ void SelectionDAGISel::LowerArguments(const Function &F) {
     if (Arg.hasAttribute(Attribute::ByVal))
       FinalType = Arg.getParamByValType();
     bool NeedsRegBlock = TLI->functionArgumentNeedsConsecutiveRegisters(
-        FinalType, F.getCallingConv(), F.isVarArg());
+        FinalType, F.getCallingConv(), F.isVarArg(), DL);
     for (unsigned Value = 0, NumValues = ValueVTs.size();
          Value != NumValues; ++Value) {
       EVT VT = ValueVTs[Value];
