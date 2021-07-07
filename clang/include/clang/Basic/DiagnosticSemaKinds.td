@@ -11252,6 +11252,8 @@ def err_oss_collapse_same_loop_type : Error<
   "expected loop iterator type to be %0 instead of %1">;
 def err_oss_nonrectangular_loop_iter_dep : Error<
   "unsupported dependencies over iterators of a non-rectangular loop">;
+def err_oss_loop_iter_no_dep : Error<
+  "iterator usage in this clause is not allowed">;
 def err_oss_loop_incr_not_compatible : Error<
   "increment expression must cause %0 to %select{decrease|increase}1 "
   "on each iteration of OmpSs-2 for loop">;

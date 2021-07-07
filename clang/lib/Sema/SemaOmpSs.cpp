@@ -2054,12 +2054,13 @@ void Sema::ActOnOmpSsLoopInitialization(SourceLocation ForLoc, Stmt *Init) {
 }
 
 namespace {
-class OSSDepOnTriangularCollapse final : public StmtVisitor<OSSDepOnTriangularCollapse, void> {
+class OSSClauseLoopIterUse final : public StmtVisitor<OSSClauseLoopIterUse, void> {
   Sema &SemaRef;
-  DSAStackTy *Stack;
   ArrayRef<OSSLoopDirective::HelperExprs> B;
   bool ErrorFound = false;
-  bool IsNonRectangular = false;
+
+  bool CurEmitDiags = false;
+  unsigned CurDiagID = 0;
 public:
 
   void VisitOSSMultiDepExpr(OSSMultiDepExpr *E) {
@@ -2114,15 +2115,17 @@ public:
 
       for (size_t i = 0; i < B.size(); ++i) {
         ValueDecl *IndVarVD = cast<DeclRefExpr>(B[i].IndVar)->getDecl();
-        if (IsNonRectangular && VD == IndVarVD) {
-          SemaRef.Diag(E->getBeginLoc(), diag::err_oss_nonrectangular_loop_iter_dep);
+        if (CurEmitDiags && VD == IndVarVD) {
+          SemaRef.Diag(E->getBeginLoc(), CurDiagID);
           ErrorFound = true;
         }
       }
     }
   }
 
-  void VisitClause(OSSClause *Clause) {
+  void VisitClause(OSSClause *Clause, bool EmitDiags, unsigned DiagID) {
+    CurEmitDiags = EmitDiags;
+    CurDiagID = DiagID;
     for (Stmt *Child : Clause->children()) {
       if (Child)
         Visit(Child);
@@ -2138,29 +2141,9 @@ public:
 
   bool isErrorFound() const { return ErrorFound; }
 
-  OSSDepOnTriangularCollapse(Sema &SemaRef, DSAStackTy *S, const SmallVectorImpl<OSSLoopDirective::HelperExprs> &B)
-      : SemaRef(SemaRef), Stack(S), B(B), ErrorFound(false) {
-
-    for (size_t i = 1; i < B.size(); ++i) {
-      for (size_t j = 0; j < i; ++j) {
-        ValueDecl *VD = cast<DeclRefExpr>(B[j].IndVar)->getDecl();
-        if (LoopCounterRefChecker(
-            SemaRef, *Stack, VD, /*IsInitializer=*/true, /*EmitDiags=*/false).Visit(B[i].LB)) {
-          IsNonRectangular = true;
-          return;
-        }
-        if (LoopCounterRefChecker(
-            SemaRef, *Stack, VD, /*IsInitializer=*/true, /*EmitDiags=*/false).Visit(B[i].UB)) {
-          IsNonRectangular = true;
-          return;
-        }
-        if (LoopCounterRefChecker(
-            SemaRef, *Stack, VD, /*IsInitializer=*/true, /*EmitDiags=*/false).Visit(B[i].Step)) {
-          // TODO: error here. it is not valid
-        }
-      }
-    }
-  }
+  OSSClauseLoopIterUse(Sema &SemaRef, const SmallVectorImpl<OSSLoopDirective::HelperExprs> &B)
+      : SemaRef(SemaRef), B(B), ErrorFound(false)
+      { }
 
 };
 } // namespace
@@ -2261,6 +2244,27 @@ static bool checkOmpSsLoop(
   return false;
 }
 
+static bool checkNonRectangular(Sema &SemaRef, DSAStackTy *Stack, const SmallVectorImpl<OSSLoopDirective::HelperExprs> &B) {
+  for (size_t i = 1; i < B.size(); ++i) {
+    for (size_t j = 0; j < i; ++j) {
+      ValueDecl *VD = cast<DeclRefExpr>(B[j].IndVar)->getDecl();
+      if (LoopCounterRefChecker(
+          SemaRef, *Stack, VD, /*IsInitializer=*/true, /*EmitDiags=*/false).Visit(B[i].LB)) {
+        return true;
+      }
+      if (LoopCounterRefChecker(
+          SemaRef, *Stack, VD, /*IsInitializer=*/true, /*EmitDiags=*/false).Visit(B[i].UB)) {
+        return true;
+      }
+      if (LoopCounterRefChecker(
+          SemaRef, *Stack, VD, /*IsInitializer=*/true, /*EmitDiags=*/false).Visit(B[i].Step)) {
+        // TODO: error here. it is not valid
+      }
+    }
+  }
+  return false;
+}
+
 StmtResult Sema::ActOnOmpSsTaskForDirective(
     ArrayRef<OSSClause *> Clauses, Stmt *AStmt,
     SourceLocation StartLoc, SourceLocation EndLoc) {
@@ -2282,13 +2286,25 @@ StmtResult Sema::ActOnOmpSsTaskLoopDirective(
   if (checkOmpSsLoop(OSSD_taskloop, AStmt, *this, *DSAStack, B))
     return StmtError();
 
-  OSSDepOnTriangularCollapse OSSDepOnCollapse(*this, DSAStack, B);
+  bool IsNonRectangular = checkNonRectangular(*this, DSAStack, B);
+  OSSClauseLoopIterUse OSSLoopIterUse(*this, B);
   for (auto *Clause : Clauses) {
     if (isa<OSSDependClause>(Clause) || isa<OSSReductionClause>(Clause)) {
-      OSSDepOnCollapse.VisitClause(Clause);
+      OSSLoopIterUse.VisitClause(
+        Clause, IsNonRectangular, diag::err_oss_nonrectangular_loop_iter_dep);
+      if (OSSLoopIterUse.isErrorFound())
+        return StmtError();
+    } else if (isa<OSSIfClause>(Clause) ||
+               isa<OSSFinalClause>(Clause) ||
+               isa<OSSCostClause>(Clause) ||
+               isa<OSSPriorityClause>(Clause) ||
+               isa<OSSOnreadyClause>(Clause) ||
+               isa<OSSChunksizeClause>(Clause) ||
+               isa<OSSGrainsizeClause>(Clause)) {
+      OSSLoopIterUse.VisitClause(Clause, /*EmitDiags=*/true, diag::err_oss_loop_iter_no_dep);
+      if (OSSLoopIterUse.isErrorFound())
+        return StmtError();
     }
-    if (OSSDepOnCollapse.isErrorFound())
-      return StmtError();
   }
 
   return OSSTaskLoopDirective::Create(Context, StartLoc, EndLoc, Clauses, AStmt, B);
@@ -2303,13 +2319,25 @@ StmtResult Sema::ActOnOmpSsTaskLoopForDirective(
   if (checkOmpSsLoop(OSSD_taskloop_for, AStmt, *this, *DSAStack, B))
     return StmtError();
 
-  OSSDepOnTriangularCollapse OSSDepOnCollapse(*this, DSAStack, B);
+  bool IsNonRectangular = checkNonRectangular(*this, DSAStack, B);
+  OSSClauseLoopIterUse OSSLoopIterUse(*this, B);
   for (auto *Clause : Clauses) {
     if (isa<OSSDependClause>(Clause) || isa<OSSReductionClause>(Clause)) {
-      OSSDepOnCollapse.VisitClause(Clause);
+      OSSLoopIterUse.VisitClause(
+        Clause, IsNonRectangular, diag::err_oss_nonrectangular_loop_iter_dep);
+      if (OSSLoopIterUse.isErrorFound())
+        return StmtError();
+    } else if (isa<OSSIfClause>(Clause) ||
+               isa<OSSFinalClause>(Clause) ||
+               isa<OSSCostClause>(Clause) ||
+               isa<OSSPriorityClause>(Clause) ||
+               isa<OSSOnreadyClause>(Clause) ||
+               isa<OSSChunksizeClause>(Clause) ||
+               isa<OSSGrainsizeClause>(Clause)) {
+      OSSLoopIterUse.VisitClause(Clause, /*EmitDiags=*/true, diag::err_oss_loop_iter_no_dep);
+      if (OSSLoopIterUse.isErrorFound())
+        return StmtError();
     }
-    if (OSSDepOnCollapse.isErrorFound())
-      return StmtError();
   }
 
   return OSSTaskLoopForDirective::Create(Context, StartLoc, EndLoc, Clauses, AStmt, B);
