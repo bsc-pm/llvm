@@ -529,8 +529,6 @@ struct OmpSs {
   // function entry.
   SmallVector<Instruction *, 4> PostMoveInstructions;
 
-  SmallVector<Instruction *> CollapseStuff;
-
   // Signed extension of V to type Ty
   static Value *createZSExtOrTrunc(IRBuilder<> &IRB, Value *V, Type *Ty, bool Signed) {
     if (Signed)
@@ -604,6 +602,7 @@ struct OmpSs {
   void buildLoopForTaskImpl(Module &M, Function &F, Instruction *Entry,
                         Instruction *Exit, const DirectiveLoopInfo &LoopInfo,
                         Instruction *&LoopEntryI, Instruction *&LoopExitI,
+                        SmallVectorImpl<Instruction *> &CollapseStuff,
                         size_t LInfoIndex = 0) {
 
     IRBuilder<> IRB(Entry);
@@ -707,19 +706,18 @@ struct OmpSs {
       Instruction *Exit, const DirectiveLoopInfo &LoopInfo) {
     Instruction *LoopEntryI = nullptr;
     Instruction *LoopExitI = nullptr;
+
+    SmallVector<Instruction *> CollapseStuff;
     for (int i = LoopInfo.LBound.size() - 1; i >= 0; --i) {
       IRBuilder<> IRB(Entry);
       LoopInfo.LBound[i].Result = IRB.CreateCall(LoopInfo.LBound[i].Fun, LoopInfo.LBound[i].Args);
       LoopInfo.UBound[i].Result = IRB.CreateCall(LoopInfo.UBound[i].Fun, LoopInfo.UBound[i].Args);
       LoopInfo.Step[i].Result = IRB.CreateCall(LoopInfo.Step[i].Fun, LoopInfo.Step[i].Args);
 
-      buildLoopForTaskImpl(M, F, Entry, Exit, LoopInfo, LoopEntryI, LoopExitI, i);
+      buildLoopForTaskImpl(M, F, Entry, Exit, LoopInfo, LoopEntryI, LoopExitI, CollapseStuff, i);
       Entry = LoopEntryI;
       Exit = LoopExitI;
     }
-    // FIXME: when building the original loop in final mode remove collapse blocks.
-    // I have to add a bool parameter or something to avoid this
-    CollapseStuff.clear();
     return LoopEntryI;
   }
 
@@ -2109,8 +2107,28 @@ struct OmpSs {
     return OlConstraintsFuncVar;
   }
 
+  // Checks if the LoopInfo[i] depends on other iterator
+  // NOTE: this assumes compute_lb/ub/step have an iterator as
+  // an arguments if and only if it is used.
+  bool isLoopIteratorDepenent(
+      const DirectiveLoopInfo &LoopInfo, unsigned i) {
+    for (size_t j = 0; j < i; ++j) {
+      Value *IndVar = LoopInfo.IndVar[j];
+      for (Value *V : LoopInfo.LBound[i].Args)
+        if (V == IndVar)
+          return true;
+      for (Value *V : LoopInfo.UBound[i].Args)
+        if (V == IndVar)
+          return true;
+      for (Value *V : LoopInfo.Step[i].Args)
+        if (V == IndVar)
+          return true;
+    }
+    return false;
+  }
+
   bool multidepUsesLoopIter(
-      const DirectiveLoopInfo &LoopInfo,const MultiDependInfo& MultiDepInfo) {
+      const DirectiveLoopInfo &LoopInfo, const MultiDependInfo& MultiDepInfo) {
     for (const auto *V : MultiDepInfo.Args) {
       for (size_t i = 0; i < LoopInfo.IndVar.size(); ++i)
         if (V == LoopInfo.IndVar[i])
@@ -2351,6 +2369,7 @@ struct OmpSs {
 
     DirectiveLoopInfo NewLoopInfo = LoopInfo;
     SmallVector<Value *> NormalizedUBs(LoopInfo.UBound.size());
+    SmallVector<Instruction *> CollapseStuff;
     if (!LoopInfo.empty()) {
 
       // This is used for nanos6_create_loop
@@ -2381,7 +2400,7 @@ struct OmpSs {
       NewLoopInfo.IndVar[0] = IRB.CreateAlloca(IndVarTy, nullptr, "loop");
       // unpacked_task_region loops are always SLT
       NewLoopInfo.LoopType[0] = DirectiveLoopInfo::LT;
-      buildLoopForTaskImpl(M, F, DirInfo.Entry, DirInfo.Exit, NewLoopInfo, NewEntryI, NewExitI);
+      buildLoopForTaskImpl(M, F, DirInfo.Entry, DirInfo.Exit, NewLoopInfo, NewEntryI, NewExitI, CollapseStuff);
     }
 
     SetVector<Instruction *> TaskBBs;
@@ -2510,7 +2529,7 @@ struct OmpSs {
 
     auto rewriteUsesBrAndGetOmpSsUnpackFunc
       = [&M, &LoopInfo, &DirInfo, &NewLoopInfo,
-         &NormalizedUBs, &UnpackTaskFuncVar, &TaskArgsToStructIdxMap,
+         &NormalizedUBs, &CollapseStuff, &UnpackTaskFuncVar, &TaskArgsToStructIdxMap,
          this]
            (BasicBlock *header, BasicBlock *newRootNode, BasicBlock *newHeader,
             Function *oldFunction, const SetVector<BasicBlock *> &Blocks) {
@@ -2551,8 +2570,7 @@ struct OmpSs {
         Value *NormVal = nullptr;
         for (size_t i = 0; i < LoopInfo.LBound.size(); ++i) {
           Instruction *Entry = &DirInfo.Entry->getParent()->front();
-          if (i < CollapseStuff.size())
-            Entry = CollapseStuff[i];
+          Entry = CollapseStuff[i];
 
           IRBuilder<> LoopBodyIRB(Entry);
           if (!i)
@@ -2606,8 +2624,7 @@ struct OmpSs {
           // BodyIndVar(i) = (TMP * Step) + OrigLBound
           LoopBodyIRB.CreateStore(createZSExtOrTrunc(LoopBodyIRB, pBodyIndVar.first, OrigIndVarTy, pBodyIndVar.second), LoopInfo.IndVar[i]);
 
-          // Only if there is more than one iterator
-          if (CollapseStuff.size() > 1) {
+          if (isLoopIteratorDepenent(LoopInfo, i)) {
             // Create a check to skip unwanted iterations due to collapse guess
             Instruction *UBoundResult = LoopBodyIRB.CreateCall(LoopInfo.UBound[i].Fun, LoopInfo.UBound[i].Args);
 

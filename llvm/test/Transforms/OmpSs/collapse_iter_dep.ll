@@ -212,30 +212,27 @@ entry:
 ; CHECK-NEXT:   %33 = sub i64 %25, %32
 ; CHECK-NEXT:   %34 = trunc i64 %31 to i32
 ; CHECK-NEXT:   store i32 %34, i32* %i, align 4
-; CHECK-NEXT:   %35 = call i32 @compute_ub()
-; CHECK-NEXT:   %36 = load i32, i32* %i, align 4
-; CHECK-NEXT:   %37 = icmp slt i32 %36, %35
-; CHECK-NEXT:   br i1 %37, label %38, label %for.incr8
-; CHECK: 38:                                               ; preds = %24
-; CHECK-NEXT:   %39 = udiv i64 %33, 1
-; CHECK-NEXT:   %40 = sext i32 %14 to i64
-; CHECK-NEXT:   %41 = mul i64 %39, %40
-; CHECK-NEXT:   %42 = sext i32 %12 to i64
-; CHECK-NEXT:   %43 = add i64 %41, %42
-; CHECK-NEXT:   %44 = mul i64 %39, 1
-; CHECK-NEXT:   %45 = sub i64 %33, %44
-; CHECK-NEXT:   %46 = trunc i64 %43 to i32
-; CHECK-NEXT:   store i32 %46, i32* %j, align 4
-; CHECK-NEXT:   %47 = call i32 @compute_ub.2(i32* %i)
-; CHECK-NEXT:   %48 = load i32, i32* %j, align 4
-; CHECK-NEXT:   %49 = icmp slt i32 %48, %47
-; CHECK-NEXT:   br i1 %49, label %for.body6, label %for.incr8
-; CHECK: for.body6:                                        ; preds = %38
+; CHECK-NEXT:   br label %35
+; CHECK: 35:                                               ; preds = %24
+; CHECK-NEXT:   %36 = udiv i64 %33, 1
+; CHECK-NEXT:   %37 = sext i32 %14 to i64
+; CHECK-NEXT:   %38 = mul i64 %36, %37
+; CHECK-NEXT:   %39 = sext i32 %12 to i64
+; CHECK-NEXT:   %40 = add i64 %38, %39
+; CHECK-NEXT:   %41 = mul i64 %36, 1
+; CHECK-NEXT:   %42 = sub i64 %33, %41
+; CHECK-NEXT:   %43 = trunc i64 %40 to i32
+; CHECK-NEXT:   store i32 %43, i32* %j, align 4
+; CHECK-NEXT:   %44 = call i32 @compute_ub.2(i32* %i)
+; CHECK-NEXT:   %45 = load i32, i32* %j, align 4
+; CHECK-NEXT:   %46 = icmp slt i32 %45, %44
+; CHECK-NEXT:   br i1 %46, label %for.body6, label %for.incr8
+; CHECK: for.body6:                                        ; preds = %35
 ; CHECK-NEXT:   br label %for.incr8
-; CHECK: for.incr8:                                        ; preds = %38, %24, %for.body6
-; CHECK-NEXT:   %50 = load i64, i64* %loop, align 8
-; CHECK-NEXT:   %51 = add i64 %50, 1
-; CHECK-NEXT:   store i64 %51, i64* %loop, align 8
+; CHECK: for.incr8:                                        ; preds = %35, %for.body6
+; CHECK-NEXT:   %47 = load i64, i64* %loop, align 8
+; CHECK-NEXT:   %48 = add i64 %47, 1
+; CHECK-NEXT:   store i64 %48, i64* %loop, align 8
 ; CHECK-NEXT:   br label %for.cond5
 ; CHECK-NEXT: }
 
