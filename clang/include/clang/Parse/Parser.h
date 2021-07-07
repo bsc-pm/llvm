@@ -3227,6 +3227,10 @@ private:
   /// initializer.
   void ParseOmpSsReductionInitializerForDecl(VarDecl *OmpPrivParm);
 
+  // Parse only collapse clauses. Only the first value (if valid)
+  // will be recorded in Stack
+  void PreParseCollapse();
+
   StmtResult
   ParseOmpSsDeclarativeOrExecutableDirective(ParsedStmtContext Allowed);
 

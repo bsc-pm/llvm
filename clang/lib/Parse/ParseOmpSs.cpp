@@ -571,6 +571,42 @@ Parser::DeclGroupPtrTy Parser::ParseOmpSsDeclarativeDirectiveWithExtDecl(
   return nullptr;
 }
 
+
+void Parser::PreParseCollapse() {
+  // Parse late clause tokens
+  PP.EnterToken(Tok, /*IsReinject*/ true);
+  PP.EnterTokenStream(OSSLateParsedToks, /*DisableMacroExpansion=*/true,
+                      /*IsReinject*/ true);
+
+  // Consume the previously pushed token.
+  ConsumeAnyToken(/*ConsumeCodeCompletionTok=*/true);
+  ConsumeAnyToken(/*ConsumeCodeCompletionTok=*/true);
+
+  while (Tok.isNot(tok::annot_pragma_ompss_end)) {
+    OmpSsClauseKind CKind = getOmpSsClauseKind(PP.getSpelling(Tok));
+    ConsumeToken();
+    if (CKind != OSSC_collapse) {
+      SkipUntil(tok::annot_pragma_ompss_end, tok::identifier, StopBeforeMatch);
+      continue;
+    }
+
+    SourceLocation RLoc;
+    // Supress diagnostics here. Errors will be handled later
+    Diags.setSuppressAllDiagnostics(true);
+
+    ExprResult Val = ParseOmpSsParensExpr(getOmpSsClauseName(CKind), RLoc);
+    if (!Val.isInvalid())
+      Actions.VerifyPositiveIntegerConstant(Val.get(), OSSC_collapse, /*StrictlyPositive=*/true);
+
+    Diags.setSuppressAllDiagnostics(false);
+
+    // Skip ',' if any.
+    if (Tok.is(tok::comma))
+      ConsumeToken();
+  }
+  ConsumeAnnotationToken();
+}
+
 /// Parsing of declarative or executable OmpSs directives.
 ///       executable-directive:
 ///         annot_pragma_ompss 'taskwait'
@@ -632,46 +668,9 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
       OSSLateParsedToks.push_back(Tok);
       ConsumeAnyToken();
 
-     // TODO: make a function of this.
      // Parse only collapse clauses. Only the first value (if valid)
      // will be recorded in Stack
-#if 1
-      // Parse late clause tokens
-      PP.EnterToken(Tok, /*IsReinject*/ true);
-      PP.EnterTokenStream(OSSLateParsedToks, /*DisableMacroExpansion=*/true,
-                          /*IsReinject*/ true);
-
-      // Consume the previously pushed token.
-      ConsumeAnyToken(/*ConsumeCodeCompletionTok=*/true);
-      ConsumeAnyToken(/*ConsumeCodeCompletionTok=*/true);
-
-      while (Tok.isNot(tok::annot_pragma_ompss_end)) {
-        OmpSsClauseKind CKind = getOmpSsClauseKind(PP.getSpelling(Tok));
-        SourceLocation Loc = ConsumeToken();
-        if (CKind != OSSC_collapse) {
-          SkipUntil(tok::annot_pragma_ompss_end, tok::identifier, StopBeforeMatch);
-          continue;
-        }
-
-        SourceLocation LLoc = Tok.getLocation();
-        SourceLocation RLoc;
-
-        // Supress diagnostics here. Errors will be handled later
-        Diags.setSuppressAllDiagnostics(true);
-
-        ExprResult Val = ParseOmpSsParensExpr(getOmpSsClauseName(CKind), RLoc);
-        if (!Val.isInvalid())
-          Actions.VerifyPositiveIntegerConstant(Val.get(), OSSC_collapse, /*StrictlyPositive=*/true);
-
-        Diags.setSuppressAllDiagnostics(false);
-
-        // Skip ',' if any.
-        if (Tok.is(tok::comma))
-          ConsumeToken();
-      }
-      ConsumeAnnotationToken();
-#endif
-
+     PreParseCollapse();
     } else {
       ConsumeToken();
 
