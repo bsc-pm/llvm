@@ -4531,10 +4531,6 @@ static Value *SimplifyExtractElementInst(Value *Vec, Value *Idx,
     if (auto *CIdx = dyn_cast<Constant>(Idx))
       return ConstantExpr::getExtractElement(CVec, CIdx);
 
-    // The index is not relevant if our vector is a splat.
-    if (auto *Splat = CVec->getSplatValue())
-      return Splat;
-
     if (Q.isUndefValue(Vec))
       return UndefValue::get(VecVTy->getElementType());
   }
@@ -4557,6 +4553,10 @@ static Value *SimplifyExtractElementInst(Value *Vec, Value *Idx,
         return Splat;
     if (Value *Elt = findScalarElement(Vec, IdxC->getZExtValue()))
       return Elt;
+  } else {
+    // The index is not relevant if our vector is a splat.
+    if (Value *Splat = getSplatValue(Vec))
+      return Splat;
   }
   return nullptr;
 }
@@ -4857,12 +4857,12 @@ static Constant *propagateNaN(Constant *In) {
 /// difference to the result.
 static Constant *simplifyFPOp(ArrayRef<Value *> Ops, FastMathFlags FMF,
                               const SimplifyQuery &Q) {
-  for (Value *V : Ops) {
-    // Poison is independent of anything else. It always propagates from an
-    // operand to a math result.
-    if (match(V, m_Poison()))
-      return PoisonValue::get(V->getType());
+  // Poison is independent of anything else. It always propagates from an
+  // operand to a math result.
+  if (any_of(Ops, [](Value *V) { return match(V, m_Poison()); }))
+    return PoisonValue::get(Ops[0]->getType());
 
+  for (Value *V : Ops) {
     bool IsNan = match(V, m_NaN());
     bool IsInf = match(V, m_Inf());
     bool IsUndef = Q.isUndefValue(V);

@@ -165,6 +165,14 @@ void UnwindInfoSectionImpl<Ptr>::prepareRelocations(ConcatInputSection *isec) {
   for (size_t i = 0; i < isec->relocs.size(); ++i) {
     Reloc &r = isec->relocs[i];
     assert(target->hasAttr(r.type, RelocAttrBits::UNSIGNED));
+
+    if (r.offset % sizeof(CompactUnwindEntry<Ptr>) == 0) {
+      if (auto *referentIsec = r.referent.dyn_cast<InputSection *>())
+        if (!cast<ConcatInputSection>(referentIsec)->shouldOmitFromOutput())
+          allEntriesAreOmitted = false;
+      continue;
+    }
+
     if (r.offset % sizeof(CompactUnwindEntry<Ptr>) !=
         offsetof(CompactUnwindEntry<Ptr>, personality))
       continue;
@@ -227,6 +235,9 @@ static ConcatInputSection *checkTextSegment(InputSection *isec) {
   return cast<ConcatInputSection>(isec);
 }
 
+template <class Ptr>
+constexpr Ptr TombstoneValue = std::numeric_limits<Ptr>::max();
+
 // We need to apply the relocations to the pre-link compact unwind section
 // before converting it to post-link form. There should only be absolute
 // relocations here: since we are not emitting the pre-link CU section, there
@@ -243,7 +254,7 @@ relocateCompactUnwind(ConcatOutputSection *compactUnwindSection,
     memcpy(buf, isec->data.data(), isec->data.size());
 
     for (const Reloc &r : isec->relocs) {
-      uint64_t referentVA = UINT64_MAX; // Tombstone value
+      uint64_t referentVA = TombstoneValue<Ptr>;
       if (auto *referentSym = r.referent.dyn_cast<Symbol *>()) {
         if (!isa<Undefined>(referentSym)) {
           assert(referentSym->isInGot());
@@ -303,7 +314,7 @@ static void addEntriesForFunctionsWithoutUnwindInfo(
     std::vector<CompactUnwindEntry<Ptr>> &cuVector) {
   DenseSet<Ptr> hasUnwindInfo;
   for (CompactUnwindEntry<Ptr> &cuEntry : cuVector)
-    if (cuEntry.functionAddress != UINT64_MAX)
+    if (cuEntry.functionAddress != TombstoneValue<Ptr>)
       hasUnwindInfo.insert(cuEntry.functionAddress);
 
   // Add explicit "has no unwind info" entries for all global and local symbols
@@ -376,7 +387,7 @@ template <class Ptr> void UnwindInfoSectionImpl<Ptr>::finalize() {
 
   // Rather than sort & fold the 32-byte entries directly, we create a
   // vector of pointers to entries and sort & fold that instead.
-  cuPtrVector.reserve(cuCount);
+  cuPtrVector.reserve(cuVector.size());
   for (CompactUnwindEntry<Ptr> &cuEntry : cuVector)
     cuPtrVector.emplace_back(&cuEntry);
   llvm::sort(cuPtrVector, [](const CompactUnwindEntry<Ptr> *a,
@@ -384,13 +395,13 @@ template <class Ptr> void UnwindInfoSectionImpl<Ptr>::finalize() {
     return a->functionAddress < b->functionAddress;
   });
 
-  // Dead-stripped functions get a functionAddress of UINT64_MAX in
+  // Dead-stripped functions get a functionAddress of TombstoneValue in
   // relocateCompactUnwind(). Filter them out here.
   // FIXME: This doesn't yet collect associated data like LSDAs kept
   // alive only by a now-removed CompactUnwindEntry or other comdat-like
   // data (`kindNoneGroupSubordinate*` in ld64).
   CompactUnwindEntry<Ptr> tombstone;
-  tombstone.functionAddress = static_cast<Ptr>(UINT64_MAX);
+  tombstone.functionAddress = TombstoneValue<Ptr>;
   cuPtrVector.erase(
       std::lower_bound(cuPtrVector.begin(), cuPtrVector.end(), &tombstone,
                        [](const CompactUnwindEntry<Ptr> *a,
@@ -398,6 +409,13 @@ template <class Ptr> void UnwindInfoSectionImpl<Ptr>::finalize() {
                          return a->functionAddress < b->functionAddress;
                        }),
       cuPtrVector.end());
+
+  // If there are no entries left after adding explicit "no unwind info"
+  // entries and removing entries for dead-stripped functions, don't write
+  // an __unwind_info section at all.
+  assert(allEntriesAreOmitted == cuPtrVector.empty());
+  if (cuPtrVector.empty())
+    return;
 
   // Fold adjacent entries with matching encoding+personality+lsda
   // We use three iterators on the same cuPtrVector to fold in-situ:
@@ -528,6 +546,8 @@ template <class Ptr> void UnwindInfoSectionImpl<Ptr>::finalize() {
 
 template <class Ptr>
 void UnwindInfoSectionImpl<Ptr>::writeTo(uint8_t *buf) const {
+  assert(!cuPtrVector.empty() && "call only if there is unwind info");
+
   // section header
   auto *uip = reinterpret_cast<unwind_info_section_header *>(buf);
   uip->version = 1;
@@ -568,8 +588,10 @@ void UnwindInfoSectionImpl<Ptr>::writeTo(uint8_t *buf) const {
     l2PagesOffset += SECOND_LEVEL_PAGE_BYTES;
   }
   // Level-1 sentinel
-  const CompactUnwindEntry<Ptr> &cuEnd = cuVector.back();
-  iep->functionOffset = cuEnd.functionAddress + cuEnd.functionLength;
+  const CompactUnwindEntry<Ptr> &cuEnd = *cuPtrVector.back();
+  assert(cuEnd.functionAddress != TombstoneValue<Ptr>);
+  iep->functionOffset =
+      cuEnd.functionAddress - in.header->addr + cuEnd.functionLength;
   iep->secondLevelPagesSectionOffset = 0;
   iep->lsdaIndexArraySectionOffset =
       lsdaOffset +

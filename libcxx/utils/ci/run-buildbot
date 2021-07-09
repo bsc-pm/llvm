@@ -285,13 +285,6 @@ generic-gcc)
     generate-cmake
     check-cxx-cxxabi
 ;;
-generic-gcc-prev)
-    export CC=gcc-10
-    export CXX=g++-10
-    clean
-    generate-cmake
-    check-cxx-cxxabi
-;;
 generic-asan)
     export CC=clang
     export CXX=clang++
@@ -469,7 +462,7 @@ runtimes-build)
     ${NINJA} -C "${BUILD_DIR}" check-runtimes
 
     echo "--- Installing libc++ and libc++abi to a fake location"
-    ${NINJA} -C "${BUILD_DIR}" install-cxx install-cxxabi
+    ${NINJA} -C "${BUILD_DIR}" install-runtimes
 ;;
 legacy-test-config)
     export CC=clang
