@@ -3541,7 +3541,7 @@ static void __kmp_create_free_agent_threads(void) {
   int gtid = __kmp_entry_gtid();
   kmp_root_t *root = __kmp_threads[gtid]->th.th_root;
 
-  for (int i = 0; i < root->r.num_free_agent_threads; i++) {
+  for (unsigned int i = 0; i < root->r.num_free_agent_threads; i++) {
     kmp_info_t *new_thr = root->r.free_agent_threads[i];
     int new_gtid = new_thr->th.th_info.ds.ds_gtid;
     /* actually fork it and create the new worker thread */
@@ -3561,7 +3561,7 @@ static void __kmp_allocate_free_agent_threads(kmp_root_t *root) {
   root->r.num_free_agent_threads = __kmp_free_agent_num_threads;
   root->r.free_agent_threads = (kmp_info_t**)__kmp_allocate(
       sizeof(*root->r.free_agent_threads) * root->r.num_free_agent_threads);
-  for (int i = 0; i < root->r.num_free_agent_threads; i++) {
+  for (unsigned int i = 0; i < root->r.num_free_agent_threads; i++) {
     root->r.free_agent_threads[i] = __kmp_allocate_free_agent_thread(root, i);
   }
 }
@@ -3800,7 +3800,7 @@ int __kmp_register_root(int initial_thread) {
   root->r.is_free_agent_thread_active = (bool*)__kmp_allocate(
       sizeof(*root->r.is_free_agent_thread_active) * __kmp_free_agent_num_threads);
   // FIXME: Maybe there is a "calloc" like allocate?
-  for (int i = 0; i < __kmp_free_agent_num_threads; i++) {
+  for (unsigned int i = 0; i < __kmp_free_agent_num_threads; i++) {
     root->r.is_free_agent_thread_active[i] = thread_starts_active;
   }
 

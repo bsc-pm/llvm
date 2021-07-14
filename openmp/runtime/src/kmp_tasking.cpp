@@ -431,7 +431,7 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task) {
 
   // Traverse all the free agent threads, if we find one that is sleeping, resume it
   // so we give it a chance to execute the task.
-  for (int i = 0; i < __kmp_free_agent_num_threads; i++) {
+  for (unsigned int i = 0; i < __kmp_free_agent_num_threads; i++) {
     kmp_info_t *free_agent_thread =
       __kmp_threads[gtid]->th.th_root->r.free_agent_threads[i];
     if (*free_agent_thread->th.is_free_agent_active) {
@@ -3624,7 +3624,7 @@ void __kmp_task_team_setup(kmp_info_t *this_thr, kmp_team_t *team, int always) {
   // Allow free agent threads to use this task team
   kmp_task_team_t* task_team = team->t.t_task_team[this_thr->th.th_task_state];
 
-  for (int i = 0; i < __kmp_free_agent_num_threads; i++) {
+  for (unsigned int i = 0; i < __kmp_free_agent_num_threads; i++) {
     kmp_info_t *free_agent = this_thr->th.th_root->r.free_agent_threads[i];
     __kmp_acquire_bootstrap_lock(&free_agent->th.allowed_teams_lock);
     __kmp_add_allowed_task_team(free_agent, task_team);
@@ -3684,7 +3684,7 @@ void __kmp_task_team_wait(
 
 
       // This team is not allowed anymore for free agent threads
-      for (int i = 0; i < __kmp_free_agent_num_threads; i++) {
+      for (unsigned int i = 0; i < __kmp_free_agent_num_threads; i++) {
         kmp_info_t *free_agent = this_thr->th.th_root->r.free_agent_threads[i];
         __kmp_acquire_bootstrap_lock(&free_agent->th.allowed_teams_lock);
         __kmp_remove_allowed_task_team(free_agent, task_team);
@@ -4711,7 +4711,6 @@ void __kmp_add_allowed_task_team(kmp_info_t *free_agent,
 
 void __kmp_remove_allowed_task_team(kmp_info_t *free_agent,
                                     kmp_task_team_t *task_team) {
-  int index = -1;
   for (int i = 0; i < free_agent->th.allowed_teams_length; i++) {
     if (free_agent->th.allowed_teams[i] == task_team) {
       free_agent->th.allowed_teams[i]

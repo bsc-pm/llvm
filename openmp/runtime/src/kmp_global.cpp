@@ -534,7 +534,7 @@ kmp_pause_status_t __kmp_pause_status = kmp_not_paused;
 // Free agent threads
 kmp_free_agent_thread_start_t
   __kmp_free_agent_thread_start = kmp_free_agent_inactive;
-int __kmp_free_agent_num_threads = 0;
+unsigned int __kmp_free_agent_num_threads = 0;
 kmp_proc_bind_t __kmp_free_agent_proc_bind = proc_bind_false;
 char *__kmp_free_agent_affinity_proclist = NULL;
 kmp_affin_mask_t *__kmp_free_agent_affinity_masks = NULL;

@@ -4704,7 +4704,7 @@ static void __kmp_stg_parse_num_free_agent_threads(char const *name,
                                                    char const *value,
                                                    void *data) {
   __kmp_stg_parse_int(name, value, 0, KMP_INT_MAX,
-                      &__kmp_free_agent_num_threads);
+                      (int*) &__kmp_free_agent_num_threads);
 }
 
 static void __kmp_stg_print_num_free_agent_threads(kmp_str_buf_t *buffer,

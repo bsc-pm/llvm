@@ -3957,7 +3957,7 @@ typedef enum kmp_free_agent_thread_start_t {
   kmp_free_agent_active = 1
 } kmp_free_agent_thread_start_t;
 extern kmp_free_agent_thread_start_t __kmp_free_agent_thread_start;
-extern int __kmp_free_agent_num_threads;
+extern unsigned int __kmp_free_agent_num_threads;
 extern kmp_proc_bind_t __kmp_free_agent_proc_bind;
 extern char *__kmp_free_agent_affinity_proclist;
 extern kmp_affin_mask_t *__kmp_free_agent_affinity_masks;

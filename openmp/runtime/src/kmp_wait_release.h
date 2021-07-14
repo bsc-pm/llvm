@@ -370,7 +370,7 @@ final_spin=FALSE)
             // Take the lock and release the list
             __kmp_release_bootstrap_lock(&this_thr->th.allowed_teams_lock);
 
-            int ret = flag->execute_tasks(
+            /*int ret =*/ flag->execute_tasks(
                 this_thr, th_gtid, final_spin,
                 &tasks_completed USE_ITT_BUILD_ARG(itt_sync_obj), 0);
 
