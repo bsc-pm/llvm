@@ -2353,7 +2353,7 @@ typedef struct kmp_base_task_team {
   std::atomic<kmp_int32> tt_unfinished_threads; /* #threads still active */
 
   KMP_ALIGN_CACHE
-  std::atomic<kmp_int32> tt_unfinished_unshackleds; /* #unshackled threads still active */
+  std::atomic<kmp_int32> tt_unfinished_free_agents; /* #free agent threads still active */
 
   KMP_ALIGN_CACHE
   volatile kmp_uint32
@@ -2550,12 +2550,12 @@ typedef struct KMP_ALIGN_CACHE kmp_base_info {
   std::atomic<bool> th_blocking;
 #endif
   kmp_cg_root_t *th_cg_roots; // list of cg_roots associated with this thread
-  bool is_unshackled; // This is an unshackled thread.
-  bool *is_unshackled_active; // Reference to the is_unshackled_thread_active array.
+  bool is_free_agent; // This is a free_agent thread.
+  bool *is_free_agent_active; // Reference to the is_free_agent_thread_active array.
                               // This is for convenience.
-  int unshackled_id;
+  int free_agent_id;
 
-  // List of teams we can enter as an unshackled.
+  // List of teams we can enter as a free agent thread
   kmp_bootstrap_lock_t allowed_teams_lock;
   int allowed_teams_capacity;
   int allowed_teams_length;
@@ -2746,10 +2746,10 @@ typedef struct kmp_base_root {
   volatile int r_begin;
   int r_blocktime; /* blocktime for this root and descendants */
 
-  /* Unshackled threads */
-  unsigned int num_unshackled_threads; // Number of unshackled threads.
-  kmp_info_t **unshackled_threads; // Threads that are unshackled in this root.
-  bool *is_unshackled_thread_active; // States if an unshackled thread is enabled or not.
+  /* Free agent threads */
+  unsigned int num_free_agent_threads; // Number of free agent threads.
+  kmp_info_t **free_agent_threads; // Threads that are free agent in this root.
+  bool *is_free_agent_thread_active; // States if a free agent thread is enabled or not.
 } kmp_base_root_t;
 
 typedef union KMP_ALIGN_CACHE kmp_root {
@@ -3951,29 +3951,29 @@ static inline void __kmp_resume_if_hard_paused() {
 
 extern void __kmp_omp_display_env(int verbose);
 
-// Unshackled threads API.
-typedef enum kmp_unshackled_thread_start_t {
-  kmp_unshackled_inactive = 0,
-  kmp_unshackled_active = 1
-} kmp_unshackled_thread_start_t;
-extern kmp_unshackled_thread_start_t __kmp_unshackled_thread_start;
-extern int __kmp_num_unshackled_threads;
-extern kmp_proc_bind_t __kmp_unshackled_proc_bind;
-extern char *__kmp_affinity_unshackled_proclist;
-extern kmp_affin_mask_t *__kmp_affinity_unshackled_masks;
-extern unsigned __kmp_affinity_num_unshackled_masks;
-// Returns the number of unshackled threads. They may not have been created yet.
-unsigned int __kmp_get_num_unshackled_threads();
-// Returns the unshackled thread id
-int __kmp_get_unshackled_id();
-// Sets the active status of an unshackled threads. They may not have been
+// Free agent threads API.
+typedef enum kmp_free_agent_thread_start_t {
+  kmp_free_agent_inactive = 0,
+  kmp_free_agent_active = 1
+} kmp_free_agent_thread_start_t;
+extern kmp_free_agent_thread_start_t __kmp_free_agent_thread_start;
+extern int __kmp_free_agent_num_threads;
+extern kmp_proc_bind_t __kmp_free_agent_proc_bind;
+extern char *__kmp_free_agent_affinity_proclist;
+extern kmp_affin_mask_t *__kmp_free_agent_affinity_masks;
+extern unsigned __kmp_free_agent_affinity_num_masks;
+// Returns the number of free agent threads. They may not have been created yet.
+unsigned int __kmp_get_num_free_agent_threads();
+// Returns the free agent thread id
+int __kmp_get_free_agent_id();
+// Sets the active status of free agent threads. They may not have been
 // created yet.
-void __kmp_set_unshackled_thread_active_status(unsigned int thread_num,
+void __kmp_set_free_agent_thread_active_status(unsigned int thread_num,
                                                bool active);
 
-void __kmp_add_allowed_task_team(kmp_info_t *unshackled,
+void __kmp_add_allowed_task_team(kmp_info_t *free_agent,
                                  kmp_task_team_t *task_team);
-void __kmp_remove_allowed_task_team(kmp_info_t *unshackled,
+void __kmp_remove_allowed_task_team(kmp_info_t *free_agent,
                                     kmp_task_team_t *task_team);
 
 #ifdef __cplusplus

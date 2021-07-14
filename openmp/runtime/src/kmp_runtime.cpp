@@ -1326,8 +1326,8 @@ void __kmp_serialized_parallel(ident_t *loc, kmp_int32 global_tid) {
   }
 #endif
   // If this parallel has been serialized, make sure tasking is enabled for
-  // it when there are unshackled threads.
-  if (__kmp_num_unshackled_threads != 0) {
+  // it when there are free agent threads.
+  if (__kmp_free_agent_num_threads != 0) {
     __kmp_enable_tasking_in_serial_mode(loc, __kmp_entry_gtid());
   }
 }
@@ -3534,35 +3534,35 @@ static int __kmp_expand_threads(int nNeed) {
 }
 
 // FIXME - Sort this.
-static kmp_info_t *__kmp_allocate_unshackled_thread(kmp_root_t *root, int new_tid);
+static kmp_info_t *__kmp_allocate_free_agent_thread(kmp_root_t *root, int new_tid);
 
-// Start unshackled threads
-static void __kmp_create_unshackled_threads(void) {
+// Start free agent threads
+static void __kmp_create_free_agent_threads(void) {
   int gtid = __kmp_entry_gtid();
   kmp_root_t *root = __kmp_threads[gtid]->th.th_root;
 
-  for (int i = 0; i < root->r.num_unshackled_threads; i++) {
-    kmp_info_t *new_thr = root->r.unshackled_threads[i];
+  for (int i = 0; i < root->r.num_free_agent_threads; i++) {
+    kmp_info_t *new_thr = root->r.free_agent_threads[i];
     int new_gtid = new_thr->th.th_info.ds.ds_gtid;
     /* actually fork it and create the new worker thread */
     KF_TRACE(
-        10, ("__kmp_create_unshackled_threads: before __kmp_create_worker: %p\n", new_thr));
+        10, ("__kmp_create_free_agent_threads: before __kmp_create_worker: %p\n", new_thr));
     __kmp_create_worker(new_gtid, new_thr, __kmp_stksize);
     KF_TRACE(10,
-            ("__kmp_create_unshackled_threads: after __kmp_create_worker: %p\n", new_thr));
+            ("__kmp_create_free_agent_threads: after __kmp_create_worker: %p\n", new_thr));
 
-    KA_TRACE(20, ("__kmp_create_unshackled_threads: T#%d forked T#%d\n", __kmp_get_gtid(),
+    KA_TRACE(20, ("__kmp_create_free_agent_threads: T#%d forked T#%d\n", __kmp_get_gtid(),
                   new_gtid));
   }
 }
 
-// Allocate unshackled threads
-static void __kmp_allocate_unshackled_threads(kmp_root_t *root) {
-  root->r.num_unshackled_threads = __kmp_num_unshackled_threads;
-  root->r.unshackled_threads = (kmp_info_t**)__kmp_allocate(
-      sizeof(*root->r.unshackled_threads) * root->r.num_unshackled_threads);
-  for (int i = 0; i < root->r.num_unshackled_threads; i++) {
-    root->r.unshackled_threads[i] = __kmp_allocate_unshackled_thread(root, i);
+// Allocate free agent threads
+static void __kmp_allocate_free_agent_threads(kmp_root_t *root) {
+  root->r.num_free_agent_threads = __kmp_free_agent_num_threads;
+  root->r.free_agent_threads = (kmp_info_t**)__kmp_allocate(
+      sizeof(*root->r.free_agent_threads) * root->r.num_free_agent_threads);
+  for (int i = 0; i < root->r.num_free_agent_threads; i++) {
+    root->r.free_agent_threads[i] = __kmp_allocate_free_agent_thread(root, i);
   }
 }
 
@@ -3796,19 +3796,19 @@ int __kmp_register_root(int initial_thread) {
   }
 #endif
 
-  bool thread_starts_active = __kmp_unshackled_thread_start == kmp_unshackled_active;
-  root->r.is_unshackled_thread_active = (bool*)__kmp_allocate(
-      sizeof(*root->r.is_unshackled_thread_active) * __kmp_num_unshackled_threads);
+  bool thread_starts_active = __kmp_free_agent_thread_start == kmp_free_agent_active;
+  root->r.is_free_agent_thread_active = (bool*)__kmp_allocate(
+      sizeof(*root->r.is_free_agent_thread_active) * __kmp_free_agent_num_threads);
   // FIXME: Maybe there is a "calloc" like allocate?
-  for (int i = 0; i < __kmp_num_unshackled_threads; i++) {
-    root->r.is_unshackled_thread_active[i] = thread_starts_active;
+  for (int i = 0; i < __kmp_free_agent_num_threads; i++) {
+    root->r.is_free_agent_thread_active[i] = thread_starts_active;
   }
 
-  __kmp_allocate_unshackled_threads(root);
+  __kmp_allocate_free_agent_threads(root);
 
   // The root team is a serial team, so enable tasking for it
-  // if we have unshackled threads.
-  if (__kmp_num_unshackled_threads != 0) {
+  // if we have free agent threads.
+  if (__kmp_free_agent_num_threads != 0) {
     __kmp_enable_tasking_in_serial_mode(/*loc=*/ NULL, gtid);
     // x86 needs this.
     propagateFPControl(root_thread->th.th_team);
@@ -4187,7 +4187,7 @@ static void __kmp_initialize_info(kmp_info_t *this_thr, kmp_team_t *team,
    caller should check on this first. */
    static
 kmp_info_t *__kmp_allocate_thread_common(kmp_root_t *root, kmp_team_t *team,
-                                  int new_tid, bool is_unshackled) {
+                                  int new_tid, bool is_free_agent) {
   kmp_team_t *serial_team;
   kmp_info_t *new_thr;
   int new_gtid;
@@ -4403,8 +4403,8 @@ kmp_info_t *__kmp_allocate_thread_common(kmp_root_t *root, kmp_team_t *team,
   }
 #endif /* KMP_ADJUST_BLOCKTIME */
 
-  if (!is_unshackled) {
-    new_thr->th.is_unshackled = false;
+  if (!is_free_agent) {
+    new_thr->th.is_free_agent = false;
 
     /* actually fork it and create the new worker thread */
     KF_TRACE(
@@ -4430,14 +4430,15 @@ kmp_info_t *__kmp_allocate_thread(kmp_root_t *root, kmp_team_t *team,
 }
 
 static
-kmp_info_t *__kmp_allocate_unshackled_thread(kmp_root_t *root, int new_tid) {
+kmp_info_t *__kmp_allocate_free_agent_thread(kmp_root_t *root, int new_tid) {
   // FIXME - Copied from __kmp_init_implicit_task.
   kmp_info_t *thread = __kmp_allocate_thread_common(root, NULL, new_tid, true);
-  // Unshackleds don't have a team so __kmp_allocate_thread_common won't give it a root.
+  // Free agent threads don't have a team so __kmp_allocate_thread_common won't
+  // give it a root.
   thread->th.th_root = root;
-  thread->th.is_unshackled = true;
-  thread->th.is_unshackled_active = &root->r.is_unshackled_thread_active[new_tid];
-  thread->th.unshackled_id = new_tid;
+  thread->th.is_free_agent = true;
+  thread->th.is_free_agent_active = &root->r.is_free_agent_thread_active[new_tid];
+  thread->th.free_agent_id = new_tid;
   kmp_taskdata_t *task =
     (kmp_taskdata_t *)__kmp_allocate(sizeof(kmp_taskdata_t) * 1);
   thread->th.th_current_task = task;
@@ -4450,7 +4451,7 @@ kmp_info_t *__kmp_allocate_unshackled_thread(kmp_root_t *root, int new_tid) {
 
   KF_TRACE(
       10,
-      ("__kmp_allocate_unshackled_thread(enter): T#:%d team=%p task=%p, reinit=%s\n",
+      ("__kmp_allocate_free_agent_thread(enter): T#:%d team=%p task=%p, reinit=%s\n",
        new_tid, NULL, task, "FALSE"));
 
   task->td_task_id = KMP_GEN_TASK_ID();
@@ -4486,7 +4487,7 @@ kmp_info_t *__kmp_allocate_unshackled_thread(kmp_root_t *root, int new_tid) {
   KMP_DEBUG_ASSERT(task->td_incomplete_child_tasks == 0);
   KMP_DEBUG_ASSERT(task->td_allocated_child_tasks == 0);
 
-  KF_TRACE(10, ("__kmp_allocate_unshackled_thread(exit): T#:%d team=%p task=%p\n", new_tid,
+  KF_TRACE(10, ("__kmp_allocate_free_agent_thread(exit): T#:%d team=%p task=%p\n", new_tid,
         NULL, task));
   return thread;
 }
@@ -6863,9 +6864,9 @@ static void __kmp_do_middle_initialize(void) {
   // for each root thread that is currently registered with the RTL.
   for (i = 0; i < __kmp_threads_capacity; i++) {
     if (TCR_PTR(__kmp_threads[i]) != NULL) {
-      // Unshackled threads may have been allocated at this point,
+      // Free agent threads may have been allocated at this point,
       // and they are not root threads
-      if (!__kmp_threads[i]->th.is_unshackled) {
+      if (!__kmp_threads[i]->th.is_free_agent) {
         __kmp_affinity_set_init_mask(i, TRUE);
       }
     }
@@ -6944,8 +6945,8 @@ static void __kmp_do_middle_initialize(void) {
 
 #endif /* KMP_ADJUST_BLOCKTIME */
 
-  /* Create and start unshackled threads here. */
-  __kmp_create_unshackled_threads();
+  /* Create and start free agent threads here. */
+  __kmp_create_free_agent_threads();
 
   /* we have finished middle initialization */
   TCW_SYNC_4(__kmp_init_middle, TRUE);
@@ -8390,36 +8391,36 @@ void __kmp_omp_display_env(int verbose) {
   __kmp_release_bootstrap_lock(&__kmp_initz_lock);
 }
 
-unsigned int __kmp_get_num_unshackled_threads() {
+unsigned int __kmp_get_num_free_agent_threads() {
   // Ensure the runtime has been initialized here.
   (void)__kmp_entry_gtid();
-  return __kmp_num_unshackled_threads;
+  return __kmp_free_agent_num_threads;
 }
 
-void __kmp_set_unshackled_thread_active_status(unsigned int thread_num,
+void __kmp_set_free_agent_thread_active_status(unsigned int thread_num,
                                                bool active) {
   // The runtime may initialize here if needed.
   int gtid = __kmp_entry_gtid();
   // FIXME: Should this be a hard error rather than silently ignore it?
-  if (thread_num >= __kmp_num_unshackled_threads)
+  if (thread_num >= __kmp_free_agent_num_threads)
     return;
-  __kmp_threads[gtid]->th.th_root->r.is_unshackled_thread_active[thread_num] =
+  __kmp_threads[gtid]->th.th_root->r.is_free_agent_thread_active[thread_num] =
       active;
 
   if (active) {
-    kmp_info_t *unshackled_thread =
-      __kmp_threads[gtid]->th.th_root->r.unshackled_threads[thread_num];
+    kmp_info_t *free_agent_thread =
+      __kmp_threads[gtid]->th.th_root->r.free_agent_threads[thread_num];
     __kmp_null_resume_wrapper(
-        unshackled_thread->th.th_info.ds.ds_gtid,
-        unshackled_thread->th.th_sleep_loc);
+        free_agent_thread->th.th_info.ds.ds_gtid,
+        free_agent_thread->th.th_sleep_loc);
   }
 }
 
-int __kmp_get_unshackled_id() {
+int __kmp_get_free_agent_id() {
   // The runtime may initialize here if needed.
   int gtid = __kmp_entry_gtid();
-  if (__kmp_threads[gtid]->th.is_unshackled) {
-    return __kmp_threads[gtid]->th.unshackled_id;
+  if (__kmp_threads[gtid]->th.is_free_agent) {
+    return __kmp_threads[gtid]->th.free_agent_id;
   } else
     return -1;
 }

@@ -4698,74 +4698,74 @@ static void __kmp_stg_print_omp_tool_libraries(kmp_str_buf_t *buffer,
 #endif
 
 // -----------------------------------------------------------------------------
-// KMP_NUM_UNSHACKLED_THREADS
+// KMP_FREE_AGENT_NUM_THREADS
 
-static void __kmp_stg_parse_num_unshackled_threads(char const *name,
+static void __kmp_stg_parse_num_free_agent_threads(char const *name,
                                                    char const *value,
                                                    void *data) {
   __kmp_stg_parse_int(name, value, 0, KMP_INT_MAX,
-                      &__kmp_num_unshackled_threads);
+                      &__kmp_free_agent_num_threads);
 }
 
-static void __kmp_stg_print_num_unshackled_threads(kmp_str_buf_t *buffer,
+static void __kmp_stg_print_num_free_agent_threads(kmp_str_buf_t *buffer,
                                                    char const *name,
                                                    void *data) {
-  __kmp_stg_print_int(buffer, name, __kmp_num_unshackled_threads);
+  __kmp_stg_print_int(buffer, name, __kmp_free_agent_num_threads);
 }
 
 // -----------------------------------------------------------------------------
-// KMP_UNSHACKLED_THREAD_START
+// KMP_FREE_AGENT_THREAD_START
 
-static void __kmp_stg_parse_unshackled_thread_start(char const *name,
+static void __kmp_stg_parse_free_agent_thread_start(char const *name,
                                                     char const *value,
                                                     void *data) {
   if (__kmp_str_match("active", 1, value)) {
-    __kmp_unshackled_thread_start = kmp_unshackled_active;
+    __kmp_free_agent_thread_start = kmp_free_agent_active;
   } else if (__kmp_str_match("inactive", 1, value)) {
-    __kmp_unshackled_thread_start = kmp_unshackled_inactive;
+    __kmp_free_agent_thread_start = kmp_free_agent_inactive;
   } else {
     // FIXME: Use KMP messaging facilities instead.
     fprintf(stderr,
-            "Ignoring value '%s' of KMP_UNSHACKLED_THREAD_START. Valid values "
+            "Ignoring value '%s' of KMP_FREE_AGENT_THREAD_START. Valid values "
             "are 'active' or 'inactive'\n",
             value);
   }
 }
 
-static void __kmp_stg_print_unshackled_thread_start(kmp_str_buf_t *buffer,
+static void __kmp_stg_print_free_agent_thread_start(kmp_str_buf_t *buffer,
                                                    char const *name,
                                                    void *data) {
-  switch(__kmp_unshackled_thread_start) {
-    case kmp_unshackled_active:
+  switch(__kmp_free_agent_thread_start) {
+    case kmp_free_agent_active:
       __kmp_stg_print_str(buffer, name, "active");
       break;
-    case kmp_unshackled_inactive:
+    case kmp_free_agent_inactive:
       __kmp_stg_print_str(buffer, name, "inactive");
       break;
   }
 }
 
 // -----------------------------------------------------------------------------
-// KMP_UNSHACKLED_PLACES
+// KMP_FREE_AGENT_PLACES
 
-static void __kmp_stg_parse_unshackled_places(char const *name,
+static void __kmp_stg_parse_free_agent_places(char const *name,
                                               char const *value,
                                               void *data) {
   // Support only proclist for now
-  if (__kmp_affinity_unshackled_proclist != NULL) {
-    KMP_INTERNAL_FREE((void *)__kmp_affinity_unshackled_proclist);
-    __kmp_affinity_unshackled_proclist = NULL;
+  if (__kmp_free_agent_affinity_proclist != NULL) {
+    KMP_INTERNAL_FREE((void *)__kmp_free_agent_affinity_proclist);
+    __kmp_free_agent_affinity_proclist = NULL;
   }
-  if (__kmp_parse_place_list(name, value, &__kmp_affinity_unshackled_proclist)) {
-    __kmp_unshackled_proc_bind = proc_bind_true;
+  if (__kmp_parse_place_list(name, value, &__kmp_free_agent_affinity_proclist)) {
+    __kmp_free_agent_proc_bind = proc_bind_true;
   }
 }
 
-static void __kmp_stg_print_unshackled_places(kmp_str_buf_t *buffer,
+static void __kmp_stg_print_free_agent_places(kmp_str_buf_t *buffer,
                                               char const *name,
                                               void *data) {
-  if (__kmp_unshackled_proc_bind == proc_bind_true) {
-    __kmp_stg_print_str(buffer, name, __kmp_affinity_unshackled_proclist);
+  if (__kmp_free_agent_proc_bind == proc_bind_true) {
+    __kmp_stg_print_str(buffer, name, __kmp_free_agent_affinity_proclist);
   } else {
     __kmp_stg_print_str(buffer, name, "");
   }
@@ -5013,13 +5013,13 @@ static kmp_setting_t __kmp_stg_table[] = {
      __kmp_stg_print_omp_tool_libraries, NULL, 0, 0},
 #endif
 
-    // Unshackled threads
-    {"KMP_NUM_UNSHACKLED_THREADS", __kmp_stg_parse_num_unshackled_threads,
-      __kmp_stg_print_num_unshackled_threads, NULL, 0, 0},
-    {"KMP_UNSHACKLED_THREAD_START", __kmp_stg_parse_unshackled_thread_start,
-      __kmp_stg_print_unshackled_thread_start, NULL, 0, 0},
-    {"KMP_UNSHACKLED_PLACES", __kmp_stg_parse_unshackled_places,
-      __kmp_stg_print_unshackled_places, NULL, 0, 0},
+    // Free agent threads
+    {"KMP_FREE_AGENT_NUM_THREADS", __kmp_stg_parse_num_free_agent_threads,
+      __kmp_stg_print_num_free_agent_threads, NULL, 0, 0},
+    {"KMP_FREE_AGENT_THREAD_START", __kmp_stg_parse_free_agent_thread_start,
+      __kmp_stg_print_free_agent_thread_start, NULL, 0, 0},
+    {"KMP_FREE_AGENT_PLACES", __kmp_stg_parse_free_agent_places,
+      __kmp_stg_print_free_agent_places, NULL, 0, 0},
 
     {"", NULL, NULL, NULL, 0, 0}}; // settings
 

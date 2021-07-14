@@ -346,7 +346,7 @@ final_spin=FALSE)
          3) Tasking is off for this region.  This could be because we are in a
          serialized region (perhaps the outer one), or else tasking was manually
          disabled (KMP_TASKING=0).  */
-      if (this_thr->th.is_unshackled && *this_thr->th.is_unshackled_active) {
+      if (this_thr->th.is_free_agent && *this_thr->th.is_free_agent_active) {
         int empty_task_teams_cnt = 0;
         int team_task_to_pick = 0;
         do {
@@ -363,9 +363,9 @@ final_spin=FALSE)
             updateHWFPControl(
                 task_team->tt.tt_threads_data[0].td.td_thr->th.th_team);
 
-            std::atomic<kmp_int32> *unfinished_unshackleds;
-            unfinished_unshackleds = &(task_team->tt.tt_unfinished_unshackleds);
-            /* kmp_int32 count = */ KMP_ATOMIC_INC(unfinished_unshackleds);
+            std::atomic<kmp_int32> *unfinished_free_agents;
+            unfinished_free_agents = &(task_team->tt.tt_unfinished_free_agents);
+            /* kmp_int32 count = */ KMP_ATOMIC_INC(unfinished_free_agents);
 
             // Take the lock and release the list
             __kmp_release_bootstrap_lock(&this_thr->th.allowed_teams_lock);
@@ -379,7 +379,7 @@ final_spin=FALSE)
             // empty_task_teams_cnt += !ret;
             empty_task_teams_cnt += 1;
 
-            /* kmp_int32 count = */KMP_ATOMIC_DEC(unfinished_unshackleds);
+            /* kmp_int32 count = */KMP_ATOMIC_DEC(unfinished_free_agents);
             this_thr->th.th_task_team = NULL;
             this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
           } else {
@@ -403,9 +403,9 @@ final_spin=FALSE)
             empty_task_teams_cnt = 0;
           }
         } while (team_task_to_pick < this_thr->th.allowed_teams_length);
-        // Reset task_team to 0 to make unshackled able to suspend
+        // Reset task_team to 0 to make free agent thread able to suspend
         task_team = NULL;
-      } else if (!this_thr->th.is_unshackled) {
+      } else if (!this_thr->th.is_free_agent) {
         if (task_team != NULL) {
           if (TCR_SYNC_4(task_team->tt.tt_active)) {
             if (KMP_TASKING_ENABLED(task_team)) {

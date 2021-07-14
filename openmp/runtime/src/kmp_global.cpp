@@ -531,13 +531,13 @@ kmp_target_offload_kind_t __kmp_target_offload = tgt_default;
 // OMP Pause Resources
 kmp_pause_status_t __kmp_pause_status = kmp_not_paused;
 
-// Unshackled
-kmp_unshackled_thread_start_t
-  __kmp_unshackled_thread_start = kmp_unshackled_inactive;
-int __kmp_num_unshackled_threads = 0;
-kmp_proc_bind_t __kmp_unshackled_proc_bind = proc_bind_false;
-char *__kmp_affinity_unshackled_proclist = NULL;
-kmp_affin_mask_t *__kmp_affinity_unshackled_masks = NULL;
-unsigned __kmp_affinity_num_unshackled_masks = 0;
+// Free agent threads
+kmp_free_agent_thread_start_t
+  __kmp_free_agent_thread_start = kmp_free_agent_inactive;
+int __kmp_free_agent_num_threads = 0;
+kmp_proc_bind_t __kmp_free_agent_proc_bind = proc_bind_false;
+char *__kmp_free_agent_affinity_proclist = NULL;
+kmp_affin_mask_t *__kmp_free_agent_affinity_masks = NULL;
+unsigned __kmp_free_agent_affinity_num_masks = 0;
 
 // end of file //

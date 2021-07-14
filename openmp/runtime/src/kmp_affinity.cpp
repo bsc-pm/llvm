@@ -4477,11 +4477,11 @@ static void __kmp_aux_affinity_initialize(void) {
   // account the setting of __kmp_affinity_compact.
   __kmp_affinity_assign_child_nums(address2os, __kmp_avail_proc);
 
-  // For now unshackleds proc bind only supports proclist
-  if (__kmp_unshackled_proc_bind == proc_bind_true) {
+  // For now free agent proc bind only supports proclist
+  if (__kmp_free_agent_proc_bind == proc_bind_true) {
     __kmp_affinity_process_placelist(
-        &__kmp_affinity_unshackled_masks, &__kmp_affinity_num_unshackled_masks,
-        __kmp_affinity_unshackled_proclist, osId2Mask, maxIndex);
+        &__kmp_free_agent_affinity_masks, &__kmp_free_agent_affinity_num_masks,
+        __kmp_free_agent_affinity_proclist, osId2Mask, maxIndex);
   }
 
   switch (__kmp_affinity_type) {
@@ -4727,15 +4727,15 @@ void __kmp_affinity_set_init_mask(int gtid, int isa_root) {
   kmp_affin_mask_t *mask;
   int i;
 
-  if (th->th.is_unshackled) {
-    if (__kmp_unshackled_proc_bind == proc_bind_false) {
+  if (th->th.is_free_agent) {
+    if (__kmp_free_agent_proc_bind == proc_bind_false) {
       KMP_ASSERT(__kmp_affin_fullMask != NULL);
       i = 0;
       mask = __kmp_affin_fullMask;
     } else {
-      KMP_DEBUG_ASSERT(__kmp_affinity_num_unshackled_masks > 0);
-      i = th->th.unshackled_id % __kmp_affinity_num_unshackled_masks;
-      mask = KMP_CPU_INDEX(__kmp_affinity_unshackled_masks, i);
+      KMP_DEBUG_ASSERT(__kmp_free_agent_affinity_num_masks > 0);
+      i = th->th.free_agent_id % __kmp_free_agent_affinity_num_masks;
+      mask = KMP_CPU_INDEX(__kmp_free_agent_affinity_masks, i);
     }
   }
   else if (KMP_AFFINITY_NON_PROC_BIND) {
