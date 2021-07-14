@@ -4479,7 +4479,7 @@ static void __kmp_aux_affinity_initialize(void) {
 
   // For now unshackleds proc bind only supports proclist
   if (__kmp_unshackled_proc_bind == proc_bind_true) {
-    __kmp_affinity_process_proclist(
+    __kmp_affinity_process_placelist(
         &__kmp_affinity_unshackled_masks, &__kmp_affinity_num_unshackled_masks,
         __kmp_affinity_unshackled_proclist, osId2Mask, maxIndex);
   }
