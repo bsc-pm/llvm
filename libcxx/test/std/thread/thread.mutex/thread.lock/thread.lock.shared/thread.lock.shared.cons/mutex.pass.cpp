@@ -7,8 +7,10 @@
 //===----------------------------------------------------------------------===//
 //
 // UNSUPPORTED: libcpp-has-no-threads
-// UNSUPPORTED: c++98, c++03, c++11
-// XFAIL: dylib-has-no-shared_mutex
+// UNSUPPORTED: c++03, c++11
+
+// dylib support for shared_mutex was added in macosx10.12
+// XFAIL: use_system_cxx_lib && target={{.+}}-apple-macosx10.{{9|10|11}}
 
 // ALLOW_RETRIES: 2
 
@@ -27,6 +29,7 @@
 #include <cstdlib>
 #include <cassert>
 
+#include "make_test_thread.h"
 #include "test_macros.h"
 
 typedef std::chrono::system_clock Clock;
@@ -78,7 +81,7 @@ int main(int, char**)
     {
         m.lock();
         for (int i = 0; i < 5; ++i)
-            v.push_back(std::thread(f));
+            v.push_back(support::make_test_thread(f));
         std::this_thread::sleep_for(WaitTime);
         m.unlock();
         for (auto& t : v)
@@ -87,8 +90,8 @@ int main(int, char**)
     {
         m.lock_shared();
         for (auto& t : v)
-            t = std::thread(g);
-        std::thread q(f);
+            t = support::make_test_thread(g);
+        std::thread q = support::make_test_thread(f);
         std::this_thread::sleep_for(WaitTime);
         m.unlock_shared();
         for (auto& t : v)

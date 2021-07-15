@@ -108,7 +108,7 @@ protected:
   std::atomic<bool> m_shutting_down; // This marks that we are shutting down so
                                      // if we get woken up from
   // BytesAvailable to disconnect, we won't try to read again.
-  bool m_waiting_for_accept;
+  bool m_waiting_for_accept = false;
   bool m_child_processes_inherit;
 
   std::string m_uri;
@@ -116,7 +116,9 @@ protected:
 private:
   void InitializeSocket(Socket *socket);
 
-  DISALLOW_COPY_AND_ASSIGN(ConnectionFileDescriptor);
+  ConnectionFileDescriptor(const ConnectionFileDescriptor &) = delete;
+  const ConnectionFileDescriptor &
+  operator=(const ConnectionFileDescriptor &) = delete;
 };
 
 } // namespace lldb_private

@@ -97,7 +97,7 @@ int FormatControl<CONTEXT>::GetIntField(
   }
   int result{0};
   bool negate{ch == '-'};
-  if (negate) {
+  if (negate || ch == '+') {
     firstCh = '\0';
     ch = PeekNext();
   }
@@ -225,14 +225,15 @@ int FormatControl<CONTEXT>::CueUpNextDataEdit(Context &context, bool stop) {
   while (true) {
     std::optional<int> repeat;
     bool unlimited{false};
-    CharType ch{Capitalize(GetNextChar(context))};
+    auto maybeReversionPoint{offset_};
+    CharType ch{GetNextChar(context)};
     while (ch == ',' || ch == ':') {
       // Skip commas, and don't complain if they're missing; the format
       // validator does that.
       if (stop && ch == ':') {
         return 0;
       }
-      ch = Capitalize(GetNextChar(context));
+      ch = GetNextChar(context);
     }
     if (ch == '-' || ch == '+' || (ch >= '0' && ch <= '9')) {
       repeat = GetIntField(context, ch);
@@ -246,6 +247,7 @@ int FormatControl<CONTEXT>::CueUpNextDataEdit(Context &context, bool stop) {
         return 0;
       }
     }
+    ch = Capitalize(ch);
     if (ch == '(') {
       if (height_ >= maxHeight_) {
         context.SignalError(IostatErrorInFormat,
@@ -253,6 +255,7 @@ int FormatControl<CONTEXT>::CueUpNextDataEdit(Context &context, bool stop) {
         return 0;
       }
       stack_[height_].start = offset_ - 1; // the '('
+      RUNTIME_CHECK(context, format_[stack_[height_].start] == '(');
       if (unlimited || height_ == 0) {
         stack_[height_].remaining = Iteration::unlimited;
         unlimitedLoopCheck = offset_ - 1;
@@ -263,6 +266,12 @@ int FormatControl<CONTEXT>::CueUpNextDataEdit(Context &context, bool stop) {
         stack_[height_].remaining = *repeat - 1;
       } else {
         stack_[height_].remaining = 0;
+      }
+      if (height_ == 1) {
+        // Subtle point (F'2018 13.4 para 9): tha last parenthesized group
+        // at height 1 becomes the restart point after control reaches the
+        // end of the format, including its repeat count.
+        stack_[0].start = maybeReversionPoint - 1;
       }
       ++height_;
     } else if (height_ == 0) {
@@ -275,14 +284,15 @@ int FormatControl<CONTEXT>::CueUpNextDataEdit(Context &context, bool stop) {
         }
         context.AdvanceRecord(); // implied / before rightmost )
       }
+      auto restart{stack_[height_ - 1].start + 1};
       if (stack_[height_ - 1].remaining == Iteration::unlimited) {
-        offset_ = stack_[height_ - 1].start + 1;
+        offset_ = restart;
         if (offset_ == unlimitedLoopCheck) {
           context.SignalError(IostatErrorInFormat,
               "Unlimited repetition in FORMAT lacks data edit descriptors");
         }
       } else if (stack_[height_ - 1].remaining-- > 0) {
-        offset_ = stack_[height_ - 1].start + 1;
+        offset_ = restart;
       } else {
         --height_;
       }
@@ -320,16 +330,20 @@ int FormatControl<CONTEXT>::CueUpNextDataEdit(Context &context, bool stop) {
       offset_ += *repeat;
     } else if (ch >= 'A' && ch <= 'Z') {
       int start{offset_ - 1};
-      CharType next{Capitalize(PeekNext())};
-      if (next >= 'A' && next <= 'Z') {
-        ++offset_;
-      } else {
-        next = '\0';
+      CharType next{'\0'};
+      if (ch != 'P') { // 1PE5.2 - comma not required (C1302)
+        CharType peek{Capitalize(PeekNext())};
+        if (peek >= 'A' && peek <= 'Z') {
+          next = peek;
+          ++offset_;
+        }
       }
-      if (ch == 'E' ||
-          (!next &&
-              (ch == 'A' || ch == 'I' || ch == 'B' || ch == 'O' || ch == 'Z' ||
-                  ch == 'F' || ch == 'D' || ch == 'G' || ch == 'L'))) {
+      if ((!next &&
+              (ch == 'A' || ch == 'I' || ch == 'B' || ch == 'E' || ch == 'D' ||
+                  ch == 'O' || ch == 'Z' || ch == 'F' || ch == 'G' ||
+                  ch == 'L')) ||
+          (ch == 'E' && (next == 'N' || next == 'S' || next == 'X')) ||
+          (ch == 'D' && next == 'T')) {
         // Data edit descriptor found
         offset_ = start;
         return repeat && *repeat > 0 ? *repeat : 1;
@@ -343,6 +357,8 @@ int FormatControl<CONTEXT>::CueUpNextDataEdit(Context &context, bool stop) {
       }
     } else if (ch == '/') {
       context.AdvanceRecord(repeat && *repeat > 0 ? *repeat : 1);
+    } else if (ch == '$' || ch == '\\') {
+      context.mutableModes().nonAdvancing = true;
     } else {
       context.SignalError(IostatErrorInFormat,
           "Invalid character '%c' in FORMAT", static_cast<char>(ch));
@@ -351,34 +367,86 @@ int FormatControl<CONTEXT>::CueUpNextDataEdit(Context &context, bool stop) {
   }
 }
 
+// Returns the next data edit descriptor
 template <typename CONTEXT>
 DataEdit FormatControl<CONTEXT>::GetNextDataEdit(
     Context &context, int maxRepeat) {
-
-  // TODO: DT editing
-
-  // Return the next data edit descriptor
   int repeat{CueUpNextDataEdit(context)};
   auto start{offset_};
   DataEdit edit;
   edit.descriptor = static_cast<char>(Capitalize(GetNextChar(context)));
   if (edit.descriptor == 'E') {
-    edit.variation = static_cast<char>(Capitalize(PeekNext()));
-    if (edit.variation >= 'A' && edit.variation <= 'Z') {
+    if (auto next{static_cast<char>(Capitalize(PeekNext()))};
+        next == 'N' || next == 'S' || next == 'X') {
+      edit.variation = next;
       ++offset_;
     }
+  } else if (edit.descriptor == 'D' && Capitalize(PeekNext()) == 'T') {
+    // DT'iotype'(v_list) user-defined derived type I/O
+    edit.descriptor = DataEdit::DefinedDerivedType;
+    ++offset_;
+    if (auto quote{static_cast<char>(PeekNext())};
+        quote == '\'' || quote == '"') {
+      // Capture the quoted 'iotype'
+      bool ok{false}, tooLong{false};
+      for (++offset_; offset_ < formatLength_;) {
+        auto ch{static_cast<char>(format_[offset_++])};
+        if (ch == quote &&
+            (offset_ == formatLength_ ||
+                static_cast<char>(format_[offset_]) != quote)) {
+          ok = true;
+          break; // that was terminating quote
+        } else if (edit.ioTypeChars >= edit.maxIoTypeChars) {
+          tooLong = true;
+        } else {
+          edit.ioType[edit.ioTypeChars++] = ch;
+          if (ch == quote) {
+            ++offset_;
+          }
+        }
+      }
+      if (!ok) {
+        context.SignalError(
+            IostatErrorInFormat, "Unclosed DT'iotype' in FORMAT");
+      } else if (tooLong) {
+        context.SignalError(
+            IostatErrorInFormat, "Excessive DT'iotype' in FORMAT");
+      }
+    }
+    if (PeekNext() == '(') {
+      // Capture the v_list arguments
+      bool ok{false}, tooLong{false};
+      for (++offset_; offset_ < formatLength_;) {
+        int n{GetIntField(context)};
+        if (edit.vListEntries >= edit.maxVListEntries) {
+          tooLong = true;
+        } else {
+          edit.vList[edit.vListEntries++] = n;
+        }
+        auto ch{static_cast<char>(GetNextChar(context))};
+        if (ch != ',') {
+          ok = ch == ')';
+          break;
+        }
+      }
+      if (!ok) {
+        context.SignalError(
+            IostatErrorInFormat, "Unclosed DT(v_list) in FORMAT");
+      } else if (tooLong) {
+        context.SignalError(
+            IostatErrorInFormat, "Excessive DT(v_list) in FORMAT");
+      }
+    }
   }
-
   if (edit.descriptor == 'A') { // width is optional for A[w]
     auto ch{PeekNext()};
     if (ch >= '0' && ch <= '9') {
       edit.width = GetIntField(context);
     }
-  } else {
+  } else if (edit.descriptor != DataEdit::DefinedDerivedType) {
     edit.width = GetIntField(context);
   }
-  edit.modes = context.mutableModes();
-  if (PeekNext() == '.') {
+  if (edit.descriptor != DataEdit::DefinedDerivedType && PeekNext() == '.') {
     ++offset_;
     edit.digits = GetIntField(context);
     CharType ch{PeekNext()};
@@ -387,15 +455,16 @@ DataEdit FormatControl<CONTEXT>::GetNextDataEdit(
       edit.expoDigits = GetIntField(context);
     }
   }
+  edit.modes = context.mutableModes();
 
   // Handle repeated nonparenthesized edit descriptors
-  if (repeat > 1) {
+  if (repeat > maxRepeat) {
     stack_[height_].start = start; // after repeat count
     stack_[height_].remaining = repeat; // full count
     ++height_;
   }
-  edit.repeat = 1;
-  if (height_ > 1) {
+  edit.repeat = std::min(1, maxRepeat); // 0 if maxRepeat==0
+  if (height_ > 1) { // Subtle: stack_[0].start doesn't necessarily point to '('
     int start{stack_[height_ - 1].start};
     if (format_[start] != '(') {
       if (stack_[height_ - 1].remaining > maxRepeat) {

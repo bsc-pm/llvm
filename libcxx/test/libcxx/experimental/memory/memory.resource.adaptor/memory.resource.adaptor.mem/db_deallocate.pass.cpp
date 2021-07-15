@@ -6,13 +6,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-// UNSUPPORTED: c++98, c++03
+// UNSUPPORTED: c++03
 
 // <experimental/memory_resource>
 
 // template <class T> class polymorphic_allocator
 
 // T* polymorphic_allocator<T>::deallocate(T*, size_t size)
+
+// XFAIL: LIBCXX-WINDOWS-FIXME
 
 int AssertCount = 0;
 

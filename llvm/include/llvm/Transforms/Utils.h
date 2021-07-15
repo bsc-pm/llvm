@@ -26,12 +26,6 @@ class Pass;
 ModulePass *createMetaRenamerPass();
 
 //===----------------------------------------------------------------------===//
-// createUniqueInternalLinkageNamesPass - Make internal linkage symbol names
-// unique.
-//
-ModulePass *createUniqueInternalLinkageNamesPass();
-
-//===----------------------------------------------------------------------===//
 //
 // LowerInvoke - This pass removes invoke instructions, converting them to call
 // instructions.
@@ -117,7 +111,7 @@ extern char &LoopSimplifyID;
 
 /// This function returns a new pass that downgrades the debug info in the
 /// module to line tables only.
-ModulePass *createStripNonLineTableDebugInfoPass();
+ModulePass *createStripNonLineTableDebugLegacyPass();
 
 //===----------------------------------------------------------------------===//
 //
@@ -154,6 +148,13 @@ FunctionPass *createFixIrreduciblePass();
 // BasicBlock when possible.
 //
 FunctionPass *createAssumeSimplifyPass();
+
+//===----------------------------------------------------------------------===//
+//
+// CanonicalizeFreezeInLoops - Canonicalize freeze instructions in loops so they
+// don't block SCEV.
+//
+Pass *createCanonicalizeFreezeInLoopsPass();
 } // namespace llvm
 
 #endif

@@ -3,9 +3,22 @@ add_gen_header(
   DEF_FILE thread_start_args.h.def
   GEN_HDR thread_start_args.h
   PARAMS
-    thread_start_args=${LIBC_TARGET_MACHINE}/thread_start_args.h.in
+    thread_start_args=${LIBC_TARGET_ARCHITECTURE}/thread_start_args.h.in
   DATA_FILES
-    ${LIBC_TARGET_MACHINE}/thread_start_args.h.in
+    ${LIBC_TARGET_ARCHITECTURE}/thread_start_args.h.in
+)
+
+add_entrypoint_object(
+  call_once
+  SRCS
+    call_once.cpp
+  HDRS
+    ../call_once.h
+  DEPENDS
+    .threads_utils
+    libc.config.linux.linux_syscall_h
+    libc.include.sys_syscall
+    libc.include.threads
 )
 
 add_header_library(

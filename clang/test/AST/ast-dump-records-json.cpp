@@ -147,7 +147,6 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:  "tagUsed": "struct"
 // CHECK-NEXT: }
 
-
 // CHECK:  "kind": "CXXRecordDecl",
 // CHECK-NEXT:  "loc": {
 // CHECK-NEXT:   "offset": 123,
@@ -178,6 +177,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:    "hasConstParam": true,
 // CHECK-NEXT:    "implicitHasConstParam": true,
 // CHECK-NEXT:    "needsImplicit": true,
+// CHECK-NEXT:    "simple": true,
 // CHECK-NEXT:    "trivial": true
 // CHECK-NEXT:   },
 // CHECK-NEXT:   "copyCtor": {
@@ -365,7 +365,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:      "type": {
 // CHECK-NEXT:       "qualType": "int"
 // CHECK-NEXT:      },
-// CHECK-NEXT:      "valueCategory": "rvalue",
+// CHECK-NEXT:      "valueCategory": "prvalue",
 // CHECK-NEXT:      "value": "12",
 // CHECK-NEXT:      "inner": [
 // CHECK-NEXT:       {
@@ -386,7 +386,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:        "type": {
 // CHECK-NEXT:         "qualType": "int"
 // CHECK-NEXT:        },
-// CHECK-NEXT:        "valueCategory": "rvalue",
+// CHECK-NEXT:        "valueCategory": "prvalue",
 // CHECK-NEXT:        "value": "12"
 // CHECK-NEXT:       }
 // CHECK-NEXT:      ]
@@ -437,7 +437,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:      "type": {
 // CHECK-NEXT:       "qualType": "int"
 // CHECK-NEXT:      },
-// CHECK-NEXT:      "valueCategory": "rvalue",
+// CHECK-NEXT:      "valueCategory": "prvalue",
 // CHECK-NEXT:      "value": "0",
 // CHECK-NEXT:      "inner": [
 // CHECK-NEXT:       {
@@ -458,7 +458,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:        "type": {
 // CHECK-NEXT:         "qualType": "int"
 // CHECK-NEXT:        },
-// CHECK-NEXT:        "valueCategory": "rvalue",
+// CHECK-NEXT:        "valueCategory": "prvalue",
 // CHECK-NEXT:        "value": "0"
 // CHECK-NEXT:       }
 // CHECK-NEXT:      ]
@@ -510,7 +510,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:      "type": {
 // CHECK-NEXT:       "qualType": "int"
 // CHECK-NEXT:      },
-// CHECK-NEXT:      "valueCategory": "rvalue",
+// CHECK-NEXT:      "valueCategory": "prvalue",
 // CHECK-NEXT:      "value": "10",
 // CHECK-NEXT:      "inner": [
 // CHECK-NEXT:       {
@@ -531,7 +531,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:        "type": {
 // CHECK-NEXT:         "qualType": "int"
 // CHECK-NEXT:        },
-// CHECK-NEXT:        "valueCategory": "rvalue",
+// CHECK-NEXT:        "valueCategory": "prvalue",
 // CHECK-NEXT:        "value": "10"
 // CHECK-NEXT:       }
 // CHECK-NEXT:      ]
@@ -567,7 +567,6 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:  ]
 // CHECK-NEXT: }
 
-
 // CHECK:  "kind": "CXXRecordDecl",
 // CHECK-NEXT:  "loc": {
 // CHECK-NEXT:   "offset": 206,
@@ -597,6 +596,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:    "hasConstParam": true,
 // CHECK-NEXT:    "implicitHasConstParam": true,
 // CHECK-NEXT:    "needsImplicit": true,
+// CHECK-NEXT:    "simple": true,
 // CHECK-NEXT:    "trivial": true
 // CHECK-NEXT:   },
 // CHECK-NEXT:   "copyCtor": {
@@ -693,6 +693,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:      "hasConstParam": true,
 // CHECK-NEXT:      "implicitHasConstParam": true,
 // CHECK-NEXT:      "needsImplicit": true,
+// CHECK-NEXT:      "simple": true,
 // CHECK-NEXT:      "trivial": true
 // CHECK-NEXT:     },
 // CHECK-NEXT:     "copyCtor": {
@@ -786,8 +787,8 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:    },
 // CHECK-NEXT:    "name": "b",
 // CHECK-NEXT:    "type": {
-// CHECK-NEXT:     "desugaredQualType": "C::(anonymous struct at {{.*}}:16:3)",
-// CHECK-NEXT:     "qualType": "struct (anonymous struct at {{.*}}:16:3)"
+// CHECK-NEXT:     "desugaredQualType": "C::(unnamed struct at {{.*}}:16:3)",
+// CHECK-NEXT:     "qualType": "struct (unnamed struct at {{.*}}:16:3)"
 // CHECK-NEXT:    }
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
@@ -820,6 +821,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:      "hasConstParam": true,
 // CHECK-NEXT:      "implicitHasConstParam": true,
 // CHECK-NEXT:      "needsImplicit": true,
+// CHECK-NEXT:      "simple": true,
 // CHECK-NEXT:      "trivial": true
 // CHECK-NEXT:     },
 // CHECK-NEXT:     "copyCtor": {
@@ -1019,6 +1021,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:      "hasConstParam": true,
 // CHECK-NEXT:      "implicitHasConstParam": true,
 // CHECK-NEXT:      "needsImplicit": true,
+// CHECK-NEXT:      "simple": true,
 // CHECK-NEXT:      "trivial": true
 // CHECK-NEXT:     },
 // CHECK-NEXT:     "copyCtor": {
@@ -1218,6 +1221,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:    "hasConstParam": true,
 // CHECK-NEXT:    "implicitHasConstParam": true,
 // CHECK-NEXT:    "needsImplicit": true,
+// CHECK-NEXT:    "simple": true,
 // CHECK-NEXT:    "trivial": true
 // CHECK-NEXT:   },
 // CHECK-NEXT:   "copyCtor": {
@@ -1412,7 +1416,6 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:  "tagUsed": "union"
 // CHECK-NEXT: }
 
-
 // CHECK:  "kind": "CXXRecordDecl",
 // CHECK-NEXT:  "loc": {
 // CHECK-NEXT:   "offset": 388,
@@ -1443,6 +1446,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:    "hasConstParam": true,
 // CHECK-NEXT:    "implicitHasConstParam": true,
 // CHECK-NEXT:    "needsImplicit": true,
+// CHECK-NEXT:    "simple": true,
 // CHECK-NEXT:    "trivial": true
 // CHECK-NEXT:   },
 // CHECK-NEXT:   "copyCtor": {
@@ -1631,7 +1635,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:      "type": {
 // CHECK-NEXT:       "qualType": "int"
 // CHECK-NEXT:      },
-// CHECK-NEXT:      "valueCategory": "rvalue",
+// CHECK-NEXT:      "valueCategory": "prvalue",
 // CHECK-NEXT:      "value": "12",
 // CHECK-NEXT:      "inner": [
 // CHECK-NEXT:       {
@@ -1652,7 +1656,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:        "type": {
 // CHECK-NEXT:         "qualType": "int"
 // CHECK-NEXT:        },
-// CHECK-NEXT:        "valueCategory": "rvalue",
+// CHECK-NEXT:        "valueCategory": "prvalue",
 // CHECK-NEXT:        "value": "12"
 // CHECK-NEXT:       }
 // CHECK-NEXT:      ]
@@ -1703,7 +1707,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:      "type": {
 // CHECK-NEXT:       "qualType": "int"
 // CHECK-NEXT:      },
-// CHECK-NEXT:      "valueCategory": "rvalue",
+// CHECK-NEXT:      "valueCategory": "prvalue",
 // CHECK-NEXT:      "value": "0",
 // CHECK-NEXT:      "inner": [
 // CHECK-NEXT:       {
@@ -1724,7 +1728,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:        "type": {
 // CHECK-NEXT:         "qualType": "int"
 // CHECK-NEXT:        },
-// CHECK-NEXT:        "valueCategory": "rvalue",
+// CHECK-NEXT:        "valueCategory": "prvalue",
 // CHECK-NEXT:        "value": "0"
 // CHECK-NEXT:       }
 // CHECK-NEXT:      ]
@@ -1776,7 +1780,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:      "type": {
 // CHECK-NEXT:       "qualType": "int"
 // CHECK-NEXT:      },
-// CHECK-NEXT:      "valueCategory": "rvalue",
+// CHECK-NEXT:      "valueCategory": "prvalue",
 // CHECK-NEXT:      "value": "10",
 // CHECK-NEXT:      "inner": [
 // CHECK-NEXT:       {
@@ -1797,7 +1801,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:        "type": {
 // CHECK-NEXT:         "qualType": "int"
 // CHECK-NEXT:        },
-// CHECK-NEXT:        "valueCategory": "rvalue",
+// CHECK-NEXT:        "valueCategory": "prvalue",
 // CHECK-NEXT:        "value": "10"
 // CHECK-NEXT:       }
 // CHECK-NEXT:      ]
@@ -1833,7 +1837,6 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:  ]
 // CHECK-NEXT: }
 
-
 // CHECK:  "kind": "CXXRecordDecl",
 // CHECK-NEXT:  "loc": {
 // CHECK-NEXT:   "offset": 470,
@@ -1863,6 +1866,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:    "hasConstParam": true,
 // CHECK-NEXT:    "implicitHasConstParam": true,
 // CHECK-NEXT:    "needsImplicit": true,
+// CHECK-NEXT:    "simple": true,
 // CHECK-NEXT:    "trivial": true
 // CHECK-NEXT:   },
 // CHECK-NEXT:   "copyCtor": {
@@ -1959,6 +1963,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:      "hasConstParam": true,
 // CHECK-NEXT:      "implicitHasConstParam": true,
 // CHECK-NEXT:      "needsImplicit": true,
+// CHECK-NEXT:      "simple": true,
 // CHECK-NEXT:      "trivial": true
 // CHECK-NEXT:     },
 // CHECK-NEXT:     "copyCtor": {
@@ -2052,8 +2057,8 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:    },
 // CHECK-NEXT:    "name": "b",
 // CHECK-NEXT:    "type": {
-// CHECK-NEXT:     "desugaredQualType": "G::(anonymous struct at {{.*}}:50:3)",
-// CHECK-NEXT:     "qualType": "struct (anonymous struct at {{.*}}:50:3)"
+// CHECK-NEXT:     "desugaredQualType": "G::(unnamed struct at {{.*}}:50:3)",
+// CHECK-NEXT:     "qualType": "struct (unnamed struct at {{.*}}:50:3)"
 // CHECK-NEXT:    }
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
@@ -2086,6 +2091,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:      "hasConstParam": true,
 // CHECK-NEXT:      "implicitHasConstParam": true,
 // CHECK-NEXT:      "needsImplicit": true,
+// CHECK-NEXT:      "simple": true,
 // CHECK-NEXT:      "trivial": true
 // CHECK-NEXT:     },
 // CHECK-NEXT:     "copyCtor": {
@@ -2285,6 +2291,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:      "hasConstParam": true,
 // CHECK-NEXT:      "implicitHasConstParam": true,
 // CHECK-NEXT:      "needsImplicit": true,
+// CHECK-NEXT:      "simple": true,
 // CHECK-NEXT:      "trivial": true
 // CHECK-NEXT:     },
 // CHECK-NEXT:     "copyCtor": {
@@ -2484,6 +2491,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:   "copyAssign": {
 // CHECK-NEXT:    "hasConstParam": true,
 // CHECK-NEXT:    "implicitHasConstParam": true,
+// CHECK-NEXT:    "simple": true,
 // CHECK-NEXT:    "trivial": true
 // CHECK-NEXT:   },
 // CHECK-NEXT:   "copyCtor": {
@@ -2724,6 +2732,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:   "copyAssign": {
 // CHECK-NEXT:    "hasConstParam": true,
 // CHECK-NEXT:    "implicitHasConstParam": true,
+// CHECK-NEXT:    "simple": true,
 // CHECK-NEXT:    "trivial": true
 // CHECK-NEXT:   },
 // CHECK-NEXT:   "copyCtor": {
@@ -2964,6 +2973,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:   "copyAssign": {
 // CHECK-NEXT:    "hasConstParam": true,
 // CHECK-NEXT:    "implicitHasConstParam": true,
+// CHECK-NEXT:    "simple": true,
 // CHECK-NEXT:    "trivial": true
 // CHECK-NEXT:   },
 // CHECK-NEXT:   "copyCtor": {
@@ -3205,6 +3215,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:    "hasConstParam": true,
 // CHECK-NEXT:    "implicitHasConstParam": true,
 // CHECK-NEXT:    "needsImplicit": true,
+// CHECK-NEXT:    "simple": true,
 // CHECK-NEXT:    "trivial": true
 // CHECK-NEXT:   },
 // CHECK-NEXT:   "copyCtor": {
@@ -3316,6 +3327,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:    "hasConstParam": true,
 // CHECK-NEXT:    "implicitHasConstParam": true,
 // CHECK-NEXT:    "needsImplicit": true,
+// CHECK-NEXT:    "simple": true,
 // CHECK-NEXT:    "trivial": true
 // CHECK-NEXT:   },
 // CHECK-NEXT:   "copyCtor": {
@@ -3424,7 +3436,8 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:   "copyAssign": {
 // CHECK-NEXT:    "hasConstParam": true,
 // CHECK-NEXT:    "implicitHasConstParam": true,
-// CHECK-NEXT:    "nonTrivial": true
+// CHECK-NEXT:    "nonTrivial": true,
+// CHECK-NEXT:    "simple": true
 // CHECK-NEXT:   },
 // CHECK-NEXT:   "copyCtor": {
 // CHECK-NEXT:    "hasConstParam": true,
@@ -3662,7 +3675,8 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:   "copyAssign": {
 // CHECK-NEXT:    "hasConstParam": true,
 // CHECK-NEXT:    "implicitHasConstParam": true,
-// CHECK-NEXT:    "nonTrivial": true
+// CHECK-NEXT:    "nonTrivial": true,
+// CHECK-NEXT:    "simple": true
 // CHECK-NEXT:   },
 // CHECK-NEXT:   "copyCtor": {
 // CHECK-NEXT:    "hasConstParam": true,
@@ -3914,7 +3928,8 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:   "copyAssign": {
 // CHECK-NEXT:    "hasConstParam": true,
 // CHECK-NEXT:    "implicitHasConstParam": true,
-// CHECK-NEXT:    "nonTrivial": true
+// CHECK-NEXT:    "nonTrivial": true,
+// CHECK-NEXT:    "simple": true
 // CHECK-NEXT:   },
 // CHECK-NEXT:   "copyCtor": {
 // CHECK-NEXT:    "hasConstParam": true,
@@ -4153,6 +4168,7 @@ struct Derived6 : virtual public Bases... {
 // CHECK-NEXT:    "hasConstParam": true,
 // CHECK-NEXT:    "implicitHasConstParam": true,
 // CHECK-NEXT:    "needsImplicit": true,
+// CHECK-NEXT:    "simple": true,
 // CHECK-NEXT:    "trivial": true
 // CHECK-NEXT:   },
 // CHECK-NEXT:   "copyCtor": {

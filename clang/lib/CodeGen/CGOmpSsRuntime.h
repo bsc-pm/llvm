@@ -107,11 +107,29 @@ struct OSSTaskDataTy final {
   const Expr *Priority = nullptr;
   const Expr *Label = nullptr;
   bool Wait = false;
+  const Expr *Onready = nullptr;
 
   bool empty() const {
     return DSAs.empty() && Deps.empty() &&
       Reductions.empty() &&
-      !If && !Final && !Cost && !Priority;
+      !If && !Final && !Cost && !Priority &&
+      !Label && !Onready;
+  }
+};
+
+struct OSSLoopDataTy final {
+  Expr *const *IndVar = nullptr;
+  Expr *const *LB = nullptr;
+  Expr *const *UB = nullptr;
+  Expr *const *Step = nullptr;
+  const Expr *Chunksize = nullptr;
+  const Expr *Grainsize = nullptr;
+  unsigned NumCollapses;
+  llvm::Optional<bool> *TestIsLessOp;
+  bool *TestIsStrictOp;
+  bool empty() const {
+    return !IndVar &&
+          !LB && !UB && !Step;
   }
 };
 
@@ -152,6 +170,39 @@ private:
   using GenericCXXNonPodMethodDefsTy = llvm::DenseMap<const CXXMethodDecl *, llvm::Function *>;
   GenericCXXNonPodMethodDefsTy GenericCXXNonPodMethodDefs;
 
+  // List of OmpSs-2 specific metadata to be added to llvm.module.flags
+  SmallVector<llvm::Metadata *, 4> MetadataList;
+
+  // List of the with the form
+  // (func_ptr, arg0, arg1... argN)
+  void BuildWrapperCallBundleList(
+    std::string FuncName,
+    CodeGenFunction &CGF, const Expr *E, QualType Q,
+    llvm::function_ref<void(CodeGenFunction &, Optional<llvm::Value *>)> Body,
+    SmallVectorImpl<llvm::Value *> &List);
+
+  // Builds a bundle of the with the form
+  // (func_ptr, arg0, arg1... argN)
+  void EmitWrapperCallBundle(
+    std::string Name, std::string FuncName,
+    CodeGenFunction &CGF, const Expr *E, QualType Q,
+    llvm::function_ref<void(CodeGenFunction &, Optional<llvm::Value *>)> Body,
+    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
+
+  // This is used by cost/priority/onready clauses to build a bundle with the form
+  // (func_ptr, arg0, arg1... argN)
+  void EmitScalarWrapperCallBundle(
+    std::string Name, std::string FuncName,
+    CodeGenFunction &CGF, const Expr *E,
+    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
+
+  // This is used by onready clauses to build a bundle with the form
+  // (func_ptr, arg0, arg1... argN)
+  void EmitIgnoredWrapperCallBundle(
+    std::string Name, std::string FuncName,
+    CodeGenFunction &CGF, const Expr *E,
+    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
+
   void EmitDSAShared(
     CodeGenFunction &CGF, const Expr *E,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
@@ -166,6 +217,10 @@ private:
     CodeGenFunction &CGF, const OSSDSAFirstprivateDataTy &PDataTy,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
     SmallVectorImpl<llvm::Value*> &CapturedList);
+
+  void EmitMultiDependencyList(
+    CodeGenFunction &CGF, const OSSDepDataTy &Dep,
+    SmallVectorImpl<llvm::Value *> &List);
 
   void EmitDependencyList(
     CodeGenFunction &CGF, const OSSDepDataTy &Dep,
@@ -191,15 +246,16 @@ private:
       SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
 
   // Build bundles for all info inside Data
-  void EmitTaskData(CodeGenFunction &CGF, const OSSTaskDataTy &Data,
-      SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
+  void EmitDirectiveData(CodeGenFunction &CGF, const OSSTaskDataTy &Data,
+      SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
+      const OSSLoopDataTy &LoopData = OSSLoopDataTy());
 
 public:
   explicit CGOmpSsRuntime(CodeGenModule &CGM) : CGM(CGM) {}
   virtual ~CGOmpSsRuntime() {};
   virtual void clear() {};
 
-  bool InTaskEmission = false;
+  bool InDirectiveEmission = false;
 
   // returns true if we're emitting code inside a task context (entry/exit)
   bool inTaskBody();
@@ -235,6 +291,18 @@ public:
   // returns the innermost nested task NormalCleanupDestSlot address
   void setTaskNormalCleanupDestSlot(Address Addr);
 
+  llvm::AllocaInst *createTaskAwareAlloca(
+    CodeGenFunction &CGF, llvm::Type *Ty, const Twine &Name, llvm::Value *ArraySize);
+
+  llvm::Function *createCallWrapperFunc(
+      CodeGenFunction &CGF,
+      const llvm::MapVector<const VarDecl *, LValue> &ExprInvolvedVarList,
+      const llvm::MapVector<const Expr *, llvm::Value *> &VLASizeInvolvedMap,
+      const llvm::DenseMap<const VarDecl *, Address> &CaptureInvolvedMap,
+      ArrayRef<QualType> RetTypes,
+      bool HasThis, bool HasSwitch, std::string FuncName, std::string RetName,
+      llvm::function_ref<void(CodeGenFunction &, Optional<llvm::Value *>)> Body);
+
   RValue emitTaskFunction(CodeGenFunction &CGF,
                           const FunctionDecl *FD,
                           const CallExpr *CE,
@@ -244,11 +312,26 @@ public:
   virtual void emitTaskwaitCall(CodeGenFunction &CGF,
                                 SourceLocation Loc,
                                 const OSSTaskDataTy &Data);
+  /// Emit code for 'release' directive.
+  virtual void emitReleaseCall(
+    CodeGenFunction &CGF, SourceLocation Loc, const OSSTaskDataTy &Data);
   /// Emit code for 'task' directive.
   virtual void emitTaskCall(CodeGenFunction &CGF,
                             const OSSExecutableDirective &D,
                             SourceLocation Loc,
                             const OSSTaskDataTy &Data);
+
+  /// Emit code for 'task' directive.
+  virtual void emitLoopCall(CodeGenFunction &CGF,
+                            const OSSLoopDirective &D,
+                            SourceLocation Loc,
+                            const OSSTaskDataTy &Data,
+                            const OSSLoopDataTy &LoopData);
+
+  // Add all the metadata to OmpSs-2 metadata list.
+  void addMetadata(ArrayRef<llvm::Metadata *> List);
+  // Get OmpSs-2 metadata list as a single metadata node.
+  llvm::MDNode *getMetadataNode();
 
 };
 

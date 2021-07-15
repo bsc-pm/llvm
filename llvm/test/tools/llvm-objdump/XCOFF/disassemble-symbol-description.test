@@ -1,5 +1,3 @@
-# REQUIRES: powerpc-registered-target
-
 # RUN: llvm-objdump -D %p/Inputs/xcoff-section-headers.o | \
 # RUN:   FileCheck --check-prefixes=COMMON,PLAIN %s
 
@@ -25,7 +23,7 @@
 COMMON: Inputs/xcoff-section-headers.o:	file format aixcoff-rs6000
 COMMON: Disassembly of section .text:
 PLAIN:      00000000 <.text>:
-DESC:       00000000 (idx: 4) .text:
+DESC:       00000000 (idx: 16) .func: 
 COMMON-NEXT:        0: 80 62 00 04                  	lwz 3, 4(2)
 RELOC:                              00000002:  R_TOC        (idx: 26) a[TC]
 COMMON-NEXT:        4: 80 63 00 00                  	lwz 3, 0(3)

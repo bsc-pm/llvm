@@ -21,7 +21,7 @@ protected:
   Unwind(Thread &thread) : m_thread(thread), m_unwind_mutex() {}
 
 public:
-  virtual ~Unwind() {}
+  virtual ~Unwind() = default;
 
   void Clear() {
     std::lock_guard<std::recursive_mutex> guard(m_unwind_mutex);
@@ -77,7 +77,8 @@ protected:
   std::recursive_mutex m_unwind_mutex;
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(Unwind);
+  Unwind(const Unwind &) = delete;
+  const Unwind &operator=(const Unwind &) = delete;
 };
 
 } // namespace lldb_private

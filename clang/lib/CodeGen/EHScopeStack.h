@@ -85,11 +85,6 @@ enum CleanupKind : unsigned {
 
   NormalAndEHCleanup = EHCleanup | NormalCleanup,
 
-  InactiveCleanup = 0x4,
-  InactiveEHCleanup = EHCleanup | InactiveCleanup,
-  InactiveNormalCleanup = NormalCleanup | InactiveCleanup,
-  InactiveNormalAndEHCleanup = NormalAndEHCleanup | InactiveCleanup,
-
   LifetimeMarker = 0x8,
   NormalEHLifetimeMarker = LifetimeMarker | NormalAndEHCleanup,
 };
@@ -154,6 +149,8 @@ public:
     Cleanup(const Cleanup &) = default;
     Cleanup(Cleanup &&) {}
     Cleanup() = default;
+
+    virtual bool isRedundantBeforeReturn() { return false; }
 
     /// Generation flags.
     class Flags {
@@ -241,6 +238,9 @@ private:
   /// The innermost EH scope on the stack.
   stable_iterator InnermostEHScope;
 
+  /// The CGF this Stack belong to
+  CodeGenFunction* CGF;
+
   /// The current set of branch fixups.  A branch fixup is a jump to
   /// an as-yet unemitted label, i.e. a label for which we don't yet
   /// know the EH stack depth.  Whenever we pop a cleanup, we have
@@ -266,9 +266,10 @@ private:
   void *pushCleanup(CleanupKind K, size_t DataSize);
 
 public:
-  EHScopeStack() : StartOfBuffer(nullptr), EndOfBuffer(nullptr),
-                   StartOfData(nullptr), InnermostNormalCleanup(stable_end()),
-                   InnermostEHScope(stable_end()) {}
+  EHScopeStack()
+    : StartOfBuffer(nullptr), EndOfBuffer(nullptr), StartOfData(nullptr),
+      InnermostNormalCleanup(stable_end()), InnermostEHScope(stable_end()),
+      CGF(nullptr) {}
   ~EHScopeStack() { delete[] StartOfBuffer; }
 
   /// Push a lazily-created cleanup on the stack.
@@ -315,6 +316,8 @@ public:
     void *Buffer = pushCleanup(Kind, Size);
     std::memcpy(Buffer, Cleanup, Size);
   }
+
+  void setCGF(CodeGenFunction *inCGF) { CGF = inCGF; }
 
   /// Pops a cleanup scope off the stack.  This is private to CGCleanup.cpp.
   void popCleanup();

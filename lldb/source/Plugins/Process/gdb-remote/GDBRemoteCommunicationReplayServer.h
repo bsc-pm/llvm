@@ -11,6 +11,7 @@
 
 // Other libraries and framework includes
 #include "GDBRemoteCommunication.h"
+#include "GDBRemoteCommunicationClient.h"
 #include "GDBRemoteCommunicationHistory.h"
 
 // Project includes
@@ -51,6 +52,8 @@ public:
   bool StartAsyncThread();
   void StopAsyncThread();
 
+  Status Connect(process_gdb_remote::GDBRemoteCommunicationClient &client);
+
 protected:
   enum {
     eBroadcastBitAsyncContinue = (1 << 0),
@@ -70,10 +73,13 @@ protected:
   HostThread m_async_thread;
   std::recursive_mutex m_async_thread_state_mutex;
 
-  bool m_skip_acks;
+  bool m_skip_acks = false;
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(GDBRemoteCommunicationReplayServer);
+  GDBRemoteCommunicationReplayServer(
+      const GDBRemoteCommunicationReplayServer &) = delete;
+  const GDBRemoteCommunicationReplayServer &
+  operator=(const GDBRemoteCommunicationReplayServer &) = delete;
 };
 
 } // namespace process_gdb_remote

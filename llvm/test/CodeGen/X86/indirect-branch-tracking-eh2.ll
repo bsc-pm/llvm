@@ -1,10 +1,9 @@
-; RUN: llc -mtriple x86_64-unknown-unknown -exception-model sjlj -verify-machineinstrs=0 < %s | FileCheck %s --check-prefix=NUM
-; RUN: llc -mtriple x86_64-unknown-unknown -exception-model sjlj -verify-machineinstrs=0 < %s | FileCheck %s --check-prefix=SJLJ
+; RUN: llc -mtriple x86_64-unknown-unknown -exception-model sjlj -verify-machineinstrs=0 -simplifycfg-require-and-preserve-domtree=1 < %s | FileCheck %s --check-prefix=NUM
+; RUN: llc -mtriple x86_64-unknown-unknown -exception-model sjlj -verify-machineinstrs=0 -simplifycfg-require-and-preserve-domtree=1 < %s | FileCheck %s --check-prefix=SJLJ
 
 ; NUM-COUNT-3: endbr64
 
 ;SJLJ:       main:                                  # @main
-;SJLJ-NEXT: .Lmain$local:
 ;SJLJ-NEXT: .Lfunc_begin0:
 ;SJLJ-NEXT: # %bb.0:                                # %entry
 ;SJLJ-NEXT:         endbr64

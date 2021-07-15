@@ -125,6 +125,7 @@ def WriteLoad    : SchedWrite;
 def WriteStore   : SchedWrite;
 def WriteStoreNT : SchedWrite;
 def WriteMove    : SchedWrite;
+def WriteVecMaskedGatherWriteback : SchedWrite;
 def WriteCopy    : WriteSequence<[WriteLoad, WriteStore]>; // mem->mem copy
 
 // Arithmetic.
@@ -341,8 +342,10 @@ def  WriteVecStoreX       : SchedWrite;
 def  WriteVecStoreY       : SchedWrite;
 def  WriteVecStoreNT      : SchedWrite;
 def  WriteVecStoreNTY     : SchedWrite;
-def  WriteVecMaskedStore  : SchedWrite;
-def  WriteVecMaskedStoreY : SchedWrite;
+def  WriteVecMaskedStore32  : SchedWrite;
+def  WriteVecMaskedStore64  : SchedWrite;
+def  WriteVecMaskedStore32Y : SchedWrite;
+def  WriteVecMaskedStore64Y : SchedWrite;
 def  WriteVecMove         : SchedWrite;
 def  WriteVecMoveX        : SchedWrite;
 def  WriteVecMoveY        : SchedWrite;
@@ -486,6 +489,7 @@ def WriteSystem : SchedWrite;
 defm WriteFShuffle256 : X86SchedWritePair<ReadAfterVecYLd>; // Fp 256-bit width vector shuffles.
 defm WriteFVarShuffle256 : X86SchedWritePair<ReadAfterVecYLd>; // Fp 256-bit width variable shuffles.
 defm WriteShuffle256 : X86SchedWritePair<ReadAfterVecYLd>; // 256-bit width vector shuffles.
+defm WriteVPMOV256 : X86SchedWritePair<ReadAfterVecYLd>; // 256-bit width packed vector width-changing move.
 defm WriteVarShuffle256 : X86SchedWritePair<ReadAfterVecYLd>; // 256-bit width vector variable shuffles.
 defm WriteVarVecShift  : X86SchedWritePair<ReadAfterVecXLd>; // Variable vector shifts.
 defm WriteVarVecShiftY : X86SchedWritePair<ReadAfterVecYLd>; // Variable vector shifts (YMM).
@@ -550,6 +554,14 @@ def WriteFMaskMove32Y
   : X86SchedWriteMaskMove<WriteFMaskedLoadY, WriteFMaskedStore32Y>;
 def WriteFMaskMove64Y
   : X86SchedWriteMaskMove<WriteFMaskedLoadY, WriteFMaskedStore64Y>;
+def WriteVecMaskMove32
+  : X86SchedWriteMaskMove<WriteVecMaskedLoad, WriteVecMaskedStore32>;
+def WriteVecMaskMove64
+  : X86SchedWriteMaskMove<WriteVecMaskedLoad, WriteVecMaskedStore64>;
+def WriteVecMaskMove32Y
+  : X86SchedWriteMaskMove<WriteVecMaskedLoadY, WriteVecMaskedStore32Y>;
+def WriteVecMaskMove64Y
+  : X86SchedWriteMaskMove<WriteVecMaskedLoadY, WriteVecMaskedStore64Y>;
 
 // Vector width wrappers.
 def SchedWriteFAdd

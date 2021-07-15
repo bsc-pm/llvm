@@ -1,8 +1,7 @@
 ; Tests that coro-split can handle the case when a code after coro.suspend uses
 ; a value produces between coro.save and coro.suspend (%Result.i19)
 ; and checks whether stray coro.saves are properly removed
-; RUN: opt < %s -coro-split -S | FileCheck %s
-; RUN: opt < %s -passes=coro-split -S | FileCheck %s
+; RUN: opt < %s -passes='cgscc(coro-split),simplifycfg,early-cse,simplifycfg' -S | FileCheck %s
 
 %"struct.std::coroutine_handle" = type { i8* }
 %"struct.std::coroutine_handle.0" = type { %"struct.std::coroutine_handle" }
@@ -31,6 +30,8 @@ await.ready:
   %val = load i32, i32* %Result.i19
   %cast = bitcast i32* %testval to i8*
   call void @llvm.lifetime.start.p0i8(i64 4, i8* %cast)
+  %test = load i32, i32* %testval
+  call void @print(i32 %test)
   call void @llvm.lifetime.end.p0i8(i64 4, i8*  %cast)
   call void @print(i32 %val)
   br label %exit
@@ -47,6 +48,8 @@ exit:
 ; CHECK-NEXT:    %val = load i32, i32* %Result
 ; CHECK-NEXT:    %cast = bitcast i32* %testval to i8*
 ; CHECK-NEXT:    call void @llvm.lifetime.start.p0i8(i64 4, i8* %cast)
+; CHECK-NEXT:    %test = load i32, i32* %testval
+; CHECK-NEXT:    call void @print(i32 %test)
 ; CHECK-NEXT:    call void @llvm.lifetime.end.p0i8(i64 4, i8* %cast)
 ; CHECK-NEXT:    call void @print(i32 %val)
 ; CHECK-NEXT:    ret void
@@ -65,4 +68,3 @@ declare i8* @llvm.coro.free(token, i8* nocapture readonly) #2
 declare i1 @llvm.coro.end(i8*, i1) #3
 declare void @llvm.lifetime.start.p0i8(i64, i8* nocapture) #4
 declare void @llvm.lifetime.end.p0i8(i64, i8* nocapture) #4
-

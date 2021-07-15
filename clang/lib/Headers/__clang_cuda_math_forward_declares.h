@@ -8,8 +8,8 @@
  */
 #ifndef __CLANG__CUDA_MATH_FORWARD_DECLARES_H__
 #define __CLANG__CUDA_MATH_FORWARD_DECLARES_H__
-#ifndef __CUDA__
-#error "This file is for CUDA compilation only."
+#if !defined(__CUDA__) && !__HIP__
+#error "This file is for CUDA/HIP compilation only."
 #endif
 
 // This file forward-declares of some math functions we (or the CUDA headers)
@@ -160,6 +160,9 @@ __DEVICE__ double scalbln(double, long);
 __DEVICE__ float scalbln(float, long);
 __DEVICE__ double scalbn(double, int);
 __DEVICE__ float scalbn(float, int);
+#ifdef _MSC_VER
+__DEVICE__ bool signbit(long double);
+#endif
 __DEVICE__ bool signbit(double);
 __DEVICE__ bool signbit(float);
 __DEVICE__ double sin(double);

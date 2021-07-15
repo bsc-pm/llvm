@@ -61,12 +61,12 @@ def run_test_once(args, extra_args):
     clang_extra_args = clang_tidy_extra_args[i + 1:]
     clang_tidy_extra_args = clang_tidy_extra_args[:i]
 
-  # If the test does not specify a formatting style, force "none"; otherwise
+  # If the test does not specify a config style, force an empty one; otherwise
   # autodetection logic can discover a ".clang-tidy" file that is not related to
   # the test.
   if not any(
-      [arg.startswith('-format-style=') for arg in clang_tidy_extra_args]):
-    clang_tidy_extra_args.append('-format-style=none')
+      [arg.startswith('-config=') for arg in clang_tidy_extra_args]):
+    clang_tidy_extra_args.append('-config={}')
 
   if extension in ['.m', '.mm']:
     clang_extra_args = ['-fobjc-abi-version=2', '-fobjc-arc', '-fblocks'] + \
@@ -119,9 +119,12 @@ def run_test_once(args, extra_args):
     has_check_messages = has_check_messages or has_check_message
     has_check_notes = has_check_notes or has_check_note
 
-    check_fixes_prefixes.append(check_fixes_prefix)
-    check_messages_prefixes.append(check_messages_prefix)
-    check_notes_prefixes.append(check_notes_prefix)
+    if has_check_fix:
+      check_fixes_prefixes.append(check_fixes_prefix)
+    if has_check_message:
+      check_messages_prefixes.append(check_messages_prefix)
+    if has_check_note:
+      check_notes_prefixes.append(check_notes_prefix)
 
   assert has_check_fixes or has_check_messages or has_check_notes
   # Remove the contents of the CHECK lines to avoid CHECKs matching on
@@ -204,15 +207,15 @@ def run_test_once(args, extra_args):
 
 def expand_std(std):
   if std == 'c++98-or-later':
-    return ['c++98', 'c++11', 'c++14', 'c++17', 'c++2a']
+    return ['c++98', 'c++11', 'c++14', 'c++17', 'c++20']
   if std == 'c++11-or-later':
-    return ['c++11', 'c++14', 'c++17', 'c++2a']
+    return ['c++11', 'c++14', 'c++17', 'c++20']
   if std == 'c++14-or-later':
-    return ['c++14', 'c++17', 'c++2a']
+    return ['c++14', 'c++17', 'c++20']
   if std == 'c++17-or-later':
-    return ['c++17', 'c++2a']
-  if std == 'c++2a-or-later':
-    return ['c++2a']
+    return ['c++17', 'c++20']
+  if std == 'c++20-or-later':
+    return ['c++20']
   return [std]
 
 

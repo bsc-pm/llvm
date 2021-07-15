@@ -1,64 +1,24 @@
-
 add_entrypoint_library(
   llvmlibc
   DEPENDS
-    # assert.h entrypoints
-    libc.src.assert.__assert_fail
-
-    # errno.h entrypoints
-    libc.src.errno.__errno_location
-
-    # signal.h entrypoints
-    libc.src.signal.raise
-    libc.src.signal.sigaction
-    libc.src.signal.sigdelset
-    libc.src.signal.sigaddset
-    libc.src.signal.sigemptyset
-    libc.src.signal.sigprocmask
-    libc.src.signal.sigfillset
-    libc.src.signal.signal
-
-    # stdlib.h entrypoints
-    libc.src.stdlib._Exit
-    libc.src.stdlib.abort
-
-    # string.h entrypoints
-    libc.src.string.memcpy
-    libc.src.string.strcpy
-    libc.src.string.strcat
-    libc.src.string.strlen
-
-    # sys/mman.h entrypoints
-    libc.src.sys.mman.mmap
-    libc.src.sys.mman.munmap
-
-    # threads.h entrypoints
-    libc.src.threads.mtx_init
-    libc.src.threads.mtx_lock
-    libc.src.threads.mtx_unlock
-    libc.src.threads.thrd_create
-    libc.src.threads.thrd_join
-
-    # unistd.h entrypoints
-    libc.src.unistd.write
+  ${TARGET_LLVMLIBC_ENTRYPOINTS}
 )
 
-add_entrypoint_library(
-  llvmlibm
-  DEPENDS
-    # math.h entrypoints
-    libc.src.math.cosf
-    libc.src.math.fabs
-    libc.src.math.fabsf
-    libc.src.math.expf
-    libc.src.math.exp2f
-    libc.src.math.round
-    libc.src.math.sincosf
-    libc.src.math.sinf
+if(LLVM_ENABLE_PER_TARGET_RUNTIME_DIR)
+  set(LIBC_INSTALL_LIBRARY_DIR lib${LLVM_LIBDIR_SUFFIX}/${LLVM_DEFAULT_TARGET_TRIPLE})
+else()
+  set(LIBC_INSTALL_LIBRARY_DIR lib${LLVM_LIBDIR_SUFFIX})
+endif()
+
+install(
+  TARGETS llvmlibc
+  ARCHIVE DESTINATION ${LIBC_INSTALL_PREFIX}/${LIBC_INSTALL_LIBRARY_DIR}
+  COMPONENT llvmlibc
 )
 
-add_redirector_library(
-  llvmlibc_redirectors
-  DEPENDS
-    round_redirector
+add_custom_target(
+    install-llvmlibc
+    DEPENDS llvmlibc
+    COMMAND "${CMAKE_COMMAND}" -DCMAKE_INSTALL_COMPONENT=llvmlibc
+            -P "${LIBC_BINARY_DIR}/cmake_install.cmake"
 )

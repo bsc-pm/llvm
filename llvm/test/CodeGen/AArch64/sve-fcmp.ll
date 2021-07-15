@@ -253,3 +253,172 @@ define <vscale x 4 x i32> @oeq_4f32_zext(<vscale x 4 x float> %x, <vscale x 4 x 
   %r = zext <vscale x 4 x i1> %y to <vscale x 4 x i32>
   ret <vscale x 4 x i32> %r
 }
+
+define <vscale x 4 x i1> @eq_fast(<vscale x 4 x float> %x, <vscale x 4 x float> %x2) {
+; CHECK-LABEL: eq_fast:
+; CHECK:       // %bb.0:
+; CHECK-NEXT:    ptrue p0.s
+; CHECK-NEXT:    fcmeq p0.s, p0/z, z0.s, z1.s
+; CHECK-NEXT:    ret
+  %y = fcmp fast oeq <vscale x 4 x float> %x, %x2
+  ret <vscale x 4 x i1> %y
+}
+define <vscale x 4 x i1> @gt_fast(<vscale x 4 x float> %x, <vscale x 4 x float> %x2) {
+; CHECK-LABEL: gt_fast:
+; CHECK:       // %bb.0:
+; CHECK-NEXT:    ptrue p0.s
+; CHECK-NEXT:    fcmgt p0.s, p0/z, z0.s, z1.s
+; CHECK-NEXT:    ret
+  %y = fcmp fast ogt <vscale x 4 x float> %x, %x2
+  ret <vscale x 4 x i1> %y
+}
+define <vscale x 4 x i1> @ge_fast(<vscale x 4 x float> %x, <vscale x 4 x float> %x2) {
+; CHECK-LABEL: ge_fast:
+; CHECK:       // %bb.0:
+; CHECK-NEXT:    ptrue p0.s
+; CHECK-NEXT:    fcmge p0.s, p0/z, z0.s, z1.s
+; CHECK-NEXT:    ret
+  %y = fcmp fast oge <vscale x 4 x float> %x, %x2
+  ret <vscale x 4 x i1> %y
+}
+define <vscale x 4 x i1> @lt_fast(<vscale x 4 x float> %x, <vscale x 4 x float> %x2) {
+; CHECK-LABEL: lt_fast:
+; CHECK:       // %bb.0:
+; CHECK-NEXT:    ptrue p0.s
+; CHECK-NEXT:    fcmgt p0.s, p0/z, z1.s, z0.s
+; CHECK-NEXT:    ret
+  %y = fcmp fast olt <vscale x 4 x float> %x, %x2
+  ret <vscale x 4 x i1> %y
+}
+define <vscale x 4 x i1> @le_fast(<vscale x 4 x float> %x, <vscale x 4 x float> %x2) {
+; CHECK-LABEL: le_fast:
+; CHECK:       // %bb.0:
+; CHECK-NEXT:    ptrue p0.s
+; CHECK-NEXT:    fcmge p0.s, p0/z, z1.s, z0.s
+; CHECK-NEXT:    ret
+  %y = fcmp fast ole <vscale x 4 x float> %x, %x2
+  ret <vscale x 4 x i1> %y
+}
+define <vscale x 4 x i1> @ne_fast(<vscale x 4 x float> %x, <vscale x 4 x float> %x2) {
+; CHECK-LABEL: ne_fast:
+; CHECK:       // %bb.0:
+; CHECK-NEXT:    ptrue p0.s
+; CHECK-NEXT:    fcmne p0.s, p0/z, z0.s, z1.s
+; CHECK-NEXT:    ret
+  %y = fcmp fast one <vscale x 4 x float> %x, %x2
+  ret <vscale x 4 x i1> %y
+}
+define <vscale x 4 x i1> @oeq_zero(<vscale x 4 x float> %x) {
+; CHECK-LABEL: oeq_zero:
+; CHECK:       // %bb.0:
+; CHECK-NEXT:    ptrue p0.s
+; CHECK-NEXT:    fcmeq p0.s, p0/z, z0.s, #0.0
+; CHECK-NEXT:    ret
+  %y = fcmp oeq <vscale x 4 x float> %x, zeroinitializer
+  ret <vscale x 4 x i1> %y
+}
+define <vscale x 4 x i1> @ogt_zero(<vscale x 4 x float> %x) {
+; CHECK-LABEL: ogt_zero:
+; CHECK:       // %bb.0:
+; CHECK-NEXT:    ptrue p0.s
+; CHECK-NEXT:    fcmgt p0.s, p0/z, z0.s, #0.0
+; CHECK-NEXT:    ret
+  %y = fcmp ogt <vscale x 4 x float> %x, zeroinitializer
+  ret <vscale x 4 x i1> %y
+}
+define <vscale x 4 x i1> @oge_zero(<vscale x 4 x float> %x) {
+; CHECK-LABEL: oge_zero:
+; CHECK:       // %bb.0:
+; CHECK-NEXT:    ptrue p0.s
+; CHECK-NEXT:    fcmge p0.s, p0/z, z0.s, #0.0
+; CHECK-NEXT:    ret
+  %y = fcmp oge <vscale x 4 x float> %x, zeroinitializer
+  ret <vscale x 4 x i1> %y
+}
+define <vscale x 4 x i1> @olt_zero(<vscale x 4 x float> %x) {
+; CHECK-LABEL: olt_zero:
+; CHECK:       // %bb.0:
+; CHECK-NEXT:    ptrue p0.s
+; CHECK-NEXT:    fcmlt p0.s, p0/z, z0.s, #0.0
+; CHECK-NEXT:    ret
+  %y = fcmp olt <vscale x 4 x float> %x, zeroinitializer
+  ret <vscale x 4 x i1> %y
+}
+define <vscale x 4 x i1> @ole_zero(<vscale x 4 x float> %x) {
+; CHECK-LABEL: ole_zero:
+; CHECK:       // %bb.0:
+; CHECK-NEXT:    ptrue p0.s
+; CHECK-NEXT:    fcmle p0.s, p0/z, z0.s, #0.0
+; CHECK-NEXT:    ret
+  %y = fcmp ole <vscale x 4 x float> %x, zeroinitializer
+  ret <vscale x 4 x i1> %y
+}
+define <vscale x 4 x i1> @one_zero(<vscale x 4 x float> %x) {
+; CHECK-LABEL: one_zero:
+; CHECK:       // %bb.0:
+; CHECK-NEXT:    ptrue p0.s
+; CHECK-NEXT:    fcmne p0.s, p0/z, z0.s, #0.0
+; CHECK-NEXT:    ret
+  %y = fcmp one <vscale x 4 x float> %x, zeroinitializer
+  ret <vscale x 4 x i1> %y
+}
+define <vscale x 4 x i1> @ueq_zero(<vscale x 4 x float> %x) {
+; CHECK-LABEL: ueq_zero:
+; CHECK:       // %bb.0:
+; CHECK-NEXT:    ptrue p0.s
+; CHECK-NEXT:    fcmne p1.s, p0/z, z0.s, #0.0
+; CHECK-NEXT:    not p0.b, p0/z, p1.b
+; CHECK-NEXT:    ret
+  %y = fcmp ueq <vscale x 4 x float> %x, zeroinitializer
+  ret <vscale x 4 x i1> %y
+}
+define <vscale x 4 x i1> @ugt_zero(<vscale x 4 x float> %x) {
+; CHECK-LABEL: ugt_zero:
+; CHECK:       // %bb.0:
+; CHECK-NEXT:    ptrue p0.s
+; CHECK-NEXT:    fcmle p1.s, p0/z, z0.s, #0.0
+; CHECK-NEXT:    not p0.b, p0/z, p1.b
+; CHECK-NEXT:    ret
+  %y = fcmp ugt <vscale x 4 x float> %x, zeroinitializer
+  ret <vscale x 4 x i1> %y
+}
+define <vscale x 4 x i1> @uge_zero(<vscale x 4 x float> %x) {
+; CHECK-LABEL: uge_zero:
+; CHECK:       // %bb.0:
+; CHECK-NEXT:    ptrue p0.s
+; CHECK-NEXT:    fcmlt p1.s, p0/z, z0.s, #0.0
+; CHECK-NEXT:    not p0.b, p0/z, p1.b
+; CHECK-NEXT:    ret
+  %y = fcmp uge <vscale x 4 x float> %x, zeroinitializer
+  ret <vscale x 4 x i1> %y
+}
+define <vscale x 4 x i1> @ult_zero(<vscale x 4 x float> %x) {
+; CHECK-LABEL: ult_zero:
+; CHECK:       // %bb.0:
+; CHECK-NEXT:    ptrue p0.s
+; CHECK-NEXT:    fcmge p1.s, p0/z, z0.s, #0.0
+; CHECK-NEXT:    not p0.b, p0/z, p1.b
+; CHECK-NEXT:    ret
+  %y = fcmp ult <vscale x 4 x float> %x, zeroinitializer
+  ret <vscale x 4 x i1> %y
+}
+define <vscale x 4 x i1> @ule_zero(<vscale x 4 x float> %x) {
+; CHECK-LABEL: ule_zero:
+; CHECK:       // %bb.0:
+; CHECK-NEXT:    ptrue p0.s
+; CHECK-NEXT:    fcmgt p1.s, p0/z, z0.s, #0.0
+; CHECK-NEXT:    not p0.b, p0/z, p1.b
+; CHECK-NEXT:    ret
+  %y = fcmp ule <vscale x 4 x float> %x, zeroinitializer
+  ret <vscale x 4 x i1> %y
+}
+define <vscale x 4 x i1> @une_zero(<vscale x 4 x float> %x) {
+; CHECK-LABEL: une_zero:
+; CHECK:       // %bb.0:
+; CHECK-NEXT:    ptrue p0.s
+; CHECK-NEXT:    fcmeq p1.s, p0/z, z0.s, #0.0
+; CHECK-NEXT:    not p0.b, p0/z, p1.b
+; CHECK-NEXT:    ret
+  %y = fcmp une <vscale x 4 x float> %x, zeroinitializer
+  ret <vscale x 4 x i1> %y
+}

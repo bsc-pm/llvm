@@ -228,22 +228,71 @@ define <2 x i1> @test11vec(<2 x i8> %a) {
   ret <2 x i1> %c
 }
 
-; Should be transformed into shl A, 1?
-
-define i32 @test12(i32 %A, i32 %B) {
-; CHECK-LABEL: @test12(
-; CHECK-NEXT:    br label [[X:%.*]]
-; CHECK:       X:
-; CHECK-NEXT:    [[C_OK:%.*]] = add i32 [[B:%.*]], [[A:%.*]]
-; CHECK-NEXT:    [[D:%.*]] = add i32 [[C_OK]], [[A]]
-; CHECK-NEXT:    ret i32 [[D]]
+define i8 @reassoc_shl1(i8 %x, i8 %y) {
+; CHECK-LABEL: @reassoc_shl1(
+; CHECK-NEXT:    [[REASS_ADD:%.*]] = shl i8 [[X:%.*]], 1
+; CHECK-NEXT:    [[R:%.*]] = add i8 [[REASS_ADD]], [[Y:%.*]]
+; CHECK-NEXT:    ret i8 [[R]]
 ;
-  %C_OK = add i32 %B, %A
-  br label %X
+  %a = add i8 %y, %x
+  %r = add i8 %a, %x
+  ret i8 %r
+}
 
-X:              ; preds = %0
-  %D = add i32 %C_OK, %A
-  ret i32 %D
+define <2 x i8> @reassoc_shl1_commute1(<2 x i8> %x, <2 x i8> %y) {
+; CHECK-LABEL: @reassoc_shl1_commute1(
+; CHECK-NEXT:    [[REASS_ADD:%.*]] = shl <2 x i8> [[X:%.*]], <i8 1, i8 1>
+; CHECK-NEXT:    [[R:%.*]] = add <2 x i8> [[REASS_ADD]], [[Y:%.*]]
+; CHECK-NEXT:    ret <2 x i8> [[R]]
+;
+  %a = add <2 x i8> %x, %y
+  %r = add <2 x i8> %a, %x
+  ret <2 x i8> %r
+}
+
+define i8 @reassoc_shl1_commute2(i8 %px, i8 %py) {
+; CHECK-LABEL: @reassoc_shl1_commute2(
+; CHECK-NEXT:    [[X:%.*]] = sdiv i8 42, [[PX:%.*]]
+; CHECK-NEXT:    [[Y:%.*]] = sdiv i8 43, [[PY:%.*]]
+; CHECK-NEXT:    [[REASS_ADD:%.*]] = shl i8 [[X]], 1
+; CHECK-NEXT:    [[R:%.*]] = add i8 [[Y]], [[REASS_ADD]]
+; CHECK-NEXT:    ret i8 [[R]]
+;
+  %x = sdiv i8 42, %px ; thwart complexity-based canonicalization
+  %y = sdiv i8 43, %py ; thwart complexity-based canonicalization
+  %a = add i8 %y, %x
+  %r = add i8 %x, %a
+  ret i8 %r
+}
+
+define i8 @reassoc_shl1_commute3(i8 %px, i8 %py) {
+; CHECK-LABEL: @reassoc_shl1_commute3(
+; CHECK-NEXT:    [[X:%.*]] = sdiv i8 42, [[PX:%.*]]
+; CHECK-NEXT:    [[Y:%.*]] = sdiv i8 43, [[PY:%.*]]
+; CHECK-NEXT:    [[REASS_ADD:%.*]] = shl i8 [[X]], 1
+; CHECK-NEXT:    [[R:%.*]] = add i8 [[Y]], [[REASS_ADD]]
+; CHECK-NEXT:    ret i8 [[R]]
+;
+  %x = sdiv i8 42, %px ; thwart complexity-based canonicalization
+  %y = sdiv i8 43, %py ; thwart complexity-based canonicalization
+  %a = add i8 %x, %y
+  %r = add i8 %x, %a
+  ret i8 %r
+}
+
+declare void @use(i8)
+
+define i8 @reassoc_shl1_extra_use(i8 %x, i8 %y) {
+; CHECK-LABEL: @reassoc_shl1_extra_use(
+; CHECK-NEXT:    [[A:%.*]] = add i8 [[Y:%.*]], [[X:%.*]]
+; CHECK-NEXT:    call void @use(i8 [[A]])
+; CHECK-NEXT:    [[R:%.*]] = add i8 [[A]], [[X]]
+; CHECK-NEXT:    ret i8 [[R]]
+;
+  %a = add i8 %y, %x
+  call void @use(i8 %a)
+  %r = add i8 %a, %x
+  ret i8 %r
 }
 
 ;; TODO: shl A, 1?
@@ -283,18 +332,6 @@ define i8 @test15(i8 %A) {
 ; CHECK-NEXT:    ret i8 [[C]]
 ;
   %B = add i8 %A, -64
-  %C = and i8 %B, 16
-  ret i8 %C
-}
-
-; Only one bit set
-define i8 @test16(i8 %A) {
-; CHECK-LABEL: @test16(
-; CHECK-NEXT:    [[B:%.*]] = and i8 [[A:%.*]], 16
-; CHECK-NEXT:    [[C:%.*]] = xor i8 [[B]], 16
-; CHECK-NEXT:    ret i8 [[C]]
-;
-  %B = add i8 %A, 16
   %C = and i8 %B, 16
   ret i8 %C
 }
@@ -370,6 +407,16 @@ define i32 @xor_sign_bit(i32 %x) {
   %xor = xor i32 %x, 2147483648
   %add = add i32 %xor, 42
   ret i32 %add
+}
+
+define <2 x i32> @xor_sign_bit_vec_splat(<2 x i32> %x) {
+; CHECK-LABEL: @xor_sign_bit_vec_splat(
+; CHECK-NEXT:    [[ADD:%.*]] = add <2 x i32> [[X:%.*]], <i32 -2147483606, i32 -2147483606>
+; CHECK-NEXT:    ret <2 x i32> [[ADD]]
+;
+  %xor = xor <2 x i32> %x, <i32 2147483648, i32 2147483648>
+  %add = add <2 x i32> %xor, <i32 42, i32 42>
+  ret <2 x i32> %add
 }
 
 ; No-wrap info allows converting the add to 'or'.
@@ -681,8 +728,8 @@ define i8 @test34(i8 %A) {
 
 define i8 @masked_add(i8 %x) {
 ; CHECK-LABEL: @masked_add(
-; CHECK-NEXT:    [[AND1:%.*]] = add i8 [[X:%.*]], 96
-; CHECK-NEXT:    [[R:%.*]] = and i8 [[AND1]], -16
+; CHECK-NEXT:    [[TMP1:%.*]] = add i8 [[X:%.*]], 96
+; CHECK-NEXT:    [[R:%.*]] = and i8 [[TMP1]], -16
 ; CHECK-NEXT:    ret i8 [[R]]
 ;
   %and = and i8 %x, 240 ; 0xf0
@@ -692,8 +739,8 @@ define i8 @masked_add(i8 %x) {
 
 define <2 x i8> @masked_add_splat(<2 x i8> %x) {
 ; CHECK-LABEL: @masked_add_splat(
-; CHECK-NEXT:    [[AND:%.*]] = and <2 x i8> [[X:%.*]], <i8 -64, i8 -64>
-; CHECK-NEXT:    [[R:%.*]] = add <2 x i8> [[AND]], <i8 64, i8 64>
+; CHECK-NEXT:    [[TMP1:%.*]] = add <2 x i8> [[X:%.*]], <i8 64, i8 64>
+; CHECK-NEXT:    [[R:%.*]] = and <2 x i8> [[TMP1]], <i8 -64, i8 -64>
 ; CHECK-NEXT:    ret <2 x i8> [[R]]
 ;
   %and = and <2 x i8> %x, <i8 192, i8 192> ; 0xc0
@@ -804,8 +851,8 @@ define <2 x i64> @test41vec_and_multiuse(<2 x i32> %a) {
 ; CHECK-LABEL: @test41vec_and_multiuse(
 ; CHECK-NEXT:    [[ADD:%.*]] = add nuw <2 x i32> [[A:%.*]], <i32 16, i32 16>
 ; CHECK-NEXT:    [[ZEXT:%.*]] = zext <2 x i32> [[ADD]] to <2 x i64>
-; CHECK-NEXT:    [[SUB:%.*]] = add nsw <2 x i64> [[ZEXT]], <i64 -1, i64 -1>
-; CHECK-NEXT:    [[EXTRAUSE:%.*]] = add nsw <2 x i64> [[SUB]], [[ZEXT]]
+; CHECK-NEXT:    [[REASS_ADD:%.*]] = shl nuw nsw <2 x i64> [[ZEXT]], <i64 1, i64 1>
+; CHECK-NEXT:    [[EXTRAUSE:%.*]] = add nsw <2 x i64> [[REASS_ADD]], <i64 -1, i64 -1>
 ; CHECK-NEXT:    ret <2 x i64> [[EXTRAUSE]]
 ;
   %add = add nuw <2 x i32> %a, <i32 16, i32 16>
@@ -964,8 +1011,8 @@ define i32 @add_to_sub(i32 %M, i32 %B) {
 ; E = (~B + A) + 1 = A - B
 define i32 @add_to_sub2(i32 %A, i32 %M) {
 ; CHECK-LABEL: @add_to_sub2(
-; CHECK-NEXT:    [[TMP1:%.*]] = mul i32 [[M:%.*]], -42
-; CHECK-NEXT:    [[E:%.*]] = add i32 [[TMP1]], [[A:%.*]]
+; CHECK-NEXT:    [[B_NEG:%.*]] = mul i32 [[M:%.*]], -42
+; CHECK-NEXT:    [[E:%.*]] = add i32 [[B_NEG]], [[A:%.*]]
 ; CHECK-NEXT:    ret i32 [[E]]
 ;
   %B = mul i32 %M, 42          ; thwart complexity-based ordering
@@ -1306,4 +1353,42 @@ define i32 @lshr_add_use2_sexts(i1 %x, i1 %y, i32* %p) {
   %sub = add i32 %xs, %ys
   %r = lshr i32 %sub, 31
   ret i32 %r
+}
+
+define i8 @add_like_or_t0(i8 %x) {
+; CHECK-LABEL: @add_like_or_t0(
+; CHECK-NEXT:    [[I0:%.*]] = shl i8 [[X:%.*]], 4
+; CHECK-NEXT:    [[R:%.*]] = add i8 [[I0]], 57
+; CHECK-NEXT:    ret i8 [[R]]
+;
+  %i0 = shl i8 %x, 4
+  %i1 = or i8 %i0, 15 ; no common bits
+  %r = add i8 %i1, 42
+  ret i8 %r
+}
+define i8 @add_like_or_n1(i8 %x) {
+; CHECK-LABEL: @add_like_or_n1(
+; CHECK-NEXT:    [[I0:%.*]] = shl i8 [[X:%.*]], 4
+; CHECK-NEXT:    [[I1:%.*]] = or i8 [[I0]], 31
+; CHECK-NEXT:    [[R:%.*]] = add i8 [[I1]], 42
+; CHECK-NEXT:    ret i8 [[R]]
+;
+  %i0 = shl i8 %x, 4
+  %i1 = or i8 %i0, 31 ; 4'th bit might be common-set
+  %r = add i8 %i1, 42
+  ret i8 %r
+}
+define i8 @add_like_or_t2_extrause(i8 %x) {
+; CHECK-LABEL: @add_like_or_t2_extrause(
+; CHECK-NEXT:    [[I0:%.*]] = shl i8 [[X:%.*]], 4
+; CHECK-NEXT:    [[I1:%.*]] = or i8 [[I0]], 15
+; CHECK-NEXT:    call void @use(i8 [[I1]])
+; CHECK-NEXT:    [[R:%.*]] = add i8 [[I0]], 57
+; CHECK-NEXT:    ret i8 [[R]]
+;
+  %i0 = shl i8 %x, 4
+  %i1 = or i8 %i0, 15 ; no common bits
+  call void @use(i8 %i1) ; extra use
+  %r = add i8 %i1, 42
+  ret i8 %r
 }

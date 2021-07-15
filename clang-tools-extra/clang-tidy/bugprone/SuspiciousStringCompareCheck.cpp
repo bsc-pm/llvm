@@ -113,10 +113,8 @@ void SuspiciousStringCompareCheck::registerMatchers(MatchFinder *Finder) {
     // Detect suspicious calls to string compare:
     //     'if (strcmp())'  ->  'if (strcmp() != 0)'
     Finder->addMatcher(
-        stmt(anyOf(ifStmt(hasCondition(StringCompareCallExpr)),
-                   whileStmt(hasCondition(StringCompareCallExpr)),
-                   doStmt(hasCondition(StringCompareCallExpr)),
-                   forStmt(hasCondition(StringCompareCallExpr)),
+        stmt(anyOf(mapAnyOf(ifStmt, whileStmt, doStmt, forStmt)
+                       .with(hasCondition(StringCompareCallExpr)),
                    binaryOperator(hasAnyOperatorName("&&", "||"),
                                   hasEitherOperand(StringCompareCallExpr))))
             .bind("missing-comparison"),
@@ -135,9 +133,10 @@ void SuspiciousStringCompareCheck::registerMatchers(MatchFinder *Finder) {
 
   // Detect suspicious cast to an inconsistant type (i.e. not integer type).
   Finder->addMatcher(
-      implicitCastExpr(unless(hasType(isInteger())),
-                       hasSourceExpression(StringCompareCallExpr))
-          .bind("invalid-conversion"),
+      traverse(TK_AsIs,
+               implicitCastExpr(unless(hasType(isInteger())),
+                                hasSourceExpression(StringCompareCallExpr))
+                   .bind("invalid-conversion")),
       this);
 
   // Detect suspicious operator with string compare function as operand.

@@ -17,7 +17,7 @@ declare void @hot_func()
 ; ACCURATE: foo_not_in_profile{{.*}}!prof ![[ZERO_ID:[0-9]+]] !section_prefix ![[COLD_ID:[0-9]+]]
 ; The function not appearing in profile is cold when -profile-sample-accurate
 ; is on.
-define void @foo_not_in_profile() {
+define void @foo_not_in_profile() #1 {
   call void @hot_func()
   ret void
 }
@@ -31,15 +31,16 @@ define void @bar_not_in_profile() #0 {
   ret void
 }
 
-attributes #0 = { "profile-sample-accurate" }
+attributes #0 = { "profile-sample-accurate" "use-sample-profile" }
+attributes #1 = { "use-sample-profile" }
 
 ; CHECK: ![[NOPROFILE_ID]] = !{!"function_entry_count", i64 -1}
 ; CHECK: ![[ZERO_ID]] = !{!"function_entry_count", i64 0}
-; CHECK: ![[COLD_ID]] = !{!"function_section_prefix", !".unlikely"}
+; CHECK: ![[COLD_ID]] = !{!"function_section_prefix", !"unlikely"}
 ; UNKNOWN: ![[NOPROFILE_ID]] = !{!"function_entry_count", i64 -1}
-; UNKNOWN: ![[UNKNOWN_ID]] = !{!"function_section_prefix", !".unknown"}
+; UNKNOWN: ![[UNKNOWN_ID]] = !{!"function_section_prefix", !"unknown"}
 ; ACCURATE: ![[ZERO_ID]] = !{!"function_entry_count", i64 0}
-; ACCURATE: ![[COLD_ID]] = !{!"function_section_prefix", !".unlikely"}
+; ACCURATE: ![[COLD_ID]] = !{!"function_section_prefix", !"unlikely"}
 !llvm.module.flags = !{!1}
 !1 = !{i32 1, !"ProfileSummary", !2}
 !2 = !{!3, !4, !5, !6, !7, !8, !9, !10}

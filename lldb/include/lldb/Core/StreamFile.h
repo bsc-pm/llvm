@@ -14,8 +14,8 @@
 #include "lldb/lldb-defines.h"
 #include "lldb/lldb-enumerations.h"
 
-#include <stdint.h>
-#include <stdio.h>
+#include <cstdint>
+#include <cstdio>
 
 namespace lldb_private {
 
@@ -48,7 +48,8 @@ protected:
   size_t WriteImpl(const void *s, size_t length) override;
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(StreamFile);
+  StreamFile(const StreamFile &) = delete;
+  const StreamFile &operator=(const StreamFile &) = delete;
 };
 
 } // namespace lldb_private

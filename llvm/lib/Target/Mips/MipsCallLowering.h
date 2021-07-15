@@ -18,6 +18,7 @@
 
 namespace llvm {
 
+class MachineMemOperand;
 class MipsTargetLowering;
 
 class MipsCallLowering : public CallLowering {
@@ -63,10 +64,12 @@ public:
   MipsCallLowering(const MipsTargetLowering &TLI);
 
   bool lowerReturn(MachineIRBuilder &MIRBuilder, const Value *Val,
-                   ArrayRef<Register> VRegs) const override;
+                   ArrayRef<Register> VRegs,
+                   FunctionLoweringInfo &FLI) const override;
 
   bool lowerFormalArguments(MachineIRBuilder &MIRBuilder, const Function &F,
-                            ArrayRef<ArrayRef<Register>> VRegs) const override;
+                            ArrayRef<ArrayRef<Register>> VRegs,
+                            FunctionLoweringInfo &FLI) const override;
 
   bool lowerCall(MachineIRBuilder &MIRBuilder,
                  CallLoweringInfo &Info) const override;
@@ -77,15 +80,7 @@ private:
   /// type.
   template <typename T>
   void subTargetRegTypeForCallingConv(const Function &F, ArrayRef<ArgInfo> Args,
-                                      ArrayRef<unsigned> OrigArgIndices,
                                       SmallVectorImpl<T> &ISDArgs) const;
-
-  /// Split structures and arrays, save original argument indices since
-  /// Mips calling convention needs info about original argument type.
-  void splitToValueTypes(const DataLayout &DL, const ArgInfo &OrigArg,
-                         unsigned OriginalIndex,
-                         SmallVectorImpl<ArgInfo> &SplitArgs,
-                         SmallVectorImpl<unsigned> &SplitArgsOrigIndices) const;
 };
 
 } // end namespace llvm

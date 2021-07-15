@@ -71,9 +71,6 @@ public:
   lldb_private::Status UnloadImage(lldb_private::Process *process,
                                    uint32_t image_token) override;
 
-  size_t ConnectToWaitingProcesses(lldb_private::Debugger &debugger,
-                                   lldb_private::Status &error) override;
-
   lldb_private::ConstString GetFullNameForDylib(lldb_private::ConstString basename) override;
 
 protected:
@@ -101,7 +98,8 @@ protected:
   llvm::StringRef GetLibdlFunctionDeclarations(lldb_private::Process *process);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(PlatformPOSIX);
+  PlatformPOSIX(const PlatformPOSIX &) = delete;
+  const PlatformPOSIX &operator=(const PlatformPOSIX &) = delete;
 };
 
 #endif // LLDB_SOURCE_PLUGINS_PLATFORM_POSIX_PLATFORMPOSIX_H

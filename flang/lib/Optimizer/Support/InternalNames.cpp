@@ -5,8 +5,14 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+//
+// Coding style: https://mlir.llvm.org/getting_started/DeveloperGuide/
+//
+//===----------------------------------------------------------------------===//
 
 #include "flang/Optimizer/Support/InternalNames.h"
+#include "flang/Optimizer/Dialect/FIRType.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -23,7 +29,7 @@ static std::string doModules(llvm::ArrayRef<llvm::StringRef> mods) {
   std::string result;
   auto *token = "M";
   for (auto mod : mods) {
-    result.append(token).append(mod);
+    result.append(token).append(mod.lower());
     token = "S";
   }
   return result;
@@ -33,7 +39,7 @@ static std::string doModulesHost(llvm::ArrayRef<llvm::StringRef> mods,
                                  llvm::Optional<llvm::StringRef> host) {
   std::string result = doModules(mods);
   if (host.hasValue())
-    result.append("F").append(*host);
+    result.append("F").append(host->lower());
   return result;
 }
 
@@ -52,10 +58,10 @@ convertToStringRef(const llvm::Optional<std::string> &from) {
 
 static std::string readName(llvm::StringRef uniq, std::size_t &i,
                             std::size_t init, std::size_t end) {
-  for (i = init; i < end && uniq[i] >= 'a' && uniq[i] <= 'z'; ++i) {
+  for (i = init; i < end && (uniq[i] < 'A' || uniq[i] > 'Z'); ++i) {
     // do nothing
   }
-  return uniq.substr(init, i).str();
+  return uniq.substr(init, i - init).str();
 }
 
 static std::int64_t readInt(llvm::StringRef uniq, std::size_t &i,
@@ -64,7 +70,7 @@ static std::int64_t readInt(llvm::StringRef uniq, std::size_t &i,
     // do nothing
   }
   std::int64_t result = BAD_VALUE;
-  if (uniq.substr(init, i).getAsInteger(10, result))
+  if (uniq.substr(init, i - init).getAsInteger(10, result))
     return BAD_VALUE;
   return result;
 }
@@ -97,11 +103,18 @@ std::string fir::NameUniquer::doCommonBlock(llvm::StringRef name) {
   return result.append("B").append(toLower(name));
 }
 
+std::string fir::NameUniquer::doBlockData(llvm::StringRef name) {
+  std::string result = prefix();
+  return result.append("L").append(toLower(name));
+}
+
 std::string
 fir::NameUniquer::doConstant(llvm::ArrayRef<llvm::StringRef> modules,
+                             llvm::Optional<llvm::StringRef> host,
                              llvm::StringRef name) {
   std::string result = prefix();
-  return result.append(doModules(modules)).append("EC").append(toLower(name));
+  result.append(doModulesHost(modules, host)).append("EC");
+  return result.append(toLower(name));
 }
 
 std::string
@@ -234,6 +247,10 @@ fir::NameUniquer::deconstruct(llvm::StringRef uniq) {
           nk = NameKind::VARIABLE;
           name = readName(uniq, i, i + 1, end);
         }
+        break;
+      case 'L':
+        nk = NameKind::BLOCK_DATA_NAME;
+        name = readName(uniq, i, i + 1, end);
         break;
       case 'P':
         nk = NameKind::PROCEDURE;

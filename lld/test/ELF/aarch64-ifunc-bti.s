@@ -14,17 +14,17 @@
 # CHECK: 0000000000010380 <.plt>:
 # CHECK-NEXT:    10380:         bti     c
 # CHECK-NEXT:                   stp     x16, x30, [sp, #-16]!
-# CHECK-NEXT:                   adrp    x16, #131072
-# CHECK-NEXT:                   ldr     x17, [x16, #1272]
-# CHECK-NEXT:                   add     x16, x16, #1272
+# CHECK-NEXT:                   adrp    x16, 0x30000
+# CHECK-NEXT:                   ldr     x17, [x16, #1288]
+# CHECK-NEXT:                   add     x16, x16, #1288
 # CHECK-NEXT:                   br      x17
 # CHECK-NEXT:                   nop
 # CHECK-NEXT:                   nop
 # CHECK: 00000000000103a0 <func1@plt>:
 # CHECK-NEXT:    103a0:         bti     c
-# CHECK-NEXT:                   adrp    x16, #131072
-# CHECK-NEXT:                   ldr     x17, [x16, #1280]
-# CHECK-NEXT:                   add     x16, x16, #1280
+# CHECK-NEXT:                   adrp    x16, 0x30000
+# CHECK-NEXT:                   ldr     x17, [x16, #1296]
+# CHECK-NEXT:                   add     x16, x16, #1296
 # CHECK-NEXT:                   br      x17
 # CHECK-NEXT:                   nop
 # CHECK-EMPTY:
@@ -32,9 +32,9 @@
 # CHECK-EMPTY:
 # CHECK-NEXT: 00000000000103c0 <myfunc>:
 # CHECK-NEXT:    103c0:         bti     c
-# CHECK-NEXT:                   adrp    x16, #131072
-# CHECK-NEXT:                   ldr     x17, [x16, #1288]
-# CHECK-NEXT:                   add     x16, x16, #1288
+# CHECK-NEXT:                   adrp    x16, 0x30000
+# CHECK-NEXT:                   ldr     x17, [x16, #1304]
+# CHECK-NEXT:                   add     x16, x16, #1304
 # CHECK-NEXT:                   br      x17
 # CHECK-NEXT:                   nop
 

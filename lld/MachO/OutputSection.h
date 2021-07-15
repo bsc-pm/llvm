@@ -12,11 +12,19 @@
 #include "lld/Common/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
 
+#include <limits>
+
 namespace lld {
 namespace macho {
 
 class InputSection;
 class OutputSegment;
+
+// The default order value for OutputSections that are not constructed from
+// InputSections (i.e. SyntheticSections). We make it less than INT_MAX in order
+// not to conflict with the ordering of zerofill sections, which must always be
+// placed at the end of their segment.
+constexpr int UnspecifiedInputOrder = std::numeric_limits<int>::max() - 1024;
 
 // Output sections represent the finalized sections present within the final
 // linked executable. They can represent special sections (like the symbol
@@ -24,14 +32,20 @@ class OutputSegment;
 // linker with the same segment / section name.
 class OutputSection {
 public:
-  OutputSection(StringRef name) : name(name) {}
+  enum Kind {
+    ConcatKind,
+    SyntheticKind,
+  };
+
+  OutputSection(Kind kind, StringRef name) : name(name), sectionKind(kind) {}
   virtual ~OutputSection() = default;
+  Kind kind() const { return sectionKind; }
 
   // These accessors will only be valid after finalizing the section.
   uint64_t getSegmentOffset() const;
 
   // How much space the section occupies in the address space.
-  virtual size_t getSize() const = 0;
+  virtual uint64_t getSize() const = 0;
   // How much space the section occupies in the file. Most sections are copied
   // as-is so their file size is the same as their address space size.
   virtual uint64_t getFileSize() const { return getSize(); }
@@ -41,10 +55,6 @@ public:
   // Unneeded sections are omitted entirely (header and body).
   virtual bool isNeeded() const { return true; }
 
-  // Some sections may allow coalescing other raw input sections.
-  virtual void mergeInput(InputSection *input);
-
-  // Specifically finalizes addresses and section size, not content.
   virtual void finalize() {
     // TODO investigate refactoring synthetic section finalization logic into
     // overrides of this function.
@@ -54,44 +64,21 @@ public:
 
   StringRef name;
   OutputSegment *parent = nullptr;
+  // For output sections that don't have explicit ordering requirements, their
+  // output order should be based on the order of the input sections they
+  // contain.
+  int inputOrder = UnspecifiedInputOrder;
 
   uint32_t index = 0;
   uint64_t addr = 0;
   uint64_t fileOff = 0;
   uint32_t align = 1;
   uint32_t flags = 0;
-};
-
-class OutputSectionComparator {
-public:
-  OutputSectionComparator(uint32_t segmentOrder,
-                          const std::vector<StringRef> &sectOrdering)
-      : segmentOrder(segmentOrder) {
-    for (uint32_t j = 0, m = sectOrdering.size(); j < m; ++j)
-      sectionOrdering[sectOrdering[j]] = j;
-  }
-
-  uint32_t sectionOrder(StringRef secname) {
-    auto sectIt = sectionOrdering.find(secname);
-    if (sectIt != sectionOrdering.end())
-      return sectIt->second;
-    return sectionOrdering.size();
-  }
-
-  // Sort sections within a common segment, which stores them in
-  // a MapVector of section name -> section
-  bool operator()(const std::pair<StringRef, OutputSection *> &a,
-                  const std::pair<StringRef, OutputSection *> &b) {
-    return sectionOrder(a.first) < sectionOrder(b.first);
-  }
-
-  bool operator<(const OutputSectionComparator &b) {
-    return segmentOrder < b.segmentOrder;
-  }
+  uint32_t reserved1 = 0;
+  uint32_t reserved2 = 0;
 
 private:
-  uint32_t segmentOrder;
-  llvm::DenseMap<StringRef, uint32_t> sectionOrdering;
+  Kind sectionKind;
 };
 
 } // namespace macho

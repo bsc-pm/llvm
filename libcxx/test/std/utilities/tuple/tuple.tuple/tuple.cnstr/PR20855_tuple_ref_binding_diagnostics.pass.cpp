@@ -7,11 +7,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-// UNSUPPORTED: c++98, c++03
+// UNSUPPORTED: c++03
 
 // <tuple>
 
-// See llvm.org/PR20855
+// See https://llvm.org/PR20855.
 
 #include <functional>
 #include <tuple>

@@ -11,12 +11,12 @@ int main() {
     foo();
 }
 
-// CHECK:   %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00") ]
+// CHECK:   %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DECL.SOURCE"([8 x i8] c"foo:4:9\00") ]
 // CHECK-NEXT:   invoke void @_Z3foov()
 // CHECK-NEXT:           to label %invoke.cont unwind label %terminate.lpad
 // CHECK: invoke.cont:                                      ; preds = %entry
 // CHECK-NEXT:   call void @llvm.directive.region.exit(token %0)
-// CHECK-NEXT:   %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00") ]
+// CHECK-NEXT:   %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DECL.SOURCE"([8 x i8] c"foo:4:9\00") ]
 // CHECK-NEXT:   invoke void @_Z3foov()
 // CHECK-NEXT:           to label %invoke.cont1 unwind label %terminate.lpad2
 // CHECK: invoke.cont1:                                     ; preds = %invoke.cont

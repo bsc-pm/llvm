@@ -60,9 +60,7 @@ Optional<unsigned> Token::getIntTypeBitwidth() const {
   assert(getKind() == inttype);
   unsigned bitwidthStart = (spelling[0] == 'i' ? 1 : 2);
   unsigned result = 0;
-  if (spelling[bitwidthStart] == '0' ||
-      spelling.drop_front(bitwidthStart).getAsInteger(10, result) ||
-      result == 0)
+  if (spelling.drop_front(bitwidthStart).getAsInteger(10, result))
     return None;
   return result;
 }
@@ -122,6 +120,33 @@ std::string Token::getStringValue() const {
   }
 
   return result;
+}
+
+/// Given a token containing a hex string literal, return its value or None if
+/// the token does not contain a valid hex string.
+Optional<std::string> Token::getHexStringValue() const {
+  assert(getKind() == string);
+
+  // Get the internal string data, without the quotes.
+  StringRef bytes = getSpelling().drop_front().drop_back();
+
+  // Try to extract the binary data from the hex string.
+  std::string hex;
+  if (!bytes.consume_front("0x") || !llvm::tryGetFromHex(bytes, hex))
+    return llvm::None;
+  return hex;
+}
+
+/// Given a token containing a symbol reference, return the unescaped string
+/// value.
+std::string Token::getSymbolReference() const {
+  assert(is(Token::at_identifier) && "expected valid @-identifier");
+  StringRef nameStr = getSpelling().drop_front();
+
+  // Check to see if the reference is a string literal, or a bare identifier.
+  if (nameStr.front() == '"')
+    return getStringValue();
+  return std::string(nameStr);
 }
 
 /// Given a hash_identifier token like #123, try to parse the number out of

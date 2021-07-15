@@ -16,8 +16,8 @@
 #include "lldb/lldb-forward.h"
 #include "lldb/lldb-types.h"
 
-#include <stddef.h>
-#include <stdint.h>
+#include <cstddef>
+#include <cstdint>
 
 namespace lldb_private {
 
@@ -225,12 +225,11 @@ private:
   ///     The total number of bytes of data this object refers to.
   size_t GetByteSize() const { return m_end - m_start; }
 
-private:
   /// A pointer to the first byte of data.
-  uint8_t *m_start;
+  uint8_t *m_start = nullptr;
 
   /// A pointer to the byte that is past the end of the data.
-  uint8_t *m_end;
+  uint8_t *m_end = nullptr;
 
   /// The byte order of the data we are extracting from.
   lldb::ByteOrder m_byte_order;
@@ -243,7 +242,8 @@ private:
   /// be shared among multiple instances
   mutable lldb::DataBufferSP m_data_sp;
 
-  DISALLOW_COPY_AND_ASSIGN(DataEncoder);
+  DataEncoder(const DataEncoder &) = delete;
+  const DataEncoder &operator=(const DataEncoder &) = delete;
 };
 
 } // namespace lldb_private

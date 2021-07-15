@@ -25,19 +25,29 @@ if (NOT (HAVE_STRERROR OR HAVE_STRERROR_R OR HAVE_DECL_STRERROR_S))
 endif()
 
 configure_file(config.h.cmake config.h)
+# include_directories is used here instead of target_include_directories
+# because add_flang_library creates multiple objects (STATIC/SHARED, OBJECT)
+# with different names
+include_directories(AFTER ${CMAKE_CURRENT_BINARY_DIR})
 
 add_flang_library(FortranRuntime
   ISO_Fortran_binding.cpp
   allocatable.cpp
   buffer.cpp
+  complex-reduction.c
+  copy.cpp
   character.cpp
   connection.cpp
-  derived-type.cpp
+  derived.cpp
   descriptor.cpp
+  descriptor-io.cpp
+  dot-product.cpp
   edit-input.cpp
   edit-output.cpp
   environment.cpp
+  extrema.cpp
   file.cpp
+  findloc.cpp
   format.cpp
   internal-unit.cpp
   iostat.cpp
@@ -45,12 +55,23 @@ add_flang_library(FortranRuntime
   io-error.cpp
   io-stmt.cpp
   main.cpp
+  matmul.cpp
   memory.cpp
+  misc-intrinsic.cpp
+  namelist.cpp
+  numeric.cpp
+  random.cpp
+  reduction.cpp
+  product.cpp
+  stat.cpp
   stop.cpp
+  sum.cpp
   terminator.cpp
+  time-intrinsic.cpp
   tools.cpp
   transformational.cpp
   type-code.cpp
+  type-info.cpp
   unit.cpp
   unit-map.cpp
 

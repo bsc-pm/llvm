@@ -57,3 +57,32 @@ OSSDeclareReductionDecl::getPrevDeclInScope() const {
       PrevDeclInScope.get(getASTContext().getExternalSource()));
 }
 
+//===----------------------------------------------------------------------===//
+// OSSAssertDecl Implementation.
+//===----------------------------------------------------------------------===//
+
+void OSSAssertDecl::anchor() { }
+
+OSSAssertDecl *OSSAssertDecl::Create(
+    ASTContext &C, DeclContext *DC, SourceLocation L, ArrayRef<Expr *> VL) {
+  OSSAssertDecl *D =
+      new (C, DC, additionalSizeToAlloc<Expr *>(VL.size()))
+          OSSAssertDecl(OSSAssert, DC, L);
+  D->NumVars = VL.size();
+  D->setVars(VL);
+  return D;
+}
+
+OSSAssertDecl *OSSAssertDecl::CreateDeserialized(
+    ASTContext &C, unsigned ID, unsigned N) {
+  OSSAssertDecl *D = new (C, ID, additionalSizeToAlloc<Expr *>(N))
+      OSSAssertDecl(OSSAssert, nullptr, SourceLocation());
+  D->NumVars = N;
+  return D;
+}
+
+void OSSAssertDecl::setVars(ArrayRef<Expr *> VL) {
+  assert(VL.size() == NumVars &&
+         "Number of variables is not the same as the preallocated buffer");
+  std::uninitialized_copy(VL.begin(), VL.end(), getTrailingObjects<Expr *>());
+}

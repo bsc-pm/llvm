@@ -289,6 +289,8 @@ void nanos6_unregister_polling_service(char const *service_name,
 // This is supposed to be called in a MPI_Init
 void nanos6_notify_task_event_counter_api() {
     int gtid = __kmp_entry_gtid();
-    __kmp_enable_tasking_in_serial_mode(NULL, gtid);
+    __kmp_enable_tasking_in_serial_mode(
+      NULL, gtid,
+      /*proxy=*/false, /*detachable=*/true, /*hidden_helper=*/false);
     KA_TRACE(5, ("event tasking  enabled\n"));
 }

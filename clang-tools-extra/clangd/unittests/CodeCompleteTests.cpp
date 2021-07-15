@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "ASTSignals.h"
 #include "Annotations.h"
 #include "ClangdServer.h"
 #include "CodeComplete.h"
@@ -25,6 +26,7 @@
 #include "clang/Tooling/CompilationDatabase.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Testing/Support/Annotations.h"
 #include "llvm/Testing/Support/Error.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -46,9 +48,12 @@ using ::testing::HasSubstr;
 using ::testing::IsEmpty;
 using ::testing::Not;
 using ::testing::UnorderedElementsAre;
+using ContextKind = CodeCompletionContext::Kind;
 
 // GMock helpers for matching completion items.
 MATCHER_P(Named, Name, "") { return arg.Name == Name; }
+MATCHER_P(MainFileRefs, Refs, "") { return arg.MainFileRefs == Refs; }
+MATCHER_P(ScopeRefs, Refs, "") { return arg.ScopeRefsInFile == Refs; }
 MATCHER_P(NameStartsWith, Prefix, "") {
   return llvm::StringRef(arg.Name).startswith(Prefix);
 }
@@ -107,7 +112,8 @@ CodeCompleteResult completions(const TestTU &TU, Position Point,
     Opts.Index = OverrideIndex.get();
   }
 
-  auto Inputs = TU.inputs();
+  MockFS FS;
+  auto Inputs = TU.inputs(FS);
   IgnoreDiagnostics Diags;
   auto CI = buildCompilerInvocation(Inputs, Diags);
   if (!CI) {
@@ -116,8 +122,8 @@ CodeCompleteResult completions(const TestTU &TU, Position Point,
   }
   auto Preamble = buildPreamble(testPath(TU.Filename), *CI, Inputs,
                                 /*InMemory=*/true, /*Callback=*/nullptr);
-  return codeComplete(testPath(TU.Filename), Inputs.CompileCommand,
-                      Preamble.get(), TU.Code, Point, Inputs.FS, Opts);
+  return codeComplete(testPath(TU.Filename), Point, Preamble.get(), Inputs,
+                      Opts);
 }
 
 // Runs code completion.
@@ -145,15 +151,77 @@ CodeCompleteResult completionsNoCompile(llvm::StringRef Text,
     Opts.Index = OverrideIndex.get();
   }
 
-  MockFSProvider FS;
+  MockFS FS;
   Annotations Test(Text);
-  return codeComplete(FilePath, tooling::CompileCommand(), /*Preamble=*/nullptr,
-                      Test.code(), Test.point(), FS.getFileSystem(), Opts);
+  ParseInputs ParseInput{tooling::CompileCommand(), &FS, Test.code().str()};
+  return codeComplete(FilePath, Test.point(), /*Preamble=*/nullptr, ParseInput,
+                      Opts);
 }
 
 Symbol withReferences(int N, Symbol S) {
   S.References = N;
   return S;
+}
+
+TEST(DecisionForestRankingModel, NameMatchSanityTest) {
+  clangd::CodeCompleteOptions Opts;
+  Opts.RankingModel = CodeCompleteOptions::DecisionForest;
+  auto Results = completions(
+      R"cpp(
+struct MemberAccess {
+  int ABG();
+  int AlphaBetaGamma();
+};
+int func() { MemberAccess().ABG^ }
+)cpp",
+      /*IndexSymbols=*/{}, Opts);
+  EXPECT_THAT(Results.Completions,
+              ElementsAre(Named("ABG"), Named("AlphaBetaGamma")));
+}
+
+TEST(DecisionForestRankingModel, ReferencesAffectRanking) {
+  clangd::CodeCompleteOptions Opts;
+  Opts.RankingModel = CodeCompleteOptions::DecisionForest;
+  constexpr int NumReferences = 100000;
+  EXPECT_THAT(
+      completions("int main() { clang^ }",
+                  {ns("clangA"), withReferences(NumReferences, func("clangD"))},
+                  Opts)
+          .Completions,
+      ElementsAre(Named("clangD"), Named("clangA")));
+  EXPECT_THAT(
+      completions("int main() { clang^ }",
+                  {withReferences(NumReferences, ns("clangA")), func("clangD")},
+                  Opts)
+          .Completions,
+      ElementsAre(Named("clangA"), Named("clangD")));
+}
+
+TEST(DecisionForestRankingModel, DecisionForestScorerCallbackTest) {
+  clangd::CodeCompleteOptions Opts;
+  constexpr float MagicNumber = 1234.5678f;
+  Opts.RankingModel = CodeCompleteOptions::DecisionForest;
+  Opts.DecisionForestScorer = [&](const SymbolQualitySignals &,
+                                  const SymbolRelevanceSignals &, float Base) {
+    DecisionForestScores Scores;
+    Scores.Total = MagicNumber;
+    Scores.ExcludingName = MagicNumber;
+    return Scores;
+  };
+  llvm::StringRef Code = "int func() { int xyz; xy^ }";
+  auto Results = completions(Code,
+                             /*IndexSymbols=*/{}, Opts);
+  ASSERT_EQ(Results.Completions.size(), 1u);
+  EXPECT_EQ(Results.Completions[0].Score.Total, MagicNumber);
+  EXPECT_EQ(Results.Completions[0].Score.ExcludingName, MagicNumber);
+
+  // Do not use DecisionForestScorer for heuristics model.
+  Opts.RankingModel = CodeCompleteOptions::Heuristics;
+  Results = completions(Code,
+                        /*IndexSymbols=*/{}, Opts);
+  ASSERT_EQ(Results.Completions.size(), 1u);
+  EXPECT_NE(Results.Completions[0].Score.Total, MagicNumber);
+  EXPECT_NE(Results.Completions[0].Score.ExcludingName, MagicNumber);
 }
 
 TEST(CompletionTest, Limit) {
@@ -189,9 +257,14 @@ TEST(CompletionTest, Filter) {
   EXPECT_THAT(completions(Body + "int main() { S().Foba^ }").Completions,
               AllOf(Has("FooBar"), Has("FooBaz"), Not(Has("Qux"))));
 
-  // Macros require  prefix match.
-  EXPECT_THAT(completions(Body + "int main() { C^ }").Completions,
-              AllOf(Has("Car"), Not(Has("MotorCar"))));
+  // Macros require prefix match, either from index or AST.
+  Symbol Sym = var("MotorCarIndex");
+  Sym.SymInfo.Kind = index::SymbolKind::Macro;
+  EXPECT_THAT(
+      completions(Body + "int main() { C^ }", {Sym}).Completions,
+      AllOf(Has("Car"), Not(Has("MotorCar")), Not(Has("MotorCarIndex"))));
+  EXPECT_THAT(completions(Body + "int main() { M^ }", {Sym}).Completions,
+              AllOf(Has("MotorCar"), Has("MotorCarIndex")));
 }
 
 void testAfterDotCompletion(clangd::CodeCompleteOptions Opts) {
@@ -245,8 +318,7 @@ void testAfterDotCompletion(clangd::CodeCompleteOptions Opts) {
   EXPECT_THAT(Results.Completions,
               Not(Contains(Kind(CompletionItemKind::Snippet))));
   // Check documentation.
-  EXPECT_IFF(Opts.IncludeComments, Results.Completions,
-             Contains(IsDocumented()));
+  EXPECT_THAT(Results.Completions, Contains(IsDocumented()));
 }
 
 void testGlobalScopeCompletion(clangd::CodeCompleteOptions Opts) {
@@ -286,14 +358,13 @@ void testGlobalScopeCompletion(clangd::CodeCompleteOptions Opts) {
                     Has("index_func" /* our fake symbol doesn't include () */),
                     Has("GlobalClass"), Has("IndexClass")));
   // A macro.
-  EXPECT_IFF(Opts.IncludeMacros, Results.Completions, Has("MACRO"));
+  EXPECT_THAT(Results.Completions, Has("MACRO"));
   // Local items. Must be present always.
   EXPECT_THAT(Results.Completions,
               AllOf(Has("local_var"), Has("LocalClass"),
                     Contains(Kind(CompletionItemKind::Snippet))));
   // Check documentation.
-  EXPECT_IFF(Opts.IncludeComments, Results.Completions,
-             Contains(IsDocumented()));
+  EXPECT_THAT(Results.Completions, Contains(IsDocumented()));
 }
 
 TEST(CompletionTest, CompletionOptions) {
@@ -303,9 +374,6 @@ TEST(CompletionTest, CompletionOptions) {
   };
   // We used to test every combination of options, but that got too slow (2^N).
   auto Flags = {
-      &clangd::CodeCompleteOptions::IncludeMacros,
-      &clangd::CodeCompleteOptions::IncludeComments,
-      &clangd::CodeCompleteOptions::IncludeCodePatterns,
       &clangd::CodeCompleteOptions::IncludeIneligibleResults,
   };
   // Test default options.
@@ -579,13 +647,13 @@ TEST(CompletionTest, ScopedWithFilter) {
 }
 
 TEST(CompletionTest, ReferencesAffectRanking) {
-  auto Results = completions("int main() { abs^ }", {ns("absl"), func("absb")});
-  EXPECT_THAT(Results.Completions,
-              HasSubsequence(Named("absb"), Named("absl")));
-  Results = completions("int main() { abs^ }",
-                        {withReferences(10000, ns("absl")), func("absb")});
-  EXPECT_THAT(Results.Completions,
-              HasSubsequence(Named("absl"), Named("absb")));
+  EXPECT_THAT(completions("int main() { abs^ }", {func("absA"), func("absB")})
+                  .Completions,
+              HasSubsequence(Named("absA"), Named("absB")));
+  EXPECT_THAT(completions("int main() { abs^ }",
+                          {func("absA"), withReferences(1000, func("absB"))})
+                  .Completions,
+              HasSubsequence(Named("absB"), Named("absA")));
 }
 
 TEST(CompletionTest, ContextWords) {
@@ -752,8 +820,20 @@ TEST(CompletionTest, CompletionInPreamble) {
   EXPECT_THAT(Results, ElementsAre(Named("ifndef")));
 }
 
+TEST(CompletionTest, CompletionRecoveryASTType) {
+  auto Results = completions(R"cpp(
+    struct S { int member; };
+    S overloaded(int);
+    void foo() {
+      // No overload matches, but we have recovery-expr with the correct type.
+      overloaded().^
+    })cpp")
+                     .Completions;
+  EXPECT_THAT(Results, ElementsAre(Named("member")));
+}
+
 TEST(CompletionTest, DynamicIndexIncludeInsertion) {
-  MockFSProvider FS;
+  MockFS FS;
   MockCompilationDatabase CDB;
   ClangdServer::Options Opts = ClangdServer::optsForTest();
   Opts.BuildDynamicSymbolIndex = true;
@@ -788,7 +868,7 @@ TEST(CompletionTest, DynamicIndexIncludeInsertion) {
 }
 
 TEST(CompletionTest, DynamicIndexMultiFile) {
-  MockFSProvider FS;
+  MockFS FS;
   MockCompilationDatabase CDB;
   auto Opts = ClangdServer::optsForTest();
   Opts.BuildDynamicSymbolIndex = true;
@@ -848,7 +928,7 @@ TEST(CompletionTest, Documentation) {
 }
 
 TEST(CompletionTest, CommentsFromSystemHeaders) {
-  MockFSProvider FS;
+  MockFS FS;
   MockCompilationDatabase CDB;
 
   auto Opts = ClangdServer::optsForTest();
@@ -1018,6 +1098,20 @@ template <template <class> class TT> int foo() {
   EXPECT_THAT(Completions, Contains(Named("TT")));
 }
 
+TEST(CompletionTest, NestedTemplateHeuristics) {
+  auto Completions = completions(R"cpp(
+struct Plain { int xxx; };
+template <typename T> class Templ { Plain ppp; };
+template <typename T> void foo(Templ<T> &t) {
+  // Formally ppp has DependentTy, because Templ may be specialized.
+  // However we sholud be able to see into it using the primary template.
+  t.ppp.^
+}
+)cpp")
+                         .Completions;
+  EXPECT_THAT(Completions, Contains(Named("xxx")));
+}
+
 TEST(CompletionTest, RecordCCResultCallback) {
   std::vector<CodeCompletion> RecordedCompletions;
   CodeCompleteOptions Opts;
@@ -1033,6 +1127,49 @@ TEST(CompletionTest, RecordCCResultCallback) {
               UnorderedElementsAre(Named("xy1"), Named("xy2")));
 }
 
+TEST(CompletionTest, ASTSignals) {
+  struct Completion {
+    std::string Name;
+    unsigned MainFileRefs;
+    unsigned ScopeRefsInFile;
+  };
+  CodeCompleteOptions Opts;
+  std::vector<Completion> RecordedCompletions;
+  Opts.RecordCCResult = [&RecordedCompletions](const CodeCompletion &CC,
+                                               const SymbolQualitySignals &,
+                                               const SymbolRelevanceSignals &R,
+                                               float Score) {
+    RecordedCompletions.push_back({CC.Name, R.MainFileRefs, R.ScopeRefsInFile});
+  };
+  ASTSignals MainFileSignals;
+  MainFileSignals.ReferencedSymbols[var("xy1").ID] = 3;
+  MainFileSignals.ReferencedSymbols[var("xy2").ID] = 1;
+  MainFileSignals.ReferencedSymbols[var("xyindex").ID] = 10;
+  MainFileSignals.RelatedNamespaces["tar::"] = 5;
+  MainFileSignals.RelatedNamespaces["bar::"] = 3;
+  Opts.MainFileSignals = &MainFileSignals;
+  Opts.AllScopes = true;
+  completions(
+      R"cpp(
+      int xy1;
+      int xy2;
+      namespace bar {
+      int xybar = 1;
+      int a = xy^
+      }
+      )cpp",
+      /*IndexSymbols=*/{var("xyindex"), var("tar::xytar"), var("bar::xybar")},
+      Opts);
+  EXPECT_THAT(RecordedCompletions,
+              UnorderedElementsAre(
+                  AllOf(Named("xy1"), MainFileRefs(3u), ScopeRefs(0u)),
+                  AllOf(Named("xy2"), MainFileRefs(1u), ScopeRefs(0u)),
+                  AllOf(Named("xyindex"), MainFileRefs(10u), ScopeRefs(0u)),
+                  AllOf(Named("xytar"), MainFileRefs(0u), ScopeRefs(5u)),
+                  AllOf(/*both from sema and index*/ Named("xybar"),
+                        MainFileRefs(0u), ScopeRefs(3u))));
+}
+
 SignatureHelp signatures(llvm::StringRef Text, Position Point,
                          std::vector<Symbol> IndexSymbols = {}) {
   std::unique_ptr<SymbolIndex> Index;
@@ -1040,7 +1177,9 @@ SignatureHelp signatures(llvm::StringRef Text, Position Point,
     Index = memIndex(IndexSymbols);
 
   auto TU = TestTU::withCode(Text);
-  auto Inputs = TU.inputs();
+  MockFS FS;
+  auto Inputs = TU.inputs(FS);
+  Inputs.Index = Index.get();
   IgnoreDiagnostics Diags;
   auto CI = buildCompilerInvocation(Inputs, Diags);
   if (!CI) {
@@ -1053,8 +1192,7 @@ SignatureHelp signatures(llvm::StringRef Text, Position Point,
     ADD_FAILURE() << "Couldn't build Preamble";
     return {};
   }
-  return signatureHelp(testPath(TU.Filename), Inputs.CompileCommand, *Preamble,
-                       Text, Point, Inputs.FS, Index.get());
+  return signatureHelp(testPath(TU.Filename), Point, *Preamble, Inputs);
 }
 
 SignatureHelp signatures(llvm::StringRef Text,
@@ -1115,6 +1253,19 @@ TEST(SignatureHelpTest, Overloads) {
   EXPECT_EQ(0, Results.activeParameter);
 }
 
+TEST(SignatureHelpTest, OverloadInitListRegression) {
+  auto Results = signatures(R"cpp(
+    struct A {int x;};
+    struct B {B(A);};
+    void f();
+    int main() {
+      B b({1});
+      f(^);
+    }
+  )cpp");
+  EXPECT_THAT(Results.signatures, UnorderedElementsAre(Sig("f() -> void")));
+}
+
 TEST(SignatureHelpTest, DefaultArgs) {
   auto Results = signatures(R"cpp(
     void bar(int x, int y = 0);
@@ -1141,44 +1292,75 @@ TEST(SignatureHelpTest, ActiveArg) {
 }
 
 TEST(SignatureHelpTest, OpeningParen) {
-  llvm::StringLiteral Tests[] = {// Recursive function call.
-                                 R"cpp(
-    int foo(int a, int b, int c);
-    int main() {
-      foo(foo $p^( foo(10, 10, 10), ^ )));
-    })cpp",
-                                 // Functional type cast.
-                                 R"cpp(
-    struct Foo {
-      Foo(int a, int b, int c);
-    };
-    int main() {
-      Foo $p^( 10, ^ );
-    })cpp",
-                                 // New expression.
-                                 R"cpp(
-    struct Foo {
-      Foo(int a, int b, int c);
-    };
-    int main() {
-      new Foo $p^( 10, ^ );
-    })cpp",
-                                 // Macro expansion.
-                                 R"cpp(
-    int foo(int a, int b, int c);
-    #define FOO foo(
+  llvm::StringLiteral Tests[] = {
+      // Recursive function call.
+      R"cpp(
+        int foo(int a, int b, int c);
+        int main() {
+          foo(foo $p^( foo(10, 10, 10), ^ )));
+        })cpp",
+      // Functional type cast.
+      R"cpp(
+        struct Foo {
+          Foo(int a, int b, int c);
+        };
+        int main() {
+          Foo $p^( 10, ^ );
+        })cpp",
+      // New expression.
+      R"cpp(
+        struct Foo {
+          Foo(int a, int b, int c);
+        };
+        int main() {
+          new Foo $p^( 10, ^ );
+        })cpp",
+      // Macro expansion.
+      R"cpp(
+        int foo(int a, int b, int c);
+        #define FOO foo(
 
-    int main() {
-      // Macro expansions.
-      $p^FOO 10, ^ );
-    })cpp",
-                                 // Macro arguments.
-                                 R"cpp(
-    int foo(int a, int b, int c);
-    int main() {
-    #define ID(X) X
-      ID(foo $p^( foo(10), ^ ))
-    })cpp"};
+        int main() {
+          // Macro expansions.
+          $p^FOO 10, ^ );
+        })cpp",
+      // Macro arguments.
+      R"cpp(
+        int foo(int a, int b, int c);
+        int main() {
+        #define ID(X) X
+          // FIXME: figure out why ID(foo (foo(10), )) doesn't work when preserving
+          // the recovery expression.
+          ID(foo $p^( 10, ^ ))
+        })cpp",
+      // Dependent args.
+      R"cpp(
+        int foo(int a, int b);
+        template <typename T> void bar(T t) {
+          foo$p^(t, ^t);
+        })cpp",
+      // Dependent args on templated func.
+      R"cpp(
+        template <typename T>
+        int foo(T, T);
+        template <typename T> void bar(T t) {
+          foo$p^(t, ^t);
+        })cpp",
+      // Dependent args on member.
+      R"cpp(
+        struct Foo { int foo(int, int); };
+        template <typename T> void bar(T t) {
+          Foo f;
+          f.foo$p^(t, ^t);
+        })cpp",
+      // Dependent args on templated member.
+      R"cpp(
+        struct Foo { template <typename T> int foo(T, T); };
+        template <typename T> void bar(T t) {
+          Foo f;
+          f.foo$p^(t, ^t);
+        })cpp",
+  };
 
   for (auto Test : Tests) {
     Annotations Code(Test);
@@ -1192,7 +1374,8 @@ TEST(SignatureHelpTest, StalePreamble) {
   TestTU TU;
   TU.Code = "";
   IgnoreDiagnostics Diags;
-  auto Inputs = TU.inputs();
+  MockFS FS;
+  auto Inputs = TU.inputs(FS);
   auto CI = buildCompilerInvocation(Inputs, Diags);
   ASSERT_TRUE(CI);
   auto EmptyPreamble = buildPreamble(testPath(TU.Filename), *CI, Inputs,
@@ -1204,10 +1387,8 @@ TEST(SignatureHelpTest, StalePreamble) {
     #include "a.h"
     void bar() { foo(^2); })cpp");
   TU.Code = Test.code().str();
-  Inputs = TU.inputs();
-  auto Results =
-      signatureHelp(testPath(TU.Filename), Inputs.CompileCommand,
-                    *EmptyPreamble, TU.Code, Test.point(), Inputs.FS, nullptr);
+  auto Results = signatureHelp(testPath(TU.Filename), Test.point(),
+                               *EmptyPreamble, TU.inputs(FS));
   EXPECT_THAT(Results.signatures, ElementsAre(Sig("foo([[int x]]) -> int")));
   EXPECT_EQ(0, Results.activeSignature);
   EXPECT_EQ(0, Results.activeParameter);
@@ -1235,6 +1416,11 @@ public:
   void relations(const RelationsRequest &,
                  llvm::function_ref<void(const SymbolID &, const Symbol &)>)
       const override {}
+
+  llvm::unique_function<IndexContents(llvm::StringRef) const>
+  indexedFiles() const override {
+    return [](llvm::StringRef) { return IndexContents::None; };
+  }
 
   // This is incorrect, but IndexRequestCollector is not an actual index and it
   // isn't used in production code.
@@ -1515,8 +1701,31 @@ TEST(CompletionTest, OverloadBundling) {
   EXPECT_EQ(A.SnippetSuffix, "($0)");
 }
 
+TEST(CompletionTest, OverloadBundlingSameFileDifferentURI) {
+  clangd::CodeCompleteOptions Opts;
+  Opts.BundleOverloads = true;
+
+  Symbol SymX = sym("ns::X", index::SymbolKind::Function, "@F@\\0#");
+  Symbol SymY = sym("ns::X", index::SymbolKind::Function, "@F@\\0#I#");
+  std::string BarHeader = testPath("bar.h");
+  auto BarURI = URI::create(BarHeader).toString();
+  SymX.CanonicalDeclaration.FileURI = BarURI.c_str();
+  SymY.CanonicalDeclaration.FileURI = BarURI.c_str();
+  // The include header is different, but really it's the same file.
+  SymX.IncludeHeaders.emplace_back("\"bar.h\"", 1);
+  SymY.IncludeHeaders.emplace_back(BarURI.c_str(), 1);
+
+  auto Results = completions("void f() { ::ns::^ }", {SymX, SymY}, Opts);
+  // Expect both results are bundled, despite the different-but-same
+  // IncludeHeader.
+  ASSERT_EQ(1u, Results.Completions.size());
+  const auto &R = Results.Completions.front();
+  EXPECT_EQ("X", R.Name);
+  EXPECT_EQ(2u, R.BundleSize);
+}
+
 TEST(CompletionTest, DocumentationFromChangedFileCrash) {
-  MockFSProvider FS;
+  MockFS FS;
   auto FooH = testPath("foo.h");
   auto FooCpp = testPath("foo.cpp");
   FS.Files[FooH] = R"cpp(
@@ -1545,7 +1754,6 @@ TEST(CompletionTest, DocumentationFromChangedFileCrash) {
   )cpp";
 
   clangd::CodeCompleteOptions Opts;
-  Opts.IncludeComments = true;
   CodeCompleteResult Completions =
       cantFail(runCodeComplete(Server, FooCpp, Source.point(), Opts));
   // We shouldn't crash. Unfortunately, current workaround is to not produce
@@ -1611,7 +1819,7 @@ TEST(CompletionTest, CompleteOnInvalidLine) {
   auto FooCpp = testPath("foo.cpp");
 
   MockCompilationDatabase CDB;
-  MockFSProvider FS;
+  MockFS FS;
   FS.Files[FooCpp] = "// empty file";
 
   ClangdServer Server(CDB, FS, ClangdServer::optsForTest());
@@ -1740,7 +1948,7 @@ TEST(CompletionTest, CodeCompletionContext) {
 }
 
 TEST(CompletionTest, FixItForArrowToDot) {
-  MockFSProvider FS;
+  MockFS FS;
   MockCompilationDatabase CDB;
 
   CodeCompleteOptions Opts;
@@ -1851,7 +2059,7 @@ TEST(CompletionTest, RenderWithFixItNonMerged) {
 }
 
 TEST(CompletionTest, CompletionTokenRange) {
-  MockFSProvider FS;
+  MockFS FS;
   MockCompilationDatabase CDB;
   TestTU TU;
   TU.AdditionalFiles["foo/abc/foo.h"] = "";
@@ -2016,7 +2224,7 @@ TEST(SignatureHelpTest, IndexDocumentation) {
 }
 
 TEST(SignatureHelpTest, DynamicIndexDocumentation) {
-  MockFSProvider FS;
+  MockFS FS;
   MockCompilationDatabase CDB;
   ClangdServer::Options Opts = ClangdServer::optsForTest();
   Opts.BuildDynamicSymbolIndex = true;
@@ -2188,7 +2396,7 @@ TEST(GuessCompletionPrefix, Filters) {
 }
 
 TEST(CompletionTest, EnableSpeculativeIndexRequest) {
-  MockFSProvider FS;
+  MockFS FS;
   MockCompilationDatabase CDB;
   ClangdServer Server(CDB, FS, ClangdServer::optsForTest());
 
@@ -2204,7 +2412,6 @@ TEST(CompletionTest, EnableSpeculativeIndexRequest) {
 
   IndexRequestCollector Requests;
   Opts.Index = &Requests;
-  Opts.SpeculativeIndexRequest = true;
 
   auto CompleteAtPoint = [&](StringRef P) {
     cantFail(runCodeComplete(Server, File, Test.point(P), Opts));
@@ -2393,7 +2600,7 @@ TEST(SignatureHelpTest, ConstructorInitializeFields) {
 }
 
 TEST(CompletionTest, IncludedCompletionKinds) {
-  Annotations Test(R"cpp(#include "^")cpp");
+  Annotations Test(R"cpp(#include "^)cpp");
   auto TU = TestTU::withCode(Test.code());
   TU.AdditionalFiles["sub/bar.h"] = "";
   TU.ExtraArgs.push_back("-I" + testPath("sub"));
@@ -2493,6 +2700,29 @@ TEST(CompletionTest, Lambda) {
   EXPECT_EQ(A.SnippetSuffix, "(${1:int a}, ${2:const double &b})");
 }
 
+TEST(CompletionTest, StructuredBinding) {
+  clangd::CodeCompleteOptions Opts = {};
+
+  auto Results = completions(R"cpp(
+    struct S {
+      using Float = float;
+      int x;
+      Float y;
+    };
+    void function() {
+      const auto &[xxx, yyy] = S{};
+      yyy^
+    }
+  )cpp",
+                             {}, Opts);
+
+  ASSERT_EQ(Results.Completions.size(), 1u);
+  const auto &A = Results.Completions.front();
+  EXPECT_EQ(A.Name, "yyy");
+  EXPECT_EQ(A.Kind, CompletionItemKind::Variable);
+  EXPECT_EQ(A.ReturnType, "const Float");
+}
+
 TEST(CompletionTest, ObjectiveCMethodNoArguments) {
   auto Results = completions(R"objc(
       @interface Foo
@@ -2564,6 +2794,79 @@ TEST(CompletionTest, ObjectiveCMethodTwoArgumentsFromMiddle) {
   EXPECT_THAT(C, ElementsAre(ReturnType("id")));
   EXPECT_THAT(C, ElementsAre(Signature("(unsigned int)")));
   EXPECT_THAT(C, ElementsAre(SnippetSuffix("${1:(unsigned int)}")));
+}
+
+TEST(CompletionTest, ObjectiveCSimpleMethodDeclaration) {
+  auto Results = completions(R"objc(
+      @interface Foo
+      - (void)foo;
+      @end
+      @implementation Foo
+      fo^
+      @end
+    )objc",
+                             /*IndexSymbols=*/{},
+                             /*Opts=*/{}, "Foo.m");
+
+  auto C = Results.Completions;
+  EXPECT_THAT(C, ElementsAre(Named("foo")));
+  EXPECT_THAT(C, ElementsAre(Kind(CompletionItemKind::Method)));
+  EXPECT_THAT(C, ElementsAre(Qualifier("- (void)")));
+}
+
+TEST(CompletionTest, ObjectiveCMethodDeclaration) {
+  auto Results = completions(R"objc(
+      @interface Foo
+      - (int)valueForCharacter:(char)c secondArgument:(id)object;
+      @end
+      @implementation Foo
+      valueFor^
+      @end
+    )objc",
+                             /*IndexSymbols=*/{},
+                             /*Opts=*/{}, "Foo.m");
+
+  auto C = Results.Completions;
+  EXPECT_THAT(C, ElementsAre(Named("valueForCharacter:")));
+  EXPECT_THAT(C, ElementsAre(Kind(CompletionItemKind::Method)));
+  EXPECT_THAT(C, ElementsAre(Qualifier("- (int)")));
+  EXPECT_THAT(C, ElementsAre(Signature("(char)c secondArgument:(id)object")));
+}
+
+TEST(CompletionTest, ObjectiveCMethodDeclarationPrefixTyped) {
+  auto Results = completions(R"objc(
+      @interface Foo
+      - (int)valueForCharacter:(char)c;
+      @end
+      @implementation Foo
+      - (int)valueFor^
+      @end
+    )objc",
+                             /*IndexSymbols=*/{},
+                             /*Opts=*/{}, "Foo.m");
+
+  auto C = Results.Completions;
+  EXPECT_THAT(C, ElementsAre(Named("valueForCharacter:")));
+  EXPECT_THAT(C, ElementsAre(Kind(CompletionItemKind::Method)));
+  EXPECT_THAT(C, ElementsAre(Signature("(char)c")));
+}
+
+TEST(CompletionTest, ObjectiveCMethodDeclarationFromMiddle) {
+  auto Results = completions(R"objc(
+      @interface Foo
+      - (int)valueForCharacter:(char)c secondArgument:(id)object;
+      @end
+      @implementation Foo
+      - (int)valueForCharacter:(char)c second^
+      @end
+    )objc",
+                             /*IndexSymbols=*/{},
+                             /*Opts=*/{}, "Foo.m");
+
+  auto C = Results.Completions;
+  EXPECT_THAT(C, ElementsAre(Named("secondArgument:")));
+  EXPECT_THAT(C, ElementsAre(Kind(CompletionItemKind::Method)));
+  EXPECT_THAT(C, ElementsAre(Signature("(id)object")));
 }
 
 TEST(CompletionTest, CursorInSnippets) {
@@ -2828,6 +3131,135 @@ TEST(NoCompileCompletionTest, WithIndex) {
               ElementsAre(AllOf(Qualifier(""), Scope("a::"))));
 }
 
+TEST(AllowImplicitCompletion, All) {
+  const char *Yes[] = {
+      "foo.^bar",
+      "foo->^bar",
+      "foo::^bar",
+      "  #  include <^foo.h>",
+      "#import <foo/^bar.h>",
+      "#include_next \"^",
+  };
+  const char *No[] = {
+      "foo>^bar",
+      "foo:^bar",
+      "foo\n^bar",
+      "#include <foo.h> //^",
+      "#include \"foo.h\"^",
+      "#error <^",
+      "#<^",
+  };
+  for (const char *Test : Yes) {
+    llvm::Annotations A(Test);
+    EXPECT_TRUE(allowImplicitCompletion(A.code(), A.point())) << Test;
+  }
+  for (const char *Test : No) {
+    llvm::Annotations A(Test);
+    EXPECT_FALSE(allowImplicitCompletion(A.code(), A.point())) << Test;
+  }
+}
+
+TEST(CompletionTest, FunctionArgsExist) {
+  clangd::CodeCompleteOptions Opts;
+  Opts.EnableSnippets = true;
+  std::string Context = R"cpp(
+    int foo(int A);
+    int bar();
+    struct Object {
+      Object(int B) {}
+    };
+    template <typename T>
+    struct Container {
+      Container(int Size) {}
+    };
+  )cpp";
+  EXPECT_THAT(completions(Context + "int y = fo^", {}, Opts).Completions,
+              UnorderedElementsAre(
+                  AllOf(Labeled("foo(int A)"), SnippetSuffix("(${1:int A})"))));
+  EXPECT_THAT(
+      completions(Context + "int y = fo^(42)", {}, Opts).Completions,
+      UnorderedElementsAre(AllOf(Labeled("foo(int A)"), SnippetSuffix(""))));
+  // FIXME(kirillbobyrev): No snippet should be produced here.
+  EXPECT_THAT(completions(Context + "int y = fo^o(42)", {}, Opts).Completions,
+              UnorderedElementsAre(
+                  AllOf(Labeled("foo(int A)"), SnippetSuffix("(${1:int A})"))));
+  EXPECT_THAT(
+      completions(Context + "int y = ba^", {}, Opts).Completions,
+      UnorderedElementsAre(AllOf(Labeled("bar()"), SnippetSuffix("()"))));
+  EXPECT_THAT(completions(Context + "int y = ba^()", {}, Opts).Completions,
+              UnorderedElementsAre(AllOf(Labeled("bar()"), SnippetSuffix(""))));
+  EXPECT_THAT(
+      completions(Context + "Object o = Obj^", {}, Opts).Completions,
+      Contains(AllOf(Labeled("Object(int B)"), SnippetSuffix("(${1:int B})"),
+                     Kind(CompletionItemKind::Constructor))));
+  EXPECT_THAT(completions(Context + "Object o = Obj^()", {}, Opts).Completions,
+              Contains(AllOf(Labeled("Object(int B)"), SnippetSuffix(""),
+                             Kind(CompletionItemKind::Constructor))));
+  EXPECT_THAT(
+      completions(Context + "Container c = Cont^", {}, Opts).Completions,
+      Contains(AllOf(Labeled("Container<typename T>(int Size)"),
+                     SnippetSuffix("<${1:typename T}>(${2:int Size})"),
+                     Kind(CompletionItemKind::Constructor))));
+  EXPECT_THAT(
+      completions(Context + "Container c = Cont^()", {}, Opts).Completions,
+      Contains(AllOf(Labeled("Container<typename T>(int Size)"),
+                     SnippetSuffix("<${1:typename T}>"),
+                     Kind(CompletionItemKind::Constructor))));
+  EXPECT_THAT(
+      completions(Context + "Container c = Cont^<int>()", {}, Opts).Completions,
+      Contains(AllOf(Labeled("Container<typename T>(int Size)"),
+                     SnippetSuffix(""),
+                     Kind(CompletionItemKind::Constructor))));
+}
+
+TEST(CompletionTest, NoCrashDueToMacroOrdering) {
+  EXPECT_THAT(completions(R"cpp(
+    #define ECHO(X) X
+    #define ECHO2(X) ECHO(X)
+    int finish_preamble = EC^HO(2);)cpp")
+                  .Completions,
+              UnorderedElementsAre(Labeled("ECHO(X)"), Labeled("ECHO2(X)")));
+}
+
+TEST(CompletionTest, ObjCCategoryDecls) {
+  TestTU TU;
+  TU.ExtraArgs.push_back("-xobjective-c");
+  TU.HeaderCode = R"objc(
+  @interface Foo
+  @end
+
+  @interface Foo (FooExt1)
+  @end
+
+  @interface Foo (FooExt2)
+  @end
+
+  @interface Bar
+  @end
+
+  @interface Bar (BarExt)
+  @end)objc";
+
+  {
+    Annotations Test(R"objc(
+  @implementation Foo (^)
+  @end
+  )objc");
+    TU.Code = Test.code().str();
+    auto Results = completions(TU, Test.point());
+    EXPECT_THAT(Results.Completions,
+                UnorderedElementsAre(Labeled("FooExt1"), Labeled("FooExt2")));
+  }
+  {
+    Annotations Test(R"objc(
+  @interface Foo (^)
+  @end
+  )objc");
+    TU.Code = Test.code().str();
+    auto Results = completions(TU, Test.point());
+    EXPECT_THAT(Results.Completions, UnorderedElementsAre(Labeled("BarExt")));
+  }
+}
 } // namespace
 } // namespace clangd
 } // namespace clang

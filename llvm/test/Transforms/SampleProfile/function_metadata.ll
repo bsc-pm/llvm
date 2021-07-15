@@ -1,5 +1,6 @@
 ; RUN: opt < %s -passes='thinlto-pre-link<O2>' -pgo-kind=pgo-sample-use-pipeline -profile-file=%S/Inputs/function_metadata.prof -S | FileCheck %s
 ; RUN: opt < %s -passes='thinlto-pre-link<O2>' -pgo-kind=pgo-sample-use-pipeline -profile-file=%S/Inputs/function_metadata.compact.afdo -S | FileCheck %s
+; RUN: opt < %s -passes='pseudo-probe,thinlto-pre-link<O2>' -pgo-kind=pgo-sample-use-pipeline -profile-file=%S/Inputs/pseudo-probe-func-metadata.prof -S | FileCheck %s
 
 ; Tests whether the functions in the inline stack are added to the
 ; function_entry_count metadata.
@@ -10,12 +11,12 @@ declare void @bar()
 
 declare !dbg !13 void @bar_dbg()
 
-define void @bar_available() !dbg !14 {
+define void @bar_available() #0 !dbg !14 {
   ret void
 }
 
 ; CHECK: define void @test({{.*}} !prof ![[ENTRY_TEST:[0-9]+]]
-define void @test(void ()*) !dbg !7 {
+define void @test(void ()*) #0 !dbg !7 {
   %2 = alloca void ()*
   store void ()* %0, void ()** %2
   %3 = load void ()*, void ()** %2
@@ -26,7 +27,7 @@ define void @test(void ()*) !dbg !7 {
 }
 
 ; CHECK: define void @test_liveness({{.*}} !prof ![[ENTRY_TEST_LIVENESS:[0-9]+]]
-define void @test_liveness() !dbg !12 {
+define void @test_liveness() #0 !dbg !12 {
   call void @foo(), !dbg !20
   ret void
 }
@@ -41,6 +42,8 @@ define void @test_liveness() !dbg !12 {
 ; make sure the liveness analysis can capture the dependency from test_liveness
 ; to bar. bar_available should not be included as it's within the same module.
 ; CHECK: ![[ENTRY_TEST_LIVENESS]] = !{!"function_entry_count", i64 1, i64 6699318081062747564, i64 -2012135647395072713, i64 -1522495160813492905}
+
+attributes #0 = {"use-sample-profile"}
 
 !llvm.dbg.cu = !{!0}
 !llvm.module.flags = !{!8, !9}

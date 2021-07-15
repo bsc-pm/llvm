@@ -6,3 +6,10 @@ void foo() {
     #pragma oss task label(asdf) // expected-warning {{expecting an expression convertible to 'const char *', ignoring}}
     {}
 }
+
+// NOTE: This way to skip label clause hides typo correction, like...
+void foo1() {
+   const char *blabla;
+   #pragma oss task label(babla) // typo correction hidden
+   {}
+}

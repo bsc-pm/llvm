@@ -73,7 +73,7 @@ static Status FindUnusedPort(uint16_t &port) {
   return error;
 }
 
-PlatformAndroidRemoteGDBServer::PlatformAndroidRemoteGDBServer() {}
+PlatformAndroidRemoteGDBServer::PlatformAndroidRemoteGDBServer() = default;
 
 PlatformAndroidRemoteGDBServer::~PlatformAndroidRemoteGDBServer() {
   for (const auto &it : m_port_forwards)
@@ -188,7 +188,7 @@ Status PlatformAndroidRemoteGDBServer::MakeConnectURL(
     if (error.Success()) {
       m_port_forwards[pid] = local_port;
       std::ostringstream url_str;
-      url_str << "connect://localhost:" << local_port;
+      url_str << "connect://127.0.0.1:" << local_port;
       connect_url = url_str.str();
       break;
     }

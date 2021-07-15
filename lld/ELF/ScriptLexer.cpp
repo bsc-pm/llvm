@@ -52,9 +52,29 @@ StringRef ScriptLexer::getLine() {
 
 // Returns 1-based line number of the current token.
 size_t ScriptLexer::getLineNumber() {
+  if (pos == 0)
+    return 1;
   StringRef s = getCurrentMB().getBuffer();
   StringRef tok = tokens[pos - 1];
-  return s.substr(0, tok.data() - s.data()).count('\n') + 1;
+  const size_t tokOffset = tok.data() - s.data();
+
+  // For the first token, or when going backwards, start from the beginning of
+  // the buffer. If this token is after the previous token, start from the
+  // previous token.
+  size_t line = 1;
+  size_t start = 0;
+  if (lastLineNumberOffset > 0 && tokOffset >= lastLineNumberOffset) {
+    start = lastLineNumberOffset;
+    line = lastLineNumber;
+  }
+
+  line += s.substr(start, tokOffset - start).count('\n');
+
+  // Store the line number of this token for reuse.
+  lastLineNumberOffset = tokOffset;
+  lastLineNumber = line;
+
+  return line;
 }
 
 // Returns 0-based column number of the current token.
@@ -144,7 +164,7 @@ StringRef ScriptLexer::skipSpace(StringRef s) {
     if (s.startswith("/*")) {
       size_t e = s.find("*/", 2);
       if (e == StringRef::npos) {
-        error("unclosed comment in a linker script");
+        setError("unclosed comment in a linker script");
         return "";
       }
       s = s.substr(e + 2);
@@ -292,7 +312,9 @@ static bool encloses(StringRef s, StringRef t) {
 
 MemoryBufferRef ScriptLexer::getCurrentMB() {
   // Find input buffer containing the current token.
-  assert(!mbs.empty() && pos > 0);
+  assert(!mbs.empty());
+  if (pos == 0)
+    return mbs.back();
   for (MemoryBufferRef mb : mbs)
     if (encloses(mb.getBuffer(), tokens[pos - 1]))
       return mb;

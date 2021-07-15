@@ -25,7 +25,9 @@
 
 #include "clang/AST/CanonicalType.h"
 #include "clang/AST/Type.h"
+#include "clang/Basic/ABI.h"
 #include "clang/CodeGen/CGFunctionInfo.h"
+#include "llvm/IR/BasicBlock.h"
 
 namespace llvm {
 class AttrBuilder;
@@ -39,6 +41,8 @@ class Type;
 
 namespace clang {
 class ASTContext;
+class CXXConstructorDecl;
+class CXXDestructorDecl;
 class CXXRecordDecl;
 class CXXMethodDecl;
 class CodeGenOptions;
@@ -52,6 +56,16 @@ class PreprocessorOptions;
 namespace CodeGen {
 class CGFunctionInfo;
 class CodeGenModule;
+
+/// Additional implicit arguments to add to a constructor argument list.
+struct ImplicitCXXConstructorArgs {
+  /// Implicit arguments to add before the explicit arguments, but after the
+  /// `*this` argument (which always comes first).
+  SmallVector<llvm::Value *, 1> Prefix;
+
+  /// Implicit arguments to add after the explicit arguments.
+  SmallVector<llvm::Value *, 1> Suffix;
+};
 
 const CGFunctionInfo &arrangeObjCMessageSendSignature(CodeGenModule &CGM,
                                                       const ObjCMethodDecl *MD,
@@ -73,6 +87,17 @@ const CGFunctionInfo &arrangeFreeFunctionCall(CodeGenModule &CGM,
                                               ArrayRef<CanQualType> argTypes,
                                               FunctionType::ExtInfo info,
                                               RequiredArgs args);
+
+/// Returns the implicit arguments to add to a complete, non-delegating C++
+/// constructor call.
+ImplicitCXXConstructorArgs
+getImplicitCXXConstructorArgs(CodeGenModule &CGM, const CXXConstructorDecl *D);
+
+llvm::Value *
+getCXXDestructorImplicitParam(CodeGenModule &CGM, llvm::BasicBlock *InsertBlock,
+                              llvm::BasicBlock::iterator InsertPoint,
+                              const CXXDestructorDecl *D, CXXDtorType Type,
+                              bool ForVirtualBase, bool Delegating);
 
 /// Returns null if the function type is incomplete and can't be lowered.
 llvm::FunctionType *convertFreeFunctionType(CodeGenModule &CGM,

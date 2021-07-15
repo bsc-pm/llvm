@@ -269,6 +269,7 @@ def : WriteRes<WriteLoad,    [PdLoad]> { let Latency = 5; let ResourceCycles = [
 def : WriteRes<WriteStore,   [PdStore]>;
 def : WriteRes<WriteStoreNT, [PdStore]>;
 def : WriteRes<WriteMove,    [PdEX01]> { let ResourceCycles = [2]; }
+defm : X86WriteResUnsupported<WriteVecMaskedGatherWriteback>;
 
 // Load/store MXCSR.
 // FIXME: These are copy and pasted from WriteLoad/Store.
@@ -1093,8 +1094,10 @@ def : InstRW<[PdWriteVMOVDQUYmr], (instrs VMOVDQUYmr)>;
 defm : PdWriteRes<WriteVecStoreNT,          [PdStore, PdFPU1,   PdFPSTO], 2>;
 defm : PdWriteRes<WriteVecStoreNTY,         [PdStore, PdFPU1,   PdFPSTO], 2, [2, 2, 2], 4>;
 
-defm : PdWriteRes<WriteVecMaskedStore,      [PdStore, PdFPU01, PdFPMAL], 6, [1, 1, 4]>;
-defm : PdWriteRes<WriteVecMaskedStoreY,     [PdStore, PdFPU01, PdFPMAL], 6, [2, 2, 4], 2>;
+defm : X86WriteResUnsupported<WriteVecMaskedStore32>;
+defm : X86WriteResUnsupported<WriteVecMaskedStore32Y>;
+defm : X86WriteResUnsupported<WriteVecMaskedStore64>;
+defm : X86WriteResUnsupported<WriteVecMaskedStore64Y>;
 
 defm : PdWriteRes<WriteVecMove,             [PdFPU01, PdFPMAL], 2>;
 defm : PdWriteRes<WriteVecMoveX,            [PdFPU01, PdFPMAL], 1, [1, 2]>;
@@ -1194,6 +1197,7 @@ defm : PdWriteResYMMPair<WriteVecTestY,      [PdFPU01, PdFPFMA, PdEX0], 1, [2, 4
 defm : X86WriteResPairUnsupported<WriteVecTestZ>;
 
 defm : PdWriteResXMMPair<WriteShuffle256,    [PdFPU01, PdFPMAL]>;
+defm : PdWriteResXMMPair<WriteVPMOV256,      [PdFPU01, PdFPMAL]>;
 defm : PdWriteResXMMPair<WriteVarShuffle256, [PdFPU01, PdFPMAL]>;
 
 defm : PdWriteResXMMPair<WriteVarVecShift,   [PdFPU01, PdFPMAL], 3, [1, 2]>;

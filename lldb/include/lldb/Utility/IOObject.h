@@ -9,8 +9,8 @@
 #ifndef LLDB_UTILITY_IOOBJECT_H
 #define LLDB_UTILITY_IOOBJECT_H
 
-#include <stdarg.h>
-#include <stdio.h>
+#include <cstdarg>
+#include <cstdio>
 #include <sys/types.h>
 
 #include "lldb/lldb-private.h"
@@ -45,7 +45,8 @@ protected:
   FDType m_fd_type;
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(IOObject);
+  IOObject(const IOObject &) = delete;
+  const IOObject &operator=(const IOObject &) = delete;
 };
 } // namespace lldb_private
 

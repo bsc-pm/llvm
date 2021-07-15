@@ -9,8 +9,8 @@
 #ifndef LLDB_UTILITY_PREDICATE_H
 #define LLDB_UTILITY_PREDICATE_H
 
-#include <stdint.h>
-#include <time.h>
+#include <cstdint>
+#include <ctime>
 
 #include <condition_variable>
 #include <mutex>
@@ -221,7 +221,8 @@ private:
       m_condition.notify_all();
   }
 
-  DISALLOW_COPY_AND_ASSIGN(Predicate);
+  Predicate(const Predicate &) = delete;
+  const Predicate &operator=(const Predicate &) = delete;
 };
 
 } // namespace lldb_private

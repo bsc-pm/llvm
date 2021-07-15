@@ -105,7 +105,7 @@ private:
 
 class TypeNameSpecifierImpl {
 public:
-  TypeNameSpecifierImpl() : m_is_regex(false), m_type() {}
+  TypeNameSpecifierImpl() : m_type() {}
 
   TypeNameSpecifierImpl(llvm::StringRef name, bool is_regex)
       : m_is_regex(is_regex), m_type() {
@@ -143,7 +143,7 @@ public:
   bool IsRegex() { return m_is_regex; }
 
 private:
-  bool m_is_regex;
+  bool m_is_regex = false;
   // TODO: Replace this with TypeAndOrName.
   struct TypeOrName {
     std::string m_type_name;
@@ -151,8 +151,9 @@ private:
   };
   TypeOrName m_type;
 
-private:
-  DISALLOW_COPY_AND_ASSIGN(TypeNameSpecifierImpl);
+  TypeNameSpecifierImpl(const TypeNameSpecifierImpl &) = delete;
+  const TypeNameSpecifierImpl &
+  operator=(const TypeNameSpecifierImpl &) = delete;
 };
 
 } // namespace lldb_private

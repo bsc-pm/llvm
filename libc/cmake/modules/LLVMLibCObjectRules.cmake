@@ -1,5 +1,9 @@
 set(OBJECT_LIBRARY_TARGET_TYPE "OBJECT_LIBRARY")
 
+function(_get_common_compile_options output_var)
+  set(${output_var} -fpie ${LLVM_CXX_STD_default} -ffreestanding ${LIBC_COMPILE_OPTIONS_DEFAULT} ${ARGN} PARENT_SCOPE)
+endfunction()
+
 # Rule which is essentially a wrapper over add_library to compile a set of
 # sources to object files.
 # Usage:
@@ -25,6 +29,7 @@ function(add_object_library target_name)
   get_fq_target_name(${target_name} fq_target_name)
   add_library(
     ${fq_target_name}
+    EXCLUDE_FROM_ALL
     OBJECT
     ${ADD_OBJECT_SRCS}
     ${ADD_OBJECT_HDRS}
@@ -36,12 +41,8 @@ function(add_object_library target_name)
       ${LIBC_SOURCE_DIR}
       ${LIBC_BUILD_DIR}
   )
-  if(ADD_OBJECT_COMPILE_OPTIONS)
-    target_compile_options(
-      ${fq_target_name}
-      PRIVATE ${ADD_OBJECT_COMPILE_OPTIONS}
-    )
-  endif()
+  _get_common_compile_options(compile_options ${ADD_OBJECT_COMPILE_OPTIONS})
+  target_compile_options(${fq_target_name} PRIVATE ${compile_options})
 
   get_fq_deps_list(fq_deps_list ${ADD_OBJECT_DEPENDS})
   if(fq_deps_list)
@@ -81,6 +82,27 @@ function(add_entrypoint_object target_name)
   )
 
   get_fq_target_name(${target_name} fq_target_name)
+  set(entrypoint_name ${target_name})
+  if(ADD_ENTRYPOINT_OBJ_NAME)
+    set(entrypoint_name ${ADD_ENTRYPOINT_OBJ_NAME})
+  endif()
+
+  list(FIND TARGET_ENTRYPOINT_NAME_LIST ${entrypoint_name} entrypoint_name_index)
+  if(${entrypoint_name_index} EQUAL -1)
+    add_custom_target(${fq_target_name})
+    set_target_properties(
+      ${fq_target_name}
+      PROPERTIES
+        "ENTRYPOINT_NAME" ${entrypoint_name}
+        "TARGET_TYPE" ${ENTRYPOINT_OBJ_TARGET_TYPE}
+        "OBJECT_FILE" ""
+        "OBJECT_FILE_RAW" ""
+        "DEPS" ""
+        "SKIPPED" "YES"
+    )
+    message(STATUS "Skipping libc entrypoint ${fq_target_name}.")
+    return()
+  endif()
 
   if(ADD_ENTRYPOINT_OBJ_ALIAS)
     # Alias targets help one add aliases to other entrypoint object targets.
@@ -109,6 +131,7 @@ function(add_entrypoint_object target_name)
     set_target_properties(
       ${fq_target_name}
       PROPERTIES
+        "ENTRYPOINT_NAME" ${entrypoint_name}
         "TARGET_TYPE" ${ENTRYPOINT_OBJ_TARGET_TYPE}
         "IS_ALIAS" "YES"
         "OBJECT_FILE" ""
@@ -125,89 +148,75 @@ function(add_entrypoint_object target_name)
     message(FATAL_ERROR "`add_entrypoint_object` rule requires HDRS to be specified.")
   endif()
 
-  set(entrypoint_name ${target_name})
-  if(ADD_ENTRYPOINT_OBJ_NAME)
-    set(entrypoint_name ${ADD_ENTRYPOINT_OBJ_NAME})
-  endif()
-
-  set(objects_target_name "${fq_target_name}_objects")
+  _get_common_compile_options(common_compile_options ${ADD_ENTRYPOINT_OBJ_COMPILE_OPTIONS})
+  set(internal_target_name ${fq_target_name}.__internal__)
+  set(include_dirs ${LIBC_BUILD_DIR}/include ${LIBC_SOURCE_DIR} ${LIBC_BUILD_DIR})
+  get_fq_deps_list(fq_deps_list ${ADD_ENTRYPOINT_OBJ_DEPENDS})
+  set(full_deps_list ${fq_deps_list} libc.src.__support.common)
 
   add_library(
-    ${objects_target_name}
-    # We want an object library as the objects will eventually get packaged into
-    # an archive (like libc.a).
+    ${internal_target_name}
+    # TODO: We don't need an object library for internal consumption.
+    # A future change should switch this to a normal static library.
+    EXCLUDE_FROM_ALL
     OBJECT
     ${ADD_ENTRYPOINT_OBJ_SRCS}
     ${ADD_ENTRYPOINT_OBJ_HDRS}
   )
-  target_compile_options(
-    ${objects_target_name}
-    BEFORE
-    PRIVATE
-      -fpie ${LLVM_CXX_STD_default}
-  )
-  target_include_directories(
-    ${objects_target_name}
-    PRIVATE
-      ${LIBC_BUILD_DIR}/include
-      ${LIBC_SOURCE_DIR}
-      ${LIBC_BUILD_DIR}
-  )
-  get_fq_deps_list(fq_deps_list ${ADD_ENTRYPOINT_OBJ_DEPENDS})
-  add_dependencies(
-    ${objects_target_name}
-    libc.src.__support.common
-    ${fq_deps_list}
-  )
+  target_compile_options(${internal_target_name} BEFORE PRIVATE ${common_compile_options})
+  target_include_directories(${internal_target_name} PRIVATE ${include_dirs})
+  add_dependencies(${internal_target_name} ${full_deps_list})
 
-  if(ADD_ENTRYPOINT_OBJ_COMPILE_OPTIONS)
-    target_compile_options(
-      ${objects_target_name}
-      PRIVATE ${ADD_ENTRYPOINT_OBJ_COMPILE_OPTIONS}
-    )
-  endif()
-
-  set(object_file_raw "${CMAKE_CURRENT_BINARY_DIR}/${target_name}_raw.o")
-  set(object_file "${CMAKE_CURRENT_BINARY_DIR}/${target_name}.o")
-
-  set(input_objects $<TARGET_OBJECTS:${objects_target_name}>)
-  add_custom_command(
-    OUTPUT ${object_file_raw}
-    DEPENDS ${input_objects}
-    COMMAND ${CMAKE_LINKER} -r ${input_objects} -o ${object_file_raw}
-  )
-
-  set(alias_attributes "0,function,global")
-  if(ADD_ENTRYPOINT_OBJ_REDIRECTED)
-    set(alias_attributes "${alias_attributes},hidden")
-  endif()
-
-  add_custom_command(
-    OUTPUT ${object_file}
-    # We llvm-objcopy here as GNU-binutils objcopy does not support the 'hidden' flag.
-    DEPENDS ${object_file_raw} ${llvm-objcopy}
-    COMMAND $<TARGET_FILE:llvm-objcopy> --add-symbol
-            "${entrypoint_name}=.llvm.libc.entrypoint.${entrypoint_name}:${alias_attributes}"
-            ${object_file_raw} ${object_file}
-  )
-
-  add_custom_target(
+  add_library(
     ${fq_target_name}
-    ALL
-    DEPENDS ${object_file}
+    # We want an object library as the objects will eventually get packaged into
+    # an archive (like libc.a).
+    EXCLUDE_FROM_ALL
+    OBJECT
+    ${ADD_ENTRYPOINT_OBJ_SRCS}
+    ${ADD_ENTRYPOINT_OBJ_HDRS}
   )
+  target_compile_options(${fq_target_name} BEFORE PRIVATE ${common_compile_options} -DLLVM_LIBC_PUBLIC_PACKAGING)
+  target_include_directories(${fq_target_name} PRIVATE ${include_dirs})
+  add_dependencies(${fq_target_name} ${full_deps_list})
+
   set_target_properties(
     ${fq_target_name}
     PROPERTIES
+      "ENTRYPOINT_NAME" ${entrypoint_name}
       "TARGET_TYPE" ${ENTRYPOINT_OBJ_TARGET_TYPE}
-      "OBJECT_FILE" "${object_file}"
-      "OBJECT_FILE_RAW" "${object_file_raw}"
+      "OBJECT_FILE" $<TARGET_OBJECTS:${fq_target_name}>
+      # TODO: We don't need to list internal object files if the internal
+      # target is a normal static library.
+      "OBJECT_FILE_RAW" $<TARGET_OBJECTS:${internal_target_name}>
       "DEPS" "${fq_deps_list}"
   )
 
   if(LLVM_LIBC_ENABLE_LINTING)
-    set(lint_timestamp "${CMAKE_CURRENT_BINARY_DIR}/.${target_name}.__lint_timestamp__")
 
+    # We only want a second invocation of clang-tidy to run
+    # restrict-system-libc-headers if the compiler-resource-dir was set in
+    # order to prevent false-positives due to a mismatch between the host
+    # compiler and the compiled clang-tidy.
+    if(COMPILER_RESOURCE_DIR)
+      # We run restrict-system-libc-headers with --system-headers to prevent
+      # transitive inclusion through compler provided headers.
+      set(restrict_system_headers_check_invocation
+        COMMAND $<TARGET_FILE:clang-tidy> --system-headers
+        --checks="-*,llvmlibc-restrict-system-libc-headers"
+        # We explicitly set the resource dir here to match the
+        # resource dir of the host compiler.
+        "--extra-arg=-resource-dir=${COMPILER_RESOURCE_DIR}"
+        --quiet
+        -p ${PROJECT_BINARY_DIR}
+        ${ADD_ENTRYPOINT_OBJ_SRCS}
+      )
+    else()
+      set(restrict_system_headers_check_invocation
+        COMMAND ${CMAKE_COMMAND} -E echo "Header file check skipped")
+    endif()
+
+    set(lint_timestamp "${CMAKE_CURRENT_BINARY_DIR}/.${target_name}.__lint_timestamp__")
     add_custom_command(
       OUTPUT ${lint_timestamp}
       # --quiet is used to surpress warning statistics from clang-tidy like:
@@ -217,10 +226,14 @@ function(add_entrypoint_object target_name)
       #     X warnings generated.
       # Until this is fixed upstream, we use -fno-caret-diagnostics to surpress
       # these.
-      COMMAND $<TARGET_FILE:clang-tidy> "--extra-arg=-fno-caret-diagnostics" --quiet
+      COMMAND $<TARGET_FILE:clang-tidy>
+              "--extra-arg=-fno-caret-diagnostics" --quiet
               # Path to directory containing compile_commands.json
               -p ${PROJECT_BINARY_DIR}
               ${ADD_ENTRYPOINT_OBJ_SRCS}
+      # See above: this might be a second invocation of clang-tidy depending on
+      # the conditions above.
+      ${restrict_system_headers_check_invocation}
       # We have two options for running commands, add_custom_command and
       # add_custom_target. We don't want to run the linter unless source files
       # have changed. add_custom_target explicitly runs everytime therefore we
@@ -229,7 +242,7 @@ function(add_entrypoint_object target_name)
       # crossplatform touch.
       COMMAND "${CMAKE_COMMAND}" -E touch ${lint_timestamp}
       COMMENT "Linting... ${target_name}"
-      DEPENDS ${clang-tidy} ${objects_target_name} ${ADD_ENTRYPOINT_OBJ_SRCS}
+      DEPENDS clang-tidy ${internal_target_name} ${ADD_ENTRYPOINT_OBJ_SRCS}
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
 
@@ -256,11 +269,12 @@ function(add_redirector_object target_name)
 
   add_library(
     ${target_name}
+    EXCLUDE_FROM_ALL
     OBJECT
     ${REDIRECTOR_OBJECT_SRC}
   )
   target_compile_options(
     ${target_name}
-    BEFORE PRIVATE -fPIC
+    BEFORE PRIVATE -fPIC ${LIBC_COMPILE_OPTIONS_DEFAULT}
   )
 endfunction(add_redirector_object)

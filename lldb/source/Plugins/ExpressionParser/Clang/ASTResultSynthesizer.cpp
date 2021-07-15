@@ -15,7 +15,6 @@
 #include "lldb/Target/Target.h"
 #include "lldb/Utility/LLDBAssert.h"
 #include "lldb/Utility/Log.h"
-#include "stdlib.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
@@ -27,6 +26,7 @@
 #include "clang/Sema/SemaDiagnostic.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
+#include <cstdlib>
 
 using namespace llvm;
 using namespace clang;
@@ -43,7 +43,7 @@ ASTResultSynthesizer::ASTResultSynthesizer(ASTConsumer *passthrough,
   m_passthrough_sema = dyn_cast<SemaConsumer>(passthrough);
 }
 
-ASTResultSynthesizer::~ASTResultSynthesizer() {}
+ASTResultSynthesizer::~ASTResultSynthesizer() = default;
 
 void ASTResultSynthesizer::Initialize(ASTContext &Context) {
   m_ast_context = &Context;
@@ -248,48 +248,37 @@ bool ASTResultSynthesizer::SynthesizeBodyResult(CompoundStmt *Body,
   // For Lvalues
   //
   //   - In AST result synthesis (here!) the expression E is transformed into an
-  //   initialization
-  //     T *$__lldb_expr_result_ptr = &E.
+  //     initialization T *$__lldb_expr_result_ptr = &E.
   //
   //   - In structure allocation, a pointer-sized slot is allocated in the
-  //   struct that is to be
-  //     passed into the expression.
+  //     struct that is to be passed into the expression.
   //
   //   - In IR transformations, reads and writes to $__lldb_expr_result_ptr are
-  //   redirected at
-  //     an entry in the struct ($__lldb_arg) passed into the expression.
-  //     (Other persistent
-  //     variables are treated similarly, having been materialized as
-  //     references, but in those
-  //     cases the value of the reference itself is never modified.)
+  //     redirected at an entry in the struct ($__lldb_arg) passed into the
+  //     expression. (Other persistent variables are treated similarly, having
+  //     been materialized as references, but in those cases the value of the
+  //     reference itself is never modified.)
   //
   //   - During materialization, $0 (the result persistent variable) is ignored.
   //
   //   - During dematerialization, $0 is marked up as a load address with value
-  //   equal to the
-  //     contents of the structure entry.
+  //     equal to the contents of the structure entry.
   //
   // For Rvalues
   //
   //   - In AST result synthesis the expression E is transformed into an
-  //   initialization
-  //     static T $__lldb_expr_result = E.
+  //     initialization static T $__lldb_expr_result = E.
   //
   //   - In structure allocation, a pointer-sized slot is allocated in the
-  //   struct that is to be
-  //     passed into the expression.
+  //     struct that is to be passed into the expression.
   //
   //   - In IR transformations, an instruction is inserted at the beginning of
-  //   the function to
-  //     dereference the pointer resident in the slot.  Reads and writes to
-  //     $__lldb_expr_result
-  //     are redirected at that dereferenced version.  Guard variables for the
-  //     static variable
-  //     are excised.
+  //     the function to dereference the pointer resident in the slot. Reads and
+  //     writes to $__lldb_expr_result are redirected at that dereferenced
+  //     version. Guard variables for the static variable are excised.
   //
   //   - During materialization, $0 (the result persistent variable) is
-  //   populated with the location
-  //     of a newly-allocated area of memory.
+  //     populated with the location of a newly-allocated area of memory.
   //
   //   - During dematerialization, $0 is ignored.
 
@@ -454,7 +443,9 @@ void ASTResultSynthesizer::CommitPersistentDecls() {
     return;
 
   auto *persistent_vars = llvm::cast<ClangPersistentVariables>(state);
-  TypeSystemClang *scratch_ctx = TypeSystemClang::GetScratch(m_target);
+
+  TypeSystemClang *scratch_ctx = ScratchTypeSystemClang::GetForTarget(
+      m_target, m_ast_context->getLangOpts());
 
   for (clang::NamedDecl *decl : m_decls) {
     StringRef name = decl->getName();

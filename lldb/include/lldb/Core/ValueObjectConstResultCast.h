@@ -17,8 +17,8 @@
 #include "lldb/lldb-forward.h"
 #include "lldb/lldb-types.h"
 
-#include <stddef.h>
-#include <stdint.h>
+#include <cstddef>
+#include <cstdint>
 
 namespace lldb_private {
 class DataExtractor;
@@ -61,7 +61,9 @@ private:
   friend class ValueObjectConstResult;
   friend class ValueObjectConstResultImpl;
 
-  DISALLOW_COPY_AND_ASSIGN(ValueObjectConstResultCast);
+  ValueObjectConstResultCast(const ValueObjectConstResultCast &) = delete;
+  const ValueObjectConstResultCast &
+  operator=(const ValueObjectConstResultCast &) = delete;
 };
 
 } // namespace lldb_private

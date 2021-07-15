@@ -9,7 +9,7 @@ define void @t1() nounwind {
 ; CHECK:       ## %bb.0: ## %entry
 ; CHECK-NEXT:    pushq %rax
 ; CHECK-NEXT:    callq _return_v1di
-; CHECK-NEXT:    movq _g_v1di@{{.*}}(%rip), %rcx
+; CHECK-NEXT:    movq _g_v1di@GOTPCREL(%rip), %rcx
 ; CHECK-NEXT:    movq %rax, (%rcx)
 ; CHECK-NEXT:    popq %rax
 ; CHECK-NEXT:    retq
@@ -32,7 +32,7 @@ define <1 x i64> @t2() nounwind {
 define <2 x i32> @t3() nounwind {
 ; CHECK-LABEL: t3:
 ; CHECK:       ## %bb.0:
-; CHECK-NEXT:    movaps {{.*#+}} xmm0 = <1,0,u,u>
+; CHECK-NEXT:    movaps {{.*#+}} xmm0 = [1,0,0,0]
 ; CHECK-NEXT:    retq
   ret <2 x i32> <i32 1, i32 0>
 }

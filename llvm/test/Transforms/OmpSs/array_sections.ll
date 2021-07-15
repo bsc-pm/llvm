@@ -18,9 +18,9 @@ target triple = "x86_64-unknown-linux-gnu"
 ; Function Attrs: noinline nounwind optnone uwtable
 define dso_local i32 @main() #0 !dbg !6 {
 entry:
-  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([7 x [3 x i32]]* @mat), "QUAL.OSS.DEP.IN"([7 x [3 x i32]]* @mat, %struct._depend_unpack_t ([7 x [3 x i32]]*)* @compute_dep, [7 x [3 x i32]]* @mat) ], !dbg !8
+  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([7 x [3 x i32]]* @mat), "QUAL.OSS.DEP.IN"([7 x [3 x i32]]* @mat, [10 x i8] c"mat[:][:]\00", %struct._depend_unpack_t ([7 x [3 x i32]]*)* @compute_dep, [7 x [3 x i32]]* @mat) ], !dbg !8
   call void @llvm.directive.region.exit(token %0), !dbg !9
-  %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([7 x [3 x i32]]* @mat), "QUAL.OSS.DEP.IN"([7 x [3 x i32]]* @mat, %struct._depend_unpack_t.0 ([7 x [3 x i32]]*)* @compute_dep.1, [7 x [3 x i32]]* @mat) ], !dbg !10
+  %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([7 x [3 x i32]]* @mat), "QUAL.OSS.DEP.IN"([7 x [3 x i32]]* @mat, [14 x i8] c"mat[0:1][1:1]\00", %struct._depend_unpack_t.0 ([7 x [3 x i32]]*)* @compute_dep.1, [7 x [3 x i32]]* @mat) ], !dbg !10
   call void @llvm.directive.region.exit(token %1), !dbg !11
   ret i32 0, !dbg !12
 }
@@ -69,49 +69,51 @@ entry:
   ret %struct._depend_unpack_t.0 %7
 }
 
-; CHECK: define internal void @nanos6_unpacked_deps_main0([7 x [3 x i32]]* %mat, i8* %loop_bounds, i8* %handler) {
+; CHECK: define internal void @nanos6_unpacked_deps_main0([7 x [3 x i32]]* %mat, %nanos6_loop_bounds_t* %loop_bounds, i8* %handler) {
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   %0 = call %struct._depend_unpack_t @compute_dep([7 x [3 x i32]]* %mat)
-; CHECK-NEXT:   %1 = extractvalue %struct._depend_unpack_t %0, 0
-; CHECK-NEXT:   %2 = bitcast [3 x i32]* %1 to i8*
-; CHECK-NEXT:   %3 = extractvalue %struct._depend_unpack_t %0, 1
-; CHECK-NEXT:   %4 = extractvalue %struct._depend_unpack_t %0, 2
-; CHECK-NEXT:   %5 = extractvalue %struct._depend_unpack_t %0, 3
-; CHECK-NEXT:   %6 = extractvalue %struct._depend_unpack_t %0, 4
-; CHECK-NEXT:   %7 = extractvalue %struct._depend_unpack_t %0, 5
-; CHECK-NEXT:   %8 = extractvalue %struct._depend_unpack_t %0, 6
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo2(i8* %handler, i32 0, i8* null, i8* %2, i64 %3, i64 %4, i64 %5, i64 %6, i64 %7, i64 %8)
+; CHECK-NEXT:   %1 = call %struct._depend_unpack_t @compute_dep([7 x [3 x i32]]* %mat)
+; CHECK-NEXT:   %2 = extractvalue %struct._depend_unpack_t %0, 0
+; CHECK-NEXT:   %3 = bitcast [3 x i32]* %2 to i8*
+; CHECK-NEXT:   %4 = extractvalue %struct._depend_unpack_t %0, 1
+; CHECK-NEXT:   %5 = extractvalue %struct._depend_unpack_t %0, 2
+; CHECK-NEXT:   %6 = extractvalue %struct._depend_unpack_t %1, 3
+; CHECK-NEXT:   %7 = extractvalue %struct._depend_unpack_t %0, 4
+; CHECK-NEXT:   %8 = extractvalue %struct._depend_unpack_t %0, 5
+; CHECK-NEXT:   %9 = extractvalue %struct._depend_unpack_t %1, 6
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo2(i8* %handler, i32 0, i8* getelementptr inbounds ([10 x i8], [10 x i8]* @1, i32 0, i32 0), i8* %3, i64 %4, i64 %5, i64 %6, i64 %7, i64 %8, i64 %9)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
-; CHECK: define internal void @nanos6_ol_deps_main0(%nanos6_task_args_main0* %task_args, i8* %loop_bounds, i8* %handler) {
+; CHECK: define internal void @nanos6_ol_deps_main0(%nanos6_task_args_main0* %task_args, %nanos6_loop_bounds_t* %loop_bounds, i8* %handler) {
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   %gep_mat = getelementptr %nanos6_task_args_main0, %nanos6_task_args_main0* %task_args, i32 0, i32 0
 ; CHECK-NEXT:   %load_gep_mat = load [7 x [3 x i32]]*, [7 x [3 x i32]]** %gep_mat
-; CHECK-NEXT:   call void @nanos6_unpacked_deps_main0([7 x [3 x i32]]* %load_gep_mat, i8* %loop_bounds, i8* %handler)
+; CHECK-NEXT:   call void @nanos6_unpacked_deps_main0([7 x [3 x i32]]* %load_gep_mat, %nanos6_loop_bounds_t* %loop_bounds, i8* %handler)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
-; CHECK: define internal void @nanos6_unpacked_deps_main1([7 x [3 x i32]]* %mat, i8* %loop_bounds, i8* %handler) {
+; CHECK: define internal void @nanos6_unpacked_deps_main1([7 x [3 x i32]]* %mat, %nanos6_loop_bounds_t* %loop_bounds, i8* %handler) {
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   %0 = call %struct._depend_unpack_t.0 @compute_dep.1([7 x [3 x i32]]* %mat)
-; CHECK-NEXT:   %1 = extractvalue %struct._depend_unpack_t.0 %0, 0
-; CHECK-NEXT:   %2 = bitcast [3 x i32]* %1 to i8*
-; CHECK-NEXT:   %3 = extractvalue %struct._depend_unpack_t.0 %0, 1
-; CHECK-NEXT:   %4 = extractvalue %struct._depend_unpack_t.0 %0, 2
-; CHECK-NEXT:   %5 = extractvalue %struct._depend_unpack_t.0 %0, 3
-; CHECK-NEXT:   %6 = extractvalue %struct._depend_unpack_t.0 %0, 4
-; CHECK-NEXT:   %7 = extractvalue %struct._depend_unpack_t.0 %0, 5
-; CHECK-NEXT:   %8 = extractvalue %struct._depend_unpack_t.0 %0, 6
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo2(i8* %handler, i32 0, i8* null, i8* %2, i64 %3, i64 %4, i64 %5, i64 %6, i64 %7, i64 %8)
+; CHECK-NEXT:   %1 = call %struct._depend_unpack_t.0 @compute_dep.1([7 x [3 x i32]]* %mat)
+; CHECK-NEXT:   %2 = extractvalue %struct._depend_unpack_t.0 %0, 0
+; CHECK-NEXT:   %3 = bitcast [3 x i32]* %2 to i8*
+; CHECK-NEXT:   %4 = extractvalue %struct._depend_unpack_t.0 %0, 1
+; CHECK-NEXT:   %5 = extractvalue %struct._depend_unpack_t.0 %0, 2
+; CHECK-NEXT:   %6 = extractvalue %struct._depend_unpack_t.0 %1, 3
+; CHECK-NEXT:   %7 = extractvalue %struct._depend_unpack_t.0 %0, 4
+; CHECK-NEXT:   %8 = extractvalue %struct._depend_unpack_t.0 %0, 5
+; CHECK-NEXT:   %9 = extractvalue %struct._depend_unpack_t.0 %1, 6
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo2(i8* %handler, i32 0, i8* getelementptr inbounds ([14 x i8], [14 x i8]* @3, i32 0, i32 0), i8* %3, i64 %4, i64 %5, i64 %6, i64 %7, i64 %8, i64 %9)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
-; CHECK: define internal void @nanos6_ol_deps_main1(%nanos6_task_args_main1* %task_args, i8* %loop_bounds, i8* %handler) {
+; CHECK: define internal void @nanos6_ol_deps_main1(%nanos6_task_args_main1* %task_args, %nanos6_loop_bounds_t* %loop_bounds, i8* %handler) {
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   %gep_mat = getelementptr %nanos6_task_args_main1, %nanos6_task_args_main1* %task_args, i32 0, i32 0
 ; CHECK-NEXT:   %load_gep_mat = load [7 x [3 x i32]]*, [7 x [3 x i32]]** %gep_mat
-; CHECK-NEXT:   call void @nanos6_unpacked_deps_main1([7 x [3 x i32]]* %load_gep_mat, i8* %loop_bounds, i8* %handler)
+; CHECK-NEXT:   call void @nanos6_unpacked_deps_main1([7 x [3 x i32]]* %load_gep_mat, %nanos6_loop_bounds_t* %loop_bounds, i8* %handler)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 

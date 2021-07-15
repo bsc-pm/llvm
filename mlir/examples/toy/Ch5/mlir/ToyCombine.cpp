@@ -23,13 +23,8 @@ namespace {
 #include "ToyCombine.inc"
 } // end anonymous namespace
 
-/// Fold simple cast operations that return the same type as the input.
-OpFoldResult CastOp::fold(ArrayRef<Attribute> operands) {
-  return mlir::impl::foldCastOp(*this);
-}
-
 /// This is an example of a c++ rewrite pattern for the TransposeOp. It
-/// optimizes the following scenario: transpose(transpose(x)) -> transpose(x)
+/// optimizes the following scenario: transpose(transpose(x)) -> x
 struct SimplifyRedundantTranspose : public mlir::OpRewritePattern<TransposeOp> {
   /// We register this pattern to match every toy.transpose in the IR.
   /// The "benefit" is used by the framework to order the patterns and process
@@ -59,15 +54,15 @@ struct SimplifyRedundantTranspose : public mlir::OpRewritePattern<TransposeOp> {
 
 /// Register our patterns as "canonicalization" patterns on the TransposeOp so
 /// that they can be picked up by the Canonicalization framework.
-void TransposeOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void TransposeOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
-  results.insert<SimplifyRedundantTranspose>(context);
+  results.add<SimplifyRedundantTranspose>(context);
 }
 
 /// Register our patterns as "canonicalization" patterns on the ReshapeOp so
 /// that they can be picked up by the Canonicalization framework.
-void ReshapeOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void ReshapeOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                             MLIRContext *context) {
-  results.insert<ReshapeReshapeOptPattern, RedundantReshapeOptPattern,
-                 FoldConstantReshapeOptPattern>(context);
+  results.add<ReshapeReshapeOptPattern, RedundantReshapeOptPattern,
+              FoldConstantReshapeOptPattern>(context);
 }

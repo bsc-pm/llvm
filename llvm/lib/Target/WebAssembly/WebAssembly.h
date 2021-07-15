@@ -39,11 +39,13 @@ FunctionPass *createWebAssemblySetP2AlignOperands();
 
 // Late passes.
 FunctionPass *createWebAssemblyReplacePhysRegs();
+FunctionPass *createWebAssemblyNullifyDebugValueLists();
 FunctionPass *createWebAssemblyPrepareForLiveIntervals();
 FunctionPass *createWebAssemblyOptimizeLiveIntervals();
 FunctionPass *createWebAssemblyMemIntrinsicResults();
 FunctionPass *createWebAssemblyRegStackify();
 FunctionPass *createWebAssemblyRegColoring();
+FunctionPass *createWebAssemblyFixBrTableDefaults();
 FunctionPass *createWebAssemblyFixIrreducibleControlFlow();
 FunctionPass *createWebAssemblyLateEHPrepare();
 FunctionPass *createWebAssemblyCFGSort();
@@ -63,11 +65,13 @@ void initializeOptimizeReturnedPass(PassRegistry &);
 void initializeWebAssemblyArgumentMovePass(PassRegistry &);
 void initializeWebAssemblySetP2AlignOperandsPass(PassRegistry &);
 void initializeWebAssemblyReplacePhysRegsPass(PassRegistry &);
+void initializeWebAssemblyNullifyDebugValueListsPass(PassRegistry &);
 void initializeWebAssemblyPrepareForLiveIntervalsPass(PassRegistry &);
 void initializeWebAssemblyOptimizeLiveIntervalsPass(PassRegistry &);
 void initializeWebAssemblyMemIntrinsicResultsPass(PassRegistry &);
 void initializeWebAssemblyRegStackifyPass(PassRegistry &);
 void initializeWebAssemblyRegColoringPass(PassRegistry &);
+void initializeWebAssemblyFixBrTableDefaultsPass(PassRegistry &);
 void initializeWebAssemblyFixIrreducibleControlFlowPass(PassRegistry &);
 void initializeWebAssemblyLateEHPreparePass(PassRegistry &);
 void initializeWebAssemblyExceptionInfoPass(PassRegistry &);
@@ -85,10 +89,14 @@ enum TargetIndex {
   TI_LOCAL,
   // Followed by an absolute global index (ULEB). DEPRECATED.
   TI_GLOBAL_FIXED,
+  // Followed by the index from the bottom of the Wasm stack.
   TI_OPERAND_STACK,
   // Followed by a compilation unit relative global index (uint32_t)
   // that will have an associated relocation.
-  TI_GLOBAL_RELOC
+  TI_GLOBAL_RELOC,
+  // Like TI_LOCAL, but indicates an indirect value (e.g. byval arg
+  // passed by pointer).
+  TI_LOCAL_INDIRECT
 };
 } // end namespace WebAssembly
 

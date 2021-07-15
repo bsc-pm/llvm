@@ -10,24 +10,41 @@ set(LLVM_LINK_COMPONENTS
   AsmParser
   )
 
+if(MLIR_INCLUDE_TESTS)
+  set(test_libs
+    MLIRTestStandardToLLVM
+    MLIRAffineTransformsTestPasses
+    MLIRDLTITestPasses
+    MLIRGPUTestPasses
+    MLIRLinalgTestPasses
+    MLIRMathTestPasses
+    MLIRSCFTestPasses
+    MLIRShapeTestPasses
+    MLIRSPIRVTestPasses
+    MLIRStandardOpsTestPasses
+    MLIRVectorTestPasses
+    MLIRTestAnalysis
+    MLIRTestDialect
+    MLIRTestIR
+    MLIRTestPass
+    MLIRTestReducer
+    MLIRTestRewrite
+    MLIRTestTransforms
+    )
+endif()
+
 set(LIBS
   ${dialect_libs}
   ${conversion_libs}
+  ${test_libs}
   MLIRLoopAnalysis
-  MLIRAffineTransformsTestPasses
   MLIRAnalysis
   MLIRDialect
-  MLIREDSC
   MLIROptLib
   MLIRParser
   MLIRPass
-  MLIRSPIRVTestPasses
   MLIRTransforms
   MLIRTransformUtils
-  MLIRTestDialect
-  MLIRTestIR
-  MLIRTestPass
-  MLIRTestTransforms
   MLIRSupport
   MLIRIR
   )

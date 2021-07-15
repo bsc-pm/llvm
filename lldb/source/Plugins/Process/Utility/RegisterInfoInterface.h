@@ -22,7 +22,7 @@ class RegisterInfoInterface {
 public:
   RegisterInfoInterface(const lldb_private::ArchSpec &target_arch)
       : m_target_arch(target_arch) {}
-  virtual ~RegisterInfoInterface() {}
+  virtual ~RegisterInfoInterface() = default;
 
   virtual size_t GetGPRSize() const = 0;
 
@@ -61,7 +61,6 @@ public:
     return nullptr;
   }
 
-public:
   // FIXME make private.
   lldb_private::ArchSpec m_target_arch;
 };

@@ -8,7 +8,7 @@ void foo1() {
   {}
   #pragma oss task depend(in: ([1][2][3]array)[4:5][5])
   {}
-  #pragma oss task depend(in: [1][2]array[4:5]) // expected-error {{OmpSs-2 array section is not allowed in array shaping}}
+  #pragma oss task depend(in: [1][2]array[4:5]) // expected-error {{OmpSs-2 array section is not allowed here}}
   {}
   #pragma oss task depend(in: [1][2 : 3]array) // expected-error {{expected ']'}} expected-note {{to match this '['}}
   {}
@@ -21,7 +21,7 @@ void foo2(int x) {
   {}
   #pragma oss task depend(in : [x + x]() {} ) // expected-error {{expected ',' or ']' in lambda capture list}}
   {}
-  #pragma oss task depend(in : [x,](array),  [x,](array){}, [3](array, array)) // expected-error {{expected variable name or 'this' in lambda capture list}} expected-warning {{expression result unused}}
+  #pragma oss task depend(in : [x,](array),  [x,](array){}, [3](x, array)) // expected-error {{expected variable name or 'this' in lambda capture list}} expected-warning {{expression result unused}}
   {}
   #pragma oss task depend(in : [x](int a) {} ) // expected-error {{expected addressable lvalue expression, array element, array shape or array section}}
   {}

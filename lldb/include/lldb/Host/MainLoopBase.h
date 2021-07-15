@@ -33,8 +33,8 @@ private:
   class ReadHandle;
 
 public:
-  MainLoopBase() {}
-  virtual ~MainLoopBase() {}
+  MainLoopBase() = default;
+  virtual ~MainLoopBase() = default;
 
   typedef std::unique_ptr<ReadHandle> ReadHandleUP;
 
@@ -75,11 +75,12 @@ private:
     IOObject::WaitableHandle m_handle;
 
     friend class MainLoopBase;
-    DISALLOW_COPY_AND_ASSIGN(ReadHandle);
+    ReadHandle(const ReadHandle &) = delete;
+    const ReadHandle &operator=(const ReadHandle &) = delete;
   };
 
-private:
-  DISALLOW_COPY_AND_ASSIGN(MainLoopBase);
+  MainLoopBase(const MainLoopBase &) = delete;
+  const MainLoopBase &operator=(const MainLoopBase &) = delete;
 };
 
 } // namespace lldb_private

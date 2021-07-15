@@ -31,10 +31,15 @@ config.available_features.add(config.tool_name)
 if config.host_os == 'Linux' and config.tool_name == "lsan" and config.target_arch == 'i386':
   config.available_features.add("lsan-x86")
 
+if config.arm_thumb:
+  config.available_features.add('thumb')
+
 if config.host_os == 'Darwin':
   # On Darwin, we default to `abort_on_error=1`, which would make tests run
   # much slower. Let's override this and run lit tests with 'abort_on_error=0'.
   default_tool_options += ['abort_on_error=0']
+  if config.tool_name == "tsan":
+    default_tool_options += ['ignore_interceptors_accesses=0']
 elif config.android:
   # The same as on Darwin, we default to "abort_on_error=1" which slows down
   # testing. Also, all existing tests are using "not" instead of "not --crash"
@@ -68,7 +73,7 @@ config.substitutions.append( ('%env_tool_opts=',
 
 config.suffixes = ['.c', '.cpp']
 
-if config.host_os not in ['Linux', 'Darwin', 'NetBSD', 'FreeBSD']:
+if config.host_os not in ['Linux', 'Darwin', 'NetBSD', 'FreeBSD', 'SunOS']:
   config.unsupported = True
 
 if not config.parallelism_group:

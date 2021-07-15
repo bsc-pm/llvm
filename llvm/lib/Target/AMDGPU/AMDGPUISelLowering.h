@@ -15,7 +15,6 @@
 #ifndef LLVM_LIB_TARGET_AMDGPU_AMDGPUISELLOWERING_H
 #define LLVM_LIB_TARGET_AMDGPU_AMDGPUISELLOWERING_H
 
-#include "AMDGPU.h"
 #include "llvm/CodeGen/CallingConvLower.h"
 #include "llvm/CodeGen/TargetLowering.h"
 
@@ -65,10 +64,9 @@ protected:
   SDValue LowerUINT_TO_FP(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerSINT_TO_FP(SDValue Op, SelectionDAG &DAG) const;
 
-  SDValue LowerFP64_TO_INT(SDValue Op, SelectionDAG &DAG, bool Signed) const;
+  SDValue LowerFP_TO_INT64(SDValue Op, SelectionDAG &DAG, bool Signed) const;
   SDValue LowerFP_TO_FP16(SDValue Op, SelectionDAG &DAG) const;
-  SDValue LowerFP_TO_UINT(SDValue Op, SelectionDAG &DAG) const;
-  SDValue LowerFP_TO_SINT(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerFP_TO_INT(SDValue Op, SelectionDAG &DAG) const;
 
   SDValue LowerSIGN_EXTEND_INREG(SDValue Op, SelectionDAG &DAG) const;
 
@@ -89,7 +87,6 @@ protected:
   SDValue performMulCombine(SDNode *N, DAGCombinerInfo &DCI) const;
   SDValue performMulhsCombine(SDNode *N, DAGCombinerInfo &DCI) const;
   SDValue performMulhuCombine(SDNode *N, DAGCombinerInfo &DCI) const;
-  SDValue performMulLoHi24Combine(SDNode *N, DAGCombinerInfo &DCI) const;
   SDValue performCtlz_CttzCombine(const SDLoc &SL, SDValue Cond, SDValue LHS,
                              SDValue RHS, DAGCombinerInfo &DCI) const;
   SDValue performSelectCombine(SDNode *N, DAGCombinerInfo &DCI) const;
@@ -124,8 +121,9 @@ protected:
   /// Split a vector load into 2 loads of half the vector.
   SDValue SplitVectorLoad(SDValue Op, SelectionDAG &DAG) const;
 
-  /// Widen a vector load from vec3 to vec4.
-  SDValue WidenVectorLoad(SDValue Op, SelectionDAG &DAG) const;
+  /// Widen a suitably aligned v3 load. For all other cases, split the input
+  /// vector load.
+  SDValue WidenOrSplitVectorLoad(SDValue Op, SelectionDAG &DAG) const;
 
   /// Split a vector store into 2 stores of half the vector.
   SDValue SplitVectorStore(SDValue Op, SelectionDAG &DAG) const;
@@ -144,16 +142,7 @@ protected:
 public:
   AMDGPUTargetLowering(const TargetMachine &TM, const AMDGPUSubtarget &STI);
 
-  bool mayIgnoreSignedZero(SDValue Op) const {
-    if (getTargetMachine().Options.NoSignedZerosFPMath)
-      return true;
-
-    const auto Flags = Op.getNode()->getFlags();
-    if (Flags.isDefined())
-      return Flags.hasNoSignedZeros();
-
-    return false;
-  }
+  bool mayIgnoreSignedZero(SDValue Op) const;
 
   static inline SDValue stripBitcast(SDValue Val) {
     return Val.getOpcode() == ISD::BITCAST ? Val.getOperand(0) : Val;
@@ -170,9 +159,10 @@ public:
   bool isZExtFree(EVT Src, EVT Dest) const override;
   bool isZExtFree(SDValue Val, EVT VT2) const override;
 
-  NegatibleCost getNegatibleCost(SDValue Op, SelectionDAG &DAG,
-                                 bool LegalOperations, bool ForCodeSize,
-                                 unsigned Depth) const override;
+  SDValue getNegatedExpression(SDValue Op, SelectionDAG &DAG,
+                               bool LegalOperations, bool ForCodeSize,
+                               NegatibleCost &Cost,
+                               unsigned Depth) const override;
 
   bool isNarrowingProfitable(EVT VT1, EVT VT2) const override;
 
@@ -337,6 +327,9 @@ public:
   }
 
   AtomicExpansionKind shouldExpandAtomicRMWInIR(AtomicRMWInst *) const override;
+
+  bool isConstantUnsignedBitfieldExtactLegal(unsigned Opc, LLT Ty1,
+                                             LLT Ty2) const override;
 };
 
 namespace AMDGPUISD {
@@ -409,7 +402,6 @@ enum NodeType : unsigned {
   // For emitting ISD::FMAD when f32 denormals are enabled because mac/mad is
   // treated as an illegal operation.
   FMAD_FTZ,
-  TRIG_PREOP, // 1 ULP max error for f64
 
   // RCP, RSQ - For f32, 1 ULP max error, no denormal handling.
   //            For f64, max error 2^29 ULP, handles denormals.
@@ -439,8 +431,6 @@ enum NodeType : unsigned {
   MAD_I24,
   MAD_U64_U32,
   MAD_I64_I32,
-  MUL_LOHI_I24,
-  MUL_LOHI_U24,
   PERM,
   TEXTURE_FETCH,
   R600_EXPORT,
@@ -469,9 +459,6 @@ enum NodeType : unsigned {
   // Same as the standard node, except the high bits of the resulting integer
   // are known 0.
   FP_TO_FP16,
-
-  // Wrapper around fp16 results that are known to zero the high bits.
-  FP16_ZEXT,
 
   /// This node is for VLIW targets and it is used to represent a vector
   /// that is stored in consecutive registers with the same channel.
@@ -533,9 +520,10 @@ enum NodeType : unsigned {
   BUFFER_ATOMIC_INC,
   BUFFER_ATOMIC_DEC,
   BUFFER_ATOMIC_CMPSWAP,
+  BUFFER_ATOMIC_CSUB,
   BUFFER_ATOMIC_FADD,
-  BUFFER_ATOMIC_PK_FADD,
-  ATOMIC_PK_FADD,
+  BUFFER_ATOMIC_FMIN,
+  BUFFER_ATOMIC_FMAX,
 
   LAST_AMDGPU_ISD_NUMBER
 };

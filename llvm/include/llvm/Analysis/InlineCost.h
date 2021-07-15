@@ -15,6 +15,7 @@
 
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/CallGraphSCCPass.h"
+#include "llvm/Analysis/InlineModelFeatureMaps.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include <cassert>
 #include <climits>
@@ -49,6 +50,9 @@ const int ColdccPenalty = 2000;
 /// Do not inline functions which allocate this many bytes on the stack
 /// when the caller is recursive.
 const unsigned TotalAllocaSizeRecursiveCaller = 1024;
+/// Do not inline dynamic allocas that have been constant propagated to be
+/// static allocas above this amount in bytes.
+const uint64_t MaxSimplifiedDynamicAllocaToInline = 65536;
 } // namespace InlineConstants
 
 /// Represents the cost of inlining a function.
@@ -182,6 +186,9 @@ struct InlineParams {
 
   /// Compute inline cost even when the cost has exceeded the threshold.
   Optional<bool> ComputeFullInlineCost;
+
+  /// Indicate whether we should allow inline deferral.
+  Optional<bool> EnableDeferral = true;
 };
 
 /// Generate the parameters to tune the inline cost analysis based only on the
@@ -264,8 +271,29 @@ Optional<int> getInliningCostEstimate(
     ProfileSummaryInfo *PSI = nullptr,
     OptimizationRemarkEmitter *ORE = nullptr);
 
+/// Get the expanded cost features. The features are returned unconditionally,
+/// even if inlining is impossible.
+Optional<InlineCostFeatures> getInliningCostFeatures(
+    CallBase &Call, TargetTransformInfo &CalleeTTI,
+    function_ref<AssumptionCache &(Function &)> GetAssumptionCache,
+    function_ref<BlockFrequencyInfo &(Function &)> GetBFI = nullptr,
+    ProfileSummaryInfo *PSI = nullptr,
+    OptimizationRemarkEmitter *ORE = nullptr);
+
 /// Minimal filter to detect invalid constructs for inlining.
 InlineResult isInlineViable(Function &Callee);
+
+// This pass is used to annotate instructions during the inline process for
+// debugging and analysis. The main purpose of the pass is to see and test
+// inliner's decisions when creating new optimizations to InlineCost.
+struct InlineCostAnnotationPrinterPass
+    : PassInfoMixin<InlineCostAnnotationPrinterPass> {
+  raw_ostream &OS;
+
+public:
+  explicit InlineCostAnnotationPrinterPass(raw_ostream &OS) : OS(OS) {}
+  PreservedAnalyses run(Function &F, FunctionAnalysisManager &FAM);
+};
 } // namespace llvm
 
 #endif

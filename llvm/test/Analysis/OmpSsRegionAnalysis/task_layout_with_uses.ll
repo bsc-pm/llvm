@@ -1,5 +1,8 @@
-; RUN: opt -ompss-2-regions -analyze -disable-checks -print-verbosity=uses < %s 2>&1 | FileCheck %s -check-prefix=USES
-; RUN: opt -ompss-2-regions -analyze -disable-checks -print-verbosity=dsa_missing < %s 2>&1 | FileCheck %s -check-prefix=DSA
+; RUN: opt -ompss-2-regions -analyze -disable-checks -print-verbosity=uses -enable-new-pm=0 < %s 2>&1 | FileCheck %s -check-prefix=USES
+; RUN: opt -ompss-2-regions -analyze -disable-checks -print-verbosity=dsa_missing -enable-new-pm=0 < %s 2>&1 | FileCheck %s -check-prefix=DSA
+
+; RUN: opt -passes='print<ompss-2-regions>' -disable-checks -print-verbosity=uses < %s 2>&1 | FileCheck %s -check-prefix=USES
+; RUN: opt -passes='print<ompss-2-regions>' -disable-checks -print-verbosity=dsa_missing < %s 2>&1 | FileCheck %s -check-prefix=DSA
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 
@@ -34,30 +37,30 @@ entry:
   call void @llvm.directive.region.exit(token %4)
   ret i32 0
 
-; USES: [0] %0
+; USES: [0] TASK %0
 ; USES-NEXT:   [Before] %func1
 ; USES-NEXT:   [Before] %arg
 ; USES-NEXT:   [After] %task0_4
-; USES-NEXT:   [1] %1
+; USES-NEXT:   [1] TASK %1
 ; USES-NEXT:     [Before] %func2
 ; USES-NEXT:     [Before] %func3
-; USES-NEXT:   [1] %2
+; USES-NEXT:   [1] TASK %2
 ; USES-NEXT:     [Before] %task0_1
 ; USES-NEXT:     [After] %task2_1
-; USES-NEXT: [0] %3
+; USES-NEXT: [0] TASK %3
 ; USES-NEXT:   [Before] %task0_4
-; USES-NEXT: [0] %4
+; USES-NEXT: [0] TASK %4
 
-; DSA: [0] %0
+; DSA: [0] TASK %0
 ; DSA-NEXT:   %func1
 ; DSA-NEXT:   %arg
-; DSA-NEXT:   [1] %1
+; DSA-NEXT:   [1] TASK %1
 ; DSA-NEXT:     %func3
-; DSA-NEXT:   [1] %2
+; DSA-NEXT:   [1] TASK %2
 ; DSA-NEXT:     %task0_1
-; DSA-NEXT: [0] %3
+; DSA-NEXT: [0] TASK %3
 ; DSA-NEXT:   %task0_4
-; DSA-NEXT: [0] %4
+; DSA-NEXT: [0] TASK %4
 
 }
 
@@ -87,18 +90,18 @@ if.else:
 if.end:
   ret i32 0
 
-; USES: [0] %0
+; USES: [0] TASK %0
 ; USES-NEXT:   [Before] %func1
 ; USES-NEXT:   [Before] %arg
-; USES-NEXT: [0] %1
+; USES-NEXT: [0] TASK %1
 ; USES-NEXT:   [Before] %func2
 ; USES-NEXT:   [Before] %func3
 ; USES-NEXT:   [Before] %arg
 
-; DSA: [0] %0
+; DSA: [0] TASK %0
 ; DSA-NEXT:   %func1
 ; DSA-NEXT:   %arg
-; DSA-NEXT: [0] %1
+; DSA-NEXT: [0] TASK %1
 ; DSA-NEXT:   %func3
 ; DSA-NEXT:   %arg
 

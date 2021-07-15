@@ -15,8 +15,8 @@
 #include "ContainerSizeEmptyCheck.h"
 #include "ConvertMemberFunctionsToStatic.h"
 #include "DeleteNullPointerCheck.h"
-#include "DeletedDefaultCheck.h"
 #include "ElseAfterReturnCheck.h"
+#include "FunctionCognitiveComplexityCheck.h"
 #include "FunctionSizeCheck.h"
 #include "IdentifierNamingCheck.h"
 #include "ImplicitBoolConversionCheck.h"
@@ -45,6 +45,7 @@
 #include "StringCompareCheck.h"
 #include "UniqueptrDeleteReleaseCheck.h"
 #include "UppercaseLiteralSuffixCheck.h"
+#include "UseAnyOfAllOfCheck.h"
 
 namespace clang {
 namespace tidy {
@@ -65,10 +66,10 @@ public:
         "readability-convert-member-functions-to-static");
     CheckFactories.registerCheck<DeleteNullPointerCheck>(
         "readability-delete-null-pointer");
-    CheckFactories.registerCheck<DeletedDefaultCheck>(
-        "readability-deleted-default");
     CheckFactories.registerCheck<ElseAfterReturnCheck>(
         "readability-else-after-return");
+    CheckFactories.registerCheck<FunctionCognitiveComplexityCheck>(
+        "readability-function-cognitive-complexity");
     CheckFactories.registerCheck<FunctionSizeCheck>(
         "readability-function-size");
     CheckFactories.registerCheck<IdentifierNamingCheck>(
@@ -125,6 +126,8 @@ public:
         "readability-uniqueptr-delete-release");
     CheckFactories.registerCheck<UppercaseLiteralSuffixCheck>(
         "readability-uppercase-literal-suffix");
+    CheckFactories.registerCheck<UseAnyOfAllOfCheck>(
+        "readability-use-anyofallof");
   }
 };
 

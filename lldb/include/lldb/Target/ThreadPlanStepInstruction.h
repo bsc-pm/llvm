@@ -18,7 +18,7 @@ namespace lldb_private {
 class ThreadPlanStepInstruction : public ThreadPlan {
 public:
   ThreadPlanStepInstruction(Thread &thread, bool step_over, bool stop_others,
-                            Vote stop_vote, Vote run_vote);
+                            Vote report_stop_vote, Vote report_run_vote);
 
   ~ThreadPlanStepInstruction() override;
 
@@ -49,7 +49,9 @@ private:
   StackID m_stack_id;
   StackID m_parent_frame_id;
 
-  DISALLOW_COPY_AND_ASSIGN(ThreadPlanStepInstruction);
+  ThreadPlanStepInstruction(const ThreadPlanStepInstruction &) = delete;
+  const ThreadPlanStepInstruction &
+  operator=(const ThreadPlanStepInstruction &) = delete;
 };
 
 } // namespace lldb_private

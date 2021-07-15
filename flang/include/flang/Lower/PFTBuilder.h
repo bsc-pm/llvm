@@ -1,79 +1,93 @@
-//===-- include/flang/Lower/PFTBuilder.h ------------------------*- C++ -*-===//
+//===-- Lower/PFTBuilder.h -- PFT builder -----------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+//
+// Coding style: https://mlir.llvm.org/getting_started/DeveloperGuide/
+//
+//===----------------------------------------------------------------------===//
+//
+// PFT (Pre-FIR Tree) interface.
+//
+//===----------------------------------------------------------------------===//
 
-#ifndef FORTRAN_LOWER_PFT_BUILDER_H_
-#define FORTRAN_LOWER_PFT_BUILDER_H_
+#ifndef FORTRAN_LOWER_PFTBUILDER_H
+#define FORTRAN_LOWER_PFTBUILDER_H
 
+#include "flang/Common/reference.h"
 #include "flang/Common/template.h"
+#include "flang/Lower/PFTDefs.h"
 #include "flang/Parser/parse-tree.h"
-#include <memory>
+#include "flang/Semantics/attr.h"
+#include "flang/Semantics/symbol.h"
+#include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
 
-/// Build a light-weight tree over the parse-tree to help with lowering to FIR.
-/// It is named Pre-FIR Tree (PFT) to underline it has no other usage than
-/// helping lowering to FIR.
-/// The PFT will capture pointers back into the parse tree, so the parse tree
-/// data structure may <em>not</em> be changed between the construction of the
-/// PFT and all of its uses.
-///
-/// The PFT captures a structured view of the program.  The program is a list of
-/// units.  Function like units will contain lists of evaluations.  Evaluations
-/// are either statements or constructs, where a construct contains a list of
-/// evaluations. The resulting PFT structure can then be used to create FIR.
-
-namespace llvm {
-class raw_ostream;
-}
-
-namespace Fortran::lower {
-namespace pft {
+namespace Fortran::lower::pft {
 
 struct Evaluation;
 struct Program;
 struct ModuleLikeUnit;
 struct FunctionLikeUnit;
 
-// TODO: A collection of Evaluations can obviously be any of the container
-// types; leaving this as a std::list _for now_ because we reserve the right to
-// insert PFT nodes in any order in O(1) time.
-using EvaluationCollection = std::list<Evaluation>;
+using EvaluationList = std::list<Evaluation>;
+using LabelEvalMap = llvm::DenseMap<Fortran::parser::Label, Evaluation *>;
 
-struct ParentType {
-  template <typename A>
-  ParentType(A &parent) : p{&parent} {}
-  const std::variant<Program *, ModuleLikeUnit *, FunctionLikeUnit *,
-                     Evaluation *>
-      p;
-};
+/// Provide a variant like container that can hold references. It can hold
+/// constant or mutable references. It is used in the other classes to provide
+/// union of const references to parse-tree nodes.
+template <bool isConst, typename... A>
+class ReferenceVariantBase {
+public:
+  template <typename B>
+  using BaseType = std::conditional_t<isConst, const B, B>;
+  template <typename B>
+  using Ref = common::Reference<BaseType<B>>;
 
-/// Flags to describe the impact of parse-trees nodes on the program
-/// control flow. These annotations to parse-tree nodes are later used to
-/// build the control flow graph when lowering to FIR.
-enum class CFGAnnotation {
-  None,            // Node does not impact control flow.
-  Goto,            // Node acts like a goto on the control flow.
-  CondGoto,        // Node acts like a conditional goto on the control flow.
-  IndGoto,         // Node acts like an indirect goto on the control flow.
-  IoSwitch,        // Node is an IO statement with ERR, END, or EOR specifier.
-  Switch,          // Node acts like a switch on the control flow.
-  Iterative,       // Node creates iterations in the control flow.
-  FirStructuredOp, // Node is a structured loop.
-  Return,          // Node triggers a return from the current procedure.
-  Terminate        // Node terminates the program.
-};
+  ReferenceVariantBase() = delete;
+  ReferenceVariantBase(std::variant<Ref<A>...> b) : u(b) {}
+  template <typename T>
+  ReferenceVariantBase(Ref<T> b) : u(b) {}
 
-/// Compiler-generated jump
-///
-/// This is used to convert implicit control-flow edges to explicit form in the
-/// decorated PFT
-struct CGJump {
-  CGJump(Evaluation &to) : target{to} {}
-  Evaluation &target;
+  template <typename B>
+  constexpr BaseType<B> &get() const {
+    return std::get<Ref<B>>(u).get();
+  }
+  template <typename B>
+  constexpr BaseType<B> &getStatement() const {
+    return std::get<Ref<parser::Statement<B>>>(u).get().statement;
+  }
+  template <typename B>
+  constexpr BaseType<B> *getIf() const {
+    auto *ptr = std::get_if<Ref<B>>(&u);
+    return ptr ? &ptr->get() : nullptr;
+  }
+  template <typename B>
+  constexpr bool isA() const {
+    return std::holds_alternative<Ref<B>>(u);
+  }
+  template <typename VISITOR>
+  constexpr auto visit(VISITOR &&visitor) const {
+    return std::visit(
+        common::visitors{[&visitor](auto ref) { return visitor(ref.get()); }},
+        u);
+  }
+
+private:
+  std::variant<Ref<A>...> u;
 };
+template <typename... A>
+using ReferenceVariant = ReferenceVariantBase<true, A...>;
+template <typename... A>
+using MutableReferenceVariant = ReferenceVariantBase<false, A...>;
+
+/// PftNode is used to provide a reference to the unit a parse-tree node
+/// belongs to. It is a variant of non-nullable pointers.
+using PftNode = MutableReferenceVariant<Program, ModuleLikeUnit,
+                                        FunctionLikeUnit, Evaluation>;
 
 /// Classify the parse-tree nodes from ExecutablePartConstruct
 
@@ -92,17 +106,8 @@ using ActionStmts = std::tuple<
     parser::ComputedGotoStmt, parser::ForallStmt, parser::ArithmeticIfStmt,
     parser::AssignStmt, parser::AssignedGotoStmt, parser::PauseStmt>;
 
-using OtherStmts = std::tuple<parser::FormatStmt, parser::EntryStmt,
-                              parser::DataStmt, parser::NamelistStmt>;
-
-using Constructs =
-    std::tuple<parser::AssociateConstruct, parser::BlockConstruct,
-               parser::CaseConstruct, parser::ChangeTeamConstruct,
-               parser::CriticalConstruct, parser::DoConstruct,
-               parser::IfConstruct, parser::SelectRankConstruct,
-               parser::SelectTypeConstruct, parser::WhereConstruct,
-               parser::ForallConstruct, parser::CompilerDirective,
-               parser::OpenMPConstruct, parser::OmpEndLoopDirective>;
+using OtherStmts =
+    std::tuple<parser::FormatStmt, parser::EntryStmt, parser::NamelistStmt>;
 
 using ConstructStmts = std::tuple<
     parser::AssociateStmt, parser::EndAssociateStmt, parser::BlockStmt,
@@ -115,283 +120,619 @@ using ConstructStmts = std::tuple<
     parser::MaskedElsewhereStmt, parser::ElsewhereStmt, parser::EndWhereStmt,
     parser::ForallConstructStmt, parser::EndForallStmt>;
 
-template <typename A>
-constexpr static bool isActionStmt{common::HasMember<A, ActionStmts>};
+using EndStmts =
+    std::tuple<parser::EndProgramStmt, parser::EndFunctionStmt,
+               parser::EndSubroutineStmt, parser::EndMpSubprogramStmt>;
+
+using Constructs =
+    std::tuple<parser::AssociateConstruct, parser::BlockConstruct,
+               parser::CaseConstruct, parser::ChangeTeamConstruct,
+               parser::CriticalConstruct, parser::DoConstruct,
+               parser::IfConstruct, parser::SelectRankConstruct,
+               parser::SelectTypeConstruct, parser::WhereConstruct,
+               parser::ForallConstruct>;
+
+using Directives =
+    std::tuple<parser::CompilerDirective, parser::OpenACCConstruct,
+               parser::OpenMPConstruct, parser::OmpEndLoopDirective>;
 
 template <typename A>
-constexpr static bool isConstruct{common::HasMember<A, Constructs>};
+static constexpr bool isActionStmt{common::HasMember<A, ActionStmts>};
 
 template <typename A>
-constexpr static bool isConstructStmt{common::HasMember<A, ConstructStmts>};
+static constexpr bool isOtherStmt{common::HasMember<A, OtherStmts>};
 
 template <typename A>
-constexpr static bool isOtherStmt{common::HasMember<A, OtherStmts>};
+static constexpr bool isConstructStmt{common::HasMember<A, ConstructStmts>};
 
 template <typename A>
-constexpr static bool isGenerated{std::is_same_v<A, CGJump>};
+static constexpr bool isEndStmt{common::HasMember<A, EndStmts>};
 
 template <typename A>
-constexpr static bool isFunctionLike{common::HasMember<
+static constexpr bool isConstruct{common::HasMember<A, Constructs>};
+
+template <typename A>
+static constexpr bool isDirective{common::HasMember<A, Directives>};
+
+template <typename A>
+static constexpr bool isIntermediateConstructStmt{common::HasMember<
+    A, std::tuple<parser::CaseStmt, parser::ElseIfStmt, parser::ElseStmt,
+                  parser::SelectRankCaseStmt, parser::TypeGuardStmt>>};
+
+template <typename A>
+static constexpr bool isNopConstructStmt{common::HasMember<
+    A, std::tuple<parser::EndAssociateStmt, parser::CaseStmt,
+                  parser::EndSelectStmt, parser::ElseIfStmt, parser::ElseStmt,
+                  parser::EndIfStmt, parser::SelectRankCaseStmt,
+                  parser::TypeGuardStmt>>};
+
+template <typename A>
+static constexpr bool isFunctionLike{common::HasMember<
     A, std::tuple<parser::MainProgram, parser::FunctionSubprogram,
                   parser::SubroutineSubprogram,
                   parser::SeparateModuleSubprogram>>};
 
-/// Function-like units can contains lists of evaluations.  These can be
-/// (simple) statements or constructs, where a construct contains its own
-/// evaluations.
-struct Evaluation {
-  using EvalTuple = common::CombineTuples<ActionStmts, OtherStmts, Constructs,
-                                          ConstructStmts>;
+template <typename A>
+struct MakeReferenceVariantHelper {};
+template <typename... A>
+struct MakeReferenceVariantHelper<std::variant<A...>> {
+  using type = ReferenceVariant<A...>;
+};
+template <typename... A>
+struct MakeReferenceVariantHelper<std::tuple<A...>> {
+  using type = ReferenceVariant<A...>;
+};
+template <typename A>
+using MakeReferenceVariant = typename MakeReferenceVariantHelper<A>::type;
 
-  /// Hide non-nullable pointers to the parse-tree node.
-  template <typename A>
-  using MakeRefType = const A *const;
-  using EvalVariant =
-      common::CombineVariants<common::MapTemplate<MakeRefType, EvalTuple>,
-                              std::variant<CGJump>>;
-  template <typename A>
-  constexpr auto visit(A visitor) const {
-    return std::visit(common::visitors{
-                          [&](const auto *p) { return visitor(*p); },
-                          [&](auto &r) { return visitor(r); },
-                      },
-                      u);
-  }
-  template <typename A>
-  constexpr const A *getIf() const {
-    if constexpr (!std::is_same_v<A, CGJump>) {
-      if (auto *ptr{std::get_if<MakeRefType<A>>(&u)}) {
-        return *ptr;
-      }
-    } else {
-      return std::get_if<CGJump>(&u);
-    }
-    return nullptr;
-  }
-  template <typename A>
-  constexpr bool isA() const {
-    if constexpr (!std::is_same_v<A, CGJump>) {
-      return std::holds_alternative<MakeRefType<A>>(u);
-    }
-    return std::holds_alternative<CGJump>(u);
-  }
+using EvaluationTuple =
+    common::CombineTuples<ActionStmts, OtherStmts, ConstructStmts, EndStmts,
+                          Constructs, Directives>;
+/// Hide non-nullable pointers to the parse-tree node.
+/// Build type std::variant<const A* const, const B* const, ...>
+/// from EvaluationTuple type (std::tuple<A, B, ...>).
+using EvaluationVariant = MakeReferenceVariant<EvaluationTuple>;
 
-  Evaluation() = delete;
-  Evaluation(const Evaluation &) = delete;
-  Evaluation(Evaluation &&) = default;
+/// Function-like units contain lists of evaluations.  These can be simple
+/// statements or constructs, where a construct contains its own evaluations.
+struct Evaluation : EvaluationVariant {
 
   /// General ctor
   template <typename A>
-  Evaluation(const A &a, const ParentType &p, const parser::CharBlock &pos,
-             const std::optional<parser::Label> &lab)
-      : u{&a}, parent{p}, pos{pos}, lab{lab} {}
+  Evaluation(const A &a, const PftNode &parent,
+             const parser::CharBlock &position,
+             const std::optional<parser::Label> &label)
+      : EvaluationVariant{a}, parent{parent}, position{position}, label{label} {
+  }
 
-  /// Compiler-generated jump
-  Evaluation(const CGJump &jump, const ParentType &p)
-      : u{jump}, parent{p}, cfg{CFGAnnotation::Goto} {}
-
-  /// Construct ctor
+  /// Construct and Directive ctor
   template <typename A>
-  Evaluation(const A &a, const ParentType &parent) : u{&a}, parent{parent} {
-    static_assert(pft::isConstruct<A>, "must be a construct");
+  Evaluation(const A &a, const PftNode &parent)
+      : EvaluationVariant{a}, parent{parent} {
+    static_assert(pft::isConstruct<A> || pft::isDirective<A>,
+                  "must be a construct or directive");
   }
 
-  constexpr bool isActionOrGenerated() const {
+  /// Evaluation classification predicates.
+  constexpr bool isActionStmt() const {
     return visit(common::visitors{
-        [](auto &r) {
-          using T = std::decay_t<decltype(r)>;
-          return isActionStmt<T> || isGenerated<T>;
-        },
-    });
+        [](auto &r) { return pft::isActionStmt<std::decay_t<decltype(r)>>; }});
   }
-
-  constexpr bool isStmt() const {
+  constexpr bool isOtherStmt() const {
     return visit(common::visitors{
-        [](auto &r) {
-          using T = std::decay_t<decltype(r)>;
-          static constexpr bool isStmt{isActionStmt<T> || isOtherStmt<T> ||
-                                       isConstructStmt<T>};
-          static_assert(!(isStmt && pft::isConstruct<T>),
-                        "statement classification is inconsistent");
-          return isStmt;
-        },
-    });
+        [](auto &r) { return pft::isOtherStmt<std::decay_t<decltype(r)>>; }});
   }
-  constexpr bool isConstruct() const { return !isStmt(); }
-
-  /// Set the type of originating control flow type for this evaluation.
-  void setCFG(CFGAnnotation a, Evaluation *cstr) {
-    cfg = a;
-    setBranches(cstr);
+  constexpr bool isConstructStmt() const {
+    return visit(common::visitors{[](auto &r) {
+      return pft::isConstructStmt<std::decay_t<decltype(r)>>;
+    }});
+  }
+  constexpr bool isEndStmt() const {
+    return visit(common::visitors{
+        [](auto &r) { return pft::isEndStmt<std::decay_t<decltype(r)>>; }});
+  }
+  constexpr bool isConstruct() const {
+    return visit(common::visitors{
+        [](auto &r) { return pft::isConstruct<std::decay_t<decltype(r)>>; }});
+  }
+  constexpr bool isDirective() const {
+    return visit(common::visitors{
+        [](auto &r) { return pft::isDirective<std::decay_t<decltype(r)>>; }});
+  }
+  constexpr bool isNopConstructStmt() const {
+    return visit(common::visitors{[](auto &r) {
+      return pft::isNopConstructStmt<std::decay_t<decltype(r)>>;
+    }});
   }
 
-  /// Is this evaluation a control-flow origin? (The PFT must be annotated)
-  bool isControlOrigin() const { return cfg != CFGAnnotation::None; }
+  /// Return the predicate:  "This is a non-initial, non-terminal construct
+  /// statement."  For an IfConstruct, this is ElseIfStmt and ElseStmt.
+  constexpr bool isIntermediateConstructStmt() const {
+    return visit(common::visitors{[](auto &r) {
+      return pft::isIntermediateConstructStmt<std::decay_t<decltype(r)>>;
+    }});
+  }
 
-  /// Is this evaluation a control-flow target? (The PFT must be annotated)
-  bool isControlTarget() const { return isTarget; }
+  LLVM_DUMP_METHOD void dump() const;
 
-  /// Set the containsBranches flag iff this evaluation (a construct) contains
-  /// control flow
-  void setBranches() { containsBranches = true; }
-
-  EvaluationCollection *getConstructEvals() {
-    auto *evals{subs.get()};
-    if (isStmt() && !evals) {
-      return nullptr;
+  /// Return the first non-nop successor of an evaluation, possibly exiting
+  /// from one or more enclosing constructs.
+  Evaluation &nonNopSuccessor() const {
+    Evaluation *successor = lexicalSuccessor;
+    if (successor && successor->isNopConstructStmt()) {
+      successor = successor->parentConstruct->constructExit;
     }
-    if (isConstruct() && evals) {
-      return evals;
-    }
-    llvm_unreachable("evaluation subs is inconsistent");
-    return nullptr;
+    assert(successor && "missing successor");
+    return *successor;
   }
 
-  /// Set that the construct `cstr` (if not a nullptr) has branches.
-  static void setBranches(Evaluation *cstr) {
-    if (cstr)
-      cstr->setBranches();
+  /// Return true if this Evaluation has at least one nested evaluation.
+  bool hasNestedEvaluations() const {
+    return evaluationList && !evaluationList->empty();
   }
 
-  EvalVariant u;
-  ParentType parent;
-  parser::CharBlock pos;
-  std::optional<parser::Label> lab;
-  std::unique_ptr<EvaluationCollection> subs; // construct sub-statements
-  CFGAnnotation cfg{CFGAnnotation::None};
-  bool isTarget{false};         // this evaluation is a control target
-  bool containsBranches{false}; // construct contains branches
+  /// Return nested evaluation list.
+  EvaluationList &getNestedEvaluations() {
+    assert(evaluationList && "no nested evaluations");
+    return *evaluationList;
+  }
+
+  Evaluation &getFirstNestedEvaluation() {
+    assert(hasNestedEvaluations() && "no nested evaluations");
+    return evaluationList->front();
+  }
+
+  Evaluation &getLastNestedEvaluation() {
+    assert(hasNestedEvaluations() && "no nested evaluations");
+    return evaluationList->back();
+  }
+
+  /// Return the FunctionLikeUnit containing this evaluation (or nullptr).
+  FunctionLikeUnit *getOwningProcedure() const;
+
+  bool lowerAsStructured() const;
+  bool lowerAsUnstructured() const;
+
+  // FIR generation looks primarily at PFT ActionStmt and ConstructStmt leaf
+  // nodes.  Members such as lexicalSuccessor and block are applicable only
+  // to these nodes.  The controlSuccessor member is used for nonlexical
+  // successors, such as linking to a GOTO target.  For multiway branches,
+  // it is set to the first target.  Successor and exit links always target
+  // statements.  An internal Construct node has a constructExit link that
+  // applies to exits from anywhere within the construct.
+  //
+  // An unstructured construct is one that contains some form of goto.  This
+  // is indicated by the isUnstructured member flag, which may be set on a
+  // statement and propagated to enclosing constructs.  This distinction allows
+  // a structured IF or DO statement to be materialized with custom structured
+  // FIR operations.  An unstructured statement is materialized as mlir
+  // operation sequences that include explicit branches.
+  //
+  // The block member is set for statements that begin a new block.  This
+  // block is the target of any branch to the statement.  Statements may have
+  // additional (unstructured) "local" blocks, but such blocks cannot be the
+  // target of any explicit branch.  The primary example of an (unstructured)
+  // statement that may have multiple associated blocks is NonLabelDoStmt,
+  // which may have a loop preheader block for loop initialization code (the
+  // block member), and always has a "local" header block that is the target
+  // of the loop back edge.  If the NonLabelDoStmt is a concurrent loop, it
+  // may be associated with an arbitrary number of nested preheader, header,
+  // and mask blocks.
+  //
+  // The printIndex member is only set for statements.  It is used for dumps
+  // (and debugging) and does not affect FIR generation.
+
+  PftNode parent;
+  parser::CharBlock position{};
+  std::optional<parser::Label> label{};
+  std::unique_ptr<EvaluationList> evaluationList; // nested evaluations
+  Evaluation *parentConstruct{nullptr};  // set for nodes below the top level
+  Evaluation *lexicalSuccessor{nullptr}; // set for ActionStmt, ConstructStmt
+  Evaluation *controlSuccessor{nullptr}; // set for some statements
+  Evaluation *constructExit{nullptr};    // set for constructs
+  bool isNewBlock{false};                // evaluation begins a new basic block
+  bool isUnstructured{false};  // evaluation has unstructured control flow
+  bool negateCondition{false}; // If[Then]Stmt condition must be negated
+  mlir::Block *block{nullptr}; // isNewBlock block (ActionStmt, ConstructStmt)
+  int printIndex{0}; // (ActionStmt, ConstructStmt) evaluation index for dumps
 };
 
+using ProgramVariant =
+    ReferenceVariant<parser::MainProgram, parser::FunctionSubprogram,
+                     parser::SubroutineSubprogram, parser::Module,
+                     parser::Submodule, parser::SeparateModuleSubprogram,
+                     parser::BlockData, parser::CompilerDirective>;
 /// A program is a list of program units.
-/// These units can be function like, module like, or block data
-struct ProgramUnit {
+/// These units can be function like, module like, or block data.
+struct ProgramUnit : ProgramVariant {
   template <typename A>
-  ProgramUnit(const A &ptr, const ParentType &parent)
-      : p{&ptr}, parent{parent} {}
+  ProgramUnit(const A &p, const PftNode &parent)
+      : ProgramVariant{p}, parent{parent} {}
   ProgramUnit(ProgramUnit &&) = default;
   ProgramUnit(const ProgramUnit &) = delete;
 
-  const std::variant<
-      const parser::MainProgram *, const parser::FunctionSubprogram *,
-      const parser::SubroutineSubprogram *, const parser::Module *,
-      const parser::Submodule *, const parser::SeparateModuleSubprogram *,
-      const parser::BlockData *>
-      p;
-  ParentType parent;
+  PftNode parent;
 };
 
-/// Function-like units have similar structure. They all can contain executable
-/// statements as well as other function-like units (internal procedures and
-/// function statements).
+/// A variable captures an object to be created per the declaration part of a
+/// function like unit.
+///
+/// Fortran EQUIVALENCE statements are a mechanism that introduces aliasing
+/// between named variables. The set of overlapping aliases will materialize a
+/// generic store object with a designated offset and size. Participant
+/// symbols will simply be pointers into the aggregate store.
+///
+/// EQUIVALENCE can also interact with COMMON and other global variables to
+/// imply aliasing between (subparts of) a global and other local variable
+/// names.
+///
+/// Properties can be applied by lowering. For example, a local array that is
+/// known to be very large may be transformed into a heap allocated entity by
+/// lowering. That decision would be tracked in its Variable instance.
+struct Variable {
+  /// Most variables are nominal and require the allocation of local/global
+  /// storage space. A nominal variable may also be an alias for some other
+  /// (subpart) of storage.
+  struct Nominal {
+    Nominal(const semantics::Symbol *symbol, int depth, bool global)
+        : symbol{symbol}, depth{depth}, global{global} {}
+    const semantics::Symbol *symbol{};
+
+    bool isGlobal() const { return global; }
+    bool isDeclaration() const {
+      return !symbol || symbol != &symbol->GetUltimate();
+    }
+
+    int depth{};
+    bool global{};
+    bool heapAlloc{}; // variable needs deallocation on exit
+    bool pointer{};
+    bool target{};
+    bool aliaser{}; // participates in EQUIVALENCE union
+    std::size_t aliasOffset{};
+  };
+
+  using Interval = std::tuple<std::size_t, std::size_t>;
+
+  /// An interval of storage is a contiguous block of memory to be allocated or
+  /// mapped onto another variable. Aliasing variables will be pointers into
+  /// interval stores and may overlap each other.
+  struct AggregateStore {
+    AggregateStore(Interval &&interval, const Fortran::semantics::Scope &scope,
+                   bool isDeclaration = false)
+        : interval{std::move(interval)}, scope{&scope}, isDecl{isDeclaration} {}
+    AggregateStore(Interval &&interval, const Fortran::semantics::Scope &scope,
+                   const llvm::SmallVector<const semantics::Symbol *, 8> &vars,
+                   bool isDeclaration = false)
+        : interval{std::move(interval)}, scope{&scope}, vars{vars},
+          isDecl{isDeclaration} {}
+
+    bool isGlobal() const { return vars.size() > 0; }
+    bool isDeclaration() const { return isDecl; }
+    /// Get offset of the aggregate inside its scope.
+    std::size_t getOffset() const { return std::get<0>(interval); }
+
+    Interval interval{};
+    /// scope in which the interval is.
+    const Fortran::semantics::Scope *scope;
+    llvm::SmallVector<const semantics::Symbol *, 8> vars{};
+    /// Is this a declaration of a storage defined in another scope ?
+    bool isDecl;
+  };
+
+  explicit Variable(const Fortran::semantics::Symbol &sym, bool global = false,
+                    int depth = 0)
+      : var{Nominal(&sym, depth, global)} {}
+  explicit Variable(AggregateStore &&istore) : var{std::move(istore)} {}
+
+  /// Return the front-end symbol for a nominal variable.
+  const Fortran::semantics::Symbol &getSymbol() const {
+    assert(hasSymbol() && "variable is not nominal");
+    return *std::get<Nominal>(var).symbol;
+  }
+
+  /// Return the aggregate store.
+  const AggregateStore &getAggregateStore() const {
+    assert(isAggregateStore());
+    return std::get<AggregateStore>(var);
+  }
+
+  /// Return the interval range of an aggregate store.
+  const Interval &getInterval() const {
+    assert(isAggregateStore());
+    return std::get<AggregateStore>(var).interval;
+  }
+
+  /// Only nominal variable have front-end symbols.
+  bool hasSymbol() const { return std::holds_alternative<Nominal>(var); }
+
+  /// Is this an aggregate store?
+  bool isAggregateStore() const {
+    return std::holds_alternative<AggregateStore>(var);
+  }
+
+  /// Is this variable a global?
+  bool isGlobal() const {
+    return std::visit([](const auto &x) { return x.isGlobal(); }, var);
+  }
+
+  /// Is this a declaration of a variable owned by another scope ?
+  bool isDeclaration() const {
+    return std::visit([](const auto &x) { return x.isDeclaration(); }, var);
+  }
+
+  const Fortran::semantics::Scope *getOwningScope() const {
+    return std::visit(
+        common::visitors{
+            [](const Nominal &x) { return &x.symbol->GetUltimate().owner(); },
+            [](const AggregateStore &agg) { return agg.scope; }},
+        var);
+  }
+
+  bool isHeapAlloc() const {
+    if (const auto *s = std::get_if<Nominal>(&var))
+      return s->heapAlloc;
+    return false;
+  }
+  bool isPointer() const {
+    if (const auto *s = std::get_if<Nominal>(&var))
+      return s->pointer;
+    return false;
+  }
+  bool isTarget() const {
+    if (const auto *s = std::get_if<Nominal>(&var))
+      return s->target;
+    return false;
+  }
+
+  /// An alias(er) is a variable that is part of a EQUIVALENCE that is allocated
+  /// locally on the stack.
+  bool isAlias() const {
+    if (const auto *s = std::get_if<Nominal>(&var))
+      return s->aliaser;
+    return false;
+  }
+  std::size_t getAlias() const {
+    if (auto *s = std::get_if<Nominal>(&var))
+      return s->aliasOffset;
+    return 0;
+  }
+  void setAlias(std::size_t offset) {
+    if (auto *s = std::get_if<Nominal>(&var)) {
+      s->aliaser = true;
+      s->aliasOffset = offset;
+    } else {
+      llvm_unreachable("not a nominal var");
+    }
+  }
+
+  void setHeapAlloc(bool to = true) {
+    if (auto *s = std::get_if<Nominal>(&var))
+      s->heapAlloc = to;
+    else
+      llvm_unreachable("not a nominal var");
+  }
+  void setPointer(bool to = true) {
+    if (auto *s = std::get_if<Nominal>(&var))
+      s->pointer = to;
+    else
+      llvm_unreachable("not a nominal var");
+  }
+  void setTarget(bool to = true) {
+    if (auto *s = std::get_if<Nominal>(&var))
+      s->target = to;
+    else
+      llvm_unreachable("not a nominal var");
+  }
+
+  /// The depth is recorded for nominal variables as a debugging aid.
+  int getDepth() const {
+    if (const auto *s = std::get_if<Nominal>(&var))
+      return s->depth;
+    return 0;
+  }
+
+  LLVM_DUMP_METHOD void dump() const;
+
+private:
+  std::variant<Nominal, AggregateStore> var;
+};
+
+/// Function-like units may contain evaluations (executable statements) and
+/// nested function-like units (internal procedures and function statements).
 struct FunctionLikeUnit : public ProgramUnit {
   // wrapper statements for function-like syntactic structures
   using FunctionStatement =
-      std::variant<const parser::Statement<parser::ProgramStmt> *,
-                   const parser::Statement<parser::EndProgramStmt> *,
-                   const parser::Statement<parser::FunctionStmt> *,
-                   const parser::Statement<parser::EndFunctionStmt> *,
-                   const parser::Statement<parser::SubroutineStmt> *,
-                   const parser::Statement<parser::EndSubroutineStmt> *,
-                   const parser::Statement<parser::MpSubprogramStmt> *,
-                   const parser::Statement<parser::EndMpSubprogramStmt> *>;
+      ReferenceVariant<parser::Statement<parser::ProgramStmt>,
+                       parser::Statement<parser::EndProgramStmt>,
+                       parser::Statement<parser::FunctionStmt>,
+                       parser::Statement<parser::EndFunctionStmt>,
+                       parser::Statement<parser::SubroutineStmt>,
+                       parser::Statement<parser::EndSubroutineStmt>,
+                       parser::Statement<parser::MpSubprogramStmt>,
+                       parser::Statement<parser::EndMpSubprogramStmt>>;
 
-  FunctionLikeUnit(const parser::MainProgram &f, const ParentType &parent);
-  FunctionLikeUnit(const parser::FunctionSubprogram &f,
-                   const ParentType &parent);
-  FunctionLikeUnit(const parser::SubroutineSubprogram &f,
-                   const ParentType &parent);
-  FunctionLikeUnit(const parser::SeparateModuleSubprogram &f,
-                   const ParentType &parent);
+  FunctionLikeUnit(
+      const parser::MainProgram &f, const PftNode &parent,
+      const Fortran::semantics::SemanticsContext &semanticsContext);
+  FunctionLikeUnit(
+      const parser::FunctionSubprogram &f, const PftNode &parent,
+      const Fortran::semantics::SemanticsContext &semanticsContext);
+  FunctionLikeUnit(
+      const parser::SubroutineSubprogram &f, const PftNode &parent,
+      const Fortran::semantics::SemanticsContext &semanticsContext);
+  FunctionLikeUnit(
+      const parser::SeparateModuleSubprogram &f, const PftNode &parent,
+      const Fortran::semantics::SemanticsContext &semanticsContext);
   FunctionLikeUnit(FunctionLikeUnit &&) = default;
   FunctionLikeUnit(const FunctionLikeUnit &) = delete;
 
-  bool isMainProgram() {
-    return std::holds_alternative<
-        const parser::Statement<parser::EndProgramStmt> *>(endStmt);
+  /// Return true iff this function like unit is Fortran recursive (actually
+  /// meaning it's reentrant).
+  bool isRecursive() const {
+    if (isMainProgram())
+      return false;
+    const auto &sym = getSubprogramSymbol();
+    return sym.attrs().test(semantics::Attr::RECURSIVE) ||
+           (!sym.attrs().test(semantics::Attr::NON_RECURSIVE) &&
+            defaultRecursiveFunctionSetting());
   }
-  const parser::FunctionStmt *getFunction() {
-    return getA<parser::FunctionStmt>();
+
+  std::vector<Variable> getOrderedSymbolTable() { return varList[0]; }
+
+  bool isMainProgram() const {
+    return endStmt.isA<parser::Statement<parser::EndProgramStmt>>();
   }
-  const parser::SubroutineStmt *getSubroutine() {
-    return getA<parser::SubroutineStmt>();
+
+  /// Get the starting source location for this function like unit
+  parser::CharBlock getStartingSourceLoc() {
+    if (beginStmt)
+      return stmtSourceLoc(*beginStmt);
+    if (!evaluationList.empty())
+      return evaluationList.front().position;
+    return stmtSourceLoc(endStmt);
   }
-  const parser::MpSubprogramStmt *getMPSubp() {
-    return getA<parser::MpSubprogramStmt>();
+
+  void setActiveEntry(int entryIndex) {
+    assert(entryIndex >= 0 && entryIndex < (int)entryPointList.size() &&
+           "invalid entry point index");
+    activeEntry = entryIndex;
   }
+
+  /// Return a reference to the subprogram symbol of this FunctionLikeUnit.
+  /// This should not be called if the FunctionLikeUnit is the main program
+  /// since anonymous main programs do not have a symbol.
+  const semantics::Symbol &getSubprogramSymbol() const {
+    const auto *symbol = entryPointList[activeEntry].first;
+    if (!symbol)
+      llvm::report_fatal_error(
+          "not inside a procedure; do not call on main program.");
+    return *symbol;
+  }
+
+  /// Return a pointer to the current entry point Evaluation.
+  /// This is null for a primary entry point.
+  Evaluation *getEntryEval() const {
+    return entryPointList[activeEntry].second;
+  }
+
+  /// Helper to get location from FunctionLikeUnit begin/end statements.
+  static parser::CharBlock stmtSourceLoc(const FunctionStatement &stmt) {
+    return stmt.visit(common::visitors{[](const auto &x) { return x.source; }});
+  }
+
+  LLVM_DUMP_METHOD void dump() const;
 
   /// Anonymous programs do not have a begin statement
   std::optional<FunctionStatement> beginStmt;
   FunctionStatement endStmt;
-  EvaluationCollection evals;        // statements
-  std::list<FunctionLikeUnit> funcs; // internal procedures
-
-private:
-  template <typename A>
-  const A *getA() {
-    if (beginStmt) {
-      if (auto p =
-              std::get_if<const parser::Statement<A> *>(&beginStmt.value()))
-        return &(*p)->statement;
-    }
-    return nullptr;
-  }
+  EvaluationList evaluationList;
+  LabelEvalMap labelEvaluationMap;
+  SymbolLabelMap assignSymbolLabelMap;
+  std::list<FunctionLikeUnit> nestedFunctions;
+  /// <Symbol, Evaluation> pairs for each entry point.  The pair at index 0
+  /// is the primary entry point; remaining pairs are alternate entry points.
+  /// The primary entry point symbol is Null for an anonymous program.
+  /// A named program symbol has MainProgramDetails.  Other symbols have
+  /// SubprogramDetails.  Evaluations are filled in for alternate entries.
+  llvm::SmallVector<std::pair<const semantics::Symbol *, Evaluation *>, 1>
+      entryPointList{std::pair{nullptr, nullptr}};
+  /// Current index into entryPointList.  Index 0 is the primary entry point.
+  int activeEntry = 0;
+  /// Dummy arguments that are not universal across entry points.
+  llvm::SmallVector<const semantics::Symbol *, 3> nonUniversalDummyArguments;
+  /// Primary result for function subprograms with alternate entries.  This
+  /// is one of the largest result values, not necessarily the first one.
+  const semantics::Symbol *primaryResult{nullptr};
+  /// Terminal basic block (if any)
+  mlir::Block *finalBlock{};
+  std::vector<std::vector<Variable>> varList;
 };
 
-/// Module-like units have similar structure. They all can contain a list of
-/// function-like units.
+/// Module-like units contain a list of function-like units.
 struct ModuleLikeUnit : public ProgramUnit {
   // wrapper statements for module-like syntactic structures
   using ModuleStatement =
-      std::variant<const parser::Statement<parser::ModuleStmt> *,
-                   const parser::Statement<parser::EndModuleStmt> *,
-                   const parser::Statement<parser::SubmoduleStmt> *,
-                   const parser::Statement<parser::EndSubmoduleStmt> *>;
+      ReferenceVariant<parser::Statement<parser::ModuleStmt>,
+                       parser::Statement<parser::EndModuleStmt>,
+                       parser::Statement<parser::SubmoduleStmt>,
+                       parser::Statement<parser::EndSubmoduleStmt>>;
 
-  ModuleLikeUnit(const parser::Module &m, const ParentType &parent);
-  ModuleLikeUnit(const parser::Submodule &m, const ParentType &parent);
+  ModuleLikeUnit(const parser::Module &m, const PftNode &parent);
+  ModuleLikeUnit(const parser::Submodule &m, const PftNode &parent);
   ~ModuleLikeUnit() = default;
   ModuleLikeUnit(ModuleLikeUnit &&) = default;
   ModuleLikeUnit(const ModuleLikeUnit &) = delete;
 
+  LLVM_DUMP_METHOD void dump() const;
+
+  std::vector<Variable> getOrderedSymbolTable() { return varList[0]; }
+
   ModuleStatement beginStmt;
   ModuleStatement endStmt;
-  std::list<FunctionLikeUnit> funcs;
+  std::list<FunctionLikeUnit> nestedFunctions;
+  std::vector<std::vector<Variable>> varList;
 };
 
+/// Block data units contain the variables and data initializers for common
+/// blocks, etc.
 struct BlockDataUnit : public ProgramUnit {
-  BlockDataUnit(const parser::BlockData &bd, const ParentType &parent);
+  BlockDataUnit(const parser::BlockData &bd, const PftNode &parent,
+                const Fortran::semantics::SemanticsContext &semanticsContext);
   BlockDataUnit(BlockDataUnit &&) = default;
   BlockDataUnit(const BlockDataUnit &) = delete;
+
+  LLVM_DUMP_METHOD void dump() const;
+
+  const Fortran::semantics::Scope &symTab; // symbol table
 };
 
-/// A Program is the top-level PFT
+// Top level compiler directives
+struct CompilerDirectiveUnit : public ProgramUnit {
+  CompilerDirectiveUnit(const parser::CompilerDirective &directive,
+                        const PftNode &parent)
+      : ProgramUnit{directive, parent} {};
+  CompilerDirectiveUnit(CompilerDirectiveUnit &&) = default;
+  CompilerDirectiveUnit(const CompilerDirectiveUnit &) = delete;
+};
+
+/// A Program is the top-level root of the PFT.
 struct Program {
-  using Units = std::variant<FunctionLikeUnit, ModuleLikeUnit, BlockDataUnit>;
+  using Units = std::variant<FunctionLikeUnit, ModuleLikeUnit, BlockDataUnit,
+                             CompilerDirectiveUnit>;
 
   Program() = default;
   Program(Program &&) = default;
   Program(const Program &) = delete;
 
+  const std::list<Units> &getUnits() const { return units; }
   std::list<Units> &getUnits() { return units; }
+
+  /// LLVM dump method on a Program.
+  LLVM_DUMP_METHOD void dump() const;
 
 private:
   std::list<Units> units;
 };
 
-} // namespace pft
+} // namespace Fortran::lower::pft
 
-/// Create an PFT from the parse tree
-std::unique_ptr<pft::Program> createPFT(const parser::Program &root);
-
-/// Decorate the PFT with control flow annotations
+namespace Fortran::lower {
+/// Create a PFT (Pre-FIR Tree) from the parse tree.
 ///
-/// The PFT must be decorated with control-flow annotations to prepare it for
-/// use in generating a CFG-like structure.
-void annotateControl(pft::Program &);
+/// A PFT is a light weight tree over the parse tree that is used to create FIR.
+/// The PFT captures pointers back into the parse tree, so the parse tree must
+/// not be changed between the construction of the PFT and its last use.  The
+/// PFT captures a structured view of a program.  A program is a list of units.
+/// A function like unit contains a list of evaluations.  An evaluation is
+/// either a statement, or a construct with a nested list of evaluations.
+std::unique_ptr<pft::Program>
+createPFT(const parser::Program &root,
+          const Fortran::semantics::SemanticsContext &semanticsContext);
 
-void dumpPFT(llvm::raw_ostream &o, pft::Program &);
+/// Dumper for displaying a PFT.
+void dumpPFT(llvm::raw_ostream &outputStream, const pft::Program &pft);
 
 } // namespace Fortran::lower
 
-#endif // FORTRAN_LOWER_PFT_BUILDER_H_
+#endif // FORTRAN_LOWER_PFTBUILDER_H

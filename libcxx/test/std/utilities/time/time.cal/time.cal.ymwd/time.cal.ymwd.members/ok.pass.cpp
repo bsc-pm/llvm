@@ -5,13 +5,13 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-// UNSUPPORTED: c++98, c++03, c++11, c++14, c++17
+// UNSUPPORTED: c++03, c++11, c++14, c++17
 
 // <chrono>
 // class year_month_weekday;
 
 // constexpr bool ok() const noexcept;
-//  Returns: If any of y_­.ok(), m_­.ok(), or wdi_­.ok() is false, returns false.
+//  Returns: If any of y_.ok(), m_.ok(), or wdi_.ok() is false, returns false.
 //           Otherwise, if *this represents a valid date, returns true.
 //           Otherwise, returns false.
 

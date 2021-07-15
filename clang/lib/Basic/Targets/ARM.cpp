@@ -25,6 +25,9 @@ void ARMTargetInfo::setABIAAPCS() {
   IsAAPCS = true;
 
   DoubleAlign = LongLongAlign = LongDoubleAlign = SuitableAlign = 64;
+  BFloat16Width = BFloat16Align = 16;
+  BFloat16Format = &llvm::APFloat::BFloat();
+
   const llvm::Triple &T = getTriple();
 
   bool IsNetBSD = T.isOSNetBSD();
@@ -41,7 +44,8 @@ void ARMTargetInfo::setABIAAPCS() {
   if (T.isOSBinFormatMachO()) {
     resetDataLayout(BigEndian
                         ? "E-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"
-                        : "e-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64");
+                        : "e-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64",
+                    "_");
   } else if (T.isOSWindows()) {
     assert(!BigEndian && "Windows on ARM does not support big endian");
     resetDataLayout("e"
@@ -74,6 +78,8 @@ void ARMTargetInfo::setABIAPCS(bool IsAAPCS16) {
     DoubleAlign = LongLongAlign = LongDoubleAlign = SuitableAlign = 64;
   else
     DoubleAlign = LongLongAlign = LongDoubleAlign = SuitableAlign = 32;
+  BFloat16Width = BFloat16Align = 16;
+  BFloat16Format = &llvm::APFloat::BFloat();
 
   WCharType = SignedInt;
 
@@ -88,12 +94,13 @@ void ARMTargetInfo::setABIAPCS(bool IsAAPCS16) {
 
   if (T.isOSBinFormatMachO() && IsAAPCS16) {
     assert(!BigEndian && "AAPCS16 does not support big-endian");
-    resetDataLayout("e-m:o-p:32:32-Fi8-i64:64-a:0:32-n32-S128");
+    resetDataLayout("e-m:o-p:32:32-Fi8-i64:64-a:0:32-n32-S128", "_");
   } else if (T.isOSBinFormatMachO())
     resetDataLayout(
         BigEndian
             ? "E-m:o-p:32:32-Fi8-f64:32:64-v64:32:64-v128:32:128-a:0:32-n32-S32"
-            : "e-m:o-p:32:32-Fi8-f64:32:64-v64:32:64-v128:32:128-a:0:32-n32-S32");
+            : "e-m:o-p:32:32-Fi8-f64:32:64-v64:32:64-v128:32:128-a:0:32-n32-S32",
+        "_");
   else
     resetDataLayout(
         BigEndian
@@ -203,6 +210,8 @@ StringRef ARMTargetInfo::getCPUAttr() const {
     return "8_5A";
   case llvm::ARM::ArchKind::ARMV8_6A:
     return "8_6A";
+  case llvm::ARM::ArchKind::ARMV8_7A:
+    return "8_7A";
   case llvm::ARM::ArchKind::ARMV8MBaseline:
     return "8M_BASE";
   case llvm::ARM::ArchKind::ARMV8MMainline:
@@ -314,7 +323,7 @@ ARMTargetInfo::ARMTargetInfo(const llvm::Triple &Triple,
 
   // Maximum alignment for ARM NEON data types should be 64-bits (AAPCS)
   // as well the default alignment
-  if (IsAAPCS && (Triple.getEnvironment() != llvm::Triple::Android))
+  if (IsAAPCS && !Triple.isAndroid())
     DefaultAlignForAttributeAligned = MaxVectorAlign = 64;
 
   // Do force alignment of members that follow zero length bitfields.  If
@@ -419,6 +428,8 @@ bool ARMTargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
   MVE = 0;
   CRC = 0;
   Crypto = 0;
+  SHA2 = 0;
+  AES = 0;
   DSP = 0;
   Unaligned = 1;
   SoftFloat = false;
@@ -428,6 +439,7 @@ bool ARMTargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
   HasMatMul = 0;
   HasFloat16 = true;
   ARMCDECoprocMask = 0;
+  HasBFloat16 = false;
 
   // This does not diagnose illegal cases like having both
   // "+vfpv2" and "+vfpv3" or having "+neon" and "-fp64".
@@ -468,6 +480,10 @@ bool ARMTargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
       CRC = 1;
     } else if (Feature == "+crypto") {
       Crypto = 1;
+    } else if (Feature == "+sha2") {
+      SHA2 = 1;
+    } else if (Feature == "+aes") {
+      AES = 1;
     } else if (Feature == "+dsp") {
       DSP = 1;
     } else if (Feature == "+fp64") {
@@ -498,6 +514,8 @@ bool ARMTargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
                Feature <= "+cdecp7") {
       unsigned Coproc = Feature.back() - '0';
       ARMCDECoprocMask |= (1U << Coproc);
+    } else if (Feature == "+bf16") {
+      HasBFloat16 = true;
     }
   }
 
@@ -545,6 +563,10 @@ bool ARMTargetInfo::hasFeature(StringRef Feature) const {
       .Case("hwdiv-arm", HWDiv & HWDivARM)
       .Case("mve", hasMVE())
       .Default(false);
+}
+
+bool ARMTargetInfo::hasBFloat16Type() const {
+  return HasBFloat16 && !SoftFloat;
 }
 
 bool ARMTargetInfo::isValidCPUName(StringRef Name) const {
@@ -625,8 +647,14 @@ void ARMTargetInfo::getTargetDefines(const LangOptions &Opts,
 
   if (ArchVersion >= 8) {
     // ACLE 6.5.7 Crypto Extension
-    if (Crypto)
+    // The __ARM_FEATURE_CRYPTO is deprecated in favor of finer grained
+    // feature macros for AES and SHA2
+    if (SHA2 && AES)
       Builder.defineMacro("__ARM_FEATURE_CRYPTO", "1");
+    if (SHA2)
+      Builder.defineMacro("__ARM_FEATURE_SHA2", "1");
+    if (AES)
+      Builder.defineMacro("__ARM_FEATURE_AES", "1");
     // ACLE 6.5.8 CRC32 Extension
     if (CRC)
       Builder.defineMacro("__ARM_FEATURE_CRC32", "1");
@@ -741,8 +769,12 @@ void ARMTargetInfo::getTargetDefines(const LangOptions &Opts,
   // Note, this is always on in gcc, even though it doesn't make sense.
   Builder.defineMacro("__APCS_32__");
 
+  // __VFP_FP__ means that the floating-point format is VFP, not that a hardware
+  // FPU is present. Moreover, the VFP format is the only one supported by
+  // clang. For these reasons, this macro is always defined.
+  Builder.defineMacro("__VFP_FP__");
+
   if (FPUModeIsVFP((FPUMode)FPU)) {
-    Builder.defineMacro("__VFP_FP__");
     if (FPU & VFP2FPU)
       Builder.defineMacro("__ARM_VFPV2__");
     if (FPU & VFP3FPU)
@@ -825,6 +857,12 @@ void ARMTargetInfo::getTargetDefines(const LangOptions &Opts,
 
   if (HasMatMul)
     Builder.defineMacro("__ARM_FEATURE_MATMUL_INT8", "1");
+
+  if (HasBFloat16) {
+    Builder.defineMacro("__ARM_FEATURE_BF16", "1");
+    Builder.defineMacro("__ARM_FEATURE_BF16_VECTOR_ARITHMETIC", "1");
+    Builder.defineMacro("__ARM_BF16_FORMAT_ALTERNATIVE", "1");
+  }
 
   switch (ArchKind) {
   default:

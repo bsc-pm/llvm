@@ -41,8 +41,8 @@ define void @test(i8* %x) uwtable ssp {
 ; CHECK-NEXT:    .cfi_offset %rbp, -16
 ; CHECK-NEXT:    movq %rdi, %rbx
 ; CHECK-NEXT:    movl $10000, %ebp ## imm = 0x2710
-; CHECK-NEXT:    movq {{.*}}(%rip), %r14
-; CHECK-NEXT:    movq _objc_msgSend@{{.*}}(%rip), %r15
+; CHECK-NEXT:    movq L_OBJC_SELECTOR_REFERENCES_(%rip), %r14
+; CHECK-NEXT:    movq _objc_msgSend@GOTPCREL(%rip), %r15
 ; CHECK-NEXT:    .p2align 4, 0x90
 ; CHECK-NEXT:  LBB0_1: ## %for.body
 ; CHECK-NEXT:    ## =>This Inner Loop Header: Depth=1
@@ -92,8 +92,8 @@ define void @test_unordered(i8* %x) uwtable ssp {
 ; CHECK-NEXT:    .cfi_offset %rbp, -16
 ; CHECK-NEXT:    movq %rdi, %rbx
 ; CHECK-NEXT:    movl $10000, %ebp ## imm = 0x2710
-; CHECK-NEXT:    movq {{.*}}(%rip), %r14
-; CHECK-NEXT:    movq _objc_msgSend@{{.*}}(%rip), %r15
+; CHECK-NEXT:    movq L_OBJC_SELECTOR_REFERENCES_(%rip), %r14
+; CHECK-NEXT:    movq _objc_msgSend@GOTPCREL(%rip), %r15
 ; CHECK-NEXT:    .p2align 4, 0x90
 ; CHECK-NEXT:  LBB1_1: ## %for.body
 ; CHECK-NEXT:    ## =>This Inner Loop Header: Depth=1
@@ -138,11 +138,11 @@ define void @test_volatile(i8* %x) uwtable ssp {
 ; CHECK-NEXT:    .cfi_offset %rbp, -16
 ; CHECK-NEXT:    movq %rdi, %rbx
 ; CHECK-NEXT:    movl $10000, %ebp ## imm = 0x2710
-; CHECK-NEXT:    movq _objc_msgSend@{{.*}}(%rip), %r14
+; CHECK-NEXT:    movq _objc_msgSend@GOTPCREL(%rip), %r14
 ; CHECK-NEXT:    .p2align 4, 0x90
 ; CHECK-NEXT:  LBB2_1: ## %for.body
 ; CHECK-NEXT:    ## =>This Inner Loop Header: Depth=1
-; CHECK-NEXT:    movq {{.*}}(%rip), %rsi
+; CHECK-NEXT:    movq L_OBJC_SELECTOR_REFERENCES_(%rip), %rsi
 ; CHECK-NEXT:    movq %rbx, %rdi
 ; CHECK-NEXT:    callq *%r14
 ; CHECK-NEXT:    decl %ebp
@@ -181,11 +181,11 @@ define void @test_seq_cst(i8* %x) uwtable ssp {
 ; CHECK-NEXT:    .cfi_offset %rbp, -16
 ; CHECK-NEXT:    movq %rdi, %rbx
 ; CHECK-NEXT:    movl $10000, %ebp ## imm = 0x2710
-; CHECK-NEXT:    movq _objc_msgSend@{{.*}}(%rip), %r14
+; CHECK-NEXT:    movq _objc_msgSend@GOTPCREL(%rip), %r14
 ; CHECK-NEXT:    .p2align 4, 0x90
 ; CHECK-NEXT:  LBB3_1: ## %for.body
 ; CHECK-NEXT:    ## =>This Inner Loop Header: Depth=1
-; CHECK-NEXT:    movq {{.*}}(%rip), %rsi
+; CHECK-NEXT:    movq L_OBJC_SELECTOR_REFERENCES_(%rip), %rsi
 ; CHECK-NEXT:    movq %rbx, %rdi
 ; CHECK-NEXT:    callq *%r14
 ; CHECK-NEXT:    decl %ebp
@@ -215,22 +215,21 @@ declare i8* @objc_msgSend(i8*, i8*, ...) nonlazybind
 define void @test_multi_def(i64* dereferenceable(8) %x1,
 ; CHECK-LABEL: test_multi_def:
 ; CHECK:       ## %bb.0: ## %entry
-; CHECK-NEXT:    movq %rdx, %r8
-; CHECK-NEXT:    xorl %r9d, %r9d
-; CHECK-NEXT:    movq (%rdi), %rdi
-; CHECK-NEXT:    movq (%rsi), %rsi
+; CHECK-NEXT:    movq %rdx, %rax
+; CHECK-NEXT:    xorl %r8d, %r8d
+; CHECK-NEXT:    movq (%rdi), %rdx
+; CHECK-NEXT:    movq (%rsi), %r9
 ; CHECK-NEXT:    .p2align 4, 0x90
 ; CHECK-NEXT:  LBB4_2: ## %for.body
 ; CHECK-NEXT:    ## =>This Inner Loop Header: Depth=1
-; CHECK-NEXT:    movq %rdi, %rax
-; CHECK-NEXT:    mulq %rsi
-; CHECK-NEXT:    addq %rax, (%r8)
-; CHECK-NEXT:    adcq %rdx, 8(%r8)
+; CHECK-NEXT:    mulxq %r9, %rsi, %rdi
+; CHECK-NEXT:    addq %rsi, (%rax)
+; CHECK-NEXT:    adcq %rdi, 8(%rax)
 ; CHECK-NEXT:  ## %bb.1: ## %for.check
 ; CHECK-NEXT:    ## in Loop: Header=BB4_2 Depth=1
-; CHECK-NEXT:    incq %r9
-; CHECK-NEXT:    addq $16, %r8
-; CHECK-NEXT:    cmpq %rcx, %r9
+; CHECK-NEXT:    incq %r8
+; CHECK-NEXT:    addq $16, %rax
+; CHECK-NEXT:    cmpq %rcx, %r8
 ; CHECK-NEXT:    jl LBB4_2
 ; CHECK-NEXT:  ## %bb.3: ## %exit
 ; CHECK-NEXT:    retq

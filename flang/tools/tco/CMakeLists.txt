@@ -1,8 +1,7 @@
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 
 set(LIBS
-  FIRDialect
-  FIRSupport
+  FIROptimizer
   ${dialect_libs}
   MLIRIR
   MLIRLLVMIR
@@ -12,7 +11,6 @@ set(LIBS
   MLIRAffineToStandard
   MLIRAnalysis
   MLIRSCFToStandard
-  MLIREDSC
   MLIRParser
   MLIRStandardToLLVM
   MLIRSupport

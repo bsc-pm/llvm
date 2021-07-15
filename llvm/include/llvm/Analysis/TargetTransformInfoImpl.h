@@ -20,8 +20,12 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GetElementPtrTypeIterator.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Operator.h"
+#include "llvm/IR/PatternMatch.h"
 #include "llvm/IR/Type.h"
+
+using namespace llvm::PatternMatch;
 
 namespace llvm {
 
@@ -43,9 +47,10 @@ public:
 
   const DataLayout &getDataLayout() const { return DL; }
 
-  int getGEPCost(Type *PointeeType, const Value *Ptr,
-                 ArrayRef<const Value *> Operands,
-                 TTI::TargetCostKind CostKind = TTI::TCK_SizeAndLatency) {
+  InstructionCost
+  getGEPCost(Type *PointeeType, const Value *Ptr,
+             ArrayRef<const Value *> Operands,
+             TTI::TargetCostKind CostKind = TTI::TCK_SizeAndLatency) const {
     // In the basic model, we just assume that all-constant GEPs will be folded
     // into their uses via addressing modes.
     for (unsigned Idx = 0, Size = Operands.size(); Idx != Size; ++Idx)
@@ -58,44 +63,57 @@ public:
   unsigned getEstimatedNumberOfCaseClusters(const SwitchInst &SI,
                                             unsigned &JTSize,
                                             ProfileSummaryInfo *PSI,
-                                            BlockFrequencyInfo *BFI) {
+                                            BlockFrequencyInfo *BFI) const {
     (void)PSI;
     (void)BFI;
     JTSize = 0;
     return SI.getNumCases();
   }
 
-  int getExtCost(const Instruction *I, const Value *Src) {
-    return TTI::TCC_Basic;
+  unsigned getInliningThresholdMultiplier() const { return 1; }
+  unsigned adjustInliningThreshold(const CallBase *CB) const { return 0; }
+
+  int getInlinerVectorBonusPercent() const { return 150; }
+
+  InstructionCost getMemcpyCost(const Instruction *I) const {
+    return TTI::TCC_Expensive;
   }
 
-  unsigned getInliningThresholdMultiplier() { return 1; }
+  // Although this default value is arbitrary, it is not random. It is assumed
+  // that a condition that evaluates the same way by a higher percentage than
+  // this is best represented as control flow. Therefore, the default value N
+  // should be set such that the win from N% correct executions is greater than
+  // the loss from (100 - N)% mispredicted executions for the majority of
+  //  intended targets.
+  BranchProbability getPredictableBranchThreshold() const {
+    return BranchProbability(99, 100);
+  }
 
-  int getInlinerVectorBonusPercent() { return 150; }
+  bool hasBranchDivergence() const { return false; }
 
-  unsigned getMemcpyCost(const Instruction *I) { return TTI::TCC_Expensive; }
+  bool useGPUDivergenceAnalysis() const { return false; }
 
-  bool hasBranchDivergence() { return false; }
+  bool isSourceOfDivergence(const Value *V) const { return false; }
 
-  bool useGPUDivergenceAnalysis() { return false; }
+  bool isAlwaysUniform(const Value *V) const { return false; }
 
-  bool isSourceOfDivergence(const Value *V) { return false; }
-
-  bool isAlwaysUniform(const Value *V) { return false; }
-
-  unsigned getFlatAddressSpace() { return -1; }
+  unsigned getFlatAddressSpace() const { return -1; }
 
   bool collectFlatAddressOperands(SmallVectorImpl<int> &OpIndexes,
                                   Intrinsic::ID IID) const {
     return false;
   }
 
-  bool rewriteIntrinsicWithAddressSpace(IntrinsicInst *II, Value *OldV,
-                                        Value *NewV) const {
-    return false;
+  bool isNoopAddrSpaceCast(unsigned, unsigned) const { return false; }
+
+  unsigned getAssumedAddrSpace(const Value *V) const { return -1; }
+
+  Value *rewriteIntrinsicWithAddressSpace(IntrinsicInst *II, Value *OldV,
+                                          Value *NewV) const {
+    return nullptr;
   }
 
-  bool isLoweredToCall(const Function *F) {
+  bool isLoweredToCall(const Function *F) const {
     assert(F && "A concrete function must be provided to this routine.");
 
     // FIXME: These should almost certainly not be handled here, and instead
@@ -133,7 +151,7 @@ public:
 
   bool isHardwareLoopProfitable(Loop *L, ScalarEvolution &SE,
                                 AssumptionCache &AC, TargetLibraryInfo *LibInfo,
-                                HardwareLoopInfo &HWLoopInfo) {
+                                HardwareLoopInfo &HWLoopInfo) const {
     return false;
   }
 
@@ -144,82 +162,118 @@ public:
     return false;
   }
 
+  bool emitGetActiveLaneMask() const {
+    return false;
+  }
+
+  Optional<Instruction *> instCombineIntrinsic(InstCombiner &IC,
+                                               IntrinsicInst &II) const {
+    return None;
+  }
+
+  Optional<Value *>
+  simplifyDemandedUseBitsIntrinsic(InstCombiner &IC, IntrinsicInst &II,
+                                   APInt DemandedMask, KnownBits &Known,
+                                   bool &KnownBitsComputed) const {
+    return None;
+  }
+
+  Optional<Value *> simplifyDemandedVectorEltsIntrinsic(
+      InstCombiner &IC, IntrinsicInst &II, APInt DemandedElts, APInt &UndefElts,
+      APInt &UndefElts2, APInt &UndefElts3,
+      std::function<void(Instruction *, unsigned, APInt, APInt &)>
+          SimplifyAndSetOp) const {
+    return None;
+  }
+
   void getUnrollingPreferences(Loop *, ScalarEvolution &,
-                               TTI::UnrollingPreferences &) {}
+                               TTI::UnrollingPreferences &) const {}
 
-  bool isLegalAddImmediate(int64_t Imm) { return false; }
+  void getPeelingPreferences(Loop *, ScalarEvolution &,
+                             TTI::PeelingPreferences &) const {}
 
-  bool isLegalICmpImmediate(int64_t Imm) { return false; }
+  bool isLegalAddImmediate(int64_t Imm) const { return false; }
+
+  bool isLegalICmpImmediate(int64_t Imm) const { return false; }
 
   bool isLegalAddressingMode(Type *Ty, GlobalValue *BaseGV, int64_t BaseOffset,
                              bool HasBaseReg, int64_t Scale, unsigned AddrSpace,
-                             Instruction *I = nullptr) {
+                             Instruction *I = nullptr) const {
     // Guess that only reg and reg+reg addressing is allowed. This heuristic is
     // taken from the implementation of LSR.
     return !BaseGV && BaseOffset == 0 && (Scale == 0 || Scale == 1);
   }
 
-  bool isLSRCostLess(TTI::LSRCost &C1, TTI::LSRCost &C2) {
+  bool isLSRCostLess(TTI::LSRCost &C1, TTI::LSRCost &C2) const {
     return std::tie(C1.NumRegs, C1.AddRecCost, C1.NumIVMuls, C1.NumBaseAdds,
                     C1.ScaleCost, C1.ImmCost, C1.SetupCost) <
            std::tie(C2.NumRegs, C2.AddRecCost, C2.NumIVMuls, C2.NumBaseAdds,
                     C2.ScaleCost, C2.ImmCost, C2.SetupCost);
   }
 
-  bool isProfitableLSRChainElement(Instruction *I) { return false; }
+  bool isNumRegsMajorCostOfLSR() const { return true; }
 
-  bool canMacroFuseCmp() { return false; }
+  bool isProfitableLSRChainElement(Instruction *I) const { return false; }
+
+  bool canMacroFuseCmp() const { return false; }
 
   bool canSaveCmp(Loop *L, BranchInst **BI, ScalarEvolution *SE, LoopInfo *LI,
                   DominatorTree *DT, AssumptionCache *AC,
-                  TargetLibraryInfo *LibInfo) {
+                  TargetLibraryInfo *LibInfo) const {
     return false;
   }
 
-  bool shouldFavorPostInc() const { return false; }
+  TTI::AddressingModeKind
+    getPreferredAddressingMode(const Loop *L, ScalarEvolution *SE) const {
+    return TTI::AMK_None;
+  }
 
-  bool shouldFavorBackedgeIndex(const Loop *L) const { return false; }
-
-  bool isLegalMaskedStore(Type *DataType, MaybeAlign Alignment) {
+  bool isLegalMaskedStore(Type *DataType, Align Alignment) const {
     return false;
   }
 
-  bool isLegalMaskedLoad(Type *DataType, MaybeAlign Alignment) { return false; }
+  bool isLegalMaskedLoad(Type *DataType, Align Alignment) const {
+    return false;
+  }
 
-  bool isLegalNTStore(Type *DataType, Align Alignment) {
+  bool isLegalNTStore(Type *DataType, Align Alignment) const {
     // By default, assume nontemporal memory stores are available for stores
     // that are aligned and have a size that is a power of 2.
     unsigned DataSize = DL.getTypeStoreSize(DataType);
     return Alignment >= DataSize && isPowerOf2_32(DataSize);
   }
 
-  bool isLegalNTLoad(Type *DataType, Align Alignment) {
+  bool isLegalNTLoad(Type *DataType, Align Alignment) const {
     // By default, assume nontemporal memory loads are available for loads that
     // are aligned and have a size that is a power of 2.
     unsigned DataSize = DL.getTypeStoreSize(DataType);
     return Alignment >= DataSize && isPowerOf2_32(DataSize);
   }
 
-  bool isLegalMaskedScatter(Type *DataType, MaybeAlign Alignment) {
+  bool isLegalMaskedScatter(Type *DataType, Align Alignment) const {
     return false;
   }
 
-  bool isLegalMaskedGather(Type *DataType, MaybeAlign Alignment) {
+  bool isLegalMaskedGather(Type *DataType, Align Alignment) const {
     return false;
   }
 
-  bool isLegalMaskedCompressStore(Type *DataType) { return false; }
+  bool isLegalMaskedCompressStore(Type *DataType) const { return false; }
 
-  bool isLegalMaskedExpandLoad(Type *DataType) { return false; }
+  bool isLegalMaskedExpandLoad(Type *DataType) const { return false; }
 
-  bool hasDivRemOp(Type *DataType, bool IsSigned) { return false; }
+  bool hasDivRemOp(Type *DataType, bool IsSigned) const { return false; }
 
-  bool hasVolatileVariant(Instruction *I, unsigned AddrSpace) { return false; }
+  bool hasVolatileVariant(Instruction *I, unsigned AddrSpace) const {
+    return false;
+  }
 
-  bool prefersVectorizedAddressing() { return true; }
+  bool prefersVectorizedAddressing() const { return true; }
 
-  int getScalingFactorCost(Type *Ty, GlobalValue *BaseGV, int64_t BaseOffset,
-                           bool HasBaseReg, int64_t Scale, unsigned AddrSpace) {
+  InstructionCost getScalingFactorCost(Type *Ty, GlobalValue *BaseGV,
+                                       int64_t BaseOffset, bool HasBaseReg,
+                                       int64_t Scale,
+                                       unsigned AddrSpace) const {
     // Guess that all legal addressing mode are free.
     if (isLegalAddressingMode(Ty, BaseGV, BaseOffset, HasBaseReg, Scale,
                               AddrSpace))
@@ -227,80 +281,92 @@ public:
     return -1;
   }
 
-  bool LSRWithInstrQueries() { return false; }
+  bool LSRWithInstrQueries() const { return false; }
 
-  bool isTruncateFree(Type *Ty1, Type *Ty2) { return false; }
+  bool isTruncateFree(Type *Ty1, Type *Ty2) const { return false; }
 
-  bool isProfitableToHoist(Instruction *I) { return true; }
+  bool isProfitableToHoist(Instruction *I) const { return true; }
 
-  bool useAA() { return false; }
+  bool useAA() const { return false; }
 
-  bool isTypeLegal(Type *Ty) { return false; }
+  bool isTypeLegal(Type *Ty) const { return false; }
 
-  bool shouldBuildLookupTables() { return true; }
-  bool shouldBuildLookupTablesForConstant(Constant *C) { return true; }
+  InstructionCost getRegUsageForType(Type *Ty) const { return 1; }
 
-  bool useColdCCForColdCall(Function &F) { return false; }
+  bool shouldBuildLookupTables() const { return true; }
 
-  unsigned getScalarizationOverhead(VectorType *Ty, const APInt &DemandedElts,
-                                    bool Insert, bool Extract) {
+  bool shouldBuildLookupTablesForConstant(Constant *C) const { return true; }
+
+  bool shouldBuildRelLookupTables() const { return false; }
+
+  bool useColdCCForColdCall(Function &F) const { return false; }
+
+  InstructionCost getScalarizationOverhead(VectorType *Ty,
+                                           const APInt &DemandedElts,
+                                           bool Insert, bool Extract) const {
     return 0;
   }
 
-  unsigned getOperandsScalarizationOverhead(ArrayRef<const Value *> Args,
-                                            unsigned VF) {
+  InstructionCost getOperandsScalarizationOverhead(ArrayRef<const Value *> Args,
+                                                   ArrayRef<Type *> Tys) const {
     return 0;
   }
 
-  bool supportsEfficientVectorElementLoadStore() { return false; }
+  bool supportsEfficientVectorElementLoadStore() const { return false; }
 
-  bool enableAggressiveInterleaving(bool LoopHasReductions) { return false; }
+  bool enableAggressiveInterleaving(bool LoopHasReductions) const {
+    return false;
+  }
 
   TTI::MemCmpExpansionOptions enableMemCmpExpansion(bool OptSize,
                                                     bool IsZeroCmp) const {
     return {};
   }
 
-  bool enableInterleavedAccessVectorization() { return false; }
+  bool enableInterleavedAccessVectorization() const { return false; }
 
-  bool enableMaskedInterleavedAccessVectorization() { return false; }
+  bool enableMaskedInterleavedAccessVectorization() const { return false; }
 
-  bool isFPVectorizationPotentiallyUnsafe() { return false; }
+  bool isFPVectorizationPotentiallyUnsafe() const { return false; }
 
   bool allowsMisalignedMemoryAccesses(LLVMContext &Context, unsigned BitWidth,
-                                      unsigned AddressSpace, unsigned Alignment,
-                                      bool *Fast) {
+                                      unsigned AddressSpace, Align Alignment,
+                                      bool *Fast) const {
     return false;
   }
 
-  TTI::PopcntSupportKind getPopcntSupport(unsigned IntTyWidthInBit) {
+  TTI::PopcntSupportKind getPopcntSupport(unsigned IntTyWidthInBit) const {
     return TTI::PSK_Software;
   }
 
-  bool haveFastSqrt(Type *Ty) { return false; }
+  bool haveFastSqrt(Type *Ty) const { return false; }
 
-  bool isFCmpOrdCheaperThanFCmpZero(Type *Ty) { return true; }
+  bool isFCmpOrdCheaperThanFCmpZero(Type *Ty) const { return true; }
 
-  unsigned getFPOpCost(Type *Ty) { return TargetTransformInfo::TCC_Basic; }
+  InstructionCost getFPOpCost(Type *Ty) const {
+    return TargetTransformInfo::TCC_Basic;
+  }
 
-  int getIntImmCodeSizeCost(unsigned Opcode, unsigned Idx, const APInt &Imm,
-                            Type *Ty) {
+  InstructionCost getIntImmCodeSizeCost(unsigned Opcode, unsigned Idx,
+                                        const APInt &Imm, Type *Ty) const {
     return 0;
   }
 
-  unsigned getIntImmCost(const APInt &Imm, Type *Ty,
-                         TTI::TargetCostKind CostKind) {
+  InstructionCost getIntImmCost(const APInt &Imm, Type *Ty,
+                                TTI::TargetCostKind CostKind) const {
     return TTI::TCC_Basic;
   }
 
-  unsigned getIntImmCostInst(unsigned Opcode, unsigned Idx, const APInt &Imm,
-                             Type *Ty, TTI::TargetCostKind CostKind) {
+  InstructionCost getIntImmCostInst(unsigned Opcode, unsigned Idx,
+                                    const APInt &Imm, Type *Ty,
+                                    TTI::TargetCostKind CostKind,
+                                    Instruction *Inst = nullptr) const {
     return TTI::TCC_Free;
   }
 
-  unsigned getIntImmCostIntrin(Intrinsic::ID IID, unsigned Idx,
-                               const APInt &Imm, Type *Ty,
-                               TTI::TargetCostKind CostKind) {
+  InstructionCost getIntImmCostIntrin(Intrinsic::ID IID, unsigned Idx,
+                                      const APInt &Imm, Type *Ty,
+                                      TTI::TargetCostKind CostKind) const {
     return TTI::TCC_Free;
   }
 
@@ -321,17 +387,24 @@ public:
     }
   }
 
-  unsigned getRegisterBitWidth(bool Vector) const { return 32; }
+  TypeSize getRegisterBitWidth(TargetTransformInfo::RegisterKind K) const {
+    return TypeSize::getFixed(32);
+  }
 
-  unsigned getMinVectorRegisterBitWidth() { return 128; }
+  unsigned getMinVectorRegisterBitWidth() const { return 128; }
 
-  bool shouldMaximizeVectorBandwidth(bool OptSize) const { return false; }
+  Optional<unsigned> getMaxVScale() const { return None; }
 
-  unsigned getMinimumVF(unsigned ElemWidth) const { return 0; }
+  bool shouldMaximizeVectorBandwidth() const { return false; }
 
-  bool
-  shouldConsiderAddressTypePromotion(const Instruction &I,
-                                     bool &AllowPromotionWithoutCommonHeader) {
+  ElementCount getMinimumVF(unsigned ElemWidth, bool IsScalable) const {
+    return ElementCount::get(0, IsScalable);
+  }
+
+  unsigned getMaximumVF(unsigned ElemWidth, unsigned Opcode) const { return 0; }
+
+  bool shouldConsiderAddressTypePromotion(
+      const Instruction &I, bool &AllowPromotionWithoutCommonHeader) const {
     AllowPromotionWithoutCommonHeader = false;
     return false;
   }
@@ -370,27 +443,41 @@ public:
   unsigned getMaxPrefetchIterationsAhead() const { return UINT_MAX; }
   bool enableWritePrefetching() const { return false; }
 
-  unsigned getMaxInterleaveFactor(unsigned VF) { return 1; }
+  unsigned getMaxInterleaveFactor(unsigned VF) const { return 1; }
 
-  unsigned getArithmeticInstrCost(unsigned Opcode, Type *Ty,
-                                  TTI::TargetCostKind CostKind,
-                                  TTI::OperandValueKind Opd1Info,
-                                  TTI::OperandValueKind Opd2Info,
-                                  TTI::OperandValueProperties Opd1PropInfo,
-                                  TTI::OperandValueProperties Opd2PropInfo,
-                                  ArrayRef<const Value *> Args,
-                                  const Instruction *CxtI = nullptr) {
+  InstructionCost getArithmeticInstrCost(
+      unsigned Opcode, Type *Ty, TTI::TargetCostKind CostKind,
+      TTI::OperandValueKind Opd1Info, TTI::OperandValueKind Opd2Info,
+      TTI::OperandValueProperties Opd1PropInfo,
+      TTI::OperandValueProperties Opd2PropInfo, ArrayRef<const Value *> Args,
+      const Instruction *CxtI = nullptr) const {
+    // FIXME: A number of transformation tests seem to require these values
+    // which seems a little odd for how arbitary there are.
+    switch (Opcode) {
+    default:
+      break;
+    case Instruction::FDiv:
+    case Instruction::FRem:
+    case Instruction::SDiv:
+    case Instruction::SRem:
+    case Instruction::UDiv:
+    case Instruction::URem:
+      // FIXME: Unlikely to be true for CodeSize.
+      return TTI::TCC_Expensive;
+    }
     return 1;
   }
 
-  unsigned getShuffleCost(TTI::ShuffleKind Kind, VectorType *Ty, int Index,
-                          VectorType *SubTp) {
+  InstructionCost getShuffleCost(TTI::ShuffleKind Kind, VectorType *Ty,
+                                 ArrayRef<int> Mask, int Index,
+                                 VectorType *SubTp) const {
     return 1;
   }
 
-  unsigned getCastInstrCost(unsigned Opcode, Type *Dst, Type *Src,
-                            TTI::TargetCostKind CostKind,
-                            const Instruction *I) {
+  InstructionCost getCastInstrCost(unsigned Opcode, Type *Dst, Type *Src,
+                                   TTI::CastContextHint CCH,
+                                   TTI::TargetCostKind CostKind,
+                                   const Instruction *I) const {
     switch (Opcode) {
     default:
       break;
@@ -413,98 +500,148 @@ public:
         // Identity and pointer-to-pointer casts are free.
         return 0;
       break;
-    case Instruction::Trunc:
+    case Instruction::Trunc: {
       // trunc to a native type is free (assuming the target has compare and
       // shift-right of the same width).
-      if (DL.isLegalInteger(DL.getTypeSizeInBits(Dst)))
+      TypeSize DstSize = DL.getTypeSizeInBits(Dst);
+      if (!DstSize.isScalable() && DL.isLegalInteger(DstSize.getFixedSize()))
         return 0;
       break;
+    }
     }
     return 1;
   }
 
-  unsigned getExtractWithExtendCost(unsigned Opcode, Type *Dst,
-                                    VectorType *VecTy, unsigned Index) {
+  InstructionCost getExtractWithExtendCost(unsigned Opcode, Type *Dst,
+                                           VectorType *VecTy,
+                                           unsigned Index) const {
     return 1;
   }
 
-  unsigned getCFInstrCost(unsigned Opcode,
-                          TTI::TargetCostKind CostKind) { return 1; }
-
-  unsigned getCmpSelInstrCost(unsigned Opcode, Type *ValTy, Type *CondTy,
-                              TTI::TargetCostKind CostKind,
-                              const Instruction *I) const {
+  InstructionCost getCFInstrCost(unsigned Opcode, TTI::TargetCostKind CostKind,
+                                 const Instruction *I = nullptr) const {
+    // A phi would be free, unless we're costing the throughput because it
+    // will require a register.
+    if (Opcode == Instruction::PHI && CostKind != TTI::TCK_RecipThroughput)
+      return 0;
     return 1;
   }
 
-  unsigned getVectorInstrCost(unsigned Opcode, Type *Val, unsigned Index) {
+  InstructionCost getCmpSelInstrCost(unsigned Opcode, Type *ValTy, Type *CondTy,
+                                     CmpInst::Predicate VecPred,
+                                     TTI::TargetCostKind CostKind,
+                                     const Instruction *I) const {
     return 1;
   }
 
-  unsigned getMemoryOpCost(unsigned Opcode, Type *Src, MaybeAlign Alignment,
-                           unsigned AddressSpace, TTI::TargetCostKind CostKind,
-                           const Instruction *I) const {
+  InstructionCost getVectorInstrCost(unsigned Opcode, Type *Val,
+                                     unsigned Index) const {
     return 1;
   }
 
-  unsigned getMaskedMemoryOpCost(unsigned Opcode, Type *Src, unsigned Alignment,
-                                 unsigned AddressSpace,
-                                 TTI::TargetCostKind CostKind) {
+  InstructionCost getMemoryOpCost(unsigned Opcode, Type *Src, Align Alignment,
+                                  unsigned AddressSpace,
+                                  TTI::TargetCostKind CostKind,
+                                  const Instruction *I) const {
     return 1;
   }
 
-  unsigned getGatherScatterOpCost(
-      unsigned Opcode, Type *DataTy, Value *Ptr, bool VariableMask,
-      unsigned Alignment, TTI::TargetCostKind CostKind,
-      const Instruction *I = nullptr) {
+  InstructionCost getMaskedMemoryOpCost(unsigned Opcode, Type *Src,
+                                        Align Alignment, unsigned AddressSpace,
+                                        TTI::TargetCostKind CostKind) const {
     return 1;
   }
 
-  unsigned getInterleavedMemoryOpCost(unsigned Opcode, Type *VecTy,
-                                      unsigned Factor,
-                                      ArrayRef<unsigned> Indices,
-                                      unsigned Alignment, unsigned AddressSpace,
-                                      TTI::TargetCostKind CostKind,
-                                      bool UseMaskForCond,
-                                      bool UseMaskForGaps) {
+  InstructionCost getGatherScatterOpCost(unsigned Opcode, Type *DataTy,
+                                         const Value *Ptr, bool VariableMask,
+                                         Align Alignment,
+                                         TTI::TargetCostKind CostKind,
+                                         const Instruction *I = nullptr) const {
     return 1;
   }
 
-  unsigned getIntrinsicInstrCost(Intrinsic::ID ID, Type *RetTy,
-                                 ArrayRef<Type *> Tys, FastMathFlags FMF,
-                                 unsigned ScalarizationCostPassed,
-                                 TTI::TargetCostKind CostKind,
-                                 const Instruction *I) {
-    return 1;
-  }
-  unsigned getIntrinsicInstrCost(Intrinsic::ID ID, Type *RetTy,
-                                 ArrayRef<Value *> Args, FastMathFlags FMF,
-                                 unsigned VF, TTI::TargetCostKind CostKind,
-                                 const Instruction *I) {
+  unsigned getInterleavedMemoryOpCost(
+      unsigned Opcode, Type *VecTy, unsigned Factor, ArrayRef<unsigned> Indices,
+      Align Alignment, unsigned AddressSpace, TTI::TargetCostKind CostKind,
+      bool UseMaskForCond, bool UseMaskForGaps) const {
     return 1;
   }
 
-  unsigned getCallInstrCost(Function *F, Type *RetTy, ArrayRef<Type *> Tys,
-                            TTI::TargetCostKind CostKind) {
+  InstructionCost getIntrinsicInstrCost(const IntrinsicCostAttributes &ICA,
+                                        TTI::TargetCostKind CostKind) const {
+    switch (ICA.getID()) {
+    default:
+      break;
+    case Intrinsic::annotation:
+    case Intrinsic::assume:
+    case Intrinsic::sideeffect:
+    case Intrinsic::pseudoprobe:
+    case Intrinsic::arithmetic_fence:
+    case Intrinsic::dbg_declare:
+    case Intrinsic::dbg_value:
+    case Intrinsic::dbg_label:
+    case Intrinsic::invariant_start:
+    case Intrinsic::invariant_end:
+    case Intrinsic::launder_invariant_group:
+    case Intrinsic::strip_invariant_group:
+    case Intrinsic::is_constant:
+    case Intrinsic::lifetime_start:
+    case Intrinsic::lifetime_end:
+    case Intrinsic::experimental_noalias_scope_decl:
+    case Intrinsic::objectsize:
+    case Intrinsic::ptr_annotation:
+    case Intrinsic::var_annotation:
+    case Intrinsic::experimental_gc_result:
+    case Intrinsic::experimental_gc_relocate:
+    case Intrinsic::coro_alloc:
+    case Intrinsic::coro_begin:
+    case Intrinsic::coro_free:
+    case Intrinsic::coro_end:
+    case Intrinsic::coro_frame:
+    case Intrinsic::coro_size:
+    case Intrinsic::coro_suspend:
+    case Intrinsic::coro_param:
+    case Intrinsic::coro_subfn_addr:
+      // These intrinsics don't actually represent code after lowering.
+      return 0;
+    }
     return 1;
   }
 
-  unsigned getNumberOfParts(Type *Tp) { return 0; }
+  InstructionCost getCallInstrCost(Function *F, Type *RetTy,
+                                   ArrayRef<Type *> Tys,
+                                   TTI::TargetCostKind CostKind) const {
+    return 1;
+  }
 
-  unsigned getAddressComputationCost(Type *Tp, ScalarEvolution *,
-                                     const SCEV *) {
+  unsigned getNumberOfParts(Type *Tp) const { return 0; }
+
+  InstructionCost getAddressComputationCost(Type *Tp, ScalarEvolution *,
+                                            const SCEV *) const {
     return 0;
   }
 
-  unsigned getArithmeticReductionCost(unsigned, VectorType *, bool,
-                                      TTI::TargetCostKind) { return 1; }
+  InstructionCost getArithmeticReductionCost(unsigned, VectorType *, bool,
+                                             TTI::TargetCostKind) const {
+    return 1;
+  }
 
-  unsigned getMinMaxReductionCost(VectorType *, VectorType *, bool, bool,
-                                  TTI::TargetCostKind) { return 1; }
+  InstructionCost getMinMaxReductionCost(VectorType *, VectorType *, bool, bool,
+                                         TTI::TargetCostKind) const {
+    return 1;
+  }
 
-  unsigned getCostOfKeepingLiveOverCall(ArrayRef<Type *> Tys) { return 0; }
+  InstructionCost getExtendedAddReductionCost(
+      bool IsMLA, bool IsUnsigned, Type *ResTy, VectorType *Ty,
+      TTI::TargetCostKind CostKind = TTI::TCK_RecipThroughput) const {
+    return 1;
+  }
 
-  bool getTgtMemIntrinsic(IntrinsicInst *Inst, MemIntrinsicInfo &Info) {
+  InstructionCost getCostOfKeepingLiveOverCall(ArrayRef<Type *> Tys) const {
+    return 0;
+  }
+
+  bool getTgtMemIntrinsic(IntrinsicInst *Inst, MemIntrinsicInfo &Info) const {
     return false;
   }
 
@@ -518,7 +655,7 @@ public:
   }
 
   Value *getOrCreateResultFromMemIntrinsic(IntrinsicInst *Inst,
-                                           Type *ExpectedType) {
+                                           Type *ExpectedType) const {
     return nullptr;
   }
 
@@ -569,17 +706,22 @@ public:
 
   bool isLegalToVectorizeStore(StoreInst *SI) const { return true; }
 
-  bool isLegalToVectorizeLoadChain(unsigned ChainSizeInBytes,
-                                   unsigned Alignment,
+  bool isLegalToVectorizeLoadChain(unsigned ChainSizeInBytes, Align Alignment,
                                    unsigned AddrSpace) const {
     return true;
   }
 
-  bool isLegalToVectorizeStoreChain(unsigned ChainSizeInBytes,
-                                    unsigned Alignment,
+  bool isLegalToVectorizeStoreChain(unsigned ChainSizeInBytes, Align Alignment,
                                     unsigned AddrSpace) const {
     return true;
   }
+
+  bool isLegalToVectorizeReduction(const RecurrenceDescriptor &RdxDesc,
+                                   ElementCount VF) const {
+    return true;
+  }
+
+  bool isElementTypeLegalForScalableVector(Type *Ty) const { return true; }
 
   unsigned getLoadVectorFactor(unsigned VF, unsigned LoadSize,
                                unsigned ChainSizeInBytes,
@@ -593,8 +735,13 @@ public:
     return VF;
   }
 
-  bool useReductionIntrinsic(unsigned Opcode, Type *Ty,
+  bool preferInLoopReduction(unsigned Opcode, Type *Ty,
                              TTI::ReductionFlags Flags) const {
+    return false;
+  }
+
+  bool preferPredicatedReductionSelect(unsigned Opcode, Type *Ty,
+                                       TTI::ReductionFlags Flags) const {
     return false;
   }
 
@@ -602,18 +749,27 @@ public:
 
   unsigned getGISelRematGlobalCost() const { return 1; }
 
+  bool supportsScalableVectors() const { return false; }
+
   bool hasActiveVectorLength() const { return false; }
+
+  TargetTransformInfo::VPLegalization
+  getVPLegalizationStrategy(const VPIntrinsic &PI) const {
+    return TargetTransformInfo::VPLegalization(
+        /* EVLParamStrategy */ TargetTransformInfo::VPLegalization::Discard,
+        /* OperatorStrategy */ TargetTransformInfo::VPLegalization::Convert);
+  }
 
 protected:
   // Obtain the minimum required size to hold the value (without the sign)
   // In case of a vector it returns the min required size for one element.
-  unsigned minRequiredElementSize(const Value *Val, bool &isSigned) {
+  unsigned minRequiredElementSize(const Value *Val, bool &isSigned) const {
     if (isa<ConstantDataVector>(Val) || isa<ConstantVector>(Val)) {
       const auto *VectorValue = cast<Constant>(Val);
 
       // In case of a vector need to pick the max between the min
       // required size for each element
-      auto *VT = cast<VectorType>(Val->getType());
+      auto *VT = cast<FixedVectorType>(Val->getType());
 
       // Assume unsigned elements
       isSigned = false;
@@ -661,12 +817,12 @@ protected:
     return Val->getType()->getScalarSizeInBits();
   }
 
-  bool isStridedAccess(const SCEV *Ptr) {
+  bool isStridedAccess(const SCEV *Ptr) const {
     return Ptr && isa<SCEVAddRecExpr>(Ptr);
   }
 
   const SCEVConstant *getConstantStrideStep(ScalarEvolution *SE,
-                                            const SCEV *Ptr) {
+                                            const SCEV *Ptr) const {
     if (!isStridedAccess(Ptr))
       return nullptr;
     const SCEVAddRecExpr *AddRec = cast<SCEVAddRecExpr>(Ptr);
@@ -674,7 +830,7 @@ protected:
   }
 
   bool isConstantStridedAccessLessThan(ScalarEvolution *SE, const SCEV *Ptr,
-                                       int64_t MergeDistance) {
+                                       int64_t MergeDistance) const {
     const SCEVConstant *Step = getConstantStrideStep(SE, Ptr);
     if (!Step)
       return false;
@@ -699,13 +855,13 @@ protected:
 public:
   using BaseT::getGEPCost;
 
-  int getGEPCost(Type *PointeeType, const Value *Ptr,
-                 ArrayRef<const Value *> Operands,
-                 TTI::TargetCostKind CostKind = TTI::TCK_SizeAndLatency) {
+  InstructionCost
+  getGEPCost(Type *PointeeType, const Value *Ptr,
+             ArrayRef<const Value *> Operands,
+             TTI::TargetCostKind CostKind = TTI::TCK_SizeAndLatency) {
     assert(PointeeType && Ptr && "can't get GEPCost of nullptr");
-    // TODO: will remove this when pointers have an opaque type.
-    assert(Ptr->getType()->getScalarType()->getPointerElementType() ==
-               PointeeType &&
+    assert(cast<PointerType>(Ptr->getType()->getScalarType())
+               ->isOpaqueOrPointeeTypeMatches(PointeeType) &&
            "explicit pointee type doesn't match operand's pointee type");
     auto *BaseGV = dyn_cast<GlobalValue>(Ptr->stripPointerCasts());
     bool HasBaseReg = (BaseGV == nullptr);
@@ -736,7 +892,12 @@ public:
         uint64_t Field = ConstIdx->getZExtValue();
         BaseOffset += DL.getStructLayout(STy)->getElementOffset(Field);
       } else {
-        int64_t ElementSize = DL.getTypeAllocSize(GTI.getIndexedType());
+        // If this operand is a scalable type, bail out early.
+        // TODO: handle scalable vectors
+        if (isa<ScalableVectorType>(TargetType))
+          return TTI::TCC_Basic;
+        int64_t ElementSize =
+            DL.getTypeAllocSize(GTI.getIndexedType()).getFixedSize();
         if (ConstIdx) {
           BaseOffset +=
               ConstIdx->getValue().sextOrTrunc(PtrSizeBits) * ElementSize;
@@ -758,85 +919,20 @@ public:
     return TTI::TCC_Basic;
   }
 
-  unsigned getIntrinsicCost(Intrinsic::ID IID, Type *RetTy,
-                            ArrayRef<Type *> ParamTys, const User *U,
-                            TTI::TargetCostKind TCK_SizeAndLatency) {
-    switch (IID) {
-    default:
-      // Intrinsics rarely (if ever) have normal argument setup constraints.
-      // Model them as having a basic instruction cost.
-      return TTI::TCC_Basic;
-
-    // TODO: other libc intrinsics.
-    case Intrinsic::memcpy:
-      return static_cast<T *>(this)->getMemcpyCost(dyn_cast<Instruction>(U));
-
-    case Intrinsic::annotation:
-    case Intrinsic::assume:
-    case Intrinsic::sideeffect:
-    case Intrinsic::dbg_declare:
-    case Intrinsic::dbg_value:
-    case Intrinsic::dbg_label:
-    case Intrinsic::invariant_start:
-    case Intrinsic::invariant_end:
-    case Intrinsic::launder_invariant_group:
-    case Intrinsic::strip_invariant_group:
-    case Intrinsic::is_constant:
-    case Intrinsic::lifetime_start:
-    case Intrinsic::lifetime_end:
-    case Intrinsic::objectsize:
-    case Intrinsic::ptr_annotation:
-    case Intrinsic::var_annotation:
-    case Intrinsic::experimental_gc_result:
-    case Intrinsic::experimental_gc_relocate:
-    case Intrinsic::coro_alloc:
-    case Intrinsic::coro_begin:
-    case Intrinsic::coro_free:
-    case Intrinsic::coro_end:
-    case Intrinsic::coro_frame:
-    case Intrinsic::coro_size:
-    case Intrinsic::coro_suspend:
-    case Intrinsic::coro_param:
-    case Intrinsic::coro_subfn_addr:
-      // These intrinsics don't actually represent code after lowering.
-      return TTI::TCC_Free;
-    }
-  }
-
-  unsigned getIntrinsicCost(Intrinsic::ID IID, Type *RetTy,
-                            ArrayRef<const Value *> Arguments, const User *U,
-                            TTI::TargetCostKind CostKind) {
-    // Delegate to the generic intrinsic handling code. This mostly provides an
-    // opportunity for targets to (for example) special case the cost of
-    // certain intrinsics based on constants used as arguments.
-    SmallVector<Type *, 8> ParamTys;
-    ParamTys.reserve(Arguments.size());
-    for (unsigned Idx = 0, Size = Arguments.size(); Idx != Size; ++Idx)
-      ParamTys.push_back(Arguments[Idx]->getType());
-    return static_cast<T *>(this)->getIntrinsicCost(IID, RetTy, ParamTys, U,
-                                                    CostKind);
-  }
-
-  unsigned getUserCost(const User *U, ArrayRef<const Value *> Operands,
-                       TTI::TargetCostKind CostKind) {
+  InstructionCost getUserCost(const User *U, ArrayRef<const Value *> Operands,
+                              TTI::TargetCostKind CostKind) {
     auto *TargetTTI = static_cast<T *>(this);
-
+    // Handle non-intrinsic calls, invokes, and callbr.
     // FIXME: Unlikely to be true for anything but CodeSize.
-    if (const auto *CB = dyn_cast<CallBase>(U)) {
-      const Function *F = CB->getCalledFunction();
-      if (F) {
-        FunctionType *FTy = F->getFunctionType();
-        if (Intrinsic::ID IID = F->getIntrinsicID()) {
-          SmallVector<Type *, 8> ParamTys(FTy->param_begin(), FTy->param_end());
-          return TargetTTI->getIntrinsicCost(IID, FTy->getReturnType(),
-                                             ParamTys, U, CostKind);
-        }
-
+    auto *CB = dyn_cast<CallBase>(U);
+    if (CB && !isa<IntrinsicInst>(U)) {
+      if (const Function *F = CB->getCalledFunction()) {
         if (!TargetTTI->isLoweredToCall(F))
           return TTI::TCC_Basic; // Give a basic cost if it will be lowered
 
-        return TTI::TCC_Basic * (FTy->getNumParams() + 1);
+        return TTI::TCC_Basic * (F->getFunctionType()->getNumParams() + 1);
       }
+      // For indirect or other calls, scale cost by number of arguments.
       return TTI::TCC_Basic * (CB->arg_size() + 1);
     }
 
@@ -848,7 +944,17 @@ public:
     switch (Opcode) {
     default:
       break;
+    case Instruction::Call: {
+      assert(isa<IntrinsicInst>(U) && "Unexpected non-intrinsic call");
+      auto *Intrinsic = cast<IntrinsicInst>(U);
+      IntrinsicCostAttributes CostAttrs(Intrinsic->getIntrinsicID(), *CB);
+      return TargetTTI->getIntrinsicInstrCost(CostAttrs, CostKind);
+    }
+    case Instruction::Br:
+    case Instruction::Ret:
     case Instruction::PHI:
+    case Instruction::Switch:
+      return TargetTTI->getCFInstrCost(Opcode, CostKind, I);
     case Instruction::ExtractValue:
     case Instruction::Freeze:
       return TTI::TCC_Free;
@@ -862,36 +968,180 @@ public:
                                    GEP->getPointerOperand(),
                                    Operands.drop_front());
     }
-    case Instruction::FDiv:
-    case Instruction::FRem:
-    case Instruction::SDiv:
-    case Instruction::SRem:
+    case Instruction::Add:
+    case Instruction::FAdd:
+    case Instruction::Sub:
+    case Instruction::FSub:
+    case Instruction::Mul:
+    case Instruction::FMul:
     case Instruction::UDiv:
+    case Instruction::SDiv:
+    case Instruction::FDiv:
     case Instruction::URem:
-      // FIXME: Unlikely to be true for CodeSize.
-      return TTI::TCC_Expensive;
+    case Instruction::SRem:
+    case Instruction::FRem:
+    case Instruction::Shl:
+    case Instruction::LShr:
+    case Instruction::AShr:
+    case Instruction::And:
+    case Instruction::Or:
+    case Instruction::Xor:
+    case Instruction::FNeg: {
+      TTI::OperandValueProperties Op1VP = TTI::OP_None;
+      TTI::OperandValueProperties Op2VP = TTI::OP_None;
+      TTI::OperandValueKind Op1VK =
+        TTI::getOperandInfo(U->getOperand(0), Op1VP);
+      TTI::OperandValueKind Op2VK = Opcode != Instruction::FNeg ?
+        TTI::getOperandInfo(U->getOperand(1), Op2VP) : TTI::OK_AnyValue;
+      SmallVector<const Value *, 2> Operands(U->operand_values());
+      return TargetTTI->getArithmeticInstrCost(Opcode, Ty, CostKind,
+                                               Op1VK, Op2VK,
+                                               Op1VP, Op2VP, Operands, I);
+    }
     case Instruction::IntToPtr:
     case Instruction::PtrToInt:
+    case Instruction::SIToFP:
+    case Instruction::UIToFP:
+    case Instruction::FPToUI:
+    case Instruction::FPToSI:
     case Instruction::Trunc:
+    case Instruction::FPTrunc:
     case Instruction::BitCast:
-      if (TargetTTI->getCastInstrCost(Opcode, Ty, OpTy, CostKind, I) ==
-          TTI::TCC_Free)
-        return TTI::TCC_Free;
-      break;
     case Instruction::FPExt:
     case Instruction::SExt:
     case Instruction::ZExt:
-      if (I && TargetTTI->getExtCost(I, Operands.back()) == TTI::TCC_Free)
-        return TTI::TCC_Free;
-      break;
+    case Instruction::AddrSpaceCast:
+      return TargetTTI->getCastInstrCost(
+          Opcode, Ty, OpTy, TTI::getCastContextHint(I), CostKind, I);
+    case Instruction::Store: {
+      auto *SI = cast<StoreInst>(U);
+      Type *ValTy = U->getOperand(0)->getType();
+      return TargetTTI->getMemoryOpCost(Opcode, ValTy, SI->getAlign(),
+                                        SI->getPointerAddressSpace(),
+                                        CostKind, I);
+    }
+    case Instruction::Load: {
+      auto *LI = cast<LoadInst>(U);
+      return TargetTTI->getMemoryOpCost(Opcode, U->getType(), LI->getAlign(),
+                                        LI->getPointerAddressSpace(),
+                                        CostKind, I);
+    }
+    case Instruction::Select: {
+      const Value *Op0, *Op1;
+      if (match(U, m_LogicalAnd(m_Value(Op0), m_Value(Op1))) ||
+          match(U, m_LogicalOr(m_Value(Op0), m_Value(Op1)))) {
+        // select x, y, false --> x & y
+        // select x, true, y --> x | y
+        TTI::OperandValueProperties Op1VP = TTI::OP_None;
+        TTI::OperandValueProperties Op2VP = TTI::OP_None;
+        TTI::OperandValueKind Op1VK = TTI::getOperandInfo(Op0, Op1VP);
+        TTI::OperandValueKind Op2VK = TTI::getOperandInfo(Op1, Op2VP);
+        assert(Op0->getType()->getScalarSizeInBits() == 1 &&
+               Op1->getType()->getScalarSizeInBits() == 1);
+
+        SmallVector<const Value *, 2> Operands{Op0, Op1};
+        return TargetTTI->getArithmeticInstrCost(
+            match(U, m_LogicalOr()) ? Instruction::Or : Instruction::And, Ty,
+            CostKind, Op1VK, Op2VK, Op1VP, Op2VP, Operands, I);
+      }
+      Type *CondTy = U->getOperand(0)->getType();
+      return TargetTTI->getCmpSelInstrCost(Opcode, U->getType(), CondTy,
+                                           CmpInst::BAD_ICMP_PREDICATE,
+                                           CostKind, I);
+    }
+    case Instruction::ICmp:
+    case Instruction::FCmp: {
+      Type *ValTy = U->getOperand(0)->getType();
+      // TODO: Also handle ICmp/FCmp constant expressions.
+      return TargetTTI->getCmpSelInstrCost(Opcode, ValTy, U->getType(),
+                                           I ? cast<CmpInst>(I)->getPredicate()
+                                             : CmpInst::BAD_ICMP_PREDICATE,
+                                           CostKind, I);
+    }
+    case Instruction::InsertElement: {
+      auto *IE = dyn_cast<InsertElementInst>(U);
+      if (!IE)
+        return TTI::TCC_Basic; // FIXME
+      auto *CI = dyn_cast<ConstantInt>(IE->getOperand(2));
+      unsigned Idx = CI ? CI->getZExtValue() : -1;
+      return TargetTTI->getVectorInstrCost(Opcode, Ty, Idx);
+    }
+    case Instruction::ShuffleVector: {
+      auto *Shuffle = dyn_cast<ShuffleVectorInst>(U);
+      if (!Shuffle)
+        return TTI::TCC_Basic; // FIXME
+      auto *VecTy = cast<VectorType>(U->getType());
+      auto *VecSrcTy = cast<VectorType>(U->getOperand(0)->getType());
+
+      // TODO: Identify and add costs for insert subvector, etc.
+      int SubIndex;
+      if (Shuffle->isExtractSubvectorMask(SubIndex))
+        return TargetTTI->getShuffleCost(TTI::SK_ExtractSubvector, VecSrcTy,
+                                         Shuffle->getShuffleMask(), SubIndex,
+                                         VecTy);
+      else if (Shuffle->changesLength())
+        return CostKind == TTI::TCK_RecipThroughput ? -1 : 1;
+      else if (Shuffle->isIdentity())
+        return 0;
+      else if (Shuffle->isReverse())
+        return TargetTTI->getShuffleCost(TTI::SK_Reverse, VecTy,
+                                         Shuffle->getShuffleMask(), 0, nullptr);
+      else if (Shuffle->isSelect())
+        return TargetTTI->getShuffleCost(TTI::SK_Select, VecTy,
+                                         Shuffle->getShuffleMask(), 0, nullptr);
+      else if (Shuffle->isTranspose())
+        return TargetTTI->getShuffleCost(TTI::SK_Transpose, VecTy,
+                                         Shuffle->getShuffleMask(), 0, nullptr);
+      else if (Shuffle->isZeroEltSplat())
+        return TargetTTI->getShuffleCost(TTI::SK_Broadcast, VecTy,
+                                         Shuffle->getShuffleMask(), 0, nullptr);
+      else if (Shuffle->isSingleSource())
+        return TargetTTI->getShuffleCost(TTI::SK_PermuteSingleSrc, VecTy,
+                                         Shuffle->getShuffleMask(), 0, nullptr);
+
+      return TargetTTI->getShuffleCost(TTI::SK_PermuteTwoSrc, VecTy,
+                                       Shuffle->getShuffleMask(), 0, nullptr);
+    }
+    case Instruction::ExtractElement: {
+      unsigned Idx = -1;
+      auto *EEI = dyn_cast<ExtractElementInst>(U);
+      if (!EEI)
+        return TTI::TCC_Basic; // FIXME
+
+      auto *CI = dyn_cast<ConstantInt>(EEI->getOperand(1));
+      if (CI)
+        Idx = CI->getZExtValue();
+
+      // Try to match a reduction (a series of shufflevector and vector ops
+      // followed by an extractelement).
+      unsigned RdxOpcode;
+      VectorType *RdxType;
+      bool IsPairwise;
+      switch (TTI::matchVectorReduction(EEI, RdxOpcode, RdxType, IsPairwise)) {
+      case TTI::RK_Arithmetic:
+        return TargetTTI->getArithmeticReductionCost(RdxOpcode, RdxType,
+                                                     IsPairwise, CostKind);
+      case TTI::RK_MinMax:
+        return TargetTTI->getMinMaxReductionCost(
+            RdxType, cast<VectorType>(CmpInst::makeCmpResultType(RdxType)),
+            IsPairwise, /*IsUnsigned=*/false, CostKind);
+      case TTI::RK_UnsignedMinMax:
+        return TargetTTI->getMinMaxReductionCost(
+            RdxType, cast<VectorType>(CmpInst::makeCmpResultType(RdxType)),
+            IsPairwise, /*IsUnsigned=*/true, CostKind);
+      case TTI::RK_None:
+        break;
+      }
+      return TargetTTI->getVectorInstrCost(Opcode, U->getOperand(0)->getType(),
+                                           Idx);
+    }
     }
     // By default, just classify everything as 'basic'.
     return TTI::TCC_Basic;
   }
 
-  int getInstructionLatency(const Instruction *I) {
-    SmallVector<const Value *, 4> Operands(I->value_op_begin(),
-                                           I->value_op_end());
+  InstructionCost getInstructionLatency(const Instruction *I) {
+    SmallVector<const Value *, 4> Operands(I->operand_values());
     if (getUserCost(I, Operands, TTI::TCK_Latency) == TTI::TCC_Free)
       return 0;
 

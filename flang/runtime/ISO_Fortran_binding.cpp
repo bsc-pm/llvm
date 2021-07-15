@@ -17,7 +17,8 @@ namespace Fortran::ISO {
 extern "C" {
 
 static inline constexpr bool IsCharacterType(CFI_type_t ty) {
-  return ty == CFI_type_char;
+  return ty == CFI_type_char || ty == CFI_type_char16_t ||
+      ty == CFI_type_char32_t;
 }
 static inline constexpr bool IsAssumedSize(const CFI_cdesc_t *dv) {
   return dv->rank > 0 && dv->dim[dv->rank - 1].extent == -1;
@@ -55,7 +56,7 @@ int CFI_allocate(CFI_cdesc_t *descriptor, const CFI_index_t lower_bounds[],
     return CFI_INVALID_RANK;
   }
   if (descriptor->type < CFI_type_signed_char ||
-      descriptor->type > CFI_type_struct) {
+      descriptor->type > CFI_TYPE_LAST) {
     return CFI_INVALID_TYPE;
   }
   if (!IsCharacterType(descriptor->type)) {
@@ -77,7 +78,7 @@ int CFI_allocate(CFI_cdesc_t *descriptor, const CFI_index_t lower_bounds[],
     byteSize *= extent;
   }
   void *p{std::malloc(byteSize)};
-  if (!p) {
+  if (!p && byteSize) {
     return CFI_ERROR_MEM_ALLOCATION;
   }
   descriptor->base_addr = p;
@@ -201,6 +202,12 @@ static constexpr std::size_t MinElemLen(CFI_type_t type) {
   case CFI_type_cptr:
     minElemLen = sizeof(void *);
     break;
+  case CFI_type_char16_t:
+    minElemLen = sizeof(char16_t);
+    break;
+  case CFI_type_char32_t:
+    minElemLen = sizeof(char32_t);
+    break;
   }
   return minElemLen;
 }
@@ -221,17 +228,20 @@ int CFI_establish(CFI_cdesc_t *descriptor, void *base_addr,
   if (rank > 0 && base_addr && !extents) {
     return CFI_INVALID_EXTENT;
   }
-  if (type < CFI_type_signed_char || type > CFI_type_struct) {
+  if (type < CFI_type_signed_char || type > CFI_TYPE_LAST) {
     return CFI_INVALID_TYPE;
   }
   if (!descriptor) {
     return CFI_INVALID_DESCRIPTOR;
   }
-  std::size_t minElemLen{MinElemLen(type)};
-  if (minElemLen > 0) {
-    elem_len = minElemLen;
-  } else if (elem_len <= 0) {
-    return CFI_INVALID_ELEM_LEN;
+  if (type == CFI_type_struct || type == CFI_type_other ||
+      IsCharacterType(type)) {
+    if (elem_len <= 0) {
+      return CFI_INVALID_ELEM_LEN;
+    }
+  } else {
+    elem_len = MinElemLen(type);
+    assert(elem_len > 0 && "Unknown element length for type");
   }
   descriptor->base_addr = base_addr;
   descriptor->elem_len = elem_len;

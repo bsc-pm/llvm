@@ -32,7 +32,7 @@ using namespace lldb_private;
 char ObjCLanguageRuntime::ID = 0;
 
 // Destructor
-ObjCLanguageRuntime::~ObjCLanguageRuntime() {}
+ObjCLanguageRuntime::~ObjCLanguageRuntime() = default;
 
 ObjCLanguageRuntime::ObjCLanguageRuntime(Process *process)
     : LanguageRuntime(process), m_impl_cache(),
@@ -41,7 +41,7 @@ ObjCLanguageRuntime::ObjCLanguageRuntime(Process *process)
       m_isa_to_descriptor_stop_id(UINT32_MAX), m_complete_class_cache(),
       m_negative_complete_class_cache() {}
 
-bool ObjCLanguageRuntime::IsWhitelistedRuntimeValue(ConstString name) {
+bool ObjCLanguageRuntime::IsAllowedRuntimeValue(ConstString name) {
   static ConstString g_self = ConstString("self");
   static ConstString g_cmd = ConstString("_cmd");
   return name == g_self || name == g_cmd;
@@ -305,7 +305,7 @@ ObjCLanguageRuntime::EncodingToType::RealizeType(const char *name,
   return CompilerType();
 }
 
-ObjCLanguageRuntime::EncodingToType::~EncodingToType() {}
+ObjCLanguageRuntime::EncodingToType::~EncodingToType() = default;
 
 ObjCLanguageRuntime::EncodingToTypeSP ObjCLanguageRuntime::GetEncodingToType() {
   return nullptr;
@@ -363,7 +363,8 @@ void ObjCLanguageRuntime::ObjCExceptionPrecondition::AddClassName(
   m_class_names.insert(class_name);
 }
 
-ObjCLanguageRuntime::ObjCExceptionPrecondition::ObjCExceptionPrecondition() {}
+ObjCLanguageRuntime::ObjCExceptionPrecondition::ObjCExceptionPrecondition() =
+    default;
 
 bool ObjCLanguageRuntime::ObjCExceptionPrecondition::EvaluatePrecondition(
     StoppointCallbackContext &context) {

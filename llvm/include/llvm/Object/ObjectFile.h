@@ -18,13 +18,11 @@
 #include "llvm/ADT/Triple.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/BinaryFormat/Magic.h"
-#include "llvm/MC/SubtargetFeature.h"
 #include "llvm/Object/Binary.h"
 #include "llvm/Object/Error.h"
 #include "llvm/Object/SymbolicFile.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Error.h"
-#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include <cassert>
 #include <cstdint>
@@ -34,6 +32,7 @@
 namespace llvm {
 
 class ARMAttributeParser;
+class SubtargetFeatures;
 
 namespace object {
 
@@ -124,7 +123,7 @@ public:
   bool isBerkeleyData() const;
 
   /// Whether this section is a debug section.
-  bool isDebugSection(StringRef SectionName) const;
+  bool isDebugSection() const;
 
   bool containsSymbol(SymbolRef S) const;
 
@@ -133,6 +132,9 @@ public:
   iterator_range<relocation_iterator> relocations() const {
     return make_range(relocation_begin(), relocation_end());
   }
+
+  /// Returns the related section if this section contains relocations. The
+  /// returned section may or may not have applied its relocations.
   Expected<section_iterator> getRelocatedSection() const;
 
   DataRefImpl getRawDataRefImpl() const;
@@ -275,7 +277,7 @@ protected:
   virtual bool isSectionStripped(DataRefImpl Sec) const;
   virtual bool isBerkeleyText(DataRefImpl Sec) const;
   virtual bool isBerkeleyData(DataRefImpl Sec) const;
-  virtual bool isDebugSection(StringRef SectionName) const;
+  virtual bool isDebugSection(DataRefImpl Sec) const;
   virtual relocation_iterator section_rel_begin(DataRefImpl Sec) const = 0;
   virtual relocation_iterator section_rel_end(DataRefImpl Sec) const = 0;
   virtual Expected<section_iterator> getRelocatedSection(DataRefImpl Sec) const;
@@ -328,6 +330,7 @@ public:
   virtual StringRef getFileFormatName() const = 0;
   virtual Triple::ArchType getArch() const = 0;
   virtual SubtargetFeatures getFeatures() const = 0;
+  virtual Optional<StringRef> tryGetCPUName() const { return None; };
   virtual void setARMSubArch(Triple &TheTriple) const { }
   virtual Expected<uint64_t> getStartAddress() const {
     return errorCodeToError(object_error::parse_failed);
@@ -350,7 +353,8 @@ public:
   createObjectFile(StringRef ObjectPath);
 
   static Expected<std::unique_ptr<ObjectFile>>
-  createObjectFile(MemoryBufferRef Object, llvm::file_magic Type);
+  createObjectFile(MemoryBufferRef Object, llvm::file_magic Type,
+                   bool InitContent = true);
   static Expected<std::unique_ptr<ObjectFile>>
   createObjectFile(MemoryBufferRef Object) {
     return createObjectFile(Object, llvm::file_magic::unknown);
@@ -367,7 +371,7 @@ public:
   createXCOFFObjectFile(MemoryBufferRef Object, unsigned FileType);
 
   static Expected<std::unique_ptr<ObjectFile>>
-  createELFObjectFile(MemoryBufferRef Object);
+  createELFObjectFile(MemoryBufferRef Object, bool InitContent = true);
 
   static Expected<std::unique_ptr<MachOObjectFile>>
   createMachOObjectFile(MemoryBufferRef Object,
@@ -503,8 +507,8 @@ inline bool SectionRef::isBerkeleyData() const {
   return OwningObject->isBerkeleyData(SectionPimpl);
 }
 
-inline bool SectionRef::isDebugSection(StringRef SectionName) const {
-  return OwningObject->isDebugSection(SectionName);
+inline bool SectionRef::isDebugSection() const {
+  return OwningObject->isDebugSection(SectionPimpl);
 }
 
 inline relocation_iterator SectionRef::relocation_begin() const {

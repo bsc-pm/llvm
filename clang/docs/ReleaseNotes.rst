@@ -1,5 +1,5 @@
 ========================================
-Clang 11.0.0 (In-Progress) Release Notes
+Clang 13.0.0 (In-Progress) Release Notes
 ========================================
 
 .. contents::
@@ -10,7 +10,7 @@ Written by the `LLVM Team <https://llvm.org/>`_
 
 .. warning::
 
-   These are in-progress notes for the upcoming Clang 11 release.
+   These are in-progress notes for the upcoming Clang 13 release.
    Release notes for previous releases can be found on
    `the Download Page <https://releases.llvm.org/download.html>`_.
 
@@ -18,7 +18,7 @@ Introduction
 ============
 
 This document contains the release notes for the Clang C/C++/Objective-C
-frontend, part of the LLVM Compiler Infrastructure, release 11.0.0. Here we
+frontend, part of the LLVM Compiler Infrastructure, release 13.0.0. Here we
 describe the status of Clang in some detail, including major
 improvements from the previous release and new feature work. For the
 general LLVM release notes, see `the LLVM
@@ -35,7 +35,7 @@ main Clang web page, this document applies to the *next* release, not
 the current one. To see the release notes for a specific release, please
 see the `releases page <https://llvm.org/releases/>`_.
 
-What's New in Clang 11.0.0?
+What's New in Clang 13.0.0?
 ===========================
 
 Some of the major new features and improvements to Clang are listed
@@ -46,90 +46,62 @@ sections with improvements to Clang's support for those languages.
 Major New Features
 ------------------
 
-- ...
+- Guaranteed tail calls are now supported with statement attributes
+  ``[[clang::musttail]]`` in C++ and ``__attribute__((musttail))`` in C. The
+  attribute is applied to a return statement (not a function declaration),
+  and an error is emitted if a tail call cannot be guaranteed, for example if
+  the function signatures of caller and callee are not compatible. Guaranteed
+  tail calls enable a class of algorithms that would otherwise use an
+  arbitrary amount of stack space.
 
 Improvements to Clang's diagnostics
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-- -Wpointer-to-int-cast is a new warning group. This group warns about C-style
-  casts of pointers to a integer type too small to hold all possible values.
+- ...
 
 Non-comprehensive list of changes in this release
 -------------------------------------------------
 
-- For the ARM target, C-language intrinsics are now provided for the full Arm
-  v8.1-M MVE instruction set. ``<arm_mve.h>`` supports the complete API defined
-  in the Arm C Language Extensions.
-
-- For the ARM target, C-language intrinsics ``<arm_cde.h>`` for the CDE
-  instruction set are now provided.
-
-- clang adds support for a set of  extended integer types (``_ExtInt(N)``) that
-  permit non-power of 2 integers, exposing the LLVM integer types. Since a major
-  motivating use case for these types is to limit 'bit' usage, these types don't
-  automatically promote to 'int' when operations are done between two
-  ``ExtInt(N)`` types, instead math occurs at the size of the largest
-  ``ExtInt(N)`` type.
-
-- Users of UBSan, PGO, and coverage on Windows will now need to add clang's
-  library resource directory to their library search path. These features all
-  use runtime libraries, and Clang provides these libraries in its resource
-  directory. For example, if LLVM is installed in ``C:\Program Files\LLVM``,
-  then the profile runtime library will appear at
-  ``C:\Program Files\LLVM\lib\clang\11.0.0\lib\windows\clang_rt.profile-x86_64.lib``.
-  To ensure that the linker can find the appropriate library, users should pass
-  ``/LIBPATH:C:\Program Files\LLVM\lib\clang\11.0.0\lib\windows`` to the
-  linker. If the user links the program with the ``clang`` or ``clang-cl``
-  drivers, the driver will pass this flag for them.
+- The default value of _MSC_VER was raised from 1911 to 1914. MSVC 19.14 has the
+  support to overaligned objects on x86_32 which is required for some LLVM 
+  passes.
 
 New Compiler Flags
 ------------------
 
-- -fstack-clash-protection will provide a protection against the stack clash
-  attack for x86 architecture through automatic probing of each page of
-  allocated stack.
+- ``-Wreserved-identifier`` emits warning when user code uses reserved
+  identifiers.
 
-- -ffp-exception-behavior={ignore,maytrap,strict} allows the user to specify
-  the floating-point exception behavior. The default setting is ``ignore``.
-
-- -ffp-model={precise,strict,fast} provides the user an umbrella option to
-  simplify access to the many single purpose floating point options. The default
-  setting is ``precise``.
+- ``-fstack-usage`` generates an extra .su file per input source file. The .su
+  file contains frame size information for each function defined in the source
+  file.
 
 Deprecated Compiler Flags
 -------------------------
-
-The following options are deprecated and ignored. They will be removed in
-future versions of Clang.
 
 - ...
 
 Modified Compiler Flags
 -----------------------
 
-- -fno-common has been enabled as the default for all targets.  Therefore, C
-  code that uses tentative definitions as definitions of a variable in multiple
-  translation units will trigger multiple-definition linker errors. Generally,
-  this occurs when the use of the ``extern`` keyword is neglected in the
-  declaration of a variable in a header file. In some cases, no specific
-  translation unit provides a definition of the variable. The previous
-  behavior can be restored by specifying ``-fcommon``.
-- -Wasm-ignored-qualifier (ex. `asm const ("")`) has been removed and replaced
-  with an error (this matches a recent change in GCC-9).
-- -Wasm-file-asm-volatile (ex. `asm volatile ("")` at global scope) has been
-  removed and replaced with an error (this matches GCC's behavior).
-- Duplicate qualifiers on asm statements (ex. `asm volatile volatile ("")`) no
-  longer produces a warning via -Wduplicate-decl-specifier, but now an error
-  (this matches GCC's behavior).
-- The deprecated argument ``-f[no-]sanitize-recover`` has changed to mean
-  ``-f[no-]sanitize-recover=all`` instead of
-  ``-f[no-]sanitize-recover=undefined,integer`` and is no longer deprecated.
-- The argument to ``-f[no-]sanitize-trap=...`` is now optional and defaults to
-  ``all``.
-- ``-fno-char8_t`` now disables the ``char8_t`` keyword, not just the use of
-  ``char8_t`` as the character type of ``u8`` literals. This restores the
-  Clang 8 behavior that regressed in Clang 9 and 10.
-- -print-targets has been added to print the registered targets.
+- -Wshadow now also checks for shadowed structured bindings
+- ``-B <prefix>`` (when ``<prefix>`` is a directory) was overloaded to additionally
+  detect GCC installations under ``<prefix>`` (``lib{,32,64}/gcc{,-cross}/$triple``).
+  This behavior was incompatible with GCC, caused interop issues with
+  ``--gcc-toolchain``, and was thus dropped. Specify ``--gcc-toolchain=<dir>``
+  instead. ``-B``'s other GCC-compatible semantics are preserved:
+  ``$prefix/$triple-$file`` and ``$prefix$file`` are searched for executables,
+  libraries, includes, and data files used by the compiler.
+
+Removed Compiler Flags
+-------------------------
+
+- The clang-cl ``/fallback`` flag, which made clang-cl invoke Microsoft Visual
+  C++ on files it couldn't compile itself, has been removed.
+
+- ``-Wreturn-std-move-in-c++11``, which checked whether an entity is affected by
+  `CWG1579 <https://wg21.link/CWG1579>`_ to become implicitly movable, has been
+  removed.
 
 New Pragmas in Clang
 --------------------
@@ -139,9 +111,10 @@ New Pragmas in Clang
 Attribute Changes in Clang
 --------------------------
 
-- Attributes can now be specified by clang plugins. See the
-  `Clang Plugins <ClangPlugins.html#defining-attributes>`_ documentation for
-  details.
+- ...
+
+- Added support for C++11-style ``[[]]`` attributes on using-declarations, as a
+  clang extension.
 
 Windows Support
 ---------------
@@ -149,58 +122,22 @@ Windows Support
 C Language Changes in Clang
 ---------------------------
 
-- The default C language standard used when `-std=` is not specified has been
-  upgraded from gnu11 to gnu17.
-
-- Clang now supports the GNU C extension `asm inline`; it won't do anything
-  *yet*, but it will be parsed.
-
 - ...
 
 C++ Language Changes in Clang
 -----------------------------
 
-- Clang now implements a restriction on giving non-C-compatible anonymous
-  structs a typedef name for linkage purposes, as described in C++ committee
-  paper `P1766R1 <http://wg21.link/p1766r1>`. This paper was adopted by the
-  C++ committee as a Defect Report resolution, so it is applied retroactively
-  to all C++ standard versions. This affects code such as:
+- The oldest supported GNU libstdc++ is now 4.8.3 (released 2014-05-22).
+  Clang workarounds for bugs in earlier versions have been removed.
 
-  .. code-block:: c++
+- ...
 
-    typedef struct {
-      int f() { return 0; }
-    } S;
-
-  Previous versions of Clang rejected some constructs of this form
-  (specifically, where the linkage of the type happened to be computed
-  before the parser reached the typedef name); those cases are still rejected
-  in Clang 11. In addition, cases that previous versions of Clang did not
-  reject now produce an extension warning. This warning can be disabled with
-  the warning flag ``-Wno-non-c-typedef-for-linkage``.
-
-  Affected code should be updated to provide a tag name for the anonymous
-  struct:
-
-  .. code-block:: c++
-
-    struct S {
-      int f() { return 0; }
-    };
-
-  If the code is shared with a C compilation (for example, if the parts that
-  are not C-compatible are guarded with ``#ifdef __cplusplus``), the typedef
-  declaration should be retained, but a tag name should still be provided:
-
-  .. code-block:: c++
-
-    typedef struct S {
-      int f() { return 0; }
-    } S;
-
-C++1z Feature Support
+C++20 Feature Support
 ^^^^^^^^^^^^^^^^^^^^^
+...
 
+C++2b Feature Support
+^^^^^^^^^^^^^^^^^^^^^
 ...
 
 Objective-C Language Changes in Clang
@@ -224,24 +161,31 @@ CUDA Support in Clang
 
 - ...
 
+X86 Support in Clang
+--------------------
+
+- ...
+
 Internal API Changes
 --------------------
 
-These are major API changes that have happened since the 10.0.0 release of
+These are major API changes that have happened since the 12.0.0 release of
 Clang. If upgrading an external codebase that uses Clang as a library,
 this section should help get you past the largest hurdles of upgrading.
+
+- ...
 
 Build System Changes
 --------------------
 
-These are major changes to the build system that have happened since the 10.0.0
+These are major changes to the build system that have happened since the 12.0.0
 release of Clang. Users of the build system should adjust accordingly.
 
-- clang-tidy and clang-include-fixer are no longer compiled into libclang by
-  default. You can set ``LIBCLANG_INCLUDE_CLANG_TOOLS_EXTRA=ON`` to undo that,
-  but it's expected that that setting will go away eventually. If this is
-  something you need, please reach out to the mailing list to discuss possible
-  ways forward.
+- The option ``LIBCLANG_INCLUDE_CLANG_TOOLS_EXTRA`` no longer exists. There were
+  two releases with that flag forced off, and no uses were added that forced it
+  on. The recommended replacement is clangd.
+
+- ...
 
 AST Matchers
 ------------
@@ -251,51 +195,90 @@ AST Matchers
 clang-format
 ------------
 
-- Option ``IndentCaseBlocks`` has been added to support treating the block
-  following a switch case label as a scope block which gets indented itself.
-  It helps avoid having the closing bracket align with the switch statement's
-  closing bracket (when ``IndentCaseLabels`` is ``false``).
+- Option ``SpacesInLineCommentPrefix`` has been added to control the
+  number of spaces in a line comments prefix.
+
+- Option ``SortIncludes`` has been updated from a ``bool`` to an
+  ``enum`` with backwards compatibility. In addition to the previous
+  ``true``/``false`` states (now ``CaseSensitive``/``Never``), a third
+  state has been added (``CaseInsensitive``) which causes an alphabetical sort
+  with case used as a tie-breaker.
 
   .. code-block:: c++
 
-    switch (fool) {                vs.     switch (fool) {
-    case 1:                                case 1: {
-      {                                      bar();
-         bar();                            } break;
-      }                                    default: {
-      break;                                 plop();
-    default:                               }
-      {                                    }
-        plop();
-      }
-    }
+    // Never (previously false)
+    #include "B/A.h"
+    #include "A/B.h"
+    #include "a/b.h"
+    #include "A/b.h"
+    #include "B/a.h"
 
-- Option ``ObjCBreakBeforeNestedBlockParam`` has been added to optionally apply
-  linebreaks for function arguments declarations before nested blocks.
+    // CaseSensitive (previously true)
+    #include "A/B.h"
+    #include "A/b.h"
+    #include "B/A.h"
+    #include "B/a.h"
+    #include "a/b.h"
 
-- Option ``InsertTrailingCommas`` can be set to ``TCS_Wrapped`` to insert
-  trailing commas in container literals (arrays and objects) that wrap across
-  multiple lines. It is currently only available for JavaScript and disabled by
-  default (``TCS_None``).
+    // CaseInsensitive
+    #include "A/B.h"
+    #include "A/b.h"
+    #include "a/b.h"
+    #include "B/A.h"
+    #include "B/a.h"
 
-- Option ``BraceWrapping.BeforeLambdaBody`` has been added to manage lambda
-  line break inside function parameter call in Allman style.
+- ``BasedOnStyle: InheritParentConfig`` allows to use the ``.clang-format`` of
+  the parent directories to overwrite only parts of it.
 
-  .. code-block:: c++
+- Option ``IndentAccessModifiers`` has been added to be able to give access
+  modifiers their own indentation level inside records.
 
-      true:
-      connect(
-        []()
-        {
-          foo();
-          bar();
-        });
+- Option ``PPIndentWidth`` has been added to be able to configure pre-processor
+  indentation independent from regular code.
 
-      false:
-      connect([]() {
-          foo();
-          bar();
-        });
+- Option ``ShortNamespaceLines`` has been added to give better control
+  over ``FixNamespaceComments`` when determining a namespace length.
+
+- Support for Whitesmiths has been improved, with fixes for ``namespace`` blocks
+  and ``case`` blocks and labels.
+
+- Option ``EmptyLineAfterAccessModifier`` has been added to remove, force or keep
+  new lines after access modifiers.
+
+- Checks for newlines in option ``EmptyLineBeforeAccessModifier`` are now based
+  on the formatted new lines and not on the new lines in the file. (Fixes
+  https://llvm.org/PR41870.)
+
+- Option ``SpacesInAngles`` has been improved, it now accepts ``Leave`` value
+  that allows to keep spaces where they are already present.
+
+- Option ``AllowShortIfStatementsOnASingleLine`` has been improved, it now
+  accepts ``AllIfsAndElse`` value that allows to put "else if" and "else" short
+  statements on a single line. (Fixes https://llvm.org/PR50019.)
+
+- Option ``BreakInheritanceList`` gets a new style, ``AfterComma``. It breaks
+  only after the commas that separate the base-specifiers.
+
+- Option ``LambdaBodyIndentation`` has been added to control how the body of a
+  lambda is indented. The default ``Signature`` value indents the body one level
+  relative to whatever indentation the signature has. ``OuterScope`` lets you
+  change that so that the lambda body is indented one level relative to the scope
+  containing the lambda, regardless of where the lambda signature was placed.
+
+- Option ``IfMacros`` has been added. This lets you define macros that get
+  formatted like conditionals much like ``ForEachMacros`` get styled like
+  foreach loops.
+
+- ``git-clang-format`` no longer formats changes to symbolic links. (Fixes
+  https://llvm.org/PR46992.)
+
+- Makes ``PointerAligment: Right`` working with ``AlignConsecutiveDeclarations``.
+  (Fixes https://llvm.org/PR27353)
+
+- Option ``AlignArrayOfStructure`` has been added to allow for ordering array-like
+  initializers.
+
+- Support for formatting JSON file (\*.json) has been added to clang-format.
 
 libclang
 --------

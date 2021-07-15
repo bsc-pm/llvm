@@ -89,9 +89,6 @@ protected:
 
   bool SetFrameAtIndex(uint32_t idx, lldb::StackFrameSP &frame_sp);
 
-  static void Merge(std::unique_ptr<StackFrameList> &curr_up,
-                    lldb::StackFrameListSP &prev_sp);
-
   void GetFramesUpTo(uint32_t end_idx);
 
   void GetOnlyConcreteFramesUpTo(uint32_t end_idx, Unwind &unwinder);
@@ -155,7 +152,8 @@ protected:
   const bool m_show_inlined_frames;
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(StackFrameList);
+  StackFrameList(const StackFrameList &) = delete;
+  const StackFrameList &operator=(const StackFrameList &) = delete;
 };
 
 } // namespace lldb_private

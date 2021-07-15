@@ -28,7 +28,7 @@ namespace llvm {
 class CallGraphUpdater {
   /// Containers for functions which we did replace or want to delete when
   /// `finalize` is called. This can happen explicitly or as part of the
-  /// destructor. Dead functions in comdat sections are tracked seperatly
+  /// destructor. Dead functions in comdat sections are tracked separately
   /// because a function with discardable linakage in a COMDAT should only
   /// be dropped if the entire COMDAT is dropped, see git ac07703842cf.
   ///{
@@ -87,7 +87,7 @@ public:
   /// If a new function was created by outlining, this method can be called
   /// to update the call graph for the new function. Note that the old one
   /// still needs to be re-analyzed or manually updated.
-  void registerOutlinedFunction(Function &NewFn);
+  void registerOutlinedFunction(Function &OriginalFn, Function &NewFn);
 
   /// Replace \p OldFn in the call graph (and SCC) with \p NewFn. The uses
   /// outside the call graph and the function \p OldFn are not modified.

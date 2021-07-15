@@ -1,4 +1,4 @@
-add_llvm_library(LLVMOmpSs
+add_llvm_component_library(LLVMOmpSs
   OmpSsTransform.cpp
 
   ADDITIONAL_HEADER_DIRS
@@ -7,4 +7,9 @@ add_llvm_library(LLVMOmpSs
 
   DEPENDS
   intrinsics_gen
+
+  LINK_COMPONENTS
+  Analysis
+  Core
+  Support
   )

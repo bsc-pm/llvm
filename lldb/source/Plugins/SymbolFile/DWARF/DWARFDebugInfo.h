@@ -54,7 +54,7 @@ public:
         (1 << 2) // Show all parent DIEs when dumping single DIEs
   };
 
-  llvm::Expected<DWARFDebugAranges &> GetCompileUnitAranges();
+  const DWARFDebugAranges &GetCompileUnitAranges();
 
 protected:
   typedef std::vector<DWARFUnitSP> UnitColl;
@@ -79,7 +79,8 @@ private:
 
   uint32_t FindUnitIndex(DIERef::Section section, dw_offset_t offset);
 
-  DISALLOW_COPY_AND_ASSIGN(DWARFDebugInfo);
+  DWARFDebugInfo(const DWARFDebugInfo &) = delete;
+  const DWARFDebugInfo &operator=(const DWARFDebugInfo &) = delete;
 };
 
 #endif // LLDB_SOURCE_PLUGINS_SYMBOLFILE_DWARF_DWARFDEBUGINFO_H

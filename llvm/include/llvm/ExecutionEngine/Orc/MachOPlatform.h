@@ -17,6 +17,7 @@
 #include "llvm/ExecutionEngine/Orc/Core.h"
 #include "llvm/ExecutionEngine/Orc/ExecutionUtils.h"
 #include "llvm/ExecutionEngine/Orc/ObjectLinkingLayer.h"
+#include "llvm/ExecutionEngine/Orc/Shared/CommonOrcRuntimeTypes.h"
 
 #include <future>
 #include <thread>
@@ -31,21 +32,13 @@ bool objCRegistrationEnabled();
 
 class MachOJITDylibInitializers {
 public:
-  struct SectionExtent {
-    SectionExtent() = default;
-    SectionExtent(JITTargetAddress Address, uint64_t NumPtrs)
-        : Address(Address), NumPtrs(NumPtrs) {}
-    JITTargetAddress Address = 0;
-    uint64_t NumPtrs = 0;
-  };
-
-  using RawPointerSectionList = std::vector<SectionExtent>;
+  using RawPointerSectionList = std::vector<shared::ExecutorAddressRange>;
 
   void setObjCImageInfoAddr(JITTargetAddress ObjCImageInfoAddr) {
     this->ObjCImageInfoAddr = ObjCImageInfoAddr;
   }
 
-  void addModInitsSection(SectionExtent ModInit) {
+  void addModInitsSection(shared::ExecutorAddressRange ModInit) {
     ModInitSections.push_back(std::move(ModInit));
   }
 
@@ -53,7 +46,7 @@ public:
     return ModInitSections;
   }
 
-  void addObjCSelRefsSection(SectionExtent ObjCSelRefs) {
+  void addObjCSelRefsSection(shared::ExecutorAddressRange ObjCSelRefs) {
     ObjCSelRefsSections.push_back(std::move(ObjCSelRefs));
   }
 
@@ -61,7 +54,7 @@ public:
     return ObjCSelRefsSections;
   }
 
-  void addObjCClassListSection(SectionExtent ObjCClassList) {
+  void addObjCClassListSection(shared::ExecutorAddressRange ObjCClassList) {
     ObjCClassListSections.push_back(std::move(ObjCClassList));
   }
 
@@ -98,8 +91,9 @@ public:
   ExecutionSession &getExecutionSession() const { return ES; }
 
   Error setupJITDylib(JITDylib &JD) override;
-  Error notifyAdding(JITDylib &JD, const MaterializationUnit &MU) override;
-  Error notifyRemoving(JITDylib &JD, VModuleKey K) override;
+  Error notifyAdding(ResourceTracker &RT,
+                     const MaterializationUnit &MU) override;
+  Error notifyRemoving(ResourceTracker &RT) override;
 
   Expected<InitializerSequence> getInitializerSequence(JITDylib &JD);
 
@@ -113,17 +107,31 @@ private:
   public:
     InitScraperPlugin(MachOPlatform &MP) : MP(MP) {}
 
-    void modifyPassConfig(MaterializationResponsibility &MR, const Triple &TT,
+    void modifyPassConfig(MaterializationResponsibility &MR,
+                          jitlink::LinkGraph &G,
                           jitlink::PassConfiguration &Config) override;
 
-    LocalDependenciesMap getSyntheticSymbolLocalDependencies(
-        MaterializationResponsibility &MR) override;
+    SyntheticSymbolDependenciesMap
+    getSyntheticSymbolDependencies(MaterializationResponsibility &MR) override;
+
+    // FIXME: We should be tentatively tracking scraped sections and discarding
+    // if the MR fails.
+    Error notifyFailed(MaterializationResponsibility &MR) override {
+      return Error::success();
+    }
+
+    Error notifyRemovingResources(ResourceKey K) override {
+      return Error::success();
+    }
+
+    void notifyTransferringResources(ResourceKey DstKey,
+                                     ResourceKey SrcKey) override {}
 
   private:
     using InitSymbolDepMap =
-        DenseMap<MaterializationResponsibility *, JITLinkSymbolVector>;
+        DenseMap<MaterializationResponsibility *, JITLinkSymbolSet>;
 
-    void preserveInitSectionIfPresent(JITLinkSymbolVector &Syms,
+    void preserveInitSectionIfPresent(JITLinkSymbolSet &Symbols,
                                       jitlink::LinkGraph &G,
                                       StringRef SectionName);
 
@@ -136,12 +144,10 @@ private:
     InitSymbolDepMap InitSymbolDeps;
   };
 
-  static std::vector<JITDylib *> getDFSLinkOrder(JITDylib &JD);
-
   void registerInitInfo(JITDylib &JD, JITTargetAddress ObjCImageInfoAddr,
-                        MachOJITDylibInitializers::SectionExtent ModInits,
-                        MachOJITDylibInitializers::SectionExtent ObjCSelRefs,
-                        MachOJITDylibInitializers::SectionExtent ObjCClassList);
+                        shared::ExecutorAddressRange ModInits,
+                        shared::ExecutorAddressRange ObjCSelRefs,
+                        shared::ExecutorAddressRange ObjCClassList);
 
   ExecutionSession &ES;
   ObjectLinkingLayer &ObjLinkingLayer;

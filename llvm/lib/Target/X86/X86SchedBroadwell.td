@@ -206,6 +206,10 @@ defm : X86WriteRes<WriteStore,   [BWPort237, BWPort4], 1, [1,1], 1>;
 defm : X86WriteRes<WriteStoreNT, [BWPort237, BWPort4], 1, [1,1], 2>;
 defm : X86WriteRes<WriteMove,    [BWPort0156], 1, [1], 1>;
 
+// Model the effect of clobbering the read-write mask operand of the GATHER operation.
+// Does not cost anything by itself, only has latency, matching that of the WriteLoad,
+defm : X86WriteRes<WriteVecMaskedGatherWriteback, [], 5, [], 0>;
+
 // Idioms that clear a register, like xorps %xmm0, %xmm0.
 // These can often bypass execution ports completely.
 def : WriteRes<WriteZero,  []>;
@@ -352,8 +356,10 @@ defm : X86WriteRes<WriteVecStoreX,       [BWPort237,BWPort4], 1, [1,1], 2>;
 defm : X86WriteRes<WriteVecStoreY,       [BWPort237,BWPort4], 1, [1,1], 2>;
 defm : X86WriteRes<WriteVecStoreNT,      [BWPort237,BWPort4], 1, [1,1], 2>;
 defm : X86WriteRes<WriteVecStoreNTY,     [BWPort237,BWPort4], 1, [1,1], 2>;
-defm : X86WriteRes<WriteVecMaskedStore,  [BWPort0,BWPort4,BWPort237,BWPort15], 5, [1,1,1,1], 4>;
-defm : X86WriteRes<WriteVecMaskedStoreY, [BWPort0,BWPort4,BWPort237,BWPort15], 5, [1,1,1,1], 4>;
+defm : X86WriteRes<WriteVecMaskedStore32,  [BWPort0,BWPort4,BWPort237,BWPort15], 5, [1,1,1,1], 4>;
+defm : X86WriteRes<WriteVecMaskedStore32Y, [BWPort0,BWPort4,BWPort237,BWPort15], 5, [1,1,1,1], 4>;
+defm : X86WriteRes<WriteVecMaskedStore64,  [BWPort0,BWPort4,BWPort237,BWPort15], 5, [1,1,1,1], 4>;
+defm : X86WriteRes<WriteVecMaskedStore64Y, [BWPort0,BWPort4,BWPort237,BWPort15], 5, [1,1,1,1], 4>;
 defm : X86WriteRes<WriteVecMove,         [BWPort015], 1, [1], 1>;
 defm : X86WriteRes<WriteVecMoveX,        [BWPort015], 1, [1], 1>;
 defm : X86WriteRes<WriteVecMoveY,        [BWPort015], 1, [1], 1>;
@@ -580,6 +586,7 @@ def : WriteRes<WriteSystem,     [BWPort0156]> { let Latency = 100; } // def Writ
 defm : BWWriteResPair<WriteFShuffle256, [BWPort5], 3, [1], 1, 6>; // Fp 256-bit width vector shuffles.
 defm : BWWriteResPair<WriteFVarShuffle256, [BWPort5], 3, [1], 1, 6>; // Fp 256-bit width vector variable shuffles.
 defm : BWWriteResPair<WriteShuffle256, [BWPort5], 3, [1], 1, 6>;  // 256-bit width vector shuffles.
+defm : BWWriteResPair<WriteVPMOV256, [BWPort5], 3, [1], 1, 6>;  // 256-bit width packed vector width-changing move.
 defm : BWWriteResPair<WriteVarShuffle256, [BWPort5], 3, [1], 1, 6>;  // 256-bit width vector variable shuffles.
 
 // Old microcoded instructions that nobody use.
@@ -987,7 +994,7 @@ def BWWriteResGroup62 : SchedWriteRes<[BWPort6,BWPort23]> {
   let NumMicroOps = 2;
   let ResourceCycles = [1,1];
 }
-def: InstRW<[BWWriteResGroup62], (instrs FARJMP64)>;
+def: InstRW<[BWWriteResGroup62], (instrs FARJMP64m)>;
 def: InstRW<[BWWriteResGroup62], (instregex "JMP(16|32|64)m")>;
 
 def BWWriteResGroup64 : SchedWriteRes<[BWPort23,BWPort15]> {
@@ -1128,7 +1135,7 @@ def BWWriteResGroup89 : SchedWriteRes<[BWPort4,BWPort6,BWPort23,BWPort237,BWPort
   let ResourceCycles = [1,1,1,1,1];
 }
 def: InstRW<[BWWriteResGroup89], (instregex "CALL(16|32|64)m")>;
-def: InstRW<[BWWriteResGroup89], (instrs FARCALL64)>;
+def: InstRW<[BWWriteResGroup89], (instrs FARCALL64m)>;
 
 def BWWriteResGroup90 : SchedWriteRes<[BWPort6,BWPort06,BWPort15,BWPort0156]> {
   let Latency = 7;

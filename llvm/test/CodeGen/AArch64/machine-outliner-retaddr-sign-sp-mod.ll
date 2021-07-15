@@ -4,9 +4,8 @@
 @v = common dso_local global i32* null, align 8
 
 ; CHECK-LABEL:  foo:                                    // @foo
-; CHECK-NEXT:   .Lfoo$local:
 ; CHECK-NEXT:   // %bb.0:                               // %entry
-; CHECK-NEXT:       paciasp
+; CHECK-NEXT:       pacia x30, sp
 ; CHECK-NOT:        OUTLINED_FUNCTION_
 ; CHECK:            retaa
 define dso_local void @foo(i32 %x) #0 {
@@ -23,9 +22,8 @@ entry:
 }
 
 ; CHECK-LABEL:  bar:                                    // @bar
-; CHECK-NEXT:   .Lbar$local:
 ; CHECK-NEXT:   // %bb.0:                               // %entry
-; CHECK-NEXT:       paciasp
+; CHECK-NEXT:       pacia x30, sp
 ; CHECK-NOT:        OUTLINED_FUNCTION_
 ; CHECK:            retaa
 define dso_local void @bar(i32 %x) #0 {

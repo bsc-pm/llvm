@@ -2,6 +2,7 @@
 ; RUN:  llc -amdgpu-scalarize-global-loads=false  -march=amdgcn -mcpu=tonga -mattr=-flat-for-global -verify-machineinstrs -denormal-fp-math-f32=preserve-sign < %s | FileCheck -check-prefix=SI -check-prefix=FUNC -check-prefix=VI %s
 
 ; RUN:  llc -amdgpu-scalarize-global-loads=false  -mtriple=amdgcn--amdhsa -mcpu=fiji -denormal-fp-math-f32=ieee < %s | FileCheck -check-prefix=GCN -check-prefix=VI %s
+; RUN:  llc -amdgpu-scalarize-global-loads=false  -mtriple=amdgcn--amdhsa -mcpu=gfx1030 -denormal-fp-math-f32=ieee < %s | FileCheck -check-prefix=GCN -check-prefix=GFX1030 %s
 
 ; RUN:  llc -amdgpu-scalarize-global-loads=false  -march=r600 -mcpu=redwood < %s | FileCheck -check-prefix=EG -check-prefix=FUNC %s
 
@@ -186,6 +187,7 @@ define amdgpu_kernel void @test_udiv_3_mulhu(i32 %p) {
 
 ; GCN-LABEL: {{^}}fdiv_test_denormals
 ; VI: v_mad_f32 v{{[0-9]+}}, -v{{[0-9]+}}, v{{[0-9]+}}, v{{[0-9]+}}
+; GFX1030: v_fmac_f32_e64 v{{[0-9]+}}, -v{{[0-9]+}}, v{{[0-9]+}}
 define amdgpu_kernel void @fdiv_test_denormals(i8 addrspace(1)* nocapture readonly %arg) {
 bb:
   %tmp = load i8, i8 addrspace(1)* null, align 1
@@ -197,4 +199,13 @@ bb:
   %tmp6 = trunc i32 %tmp5 to i8
   store i8 %tmp6, i8 addrspace(1)* null, align 1
   ret void
+}
+
+define i64 @v_test_udiv64_mulhi_fold(i64 %arg) {
+; GCN-LABEL: v_test_udiv64_mulhi_fold
+; GFX1030: s_add_u32 [[VAL:s[0-9]+]], 0x4237, s{{[0-9]+}}
+; GFX1030-NOT: s_mul_hi_u32
+; GFX1030: v_add_co_u32 v{{[0-9]+}}, [[VAL]], 0xa9000000, [[VAL]]
+  %d = udiv i64 %arg, 100000
+  ret i64 %d
 }

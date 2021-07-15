@@ -100,7 +100,7 @@ ObjectFileJIT::ObjectFileJIT(const lldb::ModuleSP &module_sp,
   }
 }
 
-ObjectFileJIT::~ObjectFileJIT() {}
+ObjectFileJIT::~ObjectFileJIT() = default;
 
 bool ObjectFileJIT::ParseHeader() {
   // JIT code is never in a file, nor is it required to have any header
@@ -120,7 +120,7 @@ Symtab *ObjectFileJIT::GetSymtab() {
   if (module_sp) {
     std::lock_guard<std::recursive_mutex> guard(module_sp->GetMutex());
     if (m_symtab_up == nullptr) {
-      m_symtab_up.reset(new Symtab(this));
+      m_symtab_up = std::make_unique<Symtab>(this);
       std::lock_guard<std::recursive_mutex> symtab_guard(
           m_symtab_up->GetMutex());
       ObjectFileJITDelegateSP delegate_sp(m_delegate_wp.lock());
@@ -139,7 +139,7 @@ bool ObjectFileJIT::IsStripped() {
 
 void ObjectFileJIT::CreateSections(SectionList &unified_section_list) {
   if (!m_sections_up) {
-    m_sections_up.reset(new SectionList());
+    m_sections_up = std::make_unique<SectionList>();
     ObjectFileJITDelegateSP delegate_sp(m_delegate_wp.lock());
     if (delegate_sp) {
       delegate_sp->PopulateSectionList(this, *m_sections_up);

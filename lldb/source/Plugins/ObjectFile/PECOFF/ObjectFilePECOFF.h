@@ -12,7 +12,7 @@
 #include <vector>
 
 #include "lldb/Symbol/ObjectFile.h"
-#include "llvm/Object/Binary.h"
+#include "llvm/Object/COFF.h"
 
 class ObjectFilePECOFF : public lldb_private::ObjectFile {
 public:
@@ -79,6 +79,7 @@ public:
 
   static bool SaveCore(const lldb::ProcessSP &process_sp,
                        const lldb_private::FileSpec &outfile,
+                       lldb::SaveCoreStyle &core_style,
                        lldb_private::Status &error);
 
   static bool MagicBytesMatch(lldb::DataBufferSP &data_sp);
@@ -293,7 +294,6 @@ protected:
 private:
   bool CreateBinary();
 
-private:
   dos_header_t m_dos_header;
   coff_header_t m_coff_header;
   coff_opt_header_t m_coff_header_opt;
@@ -301,8 +301,7 @@ private:
   lldb::addr_t m_image_base;
   lldb_private::Address m_entry_point_address;
   llvm::Optional<lldb_private::FileSpecList> m_deps_filespec;
-  typedef llvm::object::OwningBinary<llvm::object::Binary> OWNBINType;
-  llvm::Optional<OWNBINType> m_owningbin;
+  std::unique_ptr<llvm::object::COFFObjectFile> m_binary;
   lldb_private::UUID m_uuid;
 };
 

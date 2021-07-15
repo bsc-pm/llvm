@@ -22,7 +22,7 @@ class ClangDeclVendor : public DeclVendor {
 public:
   ClangDeclVendor(DeclVendorKind kind) : DeclVendor(kind) {}
 
-  virtual ~ClangDeclVendor() {}
+  virtual ~ClangDeclVendor() = default;
 
   using DeclVendor::FindDecls;
 
@@ -35,7 +35,8 @@ public:
   }
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(ClangDeclVendor);
+  ClangDeclVendor(const ClangDeclVendor &) = delete;
+  const ClangDeclVendor &operator=(const ClangDeclVendor &) = delete;
 };
 } // namespace lldb_private
 

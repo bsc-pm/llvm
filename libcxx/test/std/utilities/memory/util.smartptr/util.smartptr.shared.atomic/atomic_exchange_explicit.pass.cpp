@@ -16,9 +16,11 @@
 // shared_ptr<T>
 // atomic_exchange_explicit(shared_ptr<T>* p, shared_ptr<T> r)
 
-// UNSUPPORTED: c++98, c++03
+// UNSUPPORTED: c++03
 
 #include <memory>
+
+#include <atomic>
 #include <cassert>
 
 #include "test_macros.h"

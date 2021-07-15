@@ -1,9 +1,12 @@
 ; This test tries to verify if a csect containing code would have the correct alignment.
 
-; RUN: llc -verify-machineinstrs -mcpu=pwr4 -mtriple powerpc-ibm-aix-xcoff < %s | FileCheck %s
-; RUN: llc -verify-machineinstrs -mcpu=pwr4 -mtriple powerpc64-ibm-aix-xcoff < %s | FileCheck %s
+; RUN: llc -verify-machineinstrs -mcpu=pwr4 -mattr=-altivec -mtriple powerpc-ibm-aix-xcoff \
+; RUN:     -xcoff-traceback-table=false < %s | FileCheck %s
+; RUN: llc -verify-machineinstrs -mcpu=pwr4 -mattr=-altivec -mtriple powerpc64-ibm-aix-xcoff \
+; RUN:     -xcoff-traceback-table=false < %s | FileCheck %s
 
-; RUN: llc -verify-machineinstrs -mcpu=pwr4 -mtriple powerpc-ibm-aix-xcoff -filetype=obj -o %t.o < %s
+; RUN: llc -verify-machineinstrs -mcpu=pwr4 -mattr=-altivec -mtriple powerpc-ibm-aix-xcoff \
+; RUN:     -xcoff-traceback-table=false -filetype=obj -o %t.o < %s
 ; RUN: llvm-readobj --syms %t.o | FileCheck --check-prefix=SYMS %s
 
 ; RUN: not --crash llc -mtriple powerpc64-ibm-aix-xcoff -filetype=obj < %s 2>&1 | \
@@ -20,10 +23,10 @@ entry:
   ret i32 0
 }
 
-; CHECK:      .csect .text[PR], 6
+; CHECK:      .csect .text[PR],6
 ; CHECK-NEXT: .foo:
 
-; CHECK:      .csect .text[PR], 6
+; CHECK:      .csect .text[PR],6
 ; CHECK-NEXT: .bar:
 
 ; SYMS:       Symbol {{[{][[:space:]] *}}Index: [[#INDX:]]{{[[:space:]] *}}Name: .text

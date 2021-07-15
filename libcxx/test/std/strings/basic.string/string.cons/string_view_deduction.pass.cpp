@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 // <string>
-// UNSUPPORTED: c++98, c++03, c++11, c++14
+// UNSUPPORTED: c++03, c++11, c++14
 // XFAIL: libcpp-no-deduction-guides
 
 // template<class InputIterator>
@@ -35,7 +35,7 @@
 
 #include "test_macros.h"
 #include "test_allocator.h"
-#include "../input_iterator.h"
+#include "../cpp17_input_iterator.h"
 #include "min_allocator.h"
 
 int main(int, char**)

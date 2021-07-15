@@ -203,6 +203,10 @@ defm : X86WriteRes<WriteStore,   [SKXPort237, SKXPort4], 1, [1,1], 1>;
 defm : X86WriteRes<WriteStoreNT, [SKXPort237, SKXPort4], 1, [1,1], 2>;
 defm : X86WriteRes<WriteMove,    [SKXPort0156], 1, [1], 1>;
 
+// Model the effect of clobbering the read-write mask operand of the GATHER operation.
+// Does not cost anything by itself, only has latency, matching that of the WriteLoad,
+defm : X86WriteRes<WriteVecMaskedGatherWriteback, [], 5, [], 0>;
+
 // Idioms that clear a register, like xorps %xmm0, %xmm0.
 // These can often bypass execution ports completely.
 def : WriteRes<WriteZero,  []>;
@@ -343,8 +347,10 @@ defm : X86WriteRes<WriteVecStoreX,       [SKXPort237,SKXPort4], 1, [1,1], 2>;
 defm : X86WriteRes<WriteVecStoreY,       [SKXPort237,SKXPort4], 1, [1,1], 2>;
 defm : X86WriteRes<WriteVecStoreNT,      [SKXPort237,SKXPort4], 1, [1,1], 2>;
 defm : X86WriteRes<WriteVecStoreNTY,     [SKXPort237,SKXPort4], 1, [1,1], 2>;
-defm : X86WriteRes<WriteVecMaskedStore,  [SKXPort237,SKXPort0], 2, [1,1], 2>;
-defm : X86WriteRes<WriteVecMaskedStoreY, [SKXPort237,SKXPort0], 2, [1,1], 2>;
+defm : X86WriteRes<WriteVecMaskedStore32,  [SKXPort237,SKXPort0], 2, [1,1], 2>;
+defm : X86WriteRes<WriteVecMaskedStore32Y, [SKXPort237,SKXPort0], 2, [1,1], 2>;
+defm : X86WriteRes<WriteVecMaskedStore64,  [SKXPort237,SKXPort0], 2, [1,1], 2>;
+defm : X86WriteRes<WriteVecMaskedStore64Y, [SKXPort237,SKXPort0], 2, [1,1], 2>;
 defm : X86WriteRes<WriteVecMove,         [SKXPort05],  1, [1], 1>;
 defm : X86WriteRes<WriteVecMoveX,        [SKXPort015], 1, [1], 1>;
 defm : X86WriteRes<WriteVecMoveY,        [SKXPort015], 1, [1], 1>;
@@ -581,6 +587,7 @@ def : WriteRes<WriteSystem,     [SKXPort0156]> { let Latency = 100; } // def Wri
 defm : SKXWriteResPair<WriteFShuffle256, [SKXPort5], 3, [1], 1, 7>; // Fp 256-bit width vector shuffles.
 defm : SKXWriteResPair<WriteFVarShuffle256, [SKXPort5], 3, [1], 1, 7>; // Fp 256-bit width vector variable shuffles.
 defm : SKXWriteResPair<WriteShuffle256, [SKXPort5], 3, [1], 1, 7>;  // 256-bit width vector shuffles.
+defm : SKXWriteResPair<WriteVPMOV256, [SKXPort5], 3, [1], 1, 7>;  // 256-bit width packed vector width-changing move.
 defm : SKXWriteResPair<WriteVarShuffle256, [SKXPort5], 3, [1], 1, 7>;  // 256-bit width vector variable shuffles.
 
 // Old microcoded instructions that nobody use.
@@ -1180,7 +1187,7 @@ def SKXWriteResGroup76 : SchedWriteRes<[SKXPort6,SKXPort23]> {
   let NumMicroOps = 2;
   let ResourceCycles = [1,1];
 }
-def: InstRW<[SKXWriteResGroup76], (instrs FARJMP64)>;
+def: InstRW<[SKXWriteResGroup76], (instrs FARJMP64m)>;
 def: InstRW<[SKXWriteResGroup76], (instregex "JMP(16|32|64)m")>;
 
 def SKXWriteResGroup79 : SchedWriteRes<[SKXPort23,SKXPort15]> {
@@ -1465,7 +1472,7 @@ def SKXWriteResGroup109 : SchedWriteRes<[SKXPort4,SKXPort6,SKXPort23,SKXPort237,
   let ResourceCycles = [1,1,1,1,1];
 }
 def: InstRW<[SKXWriteResGroup109], (instregex "CALL(16|32|64)m")>;
-def: InstRW<[SKXWriteResGroup109], (instrs FARCALL64)>;
+def: InstRW<[SKXWriteResGroup109], (instrs FARCALL64m)>;
 
 def SKXWriteResGroup110 : SchedWriteRes<[SKXPort0,SKXPort4,SKXPort237,SKXPort0156]> {
   let Latency = 7;

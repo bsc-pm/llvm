@@ -1,9 +1,9 @@
-; RUN: sed -e 's/SLHATTR/speculative_load_hardening/' %s | llc -verify-machineinstrs -mtriple=aarch64-none-linux-gnu | FileCheck %s --check-prefixes=CHECK,SLH --dump-input-on-failure
-; RUN: sed -e 's/SLHATTR//' %s | llc -verify-machineinstrs -mtriple=aarch64-none-linux-gnu | FileCheck %s --check-prefixes=CHECK,NOSLH --dump-input-on-failure
-; RUN: sed -e 's/SLHATTR/speculative_load_hardening/' %s | llc -verify-machineinstrs -mtriple=aarch64-none-linux-gnu -global-isel | FileCheck %s --check-prefixes=CHECK,SLH --dump-input-on-failure
-; RUN: sed -e 's/SLHATTR//' %s | llc -verify-machineinstrs -mtriple=aarch64-none-linux-gnu -global-isel | FileCheck %s --check-prefixes=CHECK,NOSLH --dump-input-on-failure
-; RUN: sed -e 's/SLHATTR/speculative_load_hardening/' %s | llc -verify-machineinstrs -mtriple=aarch64-none-linux-gnu -fast-isel | FileCheck %s --check-prefixes=CHECK,SLH --dump-input-on-failure
-; RUN: sed -e 's/SLHATTR//' %s | llc -verify-machineinstrs -mtriple=aarch64-none-linux-gnu -fast-isel | FileCheck %s --check-prefixes=CHECK,NOSLH --dump-input-on-failure
+; RUN: sed -e 's/SLHATTR/speculative_load_hardening/' %s | llc -verify-machineinstrs -mtriple=aarch64-none-linux-gnu | FileCheck %s --check-prefixes=CHECK,SLH
+; RUN: sed -e 's/SLHATTR//' %s | llc -verify-machineinstrs -mtriple=aarch64-none-linux-gnu | FileCheck %s --check-prefixes=CHECK,NOSLH
+; RUN: sed -e 's/SLHATTR/speculative_load_hardening/' %s | llc -verify-machineinstrs -mtriple=aarch64-none-linux-gnu -global-isel | FileCheck %s --check-prefixes=CHECK,SLH
+; RUN: sed -e 's/SLHATTR//' %s | llc -verify-machineinstrs -mtriple=aarch64-none-linux-gnu -global-isel | FileCheck %s --check-prefixes=CHECK,NOSLH
+; RUN: sed -e 's/SLHATTR/speculative_load_hardening/' %s | llc -verify-machineinstrs -mtriple=aarch64-none-linux-gnu -fast-isel | FileCheck %s --check-prefixes=CHECK,SLH
+; RUN: sed -e 's/SLHATTR//' %s | llc -verify-machineinstrs -mtriple=aarch64-none-linux-gnu -fast-isel | FileCheck %s --check-prefixes=CHECK,NOSLH
 
 define i32 @f(i8* nocapture readonly %p, i32 %i, i32 %N) local_unnamed_addr SLHATTR {
 ; CHECK-LABEL: f
@@ -16,9 +16,9 @@ entry:
 ; SLH:  mov [[TMPREG:x[0-9]+]], sp
 ; SLH:  and [[TMPREG]], [[TMPREG]], x16
 ; SLH:  mov sp, [[TMPREG]]
-; NOSLH-NOT:  mov [[TMPREG:x[0-9]+]], sp
-; NOSLH-NOT:  and [[TMPREG]], [[TMPREG]], x16
-; NOSLH-NOT:  mov sp, [[TMPREG]]
+; NOSLH-NOT:  mov {{x[0-9]+}}, sp
+; NOSLH-NOT:  and [[TMPREG:x[0-9]+]], [[TMPREG]], x16
+; NOSLH-NOT:  mov sp, {{x[0-9]+}}
   %call = tail call i32 @tail_callee(i32 %i)
 ; SLH:  cmp sp, #0
 ; SLH:  csetm x16, ne
@@ -45,9 +45,9 @@ return:                                           ; preds = %entry, %if.then
 ; SLH:  mov [[TMPREG:x[0-9]+]], sp
 ; SLH:  and [[TMPREG]], [[TMPREG]], x16
 ; SLH:  mov sp, [[TMPREG]]
-; NOSLH-NOT:  mov [[TMPREG:x[0-9]+]], sp
-; NOSLH-NOT:  and [[TMPREG]], [[TMPREG]], x16
-; NOSLH-NOT:  mov sp, [[TMPREG]]
+; NOSLH-NOT:  mov {{x[0-9]+}}, sp
+; NOSLH-NOT:  and [[TMPREG:x[0-9]+]], [[TMPREG]], x16
+; NOSLH-NOT:  mov sp, {{x[0-9]+}}
   ret i32 %retval.0
 }
 
@@ -57,9 +57,9 @@ define i32 @tail_caller(i32 %a) local_unnamed_addr SLHATTR {
 ; SLH:     mov [[TMPREG:x[0-9]+]], sp
 ; SLH:     and [[TMPREG]], [[TMPREG]], x16
 ; SLH:     mov sp, [[TMPREG]]
-; NOSLH-NOT:     mov [[TMPREG:x[0-9]+]], sp
-; NOSLH-NOT:     and [[TMPREG]], [[TMPREG]], x16
-; NOSLH-NOT:     mov sp, [[TMPREG]]
+; NOSLH-NOT:     mov {{x[0-9]+}}, sp
+; NOSLH-NOT:     and [[TMPREG:x[0-9]+]], [[TMPREG]], x16
+; NOSLH-NOT:     mov sp, {{x[0-9]+}}
 ; SLH:     b tail_callee
 ; SLH-NOT:        cmp sp, #0
   %call = tail call i32 @tail_callee(i32 %a)

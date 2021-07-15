@@ -53,7 +53,7 @@ public:
   static Bound Assumed() { return Bound(Category::Assumed); }
   static Bound Deferred() { return Bound(Category::Deferred); }
   explicit Bound(MaybeSubscriptIntExpr &&expr) : expr_{std::move(expr)} {}
-  explicit Bound(int bound);
+  explicit Bound(common::ConstantSubscript bound);
   Bound(const Bound &) = default;
   Bound(Bound &&) = default;
   Bound &operator=(const Bound &) = default;
@@ -154,6 +154,9 @@ public:
       : IntrinsicTypeSpec(TypeCategory::Character, std::move(kind)),
         length_{std::move(length)} {}
   const ParamValue &length() const { return length_; }
+  bool operator==(const CharacterTypeSpec &that) const {
+    return kind() == that.kind() && length_ == that.length_;
+  }
   std::string AsFortran() const;
 
 private:
@@ -217,13 +220,12 @@ private:
 struct ArraySpec : public std::vector<ShapeSpec> {
   ArraySpec() {}
   int Rank() const { return size(); }
-  bool IsExplicitShape() const;
-  bool IsAssumedShape() const;
-  bool IsDeferredShape() const;
-  bool IsImpliedShape() const;
-  bool IsAssumedSize() const;
-  bool IsAssumedRank() const;
-  bool IsConstantShape() const; // explicit shape with constant bounds
+  inline bool IsExplicitShape() const;
+  inline bool IsAssumedShape() const;
+  inline bool IsDeferredShape() const;
+  inline bool IsImpliedShape() const;
+  inline bool IsAssumedSize() const;
+  inline bool IsAssumedRank() const;
 
 private:
   // Check non-empty and predicate is true for each element.
@@ -251,7 +253,6 @@ public:
   void ReplaceScope(const Scope &);
   RawParameters &rawParameters() { return rawParameters_; }
   const ParameterMapType &parameters() const { return parameters_; }
-  int NumLengthParameters() const;
 
   bool MightBeParameterized() const;
   bool IsForwardReferenced() const;
@@ -265,12 +266,12 @@ public:
   // Converts the raw parameter list to a map, naming each actual parameter.
   void CookParameters(evaluate::FoldingContext &);
   // Evaluates type parameter expressions.
-  void EvaluateParameters(evaluate::FoldingContext &);
+  void EvaluateParameters(SemanticsContext &);
   void AddParamValue(SourceName, ParamValue &&);
   // Creates a Scope for the type and populates it with component
   // instantiations that have been specialized with actual type parameter
   // values, which are cooked &/or evaluated if necessary.
-  void Instantiate(Scope &, SemanticsContext &);
+  void Instantiate(Scope &containingScope);
 
   ParamValue *FindParameter(SourceName);
   const ParamValue *FindParameter(SourceName target) const {
@@ -281,10 +282,9 @@ public:
       return nullptr;
     }
   }
+  bool MightBeAssignmentCompatibleWith(const DerivedTypeSpec &) const;
   bool operator==(const DerivedTypeSpec &that) const {
-    return &typeSymbol_ == &that.typeSymbol_ && cooked_ == that.cooked_ &&
-        parameters_ == that.parameters_ &&
-        rawParameters_ == that.rawParameters_;
+    return RawEquals(that) && parameters_ == that.parameters_;
   }
   std::string AsFortran() const;
 
@@ -297,6 +297,10 @@ private:
   bool instantiated_{false};
   RawParameters rawParameters_;
   ParameterMapType parameters_;
+  bool RawEquals(const DerivedTypeSpec &that) const {
+    return &typeSymbol_ == &that.typeSymbol_ && cooked_ == that.cooked_ &&
+        rawParameters_ == that.rawParameters_;
+  }
   friend llvm::raw_ostream &operator<<(
       llvm::raw_ostream &, const DerivedTypeSpec &);
 };
@@ -354,10 +358,10 @@ public:
     return std::get<DerivedTypeSpec>(typeSpec_);
   }
 
-  IntrinsicTypeSpec *AsIntrinsic();
-  const IntrinsicTypeSpec *AsIntrinsic() const;
-  DerivedTypeSpec *AsDerived();
-  const DerivedTypeSpec *AsDerived() const;
+  inline IntrinsicTypeSpec *AsIntrinsic();
+  inline const IntrinsicTypeSpec *AsIntrinsic() const;
+  inline DerivedTypeSpec *AsDerived();
+  inline const DerivedTypeSpec *AsDerived() const;
 
   std::string AsFortran() const;
 
@@ -383,5 +387,62 @@ private:
   const Symbol *symbol_{nullptr};
   const DeclTypeSpec *type_{nullptr};
 };
+
+// Define some member functions here in the header so that they can be used by
+// lib/Evaluate without link-time dependency on Semantics.
+
+inline bool ArraySpec::IsExplicitShape() const {
+  return CheckAll([](const ShapeSpec &x) { return x.ubound().isExplicit(); });
+}
+inline bool ArraySpec::IsAssumedShape() const {
+  return CheckAll([](const ShapeSpec &x) { return x.ubound().isDeferred(); });
+}
+inline bool ArraySpec::IsDeferredShape() const {
+  return CheckAll([](const ShapeSpec &x) {
+    return x.lbound().isDeferred() && x.ubound().isDeferred();
+  });
+}
+inline bool ArraySpec::IsImpliedShape() const {
+  return !IsAssumedRank() &&
+      CheckAll([](const ShapeSpec &x) { return x.ubound().isAssumed(); });
+}
+inline bool ArraySpec::IsAssumedSize() const {
+  return !empty() && !IsAssumedRank() && back().ubound().isAssumed() &&
+      std::all_of(begin(), end() - 1,
+          [](const ShapeSpec &x) { return x.ubound().isExplicit(); });
+}
+inline bool ArraySpec::IsAssumedRank() const {
+  return Rank() == 1 && front().lbound().isAssumed();
+}
+
+inline IntrinsicTypeSpec *DeclTypeSpec::AsIntrinsic() {
+  switch (category_) {
+  case Numeric:
+    return &std::get<NumericTypeSpec>(typeSpec_);
+  case Logical:
+    return &std::get<LogicalTypeSpec>(typeSpec_);
+  case Character:
+    return &std::get<CharacterTypeSpec>(typeSpec_);
+  default:
+    return nullptr;
+  }
+}
+inline const IntrinsicTypeSpec *DeclTypeSpec::AsIntrinsic() const {
+  return const_cast<DeclTypeSpec *>(this)->AsIntrinsic();
+}
+
+inline DerivedTypeSpec *DeclTypeSpec::AsDerived() {
+  switch (category_) {
+  case TypeDerived:
+  case ClassDerived:
+    return &std::get<DerivedTypeSpec>(typeSpec_);
+  default:
+    return nullptr;
+  }
+}
+inline const DerivedTypeSpec *DeclTypeSpec::AsDerived() const {
+  return const_cast<DeclTypeSpec *>(this)->AsDerived();
+}
+
 } // namespace Fortran::semantics
 #endif // FORTRAN_SEMANTICS_TYPE_H_

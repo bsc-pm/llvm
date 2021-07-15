@@ -18,7 +18,7 @@
 namespace clang {
 namespace query {
 
-enum OutputKind { OK_Diag, OK_Print, OK_DetailedAST };
+enum OutputKind { OK_Diag, OK_Print, OK_DetailedAST, OK_SrcLoc };
 
 enum QueryKind {
   QK_Invalid,
@@ -28,6 +28,7 @@ enum QueryKind {
   QK_Match,
   QK_SetBool,
   QK_SetOutputKind,
+  QK_SetTraversalKind,
   QK_EnableOutputKind,
   QK_DisableOutputKind,
   QK_Quit
@@ -119,6 +120,10 @@ template <> struct SetQueryKind<OutputKind> {
   static const QueryKind value = QK_SetOutputKind;
 };
 
+template <> struct SetQueryKind<TraversalKind> {
+  static const QueryKind value = QK_SetTraversalKind;
+};
+
 /// Query for "set VAR VALUE".
 template <typename T> struct SetQuery : Query {
   SetQuery(T QuerySession::*Var, T Value)
@@ -144,6 +149,7 @@ struct SetExclusiveOutputQuery : Query {
     QS.DiagOutput = false;
     QS.DetailedASTOutput = false;
     QS.PrintOutput = false;
+    QS.SrcLocOutput = false;
     QS.*Var = true;
     return true;
   }

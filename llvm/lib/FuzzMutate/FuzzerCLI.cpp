@@ -88,7 +88,7 @@ void llvm::handleExecNameEncodedOptimizerOpts(StringRef ExecName) {
     } else if (Opt == "earlycse") {
       Args.push_back("-passes=early-cse");
     } else if (Opt == "simplifycfg") {
-      Args.push_back("-passes=simplify-cfg");
+      Args.push_back("-passes=simplifycfg");
     } else if (Opt == "gvn") {
       Args.push_back("-passes=gvn");
     } else if (Opt == "sccp") {
@@ -111,7 +111,7 @@ void llvm::handleExecNameEncodedOptimizerOpts(StringRef ExecName) {
     } else if (Opt == "indvars") {
       Args.push_back("-passes=indvars");
     } else if (Opt == "strength_reduce") {
-      Args.push_back("-passes=strength-reduce");
+      Args.push_back("-passes=loop-reduce");
     } else if (Opt == "irce") {
       Args.push_back("-passes=irce");
 
@@ -153,7 +153,7 @@ int llvm::runFuzzerOnInputs(int ArgC, char *ArgV[], FuzzerTestFun TestOne,
       continue;
     }
 
-    auto BufOrErr = MemoryBuffer::getFile(Arg, /*FileSize-*/ -1,
+    auto BufOrErr = MemoryBuffer::getFile(Arg, /*IsText=*/false,
                                           /*RequiresNullTerminator=*/false);
     if (std::error_code EC = BufOrErr.getError()) {
       errs() << "Error reading file: " << Arg << ": " << EC.message() << "\n";

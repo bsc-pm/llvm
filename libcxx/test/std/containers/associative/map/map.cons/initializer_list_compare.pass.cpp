@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// UNSUPPORTED: c++98, c++03
+// UNSUPPORTED: c++03
 
 // <map>
 
@@ -24,7 +24,7 @@ int main(int, char**)
 {
     {
     typedef std::pair<const int, double> V;
-    typedef test_compare<std::less<int> > C;
+    typedef test_less<int> C;
     std::map<int, double, C> m({
                                 {1, 1},
                                 {1, 1.5},
@@ -45,7 +45,7 @@ int main(int, char**)
     }
     {
     typedef std::pair<const int, double> V;
-    typedef test_compare<std::less<int> > C;
+    typedef test_less<int> C;
     std::map<int, double, C, min_allocator<std::pair<const int, double>>> m({
                                 {1, 1},
                                 {1, 1.5},

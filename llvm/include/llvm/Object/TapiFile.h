@@ -10,15 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_OBJECT_TAPI_FILE_H
-#define LLVM_OBJECT_TAPI_FILE_H
+#ifndef LLVM_OBJECT_TAPIFILE_H
+#define LLVM_OBJECT_TAPIFILE_H
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Object/SymbolicFile.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/TextAPI/MachO/InterfaceFile.h"
+#include "llvm/TextAPI/InterfaceFile.h"
 
 namespace llvm {
 namespace object {
@@ -41,6 +41,8 @@ public:
 
   static bool classof(const Binary *v) { return v->isTapiFile(); }
 
+  bool is64Bit() { return MachO::is64Bit(Arch); }
+
 private:
   struct Symbol {
     StringRef Prefix;
@@ -52,9 +54,10 @@ private:
   };
 
   std::vector<Symbol> Symbols;
+  MachO::Architecture Arch;
 };
 
 } // end namespace object.
 } // end namespace llvm.
 
-#endif // LLVM_OBJECT_TAPI_FILE_H
+#endif // LLVM_OBJECT_TAPIFILE_H

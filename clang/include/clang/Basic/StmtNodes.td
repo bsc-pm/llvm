@@ -57,6 +57,7 @@ def CoreturnStmt : StmtNode<Stmt>;
 // Expressions
 def Expr : StmtNode<ValueStmt, 1>;
 def PredefinedExpr : StmtNode<Expr>;
+def SYCLUniqueStableNameExpr : StmtNode<Expr>;
 def DeclRefExpr : StmtNode<Expr>;
 def IntegerLiteral : StmtNode<Expr>;
 def FixedPointLiteral : StmtNode<Expr>;
@@ -69,11 +70,13 @@ def UnaryOperator : StmtNode<Expr>;
 def OffsetOfExpr : StmtNode<Expr>;
 def UnaryExprOrTypeTraitExpr : StmtNode<Expr>;
 def ArraySubscriptExpr : StmtNode<Expr>;
+def MatrixSubscriptExpr : StmtNode<Expr>;
 def OMPArraySectionExpr : StmtNode<Expr>;
 def OMPIteratorExpr : StmtNode<Expr>;
 // OmpSs
 def OSSArraySectionExpr : StmtNode<Expr>;
 def OSSArrayShapingExpr : StmtNode<Expr>;
+def OSSMultiDepExpr : StmtNode<Expr>;
 def CallExpr : StmtNode<Expr>;
 def MemberExpr : StmtNode<Expr>;
 def CastExpr : StmtNode<Expr, 1>;
@@ -218,10 +221,14 @@ def MSDependentExistsStmt : StmtNode<Stmt>;
 def AsTypeExpr : StmtNode<Expr>;
 
 // OpenMP Directives.
+def OMPCanonicalLoop : StmtNode<Stmt>;
 def OMPExecutableDirective : StmtNode<Stmt, 1>;
-def OMPLoopDirective : StmtNode<OMPExecutableDirective, 1>;
+def OMPLoopBasedDirective : StmtNode<OMPExecutableDirective, 1>;
+def OMPLoopDirective : StmtNode<OMPLoopBasedDirective, 1>;
 def OMPParallelDirective : StmtNode<OMPExecutableDirective>;
 def OMPSimdDirective : StmtNode<OMPLoopDirective>;
+def OMPTileDirective : StmtNode<OMPLoopBasedDirective>;
+def OMPUnrollDirective : StmtNode<OMPLoopBasedDirective>;
 def OMPForDirective : StmtNode<OMPLoopDirective>;
 def OMPForSimdDirective : StmtNode<OMPLoopDirective>;
 def OMPSectionsDirective : StmtNode<OMPExecutableDirective>;
@@ -274,8 +281,16 @@ def OMPTargetTeamsDistributeDirective : StmtNode<OMPLoopDirective>;
 def OMPTargetTeamsDistributeParallelForDirective : StmtNode<OMPLoopDirective>;
 def OMPTargetTeamsDistributeParallelForSimdDirective : StmtNode<OMPLoopDirective>;
 def OMPTargetTeamsDistributeSimdDirective : StmtNode<OMPLoopDirective>;
+def OMPInteropDirective : StmtNode<OMPExecutableDirective>;
+def OMPDispatchDirective : StmtNode<OMPExecutableDirective>;
+def OMPMaskedDirective : StmtNode<OMPExecutableDirective>;
 
 // OmpSs Directives
 def OSSExecutableDirective : StmtNode<Stmt, 1>;
+def OSSLoopDirective : StmtNode<OSSExecutableDirective, 1>;
 def OSSTaskwaitDirective : StmtNode<OSSExecutableDirective>;
+def OSSReleaseDirective : StmtNode<OSSExecutableDirective>;
 def OSSTaskDirective : StmtNode<OSSExecutableDirective>;
+def OSSTaskForDirective : StmtNode<OSSLoopDirective>;
+def OSSTaskLoopDirective : StmtNode<OSSLoopDirective>;
+def OSSTaskLoopForDirective : StmtNode<OSSLoopDirective>;

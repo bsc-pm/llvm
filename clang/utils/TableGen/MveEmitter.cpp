@@ -300,7 +300,7 @@ public:
     return Element->cNameBase() + "x" + utostr(Lanes);
   }
   std::string llvmName() const override {
-    return "llvm::VectorType::get(" + Element->llvmName() + ", " +
+    return "llvm::FixedVectorType::get(" + Element->llvmName() + ", " +
            utostr(Lanes) + ")";
   }
 
@@ -354,7 +354,7 @@ public:
     // explanation.
     unsigned ModifiedLanes = (Lanes == 2 ? 4 : Lanes);
 
-    return "llvm::VectorType::get(Builder.getInt1Ty(), " +
+    return "llvm::FixedVectorType::get(Builder.getInt1Ty(), " +
            utostr(ModifiedLanes) + ")";
   }
 
@@ -1272,6 +1272,13 @@ Result::Ptr EmitterBase::getCodeForDagArg(DagInit *D, unsigned ArgNum,
     return it->second;
   }
 
+  // Sometimes the Arg is a bit. Prior to multiclass template argument
+  // checking, integers would sneak through the bit declaration,
+  // but now they really are bits.
+  if (auto *BI = dyn_cast<BitInit>(Arg))
+    return std::make_shared<IntLiteralResult>(getScalarType("u32"),
+                                              BI->getValue());
+
   if (auto *II = dyn_cast<IntInit>(Arg))
     return std::make_shared<IntLiteralResult>(getScalarType("u32"),
                                               II->getValue());
@@ -1287,7 +1294,11 @@ Result::Ptr EmitterBase::getCodeForDagArg(DagInit *D, unsigned ArgNum,
     }
   }
 
-  PrintFatalError("bad dag argument type for code generation");
+  PrintError("bad DAG argument type for code generation");
+  PrintNote("DAG: " + D->getAsString());
+  if (TypedInit *Typed = dyn_cast<TypedInit>(Arg))
+    PrintNote("argument type: " + Typed->getType()->getAsString());
+  PrintFatalNote("argument number " + Twine(ArgNum) + ": " + Arg->getAsString());
 }
 
 Result::Ptr EmitterBase::getCodeForArg(unsigned ArgNum, const Type *ArgType,

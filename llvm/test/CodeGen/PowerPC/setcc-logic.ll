@@ -18,8 +18,8 @@ define zeroext i1 @all_sign_bits_clear(i32 %P, i32 %Q)  {
 ; CHECK-LABEL: all_sign_bits_clear:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    or 3, 3, 4
-; CHECK-NEXT:    nor 3, 3, 3
-; CHECK-NEXT:    srwi 3, 3, 31
+; CHECK-NEXT:    rlwinm 3, 3, 1, 31, 31
+; CHECK-NEXT:    xori 3, 3, 1
 ; CHECK-NEXT:    blr
   %a = icmp sgt i32 %P, -1
   %b = icmp sgt i32 %Q, -1
@@ -46,7 +46,7 @@ define zeroext i1 @all_sign_bits_set(i32 %P, i32 %Q)  {
 ; CHECK-LABEL: all_sign_bits_set:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    and 3, 3, 4
-; CHECK-NEXT:    srwi 3, 3, 31
+; CHECK-NEXT:    rlwinm 3, 3, 1, 31, 31
 ; CHECK-NEXT:    blr
   %a = icmp slt i32 %P, 0
   %b = icmp slt i32 %Q, 0
@@ -72,7 +72,7 @@ define zeroext i1 @any_sign_bits_set(i32 %P, i32 %Q)  {
 ; CHECK-LABEL: any_sign_bits_set:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    or 3, 3, 4
-; CHECK-NEXT:    srwi 3, 3, 31
+; CHECK-NEXT:    rlwinm 3, 3, 1, 31, 31
 ; CHECK-NEXT:    blr
   %a = icmp slt i32 %P, 0
   %b = icmp slt i32 %Q, 0
@@ -100,8 +100,8 @@ define zeroext i1 @any_sign_bits_clear(i32 %P, i32 %Q)  {
 ; CHECK-LABEL: any_sign_bits_clear:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    and 3, 3, 4
-; CHECK-NEXT:    nor 3, 3, 3
-; CHECK-NEXT:    srwi 3, 3, 31
+; CHECK-NEXT:    rlwinm 3, 3, 1, 31, 31
+; CHECK-NEXT:    xori 3, 3, 1
 ; CHECK-NEXT:    blr
   %a = icmp sgt i32 %P, -1
   %b = icmp sgt i32 %Q, -1
@@ -499,7 +499,7 @@ define i1 @and_icmps_const_1bit_diff(i32 %x) {
 ; CHECK-NEXT:    addi 3, 3, -4625
 ; CHECK-NEXT:    rlwinm 3, 3, 0, 28, 26
 ; CHECK-NEXT:    cntlzw 3, 3
-; CHECK-NEXT:    nor 3, 3, 3
+; CHECK-NEXT:    not 3, 3
 ; CHECK-NEXT:    rlwinm 3, 3, 27, 31, 31
 ; CHECK-NEXT:    blr
   %a = icmp ne i32 %x, 4625

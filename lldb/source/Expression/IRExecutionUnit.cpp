@@ -9,6 +9,8 @@
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/ObjectCache.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/DiagnosticHandler.h"
+#include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/SourceMgr.h"
@@ -200,16 +202,26 @@ Status IRExecutionUnit::DisassembleFunction(Stream &stream,
   return ret;
 }
 
-static void ReportInlineAsmError(const llvm::SMDiagnostic &diagnostic,
-                                 void *Context, unsigned LocCookie) {
-  Status *err = static_cast<Status *>(Context);
+namespace {
+struct IRExecDiagnosticHandler : public llvm::DiagnosticHandler {
+  Status *err;
+  IRExecDiagnosticHandler(Status *err) : err(err) {}
+  bool handleDiagnostics(const llvm::DiagnosticInfo &DI) override {
+    if (DI.getKind() == llvm::DK_SrcMgr) {
+      const auto &DISM = llvm::cast<llvm::DiagnosticInfoSrcMgr>(DI);
+      if (err && err->Success()) {
+        err->SetErrorToGenericError();
+        err->SetErrorStringWithFormat(
+            "Inline assembly error: %s",
+            DISM.getSMDiag().getMessage().str().c_str());
+      }
+      return true;
+    }
 
-  if (err && err->Success()) {
-    err->SetErrorToGenericError();
-    err->SetErrorStringWithFormat("Inline assembly error: %s",
-                                  diagnostic.getMessage().str().c_str());
+    return false;
   }
-}
+};
+} // namespace
 
 void IRExecutionUnit::ReportSymbolLookupError(ConstString name) {
   m_failed_lookups.push_back(name);
@@ -257,19 +269,17 @@ void IRExecutionUnit::GetRunnableInfo(Status &error, lldb::addr_t &func_addr,
     LLDB_LOGF(log, "Module being sent to JIT: \n%s", s.c_str());
   }
 
-  m_module_up->getContext().setInlineAsmDiagnosticHandler(ReportInlineAsmError,
-                                                          &error);
+  m_module_up->getContext().setDiagnosticHandler(
+      std::make_unique<IRExecDiagnosticHandler>(&error));
 
   llvm::EngineBuilder builder(std::move(m_module_up));
   llvm::Triple triple(m_module->getTargetTriple());
 
   builder.setEngineKind(llvm::EngineKind::JIT)
       .setErrorStr(&error_string)
-      .setRelocationModel(triple.isOSBinFormatMachO()
-                              ? llvm::Reloc::PIC_
-                              : llvm::Reloc::Static)
-      .setMCJITMemoryManager(
-          std::unique_ptr<MemoryManager>(new MemoryManager(*this)))
+      .setRelocationModel(triple.isOSBinFormatMachO() ? llvm::Reloc::PIC_
+                                                      : llvm::Reloc::Static)
+      .setMCJITMemoryManager(std::make_unique<MemoryManager>(*this))
       .setOptLevel(llvm::CodeGenOpt::Less);
 
   llvm::StringRef mArch;
@@ -330,8 +340,7 @@ void IRExecutionUnit::GetRunnableInfo(Status &error, lldb::addr_t &func_addr,
     if (function.isDeclaration() || function.hasPrivateLinkage())
       continue;
 
-    const bool external =
-        function.hasExternalLinkage() || function.hasLinkOnceODRLinkage();
+    const bool external = !function.hasLocalLinkage();
 
     void *fun_ptr = m_execution_engine_up->getPointerToFunction(&function);
 
@@ -487,7 +496,7 @@ IRExecutionUnit::~IRExecutionUnit() {
 IRExecutionUnit::MemoryManager::MemoryManager(IRExecutionUnit &parent)
     : m_default_mm_up(new llvm::SectionMemoryManager()), m_parent(parent) {}
 
-IRExecutionUnit::MemoryManager::~MemoryManager() {}
+IRExecutionUnit::MemoryManager::~MemoryManager() = default;
 
 lldb::SectionType IRExecutionUnit::GetSectionTypeFromSectionName(
     const llvm::StringRef &name, IRExecutionUnit::AllocationKind alloc_kind) {
@@ -741,19 +750,22 @@ void IRExecutionUnit::CollectFallbackNames(
   for (const SearchSpec &C_spec : C_specs) {
     ConstString name = C_spec.name;
 
-    if (CPlusPlusLanguage::IsCPPMangledName(name.GetCString())) {
-      Mangled mangled_name(name);
-      ConstString demangled_name = mangled_name.GetDemangledName();
-      if (!demangled_name.IsEmpty()) {
-        const char *demangled_cstr = demangled_name.AsCString();
-        const char *lparen_loc = strchr(demangled_cstr, '(');
-        if (lparen_loc) {
-          llvm::StringRef base_name(demangled_cstr,
-                                    lparen_loc - demangled_cstr);
-          fallback_specs.push_back(ConstString(base_name));
-        }
-      }
-    }
+    if (!CPlusPlusLanguage::IsCPPMangledName(name.GetCString()))
+      continue;
+
+    Mangled mangled_name(name);
+    ConstString demangled_name = mangled_name.GetDemangledName();
+    if (demangled_name.IsEmpty())
+      continue;
+
+    const char *demangled_cstr = demangled_name.AsCString();
+    const char *lparen_loc = strchr(demangled_cstr, '(');
+    if (!lparen_loc)
+      continue;
+
+    llvm::StringRef base_name(demangled_cstr,
+                              lparen_loc - demangled_cstr);
+    fallback_specs.push_back(ConstString(base_name));
   }
 }
 

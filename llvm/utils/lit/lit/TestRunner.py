@@ -191,7 +191,13 @@ def quote_windows_command(seq):
 
     We use the same algorithm from MSDN as CPython
     (http://msdn.microsoft.com/en-us/library/17w5ykft.aspx), but we treat more
-    characters as needing quoting, such as double quotes themselves.
+    characters as needing quoting, such as double quotes themselves, and square
+    brackets.
+
+    For MSys based tools, this is very brittle though, because quoting an
+    argument makes the MSys based tool unescape backslashes where it shouldn't
+    (e.g. "a\b\\c\\\\d" becomes "a\b\c\\d" where it should stay as it was,
+    according to regular win32 command line parsing rules).
     """
     result = []
     needquote = False
@@ -203,7 +209,7 @@ def quote_windows_command(seq):
             result.append(' ')
 
         # This logic differs from upstream list2cmdline.
-        needquote = (" " in arg) or ("\t" in arg) or ("\"" in arg) or not arg
+        needquote = (" " in arg) or ("\t" in arg) or ("\"" in arg) or ("[" in arg) or (";" in arg) or not arg
         if needquote:
             result.append('"')
 
@@ -608,6 +614,7 @@ def _executeShCmd(cmd, shenv, results, timeoutHelper):
     assert isinstance(cmd, ShUtil.Pipeline)
 
     procs = []
+    proc_not_counts = []
     default_stdin = subprocess.PIPE
     stderrTempFiles = []
     opened_files = []
@@ -652,6 +659,12 @@ def _executeShCmd(cmd, shenv, results, timeoutHelper):
                     not_crash = True
                 if not args:
                     raise InternalShellError(j, "Error: 'not' requires a"
+                                                " subcommand")
+            elif args[0] == '!':
+                not_args.append(args.pop(0))
+                not_count += 1
+                if not args:
+                    raise InternalShellError(j, "Error: '!' requires a"
                                                 " subcommand")
             else:
                 break
@@ -699,7 +712,15 @@ def _executeShCmd(cmd, shenv, results, timeoutHelper):
         # the assumptions that (1) environment variables are not intended to be
         # relevant to 'not' commands and (2) the 'env' command should always
         # blindly pass along the status it receives from any command it calls.
-        args = not_args + args
+
+        # For plain negations, either 'not' without '--crash', or the shell
+        # operator '!', leave them out from the command to execute and
+        # invert the result code afterwards.
+        if not_crash:
+            args = not_args + args
+            not_count = 0
+        else:
+            not_args = []
 
         stdin, stdout, stderr = processRedirects(j, default_stdin, cmd_shenv,
                                                  opened_files)
@@ -763,6 +784,7 @@ def _executeShCmd(cmd, shenv, results, timeoutHelper):
                                           stderr = stderr,
                                           env = cmd_shenv.env,
                                           close_fds = kUseCloseFDs))
+            proc_not_counts.append(not_count)
             # Let the helper know about this process
             timeoutHelper.addProcess(procs[-1])
         except OSError as e:
@@ -815,6 +837,10 @@ def _executeShCmd(cmd, shenv, results, timeoutHelper):
         # Detect Ctrl-C in subprocess.
         if res == -signal.SIGINT:
             raise KeyboardInterrupt
+        if proc_not_counts[i] % 2:
+            res = not res
+        elif proc_not_counts[i] > 1:
+            res = 1 if res != 0 else 0
 
         # Ensure the resulting output is always of string type.
         try:
@@ -1081,9 +1107,7 @@ def getDefaultSubstitutions(test, tmpDir, tmpBase, normalize_slashes=False):
         tmpDir = tmpDir.replace('\\', '/')
         tmpBase = tmpBase.replace('\\', '/')
 
-    # We use #_MARKER_# to hide %% while we do the other substitutions.
     substitutions = []
-    substitutions.extend([('%%', '#_MARKER_#')])
     substitutions.extend(test.config.substitutions)
     tmpName = tmpBase + '.tmp'
     baseName = os.path.basename(tmpBase)
@@ -1093,8 +1117,7 @@ def getDefaultSubstitutions(test, tmpDir, tmpBase, normalize_slashes=False):
                           ('%{pathsep}', os.pathsep),
                           ('%t', tmpName),
                           ('%basename_t', baseName),
-                          ('%T', tmpDir),
-                          ('#_MARKER_#', '%')])
+                          ('%T', tmpDir)])
 
     # "%/[STpst]" should be normalized.
     substitutions.extend([
@@ -1108,8 +1131,8 @@ def getDefaultSubstitutions(test, tmpDir, tmpBase, normalize_slashes=False):
     # "%{/[STpst]:regex_replacement}" should be normalized like "%/[STpst]" but we're
     # also in a regex replacement context of a s@@@ regex.
     def regex_escape(s):
-        s = s.replace('@', '\@')
-        s = s.replace('&', '\&')
+        s = s.replace('@', r'\@')
+        s = s.replace('&', r'\&')
         return s
     substitutions.extend([
             ('%{/s:regex_replacement}',
@@ -1159,6 +1182,14 @@ def applySubstitutions(script, substitutions, recursion_limit=None):
     `recursion_limit` times, it is an error. If the `recursion_limit` is
     `None` (the default), no recursive substitution is performed at all.
     """
+
+    # We use #_MARKER_# to hide %% while we do the other substitutions.
+    def escape(ln):
+        return _caching_re_compile('%%').sub('#_MARKER_#', ln)
+
+    def unescape(ln):
+        return _caching_re_compile('#_MARKER_#').sub('%', ln)
+
     def processLine(ln):
         # Apply substitutions
         for a,b in substitutions:
@@ -1171,7 +1202,7 @@ def applySubstitutions(script, substitutions, recursion_limit=None):
             # short-lived, since the set of substitutions is fairly small, and
             # since thrashing has such bad consequences, not bounding the cache
             # seems reasonable.
-            ln = _caching_re_compile(a).sub(b, ln)
+            ln = _caching_re_compile(a).sub(str(b), escape(ln))
 
         # Strip the trailing newline and any extra whitespace.
         return ln.strip()
@@ -1193,10 +1224,9 @@ def applySubstitutions(script, substitutions, recursion_limit=None):
 
         return processed
 
-    # Note Python 3 map() gives an iterator rather than a list so explicitly
-    # convert to list before returning.
     process = processLine if recursion_limit is None else processLineToFixedPoint
-    return list(map(process, script))
+    
+    return [unescape(process(ln)) for ln in script]
 
 
 class ParserKind(object):
@@ -1373,31 +1403,26 @@ class IntegratedTestKeywordParser(object):
                 BooleanExpression.evaluate(s, [])
         return output
 
-def parseIntegratedTestScript(test, additional_parsers=[],
-                              require_script=True):
-    """parseIntegratedTestScript - Scan an LLVM/Clang style integrated test
-    script and extract the lines to 'RUN' as well as 'XFAIL', 'REQUIRES',
-    'UNSUPPORTED' and 'ALLOW_RETRIES' information.
 
-    If additional parsers are specified then the test is also scanned for the
-    keywords they specify and all matches are passed to the custom parser.
+def _parseKeywords(sourcepath, additional_parsers=[],
+                   require_script=True):
+    """_parseKeywords
 
-    If 'require_script' is False an empty script
-    may be returned. This can be used for test formats where the actual script
-    is optional or ignored.
+    Scan an LLVM/Clang style integrated test script and extract all the lines
+    pertaining to a special parser. This includes 'RUN', 'XFAIL', 'REQUIRES',
+    'UNSUPPORTED' and 'ALLOW_RETRIES', as well as other specified custom
+    parsers.
+
+    Returns a dictionary mapping each custom parser to its value after
+    parsing the test.
     """
-
     # Install the built-in keyword parsers.
     script = []
     builtin_parsers = [
-        IntegratedTestKeywordParser('RUN:', ParserKind.COMMAND,
-                                    initial_value=script),
-        IntegratedTestKeywordParser('XFAIL:', ParserKind.BOOLEAN_EXPR,
-                                    initial_value=test.xfails),
-        IntegratedTestKeywordParser('REQUIRES:', ParserKind.BOOLEAN_EXPR,
-                                    initial_value=test.requires),
-        IntegratedTestKeywordParser('UNSUPPORTED:', ParserKind.BOOLEAN_EXPR,
-                                    initial_value=test.unsupported),
+        IntegratedTestKeywordParser('RUN:', ParserKind.COMMAND, initial_value=script),
+        IntegratedTestKeywordParser('XFAIL:', ParserKind.BOOLEAN_EXPR),
+        IntegratedTestKeywordParser('REQUIRES:', ParserKind.BOOLEAN_EXPR),
+        IntegratedTestKeywordParser('UNSUPPORTED:', ParserKind.BOOLEAN_EXPR),
         IntegratedTestKeywordParser('ALLOW_RETRIES:', ParserKind.INTEGER),
         IntegratedTestKeywordParser('END.', ParserKind.TAG)
     ]
@@ -1406,7 +1431,7 @@ def parseIntegratedTestScript(test, additional_parsers=[],
     # Install user-defined additional parsers.
     for parser in additional_parsers:
         if not isinstance(parser, IntegratedTestKeywordParser):
-            raise ValueError('additional parser must be an instance of '
+            raise ValueError('Additional parser must be an instance of '
                              'IntegratedTestKeywordParser')
         if parser.keyword in keyword_parsers:
             raise ValueError("Parser for keyword '%s' already exists"
@@ -1414,7 +1439,6 @@ def parseIntegratedTestScript(test, additional_parsers=[],
         keyword_parsers[parser.keyword] = parser
 
     # Collect the test lines from the script.
-    sourcepath = test.getSourcePath()
     for line_number, command_type, ln in \
             parseIntegratedTestScriptCommands(sourcepath,
                                               keyword_parsers.keys()):
@@ -1425,12 +1449,11 @@ def parseIntegratedTestScript(test, additional_parsers=[],
 
     # Verify the script contains a run line.
     if require_script and not script:
-        return lit.Test.Result(Test.UNRESOLVED, "Test has no run line!")
+        raise ValueError("Test has no 'RUN:' line")
 
     # Check for unterminated run lines.
     if script and script[-1][-1] == '\\':
-        return lit.Test.Result(Test.UNRESOLVED,
-                               "Test has unterminated run lines (with '\\')")
+        raise ValueError("Test has unterminated 'RUN:' lines (with '\\')")
 
     # Check boolean expressions for unterminated lines.
     for key in keyword_parsers:
@@ -1439,7 +1462,42 @@ def parseIntegratedTestScript(test, additional_parsers=[],
             continue
         value = kp.getValue()
         if value and value[-1][-1] == '\\':
-            raise ValueError("Test has unterminated %s lines (with '\\')" % key)
+            raise ValueError("Test has unterminated '{key}' lines (with '\\')"
+                             .format(key=key))
+
+    # Make sure there's at most one ALLOW_RETRIES: line
+    allowed_retries = keyword_parsers['ALLOW_RETRIES:'].getValue()
+    if allowed_retries and len(allowed_retries) > 1:
+        raise ValueError("Test has more than one ALLOW_RETRIES lines")
+
+    return {p.keyword: p.getValue() for p in keyword_parsers.values()}
+
+
+def parseIntegratedTestScript(test, additional_parsers=[],
+                              require_script=True):
+    """parseIntegratedTestScript - Scan an LLVM/Clang style integrated test
+    script and extract the lines to 'RUN' as well as 'XFAIL', 'REQUIRES',
+    'UNSUPPORTED' and 'ALLOW_RETRIES' information into the given test.
+
+    If additional parsers are specified then the test is also scanned for the
+    keywords they specify and all matches are passed to the custom parser.
+
+    If 'require_script' is False an empty script
+    may be returned. This can be used for test formats where the actual script
+    is optional or ignored.
+    """
+    # Parse the test sources and extract test properties
+    try:
+        parsed = _parseKeywords(test.getSourcePath(), additional_parsers,
+                                require_script)
+    except ValueError as e:
+        return lit.Test.Result(Test.UNRESOLVED, str(e))
+    script = parsed['RUN:'] or []
+    test.xfails += parsed['XFAIL:'] or []
+    test.requires += parsed['REQUIRES:'] or []
+    test.unsupported += parsed['UNSUPPORTED:'] or []
+    if parsed['ALLOW_RETRIES:']:
+        test.allowed_retries = parsed['ALLOW_RETRIES:'][0]
 
     # Enforce REQUIRES:
     missing_required_features = test.getMissingRequiredFeatures()
@@ -1457,14 +1515,6 @@ def parseIntegratedTestScript(test, additional_parsers=[],
             Test.UNSUPPORTED,
             "Test does not support the following features "
             "and/or targets: %s" % msg)
-
-    # Handle ALLOW_RETRIES:
-    allowed_retries = keyword_parsers['ALLOW_RETRIES:'].getValue()
-    if allowed_retries:
-        if len(allowed_retries) > 1:
-            return lit.Test.Result(Test.UNRESOLVED,
-                                   "Test has more than one ALLOW_RETRIES lines")
-        test.allowed_retries = allowed_retries[0]
 
     # Enforce limit_to_features.
     if not test.isWithinFeatureLimits():

@@ -8,9 +8,9 @@
 
 #include "UppercaseLiteralSuffixCheck.h"
 #include "../utils/ASTUtils.h"
-#include "../utils/OptionsUtils.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
+#include "clang/Lex/Lexer.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 
@@ -62,7 +62,7 @@ struct NewSuffix {
   llvm::Optional<FixItHint> FixIt;
 };
 
-llvm::Optional<SourceLocation> GetMacroAwareLocation(SourceLocation Loc,
+llvm::Optional<SourceLocation> getMacroAwareLocation(SourceLocation Loc,
                                                      const SourceManager &SM) {
   // Do nothing if the provided location is invalid.
   if (Loc.isInvalid())
@@ -74,11 +74,11 @@ llvm::Optional<SourceLocation> GetMacroAwareLocation(SourceLocation Loc,
   return SpellingLoc;
 }
 
-llvm::Optional<SourceRange> GetMacroAwareSourceRange(SourceRange Loc,
+llvm::Optional<SourceRange> getMacroAwareSourceRange(SourceRange Loc,
                                                      const SourceManager &SM) {
   llvm::Optional<SourceLocation> Begin =
-      GetMacroAwareLocation(Loc.getBegin(), SM);
-  llvm::Optional<SourceLocation> End = GetMacroAwareLocation(Loc.getEnd(), SM);
+      getMacroAwareLocation(Loc.getBegin(), SM);
+  llvm::Optional<SourceLocation> End = getMacroAwareLocation(Loc.getEnd(), SM);
   if (!Begin || !End)
     return llvm::None;
   return SourceRange(*Begin, *End);
@@ -93,7 +93,7 @@ getNewSuffix(llvm::StringRef OldSuffix,
   // Else, find matching suffix, case-*insensitive*ly.
   auto NewSuffix = llvm::find_if(
       NewSuffixes, [OldSuffix](const std::string &PotentialNewSuffix) {
-        return OldSuffix.equals_lower(PotentialNewSuffix);
+        return OldSuffix.equals_insensitive(PotentialNewSuffix);
       });
   // Have a match, return it.
   if (NewSuffix != NewSuffixes.end())
@@ -120,7 +120,7 @@ shouldReplaceLiteralSuffix(const Expr &Literal,
 
   // The literal may have macro expansion, we need the final expanded src range.
   llvm::Optional<SourceRange> Range =
-      GetMacroAwareSourceRange(ReplacementDsc.LiteralLocation, SM);
+      getMacroAwareSourceRange(ReplacementDsc.LiteralLocation, SM);
   if (!Range)
     return llvm::None;
 
@@ -200,7 +200,6 @@ void UppercaseLiteralSuffixCheck::registerMatchers(MatchFinder *Finder) {
       stmt(eachOf(integerLiteral().bind(IntegerLiteralCheck::Name),
                   floatLiteral().bind(FloatingLiteralCheck::Name)),
            unless(anyOf(hasParent(userDefinedLiteral()),
-                        hasAncestor(isImplicit()),
                         hasAncestor(substNonTypeTemplateParmExpr())))),
       this);
 }

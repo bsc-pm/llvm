@@ -81,13 +81,17 @@ CXXRecordDecl::DefinitionData::DefinitionData(CXXRecordDecl *D)
       HasPublicFields(false), HasMutableFields(false), HasVariantMembers(false),
       HasOnlyCMembers(true), HasInClassInitializer(false),
       HasUninitializedReferenceMember(false), HasUninitializedFields(false),
-      HasInheritedConstructor(false), HasInheritedAssignment(false),
+      HasInheritedConstructor(false),
+      HasInheritedDefaultConstructor(false),
+      HasInheritedAssignment(false),
       NeedOverloadResolutionForCopyConstructor(false),
       NeedOverloadResolutionForMoveConstructor(false),
+      NeedOverloadResolutionForCopyAssignment(false),
       NeedOverloadResolutionForMoveAssignment(false),
       NeedOverloadResolutionForDestructor(false),
       DefaultedCopyConstructorIsDeleted(false),
       DefaultedMoveConstructorIsDeleted(false),
+      DefaultedCopyAssignmentIsDeleted(false),
       DefaultedMoveAssignmentIsDeleted(false),
       DefaultedDestructorIsDeleted(false), HasTrivialSpecialMembers(SMF_All),
       HasTrivialSpecialMembersForCall(SMF_All),
@@ -98,13 +102,14 @@ CXXRecordDecl::DefinitionData::DefinitionData(CXXRecordDecl *D)
       DefaultedDefaultConstructorIsConstexpr(true),
       HasConstexprDefaultConstructor(false),
       DefaultedDestructorIsConstexpr(true),
-      HasNonLiteralTypeFieldsOrBases(false),
+      HasNonLiteralTypeFieldsOrBases(false), StructuralIfLiteral(true),
       UserProvidedDefaultConstructor(false), DeclaredSpecialMembers(0),
       ImplicitCopyConstructorCanHaveConstParamForVBase(true),
       ImplicitCopyConstructorCanHaveConstParamForNonVBase(true),
       ImplicitCopyAssignmentHasConstParam(true),
       HasDeclaredCopyConstructorWithConstParam(false),
-      HasDeclaredCopyAssignmentWithConstParam(false), IsLambda(false),
+      HasDeclaredCopyAssignmentWithConstParam(false),
+      IsAnyDestructorNoReturn(false), IsLambda(false),
       IsParsingBaseSpecifiers(false), ComputedVisibleConversions(false),
       HasODRHash(false), Definition(D) {}
 
@@ -256,8 +261,14 @@ CXXRecordDecl::setBases(CXXBaseSpecifier const * const *Bases,
 
     // C++1z [dcl.init.agg]p1:
     //   An aggregate is a class with [...] no private or protected base classes
-    if (Base->getAccessSpecifier() != AS_public)
+    if (Base->getAccessSpecifier() != AS_public) {
       data().Aggregate = false;
+
+      // C++20 [temp.param]p7:
+      //   A structural type is [...] a literal class type with [...] all base
+      //   classes [...] public
+      data().StructuralIfLiteral = false;
+    }
 
     // C++ [class.virtual]p1:
     //   A class that declares or inherits a virtual function is called a
@@ -414,6 +425,9 @@ CXXRecordDecl::setBases(CXXBaseSpecifier const * const *Bases,
     if (!BaseClassDecl->hasIrrelevantDestructor())
       data().HasIrrelevantDestructor = false;
 
+    if (BaseClassDecl->isAnyDestructorNoReturn())
+      data().IsAnyDestructorNoReturn = true;
+
     // C++11 [class.copy]p18:
     //   The implicitly-declared copy assignment operator for a class X will
     //   have the form 'X& X::operator=(const X&)' if each direct base class B
@@ -435,10 +449,8 @@ CXXRecordDecl::setBases(CXXBaseSpecifier const * const *Bases,
       setArgPassingRestrictions(RecordDecl::APK_CanNeverPassInRegs);
 
     // Keep track of the presence of mutable fields.
-    if (BaseClassDecl->hasMutableFields()) {
+    if (BaseClassDecl->hasMutableFields())
       data().HasMutableFields = true;
-      data().NeedOverloadResolutionForCopyConstructor = true;
-    }
 
     if (BaseClassDecl->hasUninitializedReferenceMember())
       data().HasUninitializedReferenceMember = true;
@@ -511,6 +523,8 @@ void CXXRecordDecl::addedClassSubobject(CXXRecordDecl *Subobj) {
   //    -- a direct or virtual base class B that cannot be copied/moved [...]
   //    -- a non-static data member of class type M (or array thereof)
   //        that cannot be copied or moved [...]
+  if (!Subobj->hasSimpleCopyAssignment())
+    data().NeedOverloadResolutionForCopyAssignment = true;
   if (!Subobj->hasSimpleMoveAssignment())
     data().NeedOverloadResolutionForMoveAssignment = true;
 
@@ -534,6 +548,13 @@ void CXXRecordDecl::addedClassSubobject(CXXRecordDecl *Subobj) {
   //      array thereof, that class type shall have a constexpr destructor
   if (!Subobj->hasConstexprDestructor())
     data().DefaultedDestructorIsConstexpr = false;
+
+  // C++20 [temp.param]p7:
+  //   A structural type is [...] a literal class type [for which] the types
+  //   of all base classes and non-static data members are structural types or
+  //   (possibly multi-dimensional) array thereof
+  if (!Subobj->data().StructuralIfLiteral)
+    data().StructuralIfLiteral = false;
 }
 
 bool CXXRecordDecl::hasConstexprDestructor() const {
@@ -664,8 +685,7 @@ bool CXXRecordDecl::lambdaIsDefaultConstructibleAndAssignable() const {
   // C++17 [expr.prim.lambda]p21:
   //   The closure type associated with a lambda-expression has no default
   //   constructor and a deleted copy assignment operator.
-  if (getLambdaCaptureDefault() != LCD_None ||
-      getLambdaData().NumCaptures != 0)
+  if (getLambdaCaptureDefault() != LCD_None || capture_size() != 0)
     return false;
   return getASTContext().getLangOpts().CPlusPlus20;
 }
@@ -800,6 +820,8 @@ void CXXRecordDecl::addedMember(Decl *D) {
     //   constructor [...]
     if (Constructor->isConstexpr() && !Constructor->isCopyOrMoveConstructor())
       data().HasConstexprNonCopyMoveConstructor = true;
+    if (!isa<CXXConstructorDecl>(D) && Constructor->isDefaultConstructor())
+      data().HasInheritedDefaultConstructor = true;
   }
 
   // Handle destructors.
@@ -818,6 +840,9 @@ void CXXRecordDecl::addedMember(Decl *D) {
       data().HasTrivialSpecialMembers &= ~SMF_Destructor;
       data().HasTrivialSpecialMembersForCall &= ~SMF_Destructor;
     }
+
+    if (DD->isNoReturn())
+      data().IsAnyDestructorNoReturn = true;
   }
 
   // Handle member functions.
@@ -955,6 +980,11 @@ void CXXRecordDecl::addedMember(Decl *D) {
     if (D->getAccess() == AS_private || D->getAccess() == AS_protected) {
       data().Aggregate = false;
       data().PlainOldData = false;
+
+      // C++20 [temp.param]p7:
+      //   A structural type is [...] a literal class type [for which] all
+      //   non-static data members are public
+      data().StructuralIfLiteral = false;
     }
 
     // Track whether this is the first field. We use this when checking
@@ -981,7 +1011,11 @@ void CXXRecordDecl::addedMember(Decl *D) {
     // Keep track of the presence of mutable fields.
     if (Field->isMutable()) {
       data().HasMutableFields = true;
-      data().NeedOverloadResolutionForCopyConstructor = true;
+
+      // C++20 [temp.param]p7:
+      //   A structural type is [...] a literal class type [for which] all
+      //   non-static data members are public
+      data().StructuralIfLiteral = false;
     }
 
     // C++11 [class.union]p8, DR1460:
@@ -1026,10 +1060,12 @@ void CXXRecordDecl::addedMember(Decl *D) {
         if (isUnion()) {
           data().DefaultedCopyConstructorIsDeleted = true;
           data().DefaultedMoveConstructorIsDeleted = true;
+          data().DefaultedCopyAssignmentIsDeleted = true;
           data().DefaultedMoveAssignmentIsDeleted = true;
           data().DefaultedDestructorIsDeleted = true;
           data().NeedOverloadResolutionForCopyConstructor = true;
           data().NeedOverloadResolutionForMoveConstructor = true;
+          data().NeedOverloadResolutionForCopyAssignment = true;
           data().NeedOverloadResolutionForMoveAssignment = true;
           data().NeedOverloadResolutionForDestructor = true;
         }
@@ -1096,8 +1132,10 @@ void CXXRecordDecl::addedMember(Decl *D) {
     //   A defaulted copy/move assignment operator for a class X is defined
     //   as deleted if X has:
     //    -- a non-static data member of reference type
-    if (T->isReferenceType())
+    if (T->isReferenceType()) {
+      data().DefaultedCopyAssignmentIsDeleted = true;
       data().DefaultedMoveAssignmentIsDeleted = true;
+    }
 
     // Bitfields of length 0 are also zero-sized, but we already bailed out for
     // those because they are always unnamed.
@@ -1116,6 +1154,7 @@ void CXXRecordDecl::addedMember(Decl *D) {
           // parameter.
           data().NeedOverloadResolutionForCopyConstructor = true;
           data().NeedOverloadResolutionForMoveConstructor = true;
+          data().NeedOverloadResolutionForCopyAssignment = true;
           data().NeedOverloadResolutionForMoveAssignment = true;
         }
 
@@ -1129,6 +1168,8 @@ void CXXRecordDecl::addedMember(Decl *D) {
             data().DefaultedCopyConstructorIsDeleted = true;
           if (FieldRec->hasNonTrivialMoveConstructor())
             data().DefaultedMoveConstructorIsDeleted = true;
+          if (FieldRec->hasNonTrivialCopyAssignment())
+            data().DefaultedCopyAssignmentIsDeleted = true;
           if (FieldRec->hasNonTrivialMoveAssignment())
             data().DefaultedMoveAssignmentIsDeleted = true;
           if (FieldRec->hasNonTrivialDestructor())
@@ -1142,6 +1183,8 @@ void CXXRecordDecl::addedMember(Decl *D) {
               FieldRec->data().NeedOverloadResolutionForCopyConstructor;
           data().NeedOverloadResolutionForMoveConstructor |=
               FieldRec->data().NeedOverloadResolutionForMoveConstructor;
+          data().NeedOverloadResolutionForCopyAssignment |=
+              FieldRec->data().NeedOverloadResolutionForCopyAssignment;
           data().NeedOverloadResolutionForMoveAssignment |=
               FieldRec->data().NeedOverloadResolutionForMoveAssignment;
           data().NeedOverloadResolutionForDestructor |=
@@ -1197,6 +1240,8 @@ void CXXRecordDecl::addedMember(Decl *D) {
           data().HasTrivialSpecialMembersForCall &= ~SMF_Destructor;
         if (!FieldRec->hasIrrelevantDestructor())
           data().HasIrrelevantDestructor = false;
+        if (FieldRec->isAnyDestructorNoReturn())
+          data().IsAnyDestructorNoReturn = true;
         if (FieldRec->hasObjectMember())
           setHasObjectMember(true);
         if (FieldRec->hasVolatileMember())
@@ -1239,9 +1284,15 @@ void CXXRecordDecl::addedMember(Decl *D) {
         }
 
         // Keep track of the presence of mutable fields.
-        if (FieldRec->hasMutableFields()) {
+        if (FieldRec->hasMutableFields())
           data().HasMutableFields = true;
+
+        if (Field->isMutable()) {
+          // Our copy constructor/assignment might call something other than
+          // the subobject's copy constructor/assignment if it's mutable and of
+          // class type.
           data().NeedOverloadResolutionForCopyConstructor = true;
+          data().NeedOverloadResolutionForCopyAssignment = true;
         }
 
         // C++11 [class.copy]p13:
@@ -1297,8 +1348,18 @@ void CXXRecordDecl::addedMember(Decl *D) {
       //   as deleted if X has:
       //    -- a non-static data member of const non-class type (or array
       //       thereof)
-      if (T.isConstQualified())
+      if (T.isConstQualified()) {
+        data().DefaultedCopyAssignmentIsDeleted = true;
         data().DefaultedMoveAssignmentIsDeleted = true;
+      }
+
+      // C++20 [temp.param]p7:
+      //   A structural type is [...] a literal class type [for which] the
+      //   types of all non-static data members are structural types or
+      //   (possibly multidimensional) array thereof
+      // We deal with class types elsewhere.
+      if (!T->isStructuralType())
+        data().StructuralIfLiteral = false;
     }
 
     // C++14 [meta.unary.prop]p4:
@@ -1365,6 +1426,27 @@ void CXXRecordDecl::finishedDefaultedOrDeletedMember(CXXMethodDecl *D) {
     data().HasTrivialSpecialMembers |= SMKind;
   else
     data().DeclaredNonTrivialSpecialMembers |= SMKind;
+}
+
+void CXXRecordDecl::setCaptures(ASTContext &Context,
+                                ArrayRef<LambdaCapture> Captures) {
+  CXXRecordDecl::LambdaDefinitionData &Data = getLambdaData();
+
+  // Copy captures.
+  Data.NumCaptures = Captures.size();
+  Data.NumExplicitCaptures = 0;
+  Data.Captures = (LambdaCapture *)Context.Allocate(sizeof(LambdaCapture) *
+                                                    Captures.size());
+  LambdaCapture *ToCapture = Data.Captures;
+  for (unsigned I = 0, N = Captures.size(); I != N; ++I) {
+    if (Captures[I].isExplicit())
+      ++Data.NumExplicitCaptures;
+
+    *ToCapture++ = Captures[I];
+  }
+
+  if (!lambdaIsDefaultConstructibleAndAssignable())
+    Data.DefaultedCopyAssignmentIsDeleted = true;
 }
 
 void CXXRecordDecl::setTrivialForCallFlags(CXXMethodDecl *D) {
@@ -1438,18 +1520,38 @@ CXXMethodDecl *CXXRecordDecl::getLambdaCallOperator() const {
 }
 
 CXXMethodDecl* CXXRecordDecl::getLambdaStaticInvoker() const {
-  if (!isLambda()) return nullptr;
-  DeclarationName Name =
-    &getASTContext().Idents.get(getLambdaStaticInvokerName());
-  DeclContext::lookup_result Invoker = lookup(Name);
-  if (Invoker.empty()) return nullptr;
-  assert(allLookupResultsAreTheSame(Invoker) &&
-         "More than one static invoker operator!");
-  NamedDecl *InvokerFun = Invoker.front();
-  if (const auto *InvokerTemplate = dyn_cast<FunctionTemplateDecl>(InvokerFun))
-    return cast<CXXMethodDecl>(InvokerTemplate->getTemplatedDecl());
+  CXXMethodDecl *CallOp = getLambdaCallOperator();
+  CallingConv CC = CallOp->getType()->castAs<FunctionType>()->getCallConv();
+  return getLambdaStaticInvoker(CC);
+}
 
-  return cast<CXXMethodDecl>(InvokerFun);
+static DeclContext::lookup_result
+getLambdaStaticInvokers(const CXXRecordDecl &RD) {
+  assert(RD.isLambda() && "Must be a lambda");
+  DeclarationName Name =
+      &RD.getASTContext().Idents.get(getLambdaStaticInvokerName());
+  return RD.lookup(Name);
+}
+
+static CXXMethodDecl *getInvokerAsMethod(NamedDecl *ND) {
+  if (const auto *InvokerTemplate = dyn_cast<FunctionTemplateDecl>(ND))
+    return cast<CXXMethodDecl>(InvokerTemplate->getTemplatedDecl());
+  return cast<CXXMethodDecl>(ND);
+}
+
+CXXMethodDecl *CXXRecordDecl::getLambdaStaticInvoker(CallingConv CC) const {
+  if (!isLambda())
+    return nullptr;
+  DeclContext::lookup_result Invoker = getLambdaStaticInvokers(*this);
+
+  for (NamedDecl *ND : Invoker) {
+    const auto *FTy =
+        cast<ValueDecl>(ND->getAsFunction())->getType()->castAs<FunctionType>();
+    if (FTy->getCallConv() == CC)
+      return getInvokerAsMethod(ND);
+  }
+
+  return nullptr;
 }
 
 void CXXRecordDecl::getCaptureFields(
@@ -1498,6 +1600,20 @@ Decl *CXXRecordDecl::getLambdaContextDecl() const {
   assert(isLambda() && "Not a lambda closure type!");
   ExternalASTSource *Source = getParentASTContext().getExternalSource();
   return getLambdaData().ContextDecl.get(Source);
+}
+
+void CXXRecordDecl::setDeviceLambdaManglingNumber(unsigned Num) const {
+  assert(isLambda() && "Not a lambda closure type!");
+  if (Num)
+    getASTContext().DeviceLambdaManglingNumbers[this] = Num;
+}
+
+unsigned CXXRecordDecl::getDeviceLambdaManglingNumber() const {
+  assert(isLambda() && "Not a lambda closure type!");
+  auto I = getASTContext().DeviceLambdaManglingNumbers.find(this);
+  if (I != getASTContext().DeviceLambdaManglingNumbers.end())
+    return I->second;
+  return 0;
 }
 
 static CanQualType GetConversionType(ASTContext &Context, NamedDecl *Conv) {
@@ -1781,29 +1897,6 @@ CXXDestructorDecl *CXXRecordDecl::getDestructor() const {
   return R.empty() ? nullptr : dyn_cast<CXXDestructorDecl>(R.front());
 }
 
-bool CXXRecordDecl::isAnyDestructorNoReturn() const {
-  // Destructor is noreturn.
-  if (const CXXDestructorDecl *Destructor = getDestructor())
-    if (Destructor->isNoReturn())
-      return true;
-
-  // Check base classes destructor for noreturn.
-  for (const auto &Base : bases())
-    if (const CXXRecordDecl *RD = Base.getType()->getAsCXXRecordDecl())
-      if (RD->isAnyDestructorNoReturn())
-        return true;
-
-  // Check fields for noreturn.
-  for (const auto *Field : fields())
-    if (const CXXRecordDecl *RD =
-            Field->getType()->getBaseElementTypeUnsafe()->getAsCXXRecordDecl())
-      if (RD->isAnyDestructorNoReturn())
-        return true;
-
-  // All destructors are not noreturn.
-  return false;
-}
-
 static bool isDeclContextInNamespace(const DeclContext *DC) {
   while (!DC->isTranslationUnit()) {
     if (DC->isNamespace())
@@ -1966,19 +2059,21 @@ ExplicitSpecifier ExplicitSpecifier::getFromDecl(FunctionDecl *Function) {
   }
 }
 
-CXXDeductionGuideDecl *CXXDeductionGuideDecl::Create(
-    ASTContext &C, DeclContext *DC, SourceLocation StartLoc,
-    ExplicitSpecifier ES, const DeclarationNameInfo &NameInfo, QualType T,
-    TypeSourceInfo *TInfo, SourceLocation EndLocation) {
+CXXDeductionGuideDecl *
+CXXDeductionGuideDecl::Create(ASTContext &C, DeclContext *DC,
+                              SourceLocation StartLoc, ExplicitSpecifier ES,
+                              const DeclarationNameInfo &NameInfo, QualType T,
+                              TypeSourceInfo *TInfo, SourceLocation EndLocation,
+                              CXXConstructorDecl *Ctor) {
   return new (C, DC) CXXDeductionGuideDecl(C, DC, StartLoc, ES, NameInfo, T,
-                                           TInfo, EndLocation);
+                                           TInfo, EndLocation, Ctor);
 }
 
 CXXDeductionGuideDecl *CXXDeductionGuideDecl::CreateDeserialized(ASTContext &C,
                                                                  unsigned ID) {
   return new (C, ID) CXXDeductionGuideDecl(
       C, nullptr, SourceLocation(), ExplicitSpecifier(), DeclarationNameInfo(),
-      QualType(), nullptr, SourceLocation());
+      QualType(), nullptr, SourceLocation(), nullptr);
 }
 
 RequiresExprBodyDecl *RequiresExprBodyDecl::Create(
@@ -2098,10 +2193,10 @@ CXXMethodDecl *CXXMethodDecl::Create(ASTContext &C, CXXRecordDecl *RD,
 }
 
 CXXMethodDecl *CXXMethodDecl::CreateDeserialized(ASTContext &C, unsigned ID) {
-  return new (C, ID) CXXMethodDecl(
-      CXXMethod, C, nullptr, SourceLocation(), DeclarationNameInfo(),
-      QualType(), nullptr, SC_None, false, CSK_unspecified, SourceLocation(),
-      nullptr);
+  return new (C, ID)
+      CXXMethodDecl(CXXMethod, C, nullptr, SourceLocation(),
+                    DeclarationNameInfo(), QualType(), nullptr, SC_None, false,
+                    ConstexprSpecKind::Unspecified, SourceLocation(), nullptr);
 }
 
 CXXMethodDecl *CXXMethodDecl::getDevirtualizedMethod(const Expr *Base,
@@ -2125,7 +2220,7 @@ CXXMethodDecl *CXXMethodDecl::getDevirtualizedMethod(const Expr *Base,
   // If the base expression (after skipping derived-to-base conversions) is a
   // class prvalue, then we can devirtualize.
   Base = Base->getBestDynamicClassTypeExpr();
-  if (Base->isRValue() && Base->getType()->isRecordType())
+  if (Base->isPRValue() && Base->getType()->isRecordType())
     return this;
 
   // If we don't even know what we would call, we can't devirtualize.
@@ -2390,14 +2485,8 @@ bool CXXMethodDecl::hasInlineBody() const {
 
 bool CXXMethodDecl::isLambdaStaticInvoker() const {
   const CXXRecordDecl *P = getParent();
-  if (P->isLambda()) {
-    if (const CXXMethodDecl *StaticInvoker = P->getLambdaStaticInvoker()) {
-      if (StaticInvoker == this) return true;
-      if (P->isGenericLambda() && this->isFunctionTemplateSpecialization())
-        return StaticInvoker == this->getPrimaryTemplate()->getTemplatedDecl();
-    }
-  }
-  return false;
+  return P->isLambda() && getDeclName().isIdentifier() &&
+         getName() == getLambdaStaticInvokerName();
 }
 
 CXXCtorInitializer::CXXCtorInitializer(ASTContext &Context,
@@ -2405,16 +2494,15 @@ CXXCtorInitializer::CXXCtorInitializer(ASTContext &Context,
                                        SourceLocation L, Expr *Init,
                                        SourceLocation R,
                                        SourceLocation EllipsisLoc)
-    : Initializee(TInfo), MemberOrEllipsisLocation(EllipsisLoc), Init(Init),
+    : Initializee(TInfo), Init(Init), MemberOrEllipsisLocation(EllipsisLoc),
       LParenLoc(L), RParenLoc(R), IsDelegating(false), IsVirtual(IsVirtual),
       IsWritten(false), SourceOrder(0) {}
 
-CXXCtorInitializer::CXXCtorInitializer(ASTContext &Context,
-                                       FieldDecl *Member,
+CXXCtorInitializer::CXXCtorInitializer(ASTContext &Context, FieldDecl *Member,
                                        SourceLocation MemberLoc,
                                        SourceLocation L, Expr *Init,
                                        SourceLocation R)
-    : Initializee(Member), MemberOrEllipsisLocation(MemberLoc), Init(Init),
+    : Initializee(Member), Init(Init), MemberOrEllipsisLocation(MemberLoc),
       LParenLoc(L), RParenLoc(R), IsDelegating(false), IsVirtual(false),
       IsWritten(false), SourceOrder(0) {}
 
@@ -2423,7 +2511,7 @@ CXXCtorInitializer::CXXCtorInitializer(ASTContext &Context,
                                        SourceLocation MemberLoc,
                                        SourceLocation L, Expr *Init,
                                        SourceLocation R)
-    : Initializee(Member), MemberOrEllipsisLocation(MemberLoc), Init(Init),
+    : Initializee(Member), Init(Init), MemberOrEllipsisLocation(MemberLoc),
       LParenLoc(L), RParenLoc(R), IsDelegating(false), IsVirtual(false),
       IsWritten(false), SourceOrder(0) {}
 
@@ -2500,19 +2588,19 @@ void CXXConstructorDecl::anchor() {}
 CXXConstructorDecl *CXXConstructorDecl::CreateDeserialized(ASTContext &C,
                                                            unsigned ID,
                                                            uint64_t AllocKind) {
-  bool hasTraillingExplicit = static_cast<bool>(AllocKind & TAKHasTailExplicit);
+  bool hasTrailingExplicit = static_cast<bool>(AllocKind & TAKHasTailExplicit);
   bool isInheritingConstructor =
       static_cast<bool>(AllocKind & TAKInheritsConstructor);
   unsigned Extra =
       additionalSizeToAlloc<InheritedConstructor, ExplicitSpecifier>(
-          isInheritingConstructor, hasTraillingExplicit);
-  auto *Result = new (C, ID, Extra)
-      CXXConstructorDecl(C, nullptr, SourceLocation(), DeclarationNameInfo(),
-                         QualType(), nullptr, ExplicitSpecifier(), false, false,
-                         CSK_unspecified, InheritedConstructor(), nullptr);
+          isInheritingConstructor, hasTrailingExplicit);
+  auto *Result = new (C, ID, Extra) CXXConstructorDecl(
+      C, nullptr, SourceLocation(), DeclarationNameInfo(), QualType(), nullptr,
+      ExplicitSpecifier(), false, false, ConstexprSpecKind::Unspecified,
+      InheritedConstructor(), nullptr);
   Result->setInheritingConstructor(isInheritingConstructor);
   Result->CXXConstructorDeclBits.HasTrailingExplicitSpecifier =
-      hasTraillingExplicit;
+      hasTrailingExplicit;
   Result->setExplicitSpecifier(ExplicitSpecifier());
   return Result;
 }
@@ -2549,11 +2637,11 @@ CXXConstructorDecl *CXXConstructorDecl::getTargetConstructor() const {
 }
 
 bool CXXConstructorDecl::isDefaultConstructor() const {
-  // C++ [class.ctor]p5:
-  //   A default constructor for a class X is a constructor of class
-  //   X that can be called without an argument.
-  return (getNumParams() == 0) ||
-         (getNumParams() > 0 && getParamDecl(0)->hasDefaultArg());
+  // C++ [class.default.ctor]p1:
+  //   A default constructor for a class X is a constructor of class X for
+  //   which each parameter that is not a function parameter pack has a default
+  //   argument (including the case of a constructor with no parameters)
+  return getMinRequiredArguments() == 0;
 }
 
 bool
@@ -2564,7 +2652,7 @@ CXXConstructorDecl::isCopyConstructor(unsigned &TypeQuals) const {
 
 bool CXXConstructorDecl::isMoveConstructor(unsigned &TypeQuals) const {
   return isCopyOrMoveConstructor(TypeQuals) &&
-    getParamDecl(0)->getType()->isRValueReferenceType();
+         getParamDecl(0)->getType()->isRValueReferenceType();
 }
 
 /// Determine whether this is a copy or move constructor.
@@ -2579,10 +2667,8 @@ bool CXXConstructorDecl::isCopyOrMoveConstructor(unsigned &TypeQuals) const {
   //   first parameter is of type X&&, const X&&, volatile X&&, or
   //   const volatile X&&, and either there are no other parameters or else
   //   all other parameters have default arguments.
-  if ((getNumParams() < 1) ||
-      (getNumParams() > 1 && !getParamDecl(1)->hasDefaultArg()) ||
-      (getPrimaryTemplate() != nullptr) ||
-      (getDescribedFunctionTemplate() != nullptr))
+  if (!hasOneParamOrDefaultArgs() || getPrimaryTemplate() != nullptr ||
+      getDescribedFunctionTemplate() != nullptr)
     return false;
 
   const ParmVarDecl *Param = getParamDecl(0);
@@ -2619,18 +2705,16 @@ bool CXXConstructorDecl::isConvertingConstructor(bool AllowExplicit) const {
   if (isExplicit() && !AllowExplicit)
     return false;
 
-  return (getNumParams() == 0 &&
-          getType()->castAs<FunctionProtoType>()->isVariadic()) ||
-         (getNumParams() == 1) ||
-         (getNumParams() > 1 &&
-          (getParamDecl(1)->hasDefaultArg() ||
-           getParamDecl(1)->isParameterPack()));
+  // FIXME: This has nothing to do with the definition of converting
+  // constructor, but is convenient for how we use this function in overload
+  // resolution.
+  return getNumParams() == 0
+             ? getType()->castAs<FunctionProtoType>()->isVariadic()
+             : getMinRequiredArguments() <= 1;
 }
 
 bool CXXConstructorDecl::isSpecializationCopyingObject() const {
-  if ((getNumParams() < 1) ||
-      (getNumParams() > 1 && !getParamDecl(1)->hasDefaultArg()) ||
-      (getDescribedFunctionTemplate() != nullptr))
+  if (!hasOneParamOrDefaultArgs() || getDescribedFunctionTemplate() != nullptr)
     return false;
 
   const ParmVarDecl *Param = getParamDecl(0);
@@ -2651,10 +2735,9 @@ void CXXDestructorDecl::anchor() {}
 
 CXXDestructorDecl *
 CXXDestructorDecl::CreateDeserialized(ASTContext &C, unsigned ID) {
-  return new (C, ID)
-      CXXDestructorDecl(C, nullptr, SourceLocation(), DeclarationNameInfo(),
-                        QualType(), nullptr, false, false, CSK_unspecified,
-                        nullptr);
+  return new (C, ID) CXXDestructorDecl(
+      C, nullptr, SourceLocation(), DeclarationNameInfo(), QualType(), nullptr,
+      false, false, ConstexprSpecKind::Unspecified, nullptr);
 }
 
 CXXDestructorDecl *CXXDestructorDecl::Create(
@@ -2687,7 +2770,8 @@ CXXConversionDecl *
 CXXConversionDecl::CreateDeserialized(ASTContext &C, unsigned ID) {
   return new (C, ID) CXXConversionDecl(
       C, nullptr, SourceLocation(), DeclarationNameInfo(), QualType(), nullptr,
-      false, ExplicitSpecifier(), CSK_unspecified, SourceLocation(), nullptr);
+      false, ExplicitSpecifier(), ConstexprSpecKind::Unspecified,
+      SourceLocation(), nullptr);
 }
 
 CXXConversionDecl *CXXConversionDecl::Create(
@@ -2885,10 +2969,10 @@ APValue *LifetimeExtendedTemporaryDecl::getOrCreateValue(bool MayCreate) const {
 void UsingShadowDecl::anchor() {}
 
 UsingShadowDecl::UsingShadowDecl(Kind K, ASTContext &C, DeclContext *DC,
-                                 SourceLocation Loc, UsingDecl *Using,
-                                 NamedDecl *Target)
-    : NamedDecl(K, DC, Loc, Using ? Using->getDeclName() : DeclarationName()),
-      redeclarable_base(C), UsingOrNextShadow(cast<NamedDecl>(Using)) {
+                                 SourceLocation Loc, DeclarationName Name,
+                                 BaseUsingDecl *Introducer, NamedDecl *Target)
+    : NamedDecl(K, DC, Loc, Name), redeclarable_base(C),
+      UsingOrNextShadow(Introducer) {
   if (Target)
     setTargetDecl(Target);
   setImplicit();
@@ -2903,12 +2987,12 @@ UsingShadowDecl::CreateDeserialized(ASTContext &C, unsigned ID) {
   return new (C, ID) UsingShadowDecl(UsingShadow, C, EmptyShell());
 }
 
-UsingDecl *UsingShadowDecl::getUsingDecl() const {
+BaseUsingDecl *UsingShadowDecl::getIntroducer() const {
   const UsingShadowDecl *Shadow = this;
   while (const auto *NextShadow =
              dyn_cast<UsingShadowDecl>(Shadow->UsingOrNextShadow))
     Shadow = NextShadow;
-  return cast<UsingDecl>(Shadow->UsingOrNextShadow);
+  return cast<BaseUsingDecl>(Shadow->UsingOrNextShadow);
 }
 
 void ConstructorUsingShadowDecl::anchor() {}
@@ -2927,25 +3011,25 @@ ConstructorUsingShadowDecl::CreateDeserialized(ASTContext &C, unsigned ID) {
 }
 
 CXXRecordDecl *ConstructorUsingShadowDecl::getNominatedBaseClass() const {
-  return getUsingDecl()->getQualifier()->getAsRecordDecl();
+  return getIntroducer()->getQualifier()->getAsRecordDecl();
 }
 
-void UsingDecl::anchor() {}
+void BaseUsingDecl::anchor() {}
 
-void UsingDecl::addShadowDecl(UsingShadowDecl *S) {
+void BaseUsingDecl::addShadowDecl(UsingShadowDecl *S) {
   assert(std::find(shadow_begin(), shadow_end(), S) == shadow_end() &&
          "declaration already in set");
-  assert(S->getUsingDecl() == this);
+  assert(S->getIntroducer() == this);
 
   if (FirstUsingShadow.getPointer())
     S->UsingOrNextShadow = FirstUsingShadow.getPointer();
   FirstUsingShadow.setPointer(S);
 }
 
-void UsingDecl::removeShadowDecl(UsingShadowDecl *S) {
+void BaseUsingDecl::removeShadowDecl(UsingShadowDecl *S) {
   assert(std::find(shadow_begin(), shadow_end(), S) != shadow_end() &&
          "declaration not in set");
-  assert(S->getUsingDecl() == this);
+  assert(S->getIntroducer() == this);
 
   // Remove S from the shadow decl chain. This is O(n) but hopefully rare.
 
@@ -2962,6 +3046,8 @@ void UsingDecl::removeShadowDecl(UsingShadowDecl *S) {
   Prev->UsingOrNextShadow = S->UsingOrNextShadow;
   S->UsingOrNextShadow = this;
 }
+
+void UsingDecl::anchor() {}
 
 UsingDecl *UsingDecl::Create(ASTContext &C, DeclContext *DC, SourceLocation UL,
                              NestedNameSpecifierLoc QualifierLoc,
@@ -2980,6 +3066,23 @@ SourceRange UsingDecl::getSourceRange() const {
   SourceLocation Begin = isAccessDeclaration()
     ? getQualifierLoc().getBeginLoc() : UsingLocation;
   return SourceRange(Begin, getNameInfo().getEndLoc());
+}
+
+void UsingEnumDecl::anchor() {}
+
+UsingEnumDecl *UsingEnumDecl::Create(ASTContext &C, DeclContext *DC,
+                                     SourceLocation UL, SourceLocation EL,
+                                     SourceLocation NL, EnumDecl *Enum) {
+  return new (C, DC) UsingEnumDecl(DC, Enum->getDeclName(), UL, EL, NL, Enum);
+}
+
+UsingEnumDecl *UsingEnumDecl::CreateDeserialized(ASTContext &C, unsigned ID) {
+  return new (C, ID) UsingEnumDecl(nullptr, DeclarationName(), SourceLocation(),
+                                   SourceLocation(), SourceLocation(), nullptr);
+}
+
+SourceRange UsingEnumDecl::getSourceRange() const {
+  return SourceRange(EnumLocation, getLocation());
 }
 
 void UsingPackDecl::anchor() {}
@@ -3052,6 +3155,25 @@ UnresolvedUsingTypenameDecl::CreateDeserialized(ASTContext &C, unsigned ID) {
       SourceLocation(), nullptr, SourceLocation());
 }
 
+UnresolvedUsingIfExistsDecl *
+UnresolvedUsingIfExistsDecl::Create(ASTContext &Ctx, DeclContext *DC,
+                                    SourceLocation Loc, DeclarationName Name) {
+  return new (Ctx, DC) UnresolvedUsingIfExistsDecl(DC, Loc, Name);
+}
+
+UnresolvedUsingIfExistsDecl *
+UnresolvedUsingIfExistsDecl::CreateDeserialized(ASTContext &Ctx, unsigned ID) {
+  return new (Ctx, ID)
+      UnresolvedUsingIfExistsDecl(nullptr, SourceLocation(), DeclarationName());
+}
+
+UnresolvedUsingIfExistsDecl::UnresolvedUsingIfExistsDecl(DeclContext *DC,
+                                                         SourceLocation Loc,
+                                                         DeclarationName Name)
+    : NamedDecl(Decl::UnresolvedUsingIfExists, DC, Loc, Name) {}
+
+void UnresolvedUsingIfExistsDecl::anchor() {}
+
 void StaticAssertDecl::anchor() {}
 
 StaticAssertDecl *StaticAssertDecl::Create(ASTContext &C, DeclContext *DC,
@@ -3079,12 +3201,6 @@ BindingDecl *BindingDecl::Create(ASTContext &C, DeclContext *DC,
 
 BindingDecl *BindingDecl::CreateDeserialized(ASTContext &C, unsigned ID) {
   return new (C, ID) BindingDecl(nullptr, SourceLocation(), nullptr);
-}
-
-ValueDecl *BindingDecl::getDecomposedDecl() const {
-  ExternalASTSource *Source =
-      Decomp.isOffset() ? getASTContext().getExternalSource() : nullptr;
-  return cast_or_null<ValueDecl>(Decomp.get(Source));
 }
 
 VarDecl *BindingDecl::getHoldingVar() const {
@@ -3268,12 +3384,7 @@ static const char *getAccessName(AccessSpecifier AS) {
   llvm_unreachable("Invalid access specifier!");
 }
 
-const DiagnosticBuilder &clang::operator<<(const DiagnosticBuilder &DB,
-                                           AccessSpecifier AS) {
-  return DB << getAccessName(AS);
-}
-
-const PartialDiagnostic &clang::operator<<(const PartialDiagnostic &DB,
-                                           AccessSpecifier AS) {
+const StreamingDiagnostic &clang::operator<<(const StreamingDiagnostic &DB,
+                                             AccessSpecifier AS) {
   return DB << getAccessName(AS);
 }

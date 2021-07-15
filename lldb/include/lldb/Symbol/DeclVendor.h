@@ -28,7 +28,7 @@ public:
   // Constructors and Destructors
   DeclVendor(DeclVendorKind kind) : m_kind(kind) {}
 
-  virtual ~DeclVendor() {}
+  virtual ~DeclVendor() = default;
 
   DeclVendorKind GetKind() const { return m_kind; }
 
@@ -67,7 +67,8 @@ public:
 
 private:
   // For DeclVendor only
-  DISALLOW_COPY_AND_ASSIGN(DeclVendor);
+  DeclVendor(const DeclVendor &) = delete;
+  const DeclVendor &operator=(const DeclVendor &) = delete;
 
   const DeclVendorKind m_kind;
 };

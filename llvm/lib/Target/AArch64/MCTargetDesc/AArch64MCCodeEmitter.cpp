@@ -569,23 +569,24 @@ unsigned AArch64MCCodeEmitter::fixMOVZ(const MCInst &MI, unsigned EncodedValue,
   if (UImm16MO.isImm())
     return EncodedValue;
 
-  const AArch64MCExpr *A64E = cast<AArch64MCExpr>(UImm16MO.getExpr());
-  switch (A64E->getKind()) {
-  case AArch64MCExpr::VK_DTPREL_G2:
-  case AArch64MCExpr::VK_DTPREL_G1:
-  case AArch64MCExpr::VK_DTPREL_G0:
-  case AArch64MCExpr::VK_GOTTPREL_G1:
-  case AArch64MCExpr::VK_TPREL_G2:
-  case AArch64MCExpr::VK_TPREL_G1:
-  case AArch64MCExpr::VK_TPREL_G0:
-    return EncodedValue & ~(1u << 30);
-  default:
-    // Nothing to do for an unsigned fixup.
-    return EncodedValue;
+  const MCExpr *E = UImm16MO.getExpr();
+  if (const AArch64MCExpr *A64E = dyn_cast<AArch64MCExpr>(E)) {
+    switch (A64E->getKind()) {
+    case AArch64MCExpr::VK_DTPREL_G2:
+    case AArch64MCExpr::VK_DTPREL_G1:
+    case AArch64MCExpr::VK_DTPREL_G0:
+    case AArch64MCExpr::VK_GOTTPREL_G1:
+    case AArch64MCExpr::VK_TPREL_G2:
+    case AArch64MCExpr::VK_TPREL_G1:
+    case AArch64MCExpr::VK_TPREL_G0:
+      return EncodedValue & ~(1u << 30);
+    default:
+      // Nothing to do for an unsigned fixup.
+      return EncodedValue;
+    }
   }
 
-
-  return EncodedValue & ~(1u << 30);
+  return EncodedValue;
 }
 
 void AArch64MCCodeEmitter::encodeInstruction(const MCInst &MI, raw_ostream &OS,
@@ -598,8 +599,12 @@ void AArch64MCCodeEmitter::encodeInstruction(const MCInst &MI, raw_ostream &OS,
     // This is a directive which applies an R_AARCH64_TLSDESC_CALL to the
     // following (BLR) instruction. It doesn't emit any code itself so it
     // doesn't go through the normal TableGenerated channels.
-    MCFixupKind Fixup = MCFixupKind(AArch64::fixup_aarch64_tlsdesc_call);
-    Fixups.push_back(MCFixup::create(0, MI.getOperand(0).getExpr(), Fixup));
+    auto Reloc = STI.getTargetTriple().getEnvironment() == Triple::GNUILP32
+                     ? ELF::R_AARCH64_P32_TLSDESC_CALL
+                     : ELF::R_AARCH64_TLSDESC_CALL;
+    Fixups.push_back(
+        MCFixup::create(0, MI.getOperand(0).getExpr(),
+                        MCFixupKind(FirstLiteralRelocationKind + Reloc)));
     return;
   }
 

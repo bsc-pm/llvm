@@ -7,28 +7,55 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/MC/MCAsmInfoXCOFF.h"
+#include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/CommandLine.h"
 
 using namespace llvm;
+
+namespace llvm {
+extern cl::opt<cl::boolOrDefault> UseLEB128Directives;
+}
 
 void MCAsmInfoXCOFF::anchor() {}
 
 MCAsmInfoXCOFF::MCAsmInfoXCOFF() {
   IsLittleEndian = false;
+  HasVisibilityOnlyWithLinkage = true;
+  HasBasenameOnlyForFileDirective = false;
+
+  // For XCOFF, string constant consists of any number of characters enclosed in
+  // "" (double quotation marks).
+  HasPairedDoubleQuoteStringConstants = true;
+
+  PrivateGlobalPrefix = "L..";
+  PrivateLabelPrefix = "L..";
   SupportsQuotedNames = false;
   UseDotAlignForAlignment = true;
+  UsesDwarfFileAndLocDirectives = false;
+  DwarfSectionSizeRequired = false;
+  if (UseLEB128Directives == cl::BOU_UNSET)
+    HasLEB128Directives = false;
   ZeroDirective = "\t.space\t";
   ZeroDirectiveSupportsNonZeroValue = false;
   AsciiDirective = nullptr; // not supported
   AscizDirective = nullptr; // not supported
-  Data64bitsDirective = "\t.llong\t";
+  ByteListDirective = "\t.byte\t";
+  PlainStringDirective = "\t.string\t";
+  CharacterLiteralSyntax = ACLS_SingleQuotePrefix;
+
+  // Use .vbyte for data definition to avoid directives that apply an implicit
+  // alignment.
+  Data16bitsDirective = "\t.vbyte\t2, ";
+  Data32bitsDirective = "\t.vbyte\t4, ";
+
   COMMDirectiveAlignmentIsInBytes = false;
   LCOMMDirectiveAlignmentType = LCOMM::Log2Alignment;
   HasDotTypeDotSizeDirective = false;
-  HasDotExternDirective = true;
-  HasDotLGloblDirective = true;
-  SymbolsHaveSMC = true;
   UseIntegratedAssembler = false;
+  ParseInlineAsmUsingAsmParser = true;
   NeedsFunctionDescriptors = true;
+
+  ExceptionsType = ExceptionHandling::AIX;
 }
 
 bool MCAsmInfoXCOFF::isAcceptableChar(char C) const {
@@ -37,5 +64,8 @@ bool MCAsmInfoXCOFF::isAcceptableChar(char C) const {
   if (C == '[' || C == ']')
     return true;
 
-  return MCAsmInfo::isAcceptableChar(C);
+  // For AIX assembler, symbols may consist of numeric digits,
+  // underscores, periods, uppercase or lowercase letters, or
+  // any combination of these.
+  return isAlnum(C) || C == '_' || C == '.';
 }

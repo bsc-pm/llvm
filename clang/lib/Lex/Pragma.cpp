@@ -412,9 +412,13 @@ void Preprocessor::HandlePragmaOnce(Token &OnceTok) {
   HeaderInfo.MarkFileIncludeOnce(getCurrentFileLexer()->getFileEntry());
 }
 
-void Preprocessor::HandlePragmaMark() {
+void Preprocessor::HandlePragmaMark(Token &MarkTok) {
   assert(CurPPLexer && "No current lexer?");
-  CurLexer->ReadToEndOfLine();
+
+  SmallString<64> Buffer;
+  CurLexer->ReadToEndOfLine(&Buffer);
+  if (Callbacks)
+    Callbacks->PragmaMark(MarkTok.getLocation(), Buffer);
 }
 
 /// HandlePragmaPoison - Handle \#pragma GCC poison.  PoisonTok is the 'poison'.
@@ -992,7 +996,7 @@ struct PragmaMarkHandler : public PragmaHandler {
 
   void HandlePragma(Preprocessor &PP, PragmaIntroducer Introducer,
                     Token &MarkTok) override {
-    PP.HandlePragmaMark();
+    PP.HandlePragmaMark(MarkTok);
   }
 };
 
@@ -1122,6 +1126,57 @@ struct PragmaDebugHandler : public PragmaHandler {
         DebugOverflowStack();
     } else if (II->isStr("captured")) {
       HandleCaptured(PP);
+    } else if (II->isStr("modules")) {
+      struct ModuleVisitor {
+        Preprocessor &PP;
+        void visit(Module *M, bool VisibleOnly) {
+          SourceLocation ImportLoc = PP.getModuleImportLoc(M);
+          if (!VisibleOnly || ImportLoc.isValid()) {
+            llvm::errs() << M->getFullModuleName() << " ";
+            if (ImportLoc.isValid()) {
+              llvm::errs() << M << " visible ";
+              ImportLoc.print(llvm::errs(), PP.getSourceManager());
+            }
+            llvm::errs() << "\n";
+          }
+          for (Module *Sub : M->submodules()) {
+            if (!VisibleOnly || ImportLoc.isInvalid() || Sub->IsExplicit)
+              visit(Sub, VisibleOnly);
+          }
+        }
+        void visitAll(bool VisibleOnly) {
+          for (auto &NameAndMod :
+               PP.getHeaderSearchInfo().getModuleMap().modules())
+            visit(NameAndMod.second, VisibleOnly);
+        }
+      } Visitor{PP};
+
+      Token Kind;
+      PP.LexUnexpandedToken(Kind);
+      auto *DumpII = Kind.getIdentifierInfo();
+      if (!DumpII) {
+        PP.Diag(Kind, diag::warn_pragma_debug_missing_argument)
+            << II->getName();
+      } else if (DumpII->isStr("all")) {
+        Visitor.visitAll(false);
+      } else if (DumpII->isStr("visible")) {
+        Visitor.visitAll(true);
+      } else if (DumpII->isStr("building")) {
+        for (auto &Building : PP.getBuildingSubmodules()) {
+          llvm::errs() << "in " << Building.M->getFullModuleName();
+          if (Building.ImportLoc.isValid()) {
+            llvm::errs() << " imported ";
+            if (Building.IsPragma)
+              llvm::errs() << "via pragma ";
+            llvm::errs() << "at ";
+            Building.ImportLoc.print(llvm::errs(), PP.getSourceManager());
+            llvm::errs() << "\n";
+          }
+        }
+      } else {
+        PP.Diag(Tok, diag::warn_pragma_debug_unexpected_command)
+          << DumpII->getName();
+      }
     } else {
       PP.Diag(Tok, diag::warn_pragma_debug_unexpected_command)
         << II->getName();
@@ -1356,7 +1411,7 @@ struct PragmaWarningHandler : public PragmaHandler {
         while (Tok.is(tok::numeric_constant)) {
           uint64_t Value;
           if (!PP.parseSimpleIntegerLiteral(Tok, Value) || Value == 0 ||
-              Value > std::numeric_limits<int>::max()) {
+              Value > INT_MAX) {
             PP.Diag(Tok, diag::warn_pragma_warning_expected_number);
             return;
           }
@@ -1904,13 +1959,13 @@ void Preprocessor::RegisterBuiltinPragmas() {
     AddPragmaHandler(new PragmaExecCharsetHandler());
     AddPragmaHandler(new PragmaIncludeAliasHandler());
     AddPragmaHandler(new PragmaHdrstopHandler());
+    AddPragmaHandler(new PragmaSystemHeaderHandler());
   }
 
   // Pragmas added by plugins
-  for (PragmaHandlerRegistry::iterator it = PragmaHandlerRegistry::begin(),
-                                       ie = PragmaHandlerRegistry::end();
-       it != ie; ++it) {
-    AddPragmaHandler(it->instantiate().release());
+  for (const PragmaHandlerRegistry::entry &handler :
+       PragmaHandlerRegistry::entries()) {
+    AddPragmaHandler(handler.instantiate().release());
   }
 }
 

@@ -89,6 +89,7 @@ unsigned clang::getOmpSsSimpleClauseType(OmpSsClauseKind Kind,
   case OSSC_priority:
   case OSSC_label:
   case OSSC_wait:
+  case OSSC_onready:
   case OSSC_private:
   case OSSC_firstprivate:
   case OSSC_shared:
@@ -104,6 +105,9 @@ unsigned clang::getOmpSsSimpleClauseType(OmpSsClauseKind Kind,
   case OSSC_weakconcurrent:
   case OSSC_weakcommutative:
   case OSSC_weakreduction:
+  case OSSC_chunksize:
+  case OSSC_grainsize:
+  case OSSC_collapse:
     break;
   }
   llvm_unreachable("Invalid OmpSs simple clause kind");
@@ -139,6 +143,7 @@ const char *clang::getOmpSsSimpleClauseTypeName(OmpSsClauseKind Kind,
   case OSSC_priority:
   case OSSC_label:
   case OSSC_wait:
+  case OSSC_onready:
   case OSSC_private:
   case OSSC_firstprivate:
   case OSSC_shared:
@@ -154,6 +159,9 @@ const char *clang::getOmpSsSimpleClauseTypeName(OmpSsClauseKind Kind,
   case OSSC_weakconcurrent:
   case OSSC_weakcommutative:
   case OSSC_weakreduction:
+  case OSSC_chunksize:
+  case OSSC_grainsize:
+  case OSSC_collapse:
     break;
   }
   llvm_unreachable("Invalid OmpSs simple clause kind");
@@ -167,6 +175,36 @@ bool clang::isAllowedClauseForDirective(OmpSsDirectiveKind DKind,
   case OSSD_task:
     switch (CKind) {
 #define OMPSS_TASK_CLAUSE(Name)                                               \
+  case OSSC_##Name:                                                            \
+    return true;
+#include "clang/Basic/OmpSsKinds.def"
+    default:
+      break;
+    }
+    break;
+  case OSSD_task_for:
+    switch (CKind) {
+#define OMPSS_TASK_FOR_CLAUSE(Name)                                           \
+  case OSSC_##Name:                                                            \
+    return true;
+#include "clang/Basic/OmpSsKinds.def"
+    default:
+      break;
+    }
+    break;
+  case OSSD_taskloop:
+    switch (CKind) {
+#define OMPSS_TASKLOOP_CLAUSE(Name)                                           \
+  case OSSC_##Name:                                                            \
+    return true;
+#include "clang/Basic/OmpSsKinds.def"
+    default:
+      break;
+    }
+    break;
+  case OSSD_taskloop_for:
+    switch (CKind) {
+#define OMPSS_TASKLOOP_FOR_CLAUSE(Name)                                       \
   case OSSC_##Name:                                                            \
     return true;
 #include "clang/Basic/OmpSsKinds.def"
@@ -194,7 +232,18 @@ bool clang::isAllowedClauseForDirective(OmpSsDirectiveKind DKind,
       break;
     }
     break;
+  case OSSD_release:
+    switch (CKind) {
+#define OMPSS_RELEASE_CLAUSE(Name)                                           \
+  case OSSC_##Name:                                                            \
+    return true;
+#include "clang/Basic/OmpSsKinds.def"
+    default:
+      break;
+    }
+    break;
   case OSSD_declare_reduction:
+  case OSSD_assert:
   case OSSD_unknown:
     break;
   }
@@ -206,6 +255,17 @@ bool clang::isOmpSsPrivate(OmpSsClauseKind Kind) {
 }
 
 bool clang::isOmpSsTaskingDirective(OmpSsDirectiveKind Kind) {
-  return Kind == OSSD_task;
+  return Kind == OSSD_task
+    || Kind == OSSD_declare_task
+    || isOmpSsLoopDirective(Kind);
+}
+
+bool clang::isOmpSsLoopDirective(OmpSsDirectiveKind Kind) {
+  return Kind == OSSD_taskloop || Kind == OSSD_taskloop_for ||
+         Kind == OSSD_task_for;
+}
+
+bool clang::isOmpSsTaskLoopDirective(OmpSsDirectiveKind Kind) {
+  return Kind == OSSD_taskloop || Kind == OSSD_taskloop_for;
 }
 

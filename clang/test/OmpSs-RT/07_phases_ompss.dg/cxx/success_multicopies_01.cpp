@@ -26,7 +26,6 @@
 
 // RUN: %oss-cxx-compile-and-run
 // RUN: %oss-cxx-O2-compile-and-run
-//XFAIL: *
 
 /*
 <testinfo>

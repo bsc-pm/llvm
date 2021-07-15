@@ -294,9 +294,9 @@ namespace clang {
     bool OldVal;
 
   public:
-    ParsingOpenMPDirectiveRAII(Parser &P)
+    ParsingOpenMPDirectiveRAII(Parser &P, bool Value = true)
         : P(P), OldVal(P.OpenMPDirectiveParsing) {
-      P.OpenMPDirectiveParsing = true;
+      P.OpenMPDirectiveParsing = Value;
     }
 
     /// This can be used to restore the state early, before the dtor
@@ -304,6 +304,25 @@ namespace clang {
     void restore() { P.OpenMPDirectiveParsing = OldVal; }
 
     ~ParsingOpenMPDirectiveRAII() { restore(); }
+  };
+
+  /// Activates OmpSs parsing mode to preseve OmpSs specific annotation
+  /// tokens.
+  class ParsingOmpSsDirectiveRAII {
+    Parser &P;
+    bool OldVal;
+
+  public:
+    ParsingOmpSsDirectiveRAII(Parser &P)
+        : P(P), OldVal(P.OmpSsDirectiveParsing) {
+      P.OmpSsDirectiveParsing = true;
+    }
+
+    /// This can be used to restore the state early, before the dtor
+    /// is run.
+    void restore() { P.OmpSsDirectiveParsing = OldVal; }
+
+    ~ParsingOmpSsDirectiveRAII() { restore(); }
   };
 
   /// RAII object that makes '>' behave either as an operator

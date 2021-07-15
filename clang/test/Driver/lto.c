@@ -49,7 +49,7 @@
 // NO-LLVMGOLD-NOT: "-plugin" "{{.*}}{{[/\\]}}LLVMgold.{{dll|dylib|so}}"
 
 // RUN: %clang -target x86_64-unknown-linux-gnu --sysroot %S/Inputs/basic_cross_linux_tree %s \
-// RUN:   -fuse-ld=lld -flto -O -### 2>&1 | FileCheck --check-prefix=O2 %s
+// RUN:   -fuse-ld=lld -flto -O -### 2>&1 | FileCheck --check-prefix=O1 %s
 // RUN: %clang -target x86_64-unknown-linux-gnu --sysroot %S/Inputs/basic_cross_linux_tree %s \
 // RUN:   -fuse-ld=lld -flto -O1 -### 2>&1 | FileCheck --check-prefix=O1 %s
 // RUN: %clang -target x86_64-unknown-linux-gnu --sysroot %S/Inputs/basic_cross_linux_tree %s \
@@ -77,3 +77,11 @@
 //
 // CHECK-TUNING-LLDB:   "-plugin-opt=-debugger-tune=lldb"
 // CHECK-NO-TUNING-NOT: "-plugin-opt=-debugger-tune
+//
+// -flto=auto and -flto=jobserver pass along -flto=full
+// RUN: %clang -target x86_64-unknown-linux -### %s -flto=auto 2>&1 | FileCheck --check-prefix=FLTO-AUTO %s
+// RUN: %clang -target x86_64-unknown-linux -### %s -flto=jobserver 2>&1 | FileCheck --check-prefix=FLTO-JOBSERVER %s
+//
+// FLTO-AUTO: -flto=full
+// FLTO-JOBSERVER: -flto=full
+//

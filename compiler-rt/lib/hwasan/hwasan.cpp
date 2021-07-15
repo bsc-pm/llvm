@@ -12,8 +12,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "hwasan.h"
+
 #include "hwasan_checks.h"
 #include "hwasan_dynamic_shadow.h"
+#include "hwasan_globals.h"
 #include "hwasan_poisoning.h"
 #include "hwasan_report.h"
 #include "hwasan_thread.h"
@@ -110,7 +112,7 @@ static void InitializeFlags() {
   if (__hwasan_default_options)
     parser.ParseString(__hwasan_default_options());
 #if HWASAN_CONTAINS_UBSAN
-  const char *ubsan_default_options = __ubsan::MaybeCallUbsanDefaultOptions();
+  const char *ubsan_default_options = __ubsan_default_options();
   ubsan_parser.ParseString(ubsan_default_options);
 #endif
 
@@ -126,15 +128,10 @@ static void InitializeFlags() {
   if (common_flags()->help) parser.PrintFlagDescriptions();
 }
 
-static void HWAsanCheckFailed(const char *file, int line, const char *cond,
-                              u64 v1, u64 v2) {
-  Report("HWAddressSanitizer CHECK failed: %s:%d \"%s\" (0x%zx, 0x%zx)\n", file,
-         line, cond, (uptr)v1, (uptr)v2);
-  PRINT_CURRENT_STACK_CHECK();
-  Die();
+static void CheckUnwind() {
+  GET_FATAL_STACK_TRACE_PC_BP(StackTrace::GetCurrentPc(), GET_CURRENT_FRAME());
+  stack.Print();
 }
-
-static constexpr uptr kMemoryUsageBufferSize = 4096;
 
 static void HwasanFormatMemoryUsage(InternalScopedString &s) {
   HwasanThreadList &thread_list = hwasanThreadList();
@@ -153,6 +150,8 @@ static void HwasanFormatMemoryUsage(InternalScopedString &s) {
 }
 
 #if SANITIZER_ANDROID
+static constexpr uptr kMemoryUsageBufferSize = 4096;
+
 static char *memory_usage_buffer = nullptr;
 
 static void InitMemoryUsage() {
@@ -169,7 +168,7 @@ void UpdateMemoryUsage() {
     return;
   if (!memory_usage_buffer)
     InitMemoryUsage();
-  InternalScopedString s(kMemoryUsageBufferSize);
+  InternalScopedString s;
   HwasanFormatMemoryUsage(s);
   internal_strncpy(memory_usage_buffer, s.data(), kMemoryUsageBufferSize - 1);
   memory_usage_buffer[kMemoryUsageBufferSize - 1] = '\0';
@@ -177,6 +176,65 @@ void UpdateMemoryUsage() {
 #else
 void UpdateMemoryUsage() {}
 #endif
+
+void HwasanAtExit() {
+  if (common_flags()->print_module_map)
+    DumpProcessMap();
+  if (flags()->print_stats && (flags()->atexit || hwasan_report_count > 0))
+    ReportStats();
+  if (hwasan_report_count > 0) {
+    // ReportAtExitStatistics();
+    if (common_flags()->exitcode)
+      internal__exit(common_flags()->exitcode);
+  }
+}
+
+void HandleTagMismatch(AccessInfo ai, uptr pc, uptr frame, void *uc,
+                       uptr *registers_frame) {
+  InternalMmapVector<BufferedStackTrace> stack_buffer(1);
+  BufferedStackTrace *stack = stack_buffer.data();
+  stack->Reset();
+  stack->Unwind(pc, frame, uc, common_flags()->fast_unwind_on_fatal);
+
+  // The second stack frame contains the failure __hwasan_check function, as
+  // we have a stack frame for the registers saved in __hwasan_tag_mismatch that
+  // we wish to ignore. This (currently) only occurs on AArch64, as x64
+  // implementations use SIGTRAP to implement the failure, and thus do not go
+  // through the stack saver.
+  if (registers_frame && stack->trace && stack->size > 0) {
+    stack->trace++;
+    stack->size--;
+  }
+
+  bool fatal = flags()->halt_on_error || !ai.recover;
+  ReportTagMismatch(stack, ai.addr, ai.size, ai.is_store, fatal,
+                    registers_frame);
+}
+
+void HwasanTagMismatch(uptr addr, uptr access_info, uptr *registers_frame,
+                       size_t outsize) {
+  __hwasan::AccessInfo ai;
+  ai.is_store = access_info & 0x10;
+  ai.is_load = !ai.is_store;
+  ai.recover = access_info & 0x20;
+  ai.addr = addr;
+  if ((access_info & 0xf) == 0xf)
+    ai.size = outsize;
+  else
+    ai.size = 1 << (access_info & 0xf);
+
+  HandleTagMismatch(ai, (uptr)__builtin_return_address(0),
+                    (uptr)__builtin_frame_address(0), nullptr, registers_frame);
+  __builtin_unreachable();
+}
+
+Thread *GetCurrentThread() {
+  uptr *ThreadLongPtr = GetCurrentThreadLongPtr();
+  if (UNLIKELY(*ThreadLongPtr == 0))
+    return nullptr;
+  auto *R = (StackAllocationsRingBuffer *)ThreadLongPtr;
+  return hwasanThreadList().GetThreadByBufferAddress((uptr)R->Next());
+}
 
 } // namespace __hwasan
 
@@ -194,93 +252,20 @@ void __sanitizer::BufferedStackTrace::UnwindImpl(
          request_fast);
 }
 
-struct hwasan_global {
-  s32 gv_relptr;
-  u32 info;
-};
-
-static void InitGlobals(const hwasan_global *begin, const hwasan_global *end) {
-  for (auto *desc = begin; desc != end; ++desc) {
-    uptr gv = reinterpret_cast<uptr>(desc) + desc->gv_relptr;
-    uptr size = desc->info & 0xffffff;
-    uptr full_granule_size = RoundDownTo(size, 16);
-    u8 tag = desc->info >> 24;
-    TagMemoryAligned(gv, full_granule_size, tag);
-    if (size % 16)
-      TagMemoryAligned(gv + full_granule_size, 16, size % 16);
-  }
-}
-
-enum { NT_LLVM_HWASAN_GLOBALS = 3 };
-
-struct hwasan_global_note {
-  s32 begin_relptr;
-  s32 end_relptr;
-};
-
-// Check that the given library meets the code model requirements for tagged
-// globals. These properties are not checked at link time so they need to be
-// checked at runtime.
-static void CheckCodeModel(ElfW(Addr) base, const ElfW(Phdr) * phdr,
-                           ElfW(Half) phnum) {
-  ElfW(Addr) min_addr = -1ull, max_addr = 0;
-  for (unsigned i = 0; i != phnum; ++i) {
-    if (phdr[i].p_type != PT_LOAD)
-      continue;
-    ElfW(Addr) lo = base + phdr[i].p_vaddr, hi = lo + phdr[i].p_memsz;
-    if (min_addr > lo)
-      min_addr = lo;
-    if (max_addr < hi)
-      max_addr = hi;
-  }
-
-  if (max_addr - min_addr > 1ull << 32) {
-    Report("FATAL: HWAddressSanitizer: library size exceeds 2^32\n");
-    Die();
-  }
-  if (max_addr > 1ull << 48) {
-    Report("FATAL: HWAddressSanitizer: library loaded above address 2^48\n");
-    Die();
-  }
-}
-
-static void InitGlobalsFromPhdrs(ElfW(Addr) base, const ElfW(Phdr) * phdr,
-                                 ElfW(Half) phnum) {
-  for (unsigned i = 0; i != phnum; ++i) {
-    if (phdr[i].p_type != PT_NOTE)
-      continue;
-    const char *note = reinterpret_cast<const char *>(base + phdr[i].p_vaddr);
-    const char *nend = note + phdr[i].p_memsz;
-    while (note < nend) {
-      auto *nhdr = reinterpret_cast<const ElfW(Nhdr) *>(note);
-      const char *name = note + sizeof(ElfW(Nhdr));
-      const char *desc = name + RoundUpTo(nhdr->n_namesz, 4);
-      if (nhdr->n_type != NT_LLVM_HWASAN_GLOBALS ||
-          internal_strcmp(name, "LLVM") != 0) {
-        note = desc + RoundUpTo(nhdr->n_descsz, 4);
-        continue;
-      }
-
-      // Only libraries with instrumented globals need to be checked against the
-      // code model since they use relocations that aren't checked at link time.
-      CheckCodeModel(base, phdr, phnum);
-
-      auto *global_note = reinterpret_cast<const hwasan_global_note *>(desc);
-      auto *global_begin = reinterpret_cast<const hwasan_global *>(
-          note + global_note->begin_relptr);
-      auto *global_end = reinterpret_cast<const hwasan_global *>(
-          note + global_note->end_relptr);
-      InitGlobals(global_begin, global_end);
-      return;
-    }
-  }
+static bool InitializeSingleGlobal(const hwasan_global &global) {
+  uptr full_granule_size = RoundDownTo(global.size(), 16);
+  TagMemoryAligned(global.addr(), full_granule_size, global.tag());
+  if (global.size() % 16)
+    TagMemoryAligned(global.addr() + full_granule_size, 16, global.size() % 16);
+  return false;
 }
 
 static void InitLoadedGlobals() {
   dl_iterate_phdr(
-      [](dl_phdr_info *info, size_t size, void *data) {
-        InitGlobalsFromPhdrs(info->dlpi_addr, info->dlpi_phdr,
-                             info->dlpi_phnum);
+      [](dl_phdr_info *info, size_t /* size */, void * /* data */) -> int {
+        for (const hwasan_global &global : HwasanGlobalsFor(
+                 info->dlpi_addr, info->dlpi_phdr, info->dlpi_phnum))
+          InitializeSingleGlobal(global);
         return 0;
       },
       nullptr);
@@ -299,7 +284,6 @@ static void InitInstrumentation() {
   }
 
   InitThreads();
-  hwasanThreadList().CreateCurrentThread();
 
   hwasan_instrumentation_inited = 1;
 }
@@ -321,11 +305,13 @@ void __hwasan_init_static() {
   // Fortunately, since this is a statically linked executable we can use the
   // linker-defined symbol __ehdr_start to find the only relevant set of phdrs.
   extern ElfW(Ehdr) __ehdr_start;
-  InitGlobalsFromPhdrs(
-      0,
-      reinterpret_cast<const ElfW(Phdr) *>(
-          reinterpret_cast<const char *>(&__ehdr_start) + __ehdr_start.e_phoff),
-      __ehdr_start.e_phnum);
+  for (const hwasan_global &global : HwasanGlobalsFor(
+           /* base */ 0,
+           reinterpret_cast<const ElfW(Phdr) *>(
+               reinterpret_cast<const char *>(&__ehdr_start) +
+               __ehdr_start.e_phoff),
+           __ehdr_start.e_phnum))
+    InitializeSingleGlobal(global);
 }
 
 void __hwasan_init() {
@@ -340,7 +326,7 @@ void __hwasan_init() {
   InitializeFlags();
 
   // Install tool-specific callbacks in sanitizer_common.
-  SetCheckFailedCallback(HWAsanCheckFailed);
+  SetCheckUnwindCallback(CheckUnwind);
 
   __sanitizer_set_report_path(common_flags()->log_path);
 
@@ -354,8 +340,6 @@ void __hwasan_init() {
   // Needs to be called here because flags()->random_tags might not have been
   // initialized when InitInstrumentation() was called.
   GetCurrentThread()->InitRandomState();
-
-  MadviseShadow();
 
   SetPrintfAndReportCallback(AppendToErrorMessageBuffer);
   // This may call libc -> needs initialized shadow.
@@ -384,7 +368,8 @@ void __hwasan_init() {
 
 void __hwasan_library_loaded(ElfW(Addr) base, const ElfW(Phdr) * phdr,
                              ElfW(Half) phnum) {
-  InitGlobalsFromPhdrs(base, phdr, phnum);
+  for (const hwasan_global &global : HwasanGlobalsFor(base, phdr, phnum))
+    InitializeSingleGlobal(global);
 }
 
 void __hwasan_library_unloaded(ElfW(Addr) base, const ElfW(Phdr) * phdr,
@@ -563,12 +548,12 @@ extern "C" void *__hwasan_extra_spill_area() {
 }
 
 void __hwasan_print_memory_usage() {
-  InternalScopedString s(kMemoryUsageBufferSize);
+  InternalScopedString s;
   HwasanFormatMemoryUsage(s);
   Printf("%s\n", s.data());
 }
 
-static const u8 kFallbackTag = 0xBB;
+static const u8 kFallbackTag = 0xBB & kTagMask;
 
 u8 __hwasan_generate_tag() {
   Thread *t = GetCurrentThread();

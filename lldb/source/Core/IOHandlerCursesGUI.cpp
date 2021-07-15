@@ -10,8 +10,13 @@
 #include "lldb/Host/Config.h"
 
 #if LLDB_ENABLE_CURSES
+#if CURSES_HAVE_NCURSES_CURSES_H
+#include <ncurses/curses.h>
+#include <ncurses/panel.h>
+#else
 #include <curses.h>
 #include <panel.h>
+#endif
 #endif
 
 #if defined(__APPLE__)
@@ -21,6 +26,7 @@
 
 #include "lldb/Core/Debugger.h"
 #include "lldb/Core/StreamFile.h"
+#include "lldb/Core/ValueObjectUpdater.h"
 #include "lldb/Host/File.h"
 #include "lldb/Utility/Predicate.h"
 #include "lldb/Utility/Status.h"
@@ -58,13 +64,14 @@
 #include <memory>
 #include <mutex>
 
-#include <assert.h>
-#include <ctype.h>
-#include <errno.h>
-#include <locale.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
+#include <cassert>
+#include <cctype>
+#include <cerrno>
+#include <clocale>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <functional>
 #include <type_traits>
 
 using namespace lldb;
@@ -78,6 +85,8 @@ using llvm::StringRef;
 
 #define KEY_RETURN 10
 #define KEY_ESCAPE 27
+
+#define KEY_SHIFT_TAB (KEY_MAX + 1)
 
 namespace curses {
 class Menu;
@@ -268,6 +277,32 @@ struct KeyHelp {
   const char *description;
 };
 
+// COLOR_PAIR index names
+enum {
+  // First 16 colors are 8 black background and 8 blue background colors,
+  // needed by OutputColoredStringTruncated().
+  BlackOnBlack = 1,
+  RedOnBlack,
+  GreenOnBlack,
+  YellowOnBlack,
+  BlueOnBlack,
+  MagentaOnBlack,
+  CyanOnBlack,
+  WhiteOnBlack,
+  BlackOnBlue,
+  RedOnBlue,
+  GreenOnBlue,
+  YellowOnBlue,
+  BlueOnBlue,
+  MagentaOnBlue,
+  CyanOnBlue,
+  WhiteOnBlue,
+  // Other colors, as needed.
+  BlackOnWhite,
+  MagentaOnWhite,
+  LastColorPairIndex = MagentaOnWhite
+};
+
 class WindowDelegate {
 public:
   virtual ~WindowDelegate() = default;
@@ -304,17 +339,236 @@ protected:
   int m_first_visible_line;
 };
 
-class Window {
+// A surface is an abstraction for something than can be drawn on. The surface
+// have a width, a height, a cursor position, and a multitude of drawing
+// operations. This type should be sub-classed to get an actually useful ncurses
+// object, such as a Window, SubWindow, Pad, or a SubPad.
+class Surface {
+public:
+  Surface() : m_window(nullptr) {}
+
+  WINDOW *get() { return m_window; }
+
+  operator WINDOW *() { return m_window; }
+
+  // Copy a region of the surface to another surface.
+  void CopyToSurface(Surface &target, Point source_origin, Point target_origin,
+                     Size size) {
+    ::copywin(m_window, target.get(), source_origin.y, source_origin.x,
+              target_origin.y, target_origin.x,
+              target_origin.y + size.height - 1,
+              target_origin.x + size.width - 1, false);
+  }
+
+  int GetCursorX() const { return getcurx(m_window); }
+  int GetCursorY() const { return getcury(m_window); }
+  void MoveCursor(int x, int y) { ::wmove(m_window, y, x); }
+
+  void AttributeOn(attr_t attr) { ::wattron(m_window, attr); }
+  void AttributeOff(attr_t attr) { ::wattroff(m_window, attr); }
+
+  int GetMaxX() const { return getmaxx(m_window); }
+  int GetMaxY() const { return getmaxy(m_window); }
+  int GetWidth() const { return GetMaxX(); }
+  int GetHeight() const { return GetMaxY(); }
+  Size GetSize() const { return Size(GetWidth(), GetHeight()); }
+  // Get a zero origin rectangle width the surface size.
+  Rect GetFrame() const { return Rect(Point(), GetSize()); }
+
+  void Clear() { ::wclear(m_window); }
+  void Erase() { ::werase(m_window); }
+
+  void SetBackground(int color_pair_idx) {
+    ::wbkgd(m_window, COLOR_PAIR(color_pair_idx));
+  }
+
+  void PutChar(int ch) { ::waddch(m_window, ch); }
+  void PutCString(const char *s, int len = -1) { ::waddnstr(m_window, s, len); }
+
+  void PutCStringTruncated(int right_pad, const char *s, int len = -1) {
+    int bytes_left = GetWidth() - GetCursorX();
+    if (bytes_left > right_pad) {
+      bytes_left -= right_pad;
+      ::waddnstr(m_window, s, len < 0 ? bytes_left : std::min(bytes_left, len));
+    }
+  }
+
+  void Printf(const char *format, ...) __attribute__((format(printf, 2, 3))) {
+    va_list args;
+    va_start(args, format);
+    vw_printw(m_window, format, args);
+    va_end(args);
+  }
+
+  void PrintfTruncated(int right_pad, const char *format, ...)
+      __attribute__((format(printf, 3, 4))) {
+    va_list args;
+    va_start(args, format);
+    StreamString strm;
+    strm.PrintfVarArg(format, args);
+    va_end(args);
+    PutCStringTruncated(right_pad, strm.GetData());
+  }
+
+  void VerticalLine(int n, chtype v_char = ACS_VLINE) {
+    ::wvline(m_window, v_char, n);
+  }
+  void HorizontalLine(int n, chtype h_char = ACS_HLINE) {
+    ::whline(m_window, h_char, n);
+  }
+  void Box(chtype v_char = ACS_VLINE, chtype h_char = ACS_HLINE) {
+    ::box(m_window, v_char, h_char);
+  }
+
+  void TitledBox(const char *title, chtype v_char = ACS_VLINE,
+                 chtype h_char = ACS_HLINE) {
+    Box(v_char, h_char);
+    int title_offset = 2;
+    MoveCursor(title_offset, 0);
+    PutChar('[');
+    PutCString(title, GetWidth() - title_offset);
+    PutChar(']');
+  }
+
+  void Box(const Rect &bounds, chtype v_char = ACS_VLINE,
+           chtype h_char = ACS_HLINE) {
+    MoveCursor(bounds.origin.x, bounds.origin.y);
+    VerticalLine(bounds.size.height);
+    HorizontalLine(bounds.size.width);
+    PutChar(ACS_ULCORNER);
+
+    MoveCursor(bounds.origin.x + bounds.size.width - 1, bounds.origin.y);
+    VerticalLine(bounds.size.height);
+    PutChar(ACS_URCORNER);
+
+    MoveCursor(bounds.origin.x, bounds.origin.y + bounds.size.height - 1);
+    HorizontalLine(bounds.size.width);
+    PutChar(ACS_LLCORNER);
+
+    MoveCursor(bounds.origin.x + bounds.size.width - 1,
+               bounds.origin.y + bounds.size.height - 1);
+    PutChar(ACS_LRCORNER);
+  }
+
+  void TitledBox(const Rect &bounds, const char *title,
+                 chtype v_char = ACS_VLINE, chtype h_char = ACS_HLINE) {
+    Box(bounds, v_char, h_char);
+    int title_offset = 2;
+    MoveCursor(bounds.origin.x + title_offset, bounds.origin.y);
+    PutChar('[');
+    PutCString(title, bounds.size.width - title_offset);
+    PutChar(']');
+  }
+
+  // Curses doesn't allow direct output of color escape sequences, but that's
+  // how we get source lines from the Highligher class. Read the line and
+  // convert color escape sequences to curses color attributes. Use
+  // first_skip_count to skip leading visible characters. Returns false if all
+  // visible characters were skipped due to first_skip_count.
+  bool OutputColoredStringTruncated(int right_pad, StringRef string,
+                                    size_t skip_first_count,
+                                    bool use_blue_background) {
+    attr_t saved_attr;
+    short saved_pair;
+    bool result = false;
+    wattr_get(m_window, &saved_attr, &saved_pair, nullptr);
+    if (use_blue_background)
+      ::wattron(m_window, COLOR_PAIR(WhiteOnBlue));
+    while (!string.empty()) {
+      size_t esc_pos = string.find('\x1b');
+      if (esc_pos == StringRef::npos) {
+        string = string.substr(skip_first_count);
+        if (!string.empty()) {
+          PutCStringTruncated(right_pad, string.data(), string.size());
+          result = true;
+        }
+        break;
+      }
+      if (esc_pos > 0) {
+        if (skip_first_count > 0) {
+          int skip = std::min(esc_pos, skip_first_count);
+          string = string.substr(skip);
+          skip_first_count -= skip;
+          esc_pos -= skip;
+        }
+        if (esc_pos > 0) {
+          PutCStringTruncated(right_pad, string.data(), esc_pos);
+          result = true;
+          string = string.drop_front(esc_pos);
+        }
+      }
+      bool consumed = string.consume_front("\x1b");
+      assert(consumed);
+      UNUSED_IF_ASSERT_DISABLED(consumed);
+      // This is written to match our Highlighter classes, which seem to
+      // generate only foreground color escape sequences. If necessary, this
+      // will need to be extended.
+      if (!string.consume_front("[")) {
+        llvm::errs() << "Missing '[' in color escape sequence.\n";
+        continue;
+      }
+      // Only 8 basic foreground colors and reset, our Highlighter doesn't use
+      // anything else.
+      int value;
+      if (!!string.consumeInteger(10, value) || // Returns false on success.
+          !(value == 0 || (value >= 30 && value <= 37))) {
+        llvm::errs() << "No valid color code in color escape sequence.\n";
+        continue;
+      }
+      if (!string.consume_front("m")) {
+        llvm::errs() << "Missing 'm' in color escape sequence.\n";
+        continue;
+      }
+      if (value == 0) { // Reset.
+        wattr_set(m_window, saved_attr, saved_pair, nullptr);
+        if (use_blue_background)
+          ::wattron(m_window, COLOR_PAIR(WhiteOnBlue));
+      } else {
+        // Mapped directly to first 16 color pairs (black/blue background).
+        ::wattron(m_window,
+                  COLOR_PAIR(value - 30 + 1 + (use_blue_background ? 8 : 0)));
+      }
+    }
+    wattr_set(m_window, saved_attr, saved_pair, nullptr);
+    return result;
+  }
+
+protected:
+  WINDOW *m_window;
+};
+
+class Pad : public Surface {
+public:
+  Pad(Size size) { m_window = ::newpad(size.height, size.width); }
+
+  ~Pad() { ::delwin(m_window); }
+};
+
+class SubPad : public Surface {
+public:
+  SubPad(Pad &pad, Rect bounds) {
+    m_window = ::subpad(pad.get(), bounds.size.height, bounds.size.width,
+                        bounds.origin.y, bounds.origin.x);
+  }
+  SubPad(SubPad &subpad, Rect bounds) {
+    m_window = ::subpad(subpad.get(), bounds.size.height, bounds.size.width,
+                        bounds.origin.y, bounds.origin.x);
+  }
+
+  ~SubPad() { ::delwin(m_window); }
+};
+
+class Window : public Surface {
 public:
   Window(const char *name)
-      : m_name(name), m_window(nullptr), m_panel(nullptr), m_parent(nullptr),
-        m_subwindows(), m_delegate_sp(), m_curr_active_window_idx(UINT32_MAX),
+      : m_name(name), m_panel(nullptr), m_parent(nullptr), m_subwindows(),
+        m_delegate_sp(), m_curr_active_window_idx(UINT32_MAX),
         m_prev_active_window_idx(UINT32_MAX), m_delete(false),
         m_needs_update(true), m_can_activate(true), m_is_subwin(false) {}
 
   Window(const char *name, WINDOW *w, bool del = true)
-      : m_name(name), m_window(nullptr), m_panel(nullptr), m_parent(nullptr),
-        m_subwindows(), m_delegate_sp(), m_curr_active_window_idx(UINT32_MAX),
+      : m_name(name), m_panel(nullptr), m_parent(nullptr), m_subwindows(),
+        m_delegate_sp(), m_curr_active_window_idx(UINT32_MAX),
         m_prev_active_window_idx(UINT32_MAX), m_delete(del),
         m_needs_update(true), m_can_activate(true), m_is_subwin(false) {
     if (w)
@@ -322,8 +576,8 @@ public:
   }
 
   Window(const char *name, const Rect &bounds)
-      : m_name(name), m_window(nullptr), m_parent(nullptr), m_subwindows(),
-        m_delegate_sp(), m_curr_active_window_idx(UINT32_MAX),
+      : m_name(name), m_parent(nullptr), m_subwindows(), m_delegate_sp(),
+        m_curr_active_window_idx(UINT32_MAX),
         m_prev_active_window_idx(UINT32_MAX), m_delete(true),
         m_needs_update(true), m_can_activate(true), m_is_subwin(false) {
     Reset(::newwin(bounds.size.height, bounds.size.width, bounds.origin.y,
@@ -354,51 +608,18 @@ public:
       m_delete = del;
     }
   }
-
-  void AttributeOn(attr_t attr) { ::wattron(m_window, attr); }
-  void AttributeOff(attr_t attr) { ::wattroff(m_window, attr); }
-  void Box(chtype v_char = ACS_VLINE, chtype h_char = ACS_HLINE) {
-    ::box(m_window, v_char, h_char);
-  }
-  void Clear() { ::wclear(m_window); }
-  void Erase() { ::werase(m_window); }
-  Rect GetBounds() {
-    return Rect(GetParentOrigin(), GetSize());
-  } // Get the rectangle in our parent window
+  //
+  // Get the rectangle in our parent window
+  Rect GetBounds() const { return Rect(GetParentOrigin(), GetSize()); }
   int GetChar() { return ::wgetch(m_window); }
-  int GetCursorX() { return getcurx(m_window); }
-  int GetCursorY() { return getcury(m_window); }
-  Rect GetFrame() {
-    return Rect(Point(), GetSize());
-  } // Get our rectangle in our own coordinate system
-  Point GetParentOrigin() { return Point(GetParentX(), GetParentY()); }
-  Size GetSize() { return Size(GetWidth(), GetHeight()); }
-  int GetParentX() { return getparx(m_window); }
-  int GetParentY() { return getpary(m_window); }
-  int GetMaxX() { return getmaxx(m_window); }
-  int GetMaxY() { return getmaxy(m_window); }
-  int GetWidth() { return GetMaxX(); }
-  int GetHeight() { return GetMaxY(); }
-  void MoveCursor(int x, int y) { ::wmove(m_window, y, x); }
+  Point GetParentOrigin() const { return Point(GetParentX(), GetParentY()); }
+  int GetParentX() const { return getparx(m_window); }
+  int GetParentY() const { return getpary(m_window); }
   void MoveWindow(int x, int y) { MoveWindow(Point(x, y)); }
   void Resize(int w, int h) { ::wresize(m_window, h, w); }
   void Resize(const Size &size) {
     ::wresize(m_window, size.height, size.width);
   }
-  void PutChar(int ch) { ::waddch(m_window, ch); }
-  void PutCString(const char *s, int len = -1) { ::waddnstr(m_window, s, len); }
-  void SetBackground(int color_pair_idx) {
-    ::wbkgd(m_window, COLOR_PAIR(color_pair_idx));
-  }
-
-  void PutCStringTruncated(const char *s, int right_pad) {
-    int bytes_left = GetWidth() - GetCursorX();
-    if (bytes_left > right_pad) {
-      bytes_left -= right_pad;
-      ::waddnstr(m_window, s, bytes_left);
-    }
-  }
-
   void MoveWindow(const Point &origin) {
     const bool moving_window = origin != GetParentOrigin();
     if (m_is_subwin && moving_window) {
@@ -424,13 +645,6 @@ public:
         MoveWindow(bounds.origin);
       Resize(bounds.size);
     }
-  }
-
-  void Printf(const char *format, ...) __attribute__((format(printf, 2, 3))) {
-    va_list args;
-    va_start(args, format);
-    vwprintw(m_window, format, args);
-    va_end(args);
   }
 
   void Touch() {
@@ -513,15 +727,11 @@ public:
       ::touchwin(stdscr);
   }
 
-  WINDOW *get() { return m_window; }
-
-  operator WINDOW *() { return m_window; }
-
   // Window drawing utilities
   void DrawTitleBox(const char *title, const char *bottom_message = nullptr) {
     attr_t attr = 0;
     if (IsActive())
-      attr = A_BOLD | COLOR_PAIR(2);
+      attr = A_BOLD | COLOR_PAIR(BlackOnWhite);
     else
       attr = 0;
     if (attr)
@@ -548,7 +758,7 @@ public:
       } else {
         MoveCursor(1, GetHeight() - 1);
         PutChar('[');
-        PutCStringTruncated(bottom_message, 1);
+        PutCStringTruncated(1, bottom_message);
       }
     }
     if (attr)
@@ -687,42 +897,44 @@ public:
 
   void SelectNextWindowAsActive() {
     // Move active focus to next window
-    const size_t num_subwindows = m_subwindows.size();
-    if (m_curr_active_window_idx == UINT32_MAX) {
-      uint32_t idx = 0;
-      for (auto subwindow_sp : m_subwindows) {
-        if (subwindow_sp->GetCanBeActive()) {
-          m_curr_active_window_idx = idx;
-          break;
-        }
-        ++idx;
-      }
-    } else if (m_curr_active_window_idx + 1 < num_subwindows) {
-      bool handled = false;
+    const int num_subwindows = m_subwindows.size();
+    int start_idx = 0;
+    if (m_curr_active_window_idx != UINT32_MAX) {
       m_prev_active_window_idx = m_curr_active_window_idx;
-      for (size_t idx = m_curr_active_window_idx + 1; idx < num_subwindows;
-           ++idx) {
-        if (m_subwindows[idx]->GetCanBeActive()) {
-          m_curr_active_window_idx = idx;
-          handled = true;
-          break;
-        }
+      start_idx = m_curr_active_window_idx + 1;
+    }
+    for (int idx = start_idx; idx < num_subwindows; ++idx) {
+      if (m_subwindows[idx]->GetCanBeActive()) {
+        m_curr_active_window_idx = idx;
+        return;
       }
-      if (!handled) {
-        for (size_t idx = 0; idx <= m_prev_active_window_idx; ++idx) {
-          if (m_subwindows[idx]->GetCanBeActive()) {
-            m_curr_active_window_idx = idx;
-            break;
-          }
-        }
+    }
+    for (int idx = 0; idx < start_idx; ++idx) {
+      if (m_subwindows[idx]->GetCanBeActive()) {
+        m_curr_active_window_idx = idx;
+        break;
       }
-    } else {
+    }
+  }
+
+  void SelectPreviousWindowAsActive() {
+    // Move active focus to previous window
+    const int num_subwindows = m_subwindows.size();
+    int start_idx = num_subwindows - 1;
+    if (m_curr_active_window_idx != UINT32_MAX) {
       m_prev_active_window_idx = m_curr_active_window_idx;
-      for (size_t idx = 0; idx < num_subwindows; ++idx) {
-        if (m_subwindows[idx]->GetCanBeActive()) {
-          m_curr_active_window_idx = idx;
-          break;
-        }
+      start_idx = m_curr_active_window_idx - 1;
+    }
+    for (int idx = start_idx; idx >= 0; --idx) {
+      if (m_subwindows[idx]->GetCanBeActive()) {
+        m_curr_active_window_idx = idx;
+        return;
+      }
+    }
+    for (int idx = num_subwindows - 1; idx > start_idx; --idx) {
+      if (m_subwindows[idx]->GetCanBeActive()) {
+        m_curr_active_window_idx = idx;
+        break;
       }
     }
   }
@@ -731,7 +943,6 @@ public:
 
 protected:
   std::string m_name;
-  WINDOW *m_window;
   PANEL *m_panel;
   Window *m_parent;
   Windows m_subwindows;
@@ -744,7 +955,1262 @@ protected:
   bool m_is_subwin;
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(Window);
+  Window(const Window &) = delete;
+  const Window &operator=(const Window &) = delete;
+};
+
+class DerivedWindow : public Surface {
+public:
+  DerivedWindow(Window &window, Rect bounds) {
+    m_window = ::derwin(window.get(), bounds.size.height, bounds.size.width,
+                        bounds.origin.y, bounds.origin.x);
+  }
+  DerivedWindow(DerivedWindow &derived_window, Rect bounds) {
+    m_window = ::derwin(derived_window.get(), bounds.size.height,
+                        bounds.size.width, bounds.origin.y, bounds.origin.x);
+  }
+
+  ~DerivedWindow() { ::delwin(m_window); }
+};
+
+/////////
+// Forms
+/////////
+
+// A scroll context defines a vertical region that needs to be visible in a
+// scrolling area. The region is defined by the index of the start and end lines
+// of the region. The start and end lines may be equal, in which case, the
+// region is a single line.
+struct ScrollContext {
+  int start;
+  int end;
+
+  ScrollContext(int line) : start(line), end(line) {}
+  ScrollContext(int _start, int _end) : start(_start), end(_end) {}
+
+  void Offset(int offset) {
+    start += offset;
+    end += offset;
+  }
+};
+
+class FieldDelegate {
+public:
+  virtual ~FieldDelegate() = default;
+
+  // Returns the number of lines needed to draw the field. The draw method will
+  // be given a surface that have exactly this number of lines.
+  virtual int FieldDelegateGetHeight() = 0;
+
+  // Returns the scroll context in the local coordinates of the field. By
+  // default, the scroll context spans the whole field. Bigger fields with
+  // internal navigation should override this method to provide a finer context.
+  // Typical override methods would first get the scroll context of the internal
+  // element then add the offset of the element in the field.
+  virtual ScrollContext FieldDelegateGetScrollContext() {
+    return ScrollContext(0, FieldDelegateGetHeight() - 1);
+  }
+
+  // Draw the field in the given subpad surface. The surface have a height that
+  // is equal to the height returned by FieldDelegateGetHeight(). If the field
+  // is selected in the form window, then is_selected will be true.
+  virtual void FieldDelegateDraw(SubPad &surface, bool is_selected) = 0;
+
+  // Handle the key that wasn't handled by the form window or a container field.
+  virtual HandleCharResult FieldDelegateHandleChar(int key) {
+    return eKeyNotHandled;
+  }
+
+  // This is executed once the user exists the field, that is, once the user
+  // navigates to the next or the previous field. This is particularly useful to
+  // do in-field validation and error setting. Fields with internal navigation
+  // should call this method on their fields.
+  virtual void FieldDelegateExitCallback() { return; }
+
+  // Fields may have internal navigation, for instance, a List Field have
+  // multiple internal elements, which needs to be navigated. To allow for this
+  // mechanism, the window shouldn't handle the navigation keys all the time,
+  // and instead call the key handing method of the selected field. It should
+  // only handle the navigation keys when the field contains a single element or
+  // have the last or first element selected depending on if the user is
+  // navigating forward or backward. Additionally, once a field is selected in
+  // the forward or backward direction, its first or last internal element
+  // should be selected. The following methods implements those mechanisms.
+
+  // Returns true if the first element in the field is selected or if the field
+  // contains a single element.
+  virtual bool FieldDelegateOnFirstOrOnlyElement() { return true; }
+
+  // Returns true if the last element in the field is selected or if the field
+  // contains a single element.
+  virtual bool FieldDelegateOnLastOrOnlyElement() { return true; }
+
+  // Select the first element in the field if multiple elements exists.
+  virtual void FieldDelegateSelectFirstElement() { return; }
+
+  // Select the last element in the field if multiple elements exists.
+  virtual void FieldDelegateSelectLastElement() { return; }
+};
+
+typedef std::shared_ptr<FieldDelegate> FieldDelegateSP;
+
+class TextFieldDelegate : public FieldDelegate {
+public:
+  TextFieldDelegate(const char *label, const char *content)
+      : m_label(label), m_cursor_position(0), m_first_visibile_char(0) {
+    if (content)
+      m_content = content;
+  }
+
+  // Text fields are drawn as titled boxes of a single line, with a possible
+  // error messages at the end.
+  //
+  // __[Label]___________
+  // |                  |
+  // |__________________|
+  // - Error message if it exists.
+
+  // The text field has a height of 3 lines. 2 lines for borders and 1 line for
+  // the content.
+  int GetFieldHeight() { return 3; }
+
+  // The text field has a full height of 3 or 4 lines. 3 lines for the actual
+  // field and an optional line for an error if it exists.
+  int FieldDelegateGetHeight() override {
+    int height = GetFieldHeight();
+    if (HasError())
+      height++;
+    return height;
+  }
+
+  // Get the cursor X position in the surface coordinate.
+  int GetCursorXPosition() { return m_cursor_position - m_first_visibile_char; }
+
+  int GetContentLength() { return m_content.length(); }
+
+  void DrawContent(SubPad &surface, bool is_selected) {
+    surface.MoveCursor(0, 0);
+    const char *text = m_content.c_str() + m_first_visibile_char;
+    surface.PutCString(text, surface.GetWidth());
+    m_last_drawn_content_width = surface.GetWidth();
+
+    // Highlight the cursor.
+    surface.MoveCursor(GetCursorXPosition(), 0);
+    if (is_selected)
+      surface.AttributeOn(A_REVERSE);
+    if (m_cursor_position == GetContentLength())
+      // Cursor is past the last character. Highlight an empty space.
+      surface.PutChar(' ');
+    else
+      surface.PutChar(m_content[m_cursor_position]);
+    if (is_selected)
+      surface.AttributeOff(A_REVERSE);
+  }
+
+  void DrawField(SubPad &surface, bool is_selected) {
+    surface.TitledBox(m_label.c_str());
+
+    Rect content_bounds = surface.GetFrame();
+    content_bounds.Inset(1, 1);
+    SubPad content_surface = SubPad(surface, content_bounds);
+
+    DrawContent(content_surface, is_selected);
+  }
+
+  void DrawError(SubPad &surface) {
+    if (!HasError())
+      return;
+    surface.MoveCursor(0, 0);
+    surface.AttributeOn(COLOR_PAIR(RedOnBlack));
+    surface.PutChar(ACS_DIAMOND);
+    surface.PutChar(' ');
+    surface.PutCStringTruncated(1, GetError().c_str());
+    surface.AttributeOff(COLOR_PAIR(RedOnBlack));
+  }
+
+  void FieldDelegateDraw(SubPad &surface, bool is_selected) override {
+    Rect frame = surface.GetFrame();
+    Rect field_bounds, error_bounds;
+    frame.HorizontalSplit(GetFieldHeight(), field_bounds, error_bounds);
+    SubPad field_surface = SubPad(surface, field_bounds);
+    SubPad error_surface = SubPad(surface, error_bounds);
+
+    DrawField(field_surface, is_selected);
+    DrawError(error_surface);
+  }
+
+  // The cursor is allowed to move one character past the string.
+  // m_cursor_position is in range [0, GetContentLength()].
+  void MoveCursorRight() {
+    if (m_cursor_position < GetContentLength())
+      m_cursor_position++;
+  }
+
+  void MoveCursorLeft() {
+    if (m_cursor_position > 0)
+      m_cursor_position--;
+  }
+
+  // If the cursor moved past the last visible character, scroll right by one
+  // character.
+  void ScrollRightIfNeeded() {
+    if (m_cursor_position - m_first_visibile_char == m_last_drawn_content_width)
+      m_first_visibile_char++;
+  }
+
+  void ScrollLeft() {
+    if (m_first_visibile_char > 0)
+      m_first_visibile_char--;
+  }
+
+  // If the cursor moved past the first visible character, scroll left by one
+  // character.
+  void ScrollLeftIfNeeded() {
+    if (m_cursor_position < m_first_visibile_char)
+      m_first_visibile_char--;
+  }
+
+  // Insert a character at the current cursor position, advance the cursor
+  // position, and make sure to scroll right if needed.
+  void InsertChar(char character) {
+    m_content.insert(m_cursor_position, 1, character);
+    m_cursor_position++;
+    ScrollRightIfNeeded();
+  }
+
+  // Remove the character before the cursor position, retreat the cursor
+  // position, and make sure to scroll left if needed.
+  void RemoveChar() {
+    if (m_cursor_position == 0)
+      return;
+
+    m_content.erase(m_cursor_position - 1, 1);
+    m_cursor_position--;
+    ScrollLeft();
+  }
+
+  // True if the key represents a char that can be inserted in the field
+  // content, false otherwise.
+  virtual bool IsAcceptableChar(int key) { return isprint(key); }
+
+  HandleCharResult FieldDelegateHandleChar(int key) override {
+    if (IsAcceptableChar(key)) {
+      ClearError();
+      InsertChar((char)key);
+      return eKeyHandled;
+    }
+
+    switch (key) {
+    case KEY_RIGHT:
+      MoveCursorRight();
+      ScrollRightIfNeeded();
+      return eKeyHandled;
+    case KEY_LEFT:
+      MoveCursorLeft();
+      ScrollLeftIfNeeded();
+      return eKeyHandled;
+    case KEY_BACKSPACE:
+      ClearError();
+      RemoveChar();
+      return eKeyHandled;
+    default:
+      break;
+    }
+    return eKeyNotHandled;
+  }
+
+  bool HasError() { return !m_error.empty(); }
+
+  void ClearError() { m_error.clear(); }
+
+  const std::string &GetError() { return m_error; }
+
+  void SetError(const char *error) { m_error = error; }
+
+  // Returns the text content of the field.
+  const std::string &GetText() { return m_content; }
+
+protected:
+  std::string m_label;
+  // The position of the top left corner character of the border.
+  std::string m_content;
+  // The cursor position in the content string itself. Can be in the range
+  // [0, GetContentLength()].
+  int m_cursor_position;
+  // The index of the first visible character in the content.
+  int m_first_visibile_char;
+  // The width of the fields content that was last drawn. Width can change, so
+  // this is used to determine if scrolling is needed dynamically.
+  int m_last_drawn_content_width;
+  // Optional error message. If empty, field is considered to have no error.
+  std::string m_error;
+};
+
+class IntegerFieldDelegate : public TextFieldDelegate {
+public:
+  IntegerFieldDelegate(const char *label, int content)
+      : TextFieldDelegate(label, std::to_string(content).c_str()) {}
+
+  // Only accept digits.
+  bool IsAcceptableChar(int key) override { return isdigit(key); }
+
+  // Returns the integer content of the field.
+  int GetInteger() { return std::stoi(m_content); }
+};
+
+class FileFieldDelegate : public TextFieldDelegate {
+public:
+  FileFieldDelegate(const char *label, const char *content,
+                    bool need_to_exist = true)
+      : TextFieldDelegate(label, content), m_need_to_exist(need_to_exist) {}
+
+  // Set appropriate error messages if the file doesn't exists or is, in fact, a
+  // directory.
+  void FieldDelegateExitCallback() override {
+    FileSpec file(GetPath());
+    if (m_need_to_exist && !FileSystem::Instance().Exists(file)) {
+      SetError("File doesn't exist!");
+      return;
+    }
+    if (FileSystem::Instance().IsDirectory(file)) {
+      SetError("Not a file!");
+      return;
+    }
+  }
+
+  // Returns the path of the file.
+  const std::string &GetPath() { return m_content; }
+
+protected:
+  bool m_need_to_exist;
+};
+
+class DirectoryFieldDelegate : public TextFieldDelegate {
+public:
+  DirectoryFieldDelegate(const char *label, const char *content,
+                         bool need_to_exist = true)
+      : TextFieldDelegate(label, content), m_need_to_exist(need_to_exist) {}
+
+  // Set appropriate error messages if the directory doesn't exists or is, in
+  // fact, a file.
+  void FieldDelegateExitCallback() override {
+    FileSpec file(GetPath());
+    if (m_need_to_exist && !FileSystem::Instance().Exists(file)) {
+      SetError("Directory doesn't exist!");
+      return;
+    }
+    if (!FileSystem::Instance().IsDirectory(file)) {
+      SetError("Not a directory!");
+      return;
+    }
+  }
+
+  // Returns the path of the file.
+  const std::string &GetPath() { return m_content; }
+
+protected:
+  bool m_need_to_exist;
+};
+
+class BooleanFieldDelegate : public FieldDelegate {
+public:
+  BooleanFieldDelegate(const char *label, bool content)
+      : m_label(label), m_content(content) {}
+
+  // Boolean fields are drawn as checkboxes.
+  //
+  // [X] Label  or [ ] Label
+
+  // Boolean fields are have a single line.
+  int FieldDelegateGetHeight() override { return 1; }
+
+  void FieldDelegateDraw(SubPad &surface, bool is_selected) override {
+    surface.MoveCursor(0, 0);
+    surface.PutChar('[');
+    if (is_selected)
+      surface.AttributeOn(A_REVERSE);
+    surface.PutChar(m_content ? ACS_DIAMOND : ' ');
+    if (is_selected)
+      surface.AttributeOff(A_REVERSE);
+    surface.PutChar(']');
+    surface.PutChar(' ');
+    surface.PutCString(m_label.c_str());
+  }
+
+  void ToggleContent() { m_content = !m_content; }
+
+  void SetContentToTrue() { m_content = true; }
+
+  void SetContentToFalse() { m_content = false; }
+
+  HandleCharResult FieldDelegateHandleChar(int key) override {
+    switch (key) {
+    case 't':
+    case '1':
+      SetContentToTrue();
+      return eKeyHandled;
+    case 'f':
+    case '0':
+      SetContentToFalse();
+      return eKeyHandled;
+    case ' ':
+    case '\r':
+    case '\n':
+    case KEY_ENTER:
+      ToggleContent();
+      return eKeyHandled;
+    default:
+      break;
+    }
+    return eKeyNotHandled;
+  }
+
+  // Returns the boolean content of the field.
+  bool GetBoolean() { return m_content; }
+
+protected:
+  std::string m_label;
+  bool m_content;
+};
+
+class ChoicesFieldDelegate : public FieldDelegate {
+public:
+  ChoicesFieldDelegate(const char *label, int number_of_visible_choices,
+                       std::vector<std::string> choices)
+      : m_label(label), m_number_of_visible_choices(number_of_visible_choices),
+        m_choices(choices), m_choice(0), m_first_visibile_choice(0) {}
+
+  // Choices fields are drawn as titles boxses of a number of visible choices.
+  // The rest of the choices become visible as the user scroll. The selected
+  // choice is denoted by a diamond as the first character.
+  //
+  // __[Label]___________
+  // |-Choice 1         |
+  // | Choice 2         |
+  // | Choice 3         |
+  // |__________________|
+
+  // Choices field have two border characters plus the number of visible
+  // choices.
+  int FieldDelegateGetHeight() override {
+    return m_number_of_visible_choices + 2;
+  }
+
+  int GetNumberOfChoices() { return m_choices.size(); }
+
+  // Get the index of the last visible choice.
+  int GetLastVisibleChoice() {
+    int index = m_first_visibile_choice + m_number_of_visible_choices;
+    return std::min(index, GetNumberOfChoices()) - 1;
+  }
+
+  void DrawContent(SubPad &surface, bool is_selected) {
+    int choices_to_draw = GetLastVisibleChoice() - m_first_visibile_choice + 1;
+    for (int i = 0; i < choices_to_draw; i++) {
+      surface.MoveCursor(0, i);
+      int current_choice = m_first_visibile_choice + i;
+      const char *text = m_choices[current_choice].c_str();
+      bool highlight = is_selected && current_choice == m_choice;
+      if (highlight)
+        surface.AttributeOn(A_REVERSE);
+      surface.PutChar(current_choice == m_choice ? ACS_DIAMOND : ' ');
+      surface.PutCString(text);
+      if (highlight)
+        surface.AttributeOff(A_REVERSE);
+    }
+  }
+
+  void FieldDelegateDraw(SubPad &surface, bool is_selected) override {
+    surface.TitledBox(m_label.c_str());
+
+    Rect content_bounds = surface.GetFrame();
+    content_bounds.Inset(1, 1);
+    SubPad content_surface = SubPad(surface, content_bounds);
+
+    DrawContent(content_surface, is_selected);
+  }
+
+  void SelectPrevious() {
+    if (m_choice > 0)
+      m_choice--;
+  }
+
+  void SelectNext() {
+    if (m_choice < GetNumberOfChoices() - 1)
+      m_choice++;
+  }
+
+  // If the cursor moved past the first visible choice, scroll up by one
+  // choice.
+  void ScrollUpIfNeeded() {
+    if (m_choice < m_first_visibile_choice)
+      m_first_visibile_choice--;
+  }
+
+  // If the cursor moved past the last visible choice, scroll down by one
+  // choice.
+  void ScrollDownIfNeeded() {
+    if (m_choice > GetLastVisibleChoice())
+      m_first_visibile_choice++;
+  }
+
+  HandleCharResult FieldDelegateHandleChar(int key) override {
+    switch (key) {
+    case KEY_UP:
+      SelectPrevious();
+      ScrollUpIfNeeded();
+      return eKeyHandled;
+    case KEY_DOWN:
+      SelectNext();
+      ScrollDownIfNeeded();
+      return eKeyHandled;
+    default:
+      break;
+    }
+    return eKeyNotHandled;
+  }
+
+  // Returns the content of the choice as a string.
+  std::string GetChoiceContent() { return m_choices[m_choice]; }
+
+  // Returns the index of the choice.
+  int GetChoice() { return m_choice; }
+
+protected:
+  std::string m_label;
+  int m_number_of_visible_choices;
+  std::vector<std::string> m_choices;
+  // The index of the selected choice.
+  int m_choice;
+  // The index of the first visible choice in the field.
+  int m_first_visibile_choice;
+};
+
+template <class T> class ListFieldDelegate : public FieldDelegate {
+public:
+  ListFieldDelegate(const char *label, T default_field)
+      : m_label(label), m_default_field(default_field), m_selection_index(0),
+        m_selection_type(SelectionType::NewButton) {}
+
+  // Signify which element is selected. If a field or a remove button is
+  // selected, then m_selection_index signifies the particular field that
+  // is selected or the field that the remove button belongs to.
+  enum class SelectionType { Field, RemoveButton, NewButton };
+
+  // A List field is drawn as a titled box of a number of other fields of the
+  // same type. Each field has a Remove button next to it that removes the
+  // corresponding field. Finally, the last line contains a New button to add a
+  // new field.
+  //
+  // __[Label]___________
+  // | Field 0 [Remove] |
+  // | Field 1 [Remove] |
+  // | Field 2 [Remove] |
+  // |      [New]       |
+  // |__________________|
+
+  // List fields have two lines for border characters, 1 line for the New
+  // button, and the total height of the available fields.
+  int FieldDelegateGetHeight() override {
+    // 2 border characters.
+    int height = 2;
+    // Total height of the fields.
+    for (int i = 0; i < GetNumberOfFields(); i++) {
+      height += m_fields[i].FieldDelegateGetHeight();
+    }
+    // A line for the New button.
+    height++;
+    return height;
+  }
+
+  ScrollContext FieldDelegateGetScrollContext() override {
+    int height = FieldDelegateGetHeight();
+    if (m_selection_type == SelectionType::NewButton)
+      return ScrollContext(height - 2, height - 1);
+
+    FieldDelegate &field = m_fields[m_selection_index];
+    ScrollContext context = field.FieldDelegateGetScrollContext();
+
+    // Start at 1 because of the top border.
+    int offset = 1;
+    for (int i = 0; i < m_selection_index; i++) {
+      offset += m_fields[i].FieldDelegateGetHeight();
+    }
+    context.Offset(offset);
+
+    // If the scroll context is touching the top border, include it in the
+    // context to show the label.
+    if (context.start == 1)
+      context.start--;
+
+    // If the scroll context is touching the new button, include it as well as
+    // the bottom border in the context.
+    if (context.end == height - 3)
+      context.end += 2;
+
+    return context;
+  }
+
+  void DrawRemoveButton(SubPad &surface, int highlight) {
+    surface.MoveCursor(1, surface.GetHeight() / 2);
+    if (highlight)
+      surface.AttributeOn(A_REVERSE);
+    surface.PutCString("[Remove]");
+    if (highlight)
+      surface.AttributeOff(A_REVERSE);
+  }
+
+  void DrawFields(SubPad &surface, bool is_selected) {
+    int line = 0;
+    int width = surface.GetWidth();
+    for (int i = 0; i < GetNumberOfFields(); i++) {
+      int height = m_fields[i].FieldDelegateGetHeight();
+      Rect bounds = Rect(Point(0, line), Size(width, height));
+      Rect field_bounds, remove_button_bounds;
+      bounds.VerticalSplit(bounds.size.width - sizeof(" [Remove]"),
+                           field_bounds, remove_button_bounds);
+      SubPad field_surface = SubPad(surface, field_bounds);
+      SubPad remove_button_surface = SubPad(surface, remove_button_bounds);
+
+      bool is_element_selected = m_selection_index == i && is_selected;
+      bool is_field_selected =
+          is_element_selected && m_selection_type == SelectionType::Field;
+      bool is_remove_button_selected =
+          is_element_selected &&
+          m_selection_type == SelectionType::RemoveButton;
+      m_fields[i].FieldDelegateDraw(field_surface, is_field_selected);
+      DrawRemoveButton(remove_button_surface, is_remove_button_selected);
+
+      line += height;
+    }
+  }
+
+  void DrawNewButton(SubPad &surface, bool is_selected) {
+    const char *button_text = "[New]";
+    int x = (surface.GetWidth() - sizeof(button_text) - 1) / 2;
+    surface.MoveCursor(x, 0);
+    bool highlight =
+        is_selected && m_selection_type == SelectionType::NewButton;
+    if (highlight)
+      surface.AttributeOn(A_REVERSE);
+    surface.PutCString(button_text);
+    if (highlight)
+      surface.AttributeOff(A_REVERSE);
+  }
+
+  void FieldDelegateDraw(SubPad &surface, bool is_selected) override {
+    surface.TitledBox(m_label.c_str());
+
+    Rect content_bounds = surface.GetFrame();
+    content_bounds.Inset(1, 1);
+    Rect fields_bounds, new_button_bounds;
+    content_bounds.HorizontalSplit(content_bounds.size.height - 1,
+                                   fields_bounds, new_button_bounds);
+    SubPad fields_surface = SubPad(surface, fields_bounds);
+    SubPad new_button_surface = SubPad(surface, new_button_bounds);
+
+    DrawFields(fields_surface, is_selected);
+    DrawNewButton(new_button_surface, is_selected);
+  }
+
+  void AddNewField() {
+    m_fields.push_back(m_default_field);
+    m_selection_index = GetNumberOfFields() - 1;
+    m_selection_type = SelectionType::Field;
+    FieldDelegate &field = m_fields[m_selection_index];
+    field.FieldDelegateSelectFirstElement();
+  }
+
+  void RemoveField() {
+    m_fields.erase(m_fields.begin() + m_selection_index);
+    if (m_selection_index != 0)
+      m_selection_index--;
+
+    if (GetNumberOfFields() > 0) {
+      m_selection_type = SelectionType::Field;
+      FieldDelegate &field = m_fields[m_selection_index];
+      field.FieldDelegateSelectFirstElement();
+    } else
+      m_selection_type = SelectionType::NewButton;
+  }
+
+  HandleCharResult SelecteNext(int key) {
+    if (m_selection_type == SelectionType::NewButton)
+      return eKeyNotHandled;
+
+    if (m_selection_type == SelectionType::RemoveButton) {
+      if (m_selection_index == GetNumberOfFields() - 1) {
+        m_selection_type = SelectionType::NewButton;
+        return eKeyHandled;
+      }
+      m_selection_index++;
+      m_selection_type = SelectionType::Field;
+      FieldDelegate &next_field = m_fields[m_selection_index];
+      next_field.FieldDelegateSelectFirstElement();
+      return eKeyHandled;
+    }
+
+    FieldDelegate &field = m_fields[m_selection_index];
+    if (!field.FieldDelegateOnLastOrOnlyElement()) {
+      return field.FieldDelegateHandleChar(key);
+    }
+
+    field.FieldDelegateExitCallback();
+
+    m_selection_type = SelectionType::RemoveButton;
+    return eKeyHandled;
+  }
+
+  HandleCharResult SelectPrevious(int key) {
+    if (FieldDelegateOnFirstOrOnlyElement())
+      return eKeyNotHandled;
+
+    if (m_selection_type == SelectionType::RemoveButton) {
+      m_selection_type = SelectionType::Field;
+      FieldDelegate &field = m_fields[m_selection_index];
+      field.FieldDelegateSelectLastElement();
+      return eKeyHandled;
+    }
+
+    if (m_selection_type == SelectionType::NewButton) {
+      m_selection_type = SelectionType::RemoveButton;
+      m_selection_index = GetNumberOfFields() - 1;
+      return eKeyHandled;
+    }
+
+    FieldDelegate &field = m_fields[m_selection_index];
+    if (!field.FieldDelegateOnFirstOrOnlyElement()) {
+      return field.FieldDelegateHandleChar(key);
+    }
+
+    field.FieldDelegateExitCallback();
+
+    m_selection_type = SelectionType::RemoveButton;
+    m_selection_index--;
+    return eKeyHandled;
+  }
+
+  HandleCharResult FieldDelegateHandleChar(int key) override {
+    switch (key) {
+    case '\r':
+    case '\n':
+    case KEY_ENTER:
+      switch (m_selection_type) {
+      case SelectionType::NewButton:
+        AddNewField();
+        return eKeyHandled;
+      case SelectionType::RemoveButton:
+        RemoveField();
+        return eKeyHandled;
+      default:
+        break;
+      }
+      break;
+    case '\t':
+      SelecteNext(key);
+      return eKeyHandled;
+    case KEY_SHIFT_TAB:
+      SelectPrevious(key);
+      return eKeyHandled;
+    default:
+      break;
+    }
+
+    // If the key wasn't handled and one of the fields is selected, pass the key
+    // to that field.
+    if (m_selection_type == SelectionType::Field) {
+      return m_fields[m_selection_index].FieldDelegateHandleChar(key);
+    }
+
+    return eKeyNotHandled;
+  }
+
+  bool FieldDelegateOnLastOrOnlyElement() override {
+    if (m_selection_type == SelectionType::NewButton) {
+      return true;
+    }
+    return false;
+  }
+
+  bool FieldDelegateOnFirstOrOnlyElement() override {
+    if (m_selection_type == SelectionType::NewButton &&
+        GetNumberOfFields() == 0)
+      return true;
+
+    if (m_selection_type == SelectionType::Field && m_selection_index == 0) {
+      FieldDelegate &field = m_fields[m_selection_index];
+      return field.FieldDelegateOnFirstOrOnlyElement();
+    }
+
+    return false;
+  }
+
+  void FieldDelegateSelectFirstElement() override {
+    if (GetNumberOfFields() == 0) {
+      m_selection_type = SelectionType::NewButton;
+      return;
+    }
+
+    m_selection_type = SelectionType::Field;
+    m_selection_index = 0;
+  }
+
+  void FieldDelegateSelectLastElement() override {
+    m_selection_type = SelectionType::NewButton;
+    return;
+  }
+
+  int GetNumberOfFields() { return m_fields.size(); }
+
+  // Returns the form delegate at the current index.
+  T &GetField(int index) { return m_fields[index]; }
+
+protected:
+  std::string m_label;
+  // The default field delegate instance from which new field delegates will be
+  // created though a copy.
+  T m_default_field;
+  std::vector<T> m_fields;
+  int m_selection_index;
+  // See SelectionType class enum.
+  SelectionType m_selection_type;
+};
+
+class FormAction {
+public:
+  FormAction(const char *label, std::function<void(Window &)> action)
+      : m_action(action) {
+    if (label)
+      m_label = label;
+  }
+
+  // Draw a centered [Label].
+  void Draw(SubPad &surface, bool is_selected) {
+    int x = (surface.GetWidth() - m_label.length()) / 2;
+    surface.MoveCursor(x, 0);
+    if (is_selected)
+      surface.AttributeOn(A_REVERSE);
+    surface.PutChar('[');
+    surface.PutCString(m_label.c_str());
+    surface.PutChar(']');
+    if (is_selected)
+      surface.AttributeOff(A_REVERSE);
+  }
+
+  void Execute(Window &window) { m_action(window); }
+
+  const std::string &GetLabel() { return m_label; }
+
+protected:
+  std::string m_label;
+  std::function<void(Window &)> m_action;
+};
+
+class FormDelegate {
+public:
+  FormDelegate() {}
+
+  virtual ~FormDelegate() = default;
+
+  FieldDelegateSP &GetField(int field_index) { return m_fields[field_index]; }
+
+  FormAction &GetAction(int action_index) { return m_actions[action_index]; }
+
+  int GetNumberOfFields() { return m_fields.size(); }
+
+  int GetNumberOfActions() { return m_actions.size(); }
+
+  bool HasError() { return !m_error.empty(); }
+
+  void ClearError() { m_error.clear(); }
+
+  const std::string &GetError() { return m_error; }
+
+  void SetError(const char *error) { m_error = error; }
+
+  // Factory methods to create and add fields of specific types.
+
+  TextFieldDelegate *AddTextField(const char *label, const char *content) {
+    TextFieldDelegate *delegate = new TextFieldDelegate(label, content);
+    FieldDelegateSP delegate_sp = FieldDelegateSP(delegate);
+    m_fields.push_back(delegate_sp);
+    return delegate;
+  }
+
+  FileFieldDelegate *AddFileField(const char *label, const char *content,
+                                  bool need_to_exist = true) {
+    FileFieldDelegate *delegate =
+        new FileFieldDelegate(label, content, need_to_exist);
+    FieldDelegateSP delegate_sp = FieldDelegateSP(delegate);
+    m_fields.push_back(delegate_sp);
+    return delegate;
+  }
+
+  DirectoryFieldDelegate *AddDirectoryField(const char *label,
+                                            const char *content,
+                                            bool need_to_exist = true) {
+    DirectoryFieldDelegate *delegate =
+        new DirectoryFieldDelegate(label, content, need_to_exist);
+    FieldDelegateSP delegate_sp = FieldDelegateSP(delegate);
+    m_fields.push_back(delegate_sp);
+    return delegate;
+  }
+
+  IntegerFieldDelegate *AddIntegerField(const char *label, int content) {
+    IntegerFieldDelegate *delegate = new IntegerFieldDelegate(label, content);
+    FieldDelegateSP delegate_sp = FieldDelegateSP(delegate);
+    m_fields.push_back(delegate_sp);
+    return delegate;
+  }
+
+  BooleanFieldDelegate *AddBooleanField(const char *label, bool content) {
+    BooleanFieldDelegate *delegate = new BooleanFieldDelegate(label, content);
+    FieldDelegateSP delegate_sp = FieldDelegateSP(delegate);
+    m_fields.push_back(delegate_sp);
+    return delegate;
+  }
+
+  ChoicesFieldDelegate *AddChoicesField(const char *label, int height,
+                                        std::vector<std::string> choices) {
+    ChoicesFieldDelegate *delegate =
+        new ChoicesFieldDelegate(label, height, choices);
+    FieldDelegateSP delegate_sp = FieldDelegateSP(delegate);
+    m_fields.push_back(delegate_sp);
+    return delegate;
+  }
+
+  template <class T>
+  ListFieldDelegate<T> *AddListField(const char *label, T default_field) {
+    ListFieldDelegate<T> *delegate =
+        new ListFieldDelegate<T>(label, default_field);
+    FieldDelegateSP delegate_sp = FieldDelegateSP(delegate);
+    m_fields.push_back(delegate_sp);
+    return delegate;
+  }
+
+  // Factory methods for adding actions.
+
+  void AddAction(const char *label, std::function<void(Window &)> action) {
+    m_actions.push_back(FormAction(label, action));
+  }
+
+protected:
+  std::vector<FieldDelegateSP> m_fields;
+  std::vector<FormAction> m_actions;
+  // Optional error message. If empty, form is considered to have no error.
+  std::string m_error;
+};
+
+typedef std::shared_ptr<FormDelegate> FormDelegateSP;
+
+class FormWindowDelegate : public WindowDelegate {
+public:
+  FormWindowDelegate(FormDelegateSP &delegate_sp)
+      : m_delegate_sp(delegate_sp), m_selection_index(0),
+        m_selection_type(SelectionType::Field), m_first_visible_line(0) {}
+
+  // Signify which element is selected. If a field or an action is selected,
+  // then m_selection_index signifies the particular field or action that is
+  // selected.
+  enum class SelectionType { Field, Action };
+
+  // A form window is padded by one character from all sides. First, if an error
+  // message exists, it is drawn followed by a separator. Then one or more
+  // fields are drawn. Finally, all available actions are drawn on a single
+  // line.
+  //
+  // ___<Form Name>_________________________________________________
+  // |                                                             |
+  // | - Error message if it exists.                               |
+  // |-------------------------------------------------------------|
+  // | Form elements here.                                         |
+  // |                       Form actions here.                    |
+  // |                                                             |
+  // |______________________________________[Press Esc to cancel]__|
+  //
+
+  // One line for the error and another for the horizontal line.
+  int GetErrorHeight() {
+    if (m_delegate_sp->HasError())
+      return 2;
+    return 0;
+  }
+
+  // Actions span a single line.
+  int GetActionsHeight() {
+    if (m_delegate_sp->GetNumberOfActions() > 0)
+      return 1;
+    return 0;
+  }
+
+  // Get the total number of needed lines to draw the contents.
+  int GetContentHeight() {
+    int height = 0;
+    height += GetErrorHeight();
+    for (int i = 0; i < m_delegate_sp->GetNumberOfFields(); i++) {
+      height += m_delegate_sp->GetField(i)->FieldDelegateGetHeight();
+    }
+    height += GetActionsHeight();
+    return height;
+  }
+
+  ScrollContext GetScrollContext() {
+    if (m_selection_type == SelectionType::Action)
+      return ScrollContext(GetContentHeight() - 1);
+
+    FieldDelegateSP &field = m_delegate_sp->GetField(m_selection_index);
+    ScrollContext context = field->FieldDelegateGetScrollContext();
+
+    int offset = GetErrorHeight();
+    for (int i = 0; i < m_selection_index; i++) {
+      offset += m_delegate_sp->GetField(i)->FieldDelegateGetHeight();
+    }
+    context.Offset(offset);
+
+    // If the context is touching the error, include the error in the context as
+    // well.
+    if (context.start == GetErrorHeight())
+      context.start = 0;
+
+    return context;
+  }
+
+  void UpdateScrolling(DerivedWindow &surface) {
+    ScrollContext context = GetScrollContext();
+    int content_height = GetContentHeight();
+    int surface_height = surface.GetHeight();
+    int visible_height = std::min(content_height, surface_height);
+    int last_visible_line = m_first_visible_line + visible_height - 1;
+
+    // If the last visible line is bigger than the content, then it is invalid
+    // and needs to be set to the last line in the content. This can happen when
+    // a field has shrunk in height.
+    if (last_visible_line > content_height - 1) {
+      m_first_visible_line = content_height - visible_height;
+    }
+
+    if (context.start < m_first_visible_line) {
+      m_first_visible_line = context.start;
+      return;
+    }
+
+    if (context.end > last_visible_line) {
+      m_first_visible_line = context.end - visible_height + 1;
+    }
+  }
+
+  void DrawError(SubPad &surface) {
+    if (!m_delegate_sp->HasError())
+      return;
+    surface.MoveCursor(0, 0);
+    surface.AttributeOn(COLOR_PAIR(RedOnBlack));
+    surface.PutChar(ACS_DIAMOND);
+    surface.PutChar(' ');
+    surface.PutCStringTruncated(1, m_delegate_sp->GetError().c_str());
+    surface.AttributeOff(COLOR_PAIR(RedOnBlack));
+
+    surface.MoveCursor(0, 1);
+    surface.HorizontalLine(surface.GetWidth());
+  }
+
+  void DrawFields(SubPad &surface) {
+    int line = 0;
+    int width = surface.GetWidth();
+    bool a_field_is_selected = m_selection_type == SelectionType::Field;
+    for (int i = 0; i < m_delegate_sp->GetNumberOfFields(); i++) {
+      bool is_field_selected = a_field_is_selected && m_selection_index == i;
+      FieldDelegateSP &field = m_delegate_sp->GetField(i);
+      int height = field->FieldDelegateGetHeight();
+      Rect bounds = Rect(Point(0, line), Size(width, height));
+      SubPad field_surface = SubPad(surface, bounds);
+      field->FieldDelegateDraw(field_surface, is_field_selected);
+      line += height;
+    }
+  }
+
+  void DrawActions(SubPad &surface) {
+    int number_of_actions = m_delegate_sp->GetNumberOfActions();
+    int width = surface.GetWidth() / number_of_actions;
+    bool an_action_is_selected = m_selection_type == SelectionType::Action;
+    int x = 0;
+    for (int i = 0; i < number_of_actions; i++) {
+      bool is_action_selected = an_action_is_selected && m_selection_index == i;
+      FormAction &action = m_delegate_sp->GetAction(i);
+      Rect bounds = Rect(Point(x, 0), Size(width, 1));
+      SubPad action_surface = SubPad(surface, bounds);
+      action.Draw(action_surface, is_action_selected);
+      x += width;
+    }
+  }
+
+  void DrawElements(SubPad &surface) {
+    Rect frame = surface.GetFrame();
+    Rect fields_bounds, actions_bounds;
+    frame.HorizontalSplit(surface.GetHeight() - GetActionsHeight(),
+                          fields_bounds, actions_bounds);
+    SubPad fields_surface = SubPad(surface, fields_bounds);
+    SubPad actions_surface = SubPad(surface, actions_bounds);
+
+    DrawFields(fields_surface);
+    DrawActions(actions_surface);
+  }
+
+  // Contents are first drawn on a pad. Then a subset of that pad is copied to
+  // the derived window starting at the first visible line. This essentially
+  // provides scrolling functionality.
+  void DrawContent(DerivedWindow &surface) {
+    UpdateScrolling(surface);
+
+    int width = surface.GetWidth();
+    int height = GetContentHeight();
+    Pad pad = Pad(Size(width, height));
+
+    Rect frame = pad.GetFrame();
+    Rect error_bounds, elements_bounds;
+    frame.HorizontalSplit(GetErrorHeight(), error_bounds, elements_bounds);
+    SubPad error_surface = SubPad(pad, error_bounds);
+    SubPad elements_surface = SubPad(pad, elements_bounds);
+
+    DrawError(error_surface);
+    DrawElements(elements_surface);
+
+    int copy_height = std::min(surface.GetHeight(), pad.GetHeight());
+    pad.CopyToSurface(surface, Point(0, m_first_visible_line), Point(),
+                      Size(width, copy_height));
+  }
+
+  bool WindowDelegateDraw(Window &window, bool force) override {
+
+    window.Erase();
+
+    window.DrawTitleBox(window.GetName(), "Press Esc to cancel");
+
+    Rect content_bounds = window.GetFrame();
+    content_bounds.Inset(2, 2);
+    DerivedWindow content_surface = DerivedWindow(window, content_bounds);
+
+    DrawContent(content_surface);
+    return true;
+  }
+
+  HandleCharResult SelecteNext(int key) {
+    if (m_selection_type == SelectionType::Action) {
+      if (m_selection_index < m_delegate_sp->GetNumberOfActions() - 1) {
+        m_selection_index++;
+        return eKeyHandled;
+      }
+
+      m_selection_index = 0;
+      m_selection_type = SelectionType::Field;
+      FieldDelegateSP &next_field = m_delegate_sp->GetField(m_selection_index);
+      next_field->FieldDelegateSelectFirstElement();
+      return eKeyHandled;
+    }
+
+    FieldDelegateSP &field = m_delegate_sp->GetField(m_selection_index);
+    if (!field->FieldDelegateOnLastOrOnlyElement()) {
+      return field->FieldDelegateHandleChar(key);
+    }
+
+    field->FieldDelegateExitCallback();
+
+    if (m_selection_index == m_delegate_sp->GetNumberOfFields() - 1) {
+      m_selection_type = SelectionType::Action;
+      m_selection_index = 0;
+      return eKeyHandled;
+    }
+
+    m_selection_index++;
+
+    FieldDelegateSP &next_field = m_delegate_sp->GetField(m_selection_index);
+    next_field->FieldDelegateSelectFirstElement();
+
+    return eKeyHandled;
+  }
+
+  HandleCharResult SelectePrevious(int key) {
+    if (m_selection_type == SelectionType::Action) {
+      if (m_selection_index > 0) {
+        m_selection_index--;
+        return eKeyHandled;
+      }
+      m_selection_index = m_delegate_sp->GetNumberOfFields() - 1;
+      m_selection_type = SelectionType::Field;
+      FieldDelegateSP &previous_field =
+          m_delegate_sp->GetField(m_selection_index);
+      previous_field->FieldDelegateSelectLastElement();
+      return eKeyHandled;
+    }
+
+    FieldDelegateSP &field = m_delegate_sp->GetField(m_selection_index);
+    if (!field->FieldDelegateOnFirstOrOnlyElement()) {
+      return field->FieldDelegateHandleChar(key);
+    }
+
+    field->FieldDelegateExitCallback();
+
+    if (m_selection_index == 0) {
+      m_selection_type = SelectionType::Action;
+      m_selection_index = m_delegate_sp->GetNumberOfActions() - 1;
+      return eKeyHandled;
+    }
+
+    m_selection_index--;
+
+    FieldDelegateSP &previous_field =
+        m_delegate_sp->GetField(m_selection_index);
+    previous_field->FieldDelegateSelectLastElement();
+
+    return eKeyHandled;
+  }
+
+  void ExecuteAction(Window &window) {
+    FormAction &action = m_delegate_sp->GetAction(m_selection_index);
+    action.Execute(window);
+    m_first_visible_line = 0;
+    m_selection_index = 0;
+    m_selection_type = SelectionType::Field;
+  }
+
+  HandleCharResult WindowDelegateHandleChar(Window &window, int key) override {
+    switch (key) {
+    case '\r':
+    case '\n':
+    case KEY_ENTER:
+      if (m_selection_type == SelectionType::Action) {
+        ExecuteAction(window);
+        return eKeyHandled;
+      }
+      break;
+    case '\t':
+      return SelecteNext(key);
+    case KEY_SHIFT_TAB:
+      return SelectePrevious(key);
+    case KEY_ESCAPE:
+      window.GetParent()->RemoveSubWindow(&window);
+      return eKeyHandled;
+    default:
+      break;
+    }
+
+    // If the key wasn't handled and one of the fields is selected, pass the key
+    // to that field.
+    if (m_selection_type == SelectionType::Field) {
+      FieldDelegateSP &field = m_delegate_sp->GetField(m_selection_index);
+      return field->FieldDelegateHandleChar(key);
+    }
+
+    return eKeyNotHandled;
+  }
+
+protected:
+  FormDelegateSP m_delegate_sp;
+  // The index of the currently selected SelectionType.
+  int m_selection_index;
+  // See SelectionType class enum.
+  SelectionType m_selection_type;
+  // The first visible line from the pad.
+  int m_first_visible_line;
 };
 
 class MenuDelegate {
@@ -915,10 +2381,10 @@ void Menu::DrawMenuTitle(Window &window, bool highlight) {
   } else {
     const int shortcut_key = m_key_value;
     bool underlined_shortcut = false;
-    const attr_t hilgight_attr = A_REVERSE;
+    const attr_t highlight_attr = A_REVERSE;
     if (highlight)
-      window.AttributeOn(hilgight_attr);
-    if (isprint(shortcut_key)) {
+      window.AttributeOn(highlight_attr);
+    if (llvm::isPrint(shortcut_key)) {
       size_t lower_pos = m_name.find(tolower(shortcut_key));
       size_t upper_pos = m_name.find(toupper(shortcut_key));
       const char *name = m_name.c_str();
@@ -944,18 +2410,18 @@ void Menu::DrawMenuTitle(Window &window, bool highlight) {
     }
 
     if (highlight)
-      window.AttributeOff(hilgight_attr);
+      window.AttributeOff(highlight_attr);
 
     if (m_key_name.empty()) {
-      if (!underlined_shortcut && isprint(m_key_value)) {
-        window.AttributeOn(COLOR_PAIR(3));
+      if (!underlined_shortcut && llvm::isPrint(m_key_value)) {
+        window.AttributeOn(COLOR_PAIR(MagentaOnWhite));
         window.Printf(" (%c)", m_key_value);
-        window.AttributeOff(COLOR_PAIR(3));
+        window.AttributeOff(COLOR_PAIR(MagentaOnWhite));
       }
     } else {
-      window.AttributeOn(COLOR_PAIR(3));
+      window.AttributeOn(COLOR_PAIR(MagentaOnWhite));
       window.Printf(" (%s)", m_key_name.c_str());
-      window.AttributeOff(COLOR_PAIR(3));
+      window.AttributeOff(COLOR_PAIR(MagentaOnWhite));
     }
   }
 }
@@ -967,7 +2433,7 @@ bool Menu::WindowDelegateDraw(Window &window, bool force) {
   Menu::Type menu_type = GetType();
   switch (menu_type) {
   case Menu::Type::Bar: {
-    window.SetBackground(2);
+    window.SetBackground(BlackOnWhite);
     window.MoveCursor(0, 0);
     for (size_t i = 0; i < num_submenus; ++i) {
       Menu *menu = submenus[i].get();
@@ -987,7 +2453,7 @@ bool Menu::WindowDelegateDraw(Window &window, bool force) {
     int cursor_x = 0;
     int cursor_y = 0;
     window.Erase();
-    window.SetBackground(2);
+    window.SetBackground(BlackOnWhite);
     window.Box();
     for (size_t i = 0; i < num_submenus; ++i) {
       const bool is_selected = (i == static_cast<size_t>(selected_idx));
@@ -1188,18 +2654,16 @@ public:
 
     ListenerSP listener_sp(
         Listener::MakeListener("lldb.IOHandler.curses.Application"));
-    ConstString broadcaster_class_target(Target::GetStaticBroadcasterClass());
     ConstString broadcaster_class_process(Process::GetStaticBroadcasterClass());
-    ConstString broadcaster_class_thread(Thread::GetStaticBroadcasterClass());
     debugger.EnableForwardEvents(listener_sp);
 
-    bool update = true;
+    m_update_screen = true;
 #if defined(__APPLE__)
     std::deque<int> escape_chars;
 #endif
 
     while (!done) {
-      if (update) {
+      if (m_update_screen) {
         m_window_sp->Draw(false);
         // All windows should be calling Window::DeferredRefresh() instead of
         // Window::Refresh() so we can do a single update and avoid any screen
@@ -1211,7 +2675,7 @@ public:
         m_window_sp->MoveCursor(0, 0);
 
         doupdate();
-        update = false;
+        m_update_screen = false;
       }
 
 #if defined(__APPLE__)
@@ -1271,9 +2735,7 @@ public:
                 ConstString broadcaster_class(
                     broadcaster->GetBroadcasterClass());
                 if (broadcaster_class == broadcaster_class_process) {
-                  debugger.GetCommandInterpreter().UpdateExecutionContext(
-                      nullptr);
-                  update = true;
+                  m_update_screen = true;
                   continue; // Don't get any key, just update our view
                 }
               }
@@ -1284,10 +2746,13 @@ public:
         HandleCharResult key_result = m_window_sp->HandleChar(ch);
         switch (key_result) {
         case eKeyHandled:
-          debugger.GetCommandInterpreter().UpdateExecutionContext(nullptr);
-          update = true;
+          m_update_screen = true;
           break;
         case eKeyNotHandled:
+          if (ch == 12) { // Ctrl+L, force full redraw
+            redrawwin(m_window_sp->get());
+            m_update_screen = true;
+          }
           break;
         case eQuitApplication:
           done = true;
@@ -1305,12 +2770,65 @@ public:
     return m_window_sp;
   }
 
+  void TerminalSizeChanged() {
+    ::endwin();
+    ::refresh();
+    Rect content_bounds = m_window_sp->GetFrame();
+    m_window_sp->SetBounds(content_bounds);
+    if (WindowSP menubar_window_sp = m_window_sp->FindSubWindow("Menubar"))
+      menubar_window_sp->SetBounds(content_bounds.MakeMenuBar());
+    if (WindowSP status_window_sp = m_window_sp->FindSubWindow("Status"))
+      status_window_sp->SetBounds(content_bounds.MakeStatusBar());
+
+    WindowSP source_window_sp = m_window_sp->FindSubWindow("Source");
+    WindowSP variables_window_sp = m_window_sp->FindSubWindow("Variables");
+    WindowSP registers_window_sp = m_window_sp->FindSubWindow("Registers");
+    WindowSP threads_window_sp = m_window_sp->FindSubWindow("Threads");
+
+    Rect threads_bounds;
+    Rect source_variables_bounds;
+    content_bounds.VerticalSplitPercentage(0.80, source_variables_bounds,
+                                           threads_bounds);
+    if (threads_window_sp)
+      threads_window_sp->SetBounds(threads_bounds);
+    else
+      source_variables_bounds = content_bounds;
+
+    Rect source_bounds;
+    Rect variables_registers_bounds;
+    source_variables_bounds.HorizontalSplitPercentage(
+        0.70, source_bounds, variables_registers_bounds);
+    if (variables_window_sp || registers_window_sp) {
+      if (variables_window_sp && registers_window_sp) {
+        Rect variables_bounds;
+        Rect registers_bounds;
+        variables_registers_bounds.VerticalSplitPercentage(
+            0.50, variables_bounds, registers_bounds);
+        variables_window_sp->SetBounds(variables_bounds);
+        registers_window_sp->SetBounds(registers_bounds);
+      } else if (variables_window_sp) {
+        variables_window_sp->SetBounds(variables_registers_bounds);
+      } else {
+        registers_window_sp->SetBounds(variables_registers_bounds);
+      }
+    } else {
+      source_bounds = source_variables_bounds;
+    }
+
+    source_window_sp->SetBounds(source_bounds);
+
+    touchwin(stdscr);
+    redrawwin(m_window_sp->get());
+    m_update_screen = true;
+  }
+
 protected:
   WindowSP m_window_sp;
   WindowDelegates m_window_delegates;
   SCREEN *m_screen;
   FILE *m_in;
   FILE *m_out;
+  bool m_update_screen = false;
 };
 
 } // namespace curses
@@ -1318,22 +2836,21 @@ protected:
 using namespace curses;
 
 struct Row {
-  ValueObjectManager value;
+  ValueObjectUpdater value;
   Row *parent;
   // The process stop ID when the children were calculated.
-  uint32_t children_stop_id;
-  int row_idx;
-  int x;
-  int y;
+  uint32_t children_stop_id = 0;
+  int row_idx = 0;
+  int x = 1;
+  int y = 1;
   bool might_have_children;
-  bool expanded;
-  bool calculated_children;
+  bool expanded = false;
+  bool calculated_children = false;
   std::vector<Row> children;
 
   Row(const ValueObjectSP &v, Row *p)
-      : value(v, lldb::eDynamicDontRunTarget, true), parent(p), row_idx(0),
-        x(1), y(1), might_have_children(v ? v->MightHaveChildren() : false),
-        expanded(false), calculated_children(false), children() {}
+      : value(v), parent(p),
+        might_have_children(v ? v->MightHaveChildren() : false) {}
 
   size_t GetDepth() const {
     if (parent)
@@ -1848,7 +3365,7 @@ public:
         if (FormatEntity::Format(m_format, strm, &sc, &exe_ctx, nullptr,
                                  nullptr, false, false)) {
           int right_pad = 1;
-          window.PutCStringTruncated(strm.GetString().str().c_str(), right_pad);
+          window.PutCStringTruncated(right_pad, strm.GetString().str().c_str());
         }
       }
     }
@@ -1907,7 +3424,7 @@ public:
       if (FormatEntity::Format(m_format, strm, nullptr, &exe_ctx, nullptr,
                                nullptr, false, false)) {
         int right_pad = 1;
-        window.PutCStringTruncated(strm.GetString().str().c_str(), right_pad);
+        window.PutCStringTruncated(right_pad, strm.GetString().str().c_str());
       }
     }
   }
@@ -1997,7 +3514,7 @@ public:
       if (FormatEntity::Format(m_format, strm, nullptr, &exe_ctx, nullptr,
                                nullptr, false, false)) {
         int right_pad = 1;
-        window.PutCStringTruncated(strm.GetString().str().c_str(), right_pad);
+        window.PutCStringTruncated(right_pad, strm.GetString().str().c_str());
       }
     }
   }
@@ -2046,9 +3563,7 @@ protected:
 
 class ValueObjectListDelegate : public WindowDelegate {
 public:
-  ValueObjectListDelegate()
-      : m_rows(), m_selected_row(nullptr), m_selected_row_idx(0),
-        m_first_visible_row(0), m_num_rows(0), m_max_x(0), m_max_y(0) {}
+  ValueObjectListDelegate() : m_rows() {}
 
   ValueObjectListDelegate(ValueObjectList &valobj_list)
       : m_rows(), m_selected_row(nullptr), m_selected_row_idx(0),
@@ -2236,14 +3751,14 @@ public:
 
 protected:
   std::vector<Row> m_rows;
-  Row *m_selected_row;
-  uint32_t m_selected_row_idx;
-  uint32_t m_first_visible_row;
-  uint32_t m_num_rows;
+  Row *m_selected_row = nullptr;
+  uint32_t m_selected_row_idx = 0;
+  uint32_t m_first_visible_row = 0;
+  uint32_t m_num_rows = 0;
   int m_min_x;
   int m_min_y;
-  int m_max_x;
-  int m_max_y;
+  int m_max_x = 0;
+  int m_max_y = 0;
 
   static Format FormatForChar(int c) {
     switch (c) {
@@ -2300,29 +3815,29 @@ protected:
       window.AttributeOn(A_REVERSE);
 
     if (type_name && type_name[0])
-      window.Printf("(%s) ", type_name);
+      window.PrintfTruncated(1, "(%s) ", type_name);
 
     if (name && name[0])
-      window.PutCString(name);
+      window.PutCStringTruncated(1, name);
 
     attr_t changd_attr = 0;
     if (valobj->GetValueDidChange())
-      changd_attr = COLOR_PAIR(5) | A_BOLD;
+      changd_attr = COLOR_PAIR(RedOnBlack) | A_BOLD;
 
     if (value && value[0]) {
-      window.PutCString(" = ");
+      window.PutCStringTruncated(1, " = ");
       if (changd_attr)
         window.AttributeOn(changd_attr);
-      window.PutCString(value);
+      window.PutCStringTruncated(1, value);
       if (changd_attr)
         window.AttributeOff(changd_attr);
     }
 
     if (summary && summary[0]) {
-      window.PutChar(' ');
+      window.PutCStringTruncated(1, " ");
       if (changd_attr)
         window.AttributeOn(changd_attr);
-      window.PutCString(summary);
+      window.PutCStringTruncated(1, summary);
       if (changd_attr)
         window.AttributeOff(changd_attr);
     }
@@ -2714,7 +4229,7 @@ static const char *CursesKeyToCString(int ch) {
   case KEY_ESCAPE:
     return "escape";
   default:
-    if (isprint(ch))
+    if (llvm::isPrint(ch))
       snprintf(g_desc, sizeof(g_desc), "%c", ch);
     else
       snprintf(g_desc, sizeof(g_desc), "\\x%2.2x", ch);
@@ -2760,7 +4275,7 @@ bool HelpDialogDelegate::WindowDelegateDraw(Window &window, bool force) {
   while (y <= max_y) {
     window.MoveCursor(x, y);
     window.PutCStringTruncated(
-        m_text.GetStringAtIndex(m_first_visible_line + y - min_y), 1);
+        1, m_text.GetStringAtIndex(m_first_visible_line + y - min_y));
     ++y;
   }
   return true;
@@ -2830,7 +4345,8 @@ public:
 
     eMenuID_Process,
     eMenuID_ProcessAttach,
-    eMenuID_ProcessDetach,
+    eMenuID_ProcessDetachResume,
+    eMenuID_ProcessDetachSuspended,
     eMenuID_ProcessLaunch,
     eMenuID_ProcessContinue,
     eMenuID_ProcessHalt,
@@ -2866,6 +4382,10 @@ public:
       window.SelectNextWindowAsActive();
       return eKeyHandled;
 
+    case KEY_SHIFT_TAB:
+      window.SelectPreviousWindowAsActive();
+      return eKeyHandled;
+
     case 'h':
       window.CreateHelpSubwindow();
       return eKeyHandled;
@@ -2890,6 +4410,7 @@ public:
   KeyHelp *WindowDelegateGetKeyHelp() override {
     static curses::KeyHelp g_source_view_key_help[] = {
         {'\t', "Select next view"},
+        {KEY_BTAB, "Select previous view"},
         {'h', "Show help dialog with view specific key bindings"},
         {',', "Page up"},
         {'.', "Page down"},
@@ -2975,13 +4496,15 @@ public:
     }
       return MenuActionResult::Handled;
 
-    case eMenuID_ProcessDetach: {
+    case eMenuID_ProcessDetachResume:
+    case eMenuID_ProcessDetachSuspended: {
       ExecutionContext exe_ctx =
           m_debugger.GetCommandInterpreter().GetExecutionContext();
       if (exe_ctx.HasProcessScope()) {
         Process *process = exe_ctx.GetProcessPtr();
         if (process && process->IsAlive())
-          process->Detach(false);
+          process->Detach(menu.GetIdentifier() ==
+                          eMenuID_ProcessDetachSuspended);
       }
     }
       return MenuActionResult::Handled;
@@ -3071,7 +4594,7 @@ public:
                                                    new_registers_rect);
           registers_window_sp->SetBounds(new_registers_rect);
         } else {
-          // No variables window, grab the bottom part of the source window
+          // No registers window, grab the bottom part of the source window
           Rect new_source_rect;
           source_bounds.HorizontalSplitPercentage(0.70, new_source_rect,
                                                   new_variables_rect);
@@ -3122,7 +4645,7 @@ public:
                                                    new_regs_rect);
           variables_window_sp->SetBounds(new_vars_rect);
         } else {
-          // No registers window, grab the bottom part of the source window
+          // No variables window, grab the bottom part of the source window
           Rect new_source_rect;
           source_bounds.HorizontalSplitPercentage(0.70, new_source_rect,
                                                   new_regs_rect);
@@ -3168,7 +4691,7 @@ public:
     Thread *thread = exe_ctx.GetThreadPtr();
     StackFrame *frame = exe_ctx.GetFramePtr();
     window.Erase();
-    window.SetBackground(2);
+    window.SetBackground(BlackOnWhite);
     window.MoveCursor(0, 0);
     if (process) {
       const StateType state = process->GetState();
@@ -3180,7 +4703,7 @@ public:
         if (thread && FormatEntity::Format(m_format, strm, nullptr, &exe_ctx,
                                            nullptr, nullptr, false, false)) {
           window.MoveCursor(40, 0);
-          window.PutCStringTruncated(strm.GetString().str().c_str(), 1);
+          window.PutCStringTruncated(1, strm.GetString().str().c_str());
         }
 
         window.MoveCursor(60, 0);
@@ -3211,9 +4734,10 @@ public:
   SourceFileWindowDelegate(Debugger &debugger)
       : WindowDelegate(), m_debugger(debugger), m_sc(), m_file_sp(),
         m_disassembly_scope(nullptr), m_disassembly_sp(), m_disassembly_range(),
-        m_title(), m_line_width(4), m_selected_line(0), m_pc_line(0),
-        m_stop_id(0), m_frame_idx(UINT32_MAX), m_first_visible_line(0),
-        m_min_x(0), m_min_y(0), m_max_x(0), m_max_y(0) {}
+        m_title(), m_tid(LLDB_INVALID_THREAD_ID), m_line_width(4),
+        m_selected_line(0), m_pc_line(0), m_stop_id(0), m_frame_idx(UINT32_MAX),
+        m_first_visible_line(0), m_first_visible_column(0), m_min_x(0),
+        m_min_y(0), m_max_x(0), m_max_y(0) {}
 
   ~SourceFileWindowDelegate() override = default;
 
@@ -3230,19 +4754,21 @@ public:
         {KEY_RETURN, "Run to selected line with one shot breakpoint"},
         {KEY_UP, "Select previous source line"},
         {KEY_DOWN, "Select next source line"},
+        {KEY_LEFT, "Scroll to the left"},
+        {KEY_RIGHT, "Scroll to the right"},
         {KEY_PPAGE, "Page up"},
         {KEY_NPAGE, "Page down"},
         {'b', "Set breakpoint on selected source/disassembly line"},
         {'c', "Continue process"},
-        {'d', "Detach and resume process"},
         {'D', "Detach with process suspended"},
         {'h', "Show help dialog"},
-        {'k', "Kill process"},
         {'n', "Step over (source line)"},
         {'N', "Step over (single instruction)"},
-        {'o', "Step out"},
+        {'f', "Step out (finish)"},
         {'s', "Step in (source line)"},
         {'S', "Step in (single instruction)"},
+        {'u', "Frame up"},
+        {'d', "Frame down"},
         {',', "Page up"},
         {'.', "Page down"},
         {'\0', nullptr}};
@@ -3366,7 +4892,7 @@ public:
             if (m_disassembly_scope != m_sc.function) {
               m_disassembly_scope = m_sc.function;
               m_disassembly_sp = m_sc.function->GetInstructions(
-                  exe_ctx, nullptr, prefer_file_cache);
+                  exe_ctx, nullptr, !prefer_file_cache);
               if (m_disassembly_sp) {
                 set_selected_line_to_pc = true;
                 m_disassembly_range = m_sc.function->GetAddressRange();
@@ -3406,7 +4932,7 @@ public:
       window.AttributeOn(A_REVERSE);
       window.MoveCursor(1, 1);
       window.PutChar(' ');
-      window.PutCStringTruncated(m_title.GetString().str().c_str(), 1);
+      window.PutCStringTruncated(1, m_title.GetString().str().c_str());
       int x = window.GetCursorX();
       if (x < window_width - 1) {
         window.Printf("%*s", window_width - x - 1, "");
@@ -3440,7 +4966,7 @@ public:
       }
 
       const attr_t selected_highlight_attr = A_REVERSE;
-      const attr_t pc_highlight_attr = COLOR_PAIR(1);
+      const attr_t pc_highlight_attr = COLOR_PAIR(BlackOnBlue);
 
       for (size_t i = 0; i < num_visible_lines; ++i) {
         const uint32_t curr_line = m_first_visible_line + i;
@@ -3459,7 +4985,7 @@ public:
             highlight_attr = selected_highlight_attr;
 
           if (bp_lines.find(curr_line + 1) != bp_lines.end())
-            bp_attr = COLOR_PAIR(2);
+            bp_attr = COLOR_PAIR(BlackOnWhite);
 
           if (bp_attr)
             window.AttributeOn(bp_attr);
@@ -3478,10 +5004,21 @@ public:
 
           if (highlight_attr)
             window.AttributeOn(highlight_attr);
-          const uint32_t line_len =
-              m_file_sp->GetLineLength(curr_line + 1, false);
-          if (line_len > 0)
-            window.PutCString(m_file_sp->PeekLineData(curr_line + 1), line_len);
+
+          StreamString lineStream;
+          m_file_sp->DisplaySourceLines(curr_line + 1, {}, 0, 0, &lineStream);
+          StringRef line = lineStream.GetString();
+          if (line.endswith("\n"))
+            line = line.drop_back();
+          bool wasWritten = window.OutputColoredStringTruncated(
+              1, line, m_first_visible_column, line_is_selected);
+          if (line_is_selected && !wasWritten) {
+            // Draw an empty space to show the selected line if empty,
+            // or draw '<' if nothing is visible because of scrolling too much
+            // to the right.
+            window.PutCStringTruncated(
+                1, line.empty() && m_first_visible_column == 0 ? " " : "<");
+          }
 
           if (is_pc_line && frame_sp &&
               frame_sp->GetConcreteFrameIndex() == 0) {
@@ -3493,11 +5030,15 @@ public:
               if (stop_description && stop_description[0]) {
                 size_t stop_description_len = strlen(stop_description);
                 int desc_x = window_width - stop_description_len - 16;
-                window.Printf("%*s", desc_x - window.GetCursorX(), "");
-                // window.MoveCursor(window_width - stop_description_len - 15,
-                // line_y);
-                window.Printf("<<< Thread %u: %s ", thread->GetIndexID(),
-                              stop_description);
+                if (desc_x - window.GetCursorX() > 0)
+                  window.Printf("%*s", desc_x - window.GetCursorX(), "");
+                window.MoveCursor(window_width - stop_description_len - 16,
+                                  line_y);
+                const attr_t stop_reason_attr = COLOR_PAIR(WhiteOnBlue);
+                window.AttributeOn(stop_reason_attr);
+                window.PrintfTruncated(1, " <<< Thread %u: %s ",
+                                       thread->GetIndexID(), stop_description);
+                window.AttributeOff(stop_reason_attr);
               }
             } else {
               window.Printf("%*s", window_width - window.GetCursorX() - 1, "");
@@ -3537,7 +5078,7 @@ public:
         }
 
         const attr_t selected_highlight_attr = A_REVERSE;
-        const attr_t pc_highlight_attr = COLOR_PAIR(1);
+        const attr_t pc_highlight_attr = COLOR_PAIR(WhiteOnBlue);
 
         StreamString strm;
 
@@ -3585,7 +5126,7 @@ public:
 
           if (bp_file_addrs.find(inst->GetAddress().GetFileAddress()) !=
               bp_file_addrs.end())
-            bp_attr = COLOR_PAIR(2);
+            bp_attr = COLOR_PAIR(BlackOnWhite);
 
           if (bp_attr)
             window.AttributeOn(bp_attr);
@@ -3628,7 +5169,9 @@ public:
             strm.Printf("%s", mnemonic);
 
           int right_pad = 1;
-          window.PutCStringTruncated(strm.GetData(), right_pad);
+          window.PutCStringTruncated(
+              right_pad,
+              strm.GetString().substr(m_first_visible_column).data());
 
           if (is_pc_line && frame_sp &&
               frame_sp->GetConcreteFrameIndex() == 0) {
@@ -3640,11 +5183,12 @@ public:
               if (stop_description && stop_description[0]) {
                 size_t stop_description_len = strlen(stop_description);
                 int desc_x = window_width - stop_description_len - 16;
-                window.Printf("%*s", desc_x - window.GetCursorX(), "");
-                // window.MoveCursor(window_width - stop_description_len - 15,
-                // line_y);
-                window.Printf("<<< Thread %u: %s ", thread->GetIndexID(),
-                              stop_description);
+                if (desc_x - window.GetCursorX() > 0)
+                  window.Printf("%*s", desc_x - window.GetCursorX(), "");
+                window.MoveCursor(window_width - stop_description_len - 15,
+                                  line_y);
+                window.PrintfTruncated(1, "<<< Thread %u: %s ",
+                                       thread->GetIndexID(), stop_description);
               }
             } else {
               window.Printf("%*s", window_width - window.GetCursorX() - 1, "");
@@ -3722,6 +5266,15 @@ public:
       }
       return eKeyHandled;
 
+    case KEY_LEFT:
+      if (m_first_visible_column > 0)
+        --m_first_visible_column;
+      return eKeyHandled;
+
+    case KEY_RIGHT:
+      ++m_first_visible_column;
+      return eKeyHandled;
+
     case '\r':
     case '\n':
     case KEY_ENTER:
@@ -3743,7 +5296,7 @@ public:
               false,               // request_hardware
               eLazyBoolCalculate); // move_to_nearest_code
           // Make breakpoint one shot
-          bp_sp->GetOptions()->SetOneShot(true);
+          bp_sp->GetOptions().SetOneShot(true);
           exe_ctx.GetProcessRef().Resume();
         }
       } else if (m_selected_line < GetNumDisassemblyLines()) {
@@ -3759,64 +5312,23 @@ public:
               false,  // internal
               false); // request_hardware
           // Make breakpoint one shot
-          bp_sp->GetOptions()->SetOneShot(true);
+          bp_sp->GetOptions().SetOneShot(true);
           exe_ctx.GetProcessRef().Resume();
         }
       }
       return eKeyHandled;
 
     case 'b': // 'b' == toggle breakpoint on currently selected line
-      if (m_selected_line < GetNumSourceLines()) {
-        ExecutionContext exe_ctx =
-            m_debugger.GetCommandInterpreter().GetExecutionContext();
-        if (exe_ctx.HasTargetScope()) {
-          BreakpointSP bp_sp = exe_ctx.GetTargetRef().CreateBreakpoint(
-              nullptr, // Don't limit the breakpoint to certain modules
-              m_file_sp->GetFileSpec(), // Source file
-              m_selected_line +
-                  1, // Source line number (m_selected_line is zero based)
-              0,     // No column specified.
-              0,     // No offset
-              eLazyBoolCalculate,  // Check inlines using global setting
-              eLazyBoolCalculate,  // Skip prologue using global setting,
-              false,               // internal
-              false,               // request_hardware
-              eLazyBoolCalculate); // move_to_nearest_code
-        }
-      } else if (m_selected_line < GetNumDisassemblyLines()) {
-        const Instruction *inst = m_disassembly_sp->GetInstructionList()
-                                      .GetInstructionAtIndex(m_selected_line)
-                                      .get();
-        ExecutionContext exe_ctx =
-            m_debugger.GetCommandInterpreter().GetExecutionContext();
-        if (exe_ctx.HasTargetScope()) {
-          Address addr = inst->GetAddress();
-          BreakpointSP bp_sp = exe_ctx.GetTargetRef().CreateBreakpoint(
-              addr,   // lldb_private::Address
-              false,  // internal
-              false); // request_hardware
-        }
-      }
+      ToggleBreakpointOnSelectedLine();
       return eKeyHandled;
 
-    case 'd': // 'd' == detach and let run
     case 'D': // 'D' == detach and keep stopped
     {
       ExecutionContext exe_ctx =
           m_debugger.GetCommandInterpreter().GetExecutionContext();
       if (exe_ctx.HasProcessScope())
-        exe_ctx.GetProcessRef().Detach(c == 'D');
+        exe_ctx.GetProcessRef().Detach(true);
     }
-      return eKeyHandled;
-
-    case 'k':
-      // 'k' == kill
-      {
-        ExecutionContext exe_ctx =
-            m_debugger.GetCommandInterpreter().GetExecutionContext();
-        if (exe_ctx.HasProcessScope())
-          exe_ctx.GetProcessRef().Destroy(false);
-      }
       return eKeyHandled;
 
     case 'c':
@@ -3829,8 +5341,8 @@ public:
       }
       return eKeyHandled;
 
-    case 'o':
-      // 'o' == step out
+    case 'f':
+      // 'f' == step out (finish)
       {
         ExecutionContext exe_ctx =
             m_debugger.GetCommandInterpreter().GetExecutionContext();
@@ -3867,6 +5379,26 @@ public:
     }
       return eKeyHandled;
 
+    case 'u': // 'u' == frame up
+    case 'd': // 'd' == frame down
+    {
+      ExecutionContext exe_ctx =
+          m_debugger.GetCommandInterpreter().GetExecutionContext();
+      if (exe_ctx.HasThreadScope()) {
+        Thread *thread = exe_ctx.GetThreadPtr();
+        uint32_t frame_idx = thread->GetSelectedFrameIndex();
+        if (frame_idx == UINT32_MAX)
+          frame_idx = 0;
+        if (c == 'u' && frame_idx + 1 < thread->GetStackFrameCount())
+          ++frame_idx;
+        else if (c == 'd' && frame_idx > 0)
+          --frame_idx;
+        if (thread->SetSelectedFrameByIndex(frame_idx, true))
+          exe_ctx.SetFrameSP(thread->GetSelectedFrame());
+      }
+    }
+      return eKeyHandled;
+
     case 'h':
       window.CreateHelpSubwindow();
       return eKeyHandled;
@@ -3875,6 +5407,85 @@ public:
       break;
     }
     return eKeyNotHandled;
+  }
+
+  void ToggleBreakpointOnSelectedLine() {
+    ExecutionContext exe_ctx =
+        m_debugger.GetCommandInterpreter().GetExecutionContext();
+    if (!exe_ctx.HasTargetScope())
+      return;
+    if (GetNumSourceLines() > 0) {
+      // Source file breakpoint.
+      BreakpointList &bp_list = exe_ctx.GetTargetRef().GetBreakpointList();
+      const size_t num_bps = bp_list.GetSize();
+      for (size_t bp_idx = 0; bp_idx < num_bps; ++bp_idx) {
+        BreakpointSP bp_sp = bp_list.GetBreakpointAtIndex(bp_idx);
+        const size_t num_bps_locs = bp_sp->GetNumLocations();
+        for (size_t bp_loc_idx = 0; bp_loc_idx < num_bps_locs; ++bp_loc_idx) {
+          BreakpointLocationSP bp_loc_sp =
+              bp_sp->GetLocationAtIndex(bp_loc_idx);
+          LineEntry bp_loc_line_entry;
+          if (bp_loc_sp->GetAddress().CalculateSymbolContextLineEntry(
+                  bp_loc_line_entry)) {
+            if (m_file_sp->GetFileSpec() == bp_loc_line_entry.file &&
+                m_selected_line + 1 == bp_loc_line_entry.line) {
+              bool removed =
+                  exe_ctx.GetTargetRef().RemoveBreakpointByID(bp_sp->GetID());
+              assert(removed);
+              UNUSED_IF_ASSERT_DISABLED(removed);
+              return; // Existing breakpoint removed.
+            }
+          }
+        }
+      }
+      // No breakpoint found on the location, add it.
+      BreakpointSP bp_sp = exe_ctx.GetTargetRef().CreateBreakpoint(
+          nullptr, // Don't limit the breakpoint to certain modules
+          m_file_sp->GetFileSpec(), // Source file
+          m_selected_line +
+              1, // Source line number (m_selected_line is zero based)
+          0,     // No column specified.
+          0,     // No offset
+          eLazyBoolCalculate,  // Check inlines using global setting
+          eLazyBoolCalculate,  // Skip prologue using global setting,
+          false,               // internal
+          false,               // request_hardware
+          eLazyBoolCalculate); // move_to_nearest_code
+    } else {
+      // Disassembly breakpoint.
+      assert(GetNumDisassemblyLines() > 0);
+      assert(m_selected_line < GetNumDisassemblyLines());
+      const Instruction *inst = m_disassembly_sp->GetInstructionList()
+                                    .GetInstructionAtIndex(m_selected_line)
+                                    .get();
+      Address addr = inst->GetAddress();
+      // Try to find it.
+      BreakpointList &bp_list = exe_ctx.GetTargetRef().GetBreakpointList();
+      const size_t num_bps = bp_list.GetSize();
+      for (size_t bp_idx = 0; bp_idx < num_bps; ++bp_idx) {
+        BreakpointSP bp_sp = bp_list.GetBreakpointAtIndex(bp_idx);
+        const size_t num_bps_locs = bp_sp->GetNumLocations();
+        for (size_t bp_loc_idx = 0; bp_loc_idx < num_bps_locs; ++bp_loc_idx) {
+          BreakpointLocationSP bp_loc_sp =
+              bp_sp->GetLocationAtIndex(bp_loc_idx);
+          LineEntry bp_loc_line_entry;
+          const lldb::addr_t file_addr =
+              bp_loc_sp->GetAddress().GetFileAddress();
+          if (file_addr == addr.GetFileAddress()) {
+            bool removed =
+                exe_ctx.GetTargetRef().RemoveBreakpointByID(bp_sp->GetID());
+            assert(removed);
+            UNUSED_IF_ASSERT_DISABLED(removed);
+            return; // Existing breakpoint removed.
+          }
+        }
+      }
+      // No breakpoint found on the address, add it.
+      BreakpointSP bp_sp =
+          exe_ctx.GetTargetRef().CreateBreakpoint(addr, // lldb_private::Address
+                                                  false,  // internal
+                                                  false); // request_hardware
+    }
   }
 
 protected:
@@ -3895,6 +5506,7 @@ protected:
   uint32_t m_stop_id;
   uint32_t m_frame_idx;
   int m_first_visible_line;
+  int m_first_visible_column;
   int m_min_x;
   int m_min_y;
   int m_max_x;
@@ -3909,7 +5521,7 @@ IOHandlerCursesGUI::IOHandlerCursesGUI(Debugger &debugger)
 void IOHandlerCursesGUI::Activate() {
   IOHandler::Activate();
   if (!m_app_ap) {
-    m_app_ap.reset(new Application(GetInputFILE(), GetOutputFILE()));
+    m_app_ap = std::make_unique<Application>(GetInputFILE(), GetOutputFILE());
 
     // This is both a window and a menu delegate
     std::shared_ptr<ApplicationDelegate> app_delegate_sp(
@@ -3938,8 +5550,12 @@ void IOHandlerCursesGUI::Activate() {
                                     ApplicationDelegate::eMenuID_Process));
     process_menu_sp->AddSubmenu(MenuSP(new Menu(
         "Attach", nullptr, 'a', ApplicationDelegate::eMenuID_ProcessAttach)));
-    process_menu_sp->AddSubmenu(MenuSP(new Menu(
-        "Detach", nullptr, 'd', ApplicationDelegate::eMenuID_ProcessDetach)));
+    process_menu_sp->AddSubmenu(
+        MenuSP(new Menu("Detach and resume", nullptr, 'd',
+                        ApplicationDelegate::eMenuID_ProcessDetachResume)));
+    process_menu_sp->AddSubmenu(
+        MenuSP(new Menu("Detach suspended", nullptr, 's',
+                        ApplicationDelegate::eMenuID_ProcessDetachSuspended)));
     process_menu_sp->AddSubmenu(MenuSP(new Menu(
         "Launch", nullptr, 'l', ApplicationDelegate::eMenuID_ProcessLaunch)));
     process_menu_sp->AddSubmenu(MenuSP(new Menu(Menu::Type::Separator)));
@@ -4041,11 +5657,30 @@ void IOHandlerCursesGUI::Activate() {
       main_window_sp->CreateHelpSubwindow();
     }
 
-    init_pair(1, COLOR_WHITE, COLOR_BLUE);
-    init_pair(2, COLOR_BLACK, COLOR_WHITE);
-    init_pair(3, COLOR_MAGENTA, COLOR_WHITE);
-    init_pair(4, COLOR_MAGENTA, COLOR_BLACK);
-    init_pair(5, COLOR_RED, COLOR_BLACK);
+    // All colors with black background.
+    init_pair(1, COLOR_BLACK, COLOR_BLACK);
+    init_pair(2, COLOR_RED, COLOR_BLACK);
+    init_pair(3, COLOR_GREEN, COLOR_BLACK);
+    init_pair(4, COLOR_YELLOW, COLOR_BLACK);
+    init_pair(5, COLOR_BLUE, COLOR_BLACK);
+    init_pair(6, COLOR_MAGENTA, COLOR_BLACK);
+    init_pair(7, COLOR_CYAN, COLOR_BLACK);
+    init_pair(8, COLOR_WHITE, COLOR_BLACK);
+    // All colors with blue background.
+    init_pair(9, COLOR_BLACK, COLOR_BLUE);
+    init_pair(10, COLOR_RED, COLOR_BLUE);
+    init_pair(11, COLOR_GREEN, COLOR_BLUE);
+    init_pair(12, COLOR_YELLOW, COLOR_BLUE);
+    init_pair(13, COLOR_BLUE, COLOR_BLUE);
+    init_pair(14, COLOR_MAGENTA, COLOR_BLUE);
+    init_pair(15, COLOR_CYAN, COLOR_BLUE);
+    init_pair(16, COLOR_WHITE, COLOR_BLUE);
+    // These must match the order in the color indexes enum.
+    init_pair(17, COLOR_BLACK, COLOR_WHITE);
+    init_pair(18, COLOR_MAGENTA, COLOR_WHITE);
+    static_assert(LastColorPairIndex == 18, "Color indexes do not match.");
+
+    define_key("\033[Z", KEY_SHIFT_TAB);
   }
 }
 
@@ -4063,5 +5698,9 @@ void IOHandlerCursesGUI::Cancel() {}
 bool IOHandlerCursesGUI::Interrupt() { return false; }
 
 void IOHandlerCursesGUI::GotEOF() {}
+
+void IOHandlerCursesGUI::TerminalSizeChanged() {
+  m_app_ap->TerminalSizeChanged();
+}
 
 #endif // LLDB_ENABLE_CURSES

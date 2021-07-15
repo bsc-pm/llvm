@@ -1,6 +1,3 @@
-from __future__ import print_function
-
-
 import gdbremote_testcase
 from lldbsuite.test.decorators import *
 from lldbsuite.test.lldbtest import *
@@ -12,7 +9,6 @@ class TestGdbRemoteRegisterState(gdbremote_testcase.GdbRemoteTestCaseBase):
 
     mydir = TestBase.compute_mydir(__file__)
 
-    @skipIfDarwinEmbedded # <rdar://problem/34539270> lldb-server tests not updated to work on ios etc yet
     def grp_register_save_restore_works(self, with_suffix):
         # Start up the process, use thread suffix, grab main thread id.
         inferior_args = ["message:main entered", "sleep:5"]
@@ -50,7 +46,7 @@ class TestGdbRemoteRegisterState(gdbremote_testcase.GdbRemoteTestCaseBase):
             self.assertIsNotNone(threads)
             thread_id = threads[0]
             self.assertIsNotNone(thread_id)
-            # print("Running on thread: 0x{:x}".format(thread_id))
+            self.trace("Running on thread: 0x{:x}".format(thread_id))
         else:
             thread_id = None
 
@@ -64,22 +60,22 @@ class TestGdbRemoteRegisterState(gdbremote_testcase.GdbRemoteTestCaseBase):
         (success, state_id) = self.parse_QSaveRegisterState_response(context)
         self.assertTrue(success)
         self.assertIsNotNone(state_id)
-        # print("saved register state id: {}".format(state_id))
+        self.trace("saved register state id: {}".format(state_id))
 
         # Remember initial register values.
         initial_reg_values = self.read_register_values(
             gpr_reg_infos, endian, thread_id=thread_id)
-        # print("initial_reg_values: {}".format(initial_reg_values))
+        self.trace("initial_reg_values: {}".format(initial_reg_values))
 
         # Flip gpr register values.
         (successful_writes, failed_writes) = self.flip_all_bits_in_each_register_value(
             gpr_reg_infos, endian, thread_id=thread_id)
-        # print("successful writes: {}, failed writes: {}".format(successful_writes, failed_writes))
+        self.trace("successful writes: {}, failed writes: {}".format(successful_writes, failed_writes))
         self.assertTrue(successful_writes > 0)
 
         flipped_reg_values = self.read_register_values(
             gpr_reg_infos, endian, thread_id=thread_id)
-        # print("flipped_reg_values: {}".format(flipped_reg_values))
+        self.trace("flipped_reg_values: {}".format(flipped_reg_values))
 
         # Restore register values.
         self.reset_test_sequence()
@@ -91,38 +87,18 @@ class TestGdbRemoteRegisterState(gdbremote_testcase.GdbRemoteTestCaseBase):
         # Verify registers match initial register values.
         final_reg_values = self.read_register_values(
             gpr_reg_infos, endian, thread_id=thread_id)
-        # print("final_reg_values: {}".format(final_reg_values))
+        self.trace("final_reg_values: {}".format(final_reg_values))
         self.assertIsNotNone(final_reg_values)
         self.assertEqual(final_reg_values, initial_reg_values)
 
-    @debugserver_test
-    def test_grp_register_save_restore_works_with_suffix_debugserver(self):
+    def test_grp_register_save_restore_works_with_suffix(self):
         USE_THREAD_SUFFIX = True
-        self.init_debugserver_test()
         self.build()
         self.set_inferior_startup_launch()
         self.grp_register_save_restore_works(USE_THREAD_SUFFIX)
 
-    @llgs_test
-    def test_grp_register_save_restore_works_with_suffix_llgs(self):
-        USE_THREAD_SUFFIX = True
-        self.init_llgs_test()
-        self.build()
-        self.set_inferior_startup_launch()
-        self.grp_register_save_restore_works(USE_THREAD_SUFFIX)
-
-    @debugserver_test
-    def test_grp_register_save_restore_works_no_suffix_debugserver(self):
+    def test_grp_register_save_restore_works_no_suffix(self):
         USE_THREAD_SUFFIX = False
-        self.init_debugserver_test()
-        self.build()
-        self.set_inferior_startup_launch()
-        self.grp_register_save_restore_works(USE_THREAD_SUFFIX)
-
-    @llgs_test
-    def test_grp_register_save_restore_works_no_suffix_llgs(self):
-        USE_THREAD_SUFFIX = False
-        self.init_llgs_test()
         self.build()
         self.set_inferior_startup_launch()
         self.grp_register_save_restore_works(USE_THREAD_SUFFIX)

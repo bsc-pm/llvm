@@ -87,40 +87,62 @@ public:
   /// operand bundle tags without comparing strings. Keep this in sync with
   /// LLVMContext::LLVMContext().
   enum : unsigned {
-    OB_deopt = 0,         // "deopt"
-    OB_funclet = 1,       // "funclet"
-    OB_gc_transition = 2, // "gc-transition"
-    OB_cfguardtarget = 3, // "cfguardtarget"
-    OB_preallocated = 4,  // "preallocated"
+    OB_deopt = 0,                  // "deopt"
+    OB_funclet = 1,                // "funclet"
+    OB_gc_transition = 2,          // "gc-transition"
+    OB_cfguardtarget = 3,          // "cfguardtarget"
+    OB_preallocated = 4,           // "preallocated"
+    OB_gc_live = 5,                // "gc-live"
+    OB_clang_arc_attachedcall = 6, // "clang.arc.attachedcall"
     // OmpSs IDs
-    OB_oss_shared = 5,                 // "oss_shared"
-    OB_oss_private = 6,                // "oss_private"
-    OB_oss_firstprivate = 7,           // "oss_firstprivate"
-    OB_oss_vla_dims = 8,               // "oss_vla_dims"
-    OB_oss_dep_in = 9,                 // "OB_oss_dep_in"
-    OB_oss_dep_out = 10,                // "OB_oss_dep_out"
-    OB_oss_dep_inout = 11,              // "OB_oss_dep_inout"
-    OB_oss_dep_concurrent = 12,        // "OB_oss_dep_concurrent"
-    OB_oss_dep_commutative = 13,       // "OB_oss_dep_commutative"
-    OB_oss_dep_weakin = 14,            // "OB_oss_dep_weakin"
-    OB_oss_dep_weakout = 15,           // "OB_oss_dep_weakout"
-    OB_oss_dep_weakinout = 16,         // "OB_oss_dep_weakinout"
-    OB_oss_dep_weakconcurrent = 17,    // "OB_oss_dep_weakconcurrent"
-    OB_oss_dep_weakcommutative = 18,   // "OB_oss_dep_weakcommutative"
-    OB_oss_dep_reduction = 19,         // "OB_oss_dep_reduction"
-    OB_oss_dep_weakreduction = 20,     // "OB_oss_dep_weakreduction"
-    OB_oss_reduction_init = 21,        // "OB_oss_reduction_init"
-    OB_oss_reduction_comb = 22,        // "OB_oss_reduction_comb"
-    OB_oss_final = 23,                 // "OB_oss_final"
-    OB_oss_if = 24,                    // "OB_oss_if"
-    OB_oss_cost = 25,                  // "OB_oss_cost"
-    OB_oss_priority = 26,              // "OB_oss_priority"
-    OB_oss_label = 27,                 // "OB_oss_label"
-    OB_oss_wait = 28,                  // "OB_oss_wait"
-    OB_oss_captured = 29,              // "OB_oss_captured"
-    OB_oss_init = 30,                  // "OB_oss_init"
-    OB_oss_deinit = 31,                // "OB_oss_deinit"
-    OB_oss_copy = 32,                  // "OB_oss_copy"
+    OB_oss_dir = 7,                               // "oss_dir"
+    OB_oss_shared = 8,                            // "oss_shared"
+    OB_oss_private = 9,                           // "oss_private"
+    OB_oss_firstprivate = 10,                     // "oss_firstprivate"
+    OB_oss_vla_dims = 11,                         // "oss_vla_dims"
+    OB_oss_dep_in = 12,                           // "OB_oss_dep_in"
+    OB_oss_dep_out = 13,                          // "OB_oss_dep_out"
+    OB_oss_dep_inout = 14,                        // "OB_oss_dep_inout"
+    OB_oss_dep_concurrent = 15,                   // "OB_oss_dep_concurrent"
+    OB_oss_dep_commutative = 16,                  // "OB_oss_dep_commutative"
+    OB_oss_dep_weakin = 17,                       // "OB_oss_dep_weakin"
+    OB_oss_dep_weakout = 18,                      // "OB_oss_dep_weakout"
+    OB_oss_dep_weakinout = 19,                    // "OB_oss_dep_weakinout"
+    OB_oss_dep_weakconcurrent = 20,               // "OB_oss_dep_weakconcurrent"
+    OB_oss_dep_weakcommutative = 21,              // "OB_oss_dep_weakcommutative"
+    OB_oss_dep_reduction = 22,                    // "OB_oss_dep_reduction"
+    OB_oss_dep_weakreduction = 23,                // "OB_oss_dep_weakreduction"
+    OB_oss_reduction_init = 24,                   // "OB_oss_reduction_init"
+    OB_oss_reduction_comb = 25,                   // "OB_oss_reduction_comb"
+    OB_oss_final = 26,                            // "OB_oss_final"
+    OB_oss_if = 27,                               // "OB_oss_if"
+    OB_oss_cost = 28,                             // "OB_oss_cost"
+    OB_oss_priority = 29,                         // "OB_oss_priority"
+    OB_oss_label = 30,                            // "OB_oss_label"
+    OB_oss_wait = 31,                             // "OB_oss_wait"
+    OB_oss_captured = 32,                         // "OB_oss_captured"
+    OB_oss_init = 33,                             // "OB_oss_init"
+    OB_oss_deinit = 34,                           // "OB_oss_deinit"
+    OB_oss_copy = 35,                             // "OB_oss_copy"
+    OB_oss_loop_type = 36,                        // "OB_oss_loop_type"
+    OB_oss_loop_ind_var = 37,                     // "OB_oss_loop_ind_var"
+    OB_oss_loop_lower_bound = 38,                 // "OB_oss_loop_lower_bound"
+    OB_oss_loop_upper_bound = 39,                 // "OB_oss_loop_upper_bound"
+    OB_oss_loop_step = 40,                        // "OB_oss_loop_step"
+    OB_oss_loop_chunksize = 41,                   // "OB_oss_loop_chunksize"
+    OB_oss_loop_grainsize = 42,                   // "OB_oss_loop_grainsize"
+    OB_oss_multidep_range_in = 43,                // "OB_oss_multidep_range_in"
+    OB_oss_multidep_range_out = 44,               // "OB_oss_multidep_range_out"
+    OB_oss_multidep_range_inout = 45,             // "OB_oss_multidep_range_inout"
+    OB_oss_multidep_range_concurrent = 46,        // "OB_oss_multidep_range_concurrent"
+    OB_oss_multidep_range_commutative = 47,       // "OB_oss_multidep_range_commutative"
+    OB_oss_multidep_range_weakin = 48,            // "OB_oss_multidep_range_weakin"
+    OB_oss_multidep_range_weakout = 49,           // "OB_oss_multidep_range_weakout"
+    OB_oss_multidep_range_weakinout = 50,         // "OB_oss_multidep_range_weakinout"
+    OB_oss_multidep_range_weakconcurrent = 51,    // "OB_oss_multidep_range_weakconcurrent"
+    OB_oss_multidep_range_weakcommutative = 52,   // "OB_oss_multidep_range_weakcommutative"
+    OB_oss_decl_source = 53,                      // "OB_oss_decl_source"
+    OB_oss_onready = 54,                          // "OB_oss_onready"
   };
 
   /// getMDKindID - Return a unique non-zero ID for the specified metadata kind.
@@ -180,30 +202,9 @@ public:
   void enableDebugTypeODRUniquing();
   void disableDebugTypeODRUniquing();
 
-  using InlineAsmDiagHandlerTy = void (*)(const SMDiagnostic&, void *Context,
-                                          unsigned LocCookie);
-
   /// Defines the type of a yield callback.
   /// \see LLVMContext::setYieldCallback.
   using YieldCallbackTy = void (*)(LLVMContext *Context, void *OpaqueHandle);
-
-  /// setInlineAsmDiagnosticHandler - This method sets a handler that is invoked
-  /// when problems with inline asm are detected by the backend.  The first
-  /// argument is a function pointer and the second is a context pointer that
-  /// gets passed into the DiagHandler.
-  ///
-  /// LLVMContext doesn't take ownership or interpret either of these
-  /// pointers.
-  void setInlineAsmDiagnosticHandler(InlineAsmDiagHandlerTy DiagHandler,
-                                     void *DiagContext = nullptr);
-
-  /// getInlineAsmDiagnosticHandler - Return the diagnostic handler set by
-  /// setInlineAsmDiagnosticHandler.
-  InlineAsmDiagHandlerTy getInlineAsmDiagnosticHandler() const;
-
-  /// getInlineAsmDiagnosticContext - Return the diagnostic context set by
-  /// setInlineAsmDiagnosticHandler.
-  void *getInlineAsmDiagnosticContext() const;
 
   /// setDiagnosticHandlerCallBack - This method sets a handler call back
   /// that is invoked when the backend needs to report anything to the user.
@@ -217,10 +218,11 @@ public:
       DiagnosticHandler::DiagnosticHandlerTy DiagHandler,
       void *DiagContext = nullptr, bool RespectFilters = false);
 
-  /// setDiagnosticHandler - This method sets unique_ptr to object of DiagnosticHandler
-  /// to provide custom diagnostic handling. The first argument is unique_ptr of object
-  /// of type DiagnosticHandler or a derived of that.   The third argument should be
-  /// set to true if the handler only expects enabled diagnostics.
+  /// setDiagnosticHandler - This method sets unique_ptr to object of
+  /// DiagnosticHandler to provide custom diagnostic handling. The first
+  /// argument is unique_ptr of object of type DiagnosticHandler or a derived
+  /// of that. The second argument should be set to true if the handler only
+  /// expects enabled diagnostics.
   ///
   /// Ownership of this pointer is moved to LLVMContextImpl.
   void setDiagnosticHandler(std::unique_ptr<DiagnosticHandler> &&DH,
@@ -238,7 +240,7 @@ public:
   /// setDiagnosticHandler.
   const DiagnosticHandler *getDiagHandlerPtr() const;
 
-  /// getDiagnosticHandler - transfers owenership of DiagnosticHandler unique_ptr
+  /// getDiagnosticHandler - transfers ownership of DiagnosticHandler unique_ptr
   /// to caller.
   std::unique_ptr<DiagnosticHandler> getDiagnosticHandler();
 
@@ -250,13 +252,23 @@ public:
   void setDiagnosticsHotnessRequested(bool Requested);
 
   /// Return the minimum hotness value a diagnostic would need in order
-  /// to be included in optimization diagnostics. If there is no minimum, this
-  /// returns None.
+  /// to be included in optimization diagnostics.
+  ///
+  /// Three possible return values:
+  /// 0            - threshold is disabled. Everything will be printed out.
+  /// positive int - threshold is set.
+  /// UINT64_MAX   - threshold is not yet set, and needs to be synced from
+  ///                profile summary. Note that in case of missing profile
+  ///                summary, threshold will be kept at "MAX", effectively
+  ///                suppresses all remarks output.
   uint64_t getDiagnosticsHotnessThreshold() const;
 
   /// Set the minimum hotness value a diagnostic needs in order to be
   /// included in optimization diagnostics.
-  void setDiagnosticsHotnessThreshold(uint64_t Threshold);
+  void setDiagnosticsHotnessThreshold(Optional<uint64_t> Threshold);
+
+  /// Return if hotness threshold is requested from PSI.
+  bool isDiagnosticsHotnessThresholdSetFromPSI() const;
 
   /// The "main remark streamer" used by all the specialized remark streamers.
   /// This streamer keeps generic remark metadata in memory throughout the life
@@ -341,6 +353,9 @@ public:
   /// The lifetime of the object must be guaranteed to extend as long as the
   /// LLVMContext is used by compilation.
   void setOptPassGate(OptPassGate&);
+
+  /// Whether typed pointers are supported. If false, all pointers are opaque.
+  bool supportsTypedPointers() const;
 
 private:
   // Module needs access to the add/removeModule methods.

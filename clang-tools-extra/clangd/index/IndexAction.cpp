@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "IndexAction.h"
+#include "AST.h"
 #include "Headers.h"
 #include "index/Relation.h"
 #include "index/SymbolOrigin.h"
@@ -21,6 +22,7 @@
 #include "clang/Index/IndexingOptions.h"
 #include "clang/Tooling/Tooling.h"
 #include "llvm/ADT/STLExtras.h"
+#include <cstddef>
 #include <functional>
 #include <memory>
 #include <utility>
@@ -132,11 +134,25 @@ public:
               std::function<void(RefSlab)> RefsCallback,
               std::function<void(RelationSlab)> RelationsCallback,
               std::function<void(IncludeGraph)> IncludeGraphCallback)
-      : SymbolsCallback(SymbolsCallback),
-        RefsCallback(RefsCallback), RelationsCallback(RelationsCallback),
+      : SymbolsCallback(SymbolsCallback), RefsCallback(RefsCallback),
+        RelationsCallback(RelationsCallback),
         IncludeGraphCallback(IncludeGraphCallback), Collector(C),
         Includes(std::move(Includes)), Opts(Opts),
-        PragmaHandler(collectIWYUHeaderMaps(this->Includes.get())) {}
+        PragmaHandler(collectIWYUHeaderMaps(this->Includes.get())) {
+    this->Opts.ShouldTraverseDecl = [this](const Decl *D) {
+      // Many operations performed during indexing is linear in terms of depth
+      // of the decl (USR generation, name lookups, figuring out role of a
+      // reference are some examples). Since we index all the decls nested
+      // inside, it becomes quadratic. So we give up on nested symbols.
+      if (isDeeplyNested(D))
+        return false;
+      auto &SM = D->getASTContext().getSourceManager();
+      auto FID = SM.getFileID(SM.getExpansionLoc(D->getLocation()));
+      if (!FID.isValid())
+        return true;
+      return Collector->shouldIndexFile(FID);
+    };
+  }
 
   std::unique_ptr<ASTConsumer>
   CreateASTConsumer(CompilerInstance &CI, llvm::StringRef InFile) override {
@@ -146,15 +162,8 @@ public:
       CI.getPreprocessor().addPPCallbacks(
           std::make_unique<IncludeGraphCollector>(CI.getSourceManager(), IG));
 
-    return index::createIndexingASTConsumer(
-        Collector, Opts, CI.getPreprocessorPtr(),
-        /*ShouldSkipFunctionBody=*/[this](const Decl *D) {
-          auto &SM = D->getASTContext().getSourceManager();
-          auto FID = SM.getFileID(SM.getExpansionLoc(D->getLocation()));
-          if (!FID.isValid())
-            return false;
-          return !Collector->shouldIndexFile(FID);
-        });
+    return index::createIndexingASTConsumer(Collector, Opts,
+                                            CI.getPreprocessorPtr());
   }
 
   bool BeginInvocation(CompilerInstance &CI) override {
@@ -211,6 +220,8 @@ std::unique_ptr<FrontendAction> createStaticIndexingAction(
   index::IndexingOptions IndexOpts;
   IndexOpts.SystemSymbolFilter =
       index::IndexingOptions::SystemSymbolFilterKind::All;
+  // We index function-local classes and its member functions only.
+  IndexOpts.IndexFunctionLocals = true;
   Opts.CollectIncludePath = true;
   if (Opts.Origin == SymbolOrigin::Unknown)
     Opts.Origin = SymbolOrigin::Static;

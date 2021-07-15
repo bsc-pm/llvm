@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_TRANSFORMS_IPO_OPENMP_OPT_H
-#define LLVM_TRANSFORMS_IPO_OPENMP_OPT_H
+#ifndef LLVM_TRANSFORMS_IPO_OPENMPOPT_H
+#define LLVM_TRANSFORMS_IPO_OPENMPOPT_H
 
 #include "llvm/Analysis/CGSCCPassManager.h"
 #include "llvm/Analysis/LazyCallGraph.h"
@@ -17,33 +17,30 @@ namespace llvm {
 
 namespace omp {
 
-/// Helper to remember if the module contains OpenMP (runtime calls), to be used
-/// foremost with containsOpenMP.
-struct OpenMPInModule {
-  OpenMPInModule &operator=(bool Found) {
-    if (Found)
-      Value = OpenMPInModule::OpenMP::FOUND;
-    else
-      Value = OpenMPInModule::OpenMP::NOT_FOUND;
-    return *this;
-  }
-  bool isKnown() { return Value != OpenMP::UNKNOWN; }
-  operator bool() { return Value != OpenMP::NOT_FOUND; }
+/// Summary of a kernel (=entry point for target offloading).
+using Kernel = Function *;
 
-private:
-  enum class OpenMP { FOUND, NOT_FOUND, UNKNOWN } Value = OpenMP::UNKNOWN;
-};
+/// Set of kernels in the module
+using KernelSet = SmallPtrSet<Kernel, 4>;
 
-/// Helper to determine if \p M contains OpenMP (runtime calls).
-bool containsOpenMP(Module &M, OpenMPInModule &OMPInModule);
+/// Helper to determine if \p M contains OpenMP.
+bool containsOpenMP(Module &M);
+
+/// Helper to determine if \p M is a OpenMP target offloading device module.
+bool isOpenMPDevice(Module &M);
+
+/// Get OpenMP device kernels in \p M.
+KernelSet getDeviceKernels(Module &M);
 
 } // namespace omp
 
 /// OpenMP optimizations pass.
 class OpenMPOptPass : public PassInfoMixin<OpenMPOptPass> {
-  /// Helper to remember if the module contains OpenMP (runtime calls).
-  omp::OpenMPInModule OMPInModule;
+public:
+  PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
+};
 
+class OpenMPOptCGSCCPass : public PassInfoMixin<OpenMPOptCGSCCPass> {
 public:
   PreservedAnalyses run(LazyCallGraph::SCC &C, CGSCCAnalysisManager &AM,
                         LazyCallGraph &CG, CGSCCUpdateResult &UR);
@@ -51,4 +48,4 @@ public:
 
 } // end namespace llvm
 
-#endif // LLVM_TRANSFORMS_IPO_OPENMP_OPT_H
+#endif // LLVM_TRANSFORMS_IPO_OPENMPOPT_H

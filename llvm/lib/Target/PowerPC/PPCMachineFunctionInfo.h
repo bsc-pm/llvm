@@ -22,6 +22,18 @@ namespace llvm {
 /// PPCFunctionInfo - This class is derived from MachineFunction private
 /// PowerPC target-specific information for each MachineFunction.
 class PPCFunctionInfo : public MachineFunctionInfo {
+public:
+  enum ParamType {
+    FixedType,
+    ShortFloatingPoint,
+    LongFloatingPoint,
+    VectorChar,
+    VectorShort,
+    VectorInt,
+    VectorFloat
+  };
+
+private:
   virtual void anchor();
 
   /// FramePointerSaveIndex - Frame index of where the old frame pointer is
@@ -38,6 +50,9 @@ class PPCFunctionInfo : public MachineFunctionInfo {
 
   /// Frame index where the old PIC base pointer is stored.
   int PICBasePointerSaveIndex = 0;
+
+  /// Frame index where the ROP Protection Hash is stored.
+  int ROPProtectionHashSaveIndex = 0;
 
   /// MustSaveLR - Indicates whether LR is defined (or clobbered) in the current
   /// function.  This is only valid after the initial scan of the function by
@@ -68,9 +83,6 @@ class PPCFunctionInfo : public MachineFunctionInfo {
   /// DisableNonVolatileCR - Indicates whether non-volatile CR fields would be
   /// disabled.
   bool DisableNonVolatileCR = false;
-
-  /// Indicates whether VRSAVE is spilled in the current function.
-  bool SpillsVRSAVE = false;
 
   /// LRStoreRequired - The bool indicates whether there is some explicit use of
   /// the LR/LR8 stack slot that is not obvious from scanning the code.  This
@@ -110,26 +122,36 @@ class PPCFunctionInfo : public MachineFunctionInfo {
   /// register for parameter passing.
   unsigned VarArgsNumFPR = 0;
 
+  /// FixedParmsNum - The number of fixed parameters.
+  unsigned FixedParmsNum = 0;
+
+  /// FloatingParmsNum - The number of floating parameters.
+  unsigned FloatingParmsNum = 0;
+
+  /// VectorParmsNum - The number of vector parameters.
+  unsigned VectorParmsNum = 0;
+
+  /// ParamtersType - Store all the parameter's type that are saved on
+  /// registers.
+  SmallVector<ParamType, 32> ParamtersType;
+
   /// CRSpillFrameIndex - FrameIndex for CR spill slot for 32-bit SVR4.
   int CRSpillFrameIndex = 0;
 
   /// If any of CR[2-4] need to be saved in the prologue and restored in the
   /// epilogue then they are added to this array. This is used for the
   /// 64-bit SVR4 ABI.
-  SmallVector<unsigned, 3> MustSaveCRs;
-
-  /// Hold onto our MachineFunction context.
-  MachineFunction &MF;
+  SmallVector<Register, 3> MustSaveCRs;
 
   /// Whether this uses the PIC Base register or not.
   bool UsesPICBase = false;
 
   /// We keep track attributes for each live-in virtual registers
   /// to use SExt/ZExt flags in later optimization.
-  std::vector<std::pair<unsigned, ISD::ArgFlagsTy>> LiveInAttrs;
+  std::vector<std::pair<Register, ISD::ArgFlagsTy>> LiveInAttrs;
 
 public:
-  explicit PPCFunctionInfo(MachineFunction &MF);
+  explicit PPCFunctionInfo(const MachineFunction &MF);
 
   int getFramePointerSaveIndex() const { return FramePointerSaveIndex; }
   void setFramePointerSaveIndex(int Idx) { FramePointerSaveIndex = Idx; }
@@ -142,6 +164,13 @@ public:
 
   int getPICBasePointerSaveIndex() const { return PICBasePointerSaveIndex; }
   void setPICBasePointerSaveIndex(int Idx) { PICBasePointerSaveIndex = Idx; }
+
+  int getROPProtectionHashSaveIndex() const {
+    return ROPProtectionHashSaveIndex;
+  }
+  void setROPProtectionHashSaveIndex(int Idx) {
+    ROPProtectionHashSaveIndex = Idx;
+  }
 
   unsigned getMinReservedArea() const { return MinReservedArea; }
   void setMinReservedArea(unsigned size) { MinReservedArea = size; }
@@ -178,9 +207,6 @@ public:
   void setDisableNonVolatileCR() { DisableNonVolatileCR = true; }
   bool isNonVolatileCRDisabled() const { return DisableNonVolatileCR; }
 
-  void setSpillsVRSAVE()       { SpillsVRSAVE = true; }
-  bool isVRSAVESpilled() const { return SpillsVRSAVE; }
-
   void setLRStoreRequired() { LRStoreRequired = true; }
   bool isLRStoreRequired() const { return LRStoreRequired; }
 
@@ -199,37 +225,48 @@ public:
   unsigned getVarArgsNumGPR() const { return VarArgsNumGPR; }
   void setVarArgsNumGPR(unsigned Num) { VarArgsNumGPR = Num; }
 
+  unsigned getFixedParmsNum() const { return FixedParmsNum; }
+  unsigned getFloatingPointParmsNum() const { return FloatingParmsNum; }
+  unsigned getVectorParmsNum() const { return VectorParmsNum; }
+  bool hasVectorParms() const { return VectorParmsNum != 0; }
+
+  uint32_t getParmsType() const;
+
+  uint32_t getVecExtParmsType() const;
+
+  void appendParameterType(ParamType Type);
+
   unsigned getVarArgsNumFPR() const { return VarArgsNumFPR; }
   void setVarArgsNumFPR(unsigned Num) { VarArgsNumFPR = Num; }
 
   /// This function associates attributes for each live-in virtual register.
-  void addLiveInAttr(unsigned VReg, ISD::ArgFlagsTy Flags) {
+  void addLiveInAttr(Register VReg, ISD::ArgFlagsTy Flags) {
     LiveInAttrs.push_back(std::make_pair(VReg, Flags));
   }
 
   /// This function returns true if the specified vreg is
   /// a live-in register and sign-extended.
-  bool isLiveInSExt(unsigned VReg) const;
+  bool isLiveInSExt(Register VReg) const;
 
   /// This function returns true if the specified vreg is
   /// a live-in register and zero-extended.
-  bool isLiveInZExt(unsigned VReg) const;
+  bool isLiveInZExt(Register VReg) const;
 
   int getCRSpillFrameIndex() const { return CRSpillFrameIndex; }
   void setCRSpillFrameIndex(int idx) { CRSpillFrameIndex = idx; }
 
-  const SmallVectorImpl<unsigned> &
+  const SmallVectorImpl<Register> &
     getMustSaveCRs() const { return MustSaveCRs; }
-  void addMustSaveCR(unsigned Reg) { MustSaveCRs.push_back(Reg); }
+  void addMustSaveCR(Register Reg) { MustSaveCRs.push_back(Reg); }
 
   void setUsesPICBase(bool uses) { UsesPICBase = uses; }
   bool usesPICBase() const { return UsesPICBase; }
 
-  MCSymbol *getPICOffsetSymbol() const;
+  MCSymbol *getPICOffsetSymbol(MachineFunction &MF) const;
 
-  MCSymbol *getGlobalEPSymbol() const;
-  MCSymbol *getLocalEPSymbol() const;
-  MCSymbol *getTOCOffsetSymbol() const;
+  MCSymbol *getGlobalEPSymbol(MachineFunction &MF) const;
+  MCSymbol *getLocalEPSymbol(MachineFunction &MF) const;
+  MCSymbol *getTOCOffsetSymbol(MachineFunction &MF) const;
 };
 
 } // end namespace llvm

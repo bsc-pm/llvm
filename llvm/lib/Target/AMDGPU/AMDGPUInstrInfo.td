@@ -18,10 +18,6 @@ def AMDGPUDTIntTernaryOp : SDTypeProfile<1, 3, [
   SDTCisSameAs<0, 1>, SDTCisSameAs<0, 2>, SDTCisInt<0>, SDTCisInt<3>
 ]>;
 
-def AMDGPUTrigPreOp : SDTypeProfile<1, 2,
-  [SDTCisSameAs<0, 1>, SDTCisFP<0>, SDTCisInt<2>]
->;
-
 def AMDGPULdExpOp : SDTypeProfile<1, 2,
   [SDTCisSameAs<0, 1>, SDTCisFP<0>, SDTCisInt<2>]
 >;
@@ -136,7 +132,6 @@ def AMDGPUpknorm_u16_f32_impl : SDNode<"AMDGPUISD::CVT_PKNORM_U16_F32", AMDGPUFP
 def AMDGPUpk_i16_i32_impl : SDNode<"AMDGPUISD::CVT_PK_I16_I32", AMDGPUIntPackOp>;
 def AMDGPUpk_u16_u32_impl : SDNode<"AMDGPUISD::CVT_PK_U16_U32", AMDGPUIntPackOp>;
 def AMDGPUfp_to_f16 : SDNode<"AMDGPUISD::FP_TO_FP16" , SDTFPToIntOp>;
-def AMDGPUfp16_zext : SDNode<"AMDGPUISD::FP16_ZEXT" , SDTFPToIntOp>;
 
 
 def AMDGPUfp_class_impl : SDNode<"AMDGPUISD::FP_CLASS", AMDGPUFPClassOp>;
@@ -202,13 +197,6 @@ def AMDGPUSetCCOp : SDTypeProfile<1, 3, [        // setcc
 
 def AMDGPUsetcc : SDNode<"AMDGPUISD::SETCC", AMDGPUSetCCOp>;
 
-def AMDGPUSetRegOp :  SDTypeProfile<0, 2, [
-  SDTCisInt<0>, SDTCisInt<1>
-]>;
-
-def AMDGPUsetreg : SDNode<"AMDGPUISD::SETREG", AMDGPUSetRegOp, [
-  SDNPHasChain, SDNPSideEffect, SDNPOptInGlue, SDNPOutGlue]>;
-
 def AMDGPUfma : SDNode<"AMDGPUISD::FMA_W_CHAIN", SDTFPTernaryOp, [
    SDNPHasChain, SDNPOptInGlue, SDNPOutGlue]>;
 
@@ -224,6 +212,8 @@ def AMDGPUcvt_f32_ubyte2 : SDNode<"AMDGPUISD::CVT_F32_UBYTE2",
 def AMDGPUcvt_f32_ubyte3 : SDNode<"AMDGPUISD::CVT_F32_UBYTE3",
   SDTIntToFPOp, []>;
 
+def AMDGPUcvt_pk_i16_i32 : SDNode<"AMDGPUISD::CVT_PK_I16_I32",
+  AMDGPUIntPackOp, []>;
 
 // urecip - This operation is a helper for integer division, it returns the
 // result of 1 / a as a fractional unsigned integer.
@@ -245,9 +235,6 @@ def AMDGPUdiv_fmas_impl : SDNode<"AMDGPUISD::DIV_FMAS", AMDGPUFmasOp,
 def AMDGPUdiv_fixup_impl : SDNode<"AMDGPUISD::DIV_FIXUP", SDTFPTernaryOp>;
 
 def AMDGPUfmad_ftz_impl : SDNode<"AMDGPUISD::FMAD_FTZ", SDTFPTernaryOp>;
-
-// Look Up 2.0 / pi src0 with segment select src1[4:0]
-def AMDGPUtrig_preop : SDNode<"AMDGPUISD::TRIG_PREOP", AMDGPUTrigPreOp>;
 
 def AMDGPUregister_load : SDNode<"AMDGPUISD::REGISTER_LOAD",
                           SDTypeProfile<1, 2, [SDTCisPtrTy<1>, SDTCisInt<2>]>,
@@ -325,7 +312,7 @@ def AMDGPUfdot2_impl : SDNode<"AMDGPUISD::FDOT2",
                                        SDTCisInt<4>]>,
                   []>;
 
-def AMDGPUperm : SDNode<"AMDGPUISD::PERM", AMDGPUDTIntTernaryOp, []>;
+def AMDGPUperm_impl : SDNode<"AMDGPUISD::PERM", AMDGPUDTIntTernaryOp, []>;
 
 // SI+ export
 def AMDGPUExportOp : SDTypeProfile<0, 8, [
@@ -475,3 +462,7 @@ def AMDGPUfdot2 : PatFrags<(ops node:$src0, node:$src1, node:$src2, node:$clamp)
 def AMDGPUdiv_fmas : PatFrags<(ops node:$src0, node:$src1, node:$src2, node:$vcc),
   [(int_amdgcn_div_fmas node:$src0, node:$src1, node:$src2, node:$vcc),
    (AMDGPUdiv_fmas_impl node:$src0, node:$src1, node:$src2, node:$vcc)]>;
+
+def AMDGPUperm : PatFrags<(ops node:$src0, node:$src1, node:$src2),
+  [(int_amdgcn_perm node:$src0, node:$src1, node:$src2),
+   (AMDGPUperm_impl node:$src0, node:$src1, node:$src2)]>;

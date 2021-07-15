@@ -1,4 +1,5 @@
-; RUN: opt -ompss-2-regions -analyze -disable-checks -print-verbosity=non_pod_dsa_missing < %s 2>&1 | FileCheck %s
+; RUN: opt -ompss-2-regions -analyze -disable-checks -print-verbosity=non_pod_dsa_missing -enable-new-pm=0 < %s 2>&1 | FileCheck %s
+; RUN: opt -passes='print<ompss-2-regions>'  -disable-checks -print-verbosity=non_pod_dsa_missing < %s 2>&1 | FileCheck %s
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 
 %struct.S = type <{ i32 (...)**, i32, [4 x i8] }>
@@ -19,10 +20,10 @@ entry:
   ret i32 %2
 }
 
-; CHECK: [0] %0
+; CHECK: [0] TASK %0
 ; CHECK-NEXT:   [Copy] %s
 ; CHECK-NEXT:   [Deinit] %s
-; CHECK-NEXT: [0] %1
+; CHECK-NEXT: [0] TASK %1
 ; CHECK-NEXT:   [Init] %s
 ; CHECK-NEXT:   [Deinit] %s
 

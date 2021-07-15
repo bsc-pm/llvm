@@ -273,6 +273,7 @@ def : WriteRes<WriteLoad,    [JLAGU]> { let Latency = 3; }
 def : WriteRes<WriteStore,   [JSAGU]>;
 def : WriteRes<WriteStoreNT, [JSAGU]>;
 def : WriteRes<WriteMove,    [JALU01]>;
+defm : X86WriteResUnsupported<WriteVecMaskedGatherWriteback>;
 
 // Load/store MXCSR.
 def : WriteRes<WriteLDMXCSR, [JLAGU]> { let Latency = 3; }
@@ -670,8 +671,10 @@ defm : X86WriteRes<WriteVecStoreX,        [JSAGU, JFPU1,   JSTC], 1, [1, 1, 1], 
 defm : X86WriteRes<WriteVecStoreY,        [JSAGU, JFPU1,   JSTC], 1, [2, 2, 2], 2>;
 defm : X86WriteRes<WriteVecStoreNT,       [JSAGU, JFPU1,   JSTC], 2, [1, 1, 1], 1>;
 defm : X86WriteRes<WriteVecStoreNTY,      [JSAGU, JFPU1,   JSTC], 2, [2, 2, 2], 1>;
-defm : X86WriteRes<WriteVecMaskedStore,   [JSAGU, JFPU01, JVALU], 6, [1, 1, 4], 1>;
-defm : X86WriteRes<WriteVecMaskedStoreY,  [JSAGU, JFPU01, JVALU], 6, [2, 2, 4], 2>;
+defm : X86WriteResUnsupported<WriteVecMaskedStore32>;
+defm : X86WriteResUnsupported<WriteVecMaskedStore64>;
+defm : X86WriteResUnsupported<WriteVecMaskedStore32Y>;
+defm : X86WriteResUnsupported<WriteVecMaskedStore64Y>;
 
 defm : X86WriteRes<WriteVecMove,          [JFPU01, JVALU], 1, [1, 1], 1>;
 defm : X86WriteRes<WriteVecMoveX,         [JFPU01, JVALU], 1, [1, 1], 1>;
@@ -731,6 +734,7 @@ defm : JWriteResFpuPair<WriteVecTest,     [JFPU0, JFPA, JALU0], 3>;
 defm : JWriteResYMMPair<WriteVecTestY,    [JFPU01, JFPX, JFPA, JALU0], 4, [2, 2, 2, 1], 3>;
 defm : X86WriteResPairUnsupported<WriteVecTestZ>;
 defm : X86WriteResPairUnsupported<WriteShuffle256>;
+defm : X86WriteResPairUnsupported<WriteVPMOV256>;
 defm : X86WriteResPairUnsupported<WriteVarShuffle256>;
 
 ////////////////////////////////////////////////////////////////////////////////

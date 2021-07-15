@@ -34,22 +34,29 @@ for.end:                                          ; preds = %for.cond
   ret i32 %3, !dbg !18
 }
 
-; CHECK:   %i = alloca i32, align 4
-; CHECK-NEXT:   store i32 0, i32* %i, align 4, !dbg !19
-; CHECK-NEXT:   br label %for.cond, !dbg !20
+; CHECK: define internal void @nanos6_unpacked_task_region_main0(i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table)
+; CHECK: newFuncRoot:
+; CHECK-NEXT:   br label %0
+; CHECK: .exitStub:                                        ; preds = %for.end
+; CHECK-NEXT:   ret void
+; CHECK: 0:                                                ; preds = %newFuncRoot
+; CHECK-NEXT:   %i = alloca i32, align 4
+; CHECK-NEXT:   store i32 0, i32* %i, align 4
+; CHECK-NEXT:   br label %for.cond
 ; CHECK: for.cond:                                         ; preds = %for.inc, %0
-; CHECK-NEXT:   %1 = load i32, i32* %i, align 4, !dbg !21
-; CHECK-NEXT:   %cmp = icmp slt i32 %1, 10, !dbg !22
-; CHECK-NEXT:   br i1 %cmp, label %for.body, label %for.end, !dbg !23
+; CHECK-NEXT:   %1 = load i32, i32* %i, align 4
+; CHECK-NEXT:   %cmp = icmp slt i32 %1, 10
+; CHECK-NEXT:   br i1 %cmp, label %for.body, label %for.end
 ; CHECK: for.body:                                         ; preds = %for.cond
-; CHECK-NEXT:   br label %for.inc, !dbg !24
+; CHECK-NEXT:   br label %for.inc
 ; CHECK: for.end:                                          ; preds = %for.cond
-; CHECK-NEXT:   ret void, !dbg !25
+; CHECK-NEXT:   br label %.exitStub
 ; CHECK: for.inc:                                          ; preds = %for.body
-; CHECK-NEXT:   %2 = load i32, i32* %i, align 4, !dbg !26
-; CHECK-NEXT:   %inc = add nsw i32 %2, 1, !dbg !26
-; CHECK-NEXT:   store i32 %inc, i32* %i, align 4, !dbg !26
-; CHECK-NEXT:   br label %for.cond, !dbg !23, !llvm.loop !27
+; CHECK-NEXT:   %2 = load i32, i32* %i, align 4
+; CHECK-NEXT:   %inc = add nsw i32 %2, 1
+; CHECK-NEXT:   store i32 %inc, i32* %i, align 4
+; CHECK-NEXT:   br label %for.cond
+; CHECK-NEXT: }
 
 ; Function Attrs: nounwind
 declare token @llvm.directive.region.entry() #1
@@ -83,3 +90,5 @@ attributes #1 = { nounwind }
 !16 = distinct !{!16, !13, !14}
 !17 = !DILocation(line: 7, column: 5, scope: !6)
 !18 = !DILocation(line: 8, column: 1, scope: !6)
+
+

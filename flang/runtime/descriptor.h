@@ -18,7 +18,6 @@
 // User C code is welcome to depend on that ISO_Fortran_binding.h file,
 // but should never reference this internal header.
 
-#include "derived-type.h"
 #include "memory.h"
 #include "type-code.h"
 #include "flang/ISO_Fortran_binding.h"
@@ -27,6 +26,11 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
+
+namespace Fortran::runtime::typeInfo {
+using TypeParameterValue = std::int64_t;
+class DerivedType;
+} // namespace Fortran::runtime::typeInfo
 
 namespace Fortran::runtime {
 
@@ -44,6 +48,29 @@ public:
   SubscriptValue UpperBound() const { return LowerBound() + Extent() - 1; }
   SubscriptValue ByteStride() const { return raw_.sm; }
 
+  Dimension &SetBounds(SubscriptValue lower, SubscriptValue upper) {
+    raw_.lower_bound = lower;
+    raw_.extent = upper >= lower ? upper - lower + 1 : 0;
+    return *this;
+  }
+  Dimension &SetLowerBound(SubscriptValue lower) {
+    raw_.lower_bound = lower;
+    return *this;
+  }
+  Dimension &SetUpperBound(SubscriptValue upper) {
+    auto lower{raw_.lower_bound};
+    raw_.extent = upper >= lower ? upper - lower + 1 : 0;
+    return *this;
+  }
+  Dimension &SetExtent(SubscriptValue extent) {
+    raw_.extent = extent;
+    return *this;
+  }
+  Dimension &SetByteStride(SubscriptValue bytes) {
+    raw_.sm = bytes;
+    return *this;
+  }
+
 private:
   ISO::CFI_dim_t raw_;
 };
@@ -53,7 +80,7 @@ private:
 // descriptors serve as POINTER and ALLOCATABLE components of derived type
 // instances.  The presence of this structure is implied by the flag
 // CFI_cdesc_t.f18Addendum, and the number of elements in the len_[]
-// array is determined by DerivedType::lenParameters().
+// array is determined by derivedType_->LenParameters().
 class DescriptorAddendum {
 public:
   enum Flags {
@@ -64,41 +91,40 @@ public:
   };
 
   explicit DescriptorAddendum(
-      const DerivedType *dt = nullptr, std::uint64_t flags = 0)
+      const typeInfo::DerivedType *dt = nullptr, std::uint64_t flags = 0)
       : derivedType_{dt}, flags_{flags} {}
+  DescriptorAddendum &operator=(const DescriptorAddendum &);
 
-  const DerivedType *derivedType() const { return derivedType_; }
-  DescriptorAddendum &set_derivedType(const DerivedType *dt) {
+  const typeInfo::DerivedType *derivedType() const { return derivedType_; }
+  DescriptorAddendum &set_derivedType(const typeInfo::DerivedType *dt) {
     derivedType_ = dt;
     return *this;
   }
   std::uint64_t &flags() { return flags_; }
   const std::uint64_t &flags() const { return flags_; }
 
-  std::size_t LenParameters() const {
-    if (derivedType_) {
-      return derivedType_->lenParameters();
-    }
-    return 0;
-  }
+  std::size_t LenParameters() const;
 
-  TypeParameterValue LenParameterValue(int which) const { return len_[which]; }
+  typeInfo::TypeParameterValue LenParameterValue(int which) const {
+    return len_[which];
+  }
   static constexpr std::size_t SizeInBytes(int lenParameters) {
-    return sizeof(DescriptorAddendum) - sizeof(TypeParameterValue) +
-        lenParameters * sizeof(TypeParameterValue);
+    // TODO: Don't waste that last word if lenParameters == 0
+    return sizeof(DescriptorAddendum) +
+        std::max(lenParameters - 1, 0) * sizeof(typeInfo::TypeParameterValue);
   }
   std::size_t SizeInBytes() const;
 
-  void SetLenParameterValue(int which, TypeParameterValue x) {
+  void SetLenParameterValue(int which, typeInfo::TypeParameterValue x) {
     len_[which] = x;
   }
 
   void Dump(FILE * = stdout) const;
 
 private:
-  const DerivedType *derivedType_{nullptr};
+  const typeInfo::DerivedType *derivedType_;
   std::uint64_t flags_{0};
-  TypeParameterValue len_[1]; // must be the last component
+  typeInfo::TypeParameterValue len_[1]; // must be the last component
   // The LEN type parameter values can also include captured values of
   // specification expressions that were used for bounds and for LEN type
   // parameters of components.  The values have been truncated to the LEN
@@ -126,8 +152,12 @@ public:
     raw_.f18Addendum = false;
   }
   Descriptor(const Descriptor &);
-
   ~Descriptor();
+  Descriptor &operator=(const Descriptor &);
+
+  static constexpr std::size_t BytesFor(TypeCategory category, int kind) {
+    return category == TypeCategory::Complex ? kind * 2 : kind;
+  }
 
   void Establish(TypeCode t, std::size_t elementBytes, void *p = nullptr,
       int rank = maxRank, const SubscriptValue *extent = nullptr,
@@ -137,19 +167,29 @@ public:
       const SubscriptValue *extent = nullptr,
       ISO::CFI_attribute_t attribute = CFI_attribute_other,
       bool addendum = false);
-  void Establish(const DerivedType &dt, void *p = nullptr, int rank = maxRank,
-      const SubscriptValue *extent = nullptr,
+  void Establish(int characterKind, std::size_t characters, void *p = nullptr,
+      int rank = maxRank, const SubscriptValue *extent = nullptr,
+      ISO::CFI_attribute_t attribute = CFI_attribute_other,
+      bool addendum = false);
+  void Establish(const typeInfo::DerivedType &dt, void *p = nullptr,
+      int rank = maxRank, const SubscriptValue *extent = nullptr,
       ISO::CFI_attribute_t attribute = CFI_attribute_other);
 
   static OwningPtr<Descriptor> Create(TypeCode t, std::size_t elementBytes,
       void *p = nullptr, int rank = maxRank,
       const SubscriptValue *extent = nullptr,
-      ISO::CFI_attribute_t attribute = CFI_attribute_other);
+      ISO::CFI_attribute_t attribute = CFI_attribute_other,
+      int derivedTypeLenParameters = 0);
   static OwningPtr<Descriptor> Create(TypeCategory, int kind, void *p = nullptr,
       int rank = maxRank, const SubscriptValue *extent = nullptr,
       ISO::CFI_attribute_t attribute = CFI_attribute_other);
-  static OwningPtr<Descriptor> Create(const DerivedType &dt, void *p = nullptr,
-      int rank = maxRank, const SubscriptValue *extent = nullptr,
+  static OwningPtr<Descriptor> Create(int characterKind,
+      SubscriptValue characters, void *p = nullptr, int rank = maxRank,
+      const SubscriptValue *extent = nullptr,
+      ISO::CFI_attribute_t attribute = CFI_attribute_other);
+  static OwningPtr<Descriptor> Create(const typeInfo::DerivedType &dt,
+      void *p = nullptr, int rank = maxRank,
+      const SubscriptValue *extent = nullptr,
       ISO::CFI_attribute_t attribute = CFI_attribute_other);
 
   ISO::CFI_cdesc_t &raw() { return raw_; }
@@ -182,7 +222,7 @@ public:
     return (subscriptValue - dimension.LowerBound()) * dimension.ByteStride();
   }
 
-  std::size_t SubscriptsToByteOffset(const SubscriptValue *subscript) const {
+  std::size_t SubscriptsToByteOffset(const SubscriptValue subscript[]) const {
     std::size_t offset{0};
     for (int j{0}; j < raw_.rank; ++j) {
       offset += SubscriptByteOffset(j, subscript[j]);
@@ -190,12 +230,12 @@ public:
     return offset;
   }
 
-  template <typename A> A *OffsetElement(std::size_t offset) const {
+  template <typename A = char> A *OffsetElement(std::size_t offset = 0) const {
     return reinterpret_cast<A *>(
         reinterpret_cast<char *>(raw_.base_addr) + offset);
   }
 
-  template <typename A> A *Element(const SubscriptValue *subscript) const {
+  template <typename A> A *Element(const SubscriptValue subscript[]) const {
     return OffsetElement<A>(SubscriptsToByteOffset(subscript));
   }
 
@@ -207,19 +247,27 @@ public:
     return nullptr;
   }
 
-  void GetLowerBounds(SubscriptValue *subscript) const {
+  int GetLowerBounds(SubscriptValue subscript[]) const {
     for (int j{0}; j < raw_.rank; ++j) {
       subscript[j] = GetDimension(j).LowerBound();
     }
+    return raw_.rank;
+  }
+
+  int GetShape(SubscriptValue subscript[]) const {
+    for (int j{0}; j < raw_.rank; ++j) {
+      subscript[j] = GetDimension(j).Extent();
+    }
+    return raw_.rank;
   }
 
   // When the passed subscript vector contains the last (or first)
   // subscripts of the array, these wrap the subscripts around to
   // their first (or last) values and return false.
   bool IncrementSubscripts(
-      SubscriptValue *, const int *permutation = nullptr) const;
+      SubscriptValue[], const int *permutation = nullptr) const;
   bool DecrementSubscripts(
-      SubscriptValue *, const int *permutation = nullptr) const;
+      SubscriptValue[], const int *permutation = nullptr) const;
   // False when out of range.
   bool SubscriptsForZeroBasedElementNumber(SubscriptValue *,
       std::size_t elementNumber, const int *permutation = nullptr) const;
@@ -242,6 +290,7 @@ public:
     }
   }
 
+  // Returns size in bytes of the descriptor (not the data)
   static constexpr std::size_t SizeInBytes(
       int rank, bool addendum = false, int lengthTypeParameters = 0) {
     std::size_t bytes{sizeof(Descriptor) - sizeof(Dimension)};
@@ -256,10 +305,14 @@ public:
 
   std::size_t Elements() const;
 
-  int Allocate(const SubscriptValue lb[], const SubscriptValue ub[],
-      std::size_t charLen = 0); // TODO: SOURCE= and MOLD=
+  // Allocate() assumes Elements() and ElementBytes() work;
+  // define the extents of the dimensions and the element length
+  // before calling.  It (re)computes the byte strides after
+  // allocation.
+  // TODO: SOURCE= and MOLD=
+  int Allocate();
   int Deallocate(bool finalize = true);
-  void Destroy(char *data, bool finalize = true) const;
+  void Destroy(bool finalize = true) const;
 
   bool IsContiguous(int leadingDimensions = maxRank) const {
     auto bytes{static_cast<SubscriptValue>(ElementBytes())};
@@ -273,9 +326,13 @@ public:
     return true;
   }
 
-  void Check() const;
+  // Establishes a pointer to a section or element.
+  bool EstablishPointerSection(const Descriptor &source,
+      const SubscriptValue *lower = nullptr,
+      const SubscriptValue *upper = nullptr,
+      const SubscriptValue *stride = nullptr);
 
-  // TODO: creation of array sections
+  void Check() const;
 
   void Dump(FILE * = stdout) const;
 
@@ -316,11 +373,7 @@ public:
     assert(descriptor().SizeInBytes() <= byteSize);
     if (DescriptorAddendum * addendum{descriptor().Addendum()}) {
       assert(hasAddendum);
-      if (const DerivedType * dt{addendum->derivedType()}) {
-        assert(dt->lenParameters() <= maxLengthTypeParameters);
-      } else {
-        assert(maxLengthTypeParameters == 0);
-      }
+      assert(addendum->LenParameters() <= maxLengthTypeParameters);
     } else {
       assert(!hasAddendum);
       assert(maxLengthTypeParameters == 0);

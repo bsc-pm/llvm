@@ -19,15 +19,10 @@ define amdgpu_kernel void @sgpr_if_else_salu_br(i32 addrspace(1)* %out, i32 %a, 
 ; SI-NEXT:    s_cbranch_scc0 BB0_2
 ; SI-NEXT:  ; %bb.1: ; %else
 ; SI-NEXT:    s_add_i32 s0, s11, s0
-; SI-NEXT:    s_mov_b64 s[2:3], 0
-; SI-NEXT:    s_andn2_b64 vcc, exec, s[2:3]
-; SI-NEXT:    s_cbranch_vccz BB0_3
+; SI-NEXT:    s_cbranch_execz BB0_3
 ; SI-NEXT:    s_branch BB0_4
 ; SI-NEXT:  BB0_2:
-; SI-NEXT:    s_mov_b64 s[2:3], -1
 ; SI-NEXT:    ; implicit-def: $sgpr0
-; SI-NEXT:    s_andn2_b64 vcc, exec, s[2:3]
-; SI-NEXT:    s_cbranch_vccnz BB0_4
 ; SI-NEXT:  BB0_3: ; %if
 ; SI-NEXT:    s_sub_i32 s0, s9, s10
 ; SI-NEXT:  BB0_4: ; %endif
@@ -37,6 +32,7 @@ define amdgpu_kernel void @sgpr_if_else_salu_br(i32 addrspace(1)* %out, i32 %a, 
 ; SI-NEXT:    v_mov_b32_e32 v0, s0
 ; SI-NEXT:    buffer_store_dword v0, off, s[4:7], 0
 ; SI-NEXT:    s_endpgm
+
 entry:
   %0 = icmp eq i32 %a, 0
   br i1 %0, label %if, label %else
@@ -69,15 +65,10 @@ define amdgpu_kernel void @sgpr_if_else_salu_br_opt(i32 addrspace(1)* %out, [8 x
 ; SI-NEXT:    s_load_dword s6, s[0:1], 0x37
 ; SI-NEXT:    s_waitcnt lgkmcnt(0)
 ; SI-NEXT:    s_add_i32 s3, s3, s6
-; SI-NEXT:    s_mov_b64 s[6:7], 0
-; SI-NEXT:    s_andn2_b64 vcc, exec, s[6:7]
-; SI-NEXT:    s_cbranch_vccz BB1_3
+; SI-NEXT:    s_cbranch_execz BB1_3
 ; SI-NEXT:    s_branch BB1_4
 ; SI-NEXT:  BB1_2:
-; SI-NEXT:    s_mov_b64 s[6:7], -1
 ; SI-NEXT:    ; implicit-def: $sgpr3
-; SI-NEXT:    s_andn2_b64 vcc, exec, s[6:7]
-; SI-NEXT:    s_cbranch_vccnz BB1_4
 ; SI-NEXT:  BB1_3: ; %if
 ; SI-NEXT:    s_load_dword s3, s[0:1], 0x1c
 ; SI-NEXT:    s_load_dword s0, s[0:1], 0x25
@@ -90,6 +81,7 @@ define amdgpu_kernel void @sgpr_if_else_salu_br_opt(i32 addrspace(1)* %out, [8 x
 ; SI-NEXT:    v_mov_b32_e32 v0, s0
 ; SI-NEXT:    buffer_store_dword v0, off, s[4:7], 0
 ; SI-NEXT:    s_endpgm
+
 entry:
   %cmp0 = icmp eq i32 %a, 0
   br i1 %cmp0, label %if, label %else
@@ -172,15 +164,16 @@ define amdgpu_kernel void @sgpr_if_else_valu_cmp_phi_br(i32 addrspace(1)* %out, 
 ; SI-NEXT:    s_cbranch_execz BB3_2
 ; SI-NEXT:  ; %bb.1: ; %else
 ; SI-NEXT:    s_mov_b32 s11, 0xf000
-; SI-NEXT:    v_lshlrev_b32_e32 v1, 2, v0
-; SI-NEXT:    v_mov_b32_e32 v2, 0
+; SI-NEXT:    v_lshlrev_b32_e32 v0, 2, v0
+; SI-NEXT:    v_mov_b32_e32 v1, 0
 ; SI-NEXT:    s_waitcnt lgkmcnt(0)
-; SI-NEXT:    buffer_load_dword v1, v[1:2], s[8:11], 0 addr64
+; SI-NEXT:    buffer_load_dword v0, v[0:1], s[8:11], 0 addr64
 ; SI-NEXT:    s_andn2_b64 s[0:1], s[0:1], exec
 ; SI-NEXT:    s_waitcnt vmcnt(0)
-; SI-NEXT:    v_cmp_gt_i32_e32 vcc, 0, v1
+; SI-NEXT:    v_cmp_gt_i32_e32 vcc, 0, v0
 ; SI-NEXT:    s_and_b64 s[8:9], vcc, exec
 ; SI-NEXT:    s_or_b64 s[0:1], s[0:1], s[8:9]
+; SI-NEXT:    ; implicit-def: $vgpr0
 ; SI-NEXT:  BB3_2: ; %Flow
 ; SI-NEXT:    s_or_saveexec_b64 s[2:3], s[2:3]
 ; SI-NEXT:    s_xor_b64 exec, exec, s[2:3]

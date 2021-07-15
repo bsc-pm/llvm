@@ -58,7 +58,6 @@ add_host_subdirectory(posix
 if (CMAKE_SYSTEM_NAME MATCHES "Windows")
   add_host_subdirectory(windows
     windows/ConnectionGenericFileWindows.cpp
-    windows/EditLineWin.cpp
     windows/FileSystem.cpp
     windows/Host.cpp
     windows/HostInfoWindows.cpp
@@ -83,7 +82,6 @@ else()
     )
 
   if (CMAKE_SYSTEM_NAME MATCHES "Darwin")
-    include_directories(SYSTEM ${LIBXML2_INCLUDE_DIR})
     add_subdirectory(macosx/objcxx)
     set(LLDBObjCLibs lldbHostMacOSXObjCXX)
     add_host_subdirectory(macosx
@@ -94,7 +92,7 @@ else()
       macosx/cfcpp/CFCMutableSet.cpp
       macosx/cfcpp/CFCString.cpp
       )
-    if(IOS)
+    if(APPLE_EMBEDDED)
       set_property(SOURCE macosx/Host.mm APPEND PROPERTY
                COMPILE_DEFINITIONS "NO_XPC_SERVICES=1")
     endif()
@@ -137,14 +135,10 @@ endif()
 set(EXTRA_LIBS)
 if (CMAKE_SYSTEM_NAME MATCHES "NetBSD")
   list(APPEND EXTRA_LIBS kvm)
-endif ()
-if (APPLE)
-  list(APPEND EXTRA_LIBS xml2)
-else ()
-  if (LIBXML2_FOUND)
-    list(APPEND EXTRA_LIBS ${LIBXML2_LIBRARIES})
-  endif()
-endif ()
+endif()
+if (LLDB_ENABLE_LIBXML2)
+  list(APPEND EXTRA_LIBS ${LIBXML2_LIBRARIES})
+endif()
 if (HAVE_LIBDL)
   list(APPEND EXTRA_LIBS ${CMAKE_DL_LIBS})
 endif()
@@ -156,7 +150,7 @@ if (LLDB_ENABLE_LZMA)
 endif()
 if (WIN32)
   list(APPEND LLDB_SYSTEM_LIBS psapi)
-endif ()
+endif()
 
 if (LLDB_ENABLE_LIBEDIT)
   list(APPEND LLDB_LIBEDIT_LIBS ${LibEdit_LIBRARIES})

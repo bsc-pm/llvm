@@ -329,6 +329,7 @@ void IntrinsicLowering::LowerIntrinsicCall(CallInst *CI) {
     break;
 
   case Intrinsic::assume:
+  case Intrinsic::experimental_noalias_scope_decl:
   case Intrinsic::var_annotation:
     break;   // Strip out these intrinsics
 
@@ -419,6 +420,10 @@ void IntrinsicLowering::LowerIntrinsicCall(CallInst *CI) {
   }
   case Intrinsic::round: {
     ReplaceFPIntrinsicWithCall(CI, "roundf", "round", "roundl");
+    break;
+  }
+  case Intrinsic::roundeven: {
+    ReplaceFPIntrinsicWithCall(CI, "roundevenf", "roundeven", "roundevenl");
     break;
   }
   case Intrinsic::copysign: {

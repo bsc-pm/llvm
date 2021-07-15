@@ -12,12 +12,13 @@
 using namespace mlir;
 using namespace mlir::standalone;
 
+#include "Standalone/StandaloneOpsDialect.cpp.inc"
+
 //===----------------------------------------------------------------------===//
 // Standalone dialect.
 //===----------------------------------------------------------------------===//
 
-StandaloneDialect::StandaloneDialect(mlir::MLIRContext *context)
-    : Dialect(getDialectNamespace(), context) {
+void StandaloneDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
 #include "Standalone/StandaloneOps.cpp.inc"

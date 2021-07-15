@@ -21,28 +21,28 @@ using namespace mlir::tblgen;
 // Marker to indicate an error happened when replacing a placeholder.
 const char *const kMarkerForNoSubst = "<no-subst-found>";
 
-FmtContext &tblgen::FmtContext::addSubst(StringRef placeholder, Twine subst) {
+FmtContext &FmtContext::addSubst(StringRef placeholder, Twine subst) {
   customSubstMap[placeholder] = subst.str();
   return *this;
 }
 
-FmtContext &tblgen::FmtContext::withBuilder(Twine subst) {
+FmtContext &FmtContext::withBuilder(Twine subst) {
   builtinSubstMap[PHKind::Builder] = subst.str();
   return *this;
 }
 
-FmtContext &tblgen::FmtContext::withOp(Twine subst) {
+FmtContext &FmtContext::withOp(Twine subst) {
   builtinSubstMap[PHKind::Op] = subst.str();
   return *this;
 }
 
-FmtContext &tblgen::FmtContext::withSelf(Twine subst) {
+FmtContext &FmtContext::withSelf(Twine subst) {
   builtinSubstMap[PHKind::Self] = subst.str();
   return *this;
 }
 
 Optional<StringRef>
-tblgen::FmtContext::getSubstFor(FmtContext::PHKind placeholder) const {
+FmtContext::getSubstFor(FmtContext::PHKind placeholder) const {
   if (placeholder == FmtContext::PHKind::None ||
       placeholder == FmtContext::PHKind::Custom)
     return {};
@@ -52,16 +52,15 @@ tblgen::FmtContext::getSubstFor(FmtContext::PHKind placeholder) const {
   return StringRef(it->second);
 }
 
-Optional<StringRef>
-tblgen::FmtContext::getSubstFor(StringRef placeholder) const {
+Optional<StringRef> FmtContext::getSubstFor(StringRef placeholder) const {
   auto it = customSubstMap.find(placeholder);
   if (it == customSubstMap.end())
     return {};
   return StringRef(it->second);
 }
 
-FmtContext::PHKind tblgen::FmtContext::getPlaceHolderKind(StringRef str) {
-  return llvm::StringSwitch<FmtContext::PHKind>(str)
+FmtContext::PHKind FmtContext::getPlaceHolderKind(StringRef str) {
+  return StringSwitch<FmtContext::PHKind>(str)
       .Case("_builder", FmtContext::PHKind::Builder)
       .Case("_op", FmtContext::PHKind::Op)
       .Case("_self", FmtContext::PHKind::Self)
@@ -70,7 +69,7 @@ FmtContext::PHKind tblgen::FmtContext::getPlaceHolderKind(StringRef str) {
 }
 
 std::pair<FmtReplacement, StringRef>
-tblgen::FmtObjectBase::splitFmtSegment(StringRef fmt) {
+FmtObjectBase::splitFmtSegment(StringRef fmt) {
   size_t begin = fmt.find_first_of('$');
   if (begin == StringRef::npos) {
     // No placeholders: the whole format string should be returned as a
@@ -98,12 +97,21 @@ tblgen::FmtObjectBase::splitFmtSegment(StringRef fmt) {
   // First try to see if it's a positional placeholder, and then handle special
   // placeholders.
 
-  size_t end = fmt.find_if_not([](char c) { return std::isdigit(c); }, 1);
+  size_t end =
+      fmt.find_if_not([](char c) { return std::isdigit(c); }, /*From=*/1);
   if (end != 1) {
     // We have a positional placeholder. Parse the index.
     size_t index = 0;
     if (fmt.substr(1, end - 1).consumeInteger(0, index)) {
       llvm_unreachable("invalid replacement sequence index");
+    }
+
+    // Check if this is the part of a range specification.
+    if (fmt.substr(end, 3) == "...") {
+      // Currently only ranges without upper bound are supported.
+      return {
+          FmtReplacement{fmt.substr(0, end + 3), index, FmtReplacement::kUnset},
+          fmt.substr(end + 3)};
     }
 
     if (end == StringRef::npos) {
@@ -165,6 +173,20 @@ void FmtObjectBase::format(raw_ostream &s) const {
       continue;
     }
 
+    if (repl.type == FmtReplacement::Type::PositionalRangePH) {
+      if (repl.index >= adapters.size()) {
+        s << repl.spec << kMarkerForNoSubst;
+        continue;
+      }
+      auto range = llvm::makeArrayRef(adapters);
+      range = range.drop_front(repl.index);
+      if (repl.end != FmtReplacement::kUnset)
+        range = range.drop_back(adapters.size() - repl.end);
+      llvm::interleaveComma(range, s,
+                            [&](auto &x) { x->format(s, /*Options=*/""); });
+      continue;
+    }
+
     assert(repl.type == FmtReplacement::Type::PositionalPH);
 
     if (repl.index >= adapters.size()) {
@@ -173,4 +195,23 @@ void FmtObjectBase::format(raw_ostream &s) const {
     }
     adapters[repl.index]->format(s, /*Options=*/"");
   }
+}
+
+FmtStrVecObject::FmtStrVecObject(StringRef fmt, const FmtContext *ctx,
+                                 ArrayRef<std::string> params)
+    : FmtObjectBase(fmt, ctx, params.size()) {
+  parameters.reserve(params.size());
+  for (std::string p : params)
+    parameters.push_back(llvm::detail::build_format_adapter(std::move(p)));
+
+  adapters.reserve(parameters.size());
+  for (auto &p : parameters)
+    adapters.push_back(&p);
+}
+
+FmtStrVecObject::FmtStrVecObject(FmtStrVecObject &&that)
+    : FmtObjectBase(std::move(that)), parameters(std::move(that.parameters)) {
+  adapters.reserve(parameters.size());
+  for (auto &p : parameters)
+    adapters.push_back(&p);
 }

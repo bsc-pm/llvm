@@ -47,6 +47,7 @@
 #include "clang/StaticAnalyzer/Core/PathSensitive/Store.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/ImmutableList.h"
 #include "llvm/ADT/None.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -86,7 +87,7 @@ QualType CallEvent::getResultType() const {
   case VK_XValue:
     ResultTy = Ctx.getRValueReferenceType(ResultTy);
     break;
-  case VK_RValue:
+  case VK_PRValue:
     // No adjustment is necessary.
     break;
   }
@@ -172,22 +173,8 @@ AnalysisDeclContext *CallEvent::getCalleeAnalysisDeclContext() const {
   if (!D)
     return nullptr;
 
-  // TODO: For now we skip functions without definitions, even if we have
-  // our own getDecl(), because it's hard to find out which re-declaration
-  // is going to be used, and usually clients don't really care about this
-  // situation because there's a loss of precision anyway because we cannot
-  // inline the call.
-  RuntimeDefinition RD = getRuntimeDefinition();
-  if (!RD.getDecl())
-    return nullptr;
-
   AnalysisDeclContext *ADC =
       LCtx->getAnalysisDeclContext()->getManager()->getContext(D);
-
-  // TODO: For now we skip virtual functions, because this also rises
-  // the problem of which decl to use, but now it's across different classes.
-  if (RD.mayHaveOtherDefinitions() || RD.getDecl() != ADC->getDecl())
-    return nullptr;
 
   return ADC;
 }
@@ -222,39 +209,17 @@ CallEvent::getCalleeStackFrame(unsigned BlockCount) const {
   return ADC->getManager()->getStackFrame(ADC, LCtx, E, B, BlockCount, Idx);
 }
 
-const VarRegion *CallEvent::getParameterLocation(unsigned Index,
-                                                 unsigned BlockCount) const {
+const ParamVarRegion
+*CallEvent::getParameterLocation(unsigned Index, unsigned BlockCount) const {
   const StackFrameContext *SFC = getCalleeStackFrame(BlockCount);
   // We cannot construct a VarRegion without a stack frame.
   if (!SFC)
     return nullptr;
 
-  // Retrieve parameters of the definition, which are different from
-  // CallEvent's parameters() because getDecl() isn't necessarily
-  // the definition. SFC contains the definition that would be used
-  // during analysis.
-  const Decl *D = SFC->getDecl();
-
-  // TODO: Refactor into a virtual method of CallEvent, like parameters().
-  const ParmVarDecl *PVD = nullptr;
-  if (const auto *FD = dyn_cast<FunctionDecl>(D))
-    PVD = FD->parameters()[Index];
-  else if (const auto *BD = dyn_cast<BlockDecl>(D))
-    PVD = BD->parameters()[Index];
-  else if (const auto *MD = dyn_cast<ObjCMethodDecl>(D))
-    PVD = MD->parameters()[Index];
-  else if (const auto *CD = dyn_cast<CXXConstructorDecl>(D))
-    PVD = CD->parameters()[Index];
-  assert(PVD && "Unexpected Decl kind!");
-
-  const VarRegion *VR =
-      State->getStateManager().getRegionManager().getVarRegion(PVD, SFC);
-
-  // This sanity check would fail if our parameter declaration doesn't
-  // correspond to the stack frame's function declaration.
-  assert(VR->getStackFrame() == SFC);
-
-  return VR;
+  const ParamVarRegion *PVR =
+    State->getStateManager().getRegionManager().getParamVarRegion(
+        getOriginExpr(), Index, SFC);
+  return PVR;
 }
 
 /// Returns true if a type is a pointer-to-const or reference-to-const
@@ -325,8 +290,9 @@ ProgramStateRef CallEvent::invalidateRegions(unsigned BlockCount,
     if (getKind() != CE_CXXAllocator)
       if (isArgumentConstructedDirectly(Idx))
         if (auto AdjIdx = getAdjustedParameterIndex(Idx))
-          if (const VarRegion *VR = getParameterLocation(*AdjIdx, BlockCount))
-            ValuesToInvalidate.push_back(loc::MemRegionVal(VR));
+          if (const TypedValueRegion *TVR =
+                  getParameterLocation(*AdjIdx, BlockCount))
+            ValuesToInvalidate.push_back(loc::MemRegionVal(TVR));
   }
 
   // Invalidate designated regions using the batch invalidation API.
@@ -501,6 +467,42 @@ bool CallEvent::isVariadic(const Decl *D) {
   llvm_unreachable("unknown callable kind");
 }
 
+static bool isTransparentUnion(QualType T) {
+  const RecordType *UT = T->getAsUnionType();
+  return UT && UT->getDecl()->hasAttr<TransparentUnionAttr>();
+}
+
+// In some cases, symbolic cases should be transformed before we associate
+// them with parameters.  This function incapsulates such cases.
+static SVal processArgument(SVal Value, const Expr *ArgumentExpr,
+                            const ParmVarDecl *Parameter, SValBuilder &SVB) {
+  QualType ParamType = Parameter->getType();
+  QualType ArgumentType = ArgumentExpr->getType();
+
+  // Transparent unions allow users to easily convert values of union field
+  // types into union-typed objects.
+  //
+  // Also, more importantly, they allow users to define functions with different
+  // different parameter types, substituting types matching transparent union
+  // field types with the union type itself.
+  //
+  // Here, we check specifically for latter cases and prevent binding
+  // field-typed values to union-typed regions.
+  if (isTransparentUnion(ParamType) &&
+      // Let's check that we indeed trying to bind different types.
+      !isTransparentUnion(ArgumentType)) {
+    BasicValueFactory &BVF = SVB.getBasicValueFactory();
+
+    llvm::ImmutableList<SVal> CompoundSVals = BVF.getEmptySValList();
+    CompoundSVals = BVF.prependSVal(Value, CompoundSVals);
+
+    // Wrap it with compound value.
+    return SVB.makeCompoundVal(ParamType, CompoundSVals);
+  }
+
+  return Value;
+}
+
 static void addParameterValuesToBindings(const StackFrameContext *CalleeCtx,
                                          CallEvent::BindingsTy &Bindings,
                                          SValBuilder &SVB,
@@ -514,8 +516,7 @@ static void addParameterValuesToBindings(const StackFrameContext *CalleeCtx,
   unsigned Idx = 0;
   ArrayRef<ParmVarDecl*>::iterator I = parameters.begin(), E = parameters.end();
   for (; I != E && Idx < NumArgs; ++I, ++Idx) {
-    const ParmVarDecl *ParamDecl = *I;
-    assert(ParamDecl && "Formal parameter has no decl?");
+    assert(*I && "Formal parameter has no decl?");
 
     // TODO: Support allocator calls.
     if (Call.getKind() != CE_CXXAllocator)
@@ -526,13 +527,47 @@ static void addParameterValuesToBindings(const StackFrameContext *CalleeCtx,
     // determined in compile-time but not represented as arg-expressions,
     // which makes getArgSVal() fail and return UnknownVal.
     SVal ArgVal = Call.getArgSVal(Idx);
+    const Expr *ArgExpr = Call.getArgExpr(Idx);
     if (!ArgVal.isUnknown()) {
-      Loc ParamLoc = SVB.makeLoc(MRMgr.getVarRegion(ParamDecl, CalleeCtx));
-      Bindings.push_back(std::make_pair(ParamLoc, ArgVal));
+      Loc ParamLoc = SVB.makeLoc(
+          MRMgr.getParamVarRegion(Call.getOriginExpr(), Idx, CalleeCtx));
+      Bindings.push_back(
+          std::make_pair(ParamLoc, processArgument(ArgVal, ArgExpr, *I, SVB)));
     }
   }
 
   // FIXME: Variadic arguments are not handled at all right now.
+}
+
+const ConstructionContext *CallEvent::getConstructionContext() const {
+  const StackFrameContext *StackFrame = getCalleeStackFrame(0);
+  if (!StackFrame)
+    return nullptr;
+
+  const CFGElement Element = StackFrame->getCallSiteCFGElement();
+  if (const auto Ctor = Element.getAs<CFGConstructor>()) {
+    return Ctor->getConstructionContext();
+  }
+
+  if (const auto RecCall = Element.getAs<CFGCXXRecordTypedCall>()) {
+    return RecCall->getConstructionContext();
+  }
+
+  return nullptr;
+}
+
+Optional<SVal>
+CallEvent::getReturnValueUnderConstruction() const {
+  const auto *CC = getConstructionContext();
+  if (!CC)
+    return None;
+
+  EvalCallOptions CallOpts;
+  ExprEngine &Engine = getState()->getStateManager().getOwningEngine();
+  SVal RetVal =
+    Engine.computeObjectUnderConstruction(getOriginExpr(), getState(),
+                                          getLocationContext(), CC, CallOpts);
+  return RetVal;
 }
 
 ArrayRef<ParmVarDecl*> AnyFunctionCall::parameters() const {
@@ -564,7 +599,7 @@ RuntimeDefinition AnyFunctionCall::getRuntimeDefinition() const {
     return RuntimeDefinition(Decl);
   }
 
-  SubEngine &Engine = getState()->getStateManager().getOwningEngine();
+  ExprEngine &Engine = getState()->getStateManager().getOwningEngine();
   AnalyzerOptions &Opts = Engine.getAnalysisManager().options;
 
   // Try to get CTU definition only if CTUDir is provided.
@@ -691,7 +726,7 @@ void CXXInstanceCall::getExtraInvalidatedValues(
     // base class decl, rather than the class of the instance which needs to be
     // checked for mutable fields.
     // TODO: We might as well look at the dynamic type of the object.
-    const Expr *Ex = getCXXThisExpr()->ignoreParenBaseCasts();
+    const Expr *Ex = getCXXThisExpr()->IgnoreParenBaseCasts();
     QualType T = Ex->getType();
     if (T->isPointerType()) // Arrow or implicit-this syntax?
       T = T->getPointeeType();
@@ -1202,7 +1237,7 @@ template <> struct DenseMapInfo<PrivateMethodKey> {
 };
 } // end namespace llvm
 
-const ObjCMethodDecl *
+static const ObjCMethodDecl *
 lookupRuntimeDefinition(const ObjCInterfaceDecl *Interface,
                         Selector LookupSelector, bool InstanceMethod) {
   // Repeatedly calling lookupPrivateMethod() is expensive, especially

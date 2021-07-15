@@ -9,38 +9,51 @@
 #include "Annotations.h"
 #include "ClangdServer.h"
 #include "Diagnostics.h"
+#include "GlobalCompilationDatabase.h"
 #include "Matchers.h"
 #include "ParsedAST.h"
 #include "Preamble.h"
 #include "TUScheduler.h"
 #include "TestFS.h"
+#include "TestIndex.h"
 #include "support/Cancellation.h"
 #include "support/Context.h"
 #include "support/Path.h"
 #include "support/TestTracer.h"
 #include "support/Threading.h"
+#include "support/ThreadsafeFS.h"
 #include "clang/Basic/DiagnosticDriver.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/FunctionExtras.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
+#include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringRef.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <memory>
+#include <string>
 #include <utility>
 
 namespace clang {
 namespace clangd {
 namespace {
 
+using ::testing::AllOf;
 using ::testing::AnyOf;
+using ::testing::Contains;
 using ::testing::Each;
 using ::testing::ElementsAre;
 using ::testing::Eq;
 using ::testing::Field;
 using ::testing::IsEmpty;
+using ::testing::Not;
+using ::testing::Pair;
 using ::testing::Pointee;
 using ::testing::SizeIs;
 using ::testing::UnorderedElementsAre;
@@ -58,8 +71,20 @@ MATCHER_P2(TUState, PreambleActivity, ASTActivity, "") {
   return true;
 }
 
+// Simple ContextProvider to verify the provider is invoked & contexts are used.
+static Key<std::string> BoundPath;
+Context bindPath(PathRef F) {
+  return Context::current().derive(BoundPath, F.str());
+}
+llvm::StringRef boundPath() {
+  const std::string *V = Context::current().get(BoundPath);
+  return V ? *V : llvm::StringRef("");
+}
+
 TUScheduler::Options optsForTest() {
-  return TUScheduler::Options(ClangdServer::optsForTest());
+  TUScheduler::Options Opts(ClangdServer::optsForTest());
+  Opts.ContextProvider = bindPath;
+  return Opts;
 }
 
 class TUSchedulerTests : public ::testing::Test {
@@ -67,7 +92,7 @@ protected:
   ParseInputs getInputs(PathRef File, std::string Contents) {
     ParseInputs Inputs;
     Inputs.CompileCommand = *CDB.getCompileCommand(File);
-    Inputs.FS = buildTestFS(Files, Timestamps);
+    Inputs.TFS = &FS;
     Inputs.Contents = std::move(Contents);
     Inputs.Opts = ParseOptions();
     return Inputs;
@@ -96,7 +121,7 @@ protected:
     class CaptureDiags : public ParsingCallbacks {
     public:
       void onMainAST(PathRef File, ParsedAST &AST, PublishFn Publish) override {
-        reportDiagnostics(File, AST.getDiagnostics(), Publish);
+        reportDiagnostics(File, *AST.getDiagnostics(), Publish);
       }
 
       void onFailedAST(PathRef File, llvm::StringRef Version,
@@ -143,8 +168,7 @@ protected:
                            std::move(CB));
   }
 
-  llvm::StringMap<std::string> Files;
-  llvm::StringMap<time_t> Timestamps;
+  MockFS FS;
   MockCompilationDatabase CDB;
 };
 
@@ -155,10 +179,10 @@ TEST_F(TUSchedulerTests, MissingFiles) {
   TUScheduler S(CDB, optsForTest());
 
   auto Added = testPath("added.cpp");
-  Files[Added] = "x";
+  FS.Files[Added] = "x";
 
   auto Missing = testPath("missing.cpp");
-  Files[Missing] = "";
+  FS.Files[Missing] = "";
 
   S.update(Added, getInputs(Added, "x"), WantDiagnostics::No);
 
@@ -399,6 +423,38 @@ TEST_F(TUSchedulerTests, Invalidation) {
   EXPECT_EQ(4, Actions.load()) << "All actions should run (some with error)";
 }
 
+// We don't invalidate requests for updates that don't change the file content.
+// These are mostly "refresh this file" events synthesized inside clangd itself.
+// (Usually the AST rebuild is elided after verifying that all inputs are
+// unchanged, but invalidation decisions happen earlier and so independently).
+// See https://github.com/clangd/clangd/issues/620
+TEST_F(TUSchedulerTests, InvalidationUnchanged) {
+  auto Path = testPath("foo.cpp");
+  TUScheduler S(CDB, optsForTest(), captureDiags());
+  std::atomic<int> Actions(0);
+
+  Notification Start;
+  updateWithDiags(S, Path, "a", WantDiagnostics::Yes, [&](std::vector<Diag>) {
+    Start.wait();
+  });
+  S.runWithAST(
+      "invalidatable", Path,
+      [&](llvm::Expected<InputsAndAST> AST) {
+        ++Actions;
+        EXPECT_TRUE(bool(AST))
+            << "Should not invalidate based on an update with same content: "
+            << llvm::toString(AST.takeError());
+      },
+      TUScheduler::InvalidateOnUpdate);
+  updateWithDiags(S, Path, "a", WantDiagnostics::Yes, [&](std::vector<Diag>) {
+    ADD_FAILURE() << "Shouldn't build, identical to previous";
+  });
+  Start.notify();
+  ASSERT_TRUE(S.blockUntilIdle(timeoutSeconds(10)));
+
+  EXPECT_EQ(1, Actions.load()) << "All actions should run";
+}
+
 TEST_F(TUSchedulerTests, ManyUpdates) {
   const int FilesCount = 3;
   const int UpdatesPerFile = 10;
@@ -407,6 +463,7 @@ TEST_F(TUSchedulerTests, ManyUpdates) {
   int TotalASTReads = 0;
   int TotalPreambleReads = 0;
   int TotalUpdates = 0;
+  llvm::StringMap<int> LatestDiagVersion;
 
   // Run TUScheduler and collect some stats.
   {
@@ -418,7 +475,7 @@ TEST_F(TUSchedulerTests, ManyUpdates) {
     for (int I = 0; I < FilesCount; ++I) {
       std::string Name = "foo" + std::to_string(I) + ".cpp";
       Files.push_back(testPath(Name));
-      this->Files[Files.back()] = "";
+      this->FS.Files[Files.back()] = "";
     }
 
     StringRef Contents1 = R"cpp(int a;)cpp";
@@ -441,15 +498,24 @@ TEST_F(TUSchedulerTests, ManyUpdates) {
         auto Inputs = getInputs(File, Contents.str());
         {
           WithContextValue WithNonce(NonceKey, ++Nonce);
-          Inputs.Version = std::to_string(Nonce);
+          Inputs.Version = std::to_string(UpdateI);
           updateWithDiags(
               S, File, Inputs, WantDiagnostics::Auto,
-              [File, Nonce, &Mut, &TotalUpdates](std::vector<Diag>) {
+              [File, Nonce, Version(Inputs.Version), &Mut, &TotalUpdates,
+               &LatestDiagVersion](std::vector<Diag>) {
                 EXPECT_THAT(Context::current().get(NonceKey), Pointee(Nonce));
+                EXPECT_EQ(File, boundPath());
 
                 std::lock_guard<std::mutex> Lock(Mut);
                 ++TotalUpdates;
                 EXPECT_EQ(File, *TUScheduler::getFileBeingProcessedInContext());
+                // Make sure Diags are for a newer version.
+                auto It = LatestDiagVersion.try_emplace(File, -1);
+                const int PrevVersion = It.first->second;
+                int CurVersion;
+                ASSERT_TRUE(llvm::to_integer(Version, CurVersion, 10));
+                EXPECT_LT(PrevVersion, CurVersion);
+                It.first->getValue() = CurVersion;
               });
         }
         {
@@ -459,9 +525,9 @@ TEST_F(TUSchedulerTests, ManyUpdates) {
               [File, Inputs, Nonce, &Mut,
                &TotalASTReads](Expected<InputsAndAST> AST) {
                 EXPECT_THAT(Context::current().get(NonceKey), Pointee(Nonce));
+                EXPECT_EQ(File, boundPath());
 
                 ASSERT_TRUE((bool)AST);
-                EXPECT_EQ(AST->Inputs.FS, Inputs.FS);
                 EXPECT_EQ(AST->Inputs.Contents, Inputs.Contents);
                 EXPECT_EQ(AST->Inputs.Version, Inputs.Version);
                 EXPECT_EQ(AST->AST.version(), Inputs.Version);
@@ -479,6 +545,7 @@ TEST_F(TUSchedulerTests, ManyUpdates) {
               [File, Inputs, Nonce, &Mut,
                &TotalPreambleReads](Expected<InputsAndPreamble> Preamble) {
                 EXPECT_THAT(Context::current().get(NonceKey), Pointee(Nonce));
+                EXPECT_EQ(File, boundPath());
 
                 ASSERT_TRUE((bool)Preamble);
                 EXPECT_EQ(Preamble->Contents, Inputs.Contents);
@@ -494,7 +561,13 @@ TEST_F(TUSchedulerTests, ManyUpdates) {
   } // TUScheduler destructor waits for all operations to finish.
 
   std::lock_guard<std::mutex> Lock(Mut);
-  EXPECT_EQ(TotalUpdates, FilesCount * UpdatesPerFile);
+  // Updates might get coalesced in preamble thread and result in dropping
+  // diagnostics for intermediate snapshots.
+  EXPECT_GE(TotalUpdates, FilesCount);
+  EXPECT_LE(TotalUpdates, FilesCount * UpdatesPerFile);
+  // We should receive diags for last update.
+  for (const auto &Entry : LatestDiagVersion)
+    EXPECT_EQ(Entry.second, UpdatesPerFile - 1);
   EXPECT_EQ(TotalASTReads, FilesCount * UpdatesPerFile);
   EXPECT_EQ(TotalPreambleReads, FilesCount * UpdatesPerFile);
 }
@@ -596,8 +669,8 @@ TEST_F(TUSchedulerTests, EmptyPreamble) {
   auto Foo = testPath("foo.cpp");
   auto Header = testPath("foo.h");
 
-  Files[Header] = "void foo()";
-  Timestamps[Header] = time_t(0);
+  FS.Files[Header] = "void foo()";
+  FS.Timestamps[Header] = time_t(0);
   auto WithPreamble = R"cpp(
     #include "foo.h"
     int main() {}
@@ -612,12 +685,12 @@ TEST_F(TUSchedulerTests, EmptyPreamble) {
             cantFail(std::move(Preamble)).Preamble->Preamble.getBounds().Size,
             0u);
       });
-  // Wait for the preamble is being built.
+  // Wait while the preamble is being built.
   ASSERT_TRUE(S.blockUntilIdle(timeoutSeconds(10)));
 
   // Update the file which results in an empty preamble.
   S.update(Foo, getInputs(Foo, WithEmptyPreamble), WantDiagnostics::Auto);
-  // Wait for the preamble is being built.
+  // Wait while the preamble is being built.
   ASSERT_TRUE(S.blockUntilIdle(timeoutSeconds(10)));
   S.runWithPreamble(
       "getEmptyPreamble", Foo, TUScheduler::Stale,
@@ -627,6 +700,47 @@ TEST_F(TUSchedulerTests, EmptyPreamble) {
             cantFail(std::move(Preamble)).Preamble->Preamble.getBounds().Size,
             0u);
       });
+}
+
+TEST_F(TUSchedulerTests, ASTSignalsSmokeTests) {
+  TUScheduler S(CDB, optsForTest());
+  auto Foo = testPath("foo.cpp");
+  auto Header = testPath("foo.h");
+
+  FS.Files[Header] = "namespace tar { int foo(); }";
+  const char *Contents = R"cpp(
+  #include "foo.h"
+  namespace ns {
+  int func() {
+    return tar::foo());
+  }
+  } // namespace ns
+  )cpp";
+  // Update the file which results in an empty preamble.
+  S.update(Foo, getInputs(Foo, Contents), WantDiagnostics::Yes);
+  // Wait while the preamble is being built.
+  ASSERT_TRUE(S.blockUntilIdle(timeoutSeconds(10)));
+  Notification TaskRun;
+  S.runWithPreamble(
+      "ASTSignals", Foo, TUScheduler::Stale,
+      [&](Expected<InputsAndPreamble> IP) {
+        ASSERT_FALSE(!IP);
+        std::vector<std::pair<StringRef, int>> NS;
+        for (const auto &P : IP->Signals->RelatedNamespaces)
+          NS.emplace_back(P.getKey(), P.getValue());
+        EXPECT_THAT(NS,
+                    UnorderedElementsAre(Pair("ns::", 1), Pair("tar::", 1)));
+
+        std::vector<std::pair<SymbolID, int>> Sym;
+        for (const auto &P : IP->Signals->ReferencedSymbols)
+          Sym.emplace_back(P.getFirst(), P.getSecond());
+        EXPECT_THAT(Sym, UnorderedElementsAre(Pair(ns("tar").ID, 1),
+                                              Pair(ns("ns").ID, 1),
+                                              Pair(func("tar::foo").ID, 1),
+                                              Pair(func("ns::func").ID, 1)));
+        TaskRun.notify();
+      });
+  TaskRun.wait();
 }
 
 TEST_F(TUSchedulerTests, RunWaitsForPreamble) {
@@ -665,8 +779,8 @@ TEST_F(TUSchedulerTests, NoopOnEmptyChanges) {
   auto Source = testPath("foo.cpp");
   auto Header = testPath("foo.h");
 
-  Files[Header] = "int a;";
-  Timestamps[Header] = time_t(0);
+  FS.Files[Header] = "int a;";
+  FS.Timestamps[Header] = time_t(0);
 
   std::string SourceContents = R"cpp(
       #include "foo.h"
@@ -694,7 +808,7 @@ TEST_F(TUSchedulerTests, NoopOnEmptyChanges) {
   ASSERT_EQ(S.fileStats().lookup(Source).PreambleBuilds, 1u);
 
   // Update to a header should cause a rebuild, though.
-  Timestamps[Header] = time_t(1);
+  FS.Timestamps[Header] = time_t(1);
   ASSERT_TRUE(DoUpdate(SourceContents));
   ASSERT_FALSE(DoUpdate(SourceContents));
   ASSERT_EQ(S.fileStats().lookup(Source).ASTBuilds, 2u);
@@ -715,15 +829,24 @@ TEST_F(TUSchedulerTests, NoopOnEmptyChanges) {
   ASSERT_EQ(S.fileStats().lookup(Source).PreambleBuilds, 3u);
 }
 
-TEST_F(TUSchedulerTests, ForceRebuild) {
+// We rebuild if a completely missing header exists, but not if one is added
+// on a higher-priority include path entry (for performance).
+// (Previously we wouldn't automatically rebuild when files were added).
+TEST_F(TUSchedulerTests, MissingHeader) {
+  CDB.ExtraClangFlags.push_back("-I" + testPath("a"));
+  CDB.ExtraClangFlags.push_back("-I" + testPath("b"));
+  // Force both directories to exist so they don't get pruned.
+  FS.Files.try_emplace("a/__unused__");
+  FS.Files.try_emplace("b/__unused__");
   TUScheduler S(CDB, optsForTest(), captureDiags());
 
   auto Source = testPath("foo.cpp");
-  auto Header = testPath("foo.h");
+  auto HeaderA = testPath("a/foo.h");
+  auto HeaderB = testPath("b/foo.h");
 
   auto SourceContents = R"cpp(
       #include "foo.h"
-      int b = a;
+      int c = b;
     )cpp";
 
   ParseInputs Inputs = getInputs(Source, SourceContents);
@@ -738,36 +861,47 @@ TEST_F(TUSchedulerTests, ForceRebuild) {
         EXPECT_THAT(Diags,
                     ElementsAre(Field(&Diag::Message, "'foo.h' file not found"),
                                 Field(&Diag::Message,
-                                      "use of undeclared identifier 'a'")));
+                                      "use of undeclared identifier 'b'")));
       });
+  S.blockUntilIdle(timeoutSeconds(10));
 
-  // Add the header file. We need to recreate the inputs since we changed a
-  // file from underneath the test FS.
-  Files[Header] = "int a;";
-  Timestamps[Header] = time_t(1);
-  Inputs = getInputs(Source, SourceContents);
+  FS.Files[HeaderB] = "int b;";
+  FS.Timestamps[HeaderB] = time_t(1);
 
-  // The addition of the missing header file shouldn't trigger a rebuild since
-  // we don't track missing files.
-  updateWithDiags(
-      S, Source, Inputs, WantDiagnostics::Yes,
-      [&DiagCount](std::vector<Diag> Diags) {
-        ++DiagCount;
-        ADD_FAILURE() << "Did not expect diagnostics for missing header update";
-      });
-
-  // Forcing the reload should should cause a rebuild which no longer has any
-  // errors.
-  Inputs.ForceRebuild = true;
+  // The addition of the missing header file triggers a rebuild, no errors.
   updateWithDiags(S, Source, Inputs, WantDiagnostics::Yes,
                   [&DiagCount](std::vector<Diag> Diags) {
                     ++DiagCount;
                     EXPECT_THAT(Diags, IsEmpty());
                   });
 
+  // Ensure previous assertions are done before we touch the FS again.
   ASSERT_TRUE(S.blockUntilIdle(timeoutSeconds(10)));
-  EXPECT_EQ(DiagCount, 2U);
+  // Add the high-priority header file, which should reintroduce the error.
+  FS.Files[HeaderA] = "int a;";
+  FS.Timestamps[HeaderA] = time_t(1);
+
+  // This isn't detected: we don't stat a/foo.h to validate the preamble.
+  updateWithDiags(S, Source, Inputs, WantDiagnostics::Yes,
+                  [&DiagCount](std::vector<Diag> Diags) {
+                    ++DiagCount;
+                    ADD_FAILURE()
+                        << "Didn't expect new diagnostics when adding a/foo.h";
+                  });
+
+  // Forcing the reload should should cause a rebuild.
+  Inputs.ForceRebuild = true;
+  updateWithDiags(
+      S, Source, Inputs, WantDiagnostics::Yes,
+      [&DiagCount](std::vector<Diag> Diags) {
+        ++DiagCount;
+        ElementsAre(Field(&Diag::Message, "use of undeclared identifier 'b'"));
+      });
+
+  ASSERT_TRUE(S.blockUntilIdle(timeoutSeconds(10)));
+  EXPECT_EQ(DiagCount, 3U);
 }
+
 TEST_F(TUSchedulerTests, NoChangeDiags) {
   trace::TestTracer Tracer;
   TUScheduler S(CDB, optsForTest(), captureDiags());
@@ -809,21 +943,28 @@ TEST_F(TUSchedulerTests, NoChangeDiags) {
 }
 
 TEST_F(TUSchedulerTests, Run) {
-  TUScheduler S(CDB, optsForTest());
-  std::atomic<int> Counter(0);
-  S.run("add 1", [&] { ++Counter; });
-  S.run("add 2", [&] { Counter += 2; });
-  ASSERT_TRUE(S.blockUntilIdle(timeoutSeconds(10)));
-  EXPECT_EQ(Counter.load(), 3);
+  for (bool Sync : {false, true}) {
+    auto Opts = optsForTest();
+    if (Sync)
+      Opts.AsyncThreadsCount = 0;
+    TUScheduler S(CDB, Opts);
+    std::atomic<int> Counter(0);
+    S.run("add 1", /*Path=*/"", [&] { ++Counter; });
+    S.run("add 2", /*Path=*/"", [&] { Counter += 2; });
+    ASSERT_TRUE(S.blockUntilIdle(timeoutSeconds(10)));
+    EXPECT_EQ(Counter.load(), 3);
 
-  Notification TaskRun;
-  Key<int> TestKey;
-  WithContextValue CtxWithKey(TestKey, 10);
-  S.run("props context", [&] {
-    EXPECT_EQ(Context::current().getExisting(TestKey), 10);
-    TaskRun.notify();
-  });
-  TaskRun.wait();
+    Notification TaskRun;
+    Key<int> TestKey;
+    WithContextValue CtxWithKey(TestKey, 10);
+    const char *Path = "somepath";
+    S.run("props context", Path, [&] {
+      EXPECT_EQ(Context::current().getExisting(TestKey), 10);
+      EXPECT_EQ(Path, boundPath());
+      TaskRun.notify();
+    });
+    TaskRun.wait();
+  }
 }
 
 TEST_F(TUSchedulerTests, TUStatus) {
@@ -860,7 +1001,7 @@ TEST_F(TUSchedulerTests, TUStatus) {
     std::vector<ASTAction::Kind> ASTActions;
     std::vector<PreambleAction> PreambleActions;
   } CaptureTUStatus;
-  MockFSProvider FS;
+  MockFS FS;
   MockCompilationDatabase CDB;
   ClangdServer Server(CDB, FS, ClangdServer::optsForTest(), &CaptureTUStatus);
   Annotations Code("int m^ain () {}");
@@ -948,7 +1089,7 @@ TEST_F(TUSchedulerTests, CommandLineWarnings) {
 
 TEST(DebouncePolicy, Compute) {
   namespace c = std::chrono;
-  std::vector<DebouncePolicy::clock::duration> History = {
+  DebouncePolicy::clock::duration History[] = {
       c::seconds(0),
       c::seconds(5),
       c::seconds(10),
@@ -959,8 +1100,9 @@ TEST(DebouncePolicy, Compute) {
   Policy.Max = c::seconds(25);
   // Call Policy.compute(History) and return seconds as a float.
   auto Compute = [&](llvm::ArrayRef<DebouncePolicy::clock::duration> History) {
-    using FloatingSeconds = c::duration<float, c::seconds::period>;
-    return static_cast<float>(Policy.compute(History) / FloatingSeconds(1));
+    return c::duration_cast<c::duration<float, c::seconds::period>>(
+               Policy.compute(History))
+        .count();
   };
   EXPECT_NEAR(10, Compute(History), 0.01) << "(upper) median = 10";
   Policy.RebuildRatio = 1.5;
@@ -972,6 +1114,219 @@ TEST(DebouncePolicy, Compute) {
   EXPECT_NEAR(25, Compute({}), 0.01) << "no history -> max";
 }
 
+TEST_F(TUSchedulerTests, AsyncPreambleThread) {
+  // Blocks preamble thread while building preamble with \p BlockVersion until
+  // \p N is notified.
+  class BlockPreambleThread : public ParsingCallbacks {
+  public:
+    BlockPreambleThread(llvm::StringRef BlockVersion, Notification &N)
+        : BlockVersion(BlockVersion), N(N) {}
+    void onPreambleAST(PathRef Path, llvm::StringRef Version, ASTContext &Ctx,
+                       std::shared_ptr<clang::Preprocessor> PP,
+                       const CanonicalIncludes &) override {
+      if (Version == BlockVersion)
+        N.wait();
+    }
+
+  private:
+    llvm::StringRef BlockVersion;
+    Notification &N;
+  };
+
+  static constexpr llvm::StringLiteral InputsV0 = "v0";
+  static constexpr llvm::StringLiteral InputsV1 = "v1";
+  Notification Ready;
+  TUScheduler S(CDB, optsForTest(),
+                std::make_unique<BlockPreambleThread>(InputsV1, Ready));
+
+  Path File = testPath("foo.cpp");
+  auto PI = getInputs(File, "");
+  PI.Version = InputsV0.str();
+  S.update(File, PI, WantDiagnostics::Auto);
+  S.blockUntilIdle(timeoutSeconds(10));
+
+  // Block preamble builds.
+  PI.Version = InputsV1.str();
+  // Issue second update which will block preamble thread.
+  S.update(File, PI, WantDiagnostics::Auto);
+
+  Notification RunASTAction;
+  // Issue an AST read, which shouldn't be blocked and see latest version of the
+  // file.
+  S.runWithAST("test", File, [&](Expected<InputsAndAST> AST) {
+    ASSERT_TRUE(bool(AST));
+    // Make sure preamble is built with stale inputs, but AST was built using
+    // new ones.
+    EXPECT_THAT(AST->AST.preambleVersion(), InputsV0);
+    EXPECT_THAT(AST->Inputs.Version, InputsV1.str());
+    RunASTAction.notify();
+  });
+  RunASTAction.wait();
+  Ready.notify();
+}
+
+// If a header file is missing from the CDB (or inferred using heuristics), and
+// it's included by another open file, then we parse it using that files flags.
+TEST_F(TUSchedulerTests, IncluderCache) {
+  static std::string Main = testPath("main.cpp"), Main2 = testPath("main2.cpp"),
+                     Main3 = testPath("main3.cpp"),
+                     NoCmd = testPath("no_cmd.h"),
+                     Unreliable = testPath("unreliable.h"),
+                     OK = testPath("ok.h"),
+                     NotIncluded = testPath("not_included.h");
+  class NoHeadersCDB : public GlobalCompilationDatabase {
+    llvm::Optional<tooling::CompileCommand>
+    getCompileCommand(PathRef File) const override {
+      if (File == NoCmd || File == NotIncluded)
+        return llvm::None;
+      auto Basic = getFallbackCommand(File);
+      Basic.Heuristic.clear();
+      if (File == Unreliable) {
+        Basic.Heuristic = "not reliable";
+      } else if (File == Main) {
+        Basic.CommandLine.push_back("-DMAIN");
+      } else if (File == Main2) {
+        Basic.CommandLine.push_back("-DMAIN2");
+      } else if (File == Main3) {
+        Basic.CommandLine.push_back("-DMAIN3");
+      }
+      return Basic;
+    }
+  } CDB;
+  TUScheduler S(CDB, optsForTest());
+  auto GetFlags = [&](PathRef Header) {
+    S.update(Header, getInputs(Header, ";"), WantDiagnostics::Yes);
+    EXPECT_TRUE(S.blockUntilIdle(timeoutSeconds(10)));
+    tooling::CompileCommand Cmd;
+    S.runWithPreamble("GetFlags", Header, TUScheduler::StaleOrAbsent,
+                      [&](llvm::Expected<InputsAndPreamble> Inputs) {
+                        ASSERT_FALSE(!Inputs) << Inputs.takeError();
+                        Cmd = std::move(Inputs->Command);
+                      });
+    EXPECT_TRUE(S.blockUntilIdle(timeoutSeconds(10)));
+    return Cmd.CommandLine;
+  };
+
+  for (const auto &Path : {NoCmd, Unreliable, OK, NotIncluded})
+    FS.Files[Path] = ";";
+
+  // Initially these files have normal commands from the CDB.
+  EXPECT_THAT(GetFlags(Main), Contains("-DMAIN")) << "sanity check";
+  EXPECT_THAT(GetFlags(NoCmd), Not(Contains("-DMAIN"))) << "no includes yet";
+
+  // Now make Main include the others, and some should pick up its flags.
+  const char *AllIncludes = R"cpp(
+    #include "no_cmd.h"
+    #include "ok.h"
+    #include "unreliable.h"
+  )cpp";
+  S.update(Main, getInputs(Main, AllIncludes), WantDiagnostics::Yes);
+  EXPECT_TRUE(S.blockUntilIdle(timeoutSeconds(10)));
+  EXPECT_THAT(GetFlags(NoCmd), Contains("-DMAIN"))
+      << "Included from main file, has no own command";
+  EXPECT_THAT(GetFlags(Unreliable), Contains("-DMAIN"))
+      << "Included from main file, own command is heuristic";
+  EXPECT_THAT(GetFlags(OK), Not(Contains("-DMAIN")))
+      << "Included from main file, but own command is used";
+  EXPECT_THAT(GetFlags(NotIncluded), Not(Contains("-DMAIN")))
+      << "Not included from main file";
+
+  // Open another file - it won't overwrite the associations with Main.
+  std::string SomeIncludes = R"cpp(
+    #include "no_cmd.h"
+    #include "not_included.h"
+  )cpp";
+  S.update(Main2, getInputs(Main2, SomeIncludes), WantDiagnostics::Yes);
+  EXPECT_TRUE(S.blockUntilIdle(timeoutSeconds(10)));
+  EXPECT_THAT(GetFlags(NoCmd),
+              AllOf(Contains("-DMAIN"), Not(Contains("-DMAIN2"))))
+      << "mainfile association is stable";
+  EXPECT_THAT(GetFlags(NotIncluded),
+              AllOf(Contains("-DMAIN2"), Not(Contains("-DMAIN"))))
+      << "new headers are associated with new mainfile";
+
+  // Remove includes from main - this marks the associations as invalid but
+  // doesn't actually remove them until another preamble claims them.
+  S.update(Main, getInputs(Main, ""), WantDiagnostics::Yes);
+  EXPECT_TRUE(S.blockUntilIdle(timeoutSeconds(10)));
+  EXPECT_THAT(GetFlags(NoCmd),
+              AllOf(Contains("-DMAIN"), Not(Contains("-DMAIN2"))))
+      << "mainfile association not updated yet!";
+
+  // Open yet another file - this time it claims the associations.
+  S.update(Main3, getInputs(Main3, SomeIncludes), WantDiagnostics::Yes);
+  EXPECT_TRUE(S.blockUntilIdle(timeoutSeconds(10)));
+  EXPECT_THAT(GetFlags(NoCmd), Contains("-DMAIN3"))
+      << "association invalidated and then claimed by main3";
+  EXPECT_THAT(GetFlags(Unreliable), Contains("-DMAIN"))
+      << "association invalidated but not reclaimed";
+  EXPECT_THAT(GetFlags(NotIncluded), Contains("-DMAIN2"))
+      << "association still valid";
+}
+
+TEST_F(TUSchedulerTests, PreservesLastActiveFile) {
+  for (bool Sync : {false, true}) {
+    auto Opts = optsForTest();
+    if (Sync)
+      Opts.AsyncThreadsCount = 0;
+    TUScheduler S(CDB, Opts);
+
+    auto CheckNoFileActionsSeesLastActiveFile =
+        [&](llvm::StringRef LastActiveFile) {
+          ASSERT_TRUE(S.blockUntilIdle(timeoutSeconds(10)));
+          std::atomic<int> Counter(0);
+          // We only check for run and runQuick as runWithAST and
+          // runWithPreamble is always bound to a file.
+          S.run("run-UsesLastActiveFile", /*Path=*/"", [&] {
+            ++Counter;
+            EXPECT_EQ(LastActiveFile, boundPath());
+          });
+          S.runQuick("runQuick-UsesLastActiveFile", /*Path=*/"", [&] {
+            ++Counter;
+            EXPECT_EQ(LastActiveFile, boundPath());
+          });
+          ASSERT_TRUE(S.blockUntilIdle(timeoutSeconds(10)));
+          EXPECT_EQ(2, Counter.load());
+        };
+
+    // Check that we see no file initially
+    CheckNoFileActionsSeesLastActiveFile("");
+
+    // Now check that every action scheduled with a particular file changes the
+    // LastActiveFile.
+    auto Path = testPath("run.cc");
+    S.run(Path, Path, [] {});
+    CheckNoFileActionsSeesLastActiveFile(Path);
+
+    Path = testPath("runQuick.cc");
+    S.runQuick(Path, Path, [] {});
+    CheckNoFileActionsSeesLastActiveFile(Path);
+
+    Path = testPath("runWithAST.cc");
+    S.update(Path, getInputs(Path, ""), WantDiagnostics::No);
+    S.runWithAST(Path, Path, [](llvm::Expected<InputsAndAST> Inp) {
+      EXPECT_TRUE(bool(Inp));
+    });
+    CheckNoFileActionsSeesLastActiveFile(Path);
+
+    Path = testPath("runWithPreamble.cc");
+    S.update(Path, getInputs(Path, ""), WantDiagnostics::No);
+    S.runWithPreamble(
+        Path, Path, TUScheduler::Stale,
+        [](llvm::Expected<InputsAndPreamble> Inp) { EXPECT_TRUE(bool(Inp)); });
+    CheckNoFileActionsSeesLastActiveFile(Path);
+
+    Path = testPath("update.cc");
+    S.update(Path, getInputs(Path, ""), WantDiagnostics::No);
+    CheckNoFileActionsSeesLastActiveFile(Path);
+
+    // An update with the same contents should not change LastActiveFile.
+    auto LastActive = Path;
+    Path = testPath("runWithAST.cc");
+    S.update(Path, getInputs(Path, ""), WantDiagnostics::No);
+    CheckNoFileActionsSeesLastActiveFile(LastActive);
+  }
+}
 } // namespace
 } // namespace clangd
 } // namespace clang

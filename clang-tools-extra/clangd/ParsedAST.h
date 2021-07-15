@@ -33,12 +33,16 @@
 #include "clang/Tooling/CompilationDatabase.h"
 #include "clang/Tooling/Syntax/Tokens.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/None.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/ADT/StringRef.h"
 #include <memory>
 #include <string>
 #include <vector>
 
 namespace clang {
 namespace clangd {
+class HeuristicResolver;
 class SymbolIndex;
 
 /// Stores and provides access to parsed AST.
@@ -84,7 +88,9 @@ public:
   /// (These should be const, but RecursiveASTVisitor requires Decl*).
   ArrayRef<Decl *> getLocalTopLevelDecls();
 
-  const std::vector<Diag> &getDiagnostics() const;
+  const llvm::Optional<std::vector<Diag>> &getDiagnostics() const {
+    return Diags;
+  }
 
   /// Returns the estimated size of the AST and the accessory structures, in
   /// bytes. Does not include the size of the preamble.
@@ -102,13 +108,21 @@ public:
   /// Returns the version of the ParseInputs this AST was built from.
   llvm::StringRef version() const { return Version; }
 
+  /// Returns the version of the ParseInputs used to build Preamble part of this
+  /// AST. Might be None if no Preamble is used.
+  llvm::Optional<llvm::StringRef> preambleVersion() const;
+
+  const HeuristicResolver *getHeuristicResolver() const {
+    return Resolver.get();
+  }
+
 private:
   ParsedAST(llvm::StringRef Version,
             std::shared_ptr<const PreambleData> Preamble,
             std::unique_ptr<CompilerInstance> Clang,
             std::unique_ptr<FrontendAction> Action, syntax::TokenBuffer Tokens,
             MainFileMacros Macros, std::vector<Decl *> LocalTopLevelDecls,
-            std::vector<Diag> Diags, IncludeStructure Includes,
+            llvm::Optional<std::vector<Diag>> Diags, IncludeStructure Includes,
             CanonicalIncludes CanonIncludes);
 
   std::string Version;
@@ -124,24 +138,21 @@ private:
   std::unique_ptr<FrontendAction> Action;
   /// Tokens recorded after the preamble finished.
   ///   - Includes all spelled tokens for the main file.
-  ///   - Includes expanded tokens produced **after** preabmle.
+  ///   - Includes expanded tokens produced **after** preamble.
   ///   - Does not have spelled or expanded tokens for files from preamble.
   syntax::TokenBuffer Tokens;
 
   /// All macro definitions and expansions in the main file.
   MainFileMacros Macros;
-  // Data, stored after parsing.
-  std::vector<Diag> Diags;
+  // Data, stored after parsing. None if AST was built with a stale preamble.
+  llvm::Optional<std::vector<Diag>> Diags;
   // Top-level decls inside the current file. Not that this does not include
   // top-level decls from the preamble.
   std::vector<Decl *> LocalTopLevelDecls;
   IncludeStructure Includes;
   CanonicalIncludes CanonIncludes;
+  std::unique_ptr<HeuristicResolver> Resolver;
 };
-
-/// For testing/debugging purposes. Note that this method deserializes all
-/// unserialized Decls, so use with care.
-void dumpAST(ParsedAST &AST, llvm::raw_ostream &OS);
 
 } // namespace clangd
 } // namespace clang

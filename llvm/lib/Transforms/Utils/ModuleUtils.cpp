@@ -76,18 +76,20 @@ static void appendToUsedList(Module &M, StringRef Name, ArrayRef<GlobalValue *> 
   SmallPtrSet<Constant *, 16> InitAsSet;
   SmallVector<Constant *, 16> Init;
   if (GV) {
-    auto *CA = cast<ConstantArray>(GV->getInitializer());
-    for (auto &Op : CA->operands()) {
-      Constant *C = cast_or_null<Constant>(Op);
-      if (InitAsSet.insert(C).second)
-        Init.push_back(C);
+    if (GV->hasInitializer()) {
+      auto *CA = cast<ConstantArray>(GV->getInitializer());
+      for (auto &Op : CA->operands()) {
+        Constant *C = cast_or_null<Constant>(Op);
+        if (InitAsSet.insert(C).second)
+          Init.push_back(C);
+      }
     }
     GV->eraseFromParent();
   }
 
   Type *Int8PtrTy = llvm::Type::getInt8PtrTy(M.getContext());
   for (auto *V : Values) {
-    Constant *C = ConstantExpr::getBitCast(V, Int8PtrTy);
+    Constant *C = ConstantExpr::getPointerBitCastOrAddrSpaceCast(V, Int8PtrTy);
     if (InitAsSet.insert(C).second)
       Init.push_back(C);
   }
@@ -119,6 +121,16 @@ llvm::declareSanitizerInitFunction(Module &M, StringRef InitName,
       AttributeList());
 }
 
+Function *llvm::createSanitizerCtor(Module &M, StringRef CtorName) {
+  Function *Ctor = Function::createWithDefaultAttr(
+      FunctionType::get(Type::getVoidTy(M.getContext()), false),
+      GlobalValue::InternalLinkage, 0, CtorName, &M);
+  Ctor->addAttribute(AttributeList::FunctionIndex, Attribute::NoUnwind);
+  BasicBlock *CtorBB = BasicBlock::Create(M.getContext(), "", Ctor);
+  ReturnInst::Create(M.getContext(), CtorBB);
+  return Ctor;
+}
+
 std::pair<Function *, FunctionCallee> llvm::createSanitizerCtorAndInitFunctions(
     Module &M, StringRef CtorName, StringRef InitName,
     ArrayRef<Type *> InitArgTypes, ArrayRef<Value *> InitArgs,
@@ -128,11 +140,8 @@ std::pair<Function *, FunctionCallee> llvm::createSanitizerCtorAndInitFunctions(
          "Sanitizer's init function expects different number of arguments");
   FunctionCallee InitFunction =
       declareSanitizerInitFunction(M, InitName, InitArgTypes);
-  Function *Ctor = Function::Create(
-      FunctionType::get(Type::getVoidTy(M.getContext()), false),
-      GlobalValue::InternalLinkage, CtorName, &M);
-  BasicBlock *CtorBB = BasicBlock::Create(M.getContext(), "", Ctor);
-  IRBuilder<> IRB(ReturnInst::Create(M.getContext(), CtorBB));
+  Function *Ctor = createSanitizerCtor(M, CtorName);
+  IRBuilder<> IRB(Ctor->getEntryBlock().getTerminator());
   IRB.CreateCall(InitFunction, InitArgs);
   if (!VersionCheckName.empty()) {
     FunctionCallee VersionCheckFunction = M.getOrInsertFunction(
@@ -281,7 +290,7 @@ std::string llvm::getUniqueModuleId(Module *M) {
 
   SmallString<32> Str;
   MD5::stringifyResult(R, Str);
-  return ("$" + Str).str();
+  return ("." + Str).str();
 }
 
 void VFABI::setVectorVariantNames(

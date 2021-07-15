@@ -1,8 +1,6 @@
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/..)
-
 add_clang_tool(clangd
   ClangdMain.cpp
+  Check.cpp
   $<TARGET_OBJECTS:obj.clangDaemonTweaks>
   )
 
@@ -28,10 +26,13 @@ clang_target_link_libraries(clangd
   clangToolingRefactoring
   clangToolingSyntax
   )
+
 target_link_libraries(clangd
   PRIVATE
   clangTidy
+
   clangDaemon
+  clangdRemoteIndex
   clangdSupport
   ${CLANGD_XPC_LIBS}
   )

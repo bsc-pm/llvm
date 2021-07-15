@@ -73,7 +73,23 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
          "preallocated operand bundle id drifted!");
   (void)PreallocatedEntry;
 
+  auto *GCLiveEntry = pImpl->getOrInsertBundleTag("gc-live");
+  assert(GCLiveEntry->second == LLVMContext::OB_gc_live &&
+         "gc-transition operand bundle id drifted!");
+  (void)GCLiveEntry;
+
+  auto *ClangAttachedCall =
+      pImpl->getOrInsertBundleTag("clang.arc.attachedcall");
+  assert(ClangAttachedCall->second == LLVMContext::OB_clang_arc_attachedcall &&
+         "clang.arc.attachedcall operand bundle id drifted!");
+  (void)ClangAttachedCall;
+
   // OmpSs IDs
+  auto *OSSDirEntry = pImpl->getOrInsertBundleTag("DIR.OSS");
+  assert(OSSDirEntry->second == LLVMContext::OB_oss_dir &&
+         "oss_dir operand bundle id drifted!");
+  (void)OSSDirEntry;
+
   auto *OSSSharedEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.SHARED");
   assert(OSSSharedEntry->second == LLVMContext::OB_oss_shared &&
          "oss_shared operand bundle id drifted!");
@@ -213,6 +229,101 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
   assert(OSSCopyEntry->second == LLVMContext::OB_oss_copy &&
          "oss_copy operand bundle id drifted!");
   (void)OSSCopyEntry;
+
+  auto *OSSLoopTypeEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.LOOP.TYPE");
+  assert(OSSLoopTypeEntry->second == LLVMContext::OB_oss_loop_type &&
+         "oss_loop_type operand bundle id drifted!");
+  (void)OSSLoopTypeEntry;
+
+  auto *OSSLoopIndVarEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.LOOP.IND.VAR");
+  assert(OSSLoopIndVarEntry->second == LLVMContext::OB_oss_loop_ind_var &&
+         "oss_loop_ind_var operand bundle id drifted!");
+  (void)OSSLoopIndVarEntry;
+
+  auto *OSSLoopLowerBoundEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.LOOP.LOWER.BOUND");
+  assert(OSSLoopLowerBoundEntry->second == LLVMContext::OB_oss_loop_lower_bound &&
+         "oss_loop_lower_bound operand bundle id drifted!");
+  (void)OSSLoopLowerBoundEntry;
+
+  auto *OSSLoopUpperBoundEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.LOOP.UPPER.BOUND");
+  assert(OSSLoopUpperBoundEntry->second == LLVMContext::OB_oss_loop_upper_bound &&
+         "oss_loop_upper_bound operand bundle id drifted!");
+  (void)OSSLoopUpperBoundEntry;
+
+  auto *OSSLoopStepEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.LOOP.STEP");
+  assert(OSSLoopStepEntry->second == LLVMContext::OB_oss_loop_step &&
+         "oss_loop_step operand bundle id drifted!");
+  (void)OSSLoopStepEntry;
+
+  auto *OSSLoopChunksizeEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.LOOP.CHUNKSIZE");
+  assert(OSSLoopChunksizeEntry->second == LLVMContext::OB_oss_loop_chunksize &&
+         "oss_loop_chunksize operand bundle id drifted!");
+  (void)OSSLoopChunksizeEntry;
+
+  auto *OSSLoopGrainsizeEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.LOOP.GRAINSIZE");
+  assert(OSSLoopGrainsizeEntry->second == LLVMContext::OB_oss_loop_grainsize &&
+         "oss_loop_grainsize operand bundle id drifted!");
+  (void)OSSLoopGrainsizeEntry;
+
+  auto *OSSMultiDepRangeInEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.MULTIDEP.RANGE.IN");
+  assert(OSSMultiDepRangeInEntry->second == LLVMContext::OB_oss_multidep_range_in &&
+         "oss_multidep_range_in operand bundle id drifted!");
+  (void)OSSMultiDepRangeInEntry;
+
+  auto *OSSMultiDepRangeOutEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.MULTIDEP.RANGE.OUT");
+  assert(OSSMultiDepRangeOutEntry->second == LLVMContext::OB_oss_multidep_range_out &&
+         "oss_multidep_range_out operand bundle id drifted!");
+  (void)OSSMultiDepRangeOutEntry;
+
+  auto *OSSMultiDepRangeInoutEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.MULTIDEP.RANGE.INOUT");
+  assert(OSSMultiDepRangeInoutEntry->second == LLVMContext::OB_oss_multidep_range_inout &&
+         "oss_multidep_range_inout operand bundle id drifted!");
+  (void)OSSMultiDepRangeInoutEntry;
+
+  auto *OSSMultiDepRangeConcurrentEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.MULTIDEP.RANGE.CONCURRENT");
+  assert(OSSMultiDepRangeConcurrentEntry->second == LLVMContext::OB_oss_multidep_range_concurrent &&
+         "oss_multidep_range_concurrent operand bundle id drifted!");
+  (void)OSSMultiDepRangeConcurrentEntry;
+
+  auto *OSSMultiDepRangeCommutativeEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.MULTIDEP.RANGE.COMMUTATIVE");
+  assert(OSSMultiDepRangeCommutativeEntry->second == LLVMContext::OB_oss_multidep_range_commutative &&
+         "oss_multidep_range_commutative operand bundle id drifted!");
+  (void)OSSMultiDepRangeCommutativeEntry;
+
+  auto *OSSMultiDepRangeWeakInEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.MULTIDEP.RANGE.WEAKIN");
+  assert(OSSMultiDepRangeWeakInEntry->second == LLVMContext::OB_oss_multidep_range_weakin &&
+         "oss_multidep_range_weakin operand bundle id drifted!");
+  (void)OSSMultiDepRangeWeakInEntry;
+
+  auto *OSSMultiDepRangeWeakOutEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.MULTIDEP.RANGE.WEAKOUT");
+  assert(OSSMultiDepRangeWeakOutEntry->second == LLVMContext::OB_oss_multidep_range_weakout &&
+         "oss_multidep_range_weakout operand bundle id drifted!");
+  (void)OSSMultiDepRangeWeakOutEntry;
+
+  auto *OSSMultiDepRangeWeakInoutEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.MULTIDEP.RANGE.WEAKINOUT");
+  assert(OSSMultiDepRangeWeakInoutEntry->second == LLVMContext::OB_oss_multidep_range_weakinout &&
+         "oss_multidep_range_weakinout operand bundle id drifted!");
+  (void)OSSMultiDepRangeWeakInoutEntry;
+
+  auto *OSSMultiDepRangeWeakConcurrentEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.MULTIDEP.RANGE.WEAKCONCURRENT");
+  assert(OSSMultiDepRangeWeakConcurrentEntry->second == LLVMContext::OB_oss_multidep_range_weakconcurrent &&
+         "oss_multidep_range_weakconcurrent operand bundle id drifted!");
+  (void)OSSMultiDepRangeWeakConcurrentEntry;
+
+  auto *OSSMultiDepRangeWeakCommutativeEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.MULTIDEP.RANGE.WEAKCOMMUTATIVE");
+  assert(OSSMultiDepRangeWeakCommutativeEntry->second == LLVMContext::OB_oss_multidep_range_weakcommutative &&
+         "oss_multidep_range_weakcommutative operand bundle id drifted!");
+  (void)OSSMultiDepRangeWeakCommutativeEntry;
+
+  auto *OSSDeclSourceEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DECL.SOURCE");
+  assert(OSSDeclSourceEntry->second == LLVMContext::OB_oss_decl_source &&
+         "oss_decl_source operand bundle id drifted!");
+  (void)OSSDeclSourceEntry;
+
+  auto *OSSOnreadyEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.ONREADY");
+  assert(OSSOnreadyEntry->second == LLVMContext::OB_oss_onready &&
+         "oss_onready operand bundle id drifted!");
+  (void)OSSOnreadyEntry;
   // END OmpSs IDs
 
   SyncScope::ID SingleThreadSSID =
@@ -242,26 +353,6 @@ void LLVMContext::removeModule(Module *M) {
 // Recoverable Backend Errors
 //===----------------------------------------------------------------------===//
 
-void LLVMContext::
-setInlineAsmDiagnosticHandler(InlineAsmDiagHandlerTy DiagHandler,
-                              void *DiagContext) {
-  pImpl->InlineAsmDiagHandler = DiagHandler;
-  pImpl->InlineAsmDiagContext = DiagContext;
-}
-
-/// getInlineAsmDiagnosticHandler - Return the diagnostic handler set by
-/// setInlineAsmDiagnosticHandler.
-LLVMContext::InlineAsmDiagHandlerTy
-LLVMContext::getInlineAsmDiagnosticHandler() const {
-  return pImpl->InlineAsmDiagHandler;
-}
-
-/// getInlineAsmDiagnosticContext - Return the diagnostic context set by
-/// setInlineAsmDiagnosticHandler.
-void *LLVMContext::getInlineAsmDiagnosticContext() const {
-  return pImpl->InlineAsmDiagContext;
-}
-
 void LLVMContext::setDiagnosticHandlerCallBack(
     DiagnosticHandler::DiagnosticHandlerTy DiagnosticHandler,
     void *DiagnosticContext, bool RespectFilters) {
@@ -283,11 +374,16 @@ bool LLVMContext::getDiagnosticsHotnessRequested() const {
   return pImpl->DiagnosticsHotnessRequested;
 }
 
-void LLVMContext::setDiagnosticsHotnessThreshold(uint64_t Threshold) {
+void LLVMContext::setDiagnosticsHotnessThreshold(Optional<uint64_t> Threshold) {
   pImpl->DiagnosticsHotnessThreshold = Threshold;
 }
+
 uint64_t LLVMContext::getDiagnosticsHotnessThreshold() const {
-  return pImpl->DiagnosticsHotnessThreshold;
+  return pImpl->DiagnosticsHotnessThreshold.getValueOr(UINT64_MAX);
+}
+
+bool LLVMContext::isDiagnosticsHotnessThresholdSetFromPSI() const {
+  return !pImpl->DiagnosticsHotnessThreshold.hasValue();
 }
 
 remarks::RemarkStreamer *LLVMContext::getMainRemarkStreamer() {
@@ -492,4 +588,8 @@ const DiagnosticHandler *LLVMContext::getDiagHandlerPtr() const {
 
 std::unique_ptr<DiagnosticHandler> LLVMContext::getDiagnosticHandler() {
   return std::move(pImpl->DiagHandler);
+}
+
+bool LLVMContext::supportsTypedPointers() const {
+  return !pImpl->ForceOpaquePointers;
 }

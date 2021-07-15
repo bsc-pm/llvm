@@ -759,11 +759,14 @@ bool IndexingContext::indexDeclContext(const DeclContext *DC) {
 }
 
 bool IndexingContext::indexTopLevelDecl(const Decl *D) {
-  if (D->getLocation().isInvalid())
+  if (!D || D->getLocation().isInvalid())
     return true;
 
   if (isa<ObjCMethodDecl>(D))
     return true; // Wait for the objc container.
+
+  if (IndexOpts.ShouldTraverseDecl && !IndexOpts.ShouldTraverseDecl(D))
+    return true; // skip
 
   return indexDecl(D);
 }

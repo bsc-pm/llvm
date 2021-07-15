@@ -38,7 +38,7 @@ Status OptionValueUUID::SetValueFromString(llvm::StringRef value,
 
   case eVarSetOperationReplace:
   case eVarSetOperationAssign: {
-    if (m_uuid.SetFromStringRef(value) == 0)
+    if (!m_uuid.SetFromStringRef(value))
       error.SetErrorStringWithFormat("invalid uuid string value '%s'",
                                      value.str().c_str());
     else {
@@ -56,10 +56,6 @@ Status OptionValueUUID::SetValueFromString(llvm::StringRef value,
     break;
   }
   return error;
-}
-
-lldb::OptionValueSP OptionValueUUID::DeepCopy() const {
-  return OptionValueSP(new OptionValueUUID(*this));
 }
 
 void OptionValueUUID::AutoComplete(CommandInterpreter &interpreter,

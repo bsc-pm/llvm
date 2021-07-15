@@ -14,7 +14,7 @@ DESCRIPTION
 The :program:`llvm-readobj` tool displays low-level format-specific information
 about one or more object files.
 
-If ``input`` is "``-``" or omitted, :program:`llvm-readobj` reads from standard
+If ``input`` is "``-``", :program:`llvm-readobj` reads from standard
 input. Otherwise, it will read from the specified ``filenames``.
 
 DIFFERENCES TO LLVM-READELF
@@ -95,7 +95,7 @@ file formats.
 
  Display the relocation entries in the file.
 
-.. option:: --sections, --section-headers, -s, -S
+.. option:: --sections, --section-headers, -S
 
  Display all sections.
 
@@ -123,7 +123,11 @@ file formats.
  Display the specified section(s) as a list of strings. ``section`` may be a
  section index or section name.
 
-.. option:: --symbols, --syms, -t
+.. option:: --string-table
+ 
+ Display contents of the string table.
+
+.. option:: --symbols, --syms, -s
 
  Display the symbol table.
 
@@ -148,6 +152,11 @@ The following options are implemented only for the ELF file format.
 
  Display architecture-specific information, e.g. the ARM attributes section on ARM.
 
+.. option:: --bb-addr-map
+
+ Display the contents of the basic block address map section(s), which contain the
+ address of each function, along with the relative offset of each basic block.
+
 .. option:: --demangle, -C
 
  Display demangled symbol names in the output.
@@ -168,7 +177,7 @@ The following options are implemented only for the ELF file format.
 
  Display the dynamic table.
 
-.. option:: --elf-cg-profile
+.. option:: --cg-profile
 
  Display the callgraph profile section.
 
@@ -285,6 +294,10 @@ The following options are implemented only for the PE/COFF file format.
 .. option:: --coff-debug-directory
 
  Display the debug directory.
+
+.. option:: --coff-tls-directory
+
+ Display the TLS directory.
 
 .. option:: --coff-directives
 

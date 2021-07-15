@@ -13,6 +13,7 @@ typedef NonPOD NonPODArMB[10][2];
 // PODs
 enum Enum { EV };
 enum SignedEnum : signed int { };
+enum UnsignedEnum : unsigned int { };
 struct POD { Enum e; int i; float f; NonPOD* p; };
 struct Empty {};
 struct IncompleteStruct;
@@ -1440,6 +1441,7 @@ void is_signed()
   int t25[F(__is_signed(IntArNB))];
   int t26[F(__is_signed(Union))];
   int t27[F(__is_signed(UnionAr))];
+  int t28[F(__is_signed(UnsignedEnum))];
 }
 
 void is_unsigned()
@@ -1450,7 +1452,6 @@ void is_unsigned()
   int t04[T(__is_unsigned(unsigned int))];
   int t05[T(__is_unsigned(unsigned long))];
   int t06[T(__is_unsigned(unsigned long long))];
-  int t07[T(__is_unsigned(Enum))];
 
   int t10[F(__is_unsigned(void))];
   int t11[F(__is_unsigned(cvoid))];
@@ -1468,6 +1469,9 @@ void is_unsigned()
   int t24[F(__is_unsigned(Derives))];
   int t25[F(__is_unsigned(ClassType))];
   int t26[F(__is_unsigned(IntArNB))];
+  int t27[F(__is_unsigned(Enum))];
+  int t28[F(__is_unsigned(UnsignedEnum))];
+  int t29[F(__is_unsigned(SignedEnum))];
 }
 
 typedef Int& IntRef;
@@ -2789,3 +2793,64 @@ namespace ErrorType {
   };
   bool b = __has_unique_object_representations(T);
 };
+
+namespace PR46209 {
+  // Foo has both a trivial assignment operator and a non-trivial one.
+  struct Foo {
+    Foo &operator=(const Foo &) & { return *this; }
+    Foo &operator=(const Foo &) && = default;
+  };
+
+  // Bar's copy assignment calls Foo's non-trivial assignment.
+  struct Bar {
+    Foo foo;
+  };
+
+  static_assert(!__is_trivially_assignable(Foo &, const Foo &), "");
+  static_assert(!__is_trivially_assignable(Bar &, const Bar &), "");
+
+  // Foo2 has both a trivial assignment operator and a non-trivial one.
+  struct Foo2 {
+    Foo2 &operator=(const Foo2 &) & = default;
+    Foo2 &operator=(const Foo2 &) && { return *this; }
+  };
+
+  // Bar2's copy assignment calls Foo2's trivial assignment.
+  struct Bar2 {
+    Foo2 foo;
+  };
+
+  static_assert(__is_trivially_assignable(Foo2 &, const Foo2 &), "");
+  static_assert(__is_trivially_assignable(Bar2 &, const Bar2 &), "");
+}
+
+namespace ConstClass {
+  struct A {
+    A &operator=(const A&) = default;
+  };
+  struct B {
+    const A a;
+  };
+  static_assert(!__is_trivially_assignable(B&, const B&), "");
+}
+
+namespace type_trait_expr_numargs_overflow {
+// Make sure that TypeTraitExpr can store 16 bits worth of arguments.
+#define T4(X) X,X,X,X
+#define T16(X) T4(X),T4(X),T4(X),T4(X)
+#define T64(X) T16(X),T16(X),T16(X),T16(X)
+#define T256(X) T64(X),T64(X),T64(X),T64(X)
+#define T1024(X) T256(X),T256(X),T256(X),T256(X)
+#define T4096(X) T1024(X),T1024(X),T1024(X),T1024(X)
+#define T16384(X) T4096(X),T4096(X),T4096(X),T4096(X)
+#define T32768(X) T16384(X),T16384(X)
+void test() { (void) __is_constructible(int, T32768(int)); }
+#undef T4
+#undef T16
+#undef T64
+#undef T256
+#undef T1024
+#undef T4096
+#undef T16384
+#undef T32768
+} // namespace type_trait_expr_numargs_overflow

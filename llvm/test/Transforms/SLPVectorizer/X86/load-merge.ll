@@ -56,12 +56,10 @@ define <4 x float> @PR16739_byref(<4 x float>* nocapture readonly dereferenceabl
 ; CHECK-NEXT:    [[GEP2:%.*]] = getelementptr inbounds <4 x float>, <4 x float>* [[X]], i64 0, i64 2
 ; CHECK-NEXT:    [[TMP1:%.*]] = bitcast float* [[GEP0]] to <2 x float>*
 ; CHECK-NEXT:    [[TMP2:%.*]] = load <2 x float>, <2 x float>* [[TMP1]], align 4
-; CHECK-NEXT:    [[X2:%.*]] = load float, float* [[GEP2]]
-; CHECK-NEXT:    [[TMP3:%.*]] = extractelement <2 x float> [[TMP2]], i32 0
-; CHECK-NEXT:    [[I0:%.*]] = insertelement <4 x float> undef, float [[TMP3]], i32 0
-; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <2 x float> [[TMP2]], i32 1
-; CHECK-NEXT:    [[I1:%.*]] = insertelement <4 x float> [[I0]], float [[TMP4]], i32 1
-; CHECK-NEXT:    [[I2:%.*]] = insertelement <4 x float> [[I1]], float [[X2]], i32 2
+; CHECK-NEXT:    [[X2:%.*]] = load float, float* [[GEP2]], align 4
+; CHECK-NEXT:    [[TMP3:%.*]] = shufflevector <2 x float> [[TMP2]], <2 x float> poison, <4 x i32> <i32 0, i32 1, i32 undef, i32 undef>
+; CHECK-NEXT:    [[I11:%.*]] = shufflevector <4 x float> undef, <4 x float> [[TMP3]], <4 x i32> <i32 4, i32 5, i32 2, i32 3>
+; CHECK-NEXT:    [[I2:%.*]] = insertelement <4 x float> [[I11]], float [[X2]], i32 2
 ; CHECK-NEXT:    [[I3:%.*]] = insertelement <4 x float> [[I2]], float [[X2]], i32 3
 ; CHECK-NEXT:    ret <4 x float> [[I3]]
 ;
@@ -84,14 +82,8 @@ define <4 x float> @PR16739_byref_alt(<4 x float>* nocapture readonly dereferenc
 ; CHECK-NEXT:    [[GEP1:%.*]] = getelementptr inbounds <4 x float>, <4 x float>* [[X]], i64 0, i64 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = bitcast float* [[GEP0]] to <2 x float>*
 ; CHECK-NEXT:    [[TMP2:%.*]] = load <2 x float>, <2 x float>* [[TMP1]], align 4
-; CHECK-NEXT:    [[SHUFFLE:%.*]] = shufflevector <2 x float> [[TMP2]], <2 x float> undef, <4 x i32> <i32 0, i32 0, i32 1, i32 1>
-; CHECK-NEXT:    [[TMP3:%.*]] = extractelement <4 x float> [[SHUFFLE]], i32 0
-; CHECK-NEXT:    [[I0:%.*]] = insertelement <4 x float> undef, float [[TMP3]], i32 0
-; CHECK-NEXT:    [[I1:%.*]] = insertelement <4 x float> [[I0]], float [[TMP3]], i32 1
-; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <4 x float> [[SHUFFLE]], i32 2
-; CHECK-NEXT:    [[I2:%.*]] = insertelement <4 x float> [[I1]], float [[TMP4]], i32 2
-; CHECK-NEXT:    [[I3:%.*]] = insertelement <4 x float> [[I2]], float [[TMP4]], i32 3
-; CHECK-NEXT:    ret <4 x float> [[I3]]
+; CHECK-NEXT:    [[SHUFFLE:%.*]] = shufflevector <2 x float> [[TMP2]], <2 x float> poison, <4 x i32> <i32 0, i32 0, i32 1, i32 1>
+; CHECK-NEXT:    ret <4 x float> [[SHUFFLE]]
 ;
   %gep0 = getelementptr inbounds <4 x float>, <4 x float>* %x, i64 0, i64 0
   %gep1 = getelementptr inbounds <4 x float>, <4 x float>* %x, i64 0, i64 1
@@ -111,15 +103,13 @@ define <4 x float> @PR16739_byval(<4 x float>* nocapture readonly dereferenceabl
 ; CHECK-NEXT:    [[T2:%.*]] = getelementptr inbounds <4 x float>, <4 x float>* [[X]], i64 0, i64 2
 ; CHECK-NEXT:    [[T3:%.*]] = bitcast float* [[T2]] to i64*
 ; CHECK-NEXT:    [[T4:%.*]] = load i64, i64* [[T3]], align 8
+; CHECK-NEXT:    [[T5:%.*]] = trunc i64 [[T1]] to i32
+; CHECK-NEXT:    [[T6:%.*]] = bitcast i32 [[T5]] to float
+; CHECK-NEXT:    [[T7:%.*]] = insertelement <4 x float> undef, float [[T6]], i32 0
 ; CHECK-NEXT:    [[T8:%.*]] = lshr i64 [[T1]], 32
-; CHECK-NEXT:    [[TMP1:%.*]] = insertelement <2 x i64> undef, i64 [[T1]], i32 0
-; CHECK-NEXT:    [[TMP2:%.*]] = insertelement <2 x i64> [[TMP1]], i64 [[T8]], i32 1
-; CHECK-NEXT:    [[TMP3:%.*]] = trunc <2 x i64> [[TMP2]] to <2 x i32>
-; CHECK-NEXT:    [[TMP4:%.*]] = bitcast <2 x i32> [[TMP3]] to <2 x float>
-; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <2 x float> [[TMP4]], i32 0
-; CHECK-NEXT:    [[T7:%.*]] = insertelement <4 x float> undef, float [[TMP5]], i32 0
-; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <2 x float> [[TMP4]], i32 1
-; CHECK-NEXT:    [[T11:%.*]] = insertelement <4 x float> [[T7]], float [[TMP6]], i32 1
+; CHECK-NEXT:    [[T9:%.*]] = trunc i64 [[T8]] to i32
+; CHECK-NEXT:    [[T10:%.*]] = bitcast i32 [[T9]] to float
+; CHECK-NEXT:    [[T11:%.*]] = insertelement <4 x float> [[T7]], float [[T10]], i32 1
 ; CHECK-NEXT:    [[T12:%.*]] = trunc i64 [[T4]] to i32
 ; CHECK-NEXT:    [[T13:%.*]] = bitcast i32 [[T12]] to float
 ; CHECK-NEXT:    [[T14:%.*]] = insertelement <4 x float> [[T11]], float [[T13]], i32 2

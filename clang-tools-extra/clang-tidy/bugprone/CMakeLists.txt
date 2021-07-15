@@ -13,10 +13,12 @@ add_clang_library(clangTidyBugproneModule
   CopyConstructorInitCheck.cpp
   DanglingHandleCheck.cpp
   DynamicStaticInitializersCheck.cpp
+  EasilySwappableParametersCheck.cpp
   ExceptionEscapeCheck.cpp
   FoldInitTypeCheck.cpp
   ForwardDeclarationNamespaceCheck.cpp
   ForwardingReferenceOverloadCheck.cpp
+  ImplicitWideningOfMultiplicationResultCheck.cpp
   InaccurateEraseCheck.cpp
   IncorrectRoundingsCheck.cpp
   InfiniteLoopCheck.cpp
@@ -29,10 +31,13 @@ add_clang_library(clangTidyBugproneModule
   MisplacedWideningCastCheck.cpp
   MoveForwardingReferenceCheck.cpp
   MultipleStatementMacroCheck.cpp
+  NoEscapeCheck.cpp
   NotNullTerminatedResultCheck.cpp
   ParentVirtualCallCheck.cpp
   PosixReturnCheck.cpp
+  RedundantBranchConditionCheck.cpp
   ReservedIdentifierCheck.cpp
+  SignalHandlerCheck.cpp
   SignedCharMisuseCheck.cpp
   SizeofContainerCheck.cpp
   SizeofExpressionCheck.cpp
@@ -52,6 +57,7 @@ add_clang_library(clangTidyBugproneModule
   TooSmallLoopVariableCheck.cpp
   UndefinedMemoryManipulationCheck.cpp
   UndelegatedConstructorCheck.cpp
+  UnhandledExceptionAtNewCheck.cpp
   UnhandledSelfAssignmentCheck.cpp
   UnusedRaiiCheck.cpp
   UnusedReturnValueCheck.cpp
@@ -59,13 +65,20 @@ add_clang_library(clangTidyBugproneModule
   VirtualNearMissCheck.cpp
 
   LINK_LIBS
+  clangTidy
+  clangTidyCppCoreGuidelinesModule
+  clangTidyUtils
+
+  DEPENDS
+  omp_gen
+  )
+
+clang_target_link_libraries(clangTidyBugproneModule
+  PRIVATE
   clangAnalysis
   clangAST
   clangASTMatchers
   clangBasic
   clangLex
-  clangTidy
-  clangTidyCppCoreGuidelinesModule
-  clangTidyUtils
   clangTooling
   )

@@ -29,6 +29,7 @@
 #include "lldb/Target/Process.h"
 #include "lldb/Target/Target.h"
 #include "lldb/Utility/DataExtractor.h"
+#include "lldb/Utility/LLDBAssert.h"
 #include "lldb/Utility/State.h"
 #include "lldb/Utility/StreamString.h"
 
@@ -57,6 +58,7 @@ cl::SubCommand ObjectFileSubcommand("object-file",
                                     "Display LLDB object file information");
 cl::SubCommand SymbolsSubcommand("symbols", "Dump symbols for an object file");
 cl::SubCommand IRMemoryMapSubcommand("ir-memory-map", "Test IRMemoryMap");
+cl::SubCommand AssertSubcommand("assert", "Test assert handling");
 
 cl::opt<std::string> Log("log", cl::desc("Path to a log file"), cl::init(""),
                          cl::sub(BreakpointSubcommand),
@@ -236,6 +238,9 @@ bool evalFree(StringRef Line, IRMemoryMapTestState &State);
 int evaluateMemoryMapCommands(Debugger &Dbg);
 } // namespace irmemorymap
 
+namespace assert {
+int lldb_assert(Debugger &Dbg);
+} // namespace assert
 } // namespace opts
 
 std::vector<CompilerContext> parseCompilerContext() {
@@ -380,7 +385,7 @@ int opts::breakpoint::evaluateBreakpoints(Debugger &Dbg) {
 
     std::string Command = substitute(Line);
     P.formatLine("Command: {0}", Command);
-    CommandReturnObject Result;
+    CommandReturnObject Result(/*colors*/ false);
     if (!Dbg.GetCommandInterpreter().HandleCommand(
             Command.c_str(), /*add_to_history*/ eLazyBoolNo, Result)) {
       P.formatLine("Failed: {0}", Result.GetErrorData());
@@ -530,7 +535,7 @@ Error opts::symbols::findTypes(lldb_private::Module &Module) {
   LanguageSet languages;
   if (!Language.empty())
     languages.Insert(Language::GetLanguageTypeFromString(Language));
-  
+
   DenseSet<SymbolFile *> SearchedFiles;
   TypeMap Map;
   if (!Name.empty())
@@ -1034,7 +1039,7 @@ int opts::irmemorymap::evaluateMemoryMapCommands(Debugger &Dbg) {
 
   // Set up a Process. In order to allocate memory within a target, this
   // process must be alive and must support JIT'ing.
-  CommandReturnObject Result;
+  CommandReturnObject Result(/*colors*/ false);
   Dbg.SetAsyncExecution(false);
   CommandInterpreter &CI = Dbg.GetCommandInterpreter();
   auto IssueCmd = [&](const char *Cmd) -> bool {
@@ -1077,6 +1082,11 @@ int opts::irmemorymap::evaluateMemoryMapCommands(Debugger &Dbg) {
   return 0;
 }
 
+int opts::assert::lldb_assert(Debugger &Dbg) {
+  lldbassert(false && "lldb-test assert");
+  return 1;
+}
+
 int main(int argc, const char *argv[]) {
   StringRef ToolName = argv[0];
   sys::PrintStackTraceOnErrorSignal(ToolName);
@@ -1098,9 +1108,15 @@ int main(int argc, const char *argv[]) {
 
   auto Dbg = lldb_private::Debugger::CreateInstance();
   ModuleList::GetGlobalModuleListProperties().SetEnableExternalLookup(false);
-  CommandReturnObject Result;
+  CommandReturnObject Result(/*colors*/ false);
   Dbg->GetCommandInterpreter().HandleCommand(
       "settings set plugin.process.gdb-remote.packet-timeout 60",
+      /*add_to_history*/ eLazyBoolNo, Result);
+  Dbg->GetCommandInterpreter().HandleCommand(
+      "settings set target.inherit-tcc true",
+      /*add_to_history*/ eLazyBoolNo, Result);
+  Dbg->GetCommandInterpreter().HandleCommand(
+      "settings set target.detach-on-error false",
       /*add_to_history*/ eLazyBoolNo, Result);
 
   if (!opts::Log.empty())
@@ -1114,6 +1130,8 @@ int main(int argc, const char *argv[]) {
     return opts::symbols::dumpSymbols(*Dbg);
   if (opts::IRMemoryMapSubcommand)
     return opts::irmemorymap::evaluateMemoryMapCommands(*Dbg);
+  if (opts::AssertSubcommand)
+    return opts::assert::lldb_assert(*Dbg);
 
   WithColor::error() << "No command specified.\n";
   return 1;

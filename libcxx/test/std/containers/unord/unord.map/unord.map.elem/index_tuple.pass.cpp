@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// UNSUPPORTED: c++98, c++03
+// UNSUPPORTED: c++03
 
 // <unordered_map>
 
@@ -16,7 +16,7 @@
 
 // mapped_type& operator[](const key_type& k);
 
-// https://bugs.llvm.org/show_bug.cgi?id=16542
+// https://llvm.org/PR16542
 
 #include <unordered_map>
 #include <tuple>

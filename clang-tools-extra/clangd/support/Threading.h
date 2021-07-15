@@ -12,6 +12,7 @@
 #include "support/Context.h"
 #include "llvm/ADT/FunctionExtras.h"
 #include "llvm/ADT/Twine.h"
+#include <atomic>
 #include <cassert>
 #include <condition_variable>
 #include <future>
@@ -130,6 +131,73 @@ std::future<T> runAsync(llvm::unique_function<T()> Action) {
       },
       std::move(Action), Context::current().clone());
 }
+
+/// Memoize is a cache to store and reuse computation results based on a key.
+///
+///   Memoize<DenseMap<int, bool>> PrimeCache;
+///   for (int I : RepetitiveNumbers)
+///     if (PrimeCache.get(I, [&] { return expensiveIsPrime(I); }))
+///       llvm::errs() << "Prime: " << I << "\n";
+///
+/// The computation will only be run once for each key.
+/// This class is threadsafe. Concurrent calls for the same key may run the
+/// computation multiple times, but each call will return the same result.
+template <typename Container> class Memoize {
+  mutable Container Cache;
+  std::unique_ptr<std::mutex> Mu;
+
+public:
+  Memoize() : Mu(std::make_unique<std::mutex>()) {}
+
+  template <typename T, typename Func>
+  typename Container::mapped_type get(T &&Key, Func Compute) const {
+    {
+      std::lock_guard<std::mutex> Lock(*Mu);
+      auto It = Cache.find(Key);
+      if (It != Cache.end())
+        return It->second;
+    }
+    // Don't hold the mutex while computing.
+    auto V = Compute();
+    {
+      std::lock_guard<std::mutex> Lock(*Mu);
+      auto R = Cache.try_emplace(std::forward<T>(Key), V);
+      // Insert into cache may fail if we raced with another thread.
+      if (!R.second)
+        return R.first->second; // Canonical value, from other thread.
+    }
+    return V;
+  }
+};
+
+/// Used to guard an operation that should run at most every N seconds.
+///
+/// Usage:
+///   mutable PeriodicThrottler ShouldLog(std::chrono::seconds(1));
+///   void calledFrequently() {
+///     if (ShouldLog())
+///       log("this is not spammy");
+///   }
+///
+/// This class is threadsafe. If multiple threads are involved, then the guarded
+/// operation still needs to be threadsafe!
+class PeriodicThrottler {
+  using Stopwatch = std::chrono::steady_clock;
+  using Rep = Stopwatch::duration::rep;
+
+  Rep Period;
+  std::atomic<Rep> Next;
+
+public:
+  /// If Period is zero, the throttler will return true every time.
+  PeriodicThrottler(Stopwatch::duration Period, Stopwatch::duration Delay = {})
+      : Period(Period.count()),
+        Next((Stopwatch::now() + Delay).time_since_epoch().count()) {}
+
+  /// Returns whether the operation should run at this time.
+  /// operator() is safe to call concurrently.
+  bool operator()();
+};
 
 } // namespace clangd
 } // namespace clang

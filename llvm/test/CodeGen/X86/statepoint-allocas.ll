@@ -17,7 +17,7 @@ define i32 addrspace(1)* @test(i32 addrspace(1)* %ptr) gc "statepoint-example" {
 ; CHECK-NEXT:    pushq %rax
 ; CHECK-NEXT:    .cfi_def_cfa_offset 16
 ; CHECK-NEXT:    movq %rdi, (%rsp)
-; CHECK-NEXT:    callq return_i1
+; CHECK-NEXT:    callq return_i1@PLT
 ; CHECK-NEXT:  .Ltmp0:
 ; CHECK-NEXT:    movq (%rsp), %rax
 ; CHECK-NEXT:    popq %rcx
@@ -26,7 +26,7 @@ define i32 addrspace(1)* @test(i32 addrspace(1)* %ptr) gc "statepoint-example" {
 entry:
   %alloca = alloca i32 addrspace(1)*, align 8
   store i32 addrspace(1)* %ptr, i32 addrspace(1)** %alloca
-  call token (i64, i32, i1 ()*, i32, i32, ...) @llvm.experimental.gc.statepoint.p0f_i1f(i64 0, i32 0, i1 ()* @return_i1, i32 0, i32 0, i32 0, i32 0, i32 addrspace(1)** %alloca)
+  call token (i64, i32, i1 ()*, i32, i32, ...) @llvm.experimental.gc.statepoint.p0f_i1f(i64 0, i32 0, i1 ()* @return_i1, i32 0, i32 0, i32 0, i32 0) ["gc-live" (i32 addrspace(1)** %alloca)]
   %rel = load i32 addrspace(1)*, i32 addrspace(1)** %alloca
   ret i32 addrspace(1)* %rel
 }
@@ -38,7 +38,7 @@ define i32 addrspace(1)* @test2(i32 addrspace(1)* %ptr) gc "statepoint-example" 
 ; CHECK-NEXT:    pushq %rax
 ; CHECK-NEXT:    .cfi_def_cfa_offset 16
 ; CHECK-NEXT:    movq %rdi, (%rsp)
-; CHECK-NEXT:    callq return_i1
+; CHECK-NEXT:    callq return_i1@PLT
 ; CHECK-NEXT:  .Ltmp1:
 ; CHECK-NEXT:    xorl %eax, %eax
 ; CHECK-NEXT:    popq %rcx
@@ -47,7 +47,7 @@ define i32 addrspace(1)* @test2(i32 addrspace(1)* %ptr) gc "statepoint-example" 
 entry:
   %alloca = alloca i32 addrspace(1)*, align 8
   store i32 addrspace(1)* %ptr, i32 addrspace(1)** %alloca
-  call token (i64, i32, i1 ()*, i32, i32, ...) @llvm.experimental.gc.statepoint.p0f_i1f(i64 0, i32 0, i1 ()* @return_i1, i32 0, i32 0, i32 0, i32 1, i32 addrspace(1)** %alloca)
+  call token (i64, i32, i1 ()*, i32, i32, ...) @llvm.experimental.gc.statepoint.p0f_i1f(i64 0, i32 0, i1 ()* @return_i1, i32 0, i32 0, i32 0, i32 0) ["deopt" (i32 addrspace(1)** %alloca)]
   ret i32 addrspace(1)* null
 }
 

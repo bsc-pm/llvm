@@ -18,7 +18,7 @@ namespace readability {
 
 void NonConstParameterCheck::registerMatchers(MatchFinder *Finder) {
   // Add parameters to Parameters.
-  Finder->addMatcher(parmVarDecl(unless(isInstantiated())).bind("Parm"), this);
+  Finder->addMatcher(parmVarDecl().bind("Parm"), this);
 
   // C++ constructor.
   Finder->addMatcher(cxxConstructorDecl().bind("Ctor"), this);

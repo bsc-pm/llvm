@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "hexagon-sdata"
-
 #include "HexagonTargetObjectFile.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
@@ -22,6 +20,7 @@
 #include "llvm/IR/GlobalObject.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/GlobalVariable.h"
+#include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/SectionKind.h"
@@ -30,6 +29,8 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
+
+#define DEBUG_TYPE "hexagon-sdata"
 
 using namespace llvm;
 
@@ -330,6 +331,7 @@ unsigned HexagonTargetObjectFile::getSmallestAddressableSize(const Type *Ty,
   case Type::LabelTyID:
   case Type::MetadataTyID:
   case Type::X86_MMXTyID:
+  case Type::X86_AMXTyID:
   case Type::TokenTyID:
     return 0;
   }

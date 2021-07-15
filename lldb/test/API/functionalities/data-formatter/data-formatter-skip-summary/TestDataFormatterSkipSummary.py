@@ -14,9 +14,6 @@ class SkipSummaryDataFormatterTestCase(TestBase):
     mydir = TestBase.compute_mydir(__file__)
 
     @expectedFailureAll(
-        oslist=['freebsd'],
-        bugnumber="llvm.org/pr20548 fails to build on lab.llvm.org buildbot")
-    @expectedFailureAll(
         oslist=["windows"],
         bugnumber="llvm.org/pr24462, Data formatters have problems on Windows")
     def test_with_run_command(self):
@@ -146,14 +143,14 @@ class SkipSummaryDataFormatterTestCase(TestBase):
         if self.getCompiler().endswith('gcc') and not self.getCompiler().endswith('llvm-gcc'):
             import re
             gcc_version_output = system(
-                [[lldbutil.which(self.getCompiler()), "-v"]])[1]
-            #print("my output:", gcc_version_output)
+                [[lldbutil.which(self.getCompiler()), "-v"]])
+            self.trace("my output:", gcc_version_output)
             for line in gcc_version_output.split(os.linesep):
                 m = re.search('\(Apple Inc\. build ([0-9]+)\)', line)
-                #print("line:", line)
+                self.trace("line:", line)
                 if m:
                     gcc_build = int(m.group(1))
-                    #print("gcc build:", gcc_build)
+                    self.trace("gcc build:", gcc_build)
                     if gcc_build >= 5666:
                         # rdar://problem/9804600"
                         self.skipTest(

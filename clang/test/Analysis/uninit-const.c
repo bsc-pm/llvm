@@ -1,4 +1,8 @@
-// RUN: %clang_analyze_cc1 -analyzer-checker=unix.Malloc,core,alpha.core.CallAndMessageUnInitRefArg,debug.ExprInspection -analyzer-output=text -verify %s
+// RUN: %clang_analyze_cc1 -analyzer-output=text -verify %s \
+// RUN:   -analyzer-checker=core \
+// RUN:   -analyzer-checker=unix.Malloc \
+// RUN:   -analyzer-checker=debug.ExprInspection \
+// RUN:   -analyzer-config core.CallAndMessage:ArgPointeeInitializedness=true
 
 void clang_analyzer_warnIfReached();
 
@@ -33,7 +37,7 @@ void f_1(void) {
 void f_1_1(void) {
   int t;                 // expected-note {{'t' declared without an initial value}}
   int *tp1 = &t;         // expected-note {{'tp1' initialized here}}
-  int* tp2 = tp1;        // expected-note {{'tp2' initialized here}}
+  int *tp2 = tp1;        // expected-note {{'tp2' initialized to the value of 'tp1'}}
   doStuff_pointerToConstInt(tp2);  // expected-warning {{1st function call argument is a pointer to uninitialized value}}
                        // expected-note@-1 {{1st function call argument is a pointer to uninitialized value}}
 }
@@ -49,7 +53,7 @@ void f_2(void) {
                         // expected-note@-1{{Calling 'f_2_sub'}}
                         // expected-note@-2{{Returning from 'f_2_sub'}}
                         // expected-note@-3{{'p' initialized here}}
-  int* tp = p; // expected-note {{'tp' initialized here}}
+  int *tp = p;          // expected-note {{'tp' initialized to the value of 'p'}}
   doStuff_pointerToConstInt(tp); // expected-warning {{1st function call argument is a pointer to uninitialized value}}
                       // expected-note@-1 {{1st function call argument is a pointer to uninitialized value}}
 }
@@ -66,7 +70,7 @@ void f_4(void) {
 
 void f_5(void) {
   int ta[5];           // expected-note {{'ta' initialized here}}
-  int* tp = ta;        // expected-note {{'tp' initialized here}}
+  int *tp = ta;        // expected-note {{'tp' initialized here}}
   doStuff_pointerToConstInt(tp);  // expected-warning {{1st function call argument is a pointer to uninitialized value}}
                        // expected-note@-1 {{1st function call argument is a pointer to uninitialized value}}
 }

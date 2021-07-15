@@ -2,7 +2,7 @@
 
 const char *s = "asdf";
 #pragma oss task label(s)
-void foo1();
+void foo(void);
 
 #pragma oss task label(p)
 void foo1(const char *p);

@@ -7,12 +7,15 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/IR/DebugInfo.h"
+#include "llvm/IR/DIBuilder.h"
 #include "llvm/AsmParser/Parser.h"
 #include "llvm/IR/DebugInfoMetadata.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Transforms/Utils/Local.h"
 #include "gtest/gtest.h"
 
 using namespace llvm;
@@ -143,6 +146,102 @@ TEST(StripTest, LoopMetadata) {
   bool HardError = verifyModule(*M, &errs(), &BrokenDebugInfo);
   EXPECT_FALSE(HardError);
   EXPECT_FALSE(BrokenDebugInfo);
+}
+
+TEST(MetadataTest, DeleteInstUsedByDbgValue) {
+  LLVMContext C;
+  std::unique_ptr<Module> M = parseIR(C, R"(
+    define i16 @f(i16 %a) !dbg !6 {
+      %b = add i16 %a, 1, !dbg !11
+      call void @llvm.dbg.value(metadata i16 %b, metadata !9, metadata !DIExpression()), !dbg !11
+      ret i16 0, !dbg !11
+    }
+    declare void @llvm.dbg.value(metadata, metadata, metadata) #0
+    attributes #0 = { nounwind readnone speculatable willreturn }
+
+    !llvm.dbg.cu = !{!0}
+    !llvm.module.flags = !{!5}
+
+    !0 = distinct !DICompileUnit(language: DW_LANG_C, file: !1, producer: "debugify", isOptimized: true, runtimeVersion: 0, emissionKind: FullDebug, enums: !2)
+    !1 = !DIFile(filename: "t.ll", directory: "/")
+    !2 = !{}
+    !5 = !{i32 2, !"Debug Info Version", i32 3}
+    !6 = distinct !DISubprogram(name: "foo", linkageName: "foo", scope: null, file: !1, line: 1, type: !7, scopeLine: 1, spFlags: DISPFlagDefinition | DISPFlagOptimized, unit: !0, retainedNodes: !8)
+    !7 = !DISubroutineType(types: !2)
+    !8 = !{!9}
+    !9 = !DILocalVariable(name: "1", scope: !6, file: !1, line: 1, type: !10)
+    !10 = !DIBasicType(name: "ty16", size: 16, encoding: DW_ATE_unsigned)
+    !11 = !DILocation(line: 1, column: 1, scope: !6)
+)");
+
+  // Find %b = add ...
+  Instruction &I = *M->getFunction("f")->getEntryBlock().getFirstNonPHI();
+
+  // Find the dbg.value using %b.
+  SmallVector<DbgValueInst *, 1> DVIs;
+  findDbgValues(DVIs, &I);
+
+  // Delete %b. The dbg.value should now point to undef.
+  I.eraseFromParent();
+  EXPECT_EQ(DVIs[0]->getNumVariableLocationOps(), 1u);
+  EXPECT_TRUE(isa<UndefValue>(DVIs[0]->getValue(0)));
+}
+
+TEST(DIBuilder, CreateFortranArrayTypeWithAttributes) {
+  LLVMContext Ctx;
+  std::unique_ptr<Module> M(new Module("MyModule", Ctx));
+  DIBuilder DIB(*M);
+
+  DISubrange *Subrange = DIB.getOrCreateSubrange(1,1);
+  SmallVector<Metadata*, 4> Subranges;
+  Subranges.push_back(Subrange);
+  DINodeArray Subscripts = DIB.getOrCreateArray(Subranges);
+
+  auto getDIExpression = [&DIB](int offset) {
+    SmallVector<uint64_t, 4> ops;
+    ops.push_back(llvm::dwarf::DW_OP_push_object_address);
+    DIExpression::appendOffset(ops, offset);
+    ops.push_back(llvm::dwarf::DW_OP_deref);
+
+    return DIB.createExpression(ops);
+  };
+
+  DIFile *F = DIB.createFile("main.c", "/");
+  DICompileUnit *CU = DIB.createCompileUnit(
+      dwarf::DW_LANG_C, DIB.createFile("main.c", "/"), "llvm-c", true, "", 0);
+
+  DIVariable *DataLocation =
+      DIB.createTempGlobalVariableFwdDecl(CU, "dl", "_dl", F, 1, nullptr, true);
+  DIExpression *Associated = getDIExpression(1);
+  DIExpression *Allocated = getDIExpression(2);
+  DIExpression *Rank = DIB.createConstantValueExpression(3);
+
+  DICompositeType *ArrayType = DIB.createArrayType(0, 0, nullptr, Subscripts,
+                                                   DataLocation, Associated,
+                                                   Allocated, Rank);
+
+  EXPECT_TRUE(isa_and_nonnull<DICompositeType>(ArrayType));
+  EXPECT_EQ(ArrayType->getRawDataLocation(), DataLocation);
+  EXPECT_EQ(ArrayType->getRawAssociated(), Associated);
+  EXPECT_EQ(ArrayType->getRawAllocated(), Allocated);
+  EXPECT_EQ(ArrayType->getRawRank(), Rank);
+
+  // Avoid memory leak.
+  DIVariable::deleteTemporary(DataLocation);
+}
+
+TEST(DIBuilder, CreateSetType) {
+  LLVMContext Ctx;
+  std::unique_ptr<Module> M(new Module("MyModule", Ctx));
+  DIBuilder DIB(*M);
+  DIScope *Scope = DISubprogram::getDistinct(
+      Ctx, nullptr, "", "", nullptr, 0, nullptr, 0, nullptr, 0, 0,
+      DINode::FlagZero, DISubprogram::SPFlagZero, nullptr);
+  DIType *Type = DIB.createBasicType("Int", 64, dwarf::DW_ATE_signed);
+  DIFile *F = DIB.createFile("main.c", "/");
+
+  DIDerivedType *SetType = DIB.createSetType(Scope, "set1", F, 1, 64, 64, Type);
+  EXPECT_TRUE(isa_and_nonnull<DIDerivedType>(SetType));
 }
 
 } // end namespace

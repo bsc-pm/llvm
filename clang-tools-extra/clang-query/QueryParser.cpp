@@ -11,6 +11,7 @@
 #include "QuerySession.h"
 #include "clang/ASTMatchers/Dynamic/Parser.h"
 #include "clang/Basic/CharInfo.h"
+#include "clang/Tooling/NodeIntrospection.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
 #include <set>
@@ -104,16 +105,19 @@ QueryRef QueryParser::parseSetBool(bool QuerySession::*Var) {
 
 template <typename QueryType> QueryRef QueryParser::parseSetOutputKind() {
   StringRef ValStr;
-  unsigned OutKind = LexOrCompleteWord<unsigned>(this, ValStr)
-                         .Case("diag", OK_Diag)
-                         .Case("print", OK_Print)
-                         .Case("detailed-ast", OK_DetailedAST)
-                         .Case("dump", OK_DetailedAST)
-                         .Default(~0u);
+  bool HasIntrospection = tooling::NodeIntrospection::hasIntrospectionSupport();
+  unsigned OutKind =
+      LexOrCompleteWord<unsigned>(this, ValStr)
+          .Case("diag", OK_Diag)
+          .Case("print", OK_Print)
+          .Case("detailed-ast", OK_DetailedAST)
+          .Case("srcloc", OK_SrcLoc, /*IsCompletion=*/HasIntrospection)
+          .Case("dump", OK_DetailedAST)
+          .Default(~0u);
   if (OutKind == ~0u) {
-    return new InvalidQuery(
-        "expected 'diag', 'print', 'detailed-ast' or 'dump', got '" + ValStr +
-        "'");
+    return new InvalidQuery("expected 'diag', 'print', 'detailed-ast'" +
+                            StringRef(HasIntrospection ? ", 'srcloc'" : "") +
+                            " or 'dump', got '" + ValStr + "'");
   }
 
   switch (OutKind) {
@@ -123,9 +127,26 @@ template <typename QueryType> QueryRef QueryParser::parseSetOutputKind() {
     return new QueryType(&QuerySession::DiagOutput);
   case OK_Print:
     return new QueryType(&QuerySession::PrintOutput);
+  case OK_SrcLoc:
+    if (HasIntrospection)
+      return new QueryType(&QuerySession::SrcLocOutput);
+    return new InvalidQuery("'srcloc' output support is not available.");
   }
 
   llvm_unreachable("Invalid output kind");
+}
+
+QueryRef QueryParser::parseSetTraversalKind(TraversalKind QuerySession::*Var) {
+  StringRef ValStr;
+  unsigned Value =
+      LexOrCompleteWord<unsigned>(this, ValStr)
+          .Case("AsIs", TK_AsIs)
+          .Case("IgnoreUnlessSpelledInSource", TK_IgnoreUnlessSpelledInSource)
+          .Default(~0u);
+  if (Value == ~0u) {
+    return new InvalidQuery("expected traversal kind, got '" + ValStr + "'");
+  }
+  return new SetQuery<TraversalKind>(Var, static_cast<TraversalKind>(Value));
 }
 
 QueryRef QueryParser::endQuery(QueryRef Q) {
@@ -171,7 +192,8 @@ enum ParsedQueryVariable {
   PQV_Invalid,
   PQV_Output,
   PQV_BindRoot,
-  PQV_PrintMatcher
+  PQV_PrintMatcher,
+  PQV_Traversal
 };
 
 QueryRef makeInvalidQueryFromDiagnostics(const Diagnostics &Diag) {
@@ -272,6 +294,7 @@ QueryRef QueryParser::doParse() {
             .Case("output", PQV_Output)
             .Case("bind-root", PQV_BindRoot)
             .Case("print-matcher", PQV_PrintMatcher)
+            .Case("traversal", PQV_Traversal)
             .Default(PQV_Invalid);
     if (VarStr.empty())
       return new InvalidQuery("expected variable name");
@@ -288,6 +311,9 @@ QueryRef QueryParser::doParse() {
       break;
     case PQV_PrintMatcher:
       Q = parseSetBool(&QuerySession::PrintMatcher);
+      break;
+    case PQV_Traversal:
+      Q = parseSetTraversalKind(&QuerySession::TK);
       break;
     case PQV_Invalid:
       llvm_unreachable("Invalid query kind");

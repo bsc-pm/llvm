@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// UNSUPPORTED: c++98, c++03
+// UNSUPPORTED: c++03
 
 // <set>
 
@@ -21,7 +21,7 @@
 
 int main(int, char**)
 {
-    typedef test_compare<std::less<int> > Cmp;
+    typedef test_less<int> Cmp;
     typedef std::set<int, Cmp> C;
     typedef C::value_type V;
     C m({1, 2, 3, 4, 5, 6}, Cmp(10));

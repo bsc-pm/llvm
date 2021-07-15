@@ -1,5 +1,3 @@
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../)
-
 set(LLVM_LINK_COMPONENTS
     Support
     )
@@ -20,4 +18,5 @@ clang_target_link_libraries(clangd-indexer
 target_link_libraries(clangd-indexer
   PRIVATE
   clangDaemon
+  clangdSupport
 )

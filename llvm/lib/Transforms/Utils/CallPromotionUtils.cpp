@@ -112,9 +112,7 @@ static void createRetPHINode(Instruction *OrigInst, Instruction *NewInst,
 
   Builder.SetInsertPoint(&MergeBlock->front());
   PHINode *Phi = Builder.CreatePHI(OrigInst->getType(), 0);
-  SmallVector<User *, 16> UsersToUpdate;
-  for (User *U : OrigInst->users())
-    UsersToUpdate.push_back(U);
+  SmallVector<User *, 16> UsersToUpdate(OrigInst->users());
   for (User *U : UsersToUpdate)
     U->replaceUsesOfWith(OrigInst, Phi);
   Phi->addIncoming(OrigInst, OrigInst->getParent());
@@ -165,9 +163,7 @@ static void createRetBitCast(CallBase &CB, Type *RetTy, CastInst **RetBitCast) {
 
   // Save the users of the calling instruction. These uses will be changed to
   // use the bitcast after we create it.
-  SmallVector<User *, 16> UsersToUpdate;
-  for (User *U : CB.users())
-    UsersToUpdate.push_back(U);
+  SmallVector<User *, 16> UsersToUpdate(CB.users());
 
   // Determine an appropriate location to create the bitcast for the return
   // value. The location depends on if we have a call or invoke instruction.
@@ -403,9 +399,12 @@ bool llvm::isLegalToPromote(const CallBase &CB, Function *Callee,
   // The number of formal arguments of the callee.
   unsigned NumParams = Callee->getFunctionType()->getNumParams();
 
+  // The number of actual arguments in the call.
+  unsigned NumArgs = CB.arg_size();
+
   // Check the number of arguments. The callee and call site must agree on the
   // number of arguments.
-  if (CB.arg_size() != NumParams && !Callee->isVarArg()) {
+  if (NumArgs != NumParams && !Callee->isVarArg()) {
     if (FailureReason)
       *FailureReason = "The number of arguments mismatch";
     return false;
@@ -414,7 +413,8 @@ bool llvm::isLegalToPromote(const CallBase &CB, Function *Callee,
   // Check the argument types. The callee's formal argument types must be
   // bitcast compatible with the corresponding actual argument types of the call
   // site.
-  for (unsigned I = 0; I < NumParams; ++I) {
+  unsigned I = 0;
+  for (; I < NumParams; ++I) {
     Type *FormalTy = Callee->getFunctionType()->getFunctionParamType(I);
     Type *ActualTy = CB.getArgOperand(I)->getType();
     if (FormalTy == ActualTy)
@@ -422,6 +422,15 @@ bool llvm::isLegalToPromote(const CallBase &CB, Function *Callee,
     if (!CastInst::isBitOrNoopPointerCastable(ActualTy, FormalTy, DL)) {
       if (FailureReason)
         *FailureReason = "Argument type mismatch";
+      return false;
+    }
+  }
+  for (; I < NumArgs; I++) {
+    // Vararg functions can have more arguments than parameters.
+    assert(Callee->isVarArg());
+    if (CB.paramHasAttr(I, Attribute::StructRet)) {
+      if (FailureReason)
+        *FailureReason = "SRet arg to vararg function";
       return false;
     }
   }

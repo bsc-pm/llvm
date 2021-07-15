@@ -32,7 +32,7 @@ FunctionInfo::FunctionInfo(const char *name, const Declaration *decl_ptr)
 FunctionInfo::FunctionInfo(ConstString name, const Declaration *decl_ptr)
     : m_name(name), m_declaration(decl_ptr) {}
 
-FunctionInfo::~FunctionInfo() {}
+FunctionInfo::~FunctionInfo() = default;
 
 void FunctionInfo::Dump(Stream *s, bool show_fullpaths) const {
   if (m_name)
@@ -74,7 +74,7 @@ InlineFunctionInfo::InlineFunctionInfo(ConstString name,
     : FunctionInfo(name, decl_ptr), m_mangled(mangled),
       m_call_decl(call_decl_ptr) {}
 
-InlineFunctionInfo::~InlineFunctionInfo() {}
+InlineFunctionInfo::~InlineFunctionInfo() = default;
 
 void InlineFunctionInfo::Dump(Stream *s, bool show_fullpaths) const {
   FunctionInfo::Dump(s, show_fullpaths);
@@ -145,11 +145,7 @@ lldb::addr_t CallEdge::GetLoadAddress(lldb::addr_t unresolved_pc,
 
 lldb::addr_t CallEdge::GetReturnPCAddress(Function &caller,
                                           Target &target) const {
-  return GetLoadAddress(return_pc, caller, target);
-}
-
-lldb::addr_t CallEdge::GetCallInstPC(Function &caller, Target &target) const {
-  return GetLoadAddress(call_inst_pc, caller, target);
+  return GetLoadAddress(GetUnresolvedReturnPCAddress(), caller, target);
 }
 
 void DirectCallEdge::ParseSymbolFileAndResolve(ModuleList &images) {
@@ -242,7 +238,7 @@ Function::Function(CompileUnit *comp_unit, lldb::user_id_t func_uid,
   assert(comp_unit != nullptr);
 }
 
-Function::~Function() {}
+Function::~Function() = default;
 
 void Function::GetStartLineSourceInfo(FileSpec &source_file,
                                       uint32_t &line_no) {
@@ -294,6 +290,8 @@ void Function::GetEndLineSourceInfo(FileSpec &source_file, uint32_t &line_no) {
 }
 
 llvm::ArrayRef<std::unique_ptr<CallEdge>> Function::GetCallEdges() {
+  std::lock_guard<std::mutex> guard(m_call_edges_lock);
+
   if (m_call_edges_resolved)
     return m_call_edges;
 
@@ -313,36 +311,34 @@ llvm::ArrayRef<std::unique_ptr<CallEdge>> Function::GetCallEdges() {
   m_call_edges = sym_file->ParseCallEdgesInFunction(GetID());
 
   // Sort the call edges to speed up return_pc lookups.
-  llvm::sort(m_call_edges.begin(), m_call_edges.end(),
-             [](const std::unique_ptr<CallEdge> &LHS,
-                const std::unique_ptr<CallEdge> &RHS) {
-               return LHS->GetUnresolvedReturnPCAddress() <
-                      RHS->GetUnresolvedReturnPCAddress();
-             });
+  llvm::sort(m_call_edges, [](const std::unique_ptr<CallEdge> &LHS,
+                              const std::unique_ptr<CallEdge> &RHS) {
+    return LHS->GetSortKey() < RHS->GetSortKey();
+  });
 
   return m_call_edges;
 }
 
 llvm::ArrayRef<std::unique_ptr<CallEdge>> Function::GetTailCallingEdges() {
-  // Call edges are sorted by return PC, and tail calling edges have invalid
-  // return PCs. Find them at the end of the list.
-  return GetCallEdges().drop_until([](const std::unique_ptr<CallEdge> &edge) {
-    return edge->GetUnresolvedReturnPCAddress() == LLDB_INVALID_ADDRESS;
-  });
+  // Tail calling edges are sorted at the end of the list. Find them by dropping
+  // all non-tail-calls.
+  return GetCallEdges().drop_until(
+      [](const std::unique_ptr<CallEdge> &edge) { return edge->IsTailCall(); });
 }
 
 CallEdge *Function::GetCallEdgeForReturnAddress(addr_t return_pc,
                                                 Target &target) {
   auto edges = GetCallEdges();
   auto edge_it =
-      std::lower_bound(edges.begin(), edges.end(), return_pc,
-                       [&](const std::unique_ptr<CallEdge> &edge, addr_t pc) {
-                         return edge->GetReturnPCAddress(*this, target) < pc;
-                       });
+      llvm::partition_point(edges, [&](const std::unique_ptr<CallEdge> &edge) {
+        return std::make_pair(edge->IsTailCall(),
+                              edge->GetReturnPCAddress(*this, target)) <
+               std::make_pair(false, return_pc);
+      });
   if (edge_it == edges.end() ||
       edge_it->get()->GetReturnPCAddress(*this, target) != return_pc)
     return nullptr;
-  return &const_cast<CallEdge &>(*edge_it->get());
+  return edge_it->get();
 }
 
 Block &Function::GetBlock(bool can_create) {
@@ -374,9 +370,9 @@ void Function::GetDescription(Stream *s, lldb::DescriptionLevel level,
 
   *s << "id = " << (const UserID &)*this;
   if (name)
-    *s << ", name = \"" << name.GetCString() << '"';
+    s->AsRawOstream() << ", name = \"" << name << '"';
   if (mangled)
-    *s << ", mangled = \"" << mangled.GetCString() << '"';
+    s->AsRawOstream() << ", mangled = \"" << mangled << '"';
   *s << ", range = ";
   Address::DumpStyle fallback_style;
   if (level == eDescriptionLevelVerbose)
@@ -430,17 +426,16 @@ lldb::DisassemblerSP Function::GetInstructions(const ExecutionContext &exe_ctx,
                                                bool prefer_file_cache) {
   ModuleSP module_sp(GetAddressRange().GetBaseAddress().GetModule());
   if (module_sp && exe_ctx.HasTargetScope()) {
-    const bool prefer_file_cache = false;
     return Disassembler::DisassembleRange(module_sp->GetArchitecture(), nullptr,
                                           flavor, exe_ctx.GetTargetRef(),
-                                          GetAddressRange(), prefer_file_cache);
+                                          GetAddressRange(), !prefer_file_cache);
   }
   return lldb::DisassemblerSP();
 }
 
 bool Function::GetDisassembly(const ExecutionContext &exe_ctx,
-                              const char *flavor, bool prefer_file_cache,
-                              Stream &strm) {
+                              const char *flavor, Stream &strm,
+                              bool prefer_file_cache) {
   lldb::DisassemblerSP disassembler_sp =
       GetInstructions(exe_ctx, flavor, prefer_file_cache);
   if (disassembler_sp) {

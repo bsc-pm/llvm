@@ -72,10 +72,11 @@ public:
                                           void *callback_baton);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(SBCommunication);
+  SBCommunication(const SBCommunication &) = delete;
+  const SBCommunication &operator=(const SBCommunication &) = delete;
 
-  lldb_private::Communication *m_opaque;
-  bool m_opaque_owned;
+  lldb_private::Communication *m_opaque = nullptr;
+  bool m_opaque_owned = false;
 };
 
 } // namespace lldb

@@ -25,7 +25,7 @@ public:
   // Constructors and Destructors
   StopInfo(Thread &thread, uint64_t value);
 
-  virtual ~StopInfo() {}
+  virtual ~StopInfo() = default;
 
   bool IsValid() const;
 
@@ -129,6 +129,9 @@ public:
 
   static lldb::StopInfoSP CreateStopReasonWithExec(Thread &thread);
 
+  static lldb::StopInfoSP
+  CreateStopReasonProcessorTrace(Thread &thread, const char *description);
+
   static lldb::ValueObjectSP
   GetReturnValueObject(lldb::StopInfoSP &stop_info_sp);
 
@@ -183,7 +186,8 @@ protected:
 private:
   friend class Thread;
 
-  DISALLOW_COPY_AND_ASSIGN(StopInfo);
+  StopInfo(const StopInfo &) = delete;
+  const StopInfo &operator=(const StopInfo &) = delete;
 };
 
 } // namespace lldb_private

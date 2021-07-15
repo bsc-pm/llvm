@@ -92,9 +92,11 @@ public:
     return symbols;
   }
 
-  // Filename of .a which contained this file. If this file was
-  // not in an archive file, it is the empty string. We use this
-  // string for creating error messages.
+  // Get filename to use for linker script processing.
+  StringRef getNameForScript() const;
+
+  // If not empty, this stores the name of the archive containing this file.
+  // We use this string for creating error messages.
   std::string archiveName;
 
   // If this is an architecture-specific file, the following members
@@ -128,6 +130,10 @@ public:
   // [.got, .got + 0xFFFC].
   bool ppc64SmallCodeModelTocRelocs = false;
 
+  // True if the file has TLSGD/TLSLD GOT relocations without R_PPC64_TLSGD or
+  // R_PPC64_TLSLD. Disable TLS relaxation to avoid bad code generation.
+  bool ppc64DisableTLSRelax = false;
+
   // groupId is used for --warn-backrefs which is an optional error
   // checking feature. All files within the same --{start,end}-group or
   // --{start,end}-lib get the same group ID. Otherwise, each file gets a new
@@ -147,6 +153,9 @@ protected:
 
 private:
   const Kind fileKind;
+
+  // Cache for getNameForScript().
+  mutable std::string nameForScriptCache;
 };
 
 class ELFFileBase : public InputFile {
@@ -180,12 +189,7 @@ protected:
 
 // .o file.
 template <class ELFT> class ObjFile : public ELFFileBase {
-  using Elf_Rel = typename ELFT::Rel;
-  using Elf_Rela = typename ELFT::Rela;
-  using Elf_Sym = typename ELFT::Sym;
-  using Elf_Shdr = typename ELFT::Shdr;
-  using Elf_Word = typename ELFT::Word;
-  using Elf_CGProfile = typename ELFT::CGProfile;
+  LLVM_ELF_IMPORT_TYPES_ELFT(ELFT)
 
 public:
   static bool classof(const InputFile *f) { return f->kind() == ObjKind; }
@@ -245,8 +249,10 @@ public:
   // Pointer to this input file's .llvm_addrsig section, if it has one.
   const Elf_Shdr *addrsigSec = nullptr;
 
-  // SHT_LLVM_CALL_GRAPH_PROFILE table
+  // SHT_LLVM_CALL_GRAPH_PROFILE table.
   ArrayRef<Elf_CGProfile> cgProfile;
+  // SHT_LLVM_CALL_GRAPH_PROFILE relocations, always in the REL format.
+  ArrayRef<Elf_Rel> cgProfileRel;
 
   // Get cached DWARF information.
   DWARFCache *getDwarf();
@@ -307,6 +313,12 @@ public:
   template <class ELFT> void parse();
   void fetch();
 
+  // Check if a non-common symbol should be fetched to override a common
+  // definition.
+  bool shouldFetchForCommon(const StringRef &name);
+
+  bool fetched = false;
+
 private:
   uint64_t offsetInArchive;
 };
@@ -324,8 +336,14 @@ public:
   // more than once.)
   void fetch(const Archive::Symbol &sym);
 
+  // Check if a non-common symbol should be fetched to override a common
+  // definition.
+  bool shouldFetchForCommon(const Archive::Symbol &sym);
+
   size_t getMemberCount() const;
   size_t getFetchedMemberCount() const { return seen.size(); }
+
+  bool parsed = false;
 
 private:
   std::unique_ptr<Archive> file;
@@ -365,11 +383,17 @@ public:
 
   template <typename ELFT> void parse();
 
-  // Used for --no-allow-shlib-undefined.
-  bool allNeededIsKnown;
-
   // Used for --as-needed
   bool isNeeded;
+
+  // Non-weak undefined symbols which are not yet resolved when the SO is
+  // parsed. Only filled for `--no-allow-shlib-undefined`.
+  std::vector<Symbol *> requiredSymbols;
+
+private:
+  template <typename ELFT>
+  std::vector<uint32_t> parseVerneed(const llvm::object::ELFFile<ELFT> &obj,
+                                     const typename ELFT::Shdr *sec);
 };
 
 class BinaryFile : public InputFile {

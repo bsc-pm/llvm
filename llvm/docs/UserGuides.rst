@@ -33,14 +33,20 @@ intermediate LLVM representation.
    GoldPlugin
    HowToBuildOnARM
    HowToBuildWithPGO
+   HowToBuildWindowsItaniumPrograms
    HowToCrossCompileBuiltinsOnArm
    HowToCrossCompileLLVM
+   HowToUpdateDebugInfo
    LinkTimeOptimization
    LoopTerminology
    MarkdownQuickstartTemplate
    MemorySSA
    MergeFunctions
    MCJITDesignAndImplementation
+   ORCv2
+   OpaquePointers
+   JITLink
+   NewPassManager
    NVPTXUsage
    Phabricator
    Passes
@@ -53,6 +59,7 @@ intermediate LLVM representation.
    TableGenFundamentals
    Vectorizers
    WritingAnLLVMPass
+   WritingAnLLVMNewPMPass
    WritingAnLLVMBackend
    yaml2obj
 
@@ -95,13 +102,20 @@ LLVM Builds and Distributions
 
 :doc:`Support Library <SupportLibrary>`
    This document describes the LLVM Support Library (``lib/Support``) and
-   how to keep LLVM source code portable
+   how to keep LLVM source code portable.
+
+:doc:`AdvancedBuilds`
+   This document describes more advanced build configurations.
 
 Optimizations
 -------------
 
 :doc:`WritingAnLLVMPass`
    Information on how to write LLVM transformations and analyses.
+
+:doc:`WritingAnLLVMNewPMPass`
+   Information on how to write LLVM transformations under the new pass
+   manager.
 
 :doc:`Passes`
    A list of optimizations and analyses implemented in LLVM.
@@ -162,6 +176,14 @@ JIT
 :doc:`MCJITDesignAndImplementation`
    Describes the inner workings of MCJIT execution engine.
 
+:doc:`ORCv2`
+   Describes the design and implementation of the ORC APIs, including some
+   usage examples, and a guide for users transitioning from ORCv1 to ORCv2.
+
+:doc:`JITLink`
+   Describes the design and APIs for the JITLink library, ORC's new JIT
+   linker.
+
 :doc:`DebuggingJITedCode`
    How to debug JITed code with GDB.
 
@@ -177,6 +199,9 @@ Additional Topics
 :doc:`AddingConstrainedIntrinsics`
    Gives the steps necessary when adding a new constrained math intrinsic
    to LLVM.
+
+:doc:`HowToBuildWindowsItaniumPrograms`
+   Notes on assembling a Windows Itanium enviroment.
 
 :doc:`HowToCrossCompileBuiltinsOnArm`
    Notes on cross-building and testing the compiler-rt builtins for Arm.
@@ -194,6 +219,6 @@ Additional Topics
 :doc:`AMDGPUUsage`
    This document describes using the AMDGPU backend to compile GPU kernels.
 
-:doc:`AMDGPUDwarfProposalForHeterogeneousDebugging`
-   This document describes a DWARF proposal to support heterogeneous debugging
+:doc:`AMDGPUDwarfExtensionsForHeterogeneousDebugging`
+   This document describes DWARF extensions to support heterogeneous debugging
    for targets such as the AMDGPU backend.

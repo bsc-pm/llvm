@@ -16,18 +16,19 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/TableGen/Argument.h"
 #include "mlir/TableGen/Attribute.h"
+#include "mlir/TableGen/Builder.h"
 #include "mlir/TableGen/Dialect.h"
-#include "mlir/TableGen/OpTrait.h"
 #include "mlir/TableGen/Region.h"
 #include "mlir/TableGen/Successor.h"
+#include "mlir/TableGen/Trait.h"
 #include "mlir/TableGen/Type.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/SMLoc.h"
 
 namespace llvm {
-class CodeInit;
 class DefInit;
 class Record;
 class StringInit;
@@ -56,6 +57,12 @@ public:
 
   // Returns this op's C++ class name prefixed with namespaces.
   std::string getQualCppClassName() const;
+
+  // Returns this op's C++ namespace.
+  StringRef getCppNamespace() const;
+
+  // Returns the name of op's adaptor C++ class.
+  std::string getAdaptorName() const;
 
   /// A class used to represent the decorators of an operator variable, i.e.
   /// argument or result.
@@ -147,6 +154,17 @@ public:
   // Returns the total number of arguments.
   int getNumArgs() const { return arguments.size(); }
 
+  // Returns true of the operation has a single variadic arg.
+  bool hasSingleVariadicArg() const;
+
+  // Returns true if the operation has a single variadic result.
+  bool hasSingleVariadicResult() const {
+    return getNumResults() == 1 && getResult(0).isVariadic();
+  }
+
+  // Returns true of the operation has no variadic regions.
+  bool hasNoVariadicRegions() const { return getNumVariadicRegions() == 0; }
+
   using arg_iterator = const Argument *;
   using arg_range = llvm::iterator_range<arg_iterator>;
 
@@ -161,9 +179,7 @@ public:
   var_decorator_range getArgDecorators(int index) const;
 
   // Returns the trait wrapper for the given MLIR C++ `trait`.
-  // TODO: We should add a C++ wrapper class for TableGen OpTrait instead of
-  // requiring the raw MLIR trait here.
-  const OpTrait *getTrait(llvm::StringRef trait) const;
+  const Trait *getTrait(llvm::StringRef trait) const;
 
   // Regions.
   using const_region_iterator = const NamedRegion *;
@@ -194,7 +210,7 @@ public:
   unsigned getNumVariadicSuccessors() const;
 
   // Trait.
-  using const_trait_iterator = const OpTrait *;
+  using const_trait_iterator = const Trait *;
   const_trait_iterator trait_begin() const;
   const_trait_iterator trait_end() const;
   llvm::iterator_range<const_trait_iterator> getTraits() const;
@@ -215,9 +231,9 @@ public:
   StringRef getExtraClassDeclaration() const;
 
   // Returns the Tablegen definition this operator was constructed from.
-  // TODO(antiagainst,zinenko): do not expose the TableGen record, this is a
-  // temporary solution to OpEmitter requiring a Record because Operator does
-  // not provide enough methods.
+  // TODO: do not expose the TableGen record, this is a temporary solution to
+  // OpEmitter requiring a Record because Operator does not provide enough
+  // methods.
   const llvm::Record &getDef() const;
 
   // Returns the dialect of the op.
@@ -227,15 +243,72 @@ public:
   // debugging purposes.
   void print(llvm::raw_ostream &os) const;
 
+  // Return whether all the result types are known.
+  bool allResultTypesKnown() const { return allResultsHaveKnownTypes; };
+
+  // Pair representing either a index to an argument or a type constraint. Only
+  // one of these entries should have the non-default value.
+  struct ArgOrType {
+    explicit ArgOrType(int index) : index(index), constraint(None) {}
+    explicit ArgOrType(TypeConstraint constraint)
+        : index(None), constraint(constraint) {}
+    bool isArg() const {
+      assert(constraint.hasValue() ^ index.hasValue());
+      return index.hasValue();
+    }
+    bool isType() const {
+      assert(constraint.hasValue() ^ index.hasValue());
+      return constraint.hasValue();
+    }
+
+    int getArg() const { return *index; }
+    TypeConstraint getType() const { return *constraint; }
+
+  private:
+    Optional<int> index;
+    Optional<TypeConstraint> constraint;
+  };
+
+  // Return all arguments or type constraints with same type as result[index].
+  // Requires: all result types are known.
+  ArrayRef<ArgOrType> getSameTypeAsResult(int index) const;
+
+  // Pair consisting kind of argument and index into operands or attributes.
+  struct OperandOrAttribute {
+    enum class Kind { Operand, Attribute };
+    OperandOrAttribute(Kind kind, int index) {
+      packed = (index << 1) & (kind == Kind::Attribute);
+    }
+    int operandOrAttributeIndex() const { return (packed >> 1); }
+    Kind kind() { return (packed & 0x1) ? Kind::Attribute : Kind::Operand; }
+
+  private:
+    int packed;
+  };
+
+  // Returns the OperandOrAttribute corresponding to the index.
+  OperandOrAttribute getArgToOperandOrAttribute(int index) const;
+
+  // Returns the builders of this operation.
+  ArrayRef<Builder> getBuilders() const { return builders; }
+
 private:
   // Populates the vectors containing operands, attributes, results and traits.
   void populateOpStructure();
+
+  // Populates type inference info (mostly equality) with input a mapping from
+  // names to indices for arguments and results.
+  void populateTypeInferenceInfo(
+      const llvm::StringMap<int> &argumentsAndResultsIndex);
 
   // The dialect of this op.
   Dialect dialect;
 
   // The unqualified C++ class name of the op.
   StringRef cppClassName;
+
+  // The C++ namespace for this op.
+  StringRef cppNamespace;
 
   // The operands of the op.
   SmallVector<NamedTypeConstraint, 4> operands;
@@ -256,10 +329,19 @@ private:
   SmallVector<NamedSuccessor, 0> successors;
 
   // The traits of the op.
-  SmallVector<OpTrait, 4> traits;
+  SmallVector<Trait, 4> traits;
 
   // The regions of this op.
   SmallVector<NamedRegion, 1> regions;
+
+  // The argument with the same type as the result.
+  SmallVector<SmallVector<ArgOrType, 2>, 4> resultTypeMapping;
+
+  // Map from argument to attribute or operand number.
+  SmallVector<OperandOrAttribute, 4> attrOrOperandMapping;
+
+  // The builders of this operator.
+  SmallVector<Builder> builders;
 
   // The number of native attributes stored in the leading positions of
   // `attributes`.
@@ -267,6 +349,9 @@ private:
 
   // The TableGen definition of this op.
   const llvm::Record &def;
+
+  // Whether the type of all results are known.
+  bool allResultsHaveKnownTypes;
 };
 
 } // end namespace tblgen

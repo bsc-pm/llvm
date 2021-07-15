@@ -125,69 +125,124 @@ else
   fi
 fi
 
-################################################################################
-# Detection of compiler
-################################################################################
 
-# We only support clang or gcc. While the compilers are similar in speed, clang
-# allows using LLD which is noticeably faster than GNU ld
 
-if [ -z "${COMPILER}" ];
+if [ "${ENABLE_CROSS_COMPILATION}" = 1 ];
 then
-  info "Automatic detection of compiler. Override the detection setting the COMPILER environment variable to either 'gcc' or 'clang', in which case CC and CXX will be used by cmake instead"
-  if [ -z "$(which clang)" ];
+  ##############################################################################
+  # Native/Cross compilation
+  ##############################################################################
+  info "Cross-compiling"
+  # Example: x86_64 -> aarch64
+  #  cross-compiler (TARGET_C_COMPILER): aarch64-unknown-linux-gnu-gcc
+  #  native-compiler (HOST_C_COMPILER): gcc
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_SYSTEM_NAME=Linux")
+
+  if [ -z "$CROSS_SYSTEM_PROCESSOR" ];
   then
-    # Clang not found
-    if [ -n "$(which gcc)" ];
-    then
-      COMPILER="gcc"
-      info "Using GCC $(gcc -dumpversion)"
-      info "gcc: $(which gcc)"
-      if [ -n "$(which g++)" ];
-      then
-        info "g++: $(which g++)"
-        # Sanity check
-        if [ $(gcc -dumpversion) != $(g++ -dumpversion) ];
-        then
-          warning "gcc and g++ have different versions!"
-        fi
-        CC="$(which gcc)"
-        CXX="$(which g++)"
-      else
-        error "g++ not found in the PATH but gcc was found. This usually means that your system is missing development packages"
-      fi
-    fi
-  else
-    CLANG_VERSION=$(clang --version | head -n1 | sed 's/^.*version\s\+\([0-9]\+\(\.[0-9]\+\)\+\).*$/\1/')
-    COMPILER="clang"
-    info "Using clang ${CLANG_VERSION}"
-    info "clang: $(which clang)"
-    if [ -n "$(which clang++)" ];
-    then
-      info "clang++: $(which clang++)"
-      # Sanity check
-      CLANGXX_VERSION=$(clang++ --version | head -n1 | sed 's/^.*version\s\+\([0-9]\+\(\.[0-9]\+\)\+\).*$/\1/')
-      if [ "$CLANG_VERSION" != "$CLANGXX_VERSION" ];
-      then
-        warning "clang and clang++ have different versions!"
-      fi
-      CC="$(which clang)"
-      CXX="$(which clang++)"
-    else
-      error "clang++ not found in the PATH but clang was found. You may have to review your installation"
-    fi
+    die "Need to specify CROSS_SYSTEM_PROCESSOR when cross-compiling"
   fi
-elif [ "${COMPILER}" = gcc ];
-then
-  CC=${CC:-"$(which gcc)"}
-  CXX=${CXX:-"$(which g++)"}
-elif [ "${COMPILER}" = clang ];
-then
-  CC=${CC:-"$(which clang)"}
-  CXX=${CXX:-"$(which clang++)"}
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_SYSTEM_PROCESSOR=${CROSS_SYSTEM_PROCESSOR}")
+
+  if [ -z "$CROSS_LLVM_TARGET_ARCH" ];
+  then
+    die "Need to specify CROSS_LLVM_TARGET_ARCH when cross-compiling"
+  fi
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_TARGET_ARCH=${CROSS_LLVM_TARGET_ARCH}")
+
+  if [ -z "$CROSS_TRIPLET" ];
+  then
+    die "Need to specify CROSS_TRIPLET when cross-compiling"
+  fi
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_DEFAULT_TARGET_TRIPLE=${CROSS_TRIPLET}")
+
+  if [ -z "$TARGET_C_COMPILER" ];
+  then
+    die "Need to specify TARGET_C_COMPILER when cross-compiling"
+  fi
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_C_COMPILER=${TARGET_C_COMPILER}")
+
+  if [ -z "$TARGET_CXX_COMPILER" ];
+  then
+    die "Need to specify TARGET_CXX_COMPILER when cross-compiling"
+  fi
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_CXX_COMPILER=${TARGET_CXX_COMPILER}")
+
+  if [ -z "$HOST_C_COMPILER" ];
+  then
+    die "Need to specify HOST_C_COMPILER when cross-compiling"
+  fi
+  if [ -z "$HOST_CXX_COMPILER" ];
+  then
+    die "Need to specify HOST_CXX_COMPILER when cross-compiling"
+  fi
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCROSS_TOOLCHAIN_FLAGS_LLVM_NATIVE=-DCMAKE_CXX_COMPILER=${HOST_CXX_COMPILER};-DCMAKE_C_COMPILER=${HOST_C_COMPILER}")
+else
+  ##############################################################################
+  # Native compilation: Detection of compiler
+  ##############################################################################
+
+  # We only support clang or gcc. While the compilers are similar in speed, clang
+  # allows using LLD which is noticeably faster than GNU ld
+
+  if [ -z "${COMPILER}" ];
+  then
+    info "Automatic detection of compiler. Override the detection setting the COMPILER environment variable to either 'gcc' or 'clang', in which case CC and CXX will be used by cmake instead"
+    if [ -z "$(which clang)" ];
+    then
+      # Clang not found
+      if [ -n "$(which gcc)" ];
+      then
+        COMPILER="gcc"
+        info "Using GCC $(gcc -dumpversion)"
+        info "gcc: $(which gcc)"
+        if [ -n "$(which g++)" ];
+        then
+          info "g++: $(which g++)"
+          # Sanity check
+          if [ $(gcc -dumpversion) != $(g++ -dumpversion) ];
+          then
+            warning "gcc and g++ have different versions!"
+          fi
+          CC="$(which gcc)"
+          CXX="$(which g++)"
+        else
+          error "g++ not found in the PATH but gcc was found. This usually means that your system is missing development packages"
+        fi
+      fi
+    else
+      CLANG_VERSION=$(clang --version | head -n1 | sed 's/^.*version\s\+\([0-9]\+\(\.[0-9]\+\)\+\).*$/\1/')
+      COMPILER="clang"
+      info "Using clang ${CLANG_VERSION}"
+      info "clang: $(which clang)"
+      if [ -n "$(which clang++)" ];
+      then
+        info "clang++: $(which clang++)"
+        # Sanity check
+        CLANGXX_VERSION=$(clang++ --version | head -n1 | sed 's/^.*version\s\+\([0-9]\+\(\.[0-9]\+\)\+\).*$/\1/')
+        if [ "$CLANG_VERSION" != "$CLANGXX_VERSION" ];
+        then
+          warning "clang and clang++ have different versions!"
+        fi
+        CC="$(which clang)"
+        CXX="$(which clang++)"
+      else
+        error "clang++ not found in the PATH but clang was found. You may have to review your installation"
+      fi
+    fi
+  elif [ "${COMPILER}" = gcc ];
+  then
+    CC=${CC:-"$(which gcc)"}
+    CXX=${CXX:-"$(which g++)"}
+  elif [ "${COMPILER}" = clang ];
+  then
+    CC=${CC:-"$(which clang)"}
+    CXX=${CXX:-"$(which clang++)"}
+  fi
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_C_COMPILER=${CC}")
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_CXX_COMPILER=${CXX}")
 fi
-CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_C_COMPILER=${CC}")
-CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_CXX_COMPILER=${CXX}")
+
 
 if [ -n "${CFLAGS}" ];
 then
@@ -227,6 +282,13 @@ fi
 
 if [ "$BUILD_SYSTEM" = "Ninja" ];
 then
+  if [ -n "${LLVM_PARALLEL_COMPILE_JOBS}" ];
+  then
+    NUM_COMPILE_JOBS=${LLVM_PARALLEL_COMPILE_JOBS}
+    info "Setting concurrent compile jobs to ${NUM_COMPILE_JOBS}"
+    CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_PARALLEL_COMPILE_JOBS=${NUM_COMPILE_JOBS}")
+  fi
+
   if [ -z "${LLVM_PARALLEL_LINK_JOBS}" ];
   then
     NUM_LINK_JOBS=0
@@ -260,8 +322,6 @@ if [ -n "$(which ccache)" ];
 then
   info "Using ccache: $(which ccache)"
   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_CCACHE_BUILD=ON")
-  info "Setting LLVM_APPEND_VC_REV=OFF to improve ccache hit ratio"
-  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_APPEND_VC_REV=OFF")
 else
   info "Not using ccache as it was not found"
 fi
@@ -274,7 +334,7 @@ CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_CXX_FLAGS_DEBUG=-g -ggnu-pubnames")
 if [ "$LINKER" = "lld" ];
 then
   info "Make LLD generate '.gdb_index' section for faster debugging"
-  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_EXE_LINKER_FLAGS_DEBUG=-Wl,-gdb-index")
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_EXE_LINKER_FLAGS_DEBUG=-Wl,--gdb-index")
 else
    info "GNU ld is used, '.gdb_index' sections for faster debugging won't be generated"
 fi
@@ -289,10 +349,17 @@ then
 fi
 
 ################################################################################
-# JUnit and timeout
+# Flags for lit
 ################################################################################
 
-CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_LIT_ARGS=-sv --xunit-xml-output=xunit.xml")
+LIT_ARGS="-DLLVM_LIT_ARGS=-sv --xunit-xml-output=xunit.xml"
+
+if [ -n "${LLVM_LIT_THREADS}" ];
+then
+  LIT_ARGS+=" --threads=${LLVM_LIT_THREADS}"
+fi
+
+CMAKE_INVOCATION_EXTRA_FLAGS+=("${LIT_ARGS}")
 
 ################################################################################
 # Sanitizer build
@@ -313,15 +380,61 @@ then
 fi
 
 ################################################################################
+# OpenMP for installations
+################################################################################
+
+# libomptarget is a bit flaky for testing, do not attempt to build it for now.
+# We could build it but try to disable its tests, alternatively.
+CMAKE_INVOCATION_EXTRA_FLAGS+=("-DOPENMP_ENABLE_LIBOMPTARGET=OFF")
+
+if [ -n "$TEST_OMPFLAGS" ];
+then
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DOPENMP_TEST_FLAGS=$TEST_OMPFLAGS")
+fi
+
+################################################################################
+# Extra runtimes we may want to build
+################################################################################
+
+EXTRA_RUNTIMES=""
+
+################################################################################
 # Compiler-rt for installations
 ################################################################################
 
+
 if [ "${ENABLE_COMPILER_RT}" = 1 ];
 then
-  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_ENABLE_RUNTIMES=compiler-rt")
+  EXTRA_RUNTIMES+="compiler-rt"
   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCOMPILER_RT_CAN_EXECUTE_TESTS=OFF")
   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCOMPILER_RT_INCLUDE_TESTS=OFF")
-  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCOMPILER_RT_BUILD_SANITIZERS=OFF")
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCOMPILER_RT_BUILD_SANITIZERS=ON")
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCOMPILER_RT_SANITIZERS_TO_BUILD=asan")
+  # On x86_64 compiler-rt also attempts to build i386 libraries. Avoid that
+  # because more often than not we lack support for 32-bit.
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON")
+fi
+
+################################################################################
+# How to link the C++ library
+################################################################################
+
+if [ "${CXX_LIBRARY_SHARED}" = 1 ];
+then
+  # This is the default.
+  :
+else
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_STATIC_LINK_CXX_STDLIB=ON")
+fi
+
+################################################################################
+# LLVM projects built
+################################################################################
+
+LLVM_ENABLE_PROJECTS="-DLLVM_ENABLE_PROJECTS=clang;openmp"
+if [ "$DISABLE_FORTRAN" != 1 ];
+then
+  LLVM_ENABLE_PROJECTS+=";flang"
 fi
 
 ################################################################################
@@ -331,9 +444,17 @@ fi
 info "Running cmake..."
 run cmake -G "${BUILD_SYSTEM}" ${SRCDIR}/llvm \
    -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} \
-   -DLLVM_ENABLE_PROJECTS="clang;openmp" \
+   ${LLVM_ENABLE_PROJECTS} \
+   -DLLVM_ENABLE_RUNTIMES="${EXTRA_RUNTIMES}" \
+   -DOPENMP_LLVM_LIT_EXECUTABLE="$(pwd)/bin/llvm-lit" \
+   -DOPENMP_FILECHECK_EXECUTABLE="$(pwd)/bin/FileCheck" \
+   -DOPENMP_NOT_EXECUTABLE="$(pwd)/bin/not" \
+   -DOPENMP_LIT_ARGS="-sv --xunit-xml-output=xunit.xml" \
    -DLLVM_INSTALL_UTILS=ON \
    -DLLVM_ENABLE_ASSERTIONS=ON \
+   -DLLVM_ENABLE_BINDINGS=OFF \
+   -DOPENMP_TEST_C_COMPILER_PATH="$(pwd)/bin/clang" \
+   -DOPENMP_TEST_CXX_COMPILER_PATH="$(pwd)/bin/clang++" \
    "${CMAKE_INVOCATION_EXTRA_FLAGS[@]}"
 
 if [ $? = 0 ];

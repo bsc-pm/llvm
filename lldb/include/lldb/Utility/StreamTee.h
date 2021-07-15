@@ -9,7 +9,7 @@
 #ifndef LLDB_UTILITY_STREAMTEE_H
 #define LLDB_UTILITY_STREAMTEE_H
 
-#include <limits.h>
+#include <climits>
 
 #include <mutex>
 
@@ -19,7 +19,8 @@ namespace lldb_private {
 
 class StreamTee : public Stream {
 public:
-  StreamTee() : Stream(), m_streams_mutex(), m_streams() {}
+  StreamTee(bool colors = false)
+      : Stream(colors), m_streams_mutex(), m_streams() {}
 
   StreamTee(lldb::StreamSP &stream_sp)
       : Stream(), m_streams_mutex(), m_streams() {
@@ -44,7 +45,7 @@ public:
     m_streams = rhs.m_streams;
   }
 
-  ~StreamTee() override {}
+  ~StreamTee() override = default;
 
   StreamTee &operator=(const StreamTee &rhs) {
     if (this != &rhs) {

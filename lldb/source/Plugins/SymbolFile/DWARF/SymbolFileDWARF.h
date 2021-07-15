@@ -161,11 +161,10 @@ public:
                                 lldb::SymbolContextItem resolve_scope,
                                 lldb_private::SymbolContext &sc) override;
 
-  uint32_t
-  ResolveSymbolContext(const lldb_private::FileSpec &file_spec, uint32_t line,
-                       bool check_inlines,
-                       lldb::SymbolContextItem resolve_scope,
-                       lldb_private::SymbolContextList &sc_list) override;
+  uint32_t ResolveSymbolContext(
+      const lldb_private::SourceLocationSpec &src_location_spec,
+      lldb::SymbolContextItem resolve_scope,
+      lldb_private::SymbolContextList &sc_list) override;
 
   void
   FindGlobalVariables(lldb_private::ConstString name,
@@ -318,6 +317,8 @@ public:
   static lldb::LanguageType LanguageTypeFromDWARF(uint64_t val);
 
   static lldb::LanguageType GetLanguage(DWARFUnit &unit);
+  /// Same as GetLanguage() but reports all C++ versions as C++ (no version).
+  static lldb::LanguageType GetLanguageFamily(DWARFUnit &unit);
 
 protected:
   typedef llvm::DenseMap<const DWARFDebugInfoEntry *, lldb_private::Type *>
@@ -329,7 +330,8 @@ protected:
       DIEToClangType;
   typedef llvm::DenseMap<lldb::opaque_compiler_type_t, DIERef> ClangTypeToDIE;
 
-  DISALLOW_COPY_AND_ASSIGN(SymbolFileDWARF);
+  SymbolFileDWARF(const SymbolFileDWARF &) = delete;
+  const SymbolFileDWARF &operator=(const SymbolFileDWARF &) = delete;
 
   virtual void LoadSectionData(lldb::SectionType sect_type,
                                lldb_private::DWARFDataExtractor &data);
@@ -345,7 +347,7 @@ protected:
 
   lldb::CompUnitSP ParseCompileUnit(DWARFCompileUnit &dwarf_cu);
 
-  virtual DWARFUnit *
+  virtual DWARFCompileUnit *
   GetDWARFCompileUnit(lldb_private::CompileUnit *comp_unit);
 
   DWARFUnit *GetNextUnparsedDWARFCompileUnit(DWARFUnit *prev_cu);

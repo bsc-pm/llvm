@@ -169,6 +169,15 @@ static void AddWaitData(const OSSExecutableDirective &S, bool &Wait) {
   }
 }
 
+static void AddOnreadyData(const OSSExecutableDirective &S, const Expr * &OnreadyExpr) {
+  bool Found = false;
+  for (const auto *C : S.getClausesOfKind<OSSOnreadyClause>()) {
+    assert(!Found);
+    Found = true;
+    OnreadyExpr = C->getExpression();
+  }
+}
+
 static void AddReductionData(const OSSExecutableDirective &S, OSSTaskReductionDataTy &Reductions) {
   for (const auto *C : S.getClausesOfKind<OSSReductionClause>()) {
     auto LHSRef = C->lhs_exprs().begin();
@@ -189,6 +198,51 @@ static void AddReductionData(const OSSExecutableDirective &S, OSSTaskReductionDa
   }
 }
 
+// Convenience function to add all info from a task directive
+static void AddTaskData(const OSSExecutableDirective &S, OSSTaskDataTy &TaskData) {
+  AddDSAData(S, TaskData.DSAs);
+  AddDepData(S, TaskData.Deps);
+  AddIfData(S, TaskData.If);
+  AddFinalData(S, TaskData.Final);
+  AddCostData(S, TaskData.Cost);
+  AddPriorityData(S, TaskData.Priority);
+  AddLabelData(S, TaskData.Label);
+  AddWaitData(S, TaskData.Wait);
+  AddOnreadyData(S, TaskData.Onready);
+  AddReductionData(S, TaskData.Reductions);
+}
+
+static void AddChunksizeLoopData(const OSSLoopDirective &S, const Expr * &ChunksizeExpr) {
+  bool Found = false;
+  for (const auto *C : S.getClausesOfKind<OSSChunksizeClause>()) {
+    assert(!Found);
+    Found = true;
+    ChunksizeExpr = C->getExpression();
+  }
+}
+
+static void AddGrainsizeLoopData(const OSSLoopDirective &S, const Expr * &GrainsizeExpr) {
+  bool Found = false;
+  for (const auto *C : S.getClausesOfKind<OSSGrainsizeClause>()) {
+    assert(!Found);
+    Found = true;
+    GrainsizeExpr = C->getExpression();
+  }
+}
+
+// Convenience function to add all info from a loop directive
+static void AddLoopData(const OSSLoopDirective &S, OSSLoopDataTy &LoopData) {
+  LoopData.IndVar = S.getIterationVariable();
+  LoopData.LB = S.getLowerBound();
+  LoopData.UB = S.getUpperBound();
+  LoopData.Step = S.getStep();
+  LoopData.TestIsLessOp = S.getIsLessOp();
+  LoopData.TestIsStrictOp = S.getIsStrictOp();
+  LoopData.NumCollapses = S.getNumCollapses();
+  AddChunksizeLoopData(S, LoopData.Chunksize);
+  AddGrainsizeLoopData(S, LoopData.Grainsize);
+}
+
 void CodeGenFunction::EmitOSSTaskwaitDirective(const OSSTaskwaitDirective &S) {
   OSSTaskDataTy Data;
 
@@ -197,19 +251,48 @@ void CodeGenFunction::EmitOSSTaskwaitDirective(const OSSTaskwaitDirective &S) {
   CGM.getOmpSsRuntime().emitTaskwaitCall(*this, S.getBeginLoc(), Data);
 }
 
+void CodeGenFunction::EmitOSSReleaseDirective(const OSSReleaseDirective &S) {
+  OSSTaskDataTy Data;
+
+  AddDepData(S, Data.Deps);
+  CGM.getOmpSsRuntime().emitReleaseCall(*this, S.getBeginLoc(), Data);
+}
+
 void CodeGenFunction::EmitOSSTaskDirective(const OSSTaskDirective &S) {
   OSSTaskDataTy Data;
 
-  AddDSAData(S, Data.DSAs);
-  AddDepData(S, Data.Deps);
-  AddIfData(S, Data.If);
-  AddFinalData(S, Data.Final);
-  AddCostData(S, Data.Cost);
-  AddPriorityData(S, Data.Priority);
-  AddLabelData(S, Data.Label);
-  AddWaitData(S, Data.Wait);
-  AddReductionData(S, Data.Reductions);
+  AddTaskData(S, Data);
 
   CGM.getOmpSsRuntime().emitTaskCall(*this, S, S.getBeginLoc(), Data);
+}
+
+void CodeGenFunction::EmitOSSTaskForDirective(const OSSTaskForDirective &S) {
+  OSSTaskDataTy Data;
+  OSSLoopDataTy LoopData;
+
+  AddTaskData(S, Data);
+  AddLoopData(S, LoopData);
+
+  CGM.getOmpSsRuntime().emitLoopCall(*this, S, S.getBeginLoc(), Data, LoopData);
+}
+
+void CodeGenFunction::EmitOSSTaskLoopDirective(const OSSTaskLoopDirective &S) {
+  OSSTaskDataTy Data;
+  OSSLoopDataTy LoopData;
+
+  AddTaskData(S, Data);
+  AddLoopData(S, LoopData);
+
+  CGM.getOmpSsRuntime().emitLoopCall(*this, S, S.getBeginLoc(), Data, LoopData);
+}
+
+void CodeGenFunction::EmitOSSTaskLoopForDirective(const OSSTaskLoopForDirective &S) {
+  OSSTaskDataTy Data;
+  OSSLoopDataTy LoopData;
+
+  AddTaskData(S, Data);
+  AddLoopData(S, LoopData);
+
+  CGM.getOmpSsRuntime().emitLoopCall(*this, S, S.getBeginLoc(), Data, LoopData);
 }
 

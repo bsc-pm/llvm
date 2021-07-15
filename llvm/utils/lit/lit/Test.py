@@ -1,43 +1,59 @@
+import itertools
 import os
-from xml.sax.saxutils import quoteattr
 from json import JSONEncoder
 
 from lit.BooleanExpression import BooleanExpression
+from lit.TestTimes import read_test_times
 
 # Test result codes.
 
 class ResultCode(object):
     """Test result codes."""
 
+    # All result codes (including user-defined ones) in declaration order
+    _all_codes = []
+
+    @staticmethod
+    def all_codes():
+        return ResultCode._all_codes
+
     # We override __new__ and __getnewargs__ to ensure that pickling still
     # provides unique ResultCode objects in any particular instance.
     _instances = {}
-    def __new__(cls, name, isFailure):
+
+    def __new__(cls, name, label, isFailure):
         res = cls._instances.get(name)
         if res is None:
             cls._instances[name] = res = super(ResultCode, cls).__new__(cls)
         return res
-    def __getnewargs__(self):
-        return (self.name, self.isFailure)
 
-    def __init__(self, name, isFailure):
+    def __getnewargs__(self):
+        return (self.name, self.label, self.isFailure)
+
+    def __init__(self, name, label, isFailure):
         self.name = name
+        self.label = label
         self.isFailure = isFailure
+        ResultCode._all_codes.append(self)
 
     def __repr__(self):
         return '%s%r' % (self.__class__.__name__,
                          (self.name, self.isFailure))
 
-PASS        = ResultCode('PASS', False)
-FLAKYPASS   = ResultCode('FLAKYPASS', False)
-XFAIL       = ResultCode('XFAIL', False)
-FAIL        = ResultCode('FAIL', True)
-XPASS       = ResultCode('XPASS', True)
-UNRESOLVED  = ResultCode('UNRESOLVED', True)
-UNSUPPORTED = ResultCode('UNSUPPORTED', False)
-TIMEOUT     = ResultCode('TIMEOUT', True)
-SKIPPED     = ResultCode('SKIPPED', False)
-EXCLUDED    = ResultCode('EXCLUDED', False)
+
+# Successes
+EXCLUDED    = ResultCode('EXCLUDED',    'Excluded', False)
+SKIPPED     = ResultCode('SKIPPED',     'Skipped', False)
+UNSUPPORTED = ResultCode('UNSUPPORTED', 'Unsupported', False)
+PASS        = ResultCode('PASS',        'Passed', False)
+FLAKYPASS   = ResultCode('FLAKYPASS',   'Passed With Retry', False)
+XFAIL       = ResultCode('XFAIL',       'Expectedly Failed', False)
+# Failures
+UNRESOLVED  = ResultCode('UNRESOLVED',  'Unresolved', True)
+TIMEOUT     = ResultCode('TIMEOUT',     'Timed Out', True)
+FAIL        = ResultCode('FAIL',        'Failed', True)
+XPASS       = ResultCode('XPASS',       'Unexpectedly Passed', True)
+
 
 # Test metric values.
 
@@ -135,6 +151,8 @@ class Result(object):
         self.output = output
         # The wall timing to execute the test, if timing.
         self.elapsed = elapsed
+        self.start = None
+        self.pid = None
         # The metrics reported by this test.
         self.metrics = {}
         # The micro-test results reported by this test.
@@ -162,7 +180,7 @@ class Result(object):
         addMicroResult(microResult)
 
         Attach a micro-test result to the test result, with the given name and
-        result.  It is an error to attempt to attach a micro-test with the 
+        result.  It is an error to attempt to attach a micro-test with the
         same name multiple times.
 
         Each micro-test result must be an instance of the Result class.
@@ -189,6 +207,8 @@ class TestSuite:
         self.exec_root = exec_root
         # The test suite configuration.
         self.config = config
+
+        self.test_times = read_test_times(self)
 
     def getSourcePath(self, components):
         return os.path.join(self.source_root, *components)
@@ -228,6 +248,18 @@ class Test:
 
         # The test result, once complete.
         self.result = None
+
+        # The previous test failure state, if applicable.
+        self.previous_failure = False
+
+        # The previous test elapsed time, if applicable.
+        self.previous_elapsed = 0.0
+
+        if '/'.join(path_in_suite) in suite.test_times:
+            time = suite.test_times['/'.join(path_in_suite)]
+            self.previous_elapsed = abs(time)
+            self.previous_failure = time < 0
+
 
     def setResult(self, result):
         assert self.result is None, "result already set"
@@ -359,12 +391,22 @@ class Test:
         except ValueError as e:
             raise ValueError('Error in UNSUPPORTED list:\n%s' % str(e))
 
-    def isEarlyTest(self):
+    def getUsedFeatures(self):
         """
-        isEarlyTest() -> bool
+        getUsedFeatures() -> list of strings
 
-        Check whether this test should be executed early in a particular run.
-        This can be used for test suites with long running tests to maximize
-        parallelism or where it is desirable to surface their failures early.
+        Returns a list of all features appearing in XFAIL, UNSUPPORTED and
+        REQUIRES annotations for this test.
         """
-        return self.suite.config.is_early
+        import lit.TestRunner
+        parsed = lit.TestRunner._parseKeywords(self.getSourcePath(), require_script=False)
+        feature_keywords = ('UNSUPPORTED:', 'REQUIRES:', 'XFAIL:')
+        boolean_expressions = itertools.chain.from_iterable(
+            parsed[k] or [] for k in feature_keywords
+        )
+        tokens = itertools.chain.from_iterable(
+            BooleanExpression.tokenize(expr) for expr in
+                boolean_expressions if expr != '*'
+        )
+        matchExpressions = set(filter(BooleanExpression.isMatchExpression, tokens))
+        return matchExpressions

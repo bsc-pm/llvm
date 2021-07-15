@@ -12,14 +12,14 @@ int main() {
 
   int i;
   int *p;
-  #pragma oss task private(i) depend(inout: i)
-  #pragma oss task depend(inout: i) private(i)
+  #pragma oss task private(i) depend(inout: i) // expected-error {{the data-sharing 'private' conflicts with 'shared' required by the dependency}}
+  #pragma oss task depend(inout: i) private(i) // expected-error {{the data-sharing 'private' conflicts with 'shared' required by the dependency}}
   #pragma oss task firstprivate(i) depend(inout: i) // expected-error {{the data-sharing 'firstprivate' conflicts with 'shared' required by the dependency}}
-  #pragma oss task shared(p) depend(inout: p[2])
-  #pragma oss task shared(p) depend(inout: *p)
+  #pragma oss task shared(p) depend(inout: p[2]) // expected-error {{the data-sharing 'shared' conflicts with 'firstprivate' required by the dependency}}
+  #pragma oss task shared(p) depend(inout: *p) // expected-error {{the data-sharing 'shared' conflicts with 'firstprivate' required by the dependency}}
   #pragma oss task firstprivate(array) depend(inout: array[2]) // expected-error {{the data-sharing 'firstprivate' conflicts with 'shared' required by the dependency}}
   #pragma oss task firstprivate(s) depend(inout: s.x) // expected-error {{the data-sharing 'firstprivate' conflicts with 'shared' required by the dependency}}
-  #pragma oss task shared(ps) depend(inout: ps->x)
+  #pragma oss task shared(ps) depend(inout: ps->x) // expected-error {{the data-sharing 'shared' conflicts with 'firstprivate' required by the dependency}}
   {}
 }
 

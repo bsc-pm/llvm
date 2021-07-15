@@ -88,7 +88,7 @@ static void WriteOutputFile(const Module *M, const ModuleSummaryIndex *Index) {
     exit(1);
   }
 
-  if (Force || !CheckBitcodeOutputToConsole(Out->os(), true)) {
+  if (Force || !CheckBitcodeOutputToConsole(Out->os())) {
     const ModuleSummaryIndex *IndexToWrite = nullptr;
     // Don't attempt to write a summary index unless it contains any entries or
     // has non-zero flags. The latter is used to assemble dummy index files for
@@ -115,9 +115,9 @@ static void WriteOutputFile(const Module *M, const ModuleSummaryIndex *Index) {
 
 int main(int argc, char **argv) {
   InitLLVM X(argc, argv);
-  LLVMContext Context;
   cl::HideUnrelatedOptions(AsCat);
   cl::ParseCommandLineOptions(argc, argv, "llvm .ll -> .bc assembler\n");
+  LLVMContext Context;
 
   // Parse the file now...
   SMDiagnostic Err;

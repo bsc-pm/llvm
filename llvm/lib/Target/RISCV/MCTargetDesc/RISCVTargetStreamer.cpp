@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "RISCVTargetStreamer.h"
-#include "RISCVSubtarget.h"
+#include "RISCVMCTargetDesc.h"
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/RISCVAttributes.h"
 
@@ -20,6 +20,22 @@ using namespace llvm;
 RISCVTargetStreamer::RISCVTargetStreamer(MCStreamer &S) : MCTargetStreamer(S) {}
 
 void RISCVTargetStreamer::finish() { finishAttributeSection(); }
+
+void RISCVTargetStreamer::emitDirectiveOptionPush() {}
+void RISCVTargetStreamer::emitDirectiveOptionPop() {}
+void RISCVTargetStreamer::emitDirectiveOptionPIC() {}
+void RISCVTargetStreamer::emitDirectiveOptionNoPIC() {}
+void RISCVTargetStreamer::emitDirectiveOptionRVC() {}
+void RISCVTargetStreamer::emitDirectiveOptionNoRVC() {}
+void RISCVTargetStreamer::emitDirectiveOptionRelax() {}
+void RISCVTargetStreamer::emitDirectiveOptionNoRelax() {}
+void RISCVTargetStreamer::emitAttribute(unsigned Attribute, unsigned Value) {}
+void RISCVTargetStreamer::finishAttributeSection() {}
+void RISCVTargetStreamer::emitTextAttribute(unsigned Attribute,
+                                            StringRef String) {}
+void RISCVTargetStreamer::emitIntTextAttribute(unsigned Attribute,
+                                               unsigned IntValue,
+                                               StringRef StringValue) {}
 
 void RISCVTargetStreamer::emitTargetAttributes(const MCSubtargetInfo &STI) {
   if (STI.hasFeature(RISCV::FeatureRV32E))
@@ -44,6 +60,38 @@ void RISCVTargetStreamer::emitTargetAttributes(const MCSubtargetInfo &STI) {
     Arch += "_d2p0";
   if (STI.hasFeature(RISCV::FeatureStdExtC))
     Arch += "_c2p0";
+  if (STI.hasFeature(RISCV::FeatureStdExtB))
+    Arch += "_b0p93";
+  if (STI.hasFeature(RISCV::FeatureStdExtV))
+    Arch += "_v0p10";
+  if (STI.hasFeature(RISCV::FeatureExtZfh))
+    Arch += "_zfh0p1";
+  if (STI.hasFeature(RISCV::FeatureExtZba))
+    Arch += "_zba0p93";
+  if (STI.hasFeature(RISCV::FeatureExtZbb))
+    Arch += "_zbb0p93";
+  if (STI.hasFeature(RISCV::FeatureExtZbc))
+    Arch += "_zbc0p93";
+  if (STI.hasFeature(RISCV::FeatureExtZbe))
+    Arch += "_zbe0p93";
+  if (STI.hasFeature(RISCV::FeatureExtZbf))
+    Arch += "_zbf0p93";
+  if (STI.hasFeature(RISCV::FeatureExtZbm))
+    Arch += "_zbm0p93";
+  if (STI.hasFeature(RISCV::FeatureExtZbp))
+    Arch += "_zbp0p93";
+  if (STI.hasFeature(RISCV::FeatureExtZbproposedc))
+    Arch += "_zbproposedc0p93";
+  if (STI.hasFeature(RISCV::FeatureExtZbr))
+    Arch += "_zbr0p93";
+  if (STI.hasFeature(RISCV::FeatureExtZbs))
+    Arch += "_zbs0p93";
+  if (STI.hasFeature(RISCV::FeatureExtZbt))
+    Arch += "_zbt0p93";
+  if (STI.hasFeature(RISCV::FeatureExtZvamo))
+    Arch += "_zvamo0p10";
+  if (STI.hasFeature(RISCV::FeatureStdExtZvlsseg))
+    Arch += "_zvlsseg0p10";
 
   emitTextAttribute(RISCVAttrs::ARCH, Arch);
 }

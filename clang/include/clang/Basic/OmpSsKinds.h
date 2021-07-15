@@ -73,9 +73,24 @@ bool isAllowedClauseForDirective(OmpSsDirectiveKind DKind,
 /// \return true - the clause is a private clause, otherwise - false.
 bool isOmpSsPrivate(OmpSsClauseKind Kind);
 
-/// Checks if the specified directive kind is one of tasking directives - task,
-/// taskloop or taksloop simd.
+/// Checks if the specified directive kind is one of tasking directives:
+/// task, task for,
+/// taskloop or taskloop for.
 bool isOmpSsTaskingDirective(OmpSsDirectiveKind Kind);
+
+/// Checks if the specified directive is a directive with an associated
+/// loop construct.
+/// \param DKind Specified directive.
+/// \return true - the directive is a loop-associated directive like 'oss taskloop'
+/// or 'oss task for' directive, otherwise - false.
+bool isOmpSsLoopDirective(OmpSsDirectiveKind DKind);
+
+/// Checks if the specified directive is a directive with an associated
+/// loop construct.
+/// \param DKind Specified directive.
+/// \return true - the directive is a loop-associated directive like 'oss taskloop'
+/// or 'oss taskloop for' directive, otherwise - false.
+bool isOmpSsTaskLoopDirective(OmpSsDirectiveKind DKind);
 
 }
 

@@ -113,6 +113,7 @@ protected:
   MCSection *DwarfLocDWOSection = nullptr;
   MCSection *DwarfStrOffDWOSection = nullptr;
   MCSection *DwarfMacinfoDWOSection = nullptr;
+  MCSection *DwarfMacroDWOSection = nullptr;
 
   /// The DWARF v5 string offset and address table sections.
   MCSection *DwarfStrOffSection = nullptr;
@@ -173,6 +174,10 @@ protected:
   /// Section containing metadata on function stack sizes.
   MCSection *StackSizesSection = nullptr;
 
+  /// Section for pseudo probe information used by AutoFDO
+  MCSection *PseudoProbeSection = nullptr;
+  MCSection *PseudoProbeDescSection = nullptr;
+
   // ELF specific sections.
   MCSection *DataRelROSection = nullptr;
   MCSection *MergeableConst4Section = nullptr;
@@ -213,14 +218,16 @@ protected:
   MCSection *PDataSection = nullptr;
   MCSection *XDataSection = nullptr;
   MCSection *SXDataSection = nullptr;
+  MCSection *GEHContSection = nullptr;
   MCSection *GFIDsSection = nullptr;
+  MCSection *GIATsSection = nullptr;
   MCSection *GLJMPSection = nullptr;
 
   // XCOFF specific sections
   MCSection *TOCBaseSection = nullptr;
 
 public:
-  void InitMCObjectFileInfo(const Triple &TT, bool PIC, MCContext &ctx,
+  void initMCObjectFileInfo(MCContext &MCCtx, bool PIC,
                             bool LargeCodeModel = false);
   MCContext &getContext() const { return *Ctx; }
 
@@ -309,6 +316,7 @@ public:
   MCSection *getDwarfLoclistsDWOSection() const {
     return DwarfLoclistsDWOSection;
   }
+  MCSection *getDwarfMacroDWOSection() const { return DwarfMacroDWOSection; }
   MCSection *getDwarfMacinfoDWOSection() const {
     return DwarfMacinfoDWOSection;
   }
@@ -335,6 +343,12 @@ public:
   MCSection *getRemarksSection() const { return RemarksSection; }
 
   MCSection *getStackSizesSection(const MCSection &TextSec) const;
+
+  MCSection *getBBAddrMapSection(const MCSection &TextSec) const;
+
+  MCSection *getPseudoProbeSection(const MCSection *TextSec) const;
+
+  MCSection *getPseudoProbeDescSection(StringRef FuncName) const;
 
   // ELF specific sections.
   MCSection *getDataRelROSection() const { return DataRelROSection; }
@@ -393,26 +407,21 @@ public:
   MCSection *getPDataSection() const { return PDataSection; }
   MCSection *getXDataSection() const { return XDataSection; }
   MCSection *getSXDataSection() const { return SXDataSection; }
+  MCSection *getGEHContSection() const { return GEHContSection; }
   MCSection *getGFIDsSection() const { return GFIDsSection; }
+  MCSection *getGIATsSection() const { return GIATsSection; }
   MCSection *getGLJMPSection() const { return GLJMPSection; }
 
   // XCOFF specific sections
   MCSection *getTOCBaseSection() const { return TOCBaseSection; }
 
-  MCSection *getEHFrameSection() {
-    return EHFrameSection;
-  }
-
-  enum Environment { IsMachO, IsELF, IsCOFF, IsWasm, IsXCOFF };
-  Environment getObjectFileType() const { return Env; }
+  MCSection *getEHFrameSection() const { return EHFrameSection; }
 
   bool isPositionIndependent() const { return PositionIndependent; }
 
 private:
-  Environment Env;
   bool PositionIndependent = false;
   MCContext *Ctx = nullptr;
-  Triple TT;
   VersionTuple SDKVersion;
 
   void initMachOMCObjectFileInfo(const Triple &T);
@@ -423,8 +432,6 @@ private:
   MCSection *getDwarfComdatSection(const char *Name, uint64_t Hash) const;
 
 public:
-  const Triple &getTargetTriple() const { return TT; }
-
   void setSDKVersion(const VersionTuple &TheSDKVersion) {
     SDKVersion = TheSDKVersion;
   }

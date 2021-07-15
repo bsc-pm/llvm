@@ -13,11 +13,18 @@ add_clang_library(clangTidyMain
   ClangTidyMain.cpp
 
   LINK_LIBS
+  clangTidy
+  ${ALL_CLANG_TIDY_CHECKS}
+
+  DEPENDS
+  omp_gen
+  )
+
+clang_target_link_libraries(clangTidyMain
+  PRIVATE
   clangAST
   clangASTMatchers
   clangBasic
-  clangTidy
-  ${ALL_CLANG_TIDY_CHECKS}
   clangTooling
   clangToolingCore
   )
@@ -48,5 +55,6 @@ install(PROGRAMS clang-tidy-diff.py
   DESTINATION share/clang
   COMPONENT clang-tidy)
 install(PROGRAMS run-clang-tidy.py
-  DESTINATION share/clang
-  COMPONENT clang-tidy)
+  DESTINATION bin
+  COMPONENT clang-tidy
+  RENAME run-clang-tidy)

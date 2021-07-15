@@ -14,6 +14,7 @@
 #ifndef LLVM_IR_OPERATOR_H
 #define LLVM_IR_OPERATOR_H
 
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/None.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/IR/Constants.h"
@@ -238,6 +239,9 @@ public:
 
   void operator&=(const FastMathFlags &OtherFlags) {
     Flags &= OtherFlags.Flags;
+  }
+  void operator|=(const FastMathFlags &OtherFlags) {
+    Flags |= OtherFlags.Flags;
   }
 };
 
@@ -545,6 +549,9 @@ public:
       });
   }
 
+  /// Compute the maximum alignment that this GEP is garranteed to preserve.
+  Align getMaxPreservedAlignment(const DataLayout &DL) const;
+
   /// Accumulate the constant address offset of this GEP if possible.
   ///
   /// This routine accepts an APInt into which it will try to accumulate the
@@ -565,6 +572,17 @@ public:
   bool accumulateConstantOffset(
       const DataLayout &DL, APInt &Offset,
       function_ref<bool(Value &, APInt &)> ExternalAnalysis = nullptr) const;
+
+  static bool accumulateConstantOffset(
+      Type *SourceType, ArrayRef<const Value *> Index, const DataLayout &DL,
+      APInt &Offset,
+      function_ref<bool(Value &, APInt &)> ExternalAnalysis = nullptr);
+
+  /// Collect the offset of this GEP as a map of Values to their associated
+  /// APInt multipliers, as well as a total Constant Offset.
+  bool collectOffset(const DataLayout &DL, unsigned BitWidth,
+                     MapVector<Value *, APInt> &VariableOffsets,
+                     APInt &ConstantOffset) const;
 };
 
 class PtrToIntOperator

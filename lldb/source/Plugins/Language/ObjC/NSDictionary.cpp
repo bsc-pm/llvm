@@ -66,7 +66,8 @@ NSDictionary_Additionals::GetAdditionalSynthetics() {
 static CompilerType GetLLDBNSPairType(TargetSP target_sp) {
   CompilerType compiler_type;
 
-  TypeSystemClang *target_ast_context = TypeSystemClang::GetScratch(*target_sp);
+  TypeSystemClang *target_ast_context =
+      ScratchTypeSystemClang::GetForTarget(*target_sp);
 
   if (target_ast_context) {
     ConstString g___lldb_autogen_nspair("__lldb_autogen_nspair");
@@ -278,64 +279,67 @@ namespace Foundation1100 {
 }
   
 namespace Foundation1428 {
-  struct DataDescriptor_32 {
-    uint32_t _used : 26;
-    uint32_t _kvo : 1;
-    uint32_t _size;
-    uint32_t _buffer;
-    uint64_t GetSize() { return _size; }
-  };
-  
-  struct DataDescriptor_64 {
-    uint64_t _used : 58;
-    uint32_t _kvo : 1;
-    uint64_t _size;
-    uint64_t _buffer;
-    uint64_t GetSize() { return _size; }
-  };
-  
-  
-  
+  namespace {
+    struct DataDescriptor_32 {
+      uint32_t _used : 26;
+      uint32_t _kvo : 1;
+      uint32_t _size;
+      uint32_t _buffer;
+      uint64_t GetSize() { return _size; }
+    };
+    
+    struct DataDescriptor_64 {
+      uint64_t _used : 58;
+      uint32_t _kvo : 1;
+      uint64_t _size;
+      uint64_t _buffer;
+      uint64_t GetSize() { return _size; }
+    };
+  }
+
   using NSDictionaryMSyntheticFrontEnd =
     GenericNSDictionaryMSyntheticFrontEnd<DataDescriptor_32, DataDescriptor_64>;
 }
   
 namespace Foundation1437 {
-  static const uint64_t NSDictionaryCapacities[] = {
-      0, 3, 7, 13, 23, 41, 71, 127, 191, 251, 383, 631, 1087, 1723,
-      2803, 4523, 7351, 11959, 19447, 31231, 50683, 81919, 132607,
-      214519, 346607, 561109, 907759, 1468927, 2376191, 3845119,
-      6221311, 10066421, 16287743, 26354171, 42641881, 68996069,
-      111638519, 180634607, 292272623, 472907251
-  };
-  
-  static const size_t NSDictionaryNumSizeBuckets = sizeof(NSDictionaryCapacities) / sizeof(uint64_t);
-  
-  struct DataDescriptor_32 {
-    uint32_t _buffer;
-    uint32_t _muts;
-    uint32_t _used : 25;
-    uint32_t _kvo : 1;
-    uint32_t _szidx : 6;
+  namespace {
+    static const uint64_t NSDictionaryCapacities[] = {
+        0, 3, 7, 13, 23, 41, 71, 127, 191, 251, 383, 631, 1087, 1723,
+        2803, 4523, 7351, 11959, 19447, 31231, 50683, 81919, 132607,
+        214519, 346607, 561109, 907759, 1468927, 2376191, 3845119,
+        6221311, 10066421, 16287743, 26354171, 42641881, 68996069,
+        111638519, 180634607, 292272623, 472907251
+    };
+    
+    static const size_t NSDictionaryNumSizeBuckets =
+        sizeof(NSDictionaryCapacities) / sizeof(uint64_t);
+    
+    struct DataDescriptor_32 {
+      uint32_t _buffer;
+      uint32_t _muts;
+      uint32_t _used : 25;
+      uint32_t _kvo : 1;
+      uint32_t _szidx : 6;
 
-    uint64_t GetSize() {
-      return (_szidx) >= NSDictionaryNumSizeBuckets ?
-          0 : NSDictionaryCapacities[_szidx];
-    }
-  };
-  
-  struct DataDescriptor_64 {
-    uint64_t _buffer;
-    uint32_t _muts;
-    uint32_t _used : 25;
-    uint32_t _kvo : 1;
-    uint32_t _szidx : 6;
+      uint64_t GetSize() {
+        return (_szidx) >= NSDictionaryNumSizeBuckets ?
+            0 : NSDictionaryCapacities[_szidx];
+      }
+    };
+    
+    struct DataDescriptor_64 {
+      uint64_t _buffer;
+      uint32_t _muts;
+      uint32_t _used : 25;
+      uint32_t _kvo : 1;
+      uint32_t _szidx : 6;
 
-    uint64_t GetSize() {
-      return (_szidx) >= NSDictionaryNumSizeBuckets ?
-          0 : NSDictionaryCapacities[_szidx];
-    }
-  };
+      uint64_t GetSize() {
+        return (_szidx) >= NSDictionaryNumSizeBuckets ?
+            0 : NSDictionaryCapacities[_szidx];
+      }
+    };
+  }
   
   using NSDictionaryMSyntheticFrontEnd =
     GenericNSDictionaryMSyntheticFrontEnd<DataDescriptor_32, DataDescriptor_64>;
@@ -385,7 +389,7 @@ bool lldb_private::formatters::NSDictionarySummaryProvider(
     return false;
 
   ObjCLanguageRuntime::ClassDescriptorSP descriptor(
-      runtime->GetClassDescriptor(valobj));
+      runtime->GetNonKVOClassDescriptor(valobj));
 
   if (!descriptor || !descriptor->IsValid())
     return false;
@@ -406,6 +410,7 @@ bool lldb_private::formatters::NSDictionarySummaryProvider(
   static const ConstString g_DictionaryM("__NSDictionaryM");
   static const ConstString g_DictionaryMLegacy("__NSDictionaryM_Legacy");
   static const ConstString g_DictionaryMImmutable("__NSDictionaryM_Immutable");
+  static const ConstString g_DictionaryMFrozen("__NSFrozenDictionaryM");
   static const ConstString g_Dictionary1("__NSSingleEntryDictionaryI");
   static const ConstString g_Dictionary0("__NSDictionary0");
   static const ConstString g_DictionaryCF("__CFDictionary");
@@ -423,7 +428,8 @@ bool lldb_private::formatters::NSDictionarySummaryProvider(
       return false;
 
     value &= (is_64bit ? ~0xFC00000000000000UL : ~0xFC000000U);
-  } else if (class_name == g_DictionaryM || class_name == g_DictionaryMLegacy) {
+  } else if (class_name == g_DictionaryM || class_name == g_DictionaryMLegacy 
+             || class_name == g_DictionaryMFrozen) {
     AppleObjCRuntime *apple_runtime =
     llvm::dyn_cast_or_null<AppleObjCRuntime>(runtime);
     Status error;
@@ -505,6 +511,7 @@ lldb_private::formatters::NSDictionarySyntheticFrontEndCreator(
   static const ConstString g_DictionaryM("__NSDictionaryM");
   static const ConstString g_Dictionary1("__NSSingleEntryDictionaryI");
   static const ConstString g_DictionaryImmutable("__NSDictionaryM_Immutable");
+  static const ConstString g_DictionaryMFrozen("__NSFrozenDictionaryM");
   static const ConstString g_DictionaryMLegacy("__NSDictionaryM_Legacy");
   static const ConstString g_Dictionary0("__NSDictionary0");
   static const ConstString g_DictionaryCF("__CFDictionary");
@@ -516,7 +523,7 @@ lldb_private::formatters::NSDictionarySyntheticFrontEndCreator(
 
   if (class_name == g_DictionaryI) {
     return (new NSDictionaryISyntheticFrontEnd(valobj_sp));
-  } else if (class_name == g_DictionaryM) {
+  } else if (class_name == g_DictionaryM || class_name == g_DictionaryMFrozen) {
     if (runtime->GetFoundationVersion() >= 1437) {
       return (new Foundation1437::NSDictionaryMSyntheticFrontEnd(valobj_sp));
     } else if (runtime->GetFoundationVersion() >= 1428) {
