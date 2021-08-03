@@ -831,6 +831,7 @@ void Sema::ActOnOmpSsAfterClauseGathering(SmallVectorImpl<OSSClause *>& Clauses)
     return;
 
   bool ErrorFound = false;
+  (void)ErrorFound;
 
   OSSClauseDSAChecker OSSClauseChecker(DSAStack, *this);
   for (auto *Clause : Clauses) {
