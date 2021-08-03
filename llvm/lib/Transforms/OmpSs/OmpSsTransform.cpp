@@ -473,7 +473,6 @@ struct OmpSs {
       // <=     0, (ub - lb)     / step + 1
       // >      0, (ub + 1 - lb) / step + 1
       // >=     0, (ub - lb)     / step + 1
-      Type *IndVarTy = LoopInfo.IndVar[i]->getType()->getPointerElementType();
       auto p = buildInstructionSignDependent(
         IRB, M, LoopInfo.UBound[i].Result, LoopInfo.LBound[i].Result, LoopInfo.UBoundSigned[i], LoopInfo.LBoundSigned[i],
         [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
