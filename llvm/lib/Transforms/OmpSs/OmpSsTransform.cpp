@@ -617,7 +617,9 @@ struct OmpSs {
 
     IRB.SetInsertPoint(Entry);
 
-    Value *IndVarVal = IRB.CreateLoad(LoopInfo.IndVar[LInfoIndex]);
+    Value *IndVarVal = IRB.CreateLoad(
+        LoopInfo.IndVar[LInfoIndex]->getType()->getPointerElementType(),
+        LoopInfo.IndVar[LInfoIndex]);
     Value *LoopCmp = nullptr;
     switch (LoopInfo.LoopType[LInfoIndex]) {
     case DirectiveLoopInfo::LT:
@@ -685,7 +687,9 @@ struct OmpSs {
 
     // Add a br. to for.cond
     IRB.SetInsertPoint(IncrBB);
-    IndVarVal = IRB.CreateLoad(LoopInfo.IndVar[LInfoIndex]);
+    IndVarVal = IRB.CreateLoad(
+        LoopInfo.IndVar[LInfoIndex]->getType()->getPointerElementType(),
+        LoopInfo.IndVar[LInfoIndex]);
     auto p = buildInstructionSignDependent(
       IRB, M, IndVarVal, LoopInfo.Step[LInfoIndex].Result, LoopInfo.IndVarSigned[LInfoIndex], LoopInfo.StepSigned[LInfoIndex],
       [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
@@ -765,7 +769,8 @@ struct OmpSs {
 
     IRB.SetInsertPoint(Entry);
 
-    Value *IndVarVal = IRB.CreateLoad(IndVar);
+    Value *IndVarVal =
+        IRB.CreateLoad(IndVar->getType()->getPointerElementType(), IndVar);
     Value *LoopCmp = IRB.CreateICmpSLE(IndVarVal, UBound);
 
     BasicBlock *BodyBB = IRB.saveIP().getBlock()->splitBasicBlock(IRB.saveIP().getPoint());
@@ -800,7 +805,8 @@ struct OmpSs {
     // Add a br. to for.cond
     IRB.SetInsertPoint(IncrBB);
 
-    IndVarVal = IRB.CreateLoad(IndVar);
+    IndVarVal =
+        IRB.CreateLoad(IndVar->getType()->getPointerElementType(), IndVar);
     Value *IndVarValPlusIncr = IRB.CreateAdd(IndVarVal, Incr);
     IRB.CreateStore(IndVarValPlusIncr, IndVar);
     IRB.CreateBr(CondBB);
@@ -1044,12 +1050,14 @@ struct OmpSs {
       Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
       Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
       Value *LBoundField = IRB.CreateGEP(LoopBounds, Idx, "lb_gep");
-      LBoundField = IRB.CreateLoad(LBoundField);
+      LBoundField = IRB.CreateLoad(
+          LBoundField->getType()->getPointerElementType(), LBoundField);
       LBoundField = IRB.CreateZExtOrTrunc(LBoundField, IndVarTy, "lb");
 
       Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 1);
       Value *UBoundField = IRB.CreateGEP(LoopBounds, Idx, "ub_gep");
-      UBoundField = IRB.CreateLoad(UBoundField);
+      UBoundField = IRB.CreateLoad(
+          UBoundField->getType()->getPointerElementType(), UBoundField);
       UBoundField = IRB.CreateZExtOrTrunc(UBoundField, IndVarTy);
       UBoundField = IRB.CreateSub(UBoundField, ConstantInt::get(IndVarTy, 1), "ub");
 
@@ -1291,12 +1299,14 @@ struct OmpSs {
     Idx[1] = Constant::getNullValue(Type::getInt32Ty(IRBTranslate.getContext()));
     Value *LocalAddr = IRBTranslate.CreateGEP(
         AddrTranslationTable, Idx, "local_lookup_" + DSA->getName());
-    LocalAddr = IRBTranslate.CreateLoad(LocalAddr);
+    LocalAddr = IRBTranslate.CreateLoad(
+        LocalAddr->getType()->getPointerElementType(), LocalAddr);
 
     Idx[1] = ConstantInt::get(Type::getInt32Ty(IRBTranslate.getContext()), 1);
     Value *DeviceAddr = IRBTranslate.CreateGEP(
         AddrTranslationTable, Idx, "device_lookup_" + DSA->getName());
-    DeviceAddr = IRBTranslate.CreateLoad(DeviceAddr);
+    DeviceAddr = IRBTranslate.CreateLoad(
+        DeviceAddr->getType()->getPointerElementType(), DeviceAddr);
 
     // Res = device_addr + (DSA_addr - local_addr)
     Value *Translation = IRBTranslate.CreateBitCast(
@@ -1309,7 +1319,9 @@ struct OmpSs {
       Translation = IRBTranslate.CreateBitCast(Translation, LUnpackedDSA->getType());
       IRBTranslate.CreateStore(Translation, LUnpackedDSA->getPointerOperand());
       // Reload what we have translated
-      UnpackedDSA = IRBReload.CreateLoad(LUnpackedDSA->getPointerOperand());
+      UnpackedDSA = IRBReload.CreateLoad(
+          LUnpackedDSA->getPointerOperand()->getType()->getPointerElementType(),
+          LUnpackedDSA->getPointerOperand());
     } else {
       Translation = IRBTranslate.CreateBitCast(
         Translation, UnpackedDSA->getType()->getPointerElementType());
@@ -1340,7 +1352,9 @@ struct OmpSs {
       Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), StructToIdxMap.lookup(V));
       Value *GEP = BBBuilder.CreateGEP(
           OlDepsFuncTaskArgs, Idx, "gep_" + V->getName());
-      Value *LGEP = BBBuilder.CreateLoad(GEP, "load_" + GEP->getName());
+      Value *LGEP =
+          BBBuilder.CreateLoad(GEP->getType()->getPointerElementType(), GEP,
+                               "load_" + GEP->getName());
 
       UnpackedList.push_back(LGEP);
     }
@@ -1353,7 +1367,8 @@ struct OmpSs {
 
       // VLAs
       if (VLADimsInfo.count(V))
-        GEP = BBBuilder.CreateLoad(GEP, "load_" + GEP->getName());
+        GEP = BBBuilder.CreateLoad(GEP->getType()->getPointerElementType(), GEP,
+                                   "load_" + GEP->getName());
 
       UnpackedList.push_back(GEP);
     }
@@ -1366,7 +1381,8 @@ struct OmpSs {
 
       // VLAs
       if (VLADimsInfo.count(V))
-        GEP = BBBuilder.CreateLoad(GEP, "load_" + GEP->getName());
+        GEP = BBBuilder.CreateLoad(GEP->getType()->getPointerElementType(), GEP,
+                                   "load_" + GEP->getName());
 
       UnpackedList.push_back(GEP);
     }
@@ -1376,7 +1392,9 @@ struct OmpSs {
       Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), StructToIdxMap.lookup(V));
       Value *GEP = BBBuilder.CreateGEP(
           OlDepsFuncTaskArgs, Idx, "capt_gep" + V->getName());
-      Value *LGEP = BBBuilder.CreateLoad(GEP, "load_" + GEP->getName());
+      Value *LGEP =
+          BBBuilder.CreateLoad(GEP->getType()->getPointerElementType(), GEP,
+                               "load_" + GEP->getName());
       UnpackedList.push_back(LGEP);
     }
   }
@@ -1465,7 +1483,8 @@ struct OmpSs {
     Function::arg_iterator AI = OlFunc->arg_begin();
     Value *TaskArgsSrc = &*AI++;
     Value *TaskArgsDst = &*AI++;
-    Value *TaskArgsDstL = IRB.CreateLoad(TaskArgsDst);
+    Value *TaskArgsDstL = IRB.CreateLoad(
+        TaskArgsDst->getType()->getPointerElementType(), TaskArgsDst);
 
     SmallVector<VLAAlign, 2> VLAAlignsInfo;
     computeVLAsAlignOrder(M, VLAAlignsInfo, VLADimsInfo);
@@ -1511,7 +1530,8 @@ struct OmpSs {
         Idx[1] = ConstantInt::get(IRB.getInt32Ty(), StructToIdxMap.lookup(Dim));
         Value *GEPDst = IRB.CreateGEP(
           TaskArgsDstL, Idx, "gep_dst_" + Dim->getName());
-        GEPDst = IRB.CreateLoad(GEPDst);
+        GEPDst =
+            IRB.CreateLoad(GEPDst->getType()->getPointerElementType(), GEPDst);
         VLASize = IRB.CreateNUWMul(VLASize, GEPDst);
       }
       TaskArgsDstLi8IdxGEP = IRB.CreateGEP(TaskArgsDstLi8IdxGEP, VLASize);
@@ -1525,7 +1545,9 @@ struct OmpSs {
           TaskArgsSrc, Idx, "gep_src_" + V->getName());
       Value *GEPDst = IRB.CreateGEP(
           TaskArgsDstL, Idx, "gep_dst_" + V->getName());
-      IRB.CreateStore(IRB.CreateLoad(GEPSrc), GEPDst);
+      IRB.CreateStore(
+          IRB.CreateLoad(GEPSrc->getType()->getPointerElementType(), GEPSrc),
+          GEPDst);
     }
     for (auto *V : DSAInfo.Private) {
       // Call custom constructor generated in clang in non-pods
@@ -1550,7 +1572,8 @@ struct OmpSs {
             Idx[1] = ConstantInt::get(IRB.getInt32Ty(), StructToIdxMap.lookup(Dim));
             Value *GEPSrc = IRB.CreateGEP(
               TaskArgsSrc, Idx, "gep_src_" + Dim->getName());
-            GEPSrc = IRB.CreateLoad(GEPSrc);
+            GEPSrc = IRB.CreateLoad(GEPSrc->getType()->getPointerElementType(),
+                                    GEPSrc);
             NSize = IRB.CreateNUWMul(NSize, GEPSrc);
           }
         }
@@ -1563,7 +1586,7 @@ struct OmpSs {
 
         // VLAs
         if (VLADimsInfo.count(V))
-          GEP = IRB.CreateLoad(GEP);
+          GEP = IRB.CreateLoad(GEP->getType()->getPointerElementType(), GEP);
 
         // Regular arrays have types like [10 x %struct.S]*
         // Cast to %struct.S*
@@ -1593,7 +1616,8 @@ struct OmpSs {
           Idx[1] = ConstantInt::get(IRB.getInt32Ty(), StructToIdxMap.lookup(Dim));
           Value *GEPSrc = IRB.CreateGEP(
             TaskArgsSrc, Idx, "gep_src_" + Dim->getName());
-          GEPSrc = IRB.CreateLoad(GEPSrc);
+          GEPSrc = IRB.CreateLoad(GEPSrc->getType()->getPointerElementType(),
+                                  GEPSrc);
           NSize = IRB.CreateNUWMul(NSize, GEPSrc);
         }
       }
@@ -1610,8 +1634,10 @@ struct OmpSs {
 
       // VLAs
       if (VLADimsInfo.count(V)) {
-        GEPSrc = IRB.CreateLoad(GEPSrc);
-        GEPDst = IRB.CreateLoad(GEPDst);
+        GEPSrc =
+            IRB.CreateLoad(GEPSrc->getType()->getPointerElementType(), GEPSrc);
+        GEPDst =
+            IRB.CreateLoad(GEPDst->getType()->getPointerElementType(), GEPDst);
       }
 
       auto It = NonPODsInfo.Copies.find(V);
@@ -1640,7 +1666,9 @@ struct OmpSs {
           TaskArgsSrc, Idx, "capt_gep_src_" + V->getName());
       Value *GEPDst = IRB.CreateGEP(
           TaskArgsDstL, Idx, "capt_gep_dst_" + V->getName());
-      IRB.CreateStore(IRB.CreateLoad(GEPSrc), GEPDst);
+      IRB.CreateStore(
+          IRB.CreateLoad(GEPSrc->getType()->getPointerElementType(), GEPSrc),
+          GEPDst);
     }
 
     IRB.CreateRetVoid();
@@ -2545,12 +2573,14 @@ struct OmpSs {
         Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
         Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
         Value *LBoundField = IRB.CreateGEP(LoopBounds, Idx, "lb_gep");
-        LBoundField = IRB.CreateLoad(LBoundField);
+        LBoundField = IRB.CreateLoad(
+            LBoundField->getType()->getPointerElementType(), LBoundField);
         LBoundField = IRB.CreateZExtOrTrunc(LBoundField, NewIndVarTy, "lb");
 
         Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 1);
         Value *UBoundField = IRB.CreateGEP(LoopBounds, Idx, "ub_gep");
-        UBoundField = IRB.CreateLoad(UBoundField);
+        UBoundField = IRB.CreateLoad(
+            UBoundField->getType()->getPointerElementType(), UBoundField);
         UBoundField = IRB.CreateZExtOrTrunc(UBoundField, NewIndVarTy, "ub");
 
         // Replace loop bounds of the indvar, loop cond. and loop incr.
@@ -2573,7 +2603,9 @@ struct OmpSs {
 
           IRBuilder<> LoopBodyIRB(Entry);
           if (!i)
-            NormVal = LoopBodyIRB.CreateLoad(NewLoopInfo.IndVar[0]);
+            NormVal = LoopBodyIRB.CreateLoad(
+                NewLoopInfo.IndVar[0]->getType()->getPointerElementType(),
+                NewLoopInfo.IndVar[0]);
 
           // NOTE: NormalizedUBs values are nanos6_register_loop upper_bound type
           Value *Niters = ConstantInt::get(Nanos6LoopBounds::getInstance(M).getType()->getElementType(1), 1);
@@ -2627,7 +2659,9 @@ struct OmpSs {
             // Create a check to skip unwanted iterations due to collapse guess
             Instruction *UBoundResult = LoopBodyIRB.CreateCall(LoopInfo.UBound[i].Fun, LoopInfo.UBound[i].Args);
 
-            Instruction *IndVarVal = LoopBodyIRB.CreateLoad(LoopInfo.IndVar[i]);
+            Instruction *IndVarVal = LoopBodyIRB.CreateLoad(
+                LoopInfo.IndVar[i]->getType()->getPointerElementType(),
+                LoopInfo.IndVar[i]);
             Value *LoopCmp = nullptr;
             switch (LoopInfo.LoopType[i]) {
             case DirectiveLoopInfo::LT:
@@ -2796,7 +2830,9 @@ struct OmpSs {
       } else {
         IRB.CreateStore(IRB.getInt64(0), NumDependencies);
         for (auto &DepInfo : DependsInfo.List) {
-          Instruction *NumDependenciesLoad = IRB.CreateLoad(NumDependencies);
+          Instruction *NumDependenciesLoad = IRB.CreateLoad(
+              NumDependencies->getType()->getPointerElementType(),
+              NumDependencies);
           Value *NumDependenciesIncr = IRB.CreateAdd(NumDependenciesLoad, IRB.getInt64(1));
           Instruction *NumDependenciesStore = IRB.CreateStore(NumDependenciesIncr, NumDependencies);
           if (const auto *MultiDepInfo = dyn_cast<MultiDependInfo>(DepInfo.get())) {
@@ -2829,14 +2865,14 @@ struct OmpSs {
 
       // Arguments for creating a task or a loop directive
       SmallVector<Value *, 4> CreateDirectiveArgs = {
-        TaskInfoVar,
-        TaskInvInfoVar,
-        TaskArgsSizeOf,
-        TaskArgsVarCast,
-        TaskPtrVar,
-        TaskFlagsVar,
-        IRB.CreateLoad(NumDependencies)
-      };
+          TaskInfoVar,
+          TaskInvInfoVar,
+          TaskArgsSizeOf,
+          TaskArgsVarCast,
+          TaskPtrVar,
+          TaskFlagsVar,
+          IRB.CreateLoad(NumDependencies->getType()->getPointerElementType(),
+                         NumDependencies)};
 
       if (DirEnv.isOmpSsLoopDirective()) {
         SmallVector<Value *> NormalizedUBs(LoopInfo.UBound.size());
@@ -2876,7 +2912,8 @@ struct OmpSs {
       }
 
       // DSA capture
-      Value *TaskArgsVarL = IRB.CreateLoad(TaskArgsVar);
+      Value *TaskArgsVarL = IRB.CreateLoad(
+          TaskArgsVar->getType()->getPointerElementType(), TaskArgsVar);
 
       Value *TaskArgsVarLi8 = IRB.CreateBitCast(TaskArgsVarL, IRB.getInt8PtrTy());
       Value *TaskArgsVarLi8IdxGEP = IRB.CreateGEP(TaskArgsVarLi8, TaskArgsStructSizeOf, "args_end");
@@ -2945,7 +2982,7 @@ struct OmpSs {
 
           // VLAs
           if (VLADimsInfo.count(V))
-            GEP = IRB.CreateLoad(GEP);
+            GEP = IRB.CreateLoad(GEP->getType()->getPointerElementType(), GEP);
 
           // Regular arrays have types like [10 x %struct.S]*
           // Cast to %struct.S*
@@ -2983,7 +3020,7 @@ struct OmpSs {
 
         // VLAs
         if (VLADimsInfo.count(V))
-          GEP = IRB.CreateLoad(GEP);
+          GEP = IRB.CreateLoad(GEP->getType()->getPointerElementType(), GEP);
 
         auto It = DirEnv.NonPODsInfo.Copies.find(V);
         if (It != DirEnv.NonPODsInfo.Copies.end()) {
@@ -3011,8 +3048,8 @@ struct OmpSs {
         IRB.CreateStore(V, GEP);
       }
 
-      Value *TaskPtrVarL = IRB.CreateLoad(TaskPtrVar);
-
+      Value *TaskPtrVarL = IRB.CreateLoad(
+          TaskPtrVar->getType()->getPointerElementType(), TaskPtrVar);
 
       CallInst *TaskSubmitFuncCall = IRB.CreateCall(TaskSubmitFuncCallee, TaskPtrVarL);
       return TaskSubmitFuncCall;
