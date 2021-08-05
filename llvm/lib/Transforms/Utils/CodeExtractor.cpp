@@ -919,6 +919,7 @@ Function *CodeExtractor::constructFunction(const ValueSet &inputs,
       case Attribute::Convergent:
       case Attribute::Dereferenceable:
       case Attribute::DereferenceableOrNull:
+      case Attribute::ElementType:
       case Attribute::InAlloca:
       case Attribute::InReg:
       case Attribute::InaccessibleMemOnly:

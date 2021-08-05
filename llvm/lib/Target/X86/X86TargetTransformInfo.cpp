@@ -853,7 +853,6 @@ InstructionCost X86TTIImpl::getArithmeticInstrCost(
     { ISD::SUB,     MVT::v4i64,      4 },
     { ISD::ADD,     MVT::v4i64,      4 },
 
-    { ISD::SHL,     MVT::v16i8,     10 }, // pblendvb sequence .
     { ISD::SHL,     MVT::v32i8,     22 }, // pblendvb sequence + split.
     { ISD::SHL,     MVT::v8i16,      6 }, // pblendvb sequence.
     { ISD::SHL,     MVT::v16i16,    13 }, // pblendvb sequence + split.
@@ -862,18 +861,14 @@ InstructionCost X86TTIImpl::getArithmeticInstrCost(
     { ISD::SHL,     MVT::v2i64,      2 }, // Shift each lane + blend.
     { ISD::SHL,     MVT::v4i64,      6 }, // Shift each lane + blend + split.
 
-    { ISD::SRL,     MVT::v16i8,     11 }, // pblendvb sequence.
     { ISD::SRL,     MVT::v32i8,     23 }, // pblendvb sequence + split.
-    { ISD::SRL,     MVT::v8i16,     13 }, // pblendvb sequence.
     { ISD::SRL,     MVT::v16i16,    28 }, // pblendvb sequence + split.
     { ISD::SRL,     MVT::v4i32,      6 }, // Shift each lane + blend.
     { ISD::SRL,     MVT::v8i32,     14 }, // Shift each lane + blend + split.
     { ISD::SRL,     MVT::v2i64,      2 }, // Shift each lane + blend.
     { ISD::SRL,     MVT::v4i64,      6 }, // Shift each lane + blend + split.
 
-    { ISD::SRA,     MVT::v16i8,     21 }, // pblendvb sequence.
     { ISD::SRA,     MVT::v32i8,     44 }, // pblendvb sequence + split.
-    { ISD::SRA,     MVT::v8i16,     13 }, // pblendvb sequence.
     { ISD::SRA,     MVT::v16i16,    28 }, // pblendvb sequence + split.
     { ISD::SRA,     MVT::v4i32,      6 }, // Shift each lane + blend.
     { ISD::SRA,     MVT::v8i32,     14 }, // Shift each lane + blend + split.
@@ -928,17 +923,16 @@ InstructionCost X86TTIImpl::getArithmeticInstrCost(
       return LT.first * Entry->Cost;
 
   static const CostTblEntry SSE41CostTable[] = {
-    { ISD::SHL,  MVT::v16i8,      11 }, // pblendvb sequence.
-    { ISD::SHL,  MVT::v8i16,      14 }, // pblendvb sequence.
+    { ISD::SHL,  MVT::v16i8,      10 }, // pblendvb sequence.
+    { ISD::SHL,  MVT::v8i16,      11 }, // pblendvb sequence.
     { ISD::SHL,  MVT::v4i32,       4 }, // pslld/paddd/cvttps2dq/pmulld
 
-    { ISD::SRL,  MVT::v16i8,      12 }, // pblendvb sequence.
-    { ISD::SRL,  MVT::v8i16,      14 }, // pblendvb sequence.
-    { ISD::SRL,  MVT::v4i32,      11 }, // Shift each lane + blend.
+    { ISD::SRL,  MVT::v16i8,      11 }, // pblendvb sequence.
+    { ISD::SRL,  MVT::v8i16,      13 }, // pblendvb sequence.
+    { ISD::SRL,  MVT::v4i32,      16 }, // Shift each lane + blend.
 
-    { ISD::SRA,  MVT::v16i8,      24 }, // pblendvb sequence.
-    { ISD::SRA,  MVT::v8i16,      14 }, // pblendvb sequence.
-    { ISD::SRA,  MVT::v4i32,      12 }, // Shift each lane + blend.
+    { ISD::SRA,  MVT::v16i8,      21 }, // pblendvb sequence.
+    { ISD::SRA,  MVT::v8i16,      13 }, // pblendvb sequence.
 
     { ISD::MUL,  MVT::v4i32,       2 }  // pmulld (Nehalem from agner.org)
   };
@@ -950,20 +944,20 @@ InstructionCost X86TTIImpl::getArithmeticInstrCost(
   static const CostTblEntry SSE2CostTable[] = {
     // We don't correctly identify costs of casts because they are marked as
     // custom.
-    { ISD::SHL,  MVT::v16i8,      26 }, // cmpgtb sequence.
-    { ISD::SHL,  MVT::v8i16,      32 }, // cmpgtb sequence.
-    { ISD::SHL,  MVT::v4i32,     2*5 }, // We optimized this using mul.
+    { ISD::SHL,  MVT::v16i8,      13 }, // cmpgtb sequence.
+    { ISD::SHL,  MVT::v8i16,      25 }, // cmpgtw sequence.
+    { ISD::SHL,  MVT::v4i32,      16 }, // pslld/paddd/cvttps2dq/pmuludq.
     { ISD::SHL,  MVT::v2i64,       4 }, // splat+shuffle sequence.
 
-    { ISD::SRL,  MVT::v16i8,      26 }, // cmpgtb sequence.
-    { ISD::SRL,  MVT::v8i16,      32 }, // cmpgtb sequence.
-    { ISD::SRL,  MVT::v4i32,      16 }, // Shift each lane + blend.
+    { ISD::SRL,  MVT::v16i8,      14 }, // cmpgtb sequence.
+    { ISD::SRL,  MVT::v8i16,      16 }, // cmpgtw sequence.
+    { ISD::SRL,  MVT::v4i32,      12 }, // Shift each lane + blend.
     { ISD::SRL,  MVT::v2i64,       4 }, // splat+shuffle sequence.
 
-    { ISD::SRA,  MVT::v16i8,      54 }, // unpacked cmpgtb sequence.
-    { ISD::SRA,  MVT::v8i16,      32 }, // cmpgtb sequence.
-    { ISD::SRA,  MVT::v4i32,      16 }, // Shift each lane + blend.
-    { ISD::SRA,  MVT::v2i64,      12 }, // srl/xor/sub sequence.
+    { ISD::SRA,  MVT::v16i8,      27 }, // unpacked cmpgtb sequence.
+    { ISD::SRA,  MVT::v8i16,      16 }, // cmpgtw sequence.
+    { ISD::SRA,  MVT::v4i32,      12 }, // Shift each lane + blend.
+    { ISD::SRA,  MVT::v2i64,       8 }, // srl/xor/sub splat+shuffle sequence.
 
     { ISD::MUL,  MVT::v8i16,       1 }, // pmullw
     { ISD::MUL,  MVT::v4i32,       6 }, // 3*pmuludq/4*shuffle
@@ -1127,6 +1121,9 @@ InstructionCost X86TTIImpl::getShuffleCost(TTI::ShuffleKind Kind,
       if ((Index % NumSubElts) == 0 && (NumElts % NumSubElts) == 0)
         return SubLT.first;
     }
+
+    // If the insertion isn't aligned, treat it like a 2-op shuffle.
+    Kind = TTI::SK_PermuteTwoSrc;
   }
 
   // Handle some common (illegal) sub-vector types as they are often very cheap
@@ -1696,11 +1693,16 @@ InstructionCost X86TTIImpl::getCastInstrCost(unsigned Opcode, Type *Dst,
     { ISD::UINT_TO_FP,  MVT::v8f32,  MVT::v8i64, 26 },
     { ISD::UINT_TO_FP,  MVT::v8f64,  MVT::v8i64,  5 },
 
-    { ISD::FP_TO_SINT,  MVT::v8i8,   MVT::v8f64,  3 },
+    { ISD::FP_TO_SINT,  MVT::v16i8,  MVT::v16f32, 2 },
+    { ISD::FP_TO_SINT,  MVT::v16i8,  MVT::v16f64, 7 },
+    { ISD::FP_TO_SINT,  MVT::v32i8,  MVT::v32f64,15 },
+    { ISD::FP_TO_SINT,  MVT::v64i8,  MVT::v64f32,11 },
+    { ISD::FP_TO_SINT,  MVT::v64i8,  MVT::v64f64,31 },
     { ISD::FP_TO_SINT,  MVT::v8i16,  MVT::v8f64,  3 },
+    { ISD::FP_TO_SINT,  MVT::v16i16, MVT::v16f64, 7 },
+    { ISD::FP_TO_SINT,  MVT::v32i16, MVT::v32f32, 5 },
+    { ISD::FP_TO_SINT,  MVT::v32i16, MVT::v32f64,15 },
     { ISD::FP_TO_SINT,  MVT::v8i32,  MVT::v8f64,  1 },
-    { ISD::FP_TO_SINT,  MVT::v16i8,  MVT::v16f32, 3 },
-    { ISD::FP_TO_SINT,  MVT::v16i16, MVT::v16f32, 3 },
     { ISD::FP_TO_SINT,  MVT::v16i32, MVT::v16f64, 3 },
 
     { ISD::FP_TO_UINT,  MVT::v8i32,  MVT::v8f64,  1 },
@@ -1757,12 +1759,12 @@ InstructionCost X86TTIImpl::getCastInstrCost(unsigned Opcode, Type *Dst,
     { ISD::UINT_TO_FP,  MVT::v4f32,  MVT::v4i64,  1 },
     { ISD::UINT_TO_FP,  MVT::v4f64,  MVT::v4i64,  1 },
 
-    { ISD::FP_TO_SINT,  MVT::v2i64,  MVT::v2f32,  1 },
+    { ISD::FP_TO_SINT,  MVT::v2i64,  MVT::v4f32,  1 },
     { ISD::FP_TO_SINT,  MVT::v4i64,  MVT::v4f32,  1 },
     { ISD::FP_TO_SINT,  MVT::v2i64,  MVT::v2f64,  1 },
     { ISD::FP_TO_SINT,  MVT::v4i64,  MVT::v4f64,  1 },
 
-    { ISD::FP_TO_UINT,  MVT::v2i64,  MVT::v2f32,  1 },
+    { ISD::FP_TO_UINT,  MVT::v2i64,  MVT::v4f32,  1 },
     { ISD::FP_TO_UINT,  MVT::v4i64,  MVT::v4f32,  1 },
     { ISD::FP_TO_UINT,  MVT::v2i64,  MVT::v2f64,  1 },
     { ISD::FP_TO_UINT,  MVT::v4i64,  MVT::v4f64,  1 },
@@ -1852,16 +1854,17 @@ InstructionCost X86TTIImpl::getCastInstrCost(unsigned Opcode, Type *Dst,
     { ISD::UINT_TO_FP,  MVT::v2f64,  MVT::v2i64,  5 },
     { ISD::UINT_TO_FP,  MVT::v4f64,  MVT::v4i64,  5 },
 
-    { ISD::FP_TO_SINT,  MVT::v8i8,   MVT::v8f32,  3 },
-    { ISD::FP_TO_UINT,  MVT::v8i8,   MVT::v8f32,  3 },
+    { ISD::FP_TO_SINT,  MVT::v16i8,  MVT::v8f32,  2 },
+    { ISD::FP_TO_SINT,  MVT::v16i8,  MVT::v16f32, 2 },
+    { ISD::FP_TO_SINT,  MVT::v32i8,  MVT::v32f32, 5 },
 
     { ISD::FP_TO_UINT,  MVT::i64,    MVT::f32,    1 },
     { ISD::FP_TO_UINT,  MVT::i64,    MVT::f64,    1 },
-    { ISD::FP_TO_UINT,  MVT::v2i32,  MVT::v2f32,  1 },
     { ISD::FP_TO_UINT,  MVT::v4i32,  MVT::v4f32,  1 },
-    { ISD::FP_TO_UINT,  MVT::v2i32,  MVT::v2f64,  1 },
+    { ISD::FP_TO_UINT,  MVT::v4i32,  MVT::v2f64,  1 },
     { ISD::FP_TO_UINT,  MVT::v4i32,  MVT::v4f64,  1 },
     { ISD::FP_TO_UINT,  MVT::v8i32,  MVT::v8f32,  1 },
+    { ISD::FP_TO_UINT,  MVT::v8i32,  MVT::v8f64,  1 },
   };
 
   static const TypeConversionCostTblEntry AVX2ConversionTbl[] = {
@@ -1887,25 +1890,35 @@ InstructionCost X86TTIImpl::getCastInstrCost(unsigned Opcode, Type *Dst,
     { ISD::SIGN_EXTEND, MVT::v4i64,  MVT::v4i32,  2 },
     { ISD::ZERO_EXTEND, MVT::v4i64,  MVT::v4i32,  2 },
 
-    { ISD::TRUNCATE,    MVT::v2i8,   MVT::v2i32,  1 },
-    { ISD::TRUNCATE,    MVT::v2i16,  MVT::v2i64,  1 },
-    { ISD::TRUNCATE,    MVT::v4i32,  MVT::v4i64,  1 },
     { ISD::TRUNCATE,    MVT::v8i1,   MVT::v8i32,  2 },
+
+    { ISD::TRUNCATE,    MVT::v16i8,  MVT::v8i16,  1 },
+    { ISD::TRUNCATE,    MVT::v16i8,  MVT::v4i32,  1 },
+    { ISD::TRUNCATE,    MVT::v16i8,  MVT::v2i64,  1 },
+    { ISD::TRUNCATE,    MVT::v16i8,  MVT::v8i32,  4 },
+    { ISD::TRUNCATE,    MVT::v16i8,  MVT::v4i64,  4 },
+    { ISD::TRUNCATE,    MVT::v8i16,  MVT::v4i32,  1 },
+    { ISD::TRUNCATE,    MVT::v8i16,  MVT::v2i64,  1 },
+    { ISD::TRUNCATE,    MVT::v8i16,  MVT::v4i64,  5 },
+    { ISD::TRUNCATE,    MVT::v4i32,  MVT::v4i64,  1 },
     { ISD::TRUNCATE,    MVT::v8i16,  MVT::v8i32,  2 },
 
     { ISD::FP_EXTEND,   MVT::v8f64,  MVT::v8f32,  3 },
     { ISD::FP_ROUND,    MVT::v8f32,  MVT::v8f64,  3 },
 
+    { ISD::FP_TO_SINT,  MVT::v16i16, MVT::v8f32,  1 },
     { ISD::FP_TO_SINT,  MVT::v4i32,  MVT::v4f64,  1 },
     { ISD::FP_TO_SINT,  MVT::v8i32,  MVT::v8f32,  1 },
     { ISD::FP_TO_SINT,  MVT::v8i32,  MVT::v8f64,  3 },
 
-    { ISD::FP_TO_UINT,  MVT::v2i32,  MVT::v2f32,  4 },
-    { ISD::FP_TO_UINT,  MVT::v2i32,  MVT::v2f64,  7 },
-    { ISD::FP_TO_UINT,  MVT::v4i32,  MVT::v4f32,  4 },
-    { ISD::FP_TO_UINT,  MVT::v4i32,  MVT::v4f64,  7 },
-    { ISD::FP_TO_UINT,  MVT::v8i32,  MVT::v8f32,  4 },
-    { ISD::FP_TO_UINT,  MVT::v8i32,  MVT::v8f64, 15 },
+    { ISD::FP_TO_UINT,  MVT::i64,    MVT::f32,    3 },
+    { ISD::FP_TO_UINT,  MVT::i64,    MVT::f64,    3 },
+    { ISD::FP_TO_UINT,  MVT::v16i16, MVT::v8f32,  1 },
+    { ISD::FP_TO_UINT,  MVT::v4i32,  MVT::v4f32,  3 },
+    { ISD::FP_TO_UINT,  MVT::v4i32,  MVT::v2f64,  4 },
+    { ISD::FP_TO_UINT,  MVT::v4i32,  MVT::v4f64,  4 },
+    { ISD::FP_TO_UINT,  MVT::v8i32,  MVT::v8f32,  3 },
+    { ISD::FP_TO_UINT,  MVT::v8i32,  MVT::v4f64,  4 },
 
     { ISD::SINT_TO_FP,  MVT::v2f64,  MVT::v16i8,  2 },
     { ISD::SINT_TO_FP,  MVT::v8f32,  MVT::v16i8,  2 },
@@ -1955,16 +1968,11 @@ InstructionCost X86TTIImpl::getCastInstrCost(unsigned Opcode, Type *Dst,
     { ISD::TRUNCATE,    MVT::v16i1,  MVT::v16i64, 11 },
 
     { ISD::TRUNCATE,    MVT::v16i8,  MVT::v16i16, 2 }, // and+extract+packuswb
-    { ISD::TRUNCATE,    MVT::v2i8,   MVT::v2i32,  2 }, // and+packusdw+packuswb
-    { ISD::TRUNCATE,    MVT::v8i8,   MVT::v8i32,  4 },
+    { ISD::TRUNCATE,    MVT::v16i8,  MVT::v8i32,  5 },
     { ISD::TRUNCATE,    MVT::v8i16,  MVT::v8i32,  5 },
-    { ISD::TRUNCATE,    MVT::v4i8,   MVT::v4i64,  4 },
-    { ISD::TRUNCATE,    MVT::v4i16,  MVT::v4i64,  3 }, // and+extract+2*packusdw
+    { ISD::TRUNCATE,    MVT::v16i8,  MVT::v4i64,  5 },
+    { ISD::TRUNCATE,    MVT::v8i16,  MVT::v4i64,  3 }, // and+extract+2*packusdw
     { ISD::TRUNCATE,    MVT::v4i32,  MVT::v4i64,  2 },
-    { ISD::TRUNCATE,    MVT::v8i8,   MVT::v8i64, 11 },
-    { ISD::TRUNCATE,    MVT::v8i16,  MVT::v8i64,  9 },
-    { ISD::TRUNCATE,    MVT::v8i32,  MVT::v8i64,  3 },
-    { ISD::TRUNCATE,    MVT::v16i8,  MVT::v16i64, 11 },
 
     { ISD::SINT_TO_FP,  MVT::v4f32,  MVT::v4i1,   3 },
     { ISD::SINT_TO_FP,  MVT::v4f64,  MVT::v4i1,   3 },
@@ -1997,24 +2005,31 @@ InstructionCost X86TTIImpl::getCastInstrCost(unsigned Opcode, Type *Dst,
     { ISD::UINT_TO_FP,  MVT::v2f64,  MVT::v2i64,  5 },
     { ISD::UINT_TO_FP,  MVT::v4f64,  MVT::v4i64, 10 },
 
-    { ISD::FP_TO_SINT,  MVT::v8i8,   MVT::v8f32,  4 },
-    { ISD::FP_TO_SINT,  MVT::v4i8,   MVT::v4f64,  3 },
-    { ISD::FP_TO_SINT,  MVT::v4i16,  MVT::v4f64,  2 },
+    { ISD::FP_TO_SINT,  MVT::v16i8,  MVT::v8f32,  2 },
+    { ISD::FP_TO_SINT,  MVT::v16i8,  MVT::v4f64,  2 },
+    { ISD::FP_TO_SINT,  MVT::v32i8,  MVT::v8f32,  2 },
+    { ISD::FP_TO_SINT,  MVT::v32i8,  MVT::v4f64,  2 },
+    { ISD::FP_TO_SINT,  MVT::v8i16,  MVT::v8f32,  2 },
+    { ISD::FP_TO_SINT,  MVT::v8i16,  MVT::v4f64,  2 },
+    { ISD::FP_TO_SINT,  MVT::v16i16, MVT::v8f32,  2 },
+    { ISD::FP_TO_SINT,  MVT::v16i16, MVT::v4f64,  2 },
     { ISD::FP_TO_SINT,  MVT::v4i32,  MVT::v4f64,  2 },
-    { ISD::FP_TO_SINT,  MVT::v8i16,  MVT::v8f32,  3 },
     { ISD::FP_TO_SINT,  MVT::v8i32,  MVT::v8f32,  2 },
     { ISD::FP_TO_SINT,  MVT::v8i32,  MVT::v8f64,  5 },
 
-    { ISD::FP_TO_UINT,  MVT::v2i32,  MVT::v2f32,  5 },
-    { ISD::FP_TO_UINT,  MVT::v2i32,  MVT::v2f64,  9 },
-    { ISD::FP_TO_UINT,  MVT::v4i32,  MVT::v4f32,  5 },
-    { ISD::FP_TO_UINT,  MVT::v4i8,   MVT::v4f64,  3 },
-    { ISD::FP_TO_UINT,  MVT::v4i16,  MVT::v4f64,  2 },
-    { ISD::FP_TO_UINT,  MVT::v4i32,  MVT::v4f64,  9 },
-    { ISD::FP_TO_UINT,  MVT::v8i8,   MVT::v8f32,  4 },
-    { ISD::FP_TO_UINT,  MVT::v8i16,  MVT::v8f32,  3 },
-    { ISD::FP_TO_UINT,  MVT::v8i32,  MVT::v8f32,  9 },
-    { ISD::FP_TO_UINT,  MVT::v8i32,  MVT::v8f64, 19 },
+    { ISD::FP_TO_UINT,  MVT::v16i8,  MVT::v8f32,  2 },
+    { ISD::FP_TO_UINT,  MVT::v16i8,  MVT::v4f64,  2 },
+    { ISD::FP_TO_UINT,  MVT::v32i8,  MVT::v8f32,  2 },
+    { ISD::FP_TO_UINT,  MVT::v32i8,  MVT::v4f64,  2 },
+    { ISD::FP_TO_UINT,  MVT::v8i16,  MVT::v8f32,  2 },
+    { ISD::FP_TO_UINT,  MVT::v8i16,  MVT::v4f64,  2 },
+    { ISD::FP_TO_UINT,  MVT::v16i16, MVT::v8f32,  2 },
+    { ISD::FP_TO_UINT,  MVT::v16i16, MVT::v4f64,  2 },
+    { ISD::FP_TO_UINT,  MVT::v4i32,  MVT::v4f32,  3 },
+    { ISD::FP_TO_UINT,  MVT::v4i32,  MVT::v2f64,  4 },
+    { ISD::FP_TO_UINT,  MVT::v4i32,  MVT::v4f64,  6 },
+    { ISD::FP_TO_UINT,  MVT::v8i32,  MVT::v8f32,  7 },
+    { ISD::FP_TO_UINT,  MVT::v8i32,  MVT::v4f64,  7 },
 
     { ISD::FP_EXTEND,   MVT::v4f64,  MVT::v4f32,  1 },
     { ISD::FP_ROUND,    MVT::v4f32,  MVT::v4f64,  1 },
@@ -2039,15 +2054,9 @@ InstructionCost X86TTIImpl::getCastInstrCost(unsigned Opcode, Type *Dst,
     { ISD::TRUNCATE,    MVT::v2i1,   MVT::v2i16,  1 }, // PMOVXZWQ
     { ISD::TRUNCATE,    MVT::v4i1,   MVT::v4i8,   1 }, // PMOVXZBD
 
-    { ISD::TRUNCATE,    MVT::v2i8,   MVT::v2i16,  1 },
-    { ISD::TRUNCATE,    MVT::v4i8,   MVT::v4i16,  1 },
-    { ISD::TRUNCATE,    MVT::v8i8,   MVT::v8i16,  1 },
-    { ISD::TRUNCATE,    MVT::v4i8,   MVT::v4i32,  1 },
-    { ISD::TRUNCATE,    MVT::v4i16,  MVT::v4i32,  1 },
-    { ISD::TRUNCATE,    MVT::v8i8,   MVT::v8i32,  3 },
-    { ISD::TRUNCATE,    MVT::v8i16,  MVT::v8i32,  3 },
-    { ISD::TRUNCATE,    MVT::v16i16, MVT::v16i32, 6 },
-    { ISD::TRUNCATE,    MVT::v2i8,   MVT::v2i64,  1 }, // PSHUFB
+    { ISD::TRUNCATE,    MVT::v16i8,  MVT::v4i32,  2 },
+    { ISD::TRUNCATE,    MVT::v8i16,  MVT::v4i32,  2 },
+    { ISD::TRUNCATE,    MVT::v16i8,  MVT::v2i64,  2 },
 
     { ISD::SINT_TO_FP,  MVT::f32,    MVT::i32,    1 },
     { ISD::SINT_TO_FP,  MVT::f64,    MVT::i32,    1 },
@@ -2080,14 +2089,23 @@ InstructionCost X86TTIImpl::getCastInstrCost(unsigned Opcode, Type *Dst,
     { ISD::FP_TO_SINT,  MVT::i64,    MVT::f32,    1 },
     { ISD::FP_TO_SINT,  MVT::i32,    MVT::f64,    1 },
     { ISD::FP_TO_SINT,  MVT::i64,    MVT::f64,    1 },
-    { ISD::FP_TO_SINT,  MVT::v2i8,   MVT::v2f32,  3 },
-    { ISD::FP_TO_SINT,  MVT::v2i8,   MVT::v2f64,  3 },
+    { ISD::FP_TO_SINT,  MVT::v16i8,  MVT::v4f32,  2 },
+    { ISD::FP_TO_SINT,  MVT::v16i8,  MVT::v2f64,  2 },
+    { ISD::FP_TO_SINT,  MVT::v8i16,  MVT::v4f32,  1 },
+    { ISD::FP_TO_SINT,  MVT::v8i16,  MVT::v2f64,  1 },
+    { ISD::FP_TO_SINT,  MVT::v4i32,  MVT::v4f32,  1 },
+    { ISD::FP_TO_SINT,  MVT::v4i32,  MVT::v2f64,  1 },
 
     { ISD::FP_TO_UINT,  MVT::i32,    MVT::f32,    1 },
+    { ISD::FP_TO_UINT,  MVT::i64,    MVT::f32,    4 },
     { ISD::FP_TO_UINT,  MVT::i32,    MVT::f64,    1 },
-    { ISD::FP_TO_UINT,  MVT::v2i8,   MVT::v2f32,  3 },
-    { ISD::FP_TO_UINT,  MVT::v2i8,   MVT::v2f64,  3 },
-    { ISD::FP_TO_UINT,  MVT::v4i16,  MVT::v4f32,  2 },
+    { ISD::FP_TO_UINT,  MVT::i64,    MVT::f64,    4 },
+    { ISD::FP_TO_UINT,  MVT::v16i8,  MVT::v4f32,  2 },
+    { ISD::FP_TO_UINT,  MVT::v16i8,  MVT::v2f64,  2 },
+    { ISD::FP_TO_UINT,  MVT::v8i16,  MVT::v4f32,  1 },
+    { ISD::FP_TO_UINT,  MVT::v8i16,  MVT::v2f64,  1 },
+    { ISD::FP_TO_UINT,  MVT::v4i32,  MVT::v4f32,  4 },
+    { ISD::FP_TO_UINT,  MVT::v4i32,  MVT::v2f64,  4 },
   };
 
   static const TypeConversionCostTblEntry SSE2ConversionTbl[] = {
@@ -2125,25 +2143,23 @@ InstructionCost X86TTIImpl::getCastInstrCost(unsigned Opcode, Type *Dst,
     { ISD::FP_TO_SINT,  MVT::i64,    MVT::f32,    4 },
     { ISD::FP_TO_SINT,  MVT::i32,    MVT::f64,    4 },
     { ISD::FP_TO_SINT,  MVT::i64,    MVT::f64,    4 },
-    { ISD::FP_TO_SINT,  MVT::v2i8,   MVT::v2f32,  4 },
-    { ISD::FP_TO_SINT,  MVT::v2i16,  MVT::v2f32,  2 },
-    { ISD::FP_TO_SINT,  MVT::v4i8,   MVT::v4f32,  3 },
-    { ISD::FP_TO_SINT,  MVT::v4i16,  MVT::v4f32,  2 },
-    { ISD::FP_TO_SINT,  MVT::v2i16,  MVT::v2f64,  2 },
-    { ISD::FP_TO_SINT,  MVT::v2i8,   MVT::v2f64,  4 },
-    { ISD::FP_TO_SINT,  MVT::v2i32,  MVT::v2f64,  1 },
+    { ISD::FP_TO_SINT,  MVT::v16i8,  MVT::v4f32,  6 },
+    { ISD::FP_TO_SINT,  MVT::v16i8,  MVT::v2f64,  6 },
+    { ISD::FP_TO_SINT,  MVT::v8i16,  MVT::v4f32,  5 },
+    { ISD::FP_TO_SINT,  MVT::v8i16,  MVT::v2f64,  5 },
+    { ISD::FP_TO_SINT,  MVT::v4i32,  MVT::v4f32,  4 },
+    { ISD::FP_TO_SINT,  MVT::v4i32,  MVT::v2f64,  4 },
 
     { ISD::FP_TO_UINT,  MVT::i32,    MVT::f32,    4 },
     { ISD::FP_TO_UINT,  MVT::i64,    MVT::f32,    4 },
     { ISD::FP_TO_UINT,  MVT::i32,    MVT::f64,    4 },
     { ISD::FP_TO_UINT,  MVT::i64,    MVT::f64,   15 },
-    { ISD::FP_TO_UINT,  MVT::v2i8,   MVT::v2f32,  4 },
-    { ISD::FP_TO_UINT,  MVT::v2i8,   MVT::v2f64,  4 },
-    { ISD::FP_TO_UINT,  MVT::v4i8,   MVT::v4f32,  3 },
-    { ISD::FP_TO_UINT,  MVT::v2i16,  MVT::v2f32,  2 },
-    { ISD::FP_TO_UINT,  MVT::v2i16,  MVT::v2f64,  2 },
-    { ISD::FP_TO_UINT,  MVT::v4i16,  MVT::v4f32,  4 },
+    { ISD::FP_TO_UINT,  MVT::v16i8,  MVT::v4f32,  6 },
+    { ISD::FP_TO_UINT,  MVT::v16i8,  MVT::v2f64,  6 },
+    { ISD::FP_TO_UINT,  MVT::v8i16,  MVT::v4f32,  5 },
+    { ISD::FP_TO_UINT,  MVT::v8i16,  MVT::v2f64,  5 },
     { ISD::FP_TO_UINT,  MVT::v4i32,  MVT::v4f32,  8 },
+    { ISD::FP_TO_UINT,  MVT::v4i32,  MVT::v2f64,  8 },
 
     { ISD::ZERO_EXTEND, MVT::v2i64,  MVT::v16i8,  4 },
     { ISD::SIGN_EXTEND, MVT::v2i64,  MVT::v16i8,  4 },
@@ -2166,21 +2182,17 @@ InstructionCost X86TTIImpl::getCastInstrCost(unsigned Opcode, Type *Dst,
     { ISD::TRUNCATE,    MVT::v4i1,   MVT::v4i8,   2 }, // PUNPCKLBW+WD
     { ISD::TRUNCATE,    MVT::v8i1,   MVT::v8i8,   1 }, // PUNPCKLBW
 
-    { ISD::TRUNCATE,    MVT::v2i8,   MVT::v2i16,  2 }, // PAND+PACKUSWB
-    { ISD::TRUNCATE,    MVT::v4i8,   MVT::v4i16,  2 }, // PAND+PACKUSWB
-    { ISD::TRUNCATE,    MVT::v8i8,   MVT::v8i16,  2 }, // PAND+PACKUSWB
+    { ISD::TRUNCATE,    MVT::v16i8,  MVT::v8i16,  2 }, // PAND+PACKUSWB
     { ISD::TRUNCATE,    MVT::v16i8,  MVT::v16i16, 3 },
-    { ISD::TRUNCATE,    MVT::v2i8,   MVT::v2i32,  3 }, // PAND+2*PACKUSWB
-    { ISD::TRUNCATE,    MVT::v2i16,  MVT::v2i32,  1 },
-    { ISD::TRUNCATE,    MVT::v4i8,   MVT::v4i32,  3 },
-    { ISD::TRUNCATE,    MVT::v4i16,  MVT::v4i32,  3 },
-    { ISD::TRUNCATE,    MVT::v8i8,   MVT::v8i32,  4 },
+    { ISD::TRUNCATE,    MVT::v16i8,  MVT::v4i32,  3 }, // PAND+2*PACKUSWB
     { ISD::TRUNCATE,    MVT::v16i8,  MVT::v16i32, 7 },
+    { ISD::TRUNCATE,    MVT::v2i16,  MVT::v2i32,  1 },
+    { ISD::TRUNCATE,    MVT::v8i16,  MVT::v4i32,  3 },
     { ISD::TRUNCATE,    MVT::v8i16,  MVT::v8i32,  5 },
-    { ISD::TRUNCATE,    MVT::v16i16, MVT::v16i32, 10 },
-    { ISD::TRUNCATE,    MVT::v2i8,   MVT::v2i64,  4 }, // PAND+3*PACKUSWB
-    { ISD::TRUNCATE,    MVT::v2i16,  MVT::v2i64,  2 }, // PSHUFD+PSHUFLW
-    { ISD::TRUNCATE,    MVT::v2i32,  MVT::v2i64,  1 }, // PSHUFD
+    { ISD::TRUNCATE,    MVT::v16i16, MVT::v16i32,10 },
+    { ISD::TRUNCATE,    MVT::v16i8,  MVT::v2i64,  4 }, // PAND+3*PACKUSWB
+    { ISD::TRUNCATE,    MVT::v8i16,  MVT::v2i64,  2 }, // PSHUFD+PSHUFLW
+    { ISD::TRUNCATE,    MVT::v4i32,  MVT::v2i64,  1 }, // PSHUFD
   };
 
   // Attempt to map directly to (simple) MVT types to let us match custom entries.
@@ -3737,11 +3749,10 @@ InstructionCost X86TTIImpl::getAddressComputationCost(Type *Ty,
 
 InstructionCost
 X86TTIImpl::getArithmeticReductionCost(unsigned Opcode, VectorType *ValTy,
-                                       bool IsPairwise,
+                                       Optional<FastMathFlags> FMF,
                                        TTI::TargetCostKind CostKind) {
-  // Just use the default implementation for pair reductions.
-  if (IsPairwise)
-    return BaseT::getArithmeticReductionCost(Opcode, ValTy, IsPairwise, CostKind);
+  if (TTI::requiresOrderedReduction(FMF))
+    return BaseT::getArithmeticReductionCost(Opcode, ValTy, FMF, CostKind);
 
   // We use the Intel Architecture Code Analyzer(IACA) to measure the throughput
   // and make it as the cost.
@@ -3813,7 +3824,7 @@ X86TTIImpl::getArithmeticReductionCost(unsigned Opcode, VectorType *ValTy,
     return getCastInstrCost(Instruction::ZExt, WideVecTy, ValTy,
                             TargetTransformInfo::CastContextHint::None,
                             CostKind) +
-           getArithmeticReductionCost(Opcode, WideVecTy, IsPairwise, CostKind);
+           getArithmeticReductionCost(Opcode, WideVecTy, FMF, CostKind);
   }
 
   InstructionCost ArithmeticCost = 0;
@@ -3909,8 +3920,7 @@ X86TTIImpl::getArithmeticReductionCost(unsigned Opcode, VectorType *ValTy,
       if (const auto *Entry = CostTableLookup(SSE2BoolReduction, ISD, MTy))
         return ArithmeticCost + Entry->Cost;
 
-    return BaseT::getArithmeticReductionCost(Opcode, ValVTy, IsPairwise,
-                                             CostKind);
+    return BaseT::getArithmeticReductionCost(Opcode, ValVTy, FMF, CostKind);
   }
 
   unsigned NumVecElts = ValVTy->getNumElements();
@@ -3919,8 +3929,7 @@ X86TTIImpl::getArithmeticReductionCost(unsigned Opcode, VectorType *ValTy,
   // Special case power of 2 reductions where the scalar type isn't changed
   // by type legalization.
   if (!isPowerOf2_32(NumVecElts) || ScalarSize != MTy.getScalarSizeInBits())
-    return BaseT::getArithmeticReductionCost(Opcode, ValVTy, IsPairwise,
-                                             CostKind);
+    return BaseT::getArithmeticReductionCost(Opcode, ValVTy, FMF, CostKind);
 
   InstructionCost ReductionCost = 0;
 
@@ -4118,13 +4127,8 @@ InstructionCost X86TTIImpl::getMinMaxCost(Type *Ty, Type *CondTy,
 
 InstructionCost
 X86TTIImpl::getMinMaxReductionCost(VectorType *ValTy, VectorType *CondTy,
-                                   bool IsPairwise, bool IsUnsigned,
+                                   bool IsUnsigned,
                                    TTI::TargetCostKind CostKind) {
-  // Just use the default implementation for pair reductions.
-  if (IsPairwise)
-    return BaseT::getMinMaxReductionCost(ValTy, CondTy, IsPairwise, IsUnsigned,
-                                         CostKind);
-
   std::pair<InstructionCost, MVT> LT = TLI->getTypeLegalizationCost(DL, ValTy);
 
   MVT MTy = LT.second;
@@ -4240,8 +4244,7 @@ X86TTIImpl::getMinMaxReductionCost(VectorType *ValTy, VectorType *CondTy,
   // by type legalization.
   if (!isPowerOf2_32(ValVTy->getNumElements()) ||
       ScalarSize != MTy.getScalarSizeInBits())
-    return BaseT::getMinMaxReductionCost(ValTy, CondTy, IsPairwise, IsUnsigned,
-                                         CostKind);
+    return BaseT::getMinMaxReductionCost(ValTy, CondTy, IsUnsigned, CostKind);
 
   // Now handle reduction with the legal type, taking into account size changes
   // at each level.

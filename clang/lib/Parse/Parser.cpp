@@ -309,6 +309,7 @@ bool Parser::SkipUntil(ArrayRef<tok::TokenKind> Toks, SkipUntilFlags Flags) {
       return false;
 
     case tok::annot_pragma_openmp:
+    case tok::annot_attr_openmp:
     case tok::annot_pragma_openmp_end:
       // Stop before an OpenMP pragma boundary.
       if (OpenMPDirectiveParsing)
@@ -809,6 +810,7 @@ Parser::ParseExternalDeclaration(ParsedAttributesWithRange &attrs,
     AccessSpecifier AS = AS_none;
     return ParseOmpSsDeclarativeDirectiveWithExtDecl(AS, attrs);
   }
+  case tok::annot_attr_openmp:
   case tok::annot_pragma_openmp: {
     AccessSpecifier AS = AS_none;
     return ParseOpenMPDeclarativeDirectiveWithExtDecl(AS, attrs);

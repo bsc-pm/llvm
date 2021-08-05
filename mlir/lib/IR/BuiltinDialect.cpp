@@ -78,8 +78,8 @@ void BuiltinDialect::initialize() {
 
 FuncOp FuncOp::create(Location location, StringRef name, FunctionType type,
                       ArrayRef<NamedAttribute> attrs) {
-  OperationState state(location, "func");
   OpBuilder builder(location->getContext());
+  OperationState state(location, getOperationName());
   FuncOp::build(builder, state, name, type, attrs);
   return cast<FuncOp>(Operation::create(state));
 }
@@ -284,13 +284,19 @@ LogicalResult
 UnrealizedConversionCastOp::fold(ArrayRef<Attribute> attrOperands,
                                  SmallVectorImpl<OpFoldResult> &foldResults) {
   OperandRange operands = inputs();
+  ResultRange results = outputs();
+
+  if (operands.getType() == results.getType()) {
+    foldResults.append(operands.begin(), operands.end());
+    return success();
+  }
+
   if (operands.empty())
     return failure();
 
   // Check that the input is a cast with results that all feed into this
   // operation, and operand types that directly match the result types of this
   // operation.
-  ResultRange results = outputs();
   Value firstInput = operands.front();
   auto inputOp = firstInput.getDefiningOp<UnrealizedConversionCastOp>();
   if (!inputOp || inputOp.getResults() != operands ||

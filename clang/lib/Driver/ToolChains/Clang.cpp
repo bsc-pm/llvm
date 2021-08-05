@@ -20,7 +20,6 @@
 #include "Arch/X86.h"
 #include "CommonArgs.h"
 #include "Hexagon.h"
-#include "InputInfo.h"
 #include "MSP430.h"
 #include "PS4CPU.h"
 #include "clang/Basic/CharInfo.h"
@@ -30,6 +29,7 @@
 #include "clang/Basic/Version.h"
 #include "clang/Driver/Distro.h"
 #include "clang/Driver/DriverDiagnostic.h"
+#include "clang/Driver/InputInfo.h"
 #include "clang/Driver/Options.h"
 #include "clang/Driver/SanitizerArgs.h"
 #include "clang/Driver/XRayArgs.h"
@@ -52,8 +52,9 @@ using namespace clang;
 using namespace llvm::opt;
 
 static void CheckPreprocessingOptions(const Driver &D, const ArgList &Args) {
-  if (Arg *A =
-          Args.getLastArg(clang::driver::options::OPT_C, options::OPT_CC)) {
+  if (Arg *A = Args.getLastArg(clang::driver::options::OPT_C, options::OPT_CC,
+                               options::OPT_fminimize_whitespace,
+                               options::OPT_fno_minimize_whitespace)) {
     if (!Args.hasArg(options::OPT_E) && !Args.hasArg(options::OPT__SLASH_P) &&
         !Args.hasArg(options::OPT__SLASH_EP) && !D.CCCIsCPP()) {
       D.Diag(clang::diag::err_drv_argument_only_allowed_with)
@@ -490,14 +491,6 @@ static bool ShouldEnableAutolink(const ArgList &Args, const ToolChain &TC,
                       Default);
 }
 
-static bool ShouldDisableDwarfDirectory(const ArgList &Args,
-                                        const ToolChain &TC) {
-  bool UseDwarfDirectory =
-      Args.hasFlag(options::OPT_fdwarf_directory_asm,
-                   options::OPT_fno_dwarf_directory_asm, TC.useIntegratedAs());
-  return !UseDwarfDirectory;
-}
-
 // Convert an arg of the form "-gN" or "-ggdbN" or one of their aliases
 // to the corresponding DebugInfoKind.
 static codegenoptions::DebugInfoKind DebugLevelToInfoKind(const Arg &A) {
@@ -511,7 +504,7 @@ static codegenoptions::DebugInfoKind DebugLevelToInfoKind(const Arg &A) {
     return codegenoptions::DebugLineTablesOnly;
   if (A.getOption().matches(options::OPT_gline_directives_only))
     return codegenoptions::DebugDirectivesOnly;
-  return codegenoptions::LimitedDebugInfo;
+  return codegenoptions::DebugInfoConstructor;
 }
 
 static bool mustUseNonLeafFramePointerForTarget(const llvm::Triple &Triple) {
@@ -1263,7 +1256,8 @@ void Clang::AddPreprocessingOptions(Compilation &C, const JobAction &JA,
   // If we are offloading to a target via OpenMP we need to include the
   // openmp_wrappers folder which contains alternative system headers.
   if (JA.isDeviceOffloading(Action::OFK_OpenMP) &&
-      getToolChain().getTriple().isNVPTX()){
+      (getToolChain().getTriple().isNVPTX() ||
+       getToolChain().getTriple().isAMDGCN())) {
     if (!Args.hasArg(options::OPT_nobuiltininc)) {
       // Add openmp_wrappers/* to our system include path.  This lets us wrap
       // standard library headers.
@@ -2555,7 +2549,7 @@ static void CollectArgsForIntegratedAssembler(Compilation &C,
           CmdArgs.push_back(Value.data());
         } else {
           RenderDebugEnablingArgs(Args, CmdArgs,
-                                  codegenoptions::LimitedDebugInfo,
+                                  codegenoptions::DebugInfoConstructor,
                                   DwarfVersion, llvm::DebuggerKind::Default);
         }
       } else if (Value.startswith("-mcpu") || Value.startswith("-mfpu") ||
@@ -2641,6 +2635,8 @@ static void RenderFloatingPointOptions(const ToolChain &TC, const Driver &D,
   StringRef FPModel = "";
   // -ffp-exception-behavior options: strict, maytrap, ignore
   StringRef FPExceptionBehavior = "";
+  // -ffp-eval-method options: double, extended, source
+  StringRef FPEvalMethod = "";
   const llvm::DenormalMode DefaultDenormalFPMath =
       TC.getDefaultDenormalModeForType(Args, JA);
   const llvm::DenormalMode DefaultDenormalFP32Math =
@@ -2648,7 +2644,7 @@ static void RenderFloatingPointOptions(const ToolChain &TC, const Driver &D,
 
   llvm::DenormalMode DenormalFPMath = DefaultDenormalFPMath;
   llvm::DenormalMode DenormalFP32Math = DefaultDenormalFP32Math;
-  StringRef FPContract = "";
+  StringRef FPContract = "on";
   bool StrictFPModel = false;
 
 
@@ -2673,7 +2669,7 @@ static void RenderFloatingPointOptions(const ToolChain &TC, const Driver &D,
       ReciprocalMath = false;
       SignedZeros = true;
       // -fno_fast_math restores default denormal and fpcontract handling
-      FPContract = "";
+      FPContract = "on";
       DenormalFPMath = llvm::DenormalMode::getIEEE();
 
       // FIXME: The target may have picked a non-IEEE default mode here based on
@@ -2693,20 +2689,18 @@ static void RenderFloatingPointOptions(const ToolChain &TC, const Driver &D,
       // ffp-model= is a Driver option, it is entirely rewritten into more
       // granular options before being passed into cc1.
       // Use the gcc option in the switch below.
-      if (!FPModel.empty() && !FPModel.equals(Val)) {
+      if (!FPModel.empty() && !FPModel.equals(Val))
         D.Diag(clang::diag::warn_drv_overriding_flag_option)
           << Args.MakeArgString("-ffp-model=" + FPModel)
           << Args.MakeArgString("-ffp-model=" + Val);
-        FPContract = "";
-      }
       if (Val.equals("fast")) {
         optID = options::OPT_ffast_math;
         FPModel = Val;
-        FPContract = "fast";
+        FPContract = Val;
       } else if (Val.equals("precise")) {
         optID = options::OPT_ffp_contract;
         FPModel = Val;
-        FPContract = "fast";
+        FPContract = "on";
         PreciseFPModel = true;
       } else if (Val.equals("strict")) {
         StrictFPModel = true;
@@ -2792,9 +2786,11 @@ static void RenderFloatingPointOptions(const ToolChain &TC, const Driver &D,
     case options::OPT_ffp_contract: {
       StringRef Val = A->getValue();
       if (PreciseFPModel) {
-        // -ffp-model=precise enables ffp-contract=fast as a side effect
-        // the FPContract value has already been set to a string literal
-        // and the Val string isn't a pertinent value.
+        // When -ffp-model=precise is seen on the command line,
+        // the boolean PreciseFPModel is set to true which indicates
+        // "the current option is actually PreciseFPModel". The optID
+        // is changed to OPT_ffp_contract and FPContract is set to "on".
+        // the argument Val string is "precise": it shouldn't be checked.
         ;
       } else if (Val.equals("fast") || Val.equals("on") || Val.equals("off"))
         FPContract = Val;
@@ -2827,6 +2823,18 @@ static void RenderFloatingPointOptions(const ToolChain &TC, const Driver &D,
         FPExceptionBehavior = Val;
         TrappingMath = TrappingMathPresent = true;
       } else
+        D.Diag(diag::err_drv_unsupported_option_argument)
+            << A->getOption().getName() << Val;
+      break;
+    }
+
+    // Validate and pass through -ffp-eval-method option.
+    case options::OPT_ffp_eval_method_EQ: {
+      StringRef Val = A->getValue();
+      if (Val.equals("double") || Val.equals("extended") ||
+          Val.equals("source"))
+        FPEvalMethod = Val;
+      else
         D.Diag(diag::err_drv_unsupported_option_argument)
             << A->getOption().getName() << Val;
       break;
@@ -2892,18 +2900,17 @@ static void RenderFloatingPointOptions(const ToolChain &TC, const Driver &D,
       // -fno_fast_math restores default denormal and fpcontract handling
       DenormalFPMath = DefaultDenormalFPMath;
       DenormalFP32Math = llvm::DenormalMode::getIEEE();
-      FPContract = "";
+      FPContract = "on";
       break;
     }
     if (StrictFPModel) {
       // If -ffp-model=strict has been specified on command line but
       // subsequent options conflict then emit warning diagnostic.
-      if (HonorINFs && HonorNaNs &&
-        !AssociativeMath && !ReciprocalMath &&
-        SignedZeros && TrappingMath && RoundingFPMath &&
-        (FPContract.equals("off") || FPContract.empty()) &&
-        DenormalFPMath == llvm::DenormalMode::getIEEE() &&
-        DenormalFP32Math == llvm::DenormalMode::getIEEE())
+      if (HonorINFs && HonorNaNs && !AssociativeMath && !ReciprocalMath &&
+          SignedZeros && TrappingMath && RoundingFPMath &&
+          DenormalFPMath == llvm::DenormalMode::getIEEE() &&
+          DenormalFP32Math == llvm::DenormalMode::getIEEE() &&
+          FPContract.equals("off"))
         // OK: Current Arg doesn't conflict with -ffp-model=strict
         ;
       else {
@@ -2975,6 +2982,9 @@ static void RenderFloatingPointOptions(const ToolChain &TC, const Driver &D,
   if (!FPExceptionBehavior.empty())
     CmdArgs.push_back(Args.MakeArgString("-ffp-exception-behavior=" +
                       FPExceptionBehavior));
+
+  if (!FPEvalMethod.empty())
+    CmdArgs.push_back(Args.MakeArgString("-ffp-eval-method=" + FPEvalMethod));
 
   ParseMRecip(D, Args, CmdArgs);
 
@@ -3924,7 +3934,7 @@ static void renderDebugOptions(const ToolChain &TC, const Driver &D,
     }
   }
   if (const Arg *A = Args.getLastArg(options::OPT_g_Group)) {
-    DebugInfoKind = codegenoptions::LimitedDebugInfo;
+    DebugInfoKind = codegenoptions::DebugInfoConstructor;
 
     // If the last option explicitly specified a debug-info level, use it.
     if (checkDebugInfoOption(A, Args, D, TC) &&
@@ -4046,7 +4056,7 @@ static void renderDebugOptions(const ToolChain &TC, const Driver &D,
     if (checkDebugInfoOption(A, Args, D, TC)) {
       if (DebugInfoKind != codegenoptions::DebugLineTablesOnly &&
           DebugInfoKind != codegenoptions::DebugDirectivesOnly) {
-        DebugInfoKind = codegenoptions::LimitedDebugInfo;
+        DebugInfoKind = codegenoptions::DebugInfoConstructor;
         CmdArgs.push_back("-dwarf-ext-refs");
         CmdArgs.push_back("-fmodule-format=obj");
       }
@@ -4067,7 +4077,8 @@ static void renderDebugOptions(const ToolChain &TC, const Driver &D,
   if (const Arg *A = Args.getLastArg(options::OPT_fstandalone_debug))
     (void)checkDebugInfoOption(A, Args, D, TC);
 
-  if (DebugInfoKind == codegenoptions::LimitedDebugInfo) {
+  if (DebugInfoKind == codegenoptions::LimitedDebugInfo ||
+      DebugInfoKind == codegenoptions::DebugInfoConstructor) {
     if (Args.hasFlag(options::OPT_fno_eliminate_unused_debug_types,
                      options::OPT_feliminate_unused_debug_types, false))
       DebugInfoKind = codegenoptions::UnusedTypeInfo;
@@ -4177,6 +4188,14 @@ static void renderDebugOptions(const ToolChain &TC, const Driver &D,
       CmdArgs.push_back("-generate-type-units");
     }
   }
+
+  // To avoid join/split of directory+filename, the integrated assembler prefers
+  // the directory form of .file on all DWARF versions. GNU as doesn't allow the
+  // form before DWARF v5.
+  if (!Args.hasFlag(options::OPT_fdwarf_directory_asm,
+                    options::OPT_fno_dwarf_directory_asm,
+                    TC.useIntegratedAs() || EffectiveDWARFVersion >= 5))
+    CmdArgs.push_back("-fno-dwarf-directory-asm");
 
   // Decide how to render forward declarations of template instantiations.
   // SCE wants full descriptions, others just get them in the name.
@@ -4452,7 +4471,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
       StringRef ArgStr =
           Args.hasArg(options::OPT_interface_stub_version_EQ)
               ? Args.getLastArgValue(options::OPT_interface_stub_version_EQ)
-              : "experimental-ifs-v2";
+              : "ifs-v1";
       CmdArgs.push_back("-emit-interface-stubs");
       CmdArgs.push_back(
           Args.MakeArgString(Twine("-interface-stub-version=") + ArgStr.str()));
@@ -4844,6 +4863,14 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
       CmdArgs.push_back("-mabi=vec-default");
   }
 
+  if (Arg *A = Args.getLastArg(options::OPT_mlong_double_128)) {
+    // Emit the unsupported option error until the Clang's library integration
+    // support for 128-bit long double is available for AIX.
+    if (Triple.isOSAIX())
+      D.Diag(diag::err_drv_unsupported_opt_for_target)
+          << A->getSpelling() << RawTriple.str();
+  }
+
   if (Arg *A = Args.getLastArg(options::OPT_Wframe_larger_than_EQ)) {
     StringRef v = A->getValue();
     // FIXME: Validate the argument here so we don't produce meaningless errors
@@ -5131,11 +5158,15 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   if (Arg *A = Args.getLastArg(options::OPT_mcmodel_EQ)) {
     StringRef CM = A->getValue();
     if (CM == "small" || CM == "kernel" || CM == "medium" || CM == "large" ||
-        CM == "tiny")
-      A->render(Args, CmdArgs);
-    else
+        CM == "tiny") {
+      if (Triple.isOSAIX() && CM == "medium")
+        CmdArgs.push_back("-mcmodel=large");
+      else
+        A->render(Args, CmdArgs);
+    } else {
       D.Diag(diag::err_drv_invalid_argument_to_option)
           << CM << A->getOption().getName();
+    }
   }
 
   if (Arg *A = Args.getLastArg(options::OPT_mtls_size_EQ)) {
@@ -5509,9 +5540,6 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
       CmdArgs.push_back("-fno-gnu-keywords");
   }
 
-  if (ShouldDisableDwarfDirectory(Args, TC))
-    CmdArgs.push_back("-fno-dwarf-directory-asm");
-
   if (!ShouldEnableAutolink(Args, TC, JA))
     CmdArgs.push_back("-fno-autolink");
 
@@ -5686,7 +5714,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   Args.AddLastArg(CmdArgs, options::OPT_fvisibility_inlines_hidden_static_local_var,
                            options::OPT_fno_visibility_inlines_hidden_static_local_var);
   Args.AddLastArg(CmdArgs, options::OPT_fvisibility_global_new_delete_hidden);
-
+  Args.AddLastArg(CmdArgs, options::OPT_fnew_infallible);
   Args.AddLastArg(CmdArgs, options::OPT_ftlsmodel_EQ);
 
   if (Args.hasFlag(options::OPT_fno_operator_names,
@@ -5983,8 +6011,14 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     Args.AddLastArg(CmdArgs, options::OPT_fprofile_remapping_file_EQ);
 
     if (Args.hasFlag(options::OPT_fpseudo_probe_for_profiling,
-                     options::OPT_fno_pseudo_probe_for_profiling, false))
+                     options::OPT_fno_pseudo_probe_for_profiling, false)) {
       CmdArgs.push_back("-fpseudo-probe-for-profiling");
+      // Enforce -funique-internal-linkage-names if it's not explicitly turned
+      // off.
+      if (Args.hasFlag(options::OPT_funique_internal_linkage_names,
+                       options::OPT_fno_unique_internal_linkage_names, true))
+        CmdArgs.push_back("-funique-internal-linkage-names");
+    }
   }
   RenderBuiltinOptions(TC, RawTriple, Args, CmdArgs);
 
@@ -6059,6 +6093,16 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   if (Args.hasFlag(options::OPT_fuse_line_directives,
                    options::OPT_fno_use_line_directives, false))
     CmdArgs.push_back("-fuse-line-directives");
+
+  // -fno-minimize-whitespace is default.
+  if (Args.hasFlag(options::OPT_fminimize_whitespace,
+                   options::OPT_fno_minimize_whitespace, false)) {
+    types::ID InputType = Inputs[0].getType();
+    if (!isDerivedFromC(InputType))
+      D.Diag(diag::err_drv_minws_unsupported_input_type)
+          << types::getTypeName(InputType);
+    CmdArgs.push_back("-fminimize-whitespace");
+  }
 
   // -fms-extensions=0 is default.
   if (Args.hasFlag(options::OPT_fms_extensions, options::OPT_fno_ms_extensions,
@@ -6157,7 +6201,8 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   // than 19.
   if (!Args.hasFlag(options::OPT_fthreadsafe_statics,
                     options::OPT_fno_threadsafe_statics,
-                    !IsWindowsMSVC || IsMSVC2015Compatible))
+                    !types::isOpenCL(InputType) &&
+                        (!IsWindowsMSVC || IsMSVC2015Compatible)))
     CmdArgs.push_back("-fno-threadsafe-statics");
 
   // -fno-delayed-template-parsing is default, except when targeting MSVC.
@@ -7174,7 +7219,7 @@ void Clang::AddClangCLArgs(const ArgList &Args, types::ID InputType,
                                           options::OPT_gline_tables_only)) {
     *EmitCodeView = true;
     if (DebugInfoArg->getOption().matches(options::OPT__SLASH_Z7))
-      *DebugInfoKind = codegenoptions::LimitedDebugInfo;
+      *DebugInfoKind = codegenoptions::DebugInfoConstructor;
     else
       *DebugInfoKind = codegenoptions::DebugLineTablesOnly;
   } else {
@@ -7458,7 +7503,7 @@ void ClangAs::ConstructJob(Compilation &C, const JobAction &JA,
     // the guard for source type, however there is a test which asserts
     // that some assembler invocation receives no -debug-info-kind,
     // and it's not clear whether that test is just overly restrictive.
-    DebugInfoKind = (WantDebug ? codegenoptions::LimitedDebugInfo
+    DebugInfoKind = (WantDebug ? codegenoptions::DebugInfoConstructor
                                : codegenoptions::NoDebugInfo);
     // Add the -fdebug-compilation-dir flag if needed.
     addDebugCompDirArg(Args, CmdArgs, C.getDriver().getVFS());
