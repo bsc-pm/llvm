@@ -1304,6 +1304,7 @@ void ExprEngine::Visit(const Stmt *S, ExplodedNode *Pred,
     case Stmt::OSSTaskForDirectiveClass:
     case Stmt::OSSTaskLoopDirectiveClass:
     case Stmt::OSSTaskLoopForDirectiveClass:
+    case Stmt::OSSMultiDepExprClass:
     case Stmt::CapturedStmtClass:
     case Stmt::OMPUnrollDirectiveClass: {
       const ExplodedNode *node = Bldr.generateSink(S, Pred, Pred->getState());

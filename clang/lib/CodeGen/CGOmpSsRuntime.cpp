@@ -520,9 +520,9 @@ public:
 
   QualType GetInnermostElementType(const QualType &Q) {
     if (Q->isArrayType()) {
-      if (const ConstantArrayType *BaseArrayTy = CGF.getContext().getAsConstantArrayType(Q)) {
+      if (CGF.getContext().getAsConstantArrayType(Q)) {
         return CGF.getContext().getBaseElementType(Q);
-      } else if (const VariableArrayType *BaseArrayTy = CGF.getContext().getAsVariableArrayType(Q)) {
+      } else if (CGF.getContext().getAsVariableArrayType(Q)) {
         return CGF.getContext().getBaseElementType(Q);
       } else {
         llvm_unreachable("Unhandled array type");

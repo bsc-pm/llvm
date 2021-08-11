@@ -96,7 +96,6 @@ private:
 
   /// Stack of used declaration and their data-sharing attributes.
   StackTy Stack;
-  Sema &SemaRef;
 
   using iterator = StackTy::const_reverse_iterator;
 
@@ -107,7 +106,7 @@ private:
   }
 
 public:
-  explicit DSAStackTy(Sema &S) : SemaRef(S) {}
+  explicit DSAStackTy() {}
 
   void push(OmpSsDirectiveKind DKind,
             Scope *CurScope, SourceLocation Loc) {
@@ -773,7 +772,7 @@ static DeclRefExpr *buildDeclRefExpr(Sema &S, VarDecl *D, QualType Ty,
 }
 
 void Sema::InitDataSharingAttributesStackOmpSs() {
-  VarDataSharingAttributesStackOmpSs = new DSAStackTy(*this);
+  VarDataSharingAttributesStackOmpSs = new DSAStackTy();
   // TODO: use another function
   AllowShapings = false;
 }
@@ -832,6 +831,7 @@ void Sema::ActOnOmpSsAfterClauseGathering(SmallVectorImpl<OSSClause *>& Clauses)
     return;
 
   bool ErrorFound = false;
+  (void)ErrorFound;
 
   OSSClauseDSAChecker OSSClauseChecker(DSAStack, *this);
   for (auto *Clause : Clauses) {
@@ -1488,8 +1488,6 @@ namespace {
 class OmpSsIterationSpaceChecker {
   /// Reference to Sema.
   Sema &SemaRef;
-  /// Data-sharing stack.
-  DSAStackTy &Stack;
   /// A location for diagnostics (when there is no some better location).
   SourceLocation DefaultLoc;
   /// A location for diagnostics (when increment is not compatible).
@@ -1524,10 +1522,8 @@ class OmpSsIterationSpaceChecker {
   bool doesDependOnLoopCounter(const Stmt *S, bool IsInitializer);
 
 public:
-  OmpSsIterationSpaceChecker(Sema &SemaRef, DSAStackTy &Stack,
-                              SourceLocation DefaultLoc)
-      : SemaRef(SemaRef), Stack(Stack), DefaultLoc(DefaultLoc),
-        ConditionLoc(DefaultLoc) {}
+  OmpSsIterationSpaceChecker(Sema &SemaRef, SourceLocation DefaultLoc)
+      : SemaRef(SemaRef), DefaultLoc(DefaultLoc), ConditionLoc(DefaultLoc) {}
   /// Check init-expr for canonical loop form and save loop counter
   /// variable - #Var and its initialization value - #LB.
   bool checkAndSetInit(Stmt *S, bool EmitDiags = true);
@@ -1689,7 +1685,6 @@ namespace {
 class LoopCounterRefChecker final
     : public ConstStmtVisitor<LoopCounterRefChecker, bool> {
   Sema &SemaRef;
-  DSAStackTy &Stack;
   const ValueDecl *CurLCDecl = nullptr;
   bool IsInitializer = true;
   bool EmitDiags = true;
@@ -1725,11 +1720,10 @@ public:
       Res = (Child && Visit(Child)) || Res;
     return Res;
   }
-  explicit LoopCounterRefChecker(
-    Sema &SemaRef, DSAStackTy &Stack,
-    const ValueDecl *CurLCDecl, bool IsInitializer, bool EmitDiags)
-      : SemaRef(SemaRef), Stack(Stack), CurLCDecl(CurLCDecl),
-        IsInitializer(IsInitializer), EmitDiags(EmitDiags) {}
+  explicit LoopCounterRefChecker(Sema &SemaRef, const ValueDecl *CurLCDecl,
+                                 bool IsInitializer, bool EmitDiags)
+      : SemaRef(SemaRef), CurLCDecl(CurLCDecl), IsInitializer(IsInitializer),
+        EmitDiags(EmitDiags) {}
 };
 } // namespace
 
@@ -1738,7 +1732,7 @@ OmpSsIterationSpaceChecker::doesDependOnLoopCounter(const Stmt *S,
                                                      bool IsInitializer) {
   // Check for the non-rectangular loops.
   LoopCounterRefChecker LoopStmtChecker(
-    SemaRef, Stack, LCDecl, IsInitializer, /*EmitDiags=*/true);
+    SemaRef, LCDecl, IsInitializer, /*EmitDiags=*/true);
   return LoopStmtChecker.Visit(S);
 }
 
@@ -2027,7 +2021,7 @@ void Sema::ActOnOmpSsLoopInitialization(SourceLocation ForLoc, Stmt *Init) {
   unsigned SeenAssociatedLoops = DSAStack->getSeenAssociatedLoops();
   if (AssociatedLoops > SeenAssociatedLoops &&
       isOmpSsLoopDirective(DKind)) {
-    OmpSsIterationSpaceChecker ISC(*this, *DSAStack, ForLoc);
+    OmpSsIterationSpaceChecker ISC(*this, ForLoc);
     if (!ISC.checkAndSetInit(Init, /*EmitDiags=*/false)) {
       if (ValueDecl *D = ISC.getLoopDecl()) {
         const Expr *E = ISC.getLoopDeclRefExpr();
@@ -2185,7 +2179,7 @@ static bool checkOmpSsLoop(
         return true;
       }
     }
-    OmpSsIterationSpaceChecker ISC(SemaRef, Stack, For->getForLoc());
+    OmpSsIterationSpaceChecker ISC(SemaRef, For->getForLoc());
 
     // Check init.
     Stmt *Init = For->getInit();
@@ -2249,15 +2243,15 @@ static bool checkNonRectangular(Sema &SemaRef, DSAStackTy *Stack, const SmallVec
     for (size_t j = 0; j < i; ++j) {
       ValueDecl *VD = cast<DeclRefExpr>(B[j].IndVar)->getDecl();
       if (LoopCounterRefChecker(
-          SemaRef, *Stack, VD, /*IsInitializer=*/true, /*EmitDiags=*/false).Visit(B[i].LB)) {
+          SemaRef, VD, /*IsInitializer=*/true, /*EmitDiags=*/false).Visit(B[i].LB)) {
         return true;
       }
       if (LoopCounterRefChecker(
-          SemaRef, *Stack, VD, /*IsInitializer=*/true, /*EmitDiags=*/false).Visit(B[i].UB)) {
+          SemaRef, VD, /*IsInitializer=*/true, /*EmitDiags=*/false).Visit(B[i].UB)) {
         return true;
       }
       if (LoopCounterRefChecker(
-          SemaRef, *Stack, VD, /*IsInitializer=*/true, /*EmitDiags=*/false).Visit(B[i].Step)) {
+          SemaRef, VD, /*IsInitializer=*/true, /*EmitDiags=*/false).Visit(B[i].Step)) {
         // TODO: error here. it is not valid
       }
     }
