@@ -64,14 +64,31 @@ namespace PollingAPI {
     #define MAX_SERVICES 8
 
     //! \brief Services in the system
-    unsigned int _next_free_service_slot = 0;
+    std::atomic<unsigned int> _next_free_service_slot;
     ServiceInfo _services[MAX_SERVICES];
 
+    class Spinlock {
+    public:
+        Spinlock() { m_lock.clear(); }
+        Spinlock(const Spinlock&) = delete;
+        ~Spinlock() = default;
+
+        void lock() {
+            while (m_lock.test_and_set(std::memory_order_acquire));
+        }
+        bool try_lock() {
+            return !m_lock.test_and_set(std::memory_order_acquire);
+        }
+        void unlock() {
+            m_lock.clear(std::memory_order_release);
+        }
+    private:
+        std::atomic_flag m_lock;
+    };
 
     //! \brief This is held during traversal and modification
     //! operations but not while processing a service
-    kmp_bootstrap_lock_t _lock =
-      KMP_BOOTSTRAP_LOCK_INITIALIZER( _lock); /* Polling service lock */
+    Spinlock _lock;
 
     inline bool operator<(ServiceKey const &a, ServiceKey const &b)
     {
@@ -165,12 +182,17 @@ void nanos6_decrease_task_event_counter(void *event_counter,
 
 void handleServices()
 {
-    int locked = __kmp_test_bootstrap_lock(&PollingAPI::_lock);
+    // Nothing to do
+    unsigned int num_slot = KMP_ATOMIC_LD_RLX(&PollingAPI::_next_free_service_slot);
+    if (num_slot == 0)
+        return;
+
+    bool locked = PollingAPI::_lock.try_lock();
     if (!locked) {
         return;
     }
 
-    for (unsigned int i = 0; i < PollingAPI::_next_free_service_slot; ++i)
+    for (unsigned int i = 0; i < num_slot; ++i)
     {
         // Ignore the current slot if the service that was registered there has been removed
         if (!PollingAPI::_services[i]._valid)
@@ -197,9 +219,9 @@ void handleServices()
         serviceData._processing = true;
 
         // Execute the callback without locking
-        __kmp_release_bootstrap_lock(&PollingAPI::_lock);
+        PollingAPI::_lock.unlock();
         bool unregister = serviceKey._function(serviceKey._functionData);
-        __kmp_acquire_bootstrap_lock(&PollingAPI::_lock);
+        PollingAPI::_lock.lock();
 
         // Unset the processing flag
         assert(serviceData._processing);
@@ -221,7 +243,7 @@ void handleServices()
         }
     }
 
-    __kmp_release_bootstrap_lock(&PollingAPI::_lock);
+    PollingAPI::_lock.unlock();
 }
 
 
@@ -230,8 +252,7 @@ void nanos6_register_polling_service(char const *service_name,
                                      nanos6_polling_service_t service_function,
                                      void *service_data)
 {
-    __kmp_acquire_bootstrap_lock(&PollingAPI::_lock);
-
+    PollingAPI::_lock.lock();
 
     assert(PollingAPI::_next_free_service_slot < MAX_SERVICES && "Trying to register more services than available slots");
 
@@ -242,7 +263,7 @@ void nanos6_register_polling_service(char const *service_name,
 
     PollingAPI::_next_free_service_slot++;
 
-    __kmp_release_bootstrap_lock(&PollingAPI::_lock);
+    PollingAPI::_lock.unlock();
 }
 
 void nanos6_unregister_polling_service(char const *service_name,
@@ -254,7 +275,7 @@ void nanos6_unregister_polling_service(char const *service_name,
     PollingAPI::ServiceKey key(service_function, service_data);
 
     {
-        __kmp_acquire_bootstrap_lock(&PollingAPI::_lock);
+        PollingAPI::_lock.lock();
 
         bool found = false;
         for (unsigned int i = 0; i < PollingAPI::_next_free_service_slot && !found; ++i)
@@ -276,7 +297,7 @@ void nanos6_unregister_polling_service(char const *service_name,
         }
         assert(found && "Attempt to unregister a non-existing polling service");
 
-        __kmp_release_bootstrap_lock(&PollingAPI::_lock);
+        PollingAPI::_lock.unlock();
     }
 
     // Wait until fully unregistered
