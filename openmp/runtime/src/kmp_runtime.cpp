@@ -9159,9 +9159,7 @@ void __kmp_set_free_agent_thread_active_status(unsigned int thread_num,
   if (active) {
     kmp_info_t *free_agent_thread =
       __kmp_threads[gtid]->th.th_root->r.free_agent_threads[thread_num];
-    __kmp_null_resume_wrapper(
-        free_agent_thread->th.th_info.ds.ds_gtid,
-        free_agent_thread->th.th_sleep_loc);
+    __kmp_null_resume_wrapper(free_agent_thread);
   }
 }
 
