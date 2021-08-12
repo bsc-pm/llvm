@@ -883,8 +883,9 @@ void CGOmpSsRuntime::EmitCopyCtorFunc(
   // Find the end of the array.
   llvm::Value *SrcBegin = SrcLV.getPointer(CGF);
   llvm::Value *DstBegin = DstLV.getPointer(CGF);
-  llvm::Value *DstEnd = CGF.Builder.CreateInBoundsGEP(DstBegin, NelemsValue,
-                                                      "arrayctor.dst.end");
+  llvm::Value *DstEnd = CGF.Builder.CreateInBoundsGEP(
+      DstBegin->getType()->getPointerElementType(), DstBegin, NelemsValue,
+      "arrayctor.dst.end");
 
   // Enter the loop, setting up a phi for the current location to initialize.
   llvm::BasicBlock *EntryBB = CGF.Builder.GetInsertBlock();
@@ -910,14 +911,16 @@ void CGOmpSsRuntime::EmitCopyCtorFunc(
   }
 
   // Go to the next element. Move SrcBegin too
-  llvm::Value *DstNext =
-    CGF.Builder.CreateInBoundsGEP(DstCur, llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
-                              "arrayctor.dst.next");
+  llvm::Value *DstNext = CGF.Builder.CreateInBoundsGEP(
+      DstCur->getType()->getPointerElementType(), DstCur,
+      llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
+      "arrayctor.dst.next");
   DstCur->addIncoming(DstNext, CGF.Builder.GetInsertBlock());
 
-  llvm::Value *SrcDest =
-    CGF.Builder.CreateInBoundsGEP(SrcCur, llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
-                                  "arrayctor.src.next");
+  llvm::Value *SrcDest = CGF.Builder.CreateInBoundsGEP(
+      SrcCur->getType()->getPointerElementType(), SrcCur,
+      llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
+      "arrayctor.src.next");
   SrcCur->addIncoming(SrcDest, CGF.Builder.GetInsertBlock());
 
   // Check whether that's the end of the loop.
@@ -984,8 +987,9 @@ void CGOmpSsRuntime::EmitCtorFunc(
 
   // Find the end of the array.
   llvm::Value *DstBegin = DstLV.getPointer(CGF);
-  llvm::Value *DstEnd = CGF.Builder.CreateInBoundsGEP(DstBegin, NelemsValue,
-                                                      "arrayctor.dst.end");
+  llvm::Value *DstEnd = CGF.Builder.CreateInBoundsGEP(
+      DstBegin->getType()->getPointerElementType(), DstBegin, NelemsValue,
+      "arrayctor.dst.end");
 
   // Enter the loop, setting up a phi for the current location to initialize.
   llvm::BasicBlock *EntryBB = CGF.Builder.GetInsertBlock();
@@ -1000,9 +1004,10 @@ void CGOmpSsRuntime::EmitCtorFunc(
                      /*capturedByInit=*/false);
 
   // Go to the next element
-  llvm::Value *DstNext =
-    CGF.Builder.CreateInBoundsGEP(DstCur, llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
-                              "arrayctor.dst.next");
+  llvm::Value *DstNext = CGF.Builder.CreateInBoundsGEP(
+      DstCur->getType()->getPointerElementType(), DstCur,
+      llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
+      "arrayctor.dst.next");
   DstCur->addIncoming(DstNext, CGF.Builder.GetInsertBlock());
 
   // Check whether that's the end of the loop.
@@ -1076,8 +1081,9 @@ void CGOmpSsRuntime::EmitDtorFunc(
 
   // Find the end of the array.
   llvm::Value *DstBegin = DstLV.getPointer(CGF);
-  llvm::Value *DstEnd = CGF.Builder.CreateInBoundsGEP(DstBegin, NelemsValue,
-                                                      "arraydtor.dst.end");
+  llvm::Value *DstEnd = CGF.Builder.CreateInBoundsGEP(
+      DstBegin->getType()->getPointerElementType(), DstBegin, NelemsValue,
+      "arraydtor.dst.end");
 
   // Enter the loop, setting up a phi for the current location to initialize.
   llvm::BasicBlock *EntryBB = CGF.Builder.GetInsertBlock();
@@ -1092,9 +1098,10 @@ void CGOmpSsRuntime::EmitDtorFunc(
                          Address(DstCur, DstLV.getAlignment()), Q);
 
   // Go to the next element
-  llvm::Value *DstNext =
-    CGF.Builder.CreateInBoundsGEP(DstCur, llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
-                              "arraydtor.dst.next");
+  llvm::Value *DstNext = CGF.Builder.CreateInBoundsGEP(
+      DstCur->getType()->getPointerElementType(), DstCur,
+      llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
+      "arraydtor.dst.next");
   DstCur->addIncoming(DstNext, CGF.Builder.GetInsertBlock());
 
   // Check whether that's the end of the loop.
@@ -1422,7 +1429,9 @@ static llvm::Value *emitDiscreteArray(
     llvm::Value *Idx[2];
     Idx[0] = llvm::Constant::getNullValue(CGF.ConvertType(CGF.getContext().IntTy));
     Idx[1] = CGF.EmitScalarExpr(IterExpr);
-    llvm::Value *GEP = CGF.Builder.CreateGEP(DiscreteArrLV.getPointer(CGF), Idx, "discreteidx");
+    llvm::Value *Ptr = DiscreteArrLV.getPointer(CGF);
+    llvm::Value *GEP = CGF.Builder.CreateGEP(
+        Ptr->getType()->getPointerElementType(), Ptr, Idx, "discreteidx");
     llvm::Value *LoadGEP = CGF.Builder.CreateLoad(Address(GEP, CGF.getPointerAlign()));
     return LoadGEP;
   }
@@ -1901,8 +1910,9 @@ static llvm::Value *emitReduceInitFunction(CodeGenModule &CGM,
   // Find the end of the array.
   llvm::Value *OrigBegin = OrigLV.getPointer(CGF);
   llvm::Value *PrivBegin = PrivLV.getPointer(CGF);
-  llvm::Value *PrivEnd = CGF.Builder.CreateInBoundsGEP(PrivBegin, NelemsValue,
-                                                      "arrayctor.dst.end");
+  llvm::Value *PrivEnd = CGF.Builder.CreateInBoundsGEP(
+      PrivBegin->getType()->getPointerElementType(), PrivBegin, NelemsValue,
+      "arrayctor.dst.end");
 
   // Enter the loop, setting up a phi for the current location to initialize.
   llvm::BasicBlock *EntryBB = CGF.Builder.GetInsertBlock();
@@ -1947,14 +1957,16 @@ static llvm::Value *emitReduceInitFunction(CodeGenModule &CGM,
   }
 
   // Go to the next element. Move OrigBegin too
-  llvm::Value *PrivNext =
-    CGF.Builder.CreateInBoundsGEP(PrivCur, llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
-                              "arrayctor.dst.next");
+  llvm::Value *PrivNext = CGF.Builder.CreateInBoundsGEP(
+      PrivCur->getType()->getPointerElementType(), PrivCur,
+      llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
+      "arrayctor.dst.next");
   PrivCur->addIncoming(PrivNext, CGF.Builder.GetInsertBlock());
 
-  llvm::Value *OrigDest =
-    CGF.Builder.CreateInBoundsGEP(OrigCur, llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
-                                  "arrayctor.src.next");
+  llvm::Value *OrigDest = CGF.Builder.CreateInBoundsGEP(
+      OrigCur->getType()->getPointerElementType(), OrigCur,
+      llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
+      "arrayctor.src.next");
   OrigCur->addIncoming(OrigDest, CGF.Builder.GetInsertBlock());
 
   // Check whether that's the end of the loop.
@@ -2021,8 +2033,9 @@ static llvm::Value *emitReduceCombFunction(CodeGenModule &CGM,
   // Find the end of the array.
   llvm::Value *InBegin = InLV.getPointer(CGF);
   llvm::Value *OutBegin = OutLV.getPointer(CGF);
-  llvm::Value *OutEnd = CGF.Builder.CreateInBoundsGEP(OutBegin, NelemsValue,
-                                                      "arrayctor.dst.end");
+  llvm::Value *OutEnd = CGF.Builder.CreateInBoundsGEP(
+      OutBegin->getType()->getPointerElementType(), OutBegin, NelemsValue,
+      "arrayctor.dst.end");
 
   // Enter the loop, setting up a phi for the current location to initialize.
   llvm::BasicBlock *EntryBB = CGF.Builder.GetInsertBlock();
@@ -2066,14 +2079,16 @@ static llvm::Value *emitReduceCombFunction(CodeGenModule &CGM,
   }
 
   // Go to the next element. Move InBegin too
-  llvm::Value *OutNext =
-    CGF.Builder.CreateInBoundsGEP(OutCur, llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
-                              "arrayctor.dst.next");
+  llvm::Value *OutNext = CGF.Builder.CreateInBoundsGEP(
+      OutCur->getType()->getPointerElementType(), OutCur,
+      llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
+      "arrayctor.dst.next");
   OutCur->addIncoming(OutNext, CGF.Builder.GetInsertBlock());
 
-  llvm::Value *InDest =
-    CGF.Builder.CreateInBoundsGEP(InCur, llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
-                                  "arrayctor.src.next");
+  llvm::Value *InDest = CGF.Builder.CreateInBoundsGEP(
+      InCur->getType()->getPointerElementType(), InCur,
+      llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
+      "arrayctor.src.next");
   InCur->addIncoming(InDest, CGF.Builder.GetInsertBlock());
 
   // Check whether that's the end of the loop.
