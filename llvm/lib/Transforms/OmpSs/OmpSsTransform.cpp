@@ -1049,13 +1049,17 @@ struct OmpSs {
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
       Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
-      Value *LBoundField = IRB.CreateGEP(LoopBounds, Idx, "lb_gep");
+      Value *LBoundField = IRB.CreateGEP(
+          LoopBounds->getType()->getPointerElementType(),
+          LoopBounds, Idx, "lb_gep");
       LBoundField = IRB.CreateLoad(
           LBoundField->getType()->getPointerElementType(), LBoundField);
       LBoundField = IRB.CreateZExtOrTrunc(LBoundField, IndVarTy, "lb");
 
       Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 1);
-      Value *UBoundField = IRB.CreateGEP(LoopBounds, Idx, "ub_gep");
+      Value *UBoundField = IRB.CreateGEP(
+          LoopBounds->getType()->getPointerElementType(),
+          LoopBounds, Idx, "ub_gep");
       UBoundField = IRB.CreateLoad(
           UBoundField->getType()->getPointerElementType(), UBoundField);
       UBoundField = IRB.CreateZExtOrTrunc(UBoundField, IndVarTy);
@@ -1154,8 +1158,9 @@ struct OmpSs {
     Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
     Idx[1] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
 
-    Value *GEPConstraints = BBBuilder.CreateGEP(
-          Constraints, Idx, "gep_" + Constraints->getName());
+    Value *GEPConstraints =
+        BBBuilder.CreateGEP(Constraints->getType()->getPointerElementType(),
+                            Constraints, Idx, "gep_" + Constraints->getName());
     Value *Cost = BBBuilder.CreateCall(CostInfo.Fun, CostInfo.Args);
     Value *CostCast = BBBuilder.CreateZExt(Cost, Nanos6TaskConstraints::getInstance(M).getType()->getElementType(0));
     BBBuilder.CreateStore(CostCast, GEPConstraints);
@@ -1298,12 +1303,14 @@ struct OmpSs {
       IRBTranslate.getContext()), DepSymToIdx.at(DSA));
     Idx[1] = Constant::getNullValue(Type::getInt32Ty(IRBTranslate.getContext()));
     Value *LocalAddr = IRBTranslate.CreateGEP(
+        AddrTranslationTable->getType()->getPointerElementType(),
         AddrTranslationTable, Idx, "local_lookup_" + DSA->getName());
     LocalAddr = IRBTranslate.CreateLoad(
         LocalAddr->getType()->getPointerElementType(), LocalAddr);
 
     Idx[1] = ConstantInt::get(Type::getInt32Ty(IRBTranslate.getContext()), 1);
     Value *DeviceAddr = IRBTranslate.CreateGEP(
+        AddrTranslationTable->getType()->getPointerElementType(),
         AddrTranslationTable, Idx, "device_lookup_" + DSA->getName());
     DeviceAddr = IRBTranslate.CreateLoad(
         DeviceAddr->getType()->getPointerElementType(), DeviceAddr);
@@ -1311,8 +1318,12 @@ struct OmpSs {
     // Res = device_addr + (DSA_addr - local_addr)
     Value *Translation = IRBTranslate.CreateBitCast(
       DepBase, Type::getInt8PtrTy(IRBTranslate.getContext()));
-    Translation = IRBTranslate.CreateGEP(Translation, IRBTranslate.CreateNeg(LocalAddr));
-    Translation = IRBTranslate.CreateGEP(Translation, DeviceAddr);
+    Translation =
+        IRBTranslate.CreateGEP(Translation->getType()->getPointerElementType(),
+                               Translation, IRBTranslate.CreateNeg(LocalAddr));
+    Translation =
+        IRBTranslate.CreateGEP(Translation->getType()->getPointerElementType(),
+                               Translation, DeviceAddr);
 
     // Store the translation in task_args
     if (auto *LUnpackedDSA = dyn_cast<LoadInst>(UnpackedDSA)) {
@@ -1351,6 +1362,7 @@ struct OmpSs {
       Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
       Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), StructToIdxMap.lookup(V));
       Value *GEP = BBBuilder.CreateGEP(
+          OlDepsFuncTaskArgs->getType()->getPointerElementType(),
           OlDepsFuncTaskArgs, Idx, "gep_" + V->getName());
       Value *LGEP =
           BBBuilder.CreateLoad(GEP->getType()->getPointerElementType(), GEP,
@@ -1363,6 +1375,7 @@ struct OmpSs {
       Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
       Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), StructToIdxMap.lookup(V));
       Value *GEP = BBBuilder.CreateGEP(
+          OlDepsFuncTaskArgs->getType()->getPointerElementType(),
           OlDepsFuncTaskArgs, Idx, "gep_" + V->getName());
 
       // VLAs
@@ -1377,6 +1390,7 @@ struct OmpSs {
       Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
       Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), StructToIdxMap.lookup(V));
       Value *GEP = BBBuilder.CreateGEP(
+          OlDepsFuncTaskArgs->getType()->getPointerElementType(),
           OlDepsFuncTaskArgs, Idx, "gep_" + V->getName());
 
       // VLAs
@@ -1391,6 +1405,7 @@ struct OmpSs {
       Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
       Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), StructToIdxMap.lookup(V));
       Value *GEP = BBBuilder.CreateGEP(
+          OlDepsFuncTaskArgs->getType()->getPointerElementType(),
           OlDepsFuncTaskArgs, Idx, "capt_gep" + V->getName());
       Value *LGEP =
           BBBuilder.CreateLoad(GEP->getType()->getPointerElementType(), GEP,
@@ -1503,7 +1518,9 @@ struct OmpSs {
     }
 
     Value *TaskArgsDstLi8 = IRB.CreateBitCast(TaskArgsDstL, IRB.getInt8PtrTy());
-    Value *TaskArgsDstLi8IdxGEP = IRB.CreateGEP(TaskArgsDstLi8, TaskArgsStructSizeOf, "args_end");
+    Value *TaskArgsDstLi8IdxGEP =
+        IRB.CreateGEP(TaskArgsDstLi8->getType()->getPointerElementType(),
+                      TaskArgsDstLi8, TaskArgsStructSizeOf, "args_end");
 
     // First point VLAs to its according space in task args
     for (const VLAAlign& VAlign : VLAAlignsInfo) {
@@ -1515,8 +1532,9 @@ struct OmpSs {
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
       Idx[1] = ConstantInt::get(IRB.getInt32Ty(), StructToIdxMap.lookup(V));
-      Value *GEP = IRB.CreateGEP(
-          TaskArgsDstL, Idx, "gep_dst_" + V->getName());
+      Value *GEP =
+          IRB.CreateGEP(TaskArgsDstL->getType()->getPointerElementType(),
+                        TaskArgsDstL, Idx, "gep_dst_" + V->getName());
 
       // Point VLA in task args to an aligned position of the extra space allocated
       Value *GEPi8 = IRB.CreateBitCast(GEP, IRB.getInt8PtrTy()->getPointerTo());
@@ -1528,13 +1546,16 @@ struct OmpSs {
         Value *Idx[2];
         Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
         Idx[1] = ConstantInt::get(IRB.getInt32Ty(), StructToIdxMap.lookup(Dim));
-        Value *GEPDst = IRB.CreateGEP(
-          TaskArgsDstL, Idx, "gep_dst_" + Dim->getName());
+        Value *GEPDst =
+            IRB.CreateGEP(TaskArgsDstL->getType()->getPointerElementType(),
+                          TaskArgsDstL, Idx, "gep_dst_" + Dim->getName());
         GEPDst =
             IRB.CreateLoad(GEPDst->getType()->getPointerElementType(), GEPDst);
         VLASize = IRB.CreateNUWMul(VLASize, GEPDst);
       }
-      TaskArgsDstLi8IdxGEP = IRB.CreateGEP(TaskArgsDstLi8IdxGEP, VLASize);
+      TaskArgsDstLi8IdxGEP = IRB.CreateGEP(
+          TaskArgsDstLi8IdxGEP->getType()->getPointerElementType(),
+          TaskArgsDstLi8IdxGEP, VLASize);
     }
 
     for (auto *V : DSAInfo.Shared) {
@@ -1542,8 +1563,10 @@ struct OmpSs {
       Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
       Idx[1] = ConstantInt::get(IRB.getInt32Ty(), StructToIdxMap.lookup(V));
       Value *GEPSrc = IRB.CreateGEP(
+          TaskArgsSrc->getType()->getPointerElementType(),
           TaskArgsSrc, Idx, "gep_src_" + V->getName());
       Value *GEPDst = IRB.CreateGEP(
+          TaskArgsDstL->getType()->getPointerElementType(),
           TaskArgsDstL, Idx, "gep_dst_" + V->getName());
       IRB.CreateStore(
           IRB.CreateLoad(GEPSrc->getType()->getPointerElementType(), GEPSrc),
@@ -1570,8 +1593,9 @@ struct OmpSs {
             Value *Idx[2];
             Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
             Idx[1] = ConstantInt::get(IRB.getInt32Ty(), StructToIdxMap.lookup(Dim));
-            Value *GEPSrc = IRB.CreateGEP(
-              TaskArgsSrc, Idx, "gep_src_" + Dim->getName());
+            Value *GEPSrc =
+                IRB.CreateGEP(TaskArgsSrc->getType()->getPointerElementType(),
+                              TaskArgsSrc, Idx, "gep_src_" + Dim->getName());
             GEPSrc = IRB.CreateLoad(GEPSrc->getType()->getPointerElementType(),
                                     GEPSrc);
             NSize = IRB.CreateNUWMul(NSize, GEPSrc);
@@ -1581,8 +1605,9 @@ struct OmpSs {
         Value *Idx[2];
         Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
         Idx[1] = ConstantInt::get(IRB.getInt32Ty(), StructToIdxMap.lookup(V));
-        Value *GEP = IRB.CreateGEP(
-            TaskArgsDstL, Idx, "gep_" + V->getName());
+        Value *GEP =
+            IRB.CreateGEP(TaskArgsDstL->getType()->getPointerElementType(),
+                          TaskArgsDstL, Idx, "gep_" + V->getName());
 
         // VLAs
         if (VLADimsInfo.count(V))
@@ -1614,8 +1639,9 @@ struct OmpSs {
           Value *Idx[2];
           Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
           Idx[1] = ConstantInt::get(IRB.getInt32Ty(), StructToIdxMap.lookup(Dim));
-          Value *GEPSrc = IRB.CreateGEP(
-            TaskArgsSrc, Idx, "gep_src_" + Dim->getName());
+          Value *GEPSrc =
+              IRB.CreateGEP(TaskArgsSrc->getType()->getPointerElementType(),
+                            TaskArgsSrc, Idx, "gep_src_" + Dim->getName());
           GEPSrc = IRB.CreateLoad(GEPSrc->getType()->getPointerElementType(),
                                   GEPSrc);
           NSize = IRB.CreateNUWMul(NSize, GEPSrc);
@@ -1627,10 +1653,12 @@ struct OmpSs {
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
       Idx[1] = ConstantInt::get(IRB.getInt32Ty(), StructToIdxMap.lookup(V));
-      Value *GEPSrc = IRB.CreateGEP(
-          TaskArgsSrc, Idx, "gep_src_" + V->getName());
-      Value *GEPDst = IRB.CreateGEP(
-          TaskArgsDstL, Idx, "gep_dst_" + V->getName());
+      Value *GEPSrc =
+          IRB.CreateGEP(TaskArgsSrc->getType()->getPointerElementType(),
+                        TaskArgsSrc, Idx, "gep_src_" + V->getName());
+      Value *GEPDst =
+          IRB.CreateGEP(TaskArgsDstL->getType()->getPointerElementType(),
+                        TaskArgsDstL, Idx, "gep_dst_" + V->getName());
 
       // VLAs
       if (VLADimsInfo.count(V)) {
@@ -1662,10 +1690,12 @@ struct OmpSs {
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
       Idx[1] = ConstantInt::get(IRB.getInt32Ty(), StructToIdxMap.lookup(V));
-      Value *GEPSrc = IRB.CreateGEP(
-          TaskArgsSrc, Idx, "capt_gep_src_" + V->getName());
-      Value *GEPDst = IRB.CreateGEP(
-          TaskArgsDstL, Idx, "capt_gep_dst_" + V->getName());
+      Value *GEPSrc =
+          IRB.CreateGEP(TaskArgsSrc->getType()->getPointerElementType(),
+                        TaskArgsSrc, Idx, "capt_gep_src_" + V->getName());
+      Value *GEPDst =
+          IRB.CreateGEP(TaskArgsDstL->getType()->getPointerElementType(),
+                        TaskArgsDstL, Idx, "capt_gep_dst_" + V->getName());
       IRB.CreateStore(
           IRB.CreateLoad(GEPSrc->getType()->getPointerElementType(), GEPSrc),
           GEPDst);
@@ -2572,13 +2602,17 @@ struct OmpSs {
         Value *Idx[2];
         Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
         Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
-        Value *LBoundField = IRB.CreateGEP(LoopBounds, Idx, "lb_gep");
+        Value *LBoundField =
+            IRB.CreateGEP(LoopBounds->getType()->getPointerElementType(),
+                          LoopBounds, Idx, "lb_gep");
         LBoundField = IRB.CreateLoad(
             LBoundField->getType()->getPointerElementType(), LBoundField);
         LBoundField = IRB.CreateZExtOrTrunc(LBoundField, NewIndVarTy, "lb");
 
         Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 1);
-        Value *UBoundField = IRB.CreateGEP(LoopBounds, Idx, "ub_gep");
+        Value *UBoundField =
+            IRB.CreateGEP(LoopBounds->getType()->getPointerElementType(),
+                          LoopBounds, Idx, "ub_gep");
         UBoundField = IRB.CreateLoad(
             UBoundField->getType()->getPointerElementType(), UBoundField);
         UBoundField = IRB.CreateZExtOrTrunc(UBoundField, NewIndVarTy, "ub");
@@ -2859,7 +2893,9 @@ struct OmpSs {
         Idx[0] = Constant::getNullValue(Type::getInt32Ty(IRB.getContext()));
         Idx[1] = Constant::getNullValue(Type::getInt32Ty(IRB.getContext()));
         Idx[2] = ConstantInt::get(Type::getInt32Ty(IRB.getContext()), 3);
-        Value *LabelField = IRB.CreateGEP(TaskImplInfoVar, Idx, "ASDF");
+        Value *LabelField =
+            IRB.CreateGEP(TaskImplInfoVar->getType()->getPointerElementType(),
+                          TaskImplInfoVar, Idx, "ASDF");
         IRB.CreateStore(DirEnv.Label, LabelField);
       }
 
@@ -2916,7 +2952,9 @@ struct OmpSs {
           TaskArgsVar->getType()->getPointerElementType(), TaskArgsVar);
 
       Value *TaskArgsVarLi8 = IRB.CreateBitCast(TaskArgsVarL, IRB.getInt8PtrTy());
-      Value *TaskArgsVarLi8IdxGEP = IRB.CreateGEP(TaskArgsVarLi8, TaskArgsStructSizeOf, "args_end");
+      Value *TaskArgsVarLi8IdxGEP =
+          IRB.CreateGEP(TaskArgsVarLi8->getType()->getPointerElementType(),
+                        TaskArgsVarLi8, TaskArgsStructSizeOf, "args_end");
 
       SmallVector<VLAAlign, 2> VLAAlignsInfo;
       computeVLAsAlignOrder(M, VLAAlignsInfo, VLADimsInfo);
@@ -2931,8 +2969,9 @@ struct OmpSs {
         Value *Idx[2];
         Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
         Idx[1] = ConstantInt::get(IRB.getInt32Ty(), TaskArgsToStructIdxMap[V]);
-        Value *GEP = IRB.CreateGEP(
-            TaskArgsVarL, Idx, "gep_" + V->getName());
+        Value *GEP =
+            IRB.CreateGEP(TaskArgsVarL->getType()->getPointerElementType(),
+                          TaskArgsVarL, Idx, "gep_" + V->getName());
 
         // Point VLA in task args to an aligned position of the extra space allocated
         Value *GEPi8 = IRB.CreateBitCast(GEP, IRB.getInt8PtrTy()->getPointerTo());
@@ -2942,7 +2981,9 @@ struct OmpSs {
         Value *VLASize = ConstantInt::get(IRB.getInt64Ty(), SizeB);
         for (auto *Dim : VLADimsInfo.lookup(V))
           VLASize = IRB.CreateNUWMul(VLASize, Dim);
-        TaskArgsVarLi8IdxGEP = IRB.CreateGEP(TaskArgsVarLi8IdxGEP, VLASize);
+        TaskArgsVarLi8IdxGEP = IRB.CreateGEP(
+            TaskArgsVarLi8IdxGEP->getType()->getPointerElementType(),
+            TaskArgsVarLi8IdxGEP, VLASize);
       }
 
       for (Value *V : DSAInfo.Shared) {
@@ -2950,6 +2991,7 @@ struct OmpSs {
         Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
         Idx[1] = ConstantInt::get(IRB.getInt32Ty(), TaskArgsToStructIdxMap[V]);
         Value *GEP = IRB.CreateGEP(
+            TaskArgsVarL->getType()->getPointerElementType(),
             TaskArgsVarL, Idx, "gep_" + V->getName());
         IRB.CreateStore(V, GEP);
       }
@@ -2978,6 +3020,7 @@ struct OmpSs {
           Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
           Idx[1] = ConstantInt::get(IRB.getInt32Ty(), TaskArgsToStructIdxMap[V]);
           Value *GEP = IRB.CreateGEP(
+              TaskArgsVarL->getType()->getPointerElementType(),
               TaskArgsVarL, Idx, "gep_" + V->getName());
 
           // VLAs
@@ -3016,6 +3059,7 @@ struct OmpSs {
         Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
         Idx[1] = ConstantInt::get(IRB.getInt32Ty(), TaskArgsToStructIdxMap[V]);
         Value *GEP = IRB.CreateGEP(
+            TaskArgsVarL->getType()->getPointerElementType(),
             TaskArgsVarL, Idx, "gep_" + V->getName());
 
         // VLAs
@@ -3044,6 +3088,7 @@ struct OmpSs {
         Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
         Idx[1] = ConstantInt::get(IRB.getInt32Ty(), TaskArgsToStructIdxMap[V]);
         Value *GEP = IRB.CreateGEP(
+            TaskArgsVarL->getType()->getPointerElementType(),
             TaskArgsVarL, Idx, "capt_gep_" + V->getName());
         IRB.CreateStore(V, GEP);
       }
