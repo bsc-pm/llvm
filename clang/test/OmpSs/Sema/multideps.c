@@ -34,8 +34,8 @@ int main() {
     #pragma oss task in( { v1[ii], i=0:10:1,}, v) // expected-error {{expected iterator identifier}}
     #pragma oss task in( { v[ii][j], i=0:10:1,}, v) // expected-error {{expected iterator identifier}} expected-error {{use of undeclared identifier 'j'}}
     #pragma oss task in( { , i=0:10:1}, v) // expected-error {{expected expression}}
-    #pragma oss task in( { v1[ii], i=0¿10}, v) // expected-error {{expected ':' or ';'}}
-    #pragma oss task in( { v1[ii], i=0¿10:}, v) // expected-error {{expected ':' or ';'}}
+    #pragma oss task in( { v1[ii], i=0¿10}, v) // expected-error {{invalid suffix '¿10' on integer constant}} expected-error {{expected ':' or ';'}}
+    #pragma oss task in( { v1[ii], i=0¿10:}, v) // expected-error {{invalid suffix '¿10' on integer constant}} expected-error {{expected expression}}
 
     #pragma oss task in( { v1[ii], i = {0, v, 2}} ) // expected-warning {{incompatible pointer to integer conversion initializing 'int' with an expression of type 'int [10][20]'}}
     #pragma oss task in( { v1[ii], i|0:10:0, j = 0 }, v) // expected-error {{expected '='}} expected-error {{expected ':' or ';'}}

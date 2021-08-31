@@ -37,8 +37,6 @@ for.end:                                          ; preds = %for.cond
 ; CHECK: define internal void @nanos6_unpacked_task_region_main0(i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table)
 ; CHECK: newFuncRoot:
 ; CHECK-NEXT:   br label %0
-; CHECK: .exitStub:                                        ; preds = %for.end
-; CHECK-NEXT:   ret void
 ; CHECK: 0:                                                ; preds = %newFuncRoot
 ; CHECK-NEXT:   %i = alloca i32, align 4
 ; CHECK-NEXT:   store i32 0, i32* %i, align 4
@@ -56,6 +54,8 @@ for.end:                                          ; preds = %for.cond
 ; CHECK-NEXT:   %inc = add nsw i32 %2, 1
 ; CHECK-NEXT:   store i32 %inc, i32* %i, align 4
 ; CHECK-NEXT:   br label %for.cond
+; CHECK: .exitStub:                                        ; preds = %for.end
+; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
 ; Function Attrs: nounwind

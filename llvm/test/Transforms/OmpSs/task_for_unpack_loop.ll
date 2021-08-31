@@ -116,8 +116,6 @@ entry:
 ; CHECK: define internal void @nanos6_unpacked_task_region_foo0(i32* %i, %nanos6_loop_bounds_t* %loop_bounds, %nanos6_address_translation_entry_t* %address_translation_table)
 ; CHECK: newFuncRoot:
 ; CHECK-NEXT:   br label %0
-; CHECK: .exitStub:                                        ; preds = %for.cond22
-; CHECK-NEXT:   ret void
 ; CHECK: 0:                                                ; preds = %newFuncRoot
 ; CHECK-NEXT:   %lb_gep = getelementptr %nanos6_loop_bounds_t, %nanos6_loop_bounds_t* %loop_bounds, i32 0, i32 0
 ; CHECK-NEXT:   %1 = load i64, i64* %lb_gep, align 8
@@ -162,13 +160,13 @@ entry:
 ; CHECK-NEXT:   %27 = add i32 %26, 1
 ; CHECK-NEXT:   store i32 %27, i32* %loop, align 4
 ; CHECK-NEXT:   br label %for.cond22
+; CHECK: .exitStub:                                        ; preds = %for.cond22
+; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
 ; CHECK: define internal void @nanos6_unpacked_task_region_foo1(i32* %i1, %nanos6_loop_bounds_t* %loop_bounds, %nanos6_address_translation_entry_t* %address_translation_table)
 ; CHECK: newFuncRoot:
 ; CHECK-NEXT:   br label %0
-; CHECK: .exitStub:                                        ; preds = %for.cond28
-; CHECK-NEXT:   ret void
 ; CHECK: 0:                                                ; preds = %newFuncRoot
 ; CHECK-NEXT:   %lb_gep = getelementptr %nanos6_loop_bounds_t, %nanos6_loop_bounds_t* %loop_bounds, i32 0, i32 0
 ; CHECK-NEXT:   %1 = load i64, i64* %lb_gep, align 8
@@ -213,13 +211,13 @@ entry:
 ; CHECK-NEXT:   %27 = add i32 %26, 1
 ; CHECK-NEXT:   store i32 %27, i32* %loop, align 4
 ; CHECK-NEXT:   br label %for.cond28
+; CHECK: .exitStub:                                        ; preds = %for.cond28
+; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
 ; CHECK: define internal void @nanos6_unpacked_task_region_foo2(i32* %i2, %nanos6_loop_bounds_t* %loop_bounds, %nanos6_address_translation_entry_t* %address_translation_table)
 ; CHECK: newFuncRoot:
 ; CHECK-NEXT:   br label %0
-; CHECK: .exitStub:                                        ; preds = %for.cond37
-; CHECK-NEXT:   ret void
 ; CHECK: 0:                                                ; preds = %newFuncRoot
 ; CHECK-NEXT:   %lb_gep = getelementptr %nanos6_loop_bounds_t, %nanos6_loop_bounds_t* %loop_bounds, i32 0, i32 0
 ; CHECK-NEXT:   %1 = load i64, i64* %lb_gep, align 8
@@ -264,13 +262,13 @@ entry:
 ; CHECK-NEXT:   %27 = add i32 %26, 1
 ; CHECK-NEXT:   store i32 %27, i32* %loop, align 4
 ; CHECK-NEXT:   br label %for.cond37
+; CHECK: .exitStub:                                        ; preds = %for.cond37
+; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
 ; CHECK: define internal void @nanos6_unpacked_task_region_foo3(i32* %i3, %nanos6_loop_bounds_t* %loop_bounds, %nanos6_address_translation_entry_t* %address_translation_table)
 ; CHECK: newFuncRoot:
 ; CHECK-NEXT:   br label %0
-; CHECK: .exitStub:                                        ; preds = %for.cond46
-; CHECK-NEXT:   ret void
 ; CHECK: 0:                                                ; preds = %newFuncRoot
 ; CHECK-NEXT:   %lb_gep = getelementptr %nanos6_loop_bounds_t, %nanos6_loop_bounds_t* %loop_bounds, i32 0, i32 0
 ; CHECK-NEXT:   %1 = load i64, i64* %lb_gep, align 8
@@ -315,6 +313,8 @@ entry:
 ; CHECK-NEXT:   %27 = add i32 %26, 1
 ; CHECK-NEXT:   store i32 %27, i32* %loop, align 4
 ; CHECK-NEXT:   br label %for.cond46
+; CHECK: .exitStub:                                        ; preds = %for.cond46
+; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
 attributes #0 = { noinline nounwind optnone "frame-pointer"="none" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }

@@ -34,8 +34,8 @@ void foo() {
     #pragma oss task in( { v1[ii], i=0:10:1,}, v) // expected-error {{expected iterator identifier}}
     #pragma oss task in( { v[ii][j], i=0:10:1,}, v) // expected-error {{expected iterator identifier}} expected-error {{use of undeclared identifier 'j'}}
     #pragma oss task in( { , i=0:10:1}, v) // expected-error {{expected expression}}
-    #pragma oss task in( { v1[ii], i=0¿10}, v) // expected-error {{expected ':' or ';'}}
-    #pragma oss task in( { v1[ii], i=0¿10:}, v) // expected-error {{expected ':' or ';'}}
+    #pragma oss task in( { v1[ii], i=0¿10}, v) // expected-error {{invalid suffix '¿10' on integer constant}} expected-error {{expected ':' or ';'}}
+    #pragma oss task in( { v1[ii], i=0¿10:}, v) // expected-error {{invalid suffix '¿10' on integer constant}} expected-error {{expected expression}}
 
     #pragma oss task in( { v1[ii], i = {0, v, 2}} ) // expected-error {{cannot initialize an array element of type 'int' with an lvalue of type 'int [10][10]'}}
     #pragma oss task in( { v1[ii], i = {} } ) // expected-error {{expected a non-empty list}}
