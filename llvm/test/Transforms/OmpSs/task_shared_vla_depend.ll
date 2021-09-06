@@ -211,8 +211,6 @@ entry:
 ; CHECK: define internal void @nanos6_unpacked_task_region_foo0(i32* %vla, i64 %0, i64 %1, i64 %2, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) !dbg !19 {
 ; CHECK: newFuncRoot:
 ; CHECK-NEXT:   br label %3
-; CHECK: .exitStub:                                        ; preds = %3
-; CHECK-NEXT:   ret void
 ; CHECK: 3:                                                ; preds = %newFuncRoot
 ; CHECK-NEXT:   %size = alloca i32, align 4
 ; CHECK-NEXT:   %4 = mul nuw i64 %0, %1
@@ -221,6 +219,8 @@ entry:
 ; CHECK-NEXT:   %conv = trunc i64 %6 to i32
 ; CHECK-NEXT:   store i32 %conv, i32* %size, align 4
 ; CHECK-NEXT:   br label %.exitStub
+; CHECK: .exitStub:                                        ; preds = %3
+; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
 ; CHECK: define internal void @nanos6_ol_task_region_foo0(%nanos6_task_args_foo0* %task_args, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) {

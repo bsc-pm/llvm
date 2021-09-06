@@ -165,8 +165,6 @@ entry:
 ; CHECK: define internal void @nanos6_unpacked_task_region_main0(i32* %i, i32* %j, %nanos6_loop_bounds_t* %loop_bounds, %nanos6_address_translation_entry_t* %address_translation_table)
 ; CHECK: newFuncRoot:
 ; CHECK-NEXT:   br label %0
-; CHECK: .exitStub:                                        ; preds = %for.cond5
-; CHECK-NEXT:   ret void
 ; CHECK: 0:                                                ; preds = %newFuncRoot
 ; CHECK-NEXT:   %lb_gep = getelementptr %nanos6_loop_bounds_t, %nanos6_loop_bounds_t* %loop_bounds, i32 0, i32 0
 ; CHECK-NEXT:   %1 = load i64, i64* %lb_gep, align 8
@@ -234,8 +232,9 @@ entry:
 ; CHECK-NEXT:   %48 = add i64 %47, 1
 ; CHECK-NEXT:   store i64 %48, i64* %loop, align 8
 ; CHECK-NEXT:   br label %for.cond5
+; CHECK: .exitStub:                                        ; preds = %for.cond5
+; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
-
 attributes #0 = { noinline nounwind optnone "frame-pointer"="none" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nounwind }
 attributes #2 = { "min-legal-vector-width"="0" }
