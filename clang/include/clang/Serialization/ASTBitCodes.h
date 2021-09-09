@@ -1064,8 +1064,11 @@ enum PredefinedTypeIDs {
   /// \brief The '__bf16' type
   PREDEF_TYPE_BFLOAT16_ID = 73,
 
+  /// \brief The '__ibm128' type
+  PREDEF_TYPE_IBM128_ID = 74,
+
   /// The placeholder type for OmpSs array section.
-  PREDEF_TYPE_OSS_ARRAY_SECTION = 74,
+  PREDEF_TYPE_OSS_ARRAY_SECTION = 75,
 
 /// OpenCL image types with auto numeration
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix)                   \
