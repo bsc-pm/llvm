@@ -106,6 +106,7 @@ static int __kmp_unregister_root_other_thread(int gtid);
 #endif
 static void __kmp_reap_thread(kmp_info_t *thread, int is_root);
 kmp_info_t *__kmp_thread_pool_insert_pt = NULL;
+kmp_info_t *__kmp_free_agent_list_insert_pt;
 
 void __kmp_resize_dist_barrier(kmp_team_t *team, int old_nthreads,
                                int new_nthreads);
@@ -3886,7 +3887,7 @@ int __kmp_register_root(int initial_thread) {
     root->r.is_free_agent_thread_active[i] = thread_starts_active;
   }
 
-  __kmp_allocate_free_agent_threads(root);
+  //__kmp_allocate_free_agent_threads(root);
 
   // The root team is a serial team, so enable tasking for it
   // if we have free agent threads.
@@ -4346,6 +4347,60 @@ kmp_info_t *__kmp_allocate_thread_common(kmp_root_t *root, kmp_team_t *team,
     KMP_MB();
     return new_thr;
   }
+  /*If not, try to transform a free agent into a worker*/
+  if(__kmp_free_agent_list){
+    new_thr = CCAST(kmp_info_t *, __kmp_free_agent_list);
+    __kmp_free_agent_list = (volatile kmp_info_t *)new_thr->th.th_next_free_agent;
+    if (new_thr == __kmp_free_agent_list_insert_pt) {
+      __kmp_free_agent_list_insert_pt = NULL;
+    }
+  	
+    //__kmp_suspend_initialize_thread(new_thr);
+    //__kmp_lock_suspend_mx(new_thr);
+    
+    KMP_ATOMIC_ST_RLX(&new_thr->th.is_free_agent, false);
+    //new_thr->th.is_free_agent = false;
+    new_thr->th.free_agent_id = -1;
+    KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+    
+    //__kmp_unlock_suspend_mx(new_thr);
+    /* setup the thread structure */
+    __kmp_initialize_info(new_thr, team, new_tid,
+                          new_thr->th.th_info.ds.ds_gtid);
+    KMP_DEBUG_ASSERT(new_thr->th.th_serial_team);
+
+    TCW_4(__kmp_nth, __kmp_nth + 1);
+
+    new_thr->th.th_task_state = 0;
+    new_thr->th.th_task_state_top = 0;
+    new_thr->th.th_task_state_stack_sz = 4;
+
+    if (__kmp_barrier_gather_pattern[bs_forkjoin_barrier] == bp_dist_bar) {
+      // Make sure pool thread has transitioned to waiting on own thread struct
+      KMP_DEBUG_ASSERT(new_thr->th.th_used_in_team.load() == 0);
+      // Thread activated in __kmp_allocate_team when increasing team size
+    }
+#ifdef KMP_ADJUST_BLOCKTIME
+    /* Adjust blocktime back to zero if necessary */
+    /* Middle initialization might not have occurred yet */
+    if (!__kmp_env_blocktime && (__kmp_avail_proc > 0)) {
+      if (__kmp_nth > __kmp_avail_proc) 
+        __kmp_zero_bt = TRUE;
+    }
+#endif /* KMP_ADJUST_BLOCKTIME */
+#if KMP_DEBUG
+    // If thread entered pool via __kmp_free_thread, wait_flag should !=
+    // KMP_BARRIER_PARENT_FLAG.
+    int b;
+    kmp_balign_t *balign = new_thr->th.th_bar;
+    for (b = 0; b < bs_last_barrier; ++b)
+      KMP_DEBUG_ASSERT(balign[b].bb.wait_flag != KMP_BARRIER_PARENT_FLAG);
+#endif
+    KF_TRACE(10, ("__kmp_allocate_thread: T#%d using thread %p T#%d\n",
+                  __kmp_get_gtid(), new_thr, new_thr->th.th_info.ds.ds_gtid));
+    KMP_MB();
+    return new_thr;
+  }
 
   /* no, well fork a new one */
   KMP_ASSERT(__kmp_nth == __kmp_all_nth);
@@ -4542,6 +4597,8 @@ kmp_info_t *__kmp_allocate_thread_common(kmp_root_t *root, kmp_team_t *team,
 
   if (!is_free_agent) {
     new_thr->th.is_free_agent = false;
+    new_thr->th.free_agent_id = -1;
+    new_thr->th.th_next_free_agent = NULL;
 
     /* actually fork it and create the new worker thread */
     KF_TRACE(
@@ -5842,90 +5899,158 @@ void __kmp_free_thread(kmp_info_t *this_th) {
   }
   this_th->th.th_task_state = 0;
   this_th->th.th_reap_state = KMP_SAFE_TO_REAP;
+  //TODO: check if the thread can become a free agent when that's implemented
+  if(__kmp_free_agent_num_threads > __kmp_free_agent_active_nth){
 
-  /* put thread back on the free pool */
-  TCW_PTR(this_th->th.th_team, NULL);
-  TCW_PTR(this_th->th.th_root, NULL);
-  TCW_PTR(this_th->th.th_dispatch, NULL); /* NOT NEEDED */
+		//TODO: Do we need a root in the free agent?
+		//this_th->th.th_root = 
+		this_th->th.free_agent_id = -1;
 
-  while (this_th->th.th_cg_roots) {
-    this_th->th.th_cg_roots->cg_nthreads--;
-    KA_TRACE(100, ("__kmp_free_thread: Thread %p decrement cg_nthreads on node"
-                   " %p of thread  %p to %d\n",
-                   this_th, this_th->th.th_cg_roots,
-                   this_th->th.th_cg_roots->cg_root,
-                   this_th->th.th_cg_roots->cg_nthreads));
-    kmp_cg_root_t *tmp = this_th->th.th_cg_roots;
-    if (tmp->cg_root == this_th) { // Thread is a cg_root
-      KMP_DEBUG_ASSERT(tmp->cg_nthreads == 0);
-      KA_TRACE(
-          5, ("__kmp_free_thread: Thread %p freeing node %p\n", this_th, tmp));
-      this_th->th.th_cg_roots = tmp->up;
-      __kmp_free(tmp);
-    } else { // Worker thread
-      if (tmp->cg_nthreads == 0) { // last thread leaves contention group
-        __kmp_free(tmp);
-      }
-      this_th->th.th_cg_roots = NULL;
-      break;
-    }
+  	kmp_taskdata_t *task = (kmp_taskdata_t *)__kmp_allocate(sizeof(kmp_taskdata_t)*1);
+  	this_th->th.th_current_task = task;
+
+  	this_th->th.allowed_teams_capacity = 2;
+  	this_th->th.allowed_teams_length = 0;
+  	this_th->th.allowed_teams = (kmp_task_team_t **)__kmp_allocate(
+  			sizeof(kmp_task_team_t *) * this_th->th.allowed_teams_capacity);
+  	__kmp_init_bootstrap_lock(&this_th->th.allowed_teams_lock);
+
+  	task->td_task_id = KMP_GEN_TASK_ID();
+  	task->td_team = NULL;
+  	task->td_ident = NULL;
+  	task->td_taskwait_ident = NULL;
+  	task->td_taskwait_counter = 0;
+  	task->td_taskwait_thread = 0;
+
+  	task->td_flags.tiedness = TASK_TIED;
+  	task->td_flags.tasktype = TASK_IMPLICIT;
+  	task->td_flags.proxy = TASK_FULL;
+  	task->td_flags.task_serial = 1;
+  	task->td_flags.tasking_ser = (__kmp_tasking_mode == tskm_immediate_exec);
+  	task->td_flags.team_serial = 0;
+
+  	task->td_depnode = NULL;
+  	task->td_last_tied = task;
+  	task->td_allow_completion_event.pending_events_count = -1;
+  	task->td_allow_completion_event.ed.task = nullptr;
+
+  	KMP_DEBUG_ASSERT(task->td_incomplete_child_tasks == 0);
+  	KMP_DEBUG_ASSERT(task->td_allocated_child_tasks == 0);
+
+  	gtid = this_th->th.th_info.ds.ds_gtid;
+  	if(__kmp_free_agent_list_insert_pt != NULL){
+  		KMP_DEBUG_ASSERT(__kmp_free_agent_list != NULL);
+  		if(__kmp_free_agent_list_insert_pt->th.th_info.ds.ds_gtid > gtid)
+  			__kmp_free_agent_list_insert_pt = NULL;
+  	}
+  	
+  	if(__kmp_free_agent_list_insert_pt != NULL){
+  		scan = &(__kmp_free_agent_list_insert_pt->th.th_next_free_agent);
+  	}
+  	else{
+  		scan = CCAST(kmp_info_t **, &__kmp_free_agent_list);
+  	}
+  	for(; (*scan != NULL) && ((*scan)->th.th_info.ds.ds_gtid < gtid);
+  			scan = &((*scan)->th.th_next_free_agent));
+		TCW_PTR(this_th->th.th_next_free_agent, *scan);
+		__kmp_free_agent_list_insert_pt = *scan = this_th;
+		KMP_DEBUG_ASSERT((this_th->th.th_next_free_agent == NULL) ||
+										 (this_th->th.th_info.ds.ds_gtid <
+										  this_th->th.th_next_free_agent->th.th_info.ds.ds_gtid));
+
+  	//__kmp_suspend_initialize_thread(this_th);
+  	//__kmp_lock_suspend_mx(this_th);
+  	//this_th->th.is_free_agent = true;
+  	KMP_ATOMIC_ST_RLX(&this_th->th.is_free_agent, true);
+  	KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
+  	//__kmp_unlock_suspend_mx(this_th);
+
+  	
   }
+  else{
+  	/* put thread back on the free pool */
+	  TCW_PTR(this_th->th.th_team, NULL);
+	  TCW_PTR(this_th->th.th_root, NULL);
+ 		TCW_PTR(this_th->th.th_dispatch, NULL); /* NOT NEEDED */
 
-  /* If the implicit task assigned to this thread can be used by other threads
-   * -> multiple threads can share the data and try to free the task at
-   * __kmp_reap_thread at exit. This duplicate use of the task data can happen
-   * with higher probability when hot team is disabled but can occurs even when
-   * the hot team is enabled */
-  __kmp_free_implicit_task(this_th);
-  this_th->th.th_current_task = NULL;
+	  while (this_th->th.th_cg_roots) {
+  	  this_th->th.th_cg_roots->cg_nthreads--;
+    	KA_TRACE(100, ("__kmp_free_thread: Thread %p decrement cg_nthreads on node"
+      	             " %p of thread  %p to %d\n",
+        	           this_th, this_th->th.th_cg_roots,
+          	         this_th->th.th_cg_roots->cg_root,
+            	       this_th->th.th_cg_roots->cg_nthreads));
+	    kmp_cg_root_t *tmp = this_th->th.th_cg_roots;
+  	  if (tmp->cg_root == this_th) { // Thread is a cg_root
+    	  KMP_DEBUG_ASSERT(tmp->cg_nthreads == 0);
+      	KA_TRACE(
+        	  5, ("__kmp_free_thread: Thread %p freeing node %p\n", this_th, tmp));
+	      this_th->th.th_cg_roots = tmp->up;
+  	    __kmp_free(tmp);
+    	} else { // Worker thread
+      	if (tmp->cg_nthreads == 0) { // last thread leaves contention group
+        	__kmp_free(tmp);
+	      }
+  	    this_th->th.th_cg_roots = NULL;
+    	  break;
+    	}
+  	}
 
-  // If the __kmp_thread_pool_insert_pt is already past the new insert
-  // point, then we need to re-scan the entire list.
-  gtid = this_th->th.th_info.ds.ds_gtid;
-  if (__kmp_thread_pool_insert_pt != NULL) {
-    KMP_DEBUG_ASSERT(__kmp_thread_pool != NULL);
-    if (__kmp_thread_pool_insert_pt->th.th_info.ds.ds_gtid > gtid) {
-      __kmp_thread_pool_insert_pt = NULL;
-    }
-  }
+	  /* If the implicit task assigned to this thread can be used by other threads
+  	 * -> multiple threads can share the data and try to free the task at
+		 * __kmp_reap_thread at exit. This duplicate use of the task data can happen
+  	 * with higher probability when hot team is disabled but can occurs even when
+	   * the hot team is enabled */
+  	__kmp_free_implicit_task(this_th);
+  	this_th->th.th_current_task = NULL;
 
-  // Scan down the list to find the place to insert the thread.
-  // scan is the address of a link in the list, possibly the address of
-  // __kmp_thread_pool itself.
-  //
-  // In the absence of nested parallelism, the for loop will have 0 iterations.
-  if (__kmp_thread_pool_insert_pt != NULL) {
-    scan = &(__kmp_thread_pool_insert_pt->th.th_next_pool);
-  } else {
-    scan = CCAST(kmp_info_t **, &__kmp_thread_pool);
-  }
-  for (; (*scan != NULL) && ((*scan)->th.th_info.ds.ds_gtid < gtid);
-       scan = &((*scan)->th.th_next_pool))
-    ;
+	  // If the __kmp_thread_pool_insert_pt is already past the new insert
+	  // point, then we need to re-scan the entire list.
+  	gtid = this_th->th.th_info.ds.ds_gtid;
+	  if (__kmp_thread_pool_insert_pt != NULL) {
+  	  KMP_DEBUG_ASSERT(__kmp_thread_pool != NULL);
+    	if (__kmp_thread_pool_insert_pt->th.th_info.ds.ds_gtid > gtid) {
+      	__kmp_thread_pool_insert_pt = NULL;
+	    }
+  	}
 
-  // Insert the new element on the list, and set __kmp_thread_pool_insert_pt
-  // to its address.
-  TCW_PTR(this_th->th.th_next_pool, *scan);
-  __kmp_thread_pool_insert_pt = *scan = this_th;
-  KMP_DEBUG_ASSERT((this_th->th.th_next_pool == NULL) ||
-                   (this_th->th.th_info.ds.ds_gtid <
-                    this_th->th.th_next_pool->th.th_info.ds.ds_gtid));
-  TCW_4(this_th->th.th_in_pool, TRUE);
-  __kmp_suspend_initialize_thread(this_th);
-  __kmp_lock_suspend_mx(this_th);
-  if (this_th->th.th_active == TRUE) {
-    KMP_ATOMIC_INC(&__kmp_thread_pool_active_nth);
-    this_th->th.th_active_in_pool = TRUE;
-  }
+	  // Scan down the list to find the place to insert the thread.
+  	// scan is the address of a link in the list, possibly the address of
+  	// __kmp_thread_pool itself.
+  	//
+  	// In the absence of nested parallelism, the for loop will have 0 iterations.
+  	if (__kmp_thread_pool_insert_pt != NULL) {
+    	scan = &(__kmp_thread_pool_insert_pt->th.th_next_pool);
+	  } else {
+  	  scan = CCAST(kmp_info_t **, &__kmp_thread_pool);
+	  }
+  	for (; (*scan != NULL) && ((*scan)->th.th_info.ds.ds_gtid < gtid);
+    	   scan = &((*scan)->th.th_next_pool))
+	    ;
+
+  	// Insert the new element on the list, and set __kmp_thread_pool_insert_pt
+	  // to its address.
+  	TCW_PTR(this_th->th.th_next_pool, *scan);
+	  __kmp_thread_pool_insert_pt = *scan = this_th;
+  	KMP_DEBUG_ASSERT((this_th->th.th_next_pool == NULL) ||
+    	               (this_th->th.th_info.ds.ds_gtid <
+      	              this_th->th.th_next_pool->th.th_info.ds.ds_gtid));
+	  TCW_4(this_th->th.th_in_pool, TRUE);
+	  __kmp_suspend_initialize_thread(this_th);
+  	__kmp_lock_suspend_mx(this_th);
+	  if (this_th->th.th_active == TRUE) {
+  	  KMP_ATOMIC_INC(&__kmp_thread_pool_active_nth);
+    	this_th->th.th_active_in_pool = TRUE;
+	  }
 #if KMP_DEBUG
-  else {
-    KMP_DEBUG_ASSERT(this_th->th.th_active_in_pool == FALSE);
-  }
+  	else {
+    	KMP_DEBUG_ASSERT(this_th->th.th_active_in_pool == FALSE);
+	  }
 #endif
-  __kmp_unlock_suspend_mx(this_th);
+  	__kmp_unlock_suspend_mx(this_th);
 
-  TCW_4(__kmp_nth, __kmp_nth - 1);
-
+	  TCW_4(__kmp_nth, __kmp_nth - 1);
+	}
 #ifdef KMP_ADJUST_BLOCKTIME
   /* Adjust blocktime back to user setting or default if necessary */
   /* Middle initialization might never have occurred                */

@@ -447,7 +447,19 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task) {
 
   // Traverse all the free agent threads, if we find one that is sleeping, resume it
   // so we give it a chance to execute the task.
-  for (unsigned int i = 0; i < __kmp_free_agent_num_threads; i++) {
+  kmp_info_t *free_agent = CCAST(kmp_info_t *,__kmp_free_agent_list);
+  while(free_agent != NULL){
+  	//if(free_agent->th.is_free_agent){
+  	kmp_flag_64<> *flag = RCAST(kmp_flag_64<> *,
+  		CCAST(void *, free_agent->th.th_sleep_loc));
+  	if(flag && flag->is_sleeping()){
+  		flag->resume(free_agent->th.th_info.ds.ds_gtid);
+  		break;
+  		}
+  	//}
+  	free_agent = free_agent->th.th_next_free_agent;
+  }
+  /*for (unsigned int i = 0; i < __kmp_free_agent_num_threads; i++) {
     kmp_info_t *free_agent_thread =
       __kmp_threads[gtid]->th.th_root->r.free_agent_threads[i];
     if (*free_agent_thread->th.is_free_agent_active) {
@@ -458,7 +470,7 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task) {
         break;
       }
     }
-  }
+  }*/
 
   return TASK_SUCCESSFULLY_PUSHED;
 }
@@ -2913,7 +2925,7 @@ static inline int __kmp_execute_tasks_template(
                       tid = thread->th.th_info.ds.ds_tid;
 
   // Assuming free agent threads have tid 0
-  KMP_DEBUG_ASSERT(!thread->th.is_free_agent || tid == 0);
+  //KMP_DEBUG_ASSERT(!thread->th.is_free_agent || tid == 0);
 
   KMP_DEBUG_ASSERT(__kmp_tasking_mode != tskm_immediate_exec);
   KMP_DEBUG_ASSERT(thread == __kmp_threads[gtid]);
@@ -2948,7 +2960,10 @@ static inline int __kmp_execute_tasks_template(
   // Free agent threads use victim_tid as last_stolen directly
   if (thread->th.is_free_agent) {
     victim_tid = -1;
-    tid = thread->th.free_agent_id % nthreads;
+    //if(thread == __kmp_free_agent_list) tid = 0;
+    //else tid = 1;
+    //tid = thread->th.free_agent_id % nthreads;
+    tid = tid % nthreads;
     free_agent_victim_tid = (tid + 1) % nthreads;
   }
 
@@ -3081,9 +3096,9 @@ static inline int __kmp_execute_tasks_template(
              gtid));
         return TRUE;
       }
-      if (thread->th.is_free_agent && !*thread->th.is_free_agent_active) {
+      /*if (thread->th.is_free_agent && !*thread->th.is_free_agent_active) {
         return TRUE;
-      }
+      }*/
 
       if (thread->th.th_task_team == NULL) {
         break;
@@ -3724,7 +3739,7 @@ void __kmp_task_team_setup(kmp_info_t *this_thr, kmp_team_t *team, int always) {
                     "task_team %p for team %d at parity=%d\n",
                     __kmp_gtid_from_thread(this_thr),
                     team->t.t_task_team[other_team], team->t.t_id, other_team));
-      other_task_team = team->t.t_task_team[other_team];
+      //other_task_team = team->t.t_task_team[other_team];
     } else { // Leave the old task team struct in place for the upcoming region;
       // adjust as needed
       kmp_task_team_t *task_team = team->t.t_task_team[other_team];
@@ -3744,6 +3759,7 @@ void __kmp_task_team_setup(kmp_info_t *this_thr, kmp_team_t *team, int always) {
                     __kmp_gtid_from_thread(this_thr),
                     team->t.t_task_team[other_team], team->t.t_id, other_team));
     }
+    other_task_team = team->t.t_task_team[other_team];
   }
 
   // For regular thread, task enabling should be called when the task is going
@@ -3767,16 +3783,27 @@ void __kmp_task_team_setup(kmp_info_t *this_thr, kmp_team_t *team, int always) {
   }
 
   // Allow free agent threads to use this task team
-  kmp_task_team_t* task_team = team->t.t_task_team[this_thr->th.th_task_state];
+  if(__kmp_free_agent_list){//Only if at least one free agent exists
+  	kmp_task_team_t* task_team = team->t.t_task_team[this_thr->th.th_task_state];
 
-  for (unsigned int i = 0; i < __kmp_free_agent_num_threads; i++) {
+  	kmp_info_t *free_agent = CCAST(kmp_info_t *,__kmp_free_agent_list);
+  	while(free_agent != NULL){
+    	__kmp_acquire_bootstrap_lock(&free_agent->th.allowed_teams_lock);
+    	__kmp_add_allowed_task_team(free_agent, task_team);
+    	if (other_task_team)
+     		__kmp_add_allowed_task_team(free_agent, other_task_team);
+    	__kmp_release_bootstrap_lock(&free_agent->th.allowed_teams_lock);
+    	free_agent = free_agent->th.th_next_free_agent;
+  	}
+  }
+  /*for (unsigned int i = 0; i < __kmp_free_agent_num_threads; i++) {
     kmp_info_t *free_agent = this_thr->th.th_root->r.free_agent_threads[i];
     __kmp_acquire_bootstrap_lock(&free_agent->th.allowed_teams_lock);
     __kmp_add_allowed_task_team(free_agent, task_team);
     if (other_task_team)
       __kmp_add_allowed_task_team(free_agent, other_task_team);
     __kmp_release_bootstrap_lock(&free_agent->th.allowed_teams_lock);
-  }
+  }*/
 }
 
 // __kmp_task_team_sync: Propagation of task team data from team to threads
@@ -3831,12 +3858,19 @@ void __kmp_task_team_wait(
 
 
       // This team is not allowed anymore for free agent threads
-      for (unsigned int i = 0; i < __kmp_free_agent_num_threads; i++) {
+      kmp_info_t *free_agent = CCAST(kmp_info_t *,__kmp_free_agent_list);
+      while(free_agent != NULL){
+        __kmp_acquire_bootstrap_lock(&free_agent->th.allowed_teams_lock);
+        __kmp_remove_allowed_task_team(free_agent, task_team);
+        __kmp_release_bootstrap_lock(&free_agent->th.allowed_teams_lock);
+        free_agent = free_agent->th.th_next_free_agent;
+      }
+      /*for (unsigned int i = 0; i < __kmp_free_agent_num_threads; i++) {
         kmp_info_t *free_agent = this_thr->th.th_root->r.free_agent_threads[i];
         __kmp_acquire_bootstrap_lock(&free_agent->th.allowed_teams_lock);
         __kmp_remove_allowed_task_team(free_agent, task_team);
         __kmp_release_bootstrap_lock(&free_agent->th.allowed_teams_lock);
-      }
+      }*/
       if (__kmp_free_agent_num_threads > 0) {
         std::atomic<kmp_int32> *unfinished_threads;
         unfinished_threads = &(task_team->tt.tt_unfinished_threads);

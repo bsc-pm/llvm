@@ -2691,8 +2691,9 @@ typedef struct KMP_ALIGN_CACHE kmp_base_info {
 #if KMP_OS_UNIX
   std::atomic<bool> th_blocking;
 #endif
+  kmp_info_p* th_next_free_agent; //Pointer to the next free agent in the free agents list
   kmp_cg_root_t *th_cg_roots; // list of cg_roots associated with this thread
-  bool is_free_agent; // This is a free_agent thread.
+  std::atomic<bool> is_free_agent; // This is a free_agent thread.
   bool *is_free_agent_active; // Reference to the is_free_agent_thread_active array.
                               // This is for convenience.
   int free_agent_id;
@@ -2895,6 +2896,9 @@ typedef struct kmp_base_root {
 #endif // KMP_AFFINITY_SUPPORTED
 
   /* Free agent threads */
+  kmp_info_t *kmp_free_agent_list; /*First element of the free agent thread list. Next
+  element is pointed by the thread itself*/
+  kmp_info_t *kmp_free_agent_list_insert_pt;
   unsigned int num_free_agent_threads; // Number of free agent threads.
   kmp_info_t **free_agent_threads; // Threads that are free agent in this root.
   bool *is_free_agent_thread_active; // States if a free agent thread is enabled or not.
@@ -4176,8 +4180,12 @@ typedef enum kmp_free_agent_thread_start_t {
   kmp_free_agent_inactive = 0,
   kmp_free_agent_active = 1
 } kmp_free_agent_thread_start_t;
+extern volatile kmp_info_t *__kmp_free_agent_list; /*First element of the free agent
+thread list. Next element is pointed by the thread itself*/
+extern kmp_info_t *__kmp_free_agent_list_insert_pt;
 extern kmp_free_agent_thread_start_t __kmp_free_agent_thread_start;
-extern unsigned int __kmp_free_agent_num_threads;
+extern unsigned int __kmp_free_agent_num_threads; //Max number of free agents allowed
+extern std::atomic<int> __kmp_free_agent_active_nth; //Actual number of free agents active
 extern kmp_proc_bind_t __kmp_free_agent_proc_bind;
 extern char *__kmp_free_agent_affinity_proclist;
 extern kmp_affin_mask_t *__kmp_free_agent_affinity_masks;

@@ -547,10 +547,11 @@ final_spin=FALSE)
          3) Tasking is off for this region.  This could be because we are in a
          serialized region (perhaps the outer one), or else tasking was manually
          disabled (KMP_TASKING=0).  */
-      if (this_thr->th.is_free_agent && *this_thr->th.is_free_agent_active) {
+      //if (this_thr->th.is_free_agent && *this_thr->th.is_free_agent_active) {
+      if (this_thr->th.is_free_agent && __kmp_free_agent_list) {
         int empty_task_teams_cnt = 0;
         int team_task_to_pick = 0;
-        do {
+        while (team_task_to_pick < this_thr->th.allowed_teams_length){
           __kmp_acquire_bootstrap_lock(&this_thr->th.allowed_teams_lock);
           task_team = this_thr->th.allowed_teams[team_task_to_pick];
           if ((reinterpret_cast<kmp_uintptr_t>(task_team) & 1) != 0) {
@@ -603,7 +604,7 @@ final_spin=FALSE)
             team_task_to_pick = 0;
             empty_task_teams_cnt = 0;
           }
-        } while (team_task_to_pick < this_thr->th.allowed_teams_length);
+        } //while (team_task_to_pick < this_thr->th.allowed_teams_length);
         // Reset task_team to 0 to make free agent thread able to suspend
         task_team = NULL;
       } else if (!this_thr->th.is_free_agent) {
@@ -715,6 +716,7 @@ final_spin=FALSE)
       if (final_spin)
         KMP_ATOMIC_ST_REL(&this_thr->th.th_blocking, false);
 #endif
+      //printf("suspending...\n");
       flag->suspend(th_gtid);
 #if KMP_OS_UNIX
       if (final_spin)

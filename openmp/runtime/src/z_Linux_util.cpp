@@ -1523,9 +1523,11 @@ static inline void __kmp_suspend_template(int th_gtid, C *flag) {
     if (deactivated) {
       th->th.th_active = TRUE;
       if (TCR_4(th->th.th_in_pool)) {
+        //printf("Thread %d in the thread pool\n", th_gtid);
         KMP_ATOMIC_INC(&__kmp_thread_pool_active_nth);
         th->th.th_active_in_pool = TRUE;
       }
+      //else  printf("Thread %d not in the thread pool\n", th_gtid);
     }
   }
   // We may have had the loop variable set before entering the loop body;

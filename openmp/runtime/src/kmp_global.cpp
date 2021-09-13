@@ -441,10 +441,12 @@ volatile int __kmp_nth = 0;
 volatile int __kmp_all_nth = 0;
 volatile kmp_info_t *__kmp_thread_pool = NULL;
 volatile kmp_team_t *__kmp_team_pool = NULL;
+volatile kmp_info_t *__kmp_free_agent_list = NULL;
 
 KMP_ALIGN_CACHE
 std::atomic<int> __kmp_thread_pool_active_nth = ATOMIC_VAR_INIT(0);
-
+KMP_ALIGN_CACHE
+std::atomic<int> __kmp_free_agent_active_nth = ATOMIC_VAR_INIT(0);
 /* -------------------------------------------------
  * GLOBAL/ROOT STATE */
 KMP_ALIGN_CACHE
@@ -556,7 +558,7 @@ int *__kmp_nesting_nth_level;
 // Free agent threads
 kmp_free_agent_thread_start_t
   __kmp_free_agent_thread_start = kmp_free_agent_inactive;
-unsigned int __kmp_free_agent_num_threads = 0;
+unsigned int __kmp_free_agent_num_threads = 2;
 kmp_proc_bind_t __kmp_free_agent_proc_bind = proc_bind_false;
 char *__kmp_free_agent_affinity_proclist = NULL;
 kmp_affin_mask_t *__kmp_free_agent_affinity_masks = NULL;
