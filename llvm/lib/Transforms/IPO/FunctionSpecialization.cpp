@@ -208,15 +208,14 @@ static void constantArgPropagation(SmallVectorImpl<Function *> &WorkList,
 // interfere with the constantArgPropagation optimization.
 static void removeSSACopy(Function &F) {
   for (BasicBlock &BB : F) {
-    for (BasicBlock::iterator BI = BB.begin(), E = BB.end(); BI != E;) {
-      Instruction *Inst = &*BI++;
-      auto *II = dyn_cast<IntrinsicInst>(Inst);
+    for (Instruction &Inst : llvm::make_early_inc_range(BB)) {
+      auto *II = dyn_cast<IntrinsicInst>(&Inst);
       if (!II)
         continue;
       if (II->getIntrinsicID() != Intrinsic::ssa_copy)
         continue;
-      Inst->replaceAllUsesWith(II->getOperand(0));
-      Inst->eraseFromParent();
+      Inst.replaceAllUsesWith(II->getOperand(0));
+      Inst.eraseFromParent();
     }
   }
 }
@@ -659,6 +658,12 @@ private:
       if (!isa<CallInst>(U) && !isa<InvokeInst>(U))
         continue;
       auto &CS = *cast<CallBase>(U);
+      // If the call site has attribute minsize set, that callsite won't be
+      // specialized.
+      if (CS.hasFnAttr(Attribute::MinSize)) {
+        AllConstant = false;
+        continue;
+      }
 
       // If the parent of the call site will never be executed, we don't need
       // to worry about the passed value.
@@ -688,6 +693,9 @@ private:
   /// This function modifies calls to function \p F whose argument at index \p
   /// ArgNo is equal to constant \p C. The calls are rewritten to call function
   /// \p Clone instead.
+  ///
+  /// Callsites that have been marked with the MinSize function attribute won't
+  /// be specialized and rewritten.
   void rewriteCallSites(Function *F, Function *Clone, Argument &Arg,
                         Constant *C) {
     unsigned ArgNo = Arg.getArgNo();
