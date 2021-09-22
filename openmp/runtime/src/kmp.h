@@ -2703,6 +2703,7 @@ typedef struct KMP_ALIGN_CACHE kmp_base_info {
   int allowed_teams_capacity;
   int allowed_teams_length;
   kmp_task_team_t** allowed_teams;
+  int victim_tid; //Id of the owner thread of the last stolen task
 
 } kmp_base_info_t;
 

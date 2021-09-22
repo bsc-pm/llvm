@@ -331,8 +331,10 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task) {
   }
 
   kmp_task_team_t *task_team = thread->th.th_task_team;
-  kmp_int32 tid = __kmp_tid_from_gtid(gtid);
+  kmp_int32 tid;
   kmp_thread_data_t *thread_data;
+  if(thread->th.is_free_agent)  tid = thread->th.victim_tid;
+  else  tid = __kmp_tid_from_gtid(gtid);
 
   KA_TRACE(20,
            ("__kmp_push_task: T#%d trying to push task %p.\n", gtid, taskdata));
@@ -447,6 +449,7 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task) {
 
   // Traverse all the free agent threads, if we find one that is sleeping, resume it
   // so we give it a chance to execute the task.
+  //TODO: Do we need this with the new implementation?
   kmp_info_t *free_agent = CCAST(kmp_info_t *,__kmp_free_agent_list);
   while(free_agent != NULL){
   	//if(free_agent->th.is_free_agent){
@@ -2974,10 +2977,10 @@ static inline int __kmp_execute_tasks_template(
       task = NULL;
       if (use_own_tasks) { // check on own queue first
         if (thread->th.is_free_agent) {
-          // Free agent threads own queue is tid 0
           task = __kmp_steal_task(threads_data[tid].td.td_thr, gtid, task_team,
                                   unfinished_threads, thread_finished,
                                   is_constrained);
+          if(task) thread->th.victim_tid = tid;
         } else {
           task = __kmp_remove_my_task(thread, gtid, task_team, is_constrained);
         }
@@ -2990,8 +2993,9 @@ static inline int __kmp_execute_tasks_template(
         if (victim_tid == -2) { // haven't stolen anything yet
           victim_tid = threads_data[tid].td.td_deque_last_stolen;
           if (victim_tid !=
-              -1) // if we have a last stolen from victim, get the thread
+              -1){ // if we have a last stolen from victim, get the thread
             other_thread = threads_data[victim_tid].td.td_thr;
+          }
         }
         // victim_tid is either -1 or a real tid.
         KMP_DEBUG_ASSERT(victim_tid != -2);
@@ -3005,6 +3009,7 @@ static inline int __kmp_execute_tasks_template(
             // and failed.  Arch says that's not such a great idea.
             if (thread->th.is_free_agent) {
               victim_tid = free_agent_victim_tid;
+              thread->th.victim_tid = victim_tid;
             } else {
               victim_tid = __kmp_get_random(thread) % (nthreads - 1);
               if (victim_tid >= tid) {

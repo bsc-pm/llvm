@@ -5906,13 +5906,16 @@ void __kmp_free_thread(kmp_info_t *this_th) {
 		//this_th->th.th_root = 
 		this_th->th.free_agent_id = -1;
 
-  	kmp_taskdata_t *task = (kmp_taskdata_t *)__kmp_allocate(sizeof(kmp_taskdata_t)*1);
-  	this_th->th.th_current_task = task;
+  	//kmp_taskdata_t *task = (kmp_taskdata_t *)__kmp_allocate(sizeof(kmp_taskdata_t)*1);
+  	//this_th->th.th_current_task = task;
+  	kmp_taskdata_t *task = this_th->th.th_current_task;
 
   	this_th->th.allowed_teams_capacity = 2;
   	this_th->th.allowed_teams_length = 0;
-  	this_th->th.allowed_teams = (kmp_task_team_t **)__kmp_allocate(
-  			sizeof(kmp_task_team_t *) * this_th->th.allowed_teams_capacity);
+  	if(this_th->th.allowed_teams == NULL){
+  		this_th->th.allowed_teams = (kmp_task_team_t **)__kmp_allocate(
+  				sizeof(kmp_task_team_t *) * this_th->th.allowed_teams_capacity);
+  	}
   	__kmp_init_bootstrap_lock(&this_th->th.allowed_teams_lock);
 
   	task->td_task_id = KMP_GEN_TASK_ID();
