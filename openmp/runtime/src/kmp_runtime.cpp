@@ -2054,6 +2054,11 @@ int __kmp_fork_call(ident_t *loc, int gtid,
 #if KMP_NESTED_HOT_TEAMS
         }
 #endif
+      	//Propagate the correct task_state to the workers that were free agents before
+      	for(i = 1; i < team->t.t_nproc; i++){
+      		KMP_DEBUG_ASSERT(team->t.t_threads[i]);
+      		team->t.t_threads[i]->th.th_task_state = master_th->th.th_task_state;
+      	}
       }
 #if !KMP_NESTED_HOT_TEAMS
       KMP_DEBUG_ASSERT((master_th->th.th_task_team == NULL) ||
@@ -5210,7 +5215,38 @@ __kmp_allocate_team(kmp_root_t *root, int new_nproc, int max_nproc,
       int old_nthr = team->t.t_nproc;
       __kmp_resize_dist_barrier(team, old_nthr, new_nproc);
     }
+    kmp_info_t *th;
+    //TODO: Not really sure abou how this works with nesting...
+		int count = (team->t.t_nproc - __kmp_free_agent_active_nth); //Number of active free agents stolen from the team
+		while(count < new_nproc && __kmp_free_agent_list){ //Return free agents to the team when needed
+			th = CCAST(kmp_info_t *, __kmp_free_agent_list);
+			__kmp_free_agent_list = (volatile kmp_info_t *)th->th.th_next_free_agent;
+			if(th == __kmp_free_agent_list_insert_pt){
+				__kmp_free_agent_list_insert_pt = NULL;
+			}
+			KMP_ATOMIC_ST_RLX(&th->th.is_free_agent, false);
+			th->th.free_agent_id = -1;
+			KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
 
+			__kmp_initialize_info(th, team, count, th->th.th_info.ds.ds_gtid);
+			KMP_DEBUG_ASSERT(th->th.th_serial_team);
+
+			th->th.th_task_state = master->th.th_task_state;
+			th->th.th_task_state_top = 0;
+			th->th.th_task_state_stack_sz = 4;
+			if(__kmp_barrier_gather_pattern[bs_forkjoin_barrier] == bp_dist_bar){
+				KMP_DEBUG_ASSERT(th->th.th_used_in_team.load() == 0);
+			}
+      if (__kmp_tasking_mode != tskm_immediate_exec) {
+				th->th.th_task_team = NULL;
+			}
+			count++;
+		}
+    // Update the t_nproc field in the threads that are still active.
+    /*for (f = 0; f < team->t.t_nproc; f++) {
+      KMP_DEBUG_ASSERT(team->t.t_threads[f] != NULL);
+      team->t.t_threads[f]->th.th_team_nproc = team->t.t_nproc;
+    }*/
     // Has the number of threads changed?
     /* Let's assume the most common case is that the number of threads is
        unchanged, and put that case first. */
@@ -5280,7 +5316,7 @@ __kmp_allocate_team(kmp_root_t *root, int new_nproc, int max_nproc,
             // unref task team.
             team->t.t_threads[f]->th.th_task_team = NULL;
           }
-          __kmp_free_thread(team->t.t_threads[f]);
+          if(!team->t.t_threads[f]->th.is_free_agent) __kmp_free_thread(team->t.t_threads[f]);
           team->t.t_threads[f] = NULL;
         }
 #if KMP_NESTED_HOT_TEAMS
@@ -5900,7 +5936,7 @@ void __kmp_free_thread(kmp_info_t *this_th) {
   this_th->th.th_task_state = 0;
   this_th->th.th_reap_state = KMP_SAFE_TO_REAP;
   //TODO: check if the thread can become a free agent when that's implemented
-  if(__kmp_free_agent_num_threads > __kmp_free_agent_active_nth){
+  /*if(__kmp_free_agent_num_threads > __kmp_free_agent_active_nth){
 
 		//TODO: Do we need a root in the free agent?
 		//this_th->th.th_root = 
@@ -5969,8 +6005,8 @@ void __kmp_free_thread(kmp_info_t *this_th) {
   	//__kmp_unlock_suspend_mx(this_th);
 
   	
-  }
-  else{
+  }*/
+  if(!(this_th->th.is_free_agent)){
   	/* put thread back on the free pool */
 	  TCW_PTR(this_th->th.th_team, NULL);
 	  TCW_PTR(this_th->th.th_root, NULL);
@@ -8058,6 +8094,85 @@ void __kmp_internal_join(ident_t *id, int gtid, kmp_team_t *team) {
 
   KMP_MB(); /* Flush all pending memory write invalidates.  */
   KMP_ASSERT(this_thr->th.th_team == team);
+	//Transform the other threads of the team into free agents.
+  if(__kmp_free_agent_num_threads <= __kmp_free_agent_active_nth) return;
+  kmp_info_t* new_thr = team->t.t_threads[0];
+  int i = 1; int b;
+  kmp_balign_t *balign;
+  //while(new_thr != NULL && __kmp_free_agent_active_nth < __kmp_free_agent_num_threads){
+  while(new_thr != NULL){
+  	if(new_thr == this_thr){
+  		new_thr = team->t.t_threads[i++];
+  		continue;
+  	}
+		balign = new_thr->th.th_bar;
+		for(b = 0; b < bs_last_barrier; ++b){
+			if(balign[b].bb.wait_flag == KMP_BARRIER_PARENT_FLAG)
+				balign[b].bb.wait_flag = KMP_BARRIER_SWITCH_TO_OWN_FLAG;
+			balign[b].bb.team = NULL;
+			balign[b].bb.leaf_kids = 0;
+		}
+		new_thr->th.th_task_state = 0;
+		
+  	new_thr->th.free_agent_id = -1;
+  	kmp_taskdata_t *task = new_thr->th.th_current_task;
+
+  	new_thr->th.allowed_teams_capacity = 2;
+  	new_thr->th.allowed_teams_length = 0;
+  	if(new_thr->th.allowed_teams == NULL){
+  		new_thr->th.allowed_teams = (kmp_task_team_t **)__kmp_allocate(
+  				sizeof(kmp_task_team_t *) * new_thr->th.allowed_teams_capacity);
+  	}
+  	__kmp_init_bootstrap_lock(&new_thr->th.allowed_teams_lock);
+
+  	task->td_task_id = KMP_GEN_TASK_ID();
+  	task->td_team = NULL;
+  	task->td_ident = NULL;
+  	task->td_taskwait_ident = NULL;
+  	task->td_taskwait_counter = 0;
+  	task->td_taskwait_thread = 0;
+
+  	task->td_flags.tiedness = TASK_TIED;
+  	task->td_flags.tasktype = TASK_IMPLICIT;
+  	task->td_flags.proxy = TASK_FULL;
+  	task->td_flags.task_serial = 1;
+  	task->td_flags.tasking_ser = (__kmp_tasking_mode == tskm_immediate_exec);
+  	task->td_flags.team_serial = 0;
+
+  	task->td_depnode = NULL;
+  	task->td_last_tied = task;
+  	task->td_allow_completion_event.pending_events_count = -1;
+  	task->td_allow_completion_event.ed.task = nullptr;
+
+  	KMP_DEBUG_ASSERT(task->td_incomplete_child_tasks == 0);
+  	KMP_DEBUG_ASSERT(task->td_allocated_child_tasks == 0);
+		gtid = new_thr->th.th_info.ds.ds_gtid;
+		if(__kmp_free_agent_list_insert_pt != NULL){
+			KMP_DEBUG_ASSERT(__kmp_free_agent_list != NULL);
+			if(__kmp_free_agent_list_insert_pt->th.th_info.ds.ds_gtid > gtid)
+				__kmp_free_agent_list_insert_pt = NULL;
+		}
+		kmp_info_t **scan;
+		if(__kmp_free_agent_list_insert_pt != NULL)
+			scan = &(__kmp_free_agent_list_insert_pt->th.th_next_free_agent);
+		else
+			scan = CCAST(kmp_info_t **, &__kmp_free_agent_list);
+		for(; (*scan != NULL) && ((*scan)->th.th_info.ds.ds_gtid < gtid);
+				scan = &((*scan)->th.th_next_free_agent));
+		TCW_PTR(new_thr->th.th_next_free_agent, *scan);
+		__kmp_free_agent_list_insert_pt = *scan = new_thr;
+		KMP_DEBUG_ASSERT((new_thr->th.th_next_free_agent == NULL) ||
+										 (new_thr->th.th_info.ds.ds_gtid <
+										  new_thr->th.th_next_free_agent->th.th_info.ds.ds_gtid));
+		
+		KMP_ATOMIC_ST_RLX(&new_thr->th.is_free_agent, true);
+		KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
+
+  	new_thr = team->t.t_threads[i++];
+  	//team->t.t_nproc--;
+  }
+
+	KMP_MB();
 }
 
 /* ------------------------------------------------------------------------ */
