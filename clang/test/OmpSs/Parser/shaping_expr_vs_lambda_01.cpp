@@ -2,7 +2,7 @@
 
 void foo(int *p) {
   // Shape
-  #pragma oss task in([(1, 4)]p) // expected-warning {{expression result unused}}
+  #pragma oss task in([(1, 4)]p) // expected-warning {{left operand of comma operator has no effect}}
   {}
   // Lambda
   #pragma oss task in([10(int *)p) // expected-error {{expected variable name or 'this' in lambda capture list}} expected-error {{expected ')'}} expected-note {{to match this '('}}

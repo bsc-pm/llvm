@@ -51,7 +51,7 @@ void foo() {
     #pragma oss task in( { v1[ii], i = 0:10:1 }[2], v ) // expected-error {{expected ',' or ')' in 'in' clause}} expected-error {{expected expression}}
     #pragma oss task in( { v[ii], i = { ,}, j = i: } ) // expected-error 2 {{expected expression}}
     #pragma oss task in( { v[ii], i = 0:v:v1 } ) // expected-error {{converting 'int [10][10]' to incompatible type 'int'}} expected-error {{converting 'int [10]' to incompatible type 'int'}}
-    #pragma oss task in( { v[1, 2], i=0;10 } ) // expected-warning {{expression result unused}}
+    #pragma oss task in( { v[1, 2], i=0;10 } ) // expected-warning {{left operand of comma operator has no effect}}
     {}
 }
 
