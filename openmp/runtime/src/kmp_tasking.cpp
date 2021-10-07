@@ -2981,7 +2981,7 @@ static inline int __kmp_execute_tasks_template(
                                   unfinished_threads, thread_finished,
                                   is_constrained);
           if(task) thread->th.victim_tid = tid;
-        } else {
+        } else if(free_agent_victim_tid == -1) {
           task = __kmp_remove_my_task(thread, gtid, task_team, is_constrained);
         }
       }
