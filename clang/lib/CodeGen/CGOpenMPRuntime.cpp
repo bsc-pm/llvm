@@ -4882,7 +4882,7 @@ std::pair<llvm::Value *, Address> CGOpenMPRuntime::emitDependClause(
   bool HasRegularWithIterators = false;
   llvm::Value *NumOfDepobjElements = llvm::ConstantInt::get(CGF.IntPtrTy, 0);
   llvm::Value *NumOfRegularWithIterators =
-      llvm::ConstantInt::get(CGF.IntPtrTy, 1);
+      llvm::ConstantInt::get(CGF.IntPtrTy, 0);
   // Calculate number of depobj dependecies and regular deps with the iterators.
   for (const OMPTaskDataTy::DependData &D : Dependencies) {
     if (D.DepKind == OMPC_DEPEND_depobj) {
@@ -4896,12 +4896,15 @@ std::pair<llvm::Value *, Address> CGOpenMPRuntime::emitDependClause(
       continue;
     }
     // Include number of iterations, if any.
+
     if (const auto *IE = cast_or_null<OMPIteratorExpr>(D.IteratorExpr)) {
       for (unsigned I = 0, E = IE->numOfIterators(); I < E; ++I) {
         llvm::Value *Sz = CGF.EmitScalarExpr(IE->getHelper(I).Upper);
         Sz = CGF.Builder.CreateIntCast(Sz, CGF.IntPtrTy, /*isSigned=*/false);
+        llvm::Value *NumClauseDeps = CGF.Builder.CreateNUWMul(
+            Sz, llvm::ConstantInt::get(CGF.IntPtrTy, D.DepExprs.size()));
         NumOfRegularWithIterators =
-            CGF.Builder.CreateNUWMul(NumOfRegularWithIterators, Sz);
+            CGF.Builder.CreateNUWAdd(NumOfRegularWithIterators, NumClauseDeps);
       }
       HasRegularWithIterators = true;
       continue;
@@ -7478,6 +7481,9 @@ private:
       SmallVector<OMPClauseMappableExprCommon::MappableExprComponentListRef, 4>>
       DevPointersMap;
 
+  /// Map between lambda declarations and their map type.
+  llvm::DenseMap<const ValueDecl *, const OMPMapClause *> LambdasMap;
+
   llvm::Value *getExprTypeSize(const Expr *E) const {
     QualType ExprTy = E->getType().getCanonicalType();
 
@@ -8439,6 +8445,15 @@ private:
       return MappableExprsHandler::OMP_MAP_PRIVATE |
              MappableExprsHandler::OMP_MAP_TO;
     }
+    auto I = LambdasMap.find(Cap.getCapturedVar()->getCanonicalDecl());
+    if (I != LambdasMap.end())
+      // for map(to: lambda): using user specified map type.
+      return getMapTypeBits(
+          I->getSecond()->getMapType(), I->getSecond()->getMapTypeModifiers(),
+          /*MotionModifiers=*/llvm::None, I->getSecond()->isImplicit(),
+          /*AddPtrFlag=*/false,
+          /*AddIsTargetParamFlag=*/false,
+          /*isNonContiguous=*/false);
     return MappableExprsHandler::OMP_MAP_TO |
            MappableExprsHandler::OMP_MAP_FROM;
   }
@@ -8903,6 +8918,21 @@ public:
     for (const auto *C : Dir.getClausesOfKind<OMPIsDevicePtrClause>())
       for (auto L : C->component_lists())
         DevPointersMap[std::get<0>(L)].push_back(std::get<1>(L));
+    // Extract map information.
+    for (const auto *C : Dir.getClausesOfKind<OMPMapClause>()) {
+      if (C->getMapType() != OMPC_MAP_to)
+        continue;
+      for (auto L : C->component_lists()) {
+        const ValueDecl *VD = std::get<0>(L);
+        const auto *RD = VD ? VD->getType()
+                                  .getCanonicalType()
+                                  .getNonReferenceType()
+                                  ->getAsCXXRecordDecl()
+                            : nullptr;
+        if (RD && RD->isLambda())
+          LambdasMap.try_emplace(std::get<0>(L), C);
+      }
+    }
   }
 
   /// Constructor for the declare mapper directive.
@@ -9114,6 +9144,11 @@ public:
     const ValueDecl *VD = Cap->capturesThis()
                               ? nullptr
                               : Cap->getCapturedVar()->getCanonicalDecl();
+
+    // for map(to: lambda): skip here, processing it in
+    // generateDefaultMapInfo
+    if (LambdasMap.count(VD))
+      return;
 
     // If this declaration appears in a is_device_ptr clause we just have to
     // pass the pointer by value. If it is a reference to a declaration, we just

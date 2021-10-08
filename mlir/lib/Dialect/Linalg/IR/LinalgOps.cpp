@@ -196,7 +196,7 @@ public:
   // If the cast cannot be performed, a warning will be issued and the
   // operand returned as-is (which will presumably yield a verification
   // issue downstream).
-  Value cast(Type toType, Value operand) {
+  Value cast(Type toType, Value operand, bool isUnsignedCast) {
     OpBuilder builder = getBuilder();
     auto loc = operand.getLoc();
 
@@ -204,23 +204,32 @@ public:
       return operand;
     if (auto toIntType = toType.dyn_cast<IntegerType>()) {
       // If operand is floating point, cast directly to the int type.
-      if (operand.getType().isa<FloatType>())
+      if (operand.getType().isa<FloatType>()) {
+        if (isUnsignedCast)
+          return builder.create<FPToUIOp>(loc, toType, operand);
         return builder.create<FPToSIOp>(loc, toType, operand);
+      }
       // Cast index operands directly to the int type.
       if (operand.getType().isIndex())
         return builder.create<IndexCastOp>(loc, toType, operand);
       if (auto fromIntType = operand.getType().dyn_cast<IntegerType>()) {
-        // Either sign extend or truncate.
-        if (toIntType.getWidth() > fromIntType.getWidth())
+        // Either extend or truncate.
+        if (toIntType.getWidth() > fromIntType.getWidth()) {
+          if (isUnsignedCast)
+            return builder.create<ZeroExtendIOp>(loc, toType, operand);
           return builder.create<SignExtendIOp>(loc, toType, operand);
+        }
         if (toIntType.getWidth() < fromIntType.getWidth())
           return builder.create<TruncateIOp>(loc, toType, operand);
       }
     } else if (auto toFloatType = toType.dyn_cast<FloatType>()) {
       // If operand is integer, cast directly to the float type.
       // Note that it is unclear how to cast from BF16<->FP16.
-      if (operand.getType().isa<IntegerType>())
+      if (operand.getType().isa<IntegerType>()) {
+        if (isUnsignedCast)
+          return builder.create<UIToFPOp>(loc, toFloatType, operand);
         return builder.create<SIToFPOp>(loc, toFloatType, operand);
+      }
       if (auto fromFloatType = operand.getType().dyn_cast<FloatType>()) {
         if (toFloatType.getWidth() > fromFloatType.getWidth())
           return builder.create<FPExtOp>(loc, toFloatType, operand);
@@ -276,18 +285,38 @@ public:
   }
 
   Value applyfn__max(Value lhs, Value rhs) {
+    OpBuilder builder = getBuilder();
     if (isFloatingPoint(lhs))
-      return emitCmpFAndSelect(lhs, rhs, CmpFPredicate::OGT);
+      return builder.create<MaxFOp>(lhs.getLoc(), lhs, rhs);
     if (isInteger(lhs))
-      return emitCmpIAndSelect(lhs, rhs, CmpIPredicate::sgt);
+      return builder.create<MaxSIOp>(lhs.getLoc(), lhs, rhs);
+    llvm_unreachable("unsupported non numeric type");
+  }
+
+  Value applyfn__max_unsigned(Value lhs, Value rhs) {
+    OpBuilder builder = getBuilder();
+    if (isFloatingPoint(lhs))
+      return builder.create<MaxFOp>(lhs.getLoc(), lhs, rhs);
+    if (isInteger(lhs))
+      return builder.create<MaxUIOp>(lhs.getLoc(), lhs, rhs);
     llvm_unreachable("unsupported non numeric type");
   }
 
   Value applyfn__min(Value lhs, Value rhs) {
+    OpBuilder builder = getBuilder();
     if (isFloatingPoint(lhs))
-      return emitCmpFAndSelect(lhs, rhs, CmpFPredicate::OLT);
+      return builder.create<MinFOp>(lhs.getLoc(), lhs, rhs);
     if (isInteger(lhs))
-      return emitCmpIAndSelect(lhs, rhs, CmpIPredicate::slt);
+      return builder.create<MinSIOp>(lhs.getLoc(), lhs, rhs);
+    llvm_unreachable("unsupported non numeric type");
+  }
+
+  Value applyfn__min_unsigned(Value lhs, Value rhs) {
+    OpBuilder builder = getBuilder();
+    if (isFloatingPoint(lhs))
+      return builder.create<MinFOp>(lhs.getLoc(), lhs, rhs);
+    if (isInteger(lhs))
+      return builder.create<MinUIOp>(lhs.getLoc(), lhs, rhs);
     llvm_unreachable("unsupported non numeric type");
   }
 
@@ -323,17 +352,6 @@ public:
 private:
   MLIRContext *context;
   Block &block;
-
-  Value emitCmpFAndSelect(Value lhs, Value rhs, CmpFPredicate predicate) {
-    OpBuilder builder = getBuilder();
-    Value condition = builder.create<CmpFOp>(lhs.getLoc(), predicate, lhs, rhs);
-    return builder.create<SelectOp>(lhs.getLoc(), condition, lhs, rhs);
-  }
-  Value emitCmpIAndSelect(Value lhs, Value rhs, CmpIPredicate predicate) {
-    OpBuilder builder = getBuilder();
-    Value condition = builder.create<CmpIOp>(lhs.getLoc(), predicate, lhs, rhs);
-    return builder.create<SelectOp>(lhs.getLoc(), condition, lhs, rhs);
-  }
 
   bool isFloatingPoint(Value value) { return value.getType().isa<FloatType>(); }
   bool isInteger(Value value) { return value.getType().isa<IntegerType>(); }
@@ -1085,28 +1103,28 @@ RankedTensorType PadTensorOp::inferResultType(RankedTensorType sourceType,
 void PadTensorOp::build(OpBuilder &b, OperationState &result, Value source,
                         ArrayRef<int64_t> staticLow,
                         ArrayRef<int64_t> staticHigh, ValueRange low,
-                        ValueRange high, bool packing,
+                        ValueRange high, bool nofold,
                         ArrayRef<NamedAttribute> attrs) {
   auto sourceType = source.getType().cast<RankedTensorType>();
   auto resultType = inferResultType(sourceType, staticLow, staticHigh);
   build(b, result, resultType, source, low, high, b.getI64ArrayAttr(staticLow),
-        b.getI64ArrayAttr(staticHigh), packing ? b.getUnitAttr() : UnitAttr());
+        b.getI64ArrayAttr(staticHigh), nofold ? b.getUnitAttr() : UnitAttr());
   result.addAttributes(attrs);
 }
 
 void PadTensorOp::build(OpBuilder &b, OperationState &result, Value source,
-                        ValueRange low, ValueRange high, bool packing,
+                        ValueRange low, ValueRange high, bool nofold,
                         ArrayRef<NamedAttribute> attrs) {
   auto sourceType = source.getType().cast<RankedTensorType>();
   unsigned rank = sourceType.getRank();
   SmallVector<int64_t, 4> staticVector(rank, ShapedType::kDynamicSize);
-  build(b, result, source, staticVector, staticVector, low, high, packing,
+  build(b, result, source, staticVector, staticVector, low, high, nofold,
         attrs);
 }
 
 void PadTensorOp::build(OpBuilder &b, OperationState &result, Type resultType,
                         Value source, ArrayRef<OpFoldResult> low,
-                        ArrayRef<OpFoldResult> high, bool packing,
+                        ArrayRef<OpFoldResult> high, bool nofold,
                         ArrayRef<NamedAttribute> attrs) {
   assert(resultType.isa<RankedTensorType>());
   auto sourceType = source.getType().cast<RankedTensorType>();
@@ -1129,17 +1147,17 @@ void PadTensorOp::build(OpBuilder &b, OperationState &result, Type resultType,
   }
   build(b, result, resultType, source, dynamicLow, dynamicHigh,
         b.getI64ArrayAttr(staticLow), b.getI64ArrayAttr(staticHigh),
-        packing ? b.getUnitAttr() : UnitAttr());
+        nofold ? b.getUnitAttr() : UnitAttr());
   result.addAttributes(attrs);
 }
 
 PadTensorOp PadTensorOp::createPadScalarOp(Type type, Value source, Value pad,
                                            ArrayRef<OpFoldResult> low,
                                            ArrayRef<OpFoldResult> high,
-                                           bool packing, Location loc,
+                                           bool nofold, Location loc,
                                            OpBuilder &builder) {
-  auto padTensorOp = builder.create<linalg::PadTensorOp>(loc, type, source, low,
-                                                         high, packing);
+  auto padTensorOp =
+      builder.create<linalg::PadTensorOp>(loc, type, source, low, high, nofold);
   int rank = padTensorOp.getResultType().getRank();
   SmallVector<Type, 4> blockArgTypes;
   blockArgTypes.assign(rank, builder.getIndexType());
@@ -1153,7 +1171,7 @@ PadTensorOp PadTensorOp::createPadScalarOp(Type type, Value source, Value pad,
 }
 
 PadTensorOp PadTensorOp::createPadHighOp(Type type, Value source, Value pad,
-                                         bool packing, Location loc,
+                                         bool nofold, Location loc,
                                          OpBuilder &builder) {
   SmallVector<OpFoldResult, 4> low, high;
   auto rankedTensorType = type.cast<RankedTensorType>();
@@ -1167,7 +1185,7 @@ PadTensorOp PadTensorOp::createPadHighOp(Type type, Value source, Value pad,
     high.push_back(highValue);
     low.push_back(builder.createOrFold<ConstantIndexOp>(loc, 0));
   }
-  return PadTensorOp::createPadScalarOp(type, source, pad, low, high, packing,
+  return PadTensorOp::createPadScalarOp(type, source, pad, low, high, nofold,
                                         loc, builder);
 }
 
@@ -1440,8 +1458,8 @@ Operation *PadTensorOp::getTiledImplementation(OpBuilder &b, ValueRange dest,
 }
 
 namespace {
-// Folds linalg.pad_tensor when padding is static zeros and packing is not
-// requested.
+// Folds linalg.pad_tensor when padding is static zeros and the attribute
+// doesn't request otherwise.
 struct FoldStaticZeroPadding : public OpRewritePattern<PadTensorOp> {
   using OpRewritePattern<PadTensorOp>::OpRewritePattern;
 
@@ -1449,7 +1467,7 @@ struct FoldStaticZeroPadding : public OpRewritePattern<PadTensorOp> {
                                 PatternRewriter &rewriter) const override {
     if (!padTensorOp.hasZeroLowPad() || !padTensorOp.hasZeroHighPad())
       return failure();
-    if (padTensorOp.packing())
+    if (padTensorOp.nofold())
       return failure();
     rewriter.replaceOpWithNewOp<tensor::CastOp>(
         padTensorOp, padTensorOp.result().getType(), padTensorOp.source());
@@ -1481,7 +1499,7 @@ struct FoldSourceTensorCast : public OpRewritePattern<PadTensorOp> {
       auto newOp = rewriter.create<PadTensorOp>(
           padTensorOp->getLoc(), newResultType, padTensorOp.source(),
           padTensorOp.low(), padTensorOp.high(), padTensorOp.static_low(),
-          padTensorOp.static_high(), padTensorOp.packing());
+          padTensorOp.static_high(), padTensorOp.nofold());
       BlockAndValueMapping mapper;
       padTensorOp.getRegion().cloneInto(&newOp.getRegion(), mapper);
 
@@ -1513,7 +1531,7 @@ struct FoldTargetTensorCast : public OpRewritePattern<PadTensorOp> {
         padTensorOp.getLoc(), tensorCastOp.dest().getType(),
         padTensorOp.source(), padTensorOp.low(), padTensorOp.high(),
         padTensorOp.static_low(), padTensorOp.static_high(),
-        padTensorOp.packing());
+        padTensorOp.nofold());
     replacementOp.region().takeBody(padTensorOp.region());
 
     rewriter.replaceOp(padTensorOp, replacementOp.result());
@@ -1555,7 +1573,7 @@ Value PadTensorOp::getConstantPaddingValue() {
 
 OpFoldResult PadTensorOp::fold(ArrayRef<Attribute>) {
   if (getResultType().hasStaticShape() && getResultType() == getSourceType() &&
-      !packing())
+      !nofold())
     return source();
   return {};
 }

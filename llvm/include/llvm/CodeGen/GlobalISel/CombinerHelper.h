@@ -372,6 +372,9 @@ public:
   bool matchCombineFAbsOfFAbs(MachineInstr &MI, Register &Src);
   void applyCombineFAbsOfFAbs(MachineInstr &MI, Register &Src);
 
+  /// Transform fabs(fneg(x)) to fabs(x).
+  bool matchCombineFAbsOfFNeg(MachineInstr &MI, BuildFnTy &MatchInfo);
+
   /// Transform trunc ([asz]ext x) to x or ([asz]ext x) or (trunc x).
   bool matchCombineTruncOfExt(MachineInstr &MI,
                               std::pair<Register, unsigned> &MatchInfo);
@@ -598,6 +601,14 @@ public:
   /// \returns true if it is possible to narrow the width of a scalar binop
   /// feeding a G_AND instruction \p MI.
   bool matchNarrowBinopFeedingAnd(MachineInstr &MI, BuildFnTy &MatchInfo);
+
+  /// Given an G_UDIV \p MI expressing a divide by constant, return an
+  /// expression that implements it by multiplying by a magic number.
+  /// Ref: "Hacker's Delight" or "The PowerPC Compiler Writer's Guide".
+  MachineInstr *buildUDivUsingMul(MachineInstr &MI);
+  /// Combine G_UDIV by constant into a multiply by magic constant.
+  bool matchUDivByConst(MachineInstr &MI);
+  void applyUDivByConst(MachineInstr &MI);
 
   /// Try to transform \p MI by using all of the above
   /// combine functions. Returns true if changed.
