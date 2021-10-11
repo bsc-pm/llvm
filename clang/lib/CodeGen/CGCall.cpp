@@ -1755,6 +1755,26 @@ static void AddAttributesFromFunctionProtoType(ASTContext &Ctx,
     FuncAttrs.addAttribute(llvm::Attribute::NoUnwind);
 }
 
+static void AddAttributesFromAssumes(llvm::AttrBuilder &FuncAttrs,
+                                     const Decl *Callee, const Decl *Caller,
+                                     bool AssumptionOnCallSite) {
+  if (!Callee)
+    return;
+
+  SmallVector<StringRef, 4> Attrs;
+
+  for (const AssumptionAttr *AA : Callee->specific_attrs<AssumptionAttr>())
+    AA->getAssumption().split(Attrs, ",");
+
+  if (Caller && Caller->hasAttrs() && AssumptionOnCallSite)
+    for (const AssumptionAttr *AA : Caller->specific_attrs<AssumptionAttr>())
+      AA->getAssumption().split(Attrs, ",");
+
+  if (!Attrs.empty())
+    FuncAttrs.addAttribute(llvm::AssumptionAttrKey,
+                           llvm::join(Attrs.begin(), Attrs.end(), ","));
+}
+
 bool CodeGenModule::MayDropFunctionReturn(const ASTContext &Context,
                                           QualType ReturnType) {
   // We can't just discard the return value for a record type with a
@@ -2005,12 +2025,10 @@ static bool DetermineNoUndef(QualType QTy, CodeGenTypes &Types,
 ///     attributes that restrict how the frontend generates code must be
 ///     added here rather than getDefaultFunctionAttributes.
 ///
-void CodeGenModule::ConstructAttributeList(StringRef Name,
-                                           const CGFunctionInfo &FI,
-                                           CGCalleeInfo CalleeInfo,
-                                           llvm::AttributeList &AttrList,
-                                           unsigned &CallingConv,
-                                           bool AttrOnCallSite, bool IsThunk) {
+void CodeGenModule::ConstructAttributeList(
+    StringRef Name, const CGFunctionInfo &FI, CGCalleeInfo CalleeInfo,
+    llvm::AttributeList &AttrList, unsigned &CallingConv, bool AttrOnCallSite,
+    bool IsThunk, const Decl *Caller) {
   llvm::AttrBuilder FuncAttrs;
   llvm::AttrBuilder RetAttrs;
 
@@ -2027,6 +2045,13 @@ void CodeGenModule::ConstructAttributeList(StringRef Name,
                                      CalleeInfo.getCalleeFunctionProtoType());
 
   const Decl *TargetDecl = CalleeInfo.getCalleeDecl().getDecl();
+
+  // Only attach assumptions to call sites in OpenMP mode.
+  bool AssumptionOnCallSite = getLangOpts().OpenMP && AttrOnCallSite;
+
+  // Attach assumption attributes to the declaration. If this is a call
+  // site, attach assumptions from the caller to the call as well.
+  AddAttributesFromAssumes(FuncAttrs, TargetDecl, Caller, AssumptionOnCallSite);
 
   bool HasOptnone = false;
   // The NoBuiltinAttr attached to the target FunctionDecl.
@@ -2074,24 +2099,6 @@ void CodeGenModule::ConstructAttributeList(StringRef Name,
       // allows it to work on indirect virtual function calls.
       if (AttrOnCallSite && TargetDecl->hasAttr<NoMergeAttr>())
         FuncAttrs.addAttribute(llvm::Attribute::NoMerge);
-
-      // Add known guaranteed alignment for allocation functions.
-      if (unsigned BuiltinID = Fn->getBuiltinID()) {
-        switch (BuiltinID) {
-        case Builtin::BIaligned_alloc:
-        case Builtin::BIcalloc:
-        case Builtin::BImalloc:
-        case Builtin::BImemalign:
-        case Builtin::BIrealloc:
-        case Builtin::BIstrdup:
-        case Builtin::BIstrndup:
-          RetAttrs.addAlignmentAttr(Context.getTargetInfo().getNewAlign() /
-                                    Context.getTargetInfo().getCharWidth());
-          break;
-        default:
-          break;
-        }
-      }
     }
 
     // 'const', 'pure' and 'noalias' attributed functions are also nounwind.
@@ -2145,18 +2152,6 @@ void CodeGenModule::ConstructAttributeList(StringRef Name,
                                llvm::toStringRef(CodeGenOpts.UniformWGSize));
       }
     }
-
-    std::string AssumptionValueStr;
-    for (AssumptionAttr *AssumptionA :
-         TargetDecl->specific_attrs<AssumptionAttr>()) {
-      std::string AS = AssumptionA->getAssumption().str();
-      if (!AS.empty() && !AssumptionValueStr.empty())
-        AssumptionValueStr += ",";
-      AssumptionValueStr += AS;
-    }
-
-    if (!AssumptionValueStr.empty())
-      FuncAttrs.addAttribute(llvm::AssumptionAttrKey, AssumptionValueStr);
   }
 
   // Attach "no-builtins" attributes to:
@@ -5034,12 +5029,12 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
         auto scalarAlign = CGM.getDataLayout().getPrefTypeAlignment(scalarType);
 
         // Materialize to a temporary.
-        addr = CreateTempAlloca(
-            RV.getScalarVal()->getType(),
-            CharUnits::fromQuantity(std::max(
-                (unsigned)layout->getAlignment().value(), scalarAlign)),
-            "tmp",
-            /*ArraySize=*/nullptr, &AllocaAddr);
+        addr =
+            CreateTempAlloca(RV.getScalarVal()->getType(),
+                             CharUnits::fromQuantity(std::max(
+                                 layout->getAlignment().value(), scalarAlign)),
+                             "tmp",
+                             /*ArraySize=*/nullptr, &AllocaAddr);
         tempSize = EmitLifetimeStart(scalarSize, AllocaAddr.getPointer());
 
         Builder.CreateStore(RV.getScalarVal(), addr);
@@ -5191,7 +5186,7 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
   CGM.ConstructAttributeList(CalleePtr->getName(), CallInfo,
                              Callee.getAbstractInfo(), Attrs, CallingConv,
                              /*AttrOnCallSite=*/true,
-                             /*IsThunk=*/false);
+                             /*IsThunk=*/false, CurFuncDecl);
 
   if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(CurFuncDecl))
     if (FD->hasAttr<StrictFPAttr>())

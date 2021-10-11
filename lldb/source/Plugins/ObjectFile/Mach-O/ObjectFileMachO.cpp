@@ -745,13 +745,14 @@ public:
       PrintRegisterValue(reg_ctx, "sp", nullptr, 8, data);
       PrintRegisterValue(reg_ctx, "pc", nullptr, 8, data);
       PrintRegisterValue(reg_ctx, "cpsr", nullptr, 4, data);
+      data.PutHex32(0); // uint32_t pad at the end
 
       // Write out the EXC registers
-      //            data.PutHex32 (EXCRegSet);
-      //            data.PutHex32 (EXCWordCount);
-      //            WriteRegister (reg_ctx, "far", NULL, 8, data);
-      //            WriteRegister (reg_ctx, "esr", NULL, 4, data);
-      //            WriteRegister (reg_ctx, "exception", NULL, 4, data);
+      data.PutHex32(EXCRegSet);
+      data.PutHex32(EXCWordCount);
+      PrintRegisterValue(reg_ctx, "far", NULL, 8, data);
+      PrintRegisterValue(reg_ctx, "esr", NULL, 4, data);
+      PrintRegisterValue(reg_ctx, "exception", NULL, 4, data);
       return true;
     }
     return false;
@@ -4996,10 +4997,14 @@ struct OSEnv {
     case llvm::MachO::PLATFORM_WATCHOS:
       os_type = llvm::Triple::getOSTypeName(llvm::Triple::WatchOS);
       return;
-      // NEED_BRIDGEOS_TRIPLE      case llvm::MachO::PLATFORM_BRIDGEOS:
-      // NEED_BRIDGEOS_TRIPLE        os_type =
-      // llvm::Triple::getOSTypeName(llvm::Triple::BridgeOS);
-      // NEED_BRIDGEOS_TRIPLE        return;
+    // TODO: add BridgeOS & DriverKit once in llvm/lib/Support/Triple.cpp
+    // NEED_BRIDGEOS_TRIPLE
+    // case llvm::MachO::PLATFORM_BRIDGEOS:
+    //   os_type = llvm::Triple::getOSTypeName(llvm::Triple::BridgeOS);
+    //   return;
+    // case llvm::MachO::PLATFORM_DRIVERKIT:
+    //   os_type = llvm::Triple::getOSTypeName(llvm::Triple::DriverKit);
+    //   return;
     case llvm::MachO::PLATFORM_MACCATALYST:
       os_type = llvm::Triple::getOSTypeName(llvm::Triple::IOS);
       environment = llvm::Triple::getEnvironmentTypeName(llvm::Triple::MacABI);
@@ -6173,8 +6178,6 @@ lldb_private::ConstString ObjectFileMachO::GetPluginName() {
   return GetPluginNameStatic();
 }
 
-uint32_t ObjectFileMachO::GetPluginVersion() { return 1; }
-
 Section *ObjectFileMachO::GetMachHeaderSection() {
   // Find the first address of the mach header which is the first non-zero file
   // sized section whose file offset is zero. This is the base file address of
@@ -7035,12 +7038,8 @@ bool ObjectFileMachO::LoadCoreFileImages(lldb_private::Process &process) {
                                                    image.load_address);
         }
       }
-      if (module_sp.get() && module_sp->GetObjectFile()) {
+      if (module_sp.get()) {
         added_images = true;
-        if (module_sp->GetObjectFile()->GetType() ==
-            ObjectFile::eTypeExecutable) {
-          process.GetTarget().SetExecutableModule(module_sp, eLoadDependentsNo);
-        }
         for (auto name_vmaddr_tuple : image.segment_load_addresses) {
           SectionList *sectlist = module_sp->GetObjectFile()->GetSectionList();
           if (sectlist) {

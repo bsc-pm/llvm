@@ -293,6 +293,10 @@ public:
   /// nest would extend.
   SmallVector<llvm::CanonicalLoopInfo *, 4> OMPLoopNestStack;
 
+  /// Number of nested loop to be consumed by the last surrounding
+  /// loop-associated directive.
+  int ExpectedOMPLoopDepth = 0;
+
   // CodeGen lambda for loops and support for ordered clause
   typedef llvm::function_ref<void(CodeGenFunction &, const OMPLoopDirective &,
                                   JumpDest)>
@@ -3628,6 +3632,7 @@ public:
                                        const RegionCodeGenTy &BodyGen,
                                        OMPTargetDataInfo &InputInfo);
 
+  void EmitOMPMetaDirective(const OMPMetaDirective &S);
   void EmitOMPParallelDirective(const OMPParallelDirective &S);
   void EmitOMPSimdDirective(const OMPSimdDirective &S);
   void EmitOMPTileDirective(const OMPTileDirective &S);

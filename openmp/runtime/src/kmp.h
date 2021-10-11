@@ -1206,6 +1206,12 @@ typedef struct kmp_cpuid {
   kmp_uint32 edx;
 } kmp_cpuid_t;
 
+typedef struct kmp_cpuinfo_flags_t {
+  unsigned sse2 : 1; // 0 if SSE2 instructions are not supported, 1 otherwise.
+  unsigned rtm : 1; // 0 if RTM instructions are not supported, 1 otherwise.
+  unsigned reserved : 30; // Ensure size of 32 bits
+} kmp_cpuinfo_flags_t;
+
 typedef struct kmp_cpuinfo {
   int initialized; // If 0, other fields are not initialized.
   int signature; // CPUID(1).EAX
@@ -1213,8 +1219,7 @@ typedef struct kmp_cpuinfo {
   int model; // ( CPUID(1).EAX[19:16] << 4 ) + CPUID(1).EAX[7:4] ( ( Extended
   // Model << 4 ) + Model)
   int stepping; // CPUID(1).EAX[3:0] ( Stepping )
-  int sse2; // 0 if SSE2 instructions are not supported, 1 otherwise.
-  int rtm; // 0 if RTM instructions are not supported, 1 otherwise.
+  kmp_cpuinfo_flags_t flags;
   int apic_id;
   int physical_id;
   int logical_id;
@@ -2255,22 +2260,26 @@ typedef union kmp_depnode kmp_depnode_t;
 typedef struct kmp_depnode_list kmp_depnode_list_t;
 typedef struct kmp_dephash_entry kmp_dephash_entry_t;
 
+// macros for checking dep flag as an integer
 #define KMP_DEP_IN 0x1
 #define KMP_DEP_OUT 0x2
 #define KMP_DEP_INOUT 0x3
 #define KMP_DEP_MTX 0x4
 #define KMP_DEP_SET 0x8
+#define KMP_DEP_ALL 0x80
 // Compiler sends us this info:
 typedef struct kmp_depend_info {
   kmp_intptr_t base_addr;
   size_t len;
   union {
-    kmp_uint8 flag;
-    struct {
+    kmp_uint8 flag; // flag as an unsigned char
+    struct { // flag as a set of 8 bits
       unsigned in : 1;
       unsigned out : 1;
       unsigned mtx : 1;
       unsigned set : 1;
+      unsigned unused : 3;
+      unsigned all : 1;
     } flags;
   };
 } kmp_depend_info_t;
@@ -2316,6 +2325,7 @@ struct kmp_dephash_entry {
 typedef struct kmp_dephash {
   kmp_dephash_entry_t **buckets;
   size_t size;
+  kmp_depnode_t *last_all;
   size_t generation;
   kmp_uint32 nelements;
   kmp_uint32 nconflicts;
@@ -4172,6 +4182,10 @@ typedef enum kmp_severity_t {
   severity_fatal = 2
 } kmp_severity_t;
 extern void __kmpc_error(ident_t *loc, int severity, const char *message);
+
+// Support for scope directive
+KMP_EXPORT void __kmpc_scope(ident_t *loc, kmp_int32 gtid, void *reserved);
+KMP_EXPORT void __kmpc_end_scope(ident_t *loc, kmp_int32 gtid, void *reserved);
 
 // Free agent threads API.
 typedef enum kmp_free_agent_thread_start_t {

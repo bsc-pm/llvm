@@ -37,6 +37,12 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
 include(AddMLIR)
 
+# -BSymbolic is incompatible with TypeID
+if("${CMAKE_SHARED_LINKER_FLAGS}" MATCHES "-Bsymbolic[^-]")
+  message(FATAL_ERROR " MLIR does not support `-Bsymbolic` (see http://llvm.org/pr51420 ),"
+          " try `-Bsymbolic-functions` instead.")
+endif()
+
 # Forbid implicit function declaration: this may lead to subtle bugs and we
 # don't have a reason to support this.
 check_c_compiler_flag("-Werror=implicit-function-declaration" C_SUPPORTS_WERROR_IMPLICIT_FUNCTION_DECLARATION)
@@ -106,8 +112,17 @@ set(MLIR_BINDINGS_PYTHON_LOCK_VERSION 1 CACHE BOOL
 
 if(MLIR_ENABLE_BINDINGS_PYTHON)
   include(MLIRDetectPythonEnv)
+  # After CMake 3.18, we are able to limit the scope of the search to just
+  # Development.Module. Searching for Development will fail in manylinux builds,
+  # and isn't necessary since we are not embedding the Python interpreter.
+  # See https://pybind11.readthedocs.io/en/stable/compiling.html#findpython-mode
+  if(${CMAKE_VERSION} VERSION_LESS "3.18.0")
+    set(_python_development_component Development)
+  else()
+    set(_python_development_component Development.Module)
+  endif()
   find_package(Python3 ${LLVM_MINIMUM_PYTHON_VERSION}
-    COMPONENTS Interpreter Development NumPy REQUIRED)
+    COMPONENTS Interpreter ${_python_development_component} NumPy REQUIRED)
   message(STATUS "Found python include dirs: ${Python3_INCLUDE_DIRS}")
   message(STATUS "Found python libraries: ${Python3_LIBRARIES}")
   message(STATUS "Found numpy v${Python3_NumPy_VERSION}: ${Python3_NumPy_INCLUDE_DIRS}")

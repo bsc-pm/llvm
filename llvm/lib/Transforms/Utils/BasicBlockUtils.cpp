@@ -39,6 +39,7 @@
 #include "llvm/IR/Value.h"
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Local.h"
@@ -51,6 +52,11 @@
 using namespace llvm;
 
 #define DEBUG_TYPE "basicblock-utils"
+
+static cl::opt<unsigned> MaxDeoptimizingCheckDepth(
+    "max-deopt-check-depth", cl::init(8), cl::Hidden,
+    cl::desc("Set the maximum path length when checking whether a basic block "
+             "is deoptimizing"));
 
 void llvm::DetatchDeadBlocks(
     ArrayRef<BasicBlock *> BBs,
@@ -230,7 +236,7 @@ bool llvm::MergeBlockIntoPredecessor(BasicBlock *BB, DomTreeUpdater *DTU,
   if (DTU) {
     SmallPtrSet<BasicBlock *, 2> SuccsOfBB(succ_begin(BB), succ_end(BB));
     SmallPtrSet<BasicBlock *, 2> SuccsOfPredBB(succ_begin(PredBB),
-                                               succ_begin(PredBB));
+                                               succ_end(PredBB));
     Updates.reserve(Updates.size() + 2 * SuccsOfBB.size() + 1);
     // Add insert edges first. Experimentally, for the particular case of two
     // blocks that can be merged, with a single successor and single predecessor
@@ -483,6 +489,20 @@ void llvm::ReplaceInstWithInst(BasicBlock::InstListType &BIL,
 
   // Move BI back to point to the newly inserted instruction
   BI = New;
+}
+
+bool llvm::IsBlockFollowedByDeoptOrUnreachable(const BasicBlock *BB) {
+  // Remember visited blocks to avoid infinite loop
+  SmallPtrSet<const BasicBlock *, 8> VisitedBlocks;
+  unsigned Depth = 0;
+  while (BB && Depth++ < MaxDeoptimizingCheckDepth &&
+         VisitedBlocks.insert(BB).second) {
+    if (BB->getTerminatingDeoptimizeCall() ||
+        isa<UnreachableInst>(BB->getTerminator()))
+      return true;
+    BB = BB->getSingleSuccessor();
+  }
+  return false;
 }
 
 void llvm::ReplaceInstWithInst(Instruction *From, Instruction *To) {

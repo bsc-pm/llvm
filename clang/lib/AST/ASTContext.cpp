@@ -102,7 +102,14 @@
 using namespace clang;
 
 enum FloatingRank {
-  BFloat16Rank, Float16Rank, HalfRank, FloatRank, DoubleRank, LongDoubleRank, Float128Rank
+  BFloat16Rank,
+  Float16Rank,
+  HalfRank,
+  FloatRank,
+  DoubleRank,
+  LongDoubleRank,
+  Float128Rank,
+  Ibm128Rank
 };
 
 /// \returns location that is relevant when searching for Doc comments related
@@ -1308,6 +1315,9 @@ void ASTContext::InitBuiltinTypes(const TargetInfo &Target,
   // GNU extension, __float128 for IEEE quadruple precision
   InitBuiltinType(Float128Ty,          BuiltinType::Float128);
 
+  // __ibm128 for IBM extended precision
+  InitBuiltinType(Ibm128Ty, BuiltinType::Ibm128);
+
   // C11 extension ISO/IEC TS 18661-3
   InitBuiltinType(Float16Ty,           BuiltinType::Float16);
 
@@ -1441,13 +1451,10 @@ void ASTContext::InitBuiltinTypes(const TargetInfo &Target,
 #include "clang/Basic/AArch64SVEACLETypes.def"
   }
 
-  if (Target.getTriple().isPPC64() &&
-      Target.hasFeature("paired-vector-memops")) {
-    if (Target.hasFeature("mma")) {
+  if (Target.getTriple().isPPC64()) {
 #define PPC_VECTOR_MMA_TYPE(Name, Id, Size) \
       InitBuiltinType(Id##Ty, BuiltinType::Id);
 #include "clang/Basic/PPCTypes.def"
-    }
 #define PPC_VECTOR_VSX_TYPE(Name, Id, Size) \
     InitBuiltinType(Id##Ty, BuiltinType::Id);
 #include "clang/Basic/PPCTypes.def"
@@ -1710,6 +1717,8 @@ const llvm::fltSemantics &ASTContext::getFloatTypeSemantics(QualType T) const {
     return Target->getHalfFormat();
   case BuiltinType::Float:      return Target->getFloatFormat();
   case BuiltinType::Double:     return Target->getDoubleFormat();
+  case BuiltinType::Ibm128:
+    return Target->getIbm128Format();
   case BuiltinType::LongDouble:
     if (getLangOpts().OpenMP && getLangOpts().OpenMPIsDevice)
       return AuxTarget->getLongDoubleFormat();
@@ -2136,6 +2145,10 @@ TypeInfo ASTContext::getTypeInfoImpl(const Type *T) const {
       Width = Target->getDoubleWidth();
       Align = Target->getDoubleAlign();
       break;
+    case BuiltinType::Ibm128:
+      Width = Target->getIbm128Width();
+      Align = Target->getIbm128Align();
+      break;
     case BuiltinType::LongDouble:
       if (getLangOpts().OpenMP && getLangOpts().OpenMPIsDevice &&
           (Target->getLongDoubleWidth() != AuxTarget->getLongDoubleWidth() ||
@@ -2488,8 +2501,10 @@ unsigned ASTContext::getPreferredTypeAlign(const Type *T) const {
     const RecordDecl *RD = RT->getDecl();
 
     // When used as part of a typedef, or together with a 'packed' attribute,
-    // the 'aligned' attribute can be used to decrease alignment.
-    if ((TI.isAlignRequired() && T->getAs<TypedefType>() != nullptr) ||
+    // the 'aligned' attribute can be used to decrease alignment. Note that the
+    // 'packed' case is already taken into consideration when computing the
+    // alignment, we only need to handle the typedef case here.
+    if (TI.AlignRequirement == AlignRequirementKind::RequiredByTypedef ||
         RD->isInvalidDecl())
       return ABIAlign;
 
@@ -6316,6 +6331,7 @@ static FloatingRank getFloatingRank(QualType T) {
   case BuiltinType::LongDouble: return LongDoubleRank;
   case BuiltinType::Float128:   return Float128Rank;
   case BuiltinType::BFloat16:   return BFloat16Rank;
+  case BuiltinType::Ibm128:     return Ibm128Rank;
   }
 }
 
@@ -6331,6 +6347,7 @@ QualType ASTContext::getFloatingTypeOfSizeWithinDomain(QualType Size,
     case BFloat16Rank: llvm_unreachable("Complex bfloat16 is not supported");
     case Float16Rank:
     case HalfRank: llvm_unreachable("Complex half is not supported");
+    case Ibm128Rank: llvm_unreachable("Complex __ibm128 is not supported");
     case FloatRank:      return FloatComplexTy;
     case DoubleRank:     return DoubleComplexTy;
     case LongDoubleRank: return LongDoubleComplexTy;
@@ -6347,6 +6364,8 @@ QualType ASTContext::getFloatingTypeOfSizeWithinDomain(QualType Size,
   case DoubleRank:     return DoubleTy;
   case LongDoubleRank: return LongDoubleTy;
   case Float128Rank:   return Float128Ty;
+  case Ibm128Rank:
+    return Ibm128Ty;
   }
   llvm_unreachable("getFloatingRank(): illegal value for rank");
 }
@@ -7064,7 +7083,7 @@ ASTContext::getObjCEncodingForFunctionDecl(const FunctionDecl *Decl) const {
 void ASTContext::getObjCEncodingForMethodParameter(Decl::ObjCDeclQualifier QT,
                                                    QualType T, std::string& S,
                                                    bool Extended) const {
-  // Encode type qualifer, 'in', 'inout', etc. for the parameter.
+  // Encode type qualifier, 'in', 'inout', etc. for the parameter.
   getObjCEncodingForTypeQualifier(QT, S);
   // Encode parameter type.
   ObjCEncOptions Options = ObjCEncOptions()
@@ -7322,6 +7341,7 @@ static char getObjCEncodingForPrimitiveType(const ASTContext *C,
     case BuiltinType::BFloat16:
     case BuiltinType::Float16:
     case BuiltinType::Float128:
+    case BuiltinType::Ibm128:
     case BuiltinType::Half:
     case BuiltinType::ShortAccum:
     case BuiltinType::Accum:
@@ -7768,7 +7788,7 @@ void ASTContext::getObjCEncodingForTypeImpl(QualType T, std::string &S,
                                   .setExpandStructures()),
           FD);
       if (FD || Options.EncodingProperty() || Options.EncodeClassNames()) {
-        // Note that we do extended encoding of protocol qualifer list
+        // Note that we do extended encoding of protocol qualifier list
         // Only when doing ivar or property encoding.
         S += '"';
         for (const auto *I : OPT->quals()) {
@@ -10047,7 +10067,7 @@ QualType ASTContext::mergeTypes(QualType LHS, QualType RHS,
     unsigned LHSBits = LHS->castAs<ExtIntType>()->getNumBits();
     unsigned RHSBits = RHS->castAs<ExtIntType>()->getNumBits();
 
-    // Like unsigned/int, shouldn't have a type if they dont match.
+    // Like unsigned/int, shouldn't have a type if they don't match.
     if (LHSUnsigned != RHSUnsigned)
       return {};
 
@@ -10688,7 +10708,7 @@ static QualType DecodeTypeFromStr(const char *&Str, const ASTContext &Context,
 }
 
 // On some targets such as PowerPC, some of the builtins are defined with custom
-// type decriptors for target-dependent types. These descriptors are decoded in
+// type descriptors for target-dependent types. These descriptors are decoded in
 // other functions, but it may be useful to be able to fall back to default
 // descriptor decoding to define builtins mixing target-dependent and target-
 // independent types. This function allows decoding one type descriptor with
@@ -11258,6 +11278,8 @@ QualType ASTContext::getRealTypeForBitwidth(unsigned DestWidth,
     return LongDoubleTy;
   case TargetInfo::Float128:
     return Float128Ty;
+  case TargetInfo::Ibm128:
+    return Ibm128Ty;
   case TargetInfo::NoFloat:
     return {};
   }
@@ -11783,87 +11805,4 @@ StringRef ASTContext::getCUIDHash() const {
     return StringRef();
   CUIDHash = llvm::utohexstr(llvm::MD5Hash(LangOpts.CUID), /*LowerCase=*/true);
   return CUIDHash;
-}
-
-// Get the closest named parent, so we can order the sycl naming decls somewhere
-// that mangling is meaningful.
-static const DeclContext *GetNamedParent(const CXXRecordDecl *RD) {
-  const DeclContext *DC = RD->getDeclContext();
-
-  while (!isa<NamedDecl, TranslationUnitDecl>(DC))
-    DC = DC->getParent();
-  return DC;
-}
-
-void ASTContext::AddSYCLKernelNamingDecl(const CXXRecordDecl *RD) {
-  assert(getLangOpts().isSYCL() && "Only valid for SYCL programs");
-  RD = RD->getCanonicalDecl();
-  const DeclContext *DC = GetNamedParent(RD);
-
-  assert(RD->getLocation().isValid() &&
-         "Invalid location on kernel naming decl");
-
-  (void)SYCLKernelNamingTypes[DC].insert(RD);
-}
-
-bool ASTContext::IsSYCLKernelNamingDecl(const NamedDecl *ND) const {
-  assert(getLangOpts().isSYCL() && "Only valid for SYCL programs");
-  const auto *RD = dyn_cast<CXXRecordDecl>(ND);
-  if (!RD)
-    return false;
-  RD = RD->getCanonicalDecl();
-  const DeclContext *DC = GetNamedParent(RD);
-
-  auto Itr = SYCLKernelNamingTypes.find(DC);
-
-  if (Itr == SYCLKernelNamingTypes.end())
-    return false;
-
-  return Itr->getSecond().count(RD);
-}
-
-// Filters the Decls list to those that share the lambda mangling with the
-// passed RD.
-void ASTContext::FilterSYCLKernelNamingDecls(
-    const CXXRecordDecl *RD,
-    llvm::SmallVectorImpl<const CXXRecordDecl *> &Decls) {
-
-  if (!SYCLKernelFilterContext)
-    SYCLKernelFilterContext.reset(
-        ItaniumMangleContext::create(*this, getDiagnostics()));
-
-  llvm::SmallString<128> LambdaSig;
-  llvm::raw_svector_ostream Out(LambdaSig);
-  SYCLKernelFilterContext->mangleLambdaSig(RD, Out);
-
-  llvm::erase_if(Decls, [this, &LambdaSig](const CXXRecordDecl *LocalRD) {
-    llvm::SmallString<128> LocalLambdaSig;
-    llvm::raw_svector_ostream LocalOut(LocalLambdaSig);
-    SYCLKernelFilterContext->mangleLambdaSig(LocalRD, LocalOut);
-    return LambdaSig != LocalLambdaSig;
-  });
-}
-
-unsigned ASTContext::GetSYCLKernelNamingIndex(const NamedDecl *ND) {
-  assert(getLangOpts().isSYCL() && "Only valid for SYCL programs");
-  assert(IsSYCLKernelNamingDecl(ND) &&
-         "Lambda not involved in mangling asked for a naming index?");
-
-  const CXXRecordDecl *RD = cast<CXXRecordDecl>(ND)->getCanonicalDecl();
-  const DeclContext *DC = GetNamedParent(RD);
-
-  auto Itr = SYCLKernelNamingTypes.find(DC);
-  assert(Itr != SYCLKernelNamingTypes.end() && "Not a valid DeclContext?");
-
-  const llvm::SmallPtrSet<const CXXRecordDecl *, 4> &Set = Itr->getSecond();
-
-  llvm::SmallVector<const CXXRecordDecl *> Decls{Set.begin(), Set.end()};
-
-  FilterSYCLKernelNamingDecls(RD, Decls);
-
-  llvm::sort(Decls, [](const CXXRecordDecl *LHS, const CXXRecordDecl *RHS) {
-    return LHS->getLambdaManglingNumber() < RHS->getLambdaManglingNumber();
-  });
-
-  return llvm::find(Decls, RD) - Decls.begin();
 }

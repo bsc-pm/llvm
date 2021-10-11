@@ -490,7 +490,7 @@ static bool ExecuteAssemblerImpl(AssemblerInvocation &Opts,
         T, Ctx, std::move(MAB), std::move(OW), std::move(CE), *STI,
         Opts.RelaxAll, Opts.IncrementalLinkerCompatible,
         /*DWARFMustBeAtTheEnd*/ true));
-    Str.get()->InitSections(Opts.NoExecStack);
+    Str.get()->initSections(Opts.NoExecStack, *STI);
   }
 
   // When -fembed-bitcode is passed to clang_as, a 1-byte marker
@@ -550,7 +550,7 @@ static bool ExecuteAssembler(AssemblerInvocation &Opts,
   return Failed;
 }
 
-static void LLVMErrorHandler(void *UserData, const std::string &Message,
+static void LLVMErrorHandler(void *UserData, const char *Message,
                              bool GenCrashDiag) {
   DiagnosticsEngine &Diags = *static_cast<DiagnosticsEngine*>(UserData);
 

@@ -883,8 +883,7 @@ bool llvm::hoistRegion(DomTreeNode *N, AAResults *AA, LoopInfo *LI,
     if (!LoopNestMode && inSubLoop(BB, CurLoop, LI))
       continue;
 
-    for (BasicBlock::iterator II = BB->begin(), E = BB->end(); II != E;) {
-      Instruction &I = *II++;
+    for (Instruction &I : llvm::make_early_inc_range(*BB)) {
       // Try constant folding this instruction.  If all the operands are
       // constants, it is technically hoistable, but it would be better to
       // just fold it.
@@ -1069,6 +1068,10 @@ static bool isLoadInvariantInLoop(LoadInst *LI, DominatorTree *DT,
       return false;
     Addr = BC->getOperand(0);
   }
+  // If we've ended up at a global/constant, bail. We shouldn't be looking at
+  // uselists for non-local Values in a loop pass.
+  if (isa<Constant>(Addr))
+    return false;
 
   unsigned UsesVisited = 0;
   // Traverse all uses of the load operand value, to see if invariant.start is
@@ -1241,7 +1244,7 @@ bool llvm::canSinkOrHoistInst(Instruction &I, AAResults *AA, DominatorTree *DT,
       // writes to this memory in the loop, we can hoist or sink.
       if (AAResults::onlyAccessesArgPointees(Behavior)) {
         // TODO: expand to writeable arguments
-        for (Value *Op : CI->arg_operands())
+        for (Value *Op : CI->args())
           if (Op->getType()->isPointerTy()) {
             bool Invalidated;
             if (CurAST)
@@ -2154,9 +2157,9 @@ bool llvm::promoteLoopAccessesToScalars(
       // Merge the AA tags.
       if (LoopUses.empty()) {
         // On the first load/store, just take its AA tags.
-        UI->getAAMetadata(AATags);
+        AATags = UI->getAAMetadata();
       } else if (AATags) {
-        UI->getAAMetadata(AATags, /* Merge = */ true);
+        AATags = AATags.merge(UI->getAAMetadata());
       }
 
       LoopUses.push_back(UI);

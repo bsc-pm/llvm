@@ -1162,11 +1162,12 @@ private:
   ControlElementwiseOpsFusionFn controlFoldingReshapes;
 };
 
-/// Pattern to fold a generic op with a splat constant.
-class FoldSplatConstants : public OpRewritePattern<GenericOp> {
+/// Pattern to fold a generic op with a splat constant/scalar constant. Does not
+/// handle cases where the constant is not single-valued.
+class FoldConstants : public OpRewritePattern<GenericOp> {
 public:
-  FoldSplatConstants(MLIRContext *context, ControlElementwiseOpsFusionFn &fun,
-                     PatternBenefit benefit = 1)
+  FoldConstants(MLIRContext *context, ControlElementwiseOpsFusionFn &fun,
+                PatternBenefit benefit = 1)
       : OpRewritePattern<GenericOp>(context, benefit), controlFn(fun) {}
 
   LogicalResult matchAndRewrite(GenericOp genericOp,
@@ -1175,10 +1176,37 @@ public:
       return failure();
     for (OpOperand *opOperand : genericOp.getInputOperands()) {
       Operation *def = opOperand->get().getDefiningOp();
-      DenseElementsAttr constantAttr;
-      if (!def ||
-          !matchPattern(def, m_Constant<DenseElementsAttr>(&constantAttr)) ||
-          !constantAttr.isSplat() || !controlFn(def->getResult(0), *opOperand))
+      Attribute constantAttr;
+      auto isScalarOrSplatConstantOp = [&constantAttr](Operation *def) -> bool {
+        {
+          DenseElementsAttr splatAttr;
+          if (matchPattern(def, m_Constant<DenseElementsAttr>(&splatAttr)) &&
+              splatAttr.isSplat() &&
+              splatAttr.getType().getElementType().isIntOrFloat()) {
+            constantAttr = splatAttr.getSplatValue();
+            return true;
+          }
+        }
+        {
+          IntegerAttr intAttr;
+          if (matchPattern(def, m_Constant<IntegerAttr>(&intAttr))) {
+            constantAttr = intAttr;
+            return true;
+          }
+        }
+        {
+          FloatAttr floatAttr;
+          if (matchPattern(def, m_Constant<FloatAttr>(&floatAttr))) {
+            constantAttr = floatAttr;
+            return true;
+          }
+        }
+        return false;
+      };
+
+      auto resultValue = opOperand->get().dyn_cast<OpResult>();
+      if (!def || !resultValue || !isScalarOrSplatConstantOp(def) ||
+          !controlFn(resultValue, *opOperand))
         continue;
 
       // The operands and the indexing_maps of the fused operation the same as
@@ -1186,13 +1214,17 @@ public:
       // values at the constant index dropped.
       SmallVector<AffineMap> fusedIndexMaps;
       SmallVector<Value> fusedOperands;
+      SmallVector<Location> fusedLocs{genericOp.getLoc()};
       fusedIndexMaps.reserve(genericOp.getNumInputsAndOutputs());
       fusedOperands.reserve(genericOp.getNumInputs());
+      fusedLocs.reserve(fusedLocs.size() + genericOp.getNumInputs());
       for (OpOperand *inputOperand : genericOp.getInputOperands()) {
         if (inputOperand == opOperand)
           continue;
+        Value inputValue = inputOperand->get();
         fusedIndexMaps.push_back(genericOp.getTiedIndexingMap(inputOperand));
-        fusedOperands.push_back(inputOperand->get());
+        fusedOperands.push_back(inputValue);
+        fusedLocs.push_back(inputValue.getLoc());
       }
       for (OpOperand *outputOperand : genericOp.getOutputOperands())
         fusedIndexMaps.push_back(genericOp.getTiedIndexingMap(outputOperand));
@@ -1205,12 +1237,11 @@ public:
 
       // Create a constant scalar value from the splat constant.
       Value scalarConstant = rewriter.create<ConstantOp>(
-          def->getLoc(), constantAttr.getSplatValue(),
-          constantAttr.getType().getElementType());
+          def->getLoc(), constantAttr, constantAttr.getType());
 
       SmallVector<Value> outputOperands = genericOp.getOutputOperands();
       auto fusedOp = rewriter.create<GenericOp>(
-          rewriter.getUnknownLoc(), genericOp->getResultTypes(),
+          rewriter.getFusedLoc(fusedLocs), genericOp->getResultTypes(),
           /*inputs=*/fusedOperands,
           /*outputs=*/outputOperands,
           rewriter.getAffineMapArrayAttr(fusedIndexMaps),
@@ -1411,7 +1442,7 @@ void mlir::linalg::populateFoldReshapeOpsByExpansionPatterns(
 void mlir::linalg::populateElementwiseOpsFusionPatterns(
     RewritePatternSet &patterns, LinalgElementwiseFusionOptions options) {
   auto *context = patterns.getContext();
-  patterns.add<FuseElementwiseOps, FoldSplatConstants>(
+  patterns.add<FuseElementwiseOps, FoldConstants>(
       context, options.controlElementwiseOpsFusionFn);
   patterns.add<RemoveOutsDependency>(context);
   populateFoldReshapeOpsByExpansionPatterns(patterns,

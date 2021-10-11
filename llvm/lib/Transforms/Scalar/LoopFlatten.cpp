@@ -94,7 +94,20 @@ struct FlattenInfo {
   // Whether this holds the flatten info before or after widening.
   bool Widened = false;
 
+  // Holds the old/narrow induction phis, i.e. the Phis before IV widening has
+  // been applied. This bookkeeping is used so we can skip some checks on these
+  // phi nodes.
+  PHINode *NarrowInnerInductionPHI = nullptr;
+  PHINode *NarrowOuterInductionPHI = nullptr;
+
   FlattenInfo(Loop *OL, Loop *IL) : OuterLoop(OL), InnerLoop(IL) {};
+
+  bool isNarrowInductionPhi(PHINode *Phi) {
+    // This can't be the narrow phi if we haven't widened the IV first.
+    if (!Widened)
+      return false;
+    return NarrowInnerInductionPHI == Phi || NarrowOuterInductionPHI == Phi;
+  }
 };
 
 static bool
@@ -263,6 +276,8 @@ static bool checkPHIs(FlattenInfo &FI, const TargetTransformInfo *TTI) {
     // them specially when doing the transformation.
     if (&InnerPHI == FI.InnerInductionPHI)
       continue;
+    if (FI.isNarrowInductionPhi(&InnerPHI))
+      continue;
 
     // Each inner loop PHI node must have two incoming values/blocks - one
     // from the pre-header, and one from the latch.
@@ -308,6 +323,8 @@ static bool checkPHIs(FlattenInfo &FI, const TargetTransformInfo *TTI) {
   }
 
   for (PHINode &OuterPHI : FI.OuterLoop->getHeader()->phis()) {
+    if (FI.isNarrowInductionPhi(&OuterPHI))
+      continue;
     if (!SafeOuterPHIs.count(&OuterPHI)) {
       LLVM_DEBUG(dbgs() << "found unsafe PHI in outer loop: "; OuterPHI.dump());
       return false;
@@ -398,8 +415,8 @@ static bool checkIVUsers(FlattenInfo &FI) {
     if (U == FI.InnerIncrement)
       continue;
 
-    // After widening the IVs, a trunc instruction might have been introduced, so
-    // look through truncs.
+    // After widening the IVs, a trunc instruction might have been introduced,
+    // so look through truncs.
     if (isa<TruncInst>(U)) {
       if (!U->hasOneUse())
         return false;
@@ -415,8 +432,8 @@ static bool checkIVUsers(FlattenInfo &FI) {
 
     LLVM_DEBUG(dbgs() << "Found use of inner induction variable: "; U->dump());
 
-    Value *MatchedMul;
-    Value *MatchedItCount;
+    Value *MatchedMul = nullptr;
+    Value *MatchedItCount = nullptr;
     bool IsAdd = match(U, m_c_Add(m_Specific(FI.InnerInductionPHI),
                                   m_Value(MatchedMul))) &&
                  match(MatchedMul, m_c_Mul(m_Specific(FI.OuterInductionPHI),
@@ -424,11 +441,23 @@ static bool checkIVUsers(FlattenInfo &FI) {
 
     // Matches the same pattern as above, except it also looks for truncs
     // on the phi, which can be the result of widening the induction variables.
-    bool IsAddTrunc = match(U, m_c_Add(m_Trunc(m_Specific(FI.InnerInductionPHI)),
-                                       m_Value(MatchedMul))) &&
-                      match(MatchedMul,
-                            m_c_Mul(m_Trunc(m_Specific(FI.OuterInductionPHI)),
-                            m_Value(MatchedItCount)));
+    bool IsAddTrunc =
+        match(U, m_c_Add(m_Trunc(m_Specific(FI.InnerInductionPHI)),
+                         m_Value(MatchedMul))) &&
+        match(MatchedMul, m_c_Mul(m_Trunc(m_Specific(FI.OuterInductionPHI)),
+                                  m_Value(MatchedItCount)));
+
+    if (!MatchedItCount)
+      return false;
+    // Look through extends if the IV has been widened.
+    if (FI.Widened &&
+        (isa<SExtInst>(MatchedItCount) || isa<ZExtInst>(MatchedItCount))) {
+      assert(MatchedItCount->getType() == FI.InnerInductionPHI->getType() &&
+             "Unexpected type mismatch in types after widening");
+      MatchedItCount = isa<SExtInst>(MatchedItCount)
+                           ? dyn_cast<SExtInst>(MatchedItCount)->getOperand(0)
+                           : dyn_cast<ZExtInst>(MatchedItCount)->getOperand(0);
+    }
 
     if ((IsAdd || IsAddTrunc) && MatchedItCount == InnerTripCount) {
       LLVM_DEBUG(dbgs() << "Use is optimisable\n");
@@ -668,14 +697,11 @@ static bool CanWidenIV(FlattenInfo &FI, DominatorTree *DT, LoopInfo *LI,
   }
 
   SCEVExpander Rewriter(*SE, DL, "loopflatten");
-  SmallVector<WideIVInfo, 2> WideIVs;
   SmallVector<WeakTrackingVH, 4> DeadInsts;
-  WideIVs.push_back( {FI.InnerInductionPHI, MaxLegalType, false });
-  WideIVs.push_back( {FI.OuterInductionPHI, MaxLegalType, false });
   unsigned ElimExt = 0;
   unsigned Widened = 0;
 
-  for (const auto &WideIV : WideIVs) {
+  auto CreateWideIV = [&] (WideIVInfo WideIV, bool &Deleted) -> bool {
     PHINode *WidePhi = createWideIV(WideIV, LI, SE, Rewriter, DT, DeadInsts,
                                     ElimExt, Widened, true /* HasGuards */,
                                     true /* UsePostIncrementRanges */);
@@ -683,11 +709,29 @@ static bool CanWidenIV(FlattenInfo &FI, DominatorTree *DT, LoopInfo *LI,
       return false;
     LLVM_DEBUG(dbgs() << "Created wide phi: "; WidePhi->dump());
     LLVM_DEBUG(dbgs() << "Deleting old phi: "; WideIV.NarrowIV->dump());
-    RecursivelyDeleteDeadPHINode(WideIV.NarrowIV);
-  }
-  // After widening, rediscover all the loop components.
+    Deleted = RecursivelyDeleteDeadPHINode(WideIV.NarrowIV);
+    return true;
+  };
+
+  bool Deleted;
+  if (!CreateWideIV({FI.InnerInductionPHI, MaxLegalType, false }, Deleted))
+    return false;
+  // Add the narrow phi to list, so that it will be adjusted later when the
+  // the transformation is performed.
+  if (!Deleted)
+    FI.InnerPHIsToTransform.insert(FI.InnerInductionPHI);
+
+  if (!CreateWideIV({FI.OuterInductionPHI, MaxLegalType, false }, Deleted))
+    return false;
+
   assert(Widened && "Widened IV expected");
   FI.Widened = true;
+
+  // Save the old/narrow induction phis, which we need to ignore in CheckPHIs.
+  FI.NarrowInnerInductionPHI = FI.InnerInductionPHI;
+  FI.NarrowOuterInductionPHI = FI.OuterInductionPHI;
+
+  // After widening, rediscover all the loop components.
   return CanFlattenLoopPair(FI, DT, LI, SE, AC, TTI);
 }
 
@@ -704,12 +748,30 @@ static bool FlattenLoopPair(FlattenInfo &FI, DominatorTree *DT, LoopInfo *LI,
     return false;
 
   // Check if we can widen the induction variables to avoid overflow checks.
-  if (CanWidenIV(FI, DT, LI, SE, AC, TTI))
+  bool CanFlatten = CanWidenIV(FI, DT, LI, SE, AC, TTI);
+
+  // It can happen that after widening of the IV, flattening may not be
+  // possible/happening, e.g. when it is deemed unprofitable. So bail here if
+  // that is the case.
+  // TODO: IV widening without performing the actual flattening transformation
+  // is not ideal. While this codegen change should not matter much, it is an
+  // unnecessary change which is better to avoid. It's unlikely this happens
+  // often, because if it's unprofitibale after widening, it should be
+  // unprofitabe before widening as checked in the first round of checks. But
+  // 'RepeatedInstructionThreshold' is set to only 2, which can probably be
+  // relaxed. Because this is making a code change (the IV widening, but not
+  // the flattening), we return true here.
+  if (FI.Widened && !CanFlatten)
+    return true;
+
+  // If we have widened and can perform the transformation, do that here.
+  if (CanFlatten)
     return DoFlattenLoopPair(FI, DT, LI, SE, AC, TTI);
 
-  // Check if the new iteration variable might overflow. In this case, we
-  // need to version the loop, and select the original version at runtime if
-  // the iteration space is too large.
+  // Otherwise, if we haven't widened the IV, check if the new iteration
+  // variable might overflow. In this case, we need to version the loop, and
+  // select the original version at runtime if the iteration space is too
+  // large.
   // TODO: We currently don't version the loop.
   OverflowResult OR = checkOverflow(FI, DT, AC);
   if (OR == OverflowResult::AlwaysOverflowsHigh ||
@@ -753,7 +815,7 @@ PreservedAnalyses LoopFlattenPass::run(LoopNest &LN, LoopAnalysisManager &LAM,
   if (!Changed)
     return PreservedAnalyses::all();
 
-  return PreservedAnalyses::none();
+  return getLoopPassPreservedAnalyses();
 }
 
 namespace {

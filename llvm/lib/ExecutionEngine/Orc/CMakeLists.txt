@@ -7,8 +7,9 @@ add_llvm_component_library(LLVMOrcJIT
   EPCDynamicLibrarySearchGenerator.cpp
   EPCDebugObjectRegistrar.cpp
   EPCEHFrameRegistrar.cpp
+  EPCGenericDylibManager.cpp
   EPCGenericJITLinkMemoryManager.cpp
-  EPCGenericMemoryAccess.cpp
+  EPCGenericRTDyldMemoryManager.cpp
   EPCIndirectionUtils.cpp
   ExecutionUtils.cpp
   IndirectionUtils.cpp
@@ -27,6 +28,7 @@ add_llvm_component_library(LLVMOrcJIT
   OrcABISupport.cpp
   OrcV2CBindings.cpp
   RTDyldObjectLinkingLayer.cpp
+  SimpleRemoteEPC.cpp
   Speculation.cpp
   SpeculateAnalyses.cpp
   ExecutorProcessControl.cpp
