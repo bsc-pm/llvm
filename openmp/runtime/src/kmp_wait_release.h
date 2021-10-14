@@ -538,6 +538,12 @@ final_spin=FALSE)
   // Main wait spin loop
   while (flag->notdone_check()) {
     kmp_task_team_t *task_team = NULL;
+    if(this_thr->th.is_free_agent && this_thr->th.fa_swap_to_worker){
+    	KMP_ATOMIC_ST_RLX(&this_thr->th.is_free_agent, false);
+    	KMP_ATOMIC_ST_RLX(&this_thr->th.fa_swap_to_worker,false);
+    	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+    	continue;
+    }
     if (__kmp_tasking_mode != tskm_immediate_exec) {
       task_team = this_thr->th.th_task_team;
       /* If the thread's task team pointer is NULL, it means one of 3 things:
@@ -718,6 +724,13 @@ final_spin=FALSE)
 #endif
       //printf("suspending...\n");
       flag->suspend(th_gtid);
+    	//Check if the master requested this thread to change its role while suspended
+    	if(this_thr->th.is_free_agent && this_thr->th.fa_swap_to_worker){
+    		KMP_ATOMIC_ST_RLX(&this_thr->th.is_free_agent, false);
+    		KMP_ATOMIC_ST_RLX(&this_thr->th.fa_swap_to_worker,false);
+    		KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+    		//break;
+    	}
 #if KMP_OS_UNIX
       if (final_spin)
         KMP_ATOMIC_ST_REL(&this_thr->th.th_blocking, true);

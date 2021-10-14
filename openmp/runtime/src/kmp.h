@@ -2694,6 +2694,7 @@ typedef struct KMP_ALIGN_CACHE kmp_base_info {
   kmp_info_p* th_next_free_agent; //Pointer to the next free agent in the free agents list
   kmp_cg_root_t *th_cg_roots; // list of cg_roots associated with this thread
   std::atomic<bool> is_free_agent; // This is a free_agent thread.
+  std::atomic<bool> fa_swap_to_worker; // This is a free_agent thread.
   bool *is_free_agent_active; // Reference to the is_free_agent_thread_active array.
                               // This is for convenience.
   int free_agent_id;

@@ -1209,6 +1209,7 @@ enum kmp_warnings_level {
 #define KMP_ATOMIC_LD_RLX(p) KMP_ATOMIC_LD(p, relaxed)
 #define KMP_ATOMIC_ST_REL(p, v) KMP_ATOMIC_OP(store, p, v, release)
 #define KMP_ATOMIC_ST_RLX(p, v) KMP_ATOMIC_OP(store, p, v, relaxed)
+#define KMP_ATOMIC_ST_SEQ(p, v) KMP_ATOMIC_OP(store, p, v, seq_cst)
 
 // For non-default fetch_<op>
 #define KMP_ATOMIC_ADD(p, v) KMP_ATOMIC_OP(fetch_add, p, v, acq_rel)

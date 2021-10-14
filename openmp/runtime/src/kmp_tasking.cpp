@@ -2977,11 +2977,21 @@ static inline int __kmp_execute_tasks_template(
       task = NULL;
       if (use_own_tasks) { // check on own queue first
         if (thread->th.is_free_agent) {
-          task = __kmp_steal_task(threads_data[tid].td.td_thr, gtid, task_team,
-                                  unfinished_threads, thread_finished,
-                                  is_constrained);
+          //The master may have started a new parallel and requested this thread to be one of the workers
+          if(thread->th.fa_swap_to_worker){
+          	KMP_ATOMIC_ST_RLX(&thread->th.is_free_agent, false);
+          	KMP_ATOMIC_ST_RLX(&thread->th.fa_swap_to_worker, false);
+          	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+          	break;
+          }
+          else {
+          	task = __kmp_steal_task(threads_data[tid].td.td_thr, gtid, task_team,
+                                  	unfinished_threads, thread_finished,
+                                  	is_constrained);
+          }
           if(task) thread->th.victim_tid = tid;
-        } else if(free_agent_victim_tid == -1) {
+        } 
+        else {
           task = __kmp_remove_my_task(thread, gtid, task_team, is_constrained);
         }
       }

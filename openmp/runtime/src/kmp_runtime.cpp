@@ -4376,16 +4376,19 @@ kmp_info_t *__kmp_allocate_thread_common(kmp_root_t *root, kmp_team_t *team,
     if (new_thr == __kmp_free_agent_list_insert_pt) {
       __kmp_free_agent_list_insert_pt = NULL;
     }
-  	
-    //__kmp_suspend_initialize_thread(new_thr);
-    //__kmp_lock_suspend_mx(new_thr);
-    
-    KMP_ATOMIC_ST_RLX(&new_thr->th.is_free_agent, false);
-    //new_thr->th.is_free_agent = false;
+    /*kmp_flag_64<> *flag = RCAST(kmp_flag_64<> *, CCAST(void *, new_thr->th.th_sleep_loc));
+    if(!flag || (flag && flag->is_sleeping())){
+    	//Is it safe to change the role of the thread
+    	KMP_ATOMIC_ST_RLX(&new_thr->th.is_free_agent, false);
+    	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+    }
+    else{*/
+    	//Tell the free agent to change its role when possible
+    	KMP_ATOMIC_ST_SEQ(&new_thr->th.fa_swap_to_worker, true);
+    //}
+
     new_thr->th.free_agent_id = -1;
-    KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
     
-    //__kmp_unlock_suspend_mx(new_thr);
 		if(new_thr->th.th_serial_team == NULL){
 			kmp_internal_control_t r_icvs = __kmp_get_x_global_icvs(team);
 			new_thr->th.th_serial_team = serial_team = 
@@ -4403,7 +4406,6 @@ kmp_info_t *__kmp_allocate_thread_common(kmp_root_t *root, kmp_team_t *team,
                           new_thr->th.th_info.ds.ds_gtid);
     KMP_DEBUG_ASSERT(new_thr->th.th_serial_team);
 
-    //TCW_4(__kmp_nth, __kmp_nth + 1);
 
     new_thr->th.th_task_state = 0;
     new_thr->th.th_task_state_top = 0;
@@ -4631,6 +4633,7 @@ kmp_info_t *__kmp_allocate_thread_common(kmp_root_t *root, kmp_team_t *team,
 
   if (!is_free_agent) {
     new_thr->th.is_free_agent = false;
+    new_thr->th.fa_swap_to_worker = false;
     new_thr->th.free_agent_id = -1;
     new_thr->th.th_next_free_agent = NULL;
 
@@ -4666,6 +4669,7 @@ kmp_info_t *__kmp_allocate_free_agent_thread(kmp_root_t *root, int new_tid) {
   thread->th.th_info.ds.ds_tid = new_tid + 32;
   thread->th.th_root = root;
   thread->th.is_free_agent = true;
+  thread->th.fa_swap_to_worker = false;
   //thread->th.is_free_agent_active = &root->r.is_free_agent_thread_active[new_tid];
   thread->th.free_agent_id = -1;
   thread->th.th_serial_team = NULL;
@@ -5256,9 +5260,18 @@ __kmp_allocate_team(kmp_root_t *root, int new_nproc, int max_nproc,
 			if(th == __kmp_free_agent_list_insert_pt){
 				__kmp_free_agent_list_insert_pt = NULL;
 			}
-			KMP_ATOMIC_ST_RLX(&th->th.is_free_agent, false);
+			/*kmp_flag_64<> *flag = RCAST(kmp_flag_64<> *, CCAST(void *, th->th.th_sleep_loc));
+			if(!flag || (flag && flag->is_sleeping())){
+				//Is it safe to change the role of the thread
+				KMP_ATOMIC_ST_RLX(&th->th.is_free_agent, false);
+				KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+			}
+			else{*/
+				//Tell the free agent to change its role when possible
+				KMP_ATOMIC_ST_SEQ(&th->th.fa_swap_to_worker, true);
+			//}
 			th->th.free_agent_id = -1;
-			KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+			
 			//We didn't give a serial_team to the free agent at creation. If it's the first
 			//time it reaches this function we have to assign it one.
 			if(th->th.th_serial_team == NULL){
@@ -5286,6 +5299,14 @@ __kmp_allocate_team(kmp_root_t *root, int new_nproc, int max_nproc,
       if (__kmp_tasking_mode != tskm_immediate_exec) {
 				th->th.th_task_team = NULL;
 			}
+      kmp_balign_t *balign = th->th.th_bar;
+      for (int b = 0; b < bs_last_barrier; ++b) {
+          balign[b].bb.b_arrived = team->t.t_bar[b].b_arrived;
+          KMP_DEBUG_ASSERT(balign[b].bb.wait_flag != KMP_BARRIER_PARENT_FLAG);
+#if USE_DEBUGGER
+          balign[b].bb.b_worker_arrived = team->t.t_bar[b].b_team_arrived;
+#endif
+      }
 			count++;
 		}
     // Update the t_nproc field in the threads that are still active.
@@ -8212,6 +8233,7 @@ void __kmp_internal_join(ident_t *id, int gtid, kmp_team_t *team) {
 										  new_thr->th.th_next_free_agent->th.th_info.ds.ds_gtid));
 		
 		KMP_ATOMIC_ST_RLX(&new_thr->th.is_free_agent, true);
+		KMP_ATOMIC_ST_RLX(&new_thr->th.fa_swap_to_worker, false);
 		KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
 
   	new_thr = team->t.t_threads[i++];
