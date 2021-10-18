@@ -467,7 +467,7 @@ final_spin=FALSE)
   ompt_state_t ompt_entry_state;
   ompt_data_t *tId;
   if (ompt_enabled.enabled
-      && !this_thr->th.is_free_agent) {
+      && this_thr->th.th_active_role != OMP_ROLE_FREE_AGENT) {
     ompt_entry_state = this_thr->th.ompt_thread_info.state;
     if (!final_spin || ompt_entry_state != ompt_state_wait_barrier_implicit ||
         KMP_MASTER_TID(this_thr->th.th_info.ds.ds_tid)) {
@@ -538,9 +538,10 @@ final_spin=FALSE)
   // Main wait spin loop
   while (flag->notdone_check()) {
     kmp_task_team_t *task_team = NULL;
-    if(this_thr->th.is_free_agent && this_thr->th.fa_swap_to_worker){
-    	KMP_ATOMIC_ST_RLX(&this_thr->th.is_free_agent, false);
-    	KMP_ATOMIC_ST_RLX(&this_thr->th.fa_swap_to_worker,false);
+    if(this_thr->th.th_active_role == OMP_ROLE_FREE_AGENT 
+    	 && this_thr->th.th_change_role){
+    	KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
+    	KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, this_thr->th.th_pending_role);
     	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
     	continue;
     }
@@ -553,8 +554,8 @@ final_spin=FALSE)
          3) Tasking is off for this region.  This could be because we are in a
          serialized region (perhaps the outer one), or else tasking was manually
          disabled (KMP_TASKING=0).  */
-      //if (this_thr->th.is_free_agent && *this_thr->th.is_free_agent_active) {
-      if (this_thr->th.is_free_agent && __kmp_free_agent_list) {
+      if (this_thr->th.th_active_role == OMP_ROLE_FREE_AGENT
+      		&& __kmp_free_agent_list) {
         int empty_task_teams_cnt = 0;
         int team_task_to_pick = 0;
         while (team_task_to_pick < this_thr->th.allowed_teams_length){
@@ -613,7 +614,8 @@ final_spin=FALSE)
         } //while (team_task_to_pick < this_thr->th.allowed_teams_length);
         // Reset task_team to 0 to make free agent thread able to suspend
         task_team = NULL;
-      } else if (!this_thr->th.is_free_agent) {
+      //} else if (!this_thr->th.is_free_agent) {
+      } else if (this_thr->th.th_active_role != OMP_ROLE_FREE_AGENT) {
         if (task_team != NULL) {
           if (TCR_SYNC_4(task_team->tt.tt_active)) {
             if (KMP_TASKING_ENABLED(task_team)) {
@@ -725,11 +727,11 @@ final_spin=FALSE)
       //printf("suspending...\n");
       flag->suspend(th_gtid);
     	//Check if the master requested this thread to change its role while suspended
-    	if(this_thr->th.is_free_agent && this_thr->th.fa_swap_to_worker){
-    		KMP_ATOMIC_ST_RLX(&this_thr->th.is_free_agent, false);
-    		KMP_ATOMIC_ST_RLX(&this_thr->th.fa_swap_to_worker,false);
+    	if(this_thr->th.th_active_role == OMP_ROLE_FREE_AGENT
+    		 && this_thr->th.th_change_role){
+    		KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
+    		KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, this_thr->th.th_pending_role);
     		KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
-    		//break;
     	}
 #if KMP_OS_UNIX
       if (final_spin)

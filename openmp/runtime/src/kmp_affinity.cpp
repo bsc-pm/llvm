@@ -3949,14 +3949,15 @@ void __kmp_affinity_set_init_mask(int gtid, int isa_root) {
   kmp_affin_mask_t *mask;
   int i;
 
-  if (th->th.is_free_agent) {
+  if (th->th.th_active_role == OMP_ROLE_FREE_AGENT) {
     if (__kmp_free_agent_proc_bind == proc_bind_false) {
       KMP_ASSERT(__kmp_affin_fullMask != NULL);
       i = 0;
       mask = __kmp_affin_fullMask;
     } else {
       KMP_DEBUG_ASSERT(__kmp_free_agent_affinity_num_masks > 0);
-      i = th->th.free_agent_id % __kmp_free_agent_affinity_num_masks;
+      //i = th->th.free_agent_id % __kmp_free_agent_affinity_num_masks;
+      i = th->th.th_info.ds.ds_gtid % __kmp_free_agent_affinity_num_masks;
       mask = KMP_CPU_INDEX(__kmp_free_agent_affinity_masks, i);
     }
   }

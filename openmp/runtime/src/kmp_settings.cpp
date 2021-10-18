@@ -5159,9 +5159,9 @@ static void __kmp_stg_parse_free_agent_thread_start(char const *name,
                                                     char const *value,
                                                     void *data) {
   if (__kmp_str_match("active", 1, value)) {
-    __kmp_free_agent_thread_start = kmp_free_agent_active;
+    //__kmp_free_agent_thread_start = kmp_free_agent_active;
   } else if (__kmp_str_match("inactive", 1, value)) {
-    __kmp_free_agent_thread_start = kmp_free_agent_inactive;
+    //__kmp_free_agent_thread_start = kmp_free_agent_inactive;
   } else {
     // FIXME: Use KMP messaging facilities instead.
     fprintf(stderr,
@@ -5174,14 +5174,14 @@ static void __kmp_stg_parse_free_agent_thread_start(char const *name,
 static void __kmp_stg_print_free_agent_thread_start(kmp_str_buf_t *buffer,
                                                    char const *name,
                                                    void *data) {
-  switch(__kmp_free_agent_thread_start) {
+  /*switch(__kmp_free_agent_thread_start) {
     case kmp_free_agent_active:
       __kmp_stg_print_str(buffer, name, "active");
       break;
     case kmp_free_agent_inactive:
       __kmp_stg_print_str(buffer, name, "inactive");
       break;
-  }
+  }*/
 }
 
 // -----------------------------------------------------------------------------

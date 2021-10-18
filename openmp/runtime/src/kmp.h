@@ -537,6 +537,13 @@ enum _reduction_method {
   empty_reduce_block = (4 << 8)
 };
 
+typedef enum omp_role{
+	OMP_ROLE_NONE = 0,
+	OMP_ROLE_WORKER = 1 << 0,
+	OMP_ROLE_FREE_AGENT = 1 << 1,
+	OMP_ROLE_COMMUNICATOR = 1 << 2
+} omp_role_t;
+
 // Description of the packed_reduction_method variable:
 // The packed_reduction_method variable consists of two enum types variables
 // that are packed together into 0-th byte and 1-st byte:
@@ -2693,11 +2700,16 @@ typedef struct KMP_ALIGN_CACHE kmp_base_info {
 #endif
   kmp_info_p* th_next_free_agent; //Pointer to the next free agent in the free agents list
   kmp_cg_root_t *th_cg_roots; // list of cg_roots associated with this thread
-  std::atomic<bool> is_free_agent; // This is a free_agent thread.
-  std::atomic<bool> fa_swap_to_worker; // This is a free_agent thread.
-  bool *is_free_agent_active; // Reference to the is_free_agent_thread_active array.
+  //std::atomic<bool> is_free_agent; // This is a free_agent thread.
+  //std::atomic<bool> fa_swap_to_worker; // This is a free_agent thread.
+  //bool *is_free_agent_active; // Reference to the is_free_agent_thread_active array.
                               // This is for convenience.
-  int free_agent_id;
+  //int free_agent_id;
+
+  omp_role_t th_potential_roles; //Enum with all the roles this thread can have
+  std::atomic<omp_role_t> th_active_role; //Current role of this thread
+	omp_role_t th_pending_role;
+	std::atomic<bool> th_change_role; //Indicates the thread to change the role to th_pending_role ASAP
 
   // List of teams we can enter as a free agent thread
   kmp_bootstrap_lock_t allowed_teams_lock;
@@ -2898,12 +2910,12 @@ typedef struct kmp_base_root {
 #endif // KMP_AFFINITY_SUPPORTED
 
   /* Free agent threads */
-  kmp_info_t *kmp_free_agent_list; /*First element of the free agent thread list. Next
-  element is pointed by the thread itself*/
-  kmp_info_t *kmp_free_agent_list_insert_pt;
-  unsigned int num_free_agent_threads; // Number of free agent threads.
-  kmp_info_t **free_agent_threads; // Threads that are free agent in this root.
-  bool *is_free_agent_thread_active; // States if a free agent thread is enabled or not.
+  //kmp_info_t *kmp_free_agent_list; First element of the free agent thread list. Next
+  //element is pointed by the thread itself
+  //kmp_info_t *kmp_free_agent_list_insert_pt;
+  //unsigned int num_free_agent_threads; // Number of free agent threads.
+  //kmp_info_t **free_agent_threads; // Threads that are free agent in this root.
+  //bool *is_free_agent_thread_active; // States if a free agent thread is enabled or not.
 } kmp_base_root_t;
 
 typedef union KMP_ALIGN_CACHE kmp_root {
@@ -3603,7 +3615,7 @@ extern void __kmp_suspend_initialize_thread(kmp_info_t *th);
 extern void __kmp_suspend_uninitialize_thread(kmp_info_t *th);
 
 extern kmp_info_t *__kmp_allocate_thread(kmp_root_t *root, kmp_team_t *team,
-                                         int tid);
+                                         int tid, omp_role_t role);
 extern kmp_team_t *
 __kmp_allocate_team(kmp_root_t *root, int new_nproc, int max_nproc,
 #if OMPT_SUPPORT
@@ -4185,7 +4197,7 @@ typedef enum kmp_free_agent_thread_start_t {
 extern volatile kmp_info_t *__kmp_free_agent_list; /*First element of the free agent
 thread list. Next element is pointed by the thread itself*/
 extern kmp_info_t *__kmp_free_agent_list_insert_pt;
-extern kmp_free_agent_thread_start_t __kmp_free_agent_thread_start;
+//extern kmp_free_agent_thread_start_t __kmp_free_agent_thread_start;
 extern unsigned int __kmp_free_agent_num_threads; //Max number of free agents allowed
 extern std::atomic<int> __kmp_free_agent_active_nth; //Actual number of free agents active
 extern kmp_proc_bind_t __kmp_free_agent_proc_bind;

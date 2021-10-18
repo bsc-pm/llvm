@@ -333,7 +333,8 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task) {
   kmp_task_team_t *task_team = thread->th.th_task_team;
   kmp_int32 tid;
   kmp_thread_data_t *thread_data;
-  if(thread->th.is_free_agent)  tid = thread->th.victim_tid;
+  if(thread->th.th_active_role == OMP_ROLE_FREE_AGENT)
+  	tid = thread->th.victim_tid;
   else  tid = __kmp_tid_from_gtid(gtid);
 
   KA_TRACE(20,
@@ -452,28 +453,14 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task) {
   //TODO: Do we need this with the new implementation?
   kmp_info_t *free_agent = CCAST(kmp_info_t *,__kmp_free_agent_list);
   while(free_agent != NULL){
-  	//if(free_agent->th.is_free_agent){
   	kmp_flag_64<> *flag = RCAST(kmp_flag_64<> *,
   		CCAST(void *, free_agent->th.th_sleep_loc));
   	if(flag && flag->is_sleeping()){
   		flag->resume(free_agent->th.th_info.ds.ds_gtid);
   		break;
-  		}
-  	//}
+  	}
   	free_agent = free_agent->th.th_next_free_agent;
   }
-  /*for (unsigned int i = 0; i < __kmp_free_agent_num_threads; i++) {
-    kmp_info_t *free_agent_thread =
-      __kmp_threads[gtid]->th.th_root->r.free_agent_threads[i];
-    if (*free_agent_thread->th.is_free_agent_active) {
-      kmp_flag_64<> *flag = RCAST(kmp_flag_64<> *,
-          CCAST(void *, free_agent_thread->th.th_sleep_loc));
-      if (flag && flag->is_sleeping()) {
-        flag->resume(free_agent_thread->th.th_info.ds.ds_gtid);
-        break;
-      }
-    }
-  }*/
 
   return TASK_SUCCESSFULLY_PUSHED;
 }
@@ -1260,7 +1247,7 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
   kmp_info_t *thread = __kmp_threads[gtid];
   kmp_team_t *team = thread->th.th_team;
   kmp_taskdata_t *parent_task = thread->th.th_current_task;
-  if (thread->th.is_free_agent) {
+  if (thread->th.th_active_role == OMP_ROLE_FREE_AGENT) {
     // GROSS HACK because free agent threads do not belong to a team but they
     // can execute tasks that create new tasks that logically belong to the same
     // team as the parent task.
@@ -2874,7 +2861,7 @@ static kmp_task_t *__kmp_steal_task(kmp_info_t *victim_thr, kmp_int32 gtid,
   }
   if (*thread_finished) {
     // Free agent threads do not increment.
-    if (!__kmp_threads[gtid]->th.is_free_agent) {
+    if (__kmp_threads[gtid]->th.th_active_role != OMP_ROLE_FREE_AGENT) {
       // We need to un-mark this victim as a finished victim.  This must be done
       // before releasing the lock, or else other threads (starting with the
       // primary thread victim) might be prematurely released from the barrier!!!
@@ -2927,9 +2914,6 @@ static inline int __kmp_execute_tasks_template(
   kmp_int32 nthreads, victim_tid = -2, use_own_tasks = 1, new_victim = 0,
                       tid = thread->th.th_info.ds.ds_tid;
 
-  // Assuming free agent threads have tid 0
-  //KMP_DEBUG_ASSERT(!thread->th.is_free_agent || tid == 0);
-
   KMP_DEBUG_ASSERT(__kmp_tasking_mode != tskm_immediate_exec);
   KMP_DEBUG_ASSERT(thread == __kmp_threads[gtid]);
 
@@ -2951,8 +2935,8 @@ static inline int __kmp_execute_tasks_template(
   // FIXME: We are not sure about this why it happens. Looks like free agent
   // threads can be here even if there are no proxy tasks and this is a serial
   // team.
-  KMP_DEBUG_ASSERT(thread->th.is_free_agent || nthreads > 1 ||
-                   task_team->tt.tt_found_proxy_tasks ||
+  KMP_DEBUG_ASSERT(thread->th.th_active_role == OMP_ROLE_FREE_AGENT ||
+  								 nthreads > 1 || task_team->tt.tt_found_proxy_tasks ||
                    task_team->tt.tt_hidden_helper_task_encountered);
   KMP_DEBUG_ASSERT(*unfinished_threads >= 0);
 
@@ -2961,7 +2945,7 @@ static inline int __kmp_execute_tasks_template(
   int free_agent_victim_tid = -1;
 
   // Free agent threads use victim_tid as last_stolen directly
-  if (thread->th.is_free_agent) {
+  if (thread->th.th_active_role == OMP_ROLE_FREE_AGENT) {
     victim_tid = -1;
     //if(thread == __kmp_free_agent_list) tid = 0;
     //else tid = 1;
@@ -2976,11 +2960,11 @@ static inline int __kmp_execute_tasks_template(
       handleServices();
       task = NULL;
       if (use_own_tasks) { // check on own queue first
-        if (thread->th.is_free_agent) {
+        if (thread->th.th_active_role == OMP_ROLE_FREE_AGENT) {
           //The master may have started a new parallel and requested this thread to be one of the workers
-          if(thread->th.fa_swap_to_worker){
-          	KMP_ATOMIC_ST_RLX(&thread->th.is_free_agent, false);
-          	KMP_ATOMIC_ST_RLX(&thread->th.fa_swap_to_worker, false);
+          if(thread->th.th_change_role){
+          	KMP_ATOMIC_ST_RLX(&thread->th.th_change_role, false);
+          	KMP_ATOMIC_ST_RLX(&thread->th.th_active_role, thread->th.th_pending_role);
           	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
           	break;
           }
@@ -3017,7 +3001,7 @@ static inline int __kmp_execute_tasks_template(
             // Pick a random thread. Initial plan was to cycle through all the
             // threads, and only return if we tried to steal from every thread,
             // and failed.  Arch says that's not such a great idea.
-            if (thread->th.is_free_agent) {
+            if (thread->th.th_active_role == OMP_ROLE_FREE_AGENT) {
               victim_tid = free_agent_victim_tid;
               thread->th.victim_tid = victim_tid;
             } else {
@@ -3060,7 +3044,7 @@ static inline int __kmp_execute_tasks_template(
                                   is_constrained);
         }
         if (task != NULL) { // set last stolen to victim
-          if (!thread->th.is_free_agent) {
+          if (thread->th.th_active_role != OMP_ROLE_FREE_AGENT) {
             if (threads_data[tid].td.td_deque_last_stolen != victim_tid)
               threads_data[tid].td.td_deque_last_stolen = victim_tid;
           }
@@ -3069,7 +3053,7 @@ static inline int __kmp_execute_tasks_template(
           // new_victim keeps track of this
           new_victim = 1;
         } else { // No tasks found; unset last_stolen
-          if (thread->th.is_free_agent) {
+          if (thread->th.th_active_role == OMP_ROLE_FREE_AGENT) {
             // free agent threads use victim_tid as last_stolen directly
             victim_tid = -1;
           } else {
@@ -3130,7 +3114,7 @@ static inline int __kmp_execute_tasks_template(
       }
     }
 
-    if (!final_spin && __kmp_free_agent_num_threads != 0 &&
+    if (!final_spin && __kmp_free_agent_active_nth != 0 &&
         KMP_ATOMIC_LD_ACQ(&current_task->td_incomplete_child_tasks) == 0) {
       // So this is like a taskwait but we could not find a task (perhaps a
       // free agent got a chance to execute it first)
@@ -3145,13 +3129,14 @@ static inline int __kmp_execute_tasks_template(
     // but there might be proxy tasks still executing.
     if (final_spin &&
         KMP_ATOMIC_LD_ACQ(&current_task->td_incomplete_child_tasks) == 0) {
-      if (thread->th.is_free_agent && !*thread_finished) {
+      if (thread->th.th_active_role == OMP_ROLE_FREE_AGENT
+      	  && !*thread_finished) {
         // Free agent threads do not decrement
         *thread_finished = TRUE;
       // First, decrement the #unfinished threads, if that has not already been
       // done.  This decrement might be to the spin location, and result in the
       // termination condition being satisfied.
-      } else if (!thread->th.is_free_agent && !*thread_finished) {
+      } else if (thread->th.th_active_role != OMP_ROLE_FREE_AGENT && !*thread_finished) {
         // At least one free agent thread is in my task_team. It can potencially
         // create tasks so I stay here.
         if (KMP_ATOMIC_LD_ACQ(&task_team->tt.tt_unfinished_free_agents) == 0) {
@@ -3191,10 +3176,10 @@ static inline int __kmp_execute_tasks_template(
     // We could be getting tasks from target constructs; if this is the only
     // thread, keep trying to execute tasks from own queue
     if (nthreads == 1 &&
-        !thread->th.is_free_agent &&
+        thread->th.th_active_role != OMP_ROLE_FREE_AGENT &&
         KMP_ATOMIC_LD_ACQ(&current_task->td_incomplete_child_tasks)) {
       use_own_tasks = 1;
-    } else if (thread->th.is_free_agent) {
+    } else if (thread->th.th_active_role == OMP_ROLE_FREE_AGENT) {
       free_agent_victim_tid = (free_agent_victim_tid + 1) % nthreads;
       if (free_agent_victim_tid == tid)
         return FALSE;
