@@ -2157,24 +2157,30 @@ static llvm::ConstantInt *reductionKindToNanos6Enum(CodeGenFunction &CGF, QualTy
   // See SubstTemplateTypeParmType
   Q = Q.getCanonicalType();
 
-  if (Q == CGF.getContext().CharTy)                   ReductionType = 1000;
-  else if (Q == CGF.getContext().SignedCharTy)        ReductionType = 2000;
-  else if (Q == CGF.getContext().UnsignedCharTy)      ReductionType = 3000;
-  else if (Q == CGF.getContext().ShortTy)             ReductionType = 4000;
-  else if (Q == CGF.getContext().UnsignedShortTy)     ReductionType = 5000;
-  else if (Q == CGF.getContext().IntTy)               ReductionType = 6000;
-  else if (Q == CGF.getContext().UnsignedIntTy)       ReductionType = 7000;
-  else if (Q == CGF.getContext().LongTy)              ReductionType = 8000;
-  else if (Q == CGF.getContext().UnsignedLongTy)      ReductionType = 9000;
-  else if (Q == CGF.getContext().LongLongTy)          ReductionType = 10000;
-  else if (Q == CGF.getContext().UnsignedLongLongTy)  ReductionType = 11000;
-  else if (Q == CGF.getContext().FloatTy)             ReductionType = 12000;
-  else if (Q == CGF.getContext().DoubleTy)            ReductionType = 13000;
-  else if (Q == CGF.getContext().LongDoubleTy)        ReductionType = 14000;
-  else if (Q == CGF.getContext().FloatComplexTy)      ReductionType = 15000;
-  else if (Q == CGF.getContext().DoubleComplexTy)     ReductionType = 16000;
-  else if (Q == CGF.getContext().LongDoubleComplexTy) ReductionType = 17000;
-  else if (Q == CGF.getContext().BoolTy)              ReductionType = 18000;
+  if (Q == CGF.getContext().CharTy)                  ReductionType = 1000;
+  else if (Q == CGF.getContext().SignedCharTy)       ReductionType = 2000;
+  else if (Q == CGF.getContext().UnsignedCharTy)     ReductionType = 3000;
+  else if (Q == CGF.getContext().ShortTy)            ReductionType = 4000;
+  else if (Q == CGF.getContext().UnsignedShortTy)    ReductionType = 5000;
+  else if (Q == CGF.getContext().IntTy)              ReductionType = 6000;
+  else if (Q == CGF.getContext().UnsignedIntTy)      ReductionType = 7000;
+  else if (Q == CGF.getContext().LongTy)             ReductionType = 8000;
+  else if (Q == CGF.getContext().UnsignedLongTy)     ReductionType = 9000;
+  else if (Q == CGF.getContext().LongLongTy)         ReductionType = 10000;
+  else if (Q == CGF.getContext().UnsignedLongLongTy) ReductionType = 11000;
+  else if (Q == CGF.getContext().FloatTy)            ReductionType = 12000;
+  else if (Q == CGF.getContext().DoubleTy)           ReductionType = 13000;
+  else if (Q == CGF.getContext().LongDoubleTy)       ReductionType = 14000;
+  else if (
+    Q == CGF.getContext().getComplexType(
+      CGF.getContext().FloatTy))                     ReductionType = 15000;
+  else if (
+    Q == CGF.getContext().getComplexType(
+      CGF.getContext().DoubleTy))                    ReductionType = 16000;
+  else if (
+    Q == CGF.getContext().getComplexType(
+      CGF.getContext().LongDoubleTy))                ReductionType = 17000;
+  else if (Q == CGF.getContext().BoolTy)             ReductionType = 18000;
   else llvm_unreachable("unhandled reduction type");
 
   if (BOK == BO_Add)           ReductionOperation = 0;

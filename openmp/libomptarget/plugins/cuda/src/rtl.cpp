@@ -748,7 +748,7 @@ public:
         DeviceData[DeviceId].ThreadsPerBlock) {
       DP("Default number of threads exceeds device limit, capping at %d\n",
          DeviceData[DeviceId].ThreadsPerBlock);
-      DeviceData[DeviceId].NumTeams = DeviceData[DeviceId].ThreadsPerBlock;
+      DeviceData[DeviceId].NumThreads = DeviceData[DeviceId].ThreadsPerBlock;
     }
 
     return OFFLOAD_SUCCESS;
@@ -892,10 +892,8 @@ public:
                                     static_cast<uint32_t>(DeviceId),
                                     static_cast<uint32_t>(DynamicMemorySize)};
 
-#ifdef OMPTARGET_DEBUG
       if (const char *EnvStr = getenv("LIBOMPTARGET_DEVICE_RTL_DEBUG"))
         DeviceEnv.DebugKind = std::stoi(EnvStr);
-#endif
 
       const char *DeviceEnvName = "omptarget_device_environment";
       CUdeviceptr DeviceEnvPtr;

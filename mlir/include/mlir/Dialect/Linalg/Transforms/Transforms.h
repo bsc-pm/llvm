@@ -41,10 +41,14 @@ bool skipUnitDimReshape(const OpResult &producer, OpOperand &consumer);
 //===----------------------------------------------------------------------===//
 using LinalgLoops = SmallVector<Operation *, 4>;
 
-/// Populates patterns for vectorization of all ConvN-D ops.
+/// [DEPRECATED] Populates patterns for vectorization of all ConvN-D ops.
 void populateConvVectorizationPatterns(
     MLIRContext *context, SmallVectorImpl<RewritePatternSet> &patterns,
     ArrayRef<int64_t> tileSizes);
+
+/// Populates patterns for vectorizing convolution ops.
+void populateConvolutionVectorizationPatterns(RewritePatternSet &patterns,
+                                              PatternBenefit benefit = 1);
 
 /// Populate patterns that convert `ElementwiseMappable` ops to linalg
 /// parallel loops.
@@ -452,6 +456,10 @@ using TileSizeComputationFunction =
 using PaddingValueComputationFunction =
     std::function<FailureOr<Value>(OpBuilder &, OpOperand &)>;
 
+/// Callback returning true if the pad tensor operation defining the given
+/// OpOperand shall be marked as nofold to enable packing.
+using PaddingNoFoldComputationFunction = std::function<bool(OpOperand &)>;
+
 struct LinalgTilingOptions {
   /// Computation function that returns the tile sizes for each operation.
   /// Delayed construction of constant tile sizes should occur to interoperate
@@ -523,6 +531,18 @@ struct LinalgTilingOptions {
   LinalgTilingOptions &
   setPaddingValueComputationFunction(PaddingValueComputationFunction fun) {
     paddingValueComputationFunction = std::move(fun);
+    return *this;
+  }
+
+  /// Callback returning true if the pad tensor operation defining the given
+  /// OpOperand shall be marked as nofold to enable packing. A padding operation
+  /// is only marked nofold if `paddingNoFoldComputationFunction` is set and
+  /// returns true. Otherwise, the nofold attribute is set to false.
+  PaddingNoFoldComputationFunction paddingNoFoldComputationFunction = nullptr;
+
+  LinalgTilingOptions &
+  setPaddingNoFoldComputationFunction(PaddingNoFoldComputationFunction fun) {
+    paddingNoFoldComputationFunction = std::move(fun);
     return *this;
   }
 
@@ -835,6 +855,8 @@ struct LateCodegenStrategyOptions {
   bool enableHoistRedundantVectorTransfersOnTensor = true;
   /// Vector lowering operations may result in surprising behavior when
   /// composing multiple codegen strategies and must be enabled explicitly.
+  int64_t maxTransferRank = 1;
+  bool enableVectorTransferLowering = true;
   bool enableVectorTransferPartialRewrite = false;
   bool enableVectorContractLowering = false;
   bool enableVectorToSCFConversion = false;
@@ -852,6 +874,8 @@ struct LinalgEnablingOptions {
 /// Vector lowering options control how ops are lowered down to 1-D and scf.for
 /// form.
 struct LinalgVectorLoweringOptions {
+  int64_t maxTransferRank = 1;
+  bool enableVectorTransferLowering = true;
   bool enableVectorTransferPartialRewrite = false;
   bool enableVectorContractLowering = false;
   bool enableVectorToSCFConversion = false;
@@ -970,12 +994,6 @@ void populateLinalgNamedOpsGeneralizationPatterns(
     RewritePatternSet &patterns,
     LinalgTransformationFilter filter = LinalgTransformationFilter());
 
-/// Populates `patterns` with patterns to convert linalg.conv ops to
-/// linalg.generic ops.
-void populateLinalgConvGeneralizationPatterns(
-    RewritePatternSet &patterns,
-    LinalgTransformationFilter filter = LinalgTransformationFilter());
-
 /// Linalg distribution patterns
 //
 /// Populates `patterns` with patterns to distribute linalg.tiled_loop.
@@ -1001,6 +1019,7 @@ struct PadTensorOpTransformationPattern : public OpRewritePattern<PadTensorOp> {
 LogicalResult
 rewriteAsPaddedOp(PatternRewriter &rewriter, LinalgOp opToPad,
                   const PaddingValueComputationFunction &paddingFunc,
+                  const PaddingNoFoldComputationFunction &nofoldFunc,
                   LinalgOp &paddedOp);
 
 using OptimizeCopyFn =

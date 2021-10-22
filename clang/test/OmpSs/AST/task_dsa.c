@@ -15,7 +15,7 @@ void foo1() {
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <line:{{[0-9]+}}:{{[0-9]+}}> 'int' lvalue Var {{[a-z0-9]+}} 'd' 'int'
 // CHECK-NEXT: OSSFirstprivateClause {{[a-z0-9]+}} <<invalid sloc>> <implicit>
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:{{[0-9]+}}> 'int' lvalue Var {{[a-z0-9]+}} 'a' 'int'
-// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:{{[0-9]+}}> 'int [5]' lvalue Var {{[a-z0-9]+}} 'b' 'int [5]'
+// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:{{[0-9]+}}> 'int[5]' lvalue Var {{[a-z0-9]+}} 'b' 'int[5]'
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:{{[0-9]+}}> 'int *' lvalue Var {{[a-z0-9]+}} 'c' 'int *'
 
 int a;
