@@ -16,29 +16,29 @@ target triple = "x86_64-unknown-linux-gnu"
 define void @foo() #0 !dbg !6 {
 ; CHECK-LABEL: @foo(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[TMP0:%.*]] = alloca %nanos6_task_args_foo0*, align 8, [[DBG9:!dbg !.*]]
-; CHECK-NEXT:    [[TMP1:%.*]] = alloca i8*, align 8, [[DBG9]]
-; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, [[DBG9]]
-; CHECK-NEXT:    br label [[FINAL_COND:%.*]], [[DBG9]]
+; CHECK-NEXT:    [[TMP0:%.*]] = alloca %nanos6_task_args_foo0*, align 8, !dbg [[DBG9:![0-9]+]]
+; CHECK-NEXT:    [[TMP1:%.*]] = alloca i8*, align 8, !dbg [[DBG9]]
+; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG9]]
+; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg [[DBG9]]
 ; CHECK:       codeRepl:
-; CHECK-NEXT:    [[TMP2:%.*]] = bitcast %nanos6_task_args_foo0** [[TMP0]] to i8**, [[DBG9]]
-; CHECK-NEXT:    store i64 0, i64* [[NUM_DEPS]], align 8, [[DBG9]]
-; CHECK-NEXT:    [[TMP3:%.*]] = load i64, i64* [[NUM_DEPS]], align 8, [[DBG9]]
-; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_foo0, %nanos6_task_invocation_info_t* @task_invocation_info_foo0, i8* null, i64 0, i8** [[TMP2]], i8** [[TMP1]], i64 16, i64 [[TMP3]]), [[DBG9]]
-; CHECK-NEXT:    [[TMP4:%.*]] = load %nanos6_task_args_foo0*, %nanos6_task_args_foo0** [[TMP0]], align 8, [[DBG9]]
-; CHECK-NEXT:    [[TMP5:%.*]] = bitcast %nanos6_task_args_foo0* [[TMP4]] to i8*, [[DBG9]]
-; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, i8* [[TMP5]], i64 0, [[DBG9]]
-; CHECK-NEXT:    [[TMP6:%.*]] = load i8*, i8** [[TMP1]], align 8, [[DBG9]]
-; CHECK-NEXT:    call void @nanos6_submit_task(i8* [[TMP6]]), [[DBG9]]
-; CHECK-NEXT:    br label [[FINAL_END:%.*]], [[DBG9]]
+; CHECK-NEXT:    [[TMP2:%.*]] = bitcast %nanos6_task_args_foo0** [[TMP0]] to i8**, !dbg [[DBG9]]
+; CHECK-NEXT:    store i64 0, i64* [[NUM_DEPS]], align 8, !dbg [[DBG9]]
+; CHECK-NEXT:    [[TMP3:%.*]] = load i64, i64* [[NUM_DEPS]], align 8, !dbg [[DBG9]]
+; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_foo0, %nanos6_task_invocation_info_t* @task_invocation_info_foo0, i8* null, i64 0, i8** [[TMP2]], i8** [[TMP1]], i64 32, i64 [[TMP3]]), !dbg [[DBG9]]
+; CHECK-NEXT:    [[TMP4:%.*]] = load %nanos6_task_args_foo0*, %nanos6_task_args_foo0** [[TMP0]], align 8, !dbg [[DBG9]]
+; CHECK-NEXT:    [[TMP5:%.*]] = bitcast %nanos6_task_args_foo0* [[TMP4]] to i8*, !dbg [[DBG9]]
+; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, i8* [[TMP5]], i64 0, !dbg [[DBG9]]
+; CHECK-NEXT:    [[TMP6:%.*]] = load i8*, i8** [[TMP1]], align 8, !dbg [[DBG9]]
+; CHECK-NEXT:    call void @nanos6_submit_task(i8* [[TMP6]]), !dbg [[DBG9]]
+; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG9]]
 ; CHECK:       final.end:
-; CHECK-NEXT:    ret void, [[DBG10:!dbg !.*]]
+; CHECK-NEXT:    ret void, !dbg [[DBG10:![0-9]+]]
 ; CHECK:       final.then:
-; CHECK-NEXT:    br label [[FINAL_END]], [[DBG10]]
+; CHECK-NEXT:    br label [[FINAL_END]], !dbg [[DBG10]]
 ; CHECK:       final.cond:
-; CHECK-NEXT:    [[TMP7:%.*]] = call i32 @nanos6_in_final(), [[DBG9]]
-; CHECK-NEXT:    [[TMP8:%.*]] = icmp ne i32 [[TMP7]], 0, [[DBG9]]
-; CHECK-NEXT:    br i1 [[TMP8]], label [[FINAL_THEN:%.*]], label [[CODEREPL:%.*]], [[DBG9]]
+; CHECK-NEXT:    [[TMP7:%.*]] = call i32 @nanos6_in_final(), !dbg [[DBG9]]
+; CHECK-NEXT:    [[TMP8:%.*]] = icmp ne i32 [[TMP7]], 0, !dbg [[DBG9]]
+; CHECK-NEXT:    br i1 [[TMP8]], label [[FINAL_THEN:%.*]], label [[CODEREPL:%.*]], !dbg [[DBG9]]
 ;
 entry:
   %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.WAIT"(i1 true) ], !dbg !9

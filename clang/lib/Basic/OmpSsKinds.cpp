@@ -89,6 +89,7 @@ unsigned clang::getOmpSsSimpleClauseType(OmpSsClauseKind Kind,
   case OSSC_priority:
   case OSSC_label:
   case OSSC_wait:
+  case OSSC_update:
   case OSSC_onready:
   case OSSC_private:
   case OSSC_firstprivate:
@@ -108,6 +109,7 @@ unsigned clang::getOmpSsSimpleClauseType(OmpSsClauseKind Kind,
   case OSSC_weakreduction:
   case OSSC_chunksize:
   case OSSC_grainsize:
+  case OSSC_unroll:
   case OSSC_collapse:
     break;
   }
@@ -144,6 +146,7 @@ const char *clang::getOmpSsSimpleClauseTypeName(OmpSsClauseKind Kind,
   case OSSC_priority:
   case OSSC_label:
   case OSSC_wait:
+  case OSSC_update:
   case OSSC_onready:
   case OSSC_private:
   case OSSC_firstprivate:
@@ -163,6 +166,7 @@ const char *clang::getOmpSsSimpleClauseTypeName(OmpSsClauseKind Kind,
   case OSSC_weakreduction:
   case OSSC_chunksize:
   case OSSC_grainsize:
+  case OSSC_unroll:
   case OSSC_collapse:
     break;
   }
@@ -187,6 +191,17 @@ bool clang::isAllowedClauseForDirective(OmpSsDirectiveKind DKind,
   case OSSD_task_for:
     switch (CKind) {
 #define OMPSS_TASK_FOR_CLAUSE(Name)                                           \
+  case OSSC_##Name:                                                            \
+    return true;
+#include "clang/Basic/OmpSsKinds.def"
+    default:
+      break;
+    }
+    break;
+  case OSSD_taskiter:
+  case OSSD_taskiter_while:
+    switch (CKind) {
+#define OMPSS_TASK_ITER_CLAUSE(Name)                                           \
   case OSSC_##Name:                                                            \
     return true;
 #include "clang/Basic/OmpSsKinds.def"
@@ -264,7 +279,7 @@ bool clang::isOmpSsTaskingDirective(OmpSsDirectiveKind Kind) {
 
 bool clang::isOmpSsLoopDirective(OmpSsDirectiveKind Kind) {
   return Kind == OSSD_taskloop || Kind == OSSD_taskloop_for ||
-         Kind == OSSD_task_for;
+         Kind == OSSD_task_for || Kind == OSSD_taskiter;
 }
 
 bool clang::isOmpSsTaskLoopDirective(OmpSsDirectiveKind Kind) {

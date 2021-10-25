@@ -3825,6 +3825,9 @@ DEF_TRAVERSE_STMT(OSSTaskDirective,
 DEF_TRAVERSE_STMT(OSSTaskForDirective,
                   { TRY_TO(TraverseOSSLoopDirective(S)); })
 
+DEF_TRAVERSE_STMT(OSSTaskIterDirective,
+                  { TRY_TO(TraverseOSSLoopDirective(S)); })
+
 DEF_TRAVERSE_STMT(OSSTaskLoopDirective,
                   { TRY_TO(TraverseOSSLoopDirective(S)); })
 

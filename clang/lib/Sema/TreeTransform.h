@@ -1685,6 +1685,17 @@ public:
       Condition, StartLoc, LParenLoc, EndLoc);
   }
 
+  /// Build a new OmpSs 'unroll' clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSUnrollClause(
+      Expr *Condition, SourceLocation StartLoc,
+      SourceLocation LParenLoc, SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsUnrollClause(
+      Condition, StartLoc, LParenLoc, EndLoc);
+  }
+
   /// Build a new OmpSs 'collapse' clause.
   ///
   /// By default, performs semantic analysis to build the new OmpSs clause.
@@ -10723,6 +10734,16 @@ TreeTransform<Derived>::TransformOSSTaskForDirective(OSSTaskForDirective *D) {
 
 template <typename Derived>
 StmtResult
+TreeTransform<Derived>::TransformOSSTaskIterDirective(OSSTaskIterDirective *D) {
+  getDerived().getSema().StartOmpSsDSABlock(OSSD_taskiter, nullptr,
+                                             D->getBeginLoc());
+  StmtResult Res = getDerived().TransformOSSExecutableDirective(D);
+  getDerived().getSema().EndOmpSsDSABlock(Res.get());
+  return Res;
+}
+
+template <typename Derived>
+StmtResult
 TreeTransform<Derived>::TransformOSSTaskLoopDirective(OSSTaskLoopDirective *D) {
   DeclarationNameInfo DirName;
   getDerived().getSema().StartOmpSsDSABlock(OSSD_taskloop, nullptr,
@@ -10826,6 +10847,15 @@ OSSClause *TreeTransform<Derived>::TransformOSSGrainsizeClause(OSSGrainsizeClaus
 }
 
 template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSUnrollClause(OSSUnrollClause *C) {
+  ExprResult E = getDerived().TransformExpr(C->getExpression());
+  if (E.isInvalid())
+    return nullptr;
+  return getDerived().RebuildOSSUnrollClause(
+    E.get(), C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
+}
+
+template <typename Derived>
 OSSClause *
 TreeTransform<Derived>::TransformOSSCollapseClause(OSSCollapseClause *C) {
   ExprResult E = getDerived().TransformExpr(C->getNumForLoops());
@@ -10838,6 +10868,13 @@ TreeTransform<Derived>::TransformOSSCollapseClause(OSSCollapseClause *C) {
 template <typename Derived>
 OSSClause *
 TreeTransform<Derived>::TransformOSSWaitClause(OSSWaitClause *C) {
+  // No need to rebuild this clause, no template-dependent parameters.
+  return C;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSUpdateClause(OSSUpdateClause *C) {
   // No need to rebuild this clause, no template-dependent parameters.
   return C;
 }

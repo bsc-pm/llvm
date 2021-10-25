@@ -733,6 +733,12 @@ void OSSClausePrinter::VisitOSSGrainsizeClause(OSSGrainsizeClause *Node) {
   OS << ")";
 }
 
+void OSSClausePrinter::VisitOSSUnrollClause(OSSUnrollClause *Node) {
+  OS << "unroll(";
+  Node->getExpression()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
 void OSSClausePrinter::VisitOSSCollapseClause(OSSCollapseClause *Node) {
   OS << "collapse(";
   Node->getNumForLoops()->printPretty(OS, nullptr, Policy, 0);
@@ -741,6 +747,10 @@ void OSSClausePrinter::VisitOSSCollapseClause(OSSCollapseClause *Node) {
 
 void OSSClausePrinter::VisitOSSWaitClause(OSSWaitClause *Node) {
   OS << "wait";
+}
+
+void OSSClausePrinter::VisitOSSUpdateClause(OSSUpdateClause *Node) {
+  OS << "update";
 }
 
 void OSSClausePrinter::VisitOSSOnreadyClause(OSSOnreadyClause *Node) {
@@ -1249,6 +1259,11 @@ void StmtPrinter::VisitOSSTaskDirective(OSSTaskDirective *Node) {
 
 void StmtPrinter::VisitOSSTaskForDirective(OSSTaskForDirective *Node) {
   Indent() << "#pragma oss task for";
+  PrintOSSLoopDirective(Node);
+}
+
+void StmtPrinter::VisitOSSTaskIterDirective(OSSTaskIterDirective *Node) {
+  Indent() << "#pragma oss taskiter";
   PrintOSSLoopDirective(Node);
 }
 

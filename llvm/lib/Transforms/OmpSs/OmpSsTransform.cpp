@@ -254,11 +254,15 @@ struct OmpSs {
         // void *task_type_data;
         Type *TaskTypeDataTy =
           Type::getInt8PtrTy(M.getContext());
+        // void (*iter_condition)(void *, uint8_t *);
+        Type *IterConditionFuncTy =
+          FunctionType::get(Type::getVoidTy(M.getContext()),
+                            /*IsVarArgs=*/false)->getPointerTo();
 
         instance->Ty->setBody({NumSymbolsTy, RegisterInfoFuncTy, OnreadyActionFuncTy, GetPriorityFuncTy,
                                ImplCountTy, TaskImplInfoTy, DestroyArgsBlockFuncTy,
                                DuplicateArgsBlockFuncTy, ReductInitsFuncTy, ReductCombsFuncTy,
-                               TaskTypeDataTy
+                               TaskTypeDataTy, IterConditionFuncTy
                               });
       }
       return *instance.get();
@@ -517,6 +521,7 @@ struct OmpSs {
   FunctionCallee CreateTaskFuncCallee;
   FunctionCallee TaskSubmitFuncCallee;
   FunctionCallee CreateLoopFuncCallee;
+  FunctionCallee CreateIterFuncCallee;
   FunctionCallee TaskInFinalFuncCallee;
   FunctionCallee TaskInfoRegisterFuncCallee;
   FunctionCallee TaskInfoRegisterCtorFuncCallee;
@@ -731,6 +736,53 @@ struct OmpSs {
       Exit = LoopExitI;
     }
     return LoopEntryI;
+  }
+
+  // Build a loop containing Single Entry Single Exit region Entry/Exit
+  // and returns the WhileEntry and WhileExit
+  void buildWhileForTaskImpl(Module &M, Function &F, Instruction *Entry,
+                        Instruction *Exit, const DirectiveWhileInfo &WhileInfo,
+                         Instruction *&WhileEntryI, Instruction *&WhileExitI) {
+    BasicBlock *CondBB = Entry->getParent()->splitBasicBlock(Entry);
+    CondBB->setName("while.cond");
+
+    // The new entry is the start of the loop
+    WhileEntryI = &CondBB->getUniquePredecessor()->front();
+
+    IRBuilder<> IRB(Entry);
+
+    WhileInfo.Result = IRB.CreateCall(WhileInfo.Fun, WhileInfo.Args);
+
+    BasicBlock *BodyBB = Entry->getParent()->splitBasicBlock(Entry);
+    BodyBB->setName("while.body");
+
+    BasicBlock *EndBB = BasicBlock::Create(M.getContext(), "while.end", &F);
+    IRB.SetInsertPoint(EndBB);
+    IRB.CreateBr(Exit->getParent()->getUniqueSuccessor());
+
+    // The new exit is the end of the loop
+    WhileExitI = &EndBB->front();
+
+    // Replace default br. by a conditional br. to task.body or task end
+    Instruction *OldTerminator = CondBB->getTerminator();
+    IRB.SetInsertPoint(OldTerminator);
+    IRB.CreateCondBr(WhileInfo.Result, BodyBB, EndBB);
+    OldTerminator->eraseFromParent();
+
+    // Replace task end br. by a br. to while.cond
+    OldTerminator = Exit->getParent()->getTerminator();
+    assert(OldTerminator->getNumSuccessors() == 1);
+    OldTerminator->setSuccessor(0, CondBB);
+  }
+
+  Instruction *buildWhileForTask(
+      Module &M, Function &F, Instruction *Entry,
+      Instruction *Exit, const DirectiveWhileInfo &WhileInfo) {
+    Instruction *WhileEntryI = nullptr;
+    Instruction *WhileExitI = nullptr;
+
+    buildWhileForTaskImpl(M, F, Entry, Exit, WhileInfo, WhileEntryI, WhileExitI);
+    return WhileEntryI;
   }
 
   void buildLoopForMultiDep(
@@ -1214,6 +1266,29 @@ struct OmpSs {
     IRBuilder<> BBBuilder(&F->getEntryBlock().back());
 
     BBBuilder.CreateCall(OnreadyInfo.Fun, OnreadyInfo.Args);
+    for (Instruction &I : Entry) {
+      Function::arg_iterator AI = F->arg_begin();
+      for (auto It = StructToIdxMap.begin();
+             It != StructToIdxMap.end(); ++It, ++AI) {
+        if (isReplaceableValue(It->first))
+          I.replaceUsesOfWith(It->first, &*AI);
+      }
+    }
+  }
+
+  void unpackWhileAndRewrite(
+      Module &M, const DirectiveWhileInfo &WhileInfo, Function *F,
+      const MapVector<Value *, size_t> &StructToIdxMap) {
+    BasicBlock::Create(M.getContext(), "entry", F);
+    BasicBlock &Entry = F->getEntryBlock();
+    F->getEntryBlock().getInstList().push_back(ReturnInst::Create(M.getContext()));
+    IRBuilder<> BBBuilder(&F->getEntryBlock().back());
+    Value *ResArg = &*(F->arg_end() - 1);
+
+    Value *Res = BBBuilder.CreateCall(WhileInfo.Fun, WhileInfo.Args);
+    Value *ResSExt = BBBuilder.CreateZExt(Res, Type::getInt8Ty(M.getContext()));
+    BBBuilder.CreateStore(ResSExt, ResArg);
+
     for (Instruction &I : Entry) {
       Function::arg_iterator AI = F->arg_begin();
       for (auto It = StructToIdxMap.begin();
@@ -1931,6 +2006,12 @@ struct OmpSs {
     }
   }
 
+  void rewriteDirInfoForFinal(
+      DirectiveWhileInfo &WhileInfo, ValueToValueMapTy &VMap) {
+    for (size_t i = 0; i < WhileInfo.Args.size(); ++i)
+      WhileInfo.Args[i] = mapValue(WhileInfo.Args[i], VMap);
+  }
+
   // This must be called before erasing original entry/exit
   void buildFinalCondCFG(
       Module &M, Function &F, const DirectiveInfo &DirInfo, ValueToValueMapTy &FinalInfo) {
@@ -1941,8 +2022,11 @@ struct OmpSs {
     // Process all the inner directives before
     for (size_t i = 0; i < DirInfo.InnerDirectiveInfos.size(); ++i) {
       const DirectiveInfo &InnerDirInfo = *DirInfo.InnerDirectiveInfos[i];
-      // Build loop for taskloop/taskfor
-      bool IsLoop = InnerDirInfo.DirEnv.isOmpSsLoopDirective();
+      // Build loop for taskloop/taskfor taskloopfor taskiterfor
+      bool IsLoop =
+        InnerDirInfo.DirEnv.isOmpSsLoopDirective() ||
+        InnerDirInfo.DirEnv.isOmpSsTaskIterForDirective();
+      bool IsWhile = InnerDirInfo.DirEnv.isOmpSsTaskIterWhileDirective();
       Instruction *OrigEntryI = InnerDirInfo.Entry;
       Instruction *OrigExitI = InnerDirInfo.Exit;
       Instruction *CloneEntryI = cast<Instruction>(FinalInfo.lookup(OrigEntryI));
@@ -1954,6 +2038,10 @@ struct OmpSs {
         DirectiveLoopInfo FinalLoopInfo = InnerDirInfo.DirEnv.LoopInfo;
         rewriteDirInfoForFinal(FinalLoopInfo, FinalInfo);
         buildLoopForTask(M, F, CloneEntryI, CloneExitI, FinalLoopInfo);
+      } else if (IsWhile) {
+        DirectiveWhileInfo FinalWhileInfo = InnerDirInfo.DirEnv.WhileInfo;
+        rewriteDirInfoForFinal(FinalWhileInfo, FinalInfo);
+        buildWhileForTask(M, F, CloneEntryI, CloneExitI, FinalWhileInfo);
       }
     }
 
@@ -1965,11 +2053,18 @@ struct OmpSs {
     gatherConstAllocas(Allocas, CloneEntryI);
 
     Instruction *NewCloneEntryI = CloneEntryI;
-    bool IsLoop = DirInfo.DirEnv.isOmpSsLoopDirective();
+    bool IsLoop =
+      DirInfo.DirEnv.isOmpSsLoopDirective() ||
+      DirInfo.DirEnv.isOmpSsTaskIterForDirective();
+    bool IsWhile = DirInfo.DirEnv.isOmpSsTaskIterWhileDirective();
     if (IsLoop) {
       DirectiveLoopInfo FinalLoopInfo = DirInfo.DirEnv.LoopInfo;
       rewriteDirInfoForFinal(FinalLoopInfo, FinalInfo);
       NewCloneEntryI = buildLoopForTask(M, F, CloneEntryI, CloneExitI, FinalLoopInfo);
+    } else if (IsWhile) {
+      DirectiveWhileInfo FinalWhileInfo = DirInfo.DirEnv.WhileInfo;
+      rewriteDirInfoForFinal(FinalWhileInfo, FinalInfo);
+      NewCloneEntryI = buildWhileForTask(M, F, CloneEntryI, CloneExitI, FinalWhileInfo);
     }
 
     BasicBlock *OrigEntryBB = OrigEntryI->getParent();
@@ -2377,12 +2472,47 @@ struct OmpSs {
 
     Function *OlOnreadyFuncVar
       = createUnpackOlFunction(M, F,
-                               ("nanos6_ol_priority_" + F.getName() + Twine(taskNum)).str(),
+                               ("nanos6_ol_onready_" + F.getName() + Twine(taskNum)).str(),
                                {TaskArgsTy->getPointerTo()}, {"task_args"},
                                {}, {});
     olCallToUnpack(M, DirInfo, TaskArgsToStructIdxMap, OlOnreadyFuncVar, UnpackOnreadyFuncVar);
 
     return OlOnreadyFuncVar;
+  }
+
+  Function *createTaskIterWhileCondOlFunc(
+      Module &M, Function &F, int taskNum,
+      const MapVector<Value *, size_t> &TaskArgsToStructIdxMap,
+      StructType *TaskArgsTy, const DirectiveInfo &DirInfo,
+      ArrayRef<Type *> TaskTypeList, ArrayRef<StringRef> TaskNameList) {
+
+    const DirectiveEnvironment &DirEnv = DirInfo.DirEnv;
+    const DirectiveWhileInfo &WhileInfo = DirEnv.WhileInfo;
+
+    if (WhileInfo.empty())
+      return nullptr;
+
+    SmallVector<Type *, 4> TaskExtraTypeList;
+    SmallVector<StringRef, 4> TaskExtraNameList;
+
+    // uint8_t *result
+    TaskExtraTypeList.push_back(Type::getInt8Ty(M.getContext())->getPointerTo());
+    TaskExtraNameList.push_back("result");
+
+    Function *UnpackWhileFuncVar = createUnpackOlFunction(M, F,
+                               ("nanos6_unpacked_while_cond_" + F.getName() + Twine(taskNum)).str(),
+                               TaskTypeList, TaskNameList,
+                               TaskExtraTypeList, TaskExtraNameList);
+    unpackWhileAndRewrite(M, WhileInfo, UnpackWhileFuncVar, TaskArgsToStructIdxMap);
+
+    Function *OlWhileFuncVar
+      = createUnpackOlFunction(M, F,
+                               ("nanos6_ol_while_cond_" + F.getName() + Twine(taskNum)).str(),
+                               {TaskArgsTy->getPointerTo()}, {"task_args"},
+                               TaskExtraTypeList, TaskExtraNameList);
+    olCallToUnpack(M, DirInfo, TaskArgsToStructIdxMap, OlWhileFuncVar, UnpackWhileFuncVar);
+
+    return OlWhileFuncVar;
   }
 
   // typedef enum {
@@ -2394,14 +2524,19 @@ struct OmpSs {
   //         nanos6_taskloop_task = (1 << 2),
   //         //! Specifies that the task is really a taskfor
   //         nanos6_taskfor_task = (1 << 3),
+  //         //! Specifies that the task is really a taskiter
+  //         nanos6_taskiter_task = (1 << 4),
   //         //! Specifies that the task has the "wait" clause
-  //         nanos6_waiting_task = (1 << 4),
+  //         nanos6_waiting_task = (1 << 5),
   //         //! Specifies that the args_block is preallocated from user side
-  //         nanos6_preallocated_args_block = (1 << 5),
+  //         nanos6_preallocated_args_block = (1 << 6),
   //         //! Specifies that the task has been verified by the user, hence it doesn't need runtime linting
-  //         nanos6_verified_task = (1 << 6)
+  //         nanos6_verified_task = (1 << 7)
+  //         //! Specifies that the task has the "update" clause
+  //         nanos6_update_task = (1 << 8)
   // } nanos6_task_flag_t;
   Value *computeTaskFlags(IRBuilder<> &IRB, const DirectiveEnvironment &DirEnv) {
+    const DirectiveLoopInfo &LoopInfo = DirEnv.LoopInfo;
     Value *TaskFlagsVar = ConstantInt::get(IRB.getInt64Ty(), 0);
     if (DirEnv.Final) {
       TaskFlagsVar =
@@ -2436,6 +2571,14 @@ struct OmpSs {
               ConstantInt::get(IRB.getInt64Ty(), 1),
               3));
     }
+    if (DirEnv.isOmpSsTaskIterDirective()) {
+      TaskFlagsVar =
+        IRB.CreateOr(
+          TaskFlagsVar,
+          IRB.CreateShl(
+              ConstantInt::get(IRB.getInt64Ty(), 1),
+              4));
+    }
     if (DirEnv.Wait) {
       TaskFlagsVar =
         IRB.CreateOr(
@@ -2444,7 +2587,17 @@ struct OmpSs {
             IRB.CreateZExt(
               DirEnv.Wait,
               IRB.getInt64Ty()),
-              4));
+              5));
+    }
+    if (LoopInfo.Update) {
+      TaskFlagsVar =
+        IRB.CreateOr(
+          TaskFlagsVar,
+          IRB.CreateShl(
+            IRB.CreateZExt(
+              LoopInfo.Update,
+              IRB.getInt64Ty()),
+              8));
     }
     return TaskFlagsVar;
   }
@@ -2475,6 +2628,56 @@ struct OmpSs {
         }
       }
     }
+  }
+
+  void buildUnpackedLoopForTask(
+      const DirectiveInfo &DirInfo, Module &M,
+      Function &F, DirectiveLoopInfo &NewLoopInfo,
+      Instruction *& NewEntryI, Instruction *& NewExitI,
+      SmallVectorImpl<Value *> &NormalizedUBs,
+      SmallVectorImpl<Instruction *> &CollapseStuff) {
+    const DirectiveLoopInfo &LoopInfo = DirInfo.DirEnv.LoopInfo;
+
+    SmallVector<Instruction *, 4> Allocas;
+    gatherConstAllocas(Allocas, DirInfo.Entry);
+    // Move the allocas before the loop start
+    {
+      IRBuilder<> IRB(DirInfo.Entry);
+      for (Instruction *I : Allocas) {
+        I->removeFromParent();
+        IRB.Insert(I, I->getName());
+      }
+    }
+
+    // This is used for nanos6_create_loop
+    // NOTE: all values have nanos6 upper_bound type
+    ComputeLoopBounds(M, LoopInfo, DirInfo.Entry, NormalizedUBs);
+
+    IRBuilder<> IRB(DirInfo.Entry);
+
+    Type *IndVarTy = LoopInfo.IndVar[0]->getType()->getPointerElementType();
+    // Non collapsed loops build a loop using the original type
+    NewLoopInfo.LBoundSigned[0] = LoopInfo.IndVarSigned[0];
+    NewLoopInfo.UBoundSigned[0] = LoopInfo.IndVarSigned[0];
+    NewLoopInfo.StepSigned[0] = LoopInfo.IndVarSigned[0];
+    if (LoopInfo.LBound.size() > 1) {
+      // Collapsed loops build a loop using size_t type to avoid overflows
+      IndVarTy = IRB.getInt64Ty();
+      NewLoopInfo.LBoundSigned[0] = 0;
+      NewLoopInfo.UBoundSigned[0] = 0;
+      NewLoopInfo.StepSigned[0] = 0;
+    }
+    // In reality we do not need this except for buildind the loop here.
+    // These values will be replaced by nanos6 bounds
+    NewLoopInfo.LBound[0].Result = createZSExtOrTrunc(IRB, LoopInfo.LBound[0].Result, IndVarTy, LoopInfo.LBoundSigned[0]);
+    NewLoopInfo.UBound[0].Result = createZSExtOrTrunc(IRB, LoopInfo.UBound[0].Result, IndVarTy, LoopInfo.UBoundSigned[0]);
+    // unpacked_task_region loops are always step 1
+    NewLoopInfo.Step[0].Result = ConstantInt::get(IndVarTy, 1);
+
+    NewLoopInfo.IndVar[0] = IRB.CreateAlloca(IndVarTy, nullptr, "loop");
+    // unpacked_task_region loops are always SLT
+    NewLoopInfo.LoopType[0] = DirectiveLoopInfo::LT;
+    buildLoopForTaskImpl(M, F, DirInfo.Entry, DirInfo.Exit, NewLoopInfo, NewEntryI, NewExitI, CollapseStuff);
   }
 
   void lowerTask(const DirectiveInfo &DirInfo,
@@ -2541,55 +2744,30 @@ struct OmpSs {
     Function *OlOnreadyFuncVar =
       createOnreadyOlFunc(M, F, taskNum, TaskArgsToStructIdxMap, TaskArgsTy, DirInfo, TaskTypeList, TaskNameList);
 
+    Function *OlTaskIterWhileCondFuncVar =
+      createTaskIterWhileCondOlFunc(M, F, taskNum, TaskArgsToStructIdxMap, TaskArgsTy, DirInfo, TaskTypeList, TaskNameList);
+
     DirectiveLoopInfo NewLoopInfo = LoopInfo;
     SmallVector<Value *> NormalizedUBs(LoopInfo.UBound.size());
     SmallVector<Instruction *> CollapseStuff;
-    if (!LoopInfo.empty()) {
-      SmallVector<Instruction *, 4> Allocas;
-      gatherConstAllocas(Allocas, DirInfo.Entry);
-      // Move the allocas before the loop start
-      {
-        IRBuilder<> IRB(DirInfo.Entry);
-        for (Instruction *I : Allocas) {
-          I->removeFromParent();
-          IRB.Insert(I, I->getName());
-        }
-      }
-
-      // This is used for nanos6_create_loop
-      // NOTE: all values have nanos6 upper_bound type
-      ComputeLoopBounds(M, LoopInfo, DirInfo.Entry, NormalizedUBs);
-
-      IRBuilder<> IRB(DirInfo.Entry);
-
-      Type *IndVarTy = LoopInfo.IndVar[0]->getType()->getPointerElementType();
-      // Non collapsed loops build a loop using the original type
-      NewLoopInfo.LBoundSigned[0] = LoopInfo.IndVarSigned[0];
-      NewLoopInfo.UBoundSigned[0] = LoopInfo.IndVarSigned[0];
-      NewLoopInfo.StepSigned[0] = LoopInfo.IndVarSigned[0];
-      if (LoopInfo.LBound.size() > 1) {
-        // Collapsed loops build a loop using size_t type to avoid overflows
-        IndVarTy = IRB.getInt64Ty();
-        NewLoopInfo.LBoundSigned[0] = 0;
-        NewLoopInfo.UBoundSigned[0] = 0;
-        NewLoopInfo.StepSigned[0] = 0;
-      }
-      // In reality we do not need this except for buildind the loop here.
-      // These values will be replaced by nanos6 bounds
-      NewLoopInfo.LBound[0].Result = createZSExtOrTrunc(IRB, LoopInfo.LBound[0].Result, IndVarTy, LoopInfo.LBoundSigned[0]);
-      NewLoopInfo.UBound[0].Result = createZSExtOrTrunc(IRB, LoopInfo.UBound[0].Result, IndVarTy, LoopInfo.UBoundSigned[0]);
-      // unpacked_task_region loops are always step 1
-      NewLoopInfo.Step[0].Result = ConstantInt::get(IndVarTy, 1);
-
-      NewLoopInfo.IndVar[0] = IRB.CreateAlloca(IndVarTy, nullptr, "loop");
-      // unpacked_task_region loops are always SLT
-      NewLoopInfo.LoopType[0] = DirectiveLoopInfo::LT;
-      buildLoopForTaskImpl(M, F, DirInfo.Entry, DirInfo.Exit, NewLoopInfo, NewEntryI, NewExitI, CollapseStuff);
+    if (DirEnv.isOmpSsLoopDirective())
+      buildUnpackedLoopForTask(DirInfo, M, F, NewLoopInfo, NewEntryI, NewExitI, NormalizedUBs, CollapseStuff);
+    if (DirEnv.isOmpSsTaskIterForDirective()) {
+      Type *OrigIndVarTy = LoopInfo.IndVar[0]->getType()->getPointerElementType();
+      // Increment induction variable at the end of the taskiter for
+      IRBuilder<> IRB(DirInfo.Exit);
+      Instruction *IndVarVal = IRB.CreateLoad(OrigIndVarTy, LoopInfo.IndVar[0]);
+      Instruction *StepResult = IRB.CreateCall(LoopInfo.Step[0].Fun, LoopInfo.Step[0].Args);
+      auto p = buildInstructionSignDependent(
+        IRB, M, IndVarVal, StepResult, OrigIndVarTy, LoopInfo.StepSigned[0],
+        [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+          return IRB.CreateAdd(LHS, RHS);
+        });
+      IRB.CreateStore(createZSExtOrTrunc(IRB, p.first, OrigIndVarTy, p.second), LoopInfo.IndVar[0]);
     }
 
     SetVector<Instruction *> TaskBBs;
     computeBBsBetweenEntryExit(TaskBBs, NewEntryI, NewExitI);
-
 
     // 3. Create Nanos6 task data structures info
     GlobalVariable *TaskInvInfoVar =
@@ -2705,7 +2883,11 @@ struct OmpSs {
         : ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(7))),
       ConstantExpr::getPointerCast(TaskRedInitsVar, cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(8))),
       ConstantExpr::getPointerCast(TaskRedCombsVar, cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(9))),
-      ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(10)))));
+      ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(10))),
+      OlTaskIterWhileCondFuncVar
+        ? ConstantExpr::getPointerCast(OlTaskIterWhileCondFuncVar,
+                                       Nanos6TaskInfo::getInstance(M).getType()->getElementType(11))
+        : ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(11)))));
 
     registerTaskInfo(M, TaskInfoVar);
 
@@ -2715,9 +2897,10 @@ struct OmpSs {
          this]
            (BasicBlock *header, BasicBlock *newRootNode, BasicBlock *newHeader,
             Function *oldFunction, const SetVector<BasicBlock *> &Blocks) {
+      const DirectiveEnvironment &DirEnv = DirInfo.DirEnv;
       UnpackTaskFuncVar->getBasicBlockList().push_back(newRootNode);
 
-      if (!LoopInfo.empty()) {
+      if (DirEnv.isOmpSsLoopDirective()) {
         Type *OrigIndVarTy = LoopInfo.IndVar[0]->getType()->getPointerElementType();
         Type *NewIndVarTy = NewLoopInfo.IndVar[0]->getType()->getPointerElementType();
 
@@ -3059,6 +3242,31 @@ struct OmpSs {
             Nanos6LoopBounds::getInstance(M).getType()->getElementType(3), /*Signed=*/false));
 
         IRB.CreateCall(CreateLoopFuncCallee, CreateDirectiveArgs);
+      } else if (DirEnv.isOmpSsTaskIterDirective()) {
+        Value *Niters = ConstantInt::get(Nanos6LoopBounds::getInstance(M).getType()->getElementType(1), 1);
+        if (DirEnv.isOmpSsTaskIterForDirective()) {
+          SmallVector<Value *> NormalizedUBs(LoopInfo.UBound.size());
+          ComputeLoopBounds(M, LoopInfo, &*IRB.saveIP().getPoint(), NormalizedUBs);
+
+          for (size_t i = 0; i < LoopInfo.LBound.size(); ++i)
+            Niters = IRB.CreateMul(Niters, NormalizedUBs[i]);
+        }
+
+        Value *RegisterUnroll =
+          ConstantInt::get(
+            CreateIterFuncCallee.getFunctionType()->getParamType(9), 0);
+        if (LoopInfo.Unroll)
+          RegisterUnroll = LoopInfo.Unroll;
+
+        Value *RegisterLowerB = ConstantInt::get(Nanos6LoopBounds::getInstance(M).getType()->getElementType(0), 0);
+        CreateDirectiveArgs.push_back(RegisterLowerB);
+        CreateDirectiveArgs.push_back(Niters);
+        CreateDirectiveArgs.push_back(
+          createZSExtOrTrunc(
+            IRB, RegisterUnroll,
+            CreateIterFuncCallee.getFunctionType()->getParamType(9), /*Signed=*/false));
+
+        IRB.CreateCall(CreateIterFuncCallee, CreateDirectiveArgs);
       } else {
         IRB.CreateCall(CreateTaskFuncCallee, CreateDirectiveArgs);
       }
@@ -3295,6 +3503,34 @@ struct OmpSs {
         Type::getInt8PtrTy(M.getContext())->getPointerTo(),
         Type::getInt8PtrTy(M.getContext())->getPointerTo(),
         Type::getInt64Ty(M.getContext()),
+        Type::getInt64Ty(M.getContext()),
+        Type::getInt64Ty(M.getContext()),
+        Type::getInt64Ty(M.getContext()),
+        Type::getInt64Ty(M.getContext()),
+        Type::getInt64Ty(M.getContext())
+    );
+
+    // void nanos6_create_iter(
+    //     nanos6_task_info_t *task_info,
+    //     nanos6_task_invocation_info_t *task_invocation_info,
+    //     const char *task_label,
+    //     size_t args_block_size,
+    //     /* OUT */ void **args_block_pointer,
+    //     /* OUT */ void **task_pointer,
+    //     size_t flags,
+    //     size_t num_deps,
+    //     size_t lower_bound,
+    //     size_t upper_bound,
+    //     size_t unroll
+    // );
+    CreateIterFuncCallee = M.getOrInsertFunction("nanos6_create_iter",
+        Type::getVoidTy(M.getContext()),
+        Nanos6TaskInfo::getInstance(M).getType()->getPointerTo(),
+        Nanos6TaskInvInfo::getInstance(M).getType()->getPointerTo(),
+        Type::getInt8PtrTy(M.getContext()),
+        Type::getInt64Ty(M.getContext()),
+        Type::getInt8PtrTy(M.getContext())->getPointerTo(),
+        Type::getInt8PtrTy(M.getContext())->getPointerTo(),
         Type::getInt64Ty(M.getContext()),
         Type::getInt64Ty(M.getContext()),
         Type::getInt64Ty(M.getContext()),

@@ -3483,6 +3483,7 @@ public:
   void EmitOSSReleaseDirective(const OSSReleaseDirective &S);
   void EmitOSSTaskDirective(const OSSTaskDirective &S);
   void EmitOSSTaskForDirective(const OSSTaskForDirective &S);
+  void EmitOSSTaskIterDirective(const OSSTaskIterDirective &S);
   void EmitOSSTaskLoopDirective(const OSSTaskLoopDirective &S);
   void EmitOSSTaskLoopForDirective(const OSSTaskLoopForDirective &S);
 

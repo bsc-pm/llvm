@@ -133,6 +133,59 @@ OSSTaskForDirective *OSSTaskForDirective::CreateEmpty(const ASTContext &C,
   return new (Mem) OSSTaskForDirective(NumClauses);
 }
 
+OSSTaskIterDirective *
+OSSTaskIterDirective::Create(const ASTContext &C, SourceLocation StartLoc,
+                         SourceLocation EndLoc, ArrayRef<OSSClause *> Clauses, Stmt *AStmt,
+                         const SmallVectorImpl<HelperExprs> &Exprs) {
+  unsigned Size = llvm::alignTo(sizeof(OSSTaskIterDirective), alignof(OSSClause *));
+  void *Mem =
+      C.Allocate(Size + sizeof(OSSClause *) * Clauses.size() + sizeof(Stmt *));
+  OSSTaskIterDirective *Dir =
+      new (Mem) OSSTaskIterDirective(StartLoc, EndLoc, Clauses.size(), Exprs.size());
+  Dir->setClauses(Clauses);
+  Dir->setAssociatedStmt(AStmt);
+
+  if (!Exprs.empty()) {
+    // taskiter (for)
+    Expr **IndVar;
+    Expr **LB;
+    Expr **UB;
+    Expr **Step;
+    llvm::Optional<bool>* TestIsLessOp;
+    bool *TestIsStrictOp;
+    IndVar = new (C) Expr*[Exprs.size()];
+    LB = new (C) Expr*[Exprs.size()];
+    UB = new (C) Expr*[Exprs.size()];
+    Step = new (C) Expr*[Exprs.size()];
+    TestIsLessOp = new (C) llvm::Optional<bool>[Exprs.size()];
+    TestIsStrictOp = new (C) bool[Exprs.size()];
+    for (size_t i = 0; i < Exprs.size(); ++i) {
+      IndVar[i] = Exprs[i].IndVar;
+      LB[i] = Exprs[i].LB;
+      UB[i] = Exprs[i].UB;
+      Step[i] = Exprs[i].Step;
+      TestIsLessOp[i] = Exprs[i].TestIsLessOp;
+      TestIsStrictOp[i] = Exprs[i].TestIsStrictOp;
+    }
+    Dir->setIterationVariable(IndVar);
+    Dir->setLowerBound(LB);
+    Dir->setUpperBound(UB);
+    Dir->setStep(Step);
+    Dir->setIsLessOp(TestIsLessOp);
+    Dir->setIsStrictOp(TestIsStrictOp);
+  }
+  return Dir;
+}
+
+OSSTaskIterDirective *OSSTaskIterDirective::CreateEmpty(const ASTContext &C,
+                                                unsigned NumClauses,
+                                                EmptyShell) {
+  unsigned Size = llvm::alignTo(sizeof(OSSTaskIterDirective), alignof(OSSClause *));
+  void *Mem =
+      C.Allocate(Size + sizeof(OSSClause *) * NumClauses + sizeof(Stmt *));
+  return new (Mem) OSSTaskIterDirective(NumClauses);
+}
+
 OSSTaskLoopDirective *
 OSSTaskLoopDirective::Create(const ASTContext &C, SourceLocation StartLoc,
                          SourceLocation EndLoc, ArrayRef<OSSClause *> Clauses, Stmt *AStmt,

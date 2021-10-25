@@ -470,6 +470,44 @@ public:
   }
 };
 
+/// This represents 'update' clause in the '#pragma oss taskiter' directive.
+///
+/// \code
+/// #pragma oss taskiter update
+/// \endcode
+class OSSUpdateClause : public OSSClause {
+public:
+  /// Build 'update' clause.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSUpdateClause(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSClause(OSSC_update, StartLoc, EndLoc) {}
+
+  /// Build an empty clause.
+  OSSUpdateClause()
+      : OSSClause(OSSC_update, SourceLocation(), SourceLocation()) {}
+
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+
+  const_child_range children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  child_range used_children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+  const_child_range used_children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == OSSC_update;
+  }
+};
+
 /// This represents 'onready' clause in the '#pragma oss ...' directive.
 ///
 /// \code
@@ -622,6 +660,58 @@ public:
 
   static bool classof(const OSSClause *T) {
     return T->getClauseKind() == OSSC_grainsize;
+  }
+};
+
+/// This represents 'unroll' clause in the
+/// '#pragma oss taskiter' directive.
+///
+/// \code
+/// #pragma oss taskiter unroll(foo(N))
+/// \endcode
+/// In this example directive '#pragma oss taskiter' has simple 'unroll'
+/// clause with expression 'foo(N)'.
+class OSSUnrollClause : public OSSClause {
+  friend class OSSClauseReader;
+
+  /// Location of '('.
+  SourceLocation LParenLoc;
+
+  /// Expression of the 'unroll' clause.
+  Stmt *Expression = nullptr;
+
+  /// Set expression.
+  void setExpression(Expr *E) { Expression = E; }
+
+public:
+  /// Build 'unroll' clause with expression \a E.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param E Expression of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSUnrollClause(Expr *E, SourceLocation StartLoc, SourceLocation LParenLoc,
+                SourceLocation EndLoc)
+      : OSSClause(OSSC_unroll, StartLoc, EndLoc), LParenLoc(LParenLoc),
+        Expression(E) {}
+
+  /// Build an empty clause.
+  OSSUnrollClause()
+      : OSSClause(OSSC_unroll, SourceLocation(), SourceLocation()) {}
+
+  /// Sets the location of '('.
+  void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
+
+  /// Returns the location of '('.
+  SourceLocation getLParenLoc() const { return LParenLoc; }
+
+  /// Returns expression.
+  Expr *getExpression() const { return cast_or_null<Expr>(Expression); }
+
+  child_range children() { return child_range(&Expression, &Expression + 1); }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == OSSC_unroll;
   }
 };
 

@@ -166,6 +166,11 @@ static void AddWaitData(const OSSExecutableDirective &S, bool &Wait) {
   Wait = !llvm::empty(S.getClausesOfKind<OSSWaitClause>());
 }
 
+static void AddUpdateLoopData(const OSSExecutableDirective &S, bool &Update) {
+  assert(!Update);
+  Update = !llvm::empty(S.getClausesOfKind<OSSUpdateClause>());
+}
+
 static void AddOnreadyData(const OSSExecutableDirective &S, const Expr * &OnreadyExpr) {
   bool Found = false;
   for (const auto *C : S.getClausesOfKind<OSSOnreadyClause>()) {
@@ -227,6 +232,15 @@ static void AddGrainsizeLoopData(const OSSLoopDirective &S, const Expr * &Grains
   }
 }
 
+static void AddUnrollLoopData(const OSSLoopDirective &S, const Expr * &UnrollExpr) {
+  bool Found = false;
+  for (const auto *C : S.getClausesOfKind<OSSUnrollClause>()) {
+    assert(!Found);
+    Found = true;
+    UnrollExpr = C->getExpression();
+  }
+}
+
 // Convenience function to add all info from a loop directive
 static void AddLoopData(const OSSLoopDirective &S, OSSLoopDataTy &LoopData) {
   LoopData.IndVar = S.getIterationVariable();
@@ -238,6 +252,8 @@ static void AddLoopData(const OSSLoopDirective &S, OSSLoopDataTy &LoopData) {
   LoopData.NumCollapses = S.getNumCollapses();
   AddChunksizeLoopData(S, LoopData.Chunksize);
   AddGrainsizeLoopData(S, LoopData.Grainsize);
+  AddUnrollLoopData(S, LoopData.Unroll);
+  AddUpdateLoopData(S, LoopData.Update);
 }
 
 void CodeGenFunction::EmitOSSTaskwaitDirective(const OSSTaskwaitDirective &S) {
@@ -264,6 +280,16 @@ void CodeGenFunction::EmitOSSTaskDirective(const OSSTaskDirective &S) {
 }
 
 void CodeGenFunction::EmitOSSTaskForDirective(const OSSTaskForDirective &S) {
+  OSSTaskDataTy Data;
+  OSSLoopDataTy LoopData;
+
+  AddTaskData(S, Data);
+  AddLoopData(S, LoopData);
+
+  CGM.getOmpSsRuntime().emitLoopCall(*this, S, S.getBeginLoc(), Data, LoopData);
+}
+
+void CodeGenFunction::EmitOSSTaskIterDirective(const OSSTaskIterDirective &S) {
   OSSTaskDataTy Data;
   OSSLoopDataTy LoopData;
 

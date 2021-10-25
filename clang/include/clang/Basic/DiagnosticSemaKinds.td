@@ -11453,6 +11453,8 @@ def err_oss_loop_cannot_use_stmt : Error<
 def err_oss_not_for : Error<
   "%select{statement after '#pragma oss %1' must be a for loop|"
   "expected %2 for loops after '#pragma oss %1', but found only %3}0">;
+def err_oss_taskiter_for_while : Error<
+  "statement after '#pragma oss %0' must be a for loop or a while loop">;
 def err_oss_perfect_for_nesting : Error<
   "not enough perfectly nested loops">;
 def err_oss_collapse_same_loop_type : Error<

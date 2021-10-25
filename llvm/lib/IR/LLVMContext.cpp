@@ -268,6 +268,21 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
          "oss_loop_grainsize operand bundle id drifted!");
   (void)OSSLoopGrainsizeEntry;
 
+  auto *OSSLoopUnrollEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.LOOP.UNROLL");
+  assert(OSSLoopUnrollEntry->second == LLVMContext::OB_oss_loop_unroll &&
+         "oss_loop_unroll operand bundle id drifted!");
+  (void)OSSLoopUnrollEntry;
+
+  auto *OSSLoopUpdateEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.LOOP.UPDATE");
+  assert(OSSLoopUpdateEntry->second == LLVMContext::OB_oss_loop_update &&
+         "oss_loop_update operand bundle id drifted!");
+  (void)OSSLoopUpdateEntry;
+
+  auto *OSSWhileCondEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.WHILE.COND");
+  assert(OSSWhileCondEntry->second == LLVMContext::OB_oss_while_cond &&
+         "oss_while_cond operand bundle id drifted!");
+  (void)OSSWhileCondEntry;
+
   auto *OSSMultiDepRangeInEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.MULTIDEP.RANGE.IN");
   assert(OSSMultiDepRangeInEntry->second == LLVMContext::OB_oss_multidep_range_in &&
          "oss_multidep_range_in operand bundle id drifted!");
