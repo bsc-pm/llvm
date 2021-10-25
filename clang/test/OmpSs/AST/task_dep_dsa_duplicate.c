@@ -15,7 +15,7 @@ void foo(int i, int j) {
 // CHECK-NEXT: OSSDependClause 0x{{[^ ]*}} <col:20, col:40>
 // CHECK-NEXT: ArraySubscriptExpr 0x{{[^ ]*}} <col:32, col:39> 'int' lvalue
 // CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:32, col:34> 'int *' <ArrayToPointerDecay>
-// CHECK-NEXT: MemberExpr 0x{{[^ ]*}} <col:32, col:34> 'int [10]' lvalue .a 0x{{[^ ]*}}
+// CHECK-NEXT: MemberExpr 0x{{[^ ]*}} <col:32, col:34> 'int[10]' lvalue .a 0x{{[^ ]*}}
 // CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:32> 'struct S':'struct S' lvalue Var 0x{{[^ ]*}} 's' 'struct S':'struct S'
 // CHECK-NEXT: BinaryOperator 0x{{[^ ]*}} <col:36, col:38> 'int' '+'
 // CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:36> 'int' <LValueToRValue>

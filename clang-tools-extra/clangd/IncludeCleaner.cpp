@@ -121,9 +121,15 @@ struct ReferencedFiles {
     if (!Macros.insert(FID).second)
       return;
     const auto &Exp = SM.getSLocEntry(FID).getExpansion();
-    add(Exp.getSpellingLoc());
-    add(Exp.getExpansionLocStart());
-    add(Exp.getExpansionLocEnd());
+    // For token pasting operator in macros, spelling and expansion locations
+    // can be within a temporary buffer that Clang creates (scratch space or
+    // ScratchBuffer). That is not a real file we can include.
+    if (!SM.isWrittenInScratchSpace(Exp.getSpellingLoc()))
+      add(Exp.getSpellingLoc());
+    if (!SM.isWrittenInScratchSpace(Exp.getExpansionLocStart()))
+      add(Exp.getExpansionLocStart());
+    if (!SM.isWrittenInScratchSpace(Exp.getExpansionLocEnd()))
+      add(Exp.getExpansionLocEnd());
   }
 };
 
@@ -161,7 +167,10 @@ getUnused(const IncludeStructure &Structure,
   std::vector<const Inclusion *> Unused;
   for (const Inclusion &MFI : Structure.MainFileIncludes) {
     // FIXME: Skip includes that are not self-contained.
-    assert(MFI.HeaderID);
+    if (!MFI.HeaderID) {
+      elog("File {0} not found.", MFI.Written);
+      continue;
+    }
     auto IncludeID = static_cast<IncludeStructure::HeaderID>(*MFI.HeaderID);
     if (!ReferencedFiles.contains(IncludeID)) {
       Unused.push_back(&MFI);

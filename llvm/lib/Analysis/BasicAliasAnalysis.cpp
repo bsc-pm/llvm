@@ -31,6 +31,7 @@
 #include "llvm/IR/Argument.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Constant.h"
+#include "llvm/IR/ConstantRange.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -82,8 +83,7 @@ STATISTIC(SearchTimes, "Number of times a GEP is decomposed");
 const unsigned MaxNumPhiBBsValueReachabilityCheck = 20;
 
 // The max limit of the search depth in DecomposeGEPExpression() and
-// getUnderlyingObject(), both functions need to use the same search
-// depth otherwise the algorithm in aliasGEP will assert.
+// getUnderlyingObject().
 static const unsigned MaxLookupSearchDepth = 6;
 
 bool BasicAAResult::invalidate(Function &Fn, const PreservedAnalyses &PA,
@@ -265,35 +265,37 @@ void EarliestEscapeInfo::removeInstruction(Instruction *I) {
 
 namespace {
 /// Represents zext(sext(V)).
-struct ExtendedValue {
+struct CastedValue {
   const Value *V;
-  unsigned ZExtBits;
-  unsigned SExtBits;
+  unsigned ZExtBits = 0;
+  unsigned SExtBits = 0;
 
-  explicit ExtendedValue(const Value *V, unsigned ZExtBits = 0,
-                         unsigned SExtBits = 0)
+  explicit CastedValue(const Value *V) : V(V) {}
+  explicit CastedValue(const Value *V, unsigned ZExtBits, unsigned SExtBits)
       : V(V), ZExtBits(ZExtBits), SExtBits(SExtBits) {}
 
   unsigned getBitWidth() const {
     return V->getType()->getPrimitiveSizeInBits() + ZExtBits + SExtBits;
   }
 
-  ExtendedValue withValue(const Value *NewV) const {
-    return ExtendedValue(NewV, ZExtBits, SExtBits);
+  CastedValue withValue(const Value *NewV) const {
+    return CastedValue(NewV, ZExtBits, SExtBits);
   }
 
-  ExtendedValue withZExtOfValue(const Value *NewV) const {
+  /// Replace V with zext(NewV)
+  CastedValue withZExtOfValue(const Value *NewV) const {
     unsigned ExtendBy = V->getType()->getPrimitiveSizeInBits() -
                         NewV->getType()->getPrimitiveSizeInBits();
     // zext(sext(zext(NewV))) == zext(zext(zext(NewV)))
-    return ExtendedValue(NewV, ZExtBits + SExtBits + ExtendBy, 0);
+    return CastedValue(NewV, ZExtBits + SExtBits + ExtendBy, 0);
   }
 
-  ExtendedValue withSExtOfValue(const Value *NewV) const {
+  /// Replace V with sext(NewV)
+  CastedValue withSExtOfValue(const Value *NewV) const {
     unsigned ExtendBy = V->getType()->getPrimitiveSizeInBits() -
                         NewV->getType()->getPrimitiveSizeInBits();
     // zext(sext(sext(NewV)))
-    return ExtendedValue(NewV, ZExtBits, SExtBits + ExtendBy);
+    return CastedValue(NewV, ZExtBits, SExtBits + ExtendBy);
   }
 
   APInt evaluateWith(APInt N) const {
@@ -312,31 +314,39 @@ struct ExtendedValue {
     return N;
   }
 
+  ConstantRange evaluateWith(ConstantRange N) const {
+    assert(N.getBitWidth() == V->getType()->getPrimitiveSizeInBits() &&
+           "Incompatible bit width");
+    if (SExtBits) N = N.signExtend(N.getBitWidth() + SExtBits);
+    if (ZExtBits) N = N.zeroExtend(N.getBitWidth() + ZExtBits);
+    return N;
+  }
+
   bool canDistributeOver(bool NUW, bool NSW) const {
     // zext(x op<nuw> y) == zext(x) op<nuw> zext(y)
     // sext(x op<nsw> y) == sext(x) op<nsw> sext(y)
     return (!ZExtBits || NUW) && (!SExtBits || NSW);
   }
 
-  bool hasSameExtensionsAs(const ExtendedValue &Other) const {
+  bool hasSameCastsAs(const CastedValue &Other) const {
     return ZExtBits == Other.ZExtBits && SExtBits == Other.SExtBits;
   }
 };
 
 /// Represents zext(sext(V)) * Scale + Offset.
 struct LinearExpression {
-  ExtendedValue Val;
+  CastedValue Val;
   APInt Scale;
   APInt Offset;
 
   /// True if all operations in this expression are NSW.
   bool IsNSW;
 
-  LinearExpression(const ExtendedValue &Val, const APInt &Scale,
+  LinearExpression(const CastedValue &Val, const APInt &Scale,
                    const APInt &Offset, bool IsNSW)
       : Val(Val), Scale(Scale), Offset(Offset), IsNSW(IsNSW) {}
 
-  LinearExpression(const ExtendedValue &Val) : Val(Val), IsNSW(true) {
+  LinearExpression(const CastedValue &Val) : Val(Val), IsNSW(true) {
     unsigned BitWidth = Val.getBitWidth();
     Scale = APInt(BitWidth, 1);
     Offset = APInt(BitWidth, 0);
@@ -347,7 +357,7 @@ struct LinearExpression {
 /// Analyzes the specified value as a linear expression: "A*V + B", where A and
 /// B are constant integers.
 static LinearExpression GetLinearExpression(
-    const ExtendedValue &Val,  const DataLayout &DL, unsigned Depth,
+    const CastedValue &Val,  const DataLayout &DL, unsigned Depth,
     AssumptionCache *AC, DominatorTree *DT) {
   // Limit our recursion depth.
   if (Depth == 6)
@@ -454,7 +464,7 @@ namespace {
 // A linear transformation of a Value; this class represents
 // ZExt(SExt(V, SExtBits), ZExtBits) * Scale.
 struct VariableGEPIndex {
-  ExtendedValue Val;
+  CastedValue Val;
   APInt Scale;
 
   // Context instruction to use when querying information about this index.
@@ -485,8 +495,6 @@ struct BasicAAResult::DecomposedGEP {
   APInt Offset;
   // Scaled variable (non-constant) indices.
   SmallVector<VariableGEPIndex, 4> VarIndices;
-  // Is GEP index scale compile-time constant.
-  bool HasCompileTimeConstantScale;
   // Are all operations inbounds GEPs or non-indexing operations?
   // (None iff expression doesn't involve any geps)
   Optional<bool> InBounds;
@@ -504,8 +512,7 @@ struct BasicAAResult::DecomposedGEP {
         OS << ", ";
       VarIndices[i].print(OS);
     }
-    OS << "], HasCompileTimeConstantScale=" << HasCompileTimeConstantScale
-       << ")";
+    OS << "])";
   }
 };
 
@@ -517,11 +524,6 @@ struct BasicAAResult::DecomposedGEP {
 /// in the VarIndices vector) are Value*'s that are known to be scaled by the
 /// specified amount, but which may have other unrepresented high bits. As
 /// such, the gep cannot necessarily be reconstructed from its decomposed form.
-///
-/// This function is capable of analyzing everything that getUnderlyingObject
-/// can look through. To be able to do that getUnderlyingObject and
-/// DecomposeGEPExpression must use the same search depth
-/// (MaxLookupSearchDepth).
 BasicAAResult::DecomposedGEP
 BasicAAResult::DecomposeGEPExpression(const Value *V, const DataLayout &DL,
                                       AssumptionCache *AC, DominatorTree *DT) {
@@ -533,7 +535,6 @@ BasicAAResult::DecomposeGEPExpression(const Value *V, const DataLayout &DL,
   unsigned MaxPointerSize = DL.getMaxPointerSizeInBits();
   DecomposedGEP Decomposed;
   Decomposed.Offset = APInt(MaxPointerSize, 0);
-  Decomposed.HasCompileTimeConstantScale = true;
   do {
     // See if this is a bitcast or GEP.
     const Operator *Op = dyn_cast<Operator>(V);
@@ -596,7 +597,6 @@ BasicAAResult::DecomposeGEPExpression(const Value *V, const DataLayout &DL,
     // constant.
     if (isa<ScalableVectorType>(GEPOp->getSourceElementType())) {
       Decomposed.Base = V;
-      Decomposed.HasCompileTimeConstantScale = false;
       return Decomposed;
     }
 
@@ -639,7 +639,7 @@ BasicAAResult::DecomposeGEPExpression(const Value *V, const DataLayout &DL,
       unsigned Width = Index->getType()->getIntegerBitWidth();
       unsigned SExtBits = PointerSize > Width ? PointerSize - Width : 0;
       LinearExpression LE = GetLinearExpression(
-          ExtendedValue(Index, 0, SExtBits), DL, 0, AC, DT);
+          CastedValue(Index, 0, SExtBits), DL, 0, AC, DT);
 
       // The GEP index scale ("Scale") scales C1*V+C2, yielding (C1*V+C2)*Scale.
       // This gives us an aggregate computation of (C1*Scale)*V + C2*Scale.
@@ -655,7 +655,7 @@ BasicAAResult::DecomposeGEPExpression(const Value *V, const DataLayout &DL,
       APInt ScaledOffset = LE.Offset.sextOrTrunc(MaxPointerSize)
                            .smul_ov(Scale, Overflow);
       if (Overflow) {
-        LE = LinearExpression(ExtendedValue(Index, 0, SExtBits));
+        LE = LinearExpression(CastedValue(Index, 0, SExtBits));
       } else {
         Decomposed.Offset += ScaledOffset;
         Scale *= LE.Scale.sextOrTrunc(MaxPointerSize);
@@ -667,7 +667,7 @@ BasicAAResult::DecomposeGEPExpression(const Value *V, const DataLayout &DL,
       // This also ensures that 'x' only appears in the index list once.
       for (unsigned i = 0, e = Decomposed.VarIndices.size(); i != e; ++i) {
         if (Decomposed.VarIndices[i].Val.V == LE.Val.V &&
-            Decomposed.VarIndices[i].Val.hasSameExtensionsAs(LE.Val)) {
+            Decomposed.VarIndices[i].Val.hasSameCastsAs(LE.Val)) {
           Scale += Decomposed.VarIndices[i].Scale;
           Decomposed.VarIndices.erase(Decomposed.VarIndices.begin() + i);
           break;
@@ -1136,15 +1136,9 @@ AliasResult BasicAAResult::aliasGEP(
   DecomposedGEP DecompGEP1 = DecomposeGEPExpression(GEP1, DL, &AC, DT);
   DecomposedGEP DecompGEP2 = DecomposeGEPExpression(V2, DL, &AC, DT);
 
-  // Don't attempt to analyze the decomposed GEP if index scale is not a
-  // compile-time constant.
-  if (!DecompGEP1.HasCompileTimeConstantScale ||
-      !DecompGEP2.HasCompileTimeConstantScale)
+  // Bail if we were not able to decompose anything.
+  if (DecompGEP1.Base == GEP1 && DecompGEP2.Base == V2)
     return AliasResult::MayAlias;
-
-  assert(DecompGEP1.Base == UnderlyingV1 && DecompGEP2.Base == UnderlyingV2 &&
-         "DecomposeGEPExpression returned a result different from "
-         "getUnderlyingObject");
 
   // Subtract the GEP2 pointer from the GEP1 pointer to find out their
   // symbolic difference.
@@ -1291,13 +1285,24 @@ AliasResult BasicAAResult::aliasGEP(
       return AliasResult::NoAlias;
 
     if (V1Size.hasValue() && V2Size.hasValue()) {
-      // Try to determine whether abs(VarIndex) > 0.
+      // Try to determine the range of values for VarIndex.
+      // VarIndexRange is such that:
+      //    (VarIndex <= -MinAbsVarIndex || MinAbsVarIndex <= VarIndex) &&
+      //    VarIndexRange.contains(VarIndex)
       Optional<APInt> MinAbsVarIndex;
+      Optional<ConstantRange> VarIndexRange;
       if (DecompGEP1.VarIndices.size() == 1) {
-        // VarIndex = Scale*V. If V != 0 then abs(VarIndex) >= abs(Scale).
+        // VarIndex = Scale*V.
         const VariableGEPIndex &Var = DecompGEP1.VarIndices[0];
-        if (isKnownNonZero(Var.Val.V, DL, 0, &AC, Var.CxtI, DT))
+        if (isKnownNonZero(Var.Val.V, DL, 0, &AC, Var.CxtI, DT)) {
+          // If V != 0 then abs(VarIndex) >= abs(Scale).
           MinAbsVarIndex = Var.Scale.abs();
+        }
+        ConstantRange R = Var.Val.evaluateWith(
+            computeConstantRange(Var.Val.V, true, &AC, Var.CxtI));
+        if (!R.isFullSet() && !R.isEmptySet())
+          VarIndexRange = R.sextOrTrunc(Var.Scale.getBitWidth())
+                              .smul_fast(ConstantRange(Var.Scale));
       } else if (DecompGEP1.VarIndices.size() == 2) {
         // VarIndex = Scale*V0 + (-Scale)*V1.
         // If V0 != V1 then abs(VarIndex) >= abs(Scale).
@@ -1306,7 +1311,7 @@ AliasResult BasicAAResult::aliasGEP(
         const VariableGEPIndex &Var0 = DecompGEP1.VarIndices[0];
         const VariableGEPIndex &Var1 = DecompGEP1.VarIndices[1];
         if (Var0.Scale == -Var1.Scale &&
-            Var0.Val.hasSameExtensionsAs(Var1.Val) && VisitedPhiBBs.empty() &&
+            Var0.Val.hasSameCastsAs(Var1.Val) && VisitedPhiBBs.empty() &&
             isKnownNonEqual(Var0.Val.V, Var1.Val.V, DL, &AC, /* CxtI */ nullptr,
                             DT))
           MinAbsVarIndex = Var0.Scale.abs();
@@ -1316,10 +1321,24 @@ AliasResult BasicAAResult::aliasGEP(
         // The constant offset will have added at least +/-MinAbsVarIndex to it.
         APInt OffsetLo = DecompGEP1.Offset - *MinAbsVarIndex;
         APInt OffsetHi = DecompGEP1.Offset + *MinAbsVarIndex;
-        // Check that an access at OffsetLo or lower, and an access at OffsetHi
-        // or higher both do not alias.
+        // We know that Offset <= OffsetLo || Offset >= OffsetHi
         if (OffsetLo.isNegative() && (-OffsetLo).uge(V1Size.getValue()) &&
             OffsetHi.isNonNegative() && OffsetHi.uge(V2Size.getValue()))
+          return AliasResult::NoAlias;
+      }
+
+      if (VarIndexRange) {
+        ConstantRange OffsetRange =
+            VarIndexRange->add(ConstantRange(DecompGEP1.Offset));
+
+        // We know that Offset >= MinOffset.
+        // (MinOffset >= V2Size) => (Offset >= V2Size) => NoAlias.
+        if (OffsetRange.getSignedMin().sge(V2Size.getValue()))
+          return AliasResult::NoAlias;
+
+        // We know that Offset <= MaxOffset.
+        // (MaxOffset <= -V1Size) => (Offset <= -V1Size) => NoAlias.
+        if (OffsetRange.getSignedMax().sle(-V1Size.getValue()))
           return AliasResult::NoAlias;
       }
     }
@@ -1781,7 +1800,7 @@ void BasicAAResult::subtractDecomposedGEPs(DecomposedGEP &DestGEP,
     for (auto I : enumerate(DestGEP.VarIndices)) {
       VariableGEPIndex &Dest = I.value();
       if (!isValueEqualInPotentialCycles(Dest.Val.V, Src.Val.V) ||
-          !Dest.Val.hasSameExtensionsAs(Src.Val))
+          !Dest.Val.hasSameCastsAs(Src.Val))
         continue;
 
       // If we found it, subtract off Scale V's from the entry in Dest.  If it
@@ -1816,7 +1835,7 @@ bool BasicAAResult::constantOffsetHeuristic(
 
   const VariableGEPIndex &Var0 = GEP.VarIndices[0], &Var1 = GEP.VarIndices[1];
 
-  if (!Var0.Val.hasSameExtensionsAs(Var1.Val) || Var0.Scale != -Var1.Scale ||
+  if (!Var0.Val.hasSameCastsAs(Var1.Val) || Var0.Scale != -Var1.Scale ||
       Var0.Val.V->getType() != Var1.Val.V->getType())
     return false;
 
@@ -1825,10 +1844,10 @@ bool BasicAAResult::constantOffsetHeuristic(
   // is zext(%x + 1) we should get V1 == %x and V1Offset == 1.
 
   LinearExpression E0 =
-      GetLinearExpression(ExtendedValue(Var0.Val.V), DL, 0, AC, DT);
+      GetLinearExpression(CastedValue(Var0.Val.V), DL, 0, AC, DT);
   LinearExpression E1 =
-      GetLinearExpression(ExtendedValue(Var1.Val.V), DL, 0, AC, DT);
-  if (E0.Scale != E1.Scale || !E0.Val.hasSameExtensionsAs(E1.Val) ||
+      GetLinearExpression(CastedValue(Var1.Val.V), DL, 0, AC, DT);
+  if (E0.Scale != E1.Scale || !E0.Val.hasSameCastsAs(E1.Val) ||
       !isValueEqualInPotentialCycles(E0.Val.V, E1.Val.V))
     return false;
 

@@ -12,7 +12,7 @@ void foo(int *p) {
 
 // CHECK: OSSTaskDirective 0x{{.*}} <line:{{.*}}:{{.*}}, col:{{.*}}> ompss-2
 // CHECK-NEXT: OSSDependClause 0x{{.*}} <col:{{.*}}, col:{{.*}}> <oss syntax>
-// CHECK-NEXT: OSSArrayShapingExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int [4]' lvalue
+// CHECK-NEXT: OSSArrayShapingExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int[4]' lvalue
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'int *' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int *' lvalue ParmVar 0x{{.*}} 'p' 'int *'
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int' <LValueToRValue>
