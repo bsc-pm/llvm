@@ -4632,6 +4632,7 @@ kmp_info_t *__kmp_allocate_free_agent_thread(kmp_root_t *root, int new_tid) {
   thread->th.is_free_agent = true;
   thread->th.is_free_agent_active = &root->r.is_free_agent_thread_active[new_tid];
   thread->th.free_agent_id = new_tid;
+  thread->th.free_agent_launched = false;
   kmp_taskdata_t *task =
     (kmp_taskdata_t *)__kmp_allocate(sizeof(kmp_taskdata_t) * 1);
   thread->th.th_current_task = task;
@@ -6018,6 +6019,11 @@ void __kmp_free_thread(kmp_info_t *this_th) {
 /* ------------------------------------------------------------------------ */
 
 void *__kmp_launch_thread(kmp_info_t *this_thr) {
+  // FIXME: race condition when RT finalizes before free agent reaches here
+  if (this_thr->th.is_free_agent) {
+    this_thr->th.free_agent_launched = true;
+  }
+
 #if OMP_PROFILING_SUPPORT
   ProfileTraceFile = getenv("LIBOMPTARGET_PROFILE");
   // TODO: add a configuration option for time granularity
@@ -6499,6 +6505,24 @@ void __kmp_internal_end_library(int gtid_req) {
     __kmp_hidden_helper_main_thread_release();
     // Wait until the hidden helper team has been destroyed
     __kmp_hidden_helper_threads_deinitz_wait();
+  }
+
+  // FIXME: wait for FA to finalize
+  // Wait for free agents to be launched at least
+  if (__kmp_free_agent_num_threads > 0) {
+    int gtid = (gtid_req >= 0) ? gtid_req : __kmp_gtid_get_specific();
+    for (unsigned int i = 0; i < __kmp_free_agent_num_threads; i++) {
+      int num_sleeps = 0;
+      while(!__kmp_root[gtid]->r.free_agent_threads[i]->th.free_agent_launched) {
+        if (num_sleeps == 10) {
+          fprintf(stderr, "Time out waiting for free agent threads to be launched\n");
+          break;
+        }
+        KMP_MB();
+        usleep(1000);
+        ++num_sleeps;
+      }
+    }
   }
 
   KMP_MB(); /* Flush all pending memory write invalidates.  */
@@ -9250,9 +9274,9 @@ unsigned int __kmp_get_num_free_agent_threads() {
 void __kmp_set_free_agent_thread_active_status(unsigned int thread_num,
                                                bool active) {
   // The runtime may initialize here if needed.
-  int gtid = __kmp_entry_gtid();
+  int gtid = __kmp_gtid_get_specific();
   // FIXME: Should this be a hard error rather than silently ignore it?
-  if (thread_num >= __kmp_free_agent_num_threads)
+  if (thread_num >= __kmp_free_agent_num_threads || gtid < 0)
     return;
   __kmp_threads[gtid]->th.th_root->r.is_free_agent_thread_active[thread_num] =
       active;

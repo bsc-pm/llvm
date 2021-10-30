@@ -2723,6 +2723,8 @@ typedef struct KMP_ALIGN_CACHE kmp_base_info {
                               // This is for convenience.
   int free_agent_id;
 
+  bool free_agent_launched;
+
   // List of teams we can enter as a free agent thread
   kmp_bootstrap_lock_t allowed_teams_lock;
   int allowed_teams_capacity;
