@@ -99,9 +99,9 @@ define i32 @test17(i32 %A) {
 
 define i1 @test18(i32 %A) {
 ; CHECK-LABEL: @test18(
-; CHECK-NEXT:    [[A_OFF:%.*]] = add i32 [[A:%.*]], -50
-; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[A_OFF]], 49
-; CHECK-NEXT:    ret i1 [[TMP1]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[A:%.*]], -100
+; CHECK-NEXT:    [[TMP2:%.*]] = icmp ult i32 [[TMP1]], -50
+; CHECK-NEXT:    ret i1 [[TMP2]]
 ;
   %B = icmp sge i32 %A, 100
   %C = icmp slt i32 %A, 50
@@ -111,9 +111,9 @@ define i1 @test18(i32 %A) {
 
 define i1 @test18_logical(i32 %A) {
 ; CHECK-LABEL: @test18_logical(
-; CHECK-NEXT:    [[A_OFF:%.*]] = add i32 [[A:%.*]], -50
-; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[A_OFF]], 49
-; CHECK-NEXT:    ret i1 [[TMP1]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[A:%.*]], -100
+; CHECK-NEXT:    [[TMP2:%.*]] = icmp ult i32 [[TMP1]], -50
+; CHECK-NEXT:    ret i1 [[TMP2]]
 ;
   %B = icmp sge i32 %A, 100
   %C = icmp slt i32 %A, 50
@@ -121,13 +121,11 @@ define i1 @test18_logical(i32 %A) {
   ret i1 %D
 }
 
-; FIXME: Vectors should fold too.
 define <2 x i1> @test18vec(<2 x i32> %A) {
 ; CHECK-LABEL: @test18vec(
-; CHECK-NEXT:    [[B:%.*]] = icmp sgt <2 x i32> [[A:%.*]], <i32 99, i32 99>
-; CHECK-NEXT:    [[C:%.*]] = icmp slt <2 x i32> [[A]], <i32 50, i32 50>
-; CHECK-NEXT:    [[D:%.*]] = or <2 x i1> [[B]], [[C]]
-; CHECK-NEXT:    ret <2 x i1> [[D]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add <2 x i32> [[A:%.*]], <i32 -100, i32 -100>
+; CHECK-NEXT:    [[TMP2:%.*]] = icmp ult <2 x i32> [[TMP1]], <i32 -50, i32 -50>
+; CHECK-NEXT:    ret <2 x i1> [[TMP2]]
 ;
   %B = icmp sge <2 x i32> %A, <i32 100, i32 100>
   %C = icmp slt <2 x i32> %A, <i32 50, i32 50>
@@ -341,9 +339,9 @@ define i32 @test30(i32 %A) {
 ; CHECK-NEXT:    [[E:%.*]] = or i32 [[D]], 32962
 ; CHECK-NEXT:    ret i32 [[E]]
 ;
-  %B = or i32 %A, 32962
-  %C = and i32 %A, -65536
-  %D = and i32 %B, 40186
+  %B = or i32 %A, 32962   ; 0b1000_0000_1100_0010
+  %C = and i32 %A, -65536 ; 0xffff0000
+  %D = and i32 %B, 40186  ; 0b1001_1100_1111_1010
   %E = or i32 %D, %C
   ret i32 %E
 }
@@ -481,9 +479,9 @@ define i1 @test36_logical(i32 %x) {
 
 define i1 @test37(i32 %x) {
 ; CHECK-LABEL: @test37(
-; CHECK-NEXT:    [[ADD1:%.*]] = add i32 [[X:%.*]], 7
-; CHECK-NEXT:    [[TMP1:%.*]] = icmp ult i32 [[ADD1]], 31
-; CHECK-NEXT:    ret i1 [[TMP1]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[X:%.*]], 7
+; CHECK-NEXT:    [[TMP2:%.*]] = icmp ult i32 [[TMP1]], 31
+; CHECK-NEXT:    ret i1 [[TMP2]]
 ;
   %add1 = add i32 %x, 7
   %cmp1 = icmp ult i32 %add1, 30
@@ -494,9 +492,9 @@ define i1 @test37(i32 %x) {
 
 define i1 @test37_logical(i32 %x) {
 ; CHECK-LABEL: @test37_logical(
-; CHECK-NEXT:    [[ADD1:%.*]] = add i32 [[X:%.*]], 7
-; CHECK-NEXT:    [[TMP1:%.*]] = icmp ult i32 [[ADD1]], 31
-; CHECK-NEXT:    ret i1 [[TMP1]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[X:%.*]], 7
+; CHECK-NEXT:    [[TMP2:%.*]] = icmp ult i32 [[TMP1]], 31
+; CHECK-NEXT:    ret i1 [[TMP2]]
 ;
   %add1 = add i32 %x, 7
   %cmp1 = icmp ult i32 %add1, 30
@@ -507,11 +505,9 @@ define i1 @test37_logical(i32 %x) {
 
 define <2 x i1> @test37_uniform(<2 x i32> %x) {
 ; CHECK-LABEL: @test37_uniform(
-; CHECK-NEXT:    [[ADD1:%.*]] = add <2 x i32> [[X:%.*]], <i32 7, i32 7>
-; CHECK-NEXT:    [[CMP1:%.*]] = icmp ult <2 x i32> [[ADD1]], <i32 30, i32 30>
-; CHECK-NEXT:    [[CMP2:%.*]] = icmp eq <2 x i32> [[X]], <i32 23, i32 23>
-; CHECK-NEXT:    [[RET1:%.*]] = or <2 x i1> [[CMP1]], [[CMP2]]
-; CHECK-NEXT:    ret <2 x i1> [[RET1]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add <2 x i32> [[X:%.*]], <i32 7, i32 7>
+; CHECK-NEXT:    [[TMP2:%.*]] = icmp ult <2 x i32> [[TMP1]], <i32 31, i32 31>
+; CHECK-NEXT:    ret <2 x i1> [[TMP2]]
 ;
   %add1 = add <2 x i32> %x, <i32 7, i32 7>
   %cmp1 = icmp ult <2 x i32> %add1, <i32 30, i32 30>
@@ -537,11 +533,9 @@ define <2 x i1> @test37_undef(<2 x i32> %x) {
 
 define i1 @test38(i32 %x) {
 ; CHECK-LABEL: @test38(
-; CHECK-NEXT:    [[ADD1:%.*]] = add i32 [[X:%.*]], 7
-; CHECK-NEXT:    [[CMP1:%.*]] = icmp eq i32 [[X]], 23
-; CHECK-NEXT:    [[CMP2:%.*]] = icmp ult i32 [[ADD1]], 30
-; CHECK-NEXT:    [[RET1:%.*]] = or i1 [[CMP1]], [[CMP2]]
-; CHECK-NEXT:    ret i1 [[RET1]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[X:%.*]], 7
+; CHECK-NEXT:    [[TMP2:%.*]] = icmp ult i32 [[TMP1]], 31
+; CHECK-NEXT:    ret i1 [[TMP2]]
 ;
   %add1 = add i32 %x, 7
   %cmp1 = icmp eq i32 %x, 23
@@ -552,11 +546,9 @@ define i1 @test38(i32 %x) {
 
 define i1 @test38_logical(i32 %x) {
 ; CHECK-LABEL: @test38_logical(
-; CHECK-NEXT:    [[ADD1:%.*]] = add i32 [[X:%.*]], 7
-; CHECK-NEXT:    [[CMP1:%.*]] = icmp eq i32 [[X]], 23
-; CHECK-NEXT:    [[CMP2:%.*]] = icmp ult i32 [[ADD1]], 30
-; CHECK-NEXT:    [[RET1:%.*]] = or i1 [[CMP1]], [[CMP2]]
-; CHECK-NEXT:    ret i1 [[RET1]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[X:%.*]], 7
+; CHECK-NEXT:    [[TMP2:%.*]] = icmp ult i32 [[TMP1]], 31
+; CHECK-NEXT:    ret i1 [[TMP2]]
 ;
   %add1 = add i32 %x, 7
   %cmp1 = icmp eq i32 %x, 23
@@ -796,12 +788,10 @@ define i1 @test46_logical(i8 signext %c)  {
 
 define <2 x i1> @test46_uniform(<2 x i8> %c)  {
 ; CHECK-LABEL: @test46_uniform(
-; CHECK-NEXT:    [[C_OFF:%.*]] = add <2 x i8> [[C:%.*]], <i8 -97, i8 -97>
-; CHECK-NEXT:    [[CMP1:%.*]] = icmp ult <2 x i8> [[C_OFF]], <i8 26, i8 26>
-; CHECK-NEXT:    [[C_OFF17:%.*]] = add <2 x i8> [[C]], <i8 -65, i8 -65>
-; CHECK-NEXT:    [[CMP2:%.*]] = icmp ult <2 x i8> [[C_OFF17]], <i8 26, i8 26>
-; CHECK-NEXT:    [[OR:%.*]] = or <2 x i1> [[CMP1]], [[CMP2]]
-; CHECK-NEXT:    ret <2 x i1> [[OR]]
+; CHECK-NEXT:    [[TMP1:%.*]] = and <2 x i8> [[C:%.*]], <i8 -33, i8 -33>
+; CHECK-NEXT:    [[TMP2:%.*]] = add <2 x i8> [[TMP1]], <i8 -65, i8 -65>
+; CHECK-NEXT:    [[TMP3:%.*]] = icmp ult <2 x i8> [[TMP2]], <i8 26, i8 26>
+; CHECK-NEXT:    ret <2 x i1> [[TMP3]]
 ;
   %c.off = add <2 x i8> %c, <i8 -97, i8 -97>
   %cmp1 = icmp ult <2 x i8> %c.off, <i8 26, i8 26>

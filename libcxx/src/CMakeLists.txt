@@ -163,7 +163,8 @@ if (APPLE AND LLVM_USE_SANITIZER)
     message(WARNING "LLVM_USE_SANITIZER=${LLVM_USE_SANITIZER} is not supported on OS X")
   endif()
   if (LIBFILE)
-    find_compiler_rt_dir(LIBDIR)
+    find_compiler_rt_library(builtins LIBCXX_BUILTINS_LIBRARY)
+    get_filename_component(LIBDIR "${LIBCXX_BUILTINS_LIBRARY}" DIRECTORY)
     if (NOT IS_DIRECTORY "${LIBDIR}")
       message(FATAL_ERROR "Cannot find compiler-rt directory on OS X required for LLVM_USE_SANITIZER")
     endif()
@@ -284,6 +285,13 @@ if (LIBCXX_ENABLE_STATIC)
   )
   cxx_add_common_build_flags(cxx_static)
   cxx_set_common_defines(cxx_static)
+
+  if (LIBCXXABI_USE_LLVM_UNWINDER)
+    # If we intend to use the just-built unwinder, add a dependency so that it
+    # gets built, even if we technically aren't going to link it in at this
+    # stage.
+    add_dependencies(cxx_static unwind)
+  endif()
 
   if (LIBCXX_HERMETIC_STATIC_LIBRARY)
     # If the hermetic library doesn't define the operator new/delete functions

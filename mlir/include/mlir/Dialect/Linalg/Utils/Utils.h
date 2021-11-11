@@ -54,11 +54,39 @@ Value createOrFoldDimOp(OpBuilder &b, Location loc, Value source, int64_t dim);
 /// constructing the necessary DimOp operators.
 SmallVector<Value, 4> getDynOperands(Location loc, Value val, OpBuilder &b);
 
-/// If `size` comes from an AffineMinOp and one of the values of AffineMinOp
-/// is a constant then return a new value set to the smallest such constant.
-/// If `size` comes from a ConstantOp, return the constant.
-/// Otherwise return nullptr.
-IntegerAttr getSmallestBoundingIndex(Value size);
+/// Computes an upper bound for the result `value` of an index computation.
+/// Translates AffineMinOps and AffineApplyOps along the use-def chains of the
+/// index computation to affine constraints and projects out intermediate
+/// values. The method sets `boundMap` to an affine map that given
+/// `boundOperands` evaluates to an upper bound for the index computation.
+///
+/// Example:
+/// ```
+/// %dim0 = dim %tensor, %c0
+/// %dim1 = dim %tensor, %c1
+/// %0 = affine.min affine.map<(d0) -> (40, d0)> (%dim0)
+/// %1 = affine.apply affine.map<(d0, d1) -> (d0 + d1)> (%0, %dim1)
+/// ```
+/// getUpperBoundForIndex(%1, boundMap, boundOperands)
+/// set the output parameters to:
+/// - boundMap = affine.map<(d0) -> (d0 + 40)>
+/// - boundOperands = [%dim1]
+void getUpperBoundForIndex(Value value, AffineMap &boundMap,
+                           SmallVectorImpl<Value> &boundOperands);
+
+/// Returns a constant upper bound for the result `value` of an index
+/// computation. Calls `getUpperBoundForIndex` and returns a constant upper
+/// bound if the result of `boundMap` is a constant expression and failure
+/// otherwise.
+///
+/// Example:
+/// ```
+/// %0 = affine.min affine.map<(d0) -> (40, d0)> (%d0)
+/// %1 = affine.apply affine.map<(d0) -> (d0 + 2)> (%0)
+/// ```
+/// getConstantUpperBoundForIndex(%1) returns 42
+/// (boundsMap = affine.map<() -> (42)>)
+FailureOr<int64_t> getConstantUpperBoundForIndex(Value value);
 
 /// Create an ExtractSliceOp and, if `source` is defined by an ExtractSliceOp,
 /// fold it by adding the offsets.
@@ -164,25 +192,25 @@ struct FusionInfo {
 /// Implements the fusion part of the "tileAndFuse on buffers" transformation
 /// and thus requires the `consumerOpOperand` to be a `subview` op (generally
 /// obtained by applying the tiling transformation).
-Optional<FusionInfo> fuseProducerOfBuffer(OpBuilder &b,
-                                          OpOperand &consumerOpOperand,
-                                          const LinalgDependenceGraph &graph);
+FailureOr<FusionInfo> fuseProducerOfBuffer(OpBuilder &b,
+                                           OpOperand &consumerOpOperand,
+                                           const LinalgDependenceGraph &graph);
 /// Tensor counterpart of `fuseProducerOfBuffer`.
 /// This implements the fusion part of the "tileAndFuse on tensors"
 /// transformation and thus requires the `consumerOpOperand` to be a
 /// `extract_slice` op (generally obtained by applying the tiling
 /// transformation).
-Optional<FusionInfo> fuseProducerOfTensor(OpBuilder &b,
-                                          OpOperand &consumerOpOperand);
+FailureOr<FusionInfo> fuseProducerOfTensor(OpBuilder &b,
+                                           OpOperand &consumerOpOperand);
 /// Tensor counterpart of `fuseProducerOfBuffer`.
 /// This implements the fusion part of the "tileAndFuse on tensors"
 /// transformation and thus requires the `consumerOpOperand` to be a
 /// `extract_slice` op (generally obtained by applying the tiling
 /// transformation). Assumes `producerOfTensor` is a Linalg op that produces
 /// `consumerOpOperand`.
-Optional<FusionInfo> fuseProducerOfTensor(OpBuilder &b,
-                                          OpResult producerOpResult,
-                                          OpOperand &consumerOpOperand);
+FailureOr<FusionInfo> fuseProducerOfTensor(OpBuilder &b,
+                                           OpResult producerOpResult,
+                                           OpOperand &consumerOpOperand);
 
 //===----------------------------------------------------------------------===//
 // Fusion on tensor utilities
@@ -212,6 +240,7 @@ private:
   bool isEmpty();
 
   /// Returns true if the tile loop nest invariants are satisfied:
+  /// - The `rootOp` has been tiled at least once.
   /// - The number of tile loop operations and dimensions match.
   /// - The innermost tile loop is the parent of `tiledOp`.
   /// - The tile loops are directly nested.
@@ -233,8 +262,8 @@ private:
   bool hasOtherUses(BlockArgument bbArg, tensor::ExtractSliceOp sliceOp);
 
   LinalgOp rootOp;
-  SmallVector<scf::ForOp> loopOps;
-  SmallVector<int64_t> loopDims;
+  SmallVector<scf::ForOp> tileLoopOps;
+  DenseMap<Operation *, SmallVector<int64_t>> tiledRootAndFusedOpsLoops;
 };
 
 /// Tiles `consumerOp` and fuses its dependencies if possible. Uses the

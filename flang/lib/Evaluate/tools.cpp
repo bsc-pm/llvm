@@ -911,16 +911,16 @@ std::optional<std::string> FindImpureCall(
   return FindImpureCallHelper{context}(proc);
 }
 
-// Compare procedure characteristics for equality except that lhs may be
-// Pure or Elemental when rhs is not.
+// Compare procedure characteristics for equality except that rhs may be
+// Pure or Elemental when lhs is not.
 static bool CharacteristicsMatch(const characteristics::Procedure &lhs,
     const characteristics::Procedure &rhs) {
   using Attr = characteristics::Procedure::Attr;
-  auto lhsAttrs{rhs.attrs};
+  auto lhsAttrs{lhs.attrs};
   lhsAttrs.set(
-      Attr::Pure, lhs.attrs.test(Attr::Pure) | rhs.attrs.test(Attr::Pure));
+      Attr::Pure, lhs.attrs.test(Attr::Pure) || rhs.attrs.test(Attr::Pure));
   lhsAttrs.set(Attr::Elemental,
-      lhs.attrs.test(Attr::Elemental) | rhs.attrs.test(Attr::Elemental));
+      lhs.attrs.test(Attr::Elemental) || rhs.attrs.test(Attr::Elemental));
   return lhsAttrs == rhs.attrs && lhs.functionResult == rhs.functionResult &&
       lhs.dummyArguments == rhs.dummyArguments;
 }

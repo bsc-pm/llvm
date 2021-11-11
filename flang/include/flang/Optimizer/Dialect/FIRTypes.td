@@ -419,7 +419,9 @@ def fir_SequenceType : FIR_Type<"Sequence", "array"> {
     bool hasConstantInterior() const;
 
     // Is the shape of the sequence constant?
-    bool hasConstantShape() const { return getConstantRows() == getDimension(); }
+    bool hasConstantShape() const {
+      return getConstantRows() == getDimension();
+    }
 
     // Does the sequence have unknown shape? (`array<* x T>`)
     bool hasUnknownShape() const { return getShape().empty(); }
@@ -504,8 +506,11 @@ def AnyRealLike : TypeConstraint<Or<[FloatLike.predicate,
 def AnyIntegerType : Type<AnyIntegerLike.predicate, "any integer">;
 
 // Composable types
+// Note that we include both fir_ComplexType and AnyComplex, so we can use both
+// the FIR ComplexType and the MLIR ComplexType (the former is used to represent
+// Fortran complex and the latter for C++ std::complex).
 def AnyCompositeLike : TypeConstraint<Or<[fir_RecordType.predicate,
-    fir_SequenceType.predicate, fir_ComplexType.predicate,
+    fir_SequenceType.predicate, fir_ComplexType.predicate, AnyComplex.predicate,
     fir_VectorType.predicate, IsTupleTypePred, fir_CharacterType.predicate]>,
     "any composite">;
 

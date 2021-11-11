@@ -10206,6 +10206,7 @@ void XCoreTargetCodeGenInfo::emitTargetMetadata(
     }
   }
 }
+
 //===----------------------------------------------------------------------===//
 // Trivial ABI Implementation (Used by OmpSs-2 dependencies)
 //===----------------------------------------------------------------------===//
@@ -10219,23 +10220,24 @@ void computeTrivialABIInfo(CodeGenModule &CGM, CGFunctionInfo &FI) {
 }
 
 //===----------------------------------------------------------------------===//
-// SPIR ABI Implementation
+// Base ABI and target codegen info implementation common between SPIR and
+// SPIR-V.
 //===----------------------------------------------------------------------===//
 
 namespace {
-class SPIRABIInfo : public DefaultABIInfo {
+class CommonSPIRABIInfo : public DefaultABIInfo {
 public:
-  SPIRABIInfo(CodeGenTypes &CGT) : DefaultABIInfo(CGT) { setCCs(); }
+  CommonSPIRABIInfo(CodeGenTypes &CGT) : DefaultABIInfo(CGT) { setCCs(); }
 
 private:
   void setCCs();
 };
 } // end anonymous namespace
 namespace {
-class SPIRTargetCodeGenInfo : public TargetCodeGenInfo {
+class CommonSPIRTargetCodeGenInfo : public TargetCodeGenInfo {
 public:
-  SPIRTargetCodeGenInfo(CodeGen::CodeGenTypes &CGT)
-      : TargetCodeGenInfo(std::make_unique<SPIRABIInfo>(CGT)) {}
+  CommonSPIRTargetCodeGenInfo(CodeGen::CodeGenTypes &CGT)
+      : TargetCodeGenInfo(std::make_unique<CommonSPIRABIInfo>(CGT)) {}
 
   LangAS getASTAllocaAddressSpace() const override {
     return getLangASFromTargetAS(
@@ -10246,7 +10248,7 @@ public:
 };
 
 } // End anonymous namespace.
-void SPIRABIInfo::setCCs() {
+void CommonSPIRABIInfo::setCCs() {
   assert(getRuntimeCC() == llvm::CallingConv::C);
   RuntimeCC = llvm::CallingConv::SPIR_FUNC;
 }
@@ -10260,7 +10262,7 @@ void computeSPIRKernelABIInfo(CodeGenModule &CGM, CGFunctionInfo &FI) {
 }
 }
 
-unsigned SPIRTargetCodeGenInfo::getOpenCLKernelCallingConv() const {
+unsigned CommonSPIRTargetCodeGenInfo::getOpenCLKernelCallingConv() const {
   return llvm::CallingConv::SPIR_KERNEL;
 }
 
@@ -11329,7 +11331,9 @@ const TargetCodeGenInfo &CodeGenModule::getTargetCodeGenInfo() {
     return SetCGInfo(new ARCTargetCodeGenInfo(Types));
   case llvm::Triple::spir:
   case llvm::Triple::spir64:
-    return SetCGInfo(new SPIRTargetCodeGenInfo(Types));
+  case llvm::Triple::spirv32:
+  case llvm::Triple::spirv64:
+    return SetCGInfo(new CommonSPIRTargetCodeGenInfo(Types));
   case llvm::Triple::ve:
     return SetCGInfo(new VETargetCodeGenInfo(Types));
   }

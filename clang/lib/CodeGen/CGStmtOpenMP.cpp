@@ -518,8 +518,10 @@ static llvm::Function *emitOutlinedFunctionPrologue(
   F->setDoesNotRecurse();
 
   // Always inline the outlined function if optimizations are enabled.
-  if (CGM.getCodeGenOpts().OptimizationLevel != 0)
+  if (CGM.getCodeGenOpts().OptimizationLevel != 0) {
+    F->removeFnAttr(llvm::Attribute::NoInline);
     F->addFnAttr(llvm::Attribute::AlwaysInline);
+  }
 
   // Generate the function.
   CGF.StartFunction(CD, Ctx.VoidTy, F, FuncInfo, TargetArgs,
@@ -5364,8 +5366,6 @@ static llvm::Function *emitOutlinedOrderedFunction(CodeGenModule &CGM,
   CGF.CapturedStmtInfo = &CapStmtInfo;
   llvm::Function *Fn = CGF.GenerateOpenMPCapturedStmtFunction(*S, Loc);
   Fn->setDoesNotRecurse();
-  if (CGM.getCodeGenOpts().OptimizationLevel != 0)
-    Fn->addFnAttr(llvm::Attribute::AlwaysInline);
   return Fn;
 }
 
@@ -5990,6 +5990,10 @@ static void emitOMPAtomicExpr(CodeGenFunction &CGF, OpenMPClauseKind Kind,
   case OMPC_filter:
   case OMPC_when:
   case OMPC_adjust_args:
+  case OMPC_append_args:
+  case OMPC_memory_order:
+  case OMPC_bind:
+  case OMPC_align:
     llvm_unreachable("Clause is not allowed in 'omp atomic'.");
   }
 }
@@ -7235,6 +7239,16 @@ void CodeGenFunction::EmitOMPTargetUpdateDirective(
 
   OMPLexicalScope Scope(*this, S, OMPD_task);
   CGM.getOpenMPRuntime().emitTargetDataStandAloneCall(*this, S, IfCond, Device);
+}
+
+void CodeGenFunction::EmitOMPGenericLoopDirective(
+    const OMPGenericLoopDirective &S) {
+  // Unimplemented, just inline the underlying statement for now.
+  auto &&CodeGen = [&S](CodeGenFunction &CGF, PrePostActionTy &Action) {
+    CGF.EmitStmt(cast<CapturedStmt>(S.getAssociatedStmt())->getCapturedStmt());
+  };
+  OMPLexicalScope Scope(*this, S, OMPD_unknown);
+  CGM.getOpenMPRuntime().emitInlinedDirective(*this, OMPD_loop, CodeGen);
 }
 
 void CodeGenFunction::EmitSimpleOMPExecutableDirective(

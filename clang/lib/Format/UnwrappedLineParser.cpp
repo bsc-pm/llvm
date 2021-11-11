@@ -1075,10 +1075,9 @@ void UnwrappedLineParser::readTokenWithJavaScriptASI() {
   if (PreviousMustBeValue || Previous->is(tok::r_paren)) {
     // If the line contains an '@' sign, the previous token might be an
     // annotation, which can precede another identifier/value.
-    bool HasAt = std::find_if(Line->Tokens.begin(), Line->Tokens.end(),
-                              [](UnwrappedLineNode &LineNode) {
-                                return LineNode.Tok->is(tok::at);
-                              }) != Line->Tokens.end();
+    bool HasAt = llvm::any_of(Line->Tokens, [](UnwrappedLineNode &LineNode) {
+      return LineNode.Tok->is(tok::at);
+    });
     if (HasAt)
       return;
   }
@@ -3035,24 +3034,15 @@ LLVM_ATTRIBUTE_UNUSED static void printDebugInfo(const UnwrappedLine &Line,
   llvm::dbgs() << Prefix << "Line(" << Line.Level
                << ", FSC=" << Line.FirstStartColumn << ")"
                << (Line.InPPDirective ? " MACRO" : "") << ": ";
-  for (std::list<UnwrappedLineNode>::const_iterator I = Line.Tokens.begin(),
-                                                    E = Line.Tokens.end();
-       I != E; ++I) {
-    llvm::dbgs() << I->Tok->Tok.getName() << "["
-                 << "T=" << (unsigned)I->Tok->getType()
-                 << ", OC=" << I->Tok->OriginalColumn << "] ";
+  for (const auto &Node : Line.Tokens) {
+    llvm::dbgs() << Node.Tok->Tok.getName() << "["
+                 << "T=" << static_cast<unsigned>(Node.Tok->getType())
+                 << ", OC=" << Node.Tok->OriginalColumn << "] ";
   }
-  for (std::list<UnwrappedLineNode>::const_iterator I = Line.Tokens.begin(),
-                                                    E = Line.Tokens.end();
-       I != E; ++I) {
-    const UnwrappedLineNode &Node = *I;
-    for (SmallVectorImpl<UnwrappedLine>::const_iterator
-             I = Node.Children.begin(),
-             E = Node.Children.end();
-         I != E; ++I) {
-      printDebugInfo(*I, "\nChild: ");
-    }
-  }
+  for (const auto &Node : Line.Tokens)
+    for (const auto &ChildNode : Node.Children)
+      printDebugInfo(ChildNode, "\nChild: ");
+
   llvm::dbgs() << "\n";
 }
 

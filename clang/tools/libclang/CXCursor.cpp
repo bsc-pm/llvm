@@ -830,6 +830,9 @@ CXCursor cxcursor::MakeCXCursor(const Stmt *S, const Decl *Parent,
   case Stmt::OMPMaskedDirectiveClass:
     K = CXCursor_OMPMaskedDirective;
     break;
+  case Stmt::OMPGenericLoopDirectiveClass:
+    K = CXCursor_OMPGenericLoopDirective;
+    break;
     // OmpSs
   case Stmt::OSSTaskDirectiveClass:
   case Stmt::OSSTaskForDirectiveClass:

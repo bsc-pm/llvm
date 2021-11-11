@@ -1129,6 +1129,10 @@ public:
   /// The C++ "std::coroutine_traits" template, which is defined in
   /// \<coroutine_traits>
   ClassTemplateDecl *StdCoroutineTraitsCache;
+  /// The namespace where coroutine components are defined. In standard,
+  /// they are defined in std namespace. And in the previous implementation,
+  /// they are defined in std::experimental namespace.
+  NamespaceDecl *CoroTraitsNamespaceCache;
 
   /// The C++ "type_info" declaration, which is defined in \<typeinfo>.
   RecordDecl *CXXTypeInfoDecl;
@@ -5718,6 +5722,7 @@ public:
   NamespaceDecl *getOrCreateStdNamespace();
 
   NamespaceDecl *lookupStdExperimentalNamespace();
+  NamespaceDecl *getCachedCoroNamespace() { return CoroTraitsNamespaceCache; }
 
   CXXRecordDecl *getStdBadAlloc() const;
   EnumDecl *getStdAlignValT() const;
@@ -10287,8 +10292,11 @@ public:
   bool buildCoroutineParameterMoves(SourceLocation Loc);
   VarDecl *buildCoroutinePromise(SourceLocation Loc);
   void CheckCompletedCoroutineBody(FunctionDecl *FD, Stmt *&Body);
+  /// Lookup 'coroutine_traits' in std namespace and std::experimental
+  /// namespace. The namespace found is recorded in Namespace.
   ClassTemplateDecl *lookupCoroutineTraits(SourceLocation KwLoc,
-                                           SourceLocation FuncLoc);
+                                           SourceLocation FuncLoc,
+                                           NamespaceDecl *&Namespace);
   /// Check that the expression co_await promise.final_suspend() shall not be
   /// potentially-throwing.
   bool checkFinalSuspendNoThrow(const Stmt *FinalSuspend);
@@ -10964,6 +10972,12 @@ public:
                                         Stmt *AStmt, SourceLocation StartLoc,
                                         SourceLocation EndLoc);
 
+  /// Called on well-formed '\#pragma omp loop' after parsing of the
+  /// associated statement.
+  StmtResult ActOnOpenMPGenericLoopDirective(
+      ArrayRef<OMPClause *> Clauses, Stmt *AStmt, SourceLocation StartLoc,
+      SourceLocation EndLoc, VarsWithInheritedDSAType &VarsWithImplicitDSA);
+
   /// Checks correctness of linear modifiers.
   bool CheckOpenMPLinearModifier(OpenMPLinearClauseKind LinKind,
                                  SourceLocation LinLoc);
@@ -10988,11 +11002,14 @@ public:
   /// \param VariantRef Expression that references the variant function, which
   /// must be used instead of the original one, specified in \p DG.
   /// \param TI The trait info object representing the match clause.
+  /// \param NumAppendArgs The number of omp_interop_t arguments to account for
+  /// in checking.
   /// \returns None, if the function/variant function are not compatible with
   /// the pragma, pair of original function/variant ref expression otherwise.
   Optional<std::pair<FunctionDecl *, Expr *>>
   checkOpenMPDeclareVariantFunction(DeclGroupPtrTy DG, Expr *VariantRef,
-                                    OMPTraitInfo &TI, SourceRange SR);
+                                    OMPTraitInfo &TI, unsigned NumAppendArgs,
+                                    SourceRange SR);
 
   /// Called on well-formed '\#pragma omp declare variant' after parsing of
   /// the associated method/function.
@@ -11001,10 +11018,19 @@ public:
   /// \param VariantRef Expression that references the variant function, which
   /// must be used instead of the original one, specified in \p DG.
   /// \param TI The context traits associated with the function variant.
+  /// \param AdjustArgsNothing The list of 'nothing' arguments.
+  /// \param AdjustArgsNeedDevicePtr The list of 'need_device_ptr' arguments.
+  /// \param AppendArgs The list of 'append_args' arguments.
+  /// \param AdjustArgsLoc The Location of an 'adjust_args' clause.
+  /// \param AppendArgsLoc The Location of an 'append_args' clause.
+  /// \param SR The SourceRange of the 'declare variant' directive.
   void ActOnOpenMPDeclareVariantDirective(
       FunctionDecl *FD, Expr *VariantRef, OMPTraitInfo &TI,
       ArrayRef<Expr *> AdjustArgsNothing,
-      ArrayRef<Expr *> AdjustArgsNeedDevicePtr, SourceRange SR);
+      ArrayRef<Expr *> AdjustArgsNeedDevicePtr,
+      ArrayRef<OMPDeclareVariantAttr::InteropType> AppendArgs,
+      SourceLocation AdjustArgsLoc, SourceLocation AppendArgsLoc,
+      SourceRange SR);
 
   OMPClause *ActOnOpenMPSingleExprClause(OpenMPClauseKind Kind,
                                          Expr *Expr,
@@ -11032,6 +11058,10 @@ public:
                                          SourceLocation StartLoc,
                                          SourceLocation LParenLoc,
                                          SourceLocation EndLoc);
+  /// Called on well-formed 'align' clause.
+  OMPClause *ActOnOpenMPAlignClause(Expr *Alignment, SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc);
   /// Called on well-formed 'safelen' clause.
   OMPClause *ActOnOpenMPSafelenClause(Expr *Length,
                                       SourceLocation StartLoc,
@@ -11422,6 +11452,12 @@ public:
                                        SourceLocation ColonLoc,
                                        SourceLocation EndLoc, Expr *Modifier,
                                        ArrayRef<Expr *> Locators);
+  /// Called on a well-formed 'bind' clause.
+  OMPClause *ActOnOpenMPBindClause(OpenMPBindClauseKind Kind,
+                                   SourceLocation KindLoc,
+                                   SourceLocation StartLoc,
+                                   SourceLocation LParenLoc,
+                                   SourceLocation EndLoc);
 
   //===--------------------------------------------------------------------===//
   // OmpSs directives and clauses.
@@ -13001,6 +13037,10 @@ private:
                              const char *TypeDesc);
 
   bool CheckPPCMMAType(QualType Type, SourceLocation TypeLoc);
+
+  bool SemaBuiltinElementwiseMath(CallExpr *TheCall);
+  bool SemaBuiltinElementwiseMathOneArg(CallExpr *TheCall);
+  bool SemaBuiltinReduceMath(CallExpr *TheCall);
 
   // Matrix builtin handling.
   ExprResult SemaBuiltinMatrixTranspose(CallExpr *TheCall,

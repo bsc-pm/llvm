@@ -265,6 +265,7 @@ void Symtab::InitNameIndexes() {
   // Protected function, no need to lock mutex...
   if (!m_name_indexes_computed) {
     m_name_indexes_computed = true;
+    ElapsedTime elapsed(m_objfile->GetModule()->GetSymtabIndexTime());
     LLDB_SCOPED_TIMER();
 
     // Collect all loaded language plugins.
@@ -1099,6 +1100,7 @@ void Symtab::FindFunctionSymbols(ConstString name, uint32_t name_type_mask,
           case eSymbolTypeCode:
           case eSymbolTypeResolver:
           case eSymbolTypeReExported:
+          case eSymbolTypeAbsolute:
             symbol_indexes.push_back(temp_symbol_indexes[i]);
             break;
           default:

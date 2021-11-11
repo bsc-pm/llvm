@@ -12,6 +12,8 @@ cmake_minimum_required(VERSION 3.13.4)
 set(CMAKE_MODULE_PATH
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake"
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../cmake"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/Modules"
   ${CMAKE_MODULE_PATH}
   )
 
@@ -21,7 +23,11 @@ set(LIBUNWIND_LIBCXX_PATH "${CMAKE_CURRENT_LIST_DIR}/../libcxx" CACHE PATH
         "Specify path to libc++ source.")
 
 if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR OR LIBUNWIND_STANDALONE_BUILD)
-  project(libunwind LANGUAGES C CXX ASM)
+  # We may have an incomplete toolchain - do language support tests without
+  # linking.
+  include(EnableLanguageNolink)
+  project(libunwind LANGUAGES NONE)
+  llvm_enable_language_nolink(C CXX ASM)
 
   set(PACKAGE_NAME libunwind)
   set(PACKAGE_VERSION 14.0.0git)
@@ -90,7 +96,13 @@ set(LIBUNWIND_TEST_LINKER_FLAGS "" CACHE STRING
     "Additional linker flags for test programs.")
 set(LIBUNWIND_TEST_COMPILER_FLAGS "" CACHE STRING
     "Additional compiler flags for test programs.")
-set(LIBUNWIND_TEST_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/test/lit.site.cfg.in" CACHE STRING
+
+if (LIBUNWIND_ENABLE_SHARED)
+  set(LIBUNWIND_DEFAULT_TEST_CONFIG "llvm-libunwind-shared.cfg.in")
+else()
+  set(LIBUNWIND_DEFAULT_TEST_CONFIG "llvm-libunwind-static.cfg.in")
+endif()
+set(LIBUNWIND_TEST_CONFIG "${LIBUNWIND_DEFAULT_TEST_CONFIG}" CACHE STRING
   "The path to the Lit testing configuration to use when running the tests.
    If a relative path is provided, it is assumed to be relative to '<monorepo>/libunwind/test/configs'.")
 if (NOT IS_ABSOLUTE "${LIBUNWIND_TEST_CONFIG}")
@@ -171,6 +183,14 @@ include(HandleLibunwindFlags)
 # Get required flags.
 add_target_flags_if(LIBUNWIND_BUILD_32_BITS "-m32")
 
+# Compiler tests may be failing if the compiler implicitly links in libunwind,
+# which doesn't exist yet. This gets waived by --unwindlib=none
+# later in config-ix below, but the tests for --target etc before that may
+# be failing due to it. Only test compilation, not linking, for these
+# tests here now.
+set(CMAKE_TRY_COMPILE_TARGET_TYPE_ORIG ${CMAKE_TRY_COMPILE_TARGET_TYPE})
+set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+
 if(LIBUNWIND_TARGET_TRIPLE)
   add_target_flags_if_supported("--target=${LIBUNWIND_TARGET_TRIPLE}")
 endif()
@@ -180,6 +200,7 @@ endif()
 if(LIBUNWIND_SYSROOT)
   add_target_flags_if_supported("--sysroot=${LIBUNWIND_SYSROOT}")
 endif()
+set(CMAKE_TRY_COMPILE_TARGET_TYPE ${CMAKE_TRY_COMPILE_TARGET_TYPE_ORIG})
 
 # Configure compiler.
 include(config-ix)

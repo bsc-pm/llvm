@@ -613,7 +613,8 @@ getFramePointerKind(const ArgList &Args, const llvm::Triple &Triple) {
       A && A->getOption().matches(options::OPT_fno_omit_frame_pointer);
   bool OmitLeafFP = Args.hasFlag(options::OPT_momit_leaf_frame_pointer,
                                  options::OPT_mno_omit_leaf_frame_pointer,
-                                 Triple.isAArch64() || Triple.isPS4CPU());
+                                 Triple.isAArch64() || Triple.isPS4CPU() ||
+                                 Triple.isVE());
   if (NoOmitFP || mustUseNonLeafFramePointerForTarget(Triple) ||
       (!OmitFP && useFramePointerForTargetByDefault(Args, Triple))) {
     if (OmitLeafFP)
@@ -1825,11 +1826,25 @@ void Clang::AddAArch64TargetArgs(const ArgList &Args,
     StringRef Val = A->getValue();
     const Driver &D = getToolChain().getDriver();
     if (Val.equals("128") || Val.equals("256") || Val.equals("512") ||
-        Val.equals("1024") || Val.equals("2048"))
+        Val.equals("1024") || Val.equals("2048") || Val.equals("128+") ||
+        Val.equals("256+") || Val.equals("512+") || Val.equals("1024+") ||
+        Val.equals("2048+")) {
+      unsigned Bits = 0;
+      if (Val.endswith("+"))
+        Val = Val.substr(0, Val.size() - 1);
+      else {
+        bool Invalid = Val.getAsInteger(10, Bits); (void)Invalid;
+        assert(!Invalid && "Failed to parse value");
+        CmdArgs.push_back(
+            Args.MakeArgString("-mvscale-max=" + llvm::Twine(Bits / 128)));
+      }
+
+      bool Invalid = Val.getAsInteger(10, Bits); (void)Invalid;
+      assert(!Invalid && "Failed to parse value");
       CmdArgs.push_back(
-          Args.MakeArgString(llvm::Twine("-msve-vector-bits=") + Val));
+          Args.MakeArgString("-mvscale-min=" + llvm::Twine(Bits / 128)));
     // Silently drop requests for vector-length agnostic code as it's implied.
-    else if (!Val.equals("scalable"))
+    } else if (!Val.equals("scalable"))
       // Handle the unsupported values passed to msve-vector-bits.
       D.Diag(diag::err_drv_unsupported_option_argument)
           << A->getOption().getName() << Val;
@@ -3150,13 +3165,43 @@ static void RenderSSPOptions(const Driver &D, const ToolChain &TC,
   const std::string &TripleStr = EffectiveTriple.getTriple();
   if (Arg *A = Args.getLastArg(options::OPT_mstack_protector_guard_EQ)) {
     StringRef Value = A->getValue();
-    if (!EffectiveTriple.isX86() && !EffectiveTriple.isAArch64())
+    if (!EffectiveTriple.isX86() && !EffectiveTriple.isAArch64() &&
+        !EffectiveTriple.isARM() && !EffectiveTriple.isThumb())
       D.Diag(diag::err_drv_unsupported_opt_for_target)
           << A->getAsString(Args) << TripleStr;
-    if (EffectiveTriple.isX86() && Value != "tls" && Value != "global") {
+    if ((EffectiveTriple.isX86() || EffectiveTriple.isARM() ||
+         EffectiveTriple.isThumb()) &&
+        Value != "tls" && Value != "global") {
       D.Diag(diag::err_drv_invalid_value_with_suggestion)
           << A->getOption().getName() << Value << "tls global";
       return;
+    }
+    if ((EffectiveTriple.isARM() || EffectiveTriple.isThumb()) &&
+        Value == "tls") {
+      if (!Args.hasArg(options::OPT_mstack_protector_guard_offset_EQ)) {
+        D.Diag(diag::err_drv_ssp_missing_offset_argument)
+            << A->getAsString(Args);
+        return;
+      }
+      // Check whether the target subarch supports the hardware TLS register
+      if (arm::getARMSubArchVersionNumber(EffectiveTriple) < 7 &&
+          llvm::ARM::parseArch(EffectiveTriple.getArchName()) !=
+              llvm::ARM::ArchKind::ARMV6T2) {
+        D.Diag(diag::err_target_unsupported_tp_hard)
+            << EffectiveTriple.getArchName();
+        return;
+      }
+      // Check whether the user asked for something other than -mtp=cp15
+      if (Arg *A = Args.getLastArg(options::OPT_mtp_mode_EQ)) {
+        StringRef Value = A->getValue();
+        if (Value != "cp15") {
+          D.Diag(diag::err_drv_argument_not_allowed_with)
+              << A->getAsString(Args) << "-mstack-protector-guard=tls";
+          return;
+        }
+      }
+      CmdArgs.push_back("-target-feature");
+      CmdArgs.push_back("+read-tp-hard");
     }
     if (EffectiveTriple.isAArch64() && Value != "sysreg" && Value != "global") {
       D.Diag(diag::err_drv_invalid_value_with_suggestion)
@@ -3168,12 +3213,19 @@ static void RenderSSPOptions(const Driver &D, const ToolChain &TC,
 
   if (Arg *A = Args.getLastArg(options::OPT_mstack_protector_guard_offset_EQ)) {
     StringRef Value = A->getValue();
-    if (!EffectiveTriple.isX86() && !EffectiveTriple.isAArch64())
+    if (!EffectiveTriple.isX86() && !EffectiveTriple.isAArch64() &&
+        !EffectiveTriple.isARM() && !EffectiveTriple.isThumb())
       D.Diag(diag::err_drv_unsupported_opt_for_target)
           << A->getAsString(Args) << TripleStr;
     int Offset;
     if (Value.getAsInteger(10, Offset)) {
       D.Diag(diag::err_drv_invalid_value) << A->getOption().getName() << Value;
+      return;
+    }
+    if ((EffectiveTriple.isARM() || EffectiveTriple.isThumb()) &&
+        (Offset < 0 || Offset > 0xfffff)) {
+      D.Diag(diag::err_drv_invalid_int_value)
+          << A->getOption().getName() << Value;
       return;
     }
     A->render(Args, CmdArgs);
@@ -3376,7 +3428,7 @@ static void RenderARCMigrateToolOptions(const Driver &D, const ArgList &Args,
     Args.AddLastArg(CmdArgs, options::OPT_objcmt_returns_innerpointer_property);
     Args.AddLastArg(CmdArgs, options::OPT_objcmt_ns_nonatomic_iosonly);
     Args.AddLastArg(CmdArgs, options::OPT_objcmt_migrate_designated_init);
-    Args.AddLastArg(CmdArgs, options::OPT_objcmt_whitelist_dir_path);
+    Args.AddLastArg(CmdArgs, options::OPT_objcmt_allowlist_dir_path);
   }
 }
 
@@ -4399,7 +4451,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   TC.addClangWarningOptions(CmdArgs);
 
   // FIXME: Subclass ToolChain for SPIR and move this to addClangWarningOptions.
-  if (Triple.isSPIR())
+  if (Triple.isSPIR() || Triple.isSPIRV())
     CmdArgs.push_back("-Wspir-compat");
 
   // Select the appropriate action.
@@ -4694,10 +4746,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   if (Args.hasFlag(options::OPT_fdiscard_value_names,
                    options::OPT_fno_discard_value_names, !IsAssertBuild)) {
     if (Args.hasArg(options::OPT_fdiscard_value_names) &&
-        (std::any_of(Inputs.begin(), Inputs.end(),
-                     [](const clang::driver::InputInfo &II) {
-                       return types::isLLVMIR(II.getType());
-                     }))) {
+        llvm::any_of(Inputs, [](const clang::driver::InputInfo &II) {
+          return types::isLLVMIR(II.getType());
+        })) {
       D.Diag(diag::warn_ignoring_fdiscard_for_bitcode);
     }
     CmdArgs.push_back("-discard-value-names");

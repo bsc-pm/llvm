@@ -9,12 +9,17 @@ import lldb.formatters.Logger
 # before relying on these formatters to do the right thing for your setup
 
 
-class StdListSynthProvider:
-
-    def __init__(self, valobj, dict):
+class AbstractListSynthProvider:
+    def __init__(self, valobj, dict, has_prev):
+        '''
+        :param valobj: The value object of the list
+        :param dict: A dict with metadata provided by LLDB
+        :param has_prev: Whether the list supports a 'prev' pointer besides a 'next' one
+        '''
         logger = lldb.formatters.Logger.Logger()
         self.valobj = valobj
         self.count = None
+        self.has_prev = has_prev
         logger >> "Providing synthetic children for a list named " + \
             str(valobj.GetName())
 
@@ -24,13 +29,13 @@ class StdListSynthProvider:
 
     def is_valid(self, node):
         logger = lldb.formatters.Logger.Logger()
-        valid = self.value(self.next_node(node)) != self.node_address
+        valid = self.value(self.next_node(node)) != self.get_end_of_list_address()
         if valid:
             logger >> "%s is valid" % str(self.valobj.GetName())
         else:
             logger >> "synthetic value is not valid"
         return valid
-
+    
     def value(self, node):
         logger = lldb.formatters.Logger.Logger()
         value = node.GetValueAsUnsigned()
@@ -73,26 +78,30 @@ class StdListSynthProvider:
     def num_children_impl(self):
         logger = lldb.formatters.Logger.Logger()
         try:
-            next_val = self.next.GetValueAsUnsigned(0)
-            prev_val = self.prev.GetValueAsUnsigned(0)
             # After a std::list has been initialized, both next and prev will
             # be non-NULL
-            if next_val == 0 or prev_val == 0:
+            next_val = self.next.GetValueAsUnsigned(0)
+            if next_val == 0: 
                 return 0
-            if next_val == self.node_address:
-                return 0
-            if next_val == prev_val:
-                return 1
             if self.has_loop():
                 return 0
-            size = 2
+            if self.has_prev:
+                prev_val = self.prev.GetValueAsUnsigned(0)
+                if prev_val == 0:
+                    return 0
+                if next_val == self.node_address:
+                    return 0
+                if next_val == prev_val:
+                    return 1   
+            size = 1
             current = self.next
             while current.GetChildMemberWithName(
-                    '_M_next').GetValueAsUnsigned(0) != self.node_address:
+                    '_M_next').GetValueAsUnsigned(0) != self.get_end_of_list_address():
                 size = size + 1
                 current = current.GetChildMemberWithName('_M_next')
-            return (size - 1)
+            return size 
         except:
+            logger >> "Error determining the size"
             return 0
 
     def get_child_index(self, name):
@@ -101,7 +110,7 @@ class StdListSynthProvider:
             return int(name.lstrip('[').rstrip(']'))
         except:
             return -1
-
+      
     def get_child_at_index(self, index):
         logger = lldb.formatters.Logger.Logger()
         logger >> "Fetching child " + str(index)
@@ -115,9 +124,11 @@ class StdListSynthProvider:
             while offset > 0:
                 current = current.GetChildMemberWithName('_M_next')
                 offset = offset - 1
+            # C++ lists store the data of a node after its pointers. In the case of a forward list, there's just one pointer (next), and
+            # in the case of a double-linked list, there's an additional pointer (prev).
             return current.CreateChildAtOffset(
                 '[' + str(index) + ']',
-                2 * current.GetType().GetByteSize(),
+               (2 if self.has_prev else 1) * current.GetType().GetByteSize(),
                 self.data_type)
         except:
             return None
@@ -139,19 +150,60 @@ class StdListSynthProvider:
         # later
         self.count = None
         try:
-            impl = self.valobj.GetChildMemberWithName('_M_impl')
-            self.node = impl.GetChildMemberWithName('_M_node')
-            self.node_address = self.valobj.AddressOf().GetValueAsUnsigned(0)
-            self.next = self.node.GetChildMemberWithName('_M_next')
-            self.prev = self.node.GetChildMemberWithName('_M_prev')
+            self.impl = self.valobj.GetChildMemberWithName('_M_impl')
             self.data_type = self.extract_type()
             self.data_size = self.data_type.GetByteSize()
+            self.updateNodes()
         except:
             pass
         return False
 
+    '''
+    Method is used to extract the list pointers into the variables (e.g self.node, self.next, and optionally to self.prev)
+    and is mandatory to be overriden in each AbstractListSynthProvider subclass
+    '''
+    def updateNodes(self):
+        raise NotImplementedError
+
     def has_children(self):
         return True
+        
+    '''
+     Method is used to identify if a node traversal has reached its end
+     and is mandatory to be overriden in each AbstractListSynthProvider subclass
+    '''
+    def get_end_of_list_address(self):
+        raise NotImplementedError
+
+
+class StdForwardListSynthProvider(AbstractListSynthProvider):
+
+    def __init__(self, valobj, dict):
+        has_prev = False
+        super().__init__(valobj, dict, has_prev)
+
+    def updateNodes(self):
+        self.node = self.impl.GetChildMemberWithName('_M_head')
+        self.next = self.node.GetChildMemberWithName('_M_next')
+
+    def get_end_of_list_address(self):
+        return 0
+
+
+class StdListSynthProvider(AbstractListSynthProvider):
+
+    def __init__(self, valobj, dict):
+        has_prev = True
+        super().__init__(valobj, dict, has_prev)
+
+    def updateNodes(self):
+        self.node_address = self.valobj.AddressOf().GetValueAsUnsigned(0)
+        self.node = self.impl.GetChildMemberWithName('_M_node')
+        self.prev = self.node.GetChildMemberWithName('_M_prev')
+        self.next = self.node.GetChildMemberWithName('_M_next')
+
+    def get_end_of_list_address(self):
+        return self.node_address
 
 
 class StdVectorSynthProvider:
@@ -314,19 +366,30 @@ class StdVectorSynthProvider:
     def has_children(self):
         return True
 
-
-class StdMapSynthProvider:
+    """
+     This formatter can be applied to all
+     map-like structures (map, multimap, set, multiset)
+    """
+class StdMapLikeSynthProvider:
 
     def __init__(self, valobj, dict):
         logger = lldb.formatters.Logger.Logger()
         self.valobj = valobj
         self.count = None
-        logger >> "Providing synthetic children for a map named " + \
+        self.kind = self.get_object_kind(valobj)
+        logger >> "Providing synthetic children for a " + self.kind + " named " + \
             str(valobj.GetName())
+
+    def get_object_kind(self, valobj):
+        type_name = valobj.GetTypeName()
+        for kind in ["multiset", "multimap", "set", "map"]:
+           if kind in type_name:
+              return kind
+        return type_name
 
     # we need this function as a temporary workaround for rdar://problem/10801549
     # which prevents us from extracting the std::pair<K,V> SBType out of the template
-    # arguments for _Rep_Type _M_t in the map itself - because we have to make up the
+    # arguments for _Rep_Type _M_t in the object itself - because we have to make up the
     # typename and then find it, we may hit the situation were std::string has multiple
     # names but only one is actually referenced in the debug information. hence, we need
     # to replace the longer versions of std::string with the shorter one in order to be able
@@ -349,7 +412,7 @@ class StdMapSynthProvider:
         # later
         self.count = None
         try:
-            # we will set this to True if we find out that discovering a node in the map takes more steps than the overall size of the RB tree
+            # we will set this to True if we find out that discovering a node in the object takes more steps than the overall size of the RB tree
             # if this gets set to True, then we will merrily return None for
             # any child from that moment on
             self.garbage = False

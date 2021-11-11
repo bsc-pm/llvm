@@ -65,9 +65,9 @@ public:
 
   static void Terminate();
 
-  static ConstString GetPluginNameStatic();
+  static llvm::StringRef GetPluginNameStatic() { return "gdb-remote"; }
 
-  static const char *GetPluginDescriptionStatic();
+  static llvm::StringRef GetPluginDescriptionStatic();
 
   static std::chrono::seconds GetPacketTimeout();
 
@@ -103,9 +103,7 @@ public:
   void DidAttach(ArchSpec &process_arch) override;
 
   // PluginInterface protocol
-  llvm::StringRef GetPluginName() override {
-    return GetPluginNameStatic().GetStringRef();
-  }
+  llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
 
   // Process Control
   Status WillResume() override;
@@ -145,9 +143,6 @@ public:
 
   lldb::addr_t DoAllocateMemory(size_t size, uint32_t permissions,
                                 Status &error) override;
-
-  Status GetMemoryRegionInfo(lldb::addr_t load_addr,
-                             MemoryRegionInfo &region_info) override;
 
   Status DoDeallocateMemory(lldb::addr_t ptr) override;
 
@@ -425,6 +420,9 @@ protected:
 
   Status DoWriteMemoryTags(lldb::addr_t addr, size_t len, int32_t type,
                            const std::vector<uint8_t> &tags) override;
+
+  Status DoGetMemoryRegionInfo(lldb::addr_t load_addr,
+                               MemoryRegionInfo &region_info) override;
 
 private:
   // For ProcessGDBRemote only

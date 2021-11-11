@@ -156,7 +156,8 @@ class IndVarSimplify {
   bool rewriteNonIntegerIVs(Loop *L);
 
   bool simplifyAndExtend(Loop *L, SCEVExpander &Rewriter, LoopInfo *LI);
-  /// See if we can convert an exit condition from signed to unsigned.
+  /// Try to improve our exit conditions by converting condition from signed
+  /// to unsigned or rotating computation out of the loop.
   /// (See inline comment about why this is duplicated from simplifyAndExtend)
   bool canonicalizeExitCondition(Loop *L);
   /// Try to eliminate loop exits based on analyzeable exit counts
@@ -1430,15 +1431,20 @@ bool IndVarSimplify::canonicalizeExitCondition(Loop *L) {
     assert(BI->isConditional() && "exit branch must be conditional");
 
     auto *ICmp = dyn_cast<ICmpInst>(BI->getCondition());
-    if (!ICmp)
+    if (!ICmp || !ICmp->hasOneUse())
       continue;
 
     auto *LHS = ICmp->getOperand(0);
     auto *RHS = ICmp->getOperand(1);
-    // Avoid computing SCEVs in the loop to avoid poisoning cache with
-    // sub-optimal results.
-    if (!L->isLoopInvariant(RHS))
-      continue;
+    // For the range reasoning, avoid computing SCEVs in the loop to avoid
+    // poisoning cache with sub-optimal results.  For the must-execute case,
+    // this is a neccessary precondition for correctness.
+    if (!L->isLoopInvariant(RHS)) {
+      if (!L->isLoopInvariant(LHS))
+        continue;
+      // Same logic applies for the inverse case
+      std::swap(LHS, RHS);
+    }
 
     // Match (icmp signed-cond zext, RHS)
     Value *LHSOp = nullptr;
@@ -1450,14 +1456,92 @@ bool IndVarSimplify::canonicalizeExitCondition(Loop *L) {
     const unsigned OuterBitWidth = DL.getTypeSizeInBits(RHS->getType());
     auto FullCR = ConstantRange::getFull(InnerBitWidth);
     FullCR = FullCR.zeroExtend(OuterBitWidth);
-    if (!FullCR.contains(SE->getUnsignedRange(SE->getSCEV(RHS))))
+    auto RHSCR = SE->getUnsignedRange(SE->applyLoopGuards(SE->getSCEV(RHS), L));
+    if (FullCR.contains(RHSCR)) {
+      // We have now matched icmp signed-cond zext(X), zext(Y'), and can thus
+      // replace the signed condition with the unsigned version.
+      ICmp->setPredicate(ICmp->getUnsignedPredicate());
+      Changed = true;
+      // Note: No SCEV invalidation needed.  We've changed the predicate, but
+      // have not changed exit counts, or the values produced by the compare.
+      continue;
+    }
+  }
+
+  // Now that we've canonicalized the condition to match the extend,
+  // see if we can rotate the extend out of the loop.
+  for (auto *ExitingBB : ExitingBlocks) {
+    auto *BI = dyn_cast<BranchInst>(ExitingBB->getTerminator());
+    if (!BI)
+      continue;
+    assert(BI->isConditional() && "exit branch must be conditional");
+
+    auto *ICmp = dyn_cast<ICmpInst>(BI->getCondition());
+    if (!ICmp || !ICmp->hasOneUse() || !ICmp->isUnsigned())
       continue;
 
-    // We have now matched icmp signed-cond zext(X), zext(Y'), and can thus
-    // replace the signed condition with the unsigned version.
-    ICmp->setPredicate(ICmp->getUnsignedPredicate());
-    Changed = true;
+    bool Swapped = false;
+    auto *LHS = ICmp->getOperand(0);
+    auto *RHS = ICmp->getOperand(1);
+    if (L->isLoopInvariant(LHS) == L->isLoopInvariant(RHS))
+      // Nothing to rotate
+      continue;
+    if (L->isLoopInvariant(LHS)) {
+      // Same logic applies for the inverse case until we actually pick
+      // which operand of the compare to update.
+      Swapped = true;
+      std::swap(LHS, RHS);
+    }
+    assert(!L->isLoopInvariant(LHS) && L->isLoopInvariant(RHS));
+
+    // Match (icmp unsigned-cond zext, RHS)
+    // TODO: Extend to handle corresponding sext/signed-cmp case
+    // TODO: Extend to other invertible functions
+    Value *LHSOp = nullptr;
+    if (!match(LHS, m_ZExt(m_Value(LHSOp))))
+      continue;
+
+    // In general, we only rotate if we can do so without increasing the number
+    // of instructions.  The exception is when we have an zext(add-rec).  The
+    // reason for allowing this exception is that we know we need to get rid
+    // of the zext for SCEV to be able to compute a trip count for said loops;
+    // we consider the new trip count valuable enough to increase instruction
+    // count by one.
+    if (!LHS->hasOneUse() && !isa<SCEVAddRecExpr>(SE->getSCEV(LHSOp)))
+      continue;
+
+    // Given a icmp unsigned-cond zext(Op) where zext(trunc(RHS)) == RHS
+    // replace with an icmp of the form icmp unsigned-cond Op, trunc(RHS)
+    // when zext is loop varying and RHS is loop invariant.  This converts
+    // loop varying work to loop-invariant work.
+    auto doRotateTransform = [&]() {
+      assert(ICmp->isUnsigned() && "must have proven unsigned already");
+      auto *NewRHS =
+        CastInst::Create(Instruction::Trunc, RHS, LHSOp->getType(), "",
+                         L->getLoopPreheader()->getTerminator());
+      ICmp->setOperand(Swapped ? 1 : 0, LHSOp);
+      ICmp->setOperand(Swapped ? 0 : 1, NewRHS);
+      if (LHS->use_empty())
+        DeadInsts.push_back(LHS);
+    };
+
+
+    const DataLayout &DL = ExitingBB->getModule()->getDataLayout();
+    const unsigned InnerBitWidth = DL.getTypeSizeInBits(LHSOp->getType());
+    const unsigned OuterBitWidth = DL.getTypeSizeInBits(RHS->getType());
+    auto FullCR = ConstantRange::getFull(InnerBitWidth);
+    FullCR = FullCR.zeroExtend(OuterBitWidth);
+    auto RHSCR = SE->getUnsignedRange(SE->applyLoopGuards(SE->getSCEV(RHS), L));
+    if (FullCR.contains(RHSCR)) {
+      doRotateTransform();
+      Changed = true;
+      // Note, we are leaving SCEV in an unfortunately imprecise case here
+      // as rotation tends to reveal information about trip counts not
+      // previously visible.
+      continue;
+    }
   }
+
   return Changed;
 }
 
@@ -1840,12 +1924,11 @@ bool IndVarSimplify::run(Loop *L) {
   }
 
   // Eliminate redundant IV cycles.
-  NumElimIV += Rewriter.replaceCongruentIVs(L, DT, DeadInsts);
+  NumElimIV += Rewriter.replaceCongruentIVs(L, DT, DeadInsts, TTI);
 
-  if (canonicalizeExitCondition(L))
-    // We've changed the predicate, but have not changed exit counts, or the
-    // values which can flow through any SCEV.  i.e, no invalidation needed.
-    Changed = true;
+  // Try to convert exit conditions to unsigned and rotate computation
+  // out of the loop.  Note: Handles invalidation internally if needed.
+  Changed |= canonicalizeExitCondition(L);
 
   // Try to eliminate loop exits based on analyzeable exit counts
   if (optimizeLoopExits(L, Rewriter))  {

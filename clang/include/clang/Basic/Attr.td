@@ -1845,6 +1845,13 @@ def BTFDeclTag : InheritableAttr {
   let LangOpts = [COnly];
 }
 
+def BTFTypeTag : TypeAttr {
+  let Spellings = [Clang<"btf_type_tag">];
+  let Args = [StringArgument<"BTFTypeTag">];
+  let Documentation = [BTFTypeTagDocs];
+  let LangOpts = [COnly];
+}
+
 def WebAssemblyExportName : InheritableAttr,
                             TargetSpecificAttr<TargetWebAssembly> {
   let Spellings = [Clang<"export_name">];
@@ -3712,7 +3719,8 @@ def OMPAllocateDecl : InheritableAttr {
                    "OMPCGroupMemAlloc", "OMPPTeamMemAlloc", "OMPThreadMemAlloc",
                    "OMPUserDefinedMemAlloc"
                  ]>,
-    ExprArgument<"Allocator">
+    ExprArgument<"Allocator">,
+    ExprArgument<"Alignment">
   ];
   let Documentation = [Undocumented];
 }
@@ -3728,7 +3736,10 @@ def OMPDeclareVariant : InheritableAttr {
     ExprArgument<"VariantFuncRef">,
     OMPTraitInfoArgument<"TraitInfos">,
     VariadicExprArgument<"AdjustArgsNothing">,
-    VariadicExprArgument<"AdjustArgsNeedDevicePtr">
+    VariadicExprArgument<"AdjustArgsNeedDevicePtr">,
+    VariadicEnumArgument<"AppendArgs", "InteropType",
+                     ["target", "targetsync", "target,targetsync"],
+                     ["Target", "TargetSync", "Target_TargetSync"]>
   ];
   let AdditionalMembers = [{
     OMPTraitInfo &getTraitInfo() { return *traitInfos; }

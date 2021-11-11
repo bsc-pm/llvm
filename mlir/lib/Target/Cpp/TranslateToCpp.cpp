@@ -222,7 +222,7 @@ static LogicalResult printOperation(CppEmitter &emitter,
 static LogicalResult printOperation(CppEmitter &emitter,
                                     arith::ConstantOp constantOp) {
   Operation *operation = constantOp.getOperation();
-  Attribute value = constantOp.value();
+  Attribute value = constantOp.getValue();
 
   return printConstantOp(emitter, operation, value);
 }
@@ -230,7 +230,7 @@ static LogicalResult printOperation(CppEmitter &emitter,
 static LogicalResult printOperation(CppEmitter &emitter,
                                     mlir::ConstantOp constantOp) {
   Operation *operation = constantOp.getOperation();
-  Attribute value = constantOp.value();
+  Attribute value = constantOp.getValue();
 
   return printConstantOp(emitter, operation, value);
 }
@@ -822,7 +822,7 @@ CppEmitter::emitOperandsAndAttributes(Operation &op,
   auto emitNamedAttribute = [&](NamedAttribute attr) -> LogicalResult {
     if (llvm::is_contained(exclude, attr.first.strref()))
       return success();
-    os << "/* " << attr.first << " */";
+    os << "/* " << attr.first.getValue() << " */";
     if (failed(emitAttribute(op.getLoc(), attr.second)))
       return failure();
     return success();

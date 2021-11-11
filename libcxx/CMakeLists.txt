@@ -14,6 +14,8 @@ cmake_minimum_required(VERSION 3.13.4)
 set(CMAKE_MODULE_PATH
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake"
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../cmake"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/Modules"
   ${CMAKE_MODULE_PATH}
   )
 
@@ -612,7 +614,8 @@ function(cxx_add_warning_flags target)
   endif()
   target_add_compile_flags_if_supported(${target} PRIVATE -Wextra -W -Wwrite-strings
                                                           -Wno-unused-parameter -Wno-long-long
-                                                          -Werror=return-type -Wextra-semi -Wundef)
+                                                          -Werror=return-type -Wextra-semi -Wundef
+                                                          -Wformat-nonliteral)
   if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
     target_add_compile_flags_if_supported(${target} PRIVATE
       -Wno-user-defined-literals

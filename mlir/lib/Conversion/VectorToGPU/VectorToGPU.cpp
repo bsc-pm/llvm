@@ -121,13 +121,33 @@ static bool constantSupportsMMAMatrixType(arith::ConstantOp constantOp) {
   auto vecType = constantOp.getType().dyn_cast<VectorType>();
   if (!vecType || vecType.getRank() != 2)
     return false;
-  return constantOp.value().isa<SplatElementsAttr>();
+  return constantOp.getValue().isa<SplatElementsAttr>();
 }
 
 /// Return true if this is a broadcast from scalar to a 2D vector.
 static bool broadcastSupportsMMAMatrixType(vector::BroadcastOp broadcastOp) {
   return broadcastOp.getVectorType().getRank() == 2 &&
          broadcastOp.source().getType().isa<FloatType>();
+}
+
+/// Return the MMA elementwise enum associated with `op` if it is supported.
+/// Return `llvm::None` otherwise.
+static llvm::Optional<gpu::MMAElementwiseOp>
+convertElementwiseOpToMMA(Operation *op) {
+  if (isa<arith::AddFOp>(op))
+    return gpu::MMAElementwiseOp::ADDF;
+  if (isa<arith::MulFOp>(op))
+    return gpu::MMAElementwiseOp::MULF;
+  if (isa<MaxFOp>(op))
+    return gpu::MMAElementwiseOp::MAXF;
+  if (isa<MinFOp>(op))
+    return gpu::MMAElementwiseOp::MINF;
+  return llvm::None;
+}
+
+/// Return true if the op is supported as elementwise op on MMAMatrix type.
+static bool elementwiseSupportsMMAMatrixType(Operation *op) {
+  return convertElementwiseOpToMMA(op).hasValue();
 }
 
 static bool supportsMMaMatrixType(Operation *op) {
@@ -143,7 +163,7 @@ static bool supportsMMaMatrixType(Operation *op) {
     return constantSupportsMMAMatrixType(constant);
   if (auto broadcast = dyn_cast<vector::BroadcastOp>(op))
     return broadcastSupportsMMAMatrixType(broadcast);
-  return false;
+  return elementwiseSupportsMMAMatrixType(op);
 }
 
 // Analyze slice of operations based on convert op to figure out if the whole
@@ -329,7 +349,8 @@ static void convertConstantOp(arith::ConstantOp op,
                               llvm::DenseMap<Value, Value> &valueMapping) {
   assert(constantSupportsMMAMatrixType(op));
   OpBuilder b(op);
-  Attribute splat = op.value().cast<SplatElementsAttr>().getSplatValue();
+  Attribute splat =
+      op.getValue().cast<SplatElementsAttr>().getSplatValue<Attribute>();
   auto scalarConstant =
       b.create<arith::ConstantOp>(op.getLoc(), splat.getType(), splat);
   const char *fragType = inferFragType(op);
@@ -423,6 +444,18 @@ static void convertYieldOp(scf::YieldOp op,
   op.erase();
 }
 
+/// Convert an elementwise op to the equivalent elementwise op on MMA matrix.
+static void convertElementwiseOp(Operation *op, gpu::MMAElementwiseOp opType,
+                                 llvm::DenseMap<Value, Value> &valueMapping) {
+  OpBuilder b(op);
+  SmallVector<Value> matrixOperands;
+  for (Value operand : op->getOperands())
+    matrixOperands.push_back(valueMapping.find(operand)->second);
+  Value newOp = b.create<gpu::SubgroupMmaElementwiseOp>(
+      op->getLoc(), matrixOperands[0].getType(), matrixOperands, opType);
+  valueMapping[op->getResult(0)] = newOp;
+}
+
 namespace mlir {
 
 void populatePrepareVectorToMMAPatterns(RewritePatternSet &patterns) {
@@ -448,6 +481,8 @@ void convertVectorToMMAOps(FuncOp funcOp) {
       convertForOp(forOp, valueMapping);
     } else if (auto yiledOp = dyn_cast<scf::YieldOp>(op)) {
       convertYieldOp(yiledOp, valueMapping);
+    } else if (auto elementwiseType = convertElementwiseOpToMMA(op)) {
+      convertElementwiseOp(op, *elementwiseType, valueMapping);
     }
   }
 }

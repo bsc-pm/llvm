@@ -448,15 +448,44 @@ bool FlatAffineValueConstraints::areIdsAlignedWithOther(
   return areIdsAligned(*this, other);
 }
 
-/// Checks if the SSA values associated with `cst`'s identifiers are unique.
-static bool LLVM_ATTRIBUTE_UNUSED
-areIdsUnique(const FlatAffineValueConstraints &cst) {
+/// Checks if the SSA values associated with `cst`'s identifiers in range
+/// [start, end) are unique.
+static bool LLVM_ATTRIBUTE_UNUSED areIdsUnique(
+    const FlatAffineValueConstraints &cst, unsigned start, unsigned end) {
+
+  assert(start <= cst.getNumIds() && "Start position out of bounds");
+  assert(end <= cst.getNumIds() && "End position out of bounds");
+
+  if (start >= end)
+    return true;
+
   SmallPtrSet<Value, 8> uniqueIds;
-  for (auto val : cst.getMaybeValues()) {
+  ArrayRef<Optional<Value>> maybeValues = cst.getMaybeValues();
+  for (Optional<Value> val : maybeValues) {
     if (val.hasValue() && !uniqueIds.insert(val.getValue()).second)
       return false;
   }
   return true;
+}
+
+/// Checks if the SSA values associated with `cst`'s identifiers are unique.
+static bool LLVM_ATTRIBUTE_UNUSED
+areIdsUnique(const FlatAffineConstraints &cst) {
+  return areIdsUnique(cst, 0, cst.getNumIds());
+}
+
+/// Checks if the SSA values associated with `cst`'s identifiers of kind `kind`
+/// are unique.
+static bool LLVM_ATTRIBUTE_UNUSED areIdsUnique(
+    const FlatAffineValueConstraints &cst, FlatAffineConstraints::IdKind kind) {
+
+  if (kind == FlatAffineConstraints::IdKind::Dimension)
+    return areIdsUnique(cst, 0, cst.getNumDimIds());
+  if (kind == FlatAffineConstraints::IdKind::Symbol)
+    return areIdsUnique(cst, cst.getNumDimIds(), cst.getNumDimAndSymbolIds());
+  if (kind == FlatAffineConstraints::IdKind::Local)
+    return areIdsUnique(cst, cst.getNumDimAndSymbolIds(), cst.getNumIds());
+  llvm_unreachable("Unexpected IdKind");
 }
 
 /// Merge and align the identifiers of A and B starting at 'offset', so that
@@ -482,9 +511,6 @@ static void mergeAndAlignIds(unsigned offset, FlatAffineValueConstraints *a,
   assert(std::all_of(b->getMaybeValues().begin() + offset,
                      b->getMaybeValues().begin() + b->getNumDimAndSymbolIds(),
                      [](Optional<Value> id) { return id.hasValue(); }));
-
-  // Bring A and B to common local space
-  a->mergeLocalIds(*b);
 
   SmallVector<Value, 4> aDimValues;
   a->getValues(offset, a->getNumDimIds(), &aDimValues);
@@ -514,6 +540,8 @@ static void mergeAndAlignIds(unsigned offset, FlatAffineValueConstraints *a,
 
   // Merge and align symbols of A and B
   a->mergeSymbolIds(*b);
+  // Merge and align local ids of A and B
+  a->mergeLocalIds(*b);
 
   assert(areIdsAligned(*a, *b) && "IDs expected to be aligned");
 }
@@ -592,10 +620,15 @@ static void turnSymbolIntoDim(FlatAffineValueConstraints *cst, Value id) {
 }
 
 /// Merge and align symbols of `this` and `other` such that both get union of
-/// of symbols that are unique. Symbols with Value as `None` are considered
-/// to be inequal to all other symbols.
+/// of symbols that are unique. Symbols in `this` and `other` should be
+/// unique. Symbols with Value as `None` are considered to be inequal to all
+/// other symbols.
 void FlatAffineValueConstraints::mergeSymbolIds(
     FlatAffineValueConstraints &other) {
+
+  assert(areIdsUnique(*this, IdKind::Symbol) && "Symbol ids are not unique");
+  assert(areIdsUnique(other, IdKind::Symbol) && "Symbol ids are not unique");
+
   SmallVector<Value, 4> aSymValues;
   getValues(getNumDimIds(), getNumDimAndSymbolIds(), &aSymValues);
 
@@ -606,7 +639,7 @@ void FlatAffineValueConstraints::mergeSymbolIds(
     // If the id is a symbol in `other`, then align it, otherwise assume that
     // it is a new symbol
     if (other.findId(aSymValue, &loc) && loc >= other.getNumDimIds() &&
-        loc < getNumDimAndSymbolIds())
+        loc < other.getNumDimAndSymbolIds())
       other.swapId(s, loc);
     else
       other.insertSymbolId(s - other.getNumDimIds(), aSymValue);
@@ -621,6 +654,8 @@ void FlatAffineValueConstraints::mergeSymbolIds(
 
   assert(getNumSymbolIds() == other.getNumSymbolIds() &&
          "expected same number of symbols");
+  assert(areIdsUnique(*this, IdKind::Symbol) && "Symbol ids are not unique");
+  assert(areIdsUnique(other, IdKind::Symbol) && "Symbol ids are not unique");
 }
 
 // Changes all symbol identifiers which are loop IVs to dim identifiers.
@@ -1317,6 +1352,77 @@ bool FlatAffineConstraints::containsPoint(ArrayRef<int64_t> point) const {
   return true;
 }
 
+/// Check if the pos^th identifier can be represented as a division using upper
+/// bound inequality at position `ubIneq` and lower bound inequality at position
+/// `lbIneq`.
+///
+/// Let `id` be the pos^th identifier, then `id` is equivalent to
+/// `expr floordiv divisor` if there are constraints of the form:
+///      0 <= expr - divisor * id <= divisor - 1
+/// Rearranging, we have:
+///       divisor * id - expr + (divisor - 1) >= 0  <-- Lower bound for 'id'
+///      -divisor * id + expr                 >= 0  <-- Upper bound for 'id'
+///
+/// For example:
+///       32*k >= 16*i + j - 31                 <-- Lower bound for 'k'
+///       32*k  <= 16*i + j                     <-- Upper bound for 'k'
+///       expr = 16*i + j, divisor = 32
+///       k = ( 16*i + j ) floordiv 32
+///
+///       4q >= i + j - 2                       <-- Lower bound for 'q'
+///       4q <= i + j + 1                       <-- Upper bound for 'q'
+///       expr = i + j + 1, divisor = 4
+///       q = (i + j + 1) floordiv 4
+///
+/// If successful, `expr` is set to dividend of the division and `divisor` is
+/// set to the denominator of the division.
+static LogicalResult getDivRepr(const FlatAffineConstraints &cst, unsigned pos,
+                                unsigned ubIneq, unsigned lbIneq,
+                                SmallVector<int64_t, 8> &expr,
+                                unsigned &divisor) {
+
+  assert(pos <= cst.getNumIds() && "Invalid identifier position");
+  assert(ubIneq <= cst.getNumInequalities() &&
+         "Invalid upper bound inequality position");
+  assert(lbIneq <= cst.getNumInequalities() &&
+         "Invalid upper bound inequality position");
+
+  // Due to the form of the inequalities, sum of constants of the
+  // inequalities is (divisor - 1).
+  int64_t denominator = cst.atIneq(lbIneq, cst.getNumCols() - 1) +
+                        cst.atIneq(ubIneq, cst.getNumCols() - 1) + 1;
+
+  // Divisor should be positive.
+  if (denominator <= 0)
+    return failure();
+
+  // Check if coeff of variable is equal to divisor.
+  if (denominator != cst.atIneq(lbIneq, pos))
+    return failure();
+
+  // Check if constraints are opposite of each other. Constant term
+  // is not required to be opposite and is not checked.
+  unsigned i = 0, e = 0;
+  for (i = 0, e = cst.getNumIds(); i < e; ++i)
+    if (cst.atIneq(ubIneq, i) != -cst.atIneq(lbIneq, i))
+      break;
+
+  if (i < e)
+    return failure();
+
+  // Set expr with dividend of the division.
+  SmallVector<int64_t, 8> dividend(cst.getNumCols());
+  for (i = 0, e = cst.getNumCols(); i < e; ++i)
+    if (i != pos)
+      dividend[i] = cst.atIneq(ubIneq, i);
+  expr = dividend;
+
+  // Set divisor.
+  divisor = denominator;
+
+  return success();
+}
+
 /// Check if the pos^th identifier can be expressed as a floordiv of an affine
 /// function of other identifiers (where the divisor is a positive constant),
 /// `foundRepr` contains a boolean for each identifier indicating if the
@@ -1331,55 +1437,22 @@ computeSingleVarRepr(const FlatAffineConstraints &cst,
   SmallVector<unsigned, 4> lbIndices, ubIndices;
   cst.getLowerAndUpperBoundIndices(pos, &lbIndices, &ubIndices);
 
-  // `id` is equivalent to `expr floordiv divisor` if there
-  // are constraints of the form:
-  //      0 <= expr - divisor * id <= divisor - 1
-  // Rearranging, we have:
-  //       divisor * id - expr + (divisor - 1) >= 0  <-- Lower bound for 'id'
-  //      -divisor * id + expr                 >= 0  <-- Upper bound for 'id'
-  //
-  // For example:
-  //       32*k >= 16*i + j - 31                 <-- Lower bound for 'k'
-  //       32*k  <= 16*i + j                     <-- Upper bound for 'k'
-  //       expr = 16*i + j, divisor = 32
-  //       k = ( 16*i + j ) floordiv 32
-  //
-  //       4q >= i + j - 2                       <-- Lower bound for 'q'
-  //       4q <= i + j + 1                       <-- Upper bound for 'q'
-  //       expr = i + j + 1, divisor = 4
-  //       q = (i + j + 1) floordiv 4
   for (unsigned ubPos : ubIndices) {
     for (unsigned lbPos : lbIndices) {
-      // Due to the form of the inequalities, sum of constants of the
-      // inequalities is (divisor - 1).
-      int64_t divisor = cst.atIneq(lbPos, cst.getNumCols() - 1) +
-                        cst.atIneq(ubPos, cst.getNumCols() - 1) + 1;
-
-      // Divisor should be positive.
-      if (divisor <= 0)
-        continue;
-
-      // Check if coeff of variable is equal to divisor.
-      if (divisor != cst.atIneq(lbPos, pos))
-        continue;
-
-      // Check if constraints are opposite of each other. Constant term
-      // is not required to be opposite and is not checked.
-      unsigned c = 0, f = 0;
-      for (c = 0, f = cst.getNumIds(); c < f; ++c)
-        if (cst.atIneq(ubPos, c) != -cst.atIneq(lbPos, c))
-          break;
-
-      if (c < f)
+      // Attempt to get divison representation from ubPos, lbPos.
+      SmallVector<int64_t, 8> expr;
+      unsigned divisor;
+      if (failed(getDivRepr(cst, pos, ubPos, lbPos, expr, divisor)))
         continue;
 
       // Check if the inequalities depend on a variable for which
       // an explicit representation has not been found yet.
       // Exit to avoid circular dependencies between divisions.
+      unsigned c, f;
       for (c = 0, f = cst.getNumIds(); c < f; ++c) {
         if (c == pos)
           continue;
-        if (!foundRepr[c] && cst.atIneq(lbPos, c) != 0)
+        if (!foundRepr[c] && expr[c] != 0)
           break;
       }
 
@@ -1839,8 +1912,13 @@ void FlatAffineConstraints::removeRedundantConstraints() {
 
 /// Merge local ids of `this` and `other`. This is done by appending local ids
 /// of `other` to `this` and inserting local ids of `this` to `other` at start
-/// of its local ids.
+/// of its local ids. Number of dimension and symbol ids should match in
+/// `this` and `other`.
 void FlatAffineConstraints::mergeLocalIds(FlatAffineConstraints &other) {
+  assert(getNumDimIds() == other.getNumDimIds() &&
+         "Number of dimension ids should match");
+  assert(getNumSymbolIds() == other.getNumSymbolIds() &&
+         "Number of symbol ids should match");
   unsigned initLocals = getNumLocalIds();
   insertLocalId(getNumLocalIds(), other.getNumLocalIds());
   other.insertLocalId(0, initLocals);
@@ -3629,15 +3707,32 @@ void FlatAffineRelation::compose(const FlatAffineRelation &other) {
          "Domain of this and range of other do not match");
 
   FlatAffineRelation rel = other;
+
+  // Convert `rel` from
+  //    [otherDomain] -> [otherRange]
+  // to
+  //    [otherDomain] -> [otherRange thisRange]
+  // and `this` from
+  //    [thisDomain] -> [thisRange]
+  // to
+  //    [otherDomain thisDomain] -> [thisRange].
+  unsigned removeDims = rel.getNumRangeDims();
+  insertDomainId(0, rel.getNumDomainDims());
+  rel.appendRangeId(getNumRangeDims());
+
+  // Merge symbol and local identifiers.
   mergeSymbolIds(rel);
   mergeLocalIds(rel);
 
-  // Convert domain of `this` and range of `rel` to local identifiers.
-  convertDimToLocal(0, getNumDomainDims());
-  rel.convertDimToLocal(rel.getNumDomainDims(), rel.getNumDimIds());
-  // Add dimensions such that both relations become `domainRel -> rangeThis`.
-  appendDomainId(rel.getNumDomainDims());
-  rel.appendRangeId(getNumRangeDims());
+  // Convert `rel` from [otherDomain] -> [otherRange thisRange] to
+  // [otherDomain] -> [thisRange] by converting first otherRange range ids
+  // to local ids.
+  rel.convertDimToLocal(rel.getNumDomainDims(),
+                        rel.getNumDomainDims() + removeDims);
+  // Convert `this` from [otherDomain thisDomain] -> [thisRange] to
+  // [otherDomain] -> [thisRange] by converting last thisDomain domain ids
+  // to local ids.
+  convertDimToLocal(getNumDomainDims() - removeDims, getNumDomainDims());
 
   auto thisMaybeValues = getMaybeDimValues();
   auto relMaybeValues = rel.getMaybeDimValues();

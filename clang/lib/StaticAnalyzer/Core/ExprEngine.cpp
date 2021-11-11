@@ -1297,6 +1297,7 @@ void ExprEngine::Visit(const Stmt *S, ExplodedNode *Pred,
     case Stmt::OMPInteropDirectiveClass:
     case Stmt::OMPDispatchDirectiveClass:
     case Stmt::OMPMaskedDirectiveClass:
+    case Stmt::OMPGenericLoopDirectiveClass:
       // OmpSs
     case Stmt::OSSTaskDirectiveClass:
     case Stmt::OSSTaskwaitDirectiveClass:
