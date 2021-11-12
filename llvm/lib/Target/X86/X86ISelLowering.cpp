@@ -20089,92 +20089,6 @@ static SDValue LowerShiftParts(SDValue Op, SelectionDAG &DAG) {
   return DAG.getMergeValues({Lo, Hi}, SDLoc(Op));
 }
 
-static SDValue LowerFunnelShift(SDValue Op, const X86Subtarget &Subtarget,
-                                SelectionDAG &DAG) {
-  MVT VT = Op.getSimpleValueType();
-  assert((Op.getOpcode() == ISD::FSHL || Op.getOpcode() == ISD::FSHR) &&
-         "Unexpected funnel shift opcode!");
-
-  SDLoc DL(Op);
-  SDValue Op0 = Op.getOperand(0);
-  SDValue Op1 = Op.getOperand(1);
-  SDValue Amt = Op.getOperand(2);
-
-  bool IsFSHR = Op.getOpcode() == ISD::FSHR;
-
-  if (VT.isVector()) {
-    assert(Subtarget.hasVBMI2() && "Expected VBMI2");
-
-    if (IsFSHR)
-      std::swap(Op0, Op1);
-
-    // With AVX512, but not VLX we need to widen to get a 512-bit result type.
-    if (!Subtarget.hasVLX() && !VT.is512BitVector()) {
-      Op0 = widenSubVector(Op0, false, Subtarget, DAG, DL, 512);
-      Op1 = widenSubVector(Op1, false, Subtarget, DAG, DL, 512);
-    }
-
-    SDValue Funnel;
-    APInt APIntShiftAmt;
-    MVT ResultVT = Op0.getSimpleValueType();
-    if (X86::isConstantSplat(Amt, APIntShiftAmt)) {
-      uint64_t ShiftAmt = APIntShiftAmt.urem(VT.getScalarSizeInBits());
-      Funnel =
-          DAG.getNode(IsFSHR ? X86ISD::VSHRD : X86ISD::VSHLD, DL, ResultVT, Op0,
-                      Op1, DAG.getTargetConstant(ShiftAmt, DL, MVT::i8));
-    } else {
-      if (!Subtarget.hasVLX() && !VT.is512BitVector())
-        Amt = widenSubVector(Amt, false, Subtarget, DAG, DL, 512);
-      Funnel = DAG.getNode(IsFSHR ? X86ISD::VSHRDV : X86ISD::VSHLDV, DL,
-                           ResultVT, Op0, Op1, Amt);
-    }
-    if (!Subtarget.hasVLX() && !VT.is512BitVector())
-      Funnel = extractSubVector(Funnel, 0, DAG, DL, VT.getSizeInBits());
-    return Funnel;
-  }
-  assert(
-      (VT == MVT::i8 || VT == MVT::i16 || VT == MVT::i32 || VT == MVT::i64) &&
-      "Unexpected funnel shift type!");
-
-  // Expand slow SHLD/SHRD cases if we are not optimizing for size.
-  bool OptForSize = DAG.shouldOptForSize();
-  bool ExpandFunnel = !OptForSize && Subtarget.isSHLDSlow();
-
-  // fshl(x,y,z) -> (((aext(x) << bw) | zext(y)) << (z & (bw-1))) >> bw.
-  // fshr(x,y,z) -> (((aext(x) << bw) | zext(y)) >> (z & (bw-1))).
-  if ((VT == MVT::i8 || (ExpandFunnel && VT == MVT::i16)) &&
-      !isa<ConstantSDNode>(Amt)) {
-    unsigned EltSizeInBits = VT.getScalarSizeInBits();
-    SDValue Mask = DAG.getConstant(EltSizeInBits - 1, DL, Amt.getValueType());
-    SDValue HiShift = DAG.getConstant(EltSizeInBits, DL, Amt.getValueType());
-    Op0 = DAG.getAnyExtOrTrunc(Op0, DL, MVT::i32);
-    Op1 = DAG.getZExtOrTrunc(Op1, DL, MVT::i32);
-    Amt = DAG.getNode(ISD::AND, DL, Amt.getValueType(), Amt, Mask);
-    SDValue Res = DAG.getNode(ISD::SHL, DL, MVT::i32, Op0, HiShift);
-    Res = DAG.getNode(ISD::OR, DL, MVT::i32, Res, Op1);
-    if (IsFSHR) {
-      Res = DAG.getNode(ISD::SRL, DL, MVT::i32, Res, Amt);
-    } else {
-      Res = DAG.getNode(ISD::SHL, DL, MVT::i32, Res, Amt);
-      Res = DAG.getNode(ISD::SRL, DL, MVT::i32, Res, HiShift);
-    }
-    return DAG.getZExtOrTrunc(Res, DL, VT);
-  }
-
-  if (VT == MVT::i8 || ExpandFunnel)
-    return SDValue();
-
-  // i16 needs to modulo the shift amount, but i32/i64 have implicit modulo.
-  if (VT == MVT::i16) {
-    Amt = DAG.getNode(ISD::AND, DL, Amt.getValueType(), Amt,
-                      DAG.getConstant(15, DL, Amt.getValueType()));
-    unsigned FSHOp = (IsFSHR ? X86ISD::FSHR : X86ISD::FSHL);
-    return DAG.getNode(FSHOp, DL, VT, Op0, Op1, Amt);
-  }
-
-  return Op;
-}
-
 // Try to use a packed vector operation to handle i64 on 32-bit targets when
 // AVX512DQ is enabled.
 static SDValue LowerI64IntToFP_AVX512DQ(SDValue Op, SelectionDAG &DAG,
@@ -29660,6 +29574,92 @@ static SDValue LowerShift(SDValue Op, const X86Subtarget &Subtarget,
   return SDValue();
 }
 
+static SDValue LowerFunnelShift(SDValue Op, const X86Subtarget &Subtarget,
+                                SelectionDAG &DAG) {
+  MVT VT = Op.getSimpleValueType();
+  assert((Op.getOpcode() == ISD::FSHL || Op.getOpcode() == ISD::FSHR) &&
+         "Unexpected funnel shift opcode!");
+
+  SDLoc DL(Op);
+  SDValue Op0 = Op.getOperand(0);
+  SDValue Op1 = Op.getOperand(1);
+  SDValue Amt = Op.getOperand(2);
+
+  bool IsFSHR = Op.getOpcode() == ISD::FSHR;
+
+  if (VT.isVector()) {
+    assert(Subtarget.hasVBMI2() && "Expected VBMI2");
+
+    if (IsFSHR)
+      std::swap(Op0, Op1);
+
+    // With AVX512, but not VLX we need to widen to get a 512-bit result type.
+    if (!Subtarget.hasVLX() && !VT.is512BitVector()) {
+      Op0 = widenSubVector(Op0, false, Subtarget, DAG, DL, 512);
+      Op1 = widenSubVector(Op1, false, Subtarget, DAG, DL, 512);
+    }
+
+    SDValue Funnel;
+    APInt APIntShiftAmt;
+    MVT ResultVT = Op0.getSimpleValueType();
+    if (X86::isConstantSplat(Amt, APIntShiftAmt)) {
+      uint64_t ShiftAmt = APIntShiftAmt.urem(VT.getScalarSizeInBits());
+      Funnel =
+          DAG.getNode(IsFSHR ? X86ISD::VSHRD : X86ISD::VSHLD, DL, ResultVT, Op0,
+                      Op1, DAG.getTargetConstant(ShiftAmt, DL, MVT::i8));
+    } else {
+      if (!Subtarget.hasVLX() && !VT.is512BitVector())
+        Amt = widenSubVector(Amt, false, Subtarget, DAG, DL, 512);
+      Funnel = DAG.getNode(IsFSHR ? X86ISD::VSHRDV : X86ISD::VSHLDV, DL,
+                           ResultVT, Op0, Op1, Amt);
+    }
+    if (!Subtarget.hasVLX() && !VT.is512BitVector())
+      Funnel = extractSubVector(Funnel, 0, DAG, DL, VT.getSizeInBits());
+    return Funnel;
+  }
+  assert(
+      (VT == MVT::i8 || VT == MVT::i16 || VT == MVT::i32 || VT == MVT::i64) &&
+      "Unexpected funnel shift type!");
+
+  // Expand slow SHLD/SHRD cases if we are not optimizing for size.
+  bool OptForSize = DAG.shouldOptForSize();
+  bool ExpandFunnel = !OptForSize && Subtarget.isSHLDSlow();
+
+  // fshl(x,y,z) -> (((aext(x) << bw) | zext(y)) << (z & (bw-1))) >> bw.
+  // fshr(x,y,z) -> (((aext(x) << bw) | zext(y)) >> (z & (bw-1))).
+  if ((VT == MVT::i8 || (ExpandFunnel && VT == MVT::i16)) &&
+      !isa<ConstantSDNode>(Amt)) {
+    unsigned EltSizeInBits = VT.getScalarSizeInBits();
+    SDValue Mask = DAG.getConstant(EltSizeInBits - 1, DL, Amt.getValueType());
+    SDValue HiShift = DAG.getConstant(EltSizeInBits, DL, Amt.getValueType());
+    Op0 = DAG.getAnyExtOrTrunc(Op0, DL, MVT::i32);
+    Op1 = DAG.getZExtOrTrunc(Op1, DL, MVT::i32);
+    Amt = DAG.getNode(ISD::AND, DL, Amt.getValueType(), Amt, Mask);
+    SDValue Res = DAG.getNode(ISD::SHL, DL, MVT::i32, Op0, HiShift);
+    Res = DAG.getNode(ISD::OR, DL, MVT::i32, Res, Op1);
+    if (IsFSHR) {
+      Res = DAG.getNode(ISD::SRL, DL, MVT::i32, Res, Amt);
+    } else {
+      Res = DAG.getNode(ISD::SHL, DL, MVT::i32, Res, Amt);
+      Res = DAG.getNode(ISD::SRL, DL, MVT::i32, Res, HiShift);
+    }
+    return DAG.getZExtOrTrunc(Res, DL, VT);
+  }
+
+  if (VT == MVT::i8 || ExpandFunnel)
+    return SDValue();
+
+  // i16 needs to modulo the shift amount, but i32/i64 have implicit modulo.
+  if (VT == MVT::i16) {
+    Amt = DAG.getNode(ISD::AND, DL, Amt.getValueType(), Amt,
+                      DAG.getConstant(15, DL, Amt.getValueType()));
+    unsigned FSHOp = (IsFSHR ? X86ISD::FSHR : X86ISD::FSHL);
+    return DAG.getNode(FSHOp, DL, VT, Op0, Op1, Amt);
+  }
+
+  return Op;
+}
+
 static SDValue LowerRotate(SDValue Op, const X86Subtarget &Subtarget,
                            SelectionDAG &DAG) {
   MVT VT = Op.getSimpleValueType();
@@ -36100,8 +36100,9 @@ static bool matchUnaryShuffle(MVT MaskVT, ArrayRef<int> Mask,
         (V1.getOpcode() == ISD::SCALAR_TO_VECTOR &&
          isUndefOrZeroInRange(Mask, 1, NumMaskElts - 1))) {
       Shuffle = X86ISD::VZEXT_MOVL;
-      SrcVT = DstVT =
-          !Subtarget.hasSSE2() && MaskEltSize == 32 ? MVT::v4f32 : MaskVT;
+      SrcVT = DstVT = MaskEltSize == 16      ? MVT::v8f16
+                      : !Subtarget.hasSSE2() ? MVT::v4f32
+                                             : MaskVT;
       return true;
     }
   }
@@ -36145,11 +36146,14 @@ static bool matchUnaryShuffle(MVT MaskVT, ArrayRef<int> Mask,
   }
 
   // Match against a VZEXT_MOVL instruction, SSE1 only supports 32-bits (MOVSS).
-  if (((MaskEltSize == 32) || (MaskEltSize == 64 && Subtarget.hasSSE2())) &&
+  if (((MaskEltSize == 32) || (MaskEltSize == 64 && Subtarget.hasSSE2()) ||
+       (MaskEltSize == 16 && Subtarget.hasFP16())) &&
       isUndefOrEqual(Mask[0], 0) &&
       isUndefOrZeroInRange(Mask, 1, NumMaskElts - 1)) {
     Shuffle = X86ISD::VZEXT_MOVL;
-    SrcVT = DstVT = !Subtarget.hasSSE2() ? MVT::v4f32 : MaskVT;
+    SrcVT = DstVT = MaskEltSize == 16      ? MVT::v8f16
+                    : !Subtarget.hasSSE2() ? MVT::v4f32
+                                           : MaskVT;
     return true;
   }
 
