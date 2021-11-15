@@ -27,12 +27,15 @@ class Any;
 
 namespace mlir {
 class AnalysisManager;
-class Identifier;
 class MLIRContext;
 class Operation;
 class Pass;
 class PassInstrumentation;
 class PassInstrumentor;
+class StringAttr;
+
+// TODO: Remove this when all usages have been replaced with StringAttr.
+using Identifier = StringAttr;
 
 namespace detail {
 struct OpPassManagerImpl;
@@ -84,6 +87,9 @@ public:
   /// Add the given pass to this pass manager. If this pass has a concrete
   /// operation type, it must be the same type as this pass manager.
   void addPass(std::unique_ptr<Pass> pass);
+
+  /// Clear the pipeline, but not the other options set on this OpPassManager.
+  void clear();
 
   /// Add the given pass to a nested pass manager for the given operation kind
   /// `OpT`.

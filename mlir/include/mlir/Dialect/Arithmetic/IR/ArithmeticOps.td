@@ -92,16 +92,16 @@ def SignlessFixedWidthIntegerLike : TypeConstraint<Or<[
 // Cast from an integer type to another integer type.
 class Arith_IToICastOp<string mnemonic, list<OpTrait> traits = []> :
     Arith_CastOp<mnemonic, SignlessFixedWidthIntegerLike,
-                           SignlessFixedWidthIntegerLike>;
+                           SignlessFixedWidthIntegerLike, traits>;
 // Cast from an integer type to a floating point type.
 class Arith_IToFCastOp<string mnemonic, list<OpTrait> traits = []> :
-    Arith_CastOp<mnemonic, SignlessFixedWidthIntegerLike, FloatLike>;
+    Arith_CastOp<mnemonic, SignlessFixedWidthIntegerLike, FloatLike, traits>;
 // Cast from a floating point type to an integer type.
 class Arith_FToICastOp<string mnemonic, list<OpTrait> traits = []> :
-    Arith_CastOp<mnemonic, FloatLike, SignlessFixedWidthIntegerLike>;
+    Arith_CastOp<mnemonic, FloatLike, SignlessFixedWidthIntegerLike, traits>;
 // Cast from a floating point type to another floating point type.
 class Arith_FToFCastOp<string mnemonic, list<OpTrait> traits = []> :
-    Arith_CastOp<mnemonic, FloatLike, FloatLike>;
+    Arith_CastOp<mnemonic, FloatLike, FloatLike, traits>;
 
 // Base class for compare operations. Requires two operands of the same type
 // and returns a single `BoolLike` result. If the operand type is a vector or
@@ -271,6 +271,30 @@ def Arith_DivSIOp : Arith_IntBinaryOp<"divsi"> {
 
     // Tensor element-wise integer division.
     %x = arith.divsi %y, %z : tensor<4x?xi8>
+    ```
+  }];
+  let hasFolder = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// CeilDivUIOp
+//===----------------------------------------------------------------------===//
+
+def Arith_CeilDivUIOp : Arith_IntBinaryOp<"ceildivui"> {
+  let summary = "unsigned ceil integer division operation";
+  let description = [{
+    Unsigned integer division. Rounds towards positive infinity. Treats the 
+    leading bit as the most significant, i.e. for `i16` given two's complement
+    representation, `6 / -2 = 6 / (2^16 - 2) = 1`.
+
+    Note: the semantics of division by zero is TBD; do NOT assume any specific
+    behavior.
+
+    Example:
+
+    ```mlir
+    // Scalar unsigned integer division.
+    %a = arith.ceildivui %b, %c : i64
     ```
   }];
   let hasFolder = 1;
@@ -956,13 +980,7 @@ def Arith_CmpIOp : Arith_CompareOp<"cmpi"> {
   ];
 
   let extraClassDeclaration = [{
-    static StringRef getPredicateAttrName() { return "predicate"; }
     static arith::CmpIPredicate getPredicateByName(StringRef name);
-
-    arith::CmpIPredicate getPredicate() {
-      return (arith::CmpIPredicate) (*this)->getAttrOfType<IntegerAttr>(
-          getPredicateAttrName()).getInt();
-    }
   }];
 
   let hasFolder = 1;
@@ -1012,13 +1030,7 @@ def Arith_CmpFOp : Arith_CompareOp<"cmpf"> {
   ];
 
   let extraClassDeclaration = [{
-    static StringRef getPredicateAttrName() { return "predicate"; }
     static arith::CmpFPredicate getPredicateByName(StringRef name);
-
-    arith::CmpFPredicate getPredicate() {
-      return (arith::CmpFPredicate) (*this)->getAttrOfType<IntegerAttr>(
-          getPredicateAttrName()).getInt();
-    }
   }];
 
   let hasFolder = 1;

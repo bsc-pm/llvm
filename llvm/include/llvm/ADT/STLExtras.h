@@ -307,6 +307,32 @@ auto map_range(ContainerTy &&C, FuncTy F) {
   return make_range(map_iterator(C.begin(), F), map_iterator(C.end(), F));
 }
 
+/// A base type of mapped iterator, that is useful for building derived
+/// iterators that do not need/want to store the map function (as in
+/// mapped_iterator). These iterators must simply provide a `mapElement` method
+/// that defines how to map a value of the iterator to the provided reference
+/// type.
+template <typename DerivedT, typename ItTy, typename ReferenceTy>
+class mapped_iterator_base
+    : public iterator_adaptor_base<
+          DerivedT, ItTy,
+          typename std::iterator_traits<ItTy>::iterator_category,
+          std::remove_reference_t<ReferenceTy>,
+          typename std::iterator_traits<ItTy>::difference_type,
+          std::remove_reference_t<ReferenceTy> *, ReferenceTy> {
+public:
+  using BaseT = mapped_iterator_base<DerivedT, ItTy, ReferenceTy>;
+
+  mapped_iterator_base(ItTy U)
+      : mapped_iterator_base::iterator_adaptor_base(std::move(U)) {}
+
+  ItTy getCurrent() { return this->I; }
+
+  ReferenceTy operator*() const {
+    return static_cast<const DerivedT &>(*this).mapElement(*this->I);
+  }
+};
+
 /// Helper to determine if type T has a member called rbegin().
 template <typename Ty> class has_rbegin_impl {
   using yes = char[1];
@@ -1251,20 +1277,39 @@ public:
   }
 };
 
+namespace detail {
+/// Return a reference to the first or second member of a reference. Otherwise,
+/// return a copy of the member of a temporary.
+///
+/// When passing a range whose iterators return values instead of references,
+/// the reference must be dropped from `decltype((elt.first))`, which will
+/// always be a reference, to avoid returning a reference to a temporary.
+template <typename EltTy, typename FirstTy> class first_or_second_type {
+public:
+  using type =
+      typename std::conditional_t<std::is_reference<EltTy>::value, FirstTy,
+                                  std::remove_reference_t<FirstTy>>;
+};
+} // end namespace detail
+
 /// Given a container of pairs, return a range over the first elements.
 template <typename ContainerTy> auto make_first_range(ContainerTy &&c) {
-  return llvm::map_range(
-      std::forward<ContainerTy>(c),
-      [](decltype((*std::begin(c))) elt) -> decltype((elt.first)) {
-        return elt.first;
-      });
+  using EltTy = decltype((*std::begin(c)));
+  return llvm::map_range(std::forward<ContainerTy>(c),
+                         [](EltTy elt) -> typename detail::first_or_second_type<
+                                           EltTy, decltype((elt.first))>::type {
+                           return elt.first;
+                         });
 }
 
 /// Given a container of pairs, return a range over the second elements.
 template <typename ContainerTy> auto make_second_range(ContainerTy &&c) {
+  using EltTy = decltype((*std::begin(c)));
   return llvm::map_range(
       std::forward<ContainerTy>(c),
-      [](decltype((*std::begin(c))) elt) -> decltype((elt.second)) {
+      [](EltTy elt) ->
+      typename detail::first_or_second_type<EltTy,
+                                            decltype((elt.second))>::type {
         return elt.second;
       });
 }

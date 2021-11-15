@@ -40,7 +40,13 @@ def LinalgComprehensiveModuleBufferize :
            "Only runs inplaceability analysis (for testing purposes only)">,
     Option<"allowReturnMemref", "allow-return-memref", "bool",
             /*default=*/"false",
-           "Allows the return of memrefs (for testing purposes only)">
+           "Allows the return of memrefs (for testing purposes only)">,
+    Option<"useAlloca", "use-alloca", "bool",
+           /*default=*/"false",
+           "Use stack allocations for memrefs (for testing purposes only)">,
+    Option<"analysisFuzzerSeed", "analysis-fuzzer-seed", "unsigned",
+           /*default=*/"0",
+           "Analyze ops in random order with a given seed (fuzzer)">
   ];
   let constructor = "mlir::createLinalgComprehensiveModuleBufferizePass()";
 }
@@ -242,6 +248,19 @@ def LinalgStrategyTilePass
   ];
 }
 
+def LinalgStrategyPadPass
+    : FunctionPass<"linalg-strategy-pad-pass"> {
+  let summary = "Configurable pass to apply padding and hoisting.";
+  let constructor = "mlir::createLinalgStrategyPadPass()";
+  let dependentDialects = ["linalg::LinalgDialect"];
+  let options = [
+    Option<"anchorFuncName", "anchor-func", "std::string", /*default=*/"",
+      "Which func op is the anchor to latch on.">,
+    Option<"anchorOpName", "anchor-op", "std::string", /*default=*/"",
+      "Which linalg op within the func is the anchor to latch on.">,
+  ];
+}
+
 def LinalgStrategyPromotePass
     : FunctionPass<"linalg-strategy-promote-pass"> {
   let summary = "Configurable pass to apply pattern-based linalg promotion.";
@@ -265,6 +284,19 @@ def LinalgStrategyGeneralizePass
       "Which func op is the anchor to latch on.">,
     Option<"anchorOpName", "anchor-op", "std::string", /*default=*/"",
       "Which linalg op within the func is the anchor to latch on.">,
+  ];
+}
+
+// TODO: atm this is applied to all supported ops. If/when we need finer control
+// this should be exposed with an opName + filter and a proper pattern.
+def LinalgStrategyDecomposePass
+    : FunctionPass<"linalg-strategy-decompose-pass"> {
+  let summary = "Configurable pass to apply pattern-based generalization.";
+  let constructor = "mlir::createLinalgStrategyDecomposePass()";
+  let dependentDialects = ["linalg::LinalgDialect"];
+  let options = [
+    Option<"anchorFuncName", "anchor-func", "std::string", /*default=*/"",
+      "Which func op is the anchor to latch on.">,
   ];
 }
 
@@ -308,6 +340,17 @@ def LinalgStrategyLowerVectorsPass
     : FunctionPass<"linalg-strategy-lower-vectors-pass"> {
   let summary = "Configurable pass to lower vector operations.";
   let constructor = "mlir::createLinalgStrategyLowerVectorsPass()";
+  let dependentDialects = ["linalg::LinalgDialect"];
+  let options = [
+    Option<"anchorFuncName", "anchor-func", "std::string", /*default=*/"",
+      "Which func op is the anchor to latch on.">,
+  ];
+}
+
+def LinalgStrategyRemoveMarkersPass
+    : FunctionPass<"linalg-strategy-remove-markers-pass"> {
+  let summary = "Cleanup pass that drops markers.";
+  let constructor = "mlir::createLinalgStrategyRemoveMarkersPass()";
   let dependentDialects = ["linalg::LinalgDialect"];
   let options = [
     Option<"anchorFuncName", "anchor-func", "std::string", /*default=*/"",

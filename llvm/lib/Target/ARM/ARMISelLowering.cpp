@@ -10956,10 +10956,9 @@ void ARMTargetLowering::EmitSjLjDispatchBlock(MachineInstr &MI,
 
 static
 MachineBasicBlock *OtherSucc(MachineBasicBlock *MBB, MachineBasicBlock *Succ) {
-  for (MachineBasicBlock::succ_iterator I = MBB->succ_begin(),
-       E = MBB->succ_end(); I != E; ++I)
-    if (*I != Succ)
-      return *I;
+  for (MachineBasicBlock *S : MBB->successors())
+    if (S != Succ)
+      return S;
   llvm_unreachable("Expecting a BB with two successors!");
 }
 
@@ -11457,13 +11456,9 @@ static bool checkAndUpdateCPSRKill(MachineBasicBlock::iterator SelectItr,
   // If we hit the end of the block, check whether CPSR is live into a
   // successor.
   if (miI == BB->end()) {
-    for (MachineBasicBlock::succ_iterator sItr = BB->succ_begin(),
-                                          sEnd = BB->succ_end();
-         sItr != sEnd; ++sItr) {
-      MachineBasicBlock* succ = *sItr;
-      if (succ->isLiveIn(ARM::CPSR))
+    for (MachineBasicBlock *Succ : BB->successors())
+      if (Succ->isLiveIn(ARM::CPSR))
         return false;
-    }
   }
 
   // We found a def, or hit the end of the basic block and CPSR wasn't live
@@ -13092,19 +13087,15 @@ static SDValue PerformVSELECTCombine(SDNode *N,
 }
 
 static SDValue PerformABSCombine(SDNode *N,
-                                  TargetLowering::DAGCombinerInfo &DCI,
-                                  const ARMSubtarget *Subtarget) {
-  SDValue res;
+                                 TargetLowering::DAGCombinerInfo &DCI,
+                                 const ARMSubtarget *Subtarget) {
   SelectionDAG &DAG = DCI.DAG;
   const TargetLowering &TLI = DAG.getTargetLoweringInfo();
 
   if (TLI.isOperationLegal(N->getOpcode(), N->getValueType(0)))
     return SDValue();
 
-  if (!TLI.expandABS(N, res, DAG))
-      return SDValue();
-
-  return res;
+  return TLI.expandABS(N, DAG);
 }
 
 /// PerformADDECombine - Target-specific dag combine transform from
@@ -20691,10 +20682,7 @@ bool ARMTargetLowering::shouldInsertFencesForAtomic(
   return InsertFencesForAtomic;
 }
 
-// This has so far only been implemented for MachO.
-bool ARMTargetLowering::useLoadStackGuardNode() const {
-  return Subtarget->isTargetMachO();
-}
+bool ARMTargetLowering::useLoadStackGuardNode() const { return true; }
 
 void ARMTargetLowering::insertSSPDeclarations(Module &M) const {
   if (!Subtarget->getTargetTriple().isWindowsMSVCEnvironment())

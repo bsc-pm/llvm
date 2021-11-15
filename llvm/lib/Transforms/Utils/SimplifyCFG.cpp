@@ -280,7 +280,6 @@ public:
   }
 
   bool simplifyOnce(BasicBlock *BB);
-  bool simplifyOnceImpl(BasicBlock *BB);
   bool run(BasicBlock *BB);
 
   // Helper to set Resimplify and return change indication.
@@ -2059,7 +2058,7 @@ static bool SinkCommonCodeFromPredecessors(BasicBlock *BB,
     unsigned NumPHIdValues = 0;
     for (auto *I : *LRI)
       for (auto *V : PHIOperands[I]) {
-        if (InstructionsToSink.count(V) == 0)
+        if (!InstructionsToSink.contains(V))
           ++NumPHIdValues;
         // FIXME: this check is overly optimistic. We may end up not sinking
         // said instruction, due to the very same profitability check.
@@ -4783,26 +4782,6 @@ static bool CasesAreContiguous(SmallVectorImpl<ConstantInt *> &Cases) {
   return true;
 }
 
-static void createUnreachableSwitchDefault(SwitchInst *Switch,
-                                           DomTreeUpdater *DTU) {
-  LLVM_DEBUG(dbgs() << "SimplifyCFG: switch default is dead.\n");
-  auto *BB = Switch->getParent();
-  auto *OrigDefaultBlock = Switch->getDefaultDest();
-  OrigDefaultBlock->removePredecessor(BB);
-  BasicBlock *NewDefaultBlock = BasicBlock::Create(
-      BB->getContext(), BB->getName() + ".unreachabledefault", BB->getParent(),
-      OrigDefaultBlock);
-  new UnreachableInst(Switch->getContext(), NewDefaultBlock);
-  Switch->setDefaultDest(&*NewDefaultBlock);
-  if (DTU) {
-    SmallVector<DominatorTree::UpdateType, 2> Updates;
-    Updates.push_back({DominatorTree::Insert, BB, &*NewDefaultBlock});
-    if (!is_contained(successors(BB), OrigDefaultBlock))
-      Updates.push_back({DominatorTree::Delete, BB, &*OrigDefaultBlock});
-    DTU->applyUpdates(Updates);
-  }
-}
-
 /// Turn a switch with two reachable destinations into an integer range
 /// comparison and branch.
 bool SimplifyCFGOpt::TurnSwitchRangeIntoICmp(SwitchInst *SI,
@@ -6548,19 +6527,21 @@ static bool passingValueIsAlwaysUndefined(Value *V, Instruction *I, bool PtrValu
 
   if (C->isNullValue() || isa<UndefValue>(C)) {
     // Only look at the first use, avoid hurting compile time with long uselists
-    User *Use = *I->user_begin();
+    auto *Use = cast<Instruction>(*I->user_begin());
+    // Bail out if Use is not in the same BB as I or Use == I or Use comes
+    // before I in the block. The latter two can be the case if Use is a PHI
+    // node.
+    if (Use->getParent() != I->getParent() || Use == I || Use->comesBefore(I))
+      return false;
 
     // Now make sure that there are no instructions in between that can alter
     // control flow (eg. calls)
-    for (BasicBlock::iterator
-             i = ++BasicBlock::iterator(I),
-             UI = BasicBlock::iterator(dyn_cast<Instruction>(Use));
-         i != UI; ++i) {
-      if (i == I->getParent()->end())
-        return false;
-      if (!isGuaranteedToTransferExecutionToSuccessor(&*i))
-        return false;
-    }
+    auto InstrRange =
+        make_range(std::next(I->getIterator()), Use->getIterator());
+    if (any_of(InstrRange, [](Instruction &I) {
+          return !isGuaranteedToTransferExecutionToSuccessor(&I);
+        }))
+      return false;
 
     // Look through GEPs. A load from a GEP derived from NULL is still undefined
     if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(Use))
@@ -6680,7 +6661,7 @@ static bool removeUndefIntroducingPredecessor(BasicBlock *BB,
   return false;
 }
 
-bool SimplifyCFGOpt::simplifyOnceImpl(BasicBlock *BB) {
+bool SimplifyCFGOpt::simplifyOnce(BasicBlock *BB) {
   bool Changed = false;
 
   assert(BB && BB->getParent() && "Block not embedded in function!");
@@ -6756,12 +6737,6 @@ bool SimplifyCFGOpt::simplifyOnceImpl(BasicBlock *BB) {
     Changed |= simplifyIndirectBr(cast<IndirectBrInst>(Terminator));
     break;
   }
-
-  return Changed;
-}
-
-bool SimplifyCFGOpt::simplifyOnce(BasicBlock *BB) {
-  bool Changed = simplifyOnceImpl(BB);
 
   return Changed;
 }

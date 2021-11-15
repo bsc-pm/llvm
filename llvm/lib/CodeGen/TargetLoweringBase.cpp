@@ -925,8 +925,15 @@ EVT TargetLoweringBase::getShiftAmountTy(EVT LHSTy, const DataLayout &DL,
   assert(LHSTy.isInteger() && "Shift amount is not an integer type!");
   if (LHSTy.isVector())
     return LHSTy;
-  return LegalTypes ? getScalarShiftAmountTy(DL, LHSTy)
-                    : getPointerTy(DL);
+  MVT ShiftVT =
+      LegalTypes ? getScalarShiftAmountTy(DL, LHSTy) : getPointerTy(DL);
+  // If any possible shift value won't fit in the prefered type, just use
+  // something safe. Assume it will be legalized when the shift is expanded.
+  if (ShiftVT.getSizeInBits() < Log2_32_Ceil(LHSTy.getSizeInBits()))
+    ShiftVT = MVT::i32;
+  assert(ShiftVT.getSizeInBits() >= Log2_32_Ceil(LHSTy.getSizeInBits()) &&
+         "ShiftVT is still too small!");
+  return ShiftVT;
 }
 
 bool TargetLoweringBase::canOpTrap(unsigned Op, EVT VT) const {
@@ -1980,8 +1987,11 @@ void TargetLoweringBase::insertSSPDeclarations(Module &M) const {
     auto *GV = new GlobalVariable(M, Type::getInt8PtrTy(M.getContext()), false,
                                   GlobalVariable::ExternalLinkage, nullptr,
                                   "__stack_chk_guard");
+
+    // FreeBSD has "__stack_chk_guard" defined externally on libc.so
     if (TM.getRelocationModel() == Reloc::Static &&
-        !TM.getTargetTriple().isWindowsGNUEnvironment())
+        !TM.getTargetTriple().isWindowsGNUEnvironment() &&
+        !TM.getTargetTriple().isOSFreeBSD())
       GV->setDSOLocal(true);
   }
 }

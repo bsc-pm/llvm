@@ -212,9 +212,9 @@ public:
 
   bool SetOSVersion(llvm::VersionTuple os_version);
 
-  bool GetOSBuildString(std::string &s);
+  llvm::Optional<std::string> GetOSBuildString();
 
-  bool GetOSKernelDescription(std::string &s);
+  llvm::Optional<std::string> GetOSKernelDescription();
 
   // Returns the name of the platform
   ConstString GetName();
@@ -223,7 +223,7 @@ public:
 
   virtual ConstString GetFullNameForDylib(ConstString basename);
 
-  virtual const char *GetDescription() = 0;
+  virtual llvm::StringRef GetDescription() = 0;
 
   /// Report the current status for this platform.
   ///
@@ -240,14 +240,12 @@ public:
   // HostInfo::GetOSVersion().
   virtual bool GetRemoteOSVersion() { return false; }
 
-  virtual bool GetRemoteOSBuildString(std::string &s) {
-    s.clear();
-    return false;
+  virtual llvm::Optional<std::string> GetRemoteOSBuildString() {
+    return llvm::None;
   }
 
-  virtual bool GetRemoteOSKernelDescription(std::string &s) {
-    s.clear();
-    return false;
+  virtual llvm::Optional<std::string> GetRemoteOSKernelDescription() {
+    return llvm::None;
   }
 
   // Remote Platform subclasses need to override this function
@@ -720,6 +718,24 @@ public:
   /// \return
   ///     A list of symbol names.  The list may be empty.
   virtual const std::vector<ConstString> &GetTrapHandlerSymbolNames();
+
+  /// Try to get a specific unwind plan for a named trap handler.
+  /// The default is not to have specific unwind plans for trap handlers.
+  ///
+  /// \param[in] triple
+  ///     Triple of the current target.
+  ///
+  /// \param[in] name
+  ///     Name of the trap handler function.
+  ///
+  /// \return
+  ///     A specific unwind plan for that trap handler, or an empty
+  ///     shared pointer. The latter means there is no specific plan,
+  ///     unwind as normal.
+  virtual lldb::UnwindPlanSP
+  GetTrapHandlerUnwindPlan(const llvm::Triple &triple, ConstString name) {
+    return {};
+  }
 
   /// Find a support executable that may not live within in the standard
   /// locations related to LLDB.

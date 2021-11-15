@@ -415,15 +415,18 @@ public:
     for (const GlobalAlias &GA : M.aliases())
       visitGlobalAlias(GA);
 
+    for (const GlobalIFunc &GI : M.ifuncs())
+      visitGlobalIFunc(GI);
+
     for (const NamedMDNode &NMD : M.named_metadata())
       visitNamedMDNode(NMD);
 
     for (const StringMapEntry<Comdat> &SMEC : M.getComdatSymbolTable())
       visitComdat(SMEC.getValue());
 
-    visitModuleFlags(M);
-    visitModuleIdents(M);
-    visitModuleCommandLines(M);
+    visitModuleFlags();
+    visitModuleIdents();
+    visitModuleCommandLines();
 
     verifyCompileUnits();
 
@@ -440,6 +443,7 @@ private:
   void visitGlobalValue(const GlobalValue &GV);
   void visitGlobalVariable(const GlobalVariable &GV);
   void visitGlobalAlias(const GlobalAlias &GA);
+  void visitGlobalIFunc(const GlobalIFunc &GI);
   void visitAliaseeSubExpr(const GlobalAlias &A, const Constant &C);
   void visitAliaseeSubExpr(SmallPtrSetImpl<const GlobalAlias *> &Visited,
                            const GlobalAlias &A, const Constant &C);
@@ -448,9 +452,9 @@ private:
   void visitMetadataAsValue(const MetadataAsValue &MD, Function *F);
   void visitValueAsMetadata(const ValueAsMetadata &MD, Function *F);
   void visitComdat(const Comdat &C);
-  void visitModuleIdents(const Module &M);
-  void visitModuleCommandLines(const Module &M);
-  void visitModuleFlags(const Module &M);
+  void visitModuleIdents();
+  void visitModuleCommandLines();
+  void visitModuleFlags();
   void visitModuleFlag(const MDNode *Op,
                        DenseMap<const MDString *, const MDNode *> &SeenIDs,
                        SmallVectorImpl<const MDNode *> &Requirements);
@@ -549,6 +553,8 @@ private:
   void verifyFunctionAttrs(FunctionType *FT, AttributeList Attrs,
                            const Value *V, bool IsIntrinsic);
   void verifyFunctionMetadata(ArrayRef<std::pair<unsigned, MDNode *>> MDs);
+  template <typename T>
+  void verifyODRTypeAsScopeOperand(const MDNode &MD, T * = nullptr);
 
   void visitConstantExprsRecursively(const Constant *EntryC);
   void visitConstantExpr(const ConstantExpr *CE);
@@ -821,6 +827,21 @@ void Verifier::visitGlobalAlias(const GlobalAlias &GA) {
   visitGlobalValue(GA);
 }
 
+void Verifier::visitGlobalIFunc(const GlobalIFunc &GI) {
+  // Pierce through ConstantExprs and GlobalAliases and check that the resolver
+  // has a Function 
+  const Function *Resolver = GI.getResolverFunction();
+  Assert(Resolver, "IFunc must have a Function resolver", &GI);
+
+  // Check that the immediate resolver operand (prior to any bitcasts) has the
+  // correct type
+  const Type *ResolverTy = GI.getResolver()->getType();
+  const Type *ResolverFuncTy =
+      GlobalIFunc::getResolverFunctionType(GI.getValueType());
+  Assert(ResolverTy == ResolverFuncTy->getPointerTo(),
+         "IFunc resolver has incorrect type", &GI);
+}
+
 void Verifier::visitNamedMDNode(const NamedMDNode &NMD) {
   // There used to be various other llvm.dbg.* nodes, but we don't support
   // upgrading them and we want to reserve the namespace for future uses.
@@ -839,6 +860,19 @@ void Verifier::visitNamedMDNode(const NamedMDNode &NMD) {
   }
 }
 
+template <typename T>
+void Verifier::verifyODRTypeAsScopeOperand(const MDNode &MD, T *) {
+  if (isa<T>(MD)) {
+    if (auto *N = dyn_cast_or_null<DICompositeType>(cast<T>(MD).getScope()))
+      // Of all the supported tags for DICompositeType(see visitDICompositeType)
+      // we know that enum type cannot be a scope.
+      AssertDI(N->getTag() != dwarf::DW_TAG_enumeration_type,
+               "enum type is not a scope; check enum type ODR "
+               "violation",
+               N, &MD);
+  }
+}
+
 void Verifier::visitMDNode(const MDNode &MD, AreDebugLocsAllowed AllowLocs) {
   // Only visit each node once.  Metadata can be mutually recursive, so this
   // avoids infinite recursion here, as well as being an optimization.
@@ -847,6 +881,12 @@ void Verifier::visitMDNode(const MDNode &MD, AreDebugLocsAllowed AllowLocs) {
 
   Assert(&MD.getContext() == &Context,
          "MDNode context does not match Module context!", &MD);
+
+  // Makes sure when a scope operand is a ODR type, the ODR type uniquing does
+  // not create invalid debug metadata.
+  // TODO: check that the non-ODR-type scope operand is valid.
+  verifyODRTypeAsScopeOperand<DIType>(MD);
+  verifyODRTypeAsScopeOperand<DILocalScope>(MD);
 
   switch (MD.getMetadataID()) {
   default:
@@ -1476,7 +1516,7 @@ void Verifier::visitComdat(const Comdat &C) {
              "comdat global value has private linkage", GV);
 }
 
-void Verifier::visitModuleIdents(const Module &M) {
+void Verifier::visitModuleIdents() {
   const NamedMDNode *Idents = M.getNamedMetadata("llvm.ident");
   if (!Idents)
     return;
@@ -1493,7 +1533,7 @@ void Verifier::visitModuleIdents(const Module &M) {
   }
 }
 
-void Verifier::visitModuleCommandLines(const Module &M) {
+void Verifier::visitModuleCommandLines() {
   const NamedMDNode *CommandLines = M.getNamedMetadata("llvm.commandline");
   if (!CommandLines)
     return;
@@ -1511,7 +1551,7 @@ void Verifier::visitModuleCommandLines(const Module &M) {
   }
 }
 
-void Verifier::visitModuleFlags(const Module &M) {
+void Verifier::visitModuleFlags() {
   const NamedMDNode *Flags = M.getModuleFlagsMetadata();
   if (!Flags) return;
 

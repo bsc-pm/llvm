@@ -1451,11 +1451,15 @@ void Preprocessor::HandleDigitDirective(Token &DigitTok) {
       DiscardUntilEndOfDirective();
       return;
     }
-    FilenameID = SourceMgr.getLineTableFilenameID(Literal.GetString());
 
     // If a filename was present, read any flags that are present.
     if (ReadLineMarkerFlags(IsFileEntry, IsFileExit, FileKind, *this))
       return;
+
+    // Exiting to an empty string means pop to the including file, so leave
+    // FilenameID as -1 in that case.
+    if (!(IsFileExit && Literal.GetString().empty()))
+      FilenameID = SourceMgr.getLineTableFilenameID(Literal.GetString());
   }
 
   // Create a line note with this information.
@@ -2012,20 +2016,16 @@ Preprocessor::ImportAction Preprocessor::HandleHeaderIncludeOrImport(
   SourceLocation FilenameLoc = FilenameTok.getLocation();
   StringRef LookupFilename = Filename;
 
-#ifdef _WIN32
-  llvm::sys::path::Style BackslashStyle = llvm::sys::path::Style::windows;
-#else
   // Normalize slashes when compiling with -fms-extensions on non-Windows. This
   // is unnecessary on Windows since the filesystem there handles backslashes.
   SmallString<128> NormalizedPath;
-  llvm::sys::path::Style BackslashStyle = llvm::sys::path::Style::posix;
-  if (LangOpts.MicrosoftExt) {
+  llvm::sys::path::Style BackslashStyle = llvm::sys::path::Style::native;
+  if (is_style_posix(BackslashStyle) && LangOpts.MicrosoftExt) {
     NormalizedPath = Filename.str();
     llvm::sys::path::native(NormalizedPath);
     LookupFilename = NormalizedPath;
     BackslashStyle = llvm::sys::path::Style::windows;
   }
-#endif
 
   Optional<FileEntryRef> File = LookupHeaderIncludeOrImport(
       CurDir, Filename, FilenameLoc, FilenameRange, FilenameTok,

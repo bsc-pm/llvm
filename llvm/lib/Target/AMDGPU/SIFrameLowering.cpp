@@ -125,8 +125,8 @@ static void buildPrologSpill(const GCNSubtarget &ST, const SIRegisterInfo &TRI,
                              const SIMachineFunctionInfo &FuncInfo,
                              LivePhysRegs &LiveRegs, MachineFunction &MF,
                              MachineBasicBlock &MBB,
-                             MachineBasicBlock::iterator I, Register SpillReg,
-                             int FI) {
+                             MachineBasicBlock::iterator I, const DebugLoc &DL,
+                             Register SpillReg, int FI) {
   unsigned Opc = ST.enableFlatScratch() ? AMDGPU::SCRATCH_STORE_DWORD_SADDR
                                         : AMDGPU::BUFFER_STORE_DWORD_OFFSET;
 
@@ -136,7 +136,7 @@ static void buildPrologSpill(const GCNSubtarget &ST, const SIRegisterInfo &TRI,
       PtrInfo, MachineMemOperand::MOStore, FrameInfo.getObjectSize(FI),
       FrameInfo.getObjectAlign(FI));
   LiveRegs.addReg(SpillReg);
-  TRI.buildSpillLoadStore(MBB, I, Opc, FI, SpillReg, true,
+  TRI.buildSpillLoadStore(MBB, I, DL, Opc, FI, SpillReg, true,
                           FuncInfo.getStackPtrOffsetReg(), 0, MMO, nullptr,
                           &LiveRegs);
   LiveRegs.removeReg(SpillReg);
@@ -147,8 +147,8 @@ static void buildEpilogRestore(const GCNSubtarget &ST,
                                const SIMachineFunctionInfo &FuncInfo,
                                LivePhysRegs &LiveRegs, MachineFunction &MF,
                                MachineBasicBlock &MBB,
-                               MachineBasicBlock::iterator I, Register SpillReg,
-                               int FI) {
+                               MachineBasicBlock::iterator I,
+                               const DebugLoc &DL, Register SpillReg, int FI) {
   unsigned Opc = ST.enableFlatScratch() ? AMDGPU::SCRATCH_LOAD_DWORD_SADDR
                                         : AMDGPU::BUFFER_LOAD_DWORD_OFFSET;
 
@@ -157,7 +157,7 @@ static void buildEpilogRestore(const GCNSubtarget &ST,
   MachineMemOperand *MMO = MF.getMachineMemOperand(
       PtrInfo, MachineMemOperand::MOLoad, FrameInfo.getObjectSize(FI),
       FrameInfo.getObjectAlign(FI));
-  TRI.buildSpillLoadStore(MBB, I, Opc, FI, SpillReg, false,
+  TRI.buildSpillLoadStore(MBB, I, DL, Opc, FI, SpillReg, false,
                           FuncInfo.getStackPtrOffsetReg(), 0, MMO, nullptr,
                           &LiveRegs);
 }
@@ -419,9 +419,6 @@ void SIFrameLowering::emitEntryFunctionPrologue(MachineFunction &MF,
 
   Register PreloadedScratchWaveOffsetReg = MFI->getPreloadedReg(
       AMDGPUFunctionArgInfo::PRIVATE_SEGMENT_WAVE_BYTE_OFFSET);
-  // FIXME: Hack to not crash in situations which emitted an error.
-  if (!PreloadedScratchWaveOffsetReg)
-    return;
 
   // We need to do the replacement of the private segment buffer register even
   // if there are no stack objects. There could be stores to undef or a
@@ -467,7 +464,8 @@ void SIFrameLowering::emitEntryFunctionPrologue(MachineFunction &MF,
   // chosen by SITargetLowering::allocateSystemSGPRs, COPY the scratch
   // wave offset to a free SGPR.
   Register ScratchWaveOffsetReg;
-  if (TRI->isSubRegisterEq(ScratchRsrcReg, PreloadedScratchWaveOffsetReg)) {
+  if (PreloadedScratchWaveOffsetReg &&
+      TRI->isSubRegisterEq(ScratchRsrcReg, PreloadedScratchWaveOffsetReg)) {
     ArrayRef<MCPhysReg> AllSGPRs = TRI->getAllSGPR32(MF);
     unsigned NumPreloaded = MFI->getNumPreloadedSGPRs();
     AllSGPRs = AllSGPRs.slice(
@@ -485,7 +483,7 @@ void SIFrameLowering::emitEntryFunctionPrologue(MachineFunction &MF,
   } else {
     ScratchWaveOffsetReg = PreloadedScratchWaveOffsetReg;
   }
-  assert(ScratchWaveOffsetReg);
+  assert(ScratchWaveOffsetReg || !PreloadedScratchWaveOffsetReg);
 
   if (requiresStackPointerReference(MF)) {
     Register SPReg = MFI->getStackPtrOffsetReg();
@@ -506,7 +504,7 @@ void SIFrameLowering::emitEntryFunctionPrologue(MachineFunction &MF,
        (!allStackObjectsAreDead(FrameInfo) && ST.enableFlatScratch()));
 
   if ((NeedsFlatScratchInit || ScratchRsrcReg) &&
-      !ST.flatScratchIsArchitected()) {
+      PreloadedScratchWaveOffsetReg && !ST.flatScratchIsArchitected()) {
     MRI.addLiveIn(PreloadedScratchWaveOffsetReg);
     MBB.addLiveIn(PreloadedScratchWaveOffsetReg);
   }
@@ -776,7 +774,7 @@ void SIFrameLowering::emitPrologue(MachineFunction &MF,
       ScratchExecCopy = buildScratchExecCopy(LiveRegs, MF, MBB, MBBI,
                                              /*IsProlog*/ true);
 
-    buildPrologSpill(ST, TRI, *FuncInfo, LiveRegs, MF, MBB, MBBI, Reg.VGPR,
+    buildPrologSpill(ST, TRI, *FuncInfo, LiveRegs, MF, MBB, MBBI, DL, Reg.VGPR,
                      *Reg.FI);
   }
 
@@ -791,7 +789,8 @@ void SIFrameLowering::emitPrologue(MachineFunction &MF,
       ScratchExecCopy =
           buildScratchExecCopy(LiveRegs, MF, MBB, MBBI, /*IsProlog*/ true);
 
-    buildPrologSpill(ST, TRI, *FuncInfo, LiveRegs, MF, MBB, MBBI, VGPR, *FI);
+    buildPrologSpill(ST, TRI, *FuncInfo, LiveRegs, MF, MBB, MBBI, DL, VGPR,
+                     *FI);
   }
 
   if (ScratchExecCopy) {
@@ -817,7 +816,7 @@ void SIFrameLowering::emitPrologue(MachineFunction &MF,
     BuildMI(MBB, MBBI, DL, TII->get(AMDGPU::V_MOV_B32_e32), TmpVGPR)
         .addReg(FramePtrReg);
 
-    buildPrologSpill(ST, TRI, *FuncInfo, LiveRegs, MF, MBB, MBBI, TmpVGPR,
+    buildPrologSpill(ST, TRI, *FuncInfo, LiveRegs, MF, MBB, MBBI, DL, TmpVGPR,
                      FramePtrFI);
   }
 
@@ -835,7 +834,7 @@ void SIFrameLowering::emitPrologue(MachineFunction &MF,
     BuildMI(MBB, MBBI, DL, TII->get(AMDGPU::V_MOV_B32_e32), TmpVGPR)
         .addReg(BasePtrReg);
 
-    buildPrologSpill(ST, TRI, *FuncInfo, LiveRegs, MF, MBB, MBBI, TmpVGPR,
+    buildPrologSpill(ST, TRI, *FuncInfo, LiveRegs, MF, MBB, MBBI, DL, TmpVGPR,
                      BasePtrFI);
   }
 
@@ -1031,8 +1030,8 @@ void SIFrameLowering::emitEpilogue(MachineFunction &MF,
           MRI, LiveRegs, AMDGPU::VGPR_32RegClass);
       if (!TmpVGPR)
         report_fatal_error("failed to find free scratch register");
-      buildEpilogRestore(ST, TRI, *FuncInfo, LiveRegs, MF, MBB, MBBI, TmpVGPR,
-                         FramePtrFI);
+      buildEpilogRestore(ST, TRI, *FuncInfo, LiveRegs, MF, MBB, MBBI, DL,
+                         TmpVGPR, FramePtrFI);
       BuildMI(MBB, MBBI, DL, TII->get(AMDGPU::V_READFIRSTLANE_B32), FramePtrReg)
           .addReg(TmpVGPR, RegState::Kill);
     } else {
@@ -1057,8 +1056,8 @@ void SIFrameLowering::emitEpilogue(MachineFunction &MF,
           MRI, LiveRegs, AMDGPU::VGPR_32RegClass);
       if (!TmpVGPR)
         report_fatal_error("failed to find free scratch register");
-      buildEpilogRestore(ST, TRI, *FuncInfo, LiveRegs, MF, MBB, MBBI, TmpVGPR,
-                         BasePtrFI);
+      buildEpilogRestore(ST, TRI, *FuncInfo, LiveRegs, MF, MBB, MBBI, DL,
+                         TmpVGPR, BasePtrFI);
       BuildMI(MBB, MBBI, DL, TII->get(AMDGPU::V_READFIRSTLANE_B32), BasePtrReg)
           .addReg(TmpVGPR, RegState::Kill);
     } else {
@@ -1083,8 +1082,8 @@ void SIFrameLowering::emitEpilogue(MachineFunction &MF,
       ScratchExecCopy =
           buildScratchExecCopy(LiveRegs, MF, MBB, MBBI, /*IsProlog*/ false);
 
-    buildEpilogRestore(ST, TRI, *FuncInfo, LiveRegs, MF, MBB, MBBI, Reg.VGPR,
-                       *Reg.FI);
+    buildEpilogRestore(ST, TRI, *FuncInfo, LiveRegs, MF, MBB, MBBI, DL,
+                       Reg.VGPR, *Reg.FI);
   }
 
   for (const auto &Reg : FuncInfo->WWMReservedRegs) {
@@ -1097,7 +1096,8 @@ void SIFrameLowering::emitEpilogue(MachineFunction &MF,
       ScratchExecCopy =
           buildScratchExecCopy(LiveRegs, MF, MBB, MBBI, /*IsProlog*/ false);
 
-    buildEpilogRestore(ST, TRI, *FuncInfo, LiveRegs, MF, MBB, MBBI, VGPR, *FI);
+    buildEpilogRestore(ST, TRI, *FuncInfo, LiveRegs, MF, MBB, MBBI, DL, VGPR,
+                       *FI);
   }
 
   if (ScratchExecCopy) {
@@ -1157,11 +1157,7 @@ void SIFrameLowering::processFunctionBeforeFrameFinalized(
     bool SeenDbgInstr = false;
 
     for (MachineBasicBlock &MBB : MF) {
-      MachineBasicBlock::iterator Next;
-      for (auto I = MBB.begin(), E = MBB.end(); I != E; I = Next) {
-        MachineInstr &MI = *I;
-        Next = std::next(I);
-
+      for (MachineInstr &MI : llvm::make_early_inc_range(MBB)) {
         if (MI.isDebugInstr())
           SeenDbgInstr = true;
 

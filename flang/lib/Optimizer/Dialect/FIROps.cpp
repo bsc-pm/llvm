@@ -25,7 +25,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 
 namespace {
-#include "flang/Optimizer/Transforms/RewritePatterns.inc"
+#include "flang/Optimizer/Dialect/CanonicalizationPatterns.inc"
 } // namespace
 using namespace fir;
 
@@ -57,8 +57,6 @@ static bool verifyInType(mlir::Type inType,
       if (verifyInType(field.second, visited))
         return true;
     visited.pop_back();
-  } else if (auto rt = inType.dyn_cast<fir::PointerType>()) {
-    return verifyInType(rt.getEleTy(), visited);
   }
   return false;
 }
@@ -348,10 +346,14 @@ static mlir::LogicalResult verify(fir::ArrayCoorOp op) {
       return op.emitOpError("number of indices do not match dim rank");
   }
 
-  if (auto sliceOp = op.slice())
+  if (auto sliceOp = op.slice()) {
+    if (auto sl = mlir::dyn_cast_or_null<fir::SliceOp>(sliceOp.getDefiningOp()))
+      if (!sl.substr().empty())
+        return op.emitOpError("array_coor cannot take a slice with substring");
     if (auto sliceTy = sliceOp.getType().dyn_cast<fir::SliceType>())
       if (sliceTy.getRank() != arrDim)
         return op.emitOpError("rank of dimension in slice mismatched");
+  }
 
   return mlir::success();
 }
@@ -407,10 +409,14 @@ static mlir::LogicalResult verify(fir::ArrayLoadOp op) {
       return op.emitOpError("rank of dimension mismatched");
   }
 
-  if (auto sliceOp = op.slice())
+  if (auto sliceOp = op.slice()) {
+    if (auto sl = mlir::dyn_cast_or_null<fir::SliceOp>(sliceOp.getDefiningOp()))
+      if (!sl.substr().empty())
+        return op.emitOpError("array_load cannot take a slice with substring");
     if (auto sliceTy = sliceOp.getType().dyn_cast<fir::SliceType>())
       if (sliceTy.getRank() != arrDim)
         return op.emitOpError("rank of dimension in slice mismatched");
+  }
 
   return mlir::success();
 }
@@ -423,8 +429,11 @@ static mlir::LogicalResult verify(fir::ArrayMergeStoreOp op) {
   if (!isa<ArrayLoadOp>(op.original().getDefiningOp()))
     return op.emitOpError("operand #0 must be result of a fir.array_load op");
   if (auto sl = op.slice()) {
-    if (auto *slOp = sl.getDefiningOp()) {
-      auto sliceOp = mlir::cast<fir::SliceOp>(slOp);
+    if (auto sliceOp =
+            mlir::dyn_cast_or_null<fir::SliceOp>(sl.getDefiningOp())) {
+      if (!sliceOp.substr().empty())
+        return op.emitOpError(
+            "array_merge_store cannot take a slice with substring");
       if (!sliceOp.fields().empty()) {
         // This is an intra-object merge, where the slice is projecting the
         // subfields that are to be overwritten by the merge operation.
@@ -1274,39 +1283,6 @@ mlir::ParseResult fir::GlobalOp::verifyValidLinkage(StringRef linkage) {
   return mlir::success(llvm::is_contained(validNames, linkage));
 }
 
-template <bool AllowFields>
-static void appendAsAttribute(llvm::SmallVectorImpl<mlir::Attribute> &attrs,
-                              mlir::Value val) {
-  if (auto *op = val.getDefiningOp()) {
-    if (auto cop = mlir::dyn_cast<mlir::arith::ConstantOp>(op)) {
-      // append the integer constant value
-      if (auto iattr = cop.value().dyn_cast<mlir::IntegerAttr>()) {
-        attrs.push_back(iattr);
-        return;
-      }
-    } else if (auto fld = mlir::dyn_cast<fir::FieldIndexOp>(op)) {
-      if constexpr (AllowFields) {
-        // append the field name and the record type
-        attrs.push_back(fld.field_idAttr());
-        attrs.push_back(fld.on_typeAttr());
-        return;
-      }
-    }
-  }
-  llvm::report_fatal_error("cannot build Op with these arguments");
-}
-
-template <bool AllowFields = true>
-static mlir::ArrayAttr collectAsAttributes(mlir::MLIRContext *ctxt,
-                                           OperationState &result,
-                                           llvm::ArrayRef<mlir::Value> inds) {
-  llvm::SmallVector<mlir::Attribute> attrs;
-  for (auto v : inds)
-    appendAsAttribute<AllowFields>(attrs, v);
-  assert(!attrs.empty());
-  return mlir::ArrayAttr::get(ctxt, attrs);
-}
-
 //===----------------------------------------------------------------------===//
 // GlobalLenOp
 //===----------------------------------------------------------------------===//
@@ -1338,18 +1314,6 @@ static mlir::ParseResult parseGlobalLenOp(mlir::OpAsmParser &parser,
 static void print(mlir::OpAsmPrinter &p, fir::GlobalLenOp &op) {
   p << ' ' << op.getOperation()->getAttr(fir::GlobalLenOp::lenParamAttrName())
     << ", " << op.getOperation()->getAttr(fir::GlobalLenOp::intAttrName());
-}
-
-//===----------------------------------------------------------------------===//
-// ExtractValueOp
-//===----------------------------------------------------------------------===//
-
-void fir::ExtractValueOp::build(mlir::OpBuilder &builder,
-                                OperationState &result, mlir::Type resTy,
-                                mlir::Value aggVal,
-                                llvm::ArrayRef<mlir::Value> inds) {
-  auto aa = collectAsAttributes<>(builder.getContext(), result, inds);
-  build(builder, result, resTy, aggVal, aa);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1419,16 +1383,10 @@ void fir::FieldIndexOp::build(mlir::OpBuilder &builder,
 // InsertOnRangeOp
 //===----------------------------------------------------------------------===//
 
-void fir::InsertOnRangeOp::build(mlir::OpBuilder &builder,
-                                 OperationState &result, mlir::Type resTy,
-                                 mlir::Value aggVal, mlir::Value eleVal,
-                                 llvm::ArrayRef<mlir::Value> inds) {
-  auto aa = collectAsAttributes<false>(builder.getContext(), result, inds);
-  build(builder, result, resTy, aggVal, eleVal, aa);
-}
-
 /// Range bounds must be nonnegative, and the range must not be empty.
 static mlir::LogicalResult verify(fir::InsertOnRangeOp op) {
+  if (fir::hasDynamicSize(op.seq().getType()))
+    return op.emitOpError("must have constant shape and size");
   if (op.coor().size() < 2 || op.coor().size() % 2 != 0)
     return op.emitOpError("has uneven number of values in ranges");
   bool rangeIsKnownToBeNonempty = false;
@@ -1449,14 +1407,6 @@ static mlir::LogicalResult verify(fir::InsertOnRangeOp op) {
 //===----------------------------------------------------------------------===//
 // InsertValueOp
 //===----------------------------------------------------------------------===//
-
-void fir::InsertValueOp::build(mlir::OpBuilder &builder, OperationState &result,
-                               mlir::Type resTy, mlir::Value aggVal,
-                               mlir::Value eleVal,
-                               llvm::ArrayRef<mlir::Value> inds) {
-  auto aa = collectAsAttributes<>(builder.getContext(), result, inds);
-  build(builder, result, resTy, aggVal, eleVal, aa);
-}
 
 static bool checkIsIntegerConstant(mlir::Attribute attr, int64_t conVal) {
   if (auto iattr = attr.dyn_cast<mlir::IntegerAttr>())
@@ -2312,6 +2262,15 @@ fir::SelectOp::getSuccessorOperands(llvm::ArrayRef<mlir::Value> operands,
   return {getSubOperands(oper, getSubOperands(2, operands, segments), a)};
 }
 
+llvm::Optional<mlir::ValueRange>
+fir::SelectOp::getSuccessorOperands(mlir::ValueRange operands, unsigned oper) {
+  auto a =
+      (*this)->getAttrOfType<mlir::DenseIntElementsAttr>(getTargetOffsetAttr());
+  auto segments = (*this)->getAttrOfType<mlir::DenseIntElementsAttr>(
+      getOperandSegmentSizeAttr());
+  return {getSubOperands(oper, getSubOperands(2, operands, segments), a)};
+}
+
 unsigned fir::SelectOp::targetOffsetSize() {
   return denseElementsSize((*this)->getAttrOfType<mlir::DenseIntElementsAttr>(
       getTargetOffsetAttr()));
@@ -2338,6 +2297,16 @@ fir::SelectCaseOp::getCompareOperands(llvm::ArrayRef<mlir::Value> operands,
   return {getSubOperands(cond, getSubOperands(1, operands, segments), a)};
 }
 
+llvm::Optional<mlir::ValueRange>
+fir::SelectCaseOp::getCompareOperands(mlir::ValueRange operands,
+                                      unsigned cond) {
+  auto a = (*this)->getAttrOfType<mlir::DenseIntElementsAttr>(
+      getCompareOffsetAttr());
+  auto segments = (*this)->getAttrOfType<mlir::DenseIntElementsAttr>(
+      getOperandSegmentSizeAttr());
+  return {getSubOperands(cond, getSubOperands(1, operands, segments), a)};
+}
+
 llvm::Optional<mlir::MutableOperandRange>
 fir::SelectCaseOp::getMutableSuccessorOperands(unsigned oper) {
   return ::getMutableSuccessorOperands(oper, targetArgsMutable(),
@@ -2346,6 +2315,16 @@ fir::SelectCaseOp::getMutableSuccessorOperands(unsigned oper) {
 
 llvm::Optional<llvm::ArrayRef<mlir::Value>>
 fir::SelectCaseOp::getSuccessorOperands(llvm::ArrayRef<mlir::Value> operands,
+                                        unsigned oper) {
+  auto a =
+      (*this)->getAttrOfType<mlir::DenseIntElementsAttr>(getTargetOffsetAttr());
+  auto segments = (*this)->getAttrOfType<mlir::DenseIntElementsAttr>(
+      getOperandSegmentSizeAttr());
+  return {getSubOperands(oper, getSubOperands(2, operands, segments), a)};
+}
+
+llvm::Optional<mlir::ValueRange>
+fir::SelectCaseOp::getSuccessorOperands(mlir::ValueRange operands,
                                         unsigned oper) {
   auto a =
       (*this)->getAttrOfType<mlir::DenseIntElementsAttr>(getTargetOffsetAttr());
@@ -2605,6 +2584,16 @@ fir::SelectRankOp::getSuccessorOperands(llvm::ArrayRef<mlir::Value> operands,
   return {getSubOperands(oper, getSubOperands(2, operands, segments), a)};
 }
 
+llvm::Optional<mlir::ValueRange>
+fir::SelectRankOp::getSuccessorOperands(mlir::ValueRange operands,
+                                        unsigned oper) {
+  auto a =
+      (*this)->getAttrOfType<mlir::DenseIntElementsAttr>(getTargetOffsetAttr());
+  auto segments = (*this)->getAttrOfType<mlir::DenseIntElementsAttr>(
+      getOperandSegmentSizeAttr());
+  return {getSubOperands(oper, getSubOperands(2, operands, segments), a)};
+}
+
 unsigned fir::SelectRankOp::targetOffsetSize() {
   return denseElementsSize((*this)->getAttrOfType<mlir::DenseIntElementsAttr>(
       getTargetOffsetAttr()));
@@ -2811,13 +2800,21 @@ static mlir::LogicalResult verify(fir::ShiftOp &op) {
 // SliceOp
 //===----------------------------------------------------------------------===//
 
+void fir::SliceOp::build(mlir::OpBuilder &builder, mlir::OperationState &result,
+                         mlir::ValueRange trips, mlir::ValueRange path,
+                         mlir::ValueRange substr) {
+  const auto rank = trips.size() / 3;
+  auto sliceTy = fir::SliceType::get(builder.getContext(), rank);
+  build(builder, result, sliceTy, trips, path, substr);
+}
+
 /// Return the output rank of a slice op. The output rank must be between 1 and
 /// the rank of the array being sliced (inclusive).
 unsigned fir::SliceOp::getOutputRank(mlir::ValueRange triples) {
   unsigned rank = 0;
   if (!triples.empty()) {
     for (unsigned i = 1, end = triples.size(); i < end; i += 3) {
-      auto op = triples[i].getDefiningOp();
+      auto *op = triples[i].getDefiningOp();
       if (!mlir::isa_and_nonnull<fir::UndefOp>(op))
         ++rank;
     }

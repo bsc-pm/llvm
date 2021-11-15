@@ -393,6 +393,9 @@ void CodeGenFunction::EmitStmt(const Stmt *S, ArrayRef<const Attr *> Attrs) {
   case Stmt::OMPMaskedDirectiveClass:
     EmitOMPMaskedDirective(cast<OMPMaskedDirective>(*S));
     break;
+  case Stmt::OMPGenericLoopDirectiveClass:
+    EmitOMPGenericLoopDirective(cast<OMPGenericLoopDirective>(*S));
+    break;
   // OmpSs directives
   case Stmt::OSSTaskwaitDirectiveClass:
     EmitOSSTaskwaitDirective(cast<OSSTaskwaitDirective>(*S));
@@ -2238,20 +2241,6 @@ static void UpdateAsmCallInst(llvm::CallBase &Result, bool HasSideEffect,
       Result.addFnAttr(llvm::Attribute::ReadNone);
     else if (ReadOnly)
       Result.addFnAttr(llvm::Attribute::ReadOnly);
-  }
-
-  // Attach OpenMP assumption attributes from the caller, if they exist.
-  if (CGF.CGM.getLangOpts().OpenMP) {
-    SmallVector<StringRef, 4> Attrs;
-
-    for (const AssumptionAttr *AA :
-         CGF.CurFuncDecl->specific_attrs<AssumptionAttr>())
-      AA->getAssumption().split(Attrs, ",");
-
-    if (!Attrs.empty())
-      Result.addFnAttr(
-          llvm::Attribute::get(CGF.getLLVMContext(), llvm::AssumptionAttrKey,
-                               llvm::join(Attrs.begin(), Attrs.end(), ",")));
   }
 
   // Slap the source location of the inline asm into a !srcloc metadata on the

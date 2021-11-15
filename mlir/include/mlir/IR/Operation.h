@@ -27,8 +27,8 @@ namespace mlir {
 /// 'Block' class.
 class alignas(8) Operation final
     : public llvm::ilist_node_with_parent<Operation, Block>,
-      private llvm::TrailingObjects<Operation, BlockOperand, Region,
-                                    detail::OperandStorage> {
+      private llvm::TrailingObjects<Operation, detail::OperandStorage,
+                                    BlockOperand, Region, OpOperand> {
 public:
   /// Create a new Operation with the specific fields.
   static Operation *create(Location location, OperationName name,
@@ -151,21 +151,8 @@ public:
 
   /// Replace all uses of results of this operation with the provided 'values'.
   template <typename ValuesT>
-  std::enable_if_t<!std::is_convertible<ValuesT, Operation *>::value>
-  replaceAllUsesWith(ValuesT &&values) {
-    assert(std::distance(values.begin(), values.end()) == getNumResults() &&
-           "expected 'values' to correspond 1-1 with the number of results");
-
-    auto valueIt = values.begin();
-    for (unsigned i = 0, e = getNumResults(); i != e; ++i)
-      getResult(i).replaceAllUsesWith(*(valueIt++));
-  }
-
-  /// Replace all uses of results of this operation with results of 'op'.
-  void replaceAllUsesWith(Operation *op) {
-    assert(getNumResults() == op->getNumResults());
-    for (unsigned i = 0, e = getNumResults(); i != e; ++i)
-      getResult(i).replaceAllUsesWith(op->getResult(i));
+  void replaceAllUsesWith(ValuesT &&values) {
+    getResults().replaceAllUsesWith(std::forward<ValuesT>(values));
   }
 
   /// Destroys this operation and its subclass data.
@@ -257,7 +244,10 @@ public:
   operand_iterator operand_end() { return getOperands().end(); }
 
   /// Returns an iterator on the underlying Value's.
-  operand_range getOperands() { return operand_range(this); }
+  operand_range getOperands() {
+    MutableArrayRef<OpOperand> operands = getOpOperands();
+    return OperandRange(operands.data(), operands.size());
+  }
 
   MutableArrayRef<OpOperand> getOpOperands() {
     return LLVM_LIKELY(hasOperandStorage) ? getOperandStorage().getOperands()
@@ -342,8 +332,8 @@ public:
 
   /// Return true if the operation has an attribute with the provided name,
   /// false otherwise.
-  bool hasAttr(Identifier name) { return static_cast<bool>(getAttr(name)); }
-  bool hasAttr(StringRef name) { return static_cast<bool>(getAttr(name)); }
+  bool hasAttr(Identifier name) { return attrs.contains(name); }
+  bool hasAttr(StringRef name) { return attrs.contains(name); }
   template <typename AttrClass, typename NameT>
   bool hasAttrOfType(NameT &&name) {
     return static_cast<bool>(
@@ -711,8 +701,11 @@ private:
   friend class llvm::ilist_node_with_parent<Operation, Block>;
 
   // This stuff is used by the TrailingObjects template.
-  friend llvm::TrailingObjects<Operation, BlockOperand, Region,
-                               detail::OperandStorage>;
+  friend llvm::TrailingObjects<Operation, detail::OperandStorage, BlockOperand,
+                               Region, OpOperand>;
+  size_t numTrailingObjects(OverloadToken<detail::OperandStorage>) const {
+    return hasOperandStorage ? 1 : 0;
+  }
   size_t numTrailingObjects(OverloadToken<BlockOperand>) const {
     return numSuccs;
   }

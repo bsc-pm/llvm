@@ -16,6 +16,7 @@
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/DialectImplementation.h"
@@ -44,10 +45,6 @@
 
 using namespace mlir;
 using namespace mlir::detail;
-
-void Identifier::print(raw_ostream &os) const { os << str(); }
-
-void Identifier::dump() const { print(llvm::errs()); }
 
 void OperationName::print(raw_ostream &os) const { os << getStringRef(); }
 
@@ -1338,7 +1335,7 @@ void AsmPrinter::Impl::printLocationInternal(LocationAttr loc, bool pretty) {
       })
       .Case<FileLineColLoc>([&](FileLineColLoc loc) {
         if (pretty) {
-          os << loc.getFilename();
+          os << loc.getFilename().getValue();
         } else {
           os << "\"";
           printEscapedString(loc.getFilename(), os);
@@ -1608,6 +1605,9 @@ void AsmPrinter::Impl::printAttribute(Attribute attr,
   if (state && succeeded(state->getAliasState().getAlias(attr, os)))
     return;
 
+  if (!isa<BuiltinDialect>(attr.getDialect()))
+    return printDialectAttribute(attr);
+
   auto attrType = attr.getType();
   if (auto opaqueAttr = attr.dyn_cast<OpaqueAttr>()) {
     printDialectSymbol(os, "#", opaqueAttr.getDialectNamespace(),
@@ -1689,7 +1689,7 @@ void AsmPrinter::Impl::printAttribute(Attribute attr,
     if (printerFlags.shouldElideElementsAttr(opaqueAttr)) {
       printElidedElementsAttr(os);
     } else {
-      os << "opaque<\"" << opaqueAttr.getDialect() << "\", \"0x"
+      os << "opaque<" << opaqueAttr.getDialect() << ", \"0x"
          << llvm::toHex(opaqueAttr.getValue()) << "\">";
     }
 
@@ -1728,11 +1728,7 @@ void AsmPrinter::Impl::printAttribute(Attribute attr,
 
   } else if (auto locAttr = attr.dyn_cast<LocationAttr>()) {
     printLocation(locAttr);
-
-  } else {
-    return printDialectAttribute(attr);
   }
-
   // Don't print the type if we must elide it, or if it is a None type.
   if (typeElision != AttrTypeElision::Must && !attrType.isa<NoneType>()) {
     os << " : ";
