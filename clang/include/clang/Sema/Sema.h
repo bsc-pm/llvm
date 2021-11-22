@@ -75,7 +75,6 @@
 
 namespace llvm {
   class APSInt;
-  template <typename ValueT> struct DenseMapInfo;
   template <typename ValueT, typename ValueInfoT> class DenseSet;
   class SmallBitVector;
   struct InlineAsmIdentifierInfo;
@@ -4365,10 +4364,6 @@ public:
   llvm::Error isValidSectionSpecifier(StringRef Str);
   bool checkSectionName(SourceLocation LiteralLoc, StringRef Str);
   bool checkTargetAttr(SourceLocation LiteralLoc, StringRef Str);
-  bool checkTargetClonesAttrString(SourceLocation LiteralLoc, StringRef Str,
-                                   const StringLiteral *Literal,
-                                   bool &HasDefault, bool &HasCommas,
-                                   SmallVectorImpl<StringRef> &Strings);
   bool checkMSInheritanceAttrOnDefinition(
       CXXRecordDecl *RD, SourceRange Range, bool BestCase,
       MSInheritanceModel SemanticSpelling);
@@ -5132,7 +5127,8 @@ public:
   /// type -- entities referenced by the type are now referenced.
   void MarkDeclarationsReferencedInType(SourceLocation Loc, QualType T);
   void MarkDeclarationsReferencedInExpr(Expr *E,
-                                        bool SkipLocalVariables = false);
+                                        bool SkipLocalVariables = false,
+                                        ArrayRef<const Expr *> StopAt = None);
 
   /// Try to recover by turning the given expression into a
   /// call.  Returns true if recovery was attempted or an error was
