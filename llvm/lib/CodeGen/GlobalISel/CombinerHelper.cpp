@@ -3732,8 +3732,7 @@ void CombinerHelper::applyExtendThroughPhis(MachineInstr &MI,
   Builder.setInstrAndDebugLoc(MI);
   auto NewPhi = Builder.buildInstrNoInsert(TargetOpcode::G_PHI);
   NewPhi.addDef(DstReg);
-  for (unsigned SrcIdx = 1; SrcIdx < MI.getNumOperands(); ++SrcIdx) {
-    auto &MO = MI.getOperand(SrcIdx);
+  for (const MachineOperand &MO : llvm::drop_begin(MI.operands())) {
     if (!MO.isReg()) {
       NewPhi.addMBB(MO.getMBB());
       continue;
@@ -3825,8 +3824,7 @@ bool CombinerHelper::matchExtractAllEltsFromBuildVector(
   unsigned NumElts = DstTy.getNumElements();
 
   SmallBitVector ExtractedElts(NumElts);
-  for (auto &II : make_range(MRI.use_instr_nodbg_begin(DstReg),
-                             MRI.use_instr_nodbg_end())) {
+  for (MachineInstr &II : MRI.use_nodbg_instructions(DstReg)) {
     if (II.getOpcode() != TargetOpcode::G_EXTRACT_VECTOR_ELT)
       return false;
     auto Cst = getIConstantVRegVal(II.getOperand(2).getReg(), MRI);

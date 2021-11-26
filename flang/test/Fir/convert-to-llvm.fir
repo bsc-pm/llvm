@@ -80,7 +80,7 @@ fir.global @symbol : i64 {
 fir.global internal @_QEmultiarray : !fir.array<32x32xi32> {
   %c0_i32 = arith.constant 1 : i32
   %0 = fir.undefined !fir.array<32x32xi32>
-  %2 = fir.insert_on_range %0, %c0_i32, [0 : index, 31 : index, 0 : index, 31 : index] : (!fir.array<32x32xi32>, i32) -> !fir.array<32x32xi32>
+  %2 = fir.insert_on_range %0, %c0_i32 from (0, 0) to (31, 31) : (!fir.array<32x32xi32>, i32) -> !fir.array<32x32xi32>
   fir.has_value %2 : !fir.array<32x32xi32>
 }
 
@@ -97,7 +97,7 @@ fir.global internal @_QEmultiarray : !fir.array<32x32xi32> {
 fir.global internal @_QEmultiarray : !fir.array<32xi32> {
   %c0_i32 = arith.constant 1 : i32
   %0 = fir.undefined !fir.array<32xi32>
-  %2 = fir.insert_on_range %0, %c0_i32, [5 : index, 31 : index] : (!fir.array<32xi32>, i32) -> !fir.array<32xi32>
+  %2 = fir.insert_on_range %0, %c0_i32 from (5) to (31) : (!fir.array<32xi32>, i32) -> !fir.array<32xi32>
   fir.has_value %2 : !fir.array<32xi32>
 }
 
@@ -1569,3 +1569,23 @@ func @field_index_dynamic_size() -> () {
 // CHECK-NEXT: %{{.*}} = llvm.call @custom_typeP.field_1.offset() {field = 0 : i64} : () -> i32
 // CHECK-NEXT: %{{.*}} = llvm.call @custom_typeP.field_2.offset() {field = 1 : i64} : () -> i32
 // CHECK-NEXT:  llvm.return
+
+// -----
+
+// Check `fir.no_reassoc` conversion to LLVM IR dialect
+
+func @no_reassoc(%arg0: !fir.ref<i32>) {
+  %0 = fir.alloca i32
+  %1 = fir.load %arg0 : !fir.ref<i32>
+  %2 = fir.no_reassoc %1 : i32
+  fir.store %2 to %0 : !fir.ref<i32>
+  return
+}
+
+// CHECK-LABEL: llvm.func @no_reassoc(
+// CHECK-SAME:                        %[[ARG0:.*]]: !llvm.ptr<i32>) {
+// CHECK:         %[[C1:.*]] = llvm.mlir.constant(1 : i64) : i64
+// CHECK:         %[[ALLOC:.*]] = llvm.alloca %[[C1]] x i32 {in_type = i32, operand_segment_sizes = dense<0> : vector<2xi32>} : (i64) -> !llvm.ptr<i32>
+// CHECK:         %[[LOAD:.*]] = llvm.load %[[ARG0]] : !llvm.ptr<i32>
+// CHECK:         llvm.store %[[LOAD]], %[[ALLOC]] : !llvm.ptr<i32>
+// CHECK:         llvm.return
