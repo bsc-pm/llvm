@@ -1163,8 +1163,7 @@ void X86InstrInfo::reMaterialize(MachineBasicBlock &MBB,
 
 /// True if MI has a condition code def, e.g. EFLAGS, that is not marked dead.
 bool X86InstrInfo::hasLiveCondCodeDef(MachineInstr &MI) const {
-  for (unsigned i = 0, e = MI.getNumOperands(); i != e; ++i) {
-    MachineOperand &MO = MI.getOperand(i);
+  for (const MachineOperand &MO : MI.operands()) {
     if (MO.isReg() && MO.isDef() &&
         MO.getReg() == X86::EFLAGS && !MO.isDead()) {
       return true;
@@ -5676,10 +5675,8 @@ static MachineInstr *FuseTwoAddrInst(MachineFunction &MF, unsigned Opcode,
     MachineOperand &MO = MI.getOperand(i + 2);
     MIB.add(MO);
   }
-  for (unsigned i = NumOps + 2, e = MI.getNumOperands(); i != e; ++i) {
-    MachineOperand &MO = MI.getOperand(i);
+  for (const MachineOperand &MO : llvm::drop_begin(MI.operands(), NumOps + 2))
     MIB.add(MO);
-  }
 
   updateOperandRegConstraints(MF, *NewMI, TII);
 
@@ -9003,6 +9000,7 @@ X86InstrInfo::getSerializableDirectMachineOperandTargetFlags() const {
       {MO_GOT, "x86-got"},
       {MO_GOTOFF, "x86-gotoff"},
       {MO_GOTPCREL, "x86-gotpcrel"},
+      {MO_GOTPCREL_NORELAX, "x86-gotpcrel-norelax"},
       {MO_PLT, "x86-plt"},
       {MO_TLSGD, "x86-tlsgd"},
       {MO_TLSLD, "x86-tlsld"},
