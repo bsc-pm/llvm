@@ -139,20 +139,7 @@ static void printEhFrame(raw_ostream &os, const EhFrameSection *sec) {
   }
 }
 
-void elf::writeMapFile() {
-  if (config->mapFile.empty())
-    return;
-
-  llvm::TimeTraceScope timeScope("Write map file");
-
-  // Open a map file for writing.
-  std::error_code ec;
-  raw_fd_ostream os(config->mapFile, ec, sys::fs::OF_None);
-  if (ec) {
-    error("cannot open " + config->mapFile + ": " + ec.message());
-    return;
-  }
-
+static void writeMapFile(raw_fd_ostream &os) {
   // Collect symbol info that we want to print out.
   std::vector<Defined *> syms = getSymbols();
   SymbolMapTy sectionSyms = getSectionSyms(syms);
@@ -187,7 +174,7 @@ void elf::writeMapFile() {
             continue;
           }
 
-          writeHeader(os, isec->getVA(0), osec->getLMA() + isec->getOffset(0),
+          writeHeader(os, isec->getVA(), osec->getLMA() + isec->outSecOff,
                       isec->getSize(), isec->alignment);
           os << indent8 << toString(isec) << '\n';
           for (Symbol *sym : sectionSyms[isec])
@@ -235,10 +222,6 @@ void elf::writeWhyExtract() {
   }
 }
 
-static void print(StringRef a, StringRef b) {
-  lld::outs() << left_justify(a, 49) << " " << b << "\n";
-}
-
 // Output a cross reference table to stdout. This is for --cref.
 //
 // For each global symbol, we print out a file that defines the symbol
@@ -250,10 +233,7 @@ static void print(StringRef a, StringRef b) {
 //
 // In this case, strlen is defined by libc.so.6 and used by other two
 // files.
-void elf::writeCrossReferenceTable() {
-  if (!config->cref)
-    return;
-
+static void writeCref(raw_fd_ostream &os) {
   // Collect symbols and files.
   MapVector<Symbol *, SetVector<InputFile *>> map;
   for (InputFile *file : objectFiles) {
@@ -266,8 +246,12 @@ void elf::writeCrossReferenceTable() {
     }
   }
 
-  // Print out a header.
-  lld::outs() << "Cross Reference Table\n\n";
+  auto print = [&](StringRef a, StringRef b) {
+    os << left_justify(a, 49) << ' ' << b << '\n';
+  };
+
+  // Print a blank line and a header. The format matches GNU ld.
+  os << "\nCross Reference Table\n\n";
   print("Symbol", "File");
 
   // Print out a table.
@@ -282,6 +266,27 @@ void elf::writeCrossReferenceTable() {
   }
 }
 
+void elf::writeMapAndCref() {
+  if (config->mapFile.empty() && !config->cref)
+    return;
+
+  llvm::TimeTraceScope timeScope("Write map file");
+
+  // Open a map file for writing.
+  std::error_code ec;
+  StringRef mapFile = config->mapFile.empty() ? "-" : config->mapFile;
+  raw_fd_ostream os(mapFile, ec, sys::fs::OF_None);
+  if (ec) {
+    error("cannot open " + mapFile + ": " + ec.message());
+    return;
+  }
+
+  if (!config->mapFile.empty())
+    writeMapFile(os);
+  if (config->cref)
+    writeCref(os);
+}
+
 void elf::writeArchiveStats() {
   if (config->printArchiveStats.empty())
     return;
@@ -294,8 +299,8 @@ void elf::writeArchiveStats() {
     return;
   }
 
-  os << "members\tfetched\tarchive\n";
+  os << "members\textracted\tarchive\n";
   for (const ArchiveFile *f : archiveFiles)
-    os << f->getMemberCount() << '\t' << f->getFetchedMemberCount() << '\t'
+    os << f->getMemberCount() << '\t' << f->getExtractedMemberCount() << '\t'
        << f->getName() << '\n';
 }
