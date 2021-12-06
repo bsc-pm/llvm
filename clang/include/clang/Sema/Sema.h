@@ -1301,6 +1301,11 @@ public:
       EK_Decltype, EK_TemplateArgument, EK_Other
     } ExprContext;
 
+    // A context can be nested in both a discarded statement context and
+    // an immediate function context, so they need to be tracked independently.
+    bool InDiscardedStatement;
+    bool InImmediateFunctionContext;
+
     ExpressionEvaluationContextRecord(ExpressionEvaluationContext Context,
                                       unsigned NumCleanupObjects,
                                       CleanupInfo ParentCleanup,
@@ -1308,7 +1313,8 @@ public:
                                       ExpressionKind ExprContext)
         : Context(Context), ParentCleanup(ParentCleanup),
           NumCleanupObjects(NumCleanupObjects), NumTypos(0),
-          ManglingContextDecl(ManglingContextDecl), ExprContext(ExprContext) {}
+          ManglingContextDecl(ManglingContextDecl), ExprContext(ExprContext),
+          InDiscardedStatement(false), InImmediateFunctionContext(false) {}
 
     bool isUnevaluated() const {
       return Context == ExpressionEvaluationContext::Unevaluated ||
@@ -1322,7 +1328,13 @@ public:
     }
 
     bool isImmediateFunctionContext() const {
-      return Context == ExpressionEvaluationContext::ImmediateFunctionContext;
+      return Context == ExpressionEvaluationContext::ImmediateFunctionContext ||
+             InImmediateFunctionContext;
+    }
+
+    bool isDiscardedStatementContext() const {
+      return Context == ExpressionEvaluationContext::DiscardedStatement ||
+             InDiscardedStatement;
     }
   };
 
@@ -4364,6 +4376,10 @@ public:
   llvm::Error isValidSectionSpecifier(StringRef Str);
   bool checkSectionName(SourceLocation LiteralLoc, StringRef Str);
   bool checkTargetAttr(SourceLocation LiteralLoc, StringRef Str);
+  bool checkTargetClonesAttrString(SourceLocation LiteralLoc, StringRef Str,
+                                   const StringLiteral *Literal,
+                                   bool &HasDefault, bool &HasCommas,
+                                   SmallVectorImpl<StringRef> &Strings);
   bool checkMSInheritanceAttrOnDefinition(
       CXXRecordDecl *RD, SourceRange Range, bool BestCase,
       MSInheritanceModel SemanticSpelling);
@@ -9172,14 +9188,7 @@ public:
   bool isImmediateFunctionContext() const {
     assert(!ExprEvalContexts.empty() &&
            "Must be in an expression evaluation context");
-    for (const ExpressionEvaluationContextRecord &context :
-         llvm::reverse(ExprEvalContexts)) {
-      if (context.isImmediateFunctionContext())
-        return true;
-      if (context.isUnevaluated())
-        return false;
-    }
-    return false;
+    return ExprEvalContexts.back().isImmediateFunctionContext();
   }
 
   /// RAII class used to determine whether SFINAE has

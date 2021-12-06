@@ -13,6 +13,8 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/Operation.h"
 
+using namespace mlir;
+
 namespace mlir {
 namespace linalg {
 namespace comprehensive_bufferize {
@@ -20,6 +22,20 @@ namespace tensor_ext {
 
 using tensor::ExtractSliceOp;
 using tensor::InsertSliceOp;
+
+namespace {
+/// Extra bufferization state that is required for bufferization of tensor ops.
+struct TensorBufferizationState : public DialectBufferizationState {
+  /// InsertSliceOps that bufferize inplace and do not require a copy.
+  DenseSet<Operation *> insertSliceOpsWithoutCopy;
+};
+} // namespace
+
+static TensorBufferizationState &
+getTensorBufferizationState(BufferizationState &state) {
+  return state.getDialectState<TensorBufferizationState>(
+      tensor::TensorDialect::getDialectNamespace());
+}
 
 struct CastOpInterface
     : public BufferizableOpInterface::ExternalModel<CastOpInterface,
@@ -214,6 +230,50 @@ struct ExtractOpInterface
   }
 };
 
+struct InsertOpInterface
+    : public BufferizableOpInterface::ExternalModel<InsertOpInterface,
+                                                    tensor::InsertOp> {
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand) const {
+    return true;
+  }
+
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand) const {
+    return true;
+  }
+
+  OpResult getAliasingOpResult(Operation *op, OpOperand &opOperand) const {
+    assert(&opOperand == &op->getOpOperand(1) /*dest*/ &&
+           "expected dest OpOperand");
+    return op->getOpResult(0);
+  }
+
+  SmallVector<OpOperand *> getAliasingOpOperand(Operation *op,
+                                                OpResult opResult) const {
+    return {&op->getOpOperand(1) /*dest*/};
+  }
+
+  LogicalResult bufferize(Operation *op, OpBuilder &b,
+                          BufferizationState &state) const {
+    auto insertOp = cast<tensor::InsertOp>(op);
+
+    // Take a guard before anything else.
+    OpBuilder::InsertionGuard g(b);
+    b.setInsertionPoint(insertOp);
+
+    Location loc = insertOp.getLoc();
+    Value destMemref = getResultBuffer(b, insertOp->getOpResult(0), state);
+    b.create<memref::StoreOp>(loc, insertOp.scalar(), destMemref,
+                              insertOp.indices());
+    state.mapBuffer(insertOp, destMemref);
+    state.aliasInfo.insertNewBufferAlias(insertOp, destMemref);
+    return success();
+  }
+
+  BufferRelation bufferRelation(Operation *op, OpOperand &opOperand) const {
+    return BufferRelation::Equivalent;
+  }
+};
+
 /// Return true if the (ExtractSliceOp, InsertSliceOp) pair match (i.e.
 /// equivalent operand / result and same offset/sizes/strides specification).
 ///
@@ -374,6 +434,7 @@ struct InsertSliceOpInterface
     // catastrophically bad scheduling decision.
     // TODO: be very loud about it or even consider failing the pass.
     auto insertSliceOp = cast<tensor::InsertSliceOp>(op);
+    TensorBufferizationState &tensorState = getTensorBufferizationState(state);
 
     // Take a guard before anything else.
     OpBuilder::InsertionGuard g(b);
@@ -385,15 +446,8 @@ struct InsertSliceOpInterface
     if (!dstMemref)
       return failure();
 
-    // A copy of the source buffer is needed if either:
-    //   - The producer of `source` is not inplace. This is the case where a
-    //     slice is computed out of place into the inplace full tensor.
-    //   - The result is not inplace. This is the case where the whole tensor is
-    //     cloned and the clone needs to be updated.
-    // TODO: Is this necessary?
-    bool needCopy = !isSourceEquivalentToAMatchingInplaceExtractSliceOp(
-                        state.aliasInfo, insertSliceOp) ||
-                    !state.aliasInfo.isInPlace(insertSliceOp->getResult(0));
+    bool needCopy =
+        !tensorState.insertSliceOpsWithoutCopy.contains(insertSliceOp);
     if (needCopy) {
       // Take a subview of the dst.
       auto dstMemrefType = dstMemref.getType().cast<MemRefType>();
@@ -424,6 +478,24 @@ struct InsertSliceOpInterface
 } // namespace linalg
 } // namespace mlir
 
+LogicalResult mlir::linalg::comprehensive_bufferize::tensor_ext::
+    InplaceInsertSliceOpAnalysis::run(FuncOp funcOp, BufferizationState &state,
+                                      SmallVector<Operation *> &newOps) {
+  auto &tensorState = getTensorBufferizationState(state);
+  funcOp.walk([&](InsertSliceOp insertSliceOp) {
+    // A copy of the source buffer is needed if either:
+    //   - The producer of `source` is not inplace. This is the case where a
+    //     slice is computed out of place into the inplace full tensor.
+    //   - The result is not inplace. This is the case where the whole tensor is
+    //     cloned and the clone needs to be updated.
+    if (isSourceEquivalentToAMatchingInplaceExtractSliceOp(state.aliasInfo,
+                                                           insertSliceOp) &&
+        state.aliasInfo.isInPlace(insertSliceOp->getResult(0)))
+      tensorState.insertSliceOpsWithoutCopy.insert(insertSliceOp);
+  });
+  return success();
+}
+
 void mlir::linalg::comprehensive_bufferize::tensor_ext::
     registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry) {
   registry.addOpInterface<tensor::CastOp, tensor_ext::CastOpInterface>();
@@ -431,6 +503,7 @@ void mlir::linalg::comprehensive_bufferize::tensor_ext::
   registry.addOpInterface<tensor::ExtractSliceOp,
                           tensor_ext::ExtractSliceOpInterface>();
   registry.addOpInterface<tensor::ExtractOp, tensor_ext::ExtractOpInterface>();
+  registry.addOpInterface<tensor::InsertOp, tensor_ext::InsertOpInterface>();
   registry.addOpInterface<tensor::InsertSliceOp,
                           tensor_ext::InsertSliceOpInterface>();
 }
