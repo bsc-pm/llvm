@@ -2949,6 +2949,7 @@ uint64_t ASTReader::getGlobalBitOffset(ModuleFile &M, uint64_t LocalOffset) {
 static bool isSameTemplateParameterList(const ASTContext &C,
                                         const TemplateParameterList *X,
                                         const TemplateParameterList *Y);
+static bool isSameEntity(NamedDecl *X, NamedDecl *Y);
 
 /// Determine whether two template parameters are similar enough
 /// that they may be used in declarations of the same template.
@@ -2968,7 +2969,9 @@ static bool isSameTemplateParameter(const NamedDecl *X,
     if (!TXTC != !TYTC)
       return false;
     if (TXTC && TYTC) {
-      if (TXTC->getNamedConcept() != TYTC->getNamedConcept())
+      auto *NCX = TXTC->getNamedConcept();
+      auto *NCY = TYTC->getNamedConcept();
+      if (!NCX || !NCY || !isSameEntity(NCX, NCY))
         return false;
       if (TXTC->hasExplicitTemplateArgs() != TYTC->hasExplicitTemplateArgs())
         return false;
@@ -3112,10 +3115,11 @@ static bool hasSameOverloadableAttrs(const FunctionDecl *A,
 
 /// Determine whether the two declarations refer to the same entity.
 static bool isSameEntity(NamedDecl *X, NamedDecl *Y) {
-  assert(X->getDeclName() == Y->getDeclName() && "Declaration name mismatch!");
-
   if (X == Y)
     return true;
+
+  if (X->getDeclName() != Y->getDeclName())
+    return false;
 
   // Must be in the same context.
   //

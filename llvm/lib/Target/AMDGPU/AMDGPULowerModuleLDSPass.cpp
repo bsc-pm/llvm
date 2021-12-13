@@ -24,13 +24,6 @@
 // A possible future refinement is to specialise the structure per-kernel, so
 // that fields can be elided based on more expensive analysis.
 //
-// NOTE: Since this pass will directly pack LDS (assume large LDS) into a struct
-// type which would cause allocating huge memory for struct instance within
-// every kernel. Hence, before running this pass, it is advisable to run the
-// pass "amdgpu-replace-lds-use-with-pointer" which will replace LDS uses within
-// non-kernel functions by pointers and thereby minimizes the unnecessary per
-// kernel allocation of LDS memory.
-//
 //===----------------------------------------------------------------------===//
 
 #include "AMDGPU.h"
@@ -158,8 +151,6 @@ public:
   }
 
   bool runOnModule(Module &M) override {
-    UsedList = AMDGPU::getUsedList(M);
-
     bool Changed = processUsedLDS(M);
 
     for (Function &F : M.functions()) {
@@ -172,7 +163,6 @@ public:
       Changed |= processUsedLDS(M, &F);
     }
 
-    UsedList.clear();
     return Changed;
   }
 
@@ -343,20 +333,14 @@ private:
       refineUsesAlignmentAndAA(GEP, A, DL, AliasScope, NoAlias);
     }
 
-    // Mark kernels with asm that reads the address of the allocated structure
-    // This is not necessary for lowering. This lets other passes, specifically
-    // PromoteAlloca, accurately calculate how much LDS will be used by the
-    // kernel after lowering.
+    // This ensures the variable is allocated when called functions access it.
+    // It also lets other passes, specifically PromoteAlloca, accurately
+    // calculate how much LDS will be used by the kernel after lowering.
     if (!F) {
       IRBuilder<> Builder(Ctx);
-      SmallPtrSet<Function *, 32> Kernels;
       for (Function &Func : M.functions()) {
-        if (Func.isDeclaration())
-          continue;
-
-        if (AMDGPU::isKernelCC(&Func) && !Kernels.contains(&Func)) {
+        if (!Func.isDeclaration() && AMDGPU::isKernelCC(&Func)) {
           markUsedByKernel(Builder, &Func, SGV);
-          Kernels.insert(&Func);
         }
       }
     }
