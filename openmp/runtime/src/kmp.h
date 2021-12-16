@@ -539,9 +539,8 @@ enum _reduction_method {
 
 typedef enum omp_role{
 	OMP_ROLE_NONE = 0,
-	OMP_ROLE_WORKER = 1 << 0,
-	OMP_ROLE_FREE_AGENT = 1 << 1,
-	OMP_ROLE_COMMUNICATOR = 1 << 2
+	OMP_ROLE_FREE_AGENT = 1 << 0,
+	OMP_ROLE_COMMUNICATOR = 1 << 1
 } omp_role_t;
 
 // Description of the packed_reduction_method variable:
@@ -2071,6 +2070,7 @@ typedef struct kmp_desc_base {
   kmp_thread_t ds_thread;
   volatile int ds_tid;
   int ds_gtid;
+  int ds_thread_id; //Global thread id from 0 to n-1. For role purposes.
 #if KMP_OS_WINDOWS
   volatile int ds_alive;
   DWORD ds_thread_id;
@@ -4204,6 +4204,15 @@ extern kmp_proc_bind_t __kmp_free_agent_proc_bind;
 extern char *__kmp_free_agent_affinity_proclist;
 extern kmp_affin_mask_t *__kmp_free_agent_affinity_masks;
 extern unsigned __kmp_free_agent_affinity_num_masks;
+//Free Agents APIs
+extern int __kmp_get_num_threads_role(omp_role_t r); //returns how many threads have the role r
+extern int __kmp_get_thread_roles(int tid, omp_role_t *r); //returns the number of roles of the thread with thread_id==tid,
+																													 //and r holds the actual roles of the thread.
+extern void __kmp_set_thread_roles1(int how_many, omp_role_t r); //Gives the roles r to how_many threads, if possible. 
+																														   //It overrides the previous roles of the threads.
+extern void __kmp_set_thread_roles2(int tid, omp_role_t r); //Gives the roles r to the thread with thread_id==tid.
+																													//It overrides the previous roles of the threads.
+extern int __kmp_get_thread_id(); //Returns the (global) thread id of the calling thread. Doesn't correspond to the gtid of the runtime.
 // Returns the number of free agent threads. They may not have been created yet.
 unsigned int __kmp_get_num_free_agent_threads();
 // Returns the free agent thread id

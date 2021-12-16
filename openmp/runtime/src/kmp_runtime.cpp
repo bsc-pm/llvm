@@ -976,7 +976,7 @@ static void __kmp_fork_team_threads(kmp_root_t *root, kmp_team_t *team,
     for (i = 1; i < team->t.t_nproc; i++) {
 
       /* fork or reallocate a new thread and install it in team */
-      kmp_info_t *thr = __kmp_allocate_thread(root, team, i, OMP_ROLE_WORKER);
+      kmp_info_t *thr = __kmp_allocate_thread(root, team, i, OMP_ROLE_NONE);
       team->t.t_threads[i] = thr;
       KMP_DEBUG_ASSERT(thr);
       KMP_DEBUG_ASSERT(thr->th.th_team == team);
@@ -3774,6 +3774,10 @@ int __kmp_register_root(int initial_thread) {
       __kmp_print_thread_storage_map(root_thread, gtid);
     }
     root_thread->th.th_info.ds.ds_gtid = gtid;
+    //TODO: Does the second useful thread always have the gtid 9?
+    root_thread->th.th_info.ds.ds_thread_id = TCR_4(__kmp_init_hidden_helper_threads)
+    																					? gtid
+    																					: gtid - __kmp_hidden_helper_threads_num;
 #if OMPT_SUPPORT
     root_thread->th.ompt_thread_info.thread_data = ompt_data_none;
 #endif
@@ -3860,6 +3864,13 @@ int __kmp_register_root(int initial_thread) {
   root_thread->th.th_def_allocator = __kmp_def_allocator;
   root_thread->th.th_prev_level = 0;
   root_thread->th.th_prev_num_threads = 1;
+
+	//The master always holds the worker role
+	root_thread->th.th_potential_roles = OMP_ROLE_NONE;
+	root_thread->th.th_active_role = OMP_ROLE_NONE;
+	root_thread->th.th_pending_role = OMP_ROLE_NONE;
+	root_thread->th.th_change_role = false;
+	root_thread->th.th_next_free_agent = NULL;
 
   kmp_cg_root_t *tmp = (kmp_cg_root_t *)__kmp_allocate(sizeof(kmp_cg_root_t));
   tmp->cg_root = root_thread;
@@ -4566,7 +4577,7 @@ kmp_info_t *__kmp_allocate_thread_common(kmp_root_t *root, kmp_team_t *team,
   }
 
 	//TODO: Maybe check an environment variable for the default roles of a thread?
-  new_thr->th.th_potential_roles = (omp_role_t)(OMP_ROLE_WORKER | OMP_ROLE_FREE_AGENT | OMP_ROLE_COMMUNICATOR);
+  new_thr->th.th_potential_roles = OMP_ROLE_NONE;
   new_thr->th.th_pending_role = OMP_ROLE_NONE;
   new_thr->th.th_change_role = false;
   new_thr->th.th_active_role = role;
@@ -4640,6 +4651,9 @@ kmp_info_t *__kmp_allocate_thread_common(kmp_root_t *root, kmp_team_t *team,
   } else {
     /* Worker creation is posponed, we need to keep the gtid */
     new_thr->th.th_info.ds.ds_gtid = new_gtid;
+    new_thr->th.th_info.ds.ds_thread_id = TCR_4(__kmp_init_hidden_helper_threads)
+    																			? gtid
+    																			: gtid - __kmp_hidden_helper_threads_num;
   }
   KMP_MB();
   return new_thr;
@@ -4661,7 +4675,7 @@ kmp_info_t *__kmp_allocate_free_agent_thread(kmp_root_t *root, int new_tid) {
   thread->th.th_root = root;
   //thread->th.is_free_agent = true;
   //thread->th.fa_swap_to_worker = false;
-  thread->th.th_potential_roles = (omp_role_t)(OMP_ROLE_WORKER | OMP_ROLE_FREE_AGENT | OMP_ROLE_COMMUNICATOR);
+  thread->th.th_potential_roles = OMP_ROLE_FREE_AGENT;
   thread->th.th_active_role = OMP_ROLE_FREE_AGENT;
   thread->th.th_pending_role = OMP_ROLE_NONE;
   thread->th.th_change_role = false;
@@ -5256,7 +5270,7 @@ __kmp_allocate_team(kmp_root_t *root, int new_nproc, int max_nproc,
 				__kmp_free_agent_list_insert_pt = NULL;
 			}
 			//Tell the thread to change its role when possible
-			th->th.th_pending_role = OMP_ROLE_WORKER;
+			th->th.th_pending_role = OMP_ROLE_NONE;
 			KMP_ATOMIC_ST_SEQ(&th->th.th_change_role, true);
 			
 			//th->th.free_agent_id = -1;
@@ -5483,7 +5497,7 @@ __kmp_allocate_team(kmp_root_t *root, int new_nproc, int max_nproc,
 
         /* allocate new threads for the hot team */
         for (f = team->t.t_nproc; f < new_nproc; f++) {
-          kmp_info_t *new_worker = __kmp_allocate_thread(root, team, f, OMP_ROLE_WORKER);
+          kmp_info_t *new_worker = __kmp_allocate_thread(root, team, f, OMP_ROLE_NONE);
           KMP_DEBUG_ASSERT(new_worker);
           team->t.t_threads[f] = new_worker;
 
@@ -9407,4 +9421,48 @@ int __kmp_get_free_agent_id() {
     return __kmp_threads[gtid]->th.th_info.ds.ds_gtid + 64;
   } else
     return -1;
+}
+
+int __kmp_get_num_threads_role(omp_role_t r){
+	switch(r){
+		case OMP_ROLE_FREE_AGENT:
+			return __kmp_free_agent_num_threads; //TODO: Number of active or potential?
+		case OMP_ROLE_COMMUNICATOR:
+			return 0; //TODO: change it when we add communicator's structures.
+		default:
+			return 0;
+	}
+	return 0;
+}
+
+int __kmp_get_thread_roles(int tid, omp_role_t *r){
+	int gtid = TCR_4(__kmp_init_hidden_helper_threads)
+						 ? tid
+						 : tid + __kmp_hidden_helper_threads_num;
+	kmp_info_t *th = __kmp_threads[gtid];
+	r = th->th.th_potential_roles;
+	switch((int)(*r)){
+		case 3:
+			return 2;
+		case 1:
+			return 1;
+		case 2:
+			return 1;
+		default:
+			return 0;
+	}
+	return 0;
+}
+
+void __kmp_set_thread_roles1(int how_many, omp_role_t r){
+	return;	
+}
+
+void __kmp_set_thread_roles2(int tid, omp_role_t r){
+	return;
+}
+
+int __kmp_get_thread_id(){
+	int gtid = __kmp_entry_gtid();
+	return __kmp_threads[gtid]->th.th_info.ds.ds_thread_id;
 }

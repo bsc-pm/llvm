@@ -714,7 +714,9 @@ void __kmp_create_worker(int gtid, kmp_info_t *th, size_t stack_size) {
   int status;
 
   th->th.th_info.ds.ds_gtid = gtid;
-
+	th->th.th_info.ds.ds_thread_id = TCR_4(__kmp_init_hidden_helper_threads)
+																	 ? gtid
+																	 : gtid - __kmp_hidden_helper_threads_num;
 #if KMP_STATS_ENABLED
   // sets up worker thread stats
   __kmp_acquire_tas_lock(&__kmp_stats_lock, gtid);
