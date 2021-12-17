@@ -358,6 +358,22 @@ TEST(FlatAffineConstraintsTest, FindSampleTest) {
                                                {1, -1, 0, -1}, // y = x - 1
                                                {0, 1, -1, 0},  // z = y
                                            }}));
+
+  // Regression tests for the computation of dual coefficients.
+  checkSample(false, parseFAC("(x, y, z) : ("
+                              "6*x - 4*y + 9*z + 2 >= 0,"
+                              "x + 5*y + z + 5 >= 0,"
+                              "-4*x + y + 2*z - 1 >= 0,"
+                              "-3*x - 2*y - 7*z - 1 >= 0,"
+                              "-7*x - 5*y - 9*z - 1 >= 0)",
+                              &context));
+  checkSample(true, parseFAC("(x, y, z) : ("
+                             "3*x + 3*y + 3 >= 0,"
+                             "-4*x - 8*y - z + 4 >= 0,"
+                             "-7*x - 4*y + z + 1 >= 0,"
+                             "2*x - 7*y - 8*z - 7 >= 0,"
+                             "9*x + 8*y - 9*z - 7 >= 0)",
+                             &context));
 }
 
 TEST(FlatAffineConstraintsTest, IsIntegerEmptyTest) {
@@ -607,11 +623,15 @@ static void checkDivisionRepresentation(
 
   fac.getLocalReprs(dividends, denominators);
 
-  // Check that the `dividends` and `expectedDividends` match.
-  EXPECT_TRUE(expectedDividends == dividends);
-
   // Check that the `denominators` and `expectedDenominators` match.
   EXPECT_TRUE(expectedDenominators == denominators);
+
+  // Check that the `dividends` and `expectedDividends` match. If the
+  // denominator for a division is zero, we ignore its dividend.
+  EXPECT_TRUE(dividends.size() == expectedDividends.size());
+  for (unsigned i = 0, e = dividends.size(); i < e; ++i)
+    if (denominators[i] != 0)
+      EXPECT_TRUE(expectedDividends[i] == dividends[i]);
 }
 
 TEST(FlatAffineConstraintsTest, computeLocalReprSimple) {
@@ -668,6 +688,57 @@ TEST(FlatAffineConstraintsTest, computeLocalReprRecursive) {
   SmallVector<unsigned, 8> denoms = {3, 5, 3};
 
   // Check if floordivs which may depend on other floordivs can be computed.
+  checkDivisionRepresentation(fac, divisions, denoms);
+}
+
+TEST(FlatAffineConstraintsTest, computeLocalReprTightUpperBound) {
+  MLIRContext context;
+
+  {
+    FlatAffineConstraints fac = parseFAC("(i) : (i mod 3 - 1 >= 0)", &context);
+
+    // The set formed by the fac is:
+    //        3q - i + 2 >= 0             <-- Division lower bound
+    //       -3q + i - 1 >= 0
+    //       -3q + i     >= 0             <-- Division upper bound
+    // We remove redundant constraints to get the set:
+    //        3q - i + 2 >= 0             <-- Division lower bound
+    //       -3q + i - 1 >= 0             <-- Tighter division upper bound
+    // thus, making the upper bound tighter.
+    fac.removeRedundantConstraints();
+
+    std::vector<SmallVector<int64_t, 8>> divisions = {{1, 0, 0}};
+    SmallVector<unsigned, 8> denoms = {3};
+
+    // Check if the divisions can be computed even with a tighter upper bound.
+    checkDivisionRepresentation(fac, divisions, denoms);
+  }
+
+  {
+    FlatAffineConstraints fac = parseFAC(
+        "(i, j, q) : (4*q - i - j + 2 >= 0, -4*q + i + j >= 0)", &context);
+    // Convert `q` to a local variable.
+    fac.convertDimToLocal(2, 3);
+
+    std::vector<SmallVector<int64_t, 8>> divisions = {{1, 1, 0, 1}};
+    SmallVector<unsigned, 8> denoms = {4};
+
+    // Check if the divisions can be computed even with a tighter upper bound.
+    checkDivisionRepresentation(fac, divisions, denoms);
+  }
+}
+
+TEST(FlatAffineConstraintsTest, computeLocalReprNoRepr) {
+  MLIRContext context;
+  FlatAffineConstraints fac =
+      parseFAC("(x, q) : (x - 3 * q >= 0, -x + 3 * q + 3 >= 0)", &context);
+  // Convert q to a local variable.
+  fac.convertDimToLocal(1, 2);
+
+  std::vector<SmallVector<int64_t, 8>> divisions = {{0, 0, 0}};
+  SmallVector<unsigned, 8> denoms = {0};
+
+  // Check that no division is computed.
   checkDivisionRepresentation(fac, divisions, denoms);
 }
 
