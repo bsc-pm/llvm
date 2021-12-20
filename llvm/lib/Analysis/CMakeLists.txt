@@ -50,6 +50,7 @@ add_llvm_component_library(LLVMAnalysis
   CostModel.cpp
   CodeMetrics.cpp
   ConstantFolding.cpp
+  CycleAnalysis.cpp
   DDG.cpp
   DDGPrinter.cpp
   ConstraintSystem.cpp
@@ -102,6 +103,7 @@ add_llvm_component_library(LLVMAnalysis
   MemoryLocation.cpp
   MemorySSA.cpp
   MemorySSAUpdater.cpp
+  ModelUnderTrainingRunner.cpp
   ModuleDebugInfoPrinter.cpp
   ModuleSummaryAnalysis.cpp
   MustExecute.cpp
@@ -120,7 +122,6 @@ add_llvm_component_library(LLVMAnalysis
   RegionInfo.cpp
   RegionPass.cpp
   RegionPrinter.cpp
-  ReleaseModeModelRunner.cpp
   ReplayInlineAdvisor.cpp
   ScalarEvolution.cpp
   ScalarEvolutionAliasAnalysis.cpp

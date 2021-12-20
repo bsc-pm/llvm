@@ -553,8 +553,6 @@ private:
   void verifyFunctionAttrs(FunctionType *FT, AttributeList Attrs,
                            const Value *V, bool IsIntrinsic);
   void verifyFunctionMetadata(ArrayRef<std::pair<unsigned, MDNode *>> MDs);
-  template <typename T>
-  void verifyODRTypeAsScopeOperand(const MDNode &MD, T * = nullptr);
 
   void visitConstantExprsRecursively(const Constant *EntryC);
   void visitConstantExpr(const ConstantExpr *CE);
@@ -737,8 +735,9 @@ void Verifier::visitGlobalVariable(const GlobalVariable &GV) {
           Value *V = Op->stripPointerCasts();
           Assert(isa<GlobalVariable>(V) || isa<Function>(V) ||
                      isa<GlobalAlias>(V),
-                 "invalid llvm.used member", V);
-          Assert(V->hasName(), "members of llvm.used must be named", V);
+                 Twine("invalid ") + GV.getName() + " member", V);
+          Assert(V->hasName(),
+                 Twine("members of ") + GV.getName() + " must be named", V);
         }
       }
     }
@@ -864,19 +863,6 @@ void Verifier::visitNamedMDNode(const NamedMDNode &NMD) {
   }
 }
 
-template <typename T>
-void Verifier::verifyODRTypeAsScopeOperand(const MDNode &MD, T *) {
-  if (isa<T>(MD)) {
-    if (auto *N = dyn_cast_or_null<DICompositeType>(cast<T>(MD).getScope()))
-      // Of all the supported tags for DICompositeType(see visitDICompositeType)
-      // we know that enum type cannot be a scope.
-      AssertDI(N->getTag() != dwarf::DW_TAG_enumeration_type,
-               "enum type is not a scope; check enum type ODR "
-               "violation",
-               N, &MD);
-  }
-}
-
 void Verifier::visitMDNode(const MDNode &MD, AreDebugLocsAllowed AllowLocs) {
   // Only visit each node once.  Metadata can be mutually recursive, so this
   // avoids infinite recursion here, as well as being an optimization.
@@ -885,12 +871,6 @@ void Verifier::visitMDNode(const MDNode &MD, AreDebugLocsAllowed AllowLocs) {
 
   Assert(&MD.getContext() == &Context,
          "MDNode context does not match Module context!", &MD);
-
-  // Makes sure when a scope operand is a ODR type, the ODR type uniquing does
-  // not create invalid debug metadata.
-  // TODO: check that the non-ODR-type scope operand is valid.
-  verifyODRTypeAsScopeOperand<DIType>(MD);
-  verifyODRTypeAsScopeOperand<DILocalScope>(MD);
 
   switch (MD.getMetadataID()) {
   default:

@@ -1920,8 +1920,8 @@ void SelectionDAGBuilder::visitRet(const ReturnInst &I) {
                         DAG.getDataLayout().getAllocaAddrSpace()),
                     PtrValueVTs);
 
-    SDValue RetPtr = DAG.getCopyFromReg(DAG.getEntryNode(), getCurSDLoc(),
-                                        DemoteReg, PtrValueVTs[0]);
+    SDValue RetPtr =
+        DAG.getCopyFromReg(Chain, getCurSDLoc(), DemoteReg, PtrValueVTs[0]);
     SDValue RetOp = getValue(I.getOperand(0));
 
     SmallVector<EVT, 4> ValueVTs, MemVTs;
@@ -3111,6 +3111,8 @@ void SelectionDAGBuilder::visitUnreachable(const UnreachableInst &I) {
 
 void SelectionDAGBuilder::visitUnary(const User &I, unsigned Opcode) {
   SDNodeFlags Flags;
+  if (auto *FPOp = dyn_cast<FPMathOperator>(&I))
+    Flags.copyFMF(*FPOp);
 
   SDValue Op = getValue(I.getOperand(0));
   SDValue UnNodeValue = DAG.getNode(Opcode, getCurSDLoc(), Op.getValueType(),
@@ -7129,12 +7131,10 @@ void SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I,
     }
     SDValue VectorStep = DAG.getStepVector(sdl, VecTy);
     SDValue VectorInduction = DAG.getNode(
-        ISD::UADDO, sdl, DAG.getVTList(VecTy, CCVT), VectorIndex, VectorStep);
-    SDValue SetCC = DAG.getSetCC(sdl, CCVT, VectorInduction.getValue(0),
+        ISD::UADDSAT, sdl, VecTy, VectorIndex, VectorStep);
+    SDValue SetCC = DAG.getSetCC(sdl, CCVT, VectorInduction,
                                  VectorTripCount, ISD::CondCode::SETULT);
-    setValue(&I, DAG.getNode(ISD::AND, sdl, CCVT,
-                             DAG.getNOT(sdl, VectorInduction.getValue(1), CCVT),
-                             SetCC));
+    setValue(&I, SetCC);
     return;
   }
   case Intrinsic::experimental_vector_insert: {
