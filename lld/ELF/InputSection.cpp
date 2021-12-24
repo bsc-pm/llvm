@@ -40,7 +40,7 @@ using namespace llvm::sys;
 using namespace lld;
 using namespace lld::elf;
 
-std::vector<InputSectionBase *> elf::inputSections;
+SmallVector<InputSectionBase *, 0> elf::inputSections;
 DenseSet<std::pair<const Symbol *, uint64_t>> elf::ppc64noTocRelax;
 
 // Returns a string to construct an error message.
@@ -474,13 +474,13 @@ void InputSection::copyRelocations(uint8_t *buf, ArrayRef<RelTy> rels) {
       else if (config->relocatable && type != target->noneRel)
         sec->relocations.push_back({R_ABS, type, rel.r_offset, addend, &sym});
     } else if (config->emachine == EM_PPC && type == R_PPC_PLTREL24 &&
-               p->r_addend >= 0x8000) {
+               p->r_addend >= 0x8000 && sec->file->ppc32Got2) {
       // Similar to R_MIPS_GPREL{16,32}. If the addend of R_PPC_PLTREL24
       // indicates that r30 is relative to the input section .got2
       // (r_addend>=0x8000), after linking, r30 should be relative to the output
       // section .got2 . To compensate for the shift, adjust r_addend by
-      // ppc32Got2OutSecOff.
-      p->r_addend += sec->file->ppc32Got2OutSecOff;
+      // ppc32Got->outSecOff.
+      p->r_addend += sec->file->ppc32Got2->outSecOff;
     }
   }
 }
@@ -1225,27 +1225,26 @@ void InputSectionBase::adjustSplitStackFunctionPrologues(uint8_t *buf,
 }
 
 template <class ELFT> void InputSection::writeTo(uint8_t *buf) {
-  if (type == SHT_NOBITS)
-    return;
-
   if (auto *s = dyn_cast<SyntheticSection>(this)) {
     s->writeTo(buf + outSecOff);
     return;
   }
 
+  if (LLVM_UNLIKELY(type == SHT_NOBITS))
+    return;
   // If -r or --emit-relocs is given, then an InputSection
   // may be a relocation section.
-  if (type == SHT_RELA) {
+  if (LLVM_UNLIKELY(type == SHT_RELA)) {
     copyRelocations<ELFT>(buf + outSecOff, getDataAs<typename ELFT::Rela>());
     return;
   }
-  if (type == SHT_REL) {
+  if (LLVM_UNLIKELY(type == SHT_REL)) {
     copyRelocations<ELFT>(buf + outSecOff, getDataAs<typename ELFT::Rel>());
     return;
   }
 
   // If -r is given, we may have a SHT_GROUP section.
-  if (type == SHT_GROUP) {
+  if (LLVM_UNLIKELY(type == SHT_GROUP)) {
     copyShtGroup<ELFT>(buf + outSecOff);
     return;
   }

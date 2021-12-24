@@ -206,9 +206,9 @@ static bool isRemovable(Instruction *I) {
     }
   }
 
-  // note: only get here for calls with analyzable writes - i.e. libcalls
+  // note: only get here for calls with analyzable writes.
   if (auto *CB = dyn_cast<CallBase>(I))
-    return CB->use_empty();
+    return CB->use_empty() && CB->willReturn() && CB->doesNotThrow();
 
   return false;
 }
@@ -1209,17 +1209,10 @@ struct DSEState {
   /// loop. In particular, this guarantees that it only references a single
   /// MemoryLocation during execution of the containing function.
   bool isGuaranteedLoopInvariant(const Value *Ptr) {
-    auto IsGuaranteedLoopInvariantBase = [this](const Value *Ptr) {
+    auto IsGuaranteedLoopInvariantBase = [](const Value *Ptr) {
       Ptr = Ptr->stripPointerCasts();
-      if (auto *I = dyn_cast<Instruction>(Ptr)) {
-        if (isa<AllocaInst>(Ptr))
-          return true;
-
-        if (isAllocLikeFn(I, &TLI))
-          return true;
-
-        return false;
-      }
+      if (auto *I = dyn_cast<Instruction>(Ptr))
+        return I->getParent()->isEntryBlock();
       return true;
     };
 

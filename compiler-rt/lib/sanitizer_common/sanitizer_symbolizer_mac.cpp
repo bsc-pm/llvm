@@ -68,7 +68,7 @@ class AtosSymbolizerProcess final : public SymbolizerProcess {
   bool StartSymbolizerSubprocess() override {
     // Put the string command line argument in the object so that it outlives
     // the call to GetArgV.
-    internal_snprintf(pid_str_, sizeof(pid_str_), "%d", internal_getpid());
+    internal_snprintf(pid_str_, sizeof(pid_str_), "%d", (int)internal_getpid());
 
     // Configure sandbox before starting atos process.
     return SymbolizerProcess::StartSymbolizerSubprocess();
@@ -91,6 +91,7 @@ class AtosSymbolizerProcess final : public SymbolizerProcess {
       argv[i++] = "-d";
     }
     argv[i++] = nullptr;
+    CHECK_LE(i, kArgVMax);
   }
 
   char pid_str_[16];
