@@ -821,7 +821,7 @@ ABIArgInfo TrivialABIInfo::classifyReturnType(QualType RetTy) const {
   if (const EnumType *EnumTy = RetTy->getAs<EnumType>())
     RetTy = EnumTy->getDecl()->getIntegerType();
 
-  if (const auto *EIT = RetTy->getAs<ExtIntType>())
+  if (const auto *EIT = RetTy->getAs<BitIntType>())
     if (EIT->getNumBits() >
         getContext().getTypeSize(getContext().getTargetInfo().hasInt128Type()
                                      ? getContext().Int128Ty
