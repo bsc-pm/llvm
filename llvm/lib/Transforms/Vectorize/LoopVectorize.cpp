@@ -676,7 +676,8 @@ protected:
   /// flags, which can be found from the original scalar operations.
   Value *emitTransformedIndex(IRBuilder<> &B, Value *Index, ScalarEvolution *SE,
                               const DataLayout &DL,
-                              const InductionDescriptor &ID) const;
+                              const InductionDescriptor &ID,
+                              BasicBlock *VectorHeader) const;
 
   /// Emit basic blocks (prefixed with \p Prefix) for the iteration check,
   /// vector loop preheader, middle block and scalar preheader. Also
@@ -2473,7 +2474,8 @@ void InnerLoopVectorizer::widenIntOrFpInduction(PHINode *IV,
                      ? Builder.CreateSExtOrTrunc(Induction, IV->getType())
                      : Builder.CreateCast(Instruction::SIToFP, Induction,
                                           IV->getType());
-      ScalarIV = emitTransformedIndex(Builder, ScalarIV, PSE.getSE(), DL, ID);
+      ScalarIV = emitTransformedIndex(Builder, ScalarIV, PSE.getSE(), DL, ID,
+                                      State.CFG.PrevBB);
       ScalarIV->setName("offset.idx");
     }
     if (Trunc) {
@@ -3275,7 +3277,7 @@ BasicBlock *InnerLoopVectorizer::emitMemRuntimeChecks(Loop *L,
 
 Value *InnerLoopVectorizer::emitTransformedIndex(
     IRBuilder<> &B, Value *Index, ScalarEvolution *SE, const DataLayout &DL,
-    const InductionDescriptor &ID) const {
+    const InductionDescriptor &ID, BasicBlock *VectorHeader) const {
 
   SCEVExpander Exp(*SE, DL, "induction");
   auto Step = ID.getStep();
@@ -3318,15 +3320,15 @@ Value *InnerLoopVectorizer::emitTransformedIndex(
   };
 
   // Get a suitable insert point for SCEV expansion. For blocks in the vector
-  // loop, choose the end of the vector loop header (=LoopVectorBody), because
+  // loop, choose the end of the vector loop header (=VectorHeader), because
   // the DomTree is not kept up-to-date for additional blocks generated in the
   // vector loop. By using the header as insertion point, we guarantee that the
   // expanded instructions dominate all their uses.
-  auto GetInsertPoint = [this, &B]() {
+  auto GetInsertPoint = [this, &B, VectorHeader]() {
     BasicBlock *InsertBB = B.GetInsertPoint()->getParent();
     if (InsertBB != LoopVectorBody &&
-        LI->getLoopFor(LoopVectorBody) == LI->getLoopFor(InsertBB))
-      return LoopVectorBody->getTerminator();
+        LI->getLoopFor(VectorHeader) == LI->getLoopFor(InsertBB))
+      return VectorHeader->getTerminator();
     return &*B.GetInsertPoint();
   };
 
@@ -3474,7 +3476,8 @@ void InnerLoopVectorizer::createInductionResumeValues(
           CastInst::getCastOpcode(VectorTripCount, true, StepType, true);
       Value *CRD = B.CreateCast(CastOp, VectorTripCount, StepType, "cast.crd");
       const DataLayout &DL = LoopScalarBody->getModule()->getDataLayout();
-      EndValue = emitTransformedIndex(B, CRD, PSE.getSE(), DL, II);
+      EndValue =
+          emitTransformedIndex(B, CRD, PSE.getSE(), DL, II, LoopVectorBody);
       EndValue->setName("ind.end");
 
       // Compute the end value for the additional bypass (if applicable).
@@ -3485,7 +3488,7 @@ void InnerLoopVectorizer::createInductionResumeValues(
         CRD =
             B.CreateCast(CastOp, AdditionalBypass.second, StepType, "cast.crd");
         EndValueFromAdditionalBypass =
-            emitTransformedIndex(B, CRD, PSE.getSE(), DL, II);
+            emitTransformedIndex(B, CRD, PSE.getSE(), DL, II, LoopVectorBody);
         EndValueFromAdditionalBypass->setName("ind.end");
       }
     }
@@ -3559,7 +3562,7 @@ BasicBlock *InnerLoopVectorizer::completeLoopSkeleton(Loop *L,
   if (MDNode *LID = OrigLoop->getLoopID())
     L->setLoopID(LID);
 
-  LoopVectorizeHints Hints(L, true, *ORE);
+  LoopVectorizeHints Hints(L, true, *ORE, TTI);
   Hints.setAlreadyVectorized();
 
 #ifdef EXPENSIVE_CHECKS
@@ -3716,7 +3719,8 @@ void InnerLoopVectorizer::fixupIVUsers(PHINode *OrigPhi,
                              II.getStep()->getType())
               : B.CreateSExtOrTrunc(CountMinusOne, II.getStep()->getType());
       CMO->setName("cast.cmo");
-      Value *Escape = emitTransformedIndex(B, CMO, PSE.getSE(), DL, II);
+      Value *Escape =
+          emitTransformedIndex(B, CMO, PSE.getSE(), DL, II, LoopVectorBody);
       Escape->setName("ind.escape");
       MissingVals[UI] = Escape;
     }
@@ -4585,8 +4589,8 @@ void InnerLoopVectorizer::widenPHIInstruction(Instruction *PN,
           Value *Idx = Builder.CreateAdd(
               PartStart, ConstantInt::get(PtrInd->getType(), Lane));
           Value *GlobalIdx = Builder.CreateAdd(PtrInd, Idx);
-          Value *SclrGep =
-              emitTransformedIndex(Builder, GlobalIdx, PSE.getSE(), DL, II);
+          Value *SclrGep = emitTransformedIndex(Builder, GlobalIdx, PSE.getSE(),
+                                                DL, II, State.CFG.PrevBB);
           SclrGep->setName("next.gep");
           State.set(PhiR, SclrGep, VPIteration(Part, Lane));
         }
@@ -5695,12 +5699,11 @@ bool LoopVectorizationCostModel::isMoreProfitable(
       EstimatedWidthB *= VScale.getValue();
   }
 
-  // When set to preferred, for now assume vscale may be larger than 1 (or the
-  // one being tuned for), so that scalable vectorization is slightly favorable
-  // over fixed-width vectorization.
-  if (Hints->isScalableVectorizationPreferred())
-    if (A.Width.isScalable() && !B.Width.isScalable())
-      return (CostA * B.Width.getFixedValue()) <= (CostB * EstimatedWidthA);
+  // Assume vscale may be larger than 1 (or the value being tuned for),
+  // so that scalable vectorization is slightly favorable over fixed-width
+  // vectorization.
+  if (A.Width.isScalable() && !B.Width.isScalable())
+    return (CostA * B.Width.getFixedValue()) <= (CostB * EstimatedWidthA);
 
   // To avoid the need for FP division:
   //      (CostA / A.Width) < (CostB / B.Width)
@@ -8411,7 +8414,7 @@ VPValue *VPRecipeBuilder::createEdgeMask(BasicBlock *Src, BasicBlock *Dst,
   assert(EdgeMask && "No Edge Mask found for condition");
 
   if (BI->getSuccessor(0) != Dst)
-    EdgeMask = Builder.createNot(EdgeMask);
+    EdgeMask = Builder.createNot(EdgeMask, BI->getDebugLoc());
 
   if (SrcMask) { // Otherwise block in-mask is all-one, no need to AND.
     // The condition is 'SrcMask && EdgeMask', which is equivalent to
@@ -8420,7 +8423,8 @@ VPValue *VPRecipeBuilder::createEdgeMask(BasicBlock *Src, BasicBlock *Dst,
     // EdgeMask is poison. Using 'and' here introduces undefined behavior.
     VPValue *False = Plan->getOrAddVPValue(
         ConstantInt::getFalse(BI->getCondition()->getType()));
-    EdgeMask = Builder.createSelect(SrcMask, EdgeMask, False);
+    EdgeMask =
+        Builder.createSelect(SrcMask, EdgeMask, False, BI->getDebugLoc());
   }
 
   return EdgeMaskCache[Edge] = EdgeMask;
@@ -8442,22 +8446,24 @@ VPValue *VPRecipeBuilder::createBlockInMask(BasicBlock *BB, VPlanPtr &Plan) {
     if (!CM.blockNeedsPredicationForAnyReason(BB))
       return BlockMaskCache[BB] = BlockMask; // Loop incoming mask is all-one.
 
+    // Introduce the early-exit compare IV <= BTC to form header block mask.
+    // This is used instead of IV < TC because TC may wrap, unlike BTC.
+    // Start by constructing the desired canonical IV in the header block.
+    VPValue *IV = nullptr;
+    if (Legal->getPrimaryInduction())
+      IV = Plan->getOrAddVPValue(Legal->getPrimaryInduction());
+    else {
+      VPBasicBlock *HeaderVPBB = Plan->getEntry()->getEntryBasicBlock();
+      auto *IVRecipe = new VPWidenCanonicalIVRecipe();
+      HeaderVPBB->insert(IVRecipe, HeaderVPBB->getFirstNonPhi());
+      IV = IVRecipe;
+    }
+
     // Create the block in mask as the first non-phi instruction in the block.
     VPBuilder::InsertPointGuard Guard(Builder);
     auto NewInsertionPoint = Builder.getInsertBlock()->getFirstNonPhi();
     Builder.setInsertPoint(Builder.getInsertBlock(), NewInsertionPoint);
 
-    // Introduce the early-exit compare IV <= BTC to form header block mask.
-    // This is used instead of IV < TC because TC may wrap, unlike BTC.
-    // Start by constructing the desired canonical IV.
-    VPValue *IV = nullptr;
-    if (Legal->getPrimaryInduction())
-      IV = Plan->getOrAddVPValue(Legal->getPrimaryInduction());
-    else {
-      auto *IVRecipe = new VPWidenCanonicalIVRecipe();
-      Builder.getInsertBlock()->insert(IVRecipe, NewInsertionPoint);
-      IV = IVRecipe;
-    }
     VPValue *BTC = Plan->getOrCreateBackedgeTakenCount();
     bool TailFolded = !CM.isScalarEpilogueAllowed();
 
@@ -8484,7 +8490,7 @@ VPValue *VPRecipeBuilder::createBlockInMask(BasicBlock *BB, VPlanPtr &Plan) {
       continue;
     }
 
-    BlockMask = Builder.createOr(BlockMask, EdgeMask);
+    BlockMask = Builder.createOr(BlockMask, EdgeMask, {});
   }
 
   return BlockMaskCache[BB] = BlockMask;
@@ -8789,13 +8795,17 @@ VPBasicBlock *VPRecipeBuilder::handleReplication(
     return VPBB;
   }
   LLVM_DEBUG(dbgs() << "LV: Scalarizing and predicating:" << *I << "\n");
-  assert(VPBB->getSuccessors().empty() &&
-         "VPBB has successors when handling predicated replication.");
+
+  VPBlockBase *SingleSucc = VPBB->getSingleSuccessor();
+  assert(SingleSucc && "VPBB must have a single successor when handling "
+                       "predicated replication.");
+  VPBlockUtils::disconnectBlocks(VPBB, SingleSucc);
   // Record predicated instructions for above packing optimizations.
   VPBlockBase *Region = createReplicateRegion(I, Recipe, Plan);
   VPBlockUtils::insertBlockAfter(Region, VPBB);
   auto *RegSucc = new VPBasicBlock();
   VPBlockUtils::insertBlockAfter(RegSucc, Region);
+  VPBlockUtils::connectBlocks(RegSucc, SingleSucc);
   return RegSucc;
 }
 
@@ -9016,30 +9026,25 @@ VPlanPtr LoopVectorizationPlanner::buildVPlanWithVPRecipes(
   // visit each basic block after having visited its predecessor basic blocks.
   // ---------------------------------------------------------------------------
 
-  auto Plan = std::make_unique<VPlan>();
+  // Create initial VPlan skeleton, with separate header and latch blocks.
+  VPBasicBlock *HeaderVPBB = new VPBasicBlock();
+  VPBasicBlock *LatchVPBB = new VPBasicBlock("vector.latch");
+  VPBlockUtils::insertBlockAfter(LatchVPBB, HeaderVPBB);
+  auto *TopRegion = new VPRegionBlock(HeaderVPBB, LatchVPBB, "vector loop");
+  auto Plan = std::make_unique<VPlan>(TopRegion);
 
   // Scan the body of the loop in a topological order to visit each basic block
   // after having visited its predecessor basic blocks.
   LoopBlocksDFS DFS(OrigLoop);
   DFS.perform(LI);
 
-  VPBasicBlock *VPBB = nullptr;
-  VPBasicBlock *HeaderVPBB = nullptr;
+  VPBasicBlock *VPBB = HeaderVPBB;
   SmallVector<VPWidenIntOrFpInductionRecipe *> InductionsToMove;
   for (BasicBlock *BB : make_range(DFS.beginRPO(), DFS.endRPO())) {
     // Relevant instructions from basic block BB will be grouped into VPRecipe
     // ingredients and fill a new VPBasicBlock.
     unsigned VPBBsForBB = 0;
-    auto *FirstVPBBForBB = new VPBasicBlock(BB->getName());
-    if (VPBB)
-      VPBlockUtils::insertBlockAfter(FirstVPBBForBB, VPBB);
-    else {
-      auto *TopRegion = new VPRegionBlock("vector loop");
-      TopRegion->setEntry(FirstVPBBForBB);
-      Plan->setEntry(TopRegion);
-      HeaderVPBB = FirstVPBBForBB;
-    }
-    VPBB = FirstVPBBForBB;
+    VPBB->setName(BB->getName());
     Builder.setInsertPoint(VPBB);
 
     // Introduce each ingredient into VPlan.
@@ -9106,7 +9111,16 @@ VPlanPtr LoopVectorizationPlanner::buildVPlanWithVPRecipes(
                                     : "");
       }
     }
+
+    VPBlockUtils::insertBlockAfter(new VPBasicBlock(), VPBB);
+    VPBB = cast<VPBasicBlock>(VPBB->getSingleSuccessor());
   }
+
+  // Fold the last, empty block into its predecessor.
+  VPBB = VPBlockUtils::tryToMergeBlockIntoPredecessor(VPBB);
+  assert(VPBB && "expected to fold last (empty) block");
+  // After here, VPBB should not be used.
+  VPBB = nullptr;
 
   assert(isa<VPRegionBlock>(Plan->getEntry()) &&
          !Plan->getEntry()->getEntryBasicBlock()->empty() &&
@@ -9177,12 +9191,8 @@ VPlanPtr LoopVectorizationPlanner::buildVPlanWithVPRecipes(
       VPBlockUtils::disconnectBlocks(SplitPred, SplitBlock);
       VPBlockUtils::connectBlocks(SplitPred, SinkRegion);
       VPBlockUtils::connectBlocks(SinkRegion, SplitBlock);
-      if (VPBB == SplitPred)
-        VPBB = SplitBlock;
     }
   }
-
-  cast<VPRegionBlock>(Plan->getEntry())->setExit(VPBB);
 
   VPlanTransforms::removeRedundantInductionCasts(*Plan);
 
@@ -9192,7 +9202,8 @@ VPlanPtr LoopVectorizationPlanner::buildVPlanWithVPRecipes(
     Ind->moveBefore(*HeaderVPBB, HeaderVPBB->getFirstNonPhi());
 
   // Adjust the recipes for any inloop reductions.
-  adjustRecipesForReductions(VPBB, Plan, RecipeBuilder, Range.Start);
+  adjustRecipesForReductions(cast<VPBasicBlock>(TopRegion->getExit()), Plan,
+                             RecipeBuilder, Range.Start);
 
   // Introduce a recipe to combine the incoming and previous values of a
   // first-order recurrence.
@@ -9271,6 +9282,11 @@ VPlanPtr LoopVectorizationPlanner::buildVPlanWithVPRecipes(
   RSO << "},UF>=1";
   RSO.flush();
   Plan->setName(PlanName);
+
+  // Fold Exit block into its predecessor if possible.
+  // TODO: Fold block earlier once all VPlan transforms properly maintain a
+  // VPBasicBlock as exit.
+  VPBlockUtils::tryToMergeBlockIntoPredecessor(TopRegion->getExit());
 
   assert(VPlanVerifier::verifyPlanIsValid(*Plan) && "VPlan is invalid");
   return Plan;
@@ -10245,7 +10261,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
                     << L->getHeader()->getParent()->getName() << "\" from "
                     << DebugLocStr << "\n");
 
-  LoopVectorizeHints Hints(L, InterleaveOnlyWhenForced, *ORE);
+  LoopVectorizeHints Hints(L, InterleaveOnlyWhenForced, *ORE, TTI);
 
   LLVM_DEBUG(
       dbgs() << "LV: Loop hints:"
