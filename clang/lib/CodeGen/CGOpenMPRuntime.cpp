@@ -3755,10 +3755,21 @@ emitTaskPrivateMappingFunction(CodeGenModule &CGM, SourceLocation Loc,
   Args.push_back(&TaskPrivatesArg);
   llvm::DenseMap<CanonicalDeclPtr<const VarDecl>, unsigned> PrivateVarsPos;
   unsigned Counter = 1;
+  // We cannot use VLA types in practice here. In fact we don't even need the
+  // original type because we are always working with pointers, so for VLAs
+  // that are not decayed, use 'void' instead of the original type.
+  auto IsVLATypeNotDecayed = [](QualType Ty) {
+    if (auto DT = dyn_cast<DecayedType>(Ty.getTypePtr()))
+        Ty = DT->getDecayedType();
+    return Ty->isVariablyModifiedType();
+  };
+  auto ReplaceVLATypes = [&](QualType Ty) {
+    return IsVLATypeNotDecayed(Ty) ? C.VoidTy : Ty;
+  };
   for (const Expr *E : Data.PrivateVars) {
     Args.push_back(ImplicitParamDecl::Create(
         C, /*DC=*/nullptr, Loc, /*Id=*/nullptr,
-        C.getPointerType(C.getPointerType(E->getType()))
+        C.getPointerType(C.getPointerType(ReplaceVLATypes(E->getType())))
             .withConst()
             .withRestrict(),
         ImplicitParamDecl::Other));
@@ -3769,7 +3780,7 @@ emitTaskPrivateMappingFunction(CodeGenModule &CGM, SourceLocation Loc,
   for (const Expr *E : Data.FirstprivateVars) {
     Args.push_back(ImplicitParamDecl::Create(
         C, /*DC=*/nullptr, Loc, /*Id=*/nullptr,
-        C.getPointerType(C.getPointerType(E->getType()))
+        C.getPointerType(C.getPointerType(ReplaceVLATypes(E->getType())))
             .withConst()
             .withRestrict(),
         ImplicitParamDecl::Other));
@@ -3780,7 +3791,7 @@ emitTaskPrivateMappingFunction(CodeGenModule &CGM, SourceLocation Loc,
   for (const Expr *E : Data.LastprivateVars) {
     Args.push_back(ImplicitParamDecl::Create(
         C, /*DC=*/nullptr, Loc, /*Id=*/nullptr,
-        C.getPointerType(C.getPointerType(E->getType()))
+        C.getPointerType(C.getPointerType(ReplaceVLATypes(E->getType())))
             .withConst()
             .withRestrict(),
         ImplicitParamDecl::Other));
@@ -3789,7 +3800,7 @@ emitTaskPrivateMappingFunction(CodeGenModule &CGM, SourceLocation Loc,
     ++Counter;
   }
   for (const VarDecl *VD : Data.PrivateLocals) {
-    QualType Ty = VD->getType().getNonReferenceType();
+    QualType Ty = ReplaceVLATypes(VD->getType().getNonReferenceType());
     if (VD->getType()->isLValueReferenceType())
       Ty = C.getPointerType(Ty);
     if (isAllocatableDecl(VD))
@@ -3834,7 +3845,12 @@ emitTaskPrivateMappingFunction(CodeGenModule &CGM, SourceLocation Loc,
         CGF.MakeAddrLValue(CGF.GetAddrOfLocalVar(VD), VD->getType());
     LValue RefLoadLVal = CGF.EmitLoadOfPointerLValue(
         RefLVal.getAddress(CGF), RefLVal.getType()->castAs<PointerType>());
-    CGF.EmitStoreOfScalar(FieldLVal.getPointer(CGF), RefLoadLVal);
+    llvm::Value *FieldPtr = FieldLVal.getPointer(CGF);
+    if (IsVLATypeNotDecayed(FieldLVal.getType())) {
+      FieldPtr = CGF.Builder.CreateBitCast(
+          FieldPtr, CGM.getTypes().ConvertTypeForMem(RefLoadLVal.getType()));
+    }
+    CGF.EmitStoreOfScalar(FieldPtr, RefLoadLVal);
     ++Counter;
   }
   CGF.FinishFunction();
