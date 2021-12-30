@@ -302,7 +302,6 @@ void LegalizerHelper::mergeMixedSubvectors(Register DstReg,
     appendVectorElts(AllElts, Leftover);
 
   MIRBuilder.buildMerge(DstReg, AllElts);
-  return;
 }
 
 /// Append the result registers of G_UNMERGE_VALUES \p MI to \p Regs.
@@ -3630,6 +3629,7 @@ Register LegalizerHelper::getVectorElementPointer(Register VecPtr, LLT VecTy,
   return MIRBuilder.buildPtrAdd(PtrTy, VecPtr, Mul).getReg(0);
 }
 
+#ifndef NDEBUG
 /// Check that all vector operands have same number of elements. Other operands
 /// should be listed in NonVecOp.
 static bool hasSameNumEltsOnAllVectorOperands(
@@ -3655,7 +3655,6 @@ static bool hasSameNumEltsOnAllVectorOperands(
     if (!Ty.isVector()) {
       if (!is_contained(NonVecOpIndices, OpIdx))
         return false;
-      is_contained(NonVecOpIndices, OpIdx);
       continue;
     }
 
@@ -3665,6 +3664,7 @@ static bool hasSameNumEltsOnAllVectorOperands(
 
   return true;
 }
+#endif
 
 /// Fill \p DstOps with DstOps that have same number of elements combined as
 /// the Ty. These DstOps have either scalar type when \p NumElts = 1 or are

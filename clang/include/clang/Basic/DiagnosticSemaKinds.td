@@ -5785,7 +5785,7 @@ def err_typecheck_invalid_restrict_invalid_pointee : Error<
 def ext_typecheck_zero_array_size : Extension<
   "zero size arrays are an extension">, InGroup<ZeroLengthArray>;
 def err_typecheck_zero_array_size : Error<
-  "zero-length arrays are not permitted in C++">;
+  "zero-length arrays are not permitted in %select{C++|SYCL device code}0">;
 def err_array_size_non_int : Error<"size of array has non-integer type %0">;
 def err_init_element_not_constant : Error<
   "initializer element is not a compile-time constant">;
@@ -10509,7 +10509,7 @@ def err_omp_atomic_capture_not_compound_statement : Error<
 def note_omp_atomic_capture: Note<
   "%select{expected assignment expression|expected compound statement|expected exactly two expression statements|expected in right hand side of the first expression}0">;
 def err_omp_atomic_several_clauses : Error<
-  "directive '#pragma omp atomic' cannot contain more than one 'read', 'write', 'update' or 'capture' clause">;
+  "directive '#pragma omp atomic' cannot contain more than one 'read', 'write', 'update', 'capture', or 'compare' clause">;
 def err_omp_several_mem_order_clauses : Error<
   "directive '#pragma omp %0' cannot contain more than one %select{'seq_cst', 'relaxed', |}1'acq_rel', 'acquire' or 'release' clause">;
 def err_omp_atomic_incompatible_mem_order_clause : Error<
