@@ -10,6 +10,8 @@
 // RUN: env KMP_DISP_NUM_BUFFERS=4 %libomp-run
 // RUN: env KMP_DISP_NUM_BUFFERS=7 %libomp-run
 // UNSUPPORTED: clang-11, clang-12
+// UNSUPPORTED: ppc64le
+// UNSUPPORTED: aarch64
 #include <stdio.h>
 #include <omp.h>
 #include <stdlib.h>
