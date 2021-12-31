@@ -1653,7 +1653,8 @@ bool DAGTypeLegalizer::PromoteIntegerOperand(SDNode *N, unsigned OpNo) {
   case ISD::UDIVFIX:
   case ISD::UDIVFIXSAT: Res = PromoteIntOp_FIX(N); break;
 
-  case ISD::FPOWI: Res = PromoteIntOp_FPOWI(N); break;
+  case ISD::FPOWI:
+  case ISD::STRICT_FPOWI: Res = PromoteIntOp_FPOWI(N); break;
 
   case ISD::VECREDUCE_ADD:
   case ISD::VECREDUCE_MUL:
@@ -1703,7 +1704,7 @@ bool DAGTypeLegalizer::PromoteIntegerOperand(SDNode *N, unsigned OpNo) {
 
 /// PromoteSetCCOperands - Promote the operands of a comparison.  This code is
 /// shared among BR_CC, SELECT_CC, and SETCC handlers.
-void DAGTypeLegalizer::PromoteSetCCOperands(SDValue &NewLHS,SDValue &NewRHS,
+void DAGTypeLegalizer::PromoteSetCCOperands(SDValue &LHS, SDValue &RHS,
                                             ISD::CondCode CCCode) {
   // We have to insert explicit sign or zero extends. Note that we could
   // insert sign extends for ALL conditions. For those operations where either
@@ -1713,22 +1714,22 @@ void DAGTypeLegalizer::PromoteSetCCOperands(SDValue &NewLHS,SDValue &NewRHS,
   default: llvm_unreachable("Unknown integer comparison!");
   case ISD::SETEQ:
   case ISD::SETNE: {
-    SDValue OpL = GetPromotedInteger(NewLHS);
-    SDValue OpR = GetPromotedInteger(NewRHS);
+    SDValue OpL = GetPromotedInteger(LHS);
+    SDValue OpR = GetPromotedInteger(RHS);
 
     // We would prefer to promote the comparison operand with sign extension.
     // If the width of OpL/OpR excluding the duplicated sign bits is no greater
-    // than the width of NewLHS/NewRH, we can avoid inserting real truncate
+    // than the width of LHS/RHS, we can avoid inserting real truncate
     // instruction, which is redundant eventually.
     unsigned OpLEffectiveBits = DAG.ComputeMinSignedBits(OpL);
     unsigned OpREffectiveBits = DAG.ComputeMinSignedBits(OpR);
-    if (OpLEffectiveBits <= NewLHS.getScalarValueSizeInBits() &&
-        OpREffectiveBits <= NewRHS.getScalarValueSizeInBits()) {
-      NewLHS = OpL;
-      NewRHS = OpR;
+    if (OpLEffectiveBits <= LHS.getScalarValueSizeInBits() &&
+        OpREffectiveBits <= RHS.getScalarValueSizeInBits()) {
+      LHS = OpL;
+      RHS = OpR;
     } else {
-      NewLHS = SExtOrZExtPromotedInteger(NewLHS);
-      NewRHS = SExtOrZExtPromotedInteger(NewRHS);
+      LHS = SExtOrZExtPromotedInteger(LHS);
+      RHS = SExtOrZExtPromotedInteger(RHS);
     }
     break;
   }
@@ -1736,15 +1737,15 @@ void DAGTypeLegalizer::PromoteSetCCOperands(SDValue &NewLHS,SDValue &NewRHS,
   case ISD::SETUGT:
   case ISD::SETULE:
   case ISD::SETULT:
-    NewLHS = SExtOrZExtPromotedInteger(NewLHS);
-    NewRHS = SExtOrZExtPromotedInteger(NewRHS);
+    LHS = SExtOrZExtPromotedInteger(LHS);
+    RHS = SExtOrZExtPromotedInteger(RHS);
     break;
   case ISD::SETGE:
   case ISD::SETGT:
   case ISD::SETLT:
   case ISD::SETLE:
-    NewLHS = SExtPromotedInteger(NewLHS);
-    NewRHS = SExtPromotedInteger(NewRHS);
+    LHS = SExtPromotedInteger(LHS);
+    RHS = SExtPromotedInteger(RHS);
     break;
   }
 }
@@ -2099,8 +2100,8 @@ SDValue DAGTypeLegalizer::PromoteIntOp_PREFETCH(SDNode *N, unsigned OpNo) {
 }
 
 SDValue DAGTypeLegalizer::PromoteIntOp_FPOWI(SDNode *N) {
-  // FIXME: Support for promotion of STRICT_FPOWI is not implemented yet.
-  assert(N->getOpcode() == ISD::FPOWI && "No STRICT_FPOWI support here yet.");
+  bool IsStrict = N->isStrictFPOpcode();
+  SDValue Chain = IsStrict ? N->getOperand(0) : SDValue();
 
   // The integer operand is the last operand in FPOWI (so the result and
   // floating point operand is already type legalized).
@@ -2118,17 +2119,19 @@ SDValue DAGTypeLegalizer::PromoteIntOp_FPOWI(SDNode *N) {
     DAG.getContext()->emitError("Don't know how to promote fpowi to fpow");
     return DAG.getUNDEF(N->getValueType(0));
   }
+  unsigned OpOffset = IsStrict ? 1 : 0;
   // The exponent should fit in a sizeof(int) type for the libcall to be valid.
   assert(DAG.getLibInfo().getIntSize() ==
-         N->getOperand(1).getValueType().getSizeInBits() &&
+             N->getOperand(1 + OpOffset).getValueType().getSizeInBits() &&
          "POWI exponent should match with sizeof(int) when doing the libcall.");
   TargetLowering::MakeLibCallOptions CallOptions;
   CallOptions.setSExt(true);
-  SDValue Ops[2] = { N->getOperand(0), N->getOperand(1) };
-  std::pair<SDValue, SDValue> Tmp =
-      TLI.makeLibCall(DAG, LC, N->getValueType(0), Ops,
-                      CallOptions, SDLoc(N), SDValue());
+  SDValue Ops[2] = {N->getOperand(0 + OpOffset), N->getOperand(1 + OpOffset)};
+  std::pair<SDValue, SDValue> Tmp = TLI.makeLibCall(
+      DAG, LC, N->getValueType(0), Ops, CallOptions, SDLoc(N), Chain);
   ReplaceValueWith(SDValue(N, 0), Tmp.first);
+  if (IsStrict)
+    ReplaceValueWith(SDValue(N, 1), Tmp.second);
   return SDValue();
 }
 
