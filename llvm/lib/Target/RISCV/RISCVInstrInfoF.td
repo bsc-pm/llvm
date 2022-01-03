@@ -73,6 +73,22 @@ def frmarg : Operand<XLenVT> {
 // Instruction class templates
 //===----------------------------------------------------------------------===//
 
+let hasSideEffects = 0, mayLoad = 1, mayStore = 0 in
+class FPLoad_r<bits<3> funct3, string opcodestr, RegisterClass rty,
+               SchedWrite sw>
+    : RVInstI<funct3, OPC_LOAD_FP, (outs rty:$rd),
+              (ins GPR:$rs1, simm12:$imm12),
+              opcodestr, "$rd, ${imm12}(${rs1})">,
+      Sched<[sw, ReadFMemBase]>;
+
+let hasSideEffects = 0, mayLoad = 0, mayStore = 1 in
+class FPStore_r<bits<3> funct3, string opcodestr, RegisterClass rty,
+                SchedWrite sw>
+    : RVInstS<funct3, OPC_STORE_FP, (outs),
+              (ins rty:$rs2, GPR:$rs1, simm12:$imm12),
+              opcodestr, "$rs2, ${imm12}(${rs1})">,
+      Sched<[sw, ReadStoreData, ReadFMemBase]>;
+
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0, mayRaiseFPException = 1,
     UseNamedOperandTable = 1, hasPostISelHook = 1 in
 class FPFMA_rrr_frm<RISCVOpcode opcode, bits<2> funct2, string opcodestr,
@@ -138,20 +154,12 @@ class FPCmp_rr<bits<7> funct7, bits<3> funct3, string opcodestr,
 //===----------------------------------------------------------------------===//
 
 let Predicates = [HasStdExtF] in {
-let hasSideEffects = 0, mayLoad = 1, mayStore = 0 in
-def FLW : RVInstI<0b010, OPC_LOAD_FP, (outs FPR32:$rd),
-                  (ins GPR:$rs1, simm12:$imm12),
-                   "flw", "$rd, ${imm12}(${rs1})">,
-          Sched<[WriteFLD32, ReadFMemBase]>;
+def FLW : FPLoad_r<0b010, "flw", FPR32, WriteFLD32>;
 
 // Operands for stores are in the order srcreg, base, offset rather than
 // reflecting the order these fields are specified in the instruction
 // encoding.
-let hasSideEffects = 0, mayLoad = 0, mayStore = 1 in
-def FSW : RVInstS<0b010, OPC_STORE_FP, (outs),
-                  (ins FPR32:$rs2, GPR:$rs1, simm12:$imm12),
-                   "fsw", "$rs2, ${imm12}(${rs1})">,
-          Sched<[WriteFST32, ReadStoreData, ReadFMemBase]>;
+def FSW : FPStore_r<0b010, "fsw", FPR32, WriteFST32>;
 
 let SchedRW = [WriteFMA32, ReadFMA32, ReadFMA32, ReadFMA32] in {
 def FMADD_S  : FPFMA_rrr_frm<OPC_MADD,  0b00, "fmadd.s",  FPR32>;
@@ -397,10 +405,10 @@ def : Pat<(i32 (riscv_fcvt_x_rtz FPR32:$rs1)), (FCVT_W_S $rs1, 0b001)>;
 def : Pat<(i32 (riscv_fcvt_xu_rtz FPR32:$rs1)), (FCVT_WU_S $rs1, 0b001)>;
 
 // float->int32 with current rounding mode.
-def : Pat<(i32 (lrint FPR32:$rs1)), (FCVT_W_S $rs1, 0b111)>;
+def : Pat<(i32 (any_lrint FPR32:$rs1)), (FCVT_W_S $rs1, 0b111)>;
 
 // float->int32 rounded to nearest with ties rounded away from zero.
-def : Pat<(i32 (lround FPR32:$rs1)), (FCVT_W_S $rs1, 0b100)>;
+def : Pat<(i32 (any_lround FPR32:$rs1)), (FCVT_W_S $rs1, 0b100)>;
 
 // [u]int->float. Match GCC and default to using dynamic rounding mode.
 def : Pat<(any_sint_to_fp (i32 GPR:$rs1)), (FCVT_S_W $rs1, 0b111)>;
@@ -429,12 +437,12 @@ def : Pat<(i64 (riscv_fcvt_x_rtz FPR32:$rs1)), (FCVT_L_S $rs1, 0b001)>;
 def : Pat<(i64 (riscv_fcvt_xu_rtz FPR32:$rs1)), (FCVT_LU_S $rs1, 0b001)>;
 
 // float->int64 with current rounding mode.
-def : Pat<(i64 (lrint FPR32:$rs1)), (FCVT_L_S $rs1, 0b111)>;
-def : Pat<(i64 (llrint FPR32:$rs1)), (FCVT_L_S $rs1, 0b111)>;
+def : Pat<(i64 (any_lrint FPR32:$rs1)), (FCVT_L_S $rs1, 0b111)>;
+def : Pat<(i64 (any_llrint FPR32:$rs1)), (FCVT_L_S $rs1, 0b111)>;
 
 // float->int64 rounded to neartest with ties rounded away from zero.
-def : Pat<(i64 (lround FPR32:$rs1)), (FCVT_L_S $rs1, 0b100)>;
-def : Pat<(i64 (llround FPR32:$rs1)), (FCVT_L_S $rs1, 0b100)>;
+def : Pat<(i64 (any_lround FPR32:$rs1)), (FCVT_L_S $rs1, 0b100)>;
+def : Pat<(i64 (any_llround FPR32:$rs1)), (FCVT_L_S $rs1, 0b100)>;
 
 // [u]int->fp. Match GCC and default to using dynamic rounding mode.
 def : Pat<(any_sint_to_fp (i64 (sexti32 (i64 GPR:$rs1)))), (FCVT_S_W $rs1, 0b111)>;
