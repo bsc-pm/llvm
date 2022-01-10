@@ -364,7 +364,7 @@ fi
 # Flags for lit
 ################################################################################
 
-LIT_ARGS="-DLLVM_LIT_ARGS=-sv --xunit-xml-output=xunit.xml"
+LIT_ARGS="-DLLVM_LIT_ARGS=-sv --xunit-xml-output=xunit.xml --timeout=300"
 
 if [ -n "${LLVM_LIT_THREADS}" ];
 then
