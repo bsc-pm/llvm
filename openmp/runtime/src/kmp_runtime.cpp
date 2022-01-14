@@ -4696,6 +4696,20 @@ kmp_info_t *__kmp_allocate_thread_into_thread_pool(omp_role_t role) {
 		balign[b].bb.use_oncore_barrier = 0;
 		balign[b].bb.leaf_kids = 0;
 	}
+  
+  //Allocate a serial team for this thread. It will be needed when this thread
+  //acts as a regular worker.
+  kmp_team_t *serial_team;
+  kmp_internal_control_t r_icvs = __kmp_get_x_global_icvs(__kmp_threads[0]->th.th_team);
+  new_thr->th.th_serial_team = serial_team =
+  									 (kmp_team_t *)__kmp_allocate_team(__kmp_threads[0]->th.th_root, 1, 1,
+#if OMPT_SUPPORT
+										 ompt_data_none,
+#endif
+										 proc_bind_default, &r_icvs, 0 USE_NESTED_HOT_ARG(NULL));
+	KMP_ASSERT(serial_team);
+	serial_team->t.t_serialized = 0;
+	serial_team->t.t_threads[0] = new_thr;
 
 	new_thr->th.th_potential_roles = role;
 	new_thr->th.th_pending_role = OMP_ROLE_NONE;
@@ -4744,6 +4758,7 @@ kmp_info_t *__kmp_allocate_thread_into_thread_pool(omp_role_t role) {
 	for(; (*scan != NULL) && ((*scan)->th.th_info.ds.ds_gtid < new_gtid);
 			scan = &((*scan)->th.th_next_pool));
 	TCW_PTR(new_thr->th.th_next_pool, *scan);
+	__kmp_thread_pool_insert_pt = *scan = new_thr;
 	KMP_DEBUG_ASSERT((new_thr->th.th_next_pool == NULL) ||
 									 (new_thr->th.th_info.ds.ds_gtid <
 									  new_thr->th.th_next_pool->th.th_info.ds.ds_gtid));
