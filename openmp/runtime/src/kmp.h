@@ -4198,7 +4198,7 @@ extern volatile kmp_info_t *__kmp_free_agent_list; /*First element of the free a
 thread list. Next element is pointed by the thread itself*/
 extern kmp_info_t *__kmp_free_agent_list_insert_pt;
 //extern kmp_free_agent_thread_start_t __kmp_free_agent_thread_start;
-extern unsigned int __kmp_free_agent_num_threads; //Max number of free agents allowed
+extern int __kmp_free_agent_num_threads; //Max number of free agents allowed
 extern std::atomic<int> __kmp_free_agent_active_nth; //Actual number of free agents active
 extern kmp_proc_bind_t __kmp_free_agent_proc_bind;
 extern char *__kmp_free_agent_affinity_proclist;
