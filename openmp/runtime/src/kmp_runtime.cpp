@@ -3763,9 +3763,12 @@ int __kmp_register_root(int initial_thread) {
     }
     root_thread->th.th_info.ds.ds_gtid = gtid;
     //TODO: Does the second useful thread always have the gtid 9?
-    root_thread->th.th_info.ds.ds_thread_id = TCR_4(__kmp_init_hidden_helper_threads)
-    																					? gtid
-    																					: gtid - __kmp_hidden_helper_threads_num;
+    if(gtid == 0) 
+    	root_thread->th.th_info.ds.ds_thread_id = 0;
+    else
+    	root_thread->th.th_info.ds.ds_thread_id = TCR_4(__kmp_init_hidden_helper_threads)
+    																						? gtid
+    																						: gtid - __kmp_hidden_helper_threads_num;
 #if OMPT_SUPPORT
     root_thread->th.ompt_thread_info.thread_data = ompt_data_none;
 #endif
