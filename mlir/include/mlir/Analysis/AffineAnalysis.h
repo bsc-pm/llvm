@@ -12,8 +12,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef MLIR_ANALYSIS_AFFINE_ANALYSIS_H
-#define MLIR_ANALYSIS_AFFINE_ANALYSIS_H
+#ifndef MLIR_ANALYSIS_AFFINEANALYSIS_H
+#define MLIR_ANALYSIS_AFFINEANALYSIS_H
 
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -137,7 +137,7 @@ struct MemRefAccess {
 // lb < ub. Note that ub/lb == None means unbounded.
 struct DependenceComponent {
   // The AffineForOp Operation associated with this dependence component.
-  Operation *op;
+  Operation *op = nullptr;
   // The lower bound of the dependence distance.
   Optional<int64_t> lb;
   // The upper bound of the dependence distance (inclusive).
@@ -185,4 +185,4 @@ void getDependenceComponents(
 
 } // namespace mlir
 
-#endif // MLIR_ANALYSIS_AFFINE_ANALYSIS_H
+#endif // MLIR_ANALYSIS_AFFINEANALYSIS_H
