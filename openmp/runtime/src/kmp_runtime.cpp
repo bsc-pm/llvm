@@ -3591,7 +3591,7 @@ static int __kmp_expand_threads(int nNeed) {
 }
 
 // FIXME - Sort this.
-static kmp_info_t *__kmp_allocate_free_agent_thread(kmp_root_t *root, int new_tid);
+//static kmp_info_t *__kmp_allocate_free_agent_thread(kmp_root_t *root, int new_tid);
 
 // Start free agent threads
 static void __kmp_create_free_agent_threads(void) {
@@ -3620,12 +3620,12 @@ static void __kmp_allocate_free_agent_threads(kmp_root_t *root) {
   //root->r.free_agent_threads = (kmp_info_t**)__kmp_allocate(sizeof(*root->r.free_agent_threads) * root->r.num_free_agent_threads);
   if(__kmp_free_agent_num_threads <= 0) return;
   kmp_info_t **insert = CCAST(kmp_info_t **, &__kmp_free_agent_list);
-  for (int i = 1; i < __kmp_free_agent_num_threads; i++) {
+  /*for (int i = 1; i < __kmp_free_agent_num_threads; i++) {
     //root->r.free_agent_threads[i] = __kmp_allocate_free_agent_thread(root, i);
     kmp_info_t *new_thr = __kmp_allocate_free_agent_thread(root, i);
     *insert = new_thr;
     insert = &(new_thr->th.th_next_free_agent);
-  }
+  }*/
 }
 
 /* Register the current thread as a root thread and obtain our gtid. We must
@@ -3903,7 +3903,7 @@ int __kmp_register_root(int initial_thread) {
     ompd_bp_thread_begin();
 #endif
 
-  __kmp_allocate_free_agent_threads(root);
+  //__kmp_allocate_free_agent_threads(root);
 
   // The root team is a serial team, so enable tasking for it
   // if we have free agent threads.
