@@ -4656,15 +4656,16 @@ kmp_info_t *__kmp_allocate_thread(kmp_root_t *root, kmp_team_t *team,
   return __kmp_allocate_thread_common(root, team, new_tid, role);
 }
 
-kmp_info_t *__kmp_allocate_thread_into_thread_pool(omp_role_t role) {
-	kmp_info_t *new_thr;
+static
+kmp_info_t *__kmp_allocate_thread_into_thread_pool(kmp_info_t *new_thr, omp_role_t role, int new_gtid) {
+	//kmp_info_t *new_thr;
 	kmp_info_t **scan;
-	int new_gtid;
+	//int new_gtid;
 
 	KA_TRACE(20, ("__kmp_allocate_thread_into_thread_pool: T#%d\n", __kmp_get_gtid()));
-	KMP_DEBUG_ASSERT(__kmp_all_nth < __kmp_max_nth);
+	//KMP_DEBUG_ASSERT(__kmp_all_nth < __kmp_max_nth);
 	KMP_MB();
-	KMP_ASSERT(__kmp_all_nth < __kmp_threads_capacity);
+	/*KMP_ASSERT(__kmp_all_nth < __kmp_threads_capacity);
 	int new_start_gtid = TCR_4(__kmp_init_hidden_helper_threads)
 													 ? 1
 													 : __kmp_hidden_helper_threads_num + 1;
@@ -4709,14 +4710,14 @@ kmp_info_t *__kmp_allocate_thread_into_thread_pool(omp_role_t role) {
 										 proc_bind_default, &r_icvs, 0 USE_NESTED_HOT_ARG(NULL));
 	KMP_ASSERT(serial_team);
 	serial_team->t.t_serialized = 0;
-	serial_team->t.t_threads[0] = new_thr;
+	serial_team->t.t_threads[0] = new_thr;*/
 
 	new_thr->th.th_potential_roles = role;
 	new_thr->th.th_pending_role = OMP_ROLE_NONE;
 	new_thr->th.th_change_role = false;
 	new_thr->th.th_active_role = OMP_ROLE_NONE;
 	
-	TCW_PTR(new_thr->th.th_sleep_loc, NULL);
+	/*TCW_PTR(new_thr->th.th_sleep_loc, NULL);
 	new_thr->th.th_sleep_loc_type = flag_unset;
 	new_thr->th.th_spin_here = FALSE;
 	new_thr->th.th_next_waiting = 0;
@@ -4740,7 +4741,8 @@ kmp_info_t *__kmp_allocate_thread_into_thread_pool(omp_role_t role) {
 	new_thr->th.th_root = NULL;
 	new_thr->th.th_dispatch = NULL;
 	new_thr->th.th_cg_roots = NULL;
-	new_thr->th.th_current_task =  NULL;
+	new_thr->th.th_current_task =  NULL;*/
+	new_thr->th.th_root = NULL;
 
 	if(__kmp_thread_pool_insert_pt != NULL){
 		KMP_DEBUG_ASSERT(__kmp_thread_pool != NULL)
@@ -4800,11 +4802,12 @@ kmp_info_t *__kmp_allocate_thread_into_thread_pool(omp_role_t role) {
 }
 
 static
-kmp_info_t *__kmp_allocate_free_agent_thread(kmp_root_t *root, int new_tid) {
+kmp_info_t *__kmp_allocate_free_agent_thread(kmp_info_t *thread, kmp_root_t *root, int new_gtid, int new_tid) {
   // FIXME - Copied from __kmp_init_implicit_task.
-  kmp_info_t *thread = __kmp_allocate_thread_common(root, NULL, new_tid, OMP_ROLE_FREE_AGENT);
+  //kmp_info_t *thread = __kmp_allocate_thread_common(root, NULL, new_tid, OMP_ROLE_FREE_AGENT);
   // Free agent threads don't have a team so __kmp_allocate_thread_common won't
   // give it a root.
+  thread->th.th_info.ds.ds_gtid = new_gtid;
   thread->th.th_info.ds.ds_tid = new_tid + 128;
   thread->th.th_root = root;
   thread->th.th_potential_roles = (omp_role_t)(OMP_ROLE_NONE | OMP_ROLE_FREE_AGENT);
@@ -4814,7 +4817,7 @@ kmp_info_t *__kmp_allocate_free_agent_thread(kmp_root_t *root, int new_tid) {
   
   //Allocate a serial team for this thread. It will be needed when this thread
   //acts as a regular worker.
-  kmp_team_t *serial_team;
+  /*kmp_team_t *serial_team;
   kmp_internal_control_t r_icvs = __kmp_get_x_global_icvs(__kmp_threads[0]->th.th_team);
   thread->th.th_serial_team = serial_team =
   									 (kmp_team_t *)__kmp_allocate_team(root, 1, 1,
@@ -4824,7 +4827,7 @@ kmp_info_t *__kmp_allocate_free_agent_thread(kmp_root_t *root, int new_tid) {
 										 proc_bind_default, &r_icvs, 0 USE_NESTED_HOT_ARG(NULL));
 	KMP_ASSERT(serial_team);
 	serial_team->t.t_serialized = 0;
-	serial_team->t.t_threads[0] = thread;
+	serial_team->t.t_threads[0] = thread;*/
   
   kmp_taskdata_t *task =
     (kmp_taskdata_t *)__kmp_allocate(sizeof(kmp_taskdata_t) * 1);
@@ -4873,10 +4876,118 @@ kmp_info_t *__kmp_allocate_free_agent_thread(kmp_root_t *root, int new_tid) {
 
   KMP_DEBUG_ASSERT(task->td_incomplete_child_tasks == 0);
   KMP_DEBUG_ASSERT(task->td_allocated_child_tasks == 0);
+	
+	TCW_4(__kmp_all_nth, __kmp_all_nth + 1);
+	__kmp_nth++;
 
   KF_TRACE(10, ("__kmp_allocate_free_agent_thread(exit): T#:%d team=%p task=%p\n", new_tid,
         NULL, task));
+  KMP_MB();
   return thread;
+}
+
+static
+kmp_info_t *__kmp_allocate_thread_middle_init(kmp_root_t *root, omp_role_t role, int tid){
+	kmp_info_t *new_thr;
+	int new_gtid;
+
+	KA_TRACE(20, ("__kmp_allocate_thread_middle_init: T#%d\n", __kmp_get_gtid()));
+	KMP_DEBUG_ASSERT(__kmp_all_nth < __kmp_max_nth);
+	KMP_MB();
+	KMP_ASSERT(__kmp_all_nth < __kmp_threads_capacity);
+	int new_start_gtid = TCR_4(__kmp_init_hidden_helper_threads)
+													 ? 1
+													 : __kmp_hidden_helper_threads_num + 1;
+	for(new_gtid = new_start_gtid; TCR_PTR(__kmp_threads[new_gtid]) != NULL;
+		  new_gtid++){
+		KMP_DEBUG_ASSERT(new_gtid < __kmp_threads_capacity);
+	}
+	if(TCR_4(__kmp_init_hidden_helper_threads))
+		KMP_DEBUG_ASSERT(new_gtid <= __kmp_hidden_helper_threads_num);
+	
+	new_thr = (kmp_info_t *)__kmp_allocate(sizeof(kmp_info_t));
+	TCW_SYNC_PTR(__kmp_threads[new_gtid], new_thr);
+	if(__kmp_storage_map)
+		__kmp_print_thread_storage_map(new_thr, new_gtid);
+#if USE_FAST_MEMORY
+	__kmp_initialize_fast_memory(new_thr);
+#endif
+#if KMP_USE_BGET
+	KMP_DEBUG_ASSERT(new_thr->th.th_local.bget_data == NULL)
+	__kmp_initialize_bget(new_thr);
+#endif
+	__kmp_init_random(new_thr);
+	int b;
+	kmp_balign_t *balign = new_thr->th.th_bar;
+	for(b = 0; b < bs_last_barrier; b++){
+		balign[b].bb.b_go = KMP_INIT_BARRIER_STATE;
+		balign[b].bb.team = NULL;
+		balign[b].bb.wait_flag = KMP_BARRIER_NOT_WAITING;
+		balign[b].bb.use_oncore_barrier = 0;
+		balign[b].bb.leaf_kids = 0;
+	}
+
+	//Allocate a serial team for this thread. It will be needed when this thread
+	//acts as a regular worker.
+	kmp_team_t *serial_team;
+	kmp_internal_control_t r_icvs = __kmp_get_x_global_icvs(__kmp_threads[0]->th.th_team);
+	new_thr->th.th_serial_team = serial_team =
+										 (kmp_team_t *)__kmp_allocate_team(__kmp_threads[0]->th.th_root, 1, 1,
+#if OMPT_SUPPORT
+										 ompt_data_none,
+#endif
+										 proc_bind_default, &r_icvs, 0 USE_NESTED_HOT_ARG(NULL));
+	KMP_ASSERT(serial_team);
+	serial_team->t.t_serialized = 0;
+	serial_team->t.t_threads[0] = new_thr;
+
+	TCW_PTR(new_thr->th.th_sleep_loc, NULL);
+	new_thr->th.th_sleep_loc_type = flag_unset;
+	new_thr->th.th_spin_here = FALSE;
+	new_thr->th.th_next_waiting = 0;
+#if KMP_OS_UNIX
+	new_thr->th.th_blocking = false;
+#endif
+#if KMP_AFFINITY_SUPPORTED
+	new_thr->th.th_current_place = KMP_PLACE_UNDEFINED;
+	new_thr->th.th_new_place = KMP_PLACE_UNDEFINED;
+	new_thr->th.th_first_place = KMP_PLACE_UNDEFINED;
+	new_thr->th.th_last_place = KMP_PLACE_UNDEFINED;
+#endif
+	new_thr->th.th_def_allocator = __kmp_def_allocator;
+	new_thr->th.th_prev_level = 0;
+	new_thr->th.th_prev_num_threads = 1;
+
+	new_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
+	new_thr->th.th_team = NULL;
+	new_thr->th.th_dispatch = NULL;
+	new_thr->th.th_cg_roots = NULL;
+	new_thr->th.th_current_task = NULL;
+
+	if(__kmp_adjust_gtid_mode){
+		if(__kmp_all_nth >= __kmp_tls_gtid_min){
+			if(TCR_4(__kmp_gtid_mode) != 2){
+				TCW_4(__kmp_gtid_mode, 2);
+			}
+		}
+		else{
+			if(TCR_4(__kmp_gtid_mode) != 1){
+				TCW_4(__kmp_gtid_mode, 1);
+			}
+		}
+	}
+
+#ifdef KMP_ADJUST_BLOCKTIME
+	if(!__kmp_env_blocktime && (__kmp_avail_proc > 0)){
+		if(__kmp_nth > __kmp_avail_proc){
+			__kmp_zero_bt = TRUE;
+		}
+	}
+#endif
+
+	if(role == OMP_ROLE_FREE_AGENT)
+		return __kmp_allocate_free_agent_thread(new_thr, root, new_gtid, tid);
+	return __kmp_allocate_thread_into_thread_pool(new_thr, role, new_gtid);
 }
 
 /* Reinitialize team for reuse.
@@ -7626,13 +7737,14 @@ static void __kmp_do_middle_initialize(void) {
 
 	/*Create and leave in the thread pool the threads required for a parallel region*/
 	KMP_ASSERT(__kmp_dflt_team_nth >= __kmp_free_agent_num_threads);
+	kmp_root_t *root = __kmp_threads[0]->th.th_root;
 	for(i = 1; i < (__kmp_dflt_team_nth - __kmp_free_agent_num_threads); i++){
-		__kmp_allocate_thread_into_thread_pool(OMP_ROLE_NONE);
+		__kmp_allocate_thread_middle_init(root, OMP_ROLE_NONE, i);
 	}
 	/*Create and start the initial free agent threads*/
 	kmp_info_t **insert = CCAST(kmp_info_t **, &__kmp_free_agent_list);
 	for(; i < __kmp_dflt_team_nth; i++){
-		kmp_info_t *new_fa = __kmp_allocate_free_agent_thread(__kmp_threads[0]->th.th_root, i);
+		kmp_info_t *new_fa = __kmp_allocate_thread_middle_init(root, OMP_ROLE_FREE_AGENT, i);
 		*insert = new_fa;
 		insert = &(new_fa->th.th_next_free_agent);
 		/*actual fork and creation of the thread*/
@@ -8258,7 +8370,7 @@ void __kmp_internal_join(ident_t *id, int gtid, kmp_team_t *team) {
   kmp_info_t *new_thr;
   kmp_balign_t *balign;
   for(i = team->t.t_nproc-1; 
-  	 (i >= 0 && __kmp_free_agent_active_nth <= __kmp_free_agent_num_threads); i++){
+  	 (i >= 0 && __kmp_free_agent_active_nth <= __kmp_free_agent_num_threads); i--){
 	  new_thr = team->t.t_threads[i];
 	  if(new_thr == this_thr) continue; //The master never changes its role
 	  if(!(new_thr->th.th_potential_roles & OMP_ROLE_FREE_AGENT)) continue;
@@ -9647,8 +9759,10 @@ void __kmp_set_thread_roles1(int how_many, omp_role_t r){
 			th = __kmp_threads[gtid];
 			th->th.th_potential_roles = (omp_role_t)(r & th->th.th_potential_roles);
 		}
+		kmp_root *root = __kmp_threads[__kmp_entry_gtid()]->th.th_root;
 		for(; i < how_many; ++i){ //Thread creation with the proper potential roles
-			th = __kmp_allocate_thread_into_thread_pool(r);
+			//th = __kmp_allocate_thread_into_thread_pool(root, r, i);
+			th = __kmp_allocate_thread_middle_init(root, r, i);
 			KMP_DEBUG_ASSERT(th != NULL);
 			KMP_DEBUG_ASSERT(th->th.th_potential_roles == r);
 		}
