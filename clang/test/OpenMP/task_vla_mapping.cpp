@@ -9,7 +9,7 @@ void foo(int N, int (*a)[N + 1]) {
 #pragma omp taskwait
 }
 // CHECK-LABEL: define {{[^@]+}}@foo
-// CHECK-SAME: (i32 [[N:%.*]], i32* [[A:%.*]]) #[[ATTR0:[0-9]+]] {
+// CHECK-SAME: (i32 noundef [[N:%.*]], i32* noundef [[A:%.*]]) #[[ATTR0:[0-9]+]] {
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    [[N_ADDR:%.*]] = alloca i32, align 4
 // CHECK-NEXT:    [[A_ADDR:%.*]] = alloca i32*, align 8
@@ -39,7 +39,7 @@ void foo(int N, int (*a)[N + 1]) {
 //
 //
 // CHECK-LABEL: define {{[^@]+}}@.omp_task_privates_map.
-// CHECK-SAME: (%struct..kmp_privates.t* noalias [[TMP0:%.*]], i8** noalias [[TMP1:%.*]]) #[[ATTR1:[0-9]+]] {
+// CHECK-SAME: (%struct..kmp_privates.t* noalias noundef [[TMP0:%.*]], i8** noalias noundef [[TMP1:%.*]]) #[[ATTR1:[0-9]+]] {
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    [[DOTADDR:%.*]] = alloca %struct..kmp_privates.t*, align 8
 // CHECK-NEXT:    [[DOTADDR1:%.*]] = alloca i8**, align 8
@@ -54,7 +54,7 @@ void foo(int N, int (*a)[N + 1]) {
 //
 //
 // CHECK-LABEL: define {{[^@]+}}@.omp_task_entry.
-// CHECK-SAME: (i32 [[TMP0:%.*]], %struct.kmp_task_t_with_privates* noalias [[TMP1:%.*]]) #[[ATTR2:[0-9]+]] {
+// CHECK-SAME: (i32 noundef [[TMP0:%.*]], %struct.kmp_task_t_with_privates* noalias noundef [[TMP1:%.*]]) #[[ATTR2:[0-9]+]] {
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    [[DOTGLOBAL_TID__ADDR_I:%.*]] = alloca i32, align 4
 // CHECK-NEXT:    [[DOTPART_ID__ADDR_I:%.*]] = alloca i32*, align 8
