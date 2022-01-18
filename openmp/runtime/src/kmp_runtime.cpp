@@ -7759,7 +7759,6 @@ static void __kmp_do_middle_initialize(void) {
                   new_gtid));
     __kmp_free_agent_active_nth++;
   }
-  KMP_DEBUG_ASSERT(__kmp_free_agent_active_nth == __kmp_free_agent_num_threads);
 
   /* we have finished middle initialization */
   TCW_SYNC_4(__kmp_init_middle, TRUE);
@@ -9699,9 +9698,15 @@ int __kmp_get_num_threads_role(omp_role_t r){
 }
 
 int __kmp_get_thread_roles(int tid, omp_role_t *r){
-	int gtid = TCR_4(__kmp_init_hidden_helper_threads)
-						 ? tid
-						 : tid + __kmp_hidden_helper_threads_num;
+	int gtid;
+	if(tid != 0){
+		gtid= TCR_4(__kmp_init_hidden_helper_threads)
+							 ? tid
+							 : tid + __kmp_hidden_helper_threads_num;
+	}
+	else{
+		gtid = 0;
+	}
 	kmp_info_t *th = __kmp_threads[gtid];
 	*r = th->th.th_potential_roles;
 	switch((int)(*r)){
@@ -9728,6 +9733,7 @@ void __kmp_set_thread_roles1(int how_many, omp_role_t r){
 	omp_role_t act_r;
 	if(r == OMP_ROLE_NONE) return;
 	if(how_many <= TCR_4(__kmp_all_nth)){ //The runtime currently has enough threads to satisfy the petition.
+		if(r & OMP_ROLE_FREE_AGENT) __kmp_free_agent_num_threads = how_many;
 		for(i = __kmp_all_nth - 1; i >= __kmp_all_nth - how_many; i--){
 			gtid = TCR_4(__kmp_init_hidden_helper_threads)
 						 ? i
@@ -9752,6 +9758,7 @@ void __kmp_set_thread_roles1(int how_many, omp_role_t r){
 		}
 	}
 	else if(how_many <= __kmp_threads_capacity){//We need more threads, and we can create them.
+		if(r & OMP_ROLE_FREE_AGENT) __kmp_free_agent_num_threads = how_many;
 		for(i = 0; i < __kmp_all_nth; i++){//Just set the potential roles
 			gtid = TCR_4(__kmp_init_hidden_helper_threads)
 						 ? i
@@ -9782,6 +9789,16 @@ void __kmp_set_thread_roles2(int tid, omp_role_t r){
 		if(!(act_r & r)){//We are actually removing the active role from the thread
 			th->th.th_pending_role = OMP_ROLE_NONE;
 			KMP_ATOMIC_ST_RLX(&th->th.th_change_role, true);
+		}
+	}
+	if(th->th.th_potential_roles & OMP_ROLE_FREE_AGENT){
+		if(!(r & OMP_ROLE_FREE_AGENT)){ //Decreasing the number of potential FA
+			--__kmp_free_agent_num_threads;
+		}
+	}
+	else{
+		if(r & OMP_ROLE_FREE_AGENT){//Increasing the number of potential FA
+			++__kmp_free_agent_num_threads;
 		}
 	}
 	th->th.th_potential_roles = r;
