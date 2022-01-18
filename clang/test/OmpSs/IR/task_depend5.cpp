@@ -13,7 +13,7 @@ void foo() {
 // CHECK: define internal %struct._depend_unpack_t @compute_dep([10 x i32]* %array)
 // CHECK: entry:
 // CHECK-NEXT:   %retval = alloca %struct._depend_unpack_t, align 8
-// CHECK:   %call = call{{( signext)?}} i32 @_Z3barv()
+// CHECK:   %call = call noundef{{( signext)?}} i32 @_Z3barv()
 // CHECK-NEXT:   %0 = sext i32 %call to i64
 // CHECK-NEXT:   %1 = add i64 %0, 1
 // CHECK-NEXT:   %arraydecay = getelementptr inbounds [10 x i32], [10 x i32]* %array, i64 0, i64 0

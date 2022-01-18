@@ -32,7 +32,7 @@ void foo() {
 // CHECK-NEXT: %4 = load [10 x [20 x %struct.S]]*, [10 x [20 x %struct.S]]** %rs1, align 8
 // CHECK-NEXT: %5 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.PRIVATE"([10 x [20 x %struct.S]]* %3), "QUAL.OSS.INIT"([10 x [20 x %struct.S]]* %3, void (%struct.S*, i64)* @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"([10 x [20 x %struct.S]]* %3, void (%struct.S*, i64)* @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"([10 x [20 x %struct.S]]* %4), "QUAL.OSS.INIT"([10 x [20 x %struct.S]]* %4, void (%struct.S*, i64)* @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"([10 x [20 x %struct.S]]* %4, void (%struct.S*, i64)* @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"([10 x [20 x %struct.S]]* %s), "QUAL.OSS.INIT"([10 x [20 x %struct.S]]* %s, void (%struct.S*, i64)* @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"([10 x [20 x %struct.S]]* %s, void (%struct.S*, i64)* @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"([10 x [20 x %struct.S]]* %s1), "QUAL.OSS.INIT"([10 x [20 x %struct.S]]* %s1, void (%struct.S*, i64)* @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"([10 x [20 x %struct.S]]* %s1, void (%struct.S*, i64)* @oss_dtor_ZN1SD1Ev) ]
 
-// CHECK: define internal void @oss_copy_ctor_ZN1SC1ERS_i(%struct.S* %0, %struct.S* %1, i64 %2)
+// CHECK: define internal void @oss_copy_ctor_ZN1SC1ERS_i(%struct.S* noundef %0, %struct.S* noundef %1, i64 noundef %2)
 // CHECK-NEXT: entry:
 // CHECK-NEXT:   %.addr = alloca %struct.S*, align 8
 // CHECK-NEXT:   %.addr1 = alloca %struct.S*, align 8
@@ -48,7 +48,7 @@ void foo() {
 // CHECK: arrayctor.loop:                                   ; preds = %arrayctor.loop, %entry
 // CHECK-NEXT:   %arrayctor.dst.cur = phi %struct.S* [ %4, %entry ], [ %arrayctor.dst.next, %arrayctor.loop ]
 // CHECK-NEXT:   %arrayctor.src.cur = phi %struct.S* [ %3, %entry ], [ %arrayctor.src.next, %arrayctor.loop ]
-// CHECK-NEXT:   call void @_ZN1SC1ERS_i(%struct.S* nonnull align 4 dereferenceable(4) %arrayctor.dst.cur, %struct.S* nonnull align 4 dereferenceable(4) %arrayctor.src.cur, i32{{( signext)?}} 0)
+// CHECK-NEXT:   call void @_ZN1SC1ERS_i(%struct.S* noundef %arrayctor.dst.cur, %struct.S* noundef nonnull align 4 dereferenceable(4) %arrayctor.src.cur, i32 noundef{{( signext)?}} 0)
 // CHECK-NEXT:   %arrayctor.dst.next = getelementptr inbounds %struct.S, %struct.S* %arrayctor.dst.cur, i64 1
 // CHECK-NEXT:   %arrayctor.src.next = getelementptr inbounds %struct.S, %struct.S* %arrayctor.src.cur, i64 1
 // CHECK-NEXT:   %arrayctor.done = icmp eq %struct.S* %arrayctor.dst.next, %arrayctor.dst.end
@@ -57,7 +57,7 @@ void foo() {
 // CHECK-NEXT:   ret void
 // CHECK-NEXT: }
 
-// CHECK: define internal void @oss_dtor_ZN1SD1Ev(%struct.S* %0, i64 %1)
+// CHECK: define internal void @oss_dtor_ZN1SD1Ev(%struct.S* noundef %0, i64 noundef %1)
 // CHECK-NEXT: entry:
 // CHECK-NEXT:   %.addr = alloca %struct.S*, align 8
 // CHECK-NEXT:   %.addr1 = alloca i64, align 8
@@ -69,7 +69,7 @@ void foo() {
 // CHECK-NEXT:   br label %arraydtor.loop
 // CHECK: arraydtor.loop:                                   ; preds = %arraydtor.loop, %entry
 // CHECK-NEXT:   %arraydtor.dst.cur = phi %struct.S* [ %2, %entry ], [ %arraydtor.dst.next, %arraydtor.loop ]
-// CHECK-NEXT:   call void @_ZN1SD1Ev(%struct.S* nonnull align 4 dereferenceable(4) %arraydtor.dst.cur)
+// CHECK-NEXT:   call void @_ZN1SD1Ev(%struct.S* noundef %arraydtor.dst.cur)
 // CHECK-NEXT:   %arraydtor.dst.next = getelementptr inbounds %struct.S, %struct.S* %arraydtor.dst.cur, i64 1
 // CHECK-NEXT:   %arraydtor.done = icmp eq %struct.S* %arraydtor.dst.next, %arraydtor.dst.end
 // CHECK-NEXT:   br i1 %arraydtor.done, label %arraydtor.cont, label %arraydtor.loop
@@ -77,7 +77,7 @@ void foo() {
 // CHECK-NEXT:   ret void
 // CHECK-NEXT: }
 
-// CHECK: define internal void @oss_ctor_ZN1SC1Ev(%struct.S* %0, i64 %1)
+// CHECK: define internal void @oss_ctor_ZN1SC1Ev(%struct.S* noundef %0, i64 noundef %1)
 // CHECK-NEXT: entry:
 // CHECK-NEXT:   %.addr = alloca %struct.S*, align 8
 // CHECK-NEXT:   %.addr1 = alloca i64, align 8
@@ -89,7 +89,7 @@ void foo() {
 // CHECK-NEXT:   br label %arrayctor.loop
 // CHECK: arrayctor.loop:                                   ; preds = %arrayctor.loop, %entry
 // CHECK-NEXT:   %arrayctor.dst.cur = phi %struct.S* [ %2, %entry ], [ %arrayctor.dst.next, %arrayctor.loop ]
-// CHECK-NEXT:   call void @_ZN1SC1Ev(%struct.S* nonnull align 4 dereferenceable(4) %arrayctor.dst.cur)
+// CHECK-NEXT:   call void @_ZN1SC1Ev(%struct.S* noundef %arrayctor.dst.cur)
 // CHECK-NEXT:   %arrayctor.dst.next = getelementptr inbounds %struct.S, %struct.S* %arrayctor.dst.cur, i64 1
 // CHECK-NEXT:   %arrayctor.done = icmp eq %struct.S* %arrayctor.dst.next, %arrayctor.dst.end
 // CHECK-NEXT:   br i1 %arrayctor.done, label %arrayctor.cont, label %arrayctor.loop

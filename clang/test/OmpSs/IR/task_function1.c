@@ -21,7 +21,7 @@ int main() {
 // CHECK: %9 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(i32* %call_arg), "QUAL.OSS.FIRSTPRIVATE"(i32** %call_arg1), "QUAL.OSS.DEP.IN"(i32** %call_arg1, [3 x i8] c"*a\00", %struct._depend_unpack_t (i32**, i64)* @compute_dep, i32** %call_arg1, i64 %8), "QUAL.OSS.CAPTURED"(i64 %8), "QUAL.OSS.DECL.SOURCE"([8 x i8] c"foo:4:9\00") ]
 // CHECK-NEXT: %10 = load i32, i32* %call_arg, align 4
 // CHECK-NEXT: %11 = load i32*, i32** %call_arg1, align 8
-// CHECK-NEXT: call void @foo(i32{{( signext)?}} %10, i32* %11)
+// CHECK-NEXT: call void @foo(i32 noundef{{( signext)?}} %10, i32* noundef %11)
 
 // CHECK: define internal %struct._depend_unpack_t @compute_dep(i32** %a, i64 %0)
 // CHECK: entry:
