@@ -9735,17 +9735,23 @@ void __kmp_set_thread_roles1(int how_many, omp_role_t r){
 	if(how_many <= TCR_4(__kmp_all_nth)){ //The runtime currently has enough threads to satisfy the petition.
 		if(r & OMP_ROLE_FREE_AGENT) __kmp_free_agent_num_threads = how_many;
 		for(i = __kmp_all_nth - 1; i >= __kmp_all_nth - how_many; i--){
-			gtid = TCR_4(__kmp_init_hidden_helper_threads)
-						 ? i
-						 : i + __kmp_init_hidden_helper_threads;
+			if(i == 0) gtid = 0;
+			else{
+				gtid = TCR_4(__kmp_init_hidden_helper_threads)
+							 ? i
+							 : i + __kmp_hidden_helper_threads_num;
+			}
 			th = __kmp_threads[gtid];
 			th->th.th_potential_roles = (omp_role_t)(r | th->th.th_potential_roles);
 		}
 		//Remove the role from the other threads if they have it
 		for(; i >= 0; i--){
-			gtid = TCR_4(__kmp_init_hidden_helper_threads)
-						 ? i
-						 : i + __kmp_init_hidden_helper_threads;
+			if(i == 0) gtid = 0;
+			else{
+				gtid = TCR_4(__kmp_init_hidden_helper_threads)
+							 ? i
+							 : i + __kmp_hidden_helper_threads_num;
+			}
 			th = __kmp_threads[gtid];
 			act_r = th->th.th_active_role;
 			if(act_r != OMP_ROLE_NONE){
@@ -9759,7 +9765,9 @@ void __kmp_set_thread_roles1(int how_many, omp_role_t r){
 	}
 	else if(how_many <= __kmp_threads_capacity){//We need more threads, and we can create them.
 		if(r & OMP_ROLE_FREE_AGENT) __kmp_free_agent_num_threads = how_many;
-		for(i = 0; i < __kmp_all_nth; i++){//Just set the potential roles
+		th = __kmp_threads[0];
+		th->th.th_potential_roles = (omp_role_t)(r & th->th.th_potential_roles);
+		for(i = 1; i < __kmp_all_nth; i++){//Just set the potential roles
 			gtid = TCR_4(__kmp_init_hidden_helper_threads)
 						 ? i
 						 : i + __kmp_hidden_helper_threads_num;
@@ -9779,9 +9787,15 @@ void __kmp_set_thread_roles1(int how_many, omp_role_t r){
 }
 
 void __kmp_set_thread_roles2(int tid, omp_role_t r){
-	int gtid = TCR_4(__kmp_init_hidden_helper_threads)
-						 ? tid
-						 : tid + __kmp_hidden_helper_threads_num;
+	int gtid;
+	if(tid != 0){
+		gtid = TCR_4(__kmp_init_hidden_helper_threads)
+							 ? tid
+							 : tid + __kmp_hidden_helper_threads_num;
+	}
+	else {
+		gtid = 0;
+	}
 	kmp_info_t *th = __kmp_threads[gtid];
 	if(th == NULL) return;
 	omp_role_t act_r = th->th.th_active_role;
