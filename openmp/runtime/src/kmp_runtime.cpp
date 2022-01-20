@@ -7736,14 +7736,17 @@ static void __kmp_do_middle_initialize(void) {
 #endif /* KMP_ADJUST_BLOCKTIME */
 
 	/*Create and leave in the thread pool the threads required for a parallel region*/
-	KMP_ASSERT(__kmp_dflt_team_nth >= __kmp_free_agent_num_threads);
+	//KMP_ASSERT(__kmp_dflt_team_nth >= __kmp_free_agent_num_threads);
+	int num_workers = __kmp_dflt_team_nth - __kmp_free_agent_num_threads;
+	int num_fa = (num_workers < 0) ? __kmp_free_agent_num_threads : __kmp_dflt_team_nth;
+
 	kmp_root_t *root = __kmp_threads[0]->th.th_root;
-	for(i = 1; i < (__kmp_dflt_team_nth - __kmp_free_agent_num_threads); i++){
+	for(i = 1; i < num_workers; i++){
 		__kmp_allocate_thread_middle_init(root, OMP_ROLE_NONE, i);
 	}
 	/*Create and start the initial free agent threads*/
 	kmp_info_t **insert = CCAST(kmp_info_t **, &__kmp_free_agent_list);
-	for(; i < __kmp_dflt_team_nth; i++){
+	for(; i < num_fa; i++){
 		kmp_info_t *new_fa = __kmp_allocate_thread_middle_init(root, OMP_ROLE_FREE_AGENT, i);
 		*insert = new_fa;
 		insert = &(new_fa->th.th_next_free_agent);
