@@ -16,6 +16,8 @@
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/IntrinsicInst.h"
 
+#include <map>
+
 namespace llvm {
 
 // Data-sharing lists.
