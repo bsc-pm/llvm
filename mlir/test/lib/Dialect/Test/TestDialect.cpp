@@ -99,12 +99,6 @@ struct TestOpAsmInterface : public OpAsmDialectInterface {
     }
     return AliasResult::NoAlias;
   }
-
-  void getAsmResultNames(Operation *op,
-                         OpAsmSetValueNameFn setNameFn) const final {
-    if (auto asmOp = dyn_cast<AsmDialectInterfaceOp>(op))
-      setNameFn(asmOp, "result");
-  }
 };
 
 struct TestDialectFoldInterface : public DialectFoldInterface {
@@ -262,6 +256,15 @@ TestDialect::~TestDialect() {
 Operation *TestDialect::materializeConstant(OpBuilder &builder, Attribute value,
                                             Type type, Location loc) {
   return builder.create<TestOpConstant>(loc, type, value);
+}
+
+::mlir::LogicalResult FormatInferType2Op::inferReturnTypes(
+    ::mlir::MLIRContext *context, ::llvm::Optional<::mlir::Location> location,
+    ::mlir::ValueRange operands, ::mlir::DictionaryAttr attributes,
+    ::mlir::RegionRange regions,
+    ::llvm::SmallVectorImpl<::mlir::Type> &inferredReturnTypes) {
+  inferredReturnTypes.assign({::mlir::IntegerType::get(context, 16)});
+  return ::mlir::success();
 }
 
 void *TestDialect::getRegisteredInterfaceForOp(TypeID typeID,
@@ -586,7 +589,7 @@ static ParseResult parseIsolatedRegionOp(OpAsmParser &parser,
 
   // Parse the body region, and reuse the operand info as the argument info.
   Region *body = result.addRegion();
-  return parser.parseRegion(*body, argInfo, argType,
+  return parser.parseRegion(*body, argInfo, argType, /*argLocations=*/{},
                             /*enableNameShadowing=*/true);
 }
 
@@ -594,6 +597,7 @@ static void print(OpAsmPrinter &p, IsolatedRegionOp op) {
   p << "test.isolated_region ";
   p.printOperand(op.getOperand());
   p.shadowRegionArgs(op.getRegion(), op.getOperand());
+  p << ' ';
   p.printRegion(op.getRegion(), /*printEntryBlockArgs=*/false);
 }
 

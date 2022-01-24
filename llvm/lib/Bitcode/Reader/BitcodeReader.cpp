@@ -1349,7 +1349,7 @@ Error BitcodeReader::parseAttributeBlock() {
         return error("Invalid record");
 
       for (unsigned i = 0, e = Record.size(); i != e; i += 2) {
-        AttrBuilder B;
+        AttrBuilder B(Context);
         decodeLLVMAttributesForBitcode(B, Record[i+1]);
         Attrs.push_back(AttributeList::get(Context, Record[i], B));
       }
@@ -1591,7 +1591,7 @@ Error BitcodeReader::parseAttributeGroupBlock() {
       uint64_t GrpID = Record[0];
       uint64_t Idx = Record[1]; // Index of the object this attribute refers to.
 
-      AttrBuilder B;
+      AttrBuilder B(Context);
       for (unsigned i = 2, e = Record.size(); i != e; ++i) {
         if (Record[i] == 0) {        // Enum attribute
           Attribute::AttrKind Kind;
@@ -3835,6 +3835,11 @@ Error BitcodeReader::parseModule(uint64_t ResumeBit,
       if (Error Err = parseComdatRecord(Record))
         return Err;
       break;
+    // FIXME: BitcodeReader should handle {GLOBALVAR, FUNCTION, ALIAS, IFUNC}
+    // written by ThinLinkBitcodeWriter. See
+    // `ThinLinkBitcodeWriter::writeSimplifiedModuleInfo` for the format of each
+    // record
+    // (https://github.com/llvm/llvm-project/blob/b6a93967d9c11e79802b5e75cec1584d6c8aa472/llvm/lib/Bitcode/Writer/BitcodeWriter.cpp#L4714)
     case bitc::MODULE_CODE_GLOBALVAR:
       if (Error Err = parseGlobalVarRecord(Record))
         return Err;
@@ -3920,6 +3925,23 @@ void BitcodeReader::propagateAttributeTypes(CallBase *CB,
       }
 
       CB->addParamAttr(i, NewAttr);
+    }
+  }
+
+  if (CB->isInlineAsm()) {
+    const InlineAsm *IA = cast<InlineAsm>(CB->getCalledOperand());
+    unsigned ArgNo = 0;
+    for (const InlineAsm::ConstraintInfo &CI : IA->ParseConstraints()) {
+      if (!CI.hasArg())
+        continue;
+
+      if (CI.isIndirect && !CB->getAttributes().getParamElementType(ArgNo)) {
+        Type *ElemTy = ArgsTys[ArgNo]->getPointerElementType();
+        CB->addParamAttr(
+            ArgNo, Attribute::get(Context, Attribute::ElementType, ElemTy));
+      }
+
+      ArgNo++;
     }
   }
 
@@ -4826,15 +4848,18 @@ Error BitcodeReader::parseFunctionBody(Function *F) {
         return error("Insufficient operands to call");
 
       SmallVector<Value*, 16> Args;
+      SmallVector<Type *, 16> ArgsTys;
       // Read the fixed params.
       for (unsigned i = 0, e = FTy->getNumParams(); i != e; ++i, ++OpNum) {
+        Value *Arg;
         if (FTy->getParamType(i)->isLabelTy())
-          Args.push_back(getBasicBlock(Record[OpNum]));
+          Arg = getBasicBlock(Record[OpNum]);
         else
-          Args.push_back(getValue(Record, OpNum, NextValueNo,
-                                  FTy->getParamType(i)));
-        if (!Args.back())
+          Arg = getValue(Record, OpNum, NextValueNo, FTy->getParamType(i));
+        if (!Arg)
           return error("Invalid record");
+        Args.push_back(Arg);
+        ArgsTys.push_back(Arg->getType());
       }
 
       // Read type/value pairs for varargs params.
@@ -4847,6 +4872,7 @@ Error BitcodeReader::parseFunctionBody(Function *F) {
           if (getValueTypePair(Record, OpNum, NextValueNo, Op))
             return error("Invalid record");
           Args.push_back(Op);
+          ArgsTys.push_back(Op->getType());
         }
       }
 
@@ -4857,6 +4883,7 @@ Error BitcodeReader::parseFunctionBody(Function *F) {
       cast<CallBrInst>(I)->setCallingConv(
           static_cast<CallingConv::ID>((0x7ff & CCInfo) >> bitc::CALL_CCONV));
       cast<CallBrInst>(I)->setAttributes(PAL);
+      propagateAttributeTypes(cast<CallBase>(I), ArgsTys);
       break;
     }
     case bitc::FUNC_CODE_INST_UNREACHABLE: // UNREACHABLE

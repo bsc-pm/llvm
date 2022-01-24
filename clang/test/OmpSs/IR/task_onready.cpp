@@ -62,7 +62,7 @@ void bar(int n) {
 
 // CHECK: define internal void @compute_onready.1()
 // CHECK-NEXT: entry:
-// CHECK-NEXT:   %call = call{{( signext)?}} i32 @_Z3fooIiET_v()
+// CHECK-NEXT:   %call = call noundef{{( signext)?}} i32 @_Z3fooIiET_v()
 // CHECK-NEXT:   ret void
 // CHECK-NEXT: }
 
@@ -104,7 +104,7 @@ void bar(int n) {
 
 // CHECK: define internal void @compute_onready.7()
 // CHECK-NEXT: entry:
-// CHECK-NEXT:   %call = call i32* @_Z3fooIPiET_v()
+// CHECK-NEXT:   %call = call noundef i32* @_Z3fooIPiET_v()
 // CHECK-NEXT:   ret void
 // CHECK-NEXT: }
 

@@ -211,11 +211,12 @@ void AllocaOp::getCanonicalizationPatterns(RewritePatternSet &results,
 static void print(OpAsmPrinter &p, AllocaScopeOp &op) {
   bool printBlockTerminators = false;
 
-  p << " ";
+  p << ' ';
   if (!op.results().empty()) {
     p << " -> (" << op.getResultTypes() << ")";
     printBlockTerminators = true;
   }
+  p << ' ';
   p.printRegion(op.bodyRegion(),
                 /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/printBlockTerminators);
@@ -342,22 +343,22 @@ bool CastOp::canFoldIntoConsumerOp(CastOp castOp) {
   for (auto it : llvm::zip(sourceType.getShape(), resultType.getShape())) {
     auto ss = std::get<0>(it), st = std::get<1>(it);
     if (ss != st)
-      if (MemRefType::isDynamic(ss) && !MemRefType::isDynamic(st))
+      if (ShapedType::isDynamic(ss) && !ShapedType::isDynamic(st))
         return false;
   }
 
   // If cast is towards more static offset along any dimension, don't fold.
   if (sourceOffset != resultOffset)
-    if (MemRefType::isDynamicStrideOrOffset(sourceOffset) &&
-        !MemRefType::isDynamicStrideOrOffset(resultOffset))
+    if (ShapedType::isDynamicStrideOrOffset(sourceOffset) &&
+        !ShapedType::isDynamicStrideOrOffset(resultOffset))
       return false;
 
   // If cast is towards more static strides along any dimension, don't fold.
   for (auto it : llvm::zip(sourceStrides, resultStrides)) {
     auto ss = std::get<0>(it), st = std::get<1>(it);
     if (ss != st)
-      if (MemRefType::isDynamicStrideOrOffset(ss) &&
-          !MemRefType::isDynamicStrideOrOffset(st))
+      if (ShapedType::isDynamicStrideOrOffset(ss) &&
+          !ShapedType::isDynamicStrideOrOffset(st))
         return false;
   }
 
@@ -395,7 +396,7 @@ bool CastOp::areCastCompatible(TypeRange inputs, TypeRange outputs) {
       };
       if (!checkCompatible(aOffset, bOffset))
         return false;
-      for (auto aStride : enumerate(aStrides))
+      for (const auto &aStride : enumerate(aStrides))
         if (!checkCompatible(aStride.value(), bStrides[aStride.index()]))
           return false;
     }
@@ -428,10 +429,7 @@ bool CastOp::areCastCompatible(TypeRange inputs, TypeRange outputs) {
 
     auto aMemSpace = (aT) ? aT.getMemorySpace() : uaT.getMemorySpace();
     auto bMemSpace = (bT) ? bT.getMemorySpace() : ubT.getMemorySpace();
-    if (aMemSpace != bMemSpace)
-      return false;
-
-    return true;
+    return aMemSpace == bMemSpace;
   }
 
   return false;
@@ -439,6 +437,75 @@ bool CastOp::areCastCompatible(TypeRange inputs, TypeRange outputs) {
 
 OpFoldResult CastOp::fold(ArrayRef<Attribute> operands) {
   return succeeded(foldMemRefCast(*this)) ? getResult() : Value();
+}
+
+//===----------------------------------------------------------------------===//
+// CopyOp
+//===----------------------------------------------------------------------===//
+
+namespace {
+/// If the source/target of a CopyOp is a CastOp that does not modify the shape
+/// and element type, the cast can be skipped. Such CastOps only cast the layout
+/// of the type.
+struct FoldCopyOfCast : public OpRewritePattern<CopyOp> {
+  using OpRewritePattern<CopyOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(CopyOp copyOp,
+                                PatternRewriter &rewriter) const override {
+    bool modified = false;
+
+    // Check source.
+    if (auto castOp = copyOp.source().getDefiningOp<CastOp>()) {
+      auto fromType = castOp.source().getType().dyn_cast<MemRefType>();
+      auto toType = castOp.source().getType().dyn_cast<MemRefType>();
+
+      if (fromType && toType) {
+        if (fromType.getShape() == toType.getShape() &&
+            fromType.getElementType() == toType.getElementType()) {
+          rewriter.updateRootInPlace(
+              copyOp, [&] { copyOp.sourceMutable().assign(castOp.source()); });
+          modified = true;
+        }
+      }
+    }
+
+    // Check target.
+    if (auto castOp = copyOp.target().getDefiningOp<CastOp>()) {
+      auto fromType = castOp.source().getType().dyn_cast<MemRefType>();
+      auto toType = castOp.source().getType().dyn_cast<MemRefType>();
+
+      if (fromType && toType) {
+        if (fromType.getShape() == toType.getShape() &&
+            fromType.getElementType() == toType.getElementType()) {
+          rewriter.updateRootInPlace(
+              copyOp, [&] { copyOp.targetMutable().assign(castOp.source()); });
+          modified = true;
+        }
+      }
+    }
+
+    return success(modified);
+  }
+};
+
+/// Fold memref.copy(%x, %x).
+struct FoldSelfCopy : public OpRewritePattern<CopyOp> {
+  using OpRewritePattern<CopyOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(CopyOp copyOp,
+                                PatternRewriter &rewriter) const override {
+    if (copyOp.source() != copyOp.target())
+      return failure();
+
+    rewriter.eraseOp(copyOp);
+    return success();
+  }
+};
+} // namespace
+
+void CopyOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                         MLIRContext *context) {
+  results.add<FoldCopyOfCast, FoldSelfCopy>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -518,7 +585,7 @@ computeMemRefRankReductionMask(MemRefType originalType, MemRefType reducedType,
   if (originalType.getRank() == reducedType.getRank())
     return unusedDims;
 
-  for (auto dim : llvm::enumerate(sizes))
+  for (const auto &dim : llvm::enumerate(sizes))
     if (auto attr = dim.value().dyn_cast<Attribute>())
       if (attr.cast<IntegerAttr>().getInt() == 1)
         unusedDims.insert(dim.index());
@@ -1158,40 +1225,44 @@ static LogicalResult verify(ReinterpretCastOp op) {
                                  extractFromI64ArrayAttr(op.static_sizes())))) {
     int64_t resultSize = std::get<0>(en.value());
     int64_t expectedSize = std::get<1>(en.value());
-    if (!ShapedType::isDynamic(resultSize) && resultSize != expectedSize)
+    if (!ShapedType::isDynamic(resultSize) &&
+        !ShapedType::isDynamic(expectedSize) && resultSize != expectedSize)
       return op.emitError("expected result type with size = ")
              << expectedSize << " instead of " << resultSize
              << " in dim = " << en.index();
   }
 
-  // Match offset and strides in static_offset and static_strides attributes if
-  // result memref type has an affine map specified.
-  if (!resultType.getLayout().isIdentity()) {
-    int64_t resultOffset;
-    SmallVector<int64_t, 4> resultStrides;
-    if (failed(getStridesAndOffset(resultType, resultStrides, resultOffset)))
-      return failure();
+  // Match offset and strides in static_offset and static_strides attributes. If
+  // result memref type has no affine map specified, this will assume an
+  // identity layout.
+  int64_t resultOffset;
+  SmallVector<int64_t, 4> resultStrides;
+  if (failed(getStridesAndOffset(resultType, resultStrides, resultOffset)))
+    return op.emitError(
+               "expected result type to have strided layout but found ")
+           << resultType;
 
-    // Match offset in result memref type and in static_offsets attribute.
-    int64_t expectedOffset =
-        extractFromI64ArrayAttr(op.static_offsets()).front();
-    if (!ShapedType::isDynamicStrideOrOffset(resultOffset) &&
-        resultOffset != expectedOffset)
-      return op.emitError("expected result type with offset = ")
-             << resultOffset << " instead of " << expectedOffset;
+  // Match offset in result memref type and in static_offsets attribute.
+  int64_t expectedOffset = extractFromI64ArrayAttr(op.static_offsets()).front();
+  if (!ShapedType::isDynamicStrideOrOffset(resultOffset) &&
+      !ShapedType::isDynamicStrideOrOffset(expectedOffset) &&
+      resultOffset != expectedOffset)
+    return op.emitError("expected result type with offset = ")
+           << resultOffset << " instead of " << expectedOffset;
 
-    // Match strides in result memref type and in static_strides attribute.
-    for (auto &en : llvm::enumerate(llvm::zip(
-             resultStrides, extractFromI64ArrayAttr(op.static_strides())))) {
-      int64_t resultStride = std::get<0>(en.value());
-      int64_t expectedStride = std::get<1>(en.value());
-      if (!ShapedType::isDynamicStrideOrOffset(resultStride) &&
-          resultStride != expectedStride)
-        return op.emitError("expected result type with stride = ")
-               << expectedStride << " instead of " << resultStride
-               << " in dim = " << en.index();
-    }
+  // Match strides in result memref type and in static_strides attribute.
+  for (auto &en : llvm::enumerate(llvm::zip(
+           resultStrides, extractFromI64ArrayAttr(op.static_strides())))) {
+    int64_t resultStride = std::get<0>(en.value());
+    int64_t expectedStride = std::get<1>(en.value());
+    if (!ShapedType::isDynamicStrideOrOffset(resultStride) &&
+        !ShapedType::isDynamicStrideOrOffset(expectedStride) &&
+        resultStride != expectedStride)
+      return op.emitError("expected result type with stride = ")
+             << expectedStride << " instead of " << resultStride
+             << " in dim = " << en.index();
   }
+
   return success();
 }
 
@@ -1263,6 +1334,7 @@ computeReshapeCollapsedType(MemRefType type,
   AffineExpr offset;
   SmallVector<AffineExpr, 4> strides;
   auto status = getStridesAndOffset(type, strides, offset);
+  auto isIdentityLayout = type.getLayout().isIdentity();
   (void)status;
   assert(succeeded(status) && "expected strided memref");
 
@@ -1279,12 +1351,19 @@ computeReshapeCollapsedType(MemRefType type,
     unsigned dim = m.getNumResults();
     int64_t size = 1;
     AffineExpr stride = strides[currentDim + dim - 1];
-    if (!isReshapableDimBand(currentDim, dim, sizes, strides)) {
+    if (isIdentityLayout ||
+        isReshapableDimBand(currentDim, dim, sizes, strides)) {
+      for (unsigned d = 0; d < dim; ++d) {
+        int64_t currentSize = sizes[currentDim + d];
+        if (ShapedType::isDynamic(currentSize)) {
+          size = ShapedType::kDynamicSize;
+          break;
+        }
+        size *= currentSize;
+      }
+    } else {
       size = ShapedType::kDynamicSize;
       stride = AffineExpr();
-    } else {
-      for (unsigned d = 0; d < dim; ++d)
-        size *= sizes[currentDim + d];
     }
     newSizes.push_back(size);
     newStrides.push_back(stride);
@@ -1500,9 +1579,9 @@ Type SubViewOp::inferResultType(MemRefType sourceMemRefType,
                                 ArrayRef<int64_t> staticStrides) {
   unsigned rank = sourceMemRefType.getRank();
   (void)rank;
-  assert(staticOffsets.size() == rank && "unexpected staticOffsets overflow");
-  assert(staticSizes.size() == rank && "unexpected staticSizes overflow");
-  assert(staticStrides.size() == rank && "unexpected staticStrides overflow");
+  assert(staticOffsets.size() == rank && "staticOffsets length mismatch");
+  assert(staticSizes.size() == rank && "staticSizes length mismatch");
+  assert(staticStrides.size() == rank && "staticStrides length mismatch");
 
   // Extract source offset and strides.
   int64_t sourceOffset;
@@ -1854,7 +1933,7 @@ static MemRefType getCanonicalSubViewResultType(
   if (!unusedDims)
     return nullptr;
   SmallVector<int64_t> shape;
-  for (auto sizes : llvm::enumerate(nonRankReducedType.getShape())) {
+  for (const auto &sizes : llvm::enumerate(nonRankReducedType.getShape())) {
     if (unusedDims->count(sizes.index()))
       continue;
     shape.push_back(sizes.value());
@@ -1906,7 +1985,7 @@ static bool isTrivialSubViewOp(SubViewOp subViewOp) {
 
   // Check all size values are static and matches the (static) source shape.
   ArrayRef<int64_t> sourceShape = subViewOp.getSourceType().getShape();
-  for (auto size : llvm::enumerate(mixedSizes)) {
+  for (const auto &size : llvm::enumerate(mixedSizes)) {
     Optional<int64_t> intValue = getConstantIntValue(size.value());
     if (!intValue || intValue.getValue() != sourceShape[size.index()])
       return false;
@@ -2043,7 +2122,7 @@ static MemRefType inferTransposeResultType(MemRefType memRefType,
   auto originalSizes = memRefType.getShape();
   // Compute permuted sizes.
   SmallVector<int64_t, 4> sizes(rank, 0);
-  for (auto en : llvm::enumerate(permutationMap.getResults()))
+  for (const auto &en : llvm::enumerate(permutationMap.getResults()))
     sizes[en.index()] =
         originalSizes[en.value().cast<AffineDimExpr>().getPosition()];
 
