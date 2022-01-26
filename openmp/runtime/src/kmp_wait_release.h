@@ -543,6 +543,18 @@ final_spin=FALSE)
     	KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
     	KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, this_thr->th.th_pending_role);
     	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+#if OMPT_SUPPORT
+			ompt_data_t *thread_data = nullptr;
+			if(ompt_enabled.enabled){
+				thread_data = &(this_thr->th.ompt_thread_info.thread_data);
+				
+				if(ompt_enabled.ompt_callback_thread_role_shift){
+					//thread_data, prior_thread_role, next_thread_role
+					ompt_callbacks.ompt_callback(ompt_callback_thread_role_shift)(
+							thread_data, (int)OMP_ROLE_FREE_AGENT, (int)this_thr->th.th_active_role);
+				}
+			}
+#endif
     	continue;
     }
     if (__kmp_tasking_mode != tskm_immediate_exec) {
@@ -732,6 +744,18 @@ final_spin=FALSE)
     		KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
     		KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, this_thr->th.th_pending_role);
     		KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+#if OMPT_SUPPORT
+				ompt_data_t *thread_data = nullptr;
+				if(ompt_enabled.enabled){
+					thread_data = &(this_thr->th.ompt_thread_info.thread_data);
+				
+					if(ompt_enabled.ompt_callback_thread_role_shift){
+						//thread_data, prior_thread_role, next_thread_role
+						ompt_callbacks.ompt_callback(ompt_callback_thread_role_shift)(
+								thread_data, (int)OMP_ROLE_FREE_AGENT, (int)this_thr->th.th_active_role);
+					}
+				}
+#endif
     	}
 #if KMP_OS_UNIX
       if (final_spin)

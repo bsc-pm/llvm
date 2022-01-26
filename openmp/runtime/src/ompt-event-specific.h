@@ -108,4 +108,6 @@
 
 #define ompt_callback_error_implemented ompt_event_MAY_ALWAYS_OPTIONAL
 
+#define ompt_callback_thread_role_shift_implemented ompt_event_MAY_ALWAYS_OPTIONAL
+
 #endif

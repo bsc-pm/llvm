@@ -2966,6 +2966,16 @@ static inline int __kmp_execute_tasks_template(
           	KMP_ATOMIC_ST_RLX(&thread->th.th_change_role, false);
           	KMP_ATOMIC_ST_RLX(&thread->th.th_active_role, thread->th.th_pending_role);
           	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+#if OMPT_SUPPORT
+						ompt_data_t *thread_data = nullptr;
+						if(ompt_enabled.enabled){
+							thread_data = &(thread->th.ompt_thread_info.thread_data);
+							if(ompt_enabled.ompt_callback_thread_role_shift){
+								ompt_callbacks.ompt_callback(ompt_callback_thread_role_shift)(
+										thread_data, (int)OMP_ROLE_FREE_AGENT, (int)thread->th.th_pending_role);
+							}
+						}
+#endif
           	break;
           }
           else {
