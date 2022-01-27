@@ -540,8 +540,9 @@ final_spin=FALSE)
     kmp_task_team_t *task_team = NULL;
     if(this_thr->th.th_active_role == OMP_ROLE_FREE_AGENT 
     	 && this_thr->th.th_change_role){
+    	omp_role_t nxt_role = this_thr->th.th_pending_role;
     	KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
-    	KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, this_thr->th.th_pending_role);
+    	KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
     	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
 #if OMPT_SUPPORT
 			ompt_data_t *thread_data = nullptr;
@@ -551,7 +552,7 @@ final_spin=FALSE)
 				if(ompt_enabled.ompt_callback_thread_role_shift){
 					//thread_data, prior_thread_role, next_thread_role
 					ompt_callbacks.ompt_callback(ompt_callback_thread_role_shift)(
-							thread_data, (int)OMP_ROLE_FREE_AGENT, (int)this_thr->th.th_active_role);
+							thread_data, (ompt_role_t)OMP_ROLE_FREE_AGENT, (ompt_role_t)nxt_role);
 				}
 			}
 #endif
@@ -738,11 +739,13 @@ final_spin=FALSE)
 #endif
       //printf("suspending...\n");
       flag->suspend(th_gtid);
+    	//TODO:A worker may change its role here too!
     	//Check if the master requested this thread to change its role while suspended
     	if(this_thr->th.th_active_role == OMP_ROLE_FREE_AGENT
     		 && this_thr->th.th_change_role){
+    		omp_role_t nxt_role =  this_thr->th.th_pending_role;
     		KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
-    		KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, this_thr->th.th_pending_role);
+    		KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
     		KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
 #if OMPT_SUPPORT
 				ompt_data_t *thread_data = nullptr;
@@ -752,7 +755,7 @@ final_spin=FALSE)
 					if(ompt_enabled.ompt_callback_thread_role_shift){
 						//thread_data, prior_thread_role, next_thread_role
 						ompt_callbacks.ompt_callback(ompt_callback_thread_role_shift)(
-								thread_data, (int)OMP_ROLE_FREE_AGENT, (int)this_thr->th.th_active_role);
+								thread_data, (ompt_role_t)OMP_ROLE_FREE_AGENT, (ompt_role_t)nxt_role);
 					}
 				}
 #endif

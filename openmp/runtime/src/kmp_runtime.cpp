@@ -3907,12 +3907,12 @@ int __kmp_register_root(int initial_thread) {
 
   // The root team is a serial team, so enable tasking for it
   // if we have free agent threads.
-  if (__kmp_free_agent_num_threads != 0) {
-    __kmp_enable_tasking_in_serial_mode(/*loc=*/ NULL, gtid,
-        /*proxy=*/ true, /*detachable=*/ false, /*hidden_helper=*/ false);
-    // x86 needs this.
-    propagateFPControl(root_thread->th.th_team);
-  }
+  //if (__kmp_free_agent_num_threads != 0) {
+  //  __kmp_enable_tasking_in_serial_mode(/*loc=*/ NULL, gtid,
+  //      /*proxy=*/ true, /*detachable=*/ false, /*hidden_helper=*/ false);
+  //  // x86 needs this.
+  //  propagateFPControl(root_thread->th.th_team);
+  //}
 
   KMP_MB();
   __kmp_release_bootstrap_lock(&__kmp_forkjoin_lock);
@@ -5512,10 +5512,16 @@ __kmp_allocate_team(kmp_root_t *root, int new_nproc, int max_nproc,
       int old_nthr = team->t.t_nproc;
       __kmp_resize_dist_barrier(team, old_nthr, new_nproc);
     }
+    int th_to_return = (team->t.t_nproc >= new_nproc)
+    										? new_nproc - 1
+    										: team->t.t_nproc;
+    int returned = 0;
     kmp_info_t *th;
     kmp_info_t *last_th = NULL;
 		kmp_info_t *list_p = CCAST(kmp_info_t *, __kmp_free_agent_list);
-		for(f = 0; (f < team->t.t_nproc) && (list_p != NULL); f++){
+		for( f = 0; 
+				 (f < team->t.t_nproc) && (list_p != NULL) && returned < (th_to_return);
+				 f++){
 			th = team->t.t_threads[f];
 			if(th->th.th_active_role != OMP_ROLE_FREE_AGENT)
 				continue;
@@ -5532,7 +5538,9 @@ __kmp_allocate_team(kmp_root_t *root, int new_nproc, int max_nproc,
 			}
 			if(th == __kmp_free_agent_list_insert_pt)
 				__kmp_free_agent_list_insert_pt = NULL;
-
+			
+			++returned;
+			
 			th->th.th_pending_role = OMP_ROLE_NONE;
 			KMP_ATOMIC_ST_SEQ(&th->th.th_change_role, true);
 
@@ -7761,6 +7769,15 @@ static void __kmp_do_middle_initialize(void) {
     __kmp_free_agent_active_nth++;
   }
 
+  //The root team is a serial team, so enable tasking for it
+  //if we have free agent threads.
+  if(__kmp_free_agent_num_threads > 0){
+  	__kmp_enable_tasking_in_serial_mode(/*loc=*/ NULL, 0,
+  			/*proxy=*/ true, /*detachable=*/ false, /*hidden_helper=*/ false);
+  	// x86 needs this.
+  	propagateFPControl(__kmp_threads[0]->th.th_team);
+  }
+
   /* we have finished middle initialization */
   TCW_SYNC_4(__kmp_init_middle, TRUE);
 
@@ -8448,7 +8465,7 @@ void __kmp_internal_join(ident_t *id, int gtid, kmp_team_t *team) {
 			thread_data = &(new_thr->th.ompt_thread_info.thread_data);
 			if(ompt_enabled.ompt_callback_thread_role_shift){
 				ompt_callbacks.ompt_callback(ompt_callback_thread_role_shift)(
-						thread_data, (int)prev_role, (int)OMP_ROLE_FREE_AGENT);
+						thread_data, (ompt_role_t)prev_role, (ompt_role_t)OMP_ROLE_FREE_AGENT);
 			}
 		}
 #endif

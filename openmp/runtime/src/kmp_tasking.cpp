@@ -2972,7 +2972,7 @@ static inline int __kmp_execute_tasks_template(
 							thread_data = &(thread->th.ompt_thread_info.thread_data);
 							if(ompt_enabled.ompt_callback_thread_role_shift){
 								ompt_callbacks.ompt_callback(ompt_callback_thread_role_shift)(
-										thread_data, (int)OMP_ROLE_FREE_AGENT, (int)thread->th.th_pending_role);
+										thread_data, (ompt_role_t)OMP_ROLE_FREE_AGENT, (ompt_role_t)thread->th.th_pending_role);
 							}
 						}
 #endif
