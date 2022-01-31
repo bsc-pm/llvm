@@ -1468,6 +1468,18 @@ int __kmp_fork_call(ident_t *loc, int gtid,
         {
           KMP_TIME_PARTITIONED_BLOCK(OMP_parallel);
           KMP_SET_THREAD_STATE_BLOCK(IMPLICIT_TASK);
+          
+          //Make sure this thread isn't a free agent and doesn't appear on the list 
+#ifdef KMP_DEBUG
+					KMP_DEBUG_ASSERT(__kmp_threads[gtid] != NULL &&
+          								 __kmp_threads[gtid]->th.th_active_role != OMP_ROLE_FREE_AGENT);
+          kmp_info_t *th = CCAST(kmp_info_t *, __kmp_free_agent_list);
+          while(th != NULL){
+          	KMP_DEBUG_ASSERT(th->th.th_info.ds.ds_gtid != gtid);
+						th = th->th.th_next_free_agent;
+					}
+#endif
+          
           __kmp_invoke_microtask(microtask, gtid, 0, argc, parent_team->t.t_argv
 #if OMPT_SUPPORT
                                  ,
@@ -1711,6 +1723,17 @@ int __kmp_fork_call(ident_t *loc, int gtid,
           {
             KMP_TIME_PARTITIONED_BLOCK(OMP_parallel);
             KMP_SET_THREAD_STATE_BLOCK(IMPLICIT_TASK);
+      
+#ifdef KMP_DEBUG
+            //Make sure this thread isn't a free agent and doesn't appear on the list
+            KMP_DEBUG_ASSERT(__kmp_threads[gtid] != NULL &&
+            								 __kmp_threads[gtid]->th.th_active_role != OMP_ROLE_FREE_AGENT);
+            kmp_info_t *th = CCAST(kmp_info_t *, __kmp_free_agent_list);
+            while(th != NULL){
+            	KMP_DEBUG_ASSERT(th->th.th_info.ds.ds_gtid != gtid);
+            	th = th->th.th_next_free_agent;
+            }
+#endif
             __kmp_invoke_microtask(microtask, gtid, 0, argc,
                                    parent_team->t.t_argv
 #if OMPT_SUPPORT
@@ -1821,6 +1844,17 @@ int __kmp_fork_call(ident_t *loc, int gtid,
           {
             KMP_TIME_PARTITIONED_BLOCK(OMP_parallel);
             KMP_SET_THREAD_STATE_BLOCK(IMPLICIT_TASK);
+      
+#ifdef KMP_DEBUG
+            //Make sure this thread isn't a free agent and doesn't appear on the list
+            KMP_DEBUG_ASSERT(__kmp_threads[gtid] != NULL &&
+            								 __kmp_threads[gtid]->th.th_active_role != OMP_ROLE_FREE_AGENT);
+            kmp_info_t *th = CCAST(kmp_info_t *, __kmp_free_agent_list);
+            while(th != NULL){
+            	KMP_DEBUG_ASSERT(th->th.th_info.ds.ds_gtid != gtid);
+            	th = th->th.th_next_free_agent;
+            }
+#endif
             __kmp_invoke_microtask(microtask, gtid, 0, argc, args
 #if OMPT_SUPPORT
                                    ,
@@ -5514,7 +5548,7 @@ __kmp_allocate_team(kmp_root_t *root, int new_nproc, int max_nproc,
     }
     int th_to_return = (team->t.t_nproc >= new_nproc)
     										? new_nproc - 1
-    										: team->t.t_nproc;
+    										: team->t.t_nproc - 1;
     int returned = 0;
     kmp_info_t *th;
     kmp_info_t *last_th = NULL;
@@ -5523,7 +5557,8 @@ __kmp_allocate_team(kmp_root_t *root, int new_nproc, int max_nproc,
 				 (f < team->t.t_nproc) && (list_p != NULL) && returned < (th_to_return);
 				 f++){
 			th = team->t.t_threads[f];
-			if(th->th.th_active_role != OMP_ROLE_FREE_AGENT)
+			if(!(th->th.th_active_role == OMP_ROLE_FREE_AGENT ||
+				 (th->th.th_change_role && th->th.th_pending_role == OMP_ROLE_FREE_AGENT)))
 				continue;
 			while(list_p != th){
 				last_th = list_p;
@@ -5826,6 +5861,22 @@ __kmp_allocate_team(kmp_root_t *root, int new_nproc, int max_nproc,
       __kmp_partition_places(team);
 #endif
     } // Check changes in number of threads
+#ifdef KMP_DEBUG
+    //Make sure the threads in the team doesn't appear on the free agent list
+    //They may hold the free agent role at this moment, but they must change it later
+    for(f = 0; f < new_nproc; f++){
+    	kmp_info_t *thr = team->t.t_threads[f];
+			KMP_DEBUG_ASSERT(thr->th.th_active_role != OMP_ROLE_FREE_AGENT ||
+								 		  (thr->th.th_pending_role == OMP_ROLE_NONE &&
+											 thr->th.th_change_role));
+    	int thr_gtid = thr->th.th_info.ds.ds_gtid;
+    	kmp_info_t *fa = CCAST(kmp_info_t *, __kmp_free_agent_list);
+    	while(fa != NULL){
+    		KMP_DEBUG_ASSERT(fa->th.th_info.ds.ds_gtid != thr_gtid);
+    		fa = fa->th.th_next_free_agent;
+    	}
+    }
+#endif
 
     kmp_info_t *master = team->t.t_threads[0];
     if (master->th.th_teams_microtask) {
@@ -6256,7 +6307,9 @@ void __kmp_free_thread(kmp_info_t *this_th) {
   this_th->th.th_task_state = 0;
   this_th->th.th_reap_state = KMP_SAFE_TO_REAP;
   
-  if(this_th->th.th_active_role != OMP_ROLE_FREE_AGENT){
+  //Don't add active free agents or threads that will shift its role to FA soon
+  if(this_th->th.th_active_role != OMP_ROLE_FREE_AGENT ||
+  	 !(this_th->th.th_change_role && this_th->th.th_pending_role == OMP_ROLE_FREE_AGENT)){
   	/* put thread back on the free pool */
 	  TCW_PTR(this_th->th.th_team, NULL);
 	  TCW_PTR(this_th->th.th_root, NULL);
@@ -8452,14 +8505,16 @@ void __kmp_internal_join(ident_t *id, int gtid, kmp_team_t *team) {
 										 (new_thr->th.th_info.ds.ds_gtid <
 										  new_thr->th.th_next_free_agent->th.th_info.ds.ds_gtid));
 		
-		new_thr->th.th_pending_role = OMP_ROLE_NONE;
-#if OMPT_SUPPORT
+		//new_thr->th.th_pending_role = OMP_ROLE_NONE;
+		new_thr->th.th_pending_role = OMP_ROLE_FREE_AGENT;
+/*#if OMPT_SUPPORT
 		omp_role_t prev_role = KMP_ATOMIC_LD_RLX(&new_thr->th.th_active_role);
-#endif
-		KMP_ATOMIC_ST_RLX(&new_thr->th.th_active_role, OMP_ROLE_FREE_AGENT);
-		KMP_ATOMIC_ST_RLX(&new_thr->th.th_change_role, false);
-		KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
-#if OMPT_SUPPORT
+#endif*/
+		//KMP_ATOMIC_ST_RLX(&new_thr->th.th_active_role, OMP_ROLE_FREE_AGENT);
+		//KMP_ATOMIC_ST_RLX(&new_thr->th.th_change_role, false);
+		KMP_ATOMIC_ST_RLX(&new_thr->th.th_change_role, true);
+		//KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
+/*#if OMPT_SUPPORT
 		ompt_data_t *thread_data = nullptr;
 		if(ompt_enabled.enabled){
 			thread_data = &(new_thr->th.ompt_thread_info.thread_data);
@@ -8468,7 +8523,7 @@ void __kmp_internal_join(ident_t *id, int gtid, kmp_team_t *team) {
 						thread_data, (ompt_role_t)prev_role, (ompt_role_t)OMP_ROLE_FREE_AGENT);
 			}
 		}
-#endif
+#endif*/
   }
 	KMP_DEBUG_ASSERT(__kmp_free_agent_active_nth <= __kmp_free_agent_num_threads);
 

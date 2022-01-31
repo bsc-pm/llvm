@@ -538,12 +538,17 @@ final_spin=FALSE)
   // Main wait spin loop
   while (flag->notdone_check()) {
     kmp_task_team_t *task_team = NULL;
-    if(this_thr->th.th_active_role == OMP_ROLE_FREE_AGENT 
-    	 && this_thr->th.th_change_role){
+    //if(this_thr->th.th_active_role == OMP_ROLE_FREE_AGENT 
+    //	 && this_thr->th.th_change_role){
+    if(this_thr->th.th_change_role){
+    	omp_role_t prv_role = KMP_ATOMIC_LD_RLX(&this_thr->th.th_active_role);
     	omp_role_t nxt_role = this_thr->th.th_pending_role;
     	KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
     	KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
-    	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+    	if(nxt_role == OMP_ROLE_FREE_AGENT)
+    		KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
+    	else if(prv_role == OMP_ROLE_FREE_AGENT)
+	    	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
 #if OMPT_SUPPORT
 			ompt_data_t *thread_data = nullptr;
 			if(ompt_enabled.enabled){
@@ -552,7 +557,7 @@ final_spin=FALSE)
 				if(ompt_enabled.ompt_callback_thread_role_shift){
 					//thread_data, prior_thread_role, next_thread_role
 					ompt_callbacks.ompt_callback(ompt_callback_thread_role_shift)(
-							thread_data, (ompt_role_t)OMP_ROLE_FREE_AGENT, (ompt_role_t)nxt_role);
+							thread_data, (ompt_role_t)prv_role, (ompt_role_t)nxt_role);
 				}
 			}
 #endif
@@ -741,12 +746,17 @@ final_spin=FALSE)
       flag->suspend(th_gtid);
     	//TODO:A worker may change its role here too!
     	//Check if the master requested this thread to change its role while suspended
-    	if(this_thr->th.th_active_role == OMP_ROLE_FREE_AGENT
-    		 && this_thr->th.th_change_role){
+    	//if(this_thr->th.th_active_role == OMP_ROLE_FREE_AGENT
+    	//	 && this_thr->th.th_change_role){
+    	if(this_thr->th.th_change_role){
+    	  omp_role_t prv_role = KMP_ATOMIC_LD_RLX(&this_thr->th.th_active_role);
     		omp_role_t nxt_role =  this_thr->th.th_pending_role;
     		KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
     		KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
-    		KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+    		if(nxt_role == OMP_ROLE_FREE_AGENT)
+    			KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
+    		else if(prv_role == OMP_ROLE_FREE_AGENT)
+	    		KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
 #if OMPT_SUPPORT
 				ompt_data_t *thread_data = nullptr;
 				if(ompt_enabled.enabled){
@@ -755,7 +765,7 @@ final_spin=FALSE)
 					if(ompt_enabled.ompt_callback_thread_role_shift){
 						//thread_data, prior_thread_role, next_thread_role
 						ompt_callbacks.ompt_callback(ompt_callback_thread_role_shift)(
-								thread_data, (ompt_role_t)OMP_ROLE_FREE_AGENT, (ompt_role_t)nxt_role);
+								thread_data, (ompt_role_t)prv_role, (ompt_role_t)nxt_role);
 					}
 				}
 #endif
