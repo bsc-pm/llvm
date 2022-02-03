@@ -6308,8 +6308,8 @@ void __kmp_free_thread(kmp_info_t *this_th) {
   this_th->th.th_reap_state = KMP_SAFE_TO_REAP;
   
   //Don't add active free agents or threads that will shift its role to FA soon
-  if(this_th->th.th_active_role != OMP_ROLE_FREE_AGENT ||
-  	 !(this_th->th.th_change_role && this_th->th.th_pending_role == OMP_ROLE_FREE_AGENT)){
+  if(!(this_th->th.th_active_role == OMP_ROLE_FREE_AGENT ||
+  	 (this_th->th.th_change_role && this_th->th.th_pending_role == OMP_ROLE_FREE_AGENT))){
   	/* put thread back on the free pool */
 	  TCW_PTR(this_th->th.th_team, NULL);
 	  TCW_PTR(this_th->th.th_root, NULL);
