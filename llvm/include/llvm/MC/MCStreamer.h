@@ -27,6 +27,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MD5.h"
 #include "llvm/Support/SMLoc.h"
+#include "llvm/Support/ARMTargetParser.h"
 #include "llvm/Support/TargetParser.h"
 #include "llvm/Support/VersionTuple.h"
 #include <cassert>
@@ -613,6 +614,12 @@ public:
   /// \param Rename - The value to which the Name parameter is
   /// changed at the end of assembly.
   virtual void emitXCOFFRenameDirective(const MCSymbol *Name, StringRef Rename);
+
+  /// Emit a XCOFF .ref directive which creates R_REF type entry in the
+  /// relocation table for one or more symbols.
+  ///
+  /// \param Sym - The symbol on the .ref directive.
+  virtual void emitXCOFFRefDirective(StringRef Sym);
 
   /// Emit an ELF .size directive.
   ///

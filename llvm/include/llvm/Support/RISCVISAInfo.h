@@ -9,8 +9,6 @@
 #ifndef LLVM_SUPPORT_RISCVISAINFO_H
 #define LLVM_SUPPORT_RISCVISAINFO_H
 
-#include "llvm/ADT/Optional.h"
-#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Error.h"
 
@@ -94,6 +92,9 @@ private:
   void updateFLen();
   void updateMinVLen();
   void updateMaxELen();
+
+  static llvm::Expected<std::unique_ptr<RISCVISAInfo>>
+  postProcessAndChecking(std::unique_ptr<RISCVISAInfo> &&ISAInfo);
 };
 
 } // namespace llvm

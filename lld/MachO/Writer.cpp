@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "Writer.h"
-#include "CallGraphSort.h"
 #include "ConcatOutputSection.h"
 #include "Config.h"
 #include "InputFiles.h"
@@ -15,6 +14,7 @@
 #include "MapFile.h"
 #include "OutputSection.h"
 #include "OutputSegment.h"
+#include "SectionPriorities.h"
 #include "SymbolTable.h"
 #include "Symbols.h"
 #include "SyntheticSections.h"
@@ -849,54 +849,6 @@ template <class LP> void Writer::createLoadCommands() {
                               : 0));
 }
 
-static size_t getSymbolPriority(const SymbolPriorityEntry &entry,
-                                const InputFile *f) {
-  // We don't use toString(InputFile *) here because it returns the full path
-  // for object files, and we only want the basename.
-  StringRef filename;
-  if (f->archiveName.empty())
-    filename = path::filename(f->getName());
-  else
-    filename = saver().save(path::filename(f->archiveName) + "(" +
-                            path::filename(f->getName()) + ")");
-  return std::max(entry.objectFiles.lookup(filename), entry.anyObjectFile);
-}
-
-// Each section gets assigned the priority of the highest-priority symbol it
-// contains.
-static DenseMap<const InputSection *, size_t> buildInputSectionPriorities() {
-  if (config->callGraphProfileSort)
-    return computeCallGraphProfileOrder();
-  DenseMap<const InputSection *, size_t> sectionPriorities;
-
-  if (config->priorities.empty())
-    return sectionPriorities;
-
-  auto addSym = [&](Defined &sym) {
-    if (sym.isAbsolute())
-      return;
-
-    auto it = config->priorities.find(sym.getName());
-    if (it == config->priorities.end())
-      return;
-
-    SymbolPriorityEntry &entry = it->second;
-    size_t &priority = sectionPriorities[sym.isec];
-    priority =
-        std::max(priority, getSymbolPriority(entry, sym.isec->getFile()));
-  };
-
-  // TODO: Make sure this handles weak symbols correctly.
-  for (const InputFile *file : inputFiles) {
-    if (isa<ObjFile>(file))
-      for (Symbol *sym : file->symbols)
-        if (auto *d = dyn_cast_or_null<Defined>(sym))
-          addSym(*d);
-  }
-
-  return sectionPriorities;
-}
-
 // Sorting only can happen once all outputs have been collected. Here we sort
 // segments, output sections within each segment, and input sections within each
 // output segment.
@@ -1156,8 +1108,10 @@ template <class LP> void Writer::run() {
   treatSpecialUndefineds();
   if (config->entry && !isa<Undefined>(config->entry))
     prepareBranchTarget(config->entry);
+
   // Canonicalization of all pointers to InputSections should be handled by
-  // these two methods.
+  // these two scan* methods. I.e. from this point onward, for all live
+  // InputSections, we should have `isec->canonical() == isec`.
   scanSymbols();
   scanRelocations();
 
@@ -1167,6 +1121,8 @@ template <class LP> void Writer::run() {
 
   if (in.stubHelper->isNeeded())
     in.stubHelper->setup();
+  // At this point, we should know exactly which output sections are needed,
+  // courtesy of scanSymbols() and scanRelocations().
   createOutputSections<LP>();
 
   // After this point, we create no new segments; HOWEVER, we might
@@ -1194,11 +1150,10 @@ void macho::resetWriter() { LCDylib::resetInstanceCount(); }
 
 void macho::createSyntheticSections() {
   in.header = make<MachHeaderSection>();
-  if (config->dedupLiterals) {
+  if (config->dedupLiterals)
     in.cStringSection = make<DeduplicatedCStringSection>();
-  } else {
+  else
     in.cStringSection = make<CStringSection>();
-  }
   in.wordLiteralSection =
       config->dedupLiterals ? make<WordLiteralSection>() : nullptr;
   in.rebase = make<RebaseSection>();
@@ -1217,10 +1172,10 @@ void macho::createSyntheticSections() {
   // dyld to cache an address to the image loader it uses.
   uint8_t *arr = bAlloc().Allocate<uint8_t>(target->wordSize);
   memset(arr, 0, target->wordSize);
-  in.imageLoaderCache = make<ConcatInputSection>(
-      segment_names::data, section_names::data, /*file=*/nullptr,
+  in.imageLoaderCache = makeSyntheticInputSection(
+      segment_names::data, section_names::data, S_REGULAR,
       ArrayRef<uint8_t>{arr, target->wordSize},
-      /*align=*/target->wordSize, /*flags=*/S_REGULAR);
+      /*align=*/target->wordSize);
   // References from dyld are not visible to us, so ensure this section is
   // always treated as live.
   in.imageLoaderCache->live = true;

@@ -11,6 +11,7 @@
 #include "bolt/Core/BinaryFunction.h"
 #include "bolt/Core/DebugData.h"
 #include "bolt/Core/ParallelUtilities.h"
+#include "bolt/Rewrite/RewriteInstance.h"
 #include "bolt/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/BinaryFormat/Dwarf.h"
@@ -20,11 +21,8 @@
 #include "llvm/MC/MCAsmBackend.h"
 #include "llvm/MC/MCAsmLayout.h"
 #include "llvm/MC/MCContext.h"
-#include "llvm/MC/MCDwarf.h"
 #include "llvm/MC/MCObjectWriter.h"
-#include "llvm/MC/MCSection.h"
 #include "llvm/MC/MCStreamer.h"
-#include "llvm/MC/MCSymbol.h"
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
@@ -325,14 +323,14 @@ void DWARFRewriter::updateDebugInfo() {
   DebugInfoPatcher->clearDestinationLabels();
   flushPendingRanges(*DebugInfoPatcher);
 
-  finalizeDebugSections(*DebugInfoPatcher);
+  CUOffsetMap OffsetMap = finalizeDebugSections(*DebugInfoPatcher);
 
   if (opts::WriteDWP)
     writeDWP(DWOIdToName);
   else
     writeDWOFiles(DWOIdToName);
 
-  updateGdbIndexSection();
+  updateGdbIndexSection(OffsetMap);
 }
 
 void DWARFRewriter::updateUnitDebugInfo(
@@ -822,8 +820,8 @@ void DWARFRewriter::updateLineTableOffsets(const MCAsmLayout &Layout) {
     TypeInfoSection->setIsFinalized();
 }
 
-void DWARFRewriter::finalizeDebugSections(
-    DebugInfoBinaryPatcher &DebugInfoPatcher) {
+CUOffsetMap
+DWARFRewriter::finalizeDebugSections(DebugInfoBinaryPatcher &DebugInfoPatcher) {
   if (StrWriter->isInitialized()) {
     RewriteInstance::addToDebugSectionsToOverwrite(".debug_str");
     std::unique_ptr<DebugStrBufferVector> DebugStrSectionContents =
@@ -900,8 +898,8 @@ void DWARFRewriter::finalizeDebugSections(
   }
 
   // No more creating new DebugInfoPatches.
-  std::unordered_map<uint32_t, uint32_t> CUMap =
-      DebugInfoPatcher.computeNewOffsets();
+  CUOffsetMap CUMap =
+      DebugInfoPatcher.computeNewOffsets(*BC.DwCtx.get(), false);
 
   // Skip .debug_aranges if we are re-generating .gdb_index.
   if (opts::KeepARanges || !BC.getGdbIndexSection()) {
@@ -918,6 +916,7 @@ void DWARFRewriter::finalizeDebugSections(
                                    copyByteArray(ARangesContents),
                                    ARangesContents.size());
   }
+  return CUMap;
 }
 
 // Creates all the data structures necessary for creating MCStreamer.
@@ -960,15 +959,14 @@ StringRef getSectionName(const SectionRef &Section) {
 
 // Exctracts an appropriate slice if input is DWP.
 // Applies patches or overwrites the section.
-Optional<StringRef>
-updateDebugData(std::string &Storage, const SectionRef &Section,
-                const StringMap<KnownSectionsEntry> &KnownSections,
-                MCStreamer &Streamer, DWARFRewriter &Writer,
-                const DWARFUnitIndex::Entry *DWOEntry, uint64_t DWOId,
-                std::unique_ptr<DebugBufferVector> &OutputBuffer) {
+Optional<StringRef> updateDebugData(
+    DWARFContext &DWCtx, std::string &Storage, const SectionRef &Section,
+    const StringMap<KnownSectionsEntry> &KnownSections, MCStreamer &Streamer,
+    DWARFRewriter &Writer, const DWARFUnitIndex::Entry *DWOEntry,
+    uint64_t DWOId, std::unique_ptr<DebugBufferVector> &OutputBuffer) {
   auto applyPatch = [&](DebugInfoBinaryPatcher *Patcher,
                         StringRef Data) -> StringRef {
-    Patcher->computeNewOffsets();
+    Patcher->computeNewOffsets(DWCtx, true);
     Storage = Patcher->patchBinary(Data);
     return StringRef(Storage.c_str(), Storage.size());
   };
@@ -1129,9 +1127,9 @@ void DWARFRewriter::writeDWP(
     for (const SectionRef &Section : DWOFile->sections()) {
       std::string Storage = "";
       std::unique_ptr<DebugBufferVector> OutputData;
-      Optional<StringRef> TOutData =
-          updateDebugData(Storage, Section, KnownSections, *Streamer, *this,
-                          DWOEntry, *DWOId, OutputData);
+      Optional<StringRef> TOutData = updateDebugData(
+          (*DWOCU)->getContext(), Storage, Section, KnownSections, *Streamer,
+          *this, DWOEntry, *DWOId, OutputData);
       if (!TOutData)
         continue;
 
@@ -1229,9 +1227,9 @@ void DWARFRewriter::writeDWOFiles(
     for (const SectionRef &Section : File->sections()) {
       std::string Storage = "";
       std::unique_ptr<DebugBufferVector> OutputData;
-      if (Optional<StringRef> OutData =
-              updateDebugData(Storage, Section, KnownSections, *Streamer, *this,
-                              DWOEntry, *DWOId, OutputData))
+      if (Optional<StringRef> OutData = updateDebugData(
+              (*DWOCU)->getContext(), Storage, Section, KnownSections,
+              *Streamer, *this, DWOEntry, *DWOId, OutputData))
         Streamer->emitBytes(*OutData);
     }
     Streamer->Finish();
@@ -1239,7 +1237,7 @@ void DWARFRewriter::writeDWOFiles(
   }
 }
 
-void DWARFRewriter::updateGdbIndexSection() {
+void DWARFRewriter::updateGdbIndexSection(CUOffsetMap &CUMap) {
   if (!BC.getGdbIndexSection())
     return;
 
@@ -1316,10 +1314,23 @@ void DWARFRewriter::updateGdbIndexSection() {
   write32le(Buffer + 20, ConstantPoolOffset + Delta);
   Buffer += 24;
 
-  // Copy over CU list and types CU list.
-  memcpy(Buffer, GdbIndexContents.data() + 24,
-         AddressTableOffset - CUListOffset);
-  Buffer += AddressTableOffset - CUListOffset;
+  // Writing out CU List <Offset, Size>
+  for (auto &CUInfo : CUMap) {
+    write64le(Buffer, CUInfo.second.Offset);
+    // Length encoded in CU doesn't contain first 4 bytes that encode length.
+    write64le(Buffer + 8, CUInfo.second.Length + 4);
+    Buffer += 16;
+  }
+
+  // Copy over types CU list
+  // Spec says " triplet, the first value is the CU offset, the second value is
+  // the type offset in the CU, and the third value is the type signature"
+  // Looking at what is being generated by gdb-add-index. The first entry is TU
+  // offset, second entry is offset from it, and third entry is the type
+  // signature.
+  memcpy(Buffer, GdbIndexContents.data() + CUTypesOffset,
+         AddressTableOffset - CUTypesOffset);
+  Buffer += AddressTableOffset - CUTypesOffset;
 
   // Generate new address table.
   for (const std::pair<const uint64_t, DebugAddressRangesVector> &CURangesPair :

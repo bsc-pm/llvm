@@ -5,6 +5,13 @@
 
 cmake_minimum_required(VERSION 3.13.4)
 
+# Check if compiler-rt is built as a standalone project.
+if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR OR COMPILER_RT_STANDALONE_BUILD)
+  project(CompilerRT C CXX ASM)
+  set(COMPILER_RT_STANDALONE_BUILD TRUE)
+  set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+endif()
+
 set(LLVM_COMMON_CMAKE_UTILS "${CMAKE_CURRENT_SOURCE_DIR}/../cmake")
 
 # Add path for custom compiler-rt modules.
@@ -14,16 +21,6 @@ list(INSERT CMAKE_MODULE_PATH 0
   "${LLVM_COMMON_CMAKE_UTILS}"
   "${LLVM_COMMON_CMAKE_UTILS}/Modules"
   )
-
-# Check if compiler-rt is built as a standalone project.
-if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR OR COMPILER_RT_STANDALONE_BUILD)
-  project(CompilerRT C CXX ASM)
-  set(COMPILER_RT_STANDALONE_BUILD TRUE)
-  set_property(GLOBAL PROPERTY USE_FOLDERS ON)
-
-  # Find the LLVM sources and simulate LLVM CMake options.
-  include(HandleOutOfTreeLLVM)
-endif()
 
 if(CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_CFG_RESOLVED_INTDIR "${CMAKE_CFG_INTDIR}/")
@@ -233,6 +230,15 @@ endif()
 option(SANITIZER_USE_STATIC_CXX_ABI
   "Use static libc++abi." ${DEFAULT_SANITIZER_USE_STATIC_CXX_ABI})
 pythonize_bool(SANITIZER_USE_STATIC_CXX_ABI)
+
+set(DEFAULT_SANITIZER_USE_STATIC_TEST_CXX OFF)
+if (DEFINED LIBCXX_ENABLE_SHARED AND NOT LIBCXX_ENABLE_SHARED)
+  set(DEFAULT_SANITIZER_USE_STATIC_TEST_CXX ON)
+endif()
+
+option(SANITIZER_USE_STATIC_TEST_CXX
+  "Use static libc++ for tests." ${DEFAULT_SANITIZER_USE_STATIC_TEST_CXX})
+pythonize_bool(SANITIZER_USE_STATIC_TEST_CXX)
 
 set(DEFAULT_COMPILER_RT_USE_BUILTINS_LIBRARY OFF)
 if (FUCHSIA)
@@ -525,9 +531,18 @@ elseif (SANITIZER_CXX_ABI_LIBNAME STREQUAL "libstdc++")
 endif()
 
 if (SANITIZER_TEST_CXX_LIBNAME STREQUAL "libc++")
-  append_libcxx_libs(SANITIZER_TEST_CXX)
+  if (SANITIZER_TEST_CXX_INTREE)
+    if (SANITIZER_USE_STATIC_TEST_CXX)
+      set(cxx_target cxx_static)
+    else()
+      set(cxx_target cxx_shared)
+    endif()
+    list(APPEND SANITIZER_TEST_CXX_LIBRARIES "$<$<BOOL:$<TARGET_NAME_IF_EXISTS:${cxx_target}>>:$<TARGET_LINKER_FILE:${cxx_target}>>")
+  else()
+    append_list_if(COMPILER_RT_HAS_LIBCXX -lc++ SANITIZER_TEST_CXX_LIBRARIES)
+  endif()
 elseif (SANITIZER_TEST_CXX_LIBNAME STREQUAL "libstdc++")
-  append_list_if(COMPILER_RT_HAS_LIBSTDCXX stdc++ SANITIZER_TEST_CXX_LIBRARIES)
+  append_list_if(COMPILER_RT_HAS_LIBSTDCXX -lstdc++ SANITIZER_TEST_CXX_LIBRARIES)
 endif()
 
 # TODO: There's a lot of duplication across lib/*/tests/CMakeLists.txt files,

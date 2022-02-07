@@ -20,6 +20,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Frontend/OpenMP/OMPIRBuilder.h"
+#include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/IRBuilder.h"
 
 using namespace mlir;
@@ -198,6 +199,7 @@ static llvm::omp::ProcBindKind getProcBindKind(omp::ClauseProcBindKind kind) {
   case omp::ClauseProcBindKind::spread:
     return llvm::omp::ProcBindKind::OMP_PROC_BIND_spread;
   }
+  llvm_unreachable("Unknown ClauseProcBindKind kind");
 }
 
 /// Converts the OpenMP parallel operation to LLVM IR.
@@ -891,7 +893,7 @@ convertOmpWsLoop(Operation &opInst, llvm::IRBuilderBase &builder,
   return success();
 }
 
-// Convert an Atomic Ordering attribute to llvm::AtomicOrdering.
+/// Convert an Atomic Ordering attribute to llvm::AtomicOrdering.
 llvm::AtomicOrdering
 convertAtomicOrdering(Optional<omp::ClauseMemoryOrderKind> ao) {
   if (!ao)
@@ -909,9 +911,10 @@ convertAtomicOrdering(Optional<omp::ClauseMemoryOrderKind> ao) {
   case omp::ClauseMemoryOrderKind::relaxed:
     return llvm::AtomicOrdering::Monotonic;
   }
+  llvm_unreachable("Unknown ClauseMemoryOrderKind kind");
 }
 
-// Convert omp.atomic.read operation to LLVM IR.
+/// Convert omp.atomic.read operation to LLVM IR.
 static LogicalResult
 convertOmpAtomicRead(Operation &opInst, llvm::IRBuilderBase &builder,
                      LLVM::ModuleTranslation &moduleTranslation) {
@@ -928,9 +931,13 @@ convertOmpAtomicRead(Operation &opInst, llvm::IRBuilderBase &builder,
                                                     llvm::DebugLoc(diLoc));
   llvm::AtomicOrdering AO = convertAtomicOrdering(readOp.memory_order());
   llvm::Value *x = moduleTranslation.lookupValue(readOp.x());
+  Type xTy = readOp.x().getType().cast<omp::PointerLikeType>().getElementType();
   llvm::Value *v = moduleTranslation.lookupValue(readOp.v());
-  llvm::OpenMPIRBuilder::AtomicOpValue V = {v, false, false};
-  llvm::OpenMPIRBuilder::AtomicOpValue X = {x, false, false};
+  Type vTy = readOp.v().getType().cast<omp::PointerLikeType>().getElementType();
+  llvm::OpenMPIRBuilder::AtomicOpValue V = {
+      v, moduleTranslation.convertType(vTy), false, false};
+  llvm::OpenMPIRBuilder::AtomicOpValue X = {
+      x, moduleTranslation.convertType(xTy), false, false};
   builder.restoreIP(ompBuilder->createAtomicRead(ompLoc, X, V, AO));
   return success();
 }
@@ -952,7 +959,8 @@ convertOmpAtomicWrite(Operation &opInst, llvm::IRBuilderBase &builder,
   llvm::AtomicOrdering ao = convertAtomicOrdering(writeOp.memory_order());
   llvm::Value *expr = moduleTranslation.lookupValue(writeOp.value());
   llvm::Value *dest = moduleTranslation.lookupValue(writeOp.address());
-  llvm::OpenMPIRBuilder::AtomicOpValue x = {dest, /*isSigned=*/false,
+  llvm::Type *ty = moduleTranslation.convertType(writeOp.value().getType());
+  llvm::OpenMPIRBuilder::AtomicOpValue x = {dest, ty, /*isSigned=*/false,
                                             /*isVolatile=*/false};
   builder.restoreIP(ompBuilder->createAtomicWrite(ompLoc, x, expr, ao));
   return success();

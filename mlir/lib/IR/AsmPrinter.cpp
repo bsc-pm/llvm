@@ -143,8 +143,8 @@ struct AsmPrinterOptions {
 
   llvm::cl::opt<bool> printLocalScopeOpt{
       "mlir-print-local-scope", llvm::cl::init(false),
-      llvm::cl::desc("Print assuming in local scope by default"),
-      llvm::cl::Hidden};
+      llvm::cl::desc("Print with local scope and inline information (eliding "
+                     "aliases for attributes, types, and locations")};
 };
 } // namespace
 
@@ -1172,12 +1172,6 @@ public:
   /// Initialize the alias state to enable the printing of aliases.
   void initializeAliases(Operation *op) {
     aliasState.initialize(op, printerFlags, interfaces);
-  }
-
-  /// Get an instance of the OpAsmDialectInterface for the given dialect, or
-  /// null if one wasn't registered.
-  const OpAsmDialectInterface *getOpAsmInterface(Dialect *dialect) {
-    return interfaces.getInterfaceFor(dialect);
   }
 
   /// Get the state used for aliases.

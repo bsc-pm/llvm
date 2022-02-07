@@ -574,7 +574,6 @@ NVPTXTargetLowering::NVPTXTargetLowering(const NVPTXTargetMachine &TM,
   for (const auto &Op : {ISD::FMINIMUM, ISD::FMAXIMUM}) {
     setFP16OperationAction(Op, MVT::f16, GetMinMaxAction(Expand), Expand);
     setOperationAction(Op, MVT::f32, GetMinMaxAction(Expand));
-    setOperationAction(Op, MVT::f64, GetMinMaxAction(Expand));
     setFP16OperationAction(Op, MVT::v2f16, GetMinMaxAction(Expand), Expand);
   }
 
@@ -1354,7 +1353,7 @@ std::string NVPTXTargetLowering::getPrototype(
     }
     auto *PTy = dyn_cast<PointerType>(Ty);
     assert(PTy && "Param with byval attribute should be a pointer type");
-    Type *ETy = PTy->getElementType();
+    Type *ETy = PTy->getPointerElementType();
 
     Align align = Outs[OIdx].Flags.getNonZeroByValAlign();
     unsigned sz = DL.getTypeAllocSize(ETy);
@@ -1577,7 +1576,8 @@ SDValue NVPTXTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
     SmallVector<uint64_t, 16> Offsets;
     auto *PTy = dyn_cast<PointerType>(Args[i].Ty);
     assert(PTy && "Type of a byval parameter should be pointer");
-    ComputePTXValueVTs(*this, DL, PTy->getElementType(), VTs, &Offsets, 0);
+    ComputePTXValueVTs(*this, DL, PTy->getPointerElementType(), VTs, &Offsets,
+                       0);
 
     // declare .param .align <align> .b8 .param<n>[<size>];
     unsigned sz = Outs[OIdx].Flags.getByValSize();
@@ -2447,7 +2447,7 @@ static bool isImageOrSamplerVal(const Value *arg, const Module *context) {
   if (!context)
     return false;
 
-  auto *STy = dyn_cast<StructType>(PTy->getElementType());
+  auto *STy = dyn_cast<StructType>(PTy->getPointerElementType());
   if (!STy || STy->isLiteral())
     return false;
 
@@ -5131,7 +5131,7 @@ void NVPTXTargetLowering::ReplaceNodeResults(
 }
 
 // Pin NVPTXTargetObjectFile's vtables to this file.
-NVPTXTargetObjectFile::~NVPTXTargetObjectFile() {}
+NVPTXTargetObjectFile::~NVPTXTargetObjectFile() = default;
 
 MCSection *NVPTXTargetObjectFile::SelectSectionForGlobal(
     const GlobalObject *GO, SectionKind Kind, const TargetMachine &TM) const {

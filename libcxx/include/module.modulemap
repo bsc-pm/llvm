@@ -246,7 +246,9 @@ module std [system] {
       module generate                 { private header "__algorithm/generate.h" }
       module generate_n               { private header "__algorithm/generate_n.h" }
       module half_positive            { private header "__algorithm/half_positive.h" }
+      module in_in_out_result         { private header "__algorithm/in_in_out_result.h" }
       module in_in_result             { private header "__algorithm/in_in_result.h" }
+      module in_out_out_result        { private header "__algorithm/in_out_out_result.h" }
       module in_out_result            { private header "__algorithm/in_out_result.h" }
       module includes                 { private header "__algorithm/includes.h" }
       module inplace_merge            { private header "__algorithm/inplace_merge.h" }
@@ -385,16 +387,19 @@ module std [system] {
     export *
 
     module __compare {
-      module common_comparison_category { private header "__compare/common_comparison_category.h" }
-      module compare_three_way          { private header "__compare/compare_three_way.h" }
-      module compare_three_way_result   { private header "__compare/compare_three_way_result.h" }
-      module is_eq                      { private header "__compare/is_eq.h" }
-      module ordering                   { private header "__compare/ordering.h" }
-      module partial_order              { private header "__compare/partial_order.h" }
-      module strong_order               { private header "__compare/strong_order.h" }
-      module synth_three_way            { private header "__compare/synth_three_way.h" }
-      module three_way_comparable       { private header "__compare/three_way_comparable.h" }
-      module weak_order                 { private header "__compare/weak_order.h" }
+      module common_comparison_category     { private header "__compare/common_comparison_category.h" }
+      module compare_partial_order_fallback { private header "__compare/compare_partial_order_fallback.h" }
+      module compare_strong_order_fallback  { private header "__compare/compare_strong_order_fallback.h" }
+      module compare_three_way              { private header "__compare/compare_three_way.h" }
+      module compare_three_way_result       { private header "__compare/compare_three_way_result.h" }
+      module compare_weak_order_fallback    { private header "__compare/compare_weak_order_fallback.h" }
+      module is_eq                          { private header "__compare/is_eq.h" }
+      module ordering                       { private header "__compare/ordering.h" }
+      module partial_order                  { private header "__compare/partial_order.h" }
+      module strong_order                   { private header "__compare/strong_order.h" }
+      module synth_three_way                { private header "__compare/synth_three_way.h" }
+      module three_way_comparable           { private header "__compare/three_way_comparable.h" }
+      module weak_order                     { private header "__compare/weak_order.h" }
     }
   }
   module complex {
@@ -488,25 +493,27 @@ module std [system] {
     export *
 
     module __format {
-      module format_arg             { private header "__format/format_arg.h" }
-      module format_args            { private header "__format/format_args.h" }
+      module format_arg               { private header "__format/format_arg.h" }
+      module format_args              { private header "__format/format_args.h" }
       module format_context {
         private header "__format/format_context.h"
         export optional
         export locale
       }
-      module format_error           { private header "__format/format_error.h" }
-      module format_fwd             { private header "__format/format_fwd.h" }
-      module format_parse_context   { private header "__format/format_parse_context.h" }
-      module format_string          { private header "__format/format_string.h" }
-      module format_to_n_result     { private header "__format/format_to_n_result.h" }
-      module formatter              { private header "__format/formatter.h" }
-      module formatter_bool         { private header "__format/formatter_bool.h" }
-      module formatter_char         { private header "__format/formatter_char.h" }
-      module formatter_integer      { private header "__format/formatter_integer.h" }
-      module formatter_integral     { private header "__format/formatter_integral.h" }
-      module formatter_string       { private header "__format/formatter_string.h" }
-      module parser_std_format_spec { private header "__format/parser_std_format_spec.h" }
+      module format_error             { private header "__format/format_error.h" }
+      module format_fwd               { private header "__format/format_fwd.h" }
+      module format_parse_context     { private header "__format/format_parse_context.h" }
+      module format_string            { private header "__format/format_string.h" }
+      module format_to_n_result       { private header "__format/format_to_n_result.h" }
+      module formatter                { private header "__format/formatter.h" }
+      module formatter_bool           { private header "__format/formatter_bool.h" }
+      module formatter_char           { private header "__format/formatter_char.h" }
+      module formatter_floating_point { private header "__format/formatter_floating_point.h" }
+      module formatter_integer        { private header "__format/formatter_integer.h" }
+      module formatter_integral       { private header "__format/formatter_integral.h" }
+      module formatter_pointer        { private header "__format/formatter_pointer.h" }
+      module formatter_string         { private header "__format/formatter_string.h" }
+      module parser_std_format_spec   { private header "__format/parser_std_format_spec.h" }
     }
   }
   module forward_list {
@@ -568,6 +575,10 @@ module std [system] {
     header "ios"
     export iosfwd
     export *
+
+    module __ios {
+      module fpos { private header "__ios/fpos.h" }
+    }
   }
   module iosfwd {
     header "iosfwd"
@@ -810,6 +821,7 @@ module std [system] {
         export functional.__functional.perfect_forward
       }
       module view_interface         { private header "__ranges/view_interface.h" }
+      module views                  { private header "__ranges/views.h" }
     }
   }
   module ratio {

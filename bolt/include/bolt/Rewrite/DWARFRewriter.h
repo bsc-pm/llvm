@@ -10,11 +10,10 @@
 #define BOLT_REWRITE_DWARF_REWRITER_H
 
 #include "bolt/Core/DebugData.h"
-#include "bolt/Rewrite/RewriteInstance.h"
 #include <cstdint>
-#include <map>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <unordered_map>
 #include <vector>
 
@@ -94,14 +93,14 @@ class DWARFRewriter {
   makeFinalLocListsSection(SimpleBinaryPatcher &DebugInfoPatcher);
 
   /// Finalize debug sections in the main binary.
-  void finalizeDebugSections(DebugInfoBinaryPatcher &DebugInfoPatcher);
+  CUOffsetMap finalizeDebugSections(DebugInfoBinaryPatcher &DebugInfoPatcher);
 
   /// Patches the binary for DWARF address ranges (e.g. in functions and lexical
   /// blocks) to be updated.
   void updateDebugAddressRanges();
 
   /// Rewrite .gdb_index section if present.
-  void updateGdbIndexSection();
+  void updateGdbIndexSection(CUOffsetMap &CUMap);
 
   /// Output .dwo files.
   void writeDWOFiles(std::unordered_map<uint64_t, std::string> &DWOIdToName);

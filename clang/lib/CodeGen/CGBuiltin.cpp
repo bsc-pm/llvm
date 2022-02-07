@@ -5875,6 +5875,10 @@ static const ARMVectorIntrinsicInfo ARMSIMDIntrinsicMap [] = {
   NEONMAP1(vqmovun_v, arm_neon_vqmovnsu, Add1ArgType),
   NEONMAP1(vqneg_v, arm_neon_vqneg, Add1ArgType),
   NEONMAP1(vqnegq_v, arm_neon_vqneg, Add1ArgType),
+  NEONMAP1(vqrdmlah_v, arm_neon_vqrdmlah, Add1ArgType),
+  NEONMAP1(vqrdmlahq_v, arm_neon_vqrdmlah, Add1ArgType),
+  NEONMAP1(vqrdmlsh_v, arm_neon_vqrdmlsh, Add1ArgType),
+  NEONMAP1(vqrdmlshq_v, arm_neon_vqrdmlsh, Add1ArgType),
   NEONMAP1(vqrdmulh_v, arm_neon_vqrdmulh, Add1ArgType),
   NEONMAP1(vqrdmulhq_v, arm_neon_vqrdmulh, Add1ArgType),
   NEONMAP2(vqrshl_v, arm_neon_vqrshiftu, arm_neon_vqrshifts, Add1ArgType | UnsignedAlts),
@@ -6100,6 +6104,10 @@ static const ARMVectorIntrinsicInfo AArch64SIMDIntrinsicMap[] = {
   NEONMAP1(vqmovun_v, aarch64_neon_sqxtun, Add1ArgType),
   NEONMAP1(vqneg_v, aarch64_neon_sqneg, Add1ArgType),
   NEONMAP1(vqnegq_v, aarch64_neon_sqneg, Add1ArgType),
+  NEONMAP1(vqrdmlah_v, aarch64_neon_sqrdmlah, Add1ArgType),
+  NEONMAP1(vqrdmlahq_v, aarch64_neon_sqrdmlah, Add1ArgType),
+  NEONMAP1(vqrdmlsh_v, aarch64_neon_sqrdmlsh, Add1ArgType),
+  NEONMAP1(vqrdmlshq_v, aarch64_neon_sqrdmlsh, Add1ArgType),
   NEONMAP1(vqrdmulh_lane_v, aarch64_neon_sqrdmulh_lane, 0),
   NEONMAP1(vqrdmulh_laneq_v, aarch64_neon_sqrdmulh_laneq, 0),
   NEONMAP1(vqrdmulh_v, aarch64_neon_sqrdmulh, Add1ArgType),
@@ -6302,6 +6310,10 @@ static const ARMVectorIntrinsicInfo AArch64SISDIntrinsicMap[] = {
   NEONMAP1(vqnegd_s64, aarch64_neon_sqneg, Add1ArgType),
   NEONMAP1(vqnegh_s16, aarch64_neon_sqneg, Vectorize1ArgType | Use64BitVectors),
   NEONMAP1(vqnegs_s32, aarch64_neon_sqneg, Add1ArgType),
+  NEONMAP1(vqrdmlahh_s16, aarch64_neon_sqrdmlah, Vectorize1ArgType | Use64BitVectors),
+  NEONMAP1(vqrdmlahs_s32, aarch64_neon_sqrdmlah, Add1ArgType),
+  NEONMAP1(vqrdmlshh_s16, aarch64_neon_sqrdmlsh, Vectorize1ArgType | Use64BitVectors),
+  NEONMAP1(vqrdmlshs_s32, aarch64_neon_sqrdmlsh, Add1ArgType),
   NEONMAP1(vqrdmulhh_s16, aarch64_neon_sqrdmulh, Vectorize1ArgType | Use64BitVectors),
   NEONMAP1(vqrdmulhs_s32, aarch64_neon_sqrdmulh, Add1ArgType),
   NEONMAP1(vqrshlb_s8, aarch64_neon_sqrshl, Vectorize1ArgType | Use64BitVectors),
@@ -7283,7 +7295,10 @@ Value *CodeGenFunction::EmitAArch64CompareBuiltinExpr(
 
   Op = Builder.CreateBitCast(Op, OTy);
   if (OTy->getScalarType()->isFloatingPointTy()) {
-    Op = Builder.CreateFCmp(Fp, Op, Constant::getNullValue(OTy));
+    if (Fp == CmpInst::FCMP_OEQ)
+      Op = Builder.CreateFCmp(Fp, Op, Constant::getNullValue(OTy));
+    else
+      Op = Builder.CreateFCmpS(Fp, Op, Constant::getNullValue(OTy));
   } else {
     Op = Builder.CreateICmp(Ip, Op, Constant::getNullValue(OTy));
   }
@@ -9766,6 +9781,18 @@ Value *CodeGenFunction::EmitAArch64BuiltinExpr(unsigned BuiltinID,
     return Builder.CreateCall(F, {Arg0, Arg1});
   }
 
+  // Memory Operations (MOPS)
+  if (BuiltinID == AArch64::BI__builtin_arm_mops_memset_tag) {
+    Value *Dst = EmitScalarExpr(E->getArg(0));
+    Value *Val = EmitScalarExpr(E->getArg(1));
+    Value *Size = EmitScalarExpr(E->getArg(2));
+    Dst = Builder.CreatePointerCast(Dst, Int8PtrTy);
+    Val = Builder.CreateTrunc(Val, Int8Ty);
+    Size = Builder.CreateIntCast(Size, Int64Ty, false);
+    return Builder.CreateCall(
+        CGM.getIntrinsic(Intrinsic::aarch64_mops_memset_tag), {Dst, Val, Size});
+  }
+
   // Memory Tagging Extensions (MTE) Intrinsics
   Intrinsic::ID MTEIntrinsicID = Intrinsic::not_intrinsic;
   switch (BuiltinID) {
@@ -10276,7 +10303,10 @@ Value *CodeGenFunction::EmitAArch64BuiltinExpr(unsigned BuiltinID,
     Ops.push_back(EmitScalarExpr(E->getArg(1)));
     Ops[0] = Builder.CreateBitCast(Ops[0], DoubleTy);
     Ops[1] = Builder.CreateBitCast(Ops[1], DoubleTy);
-    Ops[0] = Builder.CreateFCmp(P, Ops[0], Ops[1]);
+    if (P == llvm::FCmpInst::FCMP_OEQ)
+      Ops[0] = Builder.CreateFCmp(P, Ops[0], Ops[1]);
+    else
+      Ops[0] = Builder.CreateFCmpS(P, Ops[0], Ops[1]);
     return Builder.CreateSExt(Ops[0], Int64Ty, "vcmpd");
   }
   case NEON::BI__builtin_neon_vceqs_f32:
@@ -10296,7 +10326,10 @@ Value *CodeGenFunction::EmitAArch64BuiltinExpr(unsigned BuiltinID,
     Ops.push_back(EmitScalarExpr(E->getArg(1)));
     Ops[0] = Builder.CreateBitCast(Ops[0], FloatTy);
     Ops[1] = Builder.CreateBitCast(Ops[1], FloatTy);
-    Ops[0] = Builder.CreateFCmp(P, Ops[0], Ops[1]);
+    if (P == llvm::FCmpInst::FCMP_OEQ)
+      Ops[0] = Builder.CreateFCmp(P, Ops[0], Ops[1]);
+    else
+      Ops[0] = Builder.CreateFCmpS(P, Ops[0], Ops[1]);
     return Builder.CreateSExt(Ops[0], Int32Ty, "vcmpd");
   }
   case NEON::BI__builtin_neon_vceqh_f16:
@@ -10316,7 +10349,10 @@ Value *CodeGenFunction::EmitAArch64BuiltinExpr(unsigned BuiltinID,
     Ops.push_back(EmitScalarExpr(E->getArg(1)));
     Ops[0] = Builder.CreateBitCast(Ops[0], HalfTy);
     Ops[1] = Builder.CreateBitCast(Ops[1], HalfTy);
-    Ops[0] = Builder.CreateFCmp(P, Ops[0], Ops[1]);
+    if (P == llvm::FCmpInst::FCMP_OEQ)
+      Ops[0] = Builder.CreateFCmp(P, Ops[0], Ops[1]);
+    else
+      Ops[0] = Builder.CreateFCmpS(P, Ops[0], Ops[1]);
     return Builder.CreateSExt(Ops[0], Int16Ty, "vcmpd");
   }
   case NEON::BI__builtin_neon_vceqd_s64:
@@ -14286,73 +14322,6 @@ Value *CodeGenFunction::EmitX86BuiltinExpr(unsigned BuiltinID,
       return Builder.CreateCall(F, Ops[0]);
     }
   }
-  case X86::BI__builtin_ia32_pabsb128:
-  case X86::BI__builtin_ia32_pabsw128:
-  case X86::BI__builtin_ia32_pabsd128:
-  case X86::BI__builtin_ia32_pabsb256:
-  case X86::BI__builtin_ia32_pabsw256:
-  case X86::BI__builtin_ia32_pabsd256:
-  case X86::BI__builtin_ia32_pabsq128:
-  case X86::BI__builtin_ia32_pabsq256:
-  case X86::BI__builtin_ia32_pabsb512:
-  case X86::BI__builtin_ia32_pabsw512:
-  case X86::BI__builtin_ia32_pabsd512:
-  case X86::BI__builtin_ia32_pabsq512: {
-    Function *F = CGM.getIntrinsic(Intrinsic::abs, Ops[0]->getType());
-    return Builder.CreateCall(F, {Ops[0], Builder.getInt1(false)});
-  }
-  case X86::BI__builtin_ia32_pmaxsb128:
-  case X86::BI__builtin_ia32_pmaxsw128:
-  case X86::BI__builtin_ia32_pmaxsd128:
-  case X86::BI__builtin_ia32_pmaxsq128:
-  case X86::BI__builtin_ia32_pmaxsb256:
-  case X86::BI__builtin_ia32_pmaxsw256:
-  case X86::BI__builtin_ia32_pmaxsd256:
-  case X86::BI__builtin_ia32_pmaxsq256:
-  case X86::BI__builtin_ia32_pmaxsb512:
-  case X86::BI__builtin_ia32_pmaxsw512:
-  case X86::BI__builtin_ia32_pmaxsd512:
-  case X86::BI__builtin_ia32_pmaxsq512:
-    return EmitX86BinaryIntrinsic(*this, Ops, Intrinsic::smax);
-  case X86::BI__builtin_ia32_pmaxub128:
-  case X86::BI__builtin_ia32_pmaxuw128:
-  case X86::BI__builtin_ia32_pmaxud128:
-  case X86::BI__builtin_ia32_pmaxuq128:
-  case X86::BI__builtin_ia32_pmaxub256:
-  case X86::BI__builtin_ia32_pmaxuw256:
-  case X86::BI__builtin_ia32_pmaxud256:
-  case X86::BI__builtin_ia32_pmaxuq256:
-  case X86::BI__builtin_ia32_pmaxub512:
-  case X86::BI__builtin_ia32_pmaxuw512:
-  case X86::BI__builtin_ia32_pmaxud512:
-  case X86::BI__builtin_ia32_pmaxuq512:
-    return EmitX86BinaryIntrinsic(*this, Ops, Intrinsic::umax);
-  case X86::BI__builtin_ia32_pminsb128:
-  case X86::BI__builtin_ia32_pminsw128:
-  case X86::BI__builtin_ia32_pminsd128:
-  case X86::BI__builtin_ia32_pminsq128:
-  case X86::BI__builtin_ia32_pminsb256:
-  case X86::BI__builtin_ia32_pminsw256:
-  case X86::BI__builtin_ia32_pminsd256:
-  case X86::BI__builtin_ia32_pminsq256:
-  case X86::BI__builtin_ia32_pminsb512:
-  case X86::BI__builtin_ia32_pminsw512:
-  case X86::BI__builtin_ia32_pminsd512:
-  case X86::BI__builtin_ia32_pminsq512:
-    return EmitX86BinaryIntrinsic(*this, Ops, Intrinsic::smin);
-  case X86::BI__builtin_ia32_pminub128:
-  case X86::BI__builtin_ia32_pminuw128:
-  case X86::BI__builtin_ia32_pminud128:
-  case X86::BI__builtin_ia32_pminuq128:
-  case X86::BI__builtin_ia32_pminub256:
-  case X86::BI__builtin_ia32_pminuw256:
-  case X86::BI__builtin_ia32_pminud256:
-  case X86::BI__builtin_ia32_pminuq256:
-  case X86::BI__builtin_ia32_pminub512:
-  case X86::BI__builtin_ia32_pminuw512:
-  case X86::BI__builtin_ia32_pminud512:
-  case X86::BI__builtin_ia32_pminuq512:
-    return EmitX86BinaryIntrinsic(*this, Ops, Intrinsic::umin);
 
   case X86::BI__builtin_ia32_pmuludq128:
   case X86::BI__builtin_ia32_pmuludq256:
@@ -14433,12 +14402,6 @@ Value *CodeGenFunction::EmitX86BuiltinExpr(unsigned BuiltinID,
         CGM.getIntrinsic(Intrinsic::vector_reduce_add, Ops[0]->getType());
     return Builder.CreateCall(F, {Ops[0]});
   }
-  case X86::BI__builtin_ia32_reduce_and_d512:
-  case X86::BI__builtin_ia32_reduce_and_q512: {
-    Function *F =
-        CGM.getIntrinsic(Intrinsic::vector_reduce_and, Ops[0]->getType());
-    return Builder.CreateCall(F, {Ops[0]});
-  }
   case X86::BI__builtin_ia32_reduce_fadd_pd512:
   case X86::BI__builtin_ia32_reduce_fadd_ps512:
   case X86::BI__builtin_ia32_reduce_fadd_ph512:
@@ -14483,36 +14446,6 @@ Value *CodeGenFunction::EmitX86BuiltinExpr(unsigned BuiltinID,
   case X86::BI__builtin_ia32_reduce_mul_q512: {
     Function *F =
         CGM.getIntrinsic(Intrinsic::vector_reduce_mul, Ops[0]->getType());
-    return Builder.CreateCall(F, {Ops[0]});
-  }
-  case X86::BI__builtin_ia32_reduce_or_d512:
-  case X86::BI__builtin_ia32_reduce_or_q512: {
-    Function *F =
-        CGM.getIntrinsic(Intrinsic::vector_reduce_or, Ops[0]->getType());
-    return Builder.CreateCall(F, {Ops[0]});
-  }
-  case X86::BI__builtin_ia32_reduce_smax_d512:
-  case X86::BI__builtin_ia32_reduce_smax_q512: {
-    Function *F =
-        CGM.getIntrinsic(Intrinsic::vector_reduce_smax, Ops[0]->getType());
-    return Builder.CreateCall(F, {Ops[0]});
-  }
-  case X86::BI__builtin_ia32_reduce_smin_d512:
-  case X86::BI__builtin_ia32_reduce_smin_q512: {
-    Function *F =
-        CGM.getIntrinsic(Intrinsic::vector_reduce_smin, Ops[0]->getType());
-    return Builder.CreateCall(F, {Ops[0]});
-  }
-  case X86::BI__builtin_ia32_reduce_umax_d512:
-  case X86::BI__builtin_ia32_reduce_umax_q512: {
-    Function *F =
-        CGM.getIntrinsic(Intrinsic::vector_reduce_umax, Ops[0]->getType());
-    return Builder.CreateCall(F, {Ops[0]});
-  }
-  case X86::BI__builtin_ia32_reduce_umin_d512:
-  case X86::BI__builtin_ia32_reduce_umin_q512: {
-    Function *F =
-        CGM.getIntrinsic(Intrinsic::vector_reduce_umin, Ops[0]->getType());
     return Builder.CreateCall(F, {Ops[0]});
   }
 
@@ -17294,7 +17227,7 @@ static NVPTXMmaLdstInfo getNVPTXMmaLdstInfo(unsigned BuiltinID) {
   case NVPTX::BI__mma_tf32_m16n16k8_ld_a:
     return MMA_LDST(4, m16n16k8_load_a_tf32);
   case NVPTX::BI__mma_tf32_m16n16k8_ld_b:
-    return MMA_LDST(2, m16n16k8_load_b_tf32);
+    return MMA_LDST(4, m16n16k8_load_b_tf32);
   case NVPTX::BI__mma_tf32_m16n16k8_ld_c:
     return MMA_LDST(8, m16n16k8_load_c_f32);
 
