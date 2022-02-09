@@ -574,6 +574,7 @@ final_spin=FALSE)
          disabled (KMP_TASKING=0).  */
       if (this_thr->th.th_active_role == OMP_ROLE_FREE_AGENT
       		&& __kmp_free_agent_list) {
+        this_thr->th.th_reap_state = KMP_NOT_SAFE_TO_REAP;
         int empty_task_teams_cnt = 0;
         int team_task_to_pick = 0;
         while (team_task_to_pick < this_thr->th.allowed_teams_length){
@@ -632,6 +633,7 @@ final_spin=FALSE)
         } //while (team_task_to_pick < this_thr->th.allowed_teams_length);
         // Reset task_team to 0 to make free agent thread able to suspend
         task_team = NULL;
+        this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
       //} else if (!this_thr->th.is_free_agent) {
       } else if (this_thr->th.th_active_role != OMP_ROLE_FREE_AGENT) {
         if (task_team != NULL) {
