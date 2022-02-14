@@ -15,6 +15,7 @@
 #include "ObjC.h"
 #include "OutputSection.h"
 #include "OutputSegment.h"
+#include "SectionPriorities.h"
 #include "SymbolTable.h"
 #include "Symbols.h"
 #include "SyntheticSections.h"
@@ -266,8 +267,9 @@ static InputFile *addFile(StringRef path, ForceLoad forceLoadArchive,
     // We don't take a reference to cachedFile here because the
     // loadArchiveMember() call below may recursively call addFile() and
     // invalidate this reference.
-    if (ArchiveFile *cachedFile = loadedArchives[path])
-      return cachedFile;
+    auto entry = loadedArchives.find(path);
+    if (entry != loadedArchives.end())
+      return entry->second;
 
     std::unique_ptr<object::Archive> archive = CHECK(
         object::Archive::create(mbref), path + ": failed to parse archive");
@@ -387,12 +389,17 @@ static void addLibrary(StringRef name, bool isNeeded, bool isWeak,
   error("library not found for -l" + name);
 }
 
+static DenseSet<StringRef> loadedObjectFrameworks;
 static void addFramework(StringRef name, bool isNeeded, bool isWeak,
                          bool isReexport, bool isExplicit,
                          ForceLoad forceLoadArchive) {
   if (Optional<StringRef> path = findFramework(name)) {
-    if (auto *dylibFile = dyn_cast_or_null<DylibFile>(
-            addFile(*path, forceLoadArchive, /*isLazy=*/false, isExplicit))) {
+    if (loadedObjectFrameworks.contains(*path))
+      return;
+
+    InputFile *file =
+        addFile(*path, forceLoadArchive, /*isLazy=*/false, isExplicit);
+    if (auto *dylibFile = dyn_cast_or_null<DylibFile>(file)) {
       if (isNeeded)
         dylibFile->forceNeeded = true;
       if (isWeak)
@@ -401,6 +408,13 @@ static void addFramework(StringRef name, bool isNeeded, bool isWeak,
         config->hasReexports = true;
         dylibFile->reexport = true;
       }
+    } else if (isa<ObjFile>(file) || isa<BitcodeFile>(file)) {
+      // Cache frameworks containing object or bitcode files to avoid duplicate
+      // symbols. Frameworks containing static archives are cached separately
+      // in addFile() to share caching with libraries, and frameworks
+      // containing dylibs should allow overwriting of attributes such as
+      // forceNeeded by subsequent loads
+      loadedObjectFrameworks.insert(*path);
     }
     return;
   }
@@ -460,60 +474,6 @@ static void addFileList(StringRef path, bool isLazy) {
 // entry (the one nearest to the front of the list.)
 //
 // The file can also have line comments that start with '#'.
-static void parseOrderFile(StringRef path) {
-  Optional<MemoryBufferRef> buffer = readFile(path);
-  if (!buffer) {
-    error("Could not read order file at " + path);
-    return;
-  }
-
-  MemoryBufferRef mbref = *buffer;
-  size_t priority = std::numeric_limits<size_t>::max();
-  for (StringRef line : args::getLines(mbref)) {
-    StringRef objectFile, symbol;
-    line = line.take_until([](char c) { return c == '#'; }); // ignore comments
-    line = line.ltrim();
-
-    CPUType cpuType = StringSwitch<CPUType>(line)
-                          .StartsWith("i386:", CPU_TYPE_I386)
-                          .StartsWith("x86_64:", CPU_TYPE_X86_64)
-                          .StartsWith("arm:", CPU_TYPE_ARM)
-                          .StartsWith("arm64:", CPU_TYPE_ARM64)
-                          .StartsWith("ppc:", CPU_TYPE_POWERPC)
-                          .StartsWith("ppc64:", CPU_TYPE_POWERPC64)
-                          .Default(CPU_TYPE_ANY);
-
-    if (cpuType != CPU_TYPE_ANY && cpuType != target->cpuType)
-      continue;
-
-    // Drop the CPU type as well as the colon
-    if (cpuType != CPU_TYPE_ANY)
-      line = line.drop_until([](char c) { return c == ':'; }).drop_front();
-
-    constexpr std::array<StringRef, 2> fileEnds = {".o:", ".o):"};
-    for (StringRef fileEnd : fileEnds) {
-      size_t pos = line.find(fileEnd);
-      if (pos != StringRef::npos) {
-        // Split the string around the colon
-        objectFile = line.take_front(pos + fileEnd.size() - 1);
-        line = line.drop_front(pos + fileEnd.size());
-        break;
-      }
-    }
-    symbol = line.trim();
-
-    if (!symbol.empty()) {
-      SymbolPriorityEntry &entry = config->priorities[symbol];
-      if (!objectFile.empty())
-        entry.objectFiles.insert(std::make_pair(objectFile, priority));
-      else
-        entry.anyObjectFile = std::max(entry.anyObjectFile, priority);
-    }
-
-    --priority;
-  }
-}
-
 // We expect sub-library names of the form "libfoo", which will match a dylib
 // with a path of .*/libfoo.{dylib, tbd}.
 // XXX ld64 seems to ignore the extension entirely when matching sub-libraries;
@@ -580,9 +540,11 @@ static void replaceCommonSymbols() {
     // but it's not really worth supporting the linking of 64-bit programs on
     // 32-bit archs.
     ArrayRef<uint8_t> data = {nullptr, static_cast<size_t>(common->size)};
-    auto *isec = make<ConcatInputSection>(
-        segment_names::data, section_names::common, common->getFile(), data,
-        common->align, S_ZEROFILL);
+    // FIXME avoid creating one Section per symbol?
+    auto *section =
+        make<Section>(common->getFile(), segment_names::data,
+                      section_names::common, S_ZEROFILL, /*addr=*/0);
+    auto *isec = make<ConcatInputSection>(*section, data, common->align);
     if (!osec)
       osec = ConcatOutputSection::getOrCreateForInput(isec);
     isec->parent = osec;
@@ -590,7 +552,7 @@ static void replaceCommonSymbols() {
 
     // FIXME: CommonSymbol should store isReferencedDynamically, noDeadStrip
     // and pass them on here.
-    replaceSymbol<Defined>(sym, sym->getName(), isec->getFile(), isec,
+    replaceSymbol<Defined>(sym, sym->getName(), common->getFile(), isec,
                            /*value=*/0,
                            /*size=*/0,
                            /*isWeakDef=*/false,
@@ -1045,8 +1007,8 @@ static void gatherInputSections() {
   TimeTraceScope timeScope("Gathering input sections");
   int inputOrder = 0;
   for (const InputFile *file : inputFiles) {
-    for (const Section &section : file->sections) {
-      const Subsections &subsections = section.subsections;
+    for (const Section *section : file->sections) {
+      const Subsections &subsections = section->subsections;
       if (subsections.empty())
         continue;
       if (subsections[0].isec->getName() == section_names::compactUnwind)
@@ -1079,25 +1041,6 @@ static void gatherInputSections() {
     }
   }
   assert(inputOrder <= UnspecifiedInputOrder);
-}
-
-static void extractCallGraphProfile() {
-  TimeTraceScope timeScope("Extract call graph profile");
-  for (const InputFile *file : inputFiles) {
-    auto *obj = dyn_cast_or_null<ObjFile>(file);
-    if (!obj)
-      continue;
-    for (const CallGraphEntry &entry : obj->callGraph) {
-      assert(entry.fromIndex < obj->symbols.size() &&
-             entry.toIndex < obj->symbols.size());
-      auto *fromSym = dyn_cast_or_null<Defined>(obj->symbols[entry.fromIndex]);
-      auto *toSym = dyn_cast_or_null<Defined>(obj->symbols[entry.toIndex]);
-
-      if (!fromSym || !toSym)
-        continue;
-      config->callGraphProfile[{fromSym->isec, toSym->isec}] += entry.count;
-    }
-  }
 }
 
 static void foldIdenticalLiterals() {
@@ -1141,6 +1084,7 @@ bool macho::link(ArrayRef<const char *> argsArr, llvm::raw_ostream &stdoutOS,
     inputFiles.clear();
     inputSections.clear();
     loadedArchives.clear();
+    loadedObjectFrameworks.clear();
     syntheticSections.clear();
     thunkMap.clear();
 
@@ -1184,6 +1128,27 @@ bool macho::link(ArrayRef<const char *> argsArr, llvm::raw_ostream &stdoutOS,
       args.getLastArgValue(OPT_dependency_info));
   if (errorCount())
     return false;
+
+  if (args.hasArg(OPT_pagezero_size)) {
+    uint64_t pagezeroSize = args::getHex(args, OPT_pagezero_size, 0);
+
+    // ld64 does something really weird. It attempts to realign the value to the
+    // page size, but assumes the the page size is 4K. This doesn't work with
+    // most of Apple's ARM64 devices, which use a page size of 16K. This means
+    // that it will first 4K align it by rounding down, then round up to 16K.
+    // This probably only happened because no one using this arg with anything
+    // other then 0, so no one checked if it did what is what it says it does.
+
+    // So we are not copying this weird behavior and doing the it in a logical
+    // way, by always rounding down to page size.
+    if (!isAligned(Align(target->getPageSize()), pagezeroSize)) {
+      pagezeroSize -= pagezeroSize % target->getPageSize();
+      warn("__PAGEZERO size is not page aligned, rounding down to 0x" +
+           Twine::utohexstr(pagezeroSize));
+    }
+
+    target->pageZeroSize = pagezeroSize;
+  }
 
   config->osoPrefix = args.getLastArgValue(OPT_oso_prefix);
   if (!config->osoPrefix.empty()) {
@@ -1554,6 +1519,12 @@ bool macho::link(ArrayRef<const char *> argsArr, llvm::raw_ostream &stdoutOS,
       Optional<MemoryBufferRef> buffer = readFile(fileName);
       if (buffer)
         inputFiles.insert(make<OpaqueFile>(*buffer, segName, sectName));
+    }
+
+    for (const Arg *arg : args.filtered(OPT_add_empty_section)) {
+      StringRef segName = arg->getValue(0);
+      StringRef sectName = arg->getValue(1);
+      inputFiles.insert(make<OpaqueFile>(MemoryBufferRef(), segName, sectName));
     }
 
     gatherInputSections();

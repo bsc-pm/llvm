@@ -1262,7 +1262,15 @@ void VPWidenIntOrFpInductionRecipe::print(raw_ostream &O, const Twine &Indent,
   } else
     O << " " << VPlanIngredient(IV);
 }
+#endif
 
+bool VPWidenIntOrFpInductionRecipe::isCanonical() const {
+  auto *StartC = dyn_cast<ConstantInt>(getStartValue()->getLiveInIRValue());
+  auto *StepC = dyn_cast<SCEVConstant>(getInductionDescriptor().getStep());
+  return StartC && StartC->isZero() && StepC && StepC->isOne();
+}
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 void VPWidenGEPRecipe::print(raw_ostream &O, const Twine &Indent,
                              VPSlotTracker &SlotTracker) const {
   O << Indent << "WIDEN-GEP ";
@@ -1640,4 +1648,10 @@ void VPSlotTracker::assignSlots(const VPlan &Plan) {
     for (const VPRecipeBase &Recipe : *VPBB)
       for (VPValue *Def : Recipe.definedValues())
         assignSlot(Def);
+}
+
+bool vputils::onlyFirstLaneUsed(VPValue *Def) {
+  return all_of(Def->users(), [Def](VPUser *U) {
+    return cast<VPRecipeBase>(U)->onlyFirstLaneUsed(Def);
+  });
 }

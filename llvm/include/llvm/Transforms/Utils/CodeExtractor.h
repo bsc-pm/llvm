@@ -187,7 +187,7 @@ public:
     ///
     /// Based on the blocks used when constructing the code extractor,
     /// determine whether it is eligible for extraction.
-    /// 
+    ///
     /// Checks that varargs handling (with vastart and vaend) is only done in
     /// the outlined blocks.
     bool isEligible() const;
@@ -233,6 +233,10 @@ public:
     /// original block will be added to the outline region.
     BasicBlock *findOrCreateBlockForHoisting(BasicBlock *CommonExitBlock);
 
+    /// Exclude a value from aggregate argument passing when extracting a code
+    /// region, passing it instead as a scalar.
+    void excludeArgFromAggregate(Value *Arg);
+
   private:
     struct LifetimeMarkerInfo {
       bool SinkLifeStart = false;
@@ -240,6 +244,8 @@ public:
       Instruction *LifeStart = nullptr;
       Instruction *LifeEnd = nullptr;
     };
+
+    ValueSet ExcludeArgsFromAggregate;
 
     LifetimeMarkerInfo
     getLifetimeMarkers(const CodeExtractorAnalysisCache &CEAC,

@@ -174,7 +174,7 @@ Function *OpenMPIRBuilder::getOrCreateRuntimeFunctionPtr(RuntimeFunction FnID) {
 
 void OpenMPIRBuilder::initialize() { initializeTypes(M); }
 
-void OpenMPIRBuilder::finalize(Function *Fn, bool AllowExtractorSinking) {
+void OpenMPIRBuilder::finalize(Function *Fn) {
   SmallPtrSet<BasicBlock *, 32> ParallelRegionBlockSet;
   SmallVector<BasicBlock *, 32> Blocks;
   SmallVector<OutlineInfo, 16> DeferredOutlines;
@@ -193,7 +193,7 @@ void OpenMPIRBuilder::finalize(Function *Fn, bool AllowExtractorSinking) {
     Function *OuterFn = OI.getFunction();
     CodeExtractorAnalysisCache CEAC(*OuterFn);
     CodeExtractor Extractor(Blocks, /* DominatorTree */ nullptr,
-                            /* AggregateArgs */ false,
+                            /* AggregateArgs */ true,
                             /* BlockFrequencyInfo */ nullptr,
                             /* BranchProbabilityInfo */ nullptr,
                             /* AssumptionCache */ nullptr,
@@ -206,6 +206,9 @@ void OpenMPIRBuilder::finalize(Function *Fn, bool AllowExtractorSinking) {
                       << " Exit: " << OI.ExitBB->getName() << "\n");
     assert(Extractor.isEligible() &&
            "Expected OpenMP outlining to be possible!");
+
+    for (auto *V : OI.ExcludeArgsFromAggregate)
+      Extractor.excludeArgFromAggregate(V);
 
     Function *OutlinedFn = Extractor.extractCodeRegion(CEAC);
 
@@ -225,25 +228,25 @@ void OpenMPIRBuilder::finalize(Function *Fn, bool AllowExtractorSinking) {
       BasicBlock &ArtificialEntry = OutlinedFn->getEntryBlock();
       assert(ArtificialEntry.getUniqueSuccessor() == OI.EntryBB);
       assert(OI.EntryBB->getUniquePredecessor() == &ArtificialEntry);
-      if (AllowExtractorSinking) {
-        // Move instructions from the to-be-deleted ArtificialEntry to the entry
-        // basic block of the parallel region. CodeExtractor may have sunk
-        // allocas/bitcasts for values that are solely used in the outlined
-        // region and do not escape.
-        assert(!ArtificialEntry.empty() &&
-               "Expected instructions to sink in the outlined region");
-        for (BasicBlock::iterator It = ArtificialEntry.begin(),
-                                  End = ArtificialEntry.end();
-             It != End;) {
-          Instruction &I = *It;
-          It++;
+      // Move instructions from the to-be-deleted ArtificialEntry to the entry
+      // basic block of the parallel region. CodeExtractor generates
+      // instructions to unwrap the aggregate argument and may sink
+      // allocas/bitcasts for values that are solely used in the outlined region
+      // and do not escape.
+      assert(!ArtificialEntry.empty() &&
+             "Expected instructions to add in the outlined region entry");
+      for (BasicBlock::reverse_iterator It = ArtificialEntry.rbegin(),
+                                        End = ArtificialEntry.rend();
+           It != End;) {
+        Instruction &I = *It;
+        It++;
 
-          if (I.isTerminator())
-            continue;
+        if (I.isTerminator())
+          continue;
 
-          I.moveBefore(*OI.EntryBB, OI.EntryBB->getFirstInsertionPt());
-        }
+        I.moveBefore(*OI.EntryBB, OI.EntryBB->getFirstInsertionPt());
       }
+
       OI.EntryBB->moveBefore(&ArtificialEntry);
       ArtificialEntry.eraseFromParent();
     }
@@ -811,8 +814,10 @@ IRBuilder<>::InsertPoint OpenMPIRBuilder::createParallel(
       getOrCreateRuntimeFunctionPtr(OMPRTL___kmpc_global_thread_num);
 
   auto PrivHelper = [&](Value &V) {
-    if (&V == TIDAddr || &V == ZeroAddr)
+    if (&V == TIDAddr || &V == ZeroAddr) {
+      OI.ExcludeArgsFromAggregate.push_back(&V);
       return;
+    }
 
     SetVector<Use *> Uses;
     for (Use &U : V.uses())
@@ -2861,6 +2866,90 @@ CallInst *OpenMPIRBuilder::createOMPFree(const LocationDescription &Loc,
   return Builder.CreateCall(Fn, Args, Name);
 }
 
+CallInst *OpenMPIRBuilder::createOMPInteropInit(
+    const LocationDescription &Loc, Value *InteropVar,
+    omp::OMPInteropType InteropType, Value *Device, Value *NumDependences,
+    Value *DependenceAddress, bool HaveNowaitClause) {
+  IRBuilder<>::InsertPointGuard IPG(Builder);
+  Builder.restoreIP(Loc.IP);
+
+  uint32_t SrcLocStrSize;
+  Constant *SrcLocStr = getOrCreateSrcLocStr(Loc, SrcLocStrSize);
+  Value *Ident = getOrCreateIdent(SrcLocStr, SrcLocStrSize);
+  Value *ThreadId = getOrCreateThreadID(Ident);
+  if (Device == nullptr)
+    Device = ConstantInt::get(Int32, -1);
+  Constant *InteropTypeVal = ConstantInt::get(Int64, (int)InteropType);
+  if (NumDependences == nullptr) {
+    NumDependences = ConstantInt::get(Int32, 0);
+    PointerType *PointerTypeVar = Type::getInt8PtrTy(M.getContext());
+    DependenceAddress = ConstantPointerNull::get(PointerTypeVar);
+  }
+  Value *HaveNowaitClauseVal = ConstantInt::get(Int32, HaveNowaitClause);
+  Value *Args[] = {
+      Ident,  ThreadId,       InteropVar,        InteropTypeVal,
+      Device, NumDependences, DependenceAddress, HaveNowaitClauseVal};
+
+  Function *Fn = getOrCreateRuntimeFunctionPtr(OMPRTL___tgt_interop_init);
+
+  return Builder.CreateCall(Fn, Args);
+}
+
+CallInst *OpenMPIRBuilder::createOMPInteropDestroy(
+    const LocationDescription &Loc, Value *InteropVar, Value *Device,
+    Value *NumDependences, Value *DependenceAddress, bool HaveNowaitClause) {
+  IRBuilder<>::InsertPointGuard IPG(Builder);
+  Builder.restoreIP(Loc.IP);
+
+  uint32_t SrcLocStrSize;
+  Constant *SrcLocStr = getOrCreateSrcLocStr(Loc, SrcLocStrSize);
+  Value *Ident = getOrCreateIdent(SrcLocStr, SrcLocStrSize);
+  Value *ThreadId = getOrCreateThreadID(Ident);
+  if (Device == nullptr)
+    Device = ConstantInt::get(Int32, -1);
+  if (NumDependences == nullptr) {
+    NumDependences = ConstantInt::get(Int32, 0);
+    PointerType *PointerTypeVar = Type::getInt8PtrTy(M.getContext());
+    DependenceAddress = ConstantPointerNull::get(PointerTypeVar);
+  }
+  Value *HaveNowaitClauseVal = ConstantInt::get(Int32, HaveNowaitClause);
+  Value *Args[] = {
+      Ident,          ThreadId,          InteropVar,         Device,
+      NumDependences, DependenceAddress, HaveNowaitClauseVal};
+
+  Function *Fn = getOrCreateRuntimeFunctionPtr(OMPRTL___tgt_interop_destroy);
+
+  return Builder.CreateCall(Fn, Args);
+}
+
+CallInst *OpenMPIRBuilder::createOMPInteropUse(const LocationDescription &Loc,
+                                               Value *InteropVar, Value *Device,
+                                               Value *NumDependences,
+                                               Value *DependenceAddress,
+                                               bool HaveNowaitClause) {
+  IRBuilder<>::InsertPointGuard IPG(Builder);
+  Builder.restoreIP(Loc.IP);
+  uint32_t SrcLocStrSize;
+  Constant *SrcLocStr = getOrCreateSrcLocStr(Loc, SrcLocStrSize);
+  Value *Ident = getOrCreateIdent(SrcLocStr, SrcLocStrSize);
+  Value *ThreadId = getOrCreateThreadID(Ident);
+  if (Device == nullptr)
+    Device = ConstantInt::get(Int32, -1);
+  if (NumDependences == nullptr) {
+    NumDependences = ConstantInt::get(Int32, 0);
+    PointerType *PointerTypeVar = Type::getInt8PtrTy(M.getContext());
+    DependenceAddress = ConstantPointerNull::get(PointerTypeVar);
+  }
+  Value *HaveNowaitClauseVal = ConstantInt::get(Int32, HaveNowaitClause);
+  Value *Args[] = {
+      Ident,          ThreadId,          InteropVar,         Device,
+      NumDependences, DependenceAddress, HaveNowaitClauseVal};
+
+  Function *Fn = getOrCreateRuntimeFunctionPtr(OMPRTL___tgt_interop_use);
+
+  return Builder.CreateCall(Fn, Args);
+}
+
 CallInst *OpenMPIRBuilder::createCachedThreadPrivate(
     const LocationDescription &Loc, llvm::Value *Pointer,
     llvm::ConstantInt *Size, const llvm::Twine &Name) {
@@ -2982,7 +3071,8 @@ Constant *OpenMPIRBuilder::getOrCreateOMPInternalVariable(
   StringRef RuntimeName = Out.str();
   auto &Elem = *InternalVars.try_emplace(RuntimeName, nullptr).first;
   if (Elem.second) {
-    assert(Elem.second->getType()->getPointerElementType() == Ty &&
+    assert(cast<PointerType>(Elem.second->getType())
+               ->isOpaqueOrPointeeTypeMatches(Ty) &&
            "OMP internal variable has different type than requested");
   } else {
     // TODO: investigate the appropriate linkage type used for the global
@@ -3081,6 +3171,7 @@ bool OpenMPIRBuilder::checkAndEmitFlushAfterAtomic(
     }
     break;
   case Write:
+  case Compare:
   case Update:
     if (AO == AtomicOrdering::Release || AO == AtomicOrdering::AcquireRelease ||
         AO == AtomicOrdering::SequentiallyConsistent) {
@@ -3132,7 +3223,7 @@ OpenMPIRBuilder::createAtomicRead(const LocationDescription &Loc,
 
   Type *XTy = X.Var->getType();
   assert(XTy->isPointerTy() && "OMP Atomic expects a pointer to target memory");
-  Type *XElemTy = XTy->getPointerElementType();
+  Type *XElemTy = X.ElemTy;
   assert((XElemTy->isFloatingPointTy() || XElemTy->isIntegerTy() ||
           XElemTy->isPointerTy()) &&
          "OMP atomic read expected a scalar type");
@@ -3174,7 +3265,7 @@ OpenMPIRBuilder::createAtomicWrite(const LocationDescription &Loc,
 
   Type *XTy = X.Var->getType();
   assert(XTy->isPointerTy() && "OMP Atomic expects a pointer to target memory");
-  Type *XElemTy = XTy->getPointerElementType();
+  Type *XElemTy = X.ElemTy;
   assert((XElemTy->isFloatingPointTy() || XElemTy->isIntegerTy() ||
           XElemTy->isPointerTy()) &&
          "OMP atomic write expected a scalar type");
@@ -3210,7 +3301,7 @@ OpenMPIRBuilder::InsertPointTy OpenMPIRBuilder::createAtomicUpdate(
     Type *XTy = X.Var->getType();
     assert(XTy->isPointerTy() &&
            "OMP Atomic expects a pointer to target memory");
-    Type *XElemTy = XTy->getPointerElementType();
+    Type *XElemTy = X.ElemTy;
     assert((XElemTy->isFloatingPointTy() || XElemTy->isIntegerTy() ||
             XElemTy->isPointerTy()) &&
            "OMP atomic update expected a scalar type");
@@ -3219,8 +3310,8 @@ OpenMPIRBuilder::InsertPointTy OpenMPIRBuilder::createAtomicUpdate(
            "OpenMP atomic does not support LT or GT operations");
   });
 
-  emitAtomicUpdate(AllocIP, X.Var, Expr, AO, RMWOp, UpdateOp, X.IsVolatile,
-                   IsXBinopExpr);
+  emitAtomicUpdate(AllocIP, X.Var, X.ElemTy, Expr, AO, RMWOp, UpdateOp,
+                   X.IsVolatile, IsXBinopExpr);
   checkAndEmitFlushAfterAtomic(Loc, AO, AtomicKind::Update);
   return Builder.saveIP();
 }
@@ -3253,13 +3344,10 @@ Value *OpenMPIRBuilder::emitRMWOpAsInstruction(Value *Src1, Value *Src2,
   llvm_unreachable("Unsupported atomic update operation");
 }
 
-std::pair<Value *, Value *>
-OpenMPIRBuilder::emitAtomicUpdate(Instruction *AllocIP, Value *X, Value *Expr,
-                                  AtomicOrdering AO, AtomicRMWInst::BinOp RMWOp,
-                                  AtomicUpdateCallbackTy &UpdateOp,
-                                  bool VolatileX, bool IsXBinopExpr) {
-  Type *XElemTy = X->getType()->getPointerElementType();
-
+std::pair<Value *, Value *> OpenMPIRBuilder::emitAtomicUpdate(
+    Instruction *AllocIP, Value *X, Type *XElemTy, Value *Expr,
+    AtomicOrdering AO, AtomicRMWInst::BinOp RMWOp,
+    AtomicUpdateCallbackTy &UpdateOp, bool VolatileX, bool IsXBinopExpr) {
   bool DoCmpExch =
       ((RMWOp == AtomicRMWInst::BAD_BINOP) || (RMWOp == AtomicRMWInst::FAdd)) ||
       (RMWOp == AtomicRMWInst::FSub) ||
@@ -3374,13 +3462,76 @@ OpenMPIRBuilder::InsertPointTy OpenMPIRBuilder::createAtomicCapture(
   // If UpdateExpr is 'x' updated with some `expr` not based on 'x',
   // 'x' is simply atomically rewritten with 'expr'.
   AtomicRMWInst::BinOp AtomicOp = (UpdateExpr ? RMWOp : AtomicRMWInst::Xchg);
-  std::pair<Value *, Value *> Result = emitAtomicUpdate(
-      AllocIP, X.Var, Expr, AO, AtomicOp, UpdateOp, X.IsVolatile, IsXBinopExpr);
+  std::pair<Value *, Value *> Result =
+      emitAtomicUpdate(AllocIP, X.Var, X.ElemTy, Expr, AO, AtomicOp, UpdateOp,
+                       X.IsVolatile, IsXBinopExpr);
 
   Value *CapturedVal = (IsPostfixUpdate ? Result.first : Result.second);
   Builder.CreateStore(CapturedVal, V.Var, V.IsVolatile);
 
   checkAndEmitFlushAfterAtomic(Loc, AO, AtomicKind::Capture);
+  return Builder.saveIP();
+}
+
+OpenMPIRBuilder::InsertPointTy OpenMPIRBuilder::createAtomicCompare(
+    const LocationDescription &Loc, AtomicOpValue &X, Value *E, Value *D,
+    AtomicOrdering AO, OMPAtomicCompareOp Op, bool IsXBinopExpr) {
+  if (!updateToLocation(Loc))
+    return Loc.IP;
+
+  assert(X.Var->getType()->isPointerTy() &&
+         "OMP atomic expects a pointer to target memory");
+  assert((X.ElemTy->isFloatingPointTy() || X.ElemTy->isIntegerTy() ||
+          X.ElemTy->isPointerTy()) &&
+         "OMP atomic compare expected a scalar type");
+
+  if (Op == OMPAtomicCompareOp::EQ) {
+    unsigned Addrspace = cast<PointerType>(X.Var->getType())->getAddressSpace();
+    IntegerType *IntCastTy =
+        IntegerType::get(M.getContext(), X.ElemTy->getScalarSizeInBits());
+    Value *XAddr =
+        X.ElemTy->isIntegerTy()
+            ? X.Var
+            : Builder.CreateBitCast(X.Var, IntCastTy->getPointerTo(Addrspace));
+    AtomicOrdering Failure = AtomicCmpXchgInst::getStrongestFailureOrdering(AO);
+    // We don't need the result for now.
+    (void)Builder.CreateAtomicCmpXchg(XAddr, E, D, MaybeAlign(), AO, Failure);
+  } else {
+    assert((Op == OMPAtomicCompareOp::MAX || Op == OMPAtomicCompareOp::MIN) &&
+           "Op should be either max or min at this point");
+    assert(X.ElemTy->isIntegerTy() &&
+           "max and min operators only support integer type");
+
+    // Reverse the ordop as the OpenMP forms are different from LLVM forms.
+    // Let's take max as example.
+    // OpenMP form:
+    // x = x > expr ? expr : x;
+    // LLVM form:
+    // *ptr = *ptr > val ? *ptr : val;
+    // We need to transform to LLVM form.
+    // x = x <= expr ? x : expr;
+    AtomicRMWInst::BinOp NewOp;
+    if (IsXBinopExpr) {
+      if (X.IsSigned)
+        NewOp = Op == OMPAtomicCompareOp::MAX ? AtomicRMWInst::Min
+                                              : AtomicRMWInst::Max;
+      else
+        NewOp = Op == OMPAtomicCompareOp::MAX ? AtomicRMWInst::UMin
+                                              : AtomicRMWInst::UMax;
+    } else {
+      if (X.IsSigned)
+        NewOp = Op == OMPAtomicCompareOp::MAX ? AtomicRMWInst::Max
+                                              : AtomicRMWInst::Min;
+      else
+        NewOp = Op == OMPAtomicCompareOp::MAX ? AtomicRMWInst::UMax
+                                              : AtomicRMWInst::UMin;
+    }
+    // We dont' need the result for now.
+    (void)Builder.CreateAtomicRMW(NewOp, X.Var, E, MaybeAlign(), AO);
+  }
+
+  checkAndEmitFlushAfterAtomic(Loc, AO, AtomicKind::Compare);
+
   return Builder.saveIP();
 }
 

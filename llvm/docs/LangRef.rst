@@ -894,6 +894,11 @@ some can only be checked when producing an object file:
 * No global value in the expression can be a declaration, since that
   would require a relocation, which is not possible.
 
+* If either the alias or the aliasee may be replaced by a symbol outside the
+  module at link time or runtime, any optimization cannot replace the alias with
+  the aliasee, since the behavior may be different. The alias may be used as a
+  name guaranteed to point to the content in the current module.
+
 .. _langref_ifunc:
 
 IFuncs
@@ -2485,13 +2490,11 @@ ObjC ARC Attached Call Operand Bundles
 
 A ``"clang.arc.attachedcall"`` operand bundle on a call indicates the call is
 implicitly followed by a marker instruction and a call to an ObjC runtime
-function that uses the result of the call. The operand bundle takes either the
+function that uses the result of the call. The operand bundle takes a mandatory
 pointer to the runtime function (``@objc_retainAutoreleasedReturnValue`` or
-``@objc_unsafeClaimAutoreleasedReturnValue``) or no arguments. If the bundle
-doesn't take any arguments, only the marker instruction has to be emitted after
-the call; the runtime function calls don't have to be emitted since they already
-have been emitted. The return value of a call with this bundle is used by a call
-to ``@llvm.objc.clang.arc.noop.use`` unless the called function's return type is
+``@objc_unsafeClaimAutoreleasedReturnValue``).
+The return value of a call with this bundle is used by a call to
+``@llvm.objc.clang.arc.noop.use`` unless the called function's return type is
 void, in which case the operand bundle is ignored.
 
 .. code-block:: llvm
@@ -2501,11 +2504,8 @@ void, in which case the operand bundle is ignored.
    call i8* @foo() [ "clang.arc.attachedcall"(i8* (i8*)* @objc_retainAutoreleasedReturnValue) ]
    call i8* @foo() [ "clang.arc.attachedcall"(i8* (i8*)* @objc_unsafeClaimAutoreleasedReturnValue) ]
 
-   ; Only the marker instruction is inserted after the call to @foo.
-   call i8* @foo() [ "clang.arc.attachedcall"() ]
-
 The operand bundle is needed to ensure the call is immediately followed by the
-marker instruction or the ObjC runtime call in the final output.
+marker instruction and the ObjC runtime call in the final output.
 
 .. _moduleasm:
 
@@ -12251,7 +12251,7 @@ Syntax:
 
       declare token
         @llvm.experimental.gc.statepoint(i64 <id>, i32 <num patch bytes>,
-                       func_type <target>,
+                       func_type* elementtype(func_type) <target>,
                        i64 <#call args>, i64 <flags>,
                        ... (call parameters),
                        i64 0, i64 0)
@@ -12287,11 +12287,12 @@ statepoint still represents a call or invoke to 'target', and the nop
 sequence after patching is expected to represent an operation
 equivalent to a call or invoke to 'target'.
 
-The 'target' operand is the function actually being called.  The
-target can be specified as either a symbolic LLVM function, or as an
-arbitrary Value of appropriate function type.  Note that the function
-type must match the signature of the callee and the types of the 'call
-parameters' arguments.
+The 'target' operand is the function actually being called. The operand
+must have an :ref:`elementtype <attr_elementtype>` attribute specifying
+the function type of the target. The target can be specified as either
+a symbolic LLVM function, or as an arbitrary Value of pointer type. Note
+that the function type must match the signature of the callee and the
+types of the 'call parameters' arguments.
 
 The '#call args' operand is the number of arguments to the actual
 call.  It must exactly match the number of arguments passed in the
@@ -13139,6 +13140,33 @@ Semantics:
 """"""""""
 See description of '``llvm.instrprof.increment``' intrinsic.
 
+'``llvm.instrprof.cover``' Intrinsic
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Syntax:
+"""""""
+
+::
+
+      declare void @llvm.instrprof.cover(i8* <name>, i64 <hash>,
+                                         i32 <num-counters>, i32 <index>)
+
+Overview:
+"""""""""
+
+The '``llvm.instrprof.cover``' intrinsic is used to implement coverage
+instrumentation.
+
+Arguments:
+""""""""""
+The arguments are the same as the first four arguments of
+'``llvm.instrprof.increment``'.
+
+Semantics:
+""""""""""
+Similar to the '``llvm.instrprof.increment``' intrinsic, but it stores zero to
+the profiling variable to signify that the function has been covered. We store
+zero because this is more efficient on some targets.
 
 '``llvm.instrprof.value.profile``' Intrinsic
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -14958,12 +14986,8 @@ targets support all bit widths or vector types, however.
 
 ::
 
-      declare i8   @llvm.ctlz.i8  (i8   <src>, i1 <is_zero_undef>)
-      declare i16  @llvm.ctlz.i16 (i16  <src>, i1 <is_zero_undef>)
-      declare i32  @llvm.ctlz.i32 (i32  <src>, i1 <is_zero_undef>)
-      declare i64  @llvm.ctlz.i64 (i64  <src>, i1 <is_zero_undef>)
-      declare i256 @llvm.ctlz.i256(i256 <src>, i1 <is_zero_undef>)
-      declare <2 x i32> @llvm.ctlz.v2i32(<2 x i32> <src>, i1 <is_zero_undef>)
+      declare i8   @llvm.ctlz.i8  (i8   <src>, i1 <is_zero_poison>)
+      declare <2 x i37> @llvm.ctlz.v2i37(<2 x i37> <src>, i1 <is_zero_poison>)
 
 Overview:
 """""""""
@@ -14978,11 +15002,12 @@ The first argument is the value to be counted. This argument may be of
 any integer type, or a vector with integer element type. The return
 type must match the first argument type.
 
-The second argument must be a constant and is a flag to indicate whether
-the intrinsic should ensure that a zero as the first argument produces a
-defined result. Historically some architectures did not provide a
-defined result for zero values as efficiently, and many algorithms are
-now predicated on avoiding zero-value inputs.
+The second argument is a constant flag that indicates whether the intrinsic
+returns a valid result if the first argument is zero. If the first
+argument is zero and the second argument is true, the result is poison.
+Historically some architectures did not provide a defined result for zero
+values as efficiently, and many algorithms are now predicated on avoiding
+zero-value inputs.
 
 Semantics:
 """"""""""
@@ -14990,7 +15015,7 @@ Semantics:
 The '``llvm.ctlz``' intrinsic counts the leading (most significant)
 zeros in a variable, or within each element of the vector. If
 ``src == 0`` then the result is the size in bits of the type of ``src``
-if ``is_zero_undef == 0`` and ``undef`` otherwise. For example,
+if ``is_zero_poison == 0`` and ``poison`` otherwise. For example,
 ``llvm.ctlz(i32 2) = 30``.
 
 '``llvm.cttz.*``' Intrinsic
@@ -15005,12 +15030,8 @@ support all bit widths or vector types, however.
 
 ::
 
-      declare i8   @llvm.cttz.i8  (i8   <src>, i1 <is_zero_undef>)
-      declare i16  @llvm.cttz.i16 (i16  <src>, i1 <is_zero_undef>)
-      declare i32  @llvm.cttz.i32 (i32  <src>, i1 <is_zero_undef>)
-      declare i64  @llvm.cttz.i64 (i64  <src>, i1 <is_zero_undef>)
-      declare i256 @llvm.cttz.i256(i256 <src>, i1 <is_zero_undef>)
-      declare <2 x i32> @llvm.cttz.v2i32(<2 x i32> <src>, i1 <is_zero_undef>)
+      declare i42   @llvm.cttz.i42  (i42   <src>, i1 <is_zero_poison>)
+      declare <2 x i32> @llvm.cttz.v2i32(<2 x i32> <src>, i1 <is_zero_poison>)
 
 Overview:
 """""""""
@@ -15025,11 +15046,12 @@ The first argument is the value to be counted. This argument may be of
 any integer type, or a vector with integer element type. The return
 type must match the first argument type.
 
-The second argument must be a constant and is a flag to indicate whether
-the intrinsic should ensure that a zero as the first argument produces a
-defined result. Historically some architectures did not provide a
-defined result for zero values as efficiently, and many algorithms are
-now predicated on avoiding zero-value inputs.
+The second argument is a constant flag that indicates whether the intrinsic
+returns a valid result if the first argument is zero. If the first
+argument is zero and the second argument is true, the result is poison.
+Historically some architectures did not provide a defined result for zero
+values as efficiently, and many algorithms are now predicated on avoiding
+zero-value inputs.
 
 Semantics:
 """"""""""
@@ -15037,7 +15059,7 @@ Semantics:
 The '``llvm.cttz``' intrinsic counts the trailing (least significant)
 zeros in a variable, or within each element of a vector. If ``src == 0``
 then the result is the size in bits of the type of ``src`` if
-``is_zero_undef == 0`` and ``undef`` otherwise. For example,
+``is_zero_poison == 0`` and ``poison`` otherwise. For example,
 ``llvm.cttz(2) = 1``.
 
 .. _int_overflow:

@@ -32,6 +32,7 @@
 
 template <class CPO, class... Args>
 constexpr bool test(CPO& o, Args&&...) {
+  static_assert(std::is_const_v<CPO>);
   static_assert(std::is_class_v<CPO>);
   static_assert(std::is_trivial_v<CPO>);
 
@@ -177,8 +178,8 @@ static_assert(test(std::ranges::uninitialized_value_construct_n, a, 10));
 static_assert(test(std::ranges::advance, p, 5));
 static_assert(test(std::ranges::advance, p, 5, a+10));
 static_assert(test(std::ranges::advance, p, a+10));
-//static_assert(test(std::ranges::distance, a));
-//static_assert(test(std::ranges::distance, a, a+10));
+static_assert(test(std::ranges::distance, a));
+static_assert(test(std::ranges::distance, a, a+10));
 static_assert(test(std::ranges::next, a));
 static_assert(test(std::ranges::next, a, 5));
 static_assert(test(std::ranges::next, a, 5, a+10));

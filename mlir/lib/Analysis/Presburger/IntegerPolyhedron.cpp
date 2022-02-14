@@ -12,6 +12,7 @@
 
 #include "mlir/Analysis/Presburger/IntegerPolyhedron.h"
 #include "mlir/Analysis/Presburger/LinearTransform.h"
+#include "mlir/Analysis/Presburger/PresburgerSet.h"
 #include "mlir/Analysis/Presburger/Simplex.h"
 #include "mlir/Analysis/Presburger/Utils.h"
 #include "llvm/ADT/DenseMap.h"
@@ -61,6 +62,34 @@ void IntegerPolyhedron::append(const IntegerPolyhedron &other) {
   for (unsigned r = 0, e = other.getNumEqualities(); r < e; r++) {
     addEquality(other.getEquality(r));
   }
+}
+
+bool IntegerPolyhedron::isEqual(const IntegerPolyhedron &other) const {
+  return PresburgerSet(*this).isEqual(PresburgerSet(other));
+}
+
+bool IntegerPolyhedron::isSubsetOf(const IntegerPolyhedron &other) const {
+  return PresburgerSet(*this).isSubsetOf(PresburgerSet(other));
+}
+
+Optional<SmallVector<Fraction, 8>>
+IntegerPolyhedron::getRationalLexMin() const {
+  assert(getNumSymbolIds() == 0 && "Symbols are not supported!");
+  Optional<SmallVector<Fraction, 8>> maybeLexMin =
+      LexSimplex(*this).getRationalLexMin();
+
+  if (!maybeLexMin)
+    return {};
+
+  // The Simplex returns the lexmin over all the variables including locals. But
+  // locals are not actually part of the space and should not be returned in the
+  // result. Since the locals are placed last in the list of identifiers, they
+  // will be minimized last in the lexmin. So simply truncating out the locals
+  // from the end of the answer gives the desired lexmin over the dimensions.
+  assert(maybeLexMin->size() == getNumIds() &&
+         "Incorrect number of vars in lexMin!");
+  maybeLexMin->resize(getNumDimAndSymbolIds());
+  return maybeLexMin;
 }
 
 unsigned IntegerPolyhedron::insertDimId(unsigned pos, unsigned num) {
@@ -143,32 +172,21 @@ void IntegerPolyhedron::removeIdRange(unsigned idStart, unsigned idLimit) {
     return;
 
   // We are going to be removing one or more identifiers from the range.
-  assert(idStart < numIds && "invalid idStart position");
+  assert(idStart < getNumIds() && "invalid idStart position");
 
-  // TODO: Make 'removeIdRange' a lambda called from here.
   // Remove eliminated identifiers from the constraints..
   equalities.removeColumns(idStart, idLimit - idStart);
   inequalities.removeColumns(idStart, idLimit - idStart);
 
   // Update members numDims, numSymbols and numIds.
-  unsigned numDimsEliminated = 0;
-  unsigned numLocalsEliminated = 0;
-  unsigned numColsEliminated = idLimit - idStart;
-  if (idStart < numDims) {
-    numDimsEliminated = std::min(numDims, idLimit) - idStart;
-  }
-  // Check how many local id's were removed. Note that our identifier order is
-  // [dims, symbols, locals]. Local id start at position numDims + numSymbols.
-  if (idLimit > numDims + numSymbols) {
-    numLocalsEliminated = std::min(
-        idLimit - std::max(idStart, numDims + numSymbols), getNumLocalIds());
-  }
+  unsigned numDimsEliminated =
+      getIdKindOverlap(IdKind::Dimension, idStart, idLimit);
   unsigned numSymbolsEliminated =
-      numColsEliminated - numDimsEliminated - numLocalsEliminated;
+      getIdKindOverlap(IdKind::Symbol, idStart, idLimit);
 
   numDims -= numDimsEliminated;
   numSymbols -= numSymbolsEliminated;
-  numIds = numIds - numColsEliminated;
+  numIds -= (idLimit - idStart);
 }
 
 void IntegerPolyhedron::removeEquality(unsigned pos) {
@@ -214,6 +232,10 @@ unsigned IntegerPolyhedron::getIdKindOffset(IdKind kind) const {
   llvm_unreachable("IdKind expected to be Dimension, Symbol or Local!");
 }
 
+unsigned IntegerPolyhedron::getIdKindEnd(IdKind kind) const {
+  return getIdKindOffset(kind) + getNumIdKind(kind);
+}
+
 unsigned IntegerPolyhedron::getNumIdKind(IdKind kind) const {
   if (kind == IdKind::Dimension)
     return getNumDimIds();
@@ -222,6 +244,21 @@ unsigned IntegerPolyhedron::getNumIdKind(IdKind kind) const {
   if (kind == IdKind::Local)
     return getNumLocalIds();
   llvm_unreachable("IdKind expected to be Dimension, Symbol or Local!");
+}
+
+unsigned IntegerPolyhedron::getIdKindOverlap(IdKind kind, unsigned idStart,
+                                             unsigned idLimit) const {
+  unsigned idRangeStart = getIdKindOffset(kind);
+  unsigned idRangeEnd = getIdKindEnd(kind);
+
+  // Compute number of elements in intersection of the ranges [idStart, idLimit)
+  // and [idRangeStart, idRangeEnd).
+  unsigned overlapStart = std::max(idStart, idRangeStart);
+  unsigned overlapEnd = std::min(idLimit, idRangeEnd);
+
+  if (overlapStart > overlapEnd)
+    return 0;
+  return overlapEnd - overlapStart;
 }
 
 void IntegerPolyhedron::clearConstraints() {
@@ -290,7 +327,8 @@ bool IntegerPolyhedron::hasConsistentState() const {
     return false;
 
   // Catches errors where numDims, numSymbols, numIds aren't consistent.
-  if (numDims > numIds || numSymbols > numIds || numDims + numSymbols > numIds)
+  if (getNumDimIds() > getNumIds() || getNumSymbolIds() > getNumIds() ||
+      getNumDimAndSymbolIds() > getNumIds())
     return false;
 
   return true;
@@ -770,7 +808,7 @@ Optional<SmallVector<int64_t, 8>> IntegerPolyhedron::findIntegerSample() const {
   // 6) Return transform * concat(boundedSample, coneSample).
   SmallVector<int64_t, 8> &sample = boundedSample.getValue();
   sample.append(coneSample.begin(), coneSample.end());
-  return transform.preMultiplyColumn(sample);
+  return transform.postMultiplyWithColumn(sample);
 }
 
 /// Helper to evaluate an affine expression at a point.
@@ -834,15 +872,13 @@ void IntegerPolyhedron::getLocalReprs(
     changed = false;
     for (unsigned i = 0, e = getNumLocalIds(); i < e; ++i) {
       if (!foundRepr[i + divOffset]) {
-        auto res = computeSingleVarRepr(*this, foundRepr, divOffset + i,
-                                        dividends[i], denominators[i]);
-        if (res.kind == ReprKind::Inequality) {
-          foundRepr[i + divOffset] = true;
-          repr[i].kind = ReprKind::Inequality;
-          repr[i].repr.inEqualityPair = {res.repr.inEqualityPair.lowerBoundIdx,
-                                         res.repr.inEqualityPair.upperBoundIdx};
-          changed = true;
-        }
+        MaybeLocalRepr res = computeSingleVarRepr(
+            *this, foundRepr, divOffset + i, dividends[i], denominators[i]);
+        if (!res)
+          continue;
+        foundRepr[i + divOffset] = true;
+        repr[i] = res;
+        changed = true;
       }
     }
   } while (changed);
@@ -850,7 +886,7 @@ void IntegerPolyhedron::getLocalReprs(
   // Set 0 denominator for identifiers for which no division representation
   // could be found.
   for (unsigned i = 0, e = repr.size(); i < e; ++i)
-    if (repr[i].kind == ReprKind::None)
+    if (!repr[i])
       denominators[i] = 0;
 }
 
@@ -884,7 +920,7 @@ void IntegerPolyhedron::gcdTightenInequalities() {
 unsigned IntegerPolyhedron::gaussianEliminateIds(unsigned posStart,
                                                  unsigned posLimit) {
   // Return if identifier positions to eliminate are out of range.
-  assert(posLimit <= numIds);
+  assert(posLimit <= getNumIds());
   assert(hasConsistentState());
 
   if (posStart >= posLimit)
@@ -1090,47 +1126,17 @@ void IntegerPolyhedron::mergeLocalIds(IntegerPolyhedron &other) {
   std::copy(denomsB.begin() + initLocals, denomsB.end(),
             denomsA.begin() + initLocals);
 
-  // Find and merge duplicate divisions.
-  // TODO: Add division normalization to support divisions that differ by
-  // a constant.
-  // TODO: Add division ordering such that a division representation for local
-  // identifier at position `i` only depends on local identifiers at position <
-  // `i`. This would make sure that all divisions depending on other local
-  // variables that can be merged, are merged.
+  // Merge function that merges the local variables in both sets by treating
+  // them as the same identifier.
+  auto merge = [&polyA, &polyB](unsigned i, unsigned j) -> bool {
+    eliminateRedundantLocalId(polyA, i, j);
+    eliminateRedundantLocalId(polyB, i, j);
+    return true;
+  };
+
+  // Merge all divisions by removing duplicate divisions.
   unsigned localOffset = getIdKindOffset(IdKind::Local);
-  for (unsigned i = 0; i < divsA.size(); ++i) {
-    // Check if a division representation exists for the `i^th` local id.
-    if (denomsA[i] == 0)
-      continue;
-    // Check if a division exists which is a duplicate of the division at `i`.
-    for (unsigned j = i + 1; j < divsA.size(); ++j) {
-      // Check if a division representation exists for the `j^th` local id.
-      if (denomsA[j] == 0)
-        continue;
-      // Check if the denominators match.
-      if (denomsA[i] != denomsA[j])
-        continue;
-      // Check if the representations are equal.
-      if (divsA[i] != divsA[j])
-        continue;
-
-      // Merge divisions at position `j` into division at position `i`.
-      eliminateRedundantLocalId(polyA, i, j);
-      eliminateRedundantLocalId(polyB, i, j);
-      for (unsigned k = 0, g = divsA.size(); k < g; ++k) {
-        SmallVector<int64_t, 8> &div = divsA[k];
-        if (denomsA[k] != 0) {
-          div[localOffset + i] += div[localOffset + j];
-          div.erase(div.begin() + localOffset + j);
-        }
-      }
-
-      divsA.erase(divsA.begin() + j);
-      denomsA.erase(denomsA.begin() + j);
-      // Since `j` can never be zero, we do not need to worry about overflows.
-      --j;
-    }
-  }
+  removeDuplicateDivs(divsA, denomsA, localOffset, merge);
 }
 
 /// Removes local variables using equalities. Each equality is checked if it
@@ -1256,7 +1262,7 @@ void IntegerPolyhedron::addLocalFloorDiv(ArrayRef<int64_t> dividend,
 }
 
 void IntegerPolyhedron::setDimSymbolSeparation(unsigned newSymbolCount) {
-  assert(newSymbolCount <= numDims + numSymbols &&
+  assert(newSymbolCount <= getNumDimAndSymbolIds() &&
          "invalid separation position");
   numDims = numDims + numSymbols - newSymbolCount;
   numSymbols = newSymbolCount;
@@ -1927,7 +1933,7 @@ static void getCommonConstraints(const IntegerPolyhedron &a,
 // lower bounds and the max of the upper bounds along each of the dimensions.
 LogicalResult
 IntegerPolyhedron::unionBoundingBox(const IntegerPolyhedron &otherCst) {
-  assert(otherCst.getNumDimIds() == numDims && "dims mismatch");
+  assert(otherCst.getNumDimIds() == getNumDimIds() && "dims mismatch");
   assert(otherCst.getNumLocalIds() == 0 && "local ids not supported here");
   assert(getNumLocalIds() == 0 && "local ids not supported yet here");
 

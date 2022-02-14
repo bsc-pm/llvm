@@ -729,7 +729,7 @@ static void print(OpAsmPrinter &p, WrappingRegionOp op) {
 static ParseResult parsePrettyPrintedRegionOp(OpAsmParser &parser,
                                               OperationState &result) {
 
-  llvm::SMLoc loc = parser.getCurrentLocation();
+  SMLoc loc = parser.getCurrentLocation();
   Location currLocation = parser.getEncodedSourceLoc(loc);
 
   // Parse the operands.
@@ -1119,6 +1119,26 @@ void StringAttrPrettyNameOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
+// ResultTypeWithTraitOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult ResultTypeWithTraitOp::verify() {
+  if ((*this)->getResultTypes()[0].hasTrait<TypeTrait::TestTypeTrait>())
+    return success();
+  return emitError("result type should have trait 'TestTypeTrait'");
+}
+
+//===----------------------------------------------------------------------===//
+// AttrWithTraitOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult AttrWithTraitOp::verify() {
+  if (getAttr().hasTrait<AttributeTrait::TestAttrTrait>())
+    return success();
+  return emitError("'attr' attribute should have trait 'TestAttrTrait'");
+}
+
+//===----------------------------------------------------------------------===//
 // RegionIfOp
 //===----------------------------------------------------------------------===//
 
@@ -1127,15 +1147,15 @@ static void print(OpAsmPrinter &p, RegionIfOp op) {
   p.printOperands(op.getOperands());
   p << ": " << op.getOperandTypes();
   p.printArrowTypeList(op.getResultTypes());
-  p << " then";
+  p << " then ";
   p.printRegion(op.getThenRegion(),
                 /*printEntryBlockArgs=*/true,
                 /*printBlockTerminators=*/true);
-  p << " else";
+  p << " else ";
   p.printRegion(op.getElseRegion(),
                 /*printEntryBlockArgs=*/true,
                 /*printBlockTerminators=*/true);
-  p << " join";
+  p << " join ";
   p.printRegion(op.getJoinRegion(),
                 /*printEntryBlockArgs=*/true,
                 /*printBlockTerminators=*/true);
@@ -1187,6 +1207,34 @@ void RegionIfOp::getSuccessorRegions(
   // The then and else regions are the entry regions of this op.
   regions.push_back(RegionSuccessor(&getThenRegion(), getThenArgs()));
   regions.push_back(RegionSuccessor(&getElseRegion(), getElseArgs()));
+}
+
+void RegionIfOp::getRegionInvocationBounds(
+    ArrayRef<Attribute> operands,
+    SmallVectorImpl<InvocationBounds> &invocationBounds) {
+  // Each region is invoked at most once.
+  invocationBounds.assign(/*NumElts=*/3, /*Elt=*/{0, 1});
+}
+
+//===----------------------------------------------------------------------===//
+// AnyCondOp
+//===----------------------------------------------------------------------===//
+
+void AnyCondOp::getSuccessorRegions(Optional<unsigned> index,
+                                    ArrayRef<Attribute> operands,
+                                    SmallVectorImpl<RegionSuccessor> &regions) {
+  // The parent op branches into the only region, and the region branches back
+  // to the parent op.
+  if (index)
+    regions.emplace_back(&getRegion());
+  else
+    regions.emplace_back(getResults());
+}
+
+void AnyCondOp::getRegionInvocationBounds(
+    ArrayRef<Attribute> operands,
+    SmallVectorImpl<InvocationBounds> &invocationBounds) {
+  invocationBounds.emplace_back(1, 1);
 }
 
 //===----------------------------------------------------------------------===//
