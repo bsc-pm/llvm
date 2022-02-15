@@ -5016,10 +5016,37 @@ kmp_info_t *__kmp_allocate_thread_middle_init(kmp_root_t *root, omp_role_t role,
 		}
 	}
 #endif
+	/* TODO:If a thread different than the master calls the __kmp_set_thread_roles function it can
+	 * have a race condition with the master for the __kmp_threads and __kmp_free_agent_list structures */
+	if(role != OMP_ROLE_FREE_AGENT)
+		return __kmp_allocate_thread_into_thread_pool(new_thr, role, new_gtid);
+	__kmp_allocate_free_agent_thread(new_thr, root, new_gtid, tid);
+	
+	//Place the free agent in the list
+	kmp_info_t **scan;
+	if(__kmp_free_agent_list_insert_pt != NULL)
+		scan = &(__kmp_free_agent_list_insert_pt->th.th_next_free_agent);
+	else
+		scan = CCAST(kmp_info_t **, &__kmp_free_agent_list);
+	for(; (*scan != NULL) && ((*scan)->th.th_info.ds.ds_gtid < new_gtid);
+			scan = &((*scan)->th.th_next_free_agent));
+	TCW_PTR(new_thr->th.th_next_free_agent, *scan);
+	__kmp_free_agent_list_insert_pt = *scan = new_thr;
+	KMP_DEBUG_ASSERT((new_thr->th.th_next_free_agent == NULL) ||
+									 (new_thr->th.th_info.ds.ds_gtid <
+									  new_thr->th.th_next_free_agent->th.th_info.ds.ds_gtid));
+	
+	/*actual fork and creation of the thread*/
+  KF_TRACE(10,
+  				("__kmp_do_middle_initialize: before __kmp_create_worker: %p\n", new_thr));
+	__kmp_create_worker(new_gtid, new_thr, __kmp_stksize);
+  KF_TRACE(10,
+          ("__kmp_do_middle_initialize: after __kmp_create_worker: %p\n", new_thr));
+	KA_TRACE(20,
+					("__kmp_create_free_agent_threads: T#%d forked T#%d\n", __kmp_get_gtid(), new_thr));
+  __kmp_free_agent_active_nth++;
 
-	if(role == OMP_ROLE_FREE_AGENT)
-		return __kmp_allocate_free_agent_thread(new_thr, root, new_gtid, tid);
-	return __kmp_allocate_thread_into_thread_pool(new_thr, role, new_gtid);
+  return new_thr;
 }
 
 /* Reinitialize team for reuse.
@@ -7804,12 +7831,12 @@ static void __kmp_do_middle_initialize(void) {
 		__kmp_allocate_thread_middle_init(root, OMP_ROLE_NONE, i);
 	}
 	/*Create and start the initial free agent threads*/
-	kmp_info_t **insert = CCAST(kmp_info_t **, &__kmp_free_agent_list);
+	//kmp_info_t **insert = CCAST(kmp_info_t **, &__kmp_free_agent_list);
 	for(; i < num_fa; i++){
-		kmp_info_t *new_fa = __kmp_allocate_thread_middle_init(root, OMP_ROLE_FREE_AGENT, i);
-		*insert = new_fa;
+		/*kmp_info_t *new_fa = */__kmp_allocate_thread_middle_init(root, OMP_ROLE_FREE_AGENT, i);
+		/**insert = new_fa;
 		insert = &(new_fa->th.th_next_free_agent);
-		/*actual fork and creation of the thread*/
+		//actual fork and creation of the thread
 		int new_gtid = new_fa->th.th_info.ds.ds_gtid;
     KF_TRACE(
         10, ("__kmp_do_middle_initialize: before __kmp_create_worker: %p\n", new_fa));
@@ -7819,7 +7846,7 @@ static void __kmp_do_middle_initialize(void) {
 	
     KA_TRACE(20, ("__kmp_create_free_agent_threads: T#%d forked T#%d\n", __kmp_get_gtid(),
                   new_gtid));
-    __kmp_free_agent_active_nth++;
+    __kmp_free_agent_active_nth++;*/
   }
 
   //The root team is a serial team, so enable tasking for it
