@@ -1774,6 +1774,17 @@ public:
                                                   EndLoc);
   }
 
+  /// Build a new OmpSs 'ndrange' clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSNdrangeClause(ArrayRef<Expr *> VarList,
+                                     SourceLocation StartLoc,
+                                     SourceLocation LParenLoc,
+                                     SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsNdrangeClause(VarList, StartLoc, LParenLoc, EndLoc);
+  }
+
   /// Build a new OpenMP executable directive.
   ///
   /// By default, performs semantic analysis to build the new statement.
@@ -10961,6 +10972,13 @@ TreeTransform<Derived>::TransformOSSReductionClause(OSSReductionClause *C) {
 
 template <typename Derived>
 OSSClause *
+TreeTransform<Derived>::TransformOSSDeviceClause(OSSDeviceClause *C) {
+  // No need to rebuild this clause, no template-dependent parameters.
+  return C;
+}
+
+template <typename Derived>
+OSSClause *
 TreeTransform<Derived>::TransformOSSSharedClause(OSSSharedClause *C) {
   llvm::SmallVector<Expr *, 16> Vars;
   Vars.reserve(C->varlist_size());
@@ -11001,6 +11019,21 @@ OSSClause *TreeTransform<Derived>::TransformOSSFirstprivateClause(
     Vars.push_back(EVar.get());
   }
   return getDerived().RebuildOSSFirstprivateClause(
+      Vars, C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSNdrangeClause(
+    OSSNdrangeClause *C) {
+  llvm::SmallVector<Expr *, 16> Vars;
+  Vars.reserve(C->varlist_size());
+  for (auto *VE : C->varlists()) {
+    ExprResult EVar = getDerived().TransformExpr(cast<Expr>(VE));
+    if (EVar.isInvalid())
+      return nullptr;
+    Vars.push_back(EVar.get());
+  }
+  return getDerived().RebuildOSSNdrangeClause(
       Vars, C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
 }
 

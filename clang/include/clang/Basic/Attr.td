@@ -3673,6 +3673,9 @@ def OSSTaskDecl : Attr {
     ExprArgument<"IfExpr">, ExprArgument<"FinalExpr">,
     ExprArgument<"CostExpr">, ExprArgument<"PriorityExpr">,
     BoolArgument<"Wait", 0>,
+    EnumArgument<"Device", "DeviceType",
+      ["smp", "cuda", "opencl", "fpga", "unknown"],
+      ["Smp", "Cuda", "Opencl", "Fpga", "Unknown"]>,
     ExprArgument<"OnreadyExpr">,
     VariadicExprArgument<"LabelExprs">,
     // in()
@@ -3688,7 +3691,8 @@ def OSSTaskDecl : Attr {
     VariadicExprArgument<"DepConcurrents">, VariadicExprArgument<"DepCommutatives">,
     VariadicExprArgument<"DepWeakIns">, VariadicExprArgument<"DepWeakOuts">,
     VariadicExprArgument<"DepWeakInouts">,
-    VariadicExprArgument<"DepWeakConcurrents">, VariadicExprArgument<"DepWeakCommutatives">
+    VariadicExprArgument<"DepWeakConcurrents">, VariadicExprArgument<"DepWeakCommutatives">,
+    VariadicExprArgument<"Ndranges">
   ];
   let AdditionalMembers = [{
     void printPrettyPragma(raw_ostream & OS, const PrintingPolicy &Policy)

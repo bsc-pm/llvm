@@ -11600,6 +11600,12 @@ public:
 
   //===--------------------------------------------------------------------===//
   // OmpSs directives and clauses.
+
+  // Used in template instantiation
+  void InstantiateOSSDeclareTaskAttr(
+    const MultiLevelTemplateArgumentList &TemplateArgs,
+    const OSSTaskDeclAttr &Attr, Decl *New);
+
   bool AllowShapings;
   // This RAII manages the scope where we allow array shaping expressions
   class AllowShapingsRAII {
@@ -11740,6 +11746,7 @@ public:
       DeclGroupPtrTy DG,
       Expr *If, Expr *Final, Expr *Cost, Expr *Priority,
       Expr *Onready, bool Wait,
+      unsigned Device, SourceLocation DeviceLoc,
       ArrayRef<Expr *> Labels,
       ArrayRef<Expr *> Ins, ArrayRef<Expr *> Outs, ArrayRef<Expr *> Inouts,
       ArrayRef<Expr *> Concurrents, ArrayRef<Expr *> Commutatives,
@@ -11751,6 +11758,7 @@ public:
       ArrayRef<Expr *> DepWeakIns, ArrayRef<Expr *> DepWeakOuts,
       ArrayRef<Expr *> DepWeakInouts,
       ArrayRef<Expr *> DepWeakConcurrents, ArrayRef<Expr *> DepWeakCommutatives,
+      ArrayRef<Expr *> Ndranges, SourceLocation NdrangeLoc,
       SourceRange SR);
 
   OSSClause *ActOnOmpSsVarListClause(
@@ -11781,6 +11789,13 @@ public:
                                       SourceLocation LParenLoc,
                                       SourceLocation EndLoc);
 
+  /// Called on well-formed 'device' clause.
+  OSSClause *ActOnOmpSsDeviceClause(OmpSsDeviceClauseKind Kind,
+                                      SourceLocation KindLoc,
+                                      SourceLocation StartLoc,
+                                      SourceLocation LParenLoc,
+                                      SourceLocation EndLoc);
+
   /// Called on well-formed 'shared' clause.
   /// isImplicit is used to handle CXXThisExpr generated from the compiler
   OSSClause *ActOnOmpSsSharedClause(ArrayRef<Expr *> Vars,
@@ -11800,6 +11815,12 @@ public:
                                           SourceLocation StartLoc,
                                           SourceLocation LParenLoc,
                                           SourceLocation EndLoc);
+
+  /// Called on well-formed 'ndrange' clause.
+  OSSClause *ActOnOmpSsNdrangeClause(ArrayRef<Expr *> Vars,
+                                     SourceLocation StartLoc,
+                                     SourceLocation LParenLoc,
+                                     SourceLocation EndLoc);
 
   // Checks depend kinds for errors
   // if no errors DepKindsOrdered is like

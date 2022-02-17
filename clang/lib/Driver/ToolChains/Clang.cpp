@@ -5997,7 +5997,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   Args.AddLastArg(CmdArgs, options::OPT_fno_elide_type);
 
   // Forward flags for OmpSs
-  if (Args.getLastArg(options::OPT_fompss)) {
+  if (Args.getLastArg(options::OPT_fompss) && !IsCuda) {
     CmdArgs.push_back("-fompss-2");
   }
 

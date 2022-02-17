@@ -342,6 +342,21 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
   assert(OSSOnreadyEntry->second == LLVMContext::OB_oss_onready &&
          "oss_onready operand bundle id drifted!");
   (void)OSSOnreadyEntry;
+
+  auto *OSSDeviceEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEVICE");
+  assert(OSSDeviceEntry->second == LLVMContext::OB_oss_device &&
+         "oss_device operand bundle id drifted!");
+  (void)OSSDeviceEntry;
+
+  auto *OSSDeviceNdrangeEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEVICE.NDRANGE");
+  assert(OSSDeviceNdrangeEntry->second == LLVMContext::OB_oss_device_ndrange &&
+         "oss_device_ndrange operand bundle id drifted!");
+  (void)OSSDeviceNdrangeEntry;
+
+  auto *OSSDeviceDevFuncEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEVICE.DEVFUNC");
+  assert(OSSDeviceDevFuncEntry->second == LLVMContext::OB_oss_device_dev_func &&
+         "oss_device_dev_func operand bundle id drifted!");
+  (void)OSSDeviceDevFuncEntry;
   // END OmpSs IDs
 
   SyncScope::ID SingleThreadSSID =

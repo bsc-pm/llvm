@@ -82,6 +82,11 @@ unsigned clang::getOmpSsSimpleClauseType(OmpSsClauseKind Kind,
 #define OMPSS_DEPEND_KIND(Name) .Case(#Name, OSSC_DEPEND_##Name)
 #include "clang/Basic/OmpSsKinds.def"
         .Default(OSSC_DEPEND_unknown);
+  case OSSC_device:
+    return llvm::StringSwitch<OmpSsDeviceClauseKind>(Str)
+#define OMPSS_DEVICE_KIND(Name) .Case(#Name, OSSC_DEVICE_##Name)
+#include "clang/Basic/OmpSsKinds.def"
+        .Default(OSSC_DEVICE_unknown);
   case OSSC_unknown:
   case OSSC_if:
   case OSSC_final:
@@ -111,6 +116,7 @@ unsigned clang::getOmpSsSimpleClauseType(OmpSsClauseKind Kind,
   case OSSC_grainsize:
   case OSSC_unroll:
   case OSSC_collapse:
+  case OSSC_ndrange:
     break;
   }
   llvm_unreachable("Invalid OmpSs simple clause kind");
@@ -139,6 +145,16 @@ const char *clang::getOmpSsSimpleClauseTypeName(OmpSsClauseKind Kind,
 #include "clang/Basic/OmpSsKinds.def"
     }
     llvm_unreachable("Invalid OmpSs 'depend' clause type");
+  case OSSC_device:
+    switch (Type) {
+    case OSSC_DEVICE_unknown:
+      return "unknown";
+#define OMPSS_DEVICE_KIND(Name)                                             \
+  case OSSC_DEVICE_##Name:                                                   \
+    return #Name;
+#include "clang/Basic/OmpSsKinds.def"
+    }
+    llvm_unreachable("Invalid OmpSs 'device' clause type");
   case OSSC_unknown:
   case OSSC_if:
   case OSSC_final:
@@ -168,6 +184,7 @@ const char *clang::getOmpSsSimpleClauseTypeName(OmpSsClauseKind Kind,
   case OSSC_grainsize:
   case OSSC_unroll:
   case OSSC_collapse:
+  case OSSC_ndrange:
     break;
   }
   llvm_unreachable("Invalid OmpSs simple clause kind");

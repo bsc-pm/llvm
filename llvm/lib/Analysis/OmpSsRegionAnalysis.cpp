@@ -189,7 +189,7 @@ void DirectiveEnvironment::gatherVLADimsInfo(OperandBundleDef &OB) {
 }
 
 static void gatherDependInfo(
-    ArrayRef<Value *> OBArgs, std::map<Value *, int> &DepSymToIdx,
+    ArrayRef<Value *> OBArgs, std::map<Value *, std::pair<const DependInfo *, int>> &DepSymToIdx,
     DirectiveDependsInfo &DependsInfo, DependInfo &DI, uint64_t Id) {
   DI.DepType = getDependTypeFromId(Id);
 
@@ -214,10 +214,10 @@ static void gatherDependInfo(
   }
 
   if (!DepSymToIdx.count(DI.Base)) {
-    DepSymToIdx[DI.Base] = DepSymToIdx.size();
+    DepSymToIdx[DI.Base] = std::make_pair(&DI, DepSymToIdx.size());
     DependsInfo.NumSymbols++;
   }
-  DI.SymbolIndex = DepSymToIdx[DI.Base];
+  DI.SymbolIndex = DepSymToIdx[DI.Base].second;
 
 }
 
@@ -311,6 +311,26 @@ void DirectiveEnvironment::gatherWaitInfo(OperandBundleDef &OB) {
   assert(!Wait && "Only allowed one OperandBundle with this Id");
   assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
   Wait = OB.inputs()[0];
+}
+
+void DirectiveEnvironment::gatherDeviceInfo(OperandBundleDef &OB) {
+  assert(!DeviceInfo.Kind && "Only allowed one OperandBundle with this Id");
+  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  DeviceInfo.Kind = OB.inputs()[0];
+}
+
+void DirectiveEnvironment::gatherDeviceNdrangeInfo(OperandBundleDef &OB) {
+  assert(DeviceInfo.Ndrange.empty() && "Only allowed one OperandBundle with this Id");
+  DeviceInfo.NumDims = cast<ConstantInt>(OB.inputs()[0])->getSExtValue();
+  for (size_t i = 1; i < OB.input_size(); i++)
+    DeviceInfo.Ndrange.push_back(OB.inputs()[i]);
+}
+
+void DirectiveEnvironment::gatherDeviceDevFuncInfo(OperandBundleDef &OB) {
+  assert(DeviceInfo.DevFuncStringRef.empty() && "Only allowed one OperandBundle with this Id");
+  ConstantDataArray *DevFuncDataArray = cast<ConstantDataArray>(OB.inputs()[0]);
+  assert(DevFuncDataArray->isCString() && "Region text must be a C string");
+  DeviceInfo.DevFuncStringRef = DevFuncDataArray->getAsCString();
 }
 
 void DirectiveEnvironment::gatherCapturedInfo(OperandBundleDef &OB) {
@@ -533,6 +553,21 @@ void DirectiveEnvironment::verifyOnreadyInfo() {
   }
 }
 
+void DirectiveEnvironment::verifyDeviceInfo() {
+  // TODO: add a check for DeviceInfo.Kind != (cuda | opencl)
+  if (!DeviceInfo.Kind && !DeviceInfo.Ndrange.empty())
+    llvm_unreachable("It is expected to have a device kind when used ndrange");
+  if (DeviceInfo.NumDims != 0) {
+    if (DeviceInfo.NumDims < 1 || DeviceInfo.NumDims > 3)
+      llvm_unreachable("Num dimensions is expected to be 1, 2 or 3");
+    if (DeviceInfo.NumDims != DeviceInfo.Ndrange.size() &&
+        2*DeviceInfo.NumDims != DeviceInfo.Ndrange.size())
+      llvm_unreachable("Num dimensions does not match with ndrange list length");
+
+    DeviceInfo.HasLocalSize = (2*DeviceInfo.NumDims) == DeviceInfo.Ndrange.size();
+  }
+}
+
 void DirectiveEnvironment::verifyNonPODInfo() {
   for (const auto &InitMap : NonPODsInfo.Inits) {
     // INIT may only be in private clauses
@@ -624,6 +659,7 @@ void DirectiveEnvironment::verify() {
   verifyCostInfo();
   verifyPriorityInfo();
   verifyOnreadyInfo();
+  verifyDeviceInfo();
   verifyNonPODInfo();
   verifyLoopInfo();
   verifyWhileInfo();
@@ -692,6 +728,15 @@ DirectiveEnvironment::DirectiveEnvironment(const Instruction *I) {
       break;
     case LLVMContext::OB_oss_wait:
       gatherWaitInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_device:
+      gatherDeviceInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_device_ndrange:
+      gatherDeviceNdrangeInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_device_dev_func:
+      gatherDeviceDevFuncInfo(OBDef);
       break;
     case LLVMContext::OB_oss_captured:
       gatherCapturedInfo(OBDef);

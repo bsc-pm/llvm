@@ -187,13 +187,11 @@ struct OmpSs {
         Type *TaskLabelTy = Type::getInt8PtrTy(M.getContext());
         // const char *declaration_source;
         Type *DeclSourceTy = Type::getInt8PtrTy(M.getContext());
-        // void (*run_wrapper)(void *, void *, nanos6_address_translation_entry_t *);
-        Type *RunWrapperFuncTy =
-          FunctionType::get(Type::getVoidTy(M.getContext()),
-                            /*IsVarArgs=*/false)->getPointerTo();
+        // const char *device_function_name;
+        Type *DevFuncTy = Type::getInt8PtrTy(M.getContext());
         instance->Ty->setBody({DeviceTypeIdTy, RunFuncTy,
                               GetConstraintsFuncTy, TaskLabelTy,
-                              DeclSourceTy, RunWrapperFuncTy});
+                              DeclSourceTy, DevFuncTy});
       }
       return *instance.get();
     }
@@ -258,11 +256,24 @@ struct OmpSs {
         Type *IterConditionFuncTy =
           FunctionType::get(Type::getVoidTy(M.getContext()),
                             /*IsVarArgs=*/false)->getPointerTo();
+        // int num_args;
+        Type *NumArgsTy = Type::getInt32Ty(M.getContext());
+        // int *sizeof_table;
+        Type *SizeofTableDataTy =
+          Type::getInt32Ty(M.getContext())->getPointerTo();
+        // int *offset_table;
+        Type *OffsetTableDataTy =
+          Type::getInt32Ty(M.getContext())->getPointerTo();
+        // int *arg_idx_table;
+        Type *ArgIdxTableDataTy =
+          Type::getInt32Ty(M.getContext())->getPointerTo();
 
         instance->Ty->setBody({NumSymbolsTy, RegisterInfoFuncTy, OnreadyActionFuncTy, GetPriorityFuncTy,
                                ImplCountTy, TaskImplInfoTy, DestroyArgsBlockFuncTy,
                                DuplicateArgsBlockFuncTy, ReductInitsFuncTy, ReductCombsFuncTy,
-                               TaskTypeDataTy, IterConditionFuncTy
+                               TaskTypeDataTy, IterConditionFuncTy, NumArgsTy,
+                               SizeofTableDataTy, OffsetTableDataTy,
+                               ArgIdxTableDataTy
                               });
       }
       return *instance.get();
@@ -403,6 +414,9 @@ struct OmpSs {
       return DepCallee;
     }
   };
+
+  // 6 for ndrange and 1 for shm_size
+  const size_t DeviceArgsSize = 7;
 
   // Four each iterator compute the normalized bounds [0, ub) handling
   // outer iterator usage in the current one
@@ -1391,16 +1405,16 @@ struct OmpSs {
   // Rewrites task_args using address_translation
   void translateDep(
       IRBuilder<> &IRBTranslate, IRBuilder<> &IRBReload, const DependInfo *DepInfo, Value *DSA,
-      Value *&UnpackedDSA, Value *AddrTranslationTable,
-      const std::map<Value *, int> &DepSymToIdx) {
+      Value *&UnpackedDSA, Value *AddrTranslationTable, int SymbolIndex) {
 
-    Function *ComputeDepFun = cast<Function>(DepInfo->ComputeDepFun);
-    CallInst *CallComputeDep = IRBTranslate.CreateCall(ComputeDepFun, DepInfo->Args);
-    llvm::Value *DepBase = IRBTranslate.CreateExtractValue(CallComputeDep, 0);
+    llvm::Value *DepBase = UnpackedDSA;
+    if (!isa<LoadInst>(UnpackedDSA))
+      DepBase = IRBTranslate.CreateLoad(
+        DepBase->getType()->getPointerElementType(), DepBase);
 
     Value *Idx[2];
     Idx[0] = ConstantInt::get(Type::getInt32Ty(
-      IRBTranslate.getContext()), DepSymToIdx.at(DSA));
+      IRBTranslate.getContext()), SymbolIndex);
     Idx[1] = Constant::getNullValue(Type::getInt32Ty(IRBTranslate.getContext()));
     Value *LocalAddr = IRBTranslate.CreateGEP(
         AddrTranslationTable->getType()->getPointerElementType(),
@@ -1425,7 +1439,7 @@ struct OmpSs {
         IRBTranslate.CreateGEP(Translation->getType()->getPointerElementType(),
                                Translation, DeviceAddr);
 
-    // Store the translation in task_args
+    // Store the translation
     if (auto *LUnpackedDSA = dyn_cast<LoadInst>(UnpackedDSA)) {
       Translation = IRBTranslate.CreateBitCast(Translation, LUnpackedDSA->getType());
       IRBTranslate.CreateStore(Translation, LUnpackedDSA->getPointerOperand());
@@ -1516,36 +1530,39 @@ struct OmpSs {
 
   // task_args cannot be modified. This function creates
   // new variables where the translation is performed.
-  static void dupTranlationNeededArgs(
-      IRBuilder<> &IRBEntry, const DirectiveDependsInfo &DependsInfo,
+  void dupTranlationNeededArgs(
+      IRBuilder<> &IRBEntry,
+      const std::map<Value *, std::pair<const DependInfo *, int>> &DepSymToIdx,
       const MapVector<Value *, size_t> &StructToIdxMap,
-      SmallVector<Value *, 4> &UnpackParams) {
+      SmallVector<Value *, 4> &UnpackParams,
+      bool HasDevice) {
 
-    for (auto &DepInfo : DependsInfo.List) {
-      if (DepInfo->isReduction()) {
-        Value *DepBaseDSA = DepInfo->Base;
-        size_t Idx = StructToIdxMap.lookup(DepBaseDSA);
-        Value *UnpackedDSA = UnpackParams[Idx];
-        if (auto *LUnpackedDSA = dyn_cast<LoadInst>(UnpackedDSA)) {
-          Value *NewDepBaseDSA =
-            IRBEntry.CreateAlloca(
-              LUnpackedDSA->getType(), nullptr, "tlate." + LUnpackedDSA->getName());
-          IRBEntry.CreateStore(LUnpackedDSA, NewDepBaseDSA);
+    for (const auto &p : DepSymToIdx) {
+      Value *DepBaseDSA = p.first;
+      const DependInfo *DI = p.second.first;
+      size_t Idx = StructToIdxMap.lookup(DepBaseDSA);
+      if (HasDevice)
+        Idx -= DeviceArgsSize;
+      Value *UnpackedDSA = UnpackParams[Idx];
+      if (auto *LUnpackedDSA = dyn_cast<LoadInst>(UnpackedDSA)) {
+        Value *NewDepBaseDSA =
+          IRBEntry.CreateAlloca(
+            LUnpackedDSA->getType(), nullptr, "tlate." + LUnpackedDSA->getName());
+        IRBEntry.CreateStore(LUnpackedDSA, NewDepBaseDSA);
 
-          UnpackParams[Idx] =
-            IRBEntry.CreateLoad(LUnpackedDSA->getType(), NewDepBaseDSA);
-        } else {
-          Value *NewDepBaseDSA =
-            IRBEntry.CreateAlloca(
-              UnpackedDSA->getType()->getPointerElementType(),
-              nullptr, "tlate." + UnpackedDSA->getName());
-          IRBEntry.CreateStore(
-            IRBEntry.CreateLoad(
-              UnpackedDSA->getType()->getPointerElementType(), UnpackedDSA),
-            NewDepBaseDSA);
+        UnpackParams[Idx] =
+          IRBEntry.CreateLoad(LUnpackedDSA->getType(), NewDepBaseDSA);
+      } else {
+        Value *NewDepBaseDSA =
+          IRBEntry.CreateAlloca(
+            UnpackedDSA->getType()->getPointerElementType(),
+            nullptr, "tlate." + UnpackedDSA->getName());
+        IRBEntry.CreateStore(
+          IRBEntry.CreateLoad(
+            UnpackedDSA->getType()->getPointerElementType(), UnpackedDSA),
+          NewDepBaseDSA);
 
-          UnpackParams[Idx] = NewDepBaseDSA;
-        }
+        UnpackParams[Idx] = NewDepBaseDSA;
       }
     }
   }
@@ -1599,20 +1616,26 @@ struct OmpSs {
       IRBIfThen.SetInsertPoint(IfThenBB->getTerminator());
       IRBIfEnd.SetInsertPoint(IfEndBB->getTerminator());
 
-      dupTranlationNeededArgs(IRBEntry, DependsInfo, StructToIdxMap, UnpackParams);
+      bool HasDevice = !DirInfo.DirEnv.DeviceInfo.empty();
+
+      dupTranlationNeededArgs(
+          IRBEntry, DirInfo.DirEnv.DepSymToIdx, StructToIdxMap, UnpackParams, HasDevice);
 
       SmallVector<Value *, 4> UnpackParamsCopy(UnpackParams);
 
-      for (auto &DepInfo : DependsInfo.List) {
-        if (DepInfo->isReduction()) {
-          Value *DepBaseDSA = DepInfo->Base;
-          size_t Idx = StructToIdxMap.lookup(DepBaseDSA);
-          Value *&UnpackedDSA = UnpackParams[Idx];
-          translateDep(
-            IRBIfThen, IRBIfEnd, DepInfo.get(), DepBaseDSA,
-            UnpackedDSA,
-            AddrTranslationTable, DirInfo.DirEnv.DepSymToIdx);
-        }
+      for (const auto &p : DirInfo.DirEnv.DepSymToIdx) {
+        Value *DepBaseDSA = p.first;
+        const DependInfo *DI = p.second.first;
+        int SymbolIndex = p.second.second;
+
+        size_t Idx = StructToIdxMap.lookup(DepBaseDSA);
+        if (HasDevice)
+          Idx -= DeviceArgsSize;
+
+        translateDep(
+          IRBIfThen, IRBIfEnd, DI, DepBaseDSA,
+          UnpackParams[Idx],
+          AddrTranslationTable, SymbolIndex);
       }
       // Replaces dsa uses by unpacked values
       for (Instruction &I : *IfThenBB) {
@@ -1874,15 +1897,36 @@ struct OmpSs {
   StructType *createTaskArgsType(Module &M,
                                  const DirectiveInfo &DirInfo,
                                  MapVector<Value *, size_t> &StructToIdxMap, StringRef Str) {
-
     const DirectiveEnvironment &DirEnv = DirInfo.DirEnv;
     const DirectiveDSAInfo &DSAInfo = DirEnv.DSAInfo;
     const DirectiveCapturedInfo &CapturedInfo = DirEnv.CapturedInfo;
     const DirectiveVLADimsInfo &VLADimsInfo = DirEnv.VLADimsInfo;
-    // Private and Firstprivate must be stored in the struct
-    // Captured values (i.e. VLA dimensions) are not pointers
+    const DirectiveDeviceInfo &DeviceInfo = DirEnv.DeviceInfo;
     SmallVector<Type *, 4> TaskArgsMemberTy;
     size_t TaskArgsIdx = 0;
+
+    if (!DeviceInfo.empty()) {
+      // Add device info
+
+      // size_t global_size0;
+      // ...
+      // size_t global_sizeN-1;
+
+      // size_t local_size0;
+      // ...
+      // size_t local_sizeN-1;
+      const size_t FullNdrangeLength = 6;
+      for (size_t i = 0; i < FullNdrangeLength; ++i) {
+        TaskArgsMemberTy.push_back(Type::getInt64Ty(M.getContext()));
+        TaskArgsIdx++;
+      }
+      // size_t shm_size;
+      TaskArgsMemberTy.push_back(Type::getInt64Ty(M.getContext()));
+      TaskArgsIdx++;
+    }
+
+    // Private and Firstprivate must be stored in the struct
+    // Captured values (i.e. VLA dimensions) are not pointers
     for (Value *V : DSAInfo.Shared) {
       TaskArgsMemberTy.push_back(V->getType());
       StructToIdxMap[V] = TaskArgsIdx++;
@@ -1909,6 +1953,104 @@ struct OmpSs {
       StructToIdxMap[V] = TaskArgsIdx++;
     }
     return StructType::create(M.getContext(), TaskArgsMemberTy, Str);
+  }
+
+  // Useful to get lists of info needed for creating functions, assign
+  // names to the values and so on.
+  // Also computes the list of sizeofs and offsets for the members
+  // needed for devices.
+  void getTaskArgsInfo(
+      const DirectiveEnvironment &DirEnv,
+      Module &M, Function &F,
+      const MapVector<Value *, size_t> &TaskArgsToStructIdxMap,
+      size_t taskNum, StructType *TaskArgsTy,
+      SmallVector<Type *, 4> &TaskTypeList, SmallVector<StringRef, 4> &TaskNameList,
+      GlobalVariable *&SizeofTableVar, GlobalVariable *&OffsetTableVar,
+      GlobalVariable *&ArgIdxTableVar) {
+
+    const DirectiveDeviceInfo &DeviceInfo = DirEnv.DeviceInfo;
+
+    for (auto It = TaskArgsToStructIdxMap.begin();
+           It != TaskArgsToStructIdxMap.end(); ++It) {
+      Value *V = It->first;
+      TaskTypeList.push_back(V->getType());
+      TaskNameList.push_back(V->getName());
+    }
+
+    // int *sizeof_table;
+    Type *SizeofTableTy = Nanos6TaskInfo::getInstance(M).getType()->getElementType(13);
+    SizeofTableVar =
+      cast<GlobalVariable>(M.getOrInsertGlobal(
+        ("sizeof_table_var_" + F.getName() + Twine(taskNum)).str(),
+        ArrayType::get(SizeofTableTy->getPointerElementType(), TaskTypeList.size())));
+    SizeofTableVar->setLinkage(GlobalVariable::InternalLinkage);
+    SizeofTableVar->setAlignment(Align(64));
+    SizeofTableVar->setConstant(true);
+    SmallVector<Constant *, 4> TaskSizeofList;
+    // TODO: Do this in a clever way. Remove the device elements
+    ArrayRef<Type *> TaskElementTypes = TaskArgsTy->elements();
+    if (!DeviceInfo.empty())
+      TaskElementTypes = TaskElementTypes.drop_front(DeviceArgsSize);
+    for (Type *Ty : TaskElementTypes) {
+      TaskSizeofList.push_back(
+        ConstantInt::get(
+          SizeofTableTy->getPointerElementType(),
+          M.getDataLayout().getTypeStoreSize(Ty).getFixedSize()));
+    }
+    SizeofTableVar->setInitializer(
+      ConstantArray::get(
+        ArrayType::get(SizeofTableTy->getPointerElementType(), TaskTypeList.size()),
+        TaskSizeofList));
+
+    // int *offset_table;
+    Type *OffsetTableTy = Nanos6TaskInfo::getInstance(M).getType()->getElementType(14);
+    OffsetTableVar =
+      cast<GlobalVariable>(M.getOrInsertGlobal(
+        ("offset_table_var_" + F.getName() + Twine(taskNum)).str(),
+        ArrayType::get(OffsetTableTy->getPointerElementType(), TaskTypeList.size())));
+    OffsetTableVar->setLinkage(GlobalVariable::InternalLinkage);
+    OffsetTableVar->setAlignment(Align(64));
+    OffsetTableVar->setConstant(true);
+    ArrayRef<uint64_t> MemberOffsetsList =
+      M.getDataLayout().getStructLayout(TaskArgsTy)->getMemberOffsets();
+    if (!DeviceInfo.empty())
+      MemberOffsetsList = MemberOffsetsList.drop_front(DeviceArgsSize);
+    SmallVector<Constant *, 4> TaskOffsetList;
+    for (const uint64_t &val : MemberOffsetsList) {
+      TaskOffsetList.push_back(
+        ConstantInt::get(
+          OffsetTableTy->getPointerElementType(), val));
+    }
+    OffsetTableVar->setInitializer(
+      ConstantArray::get(
+        ArrayType::get(OffsetTableTy->getPointerElementType(), TaskTypeList.size()),
+        TaskOffsetList));
+
+    // int *arg_idx_table;
+    Type *ArgIdxTableTy = Nanos6TaskInfo::getInstance(M).getType()->getElementType(15);
+    ArgIdxTableVar =
+      cast<GlobalVariable>(M.getOrInsertGlobal(
+        ("arg_idx_table_var_" + F.getName() + Twine(taskNum)).str(),
+        ArrayType::get(ArgIdxTableTy->getPointerElementType(), DirEnv.DependsInfo.NumSymbols)));
+    ArgIdxTableVar->setLinkage(GlobalVariable::InternalLinkage);
+    ArgIdxTableVar->setAlignment(Align(64));
+    ArgIdxTableVar->setConstant(true);
+    SmallVector<Constant *, 4> TaskArgIdxList(DirEnv.DependsInfo.NumSymbols);
+    for (const auto &p : DirEnv.DepSymToIdx) {
+      Value *DepBase = p.first;
+      int SymbolIndex = p.second.second;
+      int Idx = TaskArgsToStructIdxMap.lookup(DepBase);
+      if (!DeviceInfo.empty())
+        Idx -= DeviceArgsSize;
+      TaskArgIdxList[SymbolIndex] =
+        ConstantInt::get(
+          ArgIdxTableTy->getPointerElementType(),
+          Idx);
+    }
+    ArgIdxTableVar->setInitializer(
+      ConstantArray::get(
+        ArrayType::get(ArgIdxTableTy->getPointerElementType(), DirEnv.DependsInfo.NumSymbols),
+        TaskArgIdxList));
   }
 
   struct VLAAlign {
@@ -2188,13 +2330,33 @@ struct OmpSs {
         Instruction *OrigExitI = DirInfo.Exit;
         Instruction *CloneEntryI = cast<Instruction>(FinalInfo[i].lookup(OrigEntryI));
         Instruction *CloneExitI = cast<Instruction>(FinalInfo[i].lookup(OrigExitI));
+
+        bool IsDeviceWithNdrange =
+          !DirEnv.DeviceInfo.empty()
+            && !DirEnv.DeviceInfo.Ndrange.empty();
+        if (IsDeviceWithNdrange)
+          lowerTaskImpl(DirInfo, F, 666, M, CloneEntryI, CloneExitI);
+
         CloneExitI->eraseFromParent();
         CloneEntryI->eraseFromParent();
         for (size_t j = 0; j < DirInfo.InnerDirectiveInfos.size(); ++j) {
-          OrigEntryI = DirInfo.InnerDirectiveInfos[j]->Entry;
-          OrigExitI = DirInfo.InnerDirectiveInfos[j]->Exit;
+          DirectiveInfo &InnerDirInfo = *DirInfo.InnerDirectiveInfos[j];
+
+          OrigEntryI = InnerDirInfo.Entry;
+          OrigExitI = InnerDirInfo.Exit;
           CloneEntryI = cast<Instruction>(FinalInfo[i].lookup(OrigEntryI));
           CloneExitI = cast<Instruction>(FinalInfo[i].lookup(OrigExitI));
+
+          bool IsDeviceWithNdrange =
+            !InnerDirInfo.DirEnv.DeviceInfo.empty()
+              && !InnerDirInfo.DirEnv.DeviceInfo.Ndrange.empty();
+          if (IsDeviceWithNdrange) {
+            llvm::Value *TmpIf = InnerDirInfo.DirEnv.If;
+            InnerDirInfo.DirEnv.If = ConstantInt::getFalse(M.getContext());
+            lowerTaskImpl(InnerDirInfo, F, 666, M, CloneEntryI, CloneExitI);
+            InnerDirInfo.DirEnv.If = TmpIf;
+          }
+
           CloneExitI->eraseFromParent();
           CloneEntryI->eraseFromParent();
         }
@@ -2680,29 +2842,39 @@ struct OmpSs {
     buildLoopForTaskImpl(M, F, DirInfo.Entry, DirInfo.Exit, NewLoopInfo, NewEntryI, NewExitI, CollapseStuff);
   }
 
-  void lowerTask(const DirectiveInfo &DirInfo,
-                 Function &F,
-                 size_t taskNum,
-                 Module &M) {
+  void lowerTaskImpl(
+      const DirectiveInfo &DirInfo, Function &F,
+      size_t taskNum, Module &M,
+      Instruction *CloneEntry, Instruction *CloneExit) {
+
+    Instruction *Entry = DirInfo.Entry;
+    Instruction *Exit = DirInfo.Exit;
+    if (CloneEntry && CloneExit) {
+      Entry = CloneEntry;
+      Exit = CloneExit;
+    }
 
     const DirectiveEnvironment &DirEnv = DirInfo.DirEnv;
     const DirectiveLoopInfo &LoopInfo = DirInfo.DirEnv.LoopInfo;
 
-    DebugLoc DLoc = DirInfo.Entry->getDebugLoc();
+    DebugLoc DLoc = Entry->getDebugLoc();
     unsigned Line = DLoc.getLine();
     unsigned Col = DLoc.getCol();
     std::string FileNamePlusLoc = (M.getSourceFileName()
                                    + ":" + Twine(Line)
                                    + ":" + Twine(Col)).str();
 
-    Constant *Nanos6TaskLocStr = IRBuilder<>(DirInfo.Entry).CreateGlobalStringPtr(FileNamePlusLoc);
+    Constant *Nanos6TaskLocStr = IRBuilder<>(Entry).CreateGlobalStringPtr(FileNamePlusLoc);
     Constant *Nanos6TaskDeclSourceStr = nullptr;
     if (!DirEnv.DeclSourceStringRef.empty())
-      Nanos6TaskDeclSourceStr = IRBuilder<>(DirInfo.Entry).CreateGlobalStringPtr(DirEnv.DeclSourceStringRef);
+      Nanos6TaskDeclSourceStr = IRBuilder<>(Entry).CreateGlobalStringPtr(DirEnv.DeclSourceStringRef);
+    Constant *Nanos6TaskDevFuncStr = nullptr;
+    if (!DirEnv.DeviceInfo.DevFuncStringRef.empty())
+      Nanos6TaskDevFuncStr = IRBuilder<>(Entry).CreateGlobalStringPtr(DirEnv.DeviceInfo.DevFuncStringRef);
 
     // In loop constructs this will be the starting loop BB
-    Instruction *NewEntryI = DirInfo.Entry;
-    Instruction *NewExitI = &DirInfo.Exit->getParent()->getUniqueSuccessor()->front();
+    Instruction *NewEntryI = Entry;
+    Instruction *NewExitI = &Exit->getParent()->getUniqueSuccessor()->front();
 
     // Create nanos6_task_args_* START
     SmallVector<Type *, 4> TaskArgsMemberTy;
@@ -2713,13 +2885,14 @@ struct OmpSs {
 
     SmallVector<Type *, 4> TaskTypeList;
     SmallVector<StringRef, 4> TaskNameList;
-    for (auto It = TaskArgsToStructIdxMap.begin();
-           It != TaskArgsToStructIdxMap.end(); ++It) {
-      Value *V = It->first;
-      TaskTypeList.push_back(V->getType());
-      TaskNameList.push_back(V->getName());
-    }
+    GlobalVariable *SizeofTableVar = nullptr;
+    GlobalVariable *OffsetTableVar = nullptr;
+    GlobalVariable *ArgIdxTableVar = nullptr;
 
+    getTaskArgsInfo(
+      DirEnv, M, F, TaskArgsToStructIdxMap, taskNum, TaskArgsTy, TaskTypeList, TaskNameList,
+      SizeofTableVar, OffsetTableVar, ArgIdxTableVar);
+   
     Function *OlDestroyArgsFuncVar =
       createDestroyArgsOlFunc(M, F, taskNum, TaskArgsToStructIdxMap, TaskArgsTy, DirInfo, TaskTypeList, TaskNameList);
 
@@ -2791,7 +2964,9 @@ struct OmpSs {
     TaskImplInfoVar->setInitializer(
       ConstantArray::get(ArrayType::get(Nanos6TaskImplInfo::getInstance(M).getType(), 1), // TODO: More than one implementations?
         ConstantStruct::get(Nanos6TaskImplInfo::getInstance(M).getType(),
-        ConstantInt::get(Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(0), 0),
+        DirEnv.DeviceInfo.Kind
+          ? cast<Constant>(DirEnv.DeviceInfo.Kind)
+          : ConstantInt::get(Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(0), 0),
         ConstantExpr::getPointerCast(OlTaskFuncVar, Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(1)),
         OlConstraintsFuncVar
           ? ConstantExpr::getPointerCast(OlConstraintsFuncVar,
@@ -2802,7 +2977,11 @@ struct OmpSs {
                                          Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(3))
           : ConstantPointerNull::get(cast<PointerType>(Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(3))),
         Nanos6TaskDeclSourceStr ? Nanos6TaskDeclSourceStr : Nanos6TaskLocStr,
-        ConstantPointerNull::get(cast<PointerType>(Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(5))))));
+        // Set device_function_name only in case of task pure device
+        // in order to let nanos6 identify them
+        (Nanos6TaskDevFuncStr && !DirEnv.DeviceInfo.Ndrange.empty())
+          ? Nanos6TaskDevFuncStr
+          : ConstantPointerNull::get(Type::getInt8PtrTy(M.getContext())))));
 
 
     GlobalVariable *TaskRedInitsVar =
@@ -2887,14 +3066,21 @@ struct OmpSs {
       OlTaskIterWhileCondFuncVar
         ? ConstantExpr::getPointerCast(OlTaskIterWhileCondFuncVar,
                                        Nanos6TaskInfo::getInstance(M).getType()->getElementType(11))
-        : ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(11)))));
+        : ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(11))),
+      ConstantInt::get(Nanos6TaskInfo::getInstance(M).getType()->getElementType(12), TaskTypeList.size()),
+      ConstantExpr::getPointerCast(SizeofTableVar,
+                                   Nanos6TaskInfo::getInstance(M).getType()->getElementType(13)),
+      ConstantExpr::getPointerCast(OffsetTableVar,
+                                   Nanos6TaskInfo::getInstance(M).getType()->getElementType(14)),
+      ConstantExpr::getPointerCast(ArgIdxTableVar,
+                                   Nanos6TaskInfo::getInstance(M).getType()->getElementType(15))));
 
     registerTaskInfo(M, TaskInfoVar);
 
     auto rewriteUsesBrAndGetOmpSsUnpackFunc
       = [&M, &LoopInfo, &DirInfo, &NewLoopInfo,
          &NormalizedUBs, &CollapseStuff, &UnpackTaskFuncVar, &TaskArgsToStructIdxMap,
-         this]
+         this, Entry, Exit]
            (BasicBlock *header, BasicBlock *newRootNode, BasicBlock *newHeader,
             Function *oldFunction, const SetVector<BasicBlock *> &Blocks) {
       const DirectiveEnvironment &DirEnv = DirInfo.DirEnv;
@@ -2940,10 +3126,10 @@ struct OmpSs {
         // BodyIndVar(i) = (TMP * Step) + OrigLBound
         Value *NormVal = nullptr;
         for (size_t i = 0; i < LoopInfo.LBound.size(); ++i) {
-          Instruction *Entry = &DirInfo.Entry->getParent()->front();
-          Entry = CollapseStuff[i];
+          Instruction *TmpEntry = &Entry->getParent()->front();
+          TmpEntry = CollapseStuff[i];
 
-          IRBuilder<> LoopBodyIRB(Entry);
+          IRBuilder<> LoopBodyIRB(TmpEntry);
           if (!i)
             NormVal = LoopBodyIRB.CreateLoad(
                 NewLoopInfo.IndVar[0]->getType()->getPointerElementType(),
@@ -3047,14 +3233,14 @@ struct OmpSs {
             }
 
             // The IncrBB is the successor of BodyBB
-            BasicBlock *BodyBB = DirInfo.Exit->getParent();
+            BasicBlock *BodyBB = Exit->getParent();
             Instruction *IncrBBI = &BodyBB->getUniqueSuccessor()->front();
 
             // Next iterator computation or BodyBB
             BasicBlock *NextBB = CollapseStuff[i]->getParent()->getUniqueSuccessor();
 
             // Replace the branch
-            Instruction *Terminator = Entry->getParent()->getTerminator();
+            Instruction *Terminator = TmpEntry->getParent()->getTerminator();
             LoopBodyIRB.SetInsertPoint(Terminator);
             LoopBodyIRB.CreateCondBr(LoopCmp, NextBB, IncrBBI->getParent());
             Terminator->eraseFromParent();
@@ -3107,6 +3293,7 @@ struct OmpSs {
       const DirectiveCapturedInfo &CapturedInfo = DirEnv.CapturedInfo;
       const DirectiveDependsInfo &DependsInfo = DirEnv.DependsInfo;
       const DirectiveLoopInfo &LoopInfo = DirEnv.LoopInfo;
+      const DirectiveDeviceInfo &DeviceInfo = DirEnv.DeviceInfo;
 
       IRBuilder<> IRB(codeReplacer);
       // Set debug info from the task entry to all instructions
@@ -3283,6 +3470,47 @@ struct OmpSs {
       SmallVector<VLAAlign, 2> VLAAlignsInfo;
       computeVLAsAlignOrder(M, VLAAlignsInfo, VLADimsInfo);
 
+      // TODO: is this a good place to put this?
+      if (!DeviceInfo.empty()) {
+        int DevGEPIdx = 0;
+        // Add device info
+        Value *Idx[2], *GEP;
+        Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
+        // size_t global_size0;
+        // ...
+        // size_t global_sizeN-1;
+
+        // size_t local_size0;
+        // ...
+        // size_t local_sizeN-1;
+        const size_t PartNdrangeLength = 3;
+        const size_t NdrangeLength =
+          DeviceInfo.HasLocalSize ? DeviceInfo.Ndrange.size()/2 : DeviceInfo.Ndrange.size();
+        for (size_t j = 0; j < 2; ++j) {
+          for (size_t i = 0; i < PartNdrangeLength; ++i) {
+            Idx[1] = ConstantInt::get(IRB.getInt32Ty(), DevGEPIdx++);
+            GEP = IRB.CreateGEP(
+                TaskArgsVarL->getType()->getPointerElementType(),
+                TaskArgsVarL, Idx, ("gep_dev_ndrange" + Twine(i)).str());
+            Value *V = ConstantInt::get(IRB.getInt64Ty(), -1);
+            if (j <= DeviceInfo.HasLocalSize && i < NdrangeLength)
+              V = createZSExtOrTrunc(
+                IRB, DeviceInfo.Ndrange[NdrangeLength*j + i],
+                IRB.getInt64Ty(), /*Signed=*/false);
+
+            IRB.CreateStore(V, GEP);
+          }
+        }
+        // size_t shm_size;
+        Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
+        Idx[1] = ConstantInt::get(IRB.getInt32Ty(), DevGEPIdx++);
+        GEP = IRB.CreateGEP(
+            TaskArgsVarL->getType()->getPointerElementType(),
+            TaskArgsVarL, Idx, "gep_dev_shm");
+        IRB.CreateStore(
+          ConstantInt::get(IRB.getInt64Ty(), 0), GEP);
+      }
+
       // First point VLAs to its according space in task args
       for (const auto& VAlign : VLAAlignsInfo) {
         auto *V = VAlign.V;
@@ -3440,10 +3668,22 @@ struct OmpSs {
     CodeExtractor CE(TaskBBs1, rewriteUsesBrAndGetOmpSsUnpackFunc, emitOmpSsCaptureAndSubmitTask, valueInUnpackParams);
     CE.extractCodeRegion(CEAC);
 
-    DirInfo.Exit->eraseFromParent();
-    DirInfo.Entry->eraseFromParent();
     // FIXME: CollapseStuff should be local to task
     CollapseStuff.clear();
+  }
+
+  void lowerTask(
+      const DirectiveInfo &DirInfo, Function &F,
+      size_t taskNum, Module &M) {
+
+    Instruction *CloneEntry = nullptr;
+    Instruction *CloneExit = nullptr;
+
+    lowerTaskImpl(
+      DirInfo, F, taskNum, M, CloneEntry, CloneEntry);
+
+    DirInfo.Exit->eraseFromParent();
+    DirInfo.Entry->eraseFromParent();
   }
 
   void buildNanos6Types(Module &M) {

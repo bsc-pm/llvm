@@ -197,3 +197,19 @@ OSSReductionClause *OSSReductionClause::CreateEmpty(const ASTContext &C,
   return new (Mem) OSSReductionClause(N);
 }
 
+OSSNdrangeClause *OSSNdrangeClause::Create(const ASTContext &C,
+                                         SourceLocation StartLoc,
+                                         SourceLocation LParenLoc,
+                                         SourceLocation EndLoc,
+                                         ArrayRef<Expr *> VL) {
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(VL.size()));
+  OSSNdrangeClause *Clause =
+      new (Mem) OSSNdrangeClause(StartLoc, LParenLoc, EndLoc, VL.size());
+  Clause->setVarRefs(VL);
+  return Clause;
+}
+
+OSSNdrangeClause *OSSNdrangeClause::CreateEmpty(const ASTContext &C, unsigned N) {
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(N));
+  return new (Mem) OSSNdrangeClause(N);
+}

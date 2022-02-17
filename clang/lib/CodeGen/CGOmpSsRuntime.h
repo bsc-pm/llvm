@@ -97,10 +97,20 @@ struct OSSTaskReductionDataTy final {
   }
 };
 
+struct OSSTaskDeviceDataTy final {
+  OmpSsDeviceClauseKind DvKind = OSSC_DEVICE_unknown;
+  SmallVector<const Expr *, 4> Ndranges;
+
+  bool empty() const {
+    return DvKind == OSSC_DEVICE_unknown && Ndranges.empty();
+  }
+};
+
 struct OSSTaskDataTy final {
   OSSTaskDSADataTy DSAs;
   OSSTaskDepDataTy Deps;
   OSSTaskReductionDataTy Reductions;
+  OSSTaskDeviceDataTy Devices;
   const Expr *If = nullptr;
   const Expr *Final = nullptr;
   const Expr *Cost = nullptr;

@@ -146,6 +146,9 @@ public:
     OB_oss_multidep_range_weakcommutative = 56,   // "OB_oss_multidep_range_weakcommutative"
     OB_oss_decl_source = 57,                      // "OB_oss_decl_source"
     OB_oss_onready = 58,                          // "OB_oss_onready"
+    OB_oss_device = 59,                           // "OB_oss_device"
+    OB_oss_device_ndrange = 60,                   // "OB_oss_device_ndrange"
+    OB_oss_device_dev_func = 61,                  // "OB_oss_device_dev_func"
   };
 
   /// getMDKindID - Return a unique non-zero ID for the specified metadata kind.

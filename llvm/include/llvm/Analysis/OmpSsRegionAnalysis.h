@@ -152,6 +152,20 @@ struct DirectiveOnreadyInfo {
   SmallVector<Value *, 4> Args;
 };
 
+struct DirectiveDeviceInfo {
+  Value *Kind = nullptr;
+  // The arguments of the call to function.
+  int64_t NumDims = 0;
+  SmallVector<Value *, 4> Ndrange;
+  bool HasLocalSize = true;
+  StringRef DevFuncStringRef;
+  bool empty() const {
+    // Not set or set to smp → 0
+    return !Kind
+      || cast<ConstantInt>(Kind)->getSExtValue() == 0;
+  }
+};
+
 struct DirectiveLoopInfo {
   enum {
     LT, // <
@@ -228,6 +242,7 @@ struct DirectiveEnvironment {
   Value *Label = nullptr;
   Value *InstanceLabel = nullptr;
   Value *Wait = nullptr;
+  DirectiveDeviceInfo DeviceInfo;
   DirectiveCapturedInfo CapturedInfo;
   DirectiveNonPODsInfo NonPODsInfo;
   DirectiveLoopInfo LoopInfo;
@@ -239,7 +254,7 @@ struct DirectiveEnvironment {
   DenseMap<Value *, int> SeenInits;
   int ReductionIndex = 0;
   // Map of Dependency symbols to Index
-  std::map<Value *, int> DepSymToIdx;
+  std::map<Value *, std::pair<const DependInfo *, int>> DepSymToIdx;
 private:
   void gatherDirInfo(OperandBundleDef &OBDef);
   void gatherSharedInfo(OperandBundleDef &OBDef);
@@ -256,6 +271,9 @@ private:
   void gatherLabelInfo(OperandBundleDef &OBDef);
   void gatherOnreadyInfo(OperandBundleDef &OBDef);
   void gatherWaitInfo(OperandBundleDef &OBDef);
+  void gatherDeviceInfo(OperandBundleDef &OBDef);
+  void gatherDeviceNdrangeInfo(OperandBundleDef &OBDef);
+  void gatherDeviceDevFuncInfo(OperandBundleDef &OBDef);
   void gatherCapturedInfo(OperandBundleDef &OBDef);
   void gatherNonPODInitInfo(OperandBundleDef &OBDef);
   void gatherNonPODDeinitInfo(OperandBundleDef &OBDef);
@@ -279,6 +297,7 @@ private:
   void verifyCostInfo();
   void verifyPriorityInfo();
   void verifyOnreadyInfo();
+  void verifyDeviceInfo();
   void verifyNonPODInfo();
   void verifyLoopInfo();
   void verifyWhileInfo();

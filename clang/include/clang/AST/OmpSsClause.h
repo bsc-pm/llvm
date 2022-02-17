@@ -1475,6 +1475,142 @@ public:
   }
 };
 
+/// This represents 'device' clause in the '#pragma oss ...' directive.
+///
+/// \code
+/// #pragma oss task device(cuda)
+/// \endcode
+/// In this example directive '#pragma oss task' has simple 'device'
+/// clause with kind 'cuda'.
+class OSSDeviceClause : public OSSClause {
+  friend class OSSClauseReader;
+
+  /// Location of '('.
+  SourceLocation LParenLoc;
+
+  /// A kind of the 'device' clause.
+  OmpSsDeviceClauseKind Kind = OSSC_DEVICE_unknown;
+
+  /// Start location of the kind in source code.
+  SourceLocation KindKwLoc;
+
+  /// Set kind of the clauses.
+  ///
+  /// \param K Argument of clause.
+  void setDeviceKind(OmpSsDeviceClauseKind K) { Kind = K; }
+
+  /// Set argument location.
+  ///
+  /// \param KLoc Argument location.
+  void setDeviceKindKwLoc(SourceLocation KLoc) { KindKwLoc = KLoc; }
+
+public:
+  /// Build 'device' clause with argument \a A ('smp' or 'cuda').
+  ///
+  /// \param A Argument of the clause ('none' or 'shared').
+  /// \param ALoc Starting location of the argument.
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param EndLoc Ending location of the clause.
+  OSSDeviceClause(OmpSsDeviceClauseKind A, SourceLocation ALoc,
+                   SourceLocation StartLoc, SourceLocation LParenLoc,
+                   SourceLocation EndLoc)
+      : OSSClause(OSSC_device, StartLoc, EndLoc), LParenLoc(LParenLoc),
+        Kind(A), KindKwLoc(ALoc) {}
+
+  /// Build an empty clause.
+  OSSDeviceClause()
+      : OSSClause(OSSC_device, SourceLocation(), SourceLocation()) {}
+
+  /// Sets the location of '('.
+  void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
+
+  /// Returns the location of '('.
+  SourceLocation getLParenLoc() const { return LParenLoc; }
+
+  /// Returns kind of the clause.
+  OmpSsDeviceClauseKind getDeviceKind() const { return Kind; }
+
+  /// Returns location of clause kind.
+  SourceLocation getDeviceKindKwLoc() const { return KindKwLoc; }
+
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == OSSC_device;
+  }
+};
+
+/// This represents 'ndrange' clause in the
+/// '#pragma oss task' directive.
+///
+/// \code
+/// #pragma oss task ndrange(1, N, 128)
+/// \endcode
+///
+/// The syntax of ndrange is
+/// \code
+///   ndrange(N, global-list, local-list)
+/// \endcode
+/// Each X-list has as much as N elements
+///
+/// In this example directive '#pragma oss task' has simple 'ndrange'
+/// clause with expression 'foo(1, N, 128)'.
+class OSSNdrangeClause final
+    : public OSSVarListClause<OSSNdrangeClause>,
+      private llvm::TrailingObjects<OSSNdrangeClause, Expr *> {
+  friend OSSVarListClause;
+  friend TrailingObjects;
+
+  /// Build clause with number of variables \a N.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param EndLoc Ending location of the clause.
+  /// \param N Number of the variables in the clause.
+  OSSNdrangeClause(SourceLocation StartLoc, SourceLocation LParenLoc,
+                  SourceLocation EndLoc, unsigned N)
+      : OSSVarListClause<OSSNdrangeClause>(OSSC_ndrange, StartLoc, LParenLoc,
+                                          EndLoc, N) {}
+
+  /// Build an empty clause.
+  ///
+  /// \param N Number of variables.
+  explicit OSSNdrangeClause(unsigned N)
+      : OSSVarListClause<OSSNdrangeClause>(OSSC_ndrange, SourceLocation(),
+                                          SourceLocation(), SourceLocation(),
+                                          N) {}
+
+public:
+  /// Creates clause with a list of variables \a VL.
+  ///
+  /// \param C AST context.
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param EndLoc Ending location of the clause.
+  /// \param VL List of references to the variables.
+  static OSSNdrangeClause *Create(const ASTContext &C, SourceLocation StartLoc,
+                                 SourceLocation LParenLoc,
+                                 SourceLocation EndLoc, ArrayRef<Expr *> VL);
+
+  /// Creates an empty clause with \a N variables.
+  ///
+  /// \param C AST context.
+  /// \param N The number of variables.
+  static OSSNdrangeClause *CreateEmpty(const ASTContext &C, unsigned N);
+
+  child_range children() {
+    return child_range(reinterpret_cast<Stmt **>(varlist_begin()),
+                       reinterpret_cast<Stmt **>(varlist_end()));
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == OSSC_ndrange;
+  }
+};
+
 /// This class implements a simple visitor for OSSClause
 /// subclasses.
 template<class ImplClass, template <typename> class Ptr, typename RetTy>

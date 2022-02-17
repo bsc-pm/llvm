@@ -63,6 +63,9 @@ enum OmpSsBundleKind {
   OSSB_unroll,
   OSSB_wait,
   OSSB_update,
+  OSSB_device,
+  OSSB_device_ndrange,
+  OSSB_device_dev_func,
   OSSB_onready,
   OSSB_while_cond,
   OSSB_in,
@@ -149,6 +152,12 @@ const char *getBundleStr(OmpSsBundleKind Kind) {
     return "QUAL.OSS.WAIT";
   case OSSB_update:
     return "QUAL.OSS.LOOP.UPDATE";
+  case OSSB_device:
+    return "QUAL.OSS.DEVICE";
+  case OSSB_device_ndrange:
+    return "QUAL.OSS.DEVICE.NDRANGE";
+  case OSSB_device_dev_func:
+    return "QUAL.OSS.DEVICE.DEVFUNC";
   case OSSB_onready:
     return "QUAL.OSS.ONREADY";
   case OSSB_while_cond:
@@ -2601,6 +2610,21 @@ static void emitMultiDepIterDecls(CodeGenFunction &CGF, const OSSTaskDataTy &Dat
   // TODO: reductions
 }
 
+// NOTE: keep this synchronized with
+// OSSTaskDeclAttr::DeviceType
+// and
+// OmpSsDeviceClauseKind
+static int convertDeviceTypeToInt(int Device) {
+  const int NumDevAttrTypes = 4;
+  const int DevAttrToNanos6Map[NumDevAttrTypes] = {
+    0, // nanos6_host_device
+    1, // nanos6_cuda_device
+    4, // nanos6_opencl_device
+    5, // nanos6_fpga_device
+  };
+  return DevAttrToNanos6Map[Device];
+}
+
 void CGOmpSsRuntime::EmitDirectiveData(
     CodeGenFunction &CGF, const OSSTaskDataTy &Data,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
@@ -2684,12 +2708,10 @@ void CGOmpSsRuntime::EmitDirectiveData(
 
     if (LoopData.Chunksize) {
       llvm::Value *V = CGF.EmitScalarExpr(LoopData.Chunksize);
-      CapturedList.push_back(V);
       TaskInfo.emplace_back(getBundleStr(OSSB_chunksize), V);
     }
     if (LoopData.Grainsize) {
       llvm::Value *V = CGF.EmitScalarExpr(LoopData.Grainsize);
-      CapturedList.push_back(V);
       TaskInfo.emplace_back(getBundleStr(OSSB_grainsize), V);
     }
     if (LoopData.Unroll) {
@@ -2756,6 +2778,12 @@ void CGOmpSsRuntime::EmitDirectiveData(
     TaskInfo.emplace_back(getBundleStr(OSSB_if), CGF.EvaluateExprAsBool(Data.If));
   if (Data.Final)
     TaskInfo.emplace_back(getBundleStr(OSSB_final), CGF.EvaluateExprAsBool(Data.Final));
+  if (!Data.Devices.empty())
+    TaskInfo.emplace_back(
+        getBundleStr(OSSB_device),
+        llvm::ConstantInt::getSigned(
+          CGF.ConvertType(CGF.getContext().IntTy),
+          convertDeviceTypeToInt(Data.Devices.DvKind)));
 }
 
 static void EmitDbgInfo(CodeGenFunction &CGF, CGDebugInfo *DI, const Expr *E) {
@@ -2881,6 +2909,7 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   TaskStack.push_back(TaskContext());
 
   bool IsMethodCall = false;
+  bool HasNdrange = false;
   if (const auto *CXXE = dyn_cast<CXXMemberCallExpr>(CE)) {
     IsMethodCall = true;
     const Expr *callee = CXXE->getCallee()->IgnoreParens();
@@ -2961,6 +2990,29 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       TaskInfo.emplace_back(
           getBundleStr(OSSB_wait),
           llvm::ConstantInt::getTrue(CGM.getLLVMContext()));
+    }
+
+    if (Attr->getDevice() != OSSTaskDeclAttr::DeviceType::Unknown) {
+      TaskInfo.emplace_back(
+          getBundleStr(OSSB_device),
+          llvm::ConstantInt::getSigned(
+            CGF.ConvertType(CGF.getContext().IntTy),
+            convertDeviceTypeToInt(Attr->getDevice())));
+
+      TaskInfo.emplace_back(
+        getBundleStr(OSSB_device_dev_func),
+        llvm::ConstantDataArray::getString(
+          CGM.getLLVMContext(), CGF.CGM.getMangledName(GlobalDecl(FD))));
+    }
+    if (Attr->ndranges_size() > 0) {
+      HasNdrange = true;
+      SmallVector<llvm::Value *, 4> Result;
+      for (const Expr *E : Attr->ndranges()) {
+        llvm::Value *V = CGF.EmitScalarExpr(E);
+        Result.push_back(V);
+      }
+      TaskInfo.emplace_back(
+          getBundleStr(OSSB_device_ndrange), Result);
     }
     if (const Expr *E = Attr->getOnreadyExpr()) {
       EmitIgnoredWrapperCallBundle(
@@ -3118,25 +3170,29 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   // longjmp() and throw() must not violate the entry/exit criteria.
   CGF.EHStack.pushTerminate();
 
-  // From EmitCallExpr
-  RValue RV;
-  if (IsMethodCall) {
-    assert(NewME && "Expected a call_arg MemberExpr");
+  // Pure task outlines (with ndrange) do not have a defined function
+  // so do not emit a call to it to avoid linking issues.
+  RValue RV = RValue::get(nullptr);
+  if (!HasNdrange) {
+    // From EmitCallExpr
+    if (IsMethodCall) {
+      assert(NewME && "Expected a call_arg MemberExpr");
 
-    CXXMemberCallExpr *NewCXXE = CXXMemberCallExpr::Create(
-        Ctx, NewME, ParmCopies, Ctx.VoidTy,
-        VK_PRValue, SourceLocation(), FPOptionsOverride());
+      CXXMemberCallExpr *NewCXXE = CXXMemberCallExpr::Create(
+          Ctx, NewME, ParmCopies, Ctx.VoidTy,
+          VK_PRValue, SourceLocation(), FPOptionsOverride());
 
-    RV = CGF.EmitCXXMemberCallExpr(NewCXXE, ReturnValue);
-  } else {
-    // Regular function call
-    CGCallee callee = CGF.EmitCallee(CE->getCallee());
+      RV = CGF.EmitCXXMemberCallExpr(NewCXXE, ReturnValue);
+    } else {
+      // Regular function call
+      CGCallee callee = CGF.EmitCallee(CE->getCallee());
 
-    CallExpr *NewCE = CallExpr::Create(
-        Ctx, const_cast<Expr *>(CE->getCallee()), ParmCopies,
-        Ctx.VoidTy, VK_PRValue, SourceLocation(), FPOptionsOverride());
+      CallExpr *NewCE = CallExpr::Create(
+          Ctx, const_cast<Expr *>(CE->getCallee()), ParmCopies,
+          Ctx.VoidTy, VK_PRValue, SourceLocation(), FPOptionsOverride());
 
-    RV = CGF.EmitCall(CE->getCallee()->getType(), callee, NewCE, ReturnValue);
+      RV = CGF.EmitCall(CE->getCallee()->getType(), callee, NewCE, ReturnValue);
+    }
   }
 
   CGF.EHStack.popTerminate();

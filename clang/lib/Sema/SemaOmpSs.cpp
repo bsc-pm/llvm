@@ -2486,10 +2486,54 @@ static bool checkDependency(Sema &S, Expr *RefExpr, bool OSSSyntax, bool Outline
   return true;
 }
 
+static bool checkNdrange(
+    Sema &S, SourceLocation Loc, ArrayRef<Expr *> VL,
+    SmallVectorImpl<Expr *> &ClauseVars) {
+
+  ClauseVars.append(VL.begin(), VL.end());
+
+  Expr *NumDimsE = ClauseVars[0];
+  // The parameter of the collapse clause must be a constant
+  // positive integer expression.
+  ExprResult NumDimsResult =
+      S.VerifyPositiveIntegerConstant(NumDimsE, OSSC_ndrange, /*StrictlyPositive=*/true);
+  if (NumDimsResult.isInvalid())
+    return false;
+  NumDimsE = NumDimsResult.get();
+  if (!isa<ConstantExpr>(NumDimsE))
+    return true;
+
+  int64_t NumDims = cast<ConstantExpr>(NumDimsE)->getResultAsAPSInt().getExtValue();
+  if (!(NumDims >= 1 && NumDims <= 3)) {
+    S.Diag(NumDimsE->getExprLoc(), diag::err_oss_clause_expect_constant_between)
+        << 1 << 3 << getOmpSsClauseName(OSSC_ndrange)
+        << NumDimsE->getSourceRange();
+    return false;
+  }
+  if (NumDims + 1 != ClauseVars.size() &&
+      NumDims*2 + 1 != ClauseVars.size()) {
+    S.Diag(Loc, diag::err_oss_ndrange_expect_nelems)
+      << NumDims << NumDims << NumDims*2 << ClauseVars.size() - 1;
+    return false;
+  }
+  ClauseVars[0] = NumDimsE;
+  bool ErrorFound = false;
+  for (int i = 1; i < ClauseVars.size(); ++i) {
+    // TODO: check global[i] >= local[i]
+    ExprResult Res = S.CheckNonNegativeIntegerValue(
+      ClauseVars[i], OSSC_ndrange, /*StrictlyPositive=*/true);
+    if (Res.isInvalid())
+      ErrorFound = true;
+    ClauseVars[i] = Res.get();
+  }
+  return !ErrorFound;
+}
+
 Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     DeclGroupPtrTy DG,
     Expr *If, Expr *Final, Expr *Cost, Expr *Priority,
     Expr *Onready, bool Wait,
+    unsigned Device, SourceLocation DeviceLoc,
     ArrayRef<Expr *> Labels,
     ArrayRef<Expr *> Ins, ArrayRef<Expr *> Outs, ArrayRef<Expr *> Inouts,
     ArrayRef<Expr *> Concurrents, ArrayRef<Expr *> Commutatives,
@@ -2501,6 +2545,7 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     ArrayRef<Expr *> DepWeakIns, ArrayRef<Expr *> DepWeakOuts,
     ArrayRef<Expr *> DepWeakInouts,
     ArrayRef<Expr *> DepWeakConcurrents, ArrayRef<Expr *> DepWeakCommutatives,
+    ArrayRef<Expr *> Ndranges, SourceLocation NdrangeLoc,
     SourceRange SR) {
   if (!DG || DG.get().isNull())
     return DeclGroupPtrTy();
@@ -2523,6 +2568,15 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
         || isa<CXXDestructorDecl>(MD)
         || MD->isOverloadedOperator()) {
       Diag(ADecl->getLocation(), diag::err_oss_function_expected) << 1;
+      return DeclGroupPtrTy();
+    }
+    // Member tasks outlines with device != smp are
+    // not supported
+    const unsigned DeviceNotSeen = OSSC_DEVICE_unknown + 1;
+    if (!(Device == OSSC_DEVICE_smp
+        || Device == DeviceNotSeen)) {
+      Diag(DeviceLoc, diag::err_oss_member_device_no_smp)
+        << getOmpSsSimpleClauseTypeName(OSSC_device, Device);
       return DeclGroupPtrTy();
     }
   }
@@ -2552,8 +2606,10 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     ++ParI;
   }
 
-  SmallVector<Expr *, 2> LabelsRes;
   ExprResult IfRes, FinalRes, CostRes, PriorityRes, OnreadyRes;
+  SmallVector<Expr *, 2> LabelsRes;
+  SmallVector<Expr *, 4> NdrangesRes;
+  OSSTaskDeclAttr::DeviceType DevType = OSSTaskDeclAttr::DeviceType::Unknown;
   if (If) {
     IfRes = VerifyBooleanConditionWithCleanups(If, If->getExprLoc());
   }
@@ -2576,6 +2632,25 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   }
   if (Onready) {
     OnreadyRes = Onready;
+  }
+  switch (Device) {
+  case OSSC_DEVICE_smp:
+    DevType = OSSTaskDeclAttr::DeviceType::Smp;
+    break;
+  case OSSC_DEVICE_cuda:
+    DevType = OSSTaskDeclAttr::DeviceType::Cuda;
+    break;
+  case OSSC_DEVICE_opencl:
+    DevType = OSSTaskDeclAttr::DeviceType::Opencl;
+    break;
+  case OSSC_DEVICE_fpga:
+    DevType = OSSTaskDeclAttr::DeviceType::Fpga;
+    break;
+  case OSSC_DEVICE_unknown:
+    Diag(DeviceLoc, diag::err_oss_unexpected_clause_value)
+        << getListOfPossibleValues(OSSC_device, /*First=*/0,
+                                   /*Last=*/OSSC_DEVICE_unknown)
+        << getOmpSsClauseName(OSSC_device);
   }
   for (Expr *RefExpr : Ins) {
     checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
@@ -2637,11 +2712,19 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   for (Expr *RefExpr : DepWeakCommutatives) {
     checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
   }
+  if (!Ndranges.empty()) {
+    if (!(DevType == OSSTaskDeclAttr::DeviceType::Cuda
+        || DevType == OSSTaskDeclAttr::DeviceType::Opencl))
+      Diag(DeviceLoc, diag::err_oss_ndrange_incompatible_device);
+
+    checkNdrange(*this, NdrangeLoc, Ndranges, NdrangesRes);
+  }
 
   auto *NewAttr = OSSTaskDeclAttr::CreateImplicit(
     Context,
     IfRes.get(), FinalRes.get(), CostRes.get(), PriorityRes.get(),
-    Wait, OnreadyRes.get(),
+    Wait, DevType,
+    OnreadyRes.get(),
     const_cast<Expr **>(LabelsRes.data()), LabelsRes.size(),
     const_cast<Expr **>(Ins.data()), Ins.size(),
     const_cast<Expr **>(Outs.data()), Outs.size(),
@@ -2663,6 +2746,7 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     const_cast<Expr **>(DepWeakInouts.data()), DepWeakInouts.size(),
     const_cast<Expr **>(DepWeakConcurrents.data()), DepWeakConcurrents.size(),
     const_cast<Expr **>(DepWeakCommutatives.data()), DepWeakCommutatives.size(),
+    const_cast<Expr **>(NdrangesRes.data()), NdrangesRes.size(),
     SR);
   ADecl->addAttr(NewAttr);
   return DG;
@@ -3645,6 +3729,9 @@ Sema::ActOnOmpSsVarListClause(
   case OSSC_firstprivate:
     Res = ActOnOmpSsFirstprivateClause(Vars, StartLoc, LParenLoc, EndLoc);
     break;
+  case OSSC_ndrange:
+    Res = ActOnOmpSsNdrangeClause(Vars, StartLoc, LParenLoc, EndLoc);
+    break;
   case OSSC_depend:
     Res = ActOnOmpSsDependClause(DepKinds, DepLoc, ColonLoc, Vars,
                                  StartLoc, LParenLoc, EndLoc);
@@ -3740,6 +3827,11 @@ Sema::ActOnOmpSsSimpleClause(OmpSsClauseKind Kind,
     ActOnOmpSsDefaultClause(static_cast<OmpSsDefaultClauseKind>(Argument),
                                  ArgumentLoc, StartLoc, LParenLoc, EndLoc);
     break;
+  case OSSC_device:
+    Res =
+    ActOnOmpSsDeviceClause(static_cast<OmpSsDeviceClauseKind>(Argument),
+                                 ArgumentLoc, StartLoc, LParenLoc, EndLoc);
+    break;
   default:
     llvm_unreachable("Clause is not allowed.");
   }
@@ -3767,6 +3859,32 @@ OSSClause *Sema::ActOnOmpSsDefaultClause(OmpSsDefaultClauseKind Kind,
   }
   return new (Context)
       OSSDefaultClause(Kind, KindKwLoc, StartLoc, LParenLoc, EndLoc);
+}
+
+OSSClause *Sema::ActOnOmpSsDeviceClause(OmpSsDeviceClauseKind Kind,
+                                          SourceLocation KindKwLoc,
+                                          SourceLocation StartLoc,
+                                          SourceLocation LParenLoc,
+                                          SourceLocation EndLoc) {
+  switch (Kind) {
+  case OSSC_DEVICE_smp:
+  case OSSC_DEVICE_opencl:
+  case OSSC_DEVICE_cuda:
+    break;
+  case OSSC_DEVICE_fpga:
+    // TODO: an an error for task inline fpga
+    Diag(KindKwLoc, diag::err_oss_inline_device_not_supported)
+      << getOmpSsSimpleClauseTypeName(OSSC_device, Kind);
+    break;
+  case OSSC_DEVICE_unknown:
+    Diag(KindKwLoc, diag::err_oss_unexpected_clause_value)
+        << getListOfPossibleValues(OSSC_device, /*First=*/0,
+                                   /*Last=*/OSSC_DEVICE_unknown)
+        << getOmpSsClauseName(OSSC_device);
+    return nullptr;
+  }
+  return new (Context)
+      OSSDeviceClause(Kind, KindKwLoc, StartLoc, LParenLoc, EndLoc);
 }
 
 ExprResult Sema::PerformOmpSsImplicitIntegerConversion(SourceLocation Loc,
@@ -4007,6 +4125,19 @@ Sema::ActOnOmpSsFirstprivateClause(ArrayRef<Expr *> Vars,
 
   return OSSFirstprivateClause::Create(Context, StartLoc, LParenLoc, EndLoc,
                                        ClauseVars, PrivateCopies, Inits);
+}
+
+OSSClause *
+Sema::ActOnOmpSsNdrangeClause(ArrayRef<Expr *> Vars,
+                       SourceLocation StartLoc,
+                       SourceLocation LParenLoc,
+                       SourceLocation EndLoc) {
+  SmallVector<Expr *, 4> ClauseVars;
+  if (!checkNdrange(*this, StartLoc, Vars, ClauseVars))
+    return nullptr;
+
+  return OSSNdrangeClause::Create(
+      Context, StartLoc, LParenLoc, EndLoc, ClauseVars);
 }
 
 ExprResult Sema::CheckNonNegativeIntegerValue(Expr *ValExpr,

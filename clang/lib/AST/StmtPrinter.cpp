@@ -836,6 +836,20 @@ void OSSClausePrinter::VisitOSSReductionClause(OSSReductionClause *Node) {
   }
 }
 
+void OSSClausePrinter::VisitOSSDeviceClause(OSSDeviceClause *Node) {
+  OS << "device("
+     << getOmpSsSimpleClauseTypeName(OSSC_device, Node->getDeviceKind())
+     << ")";
+}
+
+void OSSClausePrinter::VisitOSSNdrangeClause(OSSNdrangeClause *Node) {
+  if (!Node->varlist_empty()) {
+    OS << "ndrange";
+    VisitOSSClauseList(Node, '(');
+    OS << ")";
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //  OpenMP directives printing methods
 //===----------------------------------------------------------------------===//

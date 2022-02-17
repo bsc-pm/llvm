@@ -170,6 +170,7 @@ void OSSTaskDeclAttr::printPrettyPragma(
   l("depend(weak, inout", ":", depWeakInouts_size(), depWeakInouts_begin(), depWeakInouts_end(), OS, Policy);
   l("depend(weak, inoutset", ":", depWeakConcurrents_size(), depWeakConcurrents_begin(), depWeakConcurrents_end(), OS, Policy);
   l("depend(weak, mutexinoutset", ":", depWeakCommutatives_size(), depWeakCommutatives_begin(), depWeakCommutatives_end(), OS, Policy);
+  l("ndrange", "(", ndranges_size(), ndranges_begin(), ndranges_end(), OS, Policy);
   if (auto *E = getIfExpr()) {
     OS << " if(";
     E->printPretty(OS, nullptr, Policy);
@@ -195,6 +196,11 @@ void OSSTaskDeclAttr::printPrettyPragma(
   if (auto *E = getOnreadyExpr()) {
     OS << " onready(";
     E->printPretty(OS, nullptr, Policy);
+    OS << ")";
+  }
+  if (getDevice() != DeviceType::Unknown) {
+    OS << " device(";
+    OS << ConvertDeviceTypeToStr(getDevice());
     OS << ")";
   }
 }

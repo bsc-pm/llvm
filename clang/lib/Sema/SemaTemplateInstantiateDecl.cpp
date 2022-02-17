@@ -19,6 +19,7 @@
 #include "clang/AST/Expr.h"
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/PrettyDeclStackTrace.h"
+#include "clang/AST/StmtVisitor.h"
 #include "clang/AST/TypeLoc.h"
 #include "clang/Basic/SourceManager.h"
 #include "clang/Basic/TargetInfo.h"
@@ -298,6 +299,147 @@ static void instantiateDependentCUDALaunchBoundsAttr(
   }
 
   S.AddLaunchBoundsAttr(New, Attr, MaxThreads, MinBlocks);
+}
+
+/// Instantiation of 'oss task' attribute and its arguments.
+void Sema::InstantiateOSSDeclareTaskAttr(
+    const MultiLevelTemplateArgumentList &TemplateArgs,
+    const OSSTaskDeclAttr &Attr, Decl *New) {
+  // Allow 'this' in clauses with varlists.
+  if (auto *FTD = dyn_cast<FunctionTemplateDecl>(New))
+    New = FTD->getTemplatedDecl();
+  auto *FD = cast<FunctionDecl>(New);
+
+  Sema::ContextRAII SavedContext(*this, FD);
+  LocalInstantiationScope Local(*this);
+
+  FunctionDecl *Pattern = FD->getTemplateInstantiationPattern(
+      /*ForDefinition*/ false);
+  addInstantiatedParametersToScope(FD, Pattern, Local, TemplateArgs);
+
+  ExprResult IfRes;
+  ExprResult FinalRes;
+  ExprResult CostRes;
+  ExprResult PriorityRes;
+  ExprResult OnreadyRes;
+  bool Wait = Attr.getWait();
+  // This value means no clause seen
+  unsigned Device = OSSC_DEVICE_unknown + 1;
+
+  SmallVector<Expr *, 4> Ins;
+  SmallVector<Expr *, 4> Outs;
+  SmallVector<Expr *, 4> Inouts;
+  SmallVector<Expr *, 4> Concurrents;
+  SmallVector<Expr *, 4> Commutatives;
+  SmallVector<Expr *, 4> WeakIns;
+  SmallVector<Expr *, 4> WeakOuts;
+  SmallVector<Expr *, 4> WeakInouts;
+  SmallVector<Expr *, 4> WeakConcurrents;
+  SmallVector<Expr *, 4> WeakCommutatives;
+  SmallVector<Expr *, 4> DepIns;
+  SmallVector<Expr *, 4> DepOuts;
+  SmallVector<Expr *, 4> DepInouts;
+  SmallVector<Expr *, 4> DepConcurrents;
+  SmallVector<Expr *, 4> DepCommutatives;
+  SmallVector<Expr *, 4> DepWeakIns;
+  SmallVector<Expr *, 4> DepWeakOuts;
+  SmallVector<Expr *, 4> DepWeakInouts;
+  SmallVector<Expr *, 4> DepWeakConcurrents;
+  SmallVector<Expr *, 4> DepWeakCommutatives;
+  SmallVector<Expr *, 4> Labels;
+  SmallVector<Expr *, 4> Ndranges;
+
+  // Substitute a single OmpSs clause, which is a potentially-evaluated
+  // full-expression.
+  auto Subst = [&](Expr *E) -> ExprResult {
+    EnterExpressionEvaluationContext Evaluated(
+        *this, Sema::ExpressionEvaluationContext::PotentiallyEvaluated);
+    ExprResult Res = SubstExpr(E, TemplateArgs);
+    if (Res.isInvalid())
+      return Res;
+    return ActOnFinishFullExpr(Res.get(), false);
+  };
+
+  auto l = [&Subst](unsigned Size, Expr **Begin, Expr **End,
+              SmallVectorImpl<Expr *> &Results) {
+    if (Size > 0) {
+      Expr **I = Begin;
+      while (I != End) {
+        ExprResult Inst = Subst(*I);
+        if (Inst.isInvalid()) {
+          ++I;
+          continue;
+        }
+        Results.push_back(Inst.get());
+        ++I;
+      }
+    }
+  };
+
+  {
+    // We need to enable Shapings here since we're in a reduction clause
+    Sema::AllowShapingsRAII AllowShapings(*this, []() { return true; });
+
+    l(Attr.ins_size(), Attr.ins_begin(), Attr.ins_end(), Ins);
+    l(Attr.outs_size(), Attr.outs_begin(), Attr.outs_end(), Outs);
+    l(Attr.inouts_size(), Attr.inouts_begin(), Attr.inouts_end(), Inouts);
+    l(Attr.concurrents_size(), Attr.concurrents_begin(), Attr.concurrents_end(), Concurrents);
+    l(Attr.commutatives_size(), Attr.commutatives_begin(), Attr.commutatives_end(), Commutatives);
+    l(Attr.weakIns_size(), Attr.weakIns_begin(), Attr.weakIns_end(), WeakIns);
+    l(Attr.weakOuts_size(), Attr.weakOuts_begin(), Attr.weakOuts_end(), WeakOuts);
+    l(Attr.weakInouts_size(), Attr.weakInouts_begin(), Attr.weakInouts_end(), WeakInouts);
+    l(Attr.weakConcurrents_size(), Attr.weakConcurrents_begin(), Attr.weakConcurrents_end(), WeakConcurrents);
+    l(Attr.weakCommutatives_size(), Attr.weakCommutatives_begin(), Attr.weakCommutatives_end(), WeakCommutatives);
+    l(Attr.depIns_size(), Attr.depIns_begin(), Attr.depIns_end(), DepIns);
+    l(Attr.depOuts_size(), Attr.depOuts_begin(), Attr.depOuts_end(), DepOuts);
+    l(Attr.depInouts_size(), Attr.depInouts_begin(), Attr.depInouts_end(), DepInouts);
+    l(Attr.depConcurrents_size(), Attr.depConcurrents_begin(), Attr.depConcurrents_end(), DepConcurrents);
+    l(Attr.depCommutatives_size(), Attr.depCommutatives_begin(), Attr.depCommutatives_end(), DepCommutatives);
+    l(Attr.depWeakIns_size(), Attr.depWeakIns_begin(), Attr.depWeakIns_end(), DepWeakIns);
+    l(Attr.depWeakOuts_size(), Attr.depWeakOuts_begin(), Attr.depWeakOuts_end(), DepWeakOuts);
+    l(Attr.depWeakInouts_size(), Attr.depWeakInouts_begin(), Attr.depWeakInouts_end(), DepWeakInouts);
+    l(Attr.depWeakConcurrents_size(), Attr.depWeakConcurrents_begin(), Attr.depWeakConcurrents_end(), DepWeakConcurrents);
+    l(Attr.depWeakCommutatives_size(), Attr.depWeakCommutatives_begin(), Attr.depWeakCommutatives_end(), DepWeakCommutatives);
+  }
+
+  l(Attr.labelExprs_size(), Attr.labelExprs_begin(), Attr.labelExprs_end(), Labels);
+  l(Attr.ndranges_size(), Attr.ndranges_begin(), Attr.ndranges_end(), Ndranges);
+
+  if (auto *E = Attr.getIfExpr())
+    IfRes = Subst(E);
+
+  if (auto *E = Attr.getFinalExpr())
+    FinalRes = Subst(E);
+
+  if (auto *E = Attr.getCostExpr())
+    CostRes = Subst(E);
+
+  if (auto *E = Attr.getPriorityExpr())
+    PriorityRes = Subst(E);
+
+  if (auto *E = Attr.getOnreadyExpr())
+    OnreadyRes = Subst(E);
+
+  if (Attr.getDevice() != OSSTaskDeclAttr::DeviceType::Unknown)
+    Device = Attr.getDevice();
+
+  (void)ActOnOmpSsDeclareTaskDirective(
+    ConvertDeclToDeclGroup(New),
+    IfRes.get(), FinalRes.get(),
+    CostRes.get(), PriorityRes.get(),
+    OnreadyRes.get(), Wait,
+    Device, SourceLocation(),
+    Labels,
+    Ins, Outs, Inouts,
+    Concurrents, Commutatives,
+    WeakIns, WeakOuts, WeakInouts,
+    WeakConcurrents, WeakCommutatives,
+    DepIns, DepOuts, DepInouts,
+    DepConcurrents, DepCommutatives,
+    DepWeakIns, DepWeakOuts, DepWeakInouts,
+    DepWeakConcurrents, DepWeakCommutatives,
+    Ndranges, SourceLocation(), // TODO
+    Attr.getRange());
 }
 
 static void
@@ -724,11 +866,10 @@ void Sema::InstantiateAttrs(const MultiLevelTemplateArgumentList &TemplateArgs,
     }
 
     // OmpSs
-    // TODO: Is this needed?
-    // if (const auto *OSSAttr = dyn_cast<OSSTaskDeclAttr>(TmplAttr)) {
-    //   instantiateOSSDeclareSimdDeclAttr(*this, TemplateArgs, *OSSAttr, New);
-    //   continue;
-    // }
+    if (const auto *OSSAttr = dyn_cast<OSSTaskDeclAttr>(TmplAttr)) {
+      InstantiateOSSDeclareTaskAttr(TemplateArgs, *OSSAttr, New);
+      continue;
+    }
 
     if (const auto *OMPAttr = dyn_cast<OMPDeclareSimdDeclAttr>(TmplAttr)) {
       instantiateOMPDeclareSimdDeclAttr(*this, TemplateArgs, *OMPAttr, New);

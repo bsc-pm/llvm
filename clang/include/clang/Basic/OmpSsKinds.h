@@ -55,6 +55,14 @@ enum OmpSsDependClauseKind {
   OSSC_DEPEND_unknown
 };
 
+/// OmpSs attributes for 'device' clause.
+enum OmpSsDeviceClauseKind {
+#define OMPSS_DEVICE_KIND(Name) \
+  OSSC_DEVICE_##Name,
+#include "clang/Basic/OmpSsKinds.def"
+  OSSC_DEVICE_unknown
+};
+
 OmpSsDirectiveKind getOmpSsDirectiveKind(llvm::StringRef Str);
 const char *getOmpSsDirectiveName(OmpSsDirectiveKind Kind);
 

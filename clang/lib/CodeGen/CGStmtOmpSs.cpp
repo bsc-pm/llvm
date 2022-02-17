@@ -200,6 +200,17 @@ static void AddReductionData(const OSSExecutableDirective &S, OSSTaskReductionDa
   }
 }
 
+static void AddDeviceData(const OSSExecutableDirective &S, OSSTaskDeviceDataTy &Devices) {
+  bool Found = false;
+  for (const auto *C : S.getClausesOfKind<OSSDeviceClause>()) {
+    assert(!Found);
+    Found = true;
+    Devices.DvKind = C->getDeviceKind();
+  }
+  if (!llvm::empty(S.getClausesOfKind<OSSNdrangeClause>()))
+    llvm_unreachable("Ndrange is not supported in inline constructs");
+}
+
 // Convenience function to add all info from a task directive
 static void AddTaskData(const OSSExecutableDirective &S, OSSTaskDataTy &TaskData) {
   AddDSAData(S, TaskData.DSAs);
@@ -212,6 +223,7 @@ static void AddTaskData(const OSSExecutableDirective &S, OSSTaskDataTy &TaskData
   AddWaitData(S, TaskData.Wait);
   AddOnreadyData(S, TaskData.Onready);
   AddReductionData(S, TaskData.Reductions);
+  AddDeviceData(S, TaskData.Devices);
 }
 
 static void AddChunksizeLoopData(const OSSLoopDirective &S, const Expr * &ChunksizeExpr) {

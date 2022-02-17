@@ -11369,6 +11369,14 @@ def err_oss_clause_not_arithmetic_type_arg : Error<
   "arguments of OmpSs-2 clause '%0' for 'min' or 'max' must be of %select{scalar|arithmetic}1 type">;
 def err_oss_reduction_depend_conflict : Error<
   "variable %0 conflicts between dependency and reduction clause">;
+def err_oss_clause_expect_constant_between : Error<
+  "expected value between %0 and %1, but got %2 in '%3' clause">;
+def err_oss_ndrange_expect_nelems : Error<
+  "'ndrange(%0, argument-list)' clause requires %1 or %2 arguments in argument-list, but got %3">;
+def err_oss_ndrange_incompatible_device : Error<
+  "ndrange cannot be used with other devices than cuda and opencl">;
+def err_oss_inline_device_not_supported : Error<
+  "device(%0) is not supported in inline directives">;
 
 def err_oss_call_expr_support : Error<
   "call expressions are not supported">;
@@ -11437,6 +11445,8 @@ def warn_oss_section_is_char : Warning<"array section %select{lower bound|length
   InGroup<CharSubscript>, DefaultIgnore;
 def err_oss_single_decl_in_task : Error<
   "single declaration is expected after 'task' directive">;
+def err_oss_member_device_no_smp : Error<
+  "device(%0) is not allowed in member functions">;
 def err_oss_function_expected : Error<
   "'#pragma oss task' can only be applied to functions">;
 def err_oss_non_void_task : Error<
