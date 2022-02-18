@@ -1306,7 +1306,14 @@ llvm::Function *CGOmpSsRuntime::createCallWrapperFunc(
   if (HasThis) {
     // We don't care about lambdas.
     // NOTE: We have seen 'this' so it's fine to assume we are in a method function
-    NewCGF.CurGD = GlobalDecl(cast<CXXMethodDecl>(CGF.CurGD.getDecl()->getNonClosureContext()));
+    const CXXMethodDecl *MD = cast<CXXMethodDecl>(CGF.CurGD.getDecl()->getNonClosureContext());
+    if (const CXXConstructorDecl *CtorD = dyn_cast<CXXConstructorDecl>(MD)) {
+      NewCGF.CurGD = GlobalDecl(CtorD, Ctor_Complete);
+    } else if (const CXXDestructorDecl *DtorD = dyn_cast<CXXDestructorDecl>(MD)) {
+      NewCGF.CurGD = GlobalDecl(DtorD, Dtor_Complete);
+    } else {
+      NewCGF.CurGD = GlobalDecl(MD);
+    }
     NewCGF.CGM.getCXXABI().buildThisParam(NewCGF, Args);
   }
   if (HasSwitch) {
@@ -1367,7 +1374,7 @@ llvm::Function *CGOmpSsRuntime::createCallWrapperFunc(
 
     (void)Scope.Privatize();
 
-    NewCGF.StartFunction(NewCGF.CurGD, RetQ, FuncVar, FuncInfo, Args, SourceLocation(), SourceLocation());
+    NewCGF.StartFunction(NewCGF.CurGD, RetQ, FuncVar, FuncInfo, Args, SourceLocation(), SourceLocation(), /*DoNotEH=*/true);
   }
 
   InDirectiveEmission = true;
@@ -1413,7 +1420,7 @@ llvm::Function *CGOmpSsRuntime::createCallWrapperFunc(
   }
 
   NewCGF.EHStack.popTerminate();
-  NewCGF.FinishFunction();
+  NewCGF.FinishFunction(SourceLocation(), /*DoNotEH=*/true);
 
   // Pop temporal empty refmap, we are not in wrapper function anymore
   CaptureMapStack.pop_back();
