@@ -4,6 +4,7 @@ struct S {
   int a;
   S() {}
   void foo();
+  int array[10];
 };
 
 void S::foo() {
@@ -15,4 +16,7 @@ void S::foo() {
         #pragma oss task
         { a++; }
     };
+    int i;
+    #pragma oss task out(array[i]) firstprivate(i)
+    {}
 }
