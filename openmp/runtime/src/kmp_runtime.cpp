@@ -9887,12 +9887,25 @@ void __kmp_set_thread_roles1(int how_many, omp_role_t r){
 			th->th.th_potential_roles = (omp_role_t)(r & th->th.th_potential_roles);
 		}
 		kmp_root *root = __kmp_threads[__kmp_entry_gtid()]->th.th_root;
+	    kmp_info_t *captain = __kmp_threads[0];
+		kmp_team_t *capt_team = captain->th.th_team;
+		kmp_task_team_t *capt_tt_0 = capt_team->t.t_task_team[0];
+		kmp_task_team_t *capt_tt_1 = capt_team->t.t_task_team[1];
 		for(; i < how_many; ++i){ /*Thread creation with the proper potential roles
 			If r==OMP_ROLE_FREE_AGENT the thread will be created as an active free agent
 			otherwise, the thread is placed into the thread pool*/			
 			th = __kmp_allocate_thread_middle_init(root, r, i);
 			KMP_DEBUG_ASSERT(th != NULL);
 			KMP_DEBUG_ASSERT(th->th.th_potential_roles == r);
+			//TODO: can we do this freely?
+			if(r & OMP_ROLE_FREE_AGENT){ //Allowing the new free agents to access the same teams than
+			    __kmp_acquire_bootstrap_lock(&th->th.allowed_teams_lock);
+			    if(capt_tt_0 != NULL)
+			        __kmp_add_allowed_task_team(th, capt_tt_0);
+			    if(capt_tt_1 != NULL)
+			        __kmp_add_allowed_task_team(th, capt_tt_1);
+			    __kmp_release_bootstrap_lock(&th->th.allowed_teams_lock);
+			}
 		}
 	}
 	//The petition cannot be accomplished, so do nothing at all.
