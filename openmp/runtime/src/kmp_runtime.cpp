@@ -10052,6 +10052,16 @@ void __kmp_set_thread_roles2(int tid, omp_role_t r){
 		    th->th.th_pending_role = OMP_ROLE_FREE_AGENT;
 		    KMP_ATOMIC_ST_RLX(&th->th.th_change_role, true);
 
+            //Let the thread grab tasks from the initial thread if a task team exists
+		    kmp_task_team_t *tt_0 = __kmp_threads[0]->th.th_team->t.t_task_team[0];
+		    kmp_task_team_t *tt_1 = __kmp_threads[0]->th.th_team->t.t_task_team[1];
+		    __kmp_acquire_bootstrap_lock(&th->th.allowed_teams_lock);
+		    if(tt_0 != NULL)
+		        __kmp_add_allowed_task_team(th, tt_0);
+		    if(tt_1 != NULL)
+		        __kmp_add_allowed_task_team(th, tt_1);
+		    __kmp_release_bootstrap_lock(&th->th.allowed_teams_lock);
+
 		    KMP_MB();
 		}
 	}
