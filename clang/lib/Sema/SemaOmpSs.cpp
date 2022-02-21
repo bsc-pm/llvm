@@ -629,12 +629,12 @@ public:
   }
 
   void VisitCXXThisExpr(CXXThisExpr *ThisE) {
+    // The dep base may use this:
+    // out(this->array[i])
+    IsFirstDecl = false;
+
     // Add DSA to 'this' if is the first time we see it
     if (!Stack->getThisExpr()) {
-      // The dep base may use this:
-      // out(this->array[i])
-      IsFirstDecl = false;
-
       Stack->setThisExpr(ThisE);
     }
   }
