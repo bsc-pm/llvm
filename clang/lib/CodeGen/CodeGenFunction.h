@@ -2358,7 +2358,8 @@ public:
                      const CGFunctionInfo &FnInfo,
                      const FunctionArgList &Args,
                      SourceLocation Loc = SourceLocation(),
-                     SourceLocation StartLoc = SourceLocation());
+                     SourceLocation StartLoc = SourceLocation(),
+                     bool DoNotEH = false);
 
   static bool IsConstructorDelegationValid(const CXXConstructorDecl *Ctor);
 
@@ -2386,7 +2387,7 @@ public:
 
   /// FinishFunction - Complete IR generation of the current function. It is
   /// legal to call this function even if there is no current insertion point.
-  void FinishFunction(SourceLocation EndLoc=SourceLocation());
+  void FinishFunction(SourceLocation EndLoc=SourceLocation(), bool DoNotEH = false);
 
   void StartThunk(llvm::Function *Fn, GlobalDecl GD,
                   const CGFunctionInfo &FnInfo, bool IsUnprototyped);

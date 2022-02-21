@@ -322,7 +322,7 @@ static void EmitIfUsed(CodeGenFunction &CGF, llvm::BasicBlock *BB) {
   delete BB;
 }
 
-void CodeGenFunction::FinishFunction(SourceLocation EndLoc) {
+void CodeGenFunction::FinishFunction(SourceLocation EndLoc, bool DoNotEH) {
   assert(BreakContinueStack.empty() &&
          "mismatched push/pop in break/continue stack!");
 
@@ -394,7 +394,9 @@ void CodeGenFunction::FinishFunction(SourceLocation EndLoc) {
   // rather than that of the end of the function's scope '}'.
   ApplyDebugLocation AL(*this, Loc);
   EmitFunctionEpilog(*CurFnInfo, EmitRetDbgLoc, EndLoc);
-  EmitEndEHSpec(CurCodeDecl);
+
+  if (!DoNotEH)
+    EmitEndEHSpec(CurCodeDecl);
 
   assert(EHStack.empty() &&
          "did not remove all scopes from cleanup stack!");
@@ -711,7 +713,8 @@ void CodeGenFunction::StartFunction(GlobalDecl GD, QualType RetTy,
                                     const CGFunctionInfo &FnInfo,
                                     const FunctionArgList &Args,
                                     SourceLocation Loc,
-                                    SourceLocation StartLoc) {
+                                    SourceLocation StartLoc,
+                                    bool DoNotEH) {
   assert(!CurFn &&
          "Do not use a CodeGenFunction object for more than one function");
 
@@ -1112,7 +1115,8 @@ void CodeGenFunction::StartFunction(GlobalDecl GD, QualType RetTy,
       AutoreleaseResult = true;
   }
 
-  EmitStartEHSpec(CurCodeDecl);
+  if (!DoNotEH)
+    EmitStartEHSpec(CurCodeDecl);
 
   PrologueCleanupDepth = EHStack.stable_begin();
 
