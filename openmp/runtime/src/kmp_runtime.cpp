@@ -9765,6 +9765,67 @@ void __kmp_set_nesting_mode_threads() {
     set__max_active_levels(thread, __kmp_nesting_mode_nlevels);
 }
 
+static kmp_info_t* get_thread_from_thread_pool(int new_gtid){
+    if(__kmp_thread_pool == NULL) return NULL;
+    kmp_info_t *new_thr = CCAST(kmp_info_t *, __kmp_thread_pool);
+    kmp_info_t *prev = NULL;
+    //Locate the thread in the thread pool
+    while(new_thr != NULL && new_thr->th.th_info.ds.ds_gtid != new_gtid){
+        prev = new_thr;
+        new_thr = new_thr->th.th_next_pool;
+    }
+    if(prev == NULL){//We were searching fo the first thread
+        __kmp_thread_pool = (volatile kmp_info_t *)new_thr->th.th_next_pool;
+    }
+    else{
+        prev->th.th_next_pool = new_thr->th.th_next_pool;
+    }
+    if(new_thr == __kmp_thread_pool_insert_pt){
+        __kmp_thread_pool_insert_pt = NULL;
+    }
+    new_thr->th.th_next_pool = NULL;
+    TCW_4(new_thr->th.th_in_pool, FALSE);
+    __kmp_suspend_initialize_thread(new_thr);
+    __kmp_lock_suspend_mx(new_thr);
+    if(new_thr->th.th_active_in_pool == TRUE){
+        KMP_DEBUG_ASSERT(new_thr->th.th_active == TRUE);
+        KMP_ATOMIC_DEC(&__kmp_thread_pool_active_nth);
+        new_thr->th.th_active_in_pool = FALSE;
+    }
+    __kmp_unlock_suspend_mx(new_thr);
+
+    KMP_ASSERT(!new_thr->th.th_team);
+    KMP_DEBUG_ASSERT(__kmp_nth < __kmp_threads_capacity);
+
+    //__kmp_initialize_info(new_thr, team, new_tid, new_gtid);
+
+    TCW_4(__kmp_nth, __kmp_nth + 1);
+
+    new_thr->th.th_task_state = 0;
+    new_thr->th.th_task_state_top = 0;
+    new_thr->th.th_task_state_stack_sz = 4;
+
+    if(__kmp_barrier_gather_pattern[bs_forkjoin_barrier] == bp_dist_bar){
+        KMP_DEBUG_ASSERT(new_thr->th.th_used_in_team.load() == 0);
+    }
+#ifdef KMP_ADJUST_BLOCKTIME
+    if(!__kmp_env_blocktime && (__kmp_avail_proc > 0)){
+        if(__kmp_nth > __kmp_avail_proc){
+            __kmp_zero_bt = TRUE;
+        }
+    }
+#endif
+#ifdef KMP_DEBUG
+    int b;
+    kmp_balign_t *balign = new_thr->th.th_bar;
+    for(b = 0; b < bs_last_barrier; ++b){
+        KMP_DEBUG_ASSERT(balign[b].bb.wait_flag != KMP_BARRIER_PARENT_FLAG);
+    }
+#endif
+    KMP_MB();
+    return new_thr;
+}
+
 unsigned int __kmp_get_num_free_agent_threads() {
   // Ensure the runtime has been initialized here.
   (void)__kmp_entry_gtid();
@@ -9924,6 +9985,7 @@ void __kmp_set_thread_roles2(int tid, omp_role_t r){
 	}
 	kmp_info_t *th = __kmp_threads[gtid];
 	if(th == NULL) return;
+	th->th.th_potential_roles = r;
 	omp_role_t act_r = th->th.th_active_role;
 	if(act_r != OMP_ROLE_NONE){
 		if(!(act_r & r)){//We are actually removing the active role from the thread
@@ -9940,8 +10002,59 @@ void __kmp_set_thread_roles2(int tid, omp_role_t r){
 		if(r & OMP_ROLE_FREE_AGENT){//Increasing the number of potential FA
 			++__kmp_free_agent_num_threads;
 		}
+		if(TCR_4(th->th.th_in_pool)){//If the thread is in the thread pool, convert it to a free agent
+		    kmp_info_t *new_thr = get_thread_from_thread_pool(th->th.th_info.ds.ds_gtid); //Extract it from the thread pool
+		    KMP_DEBUG_ASSERT(new_thr == th);
+		    //Set up the relevant information for a FA
+		    kmp_taskdata_t *task = th->th.th_current_task;
+		    if(task == NULL)
+		        task = (kmp_taskdata_t *)__kmp_allocate(sizeof(kmp_taskdata_t) * 1);
+		    th->th.allowed_teams_capacity = 2;
+		    th->th.allowed_teams_length = 0;
+		    th->th.allowed_teams = (kmp_task_team_t **)__kmp_allocate(sizeof(kmp_task_team_t *) * th->th.allowed_teams_capacity);
+		    __kmp_init_bootstrap_lock(&th->th.allowed_teams_lock);
+		    task->td_task_id = KMP_GEN_TASK_ID();
+		    task->td_team = NULL;
+		    task->td_ident = NULL;
+		    task->td_taskwait_ident = NULL;
+		    task->td_taskwait_counter = 0;
+		    task->td_taskwait_thread = 0;
+		    task->td_flags.tiedness = TASK_TIED;
+		    task->td_flags.tasktype = TASK_IMPLICIT;
+		    task->td_flags.proxy = TASK_FULL;
+		    task->td_flags.task_serial = 1;
+		    task->td_flags.tasking_ser = (__kmp_tasking_mode == tskm_immediate_exec);
+		    task->td_flags.team_serial = 0;
+		    task->td_flags.started = 1;
+		    task->td_flags.executing = 1;
+		    task->td_flags.complete= 0;
+		    task->td_flags.freed = 0;
+		    task->td_depnode = NULL;
+		    task->td_last_tied = task;
+		    task->td_allow_completion_event.pending_events_count = -1;
+		    task->td_allow_completion_event.ed.task = nullptr;
+		    TCW_4(__kmp_all_nth, __kmp_all_nth+1);
+		    //Place it in the FA list
+		    kmp_info_t **scan;
+		    if(__kmp_free_agent_list_insert_pt != NULL)
+		        scan = &(__kmp_free_agent_list_insert_pt->th.th_next_free_agent);
+		    else
+		        scan = CCAST(kmp_info_t **, &__kmp_free_agent_list);
+		    for(; (*scan != NULL)&&((*scan)->th.th_info.ds.ds_gtid < gtid);
+		            scan = &((*scan)->th.th_next_free_agent));
+		    TCW_PTR(new_thr->th.th_next_free_agent, *scan);
+		    __kmp_free_agent_list_insert_pt = *scan = new_thr;
+		    KMP_DEBUG_ASSERT((new_thr->th.th_next_free_agent == NULL) ||
+		                                    (new_thr->th.th_info.ds.ds_gtid <
+		                                     new_thr->th.th_next_free_agent->th.th_info.ds.ds_gtid));
+		    
+		    //Signal the thread to change the role
+		    th->th.th_pending_role = OMP_ROLE_FREE_AGENT;
+		    KMP_ATOMIC_ST_RLX(&th->th.th_change_role, true);
+
+		    KMP_MB();
+		}
 	}
-	th->th.th_potential_roles = r;
 }
 
 int __kmp_get_thread_id(){
