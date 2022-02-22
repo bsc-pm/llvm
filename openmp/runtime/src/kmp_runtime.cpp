@@ -106,7 +106,7 @@ static int __kmp_unregister_root_other_thread(int gtid);
 #endif
 static void __kmp_reap_thread(kmp_info_t *thread, int is_root);
 kmp_info_t *__kmp_thread_pool_insert_pt = NULL;
-kmp_info_t *__kmp_free_agent_list_insert_pt;
+kmp_info_t *__kmp_free_agent_list_insert_pt = NULL;
 
 void __kmp_resize_dist_barrier(kmp_team_t *team, int old_nthreads,
                                int new_nthreads);
@@ -5600,7 +5600,12 @@ __kmp_allocate_team(kmp_root_t *root, int new_nproc, int max_nproc,
 			}
 			if(th == __kmp_free_agent_list_insert_pt)
 				__kmp_free_agent_list_insert_pt = NULL;
-			
+
+		    th->th.th_next_free_agent = NULL;
+		    KMP_DEBUG_ASSERT((last_th->th.th_next_free_agent == NULL) ||
+		                     (last_th->th.th_info.ds.ds_gtid <
+		                      last_th->th.th_next_free_agent->th.th_info.ds.ds_gtid));
+
 			++returned;
 			
 			th->th.th_pending_role = OMP_ROLE_NONE;
@@ -6379,9 +6384,9 @@ void __kmp_free_thread(kmp_info_t *this_th) {
 	  // point, then we need to re-scan the entire list.
   	gtid = this_th->th.th_info.ds.ds_gtid;
 	  if (__kmp_thread_pool_insert_pt != NULL) {
-  	  KMP_DEBUG_ASSERT(__kmp_thread_pool != NULL);
+  	    KMP_DEBUG_ASSERT(__kmp_thread_pool != NULL);
     	if (__kmp_thread_pool_insert_pt->th.th_info.ds.ds_gtid > gtid) {
-      	__kmp_thread_pool_insert_pt = NULL;
+      	    __kmp_thread_pool_insert_pt = NULL;
 	    }
   	}
 
@@ -9985,7 +9990,6 @@ void __kmp_set_thread_roles2(int tid, omp_role_t r){
 	}
 	kmp_info_t *th = __kmp_threads[gtid];
 	if(th == NULL) return;
-	th->th.th_potential_roles = r;
 	omp_role_t act_r = th->th.th_active_role;
 	if(act_r != OMP_ROLE_NONE){
 		if(!(act_r & r)){//We are actually removing the active role from the thread
@@ -9995,7 +9999,68 @@ void __kmp_set_thread_roles2(int tid, omp_role_t r){
 	}
 	if(th->th.th_potential_roles & OMP_ROLE_FREE_AGENT){
 		if(!(r & OMP_ROLE_FREE_AGENT)){ //Decreasing the number of potential FA
+			kmp_info_t *new_thr = CCAST(kmp_info_t *, __kmp_free_agent_list);
+			kmp_info_t *prev = NULL;
+			while(new_thr != NULL && new_thr != th){
+			    prev = new_thr;
+			    new_thr = new_thr->th.th_next_free_agent;
+			}
+			if(prev == NULL)
+			    __kmp_free_agent_list = new_thr->th.th_next_free_agent;
+			else
+			    prev->th.th_next_free_agent = new_thr->th.th_next_free_agent;
+			if(new_thr == __kmp_free_agent_list_insert_pt)
+			    __kmp_free_agent_list_insert_pt = NULL;
+			
+			th->th.th_next_free_agent = NULL;
+			KMP_DEBUG_ASSERT((new_thr->th.th_next_free_agent == NULL) ||
+			                 (new_thr->th.th_info.ds.ds_gtid < 
+			                  new_thr->th.th_next_free_agent->th.th_info.ds.ds_gtid));
 			--__kmp_free_agent_num_threads;
+			if(act_r == OMP_ROLE_FREE_AGENT && r == OMP_ROLE_NONE){
+			//Removing all the roles from an actual free agent. Placing it into the thread pool
+			    kmp_info_t **scan;
+			    if(__kmp_thread_pool_insert_pt != NULL){
+			        KMP_DEBUG_ASSERT(__kmp_thread_pool != NULL);
+			        if(__kmp_thread_pool_insert_pt->th.th_info.ds.ds_gtid > gtid){
+			            __kmp_thread_pool_insert_pt = NULL;
+			        }
+			    }
+			    if(__kmp_thread_pool_insert_pt != NULL){
+			        scan = &(__kmp_thread_pool_insert_pt->th.th_next_pool);
+			    }
+			    else{
+			        scan = CCAST(kmp_info_t **, &__kmp_thread_pool);
+			    }
+			    for(; (*scan != NULL) && ((*scan)->th.th_info.ds.ds_gtid < gtid);
+			            scan = &((*scan)->th.th_next_pool));
+			    TCW_PTR(th->th.th_next_pool, *scan);
+			    __kmp_thread_pool_insert_pt = *scan = th;
+			    KMP_DEBUG_ASSERT((th->th.th_next_pool == NULL) ||
+			                        (th->th.th_info.ds.ds_gtid < th->th.th_next_pool->th.th_info.ds.ds_gtid));
+			    TCW_4(th->th.th_in_pool, TRUE);
+			    __kmp_suspend_initialize_thread(th);
+			    __kmp_lock_suspend_mx(th);
+			    if(th->th.th_active == TRUE){
+			        KMP_ATOMIC_INC(&__kmp_thread_pool_active_nth);
+			        th->th.th_active_in_pool = TRUE;
+			    }
+#if KMP_DEBUG
+                else{
+                    KMP_DEBUG_ASSERT(th->th.th_active_in_pool == FALSE);
+                }
+#endif
+                __kmp_unlock_suspend_mx(th);
+                TCW_4(__kmp_nth, __kmp_nth - 1);
+#ifdef KMP_ADJUST_BLOCKTIME
+                if(!__kmp_env_blocktime && (__kmp_avail_proc > 0)){
+                    KMP_DEBUG_ASSERT(__kmp_avail_proc > 0);
+                    if(__kmp_nth <= __kmp_avail_proc){
+                        __kmp_zero_bt = FALSE;
+                    }
+                }
+#endif
+			}
 		}
 	}
 	else{
@@ -10006,9 +10071,11 @@ void __kmp_set_thread_roles2(int tid, omp_role_t r){
 		    kmp_info_t *new_thr = get_thread_from_thread_pool(th->th.th_info.ds.ds_gtid); //Extract it from the thread pool
 		    KMP_DEBUG_ASSERT(new_thr == th);
 		    //Set up the relevant information for a FA
-		    kmp_taskdata_t *task = th->th.th_current_task;
-		    if(task == NULL)
-		        task = (kmp_taskdata_t *)__kmp_allocate(sizeof(kmp_taskdata_t) * 1);
+		    //kmp_taskdata_t *task = th->th.th_current_task;
+		    //if(task == NULL)
+		    //    task = (kmp_taskdata_t *)__kmp_allocate(sizeof(kmp_taskdata_t) * 1);
+		    kmp_taskdata_t *task = (kmp_taskdata_t *)__kmp_allocate(sizeof(kmp_taskdata_t)*1);
+		    th->th.th_current_task = task;
 		    th->th.allowed_teams_capacity = 2;
 		    th->th.allowed_teams_length = 0;
 		    th->th.allowed_teams = (kmp_task_team_t **)__kmp_allocate(sizeof(kmp_task_team_t *) * th->th.allowed_teams_capacity);
@@ -10033,14 +10100,15 @@ void __kmp_set_thread_roles2(int tid, omp_role_t r){
 		    task->td_last_tied = task;
 		    task->td_allow_completion_event.pending_events_count = -1;
 		    task->td_allow_completion_event.ed.task = nullptr;
-		    TCW_4(__kmp_all_nth, __kmp_all_nth+1);
+		    //TCW_4(__kmp_all_nth, __kmp_all_nth+1);
+		    TCW_4(__kmp_nth, __kmp_nth+1);
 		    //Place it in the FA list
 		    kmp_info_t **scan;
 		    if(__kmp_free_agent_list_insert_pt != NULL)
 		        scan = &(__kmp_free_agent_list_insert_pt->th.th_next_free_agent);
 		    else
 		        scan = CCAST(kmp_info_t **, &__kmp_free_agent_list);
-		    for(; (*scan != NULL)&&((*scan)->th.th_info.ds.ds_gtid < gtid);
+		    for(; (*scan != NULL) && ((*scan)->th.th_info.ds.ds_gtid < gtid);
 		            scan = &((*scan)->th.th_next_free_agent));
 		    TCW_PTR(new_thr->th.th_next_free_agent, *scan);
 		    __kmp_free_agent_list_insert_pt = *scan = new_thr;
@@ -10062,9 +10130,10 @@ void __kmp_set_thread_roles2(int tid, omp_role_t r){
 		        __kmp_add_allowed_task_team(th, tt_1);
 		    __kmp_release_bootstrap_lock(&th->th.allowed_teams_lock);
 
-		    KMP_MB();
 		}
 	}
+	th->th.th_potential_roles = r;
+	KMP_MB();
 }
 
 int __kmp_get_thread_id(){

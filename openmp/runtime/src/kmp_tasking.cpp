@@ -2771,7 +2771,8 @@ static kmp_task_t *__kmp_steal_task(kmp_info_t *victim_thr, kmp_int32 gtid,
   kmp_thread_data_t *victim_td, *threads_data;
   kmp_int32 target;
   kmp_int32 victim_tid;
-
+    
+  KMP_DEBUG_ASSERT(victim_thr != NULL);
   KMP_DEBUG_ASSERT(__kmp_tasking_mode != tskm_immediate_exec);
 
   threads_data = task_team->tt.tt_threads_data;

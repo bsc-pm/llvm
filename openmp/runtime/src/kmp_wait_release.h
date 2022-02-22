@@ -550,16 +550,16 @@ final_spin=FALSE)
     	else if(prv_role == OMP_ROLE_FREE_AGENT)
 	    	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
 #if OMPT_SUPPORT
-			ompt_data_t *thread_data = nullptr;
-			if(ompt_enabled.enabled){
-				thread_data = &(this_thr->th.ompt_thread_info.thread_data);
-				
-				if(ompt_enabled.ompt_callback_thread_role_shift){
-					//thread_data, prior_thread_role, next_thread_role
-					ompt_callbacks.ompt_callback(ompt_callback_thread_role_shift)(
-							thread_data, (ompt_role_t)prv_role, (ompt_role_t)nxt_role);
-				}
+		ompt_data_t *thread_data = nullptr;
+		if(ompt_enabled.enabled){
+			thread_data = &(this_thr->th.ompt_thread_info.thread_data);
+			
+			if(ompt_enabled.ompt_callback_thread_role_shift){
+				//thread_data, prior_thread_role, next_thread_role
+				ompt_callbacks.ompt_callback(ompt_callback_thread_role_shift)(
+						thread_data, (ompt_role_t)prv_role, (ompt_role_t)nxt_role);
 			}
+		}
 #endif
     	continue;
     }
