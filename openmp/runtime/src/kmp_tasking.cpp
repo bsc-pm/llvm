@@ -2963,10 +2963,13 @@ static inline int __kmp_execute_tasks_template(
       if (use_own_tasks) { // check on own queue first
         if (thread->th.th_active_role == OMP_ROLE_FREE_AGENT) {
           //The master may have started a new parallel and requested this thread to be one of the workers
+          __kmp_suspend_initialize_thread(thread);
+          __kmp_lock_suspend_mx(thread);
           if(thread->th.th_change_role){
           	KMP_ATOMIC_ST_RLX(&thread->th.th_change_role, false);
           	KMP_ATOMIC_ST_RLX(&thread->th.th_active_role, thread->th.th_pending_role);
           	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+            __kmp_unlock_suspend_mx(thread);
 #if OMPT_SUPPORT
 						ompt_data_t *thread_data = nullptr;
 						if(ompt_enabled.enabled){
@@ -2979,17 +2982,37 @@ static inline int __kmp_execute_tasks_template(
 #endif
           	break;
           }
-          else {
-          	task = __kmp_steal_task(threads_data[tid].td.td_thr, gtid, task_team,
-                                  	unfinished_threads, thread_finished,
-                                  	is_constrained);
-          }
+          __kmp_unlock_suspend_mx(thread);
+          task = __kmp_steal_task(threads_data[tid].td.td_thr, gtid, task_team,
+                                  unfinished_threads, thread_finished,
+                                  is_constrained);
           if(task) thread->th.victim_tid = tid;
         } 
         else {
           task = __kmp_remove_my_task(thread, gtid, task_team, is_constrained);
         }
       }
+      __kmp_suspend_initialize_thread(thread);
+      __kmp_lock_suspend_mx(thread);
+      if(thread->th.th_active_role == OMP_ROLE_FREE_AGENT && thread->th.th_change_role){
+          KMP_ATOMIC_ST_RLX(&thread->th.th_change_role, false);
+          KMP_ATOMIC_ST_RLX(&thread->th.th_active_role, thread->th.th_pending_role);
+          KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+          __kmp_unlock_suspend_mx(thread);
+#if OMPT_SUPPORT
+          ompt_data_t *thread_data = nullptr;
+		  if(ompt_enabled.enabled){
+		      thread_data = &(thread->th.ompt_thread_info.thread_data);
+			  if(ompt_enabled.ompt_callback_thread_role_shift){
+			      ompt_callbacks.ompt_callback(ompt_callback_thread_role_shift)(
+				      thread_data, (ompt_role_t)OMP_ROLE_FREE_AGENT, (ompt_role_t)thread->th.th_pending_role);
+			  }
+		  }
+#endif
+          break;
+      }
+      __kmp_unlock_suspend_mx(thread);
+
       if ((task == NULL) && (nthreads > 1)) { // Steal a task
         int asleep = 1;
         use_own_tasks = 0;

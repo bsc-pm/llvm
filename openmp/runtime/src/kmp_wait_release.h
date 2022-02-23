@@ -20,6 +20,10 @@
 #include "ompt-specific.h"
 #endif
 
+extern "C"{
+void Extrae_event(unsigned type, long long value) __attribute__((weak));
+}
+
 /*!
 @defgroup WAIT_RELEASE Wait/Release operations
 
@@ -540,6 +544,8 @@ final_spin=FALSE)
     kmp_task_team_t *task_team = NULL;
     //if(this_thr->th.th_active_role == OMP_ROLE_FREE_AGENT 
     //	 && this_thr->th.th_change_role){
+    __kmp_suspend_initialize_thread(this_thr);
+    __kmp_lock_suspend_mx(this_thr);
     if(this_thr->th.th_change_role){
     	omp_role_t prv_role = KMP_ATOMIC_LD_RLX(&this_thr->th.th_active_role);
     	omp_role_t nxt_role = this_thr->th.th_pending_role;
@@ -549,6 +555,7 @@ final_spin=FALSE)
     		KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
     	else if(prv_role == OMP_ROLE_FREE_AGENT)
 	    	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+        __kmp_unlock_suspend_mx(this_thr);
 #if OMPT_SUPPORT
 		ompt_data_t *thread_data = nullptr;
 		if(ompt_enabled.enabled){
@@ -563,6 +570,7 @@ final_spin=FALSE)
 #endif
     	continue;
     }
+    __kmp_unlock_suspend_mx(this_thr);
     if (__kmp_tasking_mode != tskm_immediate_exec) {
       task_team = this_thr->th.th_task_team;
       /* If the thread's task team pointer is NULL, it means one of 3 things:
@@ -577,7 +585,8 @@ final_spin=FALSE)
         this_thr->th.th_reap_state = KMP_NOT_SAFE_TO_REAP;
         int empty_task_teams_cnt = 0;
         int team_task_to_pick = 0;
-        while (team_task_to_pick < this_thr->th.allowed_teams_length){
+        while (team_task_to_pick < this_thr->th.allowed_teams_length &&
+                this_thr->th.th_active_role == OMP_ROLE_FREE_AGENT){
           __kmp_acquire_bootstrap_lock(&this_thr->th.allowed_teams_lock);
           task_team = this_thr->th.allowed_teams[team_task_to_pick];
           if ((reinterpret_cast<kmp_uintptr_t>(task_team) & 1) != 0) {
@@ -745,13 +754,19 @@ final_spin=FALSE)
         KMP_ATOMIC_ST_REL(&this_thr->th.th_blocking, false);
 #endif
       //printf("suspending...\n");
+      if(Extrae_event)
+          Extrae_event(500, 0);
       flag->suspend(th_gtid);
+      if(Extrae_event)
+        Extrae_event(500, 1);
     	//TODO:A worker may change its role here too!
     	//Check if the master requested this thread to change its role while suspended
     	//if(this_thr->th.th_active_role == OMP_ROLE_FREE_AGENT
     	//	 && this_thr->th.th_change_role){
+    	__kmp_suspend_initialize_thread(this_thr);
+    	__kmp_lock_suspend_mx(this_thr);
     	if(this_thr->th.th_change_role){
-    	  omp_role_t prv_role = KMP_ATOMIC_LD_RLX(&this_thr->th.th_active_role);
+    	    omp_role_t prv_role = KMP_ATOMIC_LD_RLX(&this_thr->th.th_active_role);
     		omp_role_t nxt_role =  this_thr->th.th_pending_role;
     		KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
     		KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
@@ -759,19 +774,23 @@ final_spin=FALSE)
     			KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
     		else if(prv_role == OMP_ROLE_FREE_AGENT)
 	    		KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+            __kmp_unlock_suspend_mx(this_thr);
 #if OMPT_SUPPORT
-				ompt_data_t *thread_data = nullptr;
-				if(ompt_enabled.enabled){
-					thread_data = &(this_thr->th.ompt_thread_info.thread_data);
-				
-					if(ompt_enabled.ompt_callback_thread_role_shift){
-						//thread_data, prior_thread_role, next_thread_role
-						ompt_callbacks.ompt_callback(ompt_callback_thread_role_shift)(
-								thread_data, (ompt_role_t)prv_role, (ompt_role_t)nxt_role);
-					}
+			ompt_data_t *thread_data = nullptr;
+			if(ompt_enabled.enabled){
+				thread_data = &(this_thr->th.ompt_thread_info.thread_data);
+			
+				if(ompt_enabled.ompt_callback_thread_role_shift){
+					//thread_data, prior_thread_role, next_thread_role
+					ompt_callbacks.ompt_callback(ompt_callback_thread_role_shift)(
+							thread_data, (ompt_role_t)prv_role, (ompt_role_t)nxt_role);
 				}
+			}
 #endif
     	}
+    	else{
+        	__kmp_unlock_suspend_mx(this_thr);
+        }
 #if KMP_OS_UNIX
       if (final_spin)
         KMP_ATOMIC_ST_REL(&this_thr->th.th_blocking, true);
