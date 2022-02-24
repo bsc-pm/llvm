@@ -939,7 +939,7 @@ static void __kmp_task_finish(kmp_int32 gtid, kmp_task_t *task,
     if (!(taskdata->td_flags.team_serial || taskdata->td_flags.tasking_ser) ||
         taskdata->td_flags.detachable == TASK_DETACHABLE ||
         taskdata->td_flags.hidden_helper ||
-        __kmp_free_agent_num_threads != 0) {
+       ( __kmp_free_agent_num_threads != 0)){// && __kmp_free_agent_list != NULL)) {
       __kmp_release_deps(gtid, taskdata);
       // Predecrement simulated by "- 1" calculation
 #if KMP_DEBUG
