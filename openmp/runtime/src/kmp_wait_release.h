@@ -754,11 +754,34 @@ final_spin=FALSE)
         KMP_ATOMIC_ST_REL(&this_thr->th.th_blocking, false);
 #endif
       //printf("suspending...\n");
-      if(Extrae_event)
-          Extrae_event(500, 0);
-      flag->suspend(th_gtid);
-      if(Extrae_event)
-        Extrae_event(500, 1);
+      __kmp_suspend_initialize_thread(this_thr);
+      __kmp_lock_suspend_mx(this_thr);
+      if(this_thr->th.th_change_role && this_thr->th.th_pending_role == OMP_ROLE_FREE_AGENT){
+    	    omp_role_t prv_role = KMP_ATOMIC_LD_RLX(&this_thr->th.th_active_role);
+    		omp_role_t nxt_role =  this_thr->th.th_pending_role;
+    		KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
+    		KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
+    		KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
+            __kmp_unlock_suspend_mx(this_thr);
+#if OMPT_SUPPORT
+			ompt_data_t *thread_data = nullptr;
+			if(ompt_enabled.enabled){
+				thread_data = &(this_thr->th.ompt_thread_info.thread_data);
+			
+				if(ompt_enabled.ompt_callback_thread_role_shift){
+					//thread_data, prior_thread_role, next_thread_role
+					ompt_callbacks.ompt_callback(ompt_callback_thread_role_shift)(
+							thread_data, (ompt_role_t)prv_role, (ompt_role_t)nxt_role);
+				}
+			}
+#endif
+      }
+      else{
+          __kmp_unlock_suspend_mx(this_thr);
+          if(Extrae_event) Extrae_event(500, 0);
+          flag->suspend(th_gtid);
+          if(Extrae_event) Extrae_event(500, 1);
+      }
     	//TODO:A worker may change its role here too!
     	//Check if the master requested this thread to change its role while suspended
     	//if(this_thr->th.th_active_role == OMP_ROLE_FREE_AGENT

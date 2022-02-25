@@ -2980,19 +2980,21 @@ static inline int __kmp_execute_tasks_template(
 							}
 						}
 #endif
-          	break;
+          	//break;
           }
-          __kmp_unlock_suspend_mx(thread);
-          task = __kmp_steal_task(threads_data[tid].td.td_thr, gtid, task_team,
-                                  unfinished_threads, thread_finished,
-                                  is_constrained);
-          if(task) thread->th.victim_tid = tid;
+          else{
+            __kmp_unlock_suspend_mx(thread);
+            task = __kmp_steal_task(threads_data[tid].td.td_thr, gtid, task_team,
+                                      unfinished_threads, thread_finished,
+                                      is_constrained);
+            if(task) thread->th.victim_tid = tid;
+          }
         } 
         else {
           task = __kmp_remove_my_task(thread, gtid, task_team, is_constrained);
         }
       }
-      __kmp_suspend_initialize_thread(thread);
+      /*__kmp_suspend_initialize_thread(thread);
       __kmp_lock_suspend_mx(thread);
       if(thread->th.th_active_role == OMP_ROLE_FREE_AGENT && thread->th.th_change_role){
           KMP_ATOMIC_ST_RLX(&thread->th.th_change_role, false);
@@ -3011,7 +3013,7 @@ static inline int __kmp_execute_tasks_template(
 #endif
           break;
       }
-      __kmp_unlock_suspend_mx(thread);
+      __kmp_unlock_suspend_mx(thread);*/
 
       if ((task == NULL) && (nthreads > 1)) { // Steal a task
         int asleep = 1;
