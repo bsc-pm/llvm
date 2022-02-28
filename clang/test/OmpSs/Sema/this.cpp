@@ -19,4 +19,6 @@ void S::foo() {
     int i;
     #pragma oss task out(array[i]) firstprivate(i)
     {}
+    #pragma oss task out(array[i]) out(array[i]) firstprivate(i)
+    {}
 }
