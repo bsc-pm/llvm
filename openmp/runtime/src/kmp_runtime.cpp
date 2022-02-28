@@ -10108,6 +10108,7 @@ void __kmp_set_thread_roles1(int how_many, omp_role_t r){
 }
 
 void __kmp_set_thread_roles2(int tid, omp_role_t r){
+	if(__kmp_threads == NULL) return; //TODO: solve this from DLB and not here. It's not a runtime bug
 	int gtid;
 	int tmp = 1;
 	if(tid != 0){
