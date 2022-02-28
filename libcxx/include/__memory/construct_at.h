@@ -10,8 +10,8 @@
 #ifndef _LIBCPP___MEMORY_CONSTRUCT_AT_H
 #define _LIBCPP___MEMORY_CONSTRUCT_AT_H
 
+#include <__assert>
 #include <__config>
-#include <__debug>
 #include <__iterator/access.h>
 #include <__memory/addressof.h>
 #include <__memory/voidify.h>
@@ -21,6 +21,7 @@
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #  pragma GCC system_header
+#  pragma clang include_instead(<memory>)
 #endif
 
 _LIBCPP_BEGIN_NAMESPACE_STD

@@ -1,9 +1,6 @@
 // RUN: %libomp-compile -mlong-double-80 && %libomp-run
 // UNSUPPORTED: gcc
-// UNSUPPORTED: powerpc
-// UNSUPPORTED: riscv64
-// UNSUPPORTED: ppc64le
-// UNSUPPORTED: aarch64
+// REQUIRES: x86-registered-target
 
 #include <stdio.h>
 #include <omp.h>

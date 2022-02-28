@@ -11,10 +11,10 @@
 
 #include <__config>
 #include <__utility/swap.h>
-#include <type_traits>
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #  pragma GCC system_header
+#  pragma clang include_instead(<algorithm>)
 #endif
 
 _LIBCPP_BEGIN_NAMESPACE_STD

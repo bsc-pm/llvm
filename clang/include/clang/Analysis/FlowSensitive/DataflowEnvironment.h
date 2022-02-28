@@ -49,6 +49,11 @@ enum class SkipPast {
 };
 
 /// Holds the state of the program (store and heap) at a given program point.
+///
+/// WARNING: Symbolic values that are created by the environment for static
+/// local and global variables are not currently invalidated on function calls.
+/// This is unsound and should be taken into account when designing dataflow
+/// analyses.
 class Environment {
 public:
   /// Supplements `Environment` with non-standard comparison and join
@@ -226,7 +231,7 @@ public:
 
   /// Returns a symbolic boolean value that models a boolean literal equal to
   /// `Value`
-  BoolValue &getBoolLiteralValue(bool Value) const {
+  AtomicBoolValue &getBoolLiteralValue(bool Value) const {
     return DACtx->getBoolLiteralValue(Value);
   }
 
@@ -243,7 +248,8 @@ private:
   ///
   ///  `Type` must not be null.
   Value *createValueUnlessSelfReferential(QualType Type,
-                                          llvm::DenseSet<QualType> &Visited);
+                                          llvm::DenseSet<QualType> &Visited,
+                                          int Depth, int &CreatedValuesCount);
 
   StorageLocation &skip(StorageLocation &Loc, SkipPast SP) const;
   const StorageLocation &skip(const StorageLocation &Loc, SkipPast SP) const;
@@ -259,6 +265,12 @@ private:
   llvm::DenseMap<const Expr *, StorageLocation *> ExprToLoc;
 
   llvm::DenseMap<const StorageLocation *, Value *> LocToVal;
+
+  // Maps locations of struct members to symbolic values of the structs that own
+  // them and the decls of the struct members.
+  llvm::DenseMap<const StorageLocation *,
+                 std::pair<StructValue *, const ValueDecl *>>
+      MemberLocToStruct;
 
   // FIXME: Add flow condition constraints.
 };

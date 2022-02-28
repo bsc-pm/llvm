@@ -5,6 +5,6 @@ int main(void) {
     #pragma oss taskwait
 }
 
-// CHECK: int main() {
+// CHECK: int main(void) {
 // CHECK-NEXT:     #pragma oss taskwait
 // CHECK-NEXT: }

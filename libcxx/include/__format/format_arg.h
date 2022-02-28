@@ -10,23 +10,22 @@
 #ifndef _LIBCPP___FORMAT_FORMAT_ARG_H
 #define _LIBCPP___FORMAT_FORMAT_ARG_H
 
+#include <__assert>
 #include <__concepts/arithmetic.h>
 #include <__config>
 #include <__format/format_error.h>
 #include <__format/format_fwd.h>
 #include <__format/format_parse_context.h>
-#include <__functional_base>
 #include <__memory/addressof.h>
+#include <__utility/unreachable.h>
 #include <__variant/monostate.h>
 #include <string>
 #include <string_view>
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #  pragma GCC system_header
+#  pragma clang include_instead(<format>)
 #endif
-
-_LIBCPP_PUSH_MACROS
-#include <__undef_macros>
 
 _LIBCPP_BEGIN_NAMESPACE_STD
 
@@ -81,7 +80,7 @@ visit_format_arg(_Visitor&& __vis, basic_format_arg<_Context> __arg) {
 #ifndef _LIBCPP_HAS_NO_INT128
     return _VSTD::invoke(_VSTD::forward<_Visitor>(__vis), __arg.__i128);
 #else
-    _LIBCPP_UNREACHABLE();
+    __libcpp_unreachable();
 #endif
   case __format::__arg_t::__unsigned:
     return _VSTD::invoke(_VSTD::forward<_Visitor>(__vis), __arg.__unsigned);
@@ -92,7 +91,7 @@ visit_format_arg(_Visitor&& __vis, basic_format_arg<_Context> __arg) {
 #ifndef _LIBCPP_HAS_NO_INT128
     return _VSTD::invoke(_VSTD::forward<_Visitor>(__vis), __arg.__u128);
 #else
-   _LIBCPP_UNREACHABLE();
+   __libcpp_unreachable();
 #endif
   case __format::__arg_t::__float:
     return _VSTD::invoke(_VSTD::forward<_Visitor>(__vis), __arg.__float);
@@ -110,7 +109,7 @@ visit_format_arg(_Visitor&& __vis, basic_format_arg<_Context> __arg) {
   case __format::__arg_t::__handle:
     return _VSTD::invoke(_VSTD::forward<_Visitor>(__vis), __arg.__handle);
   }
-  _LIBCPP_UNREACHABLE();
+  __libcpp_unreachable();
 }
 
 template <class _Context>
@@ -286,7 +285,5 @@ private:
 #endif //_LIBCPP_STD_VER > 17
 
 _LIBCPP_END_NAMESPACE_STD
-
-_LIBCPP_POP_MACROS
 
 #endif // _LIBCPP___FORMAT_FORMAT_ARG_H

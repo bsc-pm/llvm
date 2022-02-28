@@ -10,11 +10,12 @@
 #define _LIBCPP___ALGORITHM_CLAMP_H
 
 #include <__algorithm/comp.h>
+#include <__assert>
 #include <__config>
-#include <__debug>
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #  pragma GCC system_header
+#  pragma clang include_instead(<algorithm>)
 #endif
 
 _LIBCPP_BEGIN_NAMESPACE_STD

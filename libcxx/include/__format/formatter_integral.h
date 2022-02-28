@@ -14,11 +14,13 @@
 #include <__algorithm/copy_n.h>
 #include <__algorithm/fill_n.h>
 #include <__algorithm/transform.h>
+#include <__assert>
 #include <__config>
 #include <__format/format_error.h>
 #include <__format/format_fwd.h>
 #include <__format/formatter.h>
 #include <__format/parser_std_format_spec.h>
+#include <__utility/unreachable.h>
 #include <array>
 #include <charconv>
 #include <concepts>
@@ -31,6 +33,7 @@
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #  pragma GCC system_header
+#  pragma clang include_instead(<format>)
 #endif
 
 _LIBCPP_PUSH_MACROS
@@ -176,7 +179,7 @@ __determine_grouping(ptrdiff_t __size, const string& __grouping) {
     }
   }
 
-  _LIBCPP_UNREACHABLE();
+  __libcpp_unreachable();
 }
 
 template <class _Parser>
@@ -292,7 +295,7 @@ private:
     }
     default:
       _LIBCPP_ASSERT(false, "The parser should have validated the type");
-      _LIBCPP_UNREACHABLE();
+      __libcpp_unreachable();
     }
   }
 

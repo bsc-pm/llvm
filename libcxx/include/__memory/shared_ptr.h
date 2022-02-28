@@ -15,7 +15,6 @@
 #include <__functional/binary_function.h>
 #include <__functional/operations.h>
 #include <__functional/reference_wrapper.h>
-#include <__functional_base>
 #include <__memory/addressof.h>
 #include <__memory/allocation_guard.h>
 #include <__memory/allocator.h>
@@ -41,6 +40,7 @@
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #  pragma GCC system_header
+#  pragma clang include_instead(<memory>)
 #endif
 
 _LIBCPP_BEGIN_NAMESPACE_STD

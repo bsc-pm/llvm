@@ -14,6 +14,7 @@
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #  pragma GCC system_header
+#  pragma clang include_instead(<concepts>)
 #endif
 
 _LIBCPP_BEGIN_NAMESPACE_STD
@@ -26,6 +27,7 @@ template<class _Tp>
 concept __class_or_enum = is_class_v<_Tp> || is_union_v<_Tp> || is_enum_v<_Tp>;
 
 // Work around Clang bug https://llvm.org/PR52970
+// TODO: remove this workaround once libc++ no longer has to support Clang 13 (it was fixed in Clang 14).
 template<class _Tp>
 concept __workaround_52970 = is_class_v<__uncvref_t<_Tp>> || is_union_v<__uncvref_t<_Tp>>;
 

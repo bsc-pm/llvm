@@ -17,9 +17,9 @@
 #include <__algorithm/min.h>
 #include <__algorithm/rotate.h>
 #include <__algorithm/transform.h>
+#include <__assert>
 #include <__concepts/arithmetic.h>
 #include <__config>
-#include <__debug>
 #include <__format/format_error.h>
 #include <__format/format_fwd.h>
 #include <__format/format_string.h>
@@ -27,6 +27,7 @@
 #include <__format/formatter_integral.h>
 #include <__format/parser_std_format_spec.h>
 #include <__utility/move.h>
+#include <__utility/unreachable.h>
 #include <charconv>
 #include <cmath>
 
@@ -36,6 +37,7 @@
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #  pragma GCC system_header
+#  pragma clang include_instead(<format>)
 #endif
 
 _LIBCPP_PUSH_MACROS
@@ -689,7 +691,7 @@ private:
 
     default:
       _LIBCPP_ASSERT(false, "The parser should have validated the type");
-      _LIBCPP_UNREACHABLE();
+      __libcpp_unreachable();
     }
   }
 };

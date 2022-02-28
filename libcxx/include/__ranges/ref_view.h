@@ -27,11 +27,12 @@
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #  pragma GCC system_header
+#  pragma clang include_instead(<ranges>)
 #endif
 
 _LIBCPP_BEGIN_NAMESPACE_STD
 
-#if !defined(_LIBCPP_HAS_NO_CONCEPTS)
+#if !defined(_LIBCPP_HAS_NO_CONCEPTS) && !defined(_LIBCPP_HAS_NO_INCOMPLETE_RANGES)
 
 namespace ranges {
   template<range _Range>
@@ -48,7 +49,7 @@ public:
         convertible_to<_Tp, _Range&> && requires { __fun(declval<_Tp>()); }
     _LIBCPP_HIDE_FROM_ABI
     constexpr ref_view(_Tp&& __t)
-      : __range_(_VSTD::addressof(static_cast<_Range&>(_VSTD::forward<_Tp>(__t))))
+      : __range_(std::addressof(static_cast<_Range&>(std::forward<_Tp>(__t))))
     {}
 
     _LIBCPP_HIDE_FROM_ABI constexpr _Range& base() const { return *__range_; }
@@ -79,7 +80,7 @@ public:
   inline constexpr bool enable_borrowed_range<ref_view<_Tp>> = true;
 } // namespace ranges
 
-#endif // !defined(_LIBCPP_HAS_NO_CONCEPTS)
+#endif // !defined(_LIBCPP_HAS_NO_CONCEPTS) && !defined(_LIBCPP_HAS_NO_INCOMPLETE_RANGES)
 
 _LIBCPP_END_NAMESPACE_STD
 

@@ -56,7 +56,7 @@
 
 #include <limits.h>
 #include <stdlib.h>
-#include <__threading_support>
+#include "threading_support.h"
 #ifndef _LIBCXXABI_HAS_NO_THREADS
 #  if defined(__ELF__) && defined(_LIBCXXABI_LINK_PTHREAD_LIB)
 #    pragma comment(lib, "pthread")
@@ -619,7 +619,7 @@ struct GlobalStatic {
   static T instance;
 };
 template <class T>
-_LIBCPP_SAFE_STATIC T GlobalStatic<T>::instance = {};
+_LIBCPP_CONSTINIT T GlobalStatic<T>::instance = {};
 
 enum class Implementation { NoThreads, GlobalMutex, Futex };
 

@@ -11,20 +11,20 @@
 #define _LIBCPP___FORMAT_FORMATTER_POINTER_H
 
 #include <__algorithm/copy.h>
+#include <__assert>
 #include <__availability>
 #include <__config>
-#include <__debug>
 #include <__format/format_error.h>
 #include <__format/format_fwd.h>
 #include <__format/formatter.h>
 #include <__format/formatter_integral.h>
 #include <__format/parser_std_format_spec.h>
 #include <__iterator/access.h>
-#include <__nullptr>
 #include <cstdint>
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #  pragma GCC system_header
+#  pragma clang include_instead(<format>)
 #endif
 
 _LIBCPP_BEGIN_NAMESPACE_STD

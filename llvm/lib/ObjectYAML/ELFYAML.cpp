@@ -29,6 +29,8 @@ namespace llvm {
 ELFYAML::Chunk::~Chunk() = default;
 
 namespace ELFYAML {
+ELF_ELFOSABI Object::getOSAbi() const { return Header.OSABI; }
+
 unsigned Object::getMachine() const {
   if (Header.Machine)
     return *Header.Machine;
@@ -344,6 +346,7 @@ void ScalarEnumerationTraits<ELFYAML::ELF_EM>::enumeration(
   ECase(EM_BPF);
   ECase(EM_VE);
   ECase(EM_CSKY);
+  ECase(EM_LOONGARCH);
 #undef ECase
   IO.enumFallback<Hex16>(Value);
 }
@@ -705,7 +708,14 @@ void ScalarBitSetTraits<ELFYAML::ELF_SHF>::bitset(IO &IO,
   BCase(SHF_GROUP);
   BCase(SHF_TLS);
   BCase(SHF_COMPRESSED);
-  BCase(SHF_GNU_RETAIN);
+  switch (Object->getOSAbi()) {
+  case ELF::ELFOSABI_SOLARIS:
+    BCase(SHF_SUNW_NODISCARD);
+    break;
+  default:
+    BCase(SHF_GNU_RETAIN);
+    break;
+  }
   switch (Object->getMachine()) {
   case ELF::EM_ARM:
     BCase(SHF_ARM_PURECODE);
@@ -847,6 +857,9 @@ void ScalarEnumerationTraits<ELFYAML::ELF_REL>::enumeration(
     break;
   case ELF::EM_68K:
 #include "llvm/BinaryFormat/ELFRelocs/M68k.def"
+    break;
+  case ELF::EM_LOONGARCH:
+#include "llvm/BinaryFormat/ELFRelocs/LoongArch.def"
     break;
   default:
     // Nothing to do.

@@ -27,6 +27,7 @@
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/CFG.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
@@ -40,6 +41,7 @@
 #include "llvm/Support/GraphWriter.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
 #include <cassert>
 #include <iterator>
 #include <string>
@@ -60,7 +62,7 @@ raw_ostream &llvm::operator<<(raw_ostream &OS, const VPValue &V) {
 }
 #endif
 
-Value *VPLane::getAsRuntimeExpr(IRBuilder<> &Builder,
+Value *VPLane::getAsRuntimeExpr(IRBuilderBase &Builder,
                                 const ElementCount &VF) const {
   switch (LaneKind) {
   case VPLane::Kind::ScalableLast:
@@ -640,7 +642,7 @@ void VPRecipeBase::moveBefore(VPBasicBlock &BB,
 
 void VPInstruction::generateInstruction(VPTransformState &State,
                                         unsigned Part) {
-  IRBuilder<> &Builder = State.Builder;
+  IRBuilderBase &Builder = State.Builder;
   Builder.SetCurrentDebugLocation(DL);
 
   if (Instruction::isBinaryOp(getOpcode())) {
@@ -1395,6 +1397,27 @@ void VPCanonicalIVPHIRecipe::print(raw_ostream &O, const Twine &Indent,
   O << Indent << "EMIT ";
   printAsOperand(O, SlotTracker);
   O << " = CANONICAL-INDUCTION";
+}
+#endif
+
+void VPExpandSCEVRecipe::execute(VPTransformState &State) {
+  assert(!State.Instance && "cannot be used in per-lane");
+  const DataLayout &DL =
+      State.CFG.VectorPreHeader->getModule()->getDataLayout();
+  SCEVExpander Exp(SE, DL, "induction");
+  Value *Res = Exp.expandCodeFor(Expr, Expr->getType(),
+                                 State.CFG.VectorPreHeader->getTerminator());
+
+  for (unsigned Part = 0, UF = State.UF; Part < UF; ++Part)
+    State.set(this, Res, Part);
+}
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+void VPExpandSCEVRecipe::print(raw_ostream &O, const Twine &Indent,
+                               VPSlotTracker &SlotTracker) const {
+  O << Indent << "EMIT ";
+  getVPSingleValue()->printAsOperand(O, SlotTracker);
+  O << " = EXPAND SCEV " << *Expr;
 }
 #endif
 

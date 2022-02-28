@@ -16,6 +16,7 @@
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #  pragma GCC system_header
+#  pragma clang include_instead(<ranges>)
 #endif
 
 _LIBCPP_BEGIN_NAMESPACE_STD
@@ -40,7 +41,7 @@ inline constexpr bool enable_view = derived_from<_Tp, view_base> ||
 
 } // namespace ranges
 
-#endif // !_LIBCPP_HAS_NO_CONCEPTS
+#endif // !defined(_LIBCPP_HAS_NO_CONCEPTS)
 
 _LIBCPP_END_NAMESPACE_STD
 

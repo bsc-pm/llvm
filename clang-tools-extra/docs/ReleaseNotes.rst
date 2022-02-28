@@ -99,11 +99,22 @@ Improvements to clang-tidy
 New checks
 ^^^^^^^^^^
 
+- New :doc:`bugprone-shared-ptr-array-mismatch <clang-tidy/checks/bugprone-shared-ptr-array-mismatch>` check.
+
+  Finds initializations of C++ shared pointers to non-array type that are initialized with an array.
+
 New check aliases
 ^^^^^^^^^^^^^^^^^
 
 Changes in existing checks
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+- Fixed a false positive in :doc:`readability-non-const-parameter
+  <clang-tidy/checks/readability-non-const-parameter>` when the parameter is referenced by an lvalue
+
+- Fixed a crash in :doc:`readability-suspicious-call-argument
+  <clang-tidy/checks/readability-suspicious-call-argument>` related to passing
+  arguments that refer to program elements without a trivial identifier.
 
 Removed checks
 ^^^^^^^^^^^^^^

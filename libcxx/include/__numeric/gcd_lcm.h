@@ -10,13 +10,14 @@
 #ifndef _LIBCPP___NUMERIC_GCD_LCM_H
 #define _LIBCPP___NUMERIC_GCD_LCM_H
 
+#include <__assert>
 #include <__config>
-#include <__debug>
 #include <limits>
 #include <type_traits>
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #  pragma GCC system_header
+#  pragma clang include_instead(<numeric>)
 #endif
 
 _LIBCPP_PUSH_MACROS

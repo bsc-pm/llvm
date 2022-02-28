@@ -10,7 +10,8 @@ Batch = S.Batch
 def matmul(
     A=TensorDef(T1, S.M, S.K),
     B=TensorDef(T2, S.K, S.N),
-    C=TensorDef(U, S.M, S.N, output=True)):
+    C=TensorDef(U, S.M, S.N, output=True),
+    cast=TypeFnAttrDef(default=TypeFn.cast)):
   """Performs a matrix multiplication of two 2D inputs.
 
   Numeric casting is performed on the operands to the inner multiply, promoting
@@ -18,7 +19,7 @@ def matmul(
   """
   domain(D.m, D.n, D.k)
   implements(ContractionOpInterface)
-  C[D.m, D.n] += TypeFn.cast(U, A[D.m, D.k]) * TypeFn.cast(U, B[D.k, D.n])
+  C[D.m, D.n] += cast(U, A[D.m, D.k]) * cast(U, B[D.k, D.n])
 
 
 @linalg_structured_op
@@ -224,8 +225,8 @@ def conv_1d_nwc_wcf(
     I=TensorDef(T1, S.N, S.OW * S.SW + S.KW * S.DW, S.C),
     K=TensorDef(T2, S.KW, S.C, S.F),
     O=TensorDef(U, S.N, S.OW, S.F, output=True),
-    strides=IndexAttrDef(S.SW),
-    dilations=IndexAttrDef(S.DW)):
+    strides=IndexAttrDef(S.SW, default=[1]),
+    dilations=IndexAttrDef(S.DW, default=[1])):
   """Performs 1-D convolution.
 
   Numeric casting is performed on the operands to the inner multiply, promoting
@@ -244,8 +245,8 @@ def conv_2d_nhwc_hwcf(
                 S.C),
     K=TensorDef(T2, S.KH, S.KW, S.C, S.F),
     O=TensorDef(U, S.N, S.OH, S.OW, S.F, output=True),
-    strides=IndexAttrDef(S.SH, S.SW),
-    dilations=IndexAttrDef(S.DH, S.DW)):
+    strides=IndexAttrDef(S.SH, S.SW, default=[1, 1]),
+    dilations=IndexAttrDef(S.DH, S.DW, default=[1, 1])):
   """Performs 2-D convolution.
 
   Layout:
@@ -270,8 +271,8 @@ def conv_2d_nhwc_hwcf_q(
     IZp=ScalarDef(I32),
     KZp=ScalarDef(I32),
     O=TensorDef(U, S.N, S.OH, S.OW, S.F, output=True),
-    strides=IndexAttrDef(S.SH, S.SW),
-    dilations=IndexAttrDef(S.DH, S.DW)):
+    strides=IndexAttrDef(S.SH, S.SW, default=[1, 1]),
+    dilations=IndexAttrDef(S.DH, S.DW, default=[1, 1])):
   """Performs 2-D convolution with zero point offsets.
 
   Layout:
@@ -297,8 +298,8 @@ def conv_2d_nchw_fchw(
                 S.OW * S.SW + S.KW * S.DW),
     K=TensorDef(T2, S.F, S.C, S.KH, S.KW),
     O=TensorDef(U, S.N, S.F, S.OH, S.OW, output=True),
-    strides=IndexAttrDef(S.SH, S.SW),
-    dilations=IndexAttrDef(S.DH, S.DW)):
+    strides=IndexAttrDef(S.SH, S.SW, default=[1, 1]),
+    dilations=IndexAttrDef(S.DH, S.DW, default=[1, 1])):
   """Performs 2-D convolution.
 
   Layout:
@@ -321,8 +322,8 @@ def conv_3d_ndhwc_dhwcf(
                 S.OW * S.SW + S.KW * S.DW, S.C),
     K=TensorDef(T2, S.KD, S.KH, S.KW, S.C, S.F),
     O=TensorDef(U, S.N, S.OD, S.OH, S.OW, S.F, output=True),
-    strides=IndexAttrDef(S.SD, S.SH, S.SW),
-    dilations=IndexAttrDef(S.DD, S.DH, S.DW)):
+    strides=IndexAttrDef(S.SD, S.SH, S.SW, default=[1, 1, 1]),
+    dilations=IndexAttrDef(S.DD, S.DH, S.DW, default=[1, 1, 1])):
   """Performs 3-D convolution.
 
   Numeric casting is performed on the operands to the inner multiply, promoting
@@ -341,8 +342,8 @@ def depthwise_conv_1d_nwc_wc(
     I=TensorDef(T1, S.N, S.OW * S.SW + S.KW * S.DW, S.IC),
     K=TensorDef(T2, S.KW, S.IC),
     O=TensorDef(U, S.N, S.OW, S.IC, output=True),
-    strides=IndexAttrDef(S.SW),
-    dilations=IndexAttrDef(S.DW)):
+    strides=IndexAttrDef(S.SW, default=[1]),
+    dilations=IndexAttrDef(S.DW, default=[1])):
   """Performs depth-wise 1-D convolution.
 
   Numeric casting is performed on the operands to the inner multiply, promoting
@@ -362,8 +363,8 @@ def depthwise_conv_2d_nhwc_hwc(
                 S.IC),
     K=TensorDef(T2, S.KH, S.KW, S.IC),
     O=TensorDef(U, S.N, S.OH, S.OW, S.IC, output=True),
-    strides=IndexAttrDef(S.SH, S.SW),
-    dilations=IndexAttrDef(S.DH, S.DW)):
+    strides=IndexAttrDef(S.SH, S.SW, default=[1, 1]),
+    dilations=IndexAttrDef(S.DH, S.DW, default=[1, 1])):
   """Performs depth-wise 2-D convolution.
 
   Numeric casting is performed on the operands to the inner multiply, promoting
@@ -385,8 +386,8 @@ def depthwise_conv_2d_nhwc_hwc_q(
     IZp=ScalarDef(I32),
     KZp=ScalarDef(I32),
     O=TensorDef(U, S.N, S.OH, S.OW, S.IC, output=True),
-    strides=IndexAttrDef(S.SH, S.SW),
-    dilations=IndexAttrDef(S.DH, S.DW)):
+    strides=IndexAttrDef(S.SH, S.SW, default=[1, 1]),
+    dilations=IndexAttrDef(S.DH, S.DW, default=[1, 1])):
   """Performs depth-wise 2-D convolution.
 
   Numeric casting is performed on the operands to the inner multiply, promoting
@@ -407,8 +408,8 @@ def depthwise_conv_2d_nhwc_hwcm(
                 S.IC),
     K=TensorDef(T2, S.KH, S.KW, S.IC, S.CM),
     O=TensorDef(U, S.N, S.OH, S.OW, S.IC, S.CM, output=True),
-    strides=IndexAttrDef(S.SH, S.SW),
-    dilations=IndexAttrDef(S.DH, S.DW)):
+    strides=IndexAttrDef(S.SH, S.SW, default=[1, 1]),
+    dilations=IndexAttrDef(S.DH, S.DW, default=[1, 1])):
   """Performs depth-wise 2-D convolution.
 
   Numeric casting is performed on the operands to the inner multiply, promoting
@@ -429,8 +430,8 @@ def depthwise_conv_2d_nhwc_hwcm_q(
     IZp=ScalarDef(I32),
     KZp=ScalarDef(I32),
     O=TensorDef(U, S.N, S.OH, S.OW, S.IC, S.CM, output=True),
-    strides=IndexAttrDef(S.SH, S.SW),
-    dilations=IndexAttrDef(S.DH, S.DW)):
+    strides=IndexAttrDef(S.SH, S.SW, default=[1, 1]),
+    dilations=IndexAttrDef(S.DH, S.DW, default=[1, 1])):
   """Performs depth-wise 2-D convolution.
 
   Numeric casting is performed on the operands to the inner multiply, promoting
@@ -451,8 +452,8 @@ def pooling_nhwc_sum(
                 S.C),
     K=TensorDef(T2, S.KH, S.KW, index_dims=[D.kh, D.kw]),
     O=TensorDef(U, S.N, S.OH, S.OW, S.C, output=True),
-    strides=IndexAttrDef(S.SH, S.SW),
-    dilations=IndexAttrDef(S.DH, S.DW)):
+    strides=IndexAttrDef(S.SH, S.SW, default=[1, 1]),
+    dilations=IndexAttrDef(S.DH, S.DW, default=[1, 1])):
   """Performs sum pooling.
 
   Numeric casting is performed on the input operand, promoting it to the same
@@ -470,8 +471,8 @@ def pooling_nhwc_max(
                 S.C),
     K=TensorDef(T2, S.KH, S.KW, index_dims=[D.kh, D.kw]),
     O=TensorDef(U, S.N, S.OH, S.OW, S.C, output=True),
-    strides=IndexAttrDef(S.SH, S.SW),
-    dilations=IndexAttrDef(S.DH, S.DW)):
+    strides=IndexAttrDef(S.SH, S.SW, default=[1, 1]),
+    dilations=IndexAttrDef(S.DH, S.DW, default=[1, 1])):
   """Performs max pooling.
 
   Numeric casting is performed on the input operand, promoting it to the same
@@ -490,8 +491,8 @@ def pooling_nhwc_max_unsigned(
                 S.C),
     K=TensorDef(T2, S.KH, S.KW, index_dims=[D.kh, D.kw]),
     O=TensorDef(U, S.N, S.OH, S.OW, S.C, output=True),
-    strides=IndexAttrDef(S.SH, S.SW),
-    dilations=IndexAttrDef(S.DH, S.DW)):
+    strides=IndexAttrDef(S.SH, S.SW, default=[1, 1]),
+    dilations=IndexAttrDef(S.DH, S.DW, default=[1, 1])):
   """Performs unsigned max pooling.
 
   Numeric casting is performed on the input operand, promoting it to the same
@@ -510,8 +511,8 @@ def pooling_nchw_max(
                 S.OW * S.SW + S.KW * S.DW),
     K=TensorDef(T2, S.KH, S.KW, index_dims=[D.kh, D.kw]),
     O=TensorDef(U, S.N, S.C, S.OH, S.OW, output=True),
-    strides=IndexAttrDef(S.SH, S.SW),
-    dilations=IndexAttrDef(S.DH, S.DW)):
+    strides=IndexAttrDef(S.SH, S.SW, default=[1, 1]),
+    dilations=IndexAttrDef(S.DH, S.DW, default=[1, 1])):
   """Performs max pooling.
 
   Numeric casting is performed on the input operand, promoting it to the same
@@ -531,8 +532,8 @@ def pooling_nhwc_min(
                 S.C),
     K=TensorDef(T2, S.KH, S.KW, index_dims=[D.kh, D.kw]),
     O=TensorDef(U, S.N, S.OH, S.OW, S.C, output=True),
-    strides=IndexAttrDef(S.SH, S.SW),
-    dilations=IndexAttrDef(S.DH, S.DW)):
+    strides=IndexAttrDef(S.SH, S.SW, default=[1, 1]),
+    dilations=IndexAttrDef(S.DH, S.DW, default=[1, 1])):
   """Performs min pooling.
 
   Numeric casting is performed on the input operand, promoting it to the same
@@ -551,8 +552,8 @@ def pooling_nhwc_min_unsigned(
                 S.C),
     K=TensorDef(T2, S.KH, S.KW, index_dims=[D.kh, D.kw]),
     O=TensorDef(U, S.N, S.OH, S.OW, S.C, output=True),
-    strides=IndexAttrDef(S.SH, S.SW),
-    dilations=IndexAttrDef(S.DH, S.DW)):
+    strides=IndexAttrDef(S.SH, S.SW, default=[1, 1]),
+    dilations=IndexAttrDef(S.DH, S.DW, default=[1, 1])):
   """Performs unsigned min pooling.
 
   Numeric casting is performed on the input operand, promoting it to the same
@@ -571,8 +572,8 @@ def pooling_ndhwc_sum(
                 S.OW * S.SW + S.KW * S.DW, S.C),
     K=TensorDef(T2, S.KD, S.KH, S.KW, index_dims=[D.kd, D.kh, D.kw]),
     O=TensorDef(U, S.N, S.OD, S.OH, S.OW, S.C, output=True),
-    strides=IndexAttrDef(S.SD, S.SH, S.SW),
-    dilations=IndexAttrDef(S.DD, S.DH, S.DW)):
+    strides=IndexAttrDef(S.SD, S.SH, S.SW, default=[1, 1, 1]),
+    dilations=IndexAttrDef(S.DD, S.DH, S.DW, default=[1, 1, 1])):
   """Performs 3D sum pooling.
 
   Numeric casting is performed on the input operand, promoting it to the same
@@ -591,8 +592,8 @@ def pooling_ndhwc_max(
                 S.OW * S.SW + S.KW * S.DW, S.C),
     K=TensorDef(T2, S.KD, S.KH, S.KW, index_dims=[D.kd, D.kh, D.kw]),
     O=TensorDef(U, S.N, S.OD, S.OH, S.OW, S.C, output=True),
-    strides=IndexAttrDef(S.SD, S.SH, S.SW),
-    dilations=IndexAttrDef(S.DD, S.DH, S.DW)):
+    strides=IndexAttrDef(S.SD, S.SH, S.SW, default=[1, 1, 1]),
+    dilations=IndexAttrDef(S.DD, S.DH, S.DW, default=[1, 1, 1])):
   """Performs 3D max pooling.
 
   Numeric casting is performed on the input operand, promoting it to the same
@@ -612,8 +613,8 @@ def pooling_ndhwc_min(
                 S.OW * S.SW + S.KW * S.DW, S.C),
     K=TensorDef(T2, S.KD, S.KH, S.KW, index_dims=[D.kd, D.kh, D.kw]),
     O=TensorDef(U, S.N, S.OD, S.OH, S.OW, S.C, output=True),
-    strides=IndexAttrDef(S.SD, S.SH, S.SW),
-    dilations=IndexAttrDef(S.DD, S.DH, S.DW)):
+    strides=IndexAttrDef(S.SD, S.SH, S.SW, default=[1, 1, 1]),
+    dilations=IndexAttrDef(S.DD, S.DH, S.DW, default=[1, 1, 1])):
   """Performs 3D min pooling.
 
   Numeric casting is performed on the input operand, promoting it to the same
@@ -625,6 +626,17 @@ def pooling_ndhwc_min(
       TypeFn.cast(
           U, I[D.n, D.od * S.SD + D.kd * S.DD, D.oh * S.SH + D.kh * S.DH,
                D.ow * S.SW + D.kw * S.DW, D.c]))
+
+
+@linalg_structured_op
+def fill_tensor(value=ScalarDef(T1), O=TensorDef(U, output=True)):
+  """Fills the output tensor with the given value.
+
+  Works for arbitrary ranked output tensors since the operation performs scalar
+  accesses only and is thus rank polymorphic. Numeric casting is performed on
+  the value operand, promoting it to the same data type as the output.
+  """
+  O[None] = TypeFn.cast(U, value)
 
 
 @linalg_structured_op
@@ -665,4 +677,4 @@ def soft_plus_2d(
   """
   domain(D.m, D.n)
   O[D.m, D.n] = \
-      ArithFn.log(TypeFn.cast(U, const(1.0)) + ArithFn.exp(TypeFn.cast(U, I[D.m, D.n])))
+      UnaryFn.log(TypeFn.cast(U, const(1.0)) + UnaryFn.exp(TypeFn.cast(U, I[D.m, D.n])))

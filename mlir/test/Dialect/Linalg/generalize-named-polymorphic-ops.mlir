@@ -36,6 +36,20 @@ func @generalize_matmul_tensor_i16i64i32(%A : tensor<16x8xi16>, %B: tensor<8x32x
 // CHECK-NEXT:   linalg.yield %[[ADD]] : i32
 // CHECK-NEXT: -> tensor<16x32xi32>
 
+
+// -----
+
+// Verifies that cast attributes control the cast operations used.
+func @generalize_matmul_tensor_i16i64i32_unsigned(%A : tensor<16x8xi16>, %B: tensor<8x32xi64>, %C: tensor<16x32xi32>) -> tensor<16x32xi32> {
+  %0 = linalg.matmul {cast = #linalg.type_fn<cast_unsigned>}
+                     ins(%A, %B: tensor<16x8xi16>, tensor<8x32xi64>)
+                          outs(%C: tensor<16x32xi32>) -> tensor<16x32xi32>
+  return %0: tensor<16x32xi32>
+}
+
+// CHECK-LABEL: @generalize_matmul_tensor_i16i64i32_unsigned
+// CHECK:        = arith.extui
+
 // -----
 
 func @generalize_matmul_tensor_i16i64f32(%A : tensor<16x8xi16>, %B: tensor<8x32xi64>, %C: tensor<16x32xf32>) -> tensor<16x32xf32> {
@@ -204,6 +218,35 @@ func @generalize_pooling_nhwc_sum_i32(%input : tensor<1x4x16x1xi32>, %shape: ten
 // CHECK-NEXT:   %[[ADD:.+]] = arith.addi %[[OUT_ARG]], %[[IN_ARG]] : i32
 // CHECK-NEXT:   linalg.yield %[[ADD]] : i32
 // CHECK-NEXT: -> tensor<1x2x4x1xi32>
+
+// -----
+
+func @generalize_fill_0d(%value: f64, %O: tensor<f32>) -> tensor<f32> {
+  %0 = linalg.fill_tensor ins(%value: f64) outs(%O : tensor<f32>) -> tensor<f32>
+  return %0: tensor<f32>
+}
+
+// CHECK-DAG: #[[$MAP0:.+]] = affine_map<() -> ()>
+
+// CHECK-LABEL: @generalize_fill_0d
+// CHECK:      linalg.generic
+// CHECK-SAME: indexing_maps = [#[[$MAP0]], #[[$MAP0]]]
+// CHECK-SAME: iterator_types = []
+
+// -----
+
+func @generalize_fill_2d(%value: f64, %O: memref<16x32xf32>) {
+  linalg.fill_tensor ins(%value: f64) outs(%O : memref<16x32xf32>)
+  return
+}
+
+// CHECK-DAG: #[[$MAP0:.+]] = affine_map<(d0, d1) -> ()>
+// CHECK-DAG: #[[$MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: @generalize_fill
+// CHECK:      linalg.generic
+// CHECK-SAME: indexing_maps = [#[[$MAP0]], #[[$MAP1]]]
+// CHECK-SAME: iterator_types = ["parallel", "parallel"]
 
 // -----
 

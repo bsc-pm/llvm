@@ -123,6 +123,8 @@ void addOmpSsRuntimeLibs(llvm::opt::ArgStringList &CmdArgs, const ToolChain &TC,
 void addOmpSsRuntimeInclude(llvm::opt::ArgStringList &CmdArgs, const ToolChain &TC,
                      const llvm::opt::ArgList &Args);
 
+const char *getAsNeededOption(const ToolChain &TC, bool as_needed);
+
 llvm::opt::Arg *getLastProfileUseArg(const llvm::opt::ArgList &Args);
 llvm::opt::Arg *getLastProfileSampleUseArg(const llvm::opt::ArgList &Args);
 

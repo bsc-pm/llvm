@@ -733,14 +733,6 @@ SmallVector<ReassociationExprs, 4> ExpandShapeOp::getReassociationExprs() {
                                             getReassociationIndices());
 }
 
-static void print(OpAsmPrinter &p, ExpandShapeOp op) {
-  ::mlir::printReshapeOp<ExpandShapeOp>(p, op);
-}
-
-static void print(OpAsmPrinter &p, CollapseShapeOp op) {
-  ::mlir::printReshapeOp<CollapseShapeOp>(p, op);
-}
-
 /// Compute the RankedTensorType obtained by applying `reassociation` to `type`.
 static RankedTensorType
 computeTensorReshapeCollapsedType(RankedTensorType type,
@@ -1235,7 +1227,12 @@ static Value foldExtractAfterInsertSlice(ExtractSliceOp extractOp) {
   return {};
 }
 
-OpFoldResult ExtractSliceOp::fold(ArrayRef<Attribute>) {
+OpFoldResult ExtractSliceOp::fold(ArrayRef<Attribute> operands) {
+  if (auto splat = operands[0].dyn_cast_or_null<SplatElementsAttr>()) {
+    auto resultType = result().getType().cast<ShapedType>();
+    if (resultType.hasStaticShape())
+      return splat.resizeSplat(resultType);
+  }
   if (getSourceType() == getType() &&
       succeeded(foldIdentityOffsetSizeAndStrideOpInterface(*this, getType())))
     return this->source();
@@ -1302,16 +1299,29 @@ void InsertSliceOp::build(OpBuilder &b, OperationState &result, Value source,
   build(b, result, source, dest, offsetValues, sizeValues, strideValues);
 }
 
+static SliceVerificationResult
+verifyInsertSliceOp(ShapedType srcType, ShapedType dstType,
+                    ArrayAttr staticOffsets, ArrayAttr staticSizes,
+                    ArrayAttr staticStrides,
+                    ShapedType *expectedType = nullptr) {
+  // insert_slice is the inverse of extract_slice, use the same type inference.
+  auto expected = ExtractSliceOp::inferRankReducedResultType(
+                      srcType.getRank(), dstType.cast<RankedTensorType>(),
+                      extractFromI64ArrayAttr(staticOffsets),
+                      extractFromI64ArrayAttr(staticSizes),
+                      extractFromI64ArrayAttr(staticStrides))
+                      .cast<ShapedType>();
+  if (expectedType)
+    *expectedType = expected;
+  return isRankReducedType(expected, srcType);
+}
+
 /// Verifier for InsertSliceOp.
 LogicalResult InsertSliceOp::verify() {
-  // insert_slice is the inverse of extract_slice, use the same type inference.
-  auto expectedType = ExtractSliceOp::inferRankReducedResultType(
-      getSourceType().getRank(), getType(),
-      extractFromI64ArrayAttr(static_offsets()),
-      extractFromI64ArrayAttr(static_sizes()),
-      extractFromI64ArrayAttr(static_strides()));
+  ShapedType expectedType;
   auto result =
-      isRankReducedType(expectedType.cast<ShapedType>(), getSourceType());
+      verifyInsertSliceOp(getSourceType(), getType(), static_offsets(),
+                          static_sizes(), static_strides(), &expectedType);
   return produceSliceErrorMsg(result, *this, expectedType);
 }
 
@@ -1443,12 +1453,20 @@ struct InsertSliceOpCastFolder final : public OpRewritePattern<InsertSliceOp> {
     if (!sourceCastSource && !destCastSource)
       return failure();
 
+    auto src = (sourceCastSource ? *sourceCastSource : insertSliceOp.source());
+    auto dst = (destCastSource ? *destCastSource : insertSliceOp.dest());
+
+    auto srcType = src.getType().cast<ShapedType>();
+    auto dstType = dst.getType().cast<ShapedType>();
+    if (verifyInsertSliceOp(srcType, dstType, insertSliceOp.static_offsets(),
+                            insertSliceOp.static_sizes(),
+                            insertSliceOp.static_strides()) !=
+        SliceVerificationResult::Success)
+      return failure();
+
     Value replacement = rewriter.create<InsertSliceOp>(
-        insertSliceOp.getLoc(),
-        (sourceCastSource ? *sourceCastSource : insertSliceOp.source()),
-        (destCastSource ? *destCastSource : insertSliceOp.dest()),
-        insertSliceOp.getMixedOffsets(), insertSliceOp.getMixedSizes(),
-        insertSliceOp.getMixedStrides());
+        insertSliceOp.getLoc(), src, dst, insertSliceOp.getMixedOffsets(),
+        insertSliceOp.getMixedSizes(), insertSliceOp.getMixedStrides());
 
     if (replacement.getType() != insertSliceOp.getType()) {
       replacement = rewriter.create<tensor::CastOp>(

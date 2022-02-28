@@ -319,6 +319,7 @@ enum {
   EM_BPF = 247,           // Linux kernel bpf virtual machine
   EM_VE = 251,            // NEC SX-Aurora VE
   EM_CSKY = 252,          // C-SKY 32-bit processor
+  EM_LOONGARCH = 258,     // LoongArch
 };
 
 // Object file classes.
@@ -865,10 +866,32 @@ enum {
 #include "ELFRelocs/VE.def"
 };
 
+// CSKY Specific e_flags
+enum : unsigned {
+  EF_CSKY_801 = 0xa,
+  EF_CSKY_802 = 0x10,
+  EF_CSKY_803 = 0x9,
+  EF_CSKY_805 = 0x11,
+  EF_CSKY_807 = 0x6,
+  EF_CSKY_810 = 0x8,
+  EF_CSKY_860 = 0xb,
+  EF_CSKY_800 = 0x1f,
+  EF_CSKY_FLOAT = 0x2000,
+  EF_CSKY_DSP = 0x4000,
+  EF_CSKY_ABIV2 = 0x20000000,
+  EF_CSKY_EFV1 = 0x1000000,
+  EF_CSKY_EFV2 = 0x2000000,
+  EF_CSKY_EFV3 = 0x3000000
+};
 
 // ELF Relocation types for CSKY
 enum {
 #include "ELFRelocs/CSKY.def"
+};
+
+// ELF Relocation types for LoongArch
+enum {
+#include "ELFRelocs/LoongArch.def"
 };
 
 #undef ELF_RELOC
@@ -985,6 +1008,8 @@ enum : unsigned {
 
   SHT_RISCV_ATTRIBUTES = 0x70000003U,
 
+  SHT_CSKY_ATTRIBUTES = 0x70000001U,
+
   SHT_HIPROC = 0x7fffffff, // Highest processor arch-specific type.
   SHT_LOUSER = 0x80000000, // Lowest type reserved for applications.
   SHT_HIUSER = 0xffffffff  // Highest type reserved for applications.
@@ -1035,6 +1060,9 @@ enum : unsigned {
   // Start of target-specific flags.
 
   SHF_MASKOS = 0x0ff00000,
+
+  // Solaris equivalent of SHF_GNU_RETAIN.
+  SHF_SUNW_NODISCARD = 0x00100000,
 
   // Bits indicating processor-specific flags.
   SHF_MASKPROC = 0xf0000000,

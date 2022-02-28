@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "InputFiles.h"
+#include "DWARF.h"
 #include "Driver.h"
 #include "InputSection.h"
 #include "LinkerScript.h"
@@ -16,16 +17,14 @@
 #include "Target.h"
 #include "lld/Common/CommonLinkerContext.h"
 #include "lld/Common/DWARF.h"
+#include "llvm/ADT/CachedHashString.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/CodeGen/Analysis.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Module.h"
 #include "llvm/LTO/LTO.h"
-#include "llvm/MC/StringTableBuilder.h"
-#include "llvm/Object/ELFObjectFile.h"
+#include "llvm/Object/IRObjectFile.h"
 #include "llvm/Support/ARMAttributeParser.h"
 #include "llvm/Support/ARMBuildAttributes.h"
 #include "llvm/Support/Endian.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/RISCVAttributeParser.h"
 #include "llvm/Support/TarWriter.h"
@@ -44,7 +43,6 @@ bool InputFile::isInGroup;
 uint32_t InputFile::nextGroupId;
 
 SmallVector<std::unique_ptr<MemoryBuffer>> elf::memoryBuffers;
-SmallVector<ArchiveFile *, 0> elf::archiveFiles;
 SmallVector<BinaryFile *, 0> elf::binaryFiles;
 SmallVector<BitcodeFile *, 0> elf::bitcodeFiles;
 SmallVector<BitcodeFile *, 0> elf::lazyBitcodeFiles;
@@ -173,13 +171,6 @@ template <class ELFT> static void doParseFile(InputFile *file) {
   // Binary file
   if (auto *f = dyn_cast<BinaryFile>(file)) {
     binaryFiles.push_back(f);
-    f->parse();
-    return;
-  }
-
-  // .a file
-  if (auto *f = dyn_cast<ArchiveFile>(file)) {
-    archiveFiles.push_back(f);
     f->parse();
     return;
   }
@@ -798,10 +789,10 @@ template <class ELFT> static uint32_t readAndFeatures(const InputSection &sec) {
   using Elf_Note = typename ELFT::Note;
 
   uint32_t featuresSet = 0;
-  ArrayRef<uint8_t> data = sec.data();
+  ArrayRef<uint8_t> data = sec.rawData;
   auto reportFatal = [&](const uint8_t *place, const char *msg) {
     fatal(toString(sec.file) + ":(" + sec.name + "+0x" +
-          Twine::utohexstr(place - sec.data().data()) + "): " + msg);
+          Twine::utohexstr(place - sec.rawData.data()) + "): " + msg);
   };
   while (!data.empty()) {
     // Read one NOTE record.
@@ -1030,40 +1021,6 @@ void ObjFile<ELFT>::initializeSymbols(const object::ELFFile<ELFT> &obj) {
 
   ArrayRef<Elf_Sym> eSyms = this->getELFSyms<ELFT>();
   symbols.resize(eSyms.size());
-  SymbolUnion *locals =
-      firstGlobal == 0
-          ? nullptr
-          : getSpecificAllocSingleton<SymbolUnion>().Allocate(firstGlobal);
-
-  for (size_t i = 0, end = firstGlobal; i != end; ++i) {
-    const Elf_Sym &eSym = eSyms[i];
-    uint32_t secIdx = eSym.st_shndx;
-    if (LLVM_UNLIKELY(secIdx == SHN_XINDEX))
-      secIdx = check(getExtendedSymbolTableIndex<ELFT>(eSym, i, shndxTable));
-    else if (secIdx >= SHN_LORESERVE)
-      secIdx = 0;
-    if (LLVM_UNLIKELY(secIdx >= sections.size()))
-      fatal(toString(this) + ": invalid section index: " + Twine(secIdx));
-    if (LLVM_UNLIKELY(eSym.getBinding() != STB_LOCAL))
-      error(toString(this) + ": non-local symbol (" + Twine(i) +
-            ") found at index < .symtab's sh_info (" + Twine(end) + ")");
-
-    InputSectionBase *sec = sections[secIdx];
-    uint8_t type = eSym.getType();
-    if (type == STT_FILE)
-      sourceFile = CHECK(eSym.getName(stringTable), this);
-    if (LLVM_UNLIKELY(stringTable.size() <= eSym.st_name))
-      fatal(toString(this) + ": invalid symbol name offset");
-    StringRef name(stringTable.data() + eSym.st_name);
-
-    symbols[i] = reinterpret_cast<Symbol *>(locals + i);
-    if (eSym.st_shndx == SHN_UNDEF || sec == &InputSection::discarded)
-      new (symbols[i]) Undefined(this, name, STB_LOCAL, eSym.st_other, type,
-                                 /*discardedSecIdx=*/secIdx);
-    else
-      new (symbols[i]) Defined(this, name, STB_LOCAL, eSym.st_other, type,
-                               eSym.st_value, eSym.st_size, sec);
-  }
 
   // Some entries have been filled by LazyObjFile.
   for (size_t i = firstGlobal, end = eSyms.size(); i != end; ++i)
@@ -1100,6 +1057,7 @@ void ObjFile<ELFT>::initializeSymbols(const object::ELFFile<ELFT> &obj) {
     uint64_t size = eSym.st_size;
 
     Symbol *sym = symbols[i];
+    sym->isUsedInRegularObj = true;
     if (LLVM_UNLIKELY(eSym.st_shndx == SHN_COMMON)) {
       if (value == 0 || value >= UINT32_MAX)
         fatal(toString(this) + ": common symbol '" + sym->getName() +
@@ -1117,19 +1075,14 @@ void ObjFile<ELFT>::initializeSymbols(const object::ELFFile<ELFT> &obj) {
     // defined symbol in a .eh_frame becomes dangling symbols.
     if (sec == &InputSection::discarded) {
       Undefined und{this, StringRef(), binding, stOther, type, secIdx};
-      // !ArchiveFile::parsed or !LazyObjFile::lazy means that the file
-      // containing this object has not finished processing, i.e. this symbol is
-      // a result of a lazy symbol extract. We should demote the lazy symbol to
-      // an Undefined so that any relocations outside of the group to it will
-      // trigger a discarded section error.
-      if ((sym->symbolKind == Symbol::LazyArchiveKind &&
-           !cast<ArchiveFile>(sym->file)->parsed) ||
-          (sym->symbolKind == Symbol::LazyObjectKind && !sym->file->lazy)) {
+      // !LazyObjFile::lazy indicates that the file containing this object has
+      // not finished processing, i.e. this symbol is a result of a lazy symbol
+      // extract. We should demote the lazy symbol to an Undefined so that any
+      // relocations outside of the group to it will trigger a discarded section
+      // error.
+      if (sym->symbolKind == Symbol::LazyObjectKind && !sym->file->lazy)
         sym->replace(und);
-        // Prevent LTO from internalizing the symbol in case there is a
-        // reference to this symbol from this file.
-        sym->isUsedInRegularObj = true;
-      } else
+      else
         sym->resolve(und);
       continue;
     }
@@ -1156,46 +1109,85 @@ void ObjFile<ELFT>::initializeSymbols(const object::ELFFile<ELFT> &obj) {
     Symbol *sym = symbols[i];
     sym->resolve(Undefined{this, StringRef(), eSym.getBinding(), eSym.st_other,
                            eSym.getType()});
+    sym->isUsedInRegularObj = true;
     sym->referenced = true;
   }
 }
 
-ArchiveFile::ArchiveFile(std::unique_ptr<Archive> &&file)
-    : InputFile(ArchiveKind, file->getMemoryBufferRef()),
-      file(std::move(file)) {}
+template <class ELFT> void ObjFile<ELFT>::initializeLocalSymbols() {
+  if (!firstGlobal)
+    return;
+  localSymStorage = std::make_unique<SymbolUnion[]>(firstGlobal);
+  SymbolUnion *locals = localSymStorage.get();
 
-void ArchiveFile::parse() {
-  SymbolTable &symtab = *elf::symtab;
-  for (const Archive::Symbol &sym : file->symbols())
-    symtab.addSymbol(LazyArchive{*this, sym});
+  ArrayRef<Elf_Sym> eSyms = this->getELFSyms<ELFT>();
+  for (size_t i = 0, end = firstGlobal; i != end; ++i) {
+    const Elf_Sym &eSym = eSyms[i];
+    uint32_t secIdx = eSym.st_shndx;
+    if (LLVM_UNLIKELY(secIdx == SHN_XINDEX))
+      secIdx = check(getExtendedSymbolTableIndex<ELFT>(eSym, i, shndxTable));
+    else if (secIdx >= SHN_LORESERVE)
+      secIdx = 0;
+    if (LLVM_UNLIKELY(secIdx >= sections.size()))
+      fatal(toString(this) + ": invalid section index: " + Twine(secIdx));
+    if (LLVM_UNLIKELY(eSym.getBinding() != STB_LOCAL))
+      error(toString(this) + ": non-local symbol (" + Twine(i) +
+            ") found at index < .symtab's sh_info (" + Twine(end) + ")");
 
-  // Inform a future invocation of ObjFile<ELFT>::initializeSymbols() that this
-  // archive has been processed.
-  parsed = true;
+    InputSectionBase *sec = sections[secIdx];
+    uint8_t type = eSym.getType();
+    if (type == STT_FILE)
+      sourceFile = CHECK(eSym.getName(stringTable), this);
+    if (LLVM_UNLIKELY(stringTable.size() <= eSym.st_name))
+      fatal(toString(this) + ": invalid symbol name offset");
+    StringRef name(stringTable.data() + eSym.st_name);
+
+    symbols[i] = reinterpret_cast<Symbol *>(locals + i);
+    if (eSym.st_shndx == SHN_UNDEF || sec == &InputSection::discarded)
+      new (symbols[i]) Undefined(this, name, STB_LOCAL, eSym.st_other, type,
+                                 /*discardedSecIdx=*/secIdx);
+    else
+      new (symbols[i]) Defined(this, name, STB_LOCAL, eSym.st_other, type,
+                               eSym.st_value, eSym.st_size, sec);
+    symbols[i]->isUsedInRegularObj = true;
+  }
 }
 
-// Returns a buffer pointing to a member file containing a given symbol.
-void ArchiveFile::extract(const Archive::Symbol &sym) {
-  Archive::Child c =
-      CHECK(sym.getMember(), toString(this) +
-                                 ": could not get the member for symbol " +
-                                 toELFString(sym));
+// Called after all ObjFile::parse is called for all ObjFiles. This checks
+// duplicate symbols and may do symbol property merge in the future.
+template <class ELFT> void ObjFile<ELFT>::postParse() {
+  ArrayRef<Elf_Sym> eSyms = this->getELFSyms<ELFT>();
+  for (size_t i = firstGlobal, end = eSyms.size(); i != end; ++i) {
+    const Elf_Sym &eSym = eSyms[i];
+    const Symbol &sym = *symbols[i];
 
-  if (!seen.insert(c.getChildOffset()).second)
-    return;
+    // st_value of STT_TLS represents the assigned offset, not the actual
+    // address which is used by STT_FUNC and STT_OBJECT. STT_TLS symbols can
+    // only be referenced by special TLS relocations. It is usually an error if
+    // a STT_TLS symbol is replaced by a non-STT_TLS symbol, vice versa.
+    if (LLVM_UNLIKELY(sym.isTls()) && eSym.getType() != STT_TLS &&
+        eSym.getType() != STT_NOTYPE)
+      errorOrWarn("TLS attribute mismatch: " + toString(sym) + "\n>>> in " +
+                  toString(sym.file) + "\n>>> in " + toString(this));
 
-  MemoryBufferRef mb =
-      CHECK(c.getMemoryBufferRef(),
-            toString(this) +
-                ": could not get the buffer for the member defining symbol " +
-                toELFString(sym));
-
-  if (tar && c.getParent()->isThin())
-    tar->append(relativeToRoot(CHECK(c.getFullName(), this)), mb.getBuffer());
-
-  InputFile *file = createObjectFile(mb, getName(), c.getChildOffset());
-  file->groupId = groupId;
-  parseFile(file);
+    // !sym.file allows a symbol assignment redefines a symbol without an error.
+    if (sym.file == this || !sym.file || !sym.isDefined() ||
+        eSym.st_shndx == SHN_UNDEF || eSym.st_shndx == SHN_COMMON ||
+        eSym.getBinding() == STB_WEAK)
+      continue;
+    uint32_t secIdx = eSym.st_shndx;
+    if (LLVM_UNLIKELY(secIdx == SHN_XINDEX))
+      secIdx = cantFail(getExtendedSymbolTableIndex<ELFT>(eSym, i, shndxTable));
+    else if (secIdx >= SHN_LORESERVE)
+      secIdx = 0;
+    if (sections[secIdx] == &InputSection::discarded)
+      continue;
+    // Allow absolute symbols with the same value for GNU ld compatibility.
+    if (!cast<Defined>(sym).section && !sections[secIdx] &&
+        cast<Defined>(sym).value == eSym.st_value)
+      continue;
+    reportDuplicate(sym, this, sections[secIdx], eSym.st_value);
+  }
 }
 
 // The handling of tentative definitions (COMMON symbols) in archives is murky.
@@ -1262,36 +1254,6 @@ static bool isNonCommonDef(MemoryBufferRef mb, StringRef symName,
   default:
     llvm_unreachable("getELFKind");
   }
-}
-
-bool ArchiveFile::shouldExtractForCommon(const Archive::Symbol &sym) {
-  Archive::Child c =
-      CHECK(sym.getMember(), toString(this) +
-                                 ": could not get the member for symbol " +
-                                 toELFString(sym));
-  MemoryBufferRef mb =
-      CHECK(c.getMemoryBufferRef(),
-            toString(this) +
-                ": could not get the buffer for the member defining symbol " +
-                toELFString(sym));
-
-  if (isBitcode(mb))
-    return isBitcodeNonCommonDef(mb, sym.getName(), getName());
-
-  return isNonCommonDef(mb, sym.getName(), getName());
-}
-
-size_t ArchiveFile::getMemberCount() const {
-  size_t count = 0;
-  Error err = Error::success();
-  for (const Archive::Child &c : file->children(err)) {
-    (void)c;
-    ++count;
-  }
-  // This function is used by --print-archive-stats=, where an error does not
-  // really matter.
-  consumeError(std::move(err));
-  return count;
 }
 
 unsigned SharedFile::vernauxNum;
@@ -1696,7 +1658,6 @@ createBitcodeSymbol(Symbol *&sym, const std::vector<bool> &keptComdats,
 }
 
 template <class ELFT> void BitcodeFile::parse() {
-  std::vector<bool> keptComdats;
   for (std::pair<StringRef, Comdat::SelectionKind> s : obj->getComdatTable()) {
     keptComdats.push_back(
         s.second == Comdat::NoDeduplicate ||
@@ -1705,10 +1666,18 @@ template <class ELFT> void BitcodeFile::parse() {
   }
 
   symbols.resize(obj->symbols().size());
-  for (auto it : llvm::enumerate(obj->symbols())) {
-    Symbol *&sym = symbols[it.index()];
-    createBitcodeSymbol<ELFT>(sym, keptComdats, it.value(), *this);
-  }
+  // Process defined symbols first. See the comment in
+  // ObjFile<ELFT>::initializeSymbols.
+  for (auto it : llvm::enumerate(obj->symbols()))
+    if (!it.value().isUndefined()) {
+      Symbol *&sym = symbols[it.index()];
+      createBitcodeSymbol<ELFT>(sym, keptComdats, it.value(), *this);
+    }
+  for (auto it : llvm::enumerate(obj->symbols()))
+    if (it.value().isUndefined()) {
+      Symbol *&sym = symbols[it.index()];
+      createBitcodeSymbol<ELFT>(sym, keptComdats, it.value(), *this);
+    }
 
   for (auto l : obj->getDependentLibraries())
     addDependentLibrary(l, this);
@@ -1723,6 +1692,20 @@ void BitcodeFile::parseLazy() {
       sym->resolve(LazyObject{*this});
       symbols[it.index()] = sym;
     }
+}
+
+void BitcodeFile::postParse() {
+  for (auto it : llvm::enumerate(obj->symbols())) {
+    const Symbol &sym = *symbols[it.index()];
+    const auto &objSym = it.value();
+    if (sym.file == this || !sym.isDefined() || objSym.isUndefined() ||
+        objSym.isCommon() || objSym.isWeak())
+      continue;
+    int c = objSym.getComdatIndex();
+    if (c != -1 && !keptComdats[c])
+      continue;
+    reportDuplicate(sym, this, nullptr, 0);
+  }
 }
 
 void BinaryFile::parse() {
@@ -1742,12 +1725,15 @@ void BinaryFile::parse() {
 
   llvm::StringSaver &saver = lld::saver();
 
-  symtab->addSymbol(Defined{nullptr, saver.save(s + "_start"), STB_GLOBAL,
-                            STV_DEFAULT, STT_OBJECT, 0, 0, section});
-  symtab->addSymbol(Defined{nullptr, saver.save(s + "_end"), STB_GLOBAL,
-                            STV_DEFAULT, STT_OBJECT, data.size(), 0, section});
-  symtab->addSymbol(Defined{nullptr, saver.save(s + "_size"), STB_GLOBAL,
-                            STV_DEFAULT, STT_OBJECT, data.size(), 0, nullptr});
+  symtab->addAndCheckDuplicate(Defined{nullptr, saver.save(s + "_start"),
+                                       STB_GLOBAL, STV_DEFAULT, STT_OBJECT, 0,
+                                       0, section});
+  symtab->addAndCheckDuplicate(Defined{nullptr, saver.save(s + "_end"),
+                                       STB_GLOBAL, STV_DEFAULT, STT_OBJECT,
+                                       data.size(), 0, section});
+  symtab->addAndCheckDuplicate(Defined{nullptr, saver.save(s + "_size"),
+                                       STB_GLOBAL, STV_DEFAULT, STT_OBJECT,
+                                       data.size(), 0, nullptr});
 }
 
 InputFile *elf::createObjectFile(MemoryBufferRef mb, StringRef archiveName,

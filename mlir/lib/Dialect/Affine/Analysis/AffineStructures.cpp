@@ -31,7 +31,7 @@
 #define DEBUG_TYPE "affine-structures"
 
 using namespace mlir;
-using namespace presburger_utils;
+using namespace presburger;
 
 namespace {
 
@@ -233,6 +233,25 @@ FlatAffineValueConstraints::getHyperrectangular(ValueRange ivs, ValueRange lbs,
   return res;
 }
 
+void FlatAffineConstraints::reset(unsigned numReservedInequalities,
+                                  unsigned numReservedEqualities,
+                                  unsigned newNumReservedCols,
+                                  unsigned newNumDims, unsigned newNumSymbols,
+                                  unsigned newNumLocals) {
+  assert(newNumReservedCols >= newNumDims + newNumSymbols + newNumLocals + 1 &&
+         "minimum 1 column");
+  *this = FlatAffineConstraints(numReservedInequalities, numReservedEqualities,
+                                newNumReservedCols, newNumDims, newNumSymbols,
+                                newNumLocals);
+}
+
+void FlatAffineConstraints::reset(unsigned newNumDims, unsigned newNumSymbols,
+                                  unsigned newNumLocals) {
+  reset(/*numReservedInequalities=*/0, /*numReservedEqualities=*/0,
+        /*numReservedCols=*/newNumDims + newNumSymbols + newNumLocals + 1,
+        newNumDims, newNumSymbols, newNumLocals);
+}
+
 void FlatAffineValueConstraints::reset(unsigned numReservedInequalities,
                                        unsigned numReservedEqualities,
                                        unsigned newNumReservedCols,
@@ -268,7 +287,7 @@ void FlatAffineValueConstraints::reset(unsigned newNumDims,
 
 unsigned FlatAffineValueConstraints::appendDimId(ValueRange vals) {
   unsigned pos = getNumDimIds();
-  insertId(IdKind::Dimension, pos, vals);
+  insertId(IdKind::SetDim, pos, vals);
   return pos;
 }
 
@@ -280,7 +299,7 @@ unsigned FlatAffineValueConstraints::appendSymbolId(ValueRange vals) {
 
 unsigned FlatAffineValueConstraints::insertDimId(unsigned pos,
                                                  ValueRange vals) {
-  return insertId(IdKind::Dimension, pos, vals);
+  return insertId(IdKind::SetDim, pos, vals);
 }
 
 unsigned FlatAffineValueConstraints::insertSymbolId(unsigned pos,
@@ -362,14 +381,14 @@ areIdsUnique(const FlatAffineConstraints &cst) {
 
 /// Checks if the SSA values associated with `cst`'s identifiers of kind `kind`
 /// are unique.
-static bool LLVM_ATTRIBUTE_UNUSED areIdsUnique(
-    const FlatAffineValueConstraints &cst, FlatAffineConstraints::IdKind kind) {
+static bool LLVM_ATTRIBUTE_UNUSED
+areIdsUnique(const FlatAffineValueConstraints &cst, IdKind kind) {
 
-  if (kind == FlatAffineConstraints::IdKind::Dimension)
+  if (kind == IdKind::SetDim)
     return areIdsUnique(cst, 0, cst.getNumDimIds());
-  if (kind == FlatAffineConstraints::IdKind::Symbol)
+  if (kind == IdKind::Symbol)
     return areIdsUnique(cst, cst.getNumDimIds(), cst.getNumDimAndSymbolIds());
-  if (kind == FlatAffineConstraints::IdKind::Local)
+  if (kind == IdKind::Local)
     return areIdsUnique(cst, cst.getNumDimAndSymbolIds(), cst.getNumIds());
   llvm_unreachable("Unexpected IdKind");
 }
@@ -1214,8 +1233,8 @@ FlatAffineValueConstraints::computeAlignedMap(AffineMap map,
 
   dims.reserve(getNumDimIds());
   syms.reserve(getNumSymbolIds());
-  for (unsigned i = getIdKindOffset(IdKind::Dimension),
-                e = getIdKindEnd(IdKind::Dimension);
+  for (unsigned i = getIdKindOffset(IdKind::SetDim),
+                e = getIdKindEnd(IdKind::SetDim);
        i < e; ++i)
     dims.push_back(values[i] ? *values[i] : Value());
   for (unsigned i = getIdKindOffset(IdKind::Symbol),

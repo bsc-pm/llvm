@@ -10,8 +10,8 @@
 #ifndef _LIBCPP___FUNCTIONAL_FUNCTION_H
 #define _LIBCPP___FUNCTIONAL_FUNCTION_H
 
+#include <__assert>
 #include <__config>
-#include <__debug>
 #include <__functional/binary_function.h>
 #include <__functional/invoke.h>
 #include <__functional/unary_function.h>
@@ -28,6 +28,7 @@
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #  pragma GCC system_header
+#  pragma clang include_instead(<functional>)
 #endif
 
 _LIBCPP_BEGIN_NAMESPACE_STD

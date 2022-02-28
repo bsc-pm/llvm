@@ -10,12 +10,13 @@
 #ifndef _LIBCPP___ITERATOR_ADVANCE_H
 #define _LIBCPP___ITERATOR_ADVANCE_H
 
+#include <__assert>
 #include <__config>
-#include <__debug>
 #include <__iterator/concepts.h>
 #include <__iterator/incrementable_traits.h>
 #include <__iterator/iterator_traits.h>
 #include <__utility/move.h>
+#include <__utility/unreachable.h>
 #include <concepts>
 #include <cstdlib>
 #include <limits>
@@ -23,6 +24,7 @@
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #  pragma GCC system_header
+#  pragma clang include_instead(<iterator>)
 #endif
 
 _LIBCPP_BEGIN_NAMESPACE_STD
@@ -64,7 +66,7 @@ void advance(_InputIter& __i, _Distance __orig_n) {
   _VSTD::__advance(__i, __n, typename iterator_traits<_InputIter>::iterator_category());
 }
 
-#if !defined(_LIBCPP_HAS_NO_CONCEPTS)
+#if !defined(_LIBCPP_HAS_NO_CONCEPTS) && !defined(_LIBCPP_HAS_NO_INCOMPLETE_RANGES)
 
 // [range.iter.op.advance]
 
@@ -181,7 +183,7 @@ public:
       return __n;
     }
 
-    _LIBCPP_UNREACHABLE();
+    __libcpp_unreachable();
   }
 };
 
@@ -192,7 +194,7 @@ inline namespace __cpo {
 } // namespace __cpo
 } // namespace ranges
 
-#endif // !defined(_LIBCPP_HAS_NO_CONCEPTS)
+#endif // !defined(_LIBCPP_HAS_NO_CONCEPTS) && !defined(_LIBCPP_HAS_NO_INCOMPLETE_RANGES)
 
 _LIBCPP_END_NAMESPACE_STD
 

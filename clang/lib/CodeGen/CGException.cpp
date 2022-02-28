@@ -426,7 +426,7 @@ Address CodeGenFunction::getExceptionSlot() {
     if (ESlotAddr.isValid())
       return ESlotAddr;
     llvm::Instruction *I = CreateTempAlloca(Int8PtrTy, "exn.slot");
-    Address Addr = Address(I, getPointerAlign());
+    Address Addr = Address(I, Int8PtrTy, getPointerAlign());
     CGM.getOmpSsRuntime().setTaskExceptionSlot(Addr);
     return Addr;
   }
@@ -443,7 +443,7 @@ Address CodeGenFunction::getEHSelectorSlot() {
     if (EHSSlotAddr.isValid())
       return EHSSlotAddr;
     llvm::Instruction *I = CreateTempAlloca(Int32Ty, "ehselector.slot");
-    Address Addr = Address(I, CharUnits::fromQuantity(4));
+    Address Addr = Address(I, Int32Ty, CharUnits::fromQuantity(4));
     CGM.getOmpSsRuntime().setTaskEHSelectorSlot(Addr);
     return Addr;
   }
@@ -1893,7 +1893,7 @@ Address CodeGenFunction::recoverAddrOfEscapedLocal(CodeGenFunction &ParentCGF,
   llvm::Value *ChildVar =
       Builder.CreateBitCast(RecoverCall, ParentVar.getType());
   ChildVar->setName(ParentVar.getName());
-  return Address(ChildVar, ParentVar.getAlignment());
+  return Address::deprecated(ChildVar, ParentVar.getAlignment());
 }
 
 void CodeGenFunction::EmitCapturedLocals(CodeGenFunction &ParentCGF,
@@ -1979,7 +1979,8 @@ void CodeGenFunction::EmitCapturedLocals(CodeGenFunction &ParentCGF,
           FrameRecoverFn, {ParentI8Fn, ParentFP,
                            llvm::ConstantInt::get(Int32Ty, FrameEscapeIdx)});
       ParentFP = Builder.CreateBitCast(ParentFP, CGM.VoidPtrPtrTy);
-      ParentFP = Builder.CreateLoad(Address(ParentFP, getPointerAlign()));
+      ParentFP = Builder.CreateLoad(
+          Address(ParentFP, CGM.VoidPtrTy, getPointerAlign()));
     }
   }
 

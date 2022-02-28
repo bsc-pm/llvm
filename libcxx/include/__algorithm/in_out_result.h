@@ -16,18 +16,19 @@
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #  pragma GCC system_header
+#  pragma clang include_instead(<algorithm>)
 #endif
 
 _LIBCPP_BEGIN_NAMESPACE_STD
 
-#if !defined(_LIBCPP_HAS_NO_CONCEPTS)
+#if !defined(_LIBCPP_HAS_NO_CONCEPTS) && !defined(_LIBCPP_HAS_NO_INCOMPLETE_RANGES)
 
 namespace ranges {
 
 template<class _InputIterator, class _OutputIterator>
 struct in_out_result {
-  [[no_unique_address]] _InputIterator in;
-  [[no_unique_address]] _OutputIterator out;
+  _LIBCPP_NO_UNIQUE_ADDRESS _InputIterator in;
+  _LIBCPP_NO_UNIQUE_ADDRESS _OutputIterator out;
 
   template <class _InputIterator2, class _OutputIterator2>
     requires convertible_to<const _InputIterator&, _InputIterator2> && convertible_to<const _OutputIterator&,
@@ -47,7 +48,7 @@ struct in_out_result {
 
 } // namespace ranges
 
-#endif // !defined(_LIBCPP_HAS_NO_CONCEPTS)
+#endif // !defined(_LIBCPP_HAS_NO_CONCEPTS) && !defined(_LIBCPP_HAS_NO_INCOMPLETE_RANGES)
 
 _LIBCPP_END_NAMESPACE_STD
 
