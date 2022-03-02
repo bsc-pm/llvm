@@ -1709,8 +1709,8 @@ void CGOmpSsRuntime::EmitDependencyList(
     uint64_t BaseElementSize =
                NewCGF.CGM
                  .getDataLayout()
-                 .getTypeSizeInBits(NewCGF
-                                    .ConvertType(BaseElementTy))/8;
+                 .getTypeStoreSize(NewCGF
+                                    .ConvertType(BaseElementTy));
 
     List.push_back(Ptr);
     bool First = true;
