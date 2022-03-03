@@ -30,6 +30,20 @@ static int __kmp_realloc_task_threads_data(kmp_info_t *thread,
                                            kmp_task_team_t *task_team);
 static void __kmp_bottom_half_finish_proxy(kmp_int32 gtid, kmp_task_t *ptask);
 
+static void wake_up_one_free_agent(){
+    if(__kmp_free_agent_list == NULL) return;
+    kmp_info_t *free_agent = CCAST(kmp_info_t *,__kmp_free_agent_list);
+    while(free_agent != NULL){
+        kmp_flag_64<> *flag = RCAST(kmp_flag_64<> *,
+            CCAST(void *, free_agent->th.th_sleep_loc));
+        if(flag && flag->is_sleeping()){
+            flag->resume(free_agent->th.th_info.ds.ds_gtid);
+            return;
+        }
+        free_agent = free_agent->th.th_next_free_agent;
+    }
+}
+
 #ifdef BUILD_TIED_TASK_STACK
 
 //  __kmp_trace_task_stack: print the tied tasks from the task stack in order
@@ -451,16 +465,7 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task) {
   // Traverse all the free agent threads, if we find one that is sleeping, resume it
   // so we give it a chance to execute the task.
   //TODO: Do we need this with the new implementation?
-  kmp_info_t *free_agent = CCAST(kmp_info_t *,__kmp_free_agent_list);
-  while(free_agent != NULL){
-  	kmp_flag_64<> *flag = RCAST(kmp_flag_64<> *,
-  		CCAST(void *, free_agent->th.th_sleep_loc));
-  	if(flag && flag->is_sleeping()){
-  		flag->resume(free_agent->th.th_info.ds.ds_gtid);
-  		break;
-  	}
-  	free_agent = free_agent->th.th_next_free_agent;
-  }
+  wake_up_one_free_agent();
 
   return TASK_SUCCESSFULLY_PUSHED;
 }
@@ -2748,13 +2753,16 @@ static kmp_task_t *__kmp_remove_my_task(kmp_info_t *thread, kmp_int32 gtid,
 
   __kmp_release_bootstrap_lock(&thread_data->td.td_deque_lock);
 
+  wake_up_one_free_agent();
+
   KA_TRACE(10, ("__kmp_remove_my_task(exit #4): T#%d task %p removed: "
                 "ntasks=%d head=%u tail=%u\n",
                 gtid, taskdata, thread_data->td.td_deque_ntasks,
                 thread_data->td.td_deque_head, thread_data->td.td_deque_tail));
 
   task = KMP_TASKDATA_TO_TASK(taskdata);
-  return task;
+  
+    return task;
 }
 
 // __kmp_steal_task: remove a task from another thread's deque

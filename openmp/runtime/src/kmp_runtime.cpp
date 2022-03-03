@@ -10018,7 +10018,7 @@ void __kmp_set_thread_roles1(int how_many, omp_role_t r){
 	if(how_many <= TCR_4(__kmp_all_nth)){ //The runtime currently has enough threads to satisfy the petition.
 		if(r & OMP_ROLE_FREE_AGENT){
 		    __kmp_free_agent_num_threads = how_many;
-		    printf("Setting the number of free agents to %d in set thread roles 1.1\n", how_many);
+		    //printf("Setting the number of free agents to %d in set thread roles 1.1\n", how_many);
 		}
 		for(i = __kmp_all_nth - 1; i >= __kmp_all_nth - how_many; i--){
 			if(i == 0) gtid = 0;
@@ -10070,7 +10070,7 @@ void __kmp_set_thread_roles1(int how_many, omp_role_t r){
 	else if(how_many <= __kmp_threads_capacity){//We need more threads, and we can create them.
 		if(r & OMP_ROLE_FREE_AGENT) {
 		    __kmp_free_agent_num_threads = how_many;
-		    printf("Setting the number of free agents to %d in set thread roles 1.2\n", how_many);
+		    //printf("Setting the number of free agents to %d in set thread roles 1.2\n", how_many);
 		}
 		th = __kmp_threads[0];
 		th->th.th_potential_roles = (omp_role_t)(r & th->th.th_potential_roles);
@@ -10150,7 +10150,7 @@ void __kmp_set_thread_roles2(int tid, omp_role_t r){
 			                 (new_thr->th.th_info.ds.ds_gtid < 
 			                  new_thr->th.th_next_free_agent->th.th_info.ds.ds_gtid));
 			--__kmp_free_agent_num_threads;
-		    printf("Setting the number of free agents to %d in set thread roles 2\n", __kmp_free_agent_num_threads);
+		    //printf("Setting the number of free agents to %d in set thread roles 2\n", __kmp_free_agent_num_threads);
 			if(act_r == OMP_ROLE_FREE_AGENT && r == OMP_ROLE_NONE){
 			//Removing all the roles from an actual free agent. Placing it into the thread pool
 			    kmp_info_t **scan;
@@ -10200,7 +10200,7 @@ void __kmp_set_thread_roles2(int tid, omp_role_t r){
 	else{
 		if(r & OMP_ROLE_FREE_AGENT){//Increasing the number of potential FA
 			++__kmp_free_agent_num_threads;
-		    printf("Setting the number of free agents to %d in set thread roles 2\n", __kmp_free_agent_num_threads);
+		    //printf("Setting the number of free agents to %d in set thread roles 2\n", __kmp_free_agent_num_threads);
 		}
 		if(TCR_4(th->th.th_in_pool)){//If the thread is in the thread pool, convert it to a free agent
 		    kmp_info_t *new_thr = get_thread_from_thread_pool(th->th.th_info.ds.ds_gtid); //Extract it from the thread pool
