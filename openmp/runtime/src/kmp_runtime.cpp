@@ -10120,7 +10120,24 @@ void __kmp_set_thread_roles2(int tid, omp_role_t r){
 		gtid = 0;
 	}
 	kmp_info_t *th = __kmp_threads[gtid];
-	if(th == NULL) return;
+	if(th == NULL){
+	    kmp_root *root = __kmp_threads[0]->th.th_root;
+	    th = __kmp_allocate_thread_middle_init(root, r, tid);
+		KMP_DEBUG_ASSERT(th != NULL);
+		KMP_DEBUG_ASSERT(th->th.th_potential_roles == r);
+	    if(r & OMP_ROLE_FREE_AGENT){
+			++__kmp_free_agent_num_threads;
+	        kmp_task_team_t *tt_0 = __kmp_threads[0]->th.th_team->t.t_task_team[0];
+	        kmp_task_team_t *tt_1 = __kmp_threads[0]->th.th_team->t.t_task_team[1];
+	        __kmp_acquire_bootstrap_lock(&th->th.allowed_teams_lock);
+	        if(tt_0 != NULL)
+	            __kmp_add_allowed_task_team(th, tt_0);
+	        if(tt_1 != NULL)
+	            __kmp_add_allowed_task_team(th, tt_1);
+            __kmp_release_bootstrap_lock(&th->th.allowed_teams_lock);
+	    }
+	    return;
+	}
     __kmp_suspend_initialize_thread(th);
 	__kmp_lock_suspend_mx(th);
 	omp_role_t act_r = th->th.th_active_role;
