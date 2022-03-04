@@ -365,13 +365,10 @@ Sema::ActOnPrivateModuleFragmentDecl(SourceLocation ModuleLoc,
 DeclResult Sema::ActOnModuleImport(SourceLocation StartLoc,
                                    SourceLocation ExportLoc,
                                    SourceLocation ImportLoc, ModuleIdPath Path,
-                                   ModuleIdPath Partition) {
+                                   bool IsPartition) {
 
-  bool IsPartition = !Partition.empty();
   bool Cxx20Mode = getLangOpts().CPlusPlusModules || getLangOpts().ModulesTS;
   assert((!IsPartition || Cxx20Mode) && "partition seen in non-C++20 code?");
-  assert((!IsPartition || Path.empty()) &&
-         "trying to import a partition with its named module specified?");
 
   // For a C++20 module name, flatten into a single identifier with the source
   // location of the first component.
@@ -382,20 +379,13 @@ DeclResult Sema::ActOnModuleImport(SourceLocation StartLoc,
     // We already checked that we are in a module purview in the parser.
     assert(!ModuleScopes.empty() && "in a module purview, but no module?");
     Module *NamedMod = ModuleScopes.back().Module;
-    if (ModuleScopes.back().IsPartition) {
-      // We're importing a partition into a partition, find the name of the
-      // owning named module.
-      size_t P = NamedMod->Name.find_first_of(":");
-      ModuleName = NamedMod->Name.substr(0, P + 1);
-    } else {
-      // We're importing a partition into the named module itself (either the
-      // interface or an implementation TU).
-      ModuleName = NamedMod->Name;
-      ModuleName += ":";
-    }
-    ModuleName += stringFromPath(Partition);
-    ModuleNameLoc = {PP.getIdentifierInfo(ModuleName), Partition[0].second};
-    Partition = ModuleIdPath(ModuleNameLoc);
+    // If we are importing into a partition, find the owning named module,
+    // otherwise, the name of the importing named module.
+    ModuleName = NamedMod->getPrimaryModuleInterfaceName().str();
+    ModuleName += ":";
+    ModuleName += stringFromPath(Path);
+    ModuleNameLoc = {PP.getIdentifierInfo(ModuleName), Path[0].second};
+    Path = ModuleIdPath(ModuleNameLoc);
   } else if (Cxx20Mode) {
     ModuleName = stringFromPath(Path);
     ModuleNameLoc = {PP.getIdentifierInfo(ModuleName), Path[0].second};
@@ -417,13 +407,11 @@ DeclResult Sema::ActOnModuleImport(SourceLocation StartLoc,
   }
 
   Module *Mod = getModuleLoader().loadModule(
-      ImportLoc, IsPartition ? Partition : Path, Module::AllVisible,
-      /*IsInclusionDirective=*/false);
+      ImportLoc, Path, Module::AllVisible, /*IsInclusionDirective=*/false);
   if (!Mod)
     return true;
 
-  return ActOnModuleImport(StartLoc, ExportLoc, ImportLoc, Mod,
-                           IsPartition ? Partition : Path);
+  return ActOnModuleImport(StartLoc, ExportLoc, ImportLoc, Mod, Path);
 }
 
 /// Determine whether \p D is lexically within an export-declaration.

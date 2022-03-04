@@ -2,8 +2,8 @@
 
 from mlir.ir import *
 from mlir.dialects import builtin
+from mlir.dialects import func
 from mlir.dialects import linalg
-from mlir.dialects import std
 
 from mlir.dialects.linalg.opdsl.lang import *
 
@@ -25,7 +25,7 @@ def matmul_poly(
     A=TensorDef(T1, S.M, S.K),
     B=TensorDef(T2, S.K, S.N),
     C=TensorDef(U, S.M, S.N, output=True),
-    cast=TypeFnAttrDef(default=TypeFn.cast)):
+    cast=TypeFnAttrDef(default=TypeFn.cast_signed)):
   domain(D.m, D.n, D.k)
   C[D.m, D.n] += cast(U, A[D.m, D.k]) * cast(U, B[D.k, D.n])
 

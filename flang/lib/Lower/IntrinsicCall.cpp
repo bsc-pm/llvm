@@ -15,10 +15,12 @@
 
 #include "flang/Lower/IntrinsicCall.h"
 #include "flang/Common/static-multimap-view.h"
+#include "flang/Lower/StatementContext.h"
 #include "flang/Lower/SymbolMap.h"
 #include "flang/Lower/Todo.h"
 #include "flang/Optimizer/Builder/Complex.h"
 #include "flang/Optimizer/Builder/FIRBuilder.h"
+#include "flang/Optimizer/Builder/MutableBox.h"
 #include "flang/Optimizer/Builder/Runtime/RTBuilder.h"
 #include "flang/Optimizer/Support/FatalError.h"
 #include "llvm/Support/CommandLine.h"
@@ -27,6 +29,49 @@
 
 #define PGMATH_DECLARE
 #include "flang/Evaluate/pgmath.h.inc"
+
+/// Enums used to templatize and share lowering of MIN and MAX.
+enum class Extremum { Min, Max };
+
+// There are different ways to deal with NaNs in MIN and MAX.
+// Known existing behaviors are listed below and can be selected for
+// f18 MIN/MAX implementation.
+enum class ExtremumBehavior {
+  // Note: the Signaling/quiet aspect of NaNs in the behaviors below are
+  // not described because there is no way to control/observe such aspect in
+  // MLIR/LLVM yet. The IEEE behaviors come with requirements regarding this
+  // aspect that are therefore currently not enforced. In the descriptions
+  // below, NaNs can be signaling or quite. Returned NaNs may be signaling
+  // if one of the input NaN was signaling but it cannot be guaranteed either.
+  // Existing compilers using an IEEE behavior (gfortran) also do not fulfill
+  // signaling/quiet requirements.
+  IeeeMinMaximumNumber,
+  // IEEE minimumNumber/maximumNumber behavior (754-2019, section 9.6):
+  // If one of the argument is and number and the other is NaN, return the
+  // number. If both arguements are NaN, return NaN.
+  // Compilers: gfortran.
+  IeeeMinMaximum,
+  // IEEE minimum/maximum behavior (754-2019, section 9.6):
+  // If one of the argument is NaN, return NaN.
+  MinMaxss,
+  // x86 minss/maxss behavior:
+  // If the second argument is a number and the other is NaN, return the number.
+  // In all other cases where at least one operand is NaN, return NaN.
+  // Compilers: xlf (only for MAX), ifort, pgfortran -nollvm, and nagfor.
+  PgfortranLlvm,
+  // "Opposite of" x86 minss/maxss behavior:
+  // If the first argument is a number and the other is NaN, return the
+  // number.
+  // In all other cases where at least one operand is NaN, return NaN.
+  // Compilers: xlf (only for MIN), and pgfortran (with llvm).
+  IeeeMinMaxNum
+  // IEEE minNum/maxNum behavior (754-2008, section 5.3.1):
+  // TODO: Not implemented.
+  // It is the only behavior where the signaling/quiet aspect of a NaN argument
+  // impacts if the result should be NaN or the argument that is a number.
+  // LLVM/MLIR do not provide ways to observe this aspect, so it is not
+  // possible to implement it without some target dependent runtime.
+};
 
 /// This file implements lowering of Fortran intrinsic procedures.
 /// Intrinsics are lowered to a mix of FIR and MLIR operations as
@@ -76,10 +121,19 @@ struct IntrinsicLibrary {
   getRuntimeCallGenerator(llvm::StringRef name,
                           mlir::FunctionType soughtFuncType);
 
+  /// Lowering for the ABS intrinsic. The ABS intrinsic expects one argument in
+  /// the llvm::ArrayRef. The ABS intrinsic is lowered into MLIR/FIR operation
+  /// if the argument is an integer, into llvm intrinsics if the argument is
+  /// real and to the `hypot` math routine if the argument is of complex type.
   mlir::Value genAbs(mlir::Type, llvm::ArrayRef<mlir::Value>);
+  template <Extremum, ExtremumBehavior>
+  mlir::Value genExtremum(mlir::Type, llvm::ArrayRef<mlir::Value>);
+  /// Lowering for the IAND intrinsic. The IAND intrinsic expects two arguments
+  /// in the llvm::ArrayRef.
   mlir::Value genIand(mlir::Type, llvm::ArrayRef<mlir::Value>);
   /// Define the different FIR generators that can be mapped to intrinsic to
-  /// generate the related code.
+  /// generate the related code. The intrinsic is lowered into an MLIR
+  /// arith::AndIOp.
   using ElementalGenerator = decltype(&IntrinsicLibrary::genAbs);
   using Generator = std::variant<ElementalGenerator>;
 
@@ -148,6 +202,17 @@ static const IntrinsicHandler *findIntrinsicHandler(llvm::StringRef name) {
 // Math runtime description and matching utility
 //===----------------------------------------------------------------------===//
 
+/// Command line option to modify math runtime version used to implement
+/// intrinsics.
+enum MathRuntimeVersion { fastVersion, llvmOnly };
+llvm::cl::opt<MathRuntimeVersion> mathRuntimeVersion(
+    "math-runtime", llvm::cl::desc("Select math runtime version:"),
+    llvm::cl::values(
+        clEnumValN(fastVersion, "fast", "use pgmath fast runtime"),
+        clEnumValN(llvmOnly, "llvm",
+                   "only use LLVM intrinsics (may be incomplete)")),
+    llvm::cl::init(fastVersion));
+
 struct RuntimeFunction {
   // llvm::StringRef comparison operator are not constexpr, so use string_view.
   using Key = std::string_view;
@@ -167,13 +232,23 @@ static constexpr RuntimeFunction pgmathFast[] = {
 };
 
 static mlir::FunctionType genF32F32FuncType(mlir::MLIRContext *context) {
-  auto t = mlir::FloatType::getF32(context);
+  mlir::Type t = mlir::FloatType::getF32(context);
   return mlir::FunctionType::get(context, {t}, {t});
 }
 
 static mlir::FunctionType genF64F64FuncType(mlir::MLIRContext *context) {
-  auto t = mlir::FloatType::getF64(context);
+  mlir::Type t = mlir::FloatType::getF64(context);
   return mlir::FunctionType::get(context, {t}, {t});
+}
+
+static mlir::FunctionType genF32F32F32FuncType(mlir::MLIRContext *context) {
+  auto t = mlir::FloatType::getF32(context);
+  return mlir::FunctionType::get(context, {t, t}, {t});
+}
+
+static mlir::FunctionType genF64F64F64FuncType(mlir::MLIRContext *context) {
+  auto t = mlir::FloatType::getF64(context);
+  return mlir::FunctionType::get(context, {t, t}, {t});
 }
 
 // TODO : Fill-up this table with more intrinsic.
@@ -182,6 +257,8 @@ static mlir::FunctionType genF64F64FuncType(mlir::MLIRContext *context) {
 static constexpr RuntimeFunction llvmIntrinsics[] = {
     {"abs", "llvm.fabs.f32", genF32F32FuncType},
     {"abs", "llvm.fabs.f64", genF64F64FuncType},
+    {"pow", "llvm.pow.f32", genF32F32F32FuncType},
+    {"pow", "llvm.pow.f64", genF64F64F64FuncType},
 };
 
 // This helper class computes a "distance" between two function types.
@@ -204,9 +281,9 @@ public:
     if (nResults != to.getNumResults() || nInputs != to.getNumInputs()) {
       infinite = true;
     } else {
-      for (decltype(nInputs) i{0}; i < nInputs && !infinite; ++i)
+      for (decltype(nInputs) i = 0; i < nInputs && !infinite; ++i)
         addArgumentDistance(from.getInput(i), to.getInput(i));
-      for (decltype(nResults) i{0}; i < nResults && !infinite; ++i)
+      for (decltype(nResults) i = 0; i < nResults && !infinite; ++i)
         addResultDistance(to.getResult(i), from.getResult(i));
     }
   }
@@ -277,20 +354,22 @@ private:
   }
 
   static Conversion conversionBetweenTypes(mlir::Type from, mlir::Type to) {
-    if (from == to) {
+    if (from == to)
       return Conversion::None;
-    }
+
     if (auto fromIntTy{from.dyn_cast<mlir::IntegerType>()}) {
       if (auto toIntTy{to.dyn_cast<mlir::IntegerType>()}) {
         return fromIntTy.getWidth() > toIntTy.getWidth() ? Conversion::Narrow
                                                          : Conversion::Extend;
       }
     }
+
     if (fir::isa_real(from) && fir::isa_real(to)) {
       return getFloatingPointWidth(from) > getFloatingPointWidth(to)
                  ? Conversion::Narrow
                  : Conversion::Extend;
     }
+
     if (auto fromCplxTy{from.dyn_cast<fir::ComplexType>()}) {
       if (auto toCplxTy{to.dyn_cast<fir::ComplexType>()}) {
         return getFloatingPointWidth(fromCplxTy) >
@@ -318,8 +397,8 @@ private:
     dataSize
   };
 
-  std::array<int, dataSize> conversions{/* zero init*/};
-  bool infinite{false}; // When forbidden conversion or wrong argument number
+  std::array<int, dataSize> conversions = {};
+  bool infinite = false; // When forbidden conversion or wrong argument number
 };
 
 /// Build mlir::FuncOp from runtime symbol description and add
@@ -342,18 +421,18 @@ mlir::FuncOp searchFunctionInLibrary(
     llvm::StringRef name, mlir::FunctionType funcType,
     const RuntimeFunction **bestNearMatch,
     FunctionDistance &bestMatchDistance) {
-  auto range = lib.equal_range(name);
-  for (auto iter{range.first}; iter != range.second && iter; ++iter) {
-    const auto &impl = *iter;
-    auto implType = impl.typeGenerator(builder.getContext());
-    if (funcType == implType) {
+  std::pair<const RuntimeFunction *, const RuntimeFunction *> range =
+      lib.equal_range(name);
+  for (auto iter = range.first; iter != range.second && iter; ++iter) {
+    const RuntimeFunction &impl = *iter;
+    mlir::FunctionType implType = impl.typeGenerator(builder.getContext());
+    if (funcType == implType)
       return getFuncOp(loc, builder, impl); // exact match
-    } else {
-      FunctionDistance distance(funcType, implType);
-      if (distance.isSmallerThan(bestMatchDistance)) {
-        *bestNearMatch = &impl;
-        bestMatchDistance = std::move(distance);
-      }
+
+    FunctionDistance distance(funcType, implType);
+    if (distance.isSmallerThan(bestMatchDistance)) {
+      *bestNearMatch = &impl;
+      bestMatchDistance = std::move(distance);
     }
   }
   return {};
@@ -373,8 +452,12 @@ static mlir::FuncOp getRuntimeFunction(mlir::Location loc,
   using RtMap = Fortran::common::StaticMultimapView<RuntimeFunction>;
   static constexpr RtMap pgmathF(pgmathFast);
   static_assert(pgmathF.Verify() && "map must be sorted");
-  match = searchFunctionInLibrary(loc, builder, pgmathF, name, funcType,
-                                  &bestNearMatch, bestMatchDistance);
+  if (mathRuntimeVersion == fastVersion) {
+    match = searchFunctionInLibrary(loc, builder, pgmathF, name, funcType,
+                                    &bestNearMatch, bestMatchDistance);
+  } else {
+    assert(mathRuntimeVersion == llvmOnly && "unknown math runtime");
+  }
   if (match)
     return match;
 
@@ -535,8 +618,8 @@ mlir::Value IntrinsicLibrary::genAbs(mlir::Type resultType,
   mlir::Value arg = args[0];
   mlir::Type type = arg.getType();
   if (fir::isa_real(type)) {
-    // Runtime call to fp abs. An alternative would be to use mlir math::AbsFOp
-    // but it does not support all fir floating point types.
+    // Runtime call to fp abs. An alternative would be to use mlir
+    // math::AbsFOp but it does not support all fir floating point types.
     return genRuntimeCall("abs", resultType, args);
   }
   if (auto intType = type.dyn_cast<mlir::IntegerType>()) {
@@ -562,6 +645,81 @@ mlir::Value IntrinsicLibrary::genIand(mlir::Type resultType,
                                       llvm::ArrayRef<mlir::Value> args) {
   assert(args.size() == 2);
   return builder.create<mlir::arith::AndIOp>(loc, args[0], args[1]);
+}
+
+// Compare two FIR values and return boolean result as i1.
+template <Extremum extremum, ExtremumBehavior behavior>
+static mlir::Value createExtremumCompare(mlir::Location loc,
+                                         fir::FirOpBuilder &builder,
+                                         mlir::Value left, mlir::Value right) {
+  static constexpr mlir::arith::CmpIPredicate integerPredicate =
+      extremum == Extremum::Max ? mlir::arith::CmpIPredicate::sgt
+                                : mlir::arith::CmpIPredicate::slt;
+  static constexpr mlir::arith::CmpFPredicate orderedCmp =
+      extremum == Extremum::Max ? mlir::arith::CmpFPredicate::OGT
+                                : mlir::arith::CmpFPredicate::OLT;
+  mlir::Type type = left.getType();
+  mlir::Value result;
+  if (fir::isa_real(type)) {
+    // Note: the signaling/quit aspect of the result required by IEEE
+    // cannot currently be obtained with LLVM without ad-hoc runtime.
+    if constexpr (behavior == ExtremumBehavior::IeeeMinMaximumNumber) {
+      // Return the number if one of the inputs is NaN and the other is
+      // a number.
+      auto leftIsResult =
+          builder.create<mlir::arith::CmpFOp>(loc, orderedCmp, left, right);
+      auto rightIsNan = builder.create<mlir::arith::CmpFOp>(
+          loc, mlir::arith::CmpFPredicate::UNE, right, right);
+      result =
+          builder.create<mlir::arith::OrIOp>(loc, leftIsResult, rightIsNan);
+    } else if constexpr (behavior == ExtremumBehavior::IeeeMinMaximum) {
+      // Always return NaNs if one the input is NaNs
+      auto leftIsResult =
+          builder.create<mlir::arith::CmpFOp>(loc, orderedCmp, left, right);
+      auto leftIsNan = builder.create<mlir::arith::CmpFOp>(
+          loc, mlir::arith::CmpFPredicate::UNE, left, left);
+      result = builder.create<mlir::arith::OrIOp>(loc, leftIsResult, leftIsNan);
+    } else if constexpr (behavior == ExtremumBehavior::MinMaxss) {
+      // If the left is a NaN, return the right whatever it is.
+      result =
+          builder.create<mlir::arith::CmpFOp>(loc, orderedCmp, left, right);
+    } else if constexpr (behavior == ExtremumBehavior::PgfortranLlvm) {
+      // If one of the operand is a NaN, return left whatever it is.
+      static constexpr auto unorderedCmp =
+          extremum == Extremum::Max ? mlir::arith::CmpFPredicate::UGT
+                                    : mlir::arith::CmpFPredicate::ULT;
+      result =
+          builder.create<mlir::arith::CmpFOp>(loc, unorderedCmp, left, right);
+    } else {
+      // TODO: ieeeMinNum/ieeeMaxNum
+      static_assert(behavior == ExtremumBehavior::IeeeMinMaxNum,
+                    "ieeeMinNum/ieeeMaxNum behavior not implemented");
+    }
+  } else if (fir::isa_integer(type)) {
+    result =
+        builder.create<mlir::arith::CmpIOp>(loc, integerPredicate, left, right);
+  } else if (fir::isa_char(type)) {
+    // TODO: ! character min and max is tricky because the result
+    // length is the length of the longest argument!
+    // So we may need a temp.
+    TODO(loc, "CHARACTER min and max");
+  }
+  assert(result && "result must be defined");
+  return result;
+}
+
+// MIN and MAX
+template <Extremum extremum, ExtremumBehavior behavior>
+mlir::Value IntrinsicLibrary::genExtremum(mlir::Type,
+                                          llvm::ArrayRef<mlir::Value> args) {
+  assert(args.size() >= 1);
+  mlir::Value result = args[0];
+  for (auto arg : args.drop_front()) {
+    mlir::Value mask =
+        createExtremumCompare<extremum, behavior>(loc, builder, result, arg);
+    result = builder.create<mlir::arith::SelectOp>(loc, mask, result, arg);
+  }
+  return result;
 }
 
 //===----------------------------------------------------------------------===//
@@ -601,4 +759,19 @@ Fortran::lower::genIntrinsicCall(fir::FirOpBuilder &builder, mlir::Location loc,
                                  llvm::ArrayRef<fir::ExtendedValue> args) {
   return IntrinsicLibrary{builder, loc}.genIntrinsicCall(name, resultType,
                                                          args);
+}
+
+mlir::Value Fortran::lower::genMax(fir::FirOpBuilder &builder,
+                                   mlir::Location loc,
+                                   llvm::ArrayRef<mlir::Value> args) {
+  assert(args.size() > 0 && "max requires at least one argument");
+  return IntrinsicLibrary{builder, loc}
+      .genExtremum<Extremum::Max, ExtremumBehavior::MinMaxss>(args[0].getType(),
+                                                              args);
+}
+
+mlir::Value Fortran::lower::genPow(fir::FirOpBuilder &builder,
+                                   mlir::Location loc, mlir::Type type,
+                                   mlir::Value x, mlir::Value y) {
+  return IntrinsicLibrary{builder, loc}.genRuntimeCall("pow", type, {x, y});
 }

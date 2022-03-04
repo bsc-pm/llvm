@@ -18,7 +18,6 @@
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #  pragma GCC system_header
-#  pragma clang include_instead(<iterator>)
 #endif
 
 _LIBCPP_BEGIN_NAMESPACE_STD
@@ -199,7 +198,7 @@ concept __cpp17_random_access_iterator =
     { __i +  __n } -> same_as<_Ip>;
     { __n +  __i } -> same_as<_Ip>;
     { __i -  __n } -> same_as<_Ip>;
-    { __i -  __i } -> same_as<decltype(__n)>;
+    { __i -  __i } -> same_as<decltype(__n)>; // NOLINT(misc-redundant-expression) ; This is llvm.org/PR54114
     {  __i[__n]  } -> convertible_to<iter_reference_t<_Ip>>;
   };
 } // namespace __iterator_traits_detail

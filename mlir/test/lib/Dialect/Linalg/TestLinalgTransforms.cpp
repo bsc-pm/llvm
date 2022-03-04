@@ -19,7 +19,6 @@
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -41,7 +40,6 @@ struct TestLinalgTransforms
     registry.insert<AffineDialect,
                     memref::MemRefDialect,
                     scf::SCFDialect,
-                    StandardOpsDialect,
                     linalg::LinalgDialect,
                     vector::VectorDialect,
                     gpu::GPUDialect>();
@@ -617,9 +615,6 @@ static void applyTilePattern(FuncOp funcOp, const std::string &loopType,
       tilingPattern, linalgTilingOptions, f);
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(tilingPattern));
 }
-
-static constexpr char kPeeledLoopsLabel[] = "__peeled_loops__";
-static constexpr char kPartialIterationLabel[] = "__partial_iteration__";
 
 /// Apply transformations specified as patterns.
 void TestLinalgTransforms::runOnOperation() {

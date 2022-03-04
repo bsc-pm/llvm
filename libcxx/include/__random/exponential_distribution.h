@@ -11,6 +11,7 @@
 
 #include <__config>
 #include <__random/generate_canonical.h>
+#include <__random/is_valid.h>
 #include <__random/uniform_real_distribution.h>
 #include <cmath>
 #include <iosfwd>
@@ -18,7 +19,6 @@
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #  pragma GCC system_header
-#  pragma clang include_instead(<random>)
 #endif
 
 _LIBCPP_PUSH_MACROS
@@ -110,6 +110,7 @@ template<class _URNG>
 _RealType
 exponential_distribution<_RealType>::operator()(_URNG& __g, const param_type& __p)
 {
+    static_assert(__libcpp_random_is_valid_urng<_URNG>::value, "");
     return -_VSTD::log
                   (
                       result_type(1) -
