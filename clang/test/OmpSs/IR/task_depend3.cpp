@@ -223,3 +223,25 @@ void foo2() {
 // CHECK-NEXT:   %4 = load %struct._depend_unpack_t.6, %struct._depend_unpack_t.6* %retval, align 8
 // CHECK-NEXT:   ret %struct._depend_unpack_t.6 %4
 // CHECK-NEXT: }
+
+void foo3(bool b) {
+    #pragma oss task in(b)
+    {}
+}
+
+// CHECK: define internal %struct._depend_unpack_t.7 @compute_dep.8(i8* %b)
+// CHECK-NEXT: entry:
+// CHECK-NEXT:   %retval = alloca %struct._depend_unpack_t.7, align 8
+// CHECK-NEXT:   %b.addr = alloca i8*, align 8
+// CHECK-NEXT:   store i8* %b, i8** %b.addr, align 8
+// CHECK-NEXT:   %0 = getelementptr inbounds %struct._depend_unpack_t.7, %struct._depend_unpack_t.7* %retval, i32 0, i32 0
+// CHECK-NEXT:   store i8* %b, i8** %0, align 8
+// CHECK-NEXT:   %1 = getelementptr inbounds %struct._depend_unpack_t.7, %struct._depend_unpack_t.7* %retval, i32 0, i32 1
+// CHECK-NEXT:   store i64 1, i64* %1, align 8
+// CHECK-NEXT:   %2 = getelementptr inbounds %struct._depend_unpack_t.7, %struct._depend_unpack_t.7* %retval, i32 0, i32 2
+// CHECK-NEXT:   store i64 0, i64* %2, align 8
+// CHECK-NEXT:   %3 = getelementptr inbounds %struct._depend_unpack_t.7, %struct._depend_unpack_t.7* %retval, i32 0, i32 3
+// CHECK-NEXT:   store i64 1, i64* %3, align 8
+// CHECK-NEXT:   %4 = load %struct._depend_unpack_t.7, %struct._depend_unpack_t.7* %retval, align 8
+// CHECK-NEXT:   ret %struct._depend_unpack_t.7 %4
+// CHECK-NEXT: }

@@ -1,0 +1,9 @@
+add_object_library(
+  file
+  SRCS
+    file.cpp
+  HDRS
+    file.h
+  DEPENDS
+    libc.src.errno.__errno_location
+)

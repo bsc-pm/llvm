@@ -110,8 +110,13 @@ static cl::opt<bool> DisableOpenMPOptBarrierElimination(
     cl::Hidden, cl::init(false));
 
 static cl::opt<bool> PrintModuleAfterOptimizations(
-    "openmp-opt-print-module", cl::ZeroOrMore,
+    "openmp-opt-print-module-after", cl::ZeroOrMore,
     cl::desc("Print the current module after OpenMP optimizations."),
+    cl::Hidden, cl::init(false));
+
+static cl::opt<bool> PrintModuleBeforeOptimizations(
+    "openmp-opt-print-module-before", cl::ZeroOrMore,
+    cl::desc("Print the current module before OpenMP optimizations."),
     cl::Hidden, cl::init(false));
 
 static cl::opt<bool> AlwaysInlineDeviceFunctions(
@@ -128,6 +133,11 @@ static cl::opt<unsigned>
     SetFixpointIterations("openmp-opt-max-iterations", cl::Hidden,
                           cl::desc("Maximal number of attributor iterations."),
                           cl::init(256));
+
+static cl::opt<unsigned>
+    SharedMemoryLimit("openmp-opt-shared-limit", cl::Hidden,
+                      cl::desc("Maximum amount of shared memory to use."),
+                      cl::init(std::numeric_limits<unsigned>::max()));
 
 STATISTIC(NumOpenMPRuntimeCallsDeduplicated,
           "Number of OpenMP runtime calls deduplicated");
@@ -1458,7 +1468,6 @@ private:
             case Intrinsic::nvvm_barrier0_and:
             case Intrinsic::nvvm_barrier0_or:
             case Intrinsic::nvvm_barrier0_popc:
-            case Intrinsic::amdgcn_s_barrier:
               return true;
             default:
               break;
@@ -2120,6 +2129,8 @@ private:
                                        OMPRTL___kmpc_barrier_simple_generic);
     ExternalizationRAII ThreadId(OMPInfoCache,
                                  OMPRTL___kmpc_get_hardware_thread_id_in_block);
+    ExternalizationRAII NumThreads(
+        OMPInfoCache, OMPRTL___kmpc_get_hardware_num_threads_in_block);
     ExternalizationRAII WarpSize(OMPInfoCache, OMPRTL___kmpc_get_warp_size);
 
     registerAAs(IsModulePass);
@@ -2999,6 +3010,14 @@ struct AAHeapToSharedFunction : public AAHeapToShared {
 
       auto *AllocSize = cast<ConstantInt>(CB->getArgOperand(0));
 
+      if (AllocSize->getZExtValue() + SharedMemoryUsed > SharedMemoryLimit) {
+        LLVM_DEBUG(dbgs() << TAG << "Cannot replace call " << *CB
+                          << " with shared memory."
+                          << " Shared memory usage is limited to "
+                          << SharedMemoryLimit << " bytes\n");
+        continue;
+      }
+
       LLVM_DEBUG(dbgs() << TAG << "Replace globalization call " << *CB
                         << " with " << AllocSize->getZExtValue()
                         << " bytes of shared memory\n");
@@ -3033,7 +3052,8 @@ struct AAHeapToSharedFunction : public AAHeapToShared {
       A.deleteAfterManifest(*CB);
       A.deleteAfterManifest(*FreeCalls.front());
 
-      NumBytesMovedToSharedMemory += AllocSize->getZExtValue();
+      SharedMemoryUsed += AllocSize->getZExtValue();
+      NumBytesMovedToSharedMemory = SharedMemoryUsed;
       Changed = ChangeStatus::CHANGED;
     }
 
@@ -3069,6 +3089,8 @@ struct AAHeapToSharedFunction : public AAHeapToShared {
   SmallSetVector<CallBase *, 4> MallocCalls;
   /// Collection of potentially removed free calls in a function.
   SmallPtrSet<CallBase *, 4> PotentialRemovedFreeCalls;
+  /// The total amount of shared memory that has been used for HeapToShared.
+  unsigned SharedMemoryUsed = 0;
 };
 
 struct AAKernelInfo : public StateWrapper<KernelInfoState, AbstractAttribute> {
@@ -4899,6 +4921,9 @@ PreservedAnalyses OpenMPOptPass::run(Module &M, ModuleAnalysisManager &AM) {
       AM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager();
   KernelSet Kernels = getDeviceKernels(M);
 
+  if (PrintModuleBeforeOptimizations)
+    LLVM_DEBUG(dbgs() << TAG << "Module before OpenMPOpt Module Pass:\n" << M);
+
   auto IsCalled = [&](Function &F) {
     if (Kernels.contains(&F))
       return true;
@@ -5000,6 +5025,9 @@ PreservedAnalyses OpenMPOptCGSCCPass::run(LazyCallGraph::SCC &C,
     return PreservedAnalyses::all();
 
   Module &M = *C.begin()->getFunction().getParent();
+
+  if (PrintModuleBeforeOptimizations)
+    LLVM_DEBUG(dbgs() << TAG << "Module before OpenMPOpt CGSCC Pass:\n" << M);
 
   KernelSet Kernels = getDeviceKernels(M);
 

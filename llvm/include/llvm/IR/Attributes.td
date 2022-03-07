@@ -175,6 +175,9 @@ def NoProfile : EnumAttr<"noprofile", [FnAttr]>;
 /// Function doesn't unwind stack.
 def NoUnwind : EnumAttr<"nounwind", [FnAttr]>;
 
+/// No SanitizeBounds instrumentation.
+def NoSanitizeBounds : EnumAttr<"nosanitize_bounds", [FnAttr]>;
+
 /// No SanitizeCoverage instrumentation.
 def NoSanitizeCoverage : EnumAttr<"nosanitize_coverage", [FnAttr]>;
 
@@ -273,7 +276,7 @@ def SwiftSelf : EnumAttr<"swiftself", [ParamAttr]>;
 def SwiftAsync : EnumAttr<"swiftasync", [ParamAttr]>;
 
 /// Function must be in a unwind table.
-def UWTable : EnumAttr<"uwtable", [FnAttr]>;
+def UWTable : IntAttr<"uwtable", [FnAttr]>;
 
 /// Minimum/Maximum vscale value for function.
 def VScaleRange : IntAttr<"vscale_range", [FnAttr]>;
@@ -347,6 +350,3 @@ def : MergeRule<"adjustCallerStackProbeSize">;
 def : MergeRule<"adjustMinLegalVectorWidth">;
 def : MergeRule<"adjustNullPointerValidAttr">;
 def : MergeRule<"setAND<MustProgressAttr>">;
-
-// Target dependent attributes
-include "llvm/IR/AttributesAMDGPU.td"

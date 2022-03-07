@@ -672,6 +672,7 @@ lltok::Kind LLLexer::LexIdentifier() {
   KEYWORD(nocf_check);
   KEYWORD(noundef);
   KEYWORD(nounwind);
+  KEYWORD(nosanitize_bounds);
   KEYWORD(nosanitize_coverage);
   KEYWORD(null_pointer_is_valid);
   KEYWORD(optforfuzzing);
@@ -708,6 +709,8 @@ lltok::Kind LLLexer::LexIdentifier() {
   KEYWORD(immarg);
   KEYWORD(byref);
   KEYWORD(mustprogress);
+  KEYWORD(sync);
+  KEYWORD(async);
 
   KEYWORD(type);
   KEYWORD(opaque);

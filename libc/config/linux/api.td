@@ -159,7 +159,8 @@ def StdlibAPI : PublicAPI<"stdlib.h"> {
     "lldiv_t",
     "size_t",
     "__bsearchcompare_t",
-    "__qsortcompare_t"
+    "__qsortcompare_t",
+    "__atexithandler_t",
   ];
 }
 
@@ -215,7 +216,7 @@ def SignalAPI : PublicAPI<"signal.h"> {
 
 def ThreadsAPI : PublicAPI<"threads.h"> {
   let Macros = [
-    SimpleMacroDef<"ONCE_FLAG_INIT", "0">,
+    SimpleMacroDef<"ONCE_FLAG_INIT", "{0}">,
   ];
 
   let Types = [

@@ -34,7 +34,7 @@ void constants() {
 // CHECK-NEXT:   call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 4 %5, i8* align 4 bitcast ([3 x i32]* @__const.constants.discrete.array to i8*), i64 12, i1 false)
 // CHECK-NEXT:   %6 = load i32, i32* %i, align 4
 // CHECK-NEXT:   %discreteidx = getelementptr [3 x i32], [3 x i32]* %discrete.array, i32 0, i32 %6
-// CHECK-NEXT:   %7 = load i32, i32* %discreteidx, align 8
+// CHECK-NEXT:   %7 = load i32, i32* %discreteidx, align 4
 // CHECK-NEXT:   %8 = getelementptr inbounds %struct._depend_unpack_t, %struct._depend_unpack_t* %retval, i32 0, i32 0
 // CHECK-NEXT:   store i32 0, i32* %8, align 4
 // CHECK-NEXT:   %9 = getelementptr inbounds %struct._depend_unpack_t, %struct._depend_unpack_t* %retval, i32 0, i32 1
@@ -49,7 +49,7 @@ void constants() {
 // CHECK-NEXT:   call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 4 %13, i8* align 4 bitcast ([3 x i32]* @__const.constants.discrete.array.1 to i8*), i64 12, i1 false)
 // CHECK-NEXT:   %14 = load i32, i32* %j, align 4
 // CHECK-NEXT:   %discreteidx2 = getelementptr [3 x i32], [3 x i32]* %discrete.array1, i32 0, i32 %14
-// CHECK-NEXT:   %15 = load i32, i32* %discreteidx2, align 8
+// CHECK-NEXT:   %15 = load i32, i32* %discreteidx2, align 4
 // CHECK-NEXT:   %16 = getelementptr inbounds %struct._depend_unpack_t, %struct._depend_unpack_t* %retval, i32 0, i32 4
 // CHECK-NEXT:   store i32 0, i32* %16, align 4
 // CHECK-NEXT:   %17 = getelementptr inbounds %struct._depend_unpack_t, %struct._depend_unpack_t* %retval, i32 0, i32 5
@@ -108,7 +108,7 @@ void nonconstants_int(
 // CHECK-NEXT:   store i32 %add2, i32* %arrayinit.element1, align 4
 // CHECK-NEXT:   %8 = load i32, i32* %i, align 4
 // CHECK-NEXT:   %discreteidx = getelementptr [3 x i32], [3 x i32]* %discrete.array, i32 0, i32 %8
-// CHECK-NEXT:   %9 = load i32, i32* %discreteidx, align 8
+// CHECK-NEXT:   %9 = load i32, i32* %discreteidx, align 4
 // CHECK-NEXT:   %10 = getelementptr inbounds %struct._depend_unpack_t.1, %struct._depend_unpack_t.1* %retval, i32 0, i32 0
 // CHECK-NEXT:   store i32 0, i32* %10, align 4
 // CHECK-NEXT:   %11 = getelementptr inbounds %struct._depend_unpack_t.1, %struct._depend_unpack_t.1* %retval, i32 0, i32 1
@@ -132,7 +132,7 @@ void nonconstants_int(
 // CHECK-NEXT:   store i32 %add8, i32* %arrayinit.element7, align 4
 // CHECK-NEXT:   %18 = load i32, i32* %j, align 4
 // CHECK-NEXT:   %discreteidx9 = getelementptr [3 x i32], [3 x i32]* %discrete.array3, i32 0, i32 %18
-// CHECK-NEXT:   %19 = load i32, i32* %discreteidx9, align 8
+// CHECK-NEXT:   %19 = load i32, i32* %discreteidx9, align 4
 // CHECK-NEXT:   %20 = getelementptr inbounds %struct._depend_unpack_t.1, %struct._depend_unpack_t.1* %retval, i32 0, i32 4
 // CHECK-NEXT:   store i32 0, i32* %20, align 4
 // CHECK-NEXT:   %21 = getelementptr inbounds %struct._depend_unpack_t.1, %struct._depend_unpack_t.1* %retval, i32 0, i32 5
@@ -194,7 +194,7 @@ void nonconstants_short(
 // CHECK-NEXT:   store i32 %add4, i32* %arrayinit.element2, align 4
 // CHECK-NEXT:   %8 = load i32, i32* %i, align 4
 // CHECK-NEXT:   %discreteidx = getelementptr [3 x i32], [3 x i32]* %discrete.array, i32 0, i32 %8
-// CHECK-NEXT:   %9 = load i32, i32* %discreteidx, align 8
+// CHECK-NEXT:   %9 = load i32, i32* %discreteidx, align 4
 // CHECK-NEXT:   %10 = getelementptr inbounds %struct._depend_unpack_t.3, %struct._depend_unpack_t.3* %retval, i32 0, i32 0
 // CHECK-NEXT:   store i32 0, i32* %10, align 4
 // CHECK-NEXT:   %11 = getelementptr inbounds %struct._depend_unpack_t.3, %struct._depend_unpack_t.3* %retval, i32 0, i32 1
@@ -221,7 +221,7 @@ void nonconstants_short(
 // CHECK-NEXT:   store i32 %add13, i32* %arrayinit.element11, align 4
 // CHECK-NEXT:   %18 = load i32, i32* %j, align 4
 // CHECK-NEXT:   %discreteidx14 = getelementptr [3 x i32], [3 x i32]* %discrete.array5, i32 0, i32 %18
-// CHECK-NEXT:   %19 = load i32, i32* %discreteidx14, align 8
+// CHECK-NEXT:   %19 = load i32, i32* %discreteidx14, align 4
 // CHECK-NEXT:   %20 = getelementptr inbounds %struct._depend_unpack_t.3, %struct._depend_unpack_t.3* %retval, i32 0, i32 4
 // CHECK-NEXT:   store i32 0, i32* %20, align 4
 // CHECK-NEXT:   %21 = getelementptr inbounds %struct._depend_unpack_t.3, %struct._depend_unpack_t.3* %retval, i32 0, i32 5

@@ -1524,6 +1524,7 @@ ExprResult Parser::ParseCastExpression(CastParseKind ParseKind,
   case tok::kw___float128:
   case tok::kw___ibm128:
   case tok::kw_void:
+  case tok::kw_auto:
   case tok::kw_typename:
   case tok::kw_typeof:
   case tok::kw___vector:
@@ -1847,6 +1848,7 @@ ExprResult Parser::ParseCastExpression(CastParseKind ParseKind,
 ///         primary-expression
 ///         postfix-expression '[' expression ']'
 ///         postfix-expression '[' braced-init-list ']'
+///         postfix-expression '[' expression-list [opt] ']'  [C++2b 12.4.5]
 ///         postfix-expression '(' argument-expression-list[opt] ')'
 ///         postfix-expression '.' identifier
 ///         postfix-expression '->' identifier
@@ -1910,62 +1912,99 @@ Parser::ParsePostfixExpressionSuffix(ExprResult LHS) {
         (void)Actions.CorrectDelayedTyposInExpr(LHS);
         return ExprError();
       }
-
       BalancedDelimiterTracker T(*this, tok::l_square);
       T.consumeOpen();
       Loc = T.getOpenLocation();
-      ExprResult Idx, Length, Stride;
+      ExprResult Length, Stride;
       SourceLocation ColonLocFirst, ColonLocSecond;
       bool ColonForm = false;
+      ExprVector ArgExprs;
+      bool HasError = false;
+      PreferredType.enterSubscript(Actions, Tok.getLocation(), LHS.get());
+
+      // We try to parse a list of indexes in all language mode first
+      // and, in we find 0 or one index, we try to parse an OpenMP array
+      // section. This allow us to support C++2b multi dimensional subscript and
+      // OpenMp sections in the same language mode.
+      // TODO: ';'?
+      if (!(getLangOpts().OpenMP || getLangOpts().OmpSs)
+          || (getLangOpts().OpenMP && Tok.isNot(tok::colon))
+          || (getLangOpts().OmpSs && (Tok.isNot(tok::colon) && Tok.isNot(tok::semi)))) {
+        if (!getLangOpts().CPlusPlus2b) {
+          ExprResult Idx;
+          if (getLangOpts().CPlusPlus11 && Tok.is(tok::l_brace)) {
+            Diag(Tok, diag::warn_cxx98_compat_generalized_initializer_lists);
+            Idx = ParseBraceInitializer();
+          } else {
+            Idx = ParseExpression(); // May be a comma expression
+          }
+          LHS = Actions.CorrectDelayedTyposInExpr(LHS);
+          Idx = Actions.CorrectDelayedTyposInExpr(Idx);
+          if (Idx.isInvalid()) {
+            HasError = true;
+          } else {
+            ArgExprs.push_back(Idx.get());
+          }
+        } else if (Tok.isNot(tok::r_square)) {
+          CommaLocsTy CommaLocs;
+          if (ParseExpressionList(ArgExprs, CommaLocs)) {
+            LHS = Actions.CorrectDelayedTyposInExpr(LHS);
+            HasError = true;
+          }
+          assert(
+              (ArgExprs.empty() || ArgExprs.size() == CommaLocs.size() + 1) &&
+              "Unexpected number of commas!");
+        }
+      }
 
       auto ParseOmpSection =
-          [this, &ColonLocFirst, &ColonLocSecond, &Length, &Stride, &Idx]() {
-        ColonProtectionRAIIObject RAII(*this);
-        // Parse [: or [ expr or [ expr :
-        if (!Tok.is(tok::colon)) {
-          // [ expr
-          Idx = ParseExpression();
-        }
-        if (Tok.is(tok::colon)) {
-          // Consume ':'
-          ColonLocFirst = ConsumeToken();
-          if (Tok.isNot(tok::r_square) &&
-              (getLangOpts().OpenMP < 50 ||
-               ((Tok.isNot(tok::colon) && getLangOpts().OpenMP >= 50))))
-            Length = ParseExpression();
-        }
-        if (getLangOpts().OpenMP >= 50 &&
-            (OMPClauseKind == llvm::omp::Clause::OMPC_to ||
-             OMPClauseKind == llvm::omp::Clause::OMPC_from) &&
-            Tok.is(tok::colon)) {
-          // Consume ':'
-          ColonLocSecond = ConsumeToken();
-          if (Tok.isNot(tok::r_square)) {
-            Stride = ParseExpression();
+          [this, &ColonLocFirst, &ColonLocSecond, &Length, &Stride, &ArgExprs]() {
+        if (ArgExprs.size() <= 1 && getLangOpts().OpenMP) {
+          ColonProtectionRAIIObject RAII(*this);
+          if (Tok.is(tok::colon)) {
+            // Consume ':'
+            ColonLocFirst = ConsumeToken();
+            if (Tok.isNot(tok::r_square) &&
+                (getLangOpts().OpenMP < 50 ||
+                 ((Tok.isNot(tok::colon) && getLangOpts().OpenMP >= 50)))) {
+              Length = ParseExpression();
+              Length = Actions.CorrectDelayedTyposInExpr(Length);
+            }
+          }
+          if (getLangOpts().OpenMP >= 50 &&
+              (OMPClauseKind == llvm::omp::Clause::OMPC_to ||
+               OMPClauseKind == llvm::omp::Clause::OMPC_from) &&
+              Tok.is(tok::colon)) {
+            // Consume ':'
+            ColonLocSecond = ConsumeToken();
+            if (Tok.isNot(tok::r_square)) {
+              Stride = ParseExpression();
+            }
           }
         }
       };
 
       auto ParseOssSection =
-          [this, &ColonLocFirst, &ColonForm, &Length, &Idx]() {
-        ColonProtectionRAIIObject RAII(*this);
-        // Parse [: or [ expr or [ expr :
-        // Parse [; or [ expr or [ expr ;
-        if (!Tok.is(tok::colon) && !Tok.is(tok::semi)) {
-          // [ expr
-          Idx = ParseExpression();
-        }
-        if (Tok.is(tok::colon)) {
-          ColonForm = true;
-          // Consume ':'
-          ColonLocFirst = ConsumeToken();
-          if (Tok.isNot(tok::r_square))
-            Length = ParseExpression();
-        } else if (Tok.is(tok::semi)) {
-          // Consume ';'
-          ColonLocFirst = ConsumeToken();
-          if (Tok.isNot(tok::r_square))
-            Length = ParseExpression();
+          [this, &ColonLocFirst, &ColonForm, &Length, &ArgExprs]() {
+        // Parse ':' or ';' of the array section
+        if (ArgExprs.size() <= 1 && getLangOpts().OmpSs) {
+          ColonProtectionRAIIObject RAII(*this);
+          if (Tok.is(tok::colon)) {
+            ColonForm = true;
+            // Consume ':'
+            ColonLocFirst = ConsumeToken();
+            if (Tok.isNot(tok::r_square) && Tok.isNot(tok::colon)) {
+              Length = ParseExpression();
+              Length = Actions.CorrectDelayedTyposInExpr(Length);
+            }
+          } else if (Tok.is(tok::semi)) {
+            // Consume ';'
+            ColonLocFirst = ConsumeToken();
+            if (Tok.isNot(tok::r_square) && Tok.isNot(tok::semi)) {
+              Length = ParseExpression();
+              Length = Actions.CorrectDelayedTyposInExpr(Length);
+            }
+          }
         }
       };
 
@@ -1973,40 +2012,31 @@ Parser::ParsePostfixExpressionSuffix(ExprResult LHS) {
         (getLangOpts().OmpSs
            && (!getLangOpts().OpenMP || getCurScope()->isOmpSsDirectiveScope()));
 
-      PreferredType.enterSubscript(Actions, Tok.getLocation(), LHS.get());
-      if (getLangOpts().CPlusPlus11 && Tok.is(tok::l_brace)) {
-        Diag(Tok, diag::warn_cxx98_compat_generalized_initializer_lists);
-        Idx = ParseBraceInitializer();
-      } else if (IsOssSection) {
-        ParseOssSection();
-      } else if (getLangOpts().OpenMP) {
+      if (!IsOssSection)
         ParseOmpSection();
-      } else
-        Idx = ParseExpression();
+      else
+        ParseOssSection();
 
       SourceLocation RLoc = Tok.getLocation();
-
       LHS = Actions.CorrectDelayedTyposInExpr(LHS);
-      Idx = Actions.CorrectDelayedTyposInExpr(Idx);
-      Length = Actions.CorrectDelayedTyposInExpr(Length);
-      if (!LHS.isInvalid() && !Idx.isInvalid() && !Length.isInvalid() &&
+
+      if (!LHS.isInvalid() && !HasError && !Length.isInvalid() &&
           !Stride.isInvalid() && Tok.is(tok::r_square)) {
         if (ColonLocFirst.isValid() || ColonLocSecond.isValid()) {
           if (!IsOssSection)
             LHS = Actions.ActOnOMPArraySectionExpr(
-                LHS.get(), Loc, Idx.get(), ColonLocFirst, ColonLocSecond,
-                Length.get(), Stride.get(), RLoc);
+                LHS.get(), Loc, ArgExprs.empty() ? nullptr : ArgExprs[0],
+                ColonLocFirst, ColonLocSecond, Length.get(), Stride.get(), RLoc);
           else
             LHS = Actions.ActOnOSSArraySectionExpr(
-                LHS.get(), Loc, Idx.get(),
+                LHS.get(), Loc, ArgExprs.empty() ? nullptr : ArgExprs[0],
                 ColonLocFirst, Length.get(), RLoc, ColonForm);
         } else {
           LHS = Actions.ActOnArraySubscriptExpr(getCurScope(), LHS.get(), Loc,
-                                                Idx.get(), RLoc);
+                                                ArgExprs, RLoc);
         }
       } else {
         LHS = ExprError();
-        Idx = ExprError();
       }
 
       // Match the ']'.
@@ -3546,7 +3576,9 @@ ExprResult Parser::ParseOSSAssignmentExpression(
 /// \endverbatim
 bool Parser::ParseExpressionList(SmallVectorImpl<Expr *> &Exprs,
                                  SmallVectorImpl<SourceLocation> &CommaLocs,
-                                 llvm::function_ref<void()> ExpressionStarts) {
+                                 llvm::function_ref<void()> ExpressionStarts,
+                                 bool FailImmediatelyOnInvalidExpr,
+                                 bool EarlyTypoCorrection) {
   bool SawError = false;
   while (true) {
     if (ExpressionStarts)
@@ -3558,6 +3590,9 @@ bool Parser::ParseExpressionList(SmallVectorImpl<Expr *> &Exprs,
       Expr = ParseBraceInitializer();
     } else
       Expr = ParseAssignmentExpression();
+
+    if (EarlyTypoCorrection)
+      Expr = Actions.CorrectDelayedTyposInExpr(Expr);
 
     if (Tok.is(tok::ellipsis))
       Expr = Actions.ActOnPackExpansion(Expr.get(), ConsumeToken());
@@ -3572,8 +3607,10 @@ bool Parser::ParseExpressionList(SmallVectorImpl<Expr *> &Exprs,
       break;
     }
     if (Expr.isInvalid()) {
-      SkipUntil(tok::comma, tok::r_paren, StopBeforeMatch);
       SawError = true;
+      if (FailImmediatelyOnInvalidExpr)
+        break;
+      SkipUntil(tok::comma, tok::r_paren, StopBeforeMatch);
     } else {
       Exprs.push_back(Expr.get());
     }

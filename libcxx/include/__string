@@ -17,7 +17,9 @@
 #include <__algorithm/find_end.h>
 #include <__algorithm/find_first_of.h>
 #include <__algorithm/min.h>
+#include <__assert>
 #include <__config>
+#include <__debug>
 #include <__functional/hash.h>     // for __murmur2_or_cityhash
 #include <__iterator/iterator_traits.h>
 #include <cstdint>     // for uint_least16_t
@@ -29,8 +31,6 @@
 #ifndef _LIBCPP_HAS_NO_WIDE_CHARACTERS
 #   include <cwchar> // for wmemcpy
 #endif
-
-#include <__debug>
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #  pragma GCC system_header
@@ -679,7 +679,7 @@ char_traits<char8_t>::find(const char_type* __s, size_t __n, const char_type& __
     return nullptr;
 }
 
-#endif // #_LIBCPP_HAS_NO_CHAR8_T
+#endif // _LIBCPP_HAS_NO_CHAR8_T
 
 #ifndef _LIBCPP_HAS_NO_UNICODE_CHARS
 
@@ -1163,8 +1163,8 @@ struct __quoted_output_proxy
     _CharT  __delim;
     _CharT  __escape;
 
-    __quoted_output_proxy(_Iter __f, _Iter __l, _CharT __d, _CharT __e)
-    : __first(__f), __last(__l), __delim(__d), __escape(__e) {}
+    explicit __quoted_output_proxy(_Iter __f, _Iter __l, _CharT __d, _CharT __e)
+        : __first(__f), __last(__l), __delim(__d), __escape(__e) {}
     //  This would be a nice place for a string_ref
 };
 

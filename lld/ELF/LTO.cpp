@@ -9,23 +9,19 @@
 #include "LTO.h"
 #include "Config.h"
 #include "InputFiles.h"
-#include "LinkerScript.h"
 #include "SymbolTable.h"
 #include "Symbols.h"
 #include "lld/Common/Args.h"
 #include "lld/Common/ErrorHandler.h"
+#include "lld/Common/Strings.h"
 #include "lld/Common/TargetOptionsCommandFlags.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/BinaryFormat/ELF.h"
-#include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
-#include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/LTO/Config.h"
 #include "llvm/LTO/LTO.h"
-#include "llvm/Object/SymbolicFile.h"
 #include "llvm/Support/Caching.h"
 #include "llvm/Support/CodeGen.h"
 #include "llvm/Support/Error.h"
@@ -253,9 +249,9 @@ void BitcodeCompiler::add(BitcodeFile &f) {
                             usedStartStop.count(objSym.getSectionName());
     // Identify symbols exported dynamically, and that therefore could be
     // referenced by a shared library not visible to the linker.
-    r.ExportDynamic = sym->computeBinding() != STB_LOCAL &&
-                      (config->shared || config->exportDynamic ||
-                       sym->exportDynamic || sym->inDynamicList);
+    r.ExportDynamic =
+        sym->computeBinding() != STB_LOCAL &&
+        (config->exportDynamic || sym->exportDynamic || sym->inDynamicList);
     const auto *dr = dyn_cast<Defined>(sym);
     r.FinalDefinitionInLinkageUnit =
         (isExec || sym->visibility != STV_DEFAULT) && dr &&

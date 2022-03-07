@@ -379,7 +379,7 @@ public:
       } else if (VD->hasLinkage() || VD->isStaticDataMember()) {
         PossibleBase = CGF.CGM.GetAddrOfGlobalVar(VD);
         CharUnits Alignment = CGF.getContext().getDeclAlign(VD);
-        Address Addr(PossibleBase, Alignment);
+        Address Addr(PossibleBase, PossibleBase->getType()->getPointerElementType(), Alignment);
         CaptureInvolvedMap.try_emplace(VD, Addr);
       } else {
         LValue LV = CGF.EmitDeclRefLValue(E);
@@ -874,6 +874,7 @@ void CGOmpSsRuntime::EmitCopyCtorFunc(
 
   LValue SrcLV = CGF.EmitLoadOfPointerLValue(CGF.GetAddrOfLocalVar(&SrcArg),
                                              PQ->castAs<PointerType>());
+  Address SrcAddr = SrcLV.getAddress(CGF);
   LValue DstLV = CGF.EmitLoadOfPointerLValue(CGF.GetAddrOfLocalVar(&DstArg),
                                              PQ->castAs<PointerType>());
   llvm::Value *NelemsValue =
@@ -900,9 +901,10 @@ void CGOmpSsRuntime::EmitCopyCtorFunc(
 
   {
     CodeGenFunction::OSSPrivateScope InitScope(CGF);
-    InitScope.addPrivate(InitD, [SrcCur, SrcLV]() -> Address {
+    InitScope.addPrivate(InitD, [SrcCur, SrcAddr]() -> Address {
 
-      return Address(SrcCur, SrcLV.getAlignment());
+      return Address(
+          SrcCur, SrcAddr.getElementType(), SrcAddr.getAlignment());
     });
     (void)InitScope.Privatize();
     CGF.EmitExprAsInit(CtorE, CopyD,
@@ -1093,9 +1095,10 @@ void CGOmpSsRuntime::EmitDtorFunc(
                                              "arraydtor.dst.cur");
   DstCur->addIncoming(DstBegin, EntryBB);
 
-  CGF.EmitCXXDestructorCall(DtorD, Dtor_Complete,
-                         /*ForVirtualBase=*/false, /*Delegating=*/false,
-                         Address(DstCur, DstLV.getAlignment()), Q);
+  CGF.EmitCXXDestructorCall(
+    DtorD, Dtor_Complete, /*ForVirtualBase=*/false, /*Delegating=*/false,
+    Address(DstCur, DstLV.getAddress(CGF).getElementType(), DstLV.getAddress(CGF).getAlignment()),
+    Q);
 
   // Go to the next element
   llvm::Value *DstNext = CGF.Builder.CreateInBoundsGEP(
@@ -1386,8 +1389,10 @@ llvm::Function *CGOmpSsRuntime::createCallWrapperFunc(
     for (const auto &p : ExprInvolvedVarList) {
       const VarDecl *VD = p.first;
       LValue LV = p.second;
-      InitScope.addPrivate(VD, [&ArgI, &LV]() -> Address {
-        return Address(ArgI, LV.getAlignment());
+      Address Addr = LV.getAddress(NewCGF);
+      InitScope.addPrivate(VD, [&ArgI, &Addr]() -> Address {
+        return Address(
+            ArgI, Addr.getElementType(), Addr.getAlignment());
       });
 
       ++ArgI;
@@ -1404,7 +1409,7 @@ llvm::Function *CGOmpSsRuntime::createCallWrapperFunc(
     for (const auto &p : CaptureInvolvedMap) {
       const VarDecl *VD = p.first;
       Address Addr = p.second;
-      Address NewAddr = Address(ArgI, Addr.getAlignment());
+      Address NewAddr = Address(ArgI, Addr.getElementType(), Addr.getAlignment());
       CaptureReplacedMap.try_emplace(VD, NewAddr);
       ++ArgI;
     }
@@ -1439,7 +1444,9 @@ static llvm::Value *emitDiscreteArray(
     llvm::Value *Ptr = DiscreteArrLV.getPointer(CGF);
     llvm::Value *GEP = CGF.Builder.CreateGEP(
         Ptr->getType()->getPointerElementType(), Ptr, Idx, "discreteidx");
-    llvm::Value *LoadGEP = CGF.Builder.CreateLoad(Address(GEP, CGF.getPointerAlign()));
+    llvm::Value *LoadGEP = CGF.Builder.CreateLoad(
+        Address(GEP, GEP->getType()->getPointerElementType(),
+                DiscreteArrLV.getAddress(CGF).getAlignment()));
     return LoadGEP;
   }
   return nullptr;
@@ -1702,8 +1709,8 @@ void CGOmpSsRuntime::EmitDependencyList(
     uint64_t BaseElementSize =
                NewCGF.CGM
                  .getDataLayout()
-                 .getTypeSizeInBits(NewCGF
-                                    .ConvertType(BaseElementTy))/8;
+                 .getTypeStoreSize(NewCGF
+                                    .ConvertType(BaseElementTy));
 
     List.push_back(Ptr);
     bool First = true;
@@ -1898,8 +1905,10 @@ static llvm::Value *emitReduceInitFunction(CodeGenModule &CGM,
 
   LValue PrivLV = CGF.EmitLoadOfPointerLValue(CGF.GetAddrOfLocalVar(&PrivArg),
                                               PQ->castAs<PointerType>());
+  Address PrivAddr = PrivLV.getAddress(CGF);
   LValue OrigLV = CGF.EmitLoadOfPointerLValue(CGF.GetAddrOfLocalVar(&OrigArg),
                                               PQ->castAs<PointerType>());
+  Address OrigAddr = OrigLV.getAddress(CGF);
   llvm::Value *NBytesValue =
       CGF.EmitLoadOfScalar(CGF.GetAddrOfLocalVar(&NBytesArg), /*Volatile=*/false,
                        NBytesArg.getType(), NBytesArg.getLocation());
@@ -1938,11 +1947,11 @@ static llvm::Value *emitReduceInitFunction(CodeGenModule &CGM,
     const auto *OrigVD = cast<VarDecl>(cast<DeclRefExpr>(DRD->getInitOrig())->getDecl());
 
     CodeGenFunction::OSSPrivateScope InitScope(CGF);
-    InitScope.addPrivate(PrivVD, [PrivCur, PrivLV]() -> Address {
-      return Address(PrivCur, PrivLV.getAlignment());
+    InitScope.addPrivate(PrivVD, [PrivCur, PrivAddr]() -> Address {
+      return Address(PrivCur, PrivAddr.getElementType(), PrivAddr.getAlignment());
     });
-    InitScope.addPrivate(OrigVD, [OrigCur, OrigLV]() -> Address {
-      return Address(OrigCur, OrigLV.getAlignment());
+    InitScope.addPrivate(OrigVD, [OrigCur, OrigAddr]() -> Address {
+      return Address(OrigCur, OrigAddr.getElementType(), OrigAddr.getAlignment());
     });
     (void)InitScope.Privatize();
 
@@ -2021,8 +2030,10 @@ static llvm::Value *emitReduceCombFunction(CodeGenModule &CGM,
 
   LValue OutLV = CGF.EmitLoadOfPointerLValue(CGF.GetAddrOfLocalVar(&OutArg),
                                               PQ->castAs<PointerType>());
+  Address OutAddr = OutLV.getAddress(CGF);
   LValue InLV = CGF.EmitLoadOfPointerLValue(CGF.GetAddrOfLocalVar(&InArg),
                                               PQ->castAs<PointerType>());
+  Address InAddr = InLV.getAddress(CGF);
   llvm::Value *NBytesValue =
       CGF.EmitLoadOfScalar(CGF.GetAddrOfLocalVar(&NBytesArg), /*Volatile=*/false,
                        NBytesArg.getType(), NBytesArg.getLocation());
@@ -2060,11 +2071,11 @@ static llvm::Value *emitReduceCombFunction(CodeGenModule &CGM,
     const auto *OutVD = cast<VarDecl>(cast<DeclRefExpr>(DRD->getCombinerOut())->getDecl());
     const auto *InVD = cast<VarDecl>(cast<DeclRefExpr>(DRD->getCombinerIn())->getDecl());
     CodeGenFunction::OSSPrivateScope CombScope(CGF);
-    CombScope.addPrivate(OutVD, [OutCur, OutLV]() -> Address {
-      return Address(OutCur, OutLV.getAlignment());
+    CombScope.addPrivate(OutVD, [OutCur, OutAddr]() -> Address {
+      return Address(OutCur, OutAddr.getElementType(), OutAddr.getAlignment());
     });
-    CombScope.addPrivate(InVD, [InCur, InLV]() -> Address {
-      return Address(InCur, InLV.getAlignment());
+    CombScope.addPrivate(InVD, [InCur, InAddr]() -> Address {
+      return Address(InCur, InAddr.getElementType(), InAddr.getAlignment());
     });
     (void)CombScope.Privatize();
 
@@ -2074,11 +2085,11 @@ static llvm::Value *emitReduceCombFunction(CodeGenModule &CGM,
     // %2 = <ReductionOp>(<type> *%lhs, <type> *%rhs)
     // store <type> %2, <type>* %lhs
     CodeGenFunction::OSSPrivateScope CombScope(CGF);
-    CombScope.addPrivate(LHSVD, [OutCur, OutLV]() -> Address {
-      return Address(OutCur, OutLV.getAlignment());
+    CombScope.addPrivate(LHSVD, [OutCur, OutAddr]() -> Address {
+      return Address(OutCur, OutAddr.getElementType(), OutAddr.getAlignment());
     });
-    CombScope.addPrivate(RHSVD, [InCur, InLV]() -> Address {
-      return Address(InCur, InLV.getAlignment());
+    CombScope.addPrivate(RHSVD, [InCur, InAddr]() -> Address {
+      return Address(InCur, InAddr.getElementType(), InAddr.getAlignment());
     });
     (void)CombScope.Privatize();
 
