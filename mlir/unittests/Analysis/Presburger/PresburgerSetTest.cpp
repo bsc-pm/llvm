@@ -32,7 +32,7 @@ static PresburgerSet
 parsePresburgerSetFromPolyStrings(unsigned numDims, ArrayRef<StringRef> strs) {
   PresburgerSet set = PresburgerSet::getEmptySet(numDims);
   for (StringRef str : strs)
-    set.unionPolyInPlace(parsePoly(str));
+    set.unionInPlace(parsePoly(str));
   return set;
 }
 
@@ -103,7 +103,7 @@ static PresburgerSet makeSetFromPoly(unsigned numDims,
                                      ArrayRef<IntegerPolyhedron> polys) {
   PresburgerSet set = PresburgerSet::getEmptySet(numDims);
   for (const IntegerPolyhedron &poly : polys)
-    set.unionPolyInPlace(poly);
+    set.unionInPlace(poly);
   return set;
 }
 
@@ -528,12 +528,18 @@ TEST(SetTest, coalesceCutOneDim) {
              "(x) : ( x >= 0, -x + 3 >= 0)",
              "(x) : ( x - 2 >= 0, -x + 4 >= 0)",
          });
-  expectCoalesce(2, set);
+  expectCoalesce(1, set);
 }
 
 TEST(SetTest, coalesceSeparateOneDim) {
   PresburgerSet set = parsePresburgerSetFromPolyStrings(
       1, {"(x) : ( x >= 0, -x + 2 >= 0)", "(x) : ( x - 3 >= 0, -x + 4 >= 0)"});
+  expectCoalesce(2, set);
+}
+
+TEST(SetTest, coalesceAdjEq) {
+  PresburgerSet set = parsePresburgerSetFromPolyStrings(
+      1, {"(x) : ( x == 0)", "(x) : ( x - 1 == 0)"});
   expectCoalesce(2, set);
 }
 
@@ -551,6 +557,15 @@ TEST(SetTest, coalesceCutTwoDim) {
       2, {
              "(x,y) : (x >= 0, -x + 3 >= 0, y >= 0, -y + 2 >= 0)",
              "(x,y) : (x >= 0, -x + 3 >= 0, y - 1 >= 0, -y + 3 >= 0)",
+         });
+  expectCoalesce(1, set);
+}
+
+TEST(SetTest, coalesceEqStickingOut) {
+  PresburgerSet set = parsePresburgerSetFromPolyStrings(
+      2, {
+             "(x,y) : (x >= 0, -x + 2 >= 0, y >= 0, -y + 2 >= 0)",
+             "(x,y) : (y - 1 == 0, x >= 0, -x + 3 >= 0)",
          });
   expectCoalesce(2, set);
 }
@@ -576,10 +591,10 @@ TEST(SetTest, coalesceContainedEq) {
 TEST(SetTest, coalesceCuttingEq) {
   PresburgerSet set = parsePresburgerSetFromPolyStrings(
       2, {
-             "(x,y) : (x - 1 >= 0, -x + 3 >= 0, x - y == 0)",
+             "(x,y) : (x + 1 >= 0, -x + 1 >= 0, x - y == 0)",
              "(x,y) : (x >= 0, -x + 2 >= 0, x - y == 0)",
          });
-  expectCoalesce(2, set);
+  expectCoalesce(1, set);
 }
 
 TEST(SetTest, coalesceSeparateEq) {
@@ -628,6 +643,36 @@ TEST(SetTest, coalesceDoubleIncrement) {
              "(x) : (x - 2 >= 0, -x + 3 >= 0)",
          });
   expectCoalesce(3, set);
+}
+
+TEST(SetTest, coalesceLastCoalesced) {
+  PresburgerSet set = parsePresburgerSetFromPolyStrings(
+      1, {
+             "(x) : (x == 0)",
+             "(x) : (x - 1 >= 0, -x + 3 >= 0)",
+             "(x) : (x + 2 == 0)",
+             "(x) : (x - 2 >= 0, -x + 4 >= 0)",
+         });
+  expectCoalesce(3, set);
+}
+
+TEST(SetTest, coalesceDiv) {
+  PresburgerSet set =
+      parsePresburgerSetFromPolyStrings(1, {
+                                               "(x) : (x floordiv 2 == 0)",
+                                               "(x) : (x floordiv 2 - 1 == 0)",
+                                           });
+  expectCoalesce(2, set);
+}
+
+TEST(SetTest, coalesceDivOtherContained) {
+  PresburgerSet set =
+      parsePresburgerSetFromPolyStrings(1, {
+                                               "(x) : (x floordiv 2 == 0)",
+                                               "(x) : (x == 0)",
+                                               "(x) : (x >= 0, -x + 1 >= 0)",
+                                           });
+  expectCoalesce(2, set);
 }
 
 static void

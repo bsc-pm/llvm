@@ -476,6 +476,7 @@ bool UnwrappedLineParser::parseLevel(bool HasOpeningBrace,
                                   : TT_Unknown;
   const bool IsPrecededByCommentOrPPDirective =
       !Style.RemoveBracesLLVM || precededByCommentOrPPDirective();
+  bool HasLabel = false;
   unsigned StatementCount = 0;
   bool SwitchLabelEncountered = false;
   do {
@@ -486,9 +487,9 @@ bool UnwrappedLineParser::parseLevel(bool HasOpeningBrace,
       kind = tok::r_brace;
 
     auto ParseDefault = [this, HasOpeningBrace, IfKind, NextLevelLBracesType,
-                         &StatementCount] {
-      parseStructuralElement(IfKind, /*IsTopLevel=*/!HasOpeningBrace,
-                             /*NextLBracesType=*/NextLevelLBracesType);
+                         &HasLabel, &StatementCount] {
+      parseStructuralElement(IfKind, !HasOpeningBrace, NextLevelLBracesType,
+                             HasLabel ? nullptr : &HasLabel);
       ++StatementCount;
       assert(StatementCount > 0 && "StatementCount overflow!");
     };
@@ -523,7 +524,7 @@ bool UnwrappedLineParser::parseLevel(bool HasOpeningBrace,
       if (HasOpeningBrace) {
         if (!Style.RemoveBracesLLVM)
           return false;
-        if (FormatTok->isNot(tok::r_brace) || StatementCount != 1 ||
+        if (FormatTok->isNot(tok::r_brace) || StatementCount != 1 || HasLabel ||
             IsPrecededByCommentOrPPDirective ||
             precededByCommentOrPPDirective())
           return false;
@@ -1312,7 +1313,8 @@ void UnwrappedLineParser::readTokenWithJavaScriptASI() {
 
 void UnwrappedLineParser::parseStructuralElement(IfStmtKind *IfKind,
                                                  bool IsTopLevel,
-                                                 TokenType NextLBracesType) {
+                                                 TokenType NextLBracesType,
+                                                 bool *HasLabel) {
   if (Style.Language == FormatStyle::LK_TableGen &&
       FormatTok->is(tok::pp_include)) {
     nextToken();
@@ -1758,6 +1760,8 @@ void UnwrappedLineParser::parseStructuralElement(IfStmtKind *IfKind,
         if (FormatTok->is(tok::colon) && !Line->MustBeDeclaration) {
           Line->Tokens.begin()->Tok->MustBreakBefore = true;
           parseLabel(!Style.IndentGotoLabels);
+          if (HasLabel)
+            *HasLabel = true;
           return;
         }
         // Recognize function-like macro usages without trailing semicolon as
@@ -1833,16 +1837,16 @@ bool UnwrappedLineParser::tryToParsePropertyAccessor() {
   FormatToken *Tok = Tokens->getNextToken();
 
   // A trivial property accessor is of the form:
-  // { [ACCESS_SPECIFIER] [get]; [ACCESS_SPECIFIER] [set] }
+  // { [ACCESS_SPECIFIER] [get]; [ACCESS_SPECIFIER] [set|init] }
   // Track these as they do not require line breaks to be introduced.
-  bool HasGetOrSet = false;
+  bool HasSpecialAccessor = false;
   bool IsTrivialPropertyAccessor = true;
   while (!eof()) {
     if (Tok->isOneOf(tok::semi, tok::kw_public, tok::kw_private,
                      tok::kw_protected, Keywords.kw_internal, Keywords.kw_get,
-                     Keywords.kw_set)) {
-      if (Tok->isOneOf(Keywords.kw_get, Keywords.kw_set))
-        HasGetOrSet = true;
+                     Keywords.kw_init, Keywords.kw_set)) {
+      if (Tok->isOneOf(Keywords.kw_get, Keywords.kw_init, Keywords.kw_set))
+        HasSpecialAccessor = true;
       Tok = Tokens->getNextToken();
       continue;
     }
@@ -1851,7 +1855,7 @@ bool UnwrappedLineParser::tryToParsePropertyAccessor() {
     break;
   }
 
-  if (!HasGetOrSet) {
+  if (!HasSpecialAccessor) {
     Tokens->setPosition(StoredPosition);
     return false;
   }
@@ -1893,7 +1897,8 @@ bool UnwrappedLineParser::tryToParsePropertyAccessor() {
       nextToken();
       break;
     default:
-      if (FormatTok->isOneOf(Keywords.kw_get, Keywords.kw_set) &&
+      if (FormatTok->isOneOf(Keywords.kw_get, Keywords.kw_init,
+                             Keywords.kw_set) &&
           !IsTrivialPropertyAccessor) {
         // Non-trivial get/set needs to be on its own line.
         addUnwrappedLine();
@@ -2597,10 +2602,12 @@ void UnwrappedLineParser::parseNamespace() {
     parseParens();
   } else {
     while (FormatTok->isOneOf(tok::identifier, tok::coloncolon, tok::kw_inline,
-                              tok::l_square, tok::period) ||
+                              tok::l_square, tok::period, tok::l_paren) ||
            (Style.isCSharp() && FormatTok->is(tok::kw_union)))
       if (FormatTok->is(tok::l_square))
         parseSquare();
+      else if (FormatTok->is(tok::l_paren))
+        parseParens();
       else
         nextToken();
   }
@@ -2814,6 +2821,57 @@ void UnwrappedLineParser::parseSwitch() {
     NestedTooDeep.pop_back();
 }
 
+// Operators that can follow a C variable.
+static bool isCOperatorFollowingVar(tok::TokenKind kind) {
+  switch (kind) {
+  case tok::ampamp:
+  case tok::ampequal:
+  case tok::arrow:
+  case tok::caret:
+  case tok::caretequal:
+  case tok::comma:
+  case tok::ellipsis:
+  case tok::equal:
+  case tok::equalequal:
+  case tok::exclaim:
+  case tok::exclaimequal:
+  case tok::greater:
+  case tok::greaterequal:
+  case tok::greatergreater:
+  case tok::greatergreaterequal:
+  case tok::l_paren:
+  case tok::l_square:
+  case tok::less:
+  case tok::lessequal:
+  case tok::lessless:
+  case tok::lesslessequal:
+  case tok::minus:
+  case tok::minusequal:
+  case tok::minusminus:
+  case tok::percent:
+  case tok::percentequal:
+  case tok::period:
+  case tok::pipe:
+  case tok::pipeequal:
+  case tok::pipepipe:
+  case tok::plus:
+  case tok::plusequal:
+  case tok::plusplus:
+  case tok::question:
+  case tok::r_brace:
+  case tok::r_paren:
+  case tok::r_square:
+  case tok::semi:
+  case tok::slash:
+  case tok::slashequal:
+  case tok::star:
+  case tok::starequal:
+    return true;
+  default:
+    return false;
+  }
+}
+
 void UnwrappedLineParser::parseAccessSpecifier() {
   FormatToken *AccessSpecifierCandidate = FormatTok;
   nextToken();
@@ -2825,9 +2883,7 @@ void UnwrappedLineParser::parseAccessSpecifier() {
     nextToken();
     addUnwrappedLine();
   } else if (!FormatTok->is(tok::coloncolon) &&
-             !std::binary_search(COperatorsFollowingVar.begin(),
-                                 COperatorsFollowingVar.end(),
-                                 FormatTok->Tok.getKind())) {
+             !isCOperatorFollowingVar(FormatTok->Tok.getKind())) {
     // Not a variable name nor namespace name.
     addUnwrappedLine();
   } else if (AccessSpecifierCandidate) {

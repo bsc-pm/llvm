@@ -199,9 +199,24 @@ bool getAssumedUnderlyingObjects(Attributor &A, const Value &Ptr,
                                  bool &UsedAssumedInformation,
                                  bool Intraprocedural = false);
 
+/// Collect all potential values \p LI could read into \p PotentialValues. That
+/// is, the only values read by \p LI are assumed to be known and all are in
+/// \p PotentialValues. Dependences onto \p QueryingAA are properly tracked,
+/// \p UsedAssumedInformation will inform the caller if assumed information was
+/// used.
+///
+/// \returns True if the assumed potential copies are all in \p PotentialValues,
+///          false if something went wrong and the copies could not be
+///          determined.
+bool getPotentiallyLoadedValues(Attributor &A, LoadInst &LI,
+                                SmallSetVector<Value *, 4> &PotentialValues,
+                                const AbstractAttribute &QueryingAA,
+                                bool &UsedAssumedInformation,
+                                bool OnlyExact = false);
+
 /// Collect all potential values of the one stored by \p SI into
 /// \p PotentialCopies. That is, the only copies that were made via the
-/// store are assumed to be known and all in \p PotentialCopies. Dependences
+/// store are assumed to be known and all are in \p PotentialCopies. Dependences
 /// onto \p QueryingAA are properly tracked, \p UsedAssumedInformation will
 /// inform the caller if assumed information was used.
 ///
@@ -210,7 +225,8 @@ bool getAssumedUnderlyingObjects(Attributor &A, const Value &Ptr,
 ///          determined.
 bool getPotentialCopiesOfStoredValue(
     Attributor &A, StoreInst &SI, SmallSetVector<Value *, 4> &PotentialCopies,
-    const AbstractAttribute &QueryingAA, bool &UsedAssumedInformation);
+    const AbstractAttribute &QueryingAA, bool &UsedAssumedInformation,
+    bool OnlyExact = false);
 
 /// Return true if \p IRP is readonly. This will query respective AAs that
 /// deduce the information and introduce dependences for \p QueryingAA.
@@ -1537,7 +1553,7 @@ struct Attributor {
   /// is used, e.g., to replace \p II with a call, after information was
   /// manifested.
   void registerInvokeWithDeadSuccessor(InvokeInst &II) {
-    InvokeWithDeadSuccessor.push_back(&II);
+    InvokeWithDeadSuccessor.insert(&II);
   }
 
   /// Record that \p I is deleted after information was manifested. This also
@@ -1865,6 +1881,19 @@ public:
   bool checkForAllReturnedValues(function_ref<bool(Value &)> Pred,
                                  const AbstractAttribute &QueryingAA);
 
+  /// Check \p Pred on all instructions in \p Fn with an opcode present in
+  /// \p Opcodes.
+  ///
+  /// This method will evaluate \p Pred on all instructions with an opcode
+  /// present in \p Opcode and return true if \p Pred holds on all of them.
+  bool checkForAllInstructions(function_ref<bool(Instruction &)> Pred,
+                               const Function *Fn,
+                               const AbstractAttribute &QueryingAA,
+                               const ArrayRef<unsigned> &Opcodes,
+                               bool &UsedAssumedInformation,
+                               bool CheckBBLivenessOnly = false,
+                               bool CheckPotentiallyDead = false);
+
   /// Check \p Pred on all instructions with an opcode present in \p Opcodes.
   ///
   /// This method will evaluate \p Pred on all instructions with an opcode
@@ -1993,7 +2022,7 @@ private:
   /// (\see registerFunctionSignatureRewrite) and return Changed if the module
   /// was altered.
   ChangeStatus
-  rewriteFunctionSignatures(SmallPtrSetImpl<Function *> &ModifiedFns);
+  rewriteFunctionSignatures(SmallSetVector<Function *, 8> &ModifiedFns);
 
   /// Check if the Attribute \p AA should be seeded.
   /// See getOrCreateAAFor.
@@ -2025,7 +2054,7 @@ private:
 
   /// Set of functions for which we modified the content such that it might
   /// impact the call graph.
-  SmallPtrSet<Function *, 8> CGModifiedFunctions;
+  SmallSetVector<Function *, 8> CGModifiedFunctions;
 
   /// Information about a dependence. If FromAA is changed ToAA needs to be
   /// updated as well.
@@ -2062,17 +2091,17 @@ private:
 
   /// Uses we replace with a new value after manifest is done. We will remove
   /// then trivially dead instructions as well.
-  DenseMap<Use *, Value *> ToBeChangedUses;
+  SmallMapVector<Use *, Value *, 32> ToBeChangedUses;
 
   /// Values we replace with a new value after manifest is done. We will remove
   /// then trivially dead instructions as well.
-  DenseMap<Value *, std::pair<Value *, bool>> ToBeChangedValues;
+  SmallMapVector<Value *, std::pair<Value *, bool>, 32> ToBeChangedValues;
 
   /// Instructions we replace with `unreachable` insts after manifest is done.
-  SmallDenseSet<WeakVH, 16> ToBeChangedToUnreachableInsts;
+  SmallSetVector<WeakVH, 16> ToBeChangedToUnreachableInsts;
 
   /// Invoke instructions with at least a single dead successor block.
-  SmallVector<WeakVH, 16> InvokeWithDeadSuccessor;
+  SmallSetVector<WeakVH, 16> InvokeWithDeadSuccessor;
 
   /// A flag that indicates which stage of the process we are in. Initially, the
   /// phase is SEEDING. Phase is changed in `Attributor::run()`
@@ -2089,10 +2118,10 @@ private:
   /// Functions, blocks, and instructions we delete after manifest is done.
   ///
   ///{
-  SmallPtrSet<Function *, 8> ToBeDeletedFunctions;
-  SmallPtrSet<BasicBlock *, 8> ToBeDeletedBlocks;
   SmallPtrSet<BasicBlock *, 8> ManifestAddedBlocks;
-  SmallDenseSet<WeakVH, 8> ToBeDeletedInsts;
+  SmallSetVector<Function *, 8> ToBeDeletedFunctions;
+  SmallSetVector<BasicBlock *, 8> ToBeDeletedBlocks;
+  SmallSetVector<WeakVH, 8> ToBeDeletedInsts;
   ///}
 
   /// Callback to get an OptimizationRemarkEmitter from a Function *.
@@ -4840,21 +4869,13 @@ struct AAPointerInfo : public AbstractAttribute {
   virtual bool forallInterferingAccesses(
       OffsetAndSize OAS, function_ref<bool(const Access &, bool)> CB) const = 0;
 
-  /// Call \p CB on all accesses that might interfere with \p LI and return true
-  /// if all such accesses were known and the callback returned true for all of
-  /// them, false otherwise.
-  virtual bool forallInterferingAccesses(
-      LoadInst &LI, function_ref<bool(const Access &, bool)> CB) const = 0;
-  virtual bool forallInterferingAccesses(
-      StoreInst &SI, function_ref<bool(const Access &, bool)> CB) const = 0;
-
-  /// Call \p CB on all write accesses that might interfere with \p LI and
+  /// Call \p CB on all accesses that might interfere with \p I and
   /// return true if all such accesses were known and the callback returned true
   /// for all of them, false otherwise. In contrast to forallInterferingAccesses
   /// this function will perform reasoning to exclude write accesses that cannot
   /// affect the load even if they on the surface look as if they would.
-  virtual bool forallInterferingWrites(
-      Attributor &A, const AbstractAttribute &QueryingAA, LoadInst &LI,
+  virtual bool forallInterferingAccesses(
+      Attributor &A, const AbstractAttribute &QueryingAA, Instruction &I,
       function_ref<bool(const Access &, bool)> CB) const = 0;
 
   /// This function should return true if the type of the \p AA is AAPointerInfo
