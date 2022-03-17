@@ -36,6 +36,8 @@ struct Q {
     int *x;
 };
 
-// expected-error@+1 5 {{expected dereference, array element, array shape or array section}}
-#pragma oss task in(*(s->x), &*p, s->x, a, a++, p, *p, p[0 : 4], [10]p)
+// expected-error@+1 4 {{expected lvalue reference, dereference, array element, array shape or array section}}
+#pragma oss task in((*s).x, *(s->x), &*p, s->x, a, a++, p, *p, p[0 : 4], [10]p)
 void foo(Q *s, int a, int *p){}
+#pragma oss task in(a)
+void foo1(int &a){}
