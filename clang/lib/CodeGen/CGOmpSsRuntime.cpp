@@ -393,6 +393,12 @@ public:
     }
   }
 
+  void VisitLambdaExpr(const LambdaExpr *LE) {
+    for (const auto &Capture : LE->capture_inits()) {
+      Visit(Capture);
+    }
+  }
+
   void VisitCXXThisExpr(const CXXThisExpr *ThisE) {
     HasThis = true;
     Address CXXThisAddress = CGF.LoadCXXThisAddress();

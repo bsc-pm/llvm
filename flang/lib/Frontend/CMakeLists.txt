@@ -15,7 +15,8 @@ add_flang_library(flangFrontend
   FIRBuilder
   FIRDialect
   FIRSupport
-  MLIRBuiltinAttributeInterfacesIncGen
+  FIROptTransformsPassIncGen
+  MLIRIR
   ${dialect_libs}
 
   LINK_LIBS
@@ -26,6 +27,8 @@ add_flang_library(flangFrontend
   FortranLower
   clangBasic
   clangDriver
+  LLVMAnalysis
+  LLVMTarget
   FIRDialect
   FIRSupport
   FIRBuilder

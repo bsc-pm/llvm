@@ -1414,6 +1414,42 @@ struct OmpSs {
     }
   }
 
+  // task_args cannot be modified. This function creates
+  // new variables where the translation is performed.
+  static void dupTranlationNeededArgs(
+      IRBuilder<> &IRBEntry, const DirectiveDependsInfo &DependsInfo,
+      const MapVector<Value *, size_t> &StructToIdxMap,
+      SmallVector<Value *, 4> &UnpackParams) {
+
+    for (auto &DepInfo : DependsInfo.List) {
+      if (DepInfo->isReduction()) {
+        Value *DepBaseDSA = DepInfo->Base;
+        size_t Idx = StructToIdxMap.lookup(DepBaseDSA);
+        Value *UnpackedDSA = UnpackParams[Idx];
+        if (auto *LUnpackedDSA = dyn_cast<LoadInst>(UnpackedDSA)) {
+          Value *NewDepBaseDSA =
+            IRBEntry.CreateAlloca(
+              LUnpackedDSA->getType(), nullptr, "tlate." + LUnpackedDSA->getName());
+          IRBEntry.CreateStore(LUnpackedDSA, NewDepBaseDSA);
+
+          UnpackParams[Idx] =
+            IRBEntry.CreateLoad(LUnpackedDSA->getType(), NewDepBaseDSA);
+        } else {
+          Value *NewDepBaseDSA =
+            IRBEntry.CreateAlloca(
+              UnpackedDSA->getType()->getPointerElementType(),
+              nullptr, "tlate." + UnpackedDSA->getName());
+          IRBEntry.CreateStore(
+            IRBEntry.CreateLoad(
+              UnpackedDSA->getType()->getPointerElementType(), UnpackedDSA),
+            NewDepBaseDSA);
+
+          UnpackParams[Idx] = NewDepBaseDSA;
+        }
+      }
+    }
+  }
+
   // Given an Outline and Unpack Functions it unpacks DSAs in Outline
   // and builds a call to Unpack
   void olCallToUnpack(Module &M, const DirectiveInfo &DirInfo,
@@ -1421,7 +1457,6 @@ struct OmpSs {
                       Function *OlFunc, Function *UnpackFunc,
                       bool IsTaskFunc=false) {
     BasicBlock::Create(M.getContext(), "entry", OlFunc);
-    IRBuilder<> BBBuilder(&OlFunc->getEntryBlock());
 
     // First arg is the nanos_task_args
     Function::arg_iterator AI = OlFunc->arg_begin();
@@ -1440,28 +1475,46 @@ struct OmpSs {
       // Preserve the params before translation. And replace used after build all
       // compute_dep calls
       // NOTE: this assumes UnpackParams can be indexed with StructToIdxMap
-      SmallVector<Value *, 4> UnpackParamsCopy(UnpackParams);
+      // IRBuilder<> BBBuilder(&OlFunc->getEntryBlock());
 
       BasicBlock *IfThenBB = BasicBlock::Create(M.getContext(), "", OlFunc);
       BasicBlock *IfEndBB = BasicBlock::Create(M.getContext(), "", OlFunc);
 
-      Value *AddrTranslationTable = &*(OlFunc->arg_end() - 1);
-      Value *Cmp = BBBuilder.CreateICmpNE(
-        AddrTranslationTable, Constant::getNullValue(AddrTranslationTable->getType()));
-      BBBuilder.CreateCondBr(Cmp, IfThenBB, IfEndBB);
-
+      // Builders
+      IRBuilder<> IRBEntry(&OlFunc->getEntryBlock());
       IRBuilder<> IRBIfThen(IfThenBB);
       IRBuilder<> IRBIfEnd(IfEndBB);
+
+      // Build the skeleton
+      Value *AddrTranslationTable = &*(OlFunc->arg_end() - 1);
+      Value *Cmp = IRBEntry.CreateICmpNE(
+        AddrTranslationTable, Constant::getNullValue(AddrTranslationTable->getType()));
+      IRBEntry.CreateCondBr(Cmp, IfThenBB, IfEndBB);
+
+      IRBIfThen.CreateBr(IfEndBB);
+      IRBIfEnd.CreateRetVoid();
+
+      // Reset insert points.
+      IRBEntry.SetInsertPoint(cast<Instruction>(Cmp));
+      IRBIfThen.SetInsertPoint(IfThenBB->getTerminator());
+      IRBIfEnd.SetInsertPoint(IfEndBB->getTerminator());
+
+      dupTranlationNeededArgs(IRBEntry, DependsInfo, StructToIdxMap, UnpackParams);
+
+      SmallVector<Value *, 4> UnpackParamsCopy(UnpackParams);
 
       for (auto &DepInfo : DependsInfo.List) {
         if (DepInfo->isReduction()) {
           Value *DepBaseDSA = DepInfo->Base;
+          size_t Idx = StructToIdxMap.lookup(DepBaseDSA);
+          Value *&UnpackedDSA = UnpackParams[Idx];
           translateDep(
             IRBIfThen, IRBIfEnd, DepInfo.get(), DepBaseDSA,
-            UnpackParams[StructToIdxMap.lookup(DepBaseDSA)],
+            UnpackedDSA,
             AddrTranslationTable, DirInfo.DirEnv.DepSymToIdx);
         }
       }
+      // Replaces dsa uses by unpacked values
       for (Instruction &I : *IfThenBB) {
         auto UnpackedIt = UnpackParamsCopy.begin();
         for (auto It = StructToIdxMap.begin();
@@ -1470,14 +1523,13 @@ struct OmpSs {
             I.replaceUsesOfWith(It->first, *UnpackedIt);
         }
       }
-      IRBIfThen.CreateBr(IfEndBB);
-      // Build TaskUnpackCall
+      // Build TaskUnpackCall with the translated values
       IRBIfEnd.CreateCall(UnpackFunc, UnpackParams);
-      IRBIfEnd.CreateRetVoid();
     } else {
       // Build TaskUnpackCall
-      BBBuilder.CreateCall(UnpackFunc, UnpackParams);
-      BBBuilder.CreateRetVoid();
+      IRBuilder<> IRBEntry(&OlFunc->getEntryBlock());
+      IRBEntry.CreateCall(UnpackFunc, UnpackParams);
+      IRBEntry.CreateRetVoid();
     }
   }
 

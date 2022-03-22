@@ -2341,36 +2341,109 @@ StmtResult Sema::ActOnOmpSsTaskLoopForDirective(
   return OSSTaskLoopForDirective::Create(Context, StartLoc, EndLoc, Clauses, AStmt, B);
 }
 
-static void checkOutlineDependency(Sema &S, Expr *RefExpr, bool OSSSyntax=false) {
+static bool checkDependency(Sema &S, Expr *RefExpr, bool OSSSyntax, bool Outline) {
   SourceLocation ELoc = RefExpr->getExprLoc();
   Expr *SimpleExpr = RefExpr->IgnoreParenCasts();
-  if (RefExpr->isTypeDependent() || RefExpr->isValueDependent() ||
-      RefExpr->containsUnexpandedParameterPack()) {
+  if (RefExpr->containsUnexpandedParameterPack()) {
+    S.Diag(RefExpr->getExprLoc(), diag::err_oss_variadic_templates_not_clause_allowed);
+    return false;
+  } else if (RefExpr->isTypeDependent() || RefExpr->isValueDependent()) {
     // It will be analyzed later.
-    return;
+    return true;
   }
+
+  if (S.RequireCompleteExprType(RefExpr, diag::err_oss_incomplete_type))
+    return false;
+
   auto *ASE = dyn_cast<ArraySubscriptExpr>(SimpleExpr);
-  if (!RefExpr->IgnoreParenImpCasts()->isLValue() ||
+  // Allow only LValues, forbid ArraySubscripts over things
+  // that are not an array like:
+  //   typedef float V __attribute__((vector_size(16)));
+  //   V a;
+  //   #pragma oss task in(a[3])
+  // and functions:
+  //   void foo() { #pragma oss task in(foo) {} }
+  if (RefExpr->IgnoreParenImpCasts()->getType()->isFunctionType() ||
+      !RefExpr->IgnoreParenImpCasts()->isLValue() ||
       (ASE &&
        !ASE->getBase()->getType().getNonReferenceType()->isPointerType() &&
        !ASE->getBase()->getType().getNonReferenceType()->isArrayType())) {
-    S.Diag(ELoc, diag::err_oss_expected_dereference_or_array_item)
-        << RefExpr->getSourceRange();
-    return;
+    if (!Outline)
+      S.Diag(ELoc, diag::err_oss_expected_addressable_lvalue_or_array_item)
+          << RefExpr->getSourceRange();
+    else
+      S.Diag(ELoc, diag::err_oss_expected_lvalue_reference_dereference_or_array_item)
+          << RefExpr->getSourceRange();
+    return false;
   }
-  if (isa<DeclRefExpr>(SimpleExpr) || isa<MemberExpr>(SimpleExpr)) {
-    S.Diag(ELoc, diag::err_oss_expected_dereference_or_array_item)
-        << RefExpr->getSourceRange();
-    return;
+
+  if (Outline) {
+    if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(RefExpr->IgnoreParenImpCasts())) {
+      if (const VarDecl *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+        if (!VD->getType()->isReferenceType())
+          S.Diag(ELoc, diag::err_oss_expected_lvalue_reference_dereference_or_array_item)
+              << RefExpr->getSourceRange();
+      }
+    }
   }
+
+  class CheckCallExpr
+      : public ConstStmtVisitor<CheckCallExpr, bool> {
+  // This Visitor checks the base of the
+  // dependency is over a CallExpr, which is error.
+  // int *get();
+  // auto l = []() -> int * {...};
+  // #pragma oss task in(get()[1], l()[3])
+  public:
+    bool VisitOSSMultiDepExpr(const OSSMultiDepExpr *E) {
+      return Visit(E->getDepExpr());
+    }
+
+    bool VisitOSSArrayShapingExpr(const OSSArrayShapingExpr *E) {
+      return Visit(E->getBase());
+    }
+
+    bool VisitOSSArraySectionExpr(const OSSArraySectionExpr *E) {
+      return Visit(E->getBase());
+    }
+
+    bool VisitArraySubscriptExpr(const ArraySubscriptExpr *E) {
+      return Visit(E->getBase());
+    }
+
+    bool VisitUnaryOperator(const UnaryOperator *E) {
+      return Visit(E->getSubExpr());
+    }
+
+    bool VisitMemberExpr(const MemberExpr *E) {
+      return Visit(E->getBase());
+    }
+
+    bool VisitCallExpr(const CallExpr *E) {
+      return true;
+    }
+  };
+  CheckCallExpr CCE;
+  if (CCE.Visit(RefExpr)) {
+    S.Diag(ELoc, diag::err_oss_call_expr_support)
+        << RefExpr->getSourceRange();
+    return false;
+  }
+
+  bool InvalidArraySection = false;
   while (auto *OASE = dyn_cast<OSSArraySectionExpr>(SimpleExpr)) {
     if (!OASE->isColonForm() && !OSSSyntax) {
       S.Diag(OASE->getColonLoc(), diag::err_oss_section_invalid_form)
           << RefExpr->getSourceRange();
-      return;
+      // Only diagnose the first error
+      InvalidArraySection = true;
+      break;
     }
-    SimpleExpr = OASE->getBase()->IgnoreParenCasts();
+    SimpleExpr = OASE->getBase()->IgnoreParenImpCasts();
   }
+  if (InvalidArraySection)
+    return false;
+  return true;
 }
 
 Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
@@ -2460,64 +2533,64 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     OnreadyRes = Onready;
   }
   for (Expr *RefExpr : Ins) {
-    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
   }
   for (Expr *RefExpr : Outs) {
-    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
   }
   for (Expr *RefExpr : Inouts) {
-    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
   }
   for (Expr *RefExpr : Concurrents) {
-    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
   }
   for (Expr *RefExpr : Commutatives) {
-    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
   }
   for (Expr *RefExpr : WeakIns) {
-    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
   }
   for (Expr *RefExpr : WeakOuts) {
-    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
   }
   for (Expr *RefExpr : WeakInouts) {
-    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
   }
   for (Expr *RefExpr : WeakConcurrents) {
-    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
   }
   for (Expr *RefExpr : WeakCommutatives) {
-    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
   }
   for (Expr *RefExpr : DepIns) {
-    checkOutlineDependency(*this, RefExpr);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
   }
   for (Expr *RefExpr : DepOuts) {
-    checkOutlineDependency(*this, RefExpr);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
   }
   for (Expr *RefExpr : DepInouts) {
-    checkOutlineDependency(*this, RefExpr);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
   }
   for (Expr *RefExpr : DepConcurrents) {
-    checkOutlineDependency(*this, RefExpr);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
   }
   for (Expr *RefExpr : DepCommutatives) {
-    checkOutlineDependency(*this, RefExpr);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
   }
   for (Expr *RefExpr : DepWeakIns) {
-    checkOutlineDependency(*this, RefExpr);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
   }
   for (Expr *RefExpr : DepWeakOuts) {
-    checkOutlineDependency(*this, RefExpr);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
   }
   for (Expr *RefExpr : DepWeakInouts) {
-    checkOutlineDependency(*this, RefExpr);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
   }
   for (Expr *RefExpr : DepWeakConcurrents) {
-    checkOutlineDependency(*this, RefExpr);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
   }
   for (Expr *RefExpr : DepWeakCommutatives) {
-    checkOutlineDependency(*this, RefExpr);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
   }
 
   auto *NewAttr = OSSTaskDeclAttr::CreateImplicit(
@@ -3499,96 +3572,8 @@ Sema::ActOnOmpSsDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLoc
     return nullptr;
 
   for (Expr *RefExpr : VarList) {
-    SourceLocation ELoc = RefExpr->getExprLoc();
-    Expr *SimpleExpr = RefExpr->IgnoreParenCasts();
-    if (RefExpr->containsUnexpandedParameterPack()) {
-      Diag(RefExpr->getExprLoc(), diag::err_oss_variadic_templates_not_clause_allowed);
-      continue;
-    } else if (RefExpr->isTypeDependent() || RefExpr->isValueDependent()) {
-      // It will be analyzed later.
-      ClauseVars.push_back(RefExpr);
-      continue;
-    }
-
-    if (RequireCompleteExprType(RefExpr, diag::err_oss_incomplete_type))
-      continue;
-
-    // TODO: check with OSSArraySectionExpr
-    auto *ASE = dyn_cast<ArraySubscriptExpr>(SimpleExpr);
-    // Allow only LValues, forbid ArraySubscripts over things
-    // that are not an array like:
-    //   typedef float V __attribute__((vector_size(16)));
-    //   V a;
-    //   #pragma oss task in(a[3])
-    // and functions:
-    //   void foo() { #pragma oss task in(foo) {} }
-    if (RefExpr->IgnoreParenImpCasts()->getType()->isFunctionType() ||
-        !RefExpr->IgnoreParenImpCasts()->isLValue() ||
-        (ASE &&
-         !ASE->getBase()->getType().getNonReferenceType()->isPointerType() &&
-         !ASE->getBase()->getType().getNonReferenceType()->isArrayType())) {
-      Diag(ELoc, diag::err_oss_expected_addressable_lvalue_or_array_item)
-          << RefExpr->getSourceRange();
-      continue;
-    }
-
-    class CheckCallExpr
-        : public ConstStmtVisitor<CheckCallExpr, bool> {
-    // This Visitor checks the base of the
-    // dependency is over a CallExpr, which is error.
-    // int *get();
-    // auto l = []() -> int * {...};
-    // #pragma oss task in(get()[1], l()[3])
-    public:
-      bool VisitOSSMultiDepExpr(const OSSMultiDepExpr *E) {
-        return Visit(E->getDepExpr());
-      }
-
-      bool VisitOSSArrayShapingExpr(const OSSArrayShapingExpr *E) {
-        return Visit(E->getBase());
-      }
-
-      bool VisitOSSArraySectionExpr(const OSSArraySectionExpr *E) {
-        return Visit(E->getBase());
-      }
-
-      bool VisitArraySubscriptExpr(const ArraySubscriptExpr *E) {
-        return Visit(E->getBase());
-      }
-
-      bool VisitUnaryOperator(const UnaryOperator *E) {
-        return Visit(E->getSubExpr());
-      }
-
-      bool VisitMemberExpr(const MemberExpr *E) {
-        return Visit(E->getBase());
-      }
-
-      bool VisitCallExpr(const CallExpr *E) {
-        return true;
-      }
-    };
-    CheckCallExpr CCE;
-    if (CCE.Visit(RefExpr)) {
-      Diag(ELoc, diag::err_oss_call_expr_support)
-          << RefExpr->getSourceRange();
-      continue;
-    }
-
-    bool InvalidArraySection = false;
-    while (auto *OASE = dyn_cast<OSSArraySectionExpr>(SimpleExpr)) {
-      if (!OASE->isColonForm() && !OSSSyntax) {
-        Diag(OASE->getColonLoc(), diag::err_oss_section_invalid_form)
-            << RefExpr->getSourceRange();
-        // Only diagnose the first error
-        InvalidArraySection = true;
-        break;
-      }
-      SimpleExpr = OASE->getBase()->IgnoreParenImpCasts();
-    }
-    if (InvalidArraySection)
-      continue;
-    ClauseVars.push_back(RefExpr->IgnoreParenImpCasts());
+    if (checkDependency(*this, RefExpr, OSSSyntax, /*Outline=*/false))
+      ClauseVars.push_back(RefExpr->IgnoreParenImpCasts());
   }
   return OSSDependClause::Create(Context, StartLoc, LParenLoc, EndLoc,
                                  DepKinds, DepKindsOrdered,

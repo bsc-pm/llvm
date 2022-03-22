@@ -49,45 +49,51 @@ entry:
 }
 
 ; CHECK: define internal void @nanos6_ol_task_region_foo0(%nanos6_task_args_foo0* %task_args, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) {
-; CHECK-NEXT: entry:
+; CHECK: entry:
 ; CHECK-NEXT:   %gep_n.addr = getelementptr %nanos6_task_args_foo0, %nanos6_task_args_foo0* %task_args, i32 0, i32 0
 ; CHECK-NEXT:   %load_gep_n.addr = load i32*, i32** %gep_n.addr, align 8
 ; CHECK-NEXT:   %gep_vla = getelementptr %nanos6_task_args_foo0, %nanos6_task_args_foo0* %task_args, i32 0, i32 1
 ; CHECK-NEXT:   %load_gep_vla = load i32*, i32** %gep_vla, align 8
 ; CHECK-NEXT:   %capt_gep = getelementptr %nanos6_task_args_foo0, %nanos6_task_args_foo0* %task_args, i32 0, i32 2
 ; CHECK-NEXT:   %load_capt_gep = load i64, i64* %capt_gep, align 8
-; CHECK-NEXT:   %0 = icmp ne %nanos6_address_translation_entry_t* %address_translation_table, null
-; CHECK-NEXT:   br i1 %0, label %1, label %20
-; CHECK: 1:                                                ; preds = %entry
-; CHECK-NEXT:   %2 = call %struct._depend_unpack_t @compute_dep(i32* %load_gep_n.addr)
-; CHECK-NEXT:   %3 = extractvalue %struct._depend_unpack_t %2, 0
+; CHECK-NEXT:   %tlate.load_gep_n.addr = alloca i32*, align 8
+; CHECK-NEXT:   store i32* %load_gep_n.addr, i32** %tlate.load_gep_n.addr, align 8
+; CHECK-NEXT:   %0 = load i32*, i32** %tlate.load_gep_n.addr, align 8
+; CHECK-NEXT:   %tlate.load_gep_vla = alloca i32*, align 8
+; CHECK-NEXT:   store i32* %load_gep_vla, i32** %tlate.load_gep_vla, align 8
+; CHECK-NEXT:   %1 = load i32*, i32** %tlate.load_gep_vla, align 8
+; CHECK-NEXT:   %2 = icmp ne %nanos6_address_translation_entry_t* %address_translation_table, null
+; CHECK-NEXT:   br i1 %2, label %3, label %22
+; CHECK: 3:                                                ; preds = %entry
+; CHECK-NEXT:   %4 = call %struct._depend_unpack_t @compute_dep(i32* %0)
+; CHECK-NEXT:   %5 = extractvalue %struct._depend_unpack_t %4, 0
 ; CHECK-NEXT:   %local_lookup_n.addr = getelementptr %nanos6_address_translation_entry_t, %nanos6_address_translation_entry_t* %address_translation_table, i32 0, i32 0
-; CHECK-NEXT:   %4 = load i64, i64* %local_lookup_n.addr, align 8
+; CHECK-NEXT:   %6 = load i64, i64* %local_lookup_n.addr, align 8
 ; CHECK-NEXT:   %device_lookup_n.addr = getelementptr %nanos6_address_translation_entry_t, %nanos6_address_translation_entry_t* %address_translation_table, i32 0, i32 1
-; CHECK-NEXT:   %5 = load i64, i64* %device_lookup_n.addr, align 8
-; CHECK-NEXT:   %6 = bitcast i32* %3 to i8*
-; CHECK-NEXT:   %7 = sub i64 0, %4
-; CHECK-NEXT:   %8 = getelementptr i8, i8* %6, i64 %7
-; CHECK-NEXT:   %9 = getelementptr i8, i8* %8, i64 %5
-; CHECK-NEXT:   %10 = bitcast i8* %9 to i32*
-; CHECK-NEXT:   store i32* %10, i32** %gep_n.addr, align 8
-; CHECK-NEXT:   %11 = call %struct._depend_unpack_t.0 @compute_dep.1(i32* %load_gep_vla, i64 %load_capt_gep)
-; CHECK-NEXT:   %12 = extractvalue %struct._depend_unpack_t.0 %11, 0
+; CHECK-NEXT:   %7 = load i64, i64* %device_lookup_n.addr, align 8
+; CHECK-NEXT:   %8 = bitcast i32* %5 to i8*
+; CHECK-NEXT:   %9 = sub i64 0, %6
+; CHECK-NEXT:   %10 = getelementptr i8, i8* %8, i64 %9
+; CHECK-NEXT:   %11 = getelementptr i8, i8* %10, i64 %7
+; CHECK-NEXT:   %12 = bitcast i8* %11 to i32*
+; CHECK-NEXT:   store i32* %12, i32** %tlate.load_gep_n.addr, align 8
+; CHECK-NEXT:   %13 = call %struct._depend_unpack_t.0 @compute_dep.1(i32* %1, i64 %load_capt_gep)
+; CHECK-NEXT:   %14 = extractvalue %struct._depend_unpack_t.0 %13, 0
 ; CHECK-NEXT:   %local_lookup_vla = getelementptr %nanos6_address_translation_entry_t, %nanos6_address_translation_entry_t* %address_translation_table, i32 1, i32 0
-; CHECK-NEXT:   %13 = load i64, i64* %local_lookup_vla, align 8
+; CHECK-NEXT:   %15 = load i64, i64* %local_lookup_vla, align 8
 ; CHECK-NEXT:   %device_lookup_vla = getelementptr %nanos6_address_translation_entry_t, %nanos6_address_translation_entry_t* %address_translation_table, i32 1, i32 1
-; CHECK-NEXT:   %14 = load i64, i64* %device_lookup_vla, align 8
-; CHECK-NEXT:   %15 = bitcast i32* %12 to i8*
-; CHECK-NEXT:   %16 = sub i64 0, %13
-; CHECK-NEXT:   %17 = getelementptr i8, i8* %15, i64 %16
-; CHECK-NEXT:   %18 = getelementptr i8, i8* %17, i64 %14
-; CHECK-NEXT:   %19 = bitcast i8* %18 to i32*
-; CHECK-NEXT:   store i32* %19, i32** %gep_vla, align 8
-; CHECK-NEXT:   br label %20
-; CHECK: 20:                                               ; preds = %1, %entry
-; CHECK-NEXT:   %21 = load i32*, i32** %gep_n.addr, align 8
-; CHECK-NEXT:   %22 = load i32*, i32** %gep_vla, align 8
-; CHECK-NEXT:   call void @nanos6_unpacked_task_region_foo0(i32* %21, i32* %22, i64 %load_capt_gep, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table)
+; CHECK-NEXT:   %16 = load i64, i64* %device_lookup_vla, align 8
+; CHECK-NEXT:   %17 = bitcast i32* %14 to i8*
+; CHECK-NEXT:   %18 = sub i64 0, %15
+; CHECK-NEXT:   %19 = getelementptr i8, i8* %17, i64 %18
+; CHECK-NEXT:   %20 = getelementptr i8, i8* %19, i64 %16
+; CHECK-NEXT:   %21 = bitcast i8* %20 to i32*
+; CHECK-NEXT:   store i32* %21, i32** %tlate.load_gep_vla, align 8
+; CHECK-NEXT:   br label %22
+; CHECK: 22:                                               ; preds = %3, %entry
+; CHECK-NEXT:   %23 = load i32*, i32** %tlate.load_gep_n.addr, align 8
+; CHECK-NEXT:   %24 = load i32*, i32** %tlate.load_gep_vla, align 8
+; CHECK-NEXT:   call void @nanos6_unpacked_task_region_foo0(i32* %23, i32* %24, i64 %load_capt_gep, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
@@ -238,45 +244,51 @@ entry:
 }
 
 ; CHECK: define internal void @nanos6_ol_task_region_foo10(%nanos6_task_args_foo10* %task_args, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) {
-; CHECK-NEXT: entry:
+; CHECK: entry:
 ; CHECK-NEXT:   %gep_n.addr = getelementptr %nanos6_task_args_foo10, %nanos6_task_args_foo10* %task_args, i32 0, i32 0
 ; CHECK-NEXT:   %load_gep_n.addr = load i32*, i32** %gep_n.addr, align 8
 ; CHECK-NEXT:   %gep_vla = getelementptr %nanos6_task_args_foo10, %nanos6_task_args_foo10* %task_args, i32 0, i32 1
 ; CHECK-NEXT:   %load_gep_vla = load i32*, i32** %gep_vla, align 8
 ; CHECK-NEXT:   %capt_gep = getelementptr %nanos6_task_args_foo10, %nanos6_task_args_foo10* %task_args, i32 0, i32 2
 ; CHECK-NEXT:   %load_capt_gep = load i64, i64* %capt_gep, align 8
-; CHECK-NEXT:   %0 = icmp ne %nanos6_address_translation_entry_t* %address_translation_table, null
-; CHECK-NEXT:   br i1 %0, label %1, label %20
-; CHECK: 1:                                                ; preds = %entry
-; CHECK-NEXT:   %2 = call %struct._depend_unpack_t.1 @compute_dep.4(i32* %load_gep_n.addr)
-; CHECK-NEXT:   %3 = extractvalue %struct._depend_unpack_t.1 %2, 0
+; CHECK-NEXT:   %tlate.load_gep_n.addr = alloca i32*, align 8
+; CHECK-NEXT:   store i32* %load_gep_n.addr, i32** %tlate.load_gep_n.addr, align 8
+; CHECK-NEXT:   %0 = load i32*, i32** %tlate.load_gep_n.addr, align 8
+; CHECK-NEXT:   %tlate.load_gep_vla = alloca i32*, align 8
+; CHECK-NEXT:   store i32* %load_gep_vla, i32** %tlate.load_gep_vla, align 8
+; CHECK-NEXT:   %1 = load i32*, i32** %tlate.load_gep_vla, align 8
+; CHECK-NEXT:   %2 = icmp ne %nanos6_address_translation_entry_t* %address_translation_table, null
+; CHECK-NEXT:   br i1 %2, label %3, label %22
+; CHECK: 3:                                                ; preds = %entry
+; CHECK-NEXT:   %4 = call %struct._depend_unpack_t.1 @compute_dep.4(i32* %0)
+; CHECK-NEXT:   %5 = extractvalue %struct._depend_unpack_t.1 %4, 0
 ; CHECK-NEXT:   %local_lookup_n.addr = getelementptr %nanos6_address_translation_entry_t, %nanos6_address_translation_entry_t* %address_translation_table, i32 0, i32 0
-; CHECK-NEXT:   %4 = load i64, i64* %local_lookup_n.addr, align 8
+; CHECK-NEXT:   %6 = load i64, i64* %local_lookup_n.addr, align 8
 ; CHECK-NEXT:   %device_lookup_n.addr = getelementptr %nanos6_address_translation_entry_t, %nanos6_address_translation_entry_t* %address_translation_table, i32 0, i32 1
-; CHECK-NEXT:   %5 = load i64, i64* %device_lookup_n.addr, align 8
-; CHECK-NEXT:   %6 = bitcast i32* %3 to i8*
-; CHECK-NEXT:   %7 = sub i64 0, %4
-; CHECK-NEXT:   %8 = getelementptr i8, i8* %6, i64 %7
-; CHECK-NEXT:   %9 = getelementptr i8, i8* %8, i64 %5
-; CHECK-NEXT:   %10 = bitcast i8* %9 to i32*
-; CHECK-NEXT:   store i32* %10, i32** %gep_n.addr, align 8
-; CHECK-NEXT:   %11 = call %struct._depend_unpack_t.2 @compute_dep.5(i32* %load_gep_vla, i64 %load_capt_gep)
-; CHECK-NEXT:   %12 = extractvalue %struct._depend_unpack_t.2 %11, 0
+; CHECK-NEXT:   %7 = load i64, i64* %device_lookup_n.addr, align 8
+; CHECK-NEXT:   %8 = bitcast i32* %5 to i8*
+; CHECK-NEXT:   %9 = sub i64 0, %6
+; CHECK-NEXT:   %10 = getelementptr i8, i8* %8, i64 %9
+; CHECK-NEXT:   %11 = getelementptr i8, i8* %10, i64 %7
+; CHECK-NEXT:   %12 = bitcast i8* %11 to i32*
+; CHECK-NEXT:   store i32* %12, i32** %tlate.load_gep_n.addr, align 8
+; CHECK-NEXT:   %13 = call %struct._depend_unpack_t.2 @compute_dep.5(i32* %1, i64 %load_capt_gep)
+; CHECK-NEXT:   %14 = extractvalue %struct._depend_unpack_t.2 %13, 0
 ; CHECK-NEXT:   %local_lookup_vla = getelementptr %nanos6_address_translation_entry_t, %nanos6_address_translation_entry_t* %address_translation_table, i32 1, i32 0
-; CHECK-NEXT:   %13 = load i64, i64* %local_lookup_vla, align 8
+; CHECK-NEXT:   %15 = load i64, i64* %local_lookup_vla, align 8
 ; CHECK-NEXT:   %device_lookup_vla = getelementptr %nanos6_address_translation_entry_t, %nanos6_address_translation_entry_t* %address_translation_table, i32 1, i32 1
-; CHECK-NEXT:   %14 = load i64, i64* %device_lookup_vla, align 8
-; CHECK-NEXT:   %15 = bitcast i32* %12 to i8*
-; CHECK-NEXT:   %16 = sub i64 0, %13
-; CHECK-NEXT:   %17 = getelementptr i8, i8* %15, i64 %16
-; CHECK-NEXT:   %18 = getelementptr i8, i8* %17, i64 %14
-; CHECK-NEXT:   %19 = bitcast i8* %18 to i32*
-; CHECK-NEXT:   store i32* %19, i32** %gep_vla, align 8
-; CHECK-NEXT:   br label %20
-; CHECK: 20:                                               ; preds = %1, %entry
-; CHECK-NEXT:   %21 = load i32*, i32** %gep_n.addr, align 8
-; CHECK-NEXT:   %22 = load i32*, i32** %gep_vla, align 8
-; CHECK-NEXT:   call void @nanos6_unpacked_task_region_foo10(i32* %21, i32* %22, i64 %load_capt_gep, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table)
+; CHECK-NEXT:   %16 = load i64, i64* %device_lookup_vla, align 8
+; CHECK-NEXT:   %17 = bitcast i32* %14 to i8*
+; CHECK-NEXT:   %18 = sub i64 0, %15
+; CHECK-NEXT:   %19 = getelementptr i8, i8* %17, i64 %18
+; CHECK-NEXT:   %20 = getelementptr i8, i8* %19, i64 %16
+; CHECK-NEXT:   %21 = bitcast i8* %20 to i32*
+; CHECK-NEXT:   store i32* %21, i32** %tlate.load_gep_vla, align 8
+; CHECK-NEXT:   br label %22
+; CHECK: 22:                                               ; preds = %3, %entry
+; CHECK-NEXT:   %23 = load i32*, i32** %tlate.load_gep_n.addr, align 8
+; CHECK-NEXT:   %24 = load i32*, i32** %tlate.load_gep_vla, align 8
+; CHECK-NEXT:   call void @nanos6_unpacked_task_region_foo10(i32* %23, i32* %24, i64 %load_capt_gep, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 

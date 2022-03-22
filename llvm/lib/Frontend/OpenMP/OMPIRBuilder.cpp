@@ -300,6 +300,7 @@ void OpenMPIRBuilder::finalize(Function *Fn) {
                             /* AssumptionCache */ nullptr,
                             /* AllowVarArgs */ true,
                             /* AllowAlloca */ true,
+                            /* AllocaBlock*/ OI.OuterAllocaBB,
                             /* Suffix */ ".omp_par");
 
     LLVM_DEBUG(dbgs() << "Before     outlining: " << *OuterFn << "\n");
@@ -878,6 +879,7 @@ IRBuilder<>::InsertPoint OpenMPIRBuilder::createParallel(
   InsertPointTy PreFiniIP(PRegPreFiniBB, PRegPreFiniTI->getIterator());
   FiniCB(PreFiniIP);
 
+  OI.OuterAllocaBB = OuterAllocaBlock;
   OI.EntryBB = PRegEntryBB;
   OI.ExitBB = PRegExitBB;
 
@@ -901,6 +903,7 @@ IRBuilder<>::InsertPoint OpenMPIRBuilder::createParallel(
                           /* AssumptionCache */ nullptr,
                           /* AllowVarArgs */ true,
                           /* AllowAlloca */ true,
+                          /* AllocationBlock */ OuterAllocaBlock,
                           /* Suffix */ ".omp_par");
 
   // Find inputs to, outputs from the code region.
@@ -3583,6 +3586,8 @@ std::pair<Value *, Value *> OpenMPIRBuilder::emitAtomicUpdate(
     InsertPointTy AllocaIP, Value *X, Type *XElemTy, Value *Expr,
     AtomicOrdering AO, AtomicRMWInst::BinOp RMWOp,
     AtomicUpdateCallbackTy &UpdateOp, bool VolatileX, bool IsXBinopExpr) {
+  // TODO: handle the case where XElemTy is not byte-sized or not a power of 2
+  // or a complex datatype.
   bool DoCmpExch = (RMWOp == AtomicRMWInst::BAD_BINOP) ||
                    (RMWOp == AtomicRMWInst::FAdd) ||
                    (RMWOp == AtomicRMWInst::FSub) ||
