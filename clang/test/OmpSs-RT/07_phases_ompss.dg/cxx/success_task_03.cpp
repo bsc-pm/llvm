@@ -26,8 +26,6 @@
 
 // RUN: %oss-cxx-compile-and-run
 // RUN: %oss-cxx-O2-compile-and-run
-//XFAIL: *
-
 
 /*
 <testinfo>
@@ -47,13 +45,13 @@ struct A
     B* b;
 
 #pragma oss task inout(n, b->n)
-    void f();
+    void f() {}
 };
 
-void A::f() {}
 
 int main() 
 {
     A a;
     a.f();
+    #pragma oss taskwait
 }

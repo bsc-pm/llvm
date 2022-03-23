@@ -1275,6 +1275,7 @@ void CGOmpSsRuntime::EmitDSAFirstprivate(
 
 llvm::Function *CGOmpSsRuntime::createCallWrapperFunc(
     CodeGenFunction &CGF,
+    const Decl *FunContext,
     const llvm::MapVector<const VarDecl *, LValue> &ExprInvolvedVarList,
     const llvm::MapVector<const Expr *, llvm::Value *> &VLASizeInvolvedMap,
     const llvm::DenseMap<const VarDecl *, Address> &CaptureInvolvedMap,
@@ -1315,15 +1316,16 @@ llvm::Function *CGOmpSsRuntime::createCallWrapperFunc(
   if (HasThis) {
     // We don't care about lambdas.
     // NOTE: We have seen 'this' so it's fine to assume we are in a method function
-    const CXXMethodDecl *MD = cast<CXXMethodDecl>(CGF.CurGD.getDecl()->getNonClosureContext());
-    if (const CXXConstructorDecl *CtorD = dyn_cast<CXXConstructorDecl>(MD)) {
-      NewCGF.CurGD = GlobalDecl(CtorD, Ctor_Complete);
-    } else if (const CXXDestructorDecl *DtorD = dyn_cast<CXXDestructorDecl>(MD)) {
-      NewCGF.CurGD = GlobalDecl(DtorD, Dtor_Complete);
-    } else {
-      NewCGF.CurGD = GlobalDecl(MD);
+    if (const CXXMethodDecl *MD = dyn_cast<CXXMethodDecl>(FunContext)) {
+      if (const CXXConstructorDecl *CtorD = dyn_cast<CXXConstructorDecl>(MD)) {
+        NewCGF.CurGD = GlobalDecl(CtorD, Ctor_Complete);
+      } else if (const CXXDestructorDecl *DtorD = dyn_cast<CXXDestructorDecl>(MD)) {
+        NewCGF.CurGD = GlobalDecl(DtorD, Dtor_Complete);
+      } else {
+        NewCGF.CurGD = GlobalDecl(MD);
+      }
+      NewCGF.CGM.getCXXABI().buildThisParam(NewCGF, Args);
     }
-    NewCGF.CGM.getCXXABI().buildThisParam(NewCGF, Args);
   }
   if (HasSwitch) {
     QualType Q = C.getSizeType();
@@ -1459,8 +1461,8 @@ static llvm::Value *emitDiscreteArray(
 }
 
 void CGOmpSsRuntime::EmitMultiDependencyList(
-    CodeGenFunction &CGF, const OSSDepDataTy &Dep,
-    SmallVectorImpl<llvm::Value *> &List) {
+    CodeGenFunction &CGF, const Decl *FunContext,
+    const OSSDepDataTy &Dep, SmallVectorImpl<llvm::Value *> &List) {
   auto *MDExpr = cast<OSSMultiDepExpr>(Dep.E);
 
   OSSExprInfoGathering MultiDepInfoGathering(CGF);
@@ -1555,6 +1557,7 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
 
   llvm::Function *ComputeMultiDepFun = createCallWrapperFunc(
     CGF,
+    FunContext,
     MultiDepInfoGathering.getInvolvedVarList(),
     MultiDepInfoGathering.getVLASizeInvolvedMap(),
     MultiDepInfoGathering.getCaptureInvolvedMap(),
@@ -1605,6 +1608,7 @@ void CGOmpSsRuntime::BuildWrapperCallBundleList(
 
   auto *Func = createCallWrapperFunc(
     CGF,
+    CGF.CurGD.getDecl()->getNonClosureContext(),
     CallVisitor.getInvolvedVarList(),
     CallVisitor.getVLASizeInvolvedMap(),
     CallVisitor.getCaptureInvolvedMap(),
@@ -1683,8 +1687,8 @@ void CGOmpSsRuntime::EmitIgnoredWrapperCallBundle(
 }
 
 void CGOmpSsRuntime::EmitDependencyList(
-    CodeGenFunction &CGF, const OSSDepDataTy &Dep,
-    SmallVectorImpl<llvm::Value *> &List) {
+    CodeGenFunction &CGF, const Decl *FunContext,
+    const OSSDepDataTy &Dep, SmallVectorImpl<llvm::Value *> &List) {
 
   OSSExprInfoGathering DependInfoGathering(CGF);
   DependInfoGathering.Visit(Dep.E);
@@ -1785,6 +1789,7 @@ void CGOmpSsRuntime::EmitDependencyList(
 
   llvm::Function *ComputeDepFun = createCallWrapperFunc(
     CGF,
+    FunContext,
     DependInfoGathering.getInvolvedVarList(),
     DependInfoGathering.getVLASizeInvolvedMap(),
     DependInfoGathering.getCaptureInvolvedMap(),
@@ -1844,8 +1849,8 @@ static std::string convertDepToMultiDepStr(StringRef Str) {
 }
 
 void CGOmpSsRuntime::EmitDependency(
-    std::string Name, CodeGenFunction &CGF, const OSSDepDataTy &Dep,
-    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+    std::string Name, CodeGenFunction &CGF, const Decl *FunContext,
+    const OSSDepDataTy &Dep, SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
 
   SmallVector<llvm::Value*, 4> MultiDepData;
   SmallVector<llvm::Value*, 4> DepData;
@@ -1854,10 +1859,10 @@ void CGOmpSsRuntime::EmitDependency(
   if (isa<OSSMultiDepExpr>(Dep.E)) {
     // Convert Name in MultiName
     Name = convertDepToMultiDepStr(Name);
-    EmitMultiDependencyList(CGF, Dep, MultiDepData);
+    EmitMultiDependencyList(CGF, FunContext, Dep, MultiDepData);
   }
 
-  EmitDependencyList(CGF, Dep, DepData);
+  EmitDependencyList(CGF, FunContext, Dep, DepData);
 
   // Merge the two value lists
   MultiAndDepData.append(MultiDepData.begin(), MultiDepData.end());
@@ -2226,8 +2231,9 @@ static llvm::ConstantInt *reductionKindToNanos6Enum(CodeGenFunction &CGF, QualTy
 
 void CGOmpSsRuntime::EmitReduction(
     std::string RedName, std::string RedInitName, std::string RedCombName,
-    CodeGenFunction &CGF, const OSSReductionDataTy &Red,
-    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+    CodeGenFunction &CGF, const Decl *FunContext,
+    const OSSReductionDataTy &Red, SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+
   SmallVector<llvm::Value *, 4> List;
 
   llvm::ConstantInt *RedKind = reductionKindToNanos6Enum(CGF, Red.ReductionOp->getType(), Red.ReductionKind);
@@ -2258,7 +2264,7 @@ void CGOmpSsRuntime::EmitReduction(
   }
   InDirectiveEmission = true;
 
-  EmitDependencyList(CGF, {/*OSSSyntax=*/true, Red.Ref}, List);
+  EmitDependencyList(CGF, FunContext, {/*OSSSyntax=*/true, Red.Ref}, List);
   // First operand has to be the DSA over the dependency is made
   llvm::Value *DepBaseDSA = List[0];
 
@@ -2646,47 +2652,48 @@ void CGOmpSsRuntime::EmitDirectiveData(
   if (!CapturedList.empty())
     TaskInfo.emplace_back(getBundleStr(OSSB_captured), CapturedList);
 
+  const Decl *FunContext = CGF.CurGD.getDecl()->getNonClosureContext();
   for (const OSSDepDataTy &Dep : Data.Deps.Ins) {
-    EmitDependency(getBundleStr(OSSB_in), CGF, Dep, TaskInfo);
+    EmitDependency(getBundleStr(OSSB_in), CGF, FunContext, Dep, TaskInfo);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.Outs) {
-    EmitDependency(getBundleStr(OSSB_out), CGF, Dep, TaskInfo);
+    EmitDependency(getBundleStr(OSSB_out), CGF, FunContext, Dep, TaskInfo);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.Inouts) {
-    EmitDependency(getBundleStr(OSSB_inout), CGF, Dep, TaskInfo);
+    EmitDependency(getBundleStr(OSSB_inout), CGF, FunContext, Dep, TaskInfo);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.Concurrents) {
-    EmitDependency(getBundleStr(OSSB_concurrent), CGF, Dep, TaskInfo);
+    EmitDependency(getBundleStr(OSSB_concurrent), CGF, FunContext, Dep, TaskInfo);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.Commutatives) {
-    EmitDependency(getBundleStr(OSSB_commutative), CGF, Dep, TaskInfo);
+    EmitDependency(getBundleStr(OSSB_commutative), CGF, FunContext, Dep, TaskInfo);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.WeakIns) {
-    EmitDependency(getBundleStr(OSSB_weakin), CGF, Dep, TaskInfo);
+    EmitDependency(getBundleStr(OSSB_weakin), CGF, FunContext, Dep, TaskInfo);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.WeakOuts) {
-    EmitDependency(getBundleStr(OSSB_weakout), CGF, Dep, TaskInfo);
+    EmitDependency(getBundleStr(OSSB_weakout), CGF, FunContext, Dep, TaskInfo);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.WeakInouts) {
-    EmitDependency(getBundleStr(OSSB_weakinout), CGF, Dep, TaskInfo);
+    EmitDependency(getBundleStr(OSSB_weakinout), CGF, FunContext, Dep, TaskInfo);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.WeakConcurrents) {
-    EmitDependency(getBundleStr(OSSB_weakconcurrent), CGF, Dep, TaskInfo);
+    EmitDependency(getBundleStr(OSSB_weakconcurrent), CGF, FunContext, Dep, TaskInfo);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.WeakCommutatives) {
-    EmitDependency(getBundleStr(OSSB_weakcommutative), CGF, Dep, TaskInfo);
+    EmitDependency(getBundleStr(OSSB_weakcommutative), CGF, FunContext, Dep, TaskInfo);
   }
   for (const OSSReductionDataTy &Red : Data.Reductions.RedList) {
     EmitReduction(getBundleStr(OSSB_reduction),
                   getBundleStr(OSSB_redinit),
                   getBundleStr(OSSB_redcomb),
-                  CGF, Red, TaskInfo);
+                  CGF, FunContext, Red, TaskInfo);
   }
   for (const OSSReductionDataTy &Red : Data.Reductions.WeakRedList) {
     EmitReduction(getBundleStr(OSSB_weakreduction),
                   getBundleStr(OSSB_redinit),
                   getBundleStr(OSSB_redcomb),
-                  CGF, Red, TaskInfo);
+                  CGF, FunContext, Red, TaskInfo);
   }
 
   if (Data.If)
@@ -2719,7 +2726,9 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   SmallVector<Expr *, 4> PrivateCopies;
   SmallVector<Expr *, 4> SharedCopies;
 
-  CodeGenFunction::OSSPrivateScope InitScope(CGF);
+  MemberExpr *NewME = nullptr;
+
+  CodeGenFunction::OSSPrivateScope InitScope(CGF, /*Restore=*/true);
 
   InDirectiveEmission = true;
   CaptureMapStack.push_back(CaptureMapTy());
@@ -2776,9 +2785,39 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
     IsMethodCall = true;
     const Expr *callee = CXXE->getCallee()->IgnoreParens();
     const MemberExpr *ME = cast<MemberExpr>(callee);
+    bool IsArrow = ME->isArrow();
     const Expr *Base = ME->getBase();
-    LValue This = CGF.EmitLValue(Base);
-    TaskInfo.emplace_back(getBundleStr(OSSB_firstprivate), This.getPointer(CGF));
+
+    // Emulate call_arg as a reference
+    // Built the call_arg that stores 'this' or any complex expression like M[1][2]->foo();
+    Expr *MEBase;
+    if (IsArrow) {
+      Expr *TmpBase =
+        UnaryOperator::Create(
+          Ctx, const_cast<Expr *>(Base), UO_Deref, Base->getType()->getPointeeType(),
+          VK_PRValue, OK_Ordinary, SourceLocation(), false, FPOptionsOverride());
+      MEBase = emitTaskCallArg(
+        CGF, "call_arg", Ctx.getLValueReferenceType(Base->getType()->getPointeeType()),
+        Base->getExprLoc(), TmpBase);
+    } else {
+      MEBase = emitTaskCallArg(
+        CGF, "call_arg", Ctx.getLValueReferenceType(Base->getType()),
+        Base->getExprLoc(), Base);
+    }
+
+    NewME = MemberExpr::Create(
+          Ctx, MEBase, /*IsArrow=*/false, ME->getOperatorLoc(),
+          ME->getQualifierLoc(), ME->getTemplateKeywordLoc(),
+          ME->getMemberDecl(), ME->getFoundDecl(), ME->getMemberNameInfo(),
+          nullptr, ME->getType(), ME->getValueKind(),
+          ME->getObjectKind(), ME->isNonOdrUse());
+
+    LValue This = CGF.EmitLValue(MEBase);
+
+    InitScope.setThis(This.getPointer(CGF), This.getAlignment());
+
+    CaptureMapStack.back().try_emplace(cast<VarDecl>(cast<DeclRefExpr>(MEBase)->getDecl()), This.getAddress(CGF));
+    TaskInfo.emplace_back(getBundleStr(OSSB_shared), This.getPointer(CGF));
   }
 
   // NOTE: this should do only one iteration
@@ -2832,122 +2871,122 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_in), CGF, Dep, TaskInfo);
+      EmitDependency(getBundleStr(OSSB_in), CGF, FD, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->outs()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_out), CGF, Dep, TaskInfo);
+      EmitDependency(getBundleStr(OSSB_out), CGF, FD, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->inouts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_inout), CGF, Dep, TaskInfo);
+      EmitDependency(getBundleStr(OSSB_inout), CGF, FD, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->concurrents()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_concurrent), CGF, Dep, TaskInfo);
+      EmitDependency(getBundleStr(OSSB_concurrent), CGF, FD, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->commutatives()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_commutative), CGF, Dep, TaskInfo);
+      EmitDependency(getBundleStr(OSSB_commutative), CGF, FD, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->weakIns()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_weakin), CGF, Dep, TaskInfo);
+      EmitDependency(getBundleStr(OSSB_weakin), CGF, FD, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->weakOuts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_weakout), CGF, Dep, TaskInfo);
+      EmitDependency(getBundleStr(OSSB_weakout), CGF, FD, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->weakInouts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_weakinout), CGF, Dep, TaskInfo);
+      EmitDependency(getBundleStr(OSSB_weakinout), CGF, FD, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->weakConcurrents()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_weakconcurrent), CGF, Dep, TaskInfo);
+      EmitDependency(getBundleStr(OSSB_weakconcurrent), CGF, FD, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->weakCommutatives()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_weakcommutative), CGF, Dep, TaskInfo);
+      EmitDependency(getBundleStr(OSSB_weakcommutative), CGF, FD, Dep, TaskInfo);
     }
     // depend(in :)
     for (const Expr *E : Attr->depIns()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_in), CGF, Dep, TaskInfo);
+      EmitDependency(getBundleStr(OSSB_in), CGF, FD, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->depOuts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_out), CGF, Dep, TaskInfo);
+      EmitDependency(getBundleStr(OSSB_out), CGF, FD, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->depInouts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_inout), CGF, Dep, TaskInfo);
+      EmitDependency(getBundleStr(OSSB_inout), CGF, FD, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->depConcurrents()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_concurrent), CGF, Dep, TaskInfo);
+      EmitDependency(getBundleStr(OSSB_concurrent), CGF, FD, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->depCommutatives()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_commutative), CGF, Dep, TaskInfo);
+      EmitDependency(getBundleStr(OSSB_commutative), CGF, FD, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->depWeakIns()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_weakin), CGF, Dep, TaskInfo);
+      EmitDependency(getBundleStr(OSSB_weakin), CGF, FD, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->depWeakOuts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_weakout), CGF, Dep, TaskInfo);
+      EmitDependency(getBundleStr(OSSB_weakout), CGF, FD, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->depWeakInouts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_weakinout), CGF, Dep, TaskInfo);
+      EmitDependency(getBundleStr(OSSB_weakinout), CGF, FD, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->depWeakConcurrents()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_weakconcurrent), CGF, Dep, TaskInfo);
+      EmitDependency(getBundleStr(OSSB_weakconcurrent), CGF, FD, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->depWeakCommutatives()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_weakcommutative), CGF, Dep, TaskInfo);
+      EmitDependency(getBundleStr(OSSB_weakcommutative), CGF, FD, Dep, TaskInfo);
     }
     if (!CapturedList.empty())
       TaskInfo.emplace_back(getBundleStr(OSSB_captured), CapturedList);
@@ -2979,11 +3018,10 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   // From EmitCallExpr
   RValue RV;
   if (IsMethodCall) {
-    const Expr *callee = cast<CXXMemberCallExpr>(CE)->getCallee()->IgnoreParens();
-    const MemberExpr *ME = cast<MemberExpr>(callee);
+    assert(NewME && "Expected a call_arg MemberExpr");
 
     CXXMemberCallExpr *NewCXXE = CXXMemberCallExpr::Create(
-        Ctx, const_cast<MemberExpr *>(ME), ParmCopies, Ctx.VoidTy,
+        Ctx, NewME, ParmCopies, Ctx.VoidTy,
         VK_PRValue, SourceLocation(), FPOptionsOverride());
 
     RV = CGF.EmitCXXMemberCallExpr(NewCXXE, ReturnValue);

@@ -219,21 +219,21 @@ private:
     SmallVectorImpl<llvm::Value*> &CapturedList);
 
   void EmitMultiDependencyList(
-    CodeGenFunction &CGF, const OSSDepDataTy &Dep,
-    SmallVectorImpl<llvm::Value *> &List);
+    CodeGenFunction &CGF, const Decl *FunContext,
+    const OSSDepDataTy &Dep, SmallVectorImpl<llvm::Value *> &List);
 
   void EmitDependencyList(
-    CodeGenFunction &CGF, const OSSDepDataTy &Dep,
-    SmallVectorImpl<llvm::Value *> &List);
+    CodeGenFunction &CGF, const Decl *FunContext,
+    const OSSDepDataTy &Dep, SmallVectorImpl<llvm::Value *> &List);
 
   void EmitDependency(
-    std::string Name, CodeGenFunction &CGF, const OSSDepDataTy &Dep,
-    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
+    std::string Name, CodeGenFunction &CGF, const Decl *FunContext,
+    const OSSDepDataTy &Dep, SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
 
   void EmitReduction(
     std::string RedName, std::string RedInitName, std::string RedCombName,
-    CodeGenFunction &CGF, const OSSReductionDataTy &Red,
-    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
+    CodeGenFunction &CGF, const Decl *FunContext,
+    const OSSReductionDataTy &Red, SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
 
   void EmitCopyCtorFunc(llvm::Value *DSAValue, const CXXConstructExpr *CtorE,
       const VarDecl *CopyD, const VarDecl *InitD,
@@ -296,6 +296,7 @@ public:
 
   llvm::Function *createCallWrapperFunc(
       CodeGenFunction &CGF,
+      const Decl *FunContext,
       const llvm::MapVector<const VarDecl *, LValue> &ExprInvolvedVarList,
       const llvm::MapVector<const Expr *, llvm::Value *> &VLASizeInvolvedMap,
       const llvm::DenseMap<const VarDecl *, Address> &CaptureInvolvedMap,
