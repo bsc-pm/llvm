@@ -4294,11 +4294,17 @@ void CodeGenFunction::EmitOMPTaskBasedDirective(
   // Check if the task has 'free_agent' clause.
   if(const auto *Clause = S.getSingleClause<OMPFreeAgentClause>()){
     const Expr *FreeAgent = Clause->getFreeAgent();
-    Data.FreeAgent.setInt(/*IntVal=*/true);
-    Data.FreeAgent.setPointer(EmitScalarConversion(
-        EmitScalarExpr(FreeAgent), FreeAgent->getType(),
-        getContext().getIntTypeForBitwidth(/*DestWidth=*/32, /*Signed=*/1),
-        FreeAgent->getExprLoc()));
+    bool CondConstant;
+    if (ConstantFoldsToSimpleInteger(FreeAgent, CondConstant))
+      Data.FreeAgent.setInt(CondConstant);
+    else
+      Data.FreeAgent.setPointer(EvaluateExprAsBool(FreeAgent));
+    // Data.FreeAgent.setPointer(EmitScalarConversion(
+    //     EmitScalarExpr(FreeAgent), FreeAgent->getType(),
+    //     getContext().getIntTypeForBitwidth(/*DestWidth=*/32, /*Signed=*/1),
+    //     FreeAgent->getExprLoc()));
+  } else {
+    Data.FreeAgent.setInt(/*IntVal=*/false);
   }
   // The first function argument for tasks is a thread id, the second one is a
   // part id (0 for tied tasks, >=0 for untied task).

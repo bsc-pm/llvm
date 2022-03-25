@@ -2583,6 +2583,10 @@ void OMPClauseEnqueue::VisitOMPAffinityClause(const OMPAffinityClause *C) {
   for (const Expr *E : C->varlists())
     Visitor->AddStmt(E);
 }
+void OMPClauseEnqueue::VisitOMPFreeAgentClause(const OMPFreeAgentClause *C) {
+    VisitOMPClauseWithPreInit(C);
+    Visitor->AddStmt(C->getFreeAgent());
+}
 } // namespace
 
 void EnqueueVisitor::EnqueueChildren(const OMPClause *S) {
