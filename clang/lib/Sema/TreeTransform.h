@@ -101,298 +101,298 @@ using namespace sema;
 /// (\c getBaseLocation(), \c getBaseEntity()).
 template<typename Derived>
 class TreeTransform {
-  /// Private RAII object that helps us forget and then re-remember
-  /// the template argument corresponding to a partially-substituted parameter
-  /// pack.
-  class ForgetPartiallySubstitutedPackRAII {
-    Derived &Self;
-    TemplateArgument Old;
-
-  public:
-    ForgetPartiallySubstitutedPackRAII(Derived &Self) : Self(Self) {
-      Old = Self.ForgetPartiallySubstitutedPack();
-    }
-
-    ~ForgetPartiallySubstitutedPackRAII() {
-      Self.RememberPartiallySubstitutedPack(Old);
-    }
-  };
-
-protected:
-  Sema &SemaRef;
-
-  /// The set of local declarations that have been transformed, for
-  /// cases where we are forced to build new declarations within the transformer
-  /// rather than in the subclass (e.g., lambda closure types).
-  llvm::DenseMap<Decl *, Decl *> TransformedLocalDecls;
+/// Private RAII object that helps us forget and then re-remember
+/// the template argument corresponding to a partially-substituted parameter
+/// pack.
+class ForgetPartiallySubstitutedPackRAII {
+Derived &Self;
+TemplateArgument Old;
 
 public:
-  /// Initializes a new tree transformer.
-  TreeTransform(Sema &SemaRef) : SemaRef(SemaRef) { }
+ForgetPartiallySubstitutedPackRAII(Derived &Self) : Self(Self) {
+    Old = Self.ForgetPartiallySubstitutedPack();
+}
 
-  /// Retrieves a reference to the derived class.
-  Derived &getDerived() { return static_cast<Derived&>(*this); }
+~ForgetPartiallySubstitutedPackRAII() {
+    Self.RememberPartiallySubstitutedPack(Old);
+}
+};
 
-  /// Retrieves a reference to the derived class.
-  const Derived &getDerived() const {
-    return static_cast<const Derived&>(*this);
-  }
+protected:
+Sema &SemaRef;
 
-  static inline ExprResult Owned(Expr *E) { return E; }
-  static inline StmtResult Owned(Stmt *S) { return S; }
+/// The set of local declarations that have been transformed, for
+/// cases where we are forced to build new declarations within the transformer
+/// rather than in the subclass (e.g., lambda closure types).
+llvm::DenseMap<Decl *, Decl *> TransformedLocalDecls;
 
-  /// Retrieves a reference to the semantic analysis object used for
-  /// this tree transform.
-  Sema &getSema() const { return SemaRef; }
+public:
+/// Initializes a new tree transformer.
+TreeTransform(Sema &SemaRef) : SemaRef(SemaRef) { }
 
-  /// Whether the transformation should always rebuild AST nodes, even
-  /// if none of the children have changed.
-  ///
-  /// Subclasses may override this function to specify when the transformation
-  /// should rebuild all AST nodes.
-  ///
-  /// We must always rebuild all AST nodes when performing variadic template
-  /// pack expansion, in order to avoid violating the AST invariant that each
-  /// statement node appears at most once in its containing declaration.
-  bool AlwaysRebuild() { return SemaRef.ArgumentPackSubstitutionIndex != -1; }
+/// Retrieves a reference to the derived class.
+Derived &getDerived() { return static_cast<Derived&>(*this); }
 
-  /// Whether the transformation is forming an expression or statement that
-  /// replaces the original. In this case, we'll reuse mangling numbers from
-  /// existing lambdas.
-  bool ReplacingOriginal() { return false; }
+/// Retrieves a reference to the derived class.
+const Derived &getDerived() const {
+return static_cast<const Derived&>(*this);
+}
 
-  /// Wether CXXConstructExpr can be skipped when they are implicit.
-  /// They will be reconstructed when used if needed.
-  /// This is usefull when the user that cause rebuilding of the
-  /// CXXConstructExpr is outside of the expression at which the TreeTransform
-  /// started.
-  bool AllowSkippingCXXConstructExpr() { return true; }
+static inline ExprResult Owned(Expr *E) { return E; }
+static inline StmtResult Owned(Stmt *S) { return S; }
 
-  /// Returns the location of the entity being transformed, if that
-  /// information was not available elsewhere in the AST.
-  ///
-  /// By default, returns no source-location information. Subclasses can
-  /// provide an alternative implementation that provides better location
-  /// information.
-  SourceLocation getBaseLocation() { return SourceLocation(); }
+/// Retrieves a reference to the semantic analysis object used for
+/// this tree transform.
+Sema &getSema() const { return SemaRef; }
 
-  /// Returns the name of the entity being transformed, if that
-  /// information was not available elsewhere in the AST.
-  ///
-  /// By default, returns an empty name. Subclasses can provide an alternative
-  /// implementation with a more precise name.
-  DeclarationName getBaseEntity() { return DeclarationName(); }
+/// Whether the transformation should always rebuild AST nodes, even
+/// if none of the children have changed.
+///
+/// Subclasses may override this function to specify when the transformation
+/// should rebuild all AST nodes.
+///
+/// We must always rebuild all AST nodes when performing variadic template
+/// pack expansion, in order to avoid violating the AST invariant that each
+/// statement node appears at most once in its containing declaration.
+bool AlwaysRebuild() { return SemaRef.ArgumentPackSubstitutionIndex != -1; }
 
-  /// Sets the "base" location and entity when that
-  /// information is known based on another transformation.
-  ///
-  /// By default, the source location and entity are ignored. Subclasses can
-  /// override this function to provide a customized implementation.
-  void setBase(SourceLocation Loc, DeclarationName Entity) { }
+/// Whether the transformation is forming an expression or statement that
+/// replaces the original. In this case, we'll reuse mangling numbers from
+/// existing lambdas.
+bool ReplacingOriginal() { return false; }
 
-  /// RAII object that temporarily sets the base location and entity
-  /// used for reporting diagnostics in types.
-  class TemporaryBase {
-    TreeTransform &Self;
-    SourceLocation OldLocation;
-    DeclarationName OldEntity;
+/// Wether CXXConstructExpr can be skipped when they are implicit.
+/// They will be reconstructed when used if needed.
+/// This is usefull when the user that cause rebuilding of the
+/// CXXConstructExpr is outside of the expression at which the TreeTransform
+/// started.
+bool AllowSkippingCXXConstructExpr() { return true; }
 
-  public:
-    TemporaryBase(TreeTransform &Self, SourceLocation Location,
-                  DeclarationName Entity) : Self(Self) {
-      OldLocation = Self.getDerived().getBaseLocation();
-      OldEntity = Self.getDerived().getBaseEntity();
+/// Returns the location of the entity being transformed, if that
+/// information was not available elsewhere in the AST.
+///
+/// By default, returns no source-location information. Subclasses can
+/// provide an alternative implementation that provides better location
+/// information.
+SourceLocation getBaseLocation() { return SourceLocation(); }
 
-      if (Location.isValid())
-        Self.getDerived().setBase(Location, Entity);
-    }
+/// Returns the name of the entity being transformed, if that
+/// information was not available elsewhere in the AST.
+///
+/// By default, returns an empty name. Subclasses can provide an alternative
+/// implementation with a more precise name.
+DeclarationName getBaseEntity() { return DeclarationName(); }
 
-    ~TemporaryBase() {
-      Self.getDerived().setBase(OldLocation, OldEntity);
-    }
-  };
+/// Sets the "base" location and entity when that
+/// information is known based on another transformation.
+///
+/// By default, the source location and entity are ignored. Subclasses can
+/// override this function to provide a customized implementation.
+void setBase(SourceLocation Loc, DeclarationName Entity) { }
 
-  /// Determine whether the given type \p T has already been
-  /// transformed.
-  ///
-  /// Subclasses can provide an alternative implementation of this routine
-  /// to short-circuit evaluation when it is known that a given type will
-  /// not change. For example, template instantiation need not traverse
-  /// non-dependent types.
-  bool AlreadyTransformed(QualType T) {
-    return T.isNull();
-  }
+/// RAII object that temporarily sets the base location and entity
+/// used for reporting diagnostics in types.
+class TemporaryBase {
+TreeTransform &Self;
+SourceLocation OldLocation;
+DeclarationName OldEntity;
 
-  /// Transform a template parameter depth level.
-  ///
-  /// During a transformation that transforms template parameters, this maps
-  /// an old template parameter depth to a new depth.
-  unsigned TransformTemplateDepth(unsigned Depth) {
-    return Depth;
-  }
+public:
+TemporaryBase(TreeTransform &Self, SourceLocation Location,
+                DeclarationName Entity) : Self(Self) {
+    OldLocation = Self.getDerived().getBaseLocation();
+    OldEntity = Self.getDerived().getBaseEntity();
 
-  /// Determine whether the given call argument should be dropped, e.g.,
-  /// because it is a default argument.
-  ///
-  /// Subclasses can provide an alternative implementation of this routine to
-  /// determine which kinds of call arguments get dropped. By default,
-  /// CXXDefaultArgument nodes are dropped (prior to transformation).
-  bool DropCallArgument(Expr *E) {
-    return E->isDefaultArgument();
-  }
+    if (Location.isValid())
+    Self.getDerived().setBase(Location, Entity);
+}
 
-  /// Determine whether we should expand a pack expansion with the
-  /// given set of parameter packs into separate arguments by repeatedly
-  /// transforming the pattern.
-  ///
-  /// By default, the transformer never tries to expand pack expansions.
-  /// Subclasses can override this routine to provide different behavior.
-  ///
-  /// \param EllipsisLoc The location of the ellipsis that identifies the
-  /// pack expansion.
-  ///
-  /// \param PatternRange The source range that covers the entire pattern of
-  /// the pack expansion.
-  ///
-  /// \param Unexpanded The set of unexpanded parameter packs within the
-  /// pattern.
-  ///
-  /// \param ShouldExpand Will be set to \c true if the transformer should
-  /// expand the corresponding pack expansions into separate arguments. When
-  /// set, \c NumExpansions must also be set.
-  ///
-  /// \param RetainExpansion Whether the caller should add an unexpanded
-  /// pack expansion after all of the expanded arguments. This is used
-  /// when extending explicitly-specified template argument packs per
-  /// C++0x [temp.arg.explicit]p9.
-  ///
-  /// \param NumExpansions The number of separate arguments that will be in
-  /// the expanded form of the corresponding pack expansion. This is both an
-  /// input and an output parameter, which can be set by the caller if the
-  /// number of expansions is known a priori (e.g., due to a prior substitution)
-  /// and will be set by the callee when the number of expansions is known.
-  /// The callee must set this value when \c ShouldExpand is \c true; it may
-  /// set this value in other cases.
-  ///
-  /// \returns true if an error occurred (e.g., because the parameter packs
-  /// are to be instantiated with arguments of different lengths), false
-  /// otherwise. If false, \c ShouldExpand (and possibly \c NumExpansions)
-  /// must be set.
-  bool TryExpandParameterPacks(SourceLocation EllipsisLoc,
-                               SourceRange PatternRange,
-                               ArrayRef<UnexpandedParameterPack> Unexpanded,
-                               bool &ShouldExpand,
-                               bool &RetainExpansion,
-                               Optional<unsigned> &NumExpansions) {
-    ShouldExpand = false;
-    return false;
-  }
+~TemporaryBase() {
+    Self.getDerived().setBase(OldLocation, OldEntity);
+}
+};
 
-  /// "Forget" about the partially-substituted pack template argument,
-  /// when performing an instantiation that must preserve the parameter pack
-  /// use.
-  ///
-  /// This routine is meant to be overridden by the template instantiator.
-  TemplateArgument ForgetPartiallySubstitutedPack() {
-    return TemplateArgument();
-  }
+/// Determine whether the given type \p T has already been
+/// transformed.
+///
+/// Subclasses can provide an alternative implementation of this routine
+/// to short-circuit evaluation when it is known that a given type will
+/// not change. For example, template instantiation need not traverse
+/// non-dependent types.
+bool AlreadyTransformed(QualType T) {
+return T.isNull();
+}
 
-  /// "Remember" the partially-substituted pack template argument
-  /// after performing an instantiation that must preserve the parameter pack
-  /// use.
-  ///
-  /// This routine is meant to be overridden by the template instantiator.
-  void RememberPartiallySubstitutedPack(TemplateArgument Arg) { }
+/// Transform a template parameter depth level.
+///
+/// During a transformation that transforms template parameters, this maps
+/// an old template parameter depth to a new depth.
+unsigned TransformTemplateDepth(unsigned Depth) {
+return Depth;
+}
 
-  /// Note to the derived class when a function parameter pack is
-  /// being expanded.
-  void ExpandingFunctionParameterPack(ParmVarDecl *Pack) { }
+/// Determine whether the given call argument should be dropped, e.g.,
+/// because it is a default argument.
+///
+/// Subclasses can provide an alternative implementation of this routine to
+/// determine which kinds of call arguments get dropped. By default,
+/// CXXDefaultArgument nodes are dropped (prior to transformation).
+bool DropCallArgument(Expr *E) {
+return E->isDefaultArgument();
+}
 
-  /// Transforms the given type into another type.
-  ///
-  /// By default, this routine transforms a type by creating a
-  /// TypeSourceInfo for it and delegating to the appropriate
-  /// function.  This is expensive, but we don't mind, because
-  /// this method is deprecated anyway;  all users should be
-  /// switched to storing TypeSourceInfos.
-  ///
-  /// \returns the transformed type.
-  QualType TransformType(QualType T);
+/// Determine whether we should expand a pack expansion with the
+/// given set of parameter packs into separate arguments by repeatedly
+/// transforming the pattern.
+///
+/// By default, the transformer never tries to expand pack expansions.
+/// Subclasses can override this routine to provide different behavior.
+///
+/// \param EllipsisLoc The location of the ellipsis that identifies the
+/// pack expansion.
+///
+/// \param PatternRange The source range that covers the entire pattern of
+/// the pack expansion.
+///
+/// \param Unexpanded The set of unexpanded parameter packs within the
+/// pattern.
+///
+/// \param ShouldExpand Will be set to \c true if the transformer should
+/// expand the corresponding pack expansions into separate arguments. When
+/// set, \c NumExpansions must also be set.
+///
+/// \param RetainExpansion Whether the caller should add an unexpanded
+/// pack expansion after all of the expanded arguments. This is used
+/// when extending explicitly-specified template argument packs per
+/// C++0x [temp.arg.explicit]p9.
+///
+/// \param NumExpansions The number of separate arguments that will be in
+/// the expanded form of the corresponding pack expansion. This is both an
+/// input and an output parameter, which can be set by the caller if the
+/// number of expansions is known a priori (e.g., due to a prior substitution)
+/// and will be set by the callee when the number of expansions is known.
+/// The callee must set this value when \c ShouldExpand is \c true; it may
+/// set this value in other cases.
+///
+/// \returns true if an error occurred (e.g., because the parameter packs
+/// are to be instantiated with arguments of different lengths), false
+/// otherwise. If false, \c ShouldExpand (and possibly \c NumExpansions)
+/// must be set.
+bool TryExpandParameterPacks(SourceLocation EllipsisLoc,
+                            SourceRange PatternRange,
+                            ArrayRef<UnexpandedParameterPack> Unexpanded,
+                            bool &ShouldExpand,
+                            bool &RetainExpansion,
+                            Optional<unsigned> &NumExpansions) {
+ShouldExpand = false;
+return false;
+}
 
-  /// Transforms the given type-with-location into a new
-  /// type-with-location.
-  ///
-  /// By default, this routine transforms a type by delegating to the
-  /// appropriate TransformXXXType to build a new type.  Subclasses
-  /// may override this function (to take over all type
-  /// transformations) or some set of the TransformXXXType functions
-  /// to alter the transformation.
-  TypeSourceInfo *TransformType(TypeSourceInfo *DI);
+/// "Forget" about the partially-substituted pack template argument,
+/// when performing an instantiation that must preserve the parameter pack
+/// use.
+///
+/// This routine is meant to be overridden by the template instantiator.
+TemplateArgument ForgetPartiallySubstitutedPack() {
+return TemplateArgument();
+}
 
-  /// Transform the given type-with-location into a new
-  /// type, collecting location information in the given builder
-  /// as necessary.
-  ///
-  QualType TransformType(TypeLocBuilder &TLB, TypeLoc TL);
+/// "Remember" the partially-substituted pack template argument
+/// after performing an instantiation that must preserve the parameter pack
+/// use.
+///
+/// This routine is meant to be overridden by the template instantiator.
+void RememberPartiallySubstitutedPack(TemplateArgument Arg) { }
 
-  /// Transform a type that is permitted to produce a
-  /// DeducedTemplateSpecializationType.
-  ///
-  /// This is used in the (relatively rare) contexts where it is acceptable
-  /// for transformation to produce a class template type with deduced
-  /// template arguments.
-  /// @{
-  QualType TransformTypeWithDeducedTST(QualType T);
-  TypeSourceInfo *TransformTypeWithDeducedTST(TypeSourceInfo *DI);
-  /// @}
+/// Note to the derived class when a function parameter pack is
+/// being expanded.
+void ExpandingFunctionParameterPack(ParmVarDecl *Pack) { }
 
-  /// The reason why the value of a statement is not discarded, if any.
-  enum StmtDiscardKind {
-    SDK_Discarded,
-    SDK_NotDiscarded,
-    SDK_StmtExprResult,
-  };
+/// Transforms the given type into another type.
+///
+/// By default, this routine transforms a type by creating a
+/// TypeSourceInfo for it and delegating to the appropriate
+/// function.  This is expensive, but we don't mind, because
+/// this method is deprecated anyway;  all users should be
+/// switched to storing TypeSourceInfos.
+///
+/// \returns the transformed type.
+QualType TransformType(QualType T);
 
-  /// Transform the given statement.
-  ///
-  /// By default, this routine transforms a statement by delegating to the
-  /// appropriate TransformXXXStmt function to transform a specific kind of
-  /// statement or the TransformExpr() function to transform an expression.
-  /// Subclasses may override this function to transform statements using some
-  /// other mechanism.
-  ///
-  /// \returns the transformed statement.
-  StmtResult TransformStmt(Stmt *S, StmtDiscardKind SDK = SDK_Discarded);
+/// Transforms the given type-with-location into a new
+/// type-with-location.
+///
+/// By default, this routine transforms a type by delegating to the
+/// appropriate TransformXXXType to build a new type.  Subclasses
+/// may override this function (to take over all type
+/// transformations) or some set of the TransformXXXType functions
+/// to alter the transformation.
+TypeSourceInfo *TransformType(TypeSourceInfo *DI);
 
-  /// Transform the given statement.
-  ///
-  /// By default, this routine transforms a statement by delegating to the
-  /// appropriate TransformOMPXXXClause function to transform a specific kind
-  /// of clause. Subclasses may override this function to transform statements
-  /// using some other mechanism.
-  ///
-  /// \returns the transformed OpenMP clause.
-  OMPClause *TransformOMPClause(OMPClause *S);
+/// Transform the given type-with-location into a new
+/// type, collecting location information in the given builder
+/// as necessary.
+///
+QualType TransformType(TypeLocBuilder &TLB, TypeLoc TL);
 
-  /// Transform the given statement.
-  ///
-  /// By default, this routine transforms a statement by delegating to the
-  /// appropriate TransformOSSXXXClause function to transform a specific kind
-  /// of clause. Subclasses may override this function to transform statements
-  /// using some other mechanism.
-  ///
-  /// \returns the transformed OmpSs clause.
-  OSSClause *TransformOSSClause(OSSClause *S);
+/// Transform a type that is permitted to produce a
+/// DeducedTemplateSpecializationType.
+///
+/// This is used in the (relatively rare) contexts where it is acceptable
+/// for transformation to produce a class template type with deduced
+/// template arguments.
+/// @{
+QualType TransformTypeWithDeducedTST(QualType T);
+TypeSourceInfo *TransformTypeWithDeducedTST(TypeSourceInfo *DI);
+/// @}
 
-  /// Transform the given attribute.
-  ///
-  /// By default, this routine transforms a statement by delegating to the
-  /// appropriate TransformXXXAttr function to transform a specific kind
-  /// of attribute. Subclasses may override this function to transform
-  /// attributed statements using some other mechanism.
-  ///
-  /// \returns the transformed attribute
-  const Attr *TransformAttr(const Attr *S);
+/// The reason why the value of a statement is not discarded, if any.
+enum StmtDiscardKind {
+SDK_Discarded,
+SDK_NotDiscarded,
+SDK_StmtExprResult,
+};
+
+/// Transform the given statement.
+///
+/// By default, this routine transforms a statement by delegating to the
+/// appropriate TransformXXXStmt function to transform a specific kind of
+/// statement or the TransformExpr() function to transform an expression.
+/// Subclasses may override this function to transform statements using some
+/// other mechanism.
+///
+/// \returns the transformed statement.
+StmtResult TransformStmt(Stmt *S, StmtDiscardKind SDK = SDK_Discarded);
+
+/// Transform the given statement.
+///
+/// By default, this routine transforms a statement by delegating to the
+/// appropriate TransformOMPXXXClause function to transform a specific kind
+/// of clause. Subclasses may override this function to transform statements
+/// using some other mechanism.
+///
+/// \returns the transformed OpenMP clause.
+OMPClause *TransformOMPClause(OMPClause *S);
+
+/// Transform the given statement.
+///
+/// By default, this routine transforms a statement by delegating to the
+/// appropriate TransformOSSXXXClause function to transform a specific kind
+/// of clause. Subclasses may override this function to transform statements
+/// using some other mechanism.
+///
+/// \returns the transformed OmpSs clause.
+OSSClause *TransformOSSClause(OSSClause *S);
+
+/// Transform the given attribute.
+///
+/// By default, this routine transforms a statement by delegating to the
+/// appropriate TransformXXXAttr function to transform a specific kind
+/// of attribute. Subclasses may override this function to transform
+/// attributed statements using some other mechanism.
+///
+/// \returns the transformed attribute
+const Attr *TransformAttr(const Attr *S);
 
 /// Transform the specified attribute.
 ///
@@ -402,2037 +402,2037 @@ public:
 /// \returns the transformed attribute.
 #define ATTR(X)
 #define PRAGMA_SPELLING_ATTR(X)                                                \
-  const X##Attr *Transform##X##Attr(const X##Attr *R) { return R; }
+const X##Attr *Transform##X##Attr(const X##Attr *R) { return R; }
 #include "clang/Basic/AttrList.inc"
 
-  /// Transform the given expression.
-  ///
-  /// By default, this routine transforms an expression by delegating to the
-  /// appropriate TransformXXXExpr function to build a new expression.
-  /// Subclasses may override this function to transform expressions using some
-  /// other mechanism.
-  ///
-  /// \returns the transformed expression.
-  ExprResult TransformExpr(Expr *E);
+/// Transform the given expression.
+///
+/// By default, this routine transforms an expression by delegating to the
+/// appropriate TransformXXXExpr function to build a new expression.
+/// Subclasses may override this function to transform expressions using some
+/// other mechanism.
+///
+/// \returns the transformed expression.
+ExprResult TransformExpr(Expr *E);
 
-  /// Transform the given initializer.
-  ///
-  /// By default, this routine transforms an initializer by stripping off the
-  /// semantic nodes added by initialization, then passing the result to
-  /// TransformExpr or TransformExprs.
-  ///
-  /// \returns the transformed initializer.
-  ExprResult TransformInitializer(Expr *Init, bool NotCopyInit);
+/// Transform the given initializer.
+///
+/// By default, this routine transforms an initializer by stripping off the
+/// semantic nodes added by initialization, then passing the result to
+/// TransformExpr or TransformExprs.
+///
+/// \returns the transformed initializer.
+ExprResult TransformInitializer(Expr *Init, bool NotCopyInit);
 
-  /// Transform the given list of expressions.
-  ///
-  /// This routine transforms a list of expressions by invoking
-  /// \c TransformExpr() for each subexpression. However, it also provides
-  /// support for variadic templates by expanding any pack expansions (if the
-  /// derived class permits such expansion) along the way. When pack expansions
-  /// are present, the number of outputs may not equal the number of inputs.
-  ///
-  /// \param Inputs The set of expressions to be transformed.
-  ///
-  /// \param NumInputs The number of expressions in \c Inputs.
-  ///
-  /// \param IsCall If \c true, then this transform is being performed on
-  /// function-call arguments, and any arguments that should be dropped, will
-  /// be.
-  ///
-  /// \param Outputs The transformed input expressions will be added to this
-  /// vector.
-  ///
-  /// \param ArgChanged If non-NULL, will be set \c true if any argument changed
-  /// due to transformation.
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  bool TransformExprs(Expr *const *Inputs, unsigned NumInputs, bool IsCall,
-                      SmallVectorImpl<Expr *> &Outputs,
-                      bool *ArgChanged = nullptr);
+/// Transform the given list of expressions.
+///
+/// This routine transforms a list of expressions by invoking
+/// \c TransformExpr() for each subexpression. However, it also provides
+/// support for variadic templates by expanding any pack expansions (if the
+/// derived class permits such expansion) along the way. When pack expansions
+/// are present, the number of outputs may not equal the number of inputs.
+///
+/// \param Inputs The set of expressions to be transformed.
+///
+/// \param NumInputs The number of expressions in \c Inputs.
+///
+/// \param IsCall If \c true, then this transform is being performed on
+/// function-call arguments, and any arguments that should be dropped, will
+/// be.
+///
+/// \param Outputs The transformed input expressions will be added to this
+/// vector.
+///
+/// \param ArgChanged If non-NULL, will be set \c true if any argument changed
+/// due to transformation.
+///
+/// \returns true if an error occurred, false otherwise.
+bool TransformExprs(Expr *const *Inputs, unsigned NumInputs, bool IsCall,
+                    SmallVectorImpl<Expr *> &Outputs,
+                    bool *ArgChanged = nullptr);
 
-  /// Transform the given declaration, which is referenced from a type
-  /// or expression.
-  ///
-  /// By default, acts as the identity function on declarations, unless the
-  /// transformer has had to transform the declaration itself. Subclasses
-  /// may override this function to provide alternate behavior.
-  Decl *TransformDecl(SourceLocation Loc, Decl *D) {
-    llvm::DenseMap<Decl *, Decl *>::iterator Known
-      = TransformedLocalDecls.find(D);
-    if (Known != TransformedLocalDecls.end())
-      return Known->second;
+/// Transform the given declaration, which is referenced from a type
+/// or expression.
+///
+/// By default, acts as the identity function on declarations, unless the
+/// transformer has had to transform the declaration itself. Subclasses
+/// may override this function to provide alternate behavior.
+Decl *TransformDecl(SourceLocation Loc, Decl *D) {
+llvm::DenseMap<Decl *, Decl *>::iterator Known
+    = TransformedLocalDecls.find(D);
+if (Known != TransformedLocalDecls.end())
+    return Known->second;
 
-    return D;
-  }
+return D;
+}
 
-  /// Transform the specified condition.
-  ///
-  /// By default, this transforms the variable and expression and rebuilds
-  /// the condition.
-  Sema::ConditionResult TransformCondition(SourceLocation Loc, VarDecl *Var,
-                                           Expr *Expr,
-                                           Sema::ConditionKind Kind);
+/// Transform the specified condition.
+///
+/// By default, this transforms the variable and expression and rebuilds
+/// the condition.
+Sema::ConditionResult TransformCondition(SourceLocation Loc, VarDecl *Var,
+                                        Expr *Expr,
+                                        Sema::ConditionKind Kind);
 
-  /// Transform the attributes associated with the given declaration and
-  /// place them on the new declaration.
-  ///
-  /// By default, this operation does nothing. Subclasses may override this
-  /// behavior to transform attributes.
-  void transformAttrs(Decl *Old, Decl *New) { }
+/// Transform the attributes associated with the given declaration and
+/// place them on the new declaration.
+///
+/// By default, this operation does nothing. Subclasses may override this
+/// behavior to transform attributes.
+void transformAttrs(Decl *Old, Decl *New) { }
 
-  /// Note that a local declaration has been transformed by this
-  /// transformer.
-  ///
-  /// Local declarations are typically transformed via a call to
-  /// TransformDefinition. However, in some cases (e.g., lambda expressions),
-  /// the transformer itself has to transform the declarations. This routine
-  /// can be overridden by a subclass that keeps track of such mappings.
-  void transformedLocalDecl(Decl *Old, ArrayRef<Decl *> New) {
-    assert(New.size() == 1 &&
-           "must override transformedLocalDecl if performing pack expansion");
-    TransformedLocalDecls[Old] = New.front();
-  }
+/// Note that a local declaration has been transformed by this
+/// transformer.
+///
+/// Local declarations are typically transformed via a call to
+/// TransformDefinition. However, in some cases (e.g., lambda expressions),
+/// the transformer itself has to transform the declarations. This routine
+/// can be overridden by a subclass that keeps track of such mappings.
+void transformedLocalDecl(Decl *Old, ArrayRef<Decl *> New) {
+assert(New.size() == 1 &&
+        "must override transformedLocalDecl if performing pack expansion");
+TransformedLocalDecls[Old] = New.front();
+}
 
-  /// Transform the definition of the given declaration.
-  ///
-  /// By default, invokes TransformDecl() to transform the declaration.
-  /// Subclasses may override this function to provide alternate behavior.
-  Decl *TransformDefinition(SourceLocation Loc, Decl *D) {
-    return getDerived().TransformDecl(Loc, D);
-  }
+/// Transform the definition of the given declaration.
+///
+/// By default, invokes TransformDecl() to transform the declaration.
+/// Subclasses may override this function to provide alternate behavior.
+Decl *TransformDefinition(SourceLocation Loc, Decl *D) {
+return getDerived().TransformDecl(Loc, D);
+}
 
-  /// Transform the given declaration, which was the first part of a
-  /// nested-name-specifier in a member access expression.
-  ///
-  /// This specific declaration transformation only applies to the first
-  /// identifier in a nested-name-specifier of a member access expression, e.g.,
-  /// the \c T in \c x->T::member
-  ///
-  /// By default, invokes TransformDecl() to transform the declaration.
-  /// Subclasses may override this function to provide alternate behavior.
-  NamedDecl *TransformFirstQualifierInScope(NamedDecl *D, SourceLocation Loc) {
-    return cast_or_null<NamedDecl>(getDerived().TransformDecl(Loc, D));
-  }
+/// Transform the given declaration, which was the first part of a
+/// nested-name-specifier in a member access expression.
+///
+/// This specific declaration transformation only applies to the first
+/// identifier in a nested-name-specifier of a member access expression, e.g.,
+/// the \c T in \c x->T::member
+///
+/// By default, invokes TransformDecl() to transform the declaration.
+/// Subclasses may override this function to provide alternate behavior.
+NamedDecl *TransformFirstQualifierInScope(NamedDecl *D, SourceLocation Loc) {
+return cast_or_null<NamedDecl>(getDerived().TransformDecl(Loc, D));
+}
 
-  /// Transform the set of declarations in an OverloadExpr.
-  bool TransformOverloadExprDecls(OverloadExpr *Old, bool RequiresADL,
-                                  LookupResult &R);
+/// Transform the set of declarations in an OverloadExpr.
+bool TransformOverloadExprDecls(OverloadExpr *Old, bool RequiresADL,
+                                LookupResult &R);
 
-  /// Transform the given nested-name-specifier with source-location
-  /// information.
-  ///
-  /// By default, transforms all of the types and declarations within the
-  /// nested-name-specifier. Subclasses may override this function to provide
-  /// alternate behavior.
-  NestedNameSpecifierLoc
-  TransformNestedNameSpecifierLoc(NestedNameSpecifierLoc NNS,
-                                  QualType ObjectType = QualType(),
-                                  NamedDecl *FirstQualifierInScope = nullptr);
+/// Transform the given nested-name-specifier with source-location
+/// information.
+///
+/// By default, transforms all of the types and declarations within the
+/// nested-name-specifier. Subclasses may override this function to provide
+/// alternate behavior.
+NestedNameSpecifierLoc
+TransformNestedNameSpecifierLoc(NestedNameSpecifierLoc NNS,
+                                QualType ObjectType = QualType(),
+                                NamedDecl *FirstQualifierInScope = nullptr);
 
-  /// Transform the given declaration name.
-  ///
-  /// By default, transforms the types of conversion function, constructor,
-  /// and destructor names and then (if needed) rebuilds the declaration name.
-  /// Identifiers and selectors are returned unmodified. Sublcasses may
-  /// override this function to provide alternate behavior.
-  DeclarationNameInfo
-  TransformDeclarationNameInfo(const DeclarationNameInfo &NameInfo);
+/// Transform the given declaration name.
+///
+/// By default, transforms the types of conversion function, constructor,
+/// and destructor names and then (if needed) rebuilds the declaration name.
+/// Identifiers and selectors are returned unmodified. Sublcasses may
+/// override this function to provide alternate behavior.
+DeclarationNameInfo
+TransformDeclarationNameInfo(const DeclarationNameInfo &NameInfo);
 
-  bool TransformRequiresExprRequirements(ArrayRef<concepts::Requirement *> Reqs,
-      llvm::SmallVectorImpl<concepts::Requirement *> &Transformed);
-  concepts::TypeRequirement *
-  TransformTypeRequirement(concepts::TypeRequirement *Req);
-  concepts::ExprRequirement *
-  TransformExprRequirement(concepts::ExprRequirement *Req);
-  concepts::NestedRequirement *
-  TransformNestedRequirement(concepts::NestedRequirement *Req);
+bool TransformRequiresExprRequirements(ArrayRef<concepts::Requirement *> Reqs,
+    llvm::SmallVectorImpl<concepts::Requirement *> &Transformed);
+concepts::TypeRequirement *
+TransformTypeRequirement(concepts::TypeRequirement *Req);
+concepts::ExprRequirement *
+TransformExprRequirement(concepts::ExprRequirement *Req);
+concepts::NestedRequirement *
+TransformNestedRequirement(concepts::NestedRequirement *Req);
 
-  /// Transform the given template name.
-  ///
-  /// \param SS The nested-name-specifier that qualifies the template
-  /// name. This nested-name-specifier must already have been transformed.
-  ///
-  /// \param Name The template name to transform.
-  ///
-  /// \param NameLoc The source location of the template name.
-  ///
-  /// \param ObjectType If we're translating a template name within a member
-  /// access expression, this is the type of the object whose member template
-  /// is being referenced.
-  ///
-  /// \param FirstQualifierInScope If the first part of a nested-name-specifier
-  /// also refers to a name within the current (lexical) scope, this is the
-  /// declaration it refers to.
-  ///
-  /// By default, transforms the template name by transforming the declarations
-  /// and nested-name-specifiers that occur within the template name.
-  /// Subclasses may override this function to provide alternate behavior.
-  TemplateName
-  TransformTemplateName(CXXScopeSpec &SS, TemplateName Name,
-                        SourceLocation NameLoc,
-                        QualType ObjectType = QualType(),
-                        NamedDecl *FirstQualifierInScope = nullptr,
-                        bool AllowInjectedClassName = false);
+/// Transform the given template name.
+///
+/// \param SS The nested-name-specifier that qualifies the template
+/// name. This nested-name-specifier must already have been transformed.
+///
+/// \param Name The template name to transform.
+///
+/// \param NameLoc The source location of the template name.
+///
+/// \param ObjectType If we're translating a template name within a member
+/// access expression, this is the type of the object whose member template
+/// is being referenced.
+///
+/// \param FirstQualifierInScope If the first part of a nested-name-specifier
+/// also refers to a name within the current (lexical) scope, this is the
+/// declaration it refers to.
+///
+/// By default, transforms the template name by transforming the declarations
+/// and nested-name-specifiers that occur within the template name.
+/// Subclasses may override this function to provide alternate behavior.
+TemplateName
+TransformTemplateName(CXXScopeSpec &SS, TemplateName Name,
+                    SourceLocation NameLoc,
+                    QualType ObjectType = QualType(),
+                    NamedDecl *FirstQualifierInScope = nullptr,
+                    bool AllowInjectedClassName = false);
 
-  /// Transform the given template argument.
-  ///
-  /// By default, this operation transforms the type, expression, or
-  /// declaration stored within the template argument and constructs a
-  /// new template argument from the transformed result. Subclasses may
-  /// override this function to provide alternate behavior.
-  ///
-  /// Returns true if there was an error.
-  bool TransformTemplateArgument(const TemplateArgumentLoc &Input,
-                                 TemplateArgumentLoc &Output,
-                                 bool Uneval = false);
+/// Transform the given template argument.
+///
+/// By default, this operation transforms the type, expression, or
+/// declaration stored within the template argument and constructs a
+/// new template argument from the transformed result. Subclasses may
+/// override this function to provide alternate behavior.
+///
+/// Returns true if there was an error.
+bool TransformTemplateArgument(const TemplateArgumentLoc &Input,
+                                TemplateArgumentLoc &Output,
+                                bool Uneval = false);
 
-  /// Transform the given set of template arguments.
-  ///
-  /// By default, this operation transforms all of the template arguments
-  /// in the input set using \c TransformTemplateArgument(), and appends
-  /// the transformed arguments to the output list.
-  ///
-  /// Note that this overload of \c TransformTemplateArguments() is merely
-  /// a convenience function. Subclasses that wish to override this behavior
-  /// should override the iterator-based member template version.
-  ///
-  /// \param Inputs The set of template arguments to be transformed.
-  ///
-  /// \param NumInputs The number of template arguments in \p Inputs.
-  ///
-  /// \param Outputs The set of transformed template arguments output by this
-  /// routine.
-  ///
-  /// Returns true if an error occurred.
-  bool TransformTemplateArguments(const TemplateArgumentLoc *Inputs,
-                                  unsigned NumInputs,
-                                  TemplateArgumentListInfo &Outputs,
-                                  bool Uneval = false) {
-    return TransformTemplateArguments(Inputs, Inputs + NumInputs, Outputs,
-                                      Uneval);
-  }
+/// Transform the given set of template arguments.
+///
+/// By default, this operation transforms all of the template arguments
+/// in the input set using \c TransformTemplateArgument(), and appends
+/// the transformed arguments to the output list.
+///
+/// Note that this overload of \c TransformTemplateArguments() is merely
+/// a convenience function. Subclasses that wish to override this behavior
+/// should override the iterator-based member template version.
+///
+/// \param Inputs The set of template arguments to be transformed.
+///
+/// \param NumInputs The number of template arguments in \p Inputs.
+///
+/// \param Outputs The set of transformed template arguments output by this
+/// routine.
+///
+/// Returns true if an error occurred.
+bool TransformTemplateArguments(const TemplateArgumentLoc *Inputs,
+                                unsigned NumInputs,
+                                TemplateArgumentListInfo &Outputs,
+                                bool Uneval = false) {
+return TransformTemplateArguments(Inputs, Inputs + NumInputs, Outputs,
+                                    Uneval);
+}
 
-  /// Transform the given set of template arguments.
-  ///
-  /// By default, this operation transforms all of the template arguments
-  /// in the input set using \c TransformTemplateArgument(), and appends
-  /// the transformed arguments to the output list.
-  ///
-  /// \param First An iterator to the first template argument.
-  ///
-  /// \param Last An iterator one step past the last template argument.
-  ///
-  /// \param Outputs The set of transformed template arguments output by this
-  /// routine.
-  ///
-  /// Returns true if an error occurred.
-  template<typename InputIterator>
-  bool TransformTemplateArguments(InputIterator First,
-                                  InputIterator Last,
-                                  TemplateArgumentListInfo &Outputs,
-                                  bool Uneval = false);
+/// Transform the given set of template arguments.
+///
+/// By default, this operation transforms all of the template arguments
+/// in the input set using \c TransformTemplateArgument(), and appends
+/// the transformed arguments to the output list.
+///
+/// \param First An iterator to the first template argument.
+///
+/// \param Last An iterator one step past the last template argument.
+///
+/// \param Outputs The set of transformed template arguments output by this
+/// routine.
+///
+/// Returns true if an error occurred.
+template<typename InputIterator>
+bool TransformTemplateArguments(InputIterator First,
+                                InputIterator Last,
+                                TemplateArgumentListInfo &Outputs,
+                                bool Uneval = false);
 
-  /// Fakes up a TemplateArgumentLoc for a given TemplateArgument.
-  void InventTemplateArgumentLoc(const TemplateArgument &Arg,
-                                 TemplateArgumentLoc &ArgLoc);
+/// Fakes up a TemplateArgumentLoc for a given TemplateArgument.
+void InventTemplateArgumentLoc(const TemplateArgument &Arg,
+                                TemplateArgumentLoc &ArgLoc);
 
-  /// Fakes up a TypeSourceInfo for a type.
-  TypeSourceInfo *InventTypeSourceInfo(QualType T) {
-    return SemaRef.Context.getTrivialTypeSourceInfo(T,
-                       getDerived().getBaseLocation());
-  }
+/// Fakes up a TypeSourceInfo for a type.
+TypeSourceInfo *InventTypeSourceInfo(QualType T) {
+return SemaRef.Context.getTrivialTypeSourceInfo(T,
+                    getDerived().getBaseLocation());
+}
 
 #define ABSTRACT_TYPELOC(CLASS, PARENT)
 #define TYPELOC(CLASS, PARENT)                                   \
-  QualType Transform##CLASS##Type(TypeLocBuilder &TLB, CLASS##TypeLoc T);
+QualType Transform##CLASS##Type(TypeLocBuilder &TLB, CLASS##TypeLoc T);
 #include "clang/AST/TypeLocNodes.def"
 
-  template<typename Fn>
-  QualType TransformFunctionProtoType(TypeLocBuilder &TLB,
-                                      FunctionProtoTypeLoc TL,
-                                      CXXRecordDecl *ThisContext,
-                                      Qualifiers ThisTypeQuals,
-                                      Fn TransformExceptionSpec);
+template<typename Fn>
+QualType TransformFunctionProtoType(TypeLocBuilder &TLB,
+                                    FunctionProtoTypeLoc TL,
+                                    CXXRecordDecl *ThisContext,
+                                    Qualifiers ThisTypeQuals,
+                                    Fn TransformExceptionSpec);
 
-  bool TransformExceptionSpec(SourceLocation Loc,
-                              FunctionProtoType::ExceptionSpecInfo &ESI,
-                              SmallVectorImpl<QualType> &Exceptions,
-                              bool &Changed);
+bool TransformExceptionSpec(SourceLocation Loc,
+                            FunctionProtoType::ExceptionSpecInfo &ESI,
+                            SmallVectorImpl<QualType> &Exceptions,
+                            bool &Changed);
 
-  StmtResult TransformSEHHandler(Stmt *Handler);
+StmtResult TransformSEHHandler(Stmt *Handler);
 
-  QualType
-  TransformTemplateSpecializationType(TypeLocBuilder &TLB,
-                                      TemplateSpecializationTypeLoc TL,
-                                      TemplateName Template);
+QualType
+TransformTemplateSpecializationType(TypeLocBuilder &TLB,
+                                    TemplateSpecializationTypeLoc TL,
+                                    TemplateName Template);
 
-  QualType
-  TransformDependentTemplateSpecializationType(TypeLocBuilder &TLB,
-                                      DependentTemplateSpecializationTypeLoc TL,
-                                               TemplateName Template,
-                                               CXXScopeSpec &SS);
+QualType
+TransformDependentTemplateSpecializationType(TypeLocBuilder &TLB,
+                                    DependentTemplateSpecializationTypeLoc TL,
+                                            TemplateName Template,
+                                            CXXScopeSpec &SS);
 
-  QualType TransformDependentTemplateSpecializationType(
-      TypeLocBuilder &TLB, DependentTemplateSpecializationTypeLoc TL,
-      NestedNameSpecifierLoc QualifierLoc);
+QualType TransformDependentTemplateSpecializationType(
+    TypeLocBuilder &TLB, DependentTemplateSpecializationTypeLoc TL,
+    NestedNameSpecifierLoc QualifierLoc);
 
-  /// Transforms the parameters of a function type into the
-  /// given vectors.
-  ///
-  /// The result vectors should be kept in sync; null entries in the
-  /// variables vector are acceptable.
-  ///
-  /// Return true on error.
-  bool TransformFunctionTypeParams(
-      SourceLocation Loc, ArrayRef<ParmVarDecl *> Params,
-      const QualType *ParamTypes,
-      const FunctionProtoType::ExtParameterInfo *ParamInfos,
-      SmallVectorImpl<QualType> &PTypes, SmallVectorImpl<ParmVarDecl *> *PVars,
-      Sema::ExtParameterInfoBuilder &PInfos);
+/// Transforms the parameters of a function type into the
+/// given vectors.
+///
+/// The result vectors should be kept in sync; null entries in the
+/// variables vector are acceptable.
+///
+/// Return true on error.
+bool TransformFunctionTypeParams(
+    SourceLocation Loc, ArrayRef<ParmVarDecl *> Params,
+    const QualType *ParamTypes,
+    const FunctionProtoType::ExtParameterInfo *ParamInfos,
+    SmallVectorImpl<QualType> &PTypes, SmallVectorImpl<ParmVarDecl *> *PVars,
+    Sema::ExtParameterInfoBuilder &PInfos);
 
-  /// Transforms a single function-type parameter.  Return null
-  /// on error.
-  ///
-  /// \param indexAdjustment - A number to add to the parameter's
-  ///   scope index;  can be negative
-  ParmVarDecl *TransformFunctionTypeParam(ParmVarDecl *OldParm,
-                                          int indexAdjustment,
-                                          Optional<unsigned> NumExpansions,
-                                          bool ExpectParameterPack);
+/// Transforms a single function-type parameter.  Return null
+/// on error.
+///
+/// \param indexAdjustment - A number to add to the parameter's
+///   scope index;  can be negative
+ParmVarDecl *TransformFunctionTypeParam(ParmVarDecl *OldParm,
+                                        int indexAdjustment,
+                                        Optional<unsigned> NumExpansions,
+                                        bool ExpectParameterPack);
 
-  /// Transform the body of a lambda-expression.
-  StmtResult TransformLambdaBody(LambdaExpr *E, Stmt *Body);
-  /// Alternative implementation of TransformLambdaBody that skips transforming
-  /// the body.
-  StmtResult SkipLambdaBody(LambdaExpr *E, Stmt *Body);
+/// Transform the body of a lambda-expression.
+StmtResult TransformLambdaBody(LambdaExpr *E, Stmt *Body);
+/// Alternative implementation of TransformLambdaBody that skips transforming
+/// the body.
+StmtResult SkipLambdaBody(LambdaExpr *E, Stmt *Body);
 
-  QualType TransformReferenceType(TypeLocBuilder &TLB, ReferenceTypeLoc TL);
+QualType TransformReferenceType(TypeLocBuilder &TLB, ReferenceTypeLoc TL);
 
-  StmtResult TransformCompoundStmt(CompoundStmt *S, bool IsStmtExpr);
-  ExprResult TransformCXXNamedCastExpr(CXXNamedCastExpr *E);
+StmtResult TransformCompoundStmt(CompoundStmt *S, bool IsStmtExpr);
+ExprResult TransformCXXNamedCastExpr(CXXNamedCastExpr *E);
 
-  TemplateParameterList *TransformTemplateParameterList(
-        TemplateParameterList *TPL) {
-    return TPL;
-  }
+TemplateParameterList *TransformTemplateParameterList(
+    TemplateParameterList *TPL) {
+return TPL;
+}
 
-  ExprResult TransformAddressOfOperand(Expr *E);
+ExprResult TransformAddressOfOperand(Expr *E);
 
-  ExprResult TransformDependentScopeDeclRefExpr(DependentScopeDeclRefExpr *E,
-                                                bool IsAddressOfOperand,
-                                                TypeSourceInfo **RecoveryTSI);
+ExprResult TransformDependentScopeDeclRefExpr(DependentScopeDeclRefExpr *E,
+                                            bool IsAddressOfOperand,
+                                            TypeSourceInfo **RecoveryTSI);
 
-  ExprResult TransformParenDependentScopeDeclRefExpr(
-      ParenExpr *PE, DependentScopeDeclRefExpr *DRE, bool IsAddressOfOperand,
-      TypeSourceInfo **RecoveryTSI);
+ExprResult TransformParenDependentScopeDeclRefExpr(
+    ParenExpr *PE, DependentScopeDeclRefExpr *DRE, bool IsAddressOfOperand,
+    TypeSourceInfo **RecoveryTSI);
 
-  // OmpSs
-  StmtResult TransformOSSExecutableDirective(OSSExecutableDirective *S);
+// OmpSs
+StmtResult TransformOSSExecutableDirective(OSSExecutableDirective *S);
 
-  StmtResult TransformOMPExecutableDirective(OMPExecutableDirective *S);
+StmtResult TransformOMPExecutableDirective(OMPExecutableDirective *S);
 
 // FIXME: We use LLVM_ATTRIBUTE_NOINLINE because inlining causes a ridiculous
 // amount of stack usage with clang.
 #define STMT(Node, Parent)                        \
-  LLVM_ATTRIBUTE_NOINLINE \
-  StmtResult Transform##Node(Node *S);
+LLVM_ATTRIBUTE_NOINLINE \
+StmtResult Transform##Node(Node *S);
 #define VALUESTMT(Node, Parent)                   \
-  LLVM_ATTRIBUTE_NOINLINE \
-  StmtResult Transform##Node(Node *S, StmtDiscardKind SDK);
+LLVM_ATTRIBUTE_NOINLINE \
+StmtResult Transform##Node(Node *S, StmtDiscardKind SDK);
 #define EXPR(Node, Parent)                        \
-  LLVM_ATTRIBUTE_NOINLINE \
-  ExprResult Transform##Node(Node *E);
+LLVM_ATTRIBUTE_NOINLINE \
+ExprResult Transform##Node(Node *E);
 #define ABSTRACT_STMT(Stmt)
 #include "clang/AST/StmtNodes.inc"
 
 #define GEN_CLANG_CLAUSE_CLASS
 #define CLAUSE_CLASS(Enum, Str, Class)                                         \
-  LLVM_ATTRIBUTE_NOINLINE                                                      \
-  OMPClause *Transform##Class(Class *S);
+LLVM_ATTRIBUTE_NOINLINE                                                      \
+OMPClause *Transform##Class(Class *S);
 #include "llvm/Frontend/OpenMP/OMP.inc"
 
 #define OMPSS_CLAUSE(Name, Class)                        \
-  LLVM_ATTRIBUTE_NOINLINE \
-  OSSClause *Transform ## Class(Class *S);
+LLVM_ATTRIBUTE_NOINLINE \
+OSSClause *Transform ## Class(Class *S);
 #include "clang/Basic/OmpSsKinds.def"
 
-  /// Build a new qualified type given its unqualified type and type location.
-  ///
-  /// By default, this routine adds type qualifiers only to types that can
-  /// have qualifiers, and silently suppresses those qualifiers that are not
-  /// permitted. Subclasses may override this routine to provide different
-  /// behavior.
-  QualType RebuildQualifiedType(QualType T, QualifiedTypeLoc TL);
+/// Build a new qualified type given its unqualified type and type location.
+///
+/// By default, this routine adds type qualifiers only to types that can
+/// have qualifiers, and silently suppresses those qualifiers that are not
+/// permitted. Subclasses may override this routine to provide different
+/// behavior.
+QualType RebuildQualifiedType(QualType T, QualifiedTypeLoc TL);
 
-  /// Build a new pointer type given its pointee type.
-  ///
-  /// By default, performs semantic analysis when building the pointer type.
-  /// Subclasses may override this routine to provide different behavior.
-  QualType RebuildPointerType(QualType PointeeType, SourceLocation Sigil);
+/// Build a new pointer type given its pointee type.
+///
+/// By default, performs semantic analysis when building the pointer type.
+/// Subclasses may override this routine to provide different behavior.
+QualType RebuildPointerType(QualType PointeeType, SourceLocation Sigil);
 
-  /// Build a new block pointer type given its pointee type.
-  ///
-  /// By default, performs semantic analysis when building the block pointer
-  /// type. Subclasses may override this routine to provide different behavior.
-  QualType RebuildBlockPointerType(QualType PointeeType, SourceLocation Sigil);
+/// Build a new block pointer type given its pointee type.
+///
+/// By default, performs semantic analysis when building the block pointer
+/// type. Subclasses may override this routine to provide different behavior.
+QualType RebuildBlockPointerType(QualType PointeeType, SourceLocation Sigil);
 
-  /// Build a new reference type given the type it references.
-  ///
-  /// By default, performs semantic analysis when building the
-  /// reference type. Subclasses may override this routine to provide
-  /// different behavior.
-  ///
-  /// \param LValue whether the type was written with an lvalue sigil
-  /// or an rvalue sigil.
-  QualType RebuildReferenceType(QualType ReferentType,
-                                bool LValue,
+/// Build a new reference type given the type it references.
+///
+/// By default, performs semantic analysis when building the
+/// reference type. Subclasses may override this routine to provide
+/// different behavior.
+///
+/// \param LValue whether the type was written with an lvalue sigil
+/// or an rvalue sigil.
+QualType RebuildReferenceType(QualType ReferentType,
+                            bool LValue,
+                            SourceLocation Sigil);
+
+/// Build a new member pointer type given the pointee type and the
+/// class type it refers into.
+///
+/// By default, performs semantic analysis when building the member pointer
+/// type. Subclasses may override this routine to provide different behavior.
+QualType RebuildMemberPointerType(QualType PointeeType, QualType ClassType,
                                 SourceLocation Sigil);
 
-  /// Build a new member pointer type given the pointee type and the
-  /// class type it refers into.
-  ///
-  /// By default, performs semantic analysis when building the member pointer
-  /// type. Subclasses may override this routine to provide different behavior.
-  QualType RebuildMemberPointerType(QualType PointeeType, QualType ClassType,
-                                    SourceLocation Sigil);
+QualType RebuildObjCTypeParamType(const ObjCTypeParamDecl *Decl,
+                                SourceLocation ProtocolLAngleLoc,
+                                ArrayRef<ObjCProtocolDecl *> Protocols,
+                                ArrayRef<SourceLocation> ProtocolLocs,
+                                SourceLocation ProtocolRAngleLoc);
 
-  QualType RebuildObjCTypeParamType(const ObjCTypeParamDecl *Decl,
-                                    SourceLocation ProtocolLAngleLoc,
-                                    ArrayRef<ObjCProtocolDecl *> Protocols,
-                                    ArrayRef<SourceLocation> ProtocolLocs,
-                                    SourceLocation ProtocolRAngleLoc);
+/// Build an Objective-C object type.
+///
+/// By default, performs semantic analysis when building the object type.
+/// Subclasses may override this routine to provide different behavior.
+QualType RebuildObjCObjectType(QualType BaseType,
+                                SourceLocation Loc,
+                                SourceLocation TypeArgsLAngleLoc,
+                                ArrayRef<TypeSourceInfo *> TypeArgs,
+                                SourceLocation TypeArgsRAngleLoc,
+                                SourceLocation ProtocolLAngleLoc,
+                                ArrayRef<ObjCProtocolDecl *> Protocols,
+                                ArrayRef<SourceLocation> ProtocolLocs,
+                                SourceLocation ProtocolRAngleLoc);
 
-  /// Build an Objective-C object type.
-  ///
-  /// By default, performs semantic analysis when building the object type.
-  /// Subclasses may override this routine to provide different behavior.
-  QualType RebuildObjCObjectType(QualType BaseType,
-                                 SourceLocation Loc,
-                                 SourceLocation TypeArgsLAngleLoc,
-                                 ArrayRef<TypeSourceInfo *> TypeArgs,
-                                 SourceLocation TypeArgsRAngleLoc,
-                                 SourceLocation ProtocolLAngleLoc,
-                                 ArrayRef<ObjCProtocolDecl *> Protocols,
-                                 ArrayRef<SourceLocation> ProtocolLocs,
-                                 SourceLocation ProtocolRAngleLoc);
+/// Build a new Objective-C object pointer type given the pointee type.
+///
+/// By default, directly builds the pointer type, with no additional semantic
+/// analysis.
+QualType RebuildObjCObjectPointerType(QualType PointeeType,
+                                    SourceLocation Star);
 
-  /// Build a new Objective-C object pointer type given the pointee type.
-  ///
-  /// By default, directly builds the pointer type, with no additional semantic
-  /// analysis.
-  QualType RebuildObjCObjectPointerType(QualType PointeeType,
-                                        SourceLocation Star);
+/// Build a new array type given the element type, size
+/// modifier, size of the array (if known), size expression, and index type
+/// qualifiers.
+///
+/// By default, performs semantic analysis when building the array type.
+/// Subclasses may override this routine to provide different behavior.
+/// Also by default, all of the other Rebuild*Array
+QualType RebuildArrayType(QualType ElementType,
+                        ArrayType::ArraySizeModifier SizeMod,
+                        const llvm::APInt *Size,
+                        Expr *SizeExpr,
+                        unsigned IndexTypeQuals,
+                        SourceRange BracketsRange);
 
-  /// Build a new array type given the element type, size
-  /// modifier, size of the array (if known), size expression, and index type
-  /// qualifiers.
-  ///
-  /// By default, performs semantic analysis when building the array type.
-  /// Subclasses may override this routine to provide different behavior.
-  /// Also by default, all of the other Rebuild*Array
-  QualType RebuildArrayType(QualType ElementType,
-                            ArrayType::ArraySizeModifier SizeMod,
-                            const llvm::APInt *Size,
-                            Expr *SizeExpr,
-                            unsigned IndexTypeQuals,
-                            SourceRange BracketsRange);
+/// Build a new constant array type given the element type, size
+/// modifier, (known) size of the array, and index type qualifiers.
+///
+/// By default, performs semantic analysis when building the array type.
+/// Subclasses may override this routine to provide different behavior.
+QualType RebuildConstantArrayType(QualType ElementType,
+                                ArrayType::ArraySizeModifier SizeMod,
+                                const llvm::APInt &Size,
+                                Expr *SizeExpr,
+                                unsigned IndexTypeQuals,
+                                SourceRange BracketsRange);
 
-  /// Build a new constant array type given the element type, size
-  /// modifier, (known) size of the array, and index type qualifiers.
-  ///
-  /// By default, performs semantic analysis when building the array type.
-  /// Subclasses may override this routine to provide different behavior.
-  QualType RebuildConstantArrayType(QualType ElementType,
+/// Build a new incomplete array type given the element type, size
+/// modifier, and index type qualifiers.
+///
+/// By default, performs semantic analysis when building the array type.
+/// Subclasses may override this routine to provide different behavior.
+QualType RebuildIncompleteArrayType(QualType ElementType,
                                     ArrayType::ArraySizeModifier SizeMod,
-                                    const llvm::APInt &Size,
-                                    Expr *SizeExpr,
                                     unsigned IndexTypeQuals,
                                     SourceRange BracketsRange);
 
-  /// Build a new incomplete array type given the element type, size
-  /// modifier, and index type qualifiers.
-  ///
-  /// By default, performs semantic analysis when building the array type.
-  /// Subclasses may override this routine to provide different behavior.
-  QualType RebuildIncompleteArrayType(QualType ElementType,
-                                      ArrayType::ArraySizeModifier SizeMod,
-                                      unsigned IndexTypeQuals,
-                                      SourceRange BracketsRange);
+/// Build a new variable-length array type given the element type,
+/// size modifier, size expression, and index type qualifiers.
+///
+/// By default, performs semantic analysis when building the array type.
+/// Subclasses may override this routine to provide different behavior.
+QualType RebuildVariableArrayType(QualType ElementType,
+                                ArrayType::ArraySizeModifier SizeMod,
+                                Expr *SizeExpr,
+                                unsigned IndexTypeQuals,
+                                SourceRange BracketsRange);
 
-  /// Build a new variable-length array type given the element type,
-  /// size modifier, size expression, and index type qualifiers.
-  ///
-  /// By default, performs semantic analysis when building the array type.
-  /// Subclasses may override this routine to provide different behavior.
-  QualType RebuildVariableArrayType(QualType ElementType,
-                                    ArrayType::ArraySizeModifier SizeMod,
-                                    Expr *SizeExpr,
-                                    unsigned IndexTypeQuals,
-                                    SourceRange BracketsRange);
+/// Build a new dependent-sized array type given the element type,
+/// size modifier, size expression, and index type qualifiers.
+///
+/// By default, performs semantic analysis when building the array type.
+/// Subclasses may override this routine to provide different behavior.
+QualType RebuildDependentSizedArrayType(QualType ElementType,
+                                        ArrayType::ArraySizeModifier SizeMod,
+                                        Expr *SizeExpr,
+                                        unsigned IndexTypeQuals,
+                                        SourceRange BracketsRange);
 
-  /// Build a new dependent-sized array type given the element type,
-  /// size modifier, size expression, and index type qualifiers.
-  ///
-  /// By default, performs semantic analysis when building the array type.
-  /// Subclasses may override this routine to provide different behavior.
-  QualType RebuildDependentSizedArrayType(QualType ElementType,
-                                          ArrayType::ArraySizeModifier SizeMod,
-                                          Expr *SizeExpr,
-                                          unsigned IndexTypeQuals,
-                                          SourceRange BracketsRange);
+/// Build a new vector type given the element type and
+/// number of elements.
+///
+/// By default, performs semantic analysis when building the vector type.
+/// Subclasses may override this routine to provide different behavior.
+QualType RebuildVectorType(QualType ElementType, unsigned NumElements,
+                            VectorType::VectorKind VecKind);
 
-  /// Build a new vector type given the element type and
-  /// number of elements.
-  ///
-  /// By default, performs semantic analysis when building the vector type.
-  /// Subclasses may override this routine to provide different behavior.
-  QualType RebuildVectorType(QualType ElementType, unsigned NumElements,
-                             VectorType::VectorKind VecKind);
+/// Build a new potentially dependently-sized extended vector type
+/// given the element type and number of elements.
+///
+/// By default, performs semantic analysis when building the vector type.
+/// Subclasses may override this routine to provide different behavior.
+QualType RebuildDependentVectorType(QualType ElementType, Expr *SizeExpr,
+                                        SourceLocation AttributeLoc,
+                                        VectorType::VectorKind);
 
-  /// Build a new potentially dependently-sized extended vector type
-  /// given the element type and number of elements.
-  ///
-  /// By default, performs semantic analysis when building the vector type.
-  /// Subclasses may override this routine to provide different behavior.
-  QualType RebuildDependentVectorType(QualType ElementType, Expr *SizeExpr,
-                                           SourceLocation AttributeLoc,
-                                           VectorType::VectorKind);
+/// Build a new extended vector type given the element type and
+/// number of elements.
+///
+/// By default, performs semantic analysis when building the vector type.
+/// Subclasses may override this routine to provide different behavior.
+QualType RebuildExtVectorType(QualType ElementType, unsigned NumElements,
+                            SourceLocation AttributeLoc);
 
-  /// Build a new extended vector type given the element type and
-  /// number of elements.
-  ///
-  /// By default, performs semantic analysis when building the vector type.
-  /// Subclasses may override this routine to provide different behavior.
-  QualType RebuildExtVectorType(QualType ElementType, unsigned NumElements,
-                                SourceLocation AttributeLoc);
-
-  /// Build a new potentially dependently-sized extended vector type
-  /// given the element type and number of elements.
-  ///
-  /// By default, performs semantic analysis when building the vector type.
-  /// Subclasses may override this routine to provide different behavior.
-  QualType RebuildDependentSizedExtVectorType(QualType ElementType,
-                                              Expr *SizeExpr,
-                                              SourceLocation AttributeLoc);
-
-  /// Build a new matrix type given the element type and dimensions.
-  QualType RebuildConstantMatrixType(QualType ElementType, unsigned NumRows,
-                                     unsigned NumColumns);
-
-  /// Build a new matrix type given the type and dependently-defined
-  /// dimensions.
-  QualType RebuildDependentSizedMatrixType(QualType ElementType, Expr *RowExpr,
-                                           Expr *ColumnExpr,
-                                           SourceLocation AttributeLoc);
-
-  /// Build a new DependentAddressSpaceType or return the pointee
-  /// type variable with the correct address space (retrieved from
-  /// AddrSpaceExpr) applied to it. The former will be returned in cases
-  /// where the address space remains dependent.
-  ///
-  /// By default, performs semantic analysis when building the type with address
-  /// space applied. Subclasses may override this routine to provide different
-  /// behavior.
-  QualType RebuildDependentAddressSpaceType(QualType PointeeType,
-                                            Expr *AddrSpaceExpr,
+/// Build a new potentially dependently-sized extended vector type
+/// given the element type and number of elements.
+///
+/// By default, performs semantic analysis when building the vector type.
+/// Subclasses may override this routine to provide different behavior.
+QualType RebuildDependentSizedExtVectorType(QualType ElementType,
+                                            Expr *SizeExpr,
                                             SourceLocation AttributeLoc);
 
-  /// Build a new function type.
-  ///
-  /// By default, performs semantic analysis when building the function type.
-  /// Subclasses may override this routine to provide different behavior.
-  QualType RebuildFunctionProtoType(QualType T,
-                                    MutableArrayRef<QualType> ParamTypes,
-                                    const FunctionProtoType::ExtProtoInfo &EPI);
+/// Build a new matrix type given the element type and dimensions.
+QualType RebuildConstantMatrixType(QualType ElementType, unsigned NumRows,
+                                    unsigned NumColumns);
 
-  /// Build a new unprototyped function type.
-  QualType RebuildFunctionNoProtoType(QualType ResultType);
+/// Build a new matrix type given the type and dependently-defined
+/// dimensions.
+QualType RebuildDependentSizedMatrixType(QualType ElementType, Expr *RowExpr,
+                                        Expr *ColumnExpr,
+                                        SourceLocation AttributeLoc);
 
-  /// Rebuild an unresolved typename type, given the decl that
-  /// the UnresolvedUsingTypenameDecl was transformed to.
-  QualType RebuildUnresolvedUsingType(SourceLocation NameLoc, Decl *D);
+/// Build a new DependentAddressSpaceType or return the pointee
+/// type variable with the correct address space (retrieved from
+/// AddrSpaceExpr) applied to it. The former will be returned in cases
+/// where the address space remains dependent.
+///
+/// By default, performs semantic analysis when building the type with address
+/// space applied. Subclasses may override this routine to provide different
+/// behavior.
+QualType RebuildDependentAddressSpaceType(QualType PointeeType,
+                                        Expr *AddrSpaceExpr,
+                                        SourceLocation AttributeLoc);
 
-  /// Build a new typedef type.
-  QualType RebuildTypedefType(TypedefNameDecl *Typedef) {
-    return SemaRef.Context.getTypeDeclType(Typedef);
-  }
+/// Build a new function type.
+///
+/// By default, performs semantic analysis when building the function type.
+/// Subclasses may override this routine to provide different behavior.
+QualType RebuildFunctionProtoType(QualType T,
+                                MutableArrayRef<QualType> ParamTypes,
+                                const FunctionProtoType::ExtProtoInfo &EPI);
 
-  /// Build a new MacroDefined type.
-  QualType RebuildMacroQualifiedType(QualType T,
-                                     const IdentifierInfo *MacroII) {
-    return SemaRef.Context.getMacroQualifiedType(T, MacroII);
-  }
+/// Build a new unprototyped function type.
+QualType RebuildFunctionNoProtoType(QualType ResultType);
 
-  /// Build a new class/struct/union type.
-  QualType RebuildRecordType(RecordDecl *Record) {
-    return SemaRef.Context.getTypeDeclType(Record);
-  }
+/// Rebuild an unresolved typename type, given the decl that
+/// the UnresolvedUsingTypenameDecl was transformed to.
+QualType RebuildUnresolvedUsingType(SourceLocation NameLoc, Decl *D);
 
-  /// Build a new Enum type.
-  QualType RebuildEnumType(EnumDecl *Enum) {
-    return SemaRef.Context.getTypeDeclType(Enum);
-  }
+/// Build a new typedef type.
+QualType RebuildTypedefType(TypedefNameDecl *Typedef) {
+return SemaRef.Context.getTypeDeclType(Typedef);
+}
 
-  /// Build a new typeof(expr) type.
-  ///
-  /// By default, performs semantic analysis when building the typeof type.
-  /// Subclasses may override this routine to provide different behavior.
-  QualType RebuildTypeOfExprType(Expr *Underlying, SourceLocation Loc);
+/// Build a new MacroDefined type.
+QualType RebuildMacroQualifiedType(QualType T,
+                                    const IdentifierInfo *MacroII) {
+return SemaRef.Context.getMacroQualifiedType(T, MacroII);
+}
 
-  /// Build a new typeof(type) type.
-  ///
-  /// By default, builds a new TypeOfType with the given underlying type.
-  QualType RebuildTypeOfType(QualType Underlying);
+/// Build a new class/struct/union type.
+QualType RebuildRecordType(RecordDecl *Record) {
+return SemaRef.Context.getTypeDeclType(Record);
+}
 
-  /// Build a new unary transform type.
-  QualType RebuildUnaryTransformType(QualType BaseType,
-                                     UnaryTransformType::UTTKind UKind,
-                                     SourceLocation Loc);
+/// Build a new Enum type.
+QualType RebuildEnumType(EnumDecl *Enum) {
+return SemaRef.Context.getTypeDeclType(Enum);
+}
 
-  /// Build a new C++11 decltype type.
-  ///
-  /// By default, performs semantic analysis when building the decltype type.
-  /// Subclasses may override this routine to provide different behavior.
-  QualType RebuildDecltypeType(Expr *Underlying, SourceLocation Loc);
+/// Build a new typeof(expr) type.
+///
+/// By default, performs semantic analysis when building the typeof type.
+/// Subclasses may override this routine to provide different behavior.
+QualType RebuildTypeOfExprType(Expr *Underlying, SourceLocation Loc);
 
-  /// Build a new C++11 auto type.
-  ///
-  /// By default, builds a new AutoType with the given deduced type.
-  QualType RebuildAutoType(QualType Deduced, AutoTypeKeyword Keyword,
-                           ConceptDecl *TypeConstraintConcept,
-                           ArrayRef<TemplateArgument> TypeConstraintArgs) {
-    // Note, IsDependent is always false here: we implicitly convert an 'auto'
-    // which has been deduced to a dependent type into an undeduced 'auto', so
-    // that we'll retry deduction after the transformation.
-    return SemaRef.Context.getAutoType(Deduced, Keyword,
-                                       /*IsDependent*/ false, /*IsPack=*/false,
-                                       TypeConstraintConcept,
-                                       TypeConstraintArgs);
-  }
+/// Build a new typeof(type) type.
+///
+/// By default, builds a new TypeOfType with the given underlying type.
+QualType RebuildTypeOfType(QualType Underlying);
 
-  /// By default, builds a new DeducedTemplateSpecializationType with the given
-  /// deduced type.
-  QualType RebuildDeducedTemplateSpecializationType(TemplateName Template,
-      QualType Deduced) {
-    return SemaRef.Context.getDeducedTemplateSpecializationType(
-        Template, Deduced, /*IsDependent*/ false);
-  }
+/// Build a new unary transform type.
+QualType RebuildUnaryTransformType(QualType BaseType,
+                                    UnaryTransformType::UTTKind UKind,
+                                    SourceLocation Loc);
 
-  /// Build a new template specialization type.
-  ///
-  /// By default, performs semantic analysis when building the template
-  /// specialization type. Subclasses may override this routine to provide
-  /// different behavior.
-  QualType RebuildTemplateSpecializationType(TemplateName Template,
-                                             SourceLocation TemplateLoc,
-                                             TemplateArgumentListInfo &Args);
+/// Build a new C++11 decltype type.
+///
+/// By default, performs semantic analysis when building the decltype type.
+/// Subclasses may override this routine to provide different behavior.
+QualType RebuildDecltypeType(Expr *Underlying, SourceLocation Loc);
 
-  /// Build a new parenthesized type.
-  ///
-  /// By default, builds a new ParenType type from the inner type.
-  /// Subclasses may override this routine to provide different behavior.
-  QualType RebuildParenType(QualType InnerType) {
-    return SemaRef.BuildParenType(InnerType);
-  }
+/// Build a new C++11 auto type.
+///
+/// By default, builds a new AutoType with the given deduced type.
+QualType RebuildAutoType(QualType Deduced, AutoTypeKeyword Keyword,
+                        ConceptDecl *TypeConstraintConcept,
+                        ArrayRef<TemplateArgument> TypeConstraintArgs) {
+// Note, IsDependent is always false here: we implicitly convert an 'auto'
+// which has been deduced to a dependent type into an undeduced 'auto', so
+// that we'll retry deduction after the transformation.
+return SemaRef.Context.getAutoType(Deduced, Keyword,
+                                    /*IsDependent*/ false, /*IsPack=*/false,
+                                    TypeConstraintConcept,
+                                    TypeConstraintArgs);
+}
 
-  /// Build a new qualified name type.
-  ///
-  /// By default, builds a new ElaboratedType type from the keyword,
-  /// the nested-name-specifier and the named type.
-  /// Subclasses may override this routine to provide different behavior.
-  QualType RebuildElaboratedType(SourceLocation KeywordLoc,
-                                 ElaboratedTypeKeyword Keyword,
-                                 NestedNameSpecifierLoc QualifierLoc,
-                                 QualType Named) {
-    return SemaRef.Context.getElaboratedType(Keyword,
-                                         QualifierLoc.getNestedNameSpecifier(),
-                                             Named);
-  }
+/// By default, builds a new DeducedTemplateSpecializationType with the given
+/// deduced type.
+QualType RebuildDeducedTemplateSpecializationType(TemplateName Template,
+    QualType Deduced) {
+return SemaRef.Context.getDeducedTemplateSpecializationType(
+    Template, Deduced, /*IsDependent*/ false);
+}
 
-  /// Build a new typename type that refers to a template-id.
-  ///
-  /// By default, builds a new DependentNameType type from the
-  /// nested-name-specifier and the given type. Subclasses may override
-  /// this routine to provide different behavior.
-  QualType RebuildDependentTemplateSpecializationType(
-                                          ElaboratedTypeKeyword Keyword,
-                                          NestedNameSpecifierLoc QualifierLoc,
-                                          SourceLocation TemplateKWLoc,
-                                          const IdentifierInfo *Name,
-                                          SourceLocation NameLoc,
-                                          TemplateArgumentListInfo &Args,
-                                          bool AllowInjectedClassName) {
-    // Rebuild the template name.
-    // TODO: avoid TemplateName abstraction
-    CXXScopeSpec SS;
-    SS.Adopt(QualifierLoc);
-    TemplateName InstName = getDerived().RebuildTemplateName(
-        SS, TemplateKWLoc, *Name, NameLoc, QualType(), nullptr,
-        AllowInjectedClassName);
+/// Build a new template specialization type.
+///
+/// By default, performs semantic analysis when building the template
+/// specialization type. Subclasses may override this routine to provide
+/// different behavior.
+QualType RebuildTemplateSpecializationType(TemplateName Template,
+                                            SourceLocation TemplateLoc,
+                                            TemplateArgumentListInfo &Args);
 
-    if (InstName.isNull())
-      return QualType();
+/// Build a new parenthesized type.
+///
+/// By default, builds a new ParenType type from the inner type.
+/// Subclasses may override this routine to provide different behavior.
+QualType RebuildParenType(QualType InnerType) {
+return SemaRef.BuildParenType(InnerType);
+}
 
-    // If it's still dependent, make a dependent specialization.
-    if (InstName.getAsDependentTemplateName())
-      return SemaRef.Context.getDependentTemplateSpecializationType(Keyword,
-                                          QualifierLoc.getNestedNameSpecifier(),
-                                                                    Name,
-                                                                    Args);
+/// Build a new qualified name type.
+///
+/// By default, builds a new ElaboratedType type from the keyword,
+/// the nested-name-specifier and the named type.
+/// Subclasses may override this routine to provide different behavior.
+QualType RebuildElaboratedType(SourceLocation KeywordLoc,
+                                ElaboratedTypeKeyword Keyword,
+                                NestedNameSpecifierLoc QualifierLoc,
+                                QualType Named) {
+return SemaRef.Context.getElaboratedType(Keyword,
+                                        QualifierLoc.getNestedNameSpecifier(),
+                                            Named);
+}
 
-    // Otherwise, make an elaborated type wrapping a non-dependent
-    // specialization.
-    QualType T =
-    getDerived().RebuildTemplateSpecializationType(InstName, NameLoc, Args);
-    if (T.isNull()) return QualType();
+/// Build a new typename type that refers to a template-id.
+///
+/// By default, builds a new DependentNameType type from the
+/// nested-name-specifier and the given type. Subclasses may override
+/// this routine to provide different behavior.
+QualType RebuildDependentTemplateSpecializationType(
+                                        ElaboratedTypeKeyword Keyword,
+                                        NestedNameSpecifierLoc QualifierLoc,
+                                        SourceLocation TemplateKWLoc,
+                                        const IdentifierInfo *Name,
+                                        SourceLocation NameLoc,
+                                        TemplateArgumentListInfo &Args,
+                                        bool AllowInjectedClassName) {
+// Rebuild the template name.
+// TODO: avoid TemplateName abstraction
+CXXScopeSpec SS;
+SS.Adopt(QualifierLoc);
+TemplateName InstName = getDerived().RebuildTemplateName(
+    SS, TemplateKWLoc, *Name, NameLoc, QualType(), nullptr,
+    AllowInjectedClassName);
 
-    if (Keyword == ETK_None && QualifierLoc.getNestedNameSpecifier() == nullptr)
-      return T;
+if (InstName.isNull())
+    return QualType();
 
-    return SemaRef.Context.getElaboratedType(Keyword,
-                                       QualifierLoc.getNestedNameSpecifier(),
-                                             T);
-  }
+// If it's still dependent, make a dependent specialization.
+if (InstName.getAsDependentTemplateName())
+    return SemaRef.Context.getDependentTemplateSpecializationType(Keyword,
+                                        QualifierLoc.getNestedNameSpecifier(),
+                                                                Name,
+                                                                Args);
 
-  /// Build a new typename type that refers to an identifier.
-  ///
-  /// By default, performs semantic analysis when building the typename type
-  /// (or elaborated type). Subclasses may override this routine to provide
-  /// different behavior.
-  QualType RebuildDependentNameType(ElaboratedTypeKeyword Keyword,
-                                    SourceLocation KeywordLoc,
-                                    NestedNameSpecifierLoc QualifierLoc,
-                                    const IdentifierInfo *Id,
-                                    SourceLocation IdLoc,
-                                    bool DeducedTSTContext) {
-    CXXScopeSpec SS;
-    SS.Adopt(QualifierLoc);
+// Otherwise, make an elaborated type wrapping a non-dependent
+// specialization.
+QualType T =
+getDerived().RebuildTemplateSpecializationType(InstName, NameLoc, Args);
+if (T.isNull()) return QualType();
 
-    if (QualifierLoc.getNestedNameSpecifier()->isDependent()) {
-      // If the name is still dependent, just build a new dependent name type.
-      if (!SemaRef.computeDeclContext(SS))
-        return SemaRef.Context.getDependentNameType(Keyword,
-                                          QualifierLoc.getNestedNameSpecifier(),
-                                                    Id);
-    }
+if (Keyword == ETK_None && QualifierLoc.getNestedNameSpecifier() == nullptr)
+    return T;
 
-    if (Keyword == ETK_None || Keyword == ETK_Typename) {
-      return SemaRef.CheckTypenameType(Keyword, KeywordLoc, QualifierLoc,
-                                       *Id, IdLoc, DeducedTSTContext);
-    }
+return SemaRef.Context.getElaboratedType(Keyword,
+                                    QualifierLoc.getNestedNameSpecifier(),
+                                            T);
+}
 
-    TagTypeKind Kind = TypeWithKeyword::getTagTypeKindForKeyword(Keyword);
+/// Build a new typename type that refers to an identifier.
+///
+/// By default, performs semantic analysis when building the typename type
+/// (or elaborated type). Subclasses may override this routine to provide
+/// different behavior.
+QualType RebuildDependentNameType(ElaboratedTypeKeyword Keyword,
+                                SourceLocation KeywordLoc,
+                                NestedNameSpecifierLoc QualifierLoc,
+                                const IdentifierInfo *Id,
+                                SourceLocation IdLoc,
+                                bool DeducedTSTContext) {
+CXXScopeSpec SS;
+SS.Adopt(QualifierLoc);
 
-    // We had a dependent elaborated-type-specifier that has been transformed
-    // into a non-dependent elaborated-type-specifier. Find the tag we're
-    // referring to.
+if (QualifierLoc.getNestedNameSpecifier()->isDependent()) {
+    // If the name is still dependent, just build a new dependent name type.
+    if (!SemaRef.computeDeclContext(SS))
+    return SemaRef.Context.getDependentNameType(Keyword,
+                                        QualifierLoc.getNestedNameSpecifier(),
+                                                Id);
+}
+
+if (Keyword == ETK_None || Keyword == ETK_Typename) {
+    return SemaRef.CheckTypenameType(Keyword, KeywordLoc, QualifierLoc,
+                                    *Id, IdLoc, DeducedTSTContext);
+}
+
+TagTypeKind Kind = TypeWithKeyword::getTagTypeKindForKeyword(Keyword);
+
+// We had a dependent elaborated-type-specifier that has been transformed
+// into a non-dependent elaborated-type-specifier. Find the tag we're
+// referring to.
+LookupResult Result(SemaRef, Id, IdLoc, Sema::LookupTagName);
+DeclContext *DC = SemaRef.computeDeclContext(SS, false);
+if (!DC)
+    return QualType();
+
+if (SemaRef.RequireCompleteDeclContext(SS, DC))
+    return QualType();
+
+TagDecl *Tag = nullptr;
+SemaRef.LookupQualifiedName(Result, DC);
+switch (Result.getResultKind()) {
+    case LookupResult::NotFound:
+    case LookupResult::NotFoundInCurrentInstantiation:
+    break;
+
+    case LookupResult::Found:
+    Tag = Result.getAsSingle<TagDecl>();
+    break;
+
+    case LookupResult::FoundOverloaded:
+    case LookupResult::FoundUnresolvedValue:
+    llvm_unreachable("Tag lookup cannot find non-tags");
+
+    case LookupResult::Ambiguous:
+    // Let the LookupResult structure handle ambiguities.
+    return QualType();
+}
+
+if (!Tag) {
+    // Check where the name exists but isn't a tag type and use that to emit
+    // better diagnostics.
     LookupResult Result(SemaRef, Id, IdLoc, Sema::LookupTagName);
-    DeclContext *DC = SemaRef.computeDeclContext(SS, false);
-    if (!DC)
-      return QualType();
-
-    if (SemaRef.RequireCompleteDeclContext(SS, DC))
-      return QualType();
-
-    TagDecl *Tag = nullptr;
     SemaRef.LookupQualifiedName(Result, DC);
     switch (Result.getResultKind()) {
-      case LookupResult::NotFound:
-      case LookupResult::NotFoundInCurrentInstantiation:
+    case LookupResult::Found:
+    case LookupResult::FoundOverloaded:
+    case LookupResult::FoundUnresolvedValue: {
+        NamedDecl *SomeDecl = Result.getRepresentativeDecl();
+        Sema::NonTagKind NTK = SemaRef.getNonTagTypeDeclKind(SomeDecl, Kind);
+        SemaRef.Diag(IdLoc, diag::err_tag_reference_non_tag) << SomeDecl
+                                                            << NTK << Kind;
+        SemaRef.Diag(SomeDecl->getLocation(), diag::note_declared_at);
         break;
-
-      case LookupResult::Found:
-        Tag = Result.getAsSingle<TagDecl>();
+    }
+    default:
+        SemaRef.Diag(IdLoc, diag::err_not_tag_in_scope)
+            << Kind << Id << DC << QualifierLoc.getSourceRange();
         break;
-
-      case LookupResult::FoundOverloaded:
-      case LookupResult::FoundUnresolvedValue:
-        llvm_unreachable("Tag lookup cannot find non-tags");
-
-      case LookupResult::Ambiguous:
-        // Let the LookupResult structure handle ambiguities.
-        return QualType();
     }
+    return QualType();
+}
 
-    if (!Tag) {
-      // Check where the name exists but isn't a tag type and use that to emit
-      // better diagnostics.
-      LookupResult Result(SemaRef, Id, IdLoc, Sema::LookupTagName);
-      SemaRef.LookupQualifiedName(Result, DC);
-      switch (Result.getResultKind()) {
-        case LookupResult::Found:
-        case LookupResult::FoundOverloaded:
-        case LookupResult::FoundUnresolvedValue: {
-          NamedDecl *SomeDecl = Result.getRepresentativeDecl();
-          Sema::NonTagKind NTK = SemaRef.getNonTagTypeDeclKind(SomeDecl, Kind);
-          SemaRef.Diag(IdLoc, diag::err_tag_reference_non_tag) << SomeDecl
-                                                               << NTK << Kind;
-          SemaRef.Diag(SomeDecl->getLocation(), diag::note_declared_at);
-          break;
-        }
-        default:
-          SemaRef.Diag(IdLoc, diag::err_not_tag_in_scope)
-              << Kind << Id << DC << QualifierLoc.getSourceRange();
-          break;
-      }
-      return QualType();
-    }
+if (!SemaRef.isAcceptableTagRedeclaration(Tag, Kind, /*isDefinition*/false,
+                                            IdLoc, Id)) {
+    SemaRef.Diag(KeywordLoc, diag::err_use_with_wrong_tag) << Id;
+    SemaRef.Diag(Tag->getLocation(), diag::note_previous_use);
+    return QualType();
+}
 
-    if (!SemaRef.isAcceptableTagRedeclaration(Tag, Kind, /*isDefinition*/false,
-                                              IdLoc, Id)) {
-      SemaRef.Diag(KeywordLoc, diag::err_use_with_wrong_tag) << Id;
-      SemaRef.Diag(Tag->getLocation(), diag::note_previous_use);
-      return QualType();
-    }
+// Build the elaborated-type-specifier type.
+QualType T = SemaRef.Context.getTypeDeclType(Tag);
+return SemaRef.Context.getElaboratedType(Keyword,
+                                        QualifierLoc.getNestedNameSpecifier(),
+                                            T);
+}
 
-    // Build the elaborated-type-specifier type.
-    QualType T = SemaRef.Context.getTypeDeclType(Tag);
-    return SemaRef.Context.getElaboratedType(Keyword,
-                                         QualifierLoc.getNestedNameSpecifier(),
-                                             T);
-  }
+/// Build a new pack expansion type.
+///
+/// By default, builds a new PackExpansionType type from the given pattern.
+/// Subclasses may override this routine to provide different behavior.
+QualType RebuildPackExpansionType(QualType Pattern,
+                                SourceRange PatternRange,
+                                SourceLocation EllipsisLoc,
+                                Optional<unsigned> NumExpansions) {
+return getSema().CheckPackExpansion(Pattern, PatternRange, EllipsisLoc,
+                                    NumExpansions);
+}
 
-  /// Build a new pack expansion type.
-  ///
-  /// By default, builds a new PackExpansionType type from the given pattern.
-  /// Subclasses may override this routine to provide different behavior.
-  QualType RebuildPackExpansionType(QualType Pattern,
-                                    SourceRange PatternRange,
-                                    SourceLocation EllipsisLoc,
-                                    Optional<unsigned> NumExpansions) {
-    return getSema().CheckPackExpansion(Pattern, PatternRange, EllipsisLoc,
-                                        NumExpansions);
-  }
+/// Build a new atomic type given its value type.
+///
+/// By default, performs semantic analysis when building the atomic type.
+/// Subclasses may override this routine to provide different behavior.
+QualType RebuildAtomicType(QualType ValueType, SourceLocation KWLoc);
 
-  /// Build a new atomic type given its value type.
-  ///
-  /// By default, performs semantic analysis when building the atomic type.
-  /// Subclasses may override this routine to provide different behavior.
-  QualType RebuildAtomicType(QualType ValueType, SourceLocation KWLoc);
+/// Build a new pipe type given its value type.
+QualType RebuildPipeType(QualType ValueType, SourceLocation KWLoc,
+                        bool isReadPipe);
 
-  /// Build a new pipe type given its value type.
-  QualType RebuildPipeType(QualType ValueType, SourceLocation KWLoc,
-                           bool isReadPipe);
+/// Build an extended int given its value type.
+QualType RebuildExtIntType(bool IsUnsigned, unsigned NumBits,
+                            SourceLocation Loc);
 
-   /// Build an extended int given its value type.
-  QualType RebuildExtIntType(bool IsUnsigned, unsigned NumBits,
-                             SourceLocation Loc);
+/// Build a dependent extended int given its value type.
+QualType RebuildDependentExtIntType(bool IsUnsigned, Expr *NumBitsExpr,
+                                    SourceLocation Loc);
 
-  /// Build a dependent extended int given its value type.
-  QualType RebuildDependentExtIntType(bool IsUnsigned, Expr *NumBitsExpr,
-                                      SourceLocation Loc);
+/// Build a new template name given a nested name specifier, a flag
+/// indicating whether the "template" keyword was provided, and the template
+/// that the template name refers to.
+///
+/// By default, builds the new template name directly. Subclasses may override
+/// this routine to provide different behavior.
+TemplateName RebuildTemplateName(CXXScopeSpec &SS,
+                                bool TemplateKW,
+                                TemplateDecl *Template);
 
-  /// Build a new template name given a nested name specifier, a flag
-  /// indicating whether the "template" keyword was provided, and the template
-  /// that the template name refers to.
-  ///
-  /// By default, builds the new template name directly. Subclasses may override
-  /// this routine to provide different behavior.
-  TemplateName RebuildTemplateName(CXXScopeSpec &SS,
-                                   bool TemplateKW,
-                                   TemplateDecl *Template);
+/// Build a new template name given a nested name specifier and the
+/// name that is referred to as a template.
+///
+/// By default, performs semantic analysis to determine whether the name can
+/// be resolved to a specific template, then builds the appropriate kind of
+/// template name. Subclasses may override this routine to provide different
+/// behavior.
+TemplateName RebuildTemplateName(CXXScopeSpec &SS,
+                                SourceLocation TemplateKWLoc,
+                                const IdentifierInfo &Name,
+                                SourceLocation NameLoc, QualType ObjectType,
+                                NamedDecl *FirstQualifierInScope,
+                                bool AllowInjectedClassName);
 
-  /// Build a new template name given a nested name specifier and the
-  /// name that is referred to as a template.
-  ///
-  /// By default, performs semantic analysis to determine whether the name can
-  /// be resolved to a specific template, then builds the appropriate kind of
-  /// template name. Subclasses may override this routine to provide different
-  /// behavior.
-  TemplateName RebuildTemplateName(CXXScopeSpec &SS,
-                                   SourceLocation TemplateKWLoc,
-                                   const IdentifierInfo &Name,
-                                   SourceLocation NameLoc, QualType ObjectType,
-                                   NamedDecl *FirstQualifierInScope,
-                                   bool AllowInjectedClassName);
+/// Build a new template name given a nested name specifier and the
+/// overloaded operator name that is referred to as a template.
+///
+/// By default, performs semantic analysis to determine whether the name can
+/// be resolved to a specific template, then builds the appropriate kind of
+/// template name. Subclasses may override this routine to provide different
+/// behavior.
+TemplateName RebuildTemplateName(CXXScopeSpec &SS,
+                                SourceLocation TemplateKWLoc,
+                                OverloadedOperatorKind Operator,
+                                SourceLocation NameLoc, QualType ObjectType,
+                                bool AllowInjectedClassName);
 
-  /// Build a new template name given a nested name specifier and the
-  /// overloaded operator name that is referred to as a template.
-  ///
-  /// By default, performs semantic analysis to determine whether the name can
-  /// be resolved to a specific template, then builds the appropriate kind of
-  /// template name. Subclasses may override this routine to provide different
-  /// behavior.
-  TemplateName RebuildTemplateName(CXXScopeSpec &SS,
-                                   SourceLocation TemplateKWLoc,
-                                   OverloadedOperatorKind Operator,
-                                   SourceLocation NameLoc, QualType ObjectType,
-                                   bool AllowInjectedClassName);
+/// Build a new template name given a template template parameter pack
+/// and the
+///
+/// By default, performs semantic analysis to determine whether the name can
+/// be resolved to a specific template, then builds the appropriate kind of
+/// template name. Subclasses may override this routine to provide different
+/// behavior.
+TemplateName RebuildTemplateName(TemplateTemplateParmDecl *Param,
+                                const TemplateArgument &ArgPack) {
+return getSema().Context.getSubstTemplateTemplateParmPack(Param, ArgPack);
+}
 
-  /// Build a new template name given a template template parameter pack
-  /// and the
-  ///
-  /// By default, performs semantic analysis to determine whether the name can
-  /// be resolved to a specific template, then builds the appropriate kind of
-  /// template name. Subclasses may override this routine to provide different
-  /// behavior.
-  TemplateName RebuildTemplateName(TemplateTemplateParmDecl *Param,
-                                   const TemplateArgument &ArgPack) {
-    return getSema().Context.getSubstTemplateTemplateParmPack(Param, ArgPack);
-  }
+/// Build a new compound statement.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+StmtResult RebuildCompoundStmt(SourceLocation LBraceLoc,
+                                    MultiStmtArg Statements,
+                                    SourceLocation RBraceLoc,
+                                    bool IsStmtExpr) {
+return getSema().ActOnCompoundStmt(LBraceLoc, RBraceLoc, Statements,
+                                    IsStmtExpr);
+}
 
-  /// Build a new compound statement.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildCompoundStmt(SourceLocation LBraceLoc,
-                                       MultiStmtArg Statements,
-                                       SourceLocation RBraceLoc,
-                                       bool IsStmtExpr) {
-    return getSema().ActOnCompoundStmt(LBraceLoc, RBraceLoc, Statements,
-                                       IsStmtExpr);
-  }
+/// Build a new case statement.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+StmtResult RebuildCaseStmt(SourceLocation CaseLoc,
+                                Expr *LHS,
+                                SourceLocation EllipsisLoc,
+                                Expr *RHS,
+                                SourceLocation ColonLoc) {
+return getSema().ActOnCaseStmt(CaseLoc, LHS, EllipsisLoc, RHS,
+                                ColonLoc);
+}
 
-  /// Build a new case statement.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildCaseStmt(SourceLocation CaseLoc,
-                                   Expr *LHS,
-                                   SourceLocation EllipsisLoc,
-                                   Expr *RHS,
-                                   SourceLocation ColonLoc) {
-    return getSema().ActOnCaseStmt(CaseLoc, LHS, EllipsisLoc, RHS,
-                                   ColonLoc);
-  }
+/// Attach the body to a new case statement.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+StmtResult RebuildCaseStmtBody(Stmt *S, Stmt *Body) {
+getSema().ActOnCaseStmtBody(S, Body);
+return S;
+}
 
-  /// Attach the body to a new case statement.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildCaseStmtBody(Stmt *S, Stmt *Body) {
-    getSema().ActOnCaseStmtBody(S, Body);
-    return S;
-  }
+/// Build a new default statement.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+StmtResult RebuildDefaultStmt(SourceLocation DefaultLoc,
+                                    SourceLocation ColonLoc,
+                                    Stmt *SubStmt) {
+return getSema().ActOnDefaultStmt(DefaultLoc, ColonLoc, SubStmt,
+                                    /*CurScope=*/nullptr);
+}
 
-  /// Build a new default statement.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildDefaultStmt(SourceLocation DefaultLoc,
-                                      SourceLocation ColonLoc,
-                                      Stmt *SubStmt) {
-    return getSema().ActOnDefaultStmt(DefaultLoc, ColonLoc, SubStmt,
-                                      /*CurScope=*/nullptr);
-  }
+/// Build a new label statement.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+StmtResult RebuildLabelStmt(SourceLocation IdentLoc, LabelDecl *L,
+                            SourceLocation ColonLoc, Stmt *SubStmt) {
+return SemaRef.ActOnLabelStmt(IdentLoc, L, ColonLoc, SubStmt);
+}
 
-  /// Build a new label statement.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildLabelStmt(SourceLocation IdentLoc, LabelDecl *L,
-                              SourceLocation ColonLoc, Stmt *SubStmt) {
-    return SemaRef.ActOnLabelStmt(IdentLoc, L, ColonLoc, SubStmt);
-  }
+/// Build a new attributed statement.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+StmtResult RebuildAttributedStmt(SourceLocation AttrLoc,
+                                ArrayRef<const Attr *> Attrs,
+                                Stmt *SubStmt) {
+return SemaRef.BuildAttributedStmt(AttrLoc, Attrs, SubStmt);
+}
 
-  /// Build a new attributed statement.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildAttributedStmt(SourceLocation AttrLoc,
-                                   ArrayRef<const Attr *> Attrs,
-                                   Stmt *SubStmt) {
-    return SemaRef.BuildAttributedStmt(AttrLoc, Attrs, SubStmt);
-  }
+/// Build a new "if" statement.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+StmtResult RebuildIfStmt(SourceLocation IfLoc, bool IsConstexpr,
+                        SourceLocation LParenLoc, Sema::ConditionResult Cond,
+                        SourceLocation RParenLoc, Stmt *Init, Stmt *Then,
+                        SourceLocation ElseLoc, Stmt *Else) {
+return getSema().ActOnIfStmt(IfLoc, IsConstexpr, LParenLoc, Init, Cond,
+                                RParenLoc, Then, ElseLoc, Else);
+}
 
-  /// Build a new "if" statement.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildIfStmt(SourceLocation IfLoc, bool IsConstexpr,
-                           SourceLocation LParenLoc, Sema::ConditionResult Cond,
-                           SourceLocation RParenLoc, Stmt *Init, Stmt *Then,
-                           SourceLocation ElseLoc, Stmt *Else) {
-    return getSema().ActOnIfStmt(IfLoc, IsConstexpr, LParenLoc, Init, Cond,
-                                 RParenLoc, Then, ElseLoc, Else);
-  }
+/// Start building a new switch statement.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+StmtResult RebuildSwitchStmtStart(SourceLocation SwitchLoc,
+                                SourceLocation LParenLoc, Stmt *Init,
+                                Sema::ConditionResult Cond,
+                                SourceLocation RParenLoc) {
+return getSema().ActOnStartOfSwitchStmt(SwitchLoc, LParenLoc, Init, Cond,
+                                        RParenLoc);
+}
 
-  /// Start building a new switch statement.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildSwitchStmtStart(SourceLocation SwitchLoc,
-                                    SourceLocation LParenLoc, Stmt *Init,
-                                    Sema::ConditionResult Cond,
-                                    SourceLocation RParenLoc) {
-    return getSema().ActOnStartOfSwitchStmt(SwitchLoc, LParenLoc, Init, Cond,
-                                            RParenLoc);
-  }
+/// Attach the body to the switch statement.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+StmtResult RebuildSwitchStmtBody(SourceLocation SwitchLoc,
+                                Stmt *Switch, Stmt *Body) {
+return getSema().ActOnFinishSwitchStmt(SwitchLoc, Switch, Body);
+}
 
-  /// Attach the body to the switch statement.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildSwitchStmtBody(SourceLocation SwitchLoc,
-                                   Stmt *Switch, Stmt *Body) {
-    return getSema().ActOnFinishSwitchStmt(SwitchLoc, Switch, Body);
-  }
+/// Build a new while statement.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+StmtResult RebuildWhileStmt(SourceLocation WhileLoc, SourceLocation LParenLoc,
+                            Sema::ConditionResult Cond,
+                            SourceLocation RParenLoc, Stmt *Body) {
+return getSema().ActOnWhileStmt(WhileLoc, LParenLoc, Cond, RParenLoc, Body);
+}
 
-  /// Build a new while statement.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildWhileStmt(SourceLocation WhileLoc, SourceLocation LParenLoc,
-                              Sema::ConditionResult Cond,
-                              SourceLocation RParenLoc, Stmt *Body) {
-    return getSema().ActOnWhileStmt(WhileLoc, LParenLoc, Cond, RParenLoc, Body);
-  }
+/// Build a new do-while statement.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+StmtResult RebuildDoStmt(SourceLocation DoLoc, Stmt *Body,
+                        SourceLocation WhileLoc, SourceLocation LParenLoc,
+                        Expr *Cond, SourceLocation RParenLoc) {
+return getSema().ActOnDoStmt(DoLoc, Body, WhileLoc, LParenLoc,
+                                Cond, RParenLoc);
+}
 
-  /// Build a new do-while statement.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildDoStmt(SourceLocation DoLoc, Stmt *Body,
-                           SourceLocation WhileLoc, SourceLocation LParenLoc,
-                           Expr *Cond, SourceLocation RParenLoc) {
-    return getSema().ActOnDoStmt(DoLoc, Body, WhileLoc, LParenLoc,
-                                 Cond, RParenLoc);
-  }
+/// Build a new for statement.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+StmtResult RebuildForStmt(SourceLocation ForLoc, SourceLocation LParenLoc,
+                        Stmt *Init, Sema::ConditionResult Cond,
+                        Sema::FullExprArg Inc, SourceLocation RParenLoc,
+                        Stmt *Body) {
+return getSema().ActOnForStmt(ForLoc, LParenLoc, Init, Cond,
+                                Inc, RParenLoc, Body);
+}
 
-  /// Build a new for statement.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildForStmt(SourceLocation ForLoc, SourceLocation LParenLoc,
-                            Stmt *Init, Sema::ConditionResult Cond,
-                            Sema::FullExprArg Inc, SourceLocation RParenLoc,
-                            Stmt *Body) {
-    return getSema().ActOnForStmt(ForLoc, LParenLoc, Init, Cond,
-                                  Inc, RParenLoc, Body);
-  }
+/// Build a new goto statement.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+StmtResult RebuildGotoStmt(SourceLocation GotoLoc, SourceLocation LabelLoc,
+                            LabelDecl *Label) {
+return getSema().ActOnGotoStmt(GotoLoc, LabelLoc, Label);
+}
 
-  /// Build a new goto statement.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildGotoStmt(SourceLocation GotoLoc, SourceLocation LabelLoc,
-                             LabelDecl *Label) {
-    return getSema().ActOnGotoStmt(GotoLoc, LabelLoc, Label);
-  }
+/// Build a new indirect goto statement.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+StmtResult RebuildIndirectGotoStmt(SourceLocation GotoLoc,
+                                    SourceLocation StarLoc,
+                                    Expr *Target) {
+return getSema().ActOnIndirectGotoStmt(GotoLoc, StarLoc, Target);
+}
 
-  /// Build a new indirect goto statement.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildIndirectGotoStmt(SourceLocation GotoLoc,
-                                     SourceLocation StarLoc,
-                                     Expr *Target) {
-    return getSema().ActOnIndirectGotoStmt(GotoLoc, StarLoc, Target);
-  }
+/// Build a new return statement.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+StmtResult RebuildReturnStmt(SourceLocation ReturnLoc, Expr *Result) {
+return getSema().BuildReturnStmt(ReturnLoc, Result);
+}
 
-  /// Build a new return statement.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildReturnStmt(SourceLocation ReturnLoc, Expr *Result) {
-    return getSema().BuildReturnStmt(ReturnLoc, Result);
-  }
+/// Build a new declaration statement.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+StmtResult RebuildDeclStmt(MutableArrayRef<Decl *> Decls,
+                            SourceLocation StartLoc, SourceLocation EndLoc) {
+Sema::DeclGroupPtrTy DG = getSema().BuildDeclaratorGroup(Decls);
+return getSema().ActOnDeclStmt(DG, StartLoc, EndLoc);
+}
 
-  /// Build a new declaration statement.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildDeclStmt(MutableArrayRef<Decl *> Decls,
-                             SourceLocation StartLoc, SourceLocation EndLoc) {
-    Sema::DeclGroupPtrTy DG = getSema().BuildDeclaratorGroup(Decls);
-    return getSema().ActOnDeclStmt(DG, StartLoc, EndLoc);
-  }
+/// Build a new inline asm statement.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+StmtResult RebuildGCCAsmStmt(SourceLocation AsmLoc, bool IsSimple,
+                            bool IsVolatile, unsigned NumOutputs,
+                            unsigned NumInputs, IdentifierInfo **Names,
+                            MultiExprArg Constraints, MultiExprArg Exprs,
+                            Expr *AsmString, MultiExprArg Clobbers,
+                            unsigned NumLabels,
+                            SourceLocation RParenLoc) {
+return getSema().ActOnGCCAsmStmt(AsmLoc, IsSimple, IsVolatile, NumOutputs,
+                                    NumInputs, Names, Constraints, Exprs,
+                                    AsmString, Clobbers, NumLabels, RParenLoc);
+}
 
-  /// Build a new inline asm statement.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildGCCAsmStmt(SourceLocation AsmLoc, bool IsSimple,
-                               bool IsVolatile, unsigned NumOutputs,
-                               unsigned NumInputs, IdentifierInfo **Names,
-                               MultiExprArg Constraints, MultiExprArg Exprs,
-                               Expr *AsmString, MultiExprArg Clobbers,
-                               unsigned NumLabels,
-                               SourceLocation RParenLoc) {
-    return getSema().ActOnGCCAsmStmt(AsmLoc, IsSimple, IsVolatile, NumOutputs,
-                                     NumInputs, Names, Constraints, Exprs,
-                                     AsmString, Clobbers, NumLabels, RParenLoc);
-  }
+/// Build a new MS style inline asm statement.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+StmtResult RebuildMSAsmStmt(SourceLocation AsmLoc, SourceLocation LBraceLoc,
+                            ArrayRef<Token> AsmToks,
+                            StringRef AsmString,
+                            unsigned NumOutputs, unsigned NumInputs,
+                            ArrayRef<StringRef> Constraints,
+                            ArrayRef<StringRef> Clobbers,
+                            ArrayRef<Expr*> Exprs,
+                            SourceLocation EndLoc) {
+return getSema().ActOnMSAsmStmt(AsmLoc, LBraceLoc, AsmToks, AsmString,
+                                NumOutputs, NumInputs,
+                                Constraints, Clobbers, Exprs, EndLoc);
+}
 
-  /// Build a new MS style inline asm statement.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildMSAsmStmt(SourceLocation AsmLoc, SourceLocation LBraceLoc,
-                              ArrayRef<Token> AsmToks,
-                              StringRef AsmString,
-                              unsigned NumOutputs, unsigned NumInputs,
-                              ArrayRef<StringRef> Constraints,
-                              ArrayRef<StringRef> Clobbers,
-                              ArrayRef<Expr*> Exprs,
-                              SourceLocation EndLoc) {
-    return getSema().ActOnMSAsmStmt(AsmLoc, LBraceLoc, AsmToks, AsmString,
-                                    NumOutputs, NumInputs,
-                                    Constraints, Clobbers, Exprs, EndLoc);
-  }
-
-  /// Build a new co_return statement.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildCoreturnStmt(SourceLocation CoreturnLoc, Expr *Result,
-                                 bool IsImplicit) {
-    return getSema().BuildCoreturnStmt(CoreturnLoc, Result, IsImplicit);
-  }
-
-  /// Build a new co_await expression.
-  ///
-  /// By default, performs semantic analysis to build the new expression.
-  /// Subclasses may override this routine to provide different behavior.
-  ExprResult RebuildCoawaitExpr(SourceLocation CoawaitLoc, Expr *Result,
+/// Build a new co_return statement.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+StmtResult RebuildCoreturnStmt(SourceLocation CoreturnLoc, Expr *Result,
                                 bool IsImplicit) {
-    return getSema().BuildResolvedCoawaitExpr(CoawaitLoc, Result, IsImplicit);
-  }
+return getSema().BuildCoreturnStmt(CoreturnLoc, Result, IsImplicit);
+}
 
-  /// Build a new co_await expression.
-  ///
-  /// By default, performs semantic analysis to build the new expression.
-  /// Subclasses may override this routine to provide different behavior.
-  ExprResult RebuildDependentCoawaitExpr(SourceLocation CoawaitLoc,
-                                         Expr *Result,
-                                         UnresolvedLookupExpr *Lookup) {
-    return getSema().BuildUnresolvedCoawaitExpr(CoawaitLoc, Result, Lookup);
-  }
+/// Build a new co_await expression.
+///
+/// By default, performs semantic analysis to build the new expression.
+/// Subclasses may override this routine to provide different behavior.
+ExprResult RebuildCoawaitExpr(SourceLocation CoawaitLoc, Expr *Result,
+                            bool IsImplicit) {
+return getSema().BuildResolvedCoawaitExpr(CoawaitLoc, Result, IsImplicit);
+}
 
-  /// Build a new co_yield expression.
-  ///
-  /// By default, performs semantic analysis to build the new expression.
-  /// Subclasses may override this routine to provide different behavior.
-  ExprResult RebuildCoyieldExpr(SourceLocation CoyieldLoc, Expr *Result) {
-    return getSema().BuildCoyieldExpr(CoyieldLoc, Result);
-  }
+/// Build a new co_await expression.
+///
+/// By default, performs semantic analysis to build the new expression.
+/// Subclasses may override this routine to provide different behavior.
+ExprResult RebuildDependentCoawaitExpr(SourceLocation CoawaitLoc,
+                                        Expr *Result,
+                                        UnresolvedLookupExpr *Lookup) {
+return getSema().BuildUnresolvedCoawaitExpr(CoawaitLoc, Result, Lookup);
+}
 
-  StmtResult RebuildCoroutineBodyStmt(CoroutineBodyStmt::CtorArgs Args) {
-    return getSema().BuildCoroutineBodyStmt(Args);
-  }
+/// Build a new co_yield expression.
+///
+/// By default, performs semantic analysis to build the new expression.
+/// Subclasses may override this routine to provide different behavior.
+ExprResult RebuildCoyieldExpr(SourceLocation CoyieldLoc, Expr *Result) {
+return getSema().BuildCoyieldExpr(CoyieldLoc, Result);
+}
 
-  /// Build a new Objective-C \@try statement.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildObjCAtTryStmt(SourceLocation AtLoc,
-                                        Stmt *TryBody,
-                                        MultiStmtArg CatchStmts,
-                                        Stmt *Finally) {
-    return getSema().ActOnObjCAtTryStmt(AtLoc, TryBody, CatchStmts,
-                                        Finally);
-  }
+StmtResult RebuildCoroutineBodyStmt(CoroutineBodyStmt::CtorArgs Args) {
+return getSema().BuildCoroutineBodyStmt(Args);
+}
 
-  /// Rebuild an Objective-C exception declaration.
-  ///
-  /// By default, performs semantic analysis to build the new declaration.
-  /// Subclasses may override this routine to provide different behavior.
-  VarDecl *RebuildObjCExceptionDecl(VarDecl *ExceptionDecl,
-                                    TypeSourceInfo *TInfo, QualType T) {
-    return getSema().BuildObjCExceptionDecl(TInfo, T,
-                                            ExceptionDecl->getInnerLocStart(),
-                                            ExceptionDecl->getLocation(),
-                                            ExceptionDecl->getIdentifier());
-  }
+/// Build a new Objective-C \@try statement.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+StmtResult RebuildObjCAtTryStmt(SourceLocation AtLoc,
+                                    Stmt *TryBody,
+                                    MultiStmtArg CatchStmts,
+                                    Stmt *Finally) {
+return getSema().ActOnObjCAtTryStmt(AtLoc, TryBody, CatchStmts,
+                                    Finally);
+}
 
-  /// Build a new Objective-C \@catch statement.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildObjCAtCatchStmt(SourceLocation AtLoc,
-                                          SourceLocation RParenLoc,
-                                          VarDecl *Var,
-                                          Stmt *Body) {
-    return getSema().ActOnObjCAtCatchStmt(AtLoc, RParenLoc,
-                                          Var, Body);
-  }
+/// Rebuild an Objective-C exception declaration.
+///
+/// By default, performs semantic analysis to build the new declaration.
+/// Subclasses may override this routine to provide different behavior.
+VarDecl *RebuildObjCExceptionDecl(VarDecl *ExceptionDecl,
+                                TypeSourceInfo *TInfo, QualType T) {
+return getSema().BuildObjCExceptionDecl(TInfo, T,
+                                        ExceptionDecl->getInnerLocStart(),
+                                        ExceptionDecl->getLocation(),
+                                        ExceptionDecl->getIdentifier());
+}
 
-  /// Build a new Objective-C \@finally statement.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildObjCAtFinallyStmt(SourceLocation AtLoc,
-                                            Stmt *Body) {
-    return getSema().ActOnObjCAtFinallyStmt(AtLoc, Body);
-  }
+/// Build a new Objective-C \@catch statement.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+StmtResult RebuildObjCAtCatchStmt(SourceLocation AtLoc,
+                                        SourceLocation RParenLoc,
+                                        VarDecl *Var,
+                                        Stmt *Body) {
+return getSema().ActOnObjCAtCatchStmt(AtLoc, RParenLoc,
+                                        Var, Body);
+}
 
-  /// Build a new Objective-C \@throw statement.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildObjCAtThrowStmt(SourceLocation AtLoc,
-                                          Expr *Operand) {
-    return getSema().BuildObjCAtThrowStmt(AtLoc, Operand);
-  }
+/// Build a new Objective-C \@finally statement.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+StmtResult RebuildObjCAtFinallyStmt(SourceLocation AtLoc,
+                                        Stmt *Body) {
+return getSema().ActOnObjCAtFinallyStmt(AtLoc, Body);
+}
 
-  /// Build a new OpenMP Canonical loop.
-  ///
-  /// Ensures that the outermost loop in @p LoopStmt is wrapped by a
-  /// OMPCanonicalLoop.
-  StmtResult RebuildOMPCanonicalLoop(Stmt *LoopStmt) {
-    return getSema().ActOnOpenMPCanonicalLoop(LoopStmt);
-  }
+/// Build a new Objective-C \@throw statement.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+StmtResult RebuildObjCAtThrowStmt(SourceLocation AtLoc,
+                                        Expr *Operand) {
+return getSema().BuildObjCAtThrowStmt(AtLoc, Operand);
+}
 
-  /// Build a new OmpSs executable directive.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildOSSExecutableDirective(ArrayRef<OSSClause *> Clauses,
-                                           OmpSsDirectiveKind Kind,
-                                           Stmt *AStmt,
-                                           SourceLocation StartLoc,
-                                           SourceLocation EndLoc) {
-    SmallVector<OSSClause *, 2> RebuiltClauses;
-    for (OSSClause *const& C : Clauses) {
-      RebuiltClauses.push_back(C);
-    }
-    getSema().ActOnOmpSsAfterClauseGathering(RebuiltClauses);
-    return getSema().ActOnOmpSsExecutableDirective(RebuiltClauses,
-        Kind, AStmt, StartLoc, EndLoc);
-  }
+/// Build a new OpenMP Canonical loop.
+///
+/// Ensures that the outermost loop in @p LoopStmt is wrapped by a
+/// OMPCanonicalLoop.
+StmtResult RebuildOMPCanonicalLoop(Stmt *LoopStmt) {
+return getSema().ActOnOpenMPCanonicalLoop(LoopStmt);
+}
 
-  /// Build a new OmpSs 'if' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OmpSs clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OSSClause *RebuildOSSIfClause(Expr *Condition, SourceLocation StartLoc,
+/// Build a new OmpSs executable directive.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+StmtResult RebuildOSSExecutableDirective(ArrayRef<OSSClause *> Clauses,
+                                        OmpSsDirectiveKind Kind,
+                                        Stmt *AStmt,
+                                        SourceLocation StartLoc,
+                                        SourceLocation EndLoc) {
+SmallVector<OSSClause *, 2> RebuiltClauses;
+for (OSSClause *const& C : Clauses) {
+    RebuiltClauses.push_back(C);
+}
+getSema().ActOnOmpSsAfterClauseGathering(RebuiltClauses);
+return getSema().ActOnOmpSsExecutableDirective(RebuiltClauses,
+    Kind, AStmt, StartLoc, EndLoc);
+}
+
+/// Build a new OmpSs 'if' clause.
+///
+/// By default, performs semantic analysis to build the new OmpSs clause.
+/// Subclasses may override this routine to provide different behavior.
+OSSClause *RebuildOSSIfClause(Expr *Condition, SourceLocation StartLoc,
+                            SourceLocation LParenLoc,
+                            SourceLocation EndLoc) {
+return getSema().ActOnOmpSsIfClause(Condition, StartLoc, LParenLoc,
+                                    EndLoc);
+}
+
+/// Build a new OmpSs 'final' clause.
+///
+/// By default, performs semantic analysis to build the new OmpSs clause.
+/// Subclasses may override this routine to provide different behavior.
+OSSClause *RebuildOSSFinalClause(Expr *Condition, SourceLocation StartLoc,
                                 SourceLocation LParenLoc,
                                 SourceLocation EndLoc) {
-    return getSema().ActOnOmpSsIfClause(Condition, StartLoc, LParenLoc,
+return getSema().ActOnOmpSsFinalClause(Condition, StartLoc, LParenLoc,
                                         EndLoc);
-  }
+}
 
-  /// Build a new OmpSs 'final' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OmpSs clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OSSClause *RebuildOSSFinalClause(Expr *Condition, SourceLocation StartLoc,
-                                   SourceLocation LParenLoc,
-                                   SourceLocation EndLoc) {
-    return getSema().ActOnOmpSsFinalClause(Condition, StartLoc, LParenLoc,
-                                           EndLoc);
-  }
+/// Build a new OmpSs 'cost' clause.
+///
+/// By default, performs semantic analysis to build the new OmpSs clause.
+/// Subclasses may override this routine to provide different behavior.
+OSSClause *RebuildOSSCostClause(Expr *Condition, SourceLocation StartLoc,
+                                SourceLocation LParenLoc,
+                                SourceLocation EndLoc) {
+return getSema().ActOnOmpSsCostClause(Condition, StartLoc, LParenLoc,
+                                        EndLoc);
+}
 
-  /// Build a new OmpSs 'cost' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OmpSs clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OSSClause *RebuildOSSCostClause(Expr *Condition, SourceLocation StartLoc,
-                                  SourceLocation LParenLoc,
-                                  SourceLocation EndLoc) {
-    return getSema().ActOnOmpSsCostClause(Condition, StartLoc, LParenLoc,
-                                          EndLoc);
-  }
+/// Build a new OmpSs 'priority' clause.
+///
+/// By default, performs semantic analysis to build the new OmpSs clause.
+/// Subclasses may override this routine to provide different behavior.
+OSSClause *RebuildOSSPriorityClause(Expr *Condition, SourceLocation StartLoc,
+                                SourceLocation LParenLoc,
+                                SourceLocation EndLoc) {
+return getSema().ActOnOmpSsPriorityClause(Condition, StartLoc, LParenLoc,
+                                        EndLoc);
+}
 
-  /// Build a new OmpSs 'priority' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OmpSs clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OSSClause *RebuildOSSPriorityClause(Expr *Condition, SourceLocation StartLoc,
-                                  SourceLocation LParenLoc,
-                                  SourceLocation EndLoc) {
-    return getSema().ActOnOmpSsPriorityClause(Condition, StartLoc, LParenLoc,
-                                          EndLoc);
-  }
+/// Build a new OmpSs 'label' clause.
+///
+/// By default, performs semantic analysis to build the new OmpSs clause.
+/// Subclasses may override this routine to provide different behavior.
+OSSClause *RebuildOSSLabelClause(Expr *E, SourceLocation StartLoc,
+                                SourceLocation LParenLoc,
+                                SourceLocation EndLoc) {
+return getSema().ActOnOmpSsLabelClause(E, StartLoc, LParenLoc,
+                                        EndLoc);
+}
 
-  /// Build a new OmpSs 'label' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OmpSs clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OSSClause *RebuildOSSLabelClause(Expr *E, SourceLocation StartLoc,
-                                   SourceLocation LParenLoc,
-                                   SourceLocation EndLoc) {
-    return getSema().ActOnOmpSsLabelClause(E, StartLoc, LParenLoc,
-                                           EndLoc);
-  }
+/// Build a new OmpSs 'onready' clause.
+///
+/// By default, performs semantic analysis to build the new OmpSs clause.
+/// Subclasses may override this routine to provide different behavior.
+OSSClause *RebuildOSSOnreadyClause(
+    Expr *E, SourceLocation StartLoc,
+    SourceLocation LParenLoc, SourceLocation EndLoc) {
+return getSema().ActOnOmpSsOnreadyClause(
+    E, StartLoc, LParenLoc, EndLoc);
+}
 
-  /// Build a new OmpSs 'onready' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OmpSs clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OSSClause *RebuildOSSOnreadyClause(
-      Expr *E, SourceLocation StartLoc,
-      SourceLocation LParenLoc, SourceLocation EndLoc) {
-    return getSema().ActOnOmpSsOnreadyClause(
-      E, StartLoc, LParenLoc, EndLoc);
-  }
+/// Build a new OmpSs 'chunksize' clause.
+///
+/// By default, performs semantic analysis to build the new OmpSs clause.
+/// Subclasses may override this routine to provide different behavior.
+OSSClause *RebuildOSSChunksizeClause(
+    Expr *Condition, SourceLocation StartLoc,
+    SourceLocation LParenLoc, SourceLocation EndLoc) {
+return getSema().ActOnOmpSsChunksizeClause(
+    Condition, StartLoc, LParenLoc, EndLoc);
+}
 
-  /// Build a new OmpSs 'chunksize' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OmpSs clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OSSClause *RebuildOSSChunksizeClause(
-      Expr *Condition, SourceLocation StartLoc,
-      SourceLocation LParenLoc, SourceLocation EndLoc) {
-    return getSema().ActOnOmpSsChunksizeClause(
-      Condition, StartLoc, LParenLoc, EndLoc);
-  }
+/// Build a new OmpSs 'grainsize' clause.
+///
+/// By default, performs semantic analysis to build the new OmpSs clause.
+/// Subclasses may override this routine to provide different behavior.
+OSSClause *RebuildOSSGrainsizeClause(
+    Expr *Condition, SourceLocation StartLoc,
+    SourceLocation LParenLoc, SourceLocation EndLoc) {
+return getSema().ActOnOmpSsGrainsizeClause(
+    Condition, StartLoc, LParenLoc, EndLoc);
+}
 
-  /// Build a new OmpSs 'grainsize' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OmpSs clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OSSClause *RebuildOSSGrainsizeClause(
-      Expr *Condition, SourceLocation StartLoc,
-      SourceLocation LParenLoc, SourceLocation EndLoc) {
-    return getSema().ActOnOmpSsGrainsizeClause(
-      Condition, StartLoc, LParenLoc, EndLoc);
-  }
+/// Build a new OmpSs 'collapse' clause.
+///
+/// By default, performs semantic analysis to build the new OmpSs clause.
+/// Subclasses may override this routine to provide different behavior.
+OSSClause *RebuildOSSCollapseClause(Expr *Num, SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc) {
+return getSema().ActOnOmpSsCollapseClause(Num, StartLoc, LParenLoc,
+                                            EndLoc);
+}
 
-  /// Build a new OmpSs 'collapse' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OmpSs clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OSSClause *RebuildOSSCollapseClause(Expr *Num, SourceLocation StartLoc,
-                                      SourceLocation LParenLoc,
-                                      SourceLocation EndLoc) {
-    return getSema().ActOnOmpSsCollapseClause(Num, StartLoc, LParenLoc,
-                                              EndLoc);
-  }
+/// Build a new OmpSs 'depend' pseudo clause.
+///
+/// By default, performs semantic analysis to build the new OmpSs clause.
+/// Subclasses may override this routine to provide different behavior.
+OSSClause *
+RebuildOSSDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLocation DepLoc,
+                        SourceLocation ColonLoc, ArrayRef<Expr *> VarList,
+                        SourceLocation StartLoc, SourceLocation LParenLoc,
+                        SourceLocation EndLoc, bool OSSSyntax) {
+return getSema().ActOnOmpSsDependClause(DepKinds, DepLoc, ColonLoc, VarList,
+                                        StartLoc, LParenLoc, EndLoc, OSSSyntax);
+}
 
-  /// Build a new OmpSs 'depend' pseudo clause.
-  ///
-  /// By default, performs semantic analysis to build the new OmpSs clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OSSClause *
-  RebuildOSSDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLocation DepLoc,
-                         SourceLocation ColonLoc, ArrayRef<Expr *> VarList,
-                         SourceLocation StartLoc, SourceLocation LParenLoc,
-                         SourceLocation EndLoc, bool OSSSyntax) {
-    return getSema().ActOnOmpSsDependClause(DepKinds, DepLoc, ColonLoc, VarList,
-                                            StartLoc, LParenLoc, EndLoc, OSSSyntax);
-  }
+/// Build a new OpenMP 'reduction' clause.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+OSSClause *
+RebuildOSSReductionClause(OmpSsClauseKind Kind, ArrayRef<Expr *> VarList,
+                        SourceLocation StartLoc,
+                        SourceLocation LParenLoc,
+                        SourceLocation ColonLoc,
+                        SourceLocation EndLoc,
+                        CXXScopeSpec &ReductionIdScopeSpec,
+                        const DeclarationNameInfo &ReductionId,
+                        ArrayRef<Expr *> UnresolvedReductions) {
+return getSema().ActOnOmpSsReductionClause(Kind,
+    VarList, StartLoc, LParenLoc, ColonLoc, EndLoc, ReductionIdScopeSpec,
+    ReductionId, UnresolvedReductions);
+}
 
-  /// Build a new OpenMP 'reduction' clause.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  OSSClause *
-  RebuildOSSReductionClause(OmpSsClauseKind Kind, ArrayRef<Expr *> VarList,
-                            SourceLocation StartLoc,
+/// Build a new OmpSs 'shared' clause.
+///
+/// By default, performs semantic analysis to build the new OmpSs clause.
+/// Subclasses may override this routine to provide different behavior.
+OSSClause *RebuildOSSSharedClause(ArrayRef<Expr *> VarList,
+                                SourceLocation StartLoc,
+                                SourceLocation LParenLoc,
+                                SourceLocation EndLoc) {
+return getSema().ActOnOmpSsSharedClause(VarList, StartLoc, LParenLoc,
+                                        EndLoc);
+}
+
+/// Build a new OmpSs 'private' clause.
+///
+/// By default, performs semantic analysis to build the new OmpSs clause.
+/// Subclasses may override this routine to provide different behavior.
+OSSClause *RebuildOSSPrivateClause(ArrayRef<Expr *> VarList,
+                                    SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc) {
+return getSema().ActOnOmpSsPrivateClause(VarList, StartLoc, LParenLoc,
+                                            EndLoc);
+}
+
+/// Build a new OmpSs 'firstprivate' clause.
+///
+/// By default, performs semantic analysis to build the new OmpSs clause.
+/// Subclasses may override this routine to provide different behavior.
+OSSClause *RebuildOSSFirstprivateClause(ArrayRef<Expr *> VarList,
+                                        SourceLocation StartLoc,
+                                        SourceLocation LParenLoc,
+                                        SourceLocation EndLoc) {
+return getSema().ActOnOmpSsFirstprivateClause(VarList, StartLoc, LParenLoc,
+                                                EndLoc);
+}
+
+/// Build a new OpenMP executable directive.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+StmtResult RebuildOMPExecutableDirective(OpenMPDirectiveKind Kind,
+                                        DeclarationNameInfo DirName,
+                                        OpenMPDirectiveKind CancelRegion,
+                                        ArrayRef<OMPClause *> Clauses,
+                                        Stmt *AStmt, SourceLocation StartLoc,
+                                        SourceLocation EndLoc) {
+return getSema().ActOnOpenMPExecutableDirective(
+    Kind, DirName, CancelRegion, Clauses, AStmt, StartLoc, EndLoc);
+}
+
+/// Build a new OpenMP 'if' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPIfClause(OpenMPDirectiveKind NameModifier,
+                            Expr *Condition, SourceLocation StartLoc,
                             SourceLocation LParenLoc,
+                            SourceLocation NameModifierLoc,
                             SourceLocation ColonLoc,
+                            SourceLocation EndLoc) {
+return getSema().ActOnOpenMPIfClause(NameModifier, Condition, StartLoc,
+                                        LParenLoc, NameModifierLoc, ColonLoc,
+                                        EndLoc);
+}
+
+/// Build a new OpenMP 'final' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPFinalClause(Expr *Condition, SourceLocation StartLoc,
+                                SourceLocation LParenLoc,
+                                SourceLocation EndLoc) {
+return getSema().ActOnOpenMPFinalClause(Condition, StartLoc, LParenLoc,
+                                        EndLoc);
+}
+
+/// Build a new OpenMP 'num_threads' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPNumThreadsClause(Expr *NumThreads,
+                                    SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc) {
+return getSema().ActOnOpenMPNumThreadsClause(NumThreads, StartLoc,
+                                                LParenLoc, EndLoc);
+}
+
+/// Build a new OpenMP 'safelen' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPSafelenClause(Expr *Len, SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc) {
+return getSema().ActOnOpenMPSafelenClause(Len, StartLoc, LParenLoc, EndLoc);
+}
+
+/// Build a new OpenMP 'simdlen' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPSimdlenClause(Expr *Len, SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc) {
+return getSema().ActOnOpenMPSimdlenClause(Len, StartLoc, LParenLoc, EndLoc);
+}
+
+OMPClause *RebuildOMPSizesClause(ArrayRef<Expr *> Sizes,
+                                SourceLocation StartLoc,
+                                SourceLocation LParenLoc,
+                                SourceLocation EndLoc) {
+return getSema().ActOnOpenMPSizesClause(Sizes, StartLoc, LParenLoc, EndLoc);
+}
+
+/// Build a new OpenMP 'full' clause.
+OMPClause *RebuildOMPFullClause(SourceLocation StartLoc,
+                                SourceLocation EndLoc) {
+return getSema().ActOnOpenMPFullClause(StartLoc, EndLoc);
+}
+
+/// Build a new OpenMP 'partial' clause.
+OMPClause *RebuildOMPPartialClause(Expr *Factor, SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc) {
+return getSema().ActOnOpenMPPartialClause(Factor, StartLoc, LParenLoc,
+                                            EndLoc);
+}
+
+/// Build a new OpenMP 'allocator' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPAllocatorClause(Expr *A, SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc) {
+return getSema().ActOnOpenMPAllocatorClause(A, StartLoc, LParenLoc, EndLoc);
+}
+
+/// Build a new OpenMP 'collapse' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPCollapseClause(Expr *Num, SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc) {
+return getSema().ActOnOpenMPCollapseClause(Num, StartLoc, LParenLoc,
+                                            EndLoc);
+}
+
+/// Build a new OpenMP 'default' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPDefaultClause(DefaultKind Kind, SourceLocation KindKwLoc,
+                                    SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc) {
+return getSema().ActOnOpenMPDefaultClause(Kind, KindKwLoc,
+                                            StartLoc, LParenLoc, EndLoc);
+}
+
+/// Build a new OpenMP 'proc_bind' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPProcBindClause(ProcBindKind Kind,
+                                    SourceLocation KindKwLoc,
+                                    SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc) {
+return getSema().ActOnOpenMPProcBindClause(Kind, KindKwLoc,
+                                            StartLoc, LParenLoc, EndLoc);
+}
+
+/// Build a new OpenMP 'schedule' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPScheduleClause(
+    OpenMPScheduleClauseModifier M1, OpenMPScheduleClauseModifier M2,
+    OpenMPScheduleClauseKind Kind, Expr *ChunkSize, SourceLocation StartLoc,
+    SourceLocation LParenLoc, SourceLocation M1Loc, SourceLocation M2Loc,
+    SourceLocation KindLoc, SourceLocation CommaLoc, SourceLocation EndLoc) {
+return getSema().ActOnOpenMPScheduleClause(
+    M1, M2, Kind, ChunkSize, StartLoc, LParenLoc, M1Loc, M2Loc, KindLoc,
+    CommaLoc, EndLoc);
+}
+
+/// Build a new OpenMP 'ordered' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPOrderedClause(SourceLocation StartLoc,
+                                    SourceLocation EndLoc,
+                                    SourceLocation LParenLoc, Expr *Num) {
+return getSema().ActOnOpenMPOrderedClause(StartLoc, EndLoc, LParenLoc, Num);
+}
+
+/// Build a new OpenMP 'private' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPPrivateClause(ArrayRef<Expr *> VarList,
+                                    SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc) {
+return getSema().ActOnOpenMPPrivateClause(VarList, StartLoc, LParenLoc,
+                                            EndLoc);
+}
+
+/// Build a new OpenMP 'firstprivate' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPFirstprivateClause(ArrayRef<Expr *> VarList,
+                                        SourceLocation StartLoc,
+                                        SourceLocation LParenLoc,
+                                        SourceLocation EndLoc) {
+return getSema().ActOnOpenMPFirstprivateClause(VarList, StartLoc, LParenLoc,
+                                                EndLoc);
+}
+
+/// Build a new OpenMP 'lastprivate' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPLastprivateClause(ArrayRef<Expr *> VarList,
+                                        OpenMPLastprivateModifier LPKind,
+                                        SourceLocation LPKindLoc,
+                                        SourceLocation ColonLoc,
+                                        SourceLocation StartLoc,
+                                        SourceLocation LParenLoc,
+                                        SourceLocation EndLoc) {
+return getSema().ActOnOpenMPLastprivateClause(
+    VarList, LPKind, LPKindLoc, ColonLoc, StartLoc, LParenLoc, EndLoc);
+}
+
+/// Build a new OpenMP 'shared' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPSharedClause(ArrayRef<Expr *> VarList,
+                                SourceLocation StartLoc,
+                                SourceLocation LParenLoc,
+                                SourceLocation EndLoc) {
+return getSema().ActOnOpenMPSharedClause(VarList, StartLoc, LParenLoc,
+                                            EndLoc);
+}
+
+/// Build a new OpenMP 'reduction' clause.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPReductionClause(
+    ArrayRef<Expr *> VarList, OpenMPReductionClauseModifier Modifier,
+    SourceLocation StartLoc, SourceLocation LParenLoc,
+    SourceLocation ModifierLoc, SourceLocation ColonLoc,
+    SourceLocation EndLoc, CXXScopeSpec &ReductionIdScopeSpec,
+    const DeclarationNameInfo &ReductionId,
+    ArrayRef<Expr *> UnresolvedReductions) {
+return getSema().ActOnOpenMPReductionClause(
+    VarList, Modifier, StartLoc, LParenLoc, ModifierLoc, ColonLoc, EndLoc,
+    ReductionIdScopeSpec, ReductionId, UnresolvedReductions);
+}
+
+/// Build a new OpenMP 'task_reduction' clause.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPTaskReductionClause(
+    ArrayRef<Expr *> VarList, SourceLocation StartLoc,
+    SourceLocation LParenLoc, SourceLocation ColonLoc, SourceLocation EndLoc,
+    CXXScopeSpec &ReductionIdScopeSpec,
+    const DeclarationNameInfo &ReductionId,
+    ArrayRef<Expr *> UnresolvedReductions) {
+return getSema().ActOnOpenMPTaskReductionClause(
+    VarList, StartLoc, LParenLoc, ColonLoc, EndLoc, ReductionIdScopeSpec,
+    ReductionId, UnresolvedReductions);
+}
+
+/// Build a new OpenMP 'in_reduction' clause.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *
+RebuildOMPInReductionClause(ArrayRef<Expr *> VarList, SourceLocation StartLoc,
+                            SourceLocation LParenLoc, SourceLocation ColonLoc,
                             SourceLocation EndLoc,
                             CXXScopeSpec &ReductionIdScopeSpec,
                             const DeclarationNameInfo &ReductionId,
                             ArrayRef<Expr *> UnresolvedReductions) {
-    return getSema().ActOnOmpSsReductionClause(Kind,
-        VarList, StartLoc, LParenLoc, ColonLoc, EndLoc, ReductionIdScopeSpec,
-        ReductionId, UnresolvedReductions);
-  }
+return getSema().ActOnOpenMPInReductionClause(
+    VarList, StartLoc, LParenLoc, ColonLoc, EndLoc, ReductionIdScopeSpec,
+    ReductionId, UnresolvedReductions);
+}
 
-  /// Build a new OmpSs 'shared' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OmpSs clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OSSClause *RebuildOSSSharedClause(ArrayRef<Expr *> VarList,
-                                    SourceLocation StartLoc,
-                                    SourceLocation LParenLoc,
-                                    SourceLocation EndLoc) {
-    return getSema().ActOnOmpSsSharedClause(VarList, StartLoc, LParenLoc,
-                                            EndLoc);
-  }
-
-  /// Build a new OmpSs 'private' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OmpSs clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OSSClause *RebuildOSSPrivateClause(ArrayRef<Expr *> VarList,
-                                     SourceLocation StartLoc,
-                                     SourceLocation LParenLoc,
-                                     SourceLocation EndLoc) {
-    return getSema().ActOnOmpSsPrivateClause(VarList, StartLoc, LParenLoc,
-                                             EndLoc);
-  }
-
-  /// Build a new OmpSs 'firstprivate' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OmpSs clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OSSClause *RebuildOSSFirstprivateClause(ArrayRef<Expr *> VarList,
-                                          SourceLocation StartLoc,
-                                          SourceLocation LParenLoc,
-                                          SourceLocation EndLoc) {
-    return getSema().ActOnOmpSsFirstprivateClause(VarList, StartLoc, LParenLoc,
-                                                  EndLoc);
-  }
-
-  /// Build a new OpenMP executable directive.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildOMPExecutableDirective(OpenMPDirectiveKind Kind,
-                                           DeclarationNameInfo DirName,
-                                           OpenMPDirectiveKind CancelRegion,
-                                           ArrayRef<OMPClause *> Clauses,
-                                           Stmt *AStmt, SourceLocation StartLoc,
-                                           SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPExecutableDirective(
-        Kind, DirName, CancelRegion, Clauses, AStmt, StartLoc, EndLoc);
-  }
-
-  /// Build a new OpenMP 'if' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPIfClause(OpenMPDirectiveKind NameModifier,
-                                Expr *Condition, SourceLocation StartLoc,
+/// Build a new OpenMP 'linear' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPLinearClause(ArrayRef<Expr *> VarList, Expr *Step,
+                                SourceLocation StartLoc,
                                 SourceLocation LParenLoc,
-                                SourceLocation NameModifierLoc,
+                                OpenMPLinearClauseKind Modifier,
+                                SourceLocation ModifierLoc,
                                 SourceLocation ColonLoc,
                                 SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPIfClause(NameModifier, Condition, StartLoc,
-                                         LParenLoc, NameModifierLoc, ColonLoc,
-                                         EndLoc);
-  }
-
-  /// Build a new OpenMP 'final' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPFinalClause(Expr *Condition, SourceLocation StartLoc,
-                                   SourceLocation LParenLoc,
-                                   SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPFinalClause(Condition, StartLoc, LParenLoc,
+return getSema().ActOnOpenMPLinearClause(VarList, Step, StartLoc, LParenLoc,
+                                            Modifier, ModifierLoc, ColonLoc,
                                             EndLoc);
-  }
+}
 
-  /// Build a new OpenMP 'num_threads' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPNumThreadsClause(Expr *NumThreads,
-                                        SourceLocation StartLoc,
-                                        SourceLocation LParenLoc,
-                                        SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPNumThreadsClause(NumThreads, StartLoc,
-                                                 LParenLoc, EndLoc);
-  }
-
-  /// Build a new OpenMP 'safelen' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPSafelenClause(Expr *Len, SourceLocation StartLoc,
-                                     SourceLocation LParenLoc,
-                                     SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPSafelenClause(Len, StartLoc, LParenLoc, EndLoc);
-  }
-
-  /// Build a new OpenMP 'simdlen' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPSimdlenClause(Expr *Len, SourceLocation StartLoc,
-                                     SourceLocation LParenLoc,
-                                     SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPSimdlenClause(Len, StartLoc, LParenLoc, EndLoc);
-  }
-
-  OMPClause *RebuildOMPSizesClause(ArrayRef<Expr *> Sizes,
-                                   SourceLocation StartLoc,
-                                   SourceLocation LParenLoc,
-                                   SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPSizesClause(Sizes, StartLoc, LParenLoc, EndLoc);
-  }
-
-  /// Build a new OpenMP 'full' clause.
-  OMPClause *RebuildOMPFullClause(SourceLocation StartLoc,
-                                  SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPFullClause(StartLoc, EndLoc);
-  }
-
-  /// Build a new OpenMP 'partial' clause.
-  OMPClause *RebuildOMPPartialClause(Expr *Factor, SourceLocation StartLoc,
-                                     SourceLocation LParenLoc,
-                                     SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPPartialClause(Factor, StartLoc, LParenLoc,
-                                              EndLoc);
-  }
-
-  /// Build a new OpenMP 'allocator' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPAllocatorClause(Expr *A, SourceLocation StartLoc,
-                                       SourceLocation LParenLoc,
-                                       SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPAllocatorClause(A, StartLoc, LParenLoc, EndLoc);
-  }
-
-  /// Build a new OpenMP 'collapse' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPCollapseClause(Expr *Num, SourceLocation StartLoc,
-                                      SourceLocation LParenLoc,
-                                      SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPCollapseClause(Num, StartLoc, LParenLoc,
-                                               EndLoc);
-  }
-
-  /// Build a new OpenMP 'default' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPDefaultClause(DefaultKind Kind, SourceLocation KindKwLoc,
-                                     SourceLocation StartLoc,
-                                     SourceLocation LParenLoc,
-                                     SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPDefaultClause(Kind, KindKwLoc,
-                                              StartLoc, LParenLoc, EndLoc);
-  }
-
-  /// Build a new OpenMP 'proc_bind' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPProcBindClause(ProcBindKind Kind,
-                                      SourceLocation KindKwLoc,
-                                      SourceLocation StartLoc,
-                                      SourceLocation LParenLoc,
-                                      SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPProcBindClause(Kind, KindKwLoc,
-                                               StartLoc, LParenLoc, EndLoc);
-  }
-
-  /// Build a new OpenMP 'schedule' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPScheduleClause(
-      OpenMPScheduleClauseModifier M1, OpenMPScheduleClauseModifier M2,
-      OpenMPScheduleClauseKind Kind, Expr *ChunkSize, SourceLocation StartLoc,
-      SourceLocation LParenLoc, SourceLocation M1Loc, SourceLocation M2Loc,
-      SourceLocation KindLoc, SourceLocation CommaLoc, SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPScheduleClause(
-        M1, M2, Kind, ChunkSize, StartLoc, LParenLoc, M1Loc, M2Loc, KindLoc,
-        CommaLoc, EndLoc);
-  }
-
-  /// Build a new OpenMP 'ordered' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPOrderedClause(SourceLocation StartLoc,
-                                     SourceLocation EndLoc,
-                                     SourceLocation LParenLoc, Expr *Num) {
-    return getSema().ActOnOpenMPOrderedClause(StartLoc, EndLoc, LParenLoc, Num);
-  }
-
-  /// Build a new OpenMP 'private' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPPrivateClause(ArrayRef<Expr *> VarList,
-                                     SourceLocation StartLoc,
-                                     SourceLocation LParenLoc,
-                                     SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPPrivateClause(VarList, StartLoc, LParenLoc,
-                                              EndLoc);
-  }
-
-  /// Build a new OpenMP 'firstprivate' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPFirstprivateClause(ArrayRef<Expr *> VarList,
-                                          SourceLocation StartLoc,
-                                          SourceLocation LParenLoc,
-                                          SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPFirstprivateClause(VarList, StartLoc, LParenLoc,
-                                                   EndLoc);
-  }
-
-  /// Build a new OpenMP 'lastprivate' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPLastprivateClause(ArrayRef<Expr *> VarList,
-                                         OpenMPLastprivateModifier LPKind,
-                                         SourceLocation LPKindLoc,
-                                         SourceLocation ColonLoc,
-                                         SourceLocation StartLoc,
-                                         SourceLocation LParenLoc,
-                                         SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPLastprivateClause(
-        VarList, LPKind, LPKindLoc, ColonLoc, StartLoc, LParenLoc, EndLoc);
-  }
-
-  /// Build a new OpenMP 'shared' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPSharedClause(ArrayRef<Expr *> VarList,
+/// Build a new OpenMP 'aligned' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPAlignedClause(ArrayRef<Expr *> VarList, Expr *Alignment,
                                     SourceLocation StartLoc,
                                     SourceLocation LParenLoc,
-                                    SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPSharedClause(VarList, StartLoc, LParenLoc,
-                                             EndLoc);
-  }
-
-  /// Build a new OpenMP 'reduction' clause.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPReductionClause(
-      ArrayRef<Expr *> VarList, OpenMPReductionClauseModifier Modifier,
-      SourceLocation StartLoc, SourceLocation LParenLoc,
-      SourceLocation ModifierLoc, SourceLocation ColonLoc,
-      SourceLocation EndLoc, CXXScopeSpec &ReductionIdScopeSpec,
-      const DeclarationNameInfo &ReductionId,
-      ArrayRef<Expr *> UnresolvedReductions) {
-    return getSema().ActOnOpenMPReductionClause(
-        VarList, Modifier, StartLoc, LParenLoc, ModifierLoc, ColonLoc, EndLoc,
-        ReductionIdScopeSpec, ReductionId, UnresolvedReductions);
-  }
-
-  /// Build a new OpenMP 'task_reduction' clause.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPTaskReductionClause(
-      ArrayRef<Expr *> VarList, SourceLocation StartLoc,
-      SourceLocation LParenLoc, SourceLocation ColonLoc, SourceLocation EndLoc,
-      CXXScopeSpec &ReductionIdScopeSpec,
-      const DeclarationNameInfo &ReductionId,
-      ArrayRef<Expr *> UnresolvedReductions) {
-    return getSema().ActOnOpenMPTaskReductionClause(
-        VarList, StartLoc, LParenLoc, ColonLoc, EndLoc, ReductionIdScopeSpec,
-        ReductionId, UnresolvedReductions);
-  }
-
-  /// Build a new OpenMP 'in_reduction' clause.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *
-  RebuildOMPInReductionClause(ArrayRef<Expr *> VarList, SourceLocation StartLoc,
-                              SourceLocation LParenLoc, SourceLocation ColonLoc,
-                              SourceLocation EndLoc,
-                              CXXScopeSpec &ReductionIdScopeSpec,
-                              const DeclarationNameInfo &ReductionId,
-                              ArrayRef<Expr *> UnresolvedReductions) {
-    return getSema().ActOnOpenMPInReductionClause(
-        VarList, StartLoc, LParenLoc, ColonLoc, EndLoc, ReductionIdScopeSpec,
-        ReductionId, UnresolvedReductions);
-  }
-
-  /// Build a new OpenMP 'linear' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPLinearClause(ArrayRef<Expr *> VarList, Expr *Step,
-                                    SourceLocation StartLoc,
-                                    SourceLocation LParenLoc,
-                                    OpenMPLinearClauseKind Modifier,
-                                    SourceLocation ModifierLoc,
                                     SourceLocation ColonLoc,
                                     SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPLinearClause(VarList, Step, StartLoc, LParenLoc,
-                                             Modifier, ModifierLoc, ColonLoc,
-                                             EndLoc);
-  }
+return getSema().ActOnOpenMPAlignedClause(VarList, Alignment, StartLoc,
+                                            LParenLoc, ColonLoc, EndLoc);
+}
 
-  /// Build a new OpenMP 'aligned' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPAlignedClause(ArrayRef<Expr *> VarList, Expr *Alignment,
-                                     SourceLocation StartLoc,
-                                     SourceLocation LParenLoc,
-                                     SourceLocation ColonLoc,
-                                     SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPAlignedClause(VarList, Alignment, StartLoc,
-                                              LParenLoc, ColonLoc, EndLoc);
-  }
+/// Build a new OpenMP 'copyin' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPCopyinClause(ArrayRef<Expr *> VarList,
+                                SourceLocation StartLoc,
+                                SourceLocation LParenLoc,
+                                SourceLocation EndLoc) {
+return getSema().ActOnOpenMPCopyinClause(VarList, StartLoc, LParenLoc,
+                                            EndLoc);
+}
 
-  /// Build a new OpenMP 'copyin' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPCopyinClause(ArrayRef<Expr *> VarList,
+/// Build a new OpenMP 'copyprivate' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPCopyprivateClause(ArrayRef<Expr *> VarList,
+                                        SourceLocation StartLoc,
+                                        SourceLocation LParenLoc,
+                                        SourceLocation EndLoc) {
+return getSema().ActOnOpenMPCopyprivateClause(VarList, StartLoc, LParenLoc,
+                                                EndLoc);
+}
+
+/// Build a new OpenMP 'flush' pseudo clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPFlushClause(ArrayRef<Expr *> VarList,
+                                SourceLocation StartLoc,
+                                SourceLocation LParenLoc,
+                                SourceLocation EndLoc) {
+return getSema().ActOnOpenMPFlushClause(VarList, StartLoc, LParenLoc,
+                                        EndLoc);
+}
+
+/// Build a new OpenMP 'depobj' pseudo clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPDepobjClause(Expr *Depobj, SourceLocation StartLoc,
+                                SourceLocation LParenLoc,
+                                SourceLocation EndLoc) {
+return getSema().ActOnOpenMPDepobjClause(Depobj, StartLoc, LParenLoc,
+                                            EndLoc);
+}
+
+/// Build a new OpenMP 'depend' pseudo clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *
+RebuildOMPDependClause(Expr *DepModifier, OpenMPDependClauseKind DepKind,
+                        SourceLocation DepLoc, SourceLocation ColonLoc,
+                        ArrayRef<Expr *> VarList, SourceLocation StartLoc,
+                        SourceLocation LParenLoc, SourceLocation EndLoc) {
+return getSema().ActOnOpenMPDependClause(DepModifier, DepKind, DepLoc,
+                                            ColonLoc, VarList, StartLoc,
+                                            LParenLoc, EndLoc);
+}
+
+/// Build a new OpenMP 'device' clause.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPDeviceClause(OpenMPDeviceClauseModifier Modifier,
+                                Expr *Device, SourceLocation StartLoc,
+                                SourceLocation LParenLoc,
+                                SourceLocation ModifierLoc,
+                                SourceLocation EndLoc) {
+return getSema().ActOnOpenMPDeviceClause(Modifier, Device, StartLoc,
+                                            LParenLoc, ModifierLoc, EndLoc);
+}
+
+/// Build a new OpenMP 'map' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPMapClause(
+    ArrayRef<OpenMPMapModifierKind> MapTypeModifiers,
+    ArrayRef<SourceLocation> MapTypeModifiersLoc,
+    CXXScopeSpec MapperIdScopeSpec, DeclarationNameInfo MapperId,
+    OpenMPMapClauseKind MapType, bool IsMapTypeImplicit,
+    SourceLocation MapLoc, SourceLocation ColonLoc, ArrayRef<Expr *> VarList,
+    const OMPVarListLocTy &Locs, ArrayRef<Expr *> UnresolvedMappers) {
+return getSema().ActOnOpenMPMapClause(MapTypeModifiers, MapTypeModifiersLoc,
+                                        MapperIdScopeSpec, MapperId, MapType,
+                                        IsMapTypeImplicit, MapLoc, ColonLoc,
+                                        VarList, Locs, UnresolvedMappers);
+}
+
+/// Build a new OpenMP 'allocate' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPAllocateClause(Expr *Allocate, ArrayRef<Expr *> VarList,
+                                    SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation ColonLoc,
+                                    SourceLocation EndLoc) {
+return getSema().ActOnOpenMPAllocateClause(Allocate, VarList, StartLoc,
+                                            LParenLoc, ColonLoc, EndLoc);
+}
+
+/// Build a new OpenMP 'num_teams' clause.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPNumTeamsClause(Expr *NumTeams, SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc) {
+return getSema().ActOnOpenMPNumTeamsClause(NumTeams, StartLoc, LParenLoc,
+                                            EndLoc);
+}
+
+/// Build a new OpenMP 'thread_limit' clause.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPThreadLimitClause(Expr *ThreadLimit,
+                                        SourceLocation StartLoc,
+                                        SourceLocation LParenLoc,
+                                        SourceLocation EndLoc) {
+return getSema().ActOnOpenMPThreadLimitClause(ThreadLimit, StartLoc,
+                                                LParenLoc, EndLoc);
+}
+
+/// Build a new OpenMP 'priority' clause.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPPriorityClause(Expr *Priority, SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc) {
+return getSema().ActOnOpenMPPriorityClause(Priority, StartLoc, LParenLoc,
+                                            EndLoc);
+}
+
+/// Build a new OpenMP 'grainsize' clause.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPGrainsizeClause(Expr *Grainsize, SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc) {
+return getSema().ActOnOpenMPGrainsizeClause(Grainsize, StartLoc, LParenLoc,
+                                            EndLoc);
+}
+
+/// Build a new OpenMP 'num_tasks' clause.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPNumTasksClause(Expr *NumTasks, SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc) {
+return getSema().ActOnOpenMPNumTasksClause(NumTasks, StartLoc, LParenLoc,
+                                            EndLoc);
+}
+
+/// Build a new OpenMP 'hint' clause.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPHintClause(Expr *Hint, SourceLocation StartLoc,
+                                SourceLocation LParenLoc,
+                                SourceLocation EndLoc) {
+return getSema().ActOnOpenMPHintClause(Hint, StartLoc, LParenLoc, EndLoc);
+}
+
+/// Build a new OpenMP 'detach' clause.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPDetachClause(Expr *Evt, SourceLocation StartLoc,
+                                SourceLocation LParenLoc,
+                                SourceLocation EndLoc) {
+return getSema().ActOnOpenMPDetachClause(Evt, StartLoc, LParenLoc, EndLoc);
+}
+
+/// Build a new OpenMP 'dist_schedule' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *
+RebuildOMPDistScheduleClause(OpenMPDistScheduleClauseKind Kind,
+                            Expr *ChunkSize, SourceLocation StartLoc,
+                            SourceLocation LParenLoc, SourceLocation KindLoc,
+                            SourceLocation CommaLoc, SourceLocation EndLoc) {
+return getSema().ActOnOpenMPDistScheduleClause(
+    Kind, ChunkSize, StartLoc, LParenLoc, KindLoc, CommaLoc, EndLoc);
+}
+
+/// Build a new OpenMP 'to' clause.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *
+RebuildOMPToClause(ArrayRef<OpenMPMotionModifierKind> MotionModifiers,
+                    ArrayRef<SourceLocation> MotionModifiersLoc,
+                    CXXScopeSpec &MapperIdScopeSpec,
+                    DeclarationNameInfo &MapperId, SourceLocation ColonLoc,
+                    ArrayRef<Expr *> VarList, const OMPVarListLocTy &Locs,
+                    ArrayRef<Expr *> UnresolvedMappers) {
+return getSema().ActOnOpenMPToClause(MotionModifiers, MotionModifiersLoc,
+                                        MapperIdScopeSpec, MapperId, ColonLoc,
+                                        VarList, Locs, UnresolvedMappers);
+}
+
+/// Build a new OpenMP 'from' clause.
+///
+/// By default, performs semantic analysis to build the new statement.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *
+RebuildOMPFromClause(ArrayRef<OpenMPMotionModifierKind> MotionModifiers,
+                    ArrayRef<SourceLocation> MotionModifiersLoc,
+                    CXXScopeSpec &MapperIdScopeSpec,
+                    DeclarationNameInfo &MapperId, SourceLocation ColonLoc,
+                    ArrayRef<Expr *> VarList, const OMPVarListLocTy &Locs,
+                    ArrayRef<Expr *> UnresolvedMappers) {
+return getSema().ActOnOpenMPFromClause(
+    MotionModifiers, MotionModifiersLoc, MapperIdScopeSpec, MapperId,
+    ColonLoc, VarList, Locs, UnresolvedMappers);
+}
+
+/// Build a new OpenMP 'use_device_ptr' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPUseDevicePtrClause(ArrayRef<Expr *> VarList,
+                                        const OMPVarListLocTy &Locs) {
+return getSema().ActOnOpenMPUseDevicePtrClause(VarList, Locs);
+}
+
+/// Build a new OpenMP 'use_device_addr' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPUseDeviceAddrClause(ArrayRef<Expr *> VarList,
+                                        const OMPVarListLocTy &Locs) {
+return getSema().ActOnOpenMPUseDeviceAddrClause(VarList, Locs);
+}
+
+/// Build a new OpenMP 'is_device_ptr' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPIsDevicePtrClause(ArrayRef<Expr *> VarList,
+                                        const OMPVarListLocTy &Locs) {
+return getSema().ActOnOpenMPIsDevicePtrClause(VarList, Locs);
+}
+
+/// Build a new OpenMP 'defaultmap' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPDefaultmapClause(OpenMPDefaultmapClauseModifier M,
+                                    OpenMPDefaultmapClauseKind Kind,
+                                    SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation MLoc,
+                                    SourceLocation KindLoc,
+                                    SourceLocation EndLoc) {
+return getSema().ActOnOpenMPDefaultmapClause(M, Kind, StartLoc, LParenLoc,
+                                                MLoc, KindLoc, EndLoc);
+}
+
+/// Build a new OpenMP 'nontemporal' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPNontemporalClause(ArrayRef<Expr *> VarList,
+                                        SourceLocation StartLoc,
+                                        SourceLocation LParenLoc,
+                                        SourceLocation EndLoc) {
+return getSema().ActOnOpenMPNontemporalClause(VarList, StartLoc, LParenLoc,
+                                                EndLoc);
+}
+
+/// Build a new OpenMP 'inclusive' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPInclusiveClause(ArrayRef<Expr *> VarList,
                                     SourceLocation StartLoc,
                                     SourceLocation LParenLoc,
                                     SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPCopyinClause(VarList, StartLoc, LParenLoc,
-                                             EndLoc);
-  }
-
-  /// Build a new OpenMP 'copyprivate' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPCopyprivateClause(ArrayRef<Expr *> VarList,
-                                         SourceLocation StartLoc,
-                                         SourceLocation LParenLoc,
-                                         SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPCopyprivateClause(VarList, StartLoc, LParenLoc,
-                                                  EndLoc);
-  }
-
-  /// Build a new OpenMP 'flush' pseudo clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPFlushClause(ArrayRef<Expr *> VarList,
-                                   SourceLocation StartLoc,
-                                   SourceLocation LParenLoc,
-                                   SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPFlushClause(VarList, StartLoc, LParenLoc,
+return getSema().ActOnOpenMPInclusiveClause(VarList, StartLoc, LParenLoc,
                                             EndLoc);
-  }
+}
 
-  /// Build a new OpenMP 'depobj' pseudo clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPDepobjClause(Expr *Depobj, SourceLocation StartLoc,
+/// Build a new OpenMP 'exclusive' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPExclusiveClause(ArrayRef<Expr *> VarList,
+                                    SourceLocation StartLoc,
                                     SourceLocation LParenLoc,
                                     SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPDepobjClause(Depobj, StartLoc, LParenLoc,
-                                             EndLoc);
-  }
+return getSema().ActOnOpenMPExclusiveClause(VarList, StartLoc, LParenLoc,
+                                            EndLoc);
+}
 
-  /// Build a new OpenMP 'depend' pseudo clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *
-  RebuildOMPDependClause(Expr *DepModifier, OpenMPDependClauseKind DepKind,
-                         SourceLocation DepLoc, SourceLocation ColonLoc,
-                         ArrayRef<Expr *> VarList, SourceLocation StartLoc,
-                         SourceLocation LParenLoc, SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPDependClause(DepModifier, DepKind, DepLoc,
-                                             ColonLoc, VarList, StartLoc,
-                                             LParenLoc, EndLoc);
-  }
+/// Build a new OpenMP 'uses_allocators' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPUsesAllocatorsClause(
+    ArrayRef<Sema::UsesAllocatorsData> Data, SourceLocation StartLoc,
+    SourceLocation LParenLoc, SourceLocation EndLoc) {
+return getSema().ActOnOpenMPUsesAllocatorClause(StartLoc, LParenLoc, EndLoc,
+                                                Data);
+}
 
-  /// Build a new OpenMP 'device' clause.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPDeviceClause(OpenMPDeviceClauseModifier Modifier,
-                                    Expr *Device, SourceLocation StartLoc,
+/// Build a new OpenMP 'affinity' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPAffinityClause(SourceLocation StartLoc,
                                     SourceLocation LParenLoc,
-                                    SourceLocation ModifierLoc,
-                                    SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPDeviceClause(Modifier, Device, StartLoc,
-                                             LParenLoc, ModifierLoc, EndLoc);
-  }
+                                    SourceLocation ColonLoc,
+                                    SourceLocation EndLoc, Expr *Modifier,
+                                    ArrayRef<Expr *> Locators) {
+return getSema().ActOnOpenMPAffinityClause(StartLoc, LParenLoc, ColonLoc,
+                                            EndLoc, Modifier, Locators);
+}
 
-  /// Build a new OpenMP 'map' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPMapClause(
-      ArrayRef<OpenMPMapModifierKind> MapTypeModifiers,
-      ArrayRef<SourceLocation> MapTypeModifiersLoc,
-      CXXScopeSpec MapperIdScopeSpec, DeclarationNameInfo MapperId,
-      OpenMPMapClauseKind MapType, bool IsMapTypeImplicit,
-      SourceLocation MapLoc, SourceLocation ColonLoc, ArrayRef<Expr *> VarList,
-      const OMPVarListLocTy &Locs, ArrayRef<Expr *> UnresolvedMappers) {
-    return getSema().ActOnOpenMPMapClause(MapTypeModifiers, MapTypeModifiersLoc,
-                                          MapperIdScopeSpec, MapperId, MapType,
-                                          IsMapTypeImplicit, MapLoc, ColonLoc,
-                                          VarList, Locs, UnresolvedMappers);
-  }
+/// Build a new OpenMP 'order' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPOrderClause(OpenMPOrderClauseKind Kind,
+                                SourceLocation KindKwLoc,
+                                SourceLocation StartLoc,
+                                SourceLocation LParenLoc,
+                                SourceLocation EndLoc) {
+return getSema().ActOnOpenMPOrderClause(Kind, KindKwLoc, StartLoc,
+                                        LParenLoc, EndLoc);
+}
 
-  /// Build a new OpenMP 'allocate' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPAllocateClause(Expr *Allocate, ArrayRef<Expr *> VarList,
-                                      SourceLocation StartLoc,
-                                      SourceLocation LParenLoc,
-                                      SourceLocation ColonLoc,
-                                      SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPAllocateClause(Allocate, VarList, StartLoc,
-                                               LParenLoc, ColonLoc, EndLoc);
-  }
+/// Build a new OpenMP 'init' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPInitClause(Expr *InteropVar, ArrayRef<Expr *> PrefExprs,
+                                bool IsTarget, bool IsTargetSync,
+                                SourceLocation StartLoc,
+                                SourceLocation LParenLoc,
+                                SourceLocation VarLoc,
+                                SourceLocation EndLoc) {
+return getSema().ActOnOpenMPInitClause(InteropVar, PrefExprs, IsTarget,
+                                        IsTargetSync, StartLoc, LParenLoc,
+                                        VarLoc, EndLoc);
+}
 
-  /// Build a new OpenMP 'num_teams' clause.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPNumTeamsClause(Expr *NumTeams, SourceLocation StartLoc,
-                                      SourceLocation LParenLoc,
-                                      SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPNumTeamsClause(NumTeams, StartLoc, LParenLoc,
-                                               EndLoc);
-  }
+/// Build a new OpenMP 'use' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPUseClause(Expr *InteropVar, SourceLocation StartLoc,
+                                SourceLocation LParenLoc,
+                                SourceLocation VarLoc, SourceLocation EndLoc) {
+return getSema().ActOnOpenMPUseClause(InteropVar, StartLoc, LParenLoc,
+                                        VarLoc, EndLoc);
+}
 
-  /// Build a new OpenMP 'thread_limit' clause.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPThreadLimitClause(Expr *ThreadLimit,
-                                         SourceLocation StartLoc,
-                                         SourceLocation LParenLoc,
-                                         SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPThreadLimitClause(ThreadLimit, StartLoc,
-                                                  LParenLoc, EndLoc);
-  }
-
-  /// Build a new OpenMP 'priority' clause.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPPriorityClause(Expr *Priority, SourceLocation StartLoc,
-                                      SourceLocation LParenLoc,
-                                      SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPPriorityClause(Priority, StartLoc, LParenLoc,
-                                               EndLoc);
-  }
-
-  /// Build a new OpenMP 'grainsize' clause.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPGrainsizeClause(Expr *Grainsize, SourceLocation StartLoc,
-                                       SourceLocation LParenLoc,
-                                       SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPGrainsizeClause(Grainsize, StartLoc, LParenLoc,
-                                                EndLoc);
-  }
-
-  /// Build a new OpenMP 'num_tasks' clause.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPNumTasksClause(Expr *NumTasks, SourceLocation StartLoc,
-                                      SourceLocation LParenLoc,
-                                      SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPNumTasksClause(NumTasks, StartLoc, LParenLoc,
-                                               EndLoc);
-  }
-
-  /// Build a new OpenMP 'hint' clause.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPHintClause(Expr *Hint, SourceLocation StartLoc,
-                                  SourceLocation LParenLoc,
-                                  SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPHintClause(Hint, StartLoc, LParenLoc, EndLoc);
-  }
-
-  /// Build a new OpenMP 'detach' clause.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPDetachClause(Expr *Evt, SourceLocation StartLoc,
+/// Build a new OpenMP 'destroy' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPDestroyClause(Expr *InteropVar, SourceLocation StartLoc,
                                     SourceLocation LParenLoc,
+                                    SourceLocation VarLoc,
                                     SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPDetachClause(Evt, StartLoc, LParenLoc, EndLoc);
-  }
+return getSema().ActOnOpenMPDestroyClause(InteropVar, StartLoc, LParenLoc,
+                                            VarLoc, EndLoc);
+}
 
-  /// Build a new OpenMP 'dist_schedule' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *
-  RebuildOMPDistScheduleClause(OpenMPDistScheduleClauseKind Kind,
-                               Expr *ChunkSize, SourceLocation StartLoc,
-                               SourceLocation LParenLoc, SourceLocation KindLoc,
-                               SourceLocation CommaLoc, SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPDistScheduleClause(
-        Kind, ChunkSize, StartLoc, LParenLoc, KindLoc, CommaLoc, EndLoc);
-  }
-
-  /// Build a new OpenMP 'to' clause.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *
-  RebuildOMPToClause(ArrayRef<OpenMPMotionModifierKind> MotionModifiers,
-                     ArrayRef<SourceLocation> MotionModifiersLoc,
-                     CXXScopeSpec &MapperIdScopeSpec,
-                     DeclarationNameInfo &MapperId, SourceLocation ColonLoc,
-                     ArrayRef<Expr *> VarList, const OMPVarListLocTy &Locs,
-                     ArrayRef<Expr *> UnresolvedMappers) {
-    return getSema().ActOnOpenMPToClause(MotionModifiers, MotionModifiersLoc,
-                                         MapperIdScopeSpec, MapperId, ColonLoc,
-                                         VarList, Locs, UnresolvedMappers);
-  }
-
-  /// Build a new OpenMP 'from' clause.
-  ///
-  /// By default, performs semantic analysis to build the new statement.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *
-  RebuildOMPFromClause(ArrayRef<OpenMPMotionModifierKind> MotionModifiers,
-                       ArrayRef<SourceLocation> MotionModifiersLoc,
-                       CXXScopeSpec &MapperIdScopeSpec,
-                       DeclarationNameInfo &MapperId, SourceLocation ColonLoc,
-                       ArrayRef<Expr *> VarList, const OMPVarListLocTy &Locs,
-                       ArrayRef<Expr *> UnresolvedMappers) {
-    return getSema().ActOnOpenMPFromClause(
-        MotionModifiers, MotionModifiersLoc, MapperIdScopeSpec, MapperId,
-        ColonLoc, VarList, Locs, UnresolvedMappers);
-  }
-
-  /// Build a new OpenMP 'use_device_ptr' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPUseDevicePtrClause(ArrayRef<Expr *> VarList,
-                                          const OMPVarListLocTy &Locs) {
-    return getSema().ActOnOpenMPUseDevicePtrClause(VarList, Locs);
-  }
-
-  /// Build a new OpenMP 'use_device_addr' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPUseDeviceAddrClause(ArrayRef<Expr *> VarList,
-                                           const OMPVarListLocTy &Locs) {
-    return getSema().ActOnOpenMPUseDeviceAddrClause(VarList, Locs);
-  }
-
-  /// Build a new OpenMP 'is_device_ptr' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPIsDevicePtrClause(ArrayRef<Expr *> VarList,
-                                         const OMPVarListLocTy &Locs) {
-    return getSema().ActOnOpenMPIsDevicePtrClause(VarList, Locs);
-  }
-
-  /// Build a new OpenMP 'defaultmap' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPDefaultmapClause(OpenMPDefaultmapClauseModifier M,
-                                        OpenMPDefaultmapClauseKind Kind,
-                                        SourceLocation StartLoc,
-                                        SourceLocation LParenLoc,
-                                        SourceLocation MLoc,
-                                        SourceLocation KindLoc,
-                                        SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPDefaultmapClause(M, Kind, StartLoc, LParenLoc,
-                                                 MLoc, KindLoc, EndLoc);
-  }
-
-  /// Build a new OpenMP 'nontemporal' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPNontemporalClause(ArrayRef<Expr *> VarList,
-                                         SourceLocation StartLoc,
-                                         SourceLocation LParenLoc,
-                                         SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPNontemporalClause(VarList, StartLoc, LParenLoc,
-                                                  EndLoc);
-  }
-
-  /// Build a new OpenMP 'inclusive' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPInclusiveClause(ArrayRef<Expr *> VarList,
-                                       SourceLocation StartLoc,
-                                       SourceLocation LParenLoc,
-                                       SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPInclusiveClause(VarList, StartLoc, LParenLoc,
-                                                EndLoc);
-  }
-
-  /// Build a new OpenMP 'exclusive' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPExclusiveClause(ArrayRef<Expr *> VarList,
-                                       SourceLocation StartLoc,
-                                       SourceLocation LParenLoc,
-                                       SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPExclusiveClause(VarList, StartLoc, LParenLoc,
-                                                EndLoc);
-  }
-
-  /// Build a new OpenMP 'uses_allocators' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPUsesAllocatorsClause(
-      ArrayRef<Sema::UsesAllocatorsData> Data, SourceLocation StartLoc,
-      SourceLocation LParenLoc, SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPUsesAllocatorClause(StartLoc, LParenLoc, EndLoc,
-                                                    Data);
-  }
-
-  /// Build a new OpenMP 'affinity' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPAffinityClause(SourceLocation StartLoc,
-                                      SourceLocation LParenLoc,
-                                      SourceLocation ColonLoc,
-                                      SourceLocation EndLoc, Expr *Modifier,
-                                      ArrayRef<Expr *> Locators) {
-    return getSema().ActOnOpenMPAffinityClause(StartLoc, LParenLoc, ColonLoc,
-                                               EndLoc, Modifier, Locators);
-  }
-
-  /// Build a new OpenMP 'order' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPOrderClause(OpenMPOrderClauseKind Kind,
-                                   SourceLocation KindKwLoc,
-                                   SourceLocation StartLoc,
-                                   SourceLocation LParenLoc,
-                                   SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPOrderClause(Kind, KindKwLoc, StartLoc,
-                                            LParenLoc, EndLoc);
-  }
-
-  /// Build a new OpenMP 'init' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPInitClause(Expr *InteropVar, ArrayRef<Expr *> PrefExprs,
-                                  bool IsTarget, bool IsTargetSync,
-                                  SourceLocation StartLoc,
-                                  SourceLocation LParenLoc,
-                                  SourceLocation VarLoc,
-                                  SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPInitClause(InteropVar, PrefExprs, IsTarget,
-                                           IsTargetSync, StartLoc, LParenLoc,
-                                           VarLoc, EndLoc);
-  }
-
-  /// Build a new OpenMP 'use' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPUseClause(Expr *InteropVar, SourceLocation StartLoc,
-                                 SourceLocation LParenLoc,
-                                 SourceLocation VarLoc, SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPUseClause(InteropVar, StartLoc, LParenLoc,
-                                          VarLoc, EndLoc);
-  }
-
-  /// Build a new OpenMP 'destroy' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPDestroyClause(Expr *InteropVar, SourceLocation StartLoc,
-                                     SourceLocation LParenLoc,
-                                     SourceLocation VarLoc,
-                                     SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPDestroyClause(InteropVar, StartLoc, LParenLoc,
-                                              VarLoc, EndLoc);
-  }
-
-  /// Build a new OpenMP 'novariants' clause.
-  ///
-  /// By default, performs semantic analysis to build the new OpenMP clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPNovariantsClause(Expr *Condition,
-                                        SourceLocation StartLoc,
-                                        SourceLocation LParenLoc,
+/// Build a new OpenMP 'novariants' clause.
+///
+/// By default, performs semantic analysis to build the new OpenMP clause.
+/// Subclasses may override this routine to provide different behavior.
+OMPClause *RebuildOMPNovariantsClause(Expr *Condition,
+                                    SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
                                         SourceLocation EndLoc) {
     return getSema().ActOnOpenMPNovariantsClause(Condition, StartLoc, LParenLoc,
                                                  EndLoc);
@@ -2458,6 +2458,17 @@ public:
                                     SourceLocation EndLoc) {
     return getSema().ActOnOpenMPFilterClause(ThreadID, StartLoc, LParenLoc,
                                              EndLoc);
+  }
+
+  /// Build a new OpenMP 'free_agent' clause
+  ///
+  /// By default, performs semantic analysis to build the new OpenMP clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OMPClause *RebuildOMPFreeAgentClause(Expr *FreeAgent, SourceLocation StartLoc,
+                                       SourceLocation LParenLoc,
+                                       SourceLocation EndLoc) {
+    return getSema().ActOnOpenMPFreeAgentClause(FreeAgent, StartLoc, LParenLoc,
+                                                EndLoc);
   }
 
   /// Rebuild the operand to an Objective-C \@synchronized statement.
@@ -10478,6 +10489,15 @@ OMPClause *TreeTransform<Derived>::TransformOMPOrderClause(OMPOrderClause *C) {
   return getDerived().RebuildOMPOrderClause(C->getKind(), C->getKindKwLoc(),
                                             C->getBeginLoc(), C->getLParenLoc(),
                                             C->getEndLoc());
+}
+
+template <typename Derived>
+OMPClause *TreeTransform<Derived>::TransformOMPFreeAgentClause(OMPFreeAgentClause *C){
+    ExprResult FreeAgent = getDerived().TransformExpr(C->getFreeAgent());
+    if(FreeAgent.isInvalid())
+        return nullptr;
+    return getDerived().RebuildOMPFreeAgentClause(
+        FreeAgent.get(), C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
 }
 
 //===----------------------------------------------------------------------===//

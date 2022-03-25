@@ -117,6 +117,7 @@ struct OMPTaskDataTy final {
   llvm::PointerIntPair<llvm::Value *, 1, bool> Final;
   llvm::PointerIntPair<llvm::Value *, 1, bool> Schedule;
   llvm::PointerIntPair<llvm::Value *, 1, bool> Priority;
+  llvm::PointerIntPair<llvm::Value *, 1, bool> FreeAgent;
   llvm::Value *Reductions = nullptr;
   unsigned NumberOfParts = 0;
   bool Tied = true;

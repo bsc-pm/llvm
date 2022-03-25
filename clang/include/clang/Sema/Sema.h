@@ -11354,6 +11354,11 @@ public:
                                        SourceLocation EndLoc, Expr *Modifier,
                                        ArrayRef<Expr *> Locators);
 
+  /// Called on well-formed 'free_agent' clause
+  OMPClause *ActOnOpenMPFreeAgentClause(Expr *FreeAgent, SourceLocation StartLoc,
+                                        SourceLocation LParenLoc,
+                                        SourceLocation EndLoc);
+  
   //===--------------------------------------------------------------------===//
   // OmpSs directives and clauses.
   bool AllowShapings;

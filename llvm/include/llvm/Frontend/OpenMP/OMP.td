@@ -337,6 +337,10 @@ def OMPC_Filter : Clause<"filter"> {
   let clangClass = "OMPFilterClause";
   let flangClass = "ScalarIntExpr";
 }
+def OMPC_FreeAgent : Clause<"free_agent"> {
+    let clangClass = "OMPFreeAgentClause";
+    let flangClass = "ScalarLogicalExpr";
+}
 
 //===----------------------------------------------------------------------===//
 // Definition of OpenMP directives
@@ -376,7 +380,8 @@ def OMP_Task : Directive<"task"> {
     VersionedClause<OMPC_Default>,
     VersionedClause<OMPC_If>,
     VersionedClause<OMPC_Final>,
-    VersionedClause<OMPC_Priority>
+    VersionedClause<OMPC_Priority>,
+    VersionedClause<OMPC_FreeAgent>
   ];
 }
 def OMP_Simd : Directive<"simd"> {

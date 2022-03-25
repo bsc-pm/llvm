@@ -3720,6 +3720,13 @@ bool RecursiveASTVisitor<Derived>::VisitOMPFilterClause(OMPFilterClause *C) {
 
 // OmpSs directives.
 template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOMPFreeAgentClause(OMPFreeAgentClause *C){
+    TRY_TO(VisitOMPClauseWithPreInit(C));
+    TRY_TO(TraverseStmt(C->getFreeAgent()));
+    return true;
+}
+
+template <typename Derived>
 bool RecursiveASTVisitor<Derived>::TraverseOSSExecutableDirective(
     OSSExecutableDirective *S) {
   llvm_unreachable("");

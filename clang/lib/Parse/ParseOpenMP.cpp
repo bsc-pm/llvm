@@ -2799,6 +2799,7 @@ OMPClause *Parser::ParseOpenMPClause(OpenMPDirectiveKind DKind,
   case OMPC_novariants:
   case OMPC_nocontext:
   case OMPC_filter:
+  case OMPC_free_agent:
   case OMPC_partial:
     // OpenMP [2.5, Restrictions]
     //  At most one num_threads clause can appear on the directive.
@@ -3053,6 +3054,9 @@ ExprResult Parser::ParseOpenMPParensExpr(StringRef ClauseName,
 ///
 ///    detach-clause:
 ///      'detach' '(' event-handler-expression ')'
+///
+///    free_agent-clause:
+///      'free_agent' '(' expression ')'
 ///
 OMPClause *Parser::ParseOpenMPSingleExprClause(OpenMPClauseKind Kind,
                                                bool ParseOnly) {

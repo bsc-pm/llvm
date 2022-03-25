@@ -6693,6 +6693,12 @@ void OMPClauseWriter::VisitOMPAffinityClause(OMPAffinityClause *C) {
     Record.AddStmt(E);
 }
 
+void OMPClauseWriter::VisitOMPFreeAgentClause(OMPFreeAgentClause *C) {
+    VisitOMPClauseWithPreInit(C);
+    Record.AddStmt(C->getFreeAgent());
+    Record.AddSourceLocation(C->getLParenLoc());
+}
+
 void ASTRecordWriter::writeOMPTraitInfo(const OMPTraitInfo *TI) {
   writeUInt32(TI->Sets.size());
   for (const auto &Set : TI->Sets) {

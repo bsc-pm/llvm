@@ -879,6 +879,12 @@ void OMPClauseProfiler::VisitOMPAffinityClause(const OMPAffinityClause *C) {
     Profiler->VisitStmt(E);
 }
 void OMPClauseProfiler::VisitOMPOrderClause(const OMPOrderClause *C) {}
+
+void OMPClauseProfiler::VisitOMPFreeAgentClause(const OMPFreeAgentClause *C){
+    VistOMPClauseWithPreInit(C);
+    if(C->getFreeAgent())
+        Profiler->VisitStmt(C->getFreeAgent());
+}
 } // namespace
 
 void

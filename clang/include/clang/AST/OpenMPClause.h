@@ -1854,6 +1854,68 @@ public:
   }
 };
 
+/// This represents 'free_agent' clause in the '#pragma omp ...' directive.
+///
+/// \code
+/// #pragma omp task free_agent(true)
+/// \endcode
+/// In this example '#pragma omp task' has 'free_agent' clause.
+class OMPFreeAgentClause final : public OMPClause, public OMPClauseWithPreInit {
+    friend class OMPClauseReader;
+
+    /// Location of '('
+    SourceLocation LParenLoc;
+
+    /// Value of the 'free_agent' clause.
+    Stmt *FreeAgent = nullptr;
+
+    /// Set condition
+    void setFreeAgent(Expr *C) { FreeAgent = C; }
+
+public:
+    /// Build 'free_agent' clause with value \a FreeAgent
+    ///
+    OMPFreeAgentClause(Expr *FreeAgent, Stmt *HelperFreeAgent, OpenMPDirectiveKind CaptureRegion,
+                       SourceLocation StartLoc, SourceLocation LParenLoc, SourceLocation EndLoc)
+            : OMPClause(llvm::omp::OMPC_free_agent, StartLoc, EndLoc),
+              OMPClauseWithPreInit(this), LParenLoc(LParenLoc), FreeAgent(FreeAgent) {
+        setPreInitStmt(HelperFreeAgent, CaptureRegion);
+    }
+
+    /// Build an empty clause
+    OMPFreeAgentClause()
+            : OMPClause(llvm::omp::OMPC_free_agent, SourceLocation(), SourceLocation()),
+              OMPClauseWithPreInit(this) {}
+    
+    /// Sets the location of '('
+    void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
+
+    /// Returns the location of '('
+    SourceLocation getLParenLoc() const { return LParenLoc; }
+
+    /// Returns expression of the clause
+    Expr *getFreeAgent() const { return cast_or_null<Expr>(FreeAgent); }
+
+    child_range children() { return child_range(&FreeAgent, &FreeAgent + 1); }
+
+    const_child_range children() const{
+        return const_child_range(&FreeAgent, &FreeAgent + 1);
+    }
+
+    child_range used_children() {
+        return child_range(child_iterator(), child_iterator());
+    }
+
+    const_child_range used_children() const {
+        return const_child_range(const_child_iterator(), const_child_iterator());
+    }
+
+    static bool classof(const OMPClause *T) {
+        return T->getClauseKind() == llvm::omp::OMPC_free_agent;
+    }
+};
+
+
 /// This represents 'mergeable' clause in the '#pragma omp ...'
 /// directive.
 ///

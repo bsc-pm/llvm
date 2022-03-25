@@ -4291,6 +4291,15 @@ void CodeGenFunction::EmitOMPTaskBasedDirective(
         getContext().getIntTypeForBitwidth(/*DestWidth=*/32, /*Signed=*/1),
         Prio->getExprLoc()));
   }
+  // Check if the task has 'free_agent' clause.
+  if(const auto *Clause = S.getSingleClause<OMPFreeAgentClause>()){
+    const Expr *FreeAgent = Clause->getFreeAgent();
+    Data.FreeAgent.setInt(/*IntVal=*/true);
+    Data.FreeAgent.setPointer(EmitScalarConversion(
+        EmitScalarExpr(FreeAgent), FreeAgent->getType(),
+        getContext().getIntTypeForBitwidth(/*DestWidth=*/32, /*Signed=*/1),
+        FreeAgent->getExprLoc()));
+  }
   // The first function argument for tasks is a thread id, the second one is a
   // part id (0 for tied tasks, >=0 for untied task).
   llvm::DenseSet<const VarDecl *> EmittedAsPrivate;
@@ -5865,6 +5874,7 @@ static void emitOMPAtomicExpr(CodeGenFunction &CGF, OpenMPClauseKind Kind,
   case OMPC_novariants:
   case OMPC_nocontext:
   case OMPC_filter:
+  case OMPC_free_agent:
     llvm_unreachable("Clause is not allowed in 'omp atomic'.");
   }
 }
