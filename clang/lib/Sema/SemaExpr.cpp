@@ -6794,6 +6794,15 @@ ExprResult Sema::ActOnCallExpr(Scope *Scope, Expr *Fn, SourceLocation LParenLoc,
   if (Call.isInvalid())
     return Call;
 
+  if (getLangOpts().OmpSs)
+    if (const auto *CE = dyn_cast<CallExpr>(Call.get()))
+      if (const auto *FD = dyn_cast_or_null<FunctionDecl>(CE->getCalleeDecl()))
+        if (FD->hasAttr<OSSTaskDeclAttr>())
+          if (const auto *ME = dyn_cast<MemberExpr>(CE->getCallee()))
+            if (ME->getBase()->isXValue() && isa<MaterializeTemporaryExpr>(ME->getBase()))
+              Diag(ME->getBase()->getExprLoc(), diag::warn_oss_temporary_task)
+                << ME->getBase()->getType();
+
   // Diagnose uses of the C++20 "ADL-only template-id call" feature in earlier
   // language modes.
   if (auto *ULE = dyn_cast<UnresolvedLookupExpr>(Fn)) {
