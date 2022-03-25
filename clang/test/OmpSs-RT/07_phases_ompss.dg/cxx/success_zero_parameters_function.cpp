@@ -34,7 +34,7 @@ test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatib
 </testinfo>
 */
 
-#include"assert.h"
+#include<assert.h>
 
 struct A 
 {
