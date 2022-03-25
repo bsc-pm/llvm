@@ -2749,17 +2749,24 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
                                  ParmRef, /*BasePath=*/nullptr,
                                  VK_PRValue, FPOptionsOverride());
       FirstprivateCopies.push_back(ParmRef);
+
+      LValue ParmLV = CGF.EmitLValue(ParmRef);
+      InitScope.addPrivate(*ParI, [&CGF, &ParmLV]() -> Address { return ParmLV.getAddress(CGF); });
+      // We do need to do this every time because the next param may use the previous one
+      (void)InitScope.Privatize();
     } else {
       // We want to pass references as shared so task can modify the original value
       SharedCopies.push_back(ParmRef);
+
+      // Since it is a reference we have to manually set both call_arg and
+      // function parameter address. The first because we rewrite the call expr and
+      // the second because the dependency is made over that Decl
+      LValue ParmLV = CGF.EmitLValue(ParmRef);
+      CaptureMapStack.back().try_emplace(*ParI, ParmLV.getAddress(CGF));
+      CaptureMapStack.back().try_emplace(cast<VarDecl>(cast<DeclRefExpr>(ParmRef)->getDecl()), ParmLV.getAddress(CGF));
     }
+
     ParmCopies.push_back(ParmRef);
-
-    LValue ParmLV = CGF.EmitLValue(ParmRef);
-
-    InitScope.addPrivate(*ParI, [&CGF, &ParmLV]() -> Address { return ParmLV.getAddress(CGF); });
-    // We do need to do this every time because the next param may use the previous one
-    (void)InitScope.Privatize();
 
     ++ArgI;
     ++ParI;
