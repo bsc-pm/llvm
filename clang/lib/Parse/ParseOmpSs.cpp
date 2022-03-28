@@ -300,6 +300,7 @@ static bool parseDeclareTaskClauses(
     case OSSC_chunksize:
     case OSSC_grainsize:
     case OSSC_collapse:
+    case OSSC_on:
     case OSSC_weakconcurrent:
     case OSSC_reduction:
     case OSSC_weakreduction:
@@ -849,6 +850,7 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
   case OSSC_inout:
   case OSSC_concurrent:
   case OSSC_commutative:
+  case OSSC_on:
   case OSSC_weakin:
   case OSSC_weakout:
   case OSSC_weakinout:
@@ -1395,6 +1397,7 @@ OSSClause *Parser::ParseOmpSsVarListClause(OmpSsDirectiveKind DKind,
     return Kind == OSSC_depend || Kind == OSSC_reduction
      || Kind == OSSC_in || Kind == OSSC_out || Kind == OSSC_inout
      || Kind == OSSC_concurrent || Kind == OSSC_commutative
+     || Kind == OSSC_on
      || Kind == OSSC_weakin || Kind == OSSC_weakout || Kind == OSSC_weakinout
      || Kind == OSSC_weakconcurrent || Kind == OSSC_weakcommutative
      || Kind == OSSC_weakreduction;

@@ -106,6 +106,8 @@ OMPSS_CLAUSE_ALIAS(weakout, depend)
 OMPSS_CLAUSE_ALIAS(weakinout, depend)
 OMPSS_CLAUSE_ALIAS(weakconcurrent, depend)
 OMPSS_CLAUSE_ALIAS(weakcommutative, depend)
+// legacy taskwait inout
+OMPSS_CLAUSE_ALIAS(on,)
 // OmpSs-2 'reduction' alias
 OMPSS_CLAUSE_ALIAS(weakreduction, reduction)
 
@@ -232,6 +234,7 @@ OMPSS_TASKWAIT_CLAUSE(depend)
 OMPSS_TASKWAIT_CLAUSE(in)
 OMPSS_TASKWAIT_CLAUSE(out)
 OMPSS_TASKWAIT_CLAUSE(inout)
+OMPSS_TASKWAIT_CLAUSE(on)
 
 // Clauses allowed for OmpSs directive 'task' declaration/outline.
 OMPSS_DECLARE_TASK_CLAUSE(if)

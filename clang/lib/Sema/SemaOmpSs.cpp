@@ -3630,6 +3630,10 @@ Sema::ActOnOmpSsVarListClause(
     Res = ActOnOmpSsDependClause({ OSSC_DEPEND_mutexinoutset }, DepLoc, ColonLoc, Vars,
                                  StartLoc, LParenLoc, EndLoc, /*OSSSyntax=*/true);
     break;
+  case OSSC_on:
+    Res = ActOnOmpSsDependClause({ OSSC_DEPEND_inout }, DepLoc, ColonLoc, Vars,
+                                 StartLoc, LParenLoc, EndLoc, /*OSSSyntax=*/true);
+    break;
   case OSSC_weakin:
     Res = ActOnOmpSsDependClause({ OSSC_DEPEND_in, OSSC_DEPEND_weak },
                                  DepLoc, ColonLoc, Vars,
