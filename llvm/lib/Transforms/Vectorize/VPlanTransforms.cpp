@@ -13,6 +13,8 @@
 
 #include "VPlanTransforms.h"
 #include "llvm/ADT/PostOrderIterator.h"
+#include "llvm/ADT/SetVector.h"
+#include "llvm/Analysis/IVDescriptors.h"
 
 using namespace llvm;
 
@@ -47,8 +49,8 @@ void VPlanTransforms::VPInstructionsToVPRecipes(
         auto *Phi = cast<PHINode>(VPPhi->getUnderlyingValue());
         if (const auto *II = GetIntOrFpInductionDescriptor(Phi)) {
           VPValue *Start = Plan->getOrAddVPValue(II->getStartValue());
-          NewRecipe =
-              new VPWidenIntOrFpInductionRecipe(Phi, Start, *II, false, true);
+          NewRecipe = new VPWidenIntOrFpInductionRecipe(Phi, Start, *II, false,
+                                                        true, SE);
         } else {
           Plan->addVPValue(Phi, VPPhi);
           continue;
@@ -295,7 +297,7 @@ bool VPlanTransforms::mergeReplicateRegions(VPlan &Plan) {
 }
 
 void VPlanTransforms::removeRedundantInductionCasts(VPlan &Plan) {
-  for (auto &Phi : Plan.getEntry()->getEntryBasicBlock()->phis()) {
+  for (auto &Phi : Plan.getVectorLoopRegion()->getEntryBasicBlock()->phis()) {
     auto *IV = dyn_cast<VPWidenIntOrFpInductionRecipe>(&Phi);
     if (!IV || IV->getTruncInst())
       continue;
@@ -382,6 +384,19 @@ static bool hasOutsideUser(Instruction &I, Loop &OrigLoop) {
 
 void VPlanTransforms::removeDeadRecipes(VPlan &Plan, Loop &OrigLoop) {
   VPBasicBlock *Header = Plan.getVectorLoopRegion()->getEntryBasicBlock();
+  // Check if \p R is used outside the loop, if required.
+  // TODO: Remove once live-outs are modeled in VPlan.
+  auto HasUsersOutsideLoop = [&OrigLoop](VPRecipeBase &R) {
+    // Exit values for induction recipes are generated independent of the
+    // recipes, expect for truncated inductions. Hence there is no need to check
+    // for users outside the loop for them.
+    if (isa<VPScalarIVStepsRecipe>(&R) ||
+        (isa<VPWidenIntOrFpInductionRecipe>(&R) &&
+         !isa<TruncInst>(R.getUnderlyingInstr())))
+      return false;
+    return R.getUnderlyingInstr() &&
+           hasOutsideUser(*R.getUnderlyingInstr(), OrigLoop);
+  };
   // Remove dead recipes in header block. The recipes in the block are processed
   // in reverse order, to catch chains of dead recipes.
   // TODO: Remove dead recipes across whole plan.
@@ -389,9 +404,7 @@ void VPlanTransforms::removeDeadRecipes(VPlan &Plan, Loop &OrigLoop) {
     if (R.mayHaveSideEffects() ||
         any_of(R.definedValues(),
                [](VPValue *V) { return V->getNumUsers() > 0; }) ||
-        (!isa<VPWidenIntOrFpInductionRecipe>(&R) &&
-         !isa<VPScalarIVStepsRecipe>(&R) && R.getUnderlyingInstr() &&
-         hasOutsideUser(*R.getUnderlyingInstr(), OrigLoop)))
+        HasUsersOutsideLoop(R))
       continue;
     R.eraseFromParent();
   }
@@ -402,7 +415,7 @@ void VPlanTransforms::optimizeInductions(VPlan &Plan, ScalarEvolution &SE) {
   VPBasicBlock *HeaderVPBB = Plan.getVectorLoopRegion()->getEntryBasicBlock();
   for (VPRecipeBase &Phi : HeaderVPBB->phis()) {
     auto *IV = dyn_cast<VPWidenIntOrFpInductionRecipe>(&Phi);
-    if (!IV || IV->needsVectorIV())
+    if (!IV || !IV->needsScalarIV())
       continue;
 
     const InductionDescriptor &ID = IV->getInductionDescriptor();
@@ -430,6 +443,26 @@ void VPlanTransforms::optimizeInductions(VPlan &Plan, ScalarEvolution &SE) {
       HeaderVPBB->insert(cast<VPRecipeBase>(Step->getDef()),
                          HeaderVPBB->getFirstNonPhi());
     }
-    IV->replaceAllUsesWith(Steps);
+
+    // If there are no vector users of IV, simply update all users to use Step
+    // instead.
+    if (!IV->needsVectorIV()) {
+      IV->replaceAllUsesWith(Steps);
+      continue;
+    }
+
+    // Otherwise only update scalar users of IV to use Step instead. Use
+    // SetVector to ensure the list of users doesn't contain duplicates.
+    SetVector<VPUser *> Users(IV->user_begin(), IV->user_end());
+    for (VPUser *U : Users) {
+      VPRecipeBase *R = cast<VPRecipeBase>(U);
+      if (!R->usesScalars(IV))
+        continue;
+      for (unsigned I = 0, E = R->getNumOperands(); I != E; I++) {
+        if (R->getOperand(I) != IV)
+          continue;
+        R->setOperand(I, Steps);
+      }
+    }
   }
 }

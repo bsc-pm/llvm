@@ -13,6 +13,7 @@
 
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/HoistPadding.h"
@@ -181,9 +182,16 @@ static LogicalResult padOperandToSmallestStaticBoundingBox(
   if (failed(paddingValue))
     return failure(hasDynamicShape);
 
-  // Cannot construct a static bounding box if the operand is not defined by an
-  // ExtractSliceOp.
-  auto sliceOp = opOperand->get().getDefiningOp<tensor::ExtractSliceOp>();
+  // Follow the use-def chain if `currOpOperand` is defined by a LinalgOp.
+  OpOperand *currOpOperand = opOperand;
+  while (auto linalgOp = currOpOperand->get().getDefiningOp<LinalgOp>()) {
+    OpResult result = currOpOperand->get().cast<OpResult>();
+    currOpOperand = linalgOp.getOutputOperand(result.getResultNumber());
+  }
+
+  // Cannot construct a static bounding box if the `currOpOperand` is not
+  // defined by an ExtractSliceOp.
+  auto sliceOp = currOpOperand->get().getDefiningOp<tensor::ExtractSliceOp>();
   if (!sliceOp)
     return failure(hasDynamicShape);
 
@@ -783,8 +791,10 @@ PadOpTransformationPattern::matchAndRewrite(tensor::PadOp padOp,
       loc, resultShapedType.getShape(), resultShapedType.getElementType());
 
   // Initialize tensor with the pad value
-  Value tmpTensor =
-      rewriter.create<linalg::FillOp>(loc, padValue, initTensor).result();
+  Value tmpTensor = rewriter
+                        .create<linalg::FillOp>(loc, ValueRange{padValue},
+                                                ValueRange{initTensor})
+                        .result();
 
   // Copy original contents into new tensor
   // Uses linalg.generic, but could be done with tensor.insert_slice

@@ -20,7 +20,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/FoldingSet.h"
-#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/ilist.h"
@@ -33,17 +32,13 @@
 #include "llvm/CodeGen/SelectionDAGNodes.h"
 #include "llvm/CodeGen/ValueTypes.h"
 #include "llvm/IR/DebugLoc.h"
-#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/ArrayRecycler.h"
-#include "llvm/Support/AtomicOrdering.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/CodeGen.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MachineValueType.h"
 #include "llvm/Support/RecyclingAllocator.h"
-#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <functional>
@@ -55,6 +50,15 @@
 
 namespace llvm {
 
+class DIExpression;
+class DILabel;
+class DIVariable;
+class Function;
+class Pass;
+class Type;
+template <class GraphType> struct GraphTraits;
+template <typename T, unsigned int N> class SmallSetVector;
+template <typename T> struct FoldingSetTrait;
 class AAResults;
 class BlockAddress;
 class BlockFrequencyInfo;
@@ -467,7 +471,7 @@ public:
   void viewGraph(const std::string &Title);
   void viewGraph();
 
-#ifndef NDEBUG
+#if LLVM_ENABLE_ABI_BREAKING_CHECKS
   std::map<const SDNode *, std::string> NodeGraphAttrs;
 #endif
 
@@ -2115,39 +2119,34 @@ public:
            isConstantFPBuildVectorOrConstantFP(N);
   }
 
-  void addCallSiteInfo(const SDNode *CallNode, CallSiteInfoImpl &&CallInfo) {
-    SDCallSiteDbgInfo[CallNode].CSInfo = std::move(CallInfo);
+  /// Set CallSiteInfo to be associated with Node.
+  void addCallSiteInfo(const SDNode *Node, CallSiteInfoImpl &&CallInfo) {
+    SDCallSiteDbgInfo[Node].CSInfo = std::move(CallInfo);
   }
-
-  CallSiteInfo getSDCallSiteInfo(const SDNode *CallNode) {
-    auto I = SDCallSiteDbgInfo.find(CallNode);
-    if (I != SDCallSiteDbgInfo.end())
-      return std::move(I->second).CSInfo;
-    return CallSiteInfo();
+  /// Return CallSiteInfo associated with Node, or a default if none exists.
+  CallSiteInfo getCallSiteInfo(const SDNode *Node) {
+    auto I = SDCallSiteDbgInfo.find(Node);
+    return I != SDCallSiteDbgInfo.end() ? std::move(I->second).CSInfo
+                                        : CallSiteInfo();
   }
-
+  /// Set HeapAllocSite to be associated with Node.
   void addHeapAllocSite(const SDNode *Node, MDNode *MD) {
     SDCallSiteDbgInfo[Node].HeapAllocSite = MD;
   }
-
-  /// Return the HeapAllocSite type associated with the SDNode, if it exists.
-  MDNode *getHeapAllocSite(const SDNode *Node) {
-    auto It = SDCallSiteDbgInfo.find(Node);
-    if (It == SDCallSiteDbgInfo.end())
-      return nullptr;
-    return It->second.HeapAllocSite;
+  /// Return HeapAllocSite associated with Node, or nullptr if none exists.
+  MDNode *getHeapAllocSite(const SDNode *Node) const {
+    auto I = SDCallSiteDbgInfo.find(Node);
+    return I != SDCallSiteDbgInfo.end() ? I->second.HeapAllocSite : nullptr;
   }
-
+  /// Set NoMergeSiteInfo to be associated with Node if NoMerge is true.
   void addNoMergeSiteInfo(const SDNode *Node, bool NoMerge) {
     if (NoMerge)
       SDCallSiteDbgInfo[Node].NoMerge = NoMerge;
   }
-
-  bool getNoMergeSiteInfo(const SDNode *Node) {
+  /// Return NoMerge info associated with Node.
+  bool getNoMergeSiteInfo(const SDNode *Node) const {
     auto I = SDCallSiteDbgInfo.find(Node);
-    if (I == SDCallSiteDbgInfo.end())
-      return false;
-    return I->second.NoMerge;
+    return I != SDCallSiteDbgInfo.end() ? I->second.NoMerge : false;
   }
 
   /// Return the current function's default denormal handling kind for the given

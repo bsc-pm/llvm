@@ -27,6 +27,7 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/DebugCounter.h"
+#include "llvm/Support/MathExtras.h"
 #include "llvm/Transforms/Scalar.h"
 
 #include <string>
@@ -320,8 +321,13 @@ getConstraint(CmpInst::Predicate Pred, Value *Op0, Value *Op1,
   for (const auto &KV : VariablesB)
     R[GetOrAddIndex(KV.second)] -= KV.first;
 
-  R[0] = Offset1 + Offset2 +
-         (Pred == (IsSigned ? CmpInst::ICMP_SLT : CmpInst::ICMP_ULT) ? -1 : 0);
+  int64_t OffsetSum;
+  if (AddOverflow(Offset1, Offset2, OffsetSum))
+    return {};
+  if (Pred == (IsSigned ? CmpInst::ICMP_SLT : CmpInst::ICMP_ULT))
+    if (AddOverflow(OffsetSum, int64_t(-1), OffsetSum))
+      return {};
+  R[0] = OffsetSum;
   Res.Preconditions = std::move(Preconditions);
   return Res;
 }
@@ -419,6 +425,10 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT) {
     // Succ (e.g. the case when adding a condition from a pre-header to a loop
     // header).
     auto CanAdd = [&BB, &DT](BasicBlock *Succ) {
+      if (BB.getSingleSuccessor()) {
+        assert(BB.getSingleSuccessor() == Succ);
+        return DT.properlyDominates(&BB, Succ);
+      }
       return any_of(successors(&BB),
                     [Succ](const BasicBlock *S) { return S != Succ; }) &&
              all_of(predecessors(Succ), [&BB, &DT, Succ](BasicBlock *Pred) {

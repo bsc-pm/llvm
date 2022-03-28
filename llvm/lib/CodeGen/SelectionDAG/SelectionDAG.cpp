@@ -24,9 +24,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/Analysis/BlockFrequencyInfo.h"
 #include "llvm/Analysis/MemoryLocation.h"
-#include "llvm/Analysis/ProfileSummaryInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/CodeGen/Analysis.h"
 #include "llvm/CodeGen/FunctionLoweringInfo.h"
@@ -55,7 +53,6 @@
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Type.h"
-#include "llvm/IR/Value.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/CodeGen.h"
 #include "llvm/Support/Compiler.h"
@@ -847,6 +844,9 @@ static void AddNodeIDCustom(FoldingSetNodeID &ID, const SDNode *N) {
     ID.AddInteger(BA->getTargetFlags());
     break;
   }
+  case ISD::AssertAlign:
+    ID.AddInteger(cast<AssertAlignSDNode>(N)->getAlign().value());
+    break;
   } // end switch (N->getOpcode())
 
   // Target specific memory nodes could also have address spaces and flags

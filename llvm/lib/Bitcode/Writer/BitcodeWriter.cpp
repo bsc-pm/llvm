@@ -2653,6 +2653,10 @@ void ModuleBitcodeWriter::writeConstants(unsigned FirstVal, unsigned LastVal,
         Record.push_back(VE.getValueID(C->getOperand(1)));
         Record.push_back(CE->getPredicate());
         break;
+      case Instruction::ExtractValue:
+      case Instruction::InsertValue:
+        report_fatal_error("extractvalue/insertvalue constexprs not supported");
+        break;
       }
     } else if (const BlockAddress *BA = dyn_cast<BlockAddress>(C)) {
       Code = bitc::CST_CODE_BLOCKADDRESS;
@@ -3072,6 +3076,10 @@ void ModuleBitcodeWriter::writeInstruction(const Instruction &I,
     Bitfield::set<APV::ExplicitType>(Record, true);
     Bitfield::set<APV::SwiftError>(Record, AI.isSwiftError());
     Vals.push_back(Record);
+
+    unsigned AS = AI.getAddressSpace();
+    if (AS != M.getDataLayout().getAllocaAddrSpace())
+      Vals.push_back(AS);
     break;
   }
 
@@ -4935,7 +4943,7 @@ void llvm::embedBitcodeInModule(llvm::Module &M, llvm::MemoryBufferRef Buf,
       ConstantExpr::getPointerBitCastOrAddrSpaceCast(GV, UsedElementType));
   if (llvm::GlobalVariable *Old =
           M.getGlobalVariable("llvm.embedded.module", true)) {
-    assert(Old->hasOneUse() &&
+    assert(Old->hasZeroLiveUses() &&
            "llvm.embedded.module can only be used once in llvm.compiler.used");
     GV->takeName(Old);
     Old->eraseFromParent();
@@ -4958,7 +4966,7 @@ void llvm::embedBitcodeInModule(llvm::Module &M, llvm::MemoryBufferRef Buf,
     UsedArray.push_back(
         ConstantExpr::getPointerBitCastOrAddrSpaceCast(GV, UsedElementType));
     if (llvm::GlobalVariable *Old = M.getGlobalVariable("llvm.cmdline", true)) {
-      assert(Old->hasOneUse() &&
+      assert(Old->hasZeroLiveUses() &&
              "llvm.cmdline can only be used once in llvm.compiler.used");
       GV->takeName(Old);
       Old->eraseFromParent();

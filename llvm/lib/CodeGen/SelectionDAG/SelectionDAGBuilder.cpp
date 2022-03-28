@@ -24,25 +24,20 @@
 #include "llvm/ADT/Triple.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Analysis/AliasAnalysis.h"
-#include "llvm/Analysis/BlockFrequencyInfo.h"
 #include "llvm/Analysis/BranchProbabilityInfo.h"
 #include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/Analysis/EHPersonalities.h"
-#include "llvm/Analysis/Loads.h"
 #include "llvm/Analysis/MemoryLocation.h"
-#include "llvm/Analysis/ProfileSummaryInfo.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
-#include "llvm/Analysis/VectorUtils.h"
 #include "llvm/CodeGen/Analysis.h"
 #include "llvm/CodeGen/FunctionLoweringInfo.h"
 #include "llvm/CodeGen/GCMetadata.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
-#include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
-#include "llvm/CodeGen/MachineJumpTableInfo.h"
+#include "llvm/CodeGen/MachineInstrBundleIterator.h"
 #include "llvm/CodeGen/MachineMemOperand.h"
 #include "llvm/CodeGen/MachineModuleInfo.h"
 #include "llvm/CodeGen/MachineOperand.h"
@@ -89,7 +84,6 @@
 #include "llvm/IR/User.h"
 #include "llvm/IR/Value.h"
 #include "llvm/MC/MCContext.h"
-#include "llvm/MC/MCSymbol.h"
 #include "llvm/Support/AtomicOrdering.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
@@ -102,10 +96,8 @@
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include <cstddef>
-#include <cstring>
 #include <iterator>
 #include <limits>
-#include <numeric>
 #include <tuple>
 
 using namespace llvm;
@@ -926,7 +918,10 @@ void RegsForValue::getCopyToRegs(SDValue Val, SelectionDAG &DAG,
                                           CallConv.getValue(), RegVTs[Value])
                                     : RegVTs[Value];
 
-    if (ExtendKind == ISD::ANY_EXTEND && TLI.isZExtFree(Val, RegisterVT))
+    // We need to zero extend constants that are liveout to match assumptions
+    // in FunctionLoweringInfo::ComputePHILiveOutRegInfo.
+    if (ExtendKind == ISD::ANY_EXTEND &&
+        (TLI.isZExtFree(Val, RegisterVT) || isa<ConstantSDNode>(Val)))
       ExtendKind = ISD::ZERO_EXTEND;
 
     getCopyToParts(DAG, dl, Val.getValue(Val.getResNo() + Value), &Parts[Part],

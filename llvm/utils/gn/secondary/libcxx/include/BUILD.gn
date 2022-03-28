@@ -39,6 +39,7 @@ if (current_toolchain == default_toolchain) {
       "_LIBCPP_HAS_NO_LOCALIZATION=",
       "_LIBCPP_HAS_NO_WIDE_CHARACTERS=",
       "_LIBCPP_ABI_DEFINES=",
+      "_LIBCPP_ENABLE_ASSERTIONS_DEFAULT=",
     ]
     if (libcxx_abi_version != 1) {
       values += [ "_LIBCPP_ABI_VERSION=$libcxx_abi_version" ]
@@ -121,7 +122,11 @@ if (current_toolchain == default_toolchain) {
       "__algorithm/pop_heap.h",
       "__algorithm/prev_permutation.h",
       "__algorithm/push_heap.h",
+      "__algorithm/ranges_find.h",
+      "__algorithm/ranges_find_if.h",
+      "__algorithm/ranges_find_if_not.h",
       "__algorithm/ranges_max_element.h",
+      "__algorithm/ranges_min.h",
       "__algorithm/ranges_min_element.h",
       "__algorithm/ranges_mismatch.h",
       "__algorithm/ranges_swap_ranges.h",
@@ -235,6 +240,7 @@ if (current_toolchain == default_toolchain) {
       "__filesystem/recursive_directory_iterator.h",
       "__filesystem/space_info.h",
       "__filesystem/u8path.h",
+      "__format/buffer.h",
       "__format/format_arg.h",
       "__format/format_args.h",
       "__format/format_context.h",

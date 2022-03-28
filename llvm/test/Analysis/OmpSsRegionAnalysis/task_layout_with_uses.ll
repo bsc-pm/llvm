@@ -1,6 +1,3 @@
-; RUN: opt -ompss-2-regions -analyze -disable-checks -print-verbosity=uses -enable-new-pm=0 < %s 2>&1 | FileCheck %s -check-prefix=USES
-; RUN: opt -ompss-2-regions -analyze -disable-checks -print-verbosity=dsa_missing -enable-new-pm=0 < %s 2>&1 | FileCheck %s -check-prefix=DSA
-
 ; RUN: opt -passes='print<ompss-2-regions>' -disable-checks -print-verbosity=uses < %s 2>&1 | FileCheck %s -check-prefix=USES
 ; RUN: opt -passes='print<ompss-2-regions>' -disable-checks -print-verbosity=dsa_missing < %s 2>&1 | FileCheck %s -check-prefix=DSA
 

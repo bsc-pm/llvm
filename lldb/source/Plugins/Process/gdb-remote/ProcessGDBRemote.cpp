@@ -208,6 +208,10 @@ std::chrono::seconds ProcessGDBRemote::GetPacketTimeout() {
   return std::chrono::seconds(GetGlobalPluginProperties().GetPacketTimeout());
 }
 
+ArchSpec ProcessGDBRemote::GetSystemArchitecture() {
+  return m_gdb_comm.GetHostArchitecture();
+}
+
 bool ProcessGDBRemote::CanDebug(lldb::TargetSP target_sp,
                                 bool plugin_specified_by_name) {
   if (plugin_specified_by_name)
@@ -406,13 +410,13 @@ void ProcessGDBRemote::BuildDynamicRegisterInfo(bool force) {
   }
   if (target_definition_fspec) {
     // See if we can get register definitions from a python file
-    if (ParsePythonTargetDefinition(target_definition_fspec)) {
+    if (ParsePythonTargetDefinition(target_definition_fspec))
       return;
-    } else {
-      StreamSP stream_sp = GetTarget().GetDebugger().GetAsyncOutputStream();
-      stream_sp->Printf("ERROR: target description file %s failed to parse.\n",
-                        target_definition_fspec.GetPath().c_str());
-    }
+
+    Debugger::ReportError("target description file " +
+                              target_definition_fspec.GetPath() +
+                              " failed to parse",
+                          GetTarget().GetDebugger().GetID());
   }
 
   const ArchSpec &target_arch = GetTarget().GetArchitecture();

@@ -419,7 +419,7 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
 ///        annot_pragma_ompss_end
 ///
 Parser::DeclGroupPtrTy Parser::ParseOmpSsDeclarativeDirectiveWithExtDecl(
-    AccessSpecifier &AS, ParsedAttributesWithRange &Attrs, bool Delayed,
+    AccessSpecifier &AS, ParsedAttributes &Attrs, bool Delayed,
     DeclSpec::TST TagType, Decl *Tag) {
   assert(Tok.is(tok::annot_pragma_ompss) && "Not an OmpSs directive!");
   ParsingOmpSsDirectiveRAII DirScope(*this);

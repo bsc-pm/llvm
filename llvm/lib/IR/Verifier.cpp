@@ -84,6 +84,8 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/IntrinsicsAArch64.h"
+#include "llvm/IR/IntrinsicsARM.h"
 #include "llvm/IR/IntrinsicsWebAssembly.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Metadata.h"
@@ -100,7 +102,6 @@
 #include "llvm/Support/AtomicOrdering.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
@@ -278,6 +279,12 @@ namespace {
 class Verifier : public InstVisitor<Verifier>, VerifierSupport {
   friend class InstVisitor<Verifier>;
 
+  // ISD::ArgFlagsTy::MemAlign only have 4 bits for alignment, so
+  // the alignment size should not exceed 2^15. Since encode(Align)
+  // would plus the shift value by 1, the alignment size should
+  // not exceed 2^14, otherwise it can NOT be properly lowered
+  // in backend.
+  static constexpr unsigned ParamMaxAlignment = 1 << 14;
   DominatorTree DT;
 
   /// When verifying a basic block, keep track of all of the
@@ -465,6 +472,7 @@ private:
   void visitAnnotationMetadata(MDNode *Annotation);
   void visitAliasScopeMetadata(const MDNode *MD);
   void visitAliasScopeListMetadata(const MDNode *MD);
+  void visitAccessGroupMetadata(const MDNode *MD);
 
   template <class Ty> bool isValidMetadataArray(const MDTuple &N);
 #define HANDLE_SPECIALIZED_MDNODE_LEAF(CLASS) void visit##CLASS(const CLASS &N);
@@ -1811,6 +1819,12 @@ void Verifier::verifyParameterAttrs(AttributeSet Attrs, Type *Ty,
 
   if (PointerType *PTy = dyn_cast<PointerType>(Ty)) {
     if (Attrs.hasAttribute(Attribute::ByVal)) {
+      if (Attrs.hasAttribute(Attribute::Alignment)) {
+        Align AttrAlign = Attrs.getAlignment().valueOrOne();
+        Align MaxAlign(ParamMaxAlignment);
+        Assert(AttrAlign <= MaxAlign,
+               "Attribute 'align' exceed the max size 2^14", V);
+      }
       SmallPtrSet<Type *, 4> Visited;
       Assert(Attrs.getByValType()->isSized(&Visited),
              "Attribute 'byval' does not support unsized types!", V);
@@ -3141,6 +3155,21 @@ void Verifier::visitCallBase(CallBase &Call) {
   Assert(verifyAttributeCount(Attrs, Call.arg_size()),
          "Attribute after last parameter!", Call);
 
+  auto VerifyTypeAlign = [&](Type *Ty, const Twine &Message) {
+    if (!Ty->isSized())
+      return;
+    Align ABIAlign = DL.getABITypeAlign(Ty);
+    Align MaxAlign(ParamMaxAlignment);
+    Assert(ABIAlign <= MaxAlign,
+           "Incorrect alignment of " + Message + " to called function!", Call);
+  };
+
+  VerifyTypeAlign(FTy->getReturnType(), "return type");
+  for (unsigned i = 0, e = FTy->getNumParams(); i != e; ++i) {
+    Type *Ty = FTy->getParamType(i);
+    VerifyTypeAlign(Ty, "argument passed");
+  }
+
   Function *Callee =
       dyn_cast<Function>(Call.getCalledOperand()->stripPointerCasts());
   bool IsIntrinsic = Callee && Callee->isIntrinsic();
@@ -3875,6 +3904,10 @@ void Verifier::visitAllocaInst(AllocaInst &AI) {
   }
 
   if (AI.isSwiftError()) {
+    Assert(AI.getAllocatedType()->isPointerTy(),
+           "swifterror alloca must have pointer type", &AI);
+    Assert(!AI.isArrayAllocation(),
+           "swifterror alloca must not be array allocation", &AI);
     verifySwiftErrorValue(&AI);
   }
 
@@ -4474,6 +4507,24 @@ void Verifier::visitAliasScopeListMetadata(const MDNode *MD) {
   }
 }
 
+void Verifier::visitAccessGroupMetadata(const MDNode *MD) {
+  auto IsValidAccessScope = [](const MDNode *MD) {
+    return MD->getNumOperands() == 0 && MD->isDistinct();
+  };
+
+  // It must be either an access scope itself...
+  if (IsValidAccessScope(MD))
+    return;
+
+  // ...or a list of access scopes.
+  for (const MDOperand &Op : MD->operands()) {
+    const MDNode *OpMD = dyn_cast<MDNode>(Op);
+    Assert(OpMD != nullptr, "Access scope list must consist of MDNodes", MD);
+    Assert(IsValidAccessScope(OpMD),
+           "Access scope list contains invalid access scope", MD);
+  }
+}
+
 /// verifyInstruction - Verify that an instruction is well formed.
 ///
 void Verifier::visitInstruction(Instruction &I) {
@@ -4637,6 +4688,9 @@ void Verifier::visitInstruction(Instruction &I) {
     visitAliasScopeListMetadata(MD);
   if (MDNode *MD = I.getMetadata(LLVMContext::MD_alias_scope))
     visitAliasScopeListMetadata(MD);
+
+  if (MDNode *MD = I.getMetadata(LLVMContext::MD_access_group))
+    visitAccessGroupMetadata(MD);
 
   if (MDNode *AlignMD = I.getMetadata(LLVMContext::MD_align)) {
     Assert(I.getType()->isPointerTy(), "align applies only to pointer types",
@@ -5495,10 +5549,24 @@ void Verifier::visitIntrinsicCall(Intrinsic::ID ID, CallBase &Call) {
     break;
   }
   case Intrinsic::preserve_array_access_index:
-  case Intrinsic::preserve_struct_access_index: {
+  case Intrinsic::preserve_struct_access_index:
+  case Intrinsic::aarch64_ldaxr:
+  case Intrinsic::aarch64_ldxr:
+  case Intrinsic::arm_ldaex:
+  case Intrinsic::arm_ldrex: {
     Type *ElemTy = Call.getParamElementType(0);
     Assert(ElemTy,
            "Intrinsic requires elementtype attribute on first argument.",
+           &Call);
+    break;
+  }
+  case Intrinsic::aarch64_stlxr:
+  case Intrinsic::aarch64_stxr:
+  case Intrinsic::arm_stlex:
+  case Intrinsic::arm_strex: {
+    Type *ElemTy = Call.getAttributes().getParamElementType(1);
+    Assert(ElemTy,
+           "Intrinsic requires elementtype attribute on second argument.",
            &Call);
     break;
   }
