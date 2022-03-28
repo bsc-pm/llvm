@@ -2828,7 +2828,7 @@ static kmp_task_t *__kmp_steal_task(kmp_info_t *victim_thr, kmp_int32 gtid,
     victim_td->td.td_deque_head =
         (victim_td->td.td_deque_head + 1) & TASK_DEQUE_MASK(victim_td->td);
   } else {
-    if (!task_team->tt.tt_untied_task_encountered) {
+    if (!task_team->tt.tt_untied_task_encountered && __kmp_threads[gtid]->th.th_active_role != OMP_ROLE_FREE_AGENT) {
       // The TSC does not allow to steal victim task
       __kmp_release_bootstrap_lock(&victim_td->td.td_deque_lock);
       KA_TRACE(10, ("__kmp_steal_task(exit #3): T#%d could not steal from "
