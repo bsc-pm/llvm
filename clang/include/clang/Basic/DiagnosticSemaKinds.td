@@ -11471,7 +11471,7 @@ def warn_oss_task_redeclaration :
           "regular (non-task) function, any calls prior to this point will not create tasks|"
           "task function, any calls prior this point may create different tasks}0">, InGroup<OmpSs>;
 def warn_oss_temporary_task : Warning<
-  "the temporary %0 in this task call will be destroyed at the end of the expression">;
+  "the temporary %0 in this task call will be destroyed at the end of the expression">, InGroup<OmpSs>;
 } // end of OmpSs component.
 
 
