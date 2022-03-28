@@ -31,11 +31,11 @@ void bar(int x) {
 // CHECK-NEXT:   store i32* %x, i32** %x.addr, align 8
 // CHECK-NEXT:   %0 = getelementptr inbounds %class.anon.0, %class.anon.0* %ref.tmp, i32 0, i32 0
 // CHECK-NEXT:   store i32* %x, i32** %0, align 8
-// CHECK-NEXT:   %call = call noundef i32 @"_ZZ3bariENK3$_1clEv"(%class.anon.0* noundef nonnull align 8 dereferenceable(8) %ref.tmp)
+// CHECK-NEXT:   %call = call noundef{{( signext)?}} i32 @"_ZZ3bariENK3$_1clEv"(%class.anon.0* noundef nonnull align 8 dereferenceable(8) %ref.tmp)
 // CHECK-NEXT:   ret i32 %call
 // CHECK-NEXT: }
 
-// CHECK: define internal noundef i32 @"_ZZ3bariENK3$_1clEv"(%class.anon.0* noundef nonnull align 8 dereferenceable(8) %this)
+// CHECK: define internal noundef{{( signext)?}} i32 @"_ZZ3bariENK3$_1clEv"(%class.anon.0* noundef nonnull align 8 dereferenceable(8) %this)
 // CHECK: entry:
 // CHECK-NEXT:   %this.addr = alloca %class.anon.0*, align 8
 // CHECK-NEXT:   store %class.anon.0* %this, %class.anon.0** %this.addr, align 8
