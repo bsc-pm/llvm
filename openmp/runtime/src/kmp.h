@@ -2699,18 +2699,14 @@ typedef struct KMP_ALIGN_CACHE kmp_base_info {
 #if KMP_OS_UNIX
   std::atomic<bool> th_blocking;
 #endif
+  kmp_cg_root_t *th_cg_roots; //List of cg_roots associated with this thread
+  
   kmp_info_p* th_next_free_agent; //Pointer to the next free agent in the free agents list
-  kmp_cg_root_t *th_cg_roots; // list of cg_roots associated with this thread
-  //std::atomic<bool> is_free_agent; // This is a free_agent thread.
-  //std::atomic<bool> fa_swap_to_worker; // This is a free_agent thread.
-  //bool *is_free_agent_active; // Reference to the is_free_agent_thread_active array.
-                              // This is for convenience.
-  //int free_agent_id;
 
   omp_role_t th_potential_roles; //Enum with all the roles this thread can have
   std::atomic<omp_role_t> th_active_role; //Current role of this thread
-	omp_role_t th_pending_role;
-	std::atomic<bool> th_change_role; //Indicates the thread to change the role to th_pending_role ASAP
+  omp_role_t th_pending_role;
+  std::atomic<bool> th_change_role; //Indicates the thread to change the role to th_pending_role ASAP
 
   // List of teams we can enter as a free agent thread
   kmp_bootstrap_lock_t allowed_teams_lock;
@@ -2909,14 +2905,6 @@ typedef struct kmp_base_root {
 #if KMP_AFFINITY_SUPPORTED
   int r_affinity_assigned;
 #endif // KMP_AFFINITY_SUPPORTED
-
-  /* Free agent threads */
-  //kmp_info_t *kmp_free_agent_list; First element of the free agent thread list. Next
-  //element is pointed by the thread itself
-  //kmp_info_t *kmp_free_agent_list_insert_pt;
-  //unsigned int num_free_agent_threads; // Number of free agent threads.
-  //kmp_info_t **free_agent_threads; // Threads that are free agent in this root.
-  //bool *is_free_agent_thread_active; // States if a free agent thread is enabled or not.
 } kmp_base_root_t;
 
 typedef union KMP_ALIGN_CACHE kmp_root {
@@ -4190,22 +4178,13 @@ typedef enum kmp_severity_t {
 } kmp_severity_t;
 extern void __kmpc_error(ident_t *loc, int severity, const char *message);
 
-// Free agent threads API.
-typedef enum kmp_free_agent_thread_start_t {
-  kmp_free_agent_inactive = 0,
-  kmp_free_agent_active = 1
-} kmp_free_agent_thread_start_t;
+// Free agent threads.
 extern volatile kmp_info_t *__kmp_free_agent_list; /*First element of the free agent
 thread list. Next element is pointed by the thread itself*/
 extern kmp_info_t *__kmp_free_agent_list_insert_pt;
-//extern kmp_free_agent_thread_start_t __kmp_free_agent_thread_start;
 extern int __kmp_free_agent_num_threads; //Max number of free agents allowed
 extern std::atomic<int> __kmp_free_agent_active_nth; //Actual number of free agents active
-extern kmp_proc_bind_t __kmp_free_agent_proc_bind;
-extern char *__kmp_free_agent_affinity_proclist;
-extern kmp_affin_mask_t *__kmp_free_agent_affinity_masks;
-extern unsigned __kmp_free_agent_affinity_num_masks;
-//Free Agents APIs
+//Free Agent APIs
 extern int __kmp_get_num_threads_role(omp_role_t r); //returns how many threads have the role r
 extern int __kmp_get_thread_roles(int tid, omp_role_t *r); //returns the number of roles of the thread with thread_id==tid,
 																													 //and r holds the actual roles of the thread.
@@ -4214,14 +4193,6 @@ extern void __kmp_set_thread_roles1(int how_many, omp_role_t r); //Gives the rol
 extern void __kmp_set_thread_roles2(int tid, omp_role_t r); //Gives the roles r to the thread with thread_id==tid.
 																													//It overrides the previous roles of the threads.
 extern int __kmp_get_thread_id(); //Returns the (global) thread id of the calling thread. Doesn't correspond to the gtid of the runtime.
-// Returns the number of free agent threads. They may not have been created yet.
-unsigned int __kmp_get_num_free_agent_threads();
-// Returns the free agent thread id
-int __kmp_get_free_agent_id();
-// Sets the active status of free agent threads. They may not have been
-// created yet.
-void __kmp_set_free_agent_thread_active_status(unsigned int thread_num,
-                                               bool active);
 
 void __kmp_add_allowed_task_team(kmp_info_t *free_agent,
                                  kmp_task_team_t *task_team);

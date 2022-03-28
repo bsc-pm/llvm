@@ -20,10 +20,6 @@
 #include "ompt-specific.h"
 #endif
 
-extern "C"{
-void Extrae_event(unsigned type, long long value) __attribute__((weak));
-}
-
 /*!
 @defgroup WAIT_RELEASE Wait/Release operations
 
@@ -643,7 +639,6 @@ final_spin=FALSE)
         // Reset task_team to 0 to make free agent thread able to suspend
         task_team = NULL;
         this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
-      //} else if (!this_thr->th.is_free_agent) {
       } else if (this_thr->th.th_active_role != OMP_ROLE_FREE_AGENT) {
         if (task_team != NULL) {
           if (TCR_SYNC_4(task_team->tt.tt_active)) {
@@ -778,14 +773,10 @@ final_spin=FALSE)
       }
       else{
           __kmp_unlock_suspend_mx(this_thr);
-          if(Extrae_event) Extrae_event(500, 0);
           flag->suspend(th_gtid);
-          if(Extrae_event) Extrae_event(500, 1);
       }
     	//TODO:A worker may change its role here too!
     	//Check if the master requested this thread to change its role while suspended
-    	//if(this_thr->th.th_active_role == OMP_ROLE_FREE_AGENT
-    	//	 && this_thr->th.th_change_role){
     	__kmp_suspend_initialize_thread(this_thr);
     	__kmp_lock_suspend_mx(this_thr);
     	if(this_thr->th.th_change_role){

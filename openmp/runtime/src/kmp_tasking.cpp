@@ -2959,9 +2959,6 @@ static inline int __kmp_execute_tasks_template(
   // Free agent threads use victim_tid as last_stolen directly
   if (thread->th.th_active_role == OMP_ROLE_FREE_AGENT) {
     victim_tid = -1;
-    //if(thread == __kmp_free_agent_list) tid = 0;
-    //else tid = 1;
-    //tid = thread->th.free_agent_id % nthreads;
     tid = tid % nthreads;
     free_agent_victim_tid = (tid + 1) % nthreads;
   }
@@ -2991,7 +2988,6 @@ static inline int __kmp_execute_tasks_template(
 							}
 						}
 #endif
-          	//break;
           }
           else{
             __kmp_unlock_suspend_mx(thread);
@@ -3005,26 +3001,6 @@ static inline int __kmp_execute_tasks_template(
           task = __kmp_remove_my_task(thread, gtid, task_team, is_constrained);
         }
       }
-      /*__kmp_suspend_initialize_thread(thread);
-      __kmp_lock_suspend_mx(thread);
-      if(thread->th.th_active_role == OMP_ROLE_FREE_AGENT && thread->th.th_change_role){
-          KMP_ATOMIC_ST_RLX(&thread->th.th_change_role, false);
-          KMP_ATOMIC_ST_RLX(&thread->th.th_active_role, thread->th.th_pending_role);
-          KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
-          __kmp_unlock_suspend_mx(thread);
-#if OMPT_SUPPORT
-          ompt_data_t *thread_data = nullptr;
-		  if(ompt_enabled.enabled){
-		      thread_data = &(thread->th.ompt_thread_info.thread_data);
-			  if(ompt_enabled.ompt_callback_thread_role_shift){
-			      ompt_callbacks.ompt_callback(ompt_callback_thread_role_shift)(
-				      thread_data, (ompt_role_t)OMP_ROLE_FREE_AGENT, (ompt_role_t)thread->th.th_pending_role);
-			  }
-		  }
-#endif
-          break;
-      }
-      __kmp_unlock_suspend_mx(thread);*/
 
       if ((task == NULL) && (nthreads > 1)) { // Steal a task
         int asleep = 1;
@@ -3142,9 +3118,6 @@ static inline int __kmp_execute_tasks_template(
              gtid));
         return TRUE;
       }
-      /*if (thread->th.is_free_agent && !*thread->th.is_free_agent_active) {
-        return TRUE;
-      }*/
 
       if (thread->th.th_task_team == NULL) {
         break;

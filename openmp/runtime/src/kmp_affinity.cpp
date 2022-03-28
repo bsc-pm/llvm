@@ -3696,13 +3696,6 @@ static void __kmp_aux_affinity_initialize(void) {
     KMP_DEBUG_ASSERT((int)numUnique == __kmp_avail_proc);
   }
 
-  // For now free agent proc bind only supports proclist
-  if (__kmp_free_agent_proc_bind == proc_bind_true) {
-    __kmp_affinity_process_placelist(
-        &__kmp_free_agent_affinity_masks, &__kmp_free_agent_affinity_num_masks,
-        __kmp_free_agent_affinity_proclist, osId2Mask, maxIndex);
-  }
-
   switch (__kmp_affinity_type) {
 
   case affinity_explicit:
@@ -3949,19 +3942,7 @@ void __kmp_affinity_set_init_mask(int gtid, int isa_root) {
   kmp_affin_mask_t *mask;
   int i;
 
-  if (th->th.th_active_role == OMP_ROLE_FREE_AGENT) {
-    if (__kmp_free_agent_proc_bind == proc_bind_false) {
-      KMP_ASSERT(__kmp_affin_fullMask != NULL);
-      i = 0;
-      mask = __kmp_affin_fullMask;
-    } else {
-      KMP_DEBUG_ASSERT(__kmp_free_agent_affinity_num_masks > 0);
-      //i = th->th.free_agent_id % __kmp_free_agent_affinity_num_masks;
-      i = th->th.th_info.ds.ds_gtid % __kmp_free_agent_affinity_num_masks;
-      mask = KMP_CPU_INDEX(__kmp_free_agent_affinity_masks, i);
-    }
-  }
-  else if (KMP_AFFINITY_NON_PROC_BIND) {
+  if (KMP_AFFINITY_NON_PROC_BIND) {
     if ((__kmp_affinity_type == affinity_none) ||
         (__kmp_affinity_type == affinity_balanced) ||
         KMP_HIDDEN_HELPER_THREAD(gtid)) {
