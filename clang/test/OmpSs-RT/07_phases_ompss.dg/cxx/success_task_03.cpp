@@ -24,16 +24,16 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: %oss-cxx-compile-and-run
-// RUN: %oss-cxx-O2-compile-and-run
-//XFAIL: *
-
+// RUN: %oss-cxx-compile && NANOS6_CONFIG=%S/../../nanos6.toml %oss-run 2>&1 | FileCheck %s
+// RUN: %oss-cxx-O2-compile && NANOS6_CONFIG=%S/../../nanos6.toml %oss-run 2>&1 | FileCheck %s
 
 /*
 <testinfo>
 test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatibility")
 </testinfo>
 */
+
+#include<stdio.h>
 
 int m;
 struct B
@@ -47,13 +47,21 @@ struct A
     B* b;
 
 #pragma oss task inout(n, b->n)
-    void f();
+    void f() {}
 };
 
-void A::f() {}
 
 int main() 
 {
     A a;
+
+    fprintf(stderr, "%p\n", &a.n);
+    fprintf(stderr, "%p\n", &a.b->n);
+
     a.f();
+    #pragma oss taskwait
 }
+
+// CHECK: [[ADDR:.*]]
+
+// CHECK: start:[[ADDR]]

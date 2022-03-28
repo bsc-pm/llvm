@@ -26,7 +26,6 @@
 
 // RUN: %oss-cxx-compile-and-run
 // RUN: %oss-cxx-O2-compile-and-run
-//XFAIL: *
 
 
 /*
@@ -35,7 +34,7 @@ test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatib
 </testinfo>
 */
 
-#include"assert.h"
+#include<assert.h>
 
 struct A 
 {

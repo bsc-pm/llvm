@@ -24,9 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: %oss-cxx-compile-and-run
-// RUN: %oss-cxx-O2-compile-and-run
-// XFAIL: *
+// RUN: %oss-cxx-compile && NANOS6_CONFIG=%S/../../nanos6.toml %oss-run 2>&1 | FileCheck %s
+// RUN: %oss-cxx-O2-compile && NANOS6_CONFIG=%S/../../nanos6.toml %oss-run 2>&1 | FileCheck %s
 
 /*
 <testinfo>
@@ -37,6 +36,7 @@ test_exec_faulty=config/mercurium-ompss
 
 
 #include<assert.h>
+#include<stdio.h>
 
 struct C
 {
@@ -74,9 +74,22 @@ int main()
 
     a.n = 3;
     a.b = &b;
+
+    fprintf(stderr, "%p\n", &a.n);
+    fprintf(stderr, "%p\n", &a.b->n);
+    fprintf(stderr, "%p\n", &a.b->c->n);
+
     a.f();
     #pragma oss taskwait
     assert(a.n == 4);
     assert(a.b->n == 3);
     assert(a.b->c->n == 2);
 }
+
+// CHECK: [[ADDR:.*]]
+// CHECK: [[ADDR1:.*]]
+// CHECK: [[ADDR2:.*]]
+
+// CHECK: start:[[ADDR]]
+// CHECK: start:[[ADDR1]]
+// CHECK: start:[[ADDR2]]

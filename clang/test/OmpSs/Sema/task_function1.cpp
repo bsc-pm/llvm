@@ -20,6 +20,11 @@ struct P : S {
     // expected-error@+2 {{'#pragma oss task' can only be applied to non-volatile or static methods}}
     #pragma oss task in(*p)
     void foo(int *p) {}
+    #pragma oss task
+    void bar() {
+      #pragma oss task
+      {}
+    }
 
 };
 
