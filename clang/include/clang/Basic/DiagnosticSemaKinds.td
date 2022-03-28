@@ -11426,7 +11426,7 @@ def warn_oss_section_is_char : Warning<"array section %select{lower bound|length
 def err_oss_single_decl_in_task : Error<
   "single declaration is expected after 'task' directive">;
 def err_oss_function_expected : Error<
-  "'#pragma oss task' can only be applied to %select{functions|non-volatile or static methods}0">;
+  "'#pragma oss task' can only be applied to functions">;
 def err_oss_non_void_task : Error<
   "non-void tasks are not supported">;
 def err_oss_rvalue_param_task : Error<

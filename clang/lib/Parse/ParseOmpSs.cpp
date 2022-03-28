@@ -461,6 +461,9 @@ Parser::DeclGroupPtrTy Parser::ParseOmpSsDeclarativeDirectiveWithExtDecl(
 
   switch (DKind) {
   case OSSD_task: {
+    // Only allowed in C++ mode
+    if (!getLangOpts().CPlusPlus && getCurScope()->isClassScope())
+      break;
     // The syntax is:
     // { #pragma oss task }
     // <function-declaration-or-definition>
