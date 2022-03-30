@@ -16,6 +16,7 @@
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/DebugInfo.h"
+#include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InstIterator.h"
@@ -1262,7 +1263,8 @@ struct OmpSs {
                                  ArrayRef<Type *> TypeList,
                                  ArrayRef<StringRef> NameList,
                                  ArrayRef<Type *> ExtraTypeList,
-                                 ArrayRef<StringRef> ExtraNameList) {
+                                 ArrayRef<StringRef> ExtraNameList,
+                                 bool IsTask = false) {
     Type *RetTy = Type::getVoidTy(M.getContext());
 
     SmallVector<Type *, 4> AggTypeList;
@@ -1279,6 +1281,21 @@ struct OmpSs {
     Function *FuncVar = Function::Create(
         FuncType, GlobalValue::InternalLinkage, F.getAddressSpace(),
         Name, &M);
+
+    // Build debug info in task unpack
+    if (IsTask) {
+      DISubprogram *OldSP = F.getSubprogram();
+      DIBuilder DIB(M, /*AllowUnresolved=*/false, OldSP->getUnit());
+      auto SPType = DIB.createSubroutineType(DIB.getOrCreateTypeArray(None));
+      DISubprogram::DISPFlags SPFlags = DISubprogram::SPFlagDefinition |
+                                        DISubprogram::SPFlagOptimized |
+                                        DISubprogram::SPFlagLocalToUnit;
+      DISubprogram *NewSP = DIB.createFunction(
+          OldSP->getUnit(), FuncVar->getName(), FuncVar->getName(), OldSP->getFile(),
+          /*LineNo=*/0, SPType, /*ScopeLine=*/0, DINode::FlagZero, SPFlags);
+      FuncVar->setSubprogram(NewSP);
+      DIB.finalizeSubprogram(NewSP);
+    }
 
     // Set names for arguments.
     Function::arg_iterator AI = FuncVar->arg_begin();
@@ -2130,7 +2147,7 @@ struct OmpSs {
     // CodeExtractor will create a entry block for us
     UnpackFunc = createUnpackOlFunction(
       M, F, ("nanos6_unpacked_task_region_" + F.getName() + Twine(taskNum)).str(),
-      TaskTypeList, TaskNameList, TaskExtraTypeList, TaskExtraNameList);
+      TaskTypeList, TaskNameList, TaskExtraTypeList, TaskExtraNameList, /*IsTask=*/true);
 
     OlFunc = createUnpackOlFunction(
       M, F, ("nanos6_ol_task_region_" + F.getName() + Twine(taskNum)).str(),
@@ -3151,13 +3168,21 @@ struct OmpSs {
       CallInst *TaskSubmitFuncCall = IRB.CreateCall(TaskSubmitFuncCallee, TaskPtrVarL);
       return TaskSubmitFuncCall;
     };
+    // FIXME: duplicated from analysis valueInDSABundles,
+    // but needed in CodeExtractor
+    auto valueInUnpackParams = [&TaskArgsToStructIdxMap](Value *const V) {
+      int ret = -1;
+      if (TaskArgsToStructIdxMap.count(V))
+        ret = TaskArgsToStructIdxMap.lookup(V);
+      return ret;
+    };
 
     // 4. Extract region the way we want
     CodeExtractorAnalysisCache CEAC(F);
     SmallVector<BasicBlock *> TaskBBs1;
     for (auto *I : TaskBBs)
       TaskBBs1.push_back(I->getParent());
-    CodeExtractor CE(TaskBBs1, rewriteUsesBrAndGetOmpSsUnpackFunc, emitOmpSsCaptureAndSubmitTask);
+    CodeExtractor CE(TaskBBs1, rewriteUsesBrAndGetOmpSsUnpackFunc, emitOmpSsCaptureAndSubmitTask, valueInUnpackParams);
     CE.extractCodeRegion(CEAC);
 
     DirInfo.Exit->eraseFromParent();

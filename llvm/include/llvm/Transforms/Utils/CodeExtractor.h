@@ -122,6 +122,7 @@ public:
     std::function<CallInst*(Function *newFunction,
                             BasicBlock *codeReplacer,
                             const SetVector<BasicBlock *> &Blocks)> emitOmpSsCaptureAndSubmitTask;
+    std::function<int(Value *const V)> valueInUnpackParams;
 
   public:
     /// Create a code extractor for a sequence of blocks.
@@ -163,7 +164,8 @@ public:
                                           const SetVector<BasicBlock *> &Blocks)> rewriteUsesBrAndGetOmpSsUnpackFunc,
                   std::function<CallInst*(Function *newFunction,
                                           BasicBlock *codeReplacer,
-                                          const SetVector<BasicBlock *> &Blocks)> emitOmpSsCaptureAndSubmitTask);
+                                          const SetVector<BasicBlock *> &Blocks)> emitOmpSsCaptureAndSubmitTask,
+                  std::function<int(Value *const V)> valueInUnpackParams);
 
     /// Perform the extraction, returning the new function.
     ///
