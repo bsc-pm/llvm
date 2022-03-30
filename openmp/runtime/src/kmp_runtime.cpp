@@ -9672,6 +9672,7 @@ static kmp_info_t* get_thread_from_thread_pool(int new_gtid){
 }
 
 int __kmp_get_num_threads_role(omp_role_t r){
+	
 	switch(r){
 		case OMP_ROLE_FREE_AGENT:
 			return __kmp_free_agent_num_threads; //TODO: Number of active or potential?
@@ -9685,6 +9686,7 @@ int __kmp_get_num_threads_role(omp_role_t r){
 
 int __kmp_get_thread_roles(int tid, omp_role_t *r){
 	int gtid;
+	
 	if(tid != 0){
 		gtid= TCR_4(__kmp_init_hidden_helper_threads)
 							 ? tid
@@ -9782,6 +9784,13 @@ static void transform_thread_to_FA(kmp_info_t *th){
   __kmp_threads array the function does nothing at all. */
 void __kmp_set_thread_roles1(int how_many, omp_role_t r){
 	if(__kmp_threads == NULL) return; 
+    //Do middle init here if not already done
+    __kmp_acquire_bootstrap_lock(&__kmp_initz_lock);
+    if (!__kmp_init_middle) {
+        __kmp_do_middle_initialize();
+    }
+    __kmp_release_bootstrap_lock(&__kmp_initz_lock);
+	
 	int i, gtid;
 	kmp_info_t *th;
 	omp_role_t act_r;
@@ -9878,6 +9887,13 @@ void __kmp_set_thread_roles1(int how_many, omp_role_t r){
 
 void __kmp_set_thread_roles2(int tid, omp_role_t r){
 	if(__kmp_threads == NULL) return; 
+    //Do middle init here if not already done
+    __kmp_acquire_bootstrap_lock(&__kmp_initz_lock);
+    if (!__kmp_init_middle) {
+        __kmp_do_middle_initialize();
+    }
+    __kmp_release_bootstrap_lock(&__kmp_initz_lock);
+	
 	int gtid;
 	int tmp = 1;
 	if(tid != 0){
