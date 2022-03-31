@@ -5458,61 +5458,60 @@ __kmp_allocate_team(kmp_root_t *root, int new_nproc, int max_nproc,
       int old_nthr = team->t.t_nproc;
       __kmp_resize_dist_barrier(team, old_nthr, new_nproc);
     }
-    int th_to_return = (team->t.t_nproc >= new_nproc)
-    										? new_nproc - 1
-    										: team->t.t_nproc - 1;
-    int returned = 0;
+    //Return threads to the team when needed.
+    int th_to_visit = (team->t.t_nproc >= new_nproc)
+    										? new_nproc 
+    										: team->t.t_nproc ;
     kmp_info_t *th;
     kmp_info_t *last_th = NULL;
-		kmp_info_t *list_p = CCAST(kmp_info_t *, __kmp_free_agent_list);
-		for( f = 0; 
-				 (f < team->t.t_nproc) && (list_p != NULL) && returned < (th_to_return);
-				 f++){
-			th = team->t.t_threads[f];
-			if(!(th->th.th_active_role == OMP_ROLE_FREE_AGENT ||
-				 (th->th.th_change_role && th->th.th_pending_role == OMP_ROLE_FREE_AGENT)))
-				continue;
-			while(list_p != th){
-				last_th = list_p;
-				list_p = list_p->th.th_next_free_agent;
-			}
-			if(last_th == NULL){
-				__kmp_free_agent_list = list_p = th->th.th_next_free_agent;
-			}
-			else{
-				last_th->th.th_next_free_agent = th->th.th_next_free_agent;
-				list_p = list_p->th.th_next_free_agent;
-			}
-			if(th == __kmp_free_agent_list_insert_pt)
-				__kmp_free_agent_list_insert_pt = NULL;
-
-		    th->th.th_next_free_agent = NULL;
-		    KMP_DEBUG_ASSERT((last_th->th.th_next_free_agent == NULL) ||
-		                     (last_th->th.th_info.ds.ds_gtid <
-		                      last_th->th.th_next_free_agent->th.th_info.ds.ds_gtid));
-
-			++returned;
-			
-			th->th.th_pending_role = OMP_ROLE_NONE;
-			KMP_ATOMIC_ST_SEQ(&th->th.th_change_role, true);
-
-			__kmp_initialize_info(th, team, f, th->th.th_info.ds.ds_gtid);
-			th->th.th_task_state = master->th.th_task_state;
-			th->th.th_task_state_top = 0;
-			th->th.th_task_state_stack_sz = 4;
-			if(__kmp_barrier_gather_pattern[bs_forkjoin_barrier] == bp_dist_bar)
-				KMP_DEBUG_ASSERT(th->th.th_used_in_team.load() == 0);
-			if(__kmp_tasking_mode != tskm_immediate_exec)
-				th->th.th_task_team = NULL;
-			kmp_balign_t *balign = th->th.th_bar;
-			for(int b = 0;b < bs_last_barrier; b++){
-				balign[b].bb.b_arrived = team->t.t_bar[b].b_arrived;
-				KMP_DEBUG_ASSERT(balign[b].bb.wait_flag != KMP_BARRIER_PARENT_FLAG);
-#if USE_DEBUGGER
-				balign[b].bb.b_worker_arrived = team->t.t_bar[b].b_team_arrived;
-#endif
-			}
+	kmp_info_t *list_p = CCAST(kmp_info_t *, __kmp_free_agent_list);
+	for( f = 1; 
+			 (f < th_to_visit) && (list_p != NULL);
+			 f++){
+		th = team->t.t_threads[f];
+		if(!(th->th.th_active_role == OMP_ROLE_FREE_AGENT ||
+			 (th->th.th_change_role && th->th.th_pending_role == OMP_ROLE_FREE_AGENT)))
+			continue;
+		while(list_p != th){
+			last_th = list_p;
+			list_p = list_p->th.th_next_free_agent;
 		}
+		if(last_th == NULL){
+			__kmp_free_agent_list = list_p = th->th.th_next_free_agent;
+		}
+		else{
+			last_th->th.th_next_free_agent = th->th.th_next_free_agent;
+			list_p = list_p->th.th_next_free_agent;
+		}
+		if(th == __kmp_free_agent_list_insert_pt)
+			__kmp_free_agent_list_insert_pt = NULL;
+
+	    th->th.th_next_free_agent = NULL;
+	    KMP_DEBUG_ASSERT((last_th == NULL) ||
+	                     ((last_th->th.th_next_free_agent == NULL) ||
+	                     (last_th->th.th_info.ds.ds_gtid <
+	                      last_th->th.th_next_free_agent->th.th_info.ds.ds_gtid)));
+
+		th->th.th_pending_role = OMP_ROLE_NONE;
+		KMP_ATOMIC_ST_SEQ(&th->th.th_change_role, true);
+
+		__kmp_initialize_info(th, team, f, th->th.th_info.ds.ds_gtid);
+		th->th.th_task_state = master->th.th_task_state;
+		th->th.th_task_state_top = 0;
+		th->th.th_task_state_stack_sz = 4;
+		if(__kmp_barrier_gather_pattern[bs_forkjoin_barrier] == bp_dist_bar)
+			KMP_DEBUG_ASSERT(th->th.th_used_in_team.load() == 0);
+		if(__kmp_tasking_mode != tskm_immediate_exec)
+			th->th.th_task_team = NULL;
+		kmp_balign_t *balign = th->th.th_bar;
+		for(int b = 0;b < bs_last_barrier; b++){
+			balign[b].bb.b_arrived = team->t.t_bar[b].b_arrived;
+			KMP_DEBUG_ASSERT(balign[b].bb.wait_flag != KMP_BARRIER_PARENT_FLAG);
+#if USE_DEBUGGER
+			balign[b].bb.b_worker_arrived = team->t.t_bar[b].b_team_arrived;
+#endif
+		}
+	}
     // Has the number of threads changed?
     /* Let's assume the most common case is that the number of threads is
        unchanged, and put that case first. */
@@ -8351,13 +8350,13 @@ void __kmp_internal_join(ident_t *id, int gtid, kmp_team_t *team) {
 		
   	kmp_taskdata_t *task = new_thr->th.th_current_task;
 
-  	new_thr->th.allowed_teams_capacity = 2;
-  	new_thr->th.allowed_teams_length = 0;
   	if(new_thr->th.allowed_teams == NULL){
+  	    new_thr->th.allowed_teams_capacity = 2;
+      	new_thr->th.allowed_teams_length = 0;
+  	    __kmp_init_bootstrap_lock(&new_thr->th.allowed_teams_lock);
   		new_thr->th.allowed_teams = (kmp_task_team_t **)__kmp_allocate(
   				sizeof(kmp_task_team_t *) * new_thr->th.allowed_teams_capacity);
   	}
-  	__kmp_init_bootstrap_lock(&new_thr->th.allowed_teams_lock);
 
   	task->td_task_id = KMP_GEN_TASK_ID();
   	task->td_team = NULL;
@@ -9714,10 +9713,12 @@ static void transform_thread_to_FA(kmp_info_t *th){
     int gtid = th->th.th_info.ds.ds_gtid;
     kmp_taskdata_t *task = (kmp_taskdata_t *)__kmp_allocate(sizeof(kmp_taskdata_t)*1);
 	th->th.th_current_task = task;
-    th->th.allowed_teams_capacity = 2;
-    th->th.allowed_teams_length = 0;
-    th->th.allowed_teams = (kmp_task_team_t **)__kmp_allocate(sizeof(kmp_task_team_t *) * th->th.allowed_teams_capacity);
-    __kmp_init_bootstrap_lock(&th->th.allowed_teams_lock);
+    if(th->th.allowed_teams == NULL){
+        th->th.allowed_teams_capacity = 2;
+        th->th.allowed_teams_length = 0;
+        th->th.allowed_teams = (kmp_task_team_t **)__kmp_allocate(sizeof(kmp_task_team_t *) * th->th.allowed_teams_capacity);
+        __kmp_init_bootstrap_lock(&th->th.allowed_teams_lock);
+    }
     task->td_task_id = KMP_GEN_TASK_ID();
     task->td_team = NULL;
     task->td_ident = NULL;

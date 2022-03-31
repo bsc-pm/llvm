@@ -3816,14 +3816,6 @@ void __kmp_task_team_setup(kmp_info_t *this_thr, kmp_team_t *team, int always) {
     	free_agent = free_agent->th.th_next_free_agent;
   	}
   }
-  /*for (unsigned int i = 0; i < __kmp_free_agent_num_threads; i++) {
-    kmp_info_t *free_agent = this_thr->th.th_root->r.free_agent_threads[i];
-    __kmp_acquire_bootstrap_lock(&free_agent->th.allowed_teams_lock);
-    __kmp_add_allowed_task_team(free_agent, task_team);
-    if (other_task_team)
-      __kmp_add_allowed_task_team(free_agent, other_task_team);
-    __kmp_release_bootstrap_lock(&free_agent->th.allowed_teams_lock);
-  }*/
 }
 
 // __kmp_task_team_sync: Propagation of task team data from team to threads
@@ -3885,12 +3877,6 @@ void __kmp_task_team_wait(
         __kmp_release_bootstrap_lock(&free_agent->th.allowed_teams_lock);
         free_agent = free_agent->th.th_next_free_agent;
       }
-      /*for (unsigned int i = 0; i < __kmp_free_agent_num_threads; i++) {
-        kmp_info_t *free_agent = this_thr->th.th_root->r.free_agent_threads[i];
-        __kmp_acquire_bootstrap_lock(&free_agent->th.allowed_teams_lock);
-        __kmp_remove_allowed_task_team(free_agent, task_team);
-        __kmp_release_bootstrap_lock(&free_agent->th.allowed_teams_lock);
-      }*/
       if (__kmp_free_agent_num_threads > 0) {
         std::atomic<kmp_int32> *unfinished_threads;
         unfinished_threads = &(task_team->tt.tt_unfinished_threads);
