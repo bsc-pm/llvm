@@ -886,6 +886,7 @@ def OMP_TaskLoop : Directive<"taskloop"> {
     VersionedClause<OMPC_Collapse>,
     VersionedClause<OMPC_Final>,
     VersionedClause<OMPC_Priority>,
+    VersionedClause<OMPC_FreeAgent>,
   ];
   let allowedExclusiveClauses = [
     VersionedClause<OMPC_GrainSize>,
@@ -916,7 +917,8 @@ def OMP_TaskLoopSimd : Directive<"taskloop simd"> {
     VersionedClause<OMPC_SafeLen>,
     VersionedClause<OMPC_SimdLen>,
     VersionedClause<OMPC_Final>,
-    VersionedClause<OMPC_Priority>
+    VersionedClause<OMPC_Priority>,
+    VersionedClause<OMPC_FreeAgent>,
   ];
   let allowedExclusiveClauses = [
     VersionedClause<OMPC_GrainSize>,
@@ -1532,6 +1534,7 @@ def OMP_MasterTaskloop : Directive<"master taskloop"> {
     VersionedClause<OMPC_Untied>,
     VersionedClause<OMPC_Mergeable>,
     VersionedClause<OMPC_Priority>,
+    VersionedClause<OMPC_FreeAgent>,
     VersionedClause<OMPC_GrainSize>,
     VersionedClause<OMPC_NoGroup>,
     VersionedClause<OMPC_NumTasks>,
@@ -1554,6 +1557,7 @@ def OMP_ParallelMasterTaskloop :
     VersionedClause<OMPC_Untied>,
     VersionedClause<OMPC_Mergeable>,
     VersionedClause<OMPC_Priority>,
+    VersionedClause<OMPC_FreeAgent>,
     VersionedClause<OMPC_GrainSize>,
     VersionedClause<OMPC_NoGroup>,
     VersionedClause<OMPC_NumTasks>,
@@ -1577,6 +1581,7 @@ def OMP_MasterTaskloopSimd : Directive<"master taskloop simd"> {
     VersionedClause<OMPC_Untied>,
     VersionedClause<OMPC_Mergeable>,
     VersionedClause<OMPC_Priority>,
+    VersionedClause<OMPC_FreeAgent>,
     VersionedClause<OMPC_Linear>,
     VersionedClause<OMPC_Aligned>,
     VersionedClause<OMPC_SafeLen>,
@@ -1605,6 +1610,7 @@ def OMP_ParallelMasterTaskloopSimd :
     VersionedClause<OMPC_Untied>,
     VersionedClause<OMPC_Mergeable>,
     VersionedClause<OMPC_Priority>,
+    VersionedClause<OMPC_FreeAgent>,
     VersionedClause<OMPC_GrainSize>,
     VersionedClause<OMPC_NoGroup>,
     VersionedClause<OMPC_NumTasks>,
