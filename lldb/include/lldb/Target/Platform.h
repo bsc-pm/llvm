@@ -95,7 +95,27 @@ public:
   static lldb::PlatformSP GetHostPlatform();
 
   static lldb::PlatformSP
-  GetPlatformForArchitecture(const ArchSpec &arch, ArchSpec *platform_arch_ptr);
+  GetPlatformForArchitecture(const ArchSpec &arch,
+                             const ArchSpec &process_host_arch = {},
+                             ArchSpec *platform_arch_ptr = nullptr);
+
+  /// Get the platform for the given list of architectures.
+  ///
+  /// The algorithm works a follows:
+  ///
+  /// 1. Returns the selected platform if it matches any of the architectures.
+  /// 2. Returns the host platform if it matches any of the architectures.
+  /// 3. Returns the platform that matches all the architectures.
+  ///
+  /// If none of the above apply, this function returns a default platform. The
+  /// candidates output argument differentiates between either no platforms
+  /// supporting the given architecture or multiple platforms supporting the
+  /// given architecture.
+  static lldb::PlatformSP
+  GetPlatformForArchitectures(std::vector<ArchSpec> archs,
+                              const ArchSpec &process_host_arch,
+                              lldb::PlatformSP selected_platform_sp,
+                              std::vector<lldb::PlatformSP> &candidates);
 
   static const char *GetHostPlatformName();
 
@@ -107,6 +127,7 @@ public:
   static lldb::PlatformSP Create(ConstString name, Status &error);
 
   static lldb::PlatformSP Create(const ArchSpec &arch,
+                                 const ArchSpec &process_host_arch,
                                  ArchSpec *platform_arch_ptr, Status &error);
 
   /// Augments the triple either with information from platform or the host
@@ -310,7 +331,8 @@ public:
 
   /// Get the platform's supported architectures in the order in which they
   /// should be searched.
-  virtual std::vector<ArchSpec> GetSupportedArchitectures() = 0;
+  virtual std::vector<ArchSpec>
+  GetSupportedArchitectures(const ArchSpec &process_host_arch) = 0;
 
   virtual size_t GetSoftwareBreakpointTrapOpcode(Target &target,
                                                  BreakpointSite *bp_site);
@@ -332,6 +354,7 @@ public:
   /// Lets a platform answer if it is compatible with a given architecture and
   /// the target triple contained within.
   virtual bool IsCompatibleArchitecture(const ArchSpec &arch,
+                                        const ArchSpec &process_host_arch,
                                         bool exact_arch_match,
                                         ArchSpec *compatible_arch_ptr);
 
@@ -866,6 +889,9 @@ public:
   virtual CompilerType GetSiginfoType(const llvm::Triple &triple);
 
 protected:
+  /// For unit testing purposes only.
+  static void Clear();
+
   /// Create a list of ArchSpecs with the given OS and a architectures. The
   /// vendor field is left as an "unspecified unknown".
   static std::vector<ArchSpec>

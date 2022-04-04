@@ -27,6 +27,7 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/DebugCounter.h"
+#include "llvm/Support/MathExtras.h"
 #include "llvm/Transforms/Scalar.h"
 
 #include <string>
@@ -45,39 +46,7 @@ static int64_t MinSignedConstraintValue = std::numeric_limits<int64_t>::min();
 
 namespace {
 
-/// Wrapper encapsulating separate constraint systems and corresponding value
-/// mappings for both unsigned and signed information. Facts are added to and
-/// conditions are checked against the corresponding system depending on the
-/// signed-ness of their predicates. While the information is kept separate
-/// based on signed-ness, certain conditions can be transferred between the two
-/// systems.
-class ConstraintInfo {
-  DenseMap<Value *, unsigned> UnsignedValue2Index;
-  DenseMap<Value *, unsigned> SignedValue2Index;
-
-  ConstraintSystem UnsignedCS;
-  ConstraintSystem SignedCS;
-
-public:
-  DenseMap<Value *, unsigned> &getValue2Index(bool Signed) {
-    return Signed ? SignedValue2Index : UnsignedValue2Index;
-  }
-  const DenseMap<Value *, unsigned> &getValue2Index(bool Signed) const {
-    return Signed ? SignedValue2Index : UnsignedValue2Index;
-  }
-
-  ConstraintSystem &getCS(bool Signed) {
-    return Signed ? SignedCS : UnsignedCS;
-  }
-  const ConstraintSystem &getCS(bool Signed) const {
-    return Signed ? SignedCS : UnsignedCS;
-  }
-
-  void popLastConstraint(bool Signed) { getCS(Signed).popLastConstraint(); }
-  void popLastNVariables(bool Signed, unsigned N) {
-    getCS(Signed).popLastNVariables(N);
-  }
-};
+class ConstraintInfo;
 
 /// Struct to express a pre-condition of the form %Op0 Pred %Op1.
 struct PreconditionTy {
@@ -127,6 +96,40 @@ struct ConstraintTy {
     if (size() != 1)
       return false;
     return isValid(Info);
+  }
+};
+
+/// Wrapper encapsulating separate constraint systems and corresponding value
+/// mappings for both unsigned and signed information. Facts are added to and
+/// conditions are checked against the corresponding system depending on the
+/// signed-ness of their predicates. While the information is kept separate
+/// based on signed-ness, certain conditions can be transferred between the two
+/// systems.
+class ConstraintInfo {
+  DenseMap<Value *, unsigned> UnsignedValue2Index;
+  DenseMap<Value *, unsigned> SignedValue2Index;
+
+  ConstraintSystem UnsignedCS;
+  ConstraintSystem SignedCS;
+
+public:
+  DenseMap<Value *, unsigned> &getValue2Index(bool Signed) {
+    return Signed ? SignedValue2Index : UnsignedValue2Index;
+  }
+  const DenseMap<Value *, unsigned> &getValue2Index(bool Signed) const {
+    return Signed ? SignedValue2Index : UnsignedValue2Index;
+  }
+
+  ConstraintSystem &getCS(bool Signed) {
+    return Signed ? SignedCS : UnsignedCS;
+  }
+  const ConstraintSystem &getCS(bool Signed) const {
+    return Signed ? SignedCS : UnsignedCS;
+  }
+
+  void popLastConstraint(bool Signed) { getCS(Signed).popLastConstraint(); }
+  void popLastNVariables(bool Signed, unsigned N) {
+    getCS(Signed).popLastNVariables(N);
   }
 };
 
@@ -320,8 +323,13 @@ getConstraint(CmpInst::Predicate Pred, Value *Op0, Value *Op1,
   for (const auto &KV : VariablesB)
     R[GetOrAddIndex(KV.second)] -= KV.first;
 
-  R[0] = Offset1 + Offset2 +
-         (Pred == (IsSigned ? CmpInst::ICMP_SLT : CmpInst::ICMP_ULT) ? -1 : 0);
+  int64_t OffsetSum;
+  if (AddOverflow(Offset1, Offset2, OffsetSum))
+    return {};
+  if (Pred == (IsSigned ? CmpInst::ICMP_SLT : CmpInst::ICMP_ULT))
+    if (AddOverflow(OffsetSum, int64_t(-1), OffsetSum))
+      return {};
+  R[0] = OffsetSum;
   Res.Preconditions = std::move(Preconditions);
   return Res;
 }
@@ -419,6 +427,10 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT) {
     // Succ (e.g. the case when adding a condition from a pre-header to a loop
     // header).
     auto CanAdd = [&BB, &DT](BasicBlock *Succ) {
+      if (BB.getSingleSuccessor()) {
+        assert(BB.getSingleSuccessor() == Succ);
+        return DT.properlyDominates(&BB, Succ);
+      }
       return any_of(successors(&BB),
                     [Succ](const BasicBlock *S) { return S != Succ; }) &&
              all_of(predecessors(Succ), [&BB, &DT, Succ](BasicBlock *Pred) {

@@ -1,4 +1,3 @@
-; RUN: opt -ompss-2-regions -analyze -disable-checks -enable-new-pm=0 < %s 2>&1 | FileCheck %s
 ; RUN: opt -passes='print<ompss-2-regions>' -disable-checks < %s 2>&1 | FileCheck %s
 define i32 @main() {
 entry:

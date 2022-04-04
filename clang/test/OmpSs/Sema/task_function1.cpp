@@ -1,23 +1,23 @@
 // RUN: %clang_cc1 -verify -x c++ -fompss-2 -ferror-limit 100 -o - %s
 
 struct S {
-    // expected-error@+2 {{'#pragma oss task' can only be applied to non-volatile or static methods}}
+    // expected-error@+2 {{'#pragma oss task' can only be applied to functions}}
     #pragma oss task in(*p)
     virtual void foo(int *p) {}
 };
 
 struct P : S {
     P() {};
-    // expected-error@+2 {{'#pragma oss task' can only be applied to non-volatile or static methods}}
+    // expected-error@+2 {{'#pragma oss task' can only be applied to functions}}
     #pragma oss task in(*p)
     P(int *p) {}
-    // expected-error@+2 {{'#pragma oss task' can only be applied to non-volatile or static methods}}
+    // expected-error@+2 {{'#pragma oss task' can only be applied to functions}}
     #pragma oss task
     ~P() {}
-    // expected-error@+2 {{'#pragma oss task' can only be applied to non-volatile or static methods}}
+    // expected-error@+2 {{'#pragma oss task' can only be applied to functions}}
     #pragma oss task
     P& operator=(const P &) {}
-    // expected-error@+2 {{'#pragma oss task' can only be applied to non-volatile or static methods}}
+    // expected-error@+2 {{'#pragma oss task' can only be applied to functions}}
     #pragma oss task in(*p)
     void foo(int *p) {}
     #pragma oss task

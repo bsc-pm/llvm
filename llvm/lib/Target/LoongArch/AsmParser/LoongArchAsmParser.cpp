@@ -24,8 +24,6 @@ using namespace llvm;
 #define DEBUG_TYPE "loongarch-asm-parser"
 
 namespace {
-struct LoongArchOperand;
-
 class LoongArchAsmParser : public MCTargetAsmParser {
   SMLoc getLoc() const { return getParser().getTok().getLoc(); }
 
@@ -82,8 +80,7 @@ public:
   }
 };
 
-/// LoongArchOperand - Instances of this class represent a parsed LoongArch
-/// machine instruction.
+// Instances of this class represent a parsed LoongArch machine instruction.
 class LoongArchOperand : public MCParsedAsmOperand {
   enum class KindTy {
     Token,
@@ -443,22 +440,22 @@ bool LoongArchAsmParser::MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
     return generateImmOutOfRangeError(Operands, ErrorInfo, /*Lower=*/0,
                                       /*Upper=*/(1 << 15) - 1);
   case Match_InvalidSImm12:
-    return generateImmOutOfRangeError(Operands, ErrorInfo, -(1 << 11),
-                                      (1 << 11) - 1);
+    return generateImmOutOfRangeError(Operands, ErrorInfo, /*Lower=*/-(1 << 11),
+                                      /*Upper=*/(1 << 11) - 1);
   case Match_InvalidSImm14lsl2:
     return generateImmOutOfRangeError(
         Operands, ErrorInfo, /*Lower=*/-(1 << 15), /*Upper=*/(1 << 15) - 4,
         "immediate must be a multiple of 4 in the range");
   case Match_InvalidSImm16:
-    return generateImmOutOfRangeError(Operands, ErrorInfo, -(1 << 15),
-                                      (1 << 15) - 1);
+    return generateImmOutOfRangeError(Operands, ErrorInfo, /*Lower=*/-(1 << 15),
+                                      /*Upper=*/(1 << 15) - 1);
   case Match_InvalidSImm16lsl2:
     return generateImmOutOfRangeError(
         Operands, ErrorInfo, /*Lower=*/-(1 << 17), /*Upper=*/(1 << 17) - 4,
         "immediate must be a multiple of 4 in the range");
   case Match_InvalidSImm20:
-    return generateImmOutOfRangeError(Operands, ErrorInfo, -(1 << 19),
-                                      (1 << 19) - 1);
+    return generateImmOutOfRangeError(Operands, ErrorInfo, /*Lower=*/-(1 << 19),
+                                      /*Upper=*/(1 << 19) - 1);
   case Match_InvalidSImm21lsl2:
     return generateImmOutOfRangeError(
         Operands, ErrorInfo, /*Lower=*/-(1 << 22), /*Upper=*/(1 << 22) - 4,

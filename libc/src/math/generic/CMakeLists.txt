@@ -476,9 +476,12 @@ add_entrypoint_object(
   HDRS
     ../expf.h
   DEPENDS
-    .exp_utils
-    .math_utils
+    .common_constants
+    libc.src.__support.FPUtil.fputil
     libc.include.math
+  COMPILE_OPTIONS
+    -O3
+    -mfma
 )
 
 add_entrypoint_object(
@@ -488,9 +491,11 @@ add_entrypoint_object(
   HDRS
     ../exp2f.h
   DEPENDS
-    .exp_utils
-    .math_utils
+    libc.src.__support.FPUtil.fputil
     libc.include.math
+  COMPILE_OPTIONS
+    -O3
+    -mfma
 )
 
 add_entrypoint_object(
@@ -500,9 +505,12 @@ add_entrypoint_object(
   HDRS
     ../expm1f.h
   DEPENDS
+    .common_constants
+    libc.src.__support.FPUtil.fputil
     libc.include.math
-    libc.src.math.expf
-    libc.src.math.fabsf
+  COMPILE_OPTIONS
+    -O3
+    -mfma
 )
 
 add_entrypoint_object(
@@ -668,6 +676,7 @@ add_entrypoint_object(
     libc.src.__support.FPUtil.fputil
   COMPILE_OPTIONS
     -O3
+    -mfma
 )
 
 add_entrypoint_object(
@@ -681,6 +690,7 @@ add_entrypoint_object(
     libc.src.__support.FPUtil.fputil
   COMPILE_OPTIONS
     -O3
+    -mfma
 )
 
 add_entrypoint_object(
@@ -694,6 +704,7 @@ add_entrypoint_object(
     libc.src.__support.FPUtil.fputil
     COMPILE_OPTIONS
     -O3
+    -mfma
 )
 
 add_entrypoint_object(
@@ -707,6 +718,7 @@ add_entrypoint_object(
     libc.src.__support.FPUtil.fputil
   COMPILE_OPTIONS
     -O3
+    -mfma
 )
 
 add_entrypoint_object(

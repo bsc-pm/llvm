@@ -484,7 +484,8 @@ private:
       } else {
         // Try to merge a block with left brace unwrapped that wasn't yet
         // covered.
-        assert(!TheLine->First->isOneOf(tok::kw_class, tok::kw_enum,
+        assert(TheLine->InPPDirective ||
+               !TheLine->First->isOneOf(tok::kw_class, tok::kw_enum,
                                         tok::kw_struct));
         ShouldMerge = !Style.BraceWrapping.AfterFunction ||
                       (NextLine.First->is(tok::r_brace) &&
@@ -1430,8 +1431,10 @@ void UnwrappedLineFormatter::formatFirstToken(
   if (Newlines)
     Indent = NewlineIndent;
 
-  // Preprocessor directives get indented before the hash only if specified
-  if (Style.IndentPPDirectives != FormatStyle::PPDIS_BeforeHash &&
+  // Preprocessor directives get indented before the hash only if specified. In
+  // Javascript import statements are indented like normal statements.
+  if (!Style.isJavaScript() &&
+      Style.IndentPPDirectives != FormatStyle::PPDIS_BeforeHash &&
       (Line.Type == LT_PreprocessorDirective ||
        Line.Type == LT_ImportStatement))
     Indent = 0;

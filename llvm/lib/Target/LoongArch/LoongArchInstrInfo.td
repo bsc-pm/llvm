@@ -15,6 +15,9 @@
 //===----------------------------------------------------------------------===//
 
 // TODO: Add LoongArch specific DAG Nodes
+// Target-dependent nodes.
+def loongarch_ret : SDNode<"LoongArchISD::RET", SDTNone,
+                           [SDNPHasChain, SDNPOptInGlue, SDNPVariadic]>;
 
 //===----------------------------------------------------------------------===//
 // Operand and SDNode transformation definitions.
@@ -317,6 +320,7 @@ def RDTIMEH_W : RDTIME_2R<0b0000000000000000011001, "rdtimeh.w">;
 def CPUCFG : ALU_2R<0b0000000000000000011011, "cpucfg">;
 
 /// LA64 instructions
+
 let Predicates = [IsLA64] in {
 
 // Arithmetic Operation Instructions for 64-bits
@@ -493,13 +497,21 @@ def : PatGprGpr<and, AND>;
 def : PatGprGpr<or, OR>;
 def : PatGprGpr<xor, XOR>;
 
+/// Branches and jumps
+
+let isBarrier = 1, isReturn = 1, isTerminator = 1 in
+def PseudoRET : Pseudo<(outs), (ins), [(loongarch_ret)]>,
+                PseudoInstExpansion<(JIRL R0, R1, 0)>;
+
 /// LA32 patterns
+
 let Predicates = [IsLA32] in {
 def : PatGprGpr<add, ADD_W>;
 def : PatGprImm<add, ADDI_W, simm12>;
 } // Predicates = [IsLA32]
 
 /// LA64 patterns
+
 let Predicates = [IsLA64] in {
 def : Pat<(sext_inreg GPR:$rj, i32), (ADDI_W GPR:$rj, 0)>;
 

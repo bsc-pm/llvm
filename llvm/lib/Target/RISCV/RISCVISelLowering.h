@@ -317,6 +317,11 @@ enum NodeType : unsigned {
 };
 } // namespace RISCVISD
 
+namespace RISCV {
+// We use 64 bits as the known part in the scalable vector types.
+static constexpr unsigned RVVBitsPerBlock = 64;
+} // namespace RISCV
+
 class RISCVTargetLowering : public TargetLowering {
   const RISCVSubtarget &Subtarget;
 
@@ -341,6 +346,7 @@ public:
   bool isCheapToSpeculateCttz() const override;
   bool isCheapToSpeculateCtlz() const override;
   bool hasAndNotCompare(SDValue Y) const override;
+  bool hasBitTest(SDValue X, SDValue Y) const override;
   bool shouldSinkOperands(Instruction *I,
                           SmallVectorImpl<Use *> &Ops) const override;
   bool isFPImmLegal(const APFloat &Imm, EVT VT,
@@ -531,6 +537,15 @@ public:
                              Optional<CallingConv::ID> CC) const override;
 
   static RISCVII::VLMUL getLMUL(MVT VT);
+  inline static unsigned computeVLMAX(unsigned VectorBits, unsigned EltSize,
+                                      unsigned MinSize) {
+    // Original equation:
+    //   VLMAX = (VectorBits / EltSize) * LMUL
+    //   where LMUL = MinSize / RISCV::RVVBitsPerBlock
+    // The following equations have been reordered to prevent loss of precision
+    // when calculating fractional LMUL.
+    return ((VectorBits / EltSize) * MinSize) / RISCV::RVVBitsPerBlock;
+  };
   static unsigned getRegClassIDForLMUL(RISCVII::VLMUL LMul);
   static unsigned getSubregIndexByMVT(MVT VT, unsigned Index);
   static unsigned getRegClassIDForVecVT(MVT VT);
@@ -633,6 +648,8 @@ private:
   SDValue lowerVPOp(SDValue Op, SelectionDAG &DAG, unsigned RISCVISDOpc) const;
   SDValue lowerLogicVPOp(SDValue Op, SelectionDAG &DAG, unsigned MaskOpc,
                          unsigned VecOpc) const;
+  SDValue lowerVPFPIntConvOp(SDValue Op, SelectionDAG &DAG,
+                             unsigned RISCVISDOpc) const;
   SDValue lowerFixedLengthVectorExtendToRVV(SDValue Op, SelectionDAG &DAG,
                                             unsigned ExtendOpc) const;
   SDValue lowerGET_ROUNDING(SDValue Op, SelectionDAG &DAG) const;
@@ -671,12 +688,6 @@ private:
     return false;
   };
 };
-
-namespace RISCV {
-// We use 64 bits as the known part in the scalable vector types.
-static constexpr unsigned RVVBitsPerBlock = 64;
-} // namespace RISCV
-
 namespace RISCVVIntrinsicsTable {
 
 struct RISCVVIntrinsicInfo {

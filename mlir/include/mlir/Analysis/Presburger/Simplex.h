@@ -185,6 +185,10 @@ public:
   /// Add new variables to the end of the list of variables.
   void appendVariable(unsigned count = 1);
 
+  /// Append a new variable to the simplex and constrain it such that its only
+  /// integer value is the floor div of `coeffs` and `denom`.
+  void addDivisionVariable(ArrayRef<int64_t> coeffs, int64_t denom);
+
   /// Mark the tableau as being empty.
   void markEmpty();
 
@@ -481,7 +485,7 @@ protected:
 
   /// Get a row corresponding to a var that has a non-integral sample value, if
   /// one exists. Otherwise, return an empty optional.
-  Optional<unsigned> maybeGetNonIntegeralVarRow() const;
+  Optional<unsigned> maybeGetNonIntegralVarRow() const;
 
   /// Given two potential pivot columns for a row, return the one that results
   /// in the lexicographically smallest sample vector.
@@ -658,6 +662,23 @@ private:
   /// Reduce the given basis, starting at the specified level, using general
   /// basis reduction.
   void reduceBasis(Matrix &basis, unsigned level);
+};
+
+/// Takes a snapshot of the simplex state on construction and rolls back to the
+/// snapshot on destruction.
+///
+/// Useful for performing operations in a "transient context", all changes from
+/// which get rolled back on scope exit.
+class SimplexRollbackScopeExit {
+public:
+  SimplexRollbackScopeExit(Simplex &simplex) : simplex(simplex) {
+    snapshot = simplex.getSnapshot();
+  };
+  ~SimplexRollbackScopeExit() { simplex.rollback(snapshot); }
+
+private:
+  SimplexBase &simplex;
+  unsigned snapshot;
 };
 
 } // namespace presburger

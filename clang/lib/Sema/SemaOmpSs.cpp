@@ -2268,6 +2268,7 @@ StmtResult Sema::ActOnOmpSsTaskForDirective(
     SourceLocation StartLoc, SourceLocation EndLoc) {
   if (!AStmt)
     return StmtError();
+
   SmallVector<OSSLoopDirective::HelperExprs> B(DSAStack->getAssociatedLoops());
   if (checkOmpSsLoop(OSSD_task_for, AStmt, *this, *DSAStack, B))
     return StmtError();
@@ -2280,6 +2281,7 @@ StmtResult Sema::ActOnOmpSsTaskLoopDirective(
     SourceLocation StartLoc, SourceLocation EndLoc) {
   if (!AStmt)
     return StmtError();
+
   SmallVector<OSSLoopDirective::HelperExprs> B(DSAStack->getAssociatedLoops());
   if (checkOmpSsLoop(OSSD_taskloop, AStmt, *this, *DSAStack, B))
     return StmtError();
@@ -2313,6 +2315,7 @@ StmtResult Sema::ActOnOmpSsTaskLoopForDirective(
     SourceLocation StartLoc, SourceLocation EndLoc) {
   if (!AStmt)
     return StmtError();
+
   SmallVector<OSSLoopDirective::HelperExprs> B(DSAStack->getAssociatedLoops());
   if (checkOmpSsLoop(OSSD_taskloop_for, AStmt, *this, *DSAStack, B))
     return StmtError();
@@ -3630,6 +3633,10 @@ Sema::ActOnOmpSsVarListClause(
     Res = ActOnOmpSsDependClause({ OSSC_DEPEND_mutexinoutset }, DepLoc, ColonLoc, Vars,
                                  StartLoc, LParenLoc, EndLoc, /*OSSSyntax=*/true);
     break;
+  case OSSC_on:
+    Res = ActOnOmpSsDependClause({ OSSC_DEPEND_inout }, DepLoc, ColonLoc, Vars,
+                                 StartLoc, LParenLoc, EndLoc, /*OSSSyntax=*/true);
+    break;
   case OSSC_weakin:
     Res = ActOnOmpSsDependClause({ OSSC_DEPEND_in, OSSC_DEPEND_weak },
                                  DepLoc, ColonLoc, Vars,
@@ -4025,10 +4032,8 @@ ExprResult Sema::VerifyPositiveIntegerConstant(
         << E->getSourceRange();
     return ExprError();
   }
-  if (CKind == OSSC_collapse && DSAStack->getAssociatedLoops() == 1) {
+  if (CKind == OSSC_collapse && DSAStack->getAssociatedLoops() == 1)
     DSAStack->setAssociatedLoops(Result.getExtValue());
-    DSAStack->setSeenAssociatedLoops(0);
-  }
   return ICE;
 }
 

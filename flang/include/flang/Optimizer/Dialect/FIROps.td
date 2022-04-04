@@ -250,7 +250,7 @@ def fir_FreeMemOp : fir_Op<"freemem", [MemoryEffects<[MemFree]>]> {
 
   let arguments = (ins Arg<fir_HeapType, "", [MemFree]>:$heapref);
 
-  let assemblyFormat = "$heapref attr-dict `:` type($heapref)";
+  let assemblyFormat = "$heapref attr-dict `:` qualified(type($heapref))";
 }
 
 def fir_LoadOp : fir_OneResultOp<"load"> {
@@ -417,11 +417,9 @@ def fir_UndefOp : fir_OneResultOp<"undefined", [NoSideEffect]> {
   let results = (outs AnyType:$intype);
 
   let assemblyFormat = "type($intype) attr-dict";
-
-  let verifier = [{
-    // allow `undef : ref<T>` since it is a possible from transformations
-    return mlir::success();
-  }];
+  
+  // Note: we allow `undef : ref<T>` since it is a possible from transformations.
+  let hasVerifier = 0;
 }
 
 def fir_ZeroOp : fir_OneResultOp<"zero_bits", [NoSideEffect]> {
@@ -551,96 +549,6 @@ class fir_IntegralSwitchTerminatorOp<string mnemonic,
     }]
   >];
 
-  let parser = [{
-    mlir::OpAsmParser::OperandType selector;
-    mlir::Type type;
-    if (parseSelector(parser, result, selector, type))
-      return mlir::failure();
-
-    llvm::SmallVector<mlir::Attribute> ivalues;
-    llvm::SmallVector<mlir::Block *> dests;
-    llvm::SmallVector<llvm::SmallVector<mlir::Value>> destArgs;
-    while (true) {
-      mlir::Attribute ivalue; // Integer or Unit
-      mlir::Block *dest;
-      llvm::SmallVector<mlir::Value> destArg;
-      mlir::NamedAttrList temp;
-      if (parser.parseAttribute(ivalue, "i", temp) ||
-          parser.parseComma() ||
-          parser.parseSuccessorAndUseList(dest, destArg))
-        return mlir::failure();
-      ivalues.push_back(ivalue);
-      dests.push_back(dest);
-      destArgs.push_back(destArg);
-      if (!parser.parseOptionalRSquare())
-        break;
-      if (parser.parseComma())
-        return mlir::failure();
-    }
-    auto &bld = parser.getBuilder();
-    result.addAttribute(getCasesAttr(), bld.getArrayAttr(ivalues));
-    llvm::SmallVector<int32_t> argOffs;
-    int32_t sumArgs = 0;
-    const auto count = dests.size();
-    for (std::remove_const_t<decltype(count)> i = 0; i != count; ++i) {
-      result.addSuccessors(dests[i]);
-      result.addOperands(destArgs[i]);
-      auto argSize = destArgs[i].size();
-      argOffs.push_back(argSize);
-      sumArgs += argSize;
-    }
-    result.addAttribute(getOperandSegmentSizeAttr(),
-                        bld.getI32VectorAttr({1, 0, sumArgs}));
-    result.addAttribute(getTargetOffsetAttr(), bld.getI32VectorAttr(argOffs));
-    return mlir::success();
-  }];
-
-  let printer = [{
-    p << ' ';
-    p.printOperand(getSelector());
-    p << " : " << getSelector().getType() << " [";
-    auto cases =
-        (*this)->getAttrOfType<mlir::ArrayAttr>(getCasesAttr()).getValue();
-    auto count = getNumConditions();
-    for (decltype(count) i = 0; i != count; ++i) {
-      if (i)
-        p << ", ";
-      auto &attr = cases[i];
-      if (auto intAttr = attr.dyn_cast_or_null<mlir::IntegerAttr>())
-        p << intAttr.getValue();
-      else
-        p.printAttribute(attr);
-      p << ", ";
-      printSuccessorAtIndex(p, i);
-    }
-    p << ']';
-    p.printOptionalAttrDict((*this)->getAttrs(), {getCasesAttr(),
-        getCompareOffsetAttr(), getTargetOffsetAttr(),
-        getOperandSegmentSizeAttr()});
-  }];
-
-  let verifier = [{
-    if (!(getSelector().getType().isa<mlir::IntegerType>() ||
-          getSelector().getType().isa<mlir::IndexType>() ||
-          getSelector().getType().isa<fir::IntegerType>()))
-      return emitOpError("must be an integer");
-    auto cases =
-        (*this)->getAttrOfType<mlir::ArrayAttr>(getCasesAttr()).getValue();
-    auto count = getNumDest();
-    if (count == 0)
-      return emitOpError("must have at least one successor");
-    if (getNumConditions() != count)
-      return emitOpError("number of cases and targets don't match");
-    if (targetOffsetSize() != count)
-      return emitOpError("incorrect number of successor operand groups");
-    for (decltype(count) i = 0; i != count; ++i) {
-      auto &attr = cases[i];
-      if (!(attr.isa<mlir::IntegerAttr>() || attr.isa<mlir::UnitAttr>()))
-        return emitOpError("invalid case alternative");
-    }
-    return mlir::success();
-  }];
-
   let extraClassDeclaration = extraSwitchClassDeclaration;
 }
 
@@ -663,6 +571,9 @@ def fir_SelectOp : fir_IntegralSwitchTerminatorOp<"select"> {
                         unit, ^bb5]
     ```
   }];
+  let hasCustomAssemblyFormat = 1;
+  let hasVerifier = 1;
+
 }
 
 def fir_SelectRankOp : fir_IntegralSwitchTerminatorOp<"select_rank"> {
@@ -683,6 +594,8 @@ def fir_SelectRankOp : fir_IntegralSwitchTerminatorOp<"select_rank"> {
                              unit, ^bb5]
     ```
   }];
+  let hasCustomAssemblyFormat = 1;
+  let hasVerifier = 1;
 }
 
 def fir_SelectCaseOp : fir_SwitchTerminatorOp<"select_case"> {
@@ -972,7 +885,8 @@ def fir_EmboxProcOp : fir_Op<"emboxproc", [NoSideEffect]> {
     then the form takes only the procedure's symbol.
 
     ```mlir
-      %0 = fir.emboxproc @f : ((i32) -> i32) -> !fir.boxproc<(i32) -> i32>
+      %f = ... : (i32) -> i32
+      %0 = fir.emboxproc %f : ((i32) -> i32) -> !fir.boxproc<(i32) -> i32>
     ```
 
     An internal procedure requiring a host instance for correct execution uses
@@ -982,16 +896,20 @@ def fir_EmboxProcOp : fir_Op<"emboxproc", [NoSideEffect]> {
     promotion of local values.
 
     ```mlir
-      %4 = ... : !fir.ref<tuple<i32, i32>>
-      %5 = fir.emboxproc @g, %4 : ((i32) -> i32, !fir.ref<tuple<i32, i32>>) -> !fir.boxproc<(i32) -> i32>
+      %4 = ... : !fir.ref<tuple<!fir.ref<i32>, !fir.ref<i32>>>
+      %g = ... : (i32) -> i32
+      %5 = fir.emboxproc %g, %4 : ((i32) -> i32, !fir.ref<tuple<!fir.ref<i32>, !fir.ref<i32>>>) -> !fir.boxproc<(i32) -> i32>
     ```
   }];
 
-  let arguments = (ins SymbolRefAttr:$funcname, AnyReferenceLike:$host);
+  let arguments = (ins FuncType:$func, Optional<fir_ReferenceType>:$host);
 
   let results = (outs fir_BoxProcType);
 
-  let hasCustomAssemblyFormat = 1;
+  let assemblyFormat = [{
+    $func (`,` $host^)? attr-dict `:` functional-type(operands, results)
+  }];
+
   let hasVerifier = 1;
 }
 
@@ -1045,13 +963,13 @@ def fir_BoxAddrOp : fir_SimpleOneResultOp<"box_addr", [NoSideEffect]> {
     ```mlir
       %51 = fir.box_addr %box : (!fir.box<f64>) -> !fir.ref<f64>
       %52 = fir.box_addr %boxchar : (!fir.boxchar<1>) -> !fir.ref<!fir.char<1>>
-      %53 = fir.box_addr %boxproc : (!fir.boxproc<!P>) -> !fir.ref<!P>
+      %53 = fir.box_addr %boxproc : (!fir.boxproc<!P>) -> !P
     ```
   }];
 
-  let arguments = (ins fir_BoxType:$val);
+  let arguments = (ins AnyBoxLike:$val);
 
-  let results = (outs AnyReferenceLike);
+  let results = (outs AnyCodeOrDataRefLike);
 
   let hasFolder = 1;
 }
@@ -2103,9 +2021,8 @@ def FirRegionTerminator : SingleBlockImplicitTerminator<"ResultOp">;
 class region_Op<string mnemonic, list<Trait> traits = []> :
     fir_Op<mnemonic,
     !listconcat(traits, [FirRegionTerminator, RecursiveSideEffects])> {
-  let printer = "return ::print(p, *this);";
-  let verifier = "return ::verify(*this);";
-  let parser = "return ::parse$cppClass(parser, result);";
+  let hasCustomAssemblyFormat = 1;
+  let hasVerifier = 1;
 }
 
 def fir_DoLoopOp : region_Op<"do_loop",
@@ -2130,6 +2047,9 @@ def fir_DoLoopOp : region_Op<"do_loop",
     The above example iterates over the interval `[%l, %u]`. The unordered
     keyword indicates that the iterations can be executed in any order.
   }];
+
+  let hasVerifier = 1;
+  let hasCustomAssemblyFormat = 1;
 
   let arguments = (ins
     Index:$lowerBound,
