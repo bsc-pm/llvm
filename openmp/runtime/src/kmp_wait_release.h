@@ -392,9 +392,41 @@ __kmp_wait_template(kmp_info_t *this_thr,
   kmp_uint32 hibernate;
 #endif
 
+  __kmp_suspend_initialize_thread(this_thr);
   KMP_FSYNC_SPIN_INIT(spin, NULL);
   if (flag->done_check()) {
     KMP_FSYNC_SPIN_ACQUIRED(CCAST(void *, spin));
+    __kmp_lock_suspend_mx(this_thr);
+    if(this_thr->th.th_change_role){
+    	omp_role_t prv_role = KMP_ATOMIC_LD_RLX(&this_thr->th.th_active_role);
+    	omp_role_t nxt_role = this_thr->th.th_pending_role;
+
+        //printf("Thread %d shifting from %s to %s\n", this_thr->th.th_info.ds.ds_gtid,
+        //        prv_role == OMP_ROLE_FREE_AGENT ? "Free Agent" : prv_role == OMP_ROLE_NONE ? "NONE" : "PANIC",
+        //        nxt_role == OMP_ROLE_FREE_AGENT ? "Free Agent" : nxt_role == OMP_ROLE_NONE ? "NONE" : "PANIC");
+        //fflush(NULL);
+    	
+    	KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
+    	KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
+    	if(nxt_role == OMP_ROLE_FREE_AGENT)
+    		KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
+    	else if(prv_role == OMP_ROLE_FREE_AGENT)
+	    	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+        __kmp_unlock_suspend_mx(this_thr);
+#if OMPT_SUPPORT
+		ompt_data_t *thread_data = nullptr;
+		if(ompt_enabled.enabled){
+			thread_data = &(this_thr->th.ompt_thread_info.thread_data);
+			if(ompt_enabled.ompt_callback_thread_role_shift){
+				//thread_data, prior_thread_role, next_thread_role
+				ompt_callbacks.ompt_callback(ompt_callback_thread_role_shift)(
+						thread_data, (ompt_role_t)prv_role, (ompt_role_t)nxt_role);
+			}
+		}
+#endif
+    }
+    else
+      __kmp_unlock_suspend_mx(this_thr);
     return false;
   }
   th_gtid = this_thr->th.th_info.ds.ds_gtid;
@@ -538,13 +570,16 @@ final_spin=FALSE)
   // Main wait spin loop
   while (flag->notdone_check()) {
     kmp_task_team_t *task_team = NULL;
-    //if(this_thr->th.th_active_role == OMP_ROLE_FREE_AGENT 
-    //	 && this_thr->th.th_change_role){
-    __kmp_suspend_initialize_thread(this_thr);
     __kmp_lock_suspend_mx(this_thr);
     if(this_thr->th.th_change_role){
     	omp_role_t prv_role = KMP_ATOMIC_LD_RLX(&this_thr->th.th_active_role);
     	omp_role_t nxt_role = this_thr->th.th_pending_role;
+
+        //printf("Thread %d shifting from %s to %s\n", this_thr->th.th_info.ds.ds_gtid,
+        //        prv_role == OMP_ROLE_FREE_AGENT ? "Free Agent" : prv_role == OMP_ROLE_NONE ? "NONE" : "PANIC",
+        //        nxt_role == OMP_ROLE_FREE_AGENT ? "Free Agent" : nxt_role == OMP_ROLE_NONE ? "NONE" : "PANIC");
+        //fflush(NULL);
+    	
     	KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
     	KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
     	if(nxt_role == OMP_ROLE_FREE_AGENT)
@@ -749,11 +784,14 @@ final_spin=FALSE)
         KMP_ATOMIC_ST_REL(&this_thr->th.th_blocking, false);
 #endif
       //printf("suspending...\n");
-      __kmp_suspend_initialize_thread(this_thr);
       __kmp_lock_suspend_mx(this_thr);
       if(this_thr->th.th_change_role && this_thr->th.th_pending_role == OMP_ROLE_FREE_AGENT){
     	    omp_role_t prv_role = KMP_ATOMIC_LD_RLX(&this_thr->th.th_active_role);
     		omp_role_t nxt_role =  this_thr->th.th_pending_role;
+            //printf("Thread %d shifting from %s to %s\n", this_thr->th.th_info.ds.ds_gtid,
+            //        prv_role == OMP_ROLE_FREE_AGENT ? "Free Agent" : prv_role == OMP_ROLE_NONE ? "NONE" : "PANIC",
+            //        nxt_role == OMP_ROLE_FREE_AGENT ? "Free Agent" : nxt_role == OMP_ROLE_NONE ? "NONE" : "PANIC");
+            //fflush(NULL);
     		KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
     		KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
     		KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
@@ -777,11 +815,14 @@ final_spin=FALSE)
       }
     	//TODO:A worker may change its role here too!
     	//Check if the master requested this thread to change its role while suspended
-    	__kmp_suspend_initialize_thread(this_thr);
     	__kmp_lock_suspend_mx(this_thr);
     	if(this_thr->th.th_change_role){
     	    omp_role_t prv_role = KMP_ATOMIC_LD_RLX(&this_thr->th.th_active_role);
     		omp_role_t nxt_role =  this_thr->th.th_pending_role;
+            //printf("Thread %d shifting from %s to %s\n", this_thr->th.th_info.ds.ds_gtid,
+            //        prv_role == OMP_ROLE_FREE_AGENT ? "Free Agent" : prv_role == OMP_ROLE_NONE ? "NONE" : "PANIC",
+            //        nxt_role == OMP_ROLE_FREE_AGENT ? "Free Agent" : nxt_role == OMP_ROLE_NONE ? "NONE" : "PANIC");
+            //fflush(NULL);
     		KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
     		KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
     		if(nxt_role == OMP_ROLE_FREE_AGENT)
@@ -823,6 +864,37 @@ final_spin=FALSE)
     }
     // TODO: If thread is done with work and times out, disband/free
   }
+  __kmp_lock_suspend_mx(this_thr);
+  if(this_thr->th.th_change_role){
+    omp_role_t prv_role = KMP_ATOMIC_LD_RLX(&this_thr->th.th_active_role);
+    omp_role_t nxt_role = this_thr->th.th_pending_role;
+
+    //printf("Thread %d shifting from %s to %s\n", this_thr->th.th_info.ds.ds_gtid,
+    //        prv_role == OMP_ROLE_FREE_AGENT ? "Free Agent" : prv_role == OMP_ROLE_NONE ? "NONE" : "PANIC",
+    //        nxt_role == OMP_ROLE_FREE_AGENT ? "Free Agent" : nxt_role == OMP_ROLE_NONE ? "NONE" : "PANIC");
+    //fflush(NULL);
+    	
+    KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
+    KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
+    if(nxt_role == OMP_ROLE_FREE_AGENT)
+    	KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
+    else if(prv_role == OMP_ROLE_FREE_AGENT)
+	   	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+    __kmp_unlock_suspend_mx(this_thr);
+#if OMPT_SUPPORT
+	ompt_data_t *thread_data = nullptr;
+	if(ompt_enabled.enabled){
+		thread_data = &(this_thr->th.ompt_thread_info.thread_data);
+		if(ompt_enabled.ompt_callback_thread_role_shift){
+			//thread_data, prior_thread_role, next_thread_role
+			ompt_callbacks.ompt_callback(ompt_callback_thread_role_shift)(
+					thread_data, (ompt_role_t)prv_role, (ompt_role_t)nxt_role);
+		}
+	}
+#endif
+  }
+  else
+    __kmp_unlock_suspend_mx(this_thr);
 
 #if OMPT_SUPPORT
   ompt_state_t ompt_exit_state = this_thr->th.ompt_thread_info.state;
