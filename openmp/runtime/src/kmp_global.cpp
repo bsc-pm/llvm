@@ -557,5 +557,6 @@ int *__kmp_nesting_nth_level;
 
 // Free agent threads
 int __kmp_free_agent_num_threads = 0;
+int __kmp_free_agent_clause_dflt = FALSE;
 
 // end of file //

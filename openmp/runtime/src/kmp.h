@@ -543,6 +543,12 @@ typedef enum omp_role{
 	OMP_ROLE_COMMUNICATOR = 1 << 1
 } omp_role_t;
 
+typedef enum fa_clause{
+    FREE_AGENT_CLAUSE_UNSET = 0,
+    FREE_AGENT_CLAUSE_FALSE = 1,
+    FREE_AGENT_CLAUSE_TRUE = 2,
+} fa_clause_t;
+
 // Description of the packed_reduction_method variable:
 // The packed_reduction_method variable consists of two enum types variables
 // that are packed together into 0-th byte and 1-st byte:
@@ -2374,8 +2380,11 @@ typedef struct kmp_tasking_flags { /* Total struct must be exactly 32 bits */
                                       setting for the task */
   unsigned detachable : 1; /* 1 == can detach */
   unsigned hidden_helper : 1; /* 1 == hidden helper task */
-  unsigned free_agent : 1; /* 1 == can be executed by free agent */
-  unsigned reserved : 7; /* reserved for compiler use */
+  unsigned free_agent : 2; /* 0 == unset in the task construct
+                            * 1 == cannot be executed by free agent 
+                            * 2 == can be executed by free agent
+                            * 3 == not used by now */
+  unsigned reserved : 6; /* reserved for compiler use */
 
   /* Library flags */ /* Total library flags must be 16 bits */
   unsigned tasktype : 1; /* task is either explicit(1) or implicit (0) */
@@ -4184,6 +4193,7 @@ thread list. Next element is pointed by the thread itself*/
 extern kmp_info_t *__kmp_free_agent_list_insert_pt;
 extern int __kmp_free_agent_num_threads; //Max number of free agents allowed
 extern std::atomic<int> __kmp_free_agent_active_nth; //Actual number of free agents active
+extern int __kmp_free_agent_clause_dflt; //Value obtained from env variable KMP_FREE_AGENT_DEFAULT_CLAUSE
 //Free Agent APIs
 extern int __kmp_get_num_threads_role(omp_role_t r); //returns how many threads have the role r
 extern int __kmp_get_thread_roles(int tid, omp_role_t *r); //returns the number of roles of the thread with thread_id==tid,

@@ -286,8 +286,11 @@ static bool __kmp_task_is_allowed(int gtid, const kmp_int32 is_constrained,
     }
   }
   //If the thread is acting as a Free Agent, the task must be suitable for free agent execution
-  if(__kmp_threads[gtid]->th.th_active_role == OMP_ROLE_FREE_AGENT && !tasknew->td_flags.free_agent)
-    return false;
+  if(__kmp_threads[gtid]->th.th_active_role == OMP_ROLE_FREE_AGENT){
+    if((tasknew->td_flags.free_agent == FREE_AGENT_CLAUSE_FALSE) ||
+       (tasknew->td_flags.free_agent == FREE_AGENT_CLAUSE_UNSET && !__kmp_free_agent_clause_dflt))
+      return false;
+  }
   // Check mutexinoutset dependencies, acquire locks
   kmp_depnode_t *node = tasknew->td_depnode;
   if (UNLIKELY(node && (node->dn.mtx_num_locks > 0))) {

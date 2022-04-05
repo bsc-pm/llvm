@@ -5153,6 +5153,20 @@ static void __kmp_stg_print_num_free_agent_threads(kmp_str_buf_t *buffer,
 }
 
 // -----------------------------------------------------------------------------
+// KMP_FREE_AGENT_CLAUSE_DEFAULT
+static void __kmp_stg_parse_free_agent_clause_default(char const *name,
+                                                      char const *value,
+                                                      void *data){
+  __kmp_stg_parse_bool(name, value, &__kmp_free_agent_clause_dflt);
+}
+
+static void __kmp_stg_print_free_agent_clause_default(kmp_str_buf_t *buffer,
+                                                      char const *name,
+                                                      void *data){
+  __kmp_stg_print_bool(buffer, name, __kmp_free_agent_clause_dflt);
+}
+
+// -----------------------------------------------------------------------------
 // Table.
 
 static kmp_setting_t __kmp_stg_table[] = {
@@ -5421,6 +5435,8 @@ static kmp_setting_t __kmp_stg_table[] = {
     // Free agent threads
     {"KMP_FREE_AGENT_NUM_THREADS", __kmp_stg_parse_num_free_agent_threads,
       __kmp_stg_print_num_free_agent_threads, NULL, 0, 0},
+    {"KMP_FREE_AGENT_CLAUSE_DEFAULT", __kmp_stg_parse_free_agent_clause_default,
+      __kmp_stg_print_free_agent_clause_default, NULL, 0, 0},
 
     {"", NULL, NULL, NULL, 0, 0}}; // settings
 
