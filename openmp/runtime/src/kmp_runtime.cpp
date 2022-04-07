@@ -2088,11 +2088,6 @@ int __kmp_fork_call(ident_t *loc, int gtid,
 #if KMP_NESTED_HOT_TEAMS
         }
 #endif
-      	//Propagate the correct task_state to the workers that were free agents before
-      	for(i = 1; i < team->t.t_nproc; i++){
-      		KMP_DEBUG_ASSERT(team->t.t_threads[i]);
-      		team->t.t_threads[i]->th.th_task_state = master_th->th.th_task_state;
-      	}
       }
 #if !KMP_NESTED_HOT_TEAMS
       KMP_DEBUG_ASSERT((master_th->th.th_task_team == NULL) ||
@@ -2135,6 +2130,11 @@ int __kmp_fork_call(ident_t *loc, int gtid,
     __kmp_setup_icv_copy(team, nthreads,
                          &master_th->th.th_current_task->td_icvs, loc);
 
+    //Propagate the correct task_state to the workers that were free agents before
+    for(i = 1; i < team->t.t_nproc; i++){
+    	KMP_DEBUG_ASSERT(team->t.t_threads[i]);
+    	team->t.t_threads[i]->th.th_task_state = master_th->th.th_task_state;
+    }
 #if OMPT_SUPPORT
     master_th->th.ompt_thread_info.state = ompt_state_work_parallel;
 #endif

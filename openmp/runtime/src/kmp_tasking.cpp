@@ -2979,9 +2979,9 @@ static inline int __kmp_execute_tasks_template(
           if(thread->th.th_change_role){
           	KMP_ATOMIC_ST_RLX(&thread->th.th_change_role, false);
           	KMP_ATOMIC_ST_RLX(&thread->th.th_active_role, thread->th.th_pending_role);
-            printf("Thread %d shifting from %s to %s\n", thread->th.th_info.ds.ds_gtid,
-                    "Free Agent",
-                    thread->th.th_pending_role == OMP_ROLE_FREE_AGENT ? "Free Agent" : thread->th.th_pending_role == OMP_ROLE_NONE ? "NONE" : "PANIC");
+            //printf("Thread %d shifting from %s to %s\n", thread->th.th_info.ds.ds_gtid,
+            //        "Free Agent",
+            //        thread->th.th_pending_role == OMP_ROLE_FREE_AGENT ? "Free Agent" : thread->th.th_pending_role == OMP_ROLE_NONE ? "NONE" : "PANIC");
           	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
             __kmp_unlock_suspend_mx(thread);
 #if OMPT_SUPPORT
