@@ -4303,7 +4303,6 @@ CGOpenMPRuntime::emitTaskInit(CodeGenFunction &CGF, SourceLocation Loc,
     DestructorsFlag = 0x8,
     PriorityFlag = 0x20,
     DetachableFlag = 0x40,
-    FreeAgentFlag = 0x100,
   };
   unsigned Flags = Data.Tied ? TiedFlag : 0;
   bool NeedsCleanup = false;
@@ -4324,13 +4323,9 @@ CGOpenMPRuntime::emitTaskInit(CodeGenFunction &CGF, SourceLocation Loc,
                                      CGF.Builder.getInt32(/*C=*/0))
           : CGF.Builder.getInt32(Data.Final.getInt() ? FinalFlag : 0);
   TaskFlags = CGF.Builder.CreateOr(TaskFlags, CGF.Builder.getInt32(Flags));
-  llvm::Value *AuxFlag = 
-      Data.FreeAgent.getPointer()
-          ? CGF.Builder.CreateSelect(Data.FreeAgent.getPointer(),
-                                     CGF.Builder.getInt32(FreeAgentFlag),
-                                     CGF.Builder.getInt32(/*C=*/0))
-          : CGF.Builder.getInt32(Data.FreeAgent.getInt() ? FreeAgentFlag : 0);
-  TaskFlags = CGF.Builder.CreateOr(TaskFlags, AuxFlag);
+  if (Data.FreeAgent) {
+    TaskFlags = CGF.Builder.CreateOr(TaskFlags, Data.FreeAgent);
+  }
   llvm::Value *SharedsSize = CGM.getSize(C.getTypeSizeInChars(SharedsTy));
   SmallVector<llvm::Value *, 8> AllocArgs = {emitUpdateLocation(CGF, Loc),
       getThreadID(CGF, Loc), TaskFlags, KmpTaskTWithPrivatesTySize,

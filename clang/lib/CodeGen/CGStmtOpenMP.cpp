@@ -4292,19 +4292,19 @@ void CodeGenFunction::EmitOMPTaskBasedDirective(
         Prio->getExprLoc()));
   }
   // Check if the task has 'free_agent' clause.
-  if(const auto *Clause = S.getSingleClause<OMPFreeAgentClause>()){
+  if (const auto *Clause = S.getSingleClause<OMPFreeAgentClause>()) {
+    enum { FREE_AGENT_CLAUSE_TRUE = 0x200, FREE_AGENT_CLAUSE_FALSE = 0x100 };
     const Expr *FreeAgent = Clause->getFreeAgent();
     bool CondConstant;
-    if (ConstantFoldsToSimpleInteger(FreeAgent, CondConstant))
-      Data.FreeAgent.setInt(CondConstant);
-    else
-      Data.FreeAgent.setPointer(EvaluateExprAsBool(FreeAgent));
-    // Data.FreeAgent.setPointer(EmitScalarConversion(
-    //     EmitScalarExpr(FreeAgent), FreeAgent->getType(),
-    //     getContext().getIntTypeForBitwidth(/*DestWidth=*/32, /*Signed=*/1),
-    //     FreeAgent->getExprLoc()));
-  } else {
-    Data.FreeAgent.setInt(/*IntVal=*/false);
+    if (ConstantFoldsToSimpleInteger(FreeAgent, CondConstant)) {
+      Data.FreeAgent = CondConstant ? Builder.getInt32(FREE_AGENT_CLAUSE_TRUE)
+                                    : Builder.getInt32(FREE_AGENT_CLAUSE_FALSE);
+    } else {
+      llvm::Value *B = EvaluateExprAsBool(FreeAgent);
+      Data.FreeAgent = Builder.CreateSelect(
+          B, Builder.getInt32(FREE_AGENT_CLAUSE_TRUE),
+          Builder.getInt32(FREE_AGENT_CLAUSE_FALSE));
+    }
   }
   // The first function argument for tasks is a thread id, the second one is a
   // part id (0 for tied tasks, >=0 for untied task).
