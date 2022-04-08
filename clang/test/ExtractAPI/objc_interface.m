@@ -52,7 +52,7 @@
       "vendor": "apple"
     }
   },
-  "relationhips": [
+  "relationships": [
     {
       "kind": "memberOf",
       "source": "c:objc(cs)Super(cm)getWithProperty:",
@@ -86,6 +86,7 @@
   ],
   "symbols": [
     {
+      "accessLevel": "public",
       "declarationFragments": [
         {
           "kind": "keyword",
@@ -109,8 +110,10 @@
         "identifier": "objective-c.class"
       },
       "location": {
-        "character": 12,
-        "line": 3,
+        "position": {
+          "character": 12,
+          "line": 3
+        },
         "uri": "file://INPUT_DIR/input.h"
       },
       "names": {
@@ -121,9 +124,13 @@
           }
         ],
         "title": "Super"
-      }
+      },
+      "pathComponents": [
+        "Super"
+      ]
     },
     {
+      "accessLevel": "public",
       "declarationFragments": [
         {
           "kind": "text",
@@ -135,15 +142,11 @@
         },
         {
           "kind": "text",
-          "spelling": ")"
+          "spelling": ") "
         },
         {
           "kind": "identifier",
-          "spelling": "getWithProperty"
-        },
-        {
-          "kind": "text",
-          "spelling": ":"
+          "spelling": "getWithProperty:"
         },
         {
           "kind": "text",
@@ -156,11 +159,15 @@
         },
         {
           "kind": "text",
-          "spelling": ")"
+          "spelling": ") "
         },
         {
           "kind": "internalParam",
           "spelling": "Property"
+        },
+        {
+          "kind": "text",
+          "spelling": ";"
         }
       ],
       "identifier": {
@@ -172,8 +179,10 @@
         "identifier": "objective-c.type.method"
       },
       "location": {
-        "character": 1,
-        "line": 5,
+        "position": {
+          "character": 1,
+          "line": 5
+        },
         "uri": "file://INPUT_DIR/input.h"
       },
       "names": {
@@ -188,9 +197,14 @@
           }
         ],
         "title": "getWithProperty:"
-      }
+      },
+      "pathComponents": [
+        "Super",
+        "getWithProperty:"
+      ]
     },
     {
+      "accessLevel": "public",
       "declarationFragments": [
         {
           "kind": "keyword",
@@ -230,7 +244,7 @@
         },
         {
           "kind": "text",
-          "spelling": ")"
+          "spelling": ") "
         },
         {
           "kind": "typeIdentifier",
@@ -251,8 +265,10 @@
         "identifier": "objective-c.property"
       },
       "location": {
-        "character": 50,
-        "line": 4,
+        "position": {
+          "character": 50,
+          "line": 4
+        },
         "uri": "file://INPUT_DIR/input.h"
       },
       "names": {
@@ -263,9 +279,14 @@
           }
         ],
         "title": "Property"
-      }
+      },
+      "pathComponents": [
+        "Super",
+        "Property"
+      ]
     },
     {
+      "accessLevel": "public",
       "declarationFragments": [
         {
           "kind": "keyword",
@@ -298,8 +319,10 @@
         "identifier": "objective-c.class"
       },
       "location": {
-        "character": 12,
-        "line": 8,
+        "position": {
+          "character": 12,
+          "line": 8
+        },
         "uri": "file://INPUT_DIR/input.h"
       },
       "names": {
@@ -310,9 +333,13 @@
           }
         ],
         "title": "Derived"
-      }
+      },
+      "pathComponents": [
+        "Derived"
+      ]
     },
     {
+      "accessLevel": "public",
       "declarationFragments": [
         {
           "kind": "typeIdentifier",
@@ -337,8 +364,10 @@
         "identifier": "objective-c.ivar"
       },
       "location": {
-        "character": 8,
-        "line": 9,
+        "position": {
+          "character": 8,
+          "line": 9
+        },
         "uri": "file://INPUT_DIR/input.h"
       },
       "names": {
@@ -349,9 +378,14 @@
           }
         ],
         "title": "Ivar"
-      }
+      },
+      "pathComponents": [
+        "Derived",
+        "Ivar"
+      ]
     },
     {
+      "accessLevel": "public",
       "declarationFragments": [
         {
           "kind": "text",
@@ -364,11 +398,15 @@
         },
         {
           "kind": "text",
-          "spelling": ")"
+          "spelling": ") "
         },
         {
           "kind": "identifier",
           "spelling": "getIvar"
+        },
+        {
+          "kind": "text",
+          "spelling": ";"
         }
       ],
       "identifier": {
@@ -380,8 +418,10 @@
         "identifier": "objective-c.method"
       },
       "location": {
-        "character": 1,
-        "line": 11,
+        "position": {
+          "character": 1,
+          "line": 11
+        },
         "uri": "file://INPUT_DIR/input.h"
       },
       "names": {
@@ -396,7 +436,11 @@
           }
         ],
         "title": "getIvar"
-      }
+      },
+      "pathComponents": [
+        "Derived",
+        "getIvar"
+      ]
     }
   ]
 }
