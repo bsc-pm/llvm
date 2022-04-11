@@ -31,7 +31,7 @@ static int __kmp_realloc_task_threads_data(kmp_info_t *thread,
 static void __kmp_bottom_half_finish_proxy(kmp_int32 gtid, kmp_task_t *ptask);
 
 static void wake_up_one_free_agent(){
-    if(__kmp_free_agent_list == NULL) return;
+    if(KMP_ATOMIC_LD_RLX(&__kmp_free_agent_active_nth) == 0) return;
     kmp_info_t *free_agent = CCAST(kmp_info_t *,__kmp_free_agent_list);
     while(free_agent != NULL){
         kmp_flag_64<> *flag = RCAST(kmp_flag_64<> *,
@@ -950,7 +950,7 @@ static void __kmp_task_finish(kmp_int32 gtid, kmp_task_t *task,
     if (!(taskdata->td_flags.team_serial || taskdata->td_flags.tasking_ser) ||
         taskdata->td_flags.detachable == TASK_DETACHABLE ||
         taskdata->td_flags.hidden_helper ||
-       ( __kmp_free_agent_num_threads != 0)){// && __kmp_free_agent_list != NULL)) {
+       ( __kmp_free_agent_num_threads != 0)){
       __kmp_release_deps(gtid, taskdata);
       // Predecrement simulated by "- 1" calculation
 #if KMP_DEBUG
@@ -2982,7 +2982,7 @@ static inline int __kmp_execute_tasks_template(
             //printf("Thread %d shifting from %s to %s\n", thread->th.th_info.ds.ds_gtid,
             //        "Free Agent",
             //        thread->th.th_pending_role == OMP_ROLE_FREE_AGENT ? "Free Agent" : thread->th.th_pending_role == OMP_ROLE_NONE ? "NONE" : "PANIC");
-          	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+          	//KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
             __kmp_unlock_suspend_mx(thread);
 #if OMPT_SUPPORT
 						ompt_data_t *thread_data = nullptr;
@@ -3809,9 +3809,10 @@ void __kmp_task_team_setup(kmp_info_t *this_thr, kmp_team_t *team, int always) {
   }
 
   // Allow free agent threads to use this task team
-  if(__kmp_free_agent_list){//Only if at least one free agent exists
+  if(KMP_ATOMIC_LD_RLX(&__kmp_free_agent_active_nth) > 0){//Only if at least one free agent exists
   	kmp_task_team_t* task_team = team->t.t_task_team[this_thr->th.th_task_state];
 
+    __kmp_acquire_bootstrap_lock(&__kmp_forkjoin_lock);
   	kmp_info_t *free_agent = CCAST(kmp_info_t *,__kmp_free_agent_list);
   	while(free_agent != NULL){
     	__kmp_acquire_bootstrap_lock(&free_agent->th.allowed_teams_lock);
@@ -3821,6 +3822,7 @@ void __kmp_task_team_setup(kmp_info_t *this_thr, kmp_team_t *team, int always) {
     	__kmp_release_bootstrap_lock(&free_agent->th.allowed_teams_lock);
     	free_agent = free_agent->th.th_next_free_agent;
   	}
+    __kmp_release_bootstrap_lock(&__kmp_forkjoin_lock);
   }
 }
 
@@ -3876,19 +3878,19 @@ void __kmp_task_team_wait(
 
 
       // This team is not allowed anymore for free agent threads
-      kmp_info_t *free_agent = CCAST(kmp_info_t *,__kmp_free_agent_list);
-      while(free_agent != NULL){
-        __kmp_acquire_bootstrap_lock(&free_agent->th.allowed_teams_lock);
-        __kmp_remove_allowed_task_team(free_agent, task_team);
-        __kmp_release_bootstrap_lock(&free_agent->th.allowed_teams_lock);
-        free_agent = free_agent->th.th_next_free_agent;
-      }
-      if (__kmp_free_agent_num_threads > 0) {
+      if(KMP_ATOMIC_LD_RLX(&__kmp_free_agent_active_nth) > 0){
+        kmp_info_t *free_agent = CCAST(kmp_info_t *,__kmp_free_agent_list);
+        while(free_agent != NULL){
+          __kmp_acquire_bootstrap_lock(&free_agent->th.allowed_teams_lock);
+          __kmp_remove_allowed_task_team(free_agent, task_team);
+          __kmp_release_bootstrap_lock(&free_agent->th.allowed_teams_lock);
+          free_agent = free_agent->th.th_next_free_agent;
+        }
+        
         std::atomic<kmp_int32> *unfinished_threads;
         unfinished_threads = &(task_team->tt.tt_unfinished_threads);
         kmp_int32 count =  KMP_ATOMIC_INC(unfinished_threads);
         KMP_ASSERT(count == 0);
-
       }
       kmp_flag_32<false, false> spin_flag(RCAST(
           std::atomic<kmp_uint32> *, &task_team->tt.tt_unfinished_free_agents), 0U);

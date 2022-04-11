@@ -1471,13 +1471,13 @@ int __kmp_fork_call(ident_t *loc, int gtid,
           
           //Make sure this thread isn't a free agent and doesn't appear on the list 
 #ifdef KMP_DEBUG
-					KMP_DEBUG_ASSERT(__kmp_threads[gtid] != NULL &&
-          								 __kmp_threads[gtid]->th.th_active_role != OMP_ROLE_FREE_AGENT);
+		  KMP_DEBUG_ASSERT(__kmp_threads[gtid] != NULL &&
+            			   __kmp_threads[gtid]->th.th_active_role != OMP_ROLE_FREE_AGENT);
           kmp_info_t *th = CCAST(kmp_info_t *, __kmp_free_agent_list);
           while(th != NULL){
           	KMP_DEBUG_ASSERT(th->th.th_info.ds.ds_gtid != gtid);
-						th = th->th.th_next_free_agent;
-					}
+			th = th->th.th_next_free_agent;
+		  }
 #endif
           
           __kmp_invoke_microtask(microtask, gtid, 0, argc, parent_team->t.t_argv
@@ -4349,6 +4349,7 @@ kmp_info_t *__kmp_allocate_thread_common(kmp_root_t *root, kmp_team_t *team,
     return new_thr;
   }
   /*If not, try to transform a free agent into a worker*/
+  /*This function is already protected by the forkjoin lock since it is required for the thread_pool */
   if(__kmp_free_agent_list && (role != OMP_ROLE_FREE_AGENT)){
     new_thr = CCAST(kmp_info_t *, __kmp_free_agent_list);
     __kmp_free_agent_list = (volatile kmp_info_t *)new_thr->th.th_next_free_agent;
@@ -4356,9 +4357,6 @@ kmp_info_t *__kmp_allocate_thread_common(kmp_root_t *root, kmp_team_t *team,
       __kmp_free_agent_list_insert_pt = NULL;
     }
     new_thr->th.th_next_free_agent = NULL;
-    //Tell the free agent to change its role when possible
-    new_thr->th.th_pending_role = role;
-    KMP_ATOMIC_ST_SEQ(&new_thr->th.th_change_role, true);
 
 	if(new_thr->th.th_serial_team == NULL){
 	  kmp_internal_control_t r_icvs = __kmp_get_x_global_icvs(team);
@@ -4402,6 +4400,11 @@ kmp_info_t *__kmp_allocate_thread_common(kmp_root_t *root, kmp_team_t *team,
     for (b = 0; b < bs_last_barrier; ++b)
       KMP_DEBUG_ASSERT(balign[b].bb.wait_flag != KMP_BARRIER_PARENT_FLAG);
 #endif
+    //Tell the free agent to change its role when possible
+    new_thr->th.th_pending_role = role;
+    KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+    KMP_ATOMIC_ST_SEQ(&new_thr->th.th_change_role, true);
+    
     KF_TRACE(10, ("__kmp_allocate_thread: T#%d using thread %p T#%d\n",
                   __kmp_get_gtid(), new_thr, new_thr->th.th_info.ds.ds_gtid));
     KMP_MB();
@@ -4551,7 +4554,7 @@ kmp_info_t *__kmp_allocate_thread_common(kmp_root_t *root, kmp_team_t *team,
   }
 
 	//TODO: Maybe check an environment variable for the default roles of a thread?
-  new_thr->th.th_potential_roles = OMP_ROLE_NONE;
+  new_thr->th.th_potential_roles = role;
   new_thr->th.th_pending_role = OMP_ROLE_NONE;
   new_thr->th.th_change_role = false;
   new_thr->th.th_active_role = role;
@@ -4642,7 +4645,10 @@ kmp_info_t *__kmp_allocate_thread(kmp_root_t *root, kmp_team_t *team,
 static
 kmp_info_t *__kmp_allocate_thread_into_thread_pool(kmp_info_t *new_thr, omp_role_t role, int new_gtid) {
 	kmp_info_t **scan;
-
+    
+    //Thread pool structures are read/write protected with the forkjoin lock.
+    __kmp_acquire_bootstrap_lock(&__kmp_forkjoin_lock);
+	
 	KA_TRACE(20, ("__kmp_allocate_thread_into_thread_pool: T#%d\n", __kmp_get_gtid()));
 	KMP_MB();
 
@@ -4702,6 +4708,9 @@ kmp_info_t *__kmp_allocate_thread_into_thread_pool(kmp_info_t *new_thr, omp_role
 	}
 #endif
 	new_thr->th.th_next_free_agent = NULL;
+    
+    __kmp_release_bootstrap_lock(&__kmp_forkjoin_lock);
+	
 	__kmp_create_worker(new_gtid, new_thr, __kmp_stksize);
 
 	KMP_MB();
@@ -4775,6 +4784,8 @@ kmp_info_t *__kmp_allocate_free_agent_thread(kmp_info_t *thread, kmp_root_t *roo
   return thread;
 }
 
+/* This function assumes that the caller has the forkjoin lock acquired, or that it is called from a
+ * safe, serial point (e.g., the middle_init) */
 static
 kmp_info_t *__kmp_allocate_thread_middle_init(kmp_root_t *root, omp_role_t role, int tid){
 	kmp_info_t *new_thr;
@@ -4904,8 +4915,6 @@ kmp_info_t *__kmp_allocate_thread_middle_init(kmp_root_t *root, omp_role_t role,
 		}
 	}
 #endif
-	/* TODO:If a thread different than the master calls the __kmp_set_thread_roles function it can
-	 * have a race condition with the master for the __kmp_threads and __kmp_free_agent_list structures */
 	if(role != OMP_ROLE_FREE_AGENT)
 		return __kmp_allocate_thread_into_thread_pool(new_thr, role, new_gtid);
 	
@@ -5494,8 +5503,6 @@ __kmp_allocate_team(kmp_root_t *root, int new_nproc, int max_nproc,
 	                     (last_th->th.th_info.ds.ds_gtid <
 	                      last_th->th.th_next_free_agent->th.th_info.ds.ds_gtid)));
 
-		th->th.th_pending_role = OMP_ROLE_NONE;
-		KMP_ATOMIC_ST_SEQ(&th->th.th_change_role, true);
 
 		__kmp_initialize_info(th, team, f, th->th.th_info.ds.ds_gtid);
 		th->th.th_task_state = master->th.th_task_state;
@@ -5513,6 +5520,9 @@ __kmp_allocate_team(kmp_root_t *root, int new_nproc, int max_nproc,
 			balign[b].bb.b_worker_arrived = team->t.t_bar[b].b_team_arrived;
 #endif
 		}
+		th->th.th_pending_role = OMP_ROLE_NONE;
+		KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+		KMP_ATOMIC_ST_SEQ(&th->th.th_change_role, true);
 	}
     // Has the number of threads changed?
     /* Let's assume the most common case is that the number of threads is
@@ -8330,8 +8340,9 @@ void __kmp_internal_join(ident_t *id, int gtid, kmp_team_t *team) {
 
   KMP_MB(); /* Flush all pending memory write invalidates.  */
   KMP_ASSERT(this_thr->th.th_team == team);
-	//Transform the other threads of the team into free agents.
-  if(__kmp_free_agent_num_threads == __kmp_free_agent_active_nth) return;
+  //Transform the other threads of the team into free agents.
+  if(__kmp_free_agent_num_threads == KMP_ATOMIC_LD_RLX(&__kmp_free_agent_active_nth)) return;
+  __kmp_acquire_bootstrap_lock(&__kmp_forkjoin_lock);
   int i, b;
   kmp_info_t *new_thr;
   kmp_balign_t *balign;
@@ -8399,9 +8410,11 @@ void __kmp_internal_join(ident_t *id, int gtid, kmp_team_t *team) {
 		  			   (new_thr->th.th_info.ds.ds_gtid < new_thr->th.th_next_free_agent->th.th_info.ds.ds_gtid));
 		
 	  new_thr->th.th_pending_role = OMP_ROLE_FREE_AGENT;
+	  KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
 	  KMP_ATOMIC_ST_RLX(&new_thr->th.th_change_role, true);
   }
   KMP_DEBUG_ASSERT(__kmp_free_agent_active_nth <= __kmp_free_agent_num_threads);
+  __kmp_release_bootstrap_lock(&__kmp_forkjoin_lock);
 
   KMP_MB();
 }
@@ -9614,6 +9627,7 @@ void __kmp_set_nesting_mode_threads() {
     set__max_active_levels(thread, __kmp_nesting_mode_nlevels);
 }
 
+//Assumes the lock for the thread pool is already acquired
 static kmp_info_t* get_thread_from_thread_pool(int new_gtid){
     if(__kmp_thread_pool == NULL) return NULL;
     kmp_info_t *new_thr = CCAST(kmp_info_t *, __kmp_thread_pool);
@@ -9709,6 +9723,8 @@ int __kmp_get_thread_roles(int tid, omp_role_t *r){
 	return 0;
 }
 
+/* This function makes the thread th shift from any role to free agent.
+ * It assumes that the forkjoin lock required for the free agent structures is acquired */
 static void transform_thread_to_FA(kmp_info_t *th){
     int gtid = th->th.th_info.ds.ds_gtid;
     kmp_taskdata_t *task = (kmp_taskdata_t *)__kmp_allocate(sizeof(kmp_taskdata_t)*1);
@@ -9759,7 +9775,9 @@ static void transform_thread_to_FA(kmp_info_t *th){
                                     (th->th.th_info.ds.ds_gtid <
                                      th->th.th_next_free_agent->th.th_info.ds.ds_gtid));
     //Signal the thread to change the role
+    KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
     if(KMP_ATOMIC_LD_ACQ(&th->th.th_change_role) && th->th.th_pending_role == OMP_ROLE_NONE){
+        //The thread didn't reach a shifting point and had the change pending.
         KMP_ATOMIC_ST_REL(&th->th.th_change_role, false);
     }
     else{
@@ -9840,6 +9858,9 @@ void __kmp_set_thread_roles1(int how_many, omp_role_t r){
 			if(act_r != OMP_ROLE_NONE){
 				if(act_r & r){//We are actually removing the active role from the thread
 					th->th.th_pending_role = OMP_ROLE_NONE;
+					if(act_r == OMP_ROLE_FREE_AGENT){
+					    KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+					}
 					KMP_ATOMIC_ST_REL(&th->th.th_change_role, true);
 				}
 			}
@@ -9871,7 +9892,7 @@ void __kmp_set_thread_roles1(int how_many, omp_role_t r){
 			th = __kmp_allocate_thread_middle_init(root, r, i);
 			KMP_DEBUG_ASSERT(th != NULL);
 			KMP_DEBUG_ASSERT(th->th.th_potential_roles == r);
-			//TODO: can we do this freely?
+			//TODO: Mantain a global structure of allowed teams and copy it to the thread?
 			if(r & OMP_ROLE_FREE_AGENT){ //Allowing the new free agents to access the same teams than
 			    __kmp_acquire_bootstrap_lock(&th->th.allowed_teams_lock);
 			    if(capt_tt_0 != NULL)
@@ -9906,11 +9927,13 @@ void __kmp_set_thread_roles2(int tid, omp_role_t r){
 		gtid = 0;
 	}
 	kmp_info_t *th = __kmp_threads[gtid];
+	__kmp_acquire_bootstrap_lock(&__kmp_forkjoin_lock);
 	if(th == NULL){
 	    kmp_root *root = __kmp_threads[0]->th.th_root;
 	    th = __kmp_allocate_thread_middle_init(root, r, tid);
 		KMP_DEBUG_ASSERT(th != NULL);
 		KMP_DEBUG_ASSERT(th->th.th_potential_roles == r);
+	    //TODO: Get the task teams from a global structure
 	    if(r & OMP_ROLE_FREE_AGENT){
 			++__kmp_free_agent_num_threads;
 	        kmp_task_team_t *tt_0 = __kmp_threads[0]->th.th_team->t.t_task_team[0];
@@ -9922,6 +9945,7 @@ void __kmp_set_thread_roles2(int tid, omp_role_t r){
 	            __kmp_add_allowed_task_team(th, tt_1);
             __kmp_release_bootstrap_lock(&th->th.allowed_teams_lock);
 	    }
+	    __kmp_release_bootstrap_lock(&__kmp_forkjoin_lock);
 	    return;
 	}
     __kmp_suspend_initialize_thread(th);
@@ -9930,6 +9954,9 @@ void __kmp_set_thread_roles2(int tid, omp_role_t r){
 	if(act_r != OMP_ROLE_NONE){
 		if(!(act_r & r)){//We are actually removing the active role from the thread
 			th->th.th_pending_role = OMP_ROLE_NONE;
+			if(act_r == OMP_ROLE_FREE_AGENT){
+			    KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+			}
 			KMP_ATOMIC_ST_REL(&th->th.th_change_role, true);
 		}
 	}
@@ -10016,6 +10043,7 @@ void __kmp_set_thread_roles2(int tid, omp_role_t r){
 	}
 	th->th.th_potential_roles = r;
     if(tmp)__kmp_unlock_suspend_mx(th);
+    __kmp_release_bootstrap_lock(&__kmp_forkjoin_lock);
 	KMP_MB();
 }
 

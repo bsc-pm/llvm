@@ -3215,7 +3215,15 @@ extern volatile int __kmp_all_nth;
 extern std::atomic<int> __kmp_thread_pool_active_nth;
 
 extern kmp_root_t **__kmp_root; /* root of thread hierarchy */
+
+extern volatile kmp_info_t *__kmp_free_agent_list; /*First element of the free agent
+thread list. Next element is pointed by the thread itself */
+extern kmp_info_t *__kmp_free_agent_list_insert_pt;
 /* end data protected by fork/join lock */
+extern int __kmp_free_agent_num_threads; /*Max number of free agents allowed. Initialized with
+env variable KMP_FREE_AGENT_NUM_THREADS */
+extern std::atomic<int> __kmp_free_agent_active_nth; //Actual number of free agents active
+extern int __kmp_free_agent_clause_dflt; //Value obtained from env variable KMP_FREE_AGENT_DEFAULT_CLAUSE
 /* ------------------------------------------------------------------------- */
 
 #define __kmp_get_gtid() __kmp_get_global_thread_id()
@@ -4187,14 +4195,7 @@ typedef enum kmp_severity_t {
 } kmp_severity_t;
 extern void __kmpc_error(ident_t *loc, int severity, const char *message);
 
-// Free agent threads.
-extern volatile kmp_info_t *__kmp_free_agent_list; /*First element of the free agent
-thread list. Next element is pointed by the thread itself*/
-extern kmp_info_t *__kmp_free_agent_list_insert_pt;
-extern int __kmp_free_agent_num_threads; //Max number of free agents allowed
-extern std::atomic<int> __kmp_free_agent_active_nth; //Actual number of free agents active
-extern int __kmp_free_agent_clause_dflt; //Value obtained from env variable KMP_FREE_AGENT_DEFAULT_CLAUSE
-//Free Agent APIs
+//Role-shifting threads APIs
 extern int __kmp_get_num_threads_role(omp_role_t r); //returns how many threads have the role r
 extern int __kmp_get_thread_roles(int tid, omp_role_t *r); //returns the number of roles of the thread with thread_id==tid,
 																													 //and r holds the actual roles of the thread.

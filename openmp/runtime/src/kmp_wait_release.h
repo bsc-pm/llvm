@@ -408,10 +408,10 @@ __kmp_wait_template(kmp_info_t *this_thr,
     	
     	KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
     	KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
-    	if(nxt_role == OMP_ROLE_FREE_AGENT)
+    	/*if(nxt_role == OMP_ROLE_FREE_AGENT)
     		KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
     	else if(prv_role == OMP_ROLE_FREE_AGENT)
-	    	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+	    	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);*/
         __kmp_unlock_suspend_mx(this_thr);
 #if OMPT_SUPPORT
 		ompt_data_t *thread_data = nullptr;
@@ -582,10 +582,10 @@ final_spin=FALSE)
     	
     	KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
     	KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
-    	if(nxt_role == OMP_ROLE_FREE_AGENT)
+    	/*if(nxt_role == OMP_ROLE_FREE_AGENT)
     		KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
     	else if(prv_role == OMP_ROLE_FREE_AGENT)
-	    	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+	    	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);*/
         __kmp_unlock_suspend_mx(this_thr);
 #if OMPT_SUPPORT
 		ompt_data_t *thread_data = nullptr;
@@ -612,7 +612,7 @@ final_spin=FALSE)
          serialized region (perhaps the outer one), or else tasking was manually
          disabled (KMP_TASKING=0).  */
       if (this_thr->th.th_active_role == OMP_ROLE_FREE_AGENT
-      		&& __kmp_free_agent_list) {
+      		&& !KMP_ATOMIC_LD_ACQ(&this_thr->th.th_change_role)) {
         this_thr->th.th_reap_state = KMP_NOT_SAFE_TO_REAP;
         int empty_task_teams_cnt = 0;
         int team_task_to_pick = 0;
@@ -794,7 +794,7 @@ final_spin=FALSE)
             //fflush(NULL);
     		KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
     		KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
-    		KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
+    		//KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
             __kmp_unlock_suspend_mx(this_thr);
 #if OMPT_SUPPORT
 			ompt_data_t *thread_data = nullptr;
@@ -825,10 +825,10 @@ final_spin=FALSE)
             //fflush(NULL);
     		KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
     		KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
-    		if(nxt_role == OMP_ROLE_FREE_AGENT)
+    		/*if(nxt_role == OMP_ROLE_FREE_AGENT)
     			KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
     		else if(prv_role == OMP_ROLE_FREE_AGENT)
-	    		KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+	    		KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);*/
             __kmp_unlock_suspend_mx(this_thr);
 #if OMPT_SUPPORT
 			ompt_data_t *thread_data = nullptr;
@@ -876,10 +876,10 @@ final_spin=FALSE)
     	
     KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
     KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
-    if(nxt_role == OMP_ROLE_FREE_AGENT)
+    /*if(nxt_role == OMP_ROLE_FREE_AGENT)
     	KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
     else if(prv_role == OMP_ROLE_FREE_AGENT)
-	   	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
+	   	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);*/
     __kmp_unlock_suspend_mx(this_thr);
 #if OMPT_SUPPORT
 	ompt_data_t *thread_data = nullptr;
