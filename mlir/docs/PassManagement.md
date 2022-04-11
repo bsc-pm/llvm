@@ -128,7 +128,7 @@ Dialects must be loaded in the MLIRContext before entities from these dialects
 (operations, types, attributes, ...) can be created. Dialects must also be
 loaded before starting the execution of a multi-threaded pass pipeline. To this
 end, a pass that may create an entity from a dialect that isn't guaranteed to
-already ne loaded must express this by overriding the `getDependentDialects()`
+already be loaded must express this by overriding the `getDependentDialects()`
 method and declare this list of Dialects explicitly.
 
 ### Initialization
@@ -431,9 +431,12 @@ components are integrated with the dynamic pipeline being executed.
 MLIR provides a builtin mechanism for passes to specify options that configure
 its behavior. These options are parsed at pass construction time independently
 for each instance of the pass. Options are defined using the `Option<>` and
-`ListOption<>` classes, and follow the
+`ListOption<>` classes, and generally follow the
 [LLVM command line](https://llvm.org/docs/CommandLine.html) flag definition
-rules. See below for a few examples:
+rules. One major distinction from the LLVM command line functionality is that
+all `ListOption`s are comma-separated, and delimited sub-ranges within individual
+elements of the list may contain commas that are not treated as separators for the
+top-level list.
 
 ```c++
 struct MyPass ... {
@@ -445,8 +448,7 @@ struct MyPass ... {
   /// Any parameters after the description are forwarded to llvm::cl::list and
   /// llvm::cl::opt respectively.
   Option<int> exampleOption{*this, "flag-name", llvm::cl::desc("...")};
-  ListOption<int> exampleListOption{*this, "list-flag-name",
-                                    llvm::cl::desc("...")};
+  ListOption<int> exampleListOption{*this, "list-flag-name", llvm::cl::desc("...")};
 };
 ```
 
@@ -705,8 +707,7 @@ struct MyPass : PassWrapper<MyPass, OperationPass<ModuleOp>> {
       llvm::cl::desc("An example option"), llvm::cl::init(true)};
   ListOption<int64_t> listOption{
       *this, "example-list",
-      llvm::cl::desc("An example list option"), llvm::cl::ZeroOrMore,
-      llvm::cl::MiscFlags::CommaSeparated};
+      llvm::cl::desc("An example list option"), llvm::cl::ZeroOrMore};
 
   // Specify any statistics.
   Statistic statistic{this, "example-statistic", "An example statistic"};
@@ -742,8 +743,7 @@ def MyPass : Pass<"my-pass", "ModuleOp"> {
     Option<"option", "example-option", "bool", /*default=*/"true",
            "An example option">,
     ListOption<"listOption", "example-list", "int64_t",
-               "An example list option",
-               "llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated">
+               "An example list option", "llvm::cl::ZeroOrMore">
   ];
 
   // Specify any statistics.
@@ -818,7 +818,7 @@ string corresponding to the operation type that the pass operates on. The class
 contains the following fields:
 
 *   `summary`
-    -   A short one line summary of the pass, used as the description when
+    -   A short one-line summary of the pass, used as the description when
         registering the pass.
 *   `description`
     -   A longer, more detailed description of the pass. This is used when
@@ -847,7 +847,7 @@ class takes the following template parameters:
 *   default value
     -   The default option value.
 *   description
-    -   A one line description of the option.
+    -   A one-line description of the option.
 *   additional option flags
     -   A string containing any additional options necessary to construct the
         option.
@@ -870,7 +870,7 @@ The `ListOption` class takes the following fields:
 *   element type
     -   The C++ type of the list element.
 *   description
-    -   A one line description of the option.
+    -   A one-line description of the option.
 *   additional option flags
     -   A string containing any additional options necessary to construct the
         option.
@@ -879,8 +879,7 @@ The `ListOption` class takes the following fields:
 def MyPass : Pass<"my-pass"> {
   let options = [
     ListOption<"listOption", "example-list", "int64_t",
-               "An example list option",
-               "llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated">
+               "An example list option", "llvm::cl::ZeroOrMore">
   ];
 }
 ```
@@ -895,7 +894,7 @@ template parameters:
 *   display name
     -   The name used when displaying the statistic.
 *   description
-    -   A one line description of the statistic.
+    -   A one-line description of the statistic.
 
 ```tablegen
 def MyPass : Pass<"my-pass"> {
@@ -939,7 +938,7 @@ PassInstrumentation instances may be registered directly with a
 Instrumentations added to the PassManager are run in a stack like fashion, i.e.
 the last instrumentation to execute a `runBefore*` hook will be the first to
 execute the respective `runAfter*` hook. The hooks of a `PassInstrumentation`
-class are guaranteed to be executed in a thread safe fashion, so additional
+class are guaranteed to be executed in a thread-safe fashion, so additional
 synchronization is not necessary. Below in an example instrumentation that
 counts the number of times the `DominanceInfo` analysis is computed:
 
