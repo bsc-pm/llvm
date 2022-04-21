@@ -18774,124 +18774,127 @@ bool Sema::tryCaptureVariable(
 
     FunctionScopeInfo  *FSI = FunctionScopes[FunctionScopesIndex];
 
-    if (!(getLangOpts().OmpSs && FSI->HasOSSExecutableDirective)) {
-      CapturingScopeInfo *CSI = cast<CapturingScopeInfo>(FSI);
+    if (getLangOpts().OmpSs && FSI->HasOSSExecutableDirective) {
+      FunctionScopesIndex--;
+      continue;
+    }
 
-      // Check whether we've already captured it.
-      if (isVariableAlreadyCapturedInScopeInfo(CSI, Var, Nested, CaptureType,
-                                               DeclRefType)) {
-        CSI->getCapture(Var).markUsed(BuildAndDiagnose);
-        break;
-      }
-      // If we are instantiating a generic lambda call operator body,
-      // we do not want to capture new variables.  What was captured
-      // during either a lambdas transformation or initial parsing
-      // should be used.
-      if (isGenericLambdaCallOperatorSpecialization(DC)) {
-        if (BuildAndDiagnose) {
-          LambdaScopeInfo *LSI = cast<LambdaScopeInfo>(CSI);
-          if (LSI->ImpCaptureStyle == CapturingScopeInfo::ImpCap_None) {
-            Diag(ExprLoc, diag::err_lambda_impcap) << Var;
-            Diag(Var->getLocation(), diag::note_previous_decl) << Var;
-            Diag(LSI->Lambda->getBeginLoc(), diag::note_lambda_decl);
-            buildLambdaCaptureFixit(*this, LSI, Var);
-          } else
-            diagnoseUncapturableValueReference(*this, ExprLoc, Var);
-        }
-        return true;
-      }
+    CapturingScopeInfo *CSI = cast<CapturingScopeInfo>(FSI);
 
-      // Try to capture variable-length arrays types.
-      if (Var->getType()->isVariablyModifiedType()) {
-        // We're going to walk down into the type and look for VLA
-        // expressions.
-        QualType QTy = Var->getType();
-        if (ParmVarDecl *PVD = dyn_cast_or_null<ParmVarDecl>(Var))
-          QTy = PVD->getOriginalType();
-        captureVariablyModifiedType(Context, QTy, CSI);
-      }
-
-      if (getLangOpts().OpenMP) {
-        if (auto *RSI = dyn_cast<CapturedRegionScopeInfo>(CSI)) {
-          // OpenMP private variables should not be captured in outer scope, so
-          // just break here. Similarly, global variables that are captured in a
-          // target region should not be captured outside the scope of the region.
-          if (RSI->CapRegionKind == CR_OpenMP) {
-            OpenMPClauseKind IsOpenMPPrivateDecl = isOpenMPPrivateDecl(
-                Var, RSI->OpenMPLevel, RSI->OpenMPCaptureLevel);
-            // If the variable is private (i.e. not captured) and has variably
-            // modified type, we still need to capture the type for correct
-            // codegen in all regions, associated with the construct. Currently,
-            // it is captured in the innermost captured region only.
-            if (IsOpenMPPrivateDecl != OMPC_unknown &&
-                Var->getType()->isVariablyModifiedType()) {
-              QualType QTy = Var->getType();
-              if (ParmVarDecl *PVD = dyn_cast_or_null<ParmVarDecl>(Var))
-                QTy = PVD->getOriginalType();
-              for (int I = 1, E = getNumberOfConstructScopes(RSI->OpenMPLevel);
-                   I < E; ++I) {
-                auto *OuterRSI = cast<CapturedRegionScopeInfo>(
-                    FunctionScopes[FunctionScopesIndex - I]);
-                assert(RSI->OpenMPLevel == OuterRSI->OpenMPLevel &&
-                       "Wrong number of captured regions associated with the "
-                       "OpenMP construct.");
-                captureVariablyModifiedType(Context, QTy, OuterRSI);
-              }
-            }
-            bool IsTargetCap =
-                IsOpenMPPrivateDecl != OMPC_private &&
-                isOpenMPTargetCapturedDecl(Var, RSI->OpenMPLevel,
-                                           RSI->OpenMPCaptureLevel);
-            // Do not capture global if it is not privatized in outer regions.
-            bool IsGlobalCap =
-                IsGlobal && isOpenMPGlobalCapturedDecl(Var, RSI->OpenMPLevel,
-                                                       RSI->OpenMPCaptureLevel);
-
-            // When we detect target captures we are looking from inside the
-            // target region, therefore we need to propagate the capture from the
-            // enclosing region. Therefore, the capture is not initially nested.
-            if (IsTargetCap)
-              adjustOpenMPTargetScopeIndex(FunctionScopesIndex, RSI->OpenMPLevel);
-
-            if (IsTargetCap || IsOpenMPPrivateDecl == OMPC_private ||
-                (IsGlobal && !IsGlobalCap)) {
-              Nested = !IsTargetCap;
-              bool HasConst = DeclRefType.isConstQualified();
-              DeclRefType = DeclRefType.getUnqualifiedType();
-              // Don't lose diagnostics about assignments to const.
-              if (HasConst)
-                DeclRefType.addConst();
-              CaptureType = Context.getLValueReferenceType(DeclRefType);
-              break;
-            }
-          }
-        }
-      }
-      if (CSI->ImpCaptureStyle == CapturingScopeInfo::ImpCap_None && !Explicit) {
-        // No capture-default, and this is not an explicit capture
-        // so cannot capture this variable.
-        if (BuildAndDiagnose) {
+    // Check whether we've already captured it.
+    if (isVariableAlreadyCapturedInScopeInfo(CSI, Var, Nested, CaptureType,
+                                             DeclRefType)) {
+      CSI->getCapture(Var).markUsed(BuildAndDiagnose);
+      break;
+    }
+    // If we are instantiating a generic lambda call operator body,
+    // we do not want to capture new variables.  What was captured
+    // during either a lambdas transformation or initial parsing
+    // should be used.
+    if (isGenericLambdaCallOperatorSpecialization(DC)) {
+      if (BuildAndDiagnose) {
+        LambdaScopeInfo *LSI = cast<LambdaScopeInfo>(CSI);
+        if (LSI->ImpCaptureStyle == CapturingScopeInfo::ImpCap_None) {
           Diag(ExprLoc, diag::err_lambda_impcap) << Var;
           Diag(Var->getLocation(), diag::note_previous_decl) << Var;
-          auto *LSI = cast<LambdaScopeInfo>(CSI);
-          if (LSI->Lambda) {
-            Diag(LSI->Lambda->getBeginLoc(), diag::note_lambda_decl);
-            buildLambdaCaptureFixit(*this, LSI, Var);
-          }
-          // FIXME: If we error out because an outer lambda can not implicitly
-          // capture a variable that an inner lambda explicitly captures, we
-          // should have the inner lambda do the explicit capture - because
-          // it makes for cleaner diagnostics later.  This would purely be done
-          // so that the diagnostic does not misleadingly claim that a variable
-          // can not be captured by a lambda implicitly even though it is captured
-          // explicitly.  Suggestion:
-          //  - create const bool VariableCaptureWasInitiallyExplicit = Explicit
-          //    at the function head
-          //  - cache the StartingDeclContext - this must be a lambda
-          //  - captureInLambda in the innermost lambda the variable.
-        }
-        return true;
+          Diag(LSI->Lambda->getBeginLoc(), diag::note_lambda_decl);
+          buildLambdaCaptureFixit(*this, LSI, Var);
+        } else
+          diagnoseUncapturableValueReference(*this, ExprLoc, Var);
       }
+      return true;
+    }
+
+    // Try to capture variable-length arrays types.
+    if (Var->getType()->isVariablyModifiedType()) {
+      // We're going to walk down into the type and look for VLA
+      // expressions.
+      QualType QTy = Var->getType();
+      if (ParmVarDecl *PVD = dyn_cast_or_null<ParmVarDecl>(Var))
+        QTy = PVD->getOriginalType();
+      captureVariablyModifiedType(Context, QTy, CSI);
+    }
+
+    if (getLangOpts().OpenMP) {
+      if (auto *RSI = dyn_cast<CapturedRegionScopeInfo>(CSI)) {
+        // OpenMP private variables should not be captured in outer scope, so
+        // just break here. Similarly, global variables that are captured in a
+        // target region should not be captured outside the scope of the region.
+        if (RSI->CapRegionKind == CR_OpenMP) {
+          OpenMPClauseKind IsOpenMPPrivateDecl = isOpenMPPrivateDecl(
+              Var, RSI->OpenMPLevel, RSI->OpenMPCaptureLevel);
+          // If the variable is private (i.e. not captured) and has variably
+          // modified type, we still need to capture the type for correct
+          // codegen in all regions, associated with the construct. Currently,
+          // it is captured in the innermost captured region only.
+          if (IsOpenMPPrivateDecl != OMPC_unknown &&
+              Var->getType()->isVariablyModifiedType()) {
+            QualType QTy = Var->getType();
+            if (ParmVarDecl *PVD = dyn_cast_or_null<ParmVarDecl>(Var))
+              QTy = PVD->getOriginalType();
+            for (int I = 1, E = getNumberOfConstructScopes(RSI->OpenMPLevel);
+                 I < E; ++I) {
+              auto *OuterRSI = cast<CapturedRegionScopeInfo>(
+                  FunctionScopes[FunctionScopesIndex - I]);
+              assert(RSI->OpenMPLevel == OuterRSI->OpenMPLevel &&
+                     "Wrong number of captured regions associated with the "
+                     "OpenMP construct.");
+              captureVariablyModifiedType(Context, QTy, OuterRSI);
+            }
+          }
+          bool IsTargetCap =
+              IsOpenMPPrivateDecl != OMPC_private &&
+              isOpenMPTargetCapturedDecl(Var, RSI->OpenMPLevel,
+                                         RSI->OpenMPCaptureLevel);
+          // Do not capture global if it is not privatized in outer regions.
+          bool IsGlobalCap =
+              IsGlobal && isOpenMPGlobalCapturedDecl(Var, RSI->OpenMPLevel,
+                                                     RSI->OpenMPCaptureLevel);
+
+          // When we detect target captures we are looking from inside the
+          // target region, therefore we need to propagate the capture from the
+          // enclosing region. Therefore, the capture is not initially nested.
+          if (IsTargetCap)
+            adjustOpenMPTargetScopeIndex(FunctionScopesIndex, RSI->OpenMPLevel);
+
+          if (IsTargetCap || IsOpenMPPrivateDecl == OMPC_private ||
+              (IsGlobal && !IsGlobalCap)) {
+            Nested = !IsTargetCap;
+            bool HasConst = DeclRefType.isConstQualified();
+            DeclRefType = DeclRefType.getUnqualifiedType();
+            // Don't lose diagnostics about assignments to const.
+            if (HasConst)
+              DeclRefType.addConst();
+            CaptureType = Context.getLValueReferenceType(DeclRefType);
+            break;
+          }
+        }
+      }
+    }
+    if (CSI->ImpCaptureStyle == CapturingScopeInfo::ImpCap_None && !Explicit) {
+      // No capture-default, and this is not an explicit capture
+      // so cannot capture this variable.
+      if (BuildAndDiagnose) {
+        Diag(ExprLoc, diag::err_lambda_impcap) << Var;
+        Diag(Var->getLocation(), diag::note_previous_decl) << Var;
+        auto *LSI = cast<LambdaScopeInfo>(CSI);
+        if (LSI->Lambda) {
+          Diag(LSI->Lambda->getBeginLoc(), diag::note_lambda_decl);
+          buildLambdaCaptureFixit(*this, LSI, Var);
+        }
+        // FIXME: If we error out because an outer lambda can not implicitly
+        // capture a variable that an inner lambda explicitly captures, we
+        // should have the inner lambda do the explicit capture - because
+        // it makes for cleaner diagnostics later.  This would purely be done
+        // so that the diagnostic does not misleadingly claim that a variable
+        // can not be captured by a lambda implicitly even though it is captured
+        // explicitly.  Suggestion:
+        //  - create const bool VariableCaptureWasInitiallyExplicit = Explicit
+        //    at the function head
+        //  - cache the StartingDeclContext - this must be a lambda
+        //  - captureInLambda in the innermost lambda the variable.
+      }
+      return true;
     }
     FunctionScopesIndex--;
     DC = ParentDC;
