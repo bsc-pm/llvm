@@ -1151,10 +1151,10 @@ void __kmp_serialized_parallel(ident_t *loc, kmp_int32 global_tid) {
     serial_team->t.t_master_tid = this_thr->th.th_info.ds.ds_tid;
 
     // reset task_team if exists
-    if (serial_team->t.t_task_team[0]) {
-      TCW_4(serial_team->t.t_task_team[0]->tt.tt_found_tasks, FALSE);
-      TCW_4(serial_team->t.t_task_team[0]->tt.tt_found_proxy_tasks, FALSE);
-      TCW_4(serial_team->t.t_task_team[0]->tt.tt_active, TRUE);
+    if (serial_team->t.t_task_team[this_thr->th.th_task_state]) {
+      TCW_4(serial_team->t.t_task_team[this_thr->th.th_task_state]->tt.tt_found_tasks, FALSE);
+      TCW_4(serial_team->t.t_task_team[this_thr->th.th_task_state]->tt.tt_found_proxy_tasks, FALSE);
+      TCW_4(serial_team->t.t_task_team[this_thr->th.th_task_state]->tt.tt_active, TRUE);
     }
 
     KF_TRACE(10, ("__kmpc_serialized_parallel: T#%d curtask=%p\n", global_tid,
