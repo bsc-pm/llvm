@@ -261,12 +261,15 @@ CodeExtractor::CodeExtractor(ArrayRef<BasicBlock *> BBs,
                                                      const SetVector<BasicBlock *> &Blocks)> rewriteUsesBrAndGetOmpSsUnpackFunc,
                              std::function<CallInst*(Function *newFunction,
                                                      BasicBlock *codeReplacer,
-                                                     const SetVector<BasicBlock *> &Blocks)> emitOmpSsCaptureAndSubmitTask)
+                                                     const SetVector<BasicBlock *> &Blocks)> emitOmpSsCaptureAndSubmitTask,
+                             std::function<int(Value *const V)> valueInUnpackParams)
     : DT(nullptr), AggregateArgs(false), BFI(nullptr),
       BPI(nullptr), AC(nullptr), AllowVarArgs(false),
       // Blocks(buildExtractionBlockSet(BBs, DT, AllowVarArgs, /* AllowAlloca */ true)),
       rewriteUsesBrAndGetOmpSsUnpackFunc(rewriteUsesBrAndGetOmpSsUnpackFunc),
-      emitOmpSsCaptureAndSubmitTask(emitOmpSsCaptureAndSubmitTask) {
+      emitOmpSsCaptureAndSubmitTask(emitOmpSsCaptureAndSubmitTask),
+      valueInUnpackParams(valueInUnpackParams)
+      {
         Blocks.insert(BBs.begin(), BBs.end());
       }
 
@@ -1533,7 +1536,8 @@ static void eraseDebugIntrinsicsWithNonLocalRefs(Function &F) {
 /// locations and debug intrinsics to the new subprogram scope, and by deleting
 /// intrinsics which point to values outside of the new function.
 static void fixupDebugInfoPostExtraction(Function &OldFunc, Function &NewFunc,
-                                         CallInst &TheCall) {
+                                         CallInst &TheCall,
+                                         std::function<int(Value *const V)> valueInUnpackParams) {
   DISubprogram *OldSP = OldFunc.getSubprogram();
   LLVMContext &Ctx = OldFunc.getContext();
 
@@ -1584,14 +1588,16 @@ static void fixupDebugInfoPostExtraction(Function &OldFunc, Function &NewFunc,
       continue;
     }
 
-    auto IsInvalidLocation = [&NewFunc](Value *Location) {
+    auto IsInvalidLocation = [&NewFunc, &valueInUnpackParams](Value *Location) {
       // Location is invalid if it isn't a constant or an instruction, or is an
       // instruction but isn't in the new function.
       if (!Location ||
           (!isa<Constant>(Location) && !isa<Instruction>(Location)))
         return true;
       Instruction *LocationInst = dyn_cast<Instruction>(Location);
-      return LocationInst && LocationInst->getFunction() != &NewFunc;
+      return LocationInst
+        && (LocationInst->getFunction() != &NewFunc &&
+            (!valueInUnpackParams || (valueInUnpackParams(Location) == -1)));
     };
 
     auto *DVI = cast<DbgVariableIntrinsic>(DII);
@@ -1599,10 +1605,18 @@ static void fixupDebugInfoPostExtraction(Function &OldFunc, Function &NewFunc,
     if (any_of(DVI->location_ops(), IsInvalidLocation)) {
       DebugIntrinsicsToDelete.push_back(DVI);
       continue;
+    } else if (valueInUnpackParams) {
+      // Intrinsic is valid, replace all location referencing
+      // original code to outlined arguments
+      for (Value *Location : DVI->location_ops()) {
+        int Res = valueInUnpackParams(Location);
+        if (Res != -1)
+          DVI->replaceVariableLocationOp(Location, NewFunc.getArg(Res));
+      }
     }
-
     // Point the intrinsic to a fresh variable within the new function.
     DILocalVariable *OldVar = DVI->getVariable();
+
     DINode *&NewVar = RemappedMetadata[OldVar];
     if (!NewVar)
       NewVar = DIB.createAutoVariable(
@@ -1851,7 +1865,7 @@ CodeExtractor::extractCodeRegion(const CodeExtractorAnalysisCache &CEAC,
       }
     }
 
-  fixupDebugInfoPostExtraction(*oldFunction, *newFunction, *TheCall);
+  fixupDebugInfoPostExtraction(*oldFunction, *newFunction, *TheCall, valueInUnpackParams);
 
   // Mark the new function `noreturn` if applicable. Terminators which resume
   // exception propagation are treated as returning instructions. This is to

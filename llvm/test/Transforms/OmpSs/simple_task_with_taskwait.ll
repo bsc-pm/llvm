@@ -3,7 +3,7 @@
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 source_filename = "simple_task_with_taskwait.ll"
 
-define void @foo(i32 %x, i32 %y) {
+define void @foo(i32 %x, i32 %y) !dbg !6 {
 ; CHECK-LABEL: @foo(
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[X_ADDR:%.*]] = alloca i32, align 4

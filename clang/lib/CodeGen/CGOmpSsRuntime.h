@@ -250,6 +250,9 @@ private:
       SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
       const OSSLoopDataTy &LoopData = OSSLoopDataTy());
 
+  // Emit debug info for the data-sharings in a directive
+  void EmitDirectiveDbgInfo(CodeGenFunction &CGF, const OSSTaskDataTy &Data);
+
 public:
   explicit CGOmpSsRuntime(CodeGenModule &CGM) : CGM(CGM) {}
   virtual ~CGOmpSsRuntime() {};

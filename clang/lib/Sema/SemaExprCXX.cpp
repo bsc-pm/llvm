@@ -1363,24 +1363,24 @@ bool Sema::CheckCXXThisCapture(SourceLocation Loc, const bool Explicit,
   QualType ThisTy = getCurrentThisType();
   for (int idx = MaxFunctionScopesIndex; NumCapturingClosures;
        --idx, --NumCapturingClosures) {
-    if (!(getLangOpts().OmpSs && FunctionScopes[idx]->HasOSSExecutableDirective)) {
-      CapturingScopeInfo *CSI = cast<CapturingScopeInfo>(FunctionScopes[idx]);
+    if (getLangOpts().OmpSs && FunctionScopes[idx]->HasOSSExecutableDirective)
+      continue;
+    CapturingScopeInfo *CSI = cast<CapturingScopeInfo>(FunctionScopes[idx]);
 
-      // The type of the corresponding data member (not a 'this' pointer if 'by
-      // copy').
-      QualType CaptureType = ThisTy;
-      if (ByCopy) {
-        // If we are capturing the object referred to by '*this' by copy, ignore
-        // any cv qualifiers inherited from the type of the member function for
-        // the type of the closure-type's corresponding data member and any use
-        // of 'this'.
-        CaptureType = ThisTy->getPointeeType();
-        CaptureType.removeLocalCVRQualifiers(Qualifiers::CVRMask);
-      }
-
-      bool isNested = NumCapturingClosures > 1;
-      CSI->addThisCapture(isNested, Loc, CaptureType, ByCopy);
+    // The type of the corresponding data member (not a 'this' pointer if 'by
+    // copy').
+    QualType CaptureType = ThisTy;
+    if (ByCopy) {
+      // If we are capturing the object referred to by '*this' by copy, ignore
+      // any cv qualifiers inherited from the type of the member function for
+      // the type of the closure-type's corresponding data member and any use
+      // of 'this'.
+      CaptureType = ThisTy->getPointeeType();
+      CaptureType.removeLocalCVRQualifiers(Qualifiers::CVRMask);
     }
+
+    bool isNested = NumCapturingClosures > 1;
+    CSI->addThisCapture(isNested, Loc, CaptureType, ByCopy);
   }
   return false;
 }

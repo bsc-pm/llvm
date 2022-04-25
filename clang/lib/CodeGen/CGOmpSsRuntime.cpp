@@ -2447,6 +2447,19 @@ static void EmitLoopType(const OSSLoopDataTy &LoopData, CodeGenFunction &CGF,
   TaskInfo.emplace_back(getBundleStr(OSSB_loop_type), List);
 }
 
+static VarDecl *createImplicitVarDecl(
+    CodeGenFunction &CGF, StringRef Name, QualType Q, SourceLocation Loc,
+    const DeclContext *DC) {
+  ASTContext &Ctx = CGF.getContext();
+  auto *VD =
+    VarDecl::Create(
+      Ctx, const_cast<DeclContext *>(DC),
+      Loc, Loc, &Ctx.Idents.get(Name),
+      Q, Ctx.getTrivialTypeSourceInfo(Q, Loc), SC_Auto);
+  VD->setImplicit();
+  return VD;
+}
+
 static DeclRefExpr *emitTaskCallArg(
     CodeGenFunction &CGF, StringRef Name, QualType Q, SourceLocation Loc,
     llvm::Optional<const Expr *> InitE = llvm::None) {
@@ -2457,13 +2470,8 @@ static DeclRefExpr *emitTaskCallArg(
   if (Q->isArrayType())
     Q = Ctx.getBaseElementType(Q).getCanonicalType();
 
-  auto *VD =
-    VarDecl::Create(
-      Ctx, const_cast<DeclContext *>(cast<DeclContext>(CGF.CurCodeDecl)),
-      Loc, Loc, &Ctx.Idents.get(Name),
-      Q, Ctx.getTrivialTypeSourceInfo(Q, Loc), SC_Auto);
+  auto *VD = createImplicitVarDecl(CGF, Name, Q, Loc, cast<DeclContext>(CGF.CurCodeDecl));
 
-  VD->setImplicit();
   VD->setReferenced();
   VD->markUsed(Ctx);
   VD->setInitStyle(VarDecl::CInit);
@@ -2700,6 +2708,43 @@ void CGOmpSsRuntime::EmitDirectiveData(
     TaskInfo.emplace_back(getBundleStr(OSSB_if), CGF.EvaluateExprAsBool(Data.If));
   if (Data.Final)
     TaskInfo.emplace_back(getBundleStr(OSSB_final), CGF.EvaluateExprAsBool(Data.Final));
+}
+
+static void EmitDbgInfo(CodeGenFunction &CGF, CGDebugInfo *DI, const Expr *E) {
+  if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
+    const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
+    if (VD->getType()->isReferenceType()) {
+      const VarDecl *ImplVD = createImplicitVarDecl(
+        CGF, VD->getName(), E->getType(), VD->getLocation(), VD->getDeclContext());
+      (void)DI->EmitDeclareOfAutoVariable(
+        ImplVD, CGF.EmitLValue(DRE).getPointer(CGF), CGF.Builder, /*UsePointerValue=*/false);
+    } else {
+      (void)DI->EmitDeclareOfAutoVariable(
+        VD, CGF.EmitLValue(DRE).getPointer(CGF), CGF.Builder, /*UsePointerValue=*/false);
+    }
+  } else if (isa<CXXThisExpr>(E)) {
+    const VarDecl *ImplVD = createImplicitVarDecl(
+      CGF, "this", E->getType()->getPointeeType(), E->getExprLoc(), cast<DeclContext>(CGF.CurCodeDecl));
+
+    (void)DI->EmitDeclareOfAutoVariable(
+      ImplVD, CGF.EmitScalarExpr(E), CGF.Builder, /*UsePointerValue=*/false);
+  } else {
+    llvm_unreachable("Unsupported debug info in OmpSs-2 directive");
+  }
+}
+
+void CGOmpSsRuntime::EmitDirectiveDbgInfo(
+    CodeGenFunction &CGF, const OSSTaskDataTy &Data) {
+  auto *DI = CGF.getDebugInfo();
+  for (const Expr *E : Data.DSAs.Shareds) {
+    EmitDbgInfo(CGF, DI, E);
+  }
+  for (const OSSDSAPrivateDataTy &PDataTy : Data.DSAs.Privates) {
+    EmitDbgInfo(CGF, DI, PDataTy.Ref);
+  }
+  for (const OSSDSAFirstprivateDataTy &FpDataTy : Data.DSAs.Firstprivates) {
+    EmitDbgInfo(CGF, DI, FpDataTy.Ref);
+  }
 }
 
 llvm::AllocaInst *CGOmpSsRuntime::createTaskAwareAlloca(
@@ -3018,6 +3063,9 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   llvm::Instruction *TaskAllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "taskallocapt", Result->getParent());
   setTaskInsertPt(TaskAllocaInsertPt);
 
+  // TODO:
+  // EmitDirectiveDbgInfo
+
   // The point of exit cannot be a branch out of the structured block.
   // longjmp() and throw() must not violate the entry/exit criteria.
   CGF.EHStack.pushTerminate();
@@ -3087,6 +3135,9 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
   llvm::Instruction *TaskAllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "taskallocapt", Result->getParent());
   setTaskInsertPt(TaskAllocaInsertPt);
+
+  if (CGM.getCodeGenOpts().hasReducedDebugInfo())
+    EmitDirectiveDbgInfo(CGF, Data);
 
   // The point of exit cannot be a branch out of the structured block.
   // longjmp() and throw() must not violate the entry/exit criteria.
@@ -3159,6 +3210,9 @@ void CGOmpSsRuntime::emitLoopCall(CodeGenFunction &CGF,
   llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
   llvm::Instruction *TaskAllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "taskallocapt", Result->getParent());
   setTaskInsertPt(TaskAllocaInsertPt);
+
+  if (CGM.getCodeGenOpts().hasReducedDebugInfo())
+    EmitDirectiveDbgInfo(CGF, Data);
 
   // The point of exit cannot be a branch out of the structured block.
   // longjmp() and throw() must not violate the entry/exit criteria.
