@@ -576,22 +576,30 @@ struct OmpSs {
   // Converts all ConstantExpr users of GV in Blocks to instructions
   static void constantExprToInstruction(
       GlobalValue *GV, const SetVector<BasicBlock *> &Blocks) {
-    SmallVector<ConstantExpr*,4> Users;
-    for (auto *U : GV->users()) {
-      if (isa<ConstantExpr>(U))
-        Users.push_back(cast<ConstantExpr>(U));
+    SmallVector<ConstantExpr*,4> UsersStack;
+    SmallVector<Constant*,4> Worklist;
+    Worklist.push_back(GV);
+    while (!Worklist.empty()) {
+      Constant *C = Worklist.pop_back_val();
+      for (auto *U : C->users()) {
+        if (ConstantExpr *CC = dyn_cast<ConstantExpr>(U)) {
+          UsersStack.insert(UsersStack.begin(), CC);
+          Worklist.push_back(CC);
+        }
+      }
     }
 
     SmallVector<Value*,4> UUsers;
-    for (auto *U : Users) {
+    for (auto *U : UsersStack) {
       UUsers.clear();
       append_range(UUsers, U->users());
       for (auto *UU : UUsers) {
-        Instruction *UI = cast<Instruction>(UU);
-        if (Blocks.count(UI->getParent())) {
-          Instruction *NewU = U->getAsInstruction();
-          NewU->insertBefore(UI);
-          UI->replaceUsesOfWith(U, NewU);
+        if (Instruction *UI = dyn_cast<Instruction>(UU)) {
+          if (Blocks.count(UI->getParent())) {
+            Instruction *NewU = U->getAsInstruction();
+            NewU->insertBefore(UI);
+            UI->replaceUsesOfWith(U, NewU);
+          }
         }
       }
     }
