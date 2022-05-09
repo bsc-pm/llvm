@@ -488,6 +488,8 @@ void __kmp_pop_current_task_from_thread(kmp_info_t *this_thr) {
                 this_thr->th.th_current_task->td_parent));
 
   this_thr->th.th_current_task = this_thr->th.th_current_task->td_parent;
+  //printf("Thread %d setting current task to %p in pop_current_task_from_thread\n",
+  //       this_thr->th.th_info.ds.ds_gtid, this_thr->th.th_current_task->td_parent);
 
   KF_TRACE(10, ("__kmp_pop_current_task_from_thread(exit): T#%d "
                 "this_thread=%p, curtask=%p, "
@@ -524,6 +526,7 @@ void __kmp_push_current_task_to_thread(kmp_info_t *this_thr, kmp_team_t *team,
     team->t.t_implicit_task_taskdata[tid].td_parent =
         team->t.t_implicit_task_taskdata[0].td_parent;
     this_thr->th.th_current_task = &team->t.t_implicit_task_taskdata[tid];
+    //printf("Adding task %p from team %p to thread %d\n", &team->t.t_implicit_task_taskdata[tid], team, this_thr->th.th_info.ds.ds_gtid);
   }
 
   KF_TRACE(10, ("__kmp_push_current_task_to_thread(exit): T#%d this_thread=%p "
@@ -563,6 +566,8 @@ static void __kmp_task_start(kmp_int32 gtid, kmp_task_t *task,
 
   // mark starting task as executing and as current task
   thread->th.th_current_task = taskdata;
+  //printf("Thread %d setting current task to %p in kmp_task_start. FA? %d\n",
+  //       thread->th.th_info.ds.ds_gtid, taskdata, thread->th.th_active_role == OMP_ROLE_FREE_AGENT);
 
   KMP_DEBUG_ASSERT(taskdata->td_flags.started == 0 ||
                    taskdata->td_flags.tiedness == TASK_UNTIED);
@@ -887,6 +892,8 @@ static void __kmp_task_finish(kmp_int32 gtid, kmp_task_t *task,
         // task is the parent
       }
       thread->th.th_current_task = resumed_task; // restore current_task
+      //printf("Thread %d setting current task to %p in kmp_task_finish\n",
+      //        thread->th.th_info.ds.ds_gtid, resumed_task);
       resumed_task->td_flags.executing = 1; // resume previous task
       KA_TRACE(10, ("__kmp_task_finish(exit): T#%d partially done task %p, "
                     "resuming task %p\n",
@@ -983,6 +990,8 @@ static void __kmp_task_finish(kmp_int32 gtid, kmp_task_t *task,
   // johnmc: if an asynchronous inquiry peers into the runtime system
   // it doesn't see the freed task as the current task.
   thread->th.th_current_task = resumed_task;
+  //printf("Thread %d setting current task to %p in kmp_task_finish. FA? %d\n",
+  //        thread->th.th_info.ds.ds_gtid, resumed_task, thread->th.th_active_role == OMP_ROLE_FREE_AGENT);
   if (!detach)
     __kmp_free_task_and_ancestors(gtid, taskdata, thread);
 
@@ -1085,7 +1094,13 @@ void __kmp_init_implicit_task(ident_t *loc_ref, kmp_info_t *this_thr,
        tid, team, task, set_curr_task ? "TRUE" : "FALSE"));
 
   task->td_task_id = KMP_GEN_TASK_ID();
+  /*if(task->td_team != team){
+    TCW_SYNC_PTR(task->td_team, team);
+  }*/
   task->td_team = team;
+  /*if(this_thr != NULL){
+    printf("Adding team %p to task %p from thread %d\n", team, task, this_thr->th.th_info.ds.ds_gtid);
+  }*/
   //    task->td_parent   = NULL;  // fix for CQ230101 (broken parent task info
   //    in debugger)
   task->td_ident = loc_ref;
@@ -2881,6 +2896,7 @@ static kmp_task_t *__kmp_steal_task(kmp_info_t *victim_thr, kmp_int32 gtid,
       // before releasing the lock, or else other threads (starting with the
       // primary thread victim) might be prematurely released from the barrier!!!
 #if KMP_DEBUG
+      //KMP_DEBUG_ASSERT(*unfinished_threads >= 0);
       kmp_int32 count =
 #endif
           KMP_ATOMIC_INC(unfinished_threads);
@@ -2974,7 +2990,7 @@ static inline int __kmp_execute_tasks_template(
       if (use_own_tasks) { // check on own queue first
         if (thread->th.th_active_role == OMP_ROLE_FREE_AGENT) {
           //The master may have started a new parallel and requested this thread to be one of the workers
-          __kmp_suspend_initialize_thread(thread);
+          /*__kmp_suspend_initialize_thread(thread);
           __kmp_lock_suspend_mx(thread);
           if(thread->th.th_change_role){
           	KMP_ATOMIC_ST_RLX(&thread->th.th_change_role, false);
@@ -2996,12 +3012,12 @@ static inline int __kmp_execute_tasks_template(
 #endif
           }
           else{
-            __kmp_unlock_suspend_mx(thread);
+            __kmp_unlock_suspend_mx(thread);*/
             task = __kmp_steal_task(threads_data[tid].td.td_thr, gtid, task_team,
                                       unfinished_threads, thread_finished,
                                       is_constrained);
             if(task) thread->th.victim_tid = tid;
-          }
+          //}
         } 
         else {
           task = __kmp_remove_my_task(thread, gtid, task_team, is_constrained);
@@ -3167,6 +3183,7 @@ static inline int __kmp_execute_tasks_template(
         // create tasks so I stay here.
         if (KMP_ATOMIC_LD_ACQ(&task_team->tt.tt_unfinished_free_agents) == 0) {
 #if KMP_DEBUG
+          //KMP_DEBUG_ASSERT(*unfinished_threads > 0);
           kmp_int32 count = -1 +
 #endif
               KMP_ATOMIC_DEC(unfinished_threads);
@@ -3889,6 +3906,7 @@ void __kmp_task_team_wait(
         
         std::atomic<kmp_int32> *unfinished_threads;
         unfinished_threads = &(task_team->tt.tt_unfinished_threads);
+        //KMP_DEBUG_ASSERT(*unfinished_threads >= 0);
         kmp_int32 count =  KMP_ATOMIC_INC(unfinished_threads);
         KMP_ASSERT(count == 0);
       }
@@ -4944,6 +4962,7 @@ void __kmpc_taskloop(ident_t *loc, int gtid, kmp_task_t *task, int if_val,
                      int sched, kmp_uint64 grainsize, void *task_dup) {
   __kmp_assert_valid_gtid(gtid);
   KA_TRACE(20, ("__kmpc_taskloop(enter): T#%d\n", gtid));
+  //KMP_DEBUG_ASSERT(__kmp_threads[gtid]->th.th_task_team != NULL);
   __kmp_taskloop(loc, gtid, task, if_val, lb, ub, st, nogroup, sched, grainsize,
                  0, task_dup);
   KA_TRACE(20, ("__kmpc_taskloop(exit): T#%d\n", gtid));
@@ -5007,6 +5026,7 @@ void __kmp_remove_allowed_task_team(kmp_info_t *free_agent,
       free_agent->th.allowed_teams[i]
         = reinterpret_cast<kmp_task_team_t*>(
             reinterpret_cast<kmp_uintptr_t>(task_team) | 1);
+      free_agent->th.allowed_teams_length--;
       return;
     }
   }

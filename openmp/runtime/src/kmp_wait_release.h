@@ -933,6 +933,7 @@ final_spin=FALSE)
         kmp_task_team_t *task_team = this_thr->th.th_task_team;
         std::atomic<kmp_int32> *unfinished_threads =
             &(task_team->tt.tt_unfinished_threads);
+        //KMP_DEBUG_ASSERT(*unfinished_threads >= 0);
         KMP_ATOMIC_INC(unfinished_threads);
       }
       return true;
