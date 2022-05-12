@@ -1907,10 +1907,36 @@ struct OmpSs {
     }
   }
 
+  // Final codes need to float nested directives constant allocas to be placed
+  // at the beginning of the final code
+  // Loop directives need to float body constant allocas to the beginning of
+  // the loop
+  // This function does this assuming all the allocas are placed just
+  // after the Entry intrinsic (because clang does that)
+  void gatherConstAllocas(
+      SmallVectorImpl<Instruction *> &Allocas, Instruction *Entry) {
+    BasicBlock::iterator It = Entry->getParent()->begin();
+    // Skip Entry intrinsic
+    ++It;
+    // Allocas inside the task are put just after Entry
+    // intrinsic
+    while (It != Entry->getParent()->end()) {
+      if (auto *II = dyn_cast<AllocaInst>(&*It)) {
+        if (isa<ConstantInt>(II->getArraySize()))
+          Allocas.push_back(II);
+      } else {
+        break;
+      }
+      ++It;
+    }
+  }
+
   // This must be called before erasing original entry/exit
   void buildFinalCondCFG(
       Module &M, Function &F, const DirectiveInfo &DirInfo, ValueToValueMapTy &FinalInfo) {
     // Lower final inner tasks
+
+    SmallVector<Instruction *, 4> Allocas;
 
     // Process all the inner directives before
     for (size_t i = 0; i < DirInfo.InnerDirectiveInfos.size(); ++i) {
@@ -1921,6 +1947,9 @@ struct OmpSs {
       Instruction *OrigExitI = InnerDirInfo.Exit;
       Instruction *CloneEntryI = cast<Instruction>(FinalInfo.lookup(OrigEntryI));
       Instruction *CloneExitI = cast<Instruction>(FinalInfo.lookup(OrigExitI));
+
+      gatherConstAllocas(Allocas, CloneEntryI);
+
       if (IsLoop) {
         DirectiveLoopInfo FinalLoopInfo = InnerDirInfo.DirEnv.LoopInfo;
         rewriteDirInfoForFinal(FinalLoopInfo, FinalInfo);
@@ -1932,6 +1961,8 @@ struct OmpSs {
     Instruction *OrigExitI = DirInfo.Exit;
     Instruction *CloneEntryI = cast<Instruction>(FinalInfo.lookup(OrigEntryI));
     Instruction *CloneExitI = cast<Instruction>(FinalInfo.lookup(OrigExitI));
+
+    gatherConstAllocas(Allocas, CloneEntryI);
 
     Instruction *NewCloneEntryI = CloneEntryI;
     bool IsLoop = DirInfo.DirEnv.isOmpSsLoopDirective();
@@ -1949,6 +1980,15 @@ struct OmpSs {
 
     BasicBlock *NewCloneEntryBB = NewCloneEntryI->getParent();
     NewCloneEntryBB->setName("final.then");
+    // Move the allocas gathered to the start
+    // of the final code
+    {
+      IRBuilder<> IRB(NewCloneEntryI);
+      for (Instruction *I : Allocas) {
+        I->removeFromParent();
+        IRB.Insert(I, I->getName());
+      }
+    }
 
     // We are now just before the branch to task body
     Instruction *EntryBBTerminator = OrigEntryBB->getSinglePredecessor()->getTerminator();
@@ -2505,6 +2545,16 @@ struct OmpSs {
     SmallVector<Value *> NormalizedUBs(LoopInfo.UBound.size());
     SmallVector<Instruction *> CollapseStuff;
     if (!LoopInfo.empty()) {
+      SmallVector<Instruction *, 4> Allocas;
+      gatherConstAllocas(Allocas, DirInfo.Entry);
+      // Move the allocas before the loop start
+      {
+        IRBuilder<> IRB(DirInfo.Entry);
+        for (Instruction *I : Allocas) {
+          I->removeFromParent();
+          IRB.Insert(I, I->getName());
+        }
+      }
 
       // This is used for nanos6_create_loop
       // NOTE: all values have nanos6 upper_bound type
