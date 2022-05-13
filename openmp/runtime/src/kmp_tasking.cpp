@@ -2989,6 +2989,7 @@ static inline int __kmp_execute_tasks_template(
       task = NULL;
       if (use_own_tasks) { // check on own queue first
         if (thread->th.th_active_role == OMP_ROLE_FREE_AGENT) {
+            if(KMP_ATOMIC_LD_ACQ(&thread->th.th_change_role)) return FALSE;
           //The master may have started a new parallel and requested this thread to be one of the workers
           /*__kmp_suspend_initialize_thread(thread);
           __kmp_lock_suspend_mx(thread);

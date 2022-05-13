@@ -617,7 +617,8 @@ final_spin=FALSE)
         int empty_task_teams_cnt = 0;
         int team_task_to_pick = 0;
         while (team_task_to_pick < this_thr->th.allowed_teams_length &&
-                this_thr->th.th_active_role == OMP_ROLE_FREE_AGENT){
+                this_thr->th.th_active_role == OMP_ROLE_FREE_AGENT &&
+                !KMP_ATOMIC_LD_ACQ(&this_thr->th.th_change_role)){
           __kmp_acquire_bootstrap_lock(&this_thr->th.allowed_teams_lock);
           task_team = this_thr->th.allowed_teams[team_task_to_pick];
           if ((reinterpret_cast<kmp_uintptr_t>(task_team) & 1) != 0) {
@@ -674,7 +675,8 @@ final_spin=FALSE)
         // Reset task_team to 0 to make free agent thread able to suspend
         task_team = NULL;
         this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
-      } else if (this_thr->th.th_active_role != OMP_ROLE_FREE_AGENT) {
+      } else if (KMP_ATOMIC_LD_RLX(&this_thr->th.th_active_role) != OMP_ROLE_FREE_AGENT &&
+                 !KMP_ATOMIC_LD_RLX(&this_thr->th.th_change_role) ) {
         if (task_team != NULL) {
           if (TCR_SYNC_4(task_team->tt.tt_active)) {
             if (KMP_TASKING_ENABLED(task_team)) {
@@ -933,7 +935,7 @@ final_spin=FALSE)
         kmp_task_team_t *task_team = this_thr->th.th_task_team;
         std::atomic<kmp_int32> *unfinished_threads =
             &(task_team->tt.tt_unfinished_threads);
-        //KMP_DEBUG_ASSERT(*unfinished_threads >= 0);
+        KMP_DEBUG_ASSERT(*unfinished_threads >= 0);
         KMP_ATOMIC_INC(unfinished_threads);
       }
       return true;
