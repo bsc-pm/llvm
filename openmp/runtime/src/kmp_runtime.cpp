@@ -7807,18 +7807,19 @@ static void __kmp_do_middle_initialize(void) {
 #endif /* KMP_ADJUST_BLOCKTIME */
 
 	/*Create and leave in the thread pool the threads required for a parallel region*/
-	int num_workers = __kmp_dflt_team_nth - __kmp_free_agent_num_threads;
-	int num_fa = (num_workers < 0) ? __kmp_free_agent_num_threads : __kmp_dflt_team_nth;
+	if(__kmp_free_agent_num_threads > 0){
+	    int num_workers = __kmp_dflt_team_nth - __kmp_free_agent_num_threads;
+    	int num_fa = (num_workers < 0) ? __kmp_free_agent_num_threads : __kmp_dflt_team_nth;
 
-	kmp_root_t *root = __kmp_threads[0]->th.th_root;
-	for(i = 1; i < num_workers; i++){
-		__kmp_allocate_thread_middle_init(root, OMP_ROLE_NONE, i);
-	}
-	/*Create and start the initial free agent threads*/
-	for(; i < num_fa; i++){
-		__kmp_allocate_thread_middle_init(root, OMP_ROLE_FREE_AGENT, i);
+	    kmp_root_t *root = __kmp_threads[0]->th.th_root;
+    	for(i = 1; i < num_workers; i++){
+	    	__kmp_allocate_thread_middle_init(root, OMP_ROLE_NONE, i);
+    	}
+	    /*Create and start the initial free agent threads*/
+    	for(; i < num_fa; i++){
+	    	__kmp_allocate_thread_middle_init(root, OMP_ROLE_FREE_AGENT, i);
+        }
     }
-
   //The root team is a serial team, so enable tasking for it
   //if we have free agent threads.
   if(__kmp_free_agent_num_threads > 0){
