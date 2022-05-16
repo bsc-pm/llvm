@@ -400,18 +400,8 @@ __kmp_wait_template(kmp_info_t *this_thr,
     if(this_thr->th.th_change_role){
     	omp_role_t prv_role = KMP_ATOMIC_LD_RLX(&this_thr->th.th_active_role);
     	omp_role_t nxt_role = this_thr->th.th_pending_role;
-
-        //printf("Thread %d shifting from %s to %s\n", this_thr->th.th_info.ds.ds_gtid,
-        //        prv_role == OMP_ROLE_FREE_AGENT ? "Free Agent" : prv_role == OMP_ROLE_NONE ? "NONE" : "PANIC",
-        //        nxt_role == OMP_ROLE_FREE_AGENT ? "Free Agent" : nxt_role == OMP_ROLE_NONE ? "NONE" : "PANIC");
-        //fflush(NULL);
-    	
     	KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
     	KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
-    	/*if(nxt_role == OMP_ROLE_FREE_AGENT)
-    		KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
-    	else if(prv_role == OMP_ROLE_FREE_AGENT)
-	    	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);*/
         __kmp_unlock_suspend_mx(this_thr);
 #if OMPT_SUPPORT
 		ompt_data_t *thread_data = nullptr;
@@ -574,18 +564,8 @@ final_spin=FALSE)
     if(this_thr->th.th_change_role){
     	omp_role_t prv_role = KMP_ATOMIC_LD_RLX(&this_thr->th.th_active_role);
     	omp_role_t nxt_role = this_thr->th.th_pending_role;
-
-        //printf("Thread %d shifting from %s to %s\n", this_thr->th.th_info.ds.ds_gtid,
-        //        prv_role == OMP_ROLE_FREE_AGENT ? "Free Agent" : prv_role == OMP_ROLE_NONE ? "NONE" : "PANIC",
-        //        nxt_role == OMP_ROLE_FREE_AGENT ? "Free Agent" : nxt_role == OMP_ROLE_NONE ? "NONE" : "PANIC");
-        //fflush(NULL);
-    	
     	KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
     	KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
-    	/*if(nxt_role == OMP_ROLE_FREE_AGENT)
-    		KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
-    	else if(prv_role == OMP_ROLE_FREE_AGENT)
-	    	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);*/
         __kmp_unlock_suspend_mx(this_thr);
 #if OMPT_SUPPORT
 		ompt_data_t *thread_data = nullptr;
@@ -785,18 +765,12 @@ final_spin=FALSE)
       if (final_spin)
         KMP_ATOMIC_ST_REL(&this_thr->th.th_blocking, false);
 #endif
-      //printf("suspending...\n");
       __kmp_lock_suspend_mx(this_thr);
       if(this_thr->th.th_change_role && this_thr->th.th_pending_role == OMP_ROLE_FREE_AGENT){
     	    omp_role_t prv_role = KMP_ATOMIC_LD_RLX(&this_thr->th.th_active_role);
     		omp_role_t nxt_role =  this_thr->th.th_pending_role;
-            //printf("Thread %d shifting from %s to %s\n", this_thr->th.th_info.ds.ds_gtid,
-            //        prv_role == OMP_ROLE_FREE_AGENT ? "Free Agent" : prv_role == OMP_ROLE_NONE ? "NONE" : "PANIC",
-            //        nxt_role == OMP_ROLE_FREE_AGENT ? "Free Agent" : nxt_role == OMP_ROLE_NONE ? "NONE" : "PANIC");
-            //fflush(NULL);
     		KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
     		KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
-    		//KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
             __kmp_unlock_suspend_mx(this_thr);
 #if OMPT_SUPPORT
 			ompt_data_t *thread_data = nullptr;
@@ -821,16 +795,8 @@ final_spin=FALSE)
     	if(this_thr->th.th_change_role){
     	    omp_role_t prv_role = KMP_ATOMIC_LD_RLX(&this_thr->th.th_active_role);
     		omp_role_t nxt_role =  this_thr->th.th_pending_role;
-            //printf("Thread %d shifting from %s to %s\n", this_thr->th.th_info.ds.ds_gtid,
-            //        prv_role == OMP_ROLE_FREE_AGENT ? "Free Agent" : prv_role == OMP_ROLE_NONE ? "NONE" : "PANIC",
-            //        nxt_role == OMP_ROLE_FREE_AGENT ? "Free Agent" : nxt_role == OMP_ROLE_NONE ? "NONE" : "PANIC");
-            //fflush(NULL);
     		KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
     		KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
-    		/*if(nxt_role == OMP_ROLE_FREE_AGENT)
-    			KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
-    		else if(prv_role == OMP_ROLE_FREE_AGENT)
-	    		KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);*/
             __kmp_unlock_suspend_mx(this_thr);
 #if OMPT_SUPPORT
 			ompt_data_t *thread_data = nullptr;
@@ -870,18 +836,8 @@ final_spin=FALSE)
   if(this_thr->th.th_change_role){
     omp_role_t prv_role = KMP_ATOMIC_LD_RLX(&this_thr->th.th_active_role);
     omp_role_t nxt_role = this_thr->th.th_pending_role;
-
-    //printf("Thread %d shifting from %s to %s\n", this_thr->th.th_info.ds.ds_gtid,
-    //        prv_role == OMP_ROLE_FREE_AGENT ? "Free Agent" : prv_role == OMP_ROLE_NONE ? "NONE" : "PANIC",
-    //        nxt_role == OMP_ROLE_FREE_AGENT ? "Free Agent" : nxt_role == OMP_ROLE_NONE ? "NONE" : "PANIC");
-    //fflush(NULL);
-    	
     KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
     KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
-    /*if(nxt_role == OMP_ROLE_FREE_AGENT)
-    	KMP_ATOMIC_INC(&__kmp_free_agent_active_nth);
-    else if(prv_role == OMP_ROLE_FREE_AGENT)
-	   	KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);*/
     __kmp_unlock_suspend_mx(this_thr);
 #if OMPT_SUPPORT
 	ompt_data_t *thread_data = nullptr;
