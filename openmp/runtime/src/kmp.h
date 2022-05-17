@@ -3224,8 +3224,15 @@ extern int __kmp_free_agent_num_threads; /*Max number of free agents allowed. In
 env variable KMP_FREE_AGENT_NUM_THREADS */
 extern std::atomic<int> __kmp_free_agent_active_nth; //Actual number of free agents active
 extern int __kmp_free_agent_clause_dflt; //Value obtained from env variable KMP_FREE_AGENT_DEFAULT_CLAUSE
-/* ------------------------------------------------------------------------- */
-
+/* -------------------------------------------------------------------------- */
+/* Global list of allowed teams for the free agent threads. All elements are  */
+/* read/write protected. Active free agents have a copy of this list in       */
+/* their on structure. This should keep the contention low on the global lock */
+extern kmp_bootstrap_lock_t __kmp_free_agent_allowed_teams_lock;
+extern int __kmp_free_agent_allowed_teams_capacity;
+extern int __kmp_free_agent_allowed_teams_length;
+extern kmp_task_team_t** __kmp_free_agent_allowed_teams;
+/* -------------------------------------------------------------------------- */
 #define __kmp_get_gtid() __kmp_get_global_thread_id()
 #define __kmp_entry_gtid() __kmp_get_global_thread_id_reg()
 #define __kmp_get_tid() (__kmp_tid_from_gtid(__kmp_get_gtid()))
@@ -4205,6 +4212,10 @@ extern void __kmp_set_thread_roles2(int tid, omp_role_t r); //Gives the roles r 
 																													//It overrides the previous roles of the threads.
 extern int __kmp_get_thread_id(); //Returns the (global) thread id of the calling thread. Doesn't correspond to the gtid of the runtime.
 
+void __kmp_copy_global_allowed_teams_to_thread(kmp_info_t *this_thr);
+void __kmp_add_global_allowed_task_team(kmp_task_team_t *task_team);
+void __kmp_remove_global_allowed_task_team(kmp_task_team_t *task_team);
+void __kmp_realloc_thread_allowed_task_team(kmp_info_t *this_thr);
 void __kmp_add_allowed_task_team(kmp_info_t *free_agent,
                                  kmp_task_team_t *task_team);
 void __kmp_remove_allowed_task_team(kmp_info_t *free_agent,

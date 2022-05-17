@@ -3789,6 +3789,11 @@ void __kmp_task_team_setup(kmp_info_t *this_thr, kmp_team_t *team, int always) {
   	kmp_task_team_t* task_team = team->t.t_task_team[this_thr->th.th_task_state];
 
     __kmp_acquire_bootstrap_lock(&__kmp_forkjoin_lock);
+    __kmp_acquire_bootstrap_lock(&__kmp_free_agent_allowed_teams_lock);
+    __kmp_add_global_allowed_task_team(task_team);
+    if(other_task_team){
+        __kmp_add_global_allowed_task_team(other_task_team);
+    }
   	kmp_info_t *free_agent = CCAST(kmp_info_t *,__kmp_free_agent_list);
   	while(free_agent != NULL){
     	__kmp_acquire_bootstrap_lock(&free_agent->th.allowed_teams_lock);
@@ -3798,6 +3803,7 @@ void __kmp_task_team_setup(kmp_info_t *this_thr, kmp_team_t *team, int always) {
     	__kmp_release_bootstrap_lock(&free_agent->th.allowed_teams_lock);
     	free_agent = free_agent->th.th_next_free_agent;
   	}
+    __kmp_release_bootstrap_lock(&__kmp_free_agent_allowed_teams_lock);
     __kmp_release_bootstrap_lock(&__kmp_forkjoin_lock);
   }
 }
@@ -3855,6 +3861,8 @@ void __kmp_task_team_wait(
 
       // This team is not allowed anymore for free agent threads
       if(KMP_ATOMIC_LD_RLX(&__kmp_free_agent_active_nth) > 0){
+        __kmp_acquire_bootstrap_lock(&__kmp_free_agent_allowed_teams_lock);
+        __kmp_remove_global_allowed_task_team(task_team);
         kmp_info_t *free_agent = CCAST(kmp_info_t *,__kmp_free_agent_list);
         while(free_agent != NULL){
           __kmp_acquire_bootstrap_lock(&free_agent->th.allowed_teams_lock);
@@ -3862,6 +3870,7 @@ void __kmp_task_team_wait(
           __kmp_release_bootstrap_lock(&free_agent->th.allowed_teams_lock);
           free_agent = free_agent->th.th_next_free_agent;
         }
+        __kmp_release_bootstrap_lock(&__kmp_free_agent_allowed_teams_lock);
         
         std::atomic<kmp_int32> *unfinished_threads;
         unfinished_threads = &(task_team->tt.tt_unfinished_threads);
@@ -4955,32 +4964,69 @@ void __kmpc_taskloop_5(ident_t *loc, int gtid, kmp_task_t *task, int if_val,
   KA_TRACE(20, ("__kmpc_taskloop_5(exit): T#%d\n", gtid));
 }
 
-// These two functions assume the mutex of allowed_teams has been acquire.
+// These five functions assume the global lock of allowed_teams and the one
+// for the free agent have been acquired.
+void __kmp_add_global_allowed_task_team(kmp_task_team_t *task_team) {
+  //TODO: reallocation if full
+  KMP_DEBUG_ASSERT(__kmp_free_agent_allowed_teams_length <
+                   __kmp_free_agent_allowed_teams_capacity);
+  int i;
+  for(i = 0; i < __kmp_free_agent_allowed_teams_length; i ++){
+    if(__kmp_free_agent_allowed_teams[i] == NULL){
+        __kmp_free_agent_allowed_teams[i] = task_team;
+        break;
+    }
+  }
+  if(i == __kmp_free_agent_allowed_teams_length){
+    __kmp_free_agent_allowed_teams[i] = task_team;
+    __kmp_free_agent_allowed_teams_length++;
+  }
+}
+
+void __kmp_realloc_thread_allowed_task_team(kmp_info_t *this_thr){
+    this_thr->th.allowed_teams_capacity *= 2;
+    kmp_task_team_t **new_buffer = (kmp_task_team_t **)__kmp_allocate(
+        sizeof(kmp_task_team_t *) * this_thr->th.allowed_teams_capacity);
+    KMP_MEMCPY_S(
+        new_buffer,
+        sizeof(kmp_task_team_t *) * this_thr->th.allowed_teams_capacity,
+        this_thr->th.allowed_teams,
+        sizeof(kmp_task_team_t *) * this_thr->th.allowed_teams_length);
+    this_thr->th.allowed_teams = new_buffer;
+    KMP_ASSERT(this_thr->th.allowed_teams_length + 1 <
+               this_thr->th.allowed_teams_capacity);
+    KMP_MB();
+}
+
 void __kmp_add_allowed_task_team(kmp_info_t *free_agent,
                                  kmp_task_team_t *task_team) {
   // Realloc if needed.
   if (free_agent->th.allowed_teams_length ==
       free_agent->th.allowed_teams_capacity) {
-    free_agent->th.allowed_teams_capacity *= 2;
-    kmp_task_team_t **new_buffer = (kmp_task_team_t **)__kmp_allocate(
-        sizeof(kmp_task_team_t *) * free_agent->th.allowed_teams_capacity);
-    KMP_MEMCPY_S(
-        new_buffer,
-        sizeof(kmp_task_team_t *) * free_agent->th.allowed_teams_capacity,
-        free_agent->th.allowed_teams,
-        sizeof(kmp_task_team_t *) * free_agent->th.allowed_teams_length);
-    free_agent->th.allowed_teams = new_buffer;
-    KMP_ASSERT(free_agent->th.allowed_teams_length + 1 <
-               free_agent->th.allowed_teams_capacity);
+      __kmp_realloc_thread_allowed_task_team(free_agent);
   }
 
   free_agent->th.allowed_teams[free_agent->th.allowed_teams_length] = task_team;
   free_agent->th.allowed_teams_length++;
 }
 
+void __kmp_remove_global_allowed_task_team(kmp_task_team_t *task_team) {
+  KMP_DEBUG_ASSERT(__kmp_free_agent_allowed_teams_length > 0);
+  int i;
+  for(i = 0; i < __kmp_free_agent_allowed_teams_length; i++){
+    if(__kmp_free_agent_allowed_teams[i] == task_team){
+        __kmp_free_agent_allowed_teams[i] = NULL;
+        if(i == __kmp_free_agent_allowed_teams_length - 1)
+            --__kmp_free_agent_allowed_teams_length;
+        return;
+    }
+  }
+}
+
 void __kmp_remove_allowed_task_team(kmp_info_t *free_agent,
                                     kmp_task_team_t *task_team) {
-  for (int i = 0; i < free_agent->th.allowed_teams_length; i++) {
+  int i;
+  for (i = 0; i < free_agent->th.allowed_teams_length; i++) {
     if (free_agent->th.allowed_teams[i] == task_team) {
       free_agent->th.allowed_teams[i]
         = reinterpret_cast<kmp_task_team_t*>(
@@ -4989,4 +5035,12 @@ void __kmp_remove_allowed_task_team(kmp_info_t *free_agent,
       return;
     }
   }
+}
+
+void __kmp_copy_global_allowed_teams_to_thread(kmp_info_t *this_thr){
+    KMP_DEBUG_ASSERT(this_thr->th.allowed_teams_length == __kmp_free_agent_allowed_teams_length);
+    memcpy(this_thr->th.allowed_teams, 
+           __kmp_free_agent_allowed_teams,
+           sizeof(kmp_task_team *) * __kmp_free_agent_allowed_teams_length);
+    KMP_MB();
 }

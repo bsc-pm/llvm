@@ -2289,13 +2289,22 @@ static void __kmp_transform_team_threads_to_FA(int gtid){
 	    new_thr->th.th_task_state = 0;
 	    kmp_taskdata_t *task = new_thr->th.th_current_task;
 
+  	    __kmp_acquire_bootstrap_lock(&__kmp_free_agent_allowed_teams_lock);
   	    if(new_thr->th.allowed_teams == NULL){
-  	        new_thr->th.allowed_teams_capacity = 2;
-            new_thr->th.allowed_teams_length = 0;
   	        __kmp_init_bootstrap_lock(&new_thr->th.allowed_teams_lock);
+  	        new_thr->th.allowed_teams_capacity =
+  	            (__kmp_free_agent_allowed_teams_capacity / 2 >= __kmp_free_agent_allowed_teams_length) 
+  	            ? __kmp_free_agent_allowed_teams_length * 2 
+  	            : __kmp_free_agent_allowed_teams_capacity;
   		    new_thr->th.allowed_teams = (kmp_task_team_t **)__kmp_allocate(
   			  	  sizeof(kmp_task_team_t *) * new_thr->th.allowed_teams_capacity);
   	    }
+  	    else if(new_thr->th.allowed_teams_capacity <= __kmp_free_agent_allowed_teams_length){
+  	        __kmp_realloc_thread_allowed_task_team(new_thr);
+  	    }
+  	    new_thr->th.allowed_teams_length = __kmp_free_agent_allowed_teams_length;
+  	    __kmp_copy_global_allowed_teams_to_thread(new_thr);
+  	    __kmp_release_bootstrap_lock(&__kmp_free_agent_allowed_teams_lock);
 
   	    task->td_task_id = KMP_GEN_TASK_ID();
   	    task->td_team = NULL;
@@ -2331,7 +2340,8 @@ static void __kmp_transform_team_threads_to_FA(int gtid){
 	    else
 	  	    scan = CCAST(kmp_info_t **, &__kmp_free_agent_list);
 	    for(; (*scan != NULL) && ((*scan)->th.th_info.ds.ds_gtid < gtid);
-	        scan = &((*scan)->th.th_next_free_agent));
+	        scan = &((*scan)->th.th_next_free_agent))
+	        ;
         TCW_PTR(new_thr->th.th_next_free_agent, *scan);
 	    __kmp_free_agent_list_insert_pt = *scan = new_thr;
 	    KMP_DEBUG_ASSERT((new_thr->th.th_next_free_agent == NULL) ||
@@ -4434,6 +4444,11 @@ kmp_info_t *__kmp_allocate_thread_common(kmp_root_t *root, kmp_team_t *team,
   /*This function is already protected by the forkjoin lock since it is required for the thread_pool */
   if(__kmp_free_agent_list && (role != OMP_ROLE_FREE_AGENT)){
     new_thr = CCAST(kmp_info_t *, __kmp_free_agent_list);
+    
+    __kmp_acquire_bootstrap_lock(&new_thr->th.allowed_teams_lock);
+    new_thr->th.allowed_teams_length = 0;
+    __kmp_release_bootstrap_lock(&new_thr->th.allowed_teams_lock);
+    
     __kmp_free_agent_list = (volatile kmp_info_t *)new_thr->th.th_next_free_agent;
     if (new_thr == __kmp_free_agent_list_insert_pt) {
       __kmp_free_agent_list_insert_pt = NULL;
@@ -4455,8 +4470,7 @@ kmp_info_t *__kmp_allocate_thread_common(kmp_root_t *root, kmp_team_t *team,
     __kmp_initialize_info(new_thr, team, new_tid,
                           new_thr->th.th_info.ds.ds_gtid);
     KMP_DEBUG_ASSERT(new_thr->th.th_serial_team);
-
-
+    
     new_thr->th.th_task_state = 0;
     new_thr->th.th_task_state_top = 0;
     new_thr->th.th_task_state_stack_sz = 4;
@@ -4736,6 +4750,8 @@ kmp_info_t *__kmp_allocate_thread_into_thread_pool(kmp_info_t *new_thr, omp_role
 	new_thr->th.th_pending_role = OMP_ROLE_NONE;
 	new_thr->th.th_change_role = false;
 	new_thr->th.th_active_role = OMP_ROLE_NONE;
+	new_thr->th.allowed_teams_length = 0;
+	new_thr->th.allowed_teams_capacity = 0;
 	new_thr->th.th_root = NULL;
 
 	if(__kmp_thread_pool_insert_pt != NULL){
@@ -4808,12 +4824,20 @@ kmp_info_t *__kmp_allocate_free_agent_thread(kmp_info_t *thread, kmp_root_t *roo
   kmp_taskdata_t *task =
     (kmp_taskdata_t *)__kmp_allocate(sizeof(kmp_taskdata_t) * 1);
   thread->th.th_current_task = task;
-
-  thread->th.allowed_teams_capacity = 2;
-  thread->th.allowed_teams_length = 0;
+    
+  __kmp_acquire_bootstrap_lock(&__kmp_free_agent_allowed_teams_lock);
+  
+  thread->th.allowed_teams_capacity = 
+      (__kmp_free_agent_allowed_teams_capacity / 2 >= __kmp_free_agent_allowed_teams_length)
+      ? __kmp_free_agent_allowed_teams_length * 2
+      : __kmp_free_agent_allowed_teams_capacity;
+  thread->th.allowed_teams_length = __kmp_free_agent_allowed_teams_length;
   thread->th.allowed_teams = (kmp_task_team_t **)__kmp_allocate(
       sizeof(kmp_task_team_t *) * thread->th.allowed_teams_capacity);
   __kmp_init_bootstrap_lock(&thread->th.allowed_teams_lock);
+  __kmp_copy_global_allowed_teams_to_thread(thread);
+  
+  __kmp_release_bootstrap_lock(&__kmp_free_agent_allowed_teams_lock);
 
   KF_TRACE(
       10,
@@ -4826,6 +4850,8 @@ kmp_info_t *__kmp_allocate_free_agent_thread(kmp_info_t *thread, kmp_root_t *roo
   task->td_taskwait_ident = NULL;
   task->td_taskwait_counter = 0;
   task->td_taskwait_thread = 0;
+  task->td_allocated_child_tasks = 0;
+  task->td_incomplete_child_tasks = 0;
 
   task->td_flags.tiedness = TASK_TIED;
   task->td_flags.tasktype = TASK_IMPLICIT;
@@ -5589,7 +5615,9 @@ __kmp_allocate_team(kmp_root_t *root, int new_nproc, int max_nproc,
 	                     ((last_th->th.th_next_free_agent == NULL) ||
 	                     (last_th->th.th_info.ds.ds_gtid <
 	                      last_th->th.th_next_free_agent->th.th_info.ds.ds_gtid)));
-
+        __kmp_acquire_bootstrap_lock(&th->th.allowed_teams_lock);
+        th->th.allowed_teams_length = 0;
+        __kmp_release_bootstrap_lock(&th->th.allowed_teams_lock);
 
 		__kmp_initialize_info(th, team, f, th->th.th_info.ds.ds_gtid);
 		th->th.th_task_state = master->th.th_task_state;
@@ -7459,6 +7487,7 @@ static void __kmp_do_serial_initialize(void) {
   __kmp_init_atomic_lock(&__kmp_atomic_lock_32c);
   __kmp_init_bootstrap_lock(&__kmp_forkjoin_lock);
   __kmp_init_bootstrap_lock(&__kmp_exit_lock);
+  __kmp_init_bootstrap_lock(&__kmp_free_agent_allowed_teams_lock);
 #if KMP_USE_MONITOR
   __kmp_init_bootstrap_lock(&__kmp_monitor_lock);
 #endif
@@ -7605,17 +7634,22 @@ static void __kmp_do_serial_initialize(void) {
   __kmp_thread_pool = NULL;
   __kmp_thread_pool_insert_pt = NULL;
   __kmp_team_pool = NULL;
+  __kmp_free_agent_list = NULL;
+  __kmp_free_agent_list_insert_pt = NULL;
 
   /* Allocate all of the variable sized records */
   /* NOTE: __kmp_threads_capacity entries are allocated, but the arrays are
    * expandable */
   /* Since allocation is cache-aligned, just add extra padding at the end */
+  __kmp_free_agent_allowed_teams_capacity = __kmp_threads_capacity;
   size =
       (sizeof(kmp_info_t *) + sizeof(kmp_root_t *)) * __kmp_threads_capacity +
       CACHE_LINE;
   __kmp_threads = (kmp_info_t **)__kmp_allocate(size);
   __kmp_root = (kmp_root_t **)((char *)__kmp_threads +
                                sizeof(kmp_info_t *) * __kmp_threads_capacity);
+  __kmp_free_agent_allowed_teams = (kmp_task_team_t **)__kmp_allocate(
+                sizeof(kmp_task_team_t *) * __kmp_free_agent_allowed_teams_capacity);
 
   /* init thread counts */
   KMP_DEBUG_ASSERT(__kmp_all_nth ==
