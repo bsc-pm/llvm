@@ -4983,17 +4983,19 @@ void __kmp_add_global_allowed_task_team(kmp_task_team_t *task_team) {
   }
 }
 
-void __kmp_realloc_thread_allowed_task_team(kmp_info_t *this_thr){
-    this_thr->th.allowed_teams_capacity *= 2;
+void __kmp_realloc_thread_allowed_task_team(kmp_info_t *this_thr, int capacity, int copy){
+    this_thr->th.allowed_teams_capacity = capacity;
     kmp_task_team_t **new_buffer = (kmp_task_team_t **)__kmp_allocate(
         sizeof(kmp_task_team_t *) * this_thr->th.allowed_teams_capacity);
-    KMP_MEMCPY_S(
-        new_buffer,
-        sizeof(kmp_task_team_t *) * this_thr->th.allowed_teams_capacity,
-        this_thr->th.allowed_teams,
-        sizeof(kmp_task_team_t *) * this_thr->th.allowed_teams_length);
+    if(copy){
+        KMP_MEMCPY_S(
+            new_buffer,
+            sizeof(kmp_task_team_t *) * this_thr->th.allowed_teams_capacity,
+            this_thr->th.allowed_teams,
+            sizeof(kmp_task_team_t *) * this_thr->th.allowed_teams_length);
+    }
     this_thr->th.allowed_teams = new_buffer;
-    KMP_ASSERT(this_thr->th.allowed_teams_length + 1 <
+    KMP_ASSERT(this_thr->th.allowed_teams_length + 1 < 
                this_thr->th.allowed_teams_capacity);
     KMP_MB();
 }
@@ -5003,7 +5005,7 @@ void __kmp_add_allowed_task_team(kmp_info_t *free_agent,
   // Realloc if needed.
   if (free_agent->th.allowed_teams_length ==
       free_agent->th.allowed_teams_capacity) {
-      __kmp_realloc_thread_allowed_task_team(free_agent);
+      __kmp_realloc_thread_allowed_task_team(free_agent, free_agent->th.allowed_teams_length*2, TRUE);
   }
 
   free_agent->th.allowed_teams[free_agent->th.allowed_teams_length] = task_team;
@@ -5028,9 +5030,7 @@ void __kmp_remove_allowed_task_team(kmp_info_t *free_agent,
   int i;
   for (i = 0; i < free_agent->th.allowed_teams_length; i++) {
     if (free_agent->th.allowed_teams[i] == task_team) {
-      free_agent->th.allowed_teams[i]
-        = reinterpret_cast<kmp_task_team_t*>(
-            reinterpret_cast<kmp_uintptr_t>(task_team) | 1);
+      free_agent->th.allowed_teams[i] = NULL;
       free_agent->th.allowed_teams_length--;
       return;
     }

@@ -4215,7 +4215,7 @@ extern int __kmp_get_thread_id(); //Returns the (global) thread id of the callin
 void __kmp_copy_global_allowed_teams_to_thread(kmp_info_t *this_thr);
 void __kmp_add_global_allowed_task_team(kmp_task_team_t *task_team);
 void __kmp_remove_global_allowed_task_team(kmp_task_team_t *task_team);
-void __kmp_realloc_thread_allowed_task_team(kmp_info_t *this_thr);
+void __kmp_realloc_thread_allowed_task_team(kmp_info_t *this_thr, int capacity, int copy);
 void __kmp_add_allowed_task_team(kmp_info_t *free_agent,
                                  kmp_task_team_t *task_team);
 void __kmp_remove_allowed_task_team(kmp_info_t *free_agent,

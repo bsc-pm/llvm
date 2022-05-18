@@ -362,7 +362,7 @@ static void kmp_compact_allowed_teams(kmp_info_t *this_thr) {
   for (int i = 0; i < this_thr->th.allowed_teams_length; i++) {
     kmp_task_team_t *task_team = allowed_teams[i];
     // Keep only alive task_teams
-    if ((reinterpret_cast<kmp_uintptr_t>(task_team) & 1) == 0)
+    if (task_team != NULL)
       allowed_teams[new_allowed_teams_length++] = task_team;
   }
   this_thr->th.allowed_teams_length = new_allowed_teams_length;
@@ -601,7 +601,7 @@ final_spin=FALSE)
                 !KMP_ATOMIC_LD_ACQ(&this_thr->th.th_change_role)){
           __kmp_acquire_bootstrap_lock(&this_thr->th.allowed_teams_lock);
           task_team = this_thr->th.allowed_teams[team_task_to_pick];
-          if ((reinterpret_cast<kmp_uintptr_t>(task_team) & 1) != 0) {
+          if (task_team == NULL) {
             // task_team marked as dead, skip
             empty_task_teams_cnt++;
             __kmp_release_bootstrap_lock(&this_thr->th.allowed_teams_lock);

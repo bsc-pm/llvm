@@ -2293,14 +2293,14 @@ static void __kmp_transform_team_threads_to_FA(int gtid){
   	    if(new_thr->th.allowed_teams == NULL){
   	        __kmp_init_bootstrap_lock(&new_thr->th.allowed_teams_lock);
   	        new_thr->th.allowed_teams_capacity =
-  	            (__kmp_free_agent_allowed_teams_capacity / 2 >= __kmp_free_agent_allowed_teams_length) 
-  	            ? __kmp_free_agent_allowed_teams_length * 2 
-  	            : __kmp_free_agent_allowed_teams_capacity;
+  	            (__kmp_free_agent_allowed_teams_length > 0)
+  	            ? __kmp_free_agent_allowed_teams_length*2
+  	            : 4;
   		    new_thr->th.allowed_teams = (kmp_task_team_t **)__kmp_allocate(
   			  	  sizeof(kmp_task_team_t *) * new_thr->th.allowed_teams_capacity);
   	    }
   	    else if(new_thr->th.allowed_teams_capacity <= __kmp_free_agent_allowed_teams_length){
-  	        __kmp_realloc_thread_allowed_task_team(new_thr);
+  	        __kmp_realloc_thread_allowed_task_team(new_thr, __kmp_free_agent_allowed_teams_length*2, FALSE);
   	    }
   	    new_thr->th.allowed_teams_length = __kmp_free_agent_allowed_teams_length;
   	    __kmp_copy_global_allowed_teams_to_thread(new_thr);
@@ -4828,9 +4828,9 @@ kmp_info_t *__kmp_allocate_free_agent_thread(kmp_info_t *thread, kmp_root_t *roo
   __kmp_acquire_bootstrap_lock(&__kmp_free_agent_allowed_teams_lock);
   
   thread->th.allowed_teams_capacity = 
-      (__kmp_free_agent_allowed_teams_capacity / 2 >= __kmp_free_agent_allowed_teams_length)
-      ? __kmp_free_agent_allowed_teams_length * 2
-      : __kmp_free_agent_allowed_teams_capacity;
+      (__kmp_free_agent_allowed_teams_length > 0)
+      ? __kmp_free_agent_allowed_teams_length*2
+      : 4;
   thread->th.allowed_teams_length = __kmp_free_agent_allowed_teams_length;
   thread->th.allowed_teams = (kmp_task_team_t **)__kmp_allocate(
       sizeof(kmp_task_team_t *) * thread->th.allowed_teams_capacity);
@@ -9780,12 +9780,6 @@ static void transform_thread_to_FA(kmp_info_t *th){
     int gtid = th->th.th_info.ds.ds_gtid;
     kmp_taskdata_t *task = (kmp_taskdata_t *)__kmp_allocate(sizeof(kmp_taskdata_t)*1);
 	th->th.th_current_task = task;
-    if(th->th.allowed_teams == NULL){
-        th->th.allowed_teams_capacity = 2;
-        th->th.allowed_teams_length = 0;
-        th->th.allowed_teams = (kmp_task_team_t **)__kmp_allocate(sizeof(kmp_task_team_t *) * th->th.allowed_teams_capacity);
-        __kmp_init_bootstrap_lock(&th->th.allowed_teams_lock);
-    }
     task->td_task_id = KMP_GEN_TASK_ID();
     task->td_team = NULL;
     task->td_ident = NULL;
@@ -9835,16 +9829,23 @@ static void transform_thread_to_FA(kmp_info_t *th){
 	    th->th.th_pending_role = OMP_ROLE_FREE_AGENT;
 	    KMP_ATOMIC_ST_REL(&th->th.th_change_role, true);
 	}
+	__kmp_acquire_bootstrap_lock(&__kmp_free_agent_allowed_teams_lock);
+    if(th->th.allowed_teams == NULL){
+        __kmp_init_bootstrap_lock(&th->th.allowed_teams_lock);
+        th->th.allowed_teams_capacity = 
+            (__kmp_free_agent_allowed_teams_length > 0)
+            ? __kmp_free_agent_allowed_teams_length*2
+            : 4;
+        th->th.allowed_teams = (kmp_task_team_t **)__kmp_allocate(sizeof(kmp_task_team_t *) * th->th.allowed_teams_capacity);
+    }
+    else if(th->th.allowed_teams_capacity <= __kmp_free_agent_allowed_teams_length){
+        __kmp_realloc_thread_allowed_task_team(th, __kmp_free_agent_allowed_teams_length*2, FALSE);
+    }
+    th->th.allowed_teams_length = __kmp_free_agent_allowed_teams_length;
+    __kmp_copy_global_allowed_teams_to_thread(th);
 
-    //Let the thread grab tasks from the initial thread if a task team exists
-    kmp_task_team_t *tt_0 = __kmp_threads[0]->th.th_team->t.t_task_team[0];
-    kmp_task_team_t *tt_1 = __kmp_threads[0]->th.th_team->t.t_task_team[1];
-    __kmp_acquire_bootstrap_lock(&th->th.allowed_teams_lock);
-    if(tt_0 != NULL)
-        __kmp_add_allowed_task_team(th, tt_0);
-    if(tt_1 != NULL)
-        __kmp_add_allowed_task_team(th, tt_1);
-    __kmp_release_bootstrap_lock(&th->th.allowed_teams_lock);
+	__kmp_release_bootstrap_lock(&__kmp_free_agent_allowed_teams_lock);
+    KMP_MB();
 }
 
 /*This function attemps to give the roles r to the number of therads indicated by how_many.
@@ -9933,25 +9934,12 @@ void __kmp_set_thread_roles1(int how_many, omp_role_t r){
 			th->th.th_potential_roles = (omp_role_t)(r & th->th.th_potential_roles);
 		}
 		kmp_root *root = __kmp_threads[__kmp_entry_gtid()]->th.th_root;
-	    kmp_info_t *captain = __kmp_threads[0];
-		kmp_team_t *capt_team = captain->th.th_team;
-		kmp_task_team_t *capt_tt_0 = capt_team->t.t_task_team[0];
-		kmp_task_team_t *capt_tt_1 = capt_team->t.t_task_team[1];
 		for(; i < how_many; ++i){ /*Thread creation with the proper potential roles
 			If r==OMP_ROLE_FREE_AGENT the thread will be created as an active free agent
 			otherwise, the thread is placed into the thread pool*/			
 			th = __kmp_allocate_thread_middle_init(root, r, i);
 			KMP_DEBUG_ASSERT(th != NULL);
 			KMP_DEBUG_ASSERT(th->th.th_potential_roles == r);
-			//TODO: Mantain a global structure of allowed teams and copy it to the thread?
-			if(r & OMP_ROLE_FREE_AGENT){ //Allowing the new free agents to access the same teams than
-			    __kmp_acquire_bootstrap_lock(&th->th.allowed_teams_lock);
-			    if(capt_tt_0 != NULL)
-			        __kmp_add_allowed_task_team(th, capt_tt_0);
-			    if(capt_tt_1 != NULL)
-			        __kmp_add_allowed_task_team(th, capt_tt_1);
-			    __kmp_release_bootstrap_lock(&th->th.allowed_teams_lock);
-			}
 		}
 	}
 	//The petition cannot be accomplished, so do nothing at all.
@@ -9987,14 +9975,6 @@ void __kmp_set_thread_roles2(int tid, omp_role_t r){
 	    //TODO: Get the task teams from a global structure
 	    if(r & OMP_ROLE_FREE_AGENT){
 			++__kmp_free_agent_num_threads;
-	        kmp_task_team_t *tt_0 = __kmp_threads[0]->th.th_team->t.t_task_team[0];
-	        kmp_task_team_t *tt_1 = __kmp_threads[0]->th.th_team->t.t_task_team[1];
-	        __kmp_acquire_bootstrap_lock(&th->th.allowed_teams_lock);
-	        if(tt_0 != NULL)
-	            __kmp_add_allowed_task_team(th, tt_0);
-	        if(tt_1 != NULL)
-	            __kmp_add_allowed_task_team(th, tt_1);
-            __kmp_release_bootstrap_lock(&th->th.allowed_teams_lock);
 	    }
 	    __kmp_release_bootstrap_lock(&__kmp_forkjoin_lock);
 	    return;
