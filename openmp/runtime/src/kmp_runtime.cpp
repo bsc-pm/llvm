@@ -2325,8 +2325,8 @@ static void __kmp_transform_team_threads_to_FA(int gtid){
   	    task->td_allow_completion_event.pending_events_count = -1;
   	    task->td_allow_completion_event.ed.task = nullptr;
 
-  	    if (task->td_incomplete_child_tasks != 0)
-      	    KMP_DEBUG_ASSERT(task->td_incomplete_child_tasks == 0);
+  	    if (KMP_ATOMIC_LD_ACQ(&task->td_incomplete_child_tasks) != 0)
+      	    KMP_DEBUG_ASSERT(KMP_ATOMIC_LD_ACQ(&task->td_incomplete_child_tasks) == 0);
   	    KMP_DEBUG_ASSERT(task->td_allocated_child_tasks == 0);
 	    gtid = new_thr->th.th_info.ds.ds_gtid;
 	    if(__kmp_free_agent_list_insert_pt != NULL){
@@ -4867,6 +4867,8 @@ kmp_info_t *__kmp_allocate_free_agent_thread(kmp_info_t *thread, kmp_root_t *roo
   task->td_flags.complete = 0;
   task->td_flags.freed = 0;
 
+  task->td_taskgroup = NULL;
+  task->td_dephash = NULL;
   task->td_depnode = NULL;
   task->td_last_tied = task;
 
@@ -4874,11 +4876,8 @@ kmp_info_t *__kmp_allocate_free_agent_thread(kmp_info_t *thread, kmp_root_t *roo
   task->td_allow_completion_event.pending_events_count = -1;
   task->td_allow_completion_event.ed.task = nullptr;
 
-  KMP_DEBUG_ASSERT(task->td_incomplete_child_tasks == 0);
-  KMP_DEBUG_ASSERT(task->td_allocated_child_tasks == 0);
-	
-	TCW_4(__kmp_all_nth, __kmp_all_nth + 1);
-	__kmp_nth++;
+  TCW_4(__kmp_all_nth, __kmp_all_nth + 1);
+  __kmp_nth++;
   KF_TRACE(10, ("__kmp_allocate_free_agent_thread(exit): T#:%d team=%p task=%p\n", new_tid,
         NULL, task));
   KMP_MB();
@@ -5705,14 +5704,17 @@ __kmp_allocate_team(kmp_root_t *root, int new_nproc, int max_nproc,
 #endif // KMP_NESTED_HOT_TEAMS
         /* release the extra threads we don't need any more */
         for (f = new_nproc; f < team->t.t_nproc; f++) {
-          KMP_DEBUG_ASSERT(team->t.t_threads[f]);
+          kmp_info_t *thr = team->t.t_threads[f];
+          KMP_DEBUG_ASSERT(thr);
           if (__kmp_tasking_mode != tskm_immediate_exec) {
             // When decreasing team size, threads no longer in the team should
             // unref task team.
-            team->t.t_threads[f]->th.th_task_team = NULL;
+            thr->th.th_task_team = NULL;
           }
-          if(team->t.t_threads[f]->th.th_active_role != OMP_ROLE_FREE_AGENT)
+          if(!((thr->th.th_active_role == OMP_ROLE_FREE_AGENT) ||
+              (thr->th.th_change_role && thr->th.th_pending_role == OMP_ROLE_FREE_AGENT))){ 
           	__kmp_free_thread(team->t.t_threads[f]);
+          }
           team->t.t_threads[f] = NULL;
         }
 #if KMP_NESTED_HOT_TEAMS
@@ -6207,12 +6209,16 @@ void __kmp_free_team(kmp_root_t *root,
 
     /* free the worker threads */
     for (f = 1; f < team->t.t_nproc; ++f) {
-      KMP_DEBUG_ASSERT(team->t.t_threads[f]);
+      kmp_info_t *thr = team->t.t_threads[f];
+      KMP_DEBUG_ASSERT(thr);
       if (__kmp_barrier_gather_pattern[bs_forkjoin_barrier] == bp_dist_bar) {
-        KMP_COMPARE_AND_STORE_ACQ32(&(team->t.t_threads[f]->th.th_used_in_team),
+        KMP_COMPARE_AND_STORE_ACQ32(&(thr->th.th_used_in_team),
                                     1, 2);
       }
-      __kmp_free_thread(team->t.t_threads[f]);
+      if((thr->th.th_active_role == OMP_ROLE_FREE_AGENT) || 
+         (thr->th.th_change_role && thr->th.th_pending_role == OMP_ROLE_FREE_AGENT))
+         continue;
+      __kmp_free_thread(thr);
     }
 
     if (__kmp_barrier_gather_pattern[bs_forkjoin_barrier] == bp_dist_bar) {
@@ -9800,6 +9806,10 @@ static void transform_thread_to_FA(kmp_info_t *th){
     task->td_last_tied = task;
     task->td_allow_completion_event.pending_events_count = -1;
     task->td_allow_completion_event.ed.task = nullptr;
+    task->td_allocated_child_tasks = 0;
+    task->td_incomplete_child_tasks = 0;
+    task->td_taskgroup = NULL;
+    task->td_dephash = NULL;
     //Place it in the FA list
     if(__kmp_free_agent_list_insert_pt != NULL){
         KMP_DEBUG_ASSERT(__kmp_free_agent_list != NULL);
