@@ -2603,15 +2603,13 @@ struct OmpSs {
     TaskInvInfoVar->setInitializer(
       ConstantStruct::get(Nanos6TaskInvInfo::getInstance(M).getType(), Nanos6TaskLocStr));
 
-    bool IsConstLabelOrNull = !DirEnv.Label || isa<Constant>(DirEnv.Label);
-
     GlobalVariable *TaskImplInfoVar =
       cast<GlobalVariable>(M.getOrInsertGlobal(
         ("implementations_var_" + F.getName() + Twine(taskNum)).str(),
         ArrayType::get(Nanos6TaskImplInfo::getInstance(M).getType(), 1)));
     TaskImplInfoVar->setLinkage(GlobalVariable::InternalLinkage);
     TaskImplInfoVar->setAlignment(Align(64));
-    TaskImplInfoVar->setConstant(IsConstLabelOrNull);
+    TaskImplInfoVar->setConstant(true);
     TaskImplInfoVar->setInitializer(
       ConstantArray::get(ArrayType::get(Nanos6TaskImplInfo::getInstance(M).getType(), 1), // TODO: More than one implementations?
         ConstantStruct::get(Nanos6TaskImplInfo::getInstance(M).getType(),
@@ -2621,7 +2619,7 @@ struct OmpSs {
           ? ConstantExpr::getPointerCast(OlConstraintsFuncVar,
                                          Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(2))
           : ConstantPointerNull::get(cast<PointerType>(Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(2))),
-        DirEnv.Label && isa<Constant>(DirEnv.Label)
+        DirEnv.Label
           ? ConstantExpr::getPointerCast(cast<Constant>(DirEnv.Label),
                                          Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(3))
           : ConstantPointerNull::get(cast<PointerType>(Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(3))),
@@ -2917,10 +2915,9 @@ struct OmpSs {
     auto emitOmpSsCaptureAndSubmitTask
       = [this, &M, &F, &DLoc, &TaskArgsTy,
          &DirEnv, &TaskArgsToStructIdxMap,
-         &TaskInfoVar, &TaskImplInfoVar,
-         &TaskInvInfoVar](Function *newFunction,
-                          BasicBlock *codeReplacer,
-                          const SetVector<BasicBlock *> &Blocks) {
+         &TaskInfoVar, &TaskInvInfoVar](
+           Function *newFunction, BasicBlock *codeReplacer,
+           const SetVector<BasicBlock *> &Blocks) {
 
       const DirectiveDSAInfo &DSAInfo = DirEnv.DSAInfo;
       const DirectiveVLADimsInfo &VLADimsInfo = DirEnv.VLADimsInfo;
@@ -3014,28 +3011,20 @@ struct OmpSs {
         }
       }
 
-      // Store label if it's not a string literal (i.e label("L1"))
-      if (DirEnv.Label && !isa<Constant>(DirEnv.Label)) {
-        Value *Idx[3];
-        Idx[0] = Constant::getNullValue(Type::getInt32Ty(IRB.getContext()));
-        Idx[1] = Constant::getNullValue(Type::getInt32Ty(IRB.getContext()));
-        Idx[2] = ConstantInt::get(Type::getInt32Ty(IRB.getContext()), 3);
-        Value *LabelField =
-            IRB.CreateGEP(TaskImplInfoVar->getType()->getPointerElementType(),
-                          TaskImplInfoVar, Idx, "ASDF");
-        IRB.CreateStore(DirEnv.Label, LabelField);
-      }
-
       // Arguments for creating a task or a loop directive
       SmallVector<Value *, 4> CreateDirectiveArgs = {
           TaskInfoVar,
           TaskInvInfoVar,
+          DirEnv.InstanceLabel
+            ? IRB.CreateBitCast(DirEnv.InstanceLabel, IRB.getInt8PtrTy())
+            : Constant::getNullValue(IRB.getInt8PtrTy()),
           TaskArgsSizeOf,
           TaskArgsVarCast,
           TaskPtrVar,
           TaskFlagsVar,
           IRB.CreateLoad(NumDependencies->getType()->getPointerElementType(),
-                         NumDependencies)};
+                         NumDependencies)
+      };
 
       if (DirEnv.isOmpSsLoopDirective()) {
         SmallVector<Value *> NormalizedUBs(LoopInfo.UBound.size());
@@ -3253,6 +3242,7 @@ struct OmpSs {
     // void nanos6_create_task(
     //         nanos6_task_info_t *task_info,
     //         nanos6_task_invocation_info_t *task_invocation_info,
+    //         const char *task_label,
     //         size_t args_block_size,
     //         /* OUT */ void **args_block_pointer,
     //         /* OUT */ void **task_pointer,
@@ -3263,6 +3253,7 @@ struct OmpSs {
         Type::getVoidTy(M.getContext()),
         Nanos6TaskInfo::getInstance(M).getType()->getPointerTo(),
         Nanos6TaskInvInfo::getInstance(M).getType()->getPointerTo(),
+        Type::getInt8PtrTy(M.getContext()),
         Type::getInt64Ty(M.getContext()),
         Type::getInt8PtrTy(M.getContext())->getPointerTo(),
         Type::getInt8PtrTy(M.getContext())->getPointerTo(),
@@ -3284,6 +3275,7 @@ struct OmpSs {
     // void nanos6_create_loop(
     //     nanos6_task_info_t *task_info,
     //     nanos6_task_invocation_info_t *task_invocation_info,
+    //     const char *task_label,
     //     size_t args_block_size,
     //     /* OUT */ void **args_block_pointer,
     //     /* OUT */ void **task_pointer,
@@ -3298,6 +3290,7 @@ struct OmpSs {
         Type::getVoidTy(M.getContext()),
         Nanos6TaskInfo::getInstance(M).getType()->getPointerTo(),
         Nanos6TaskInvInfo::getInstance(M).getType()->getPointerTo(),
+        Type::getInt8PtrTy(M.getContext()),
         Type::getInt64Ty(M.getContext()),
         Type::getInt8PtrTy(M.getContext())->getPointerTo(),
         Type::getInt8PtrTy(M.getContext())->getPointerTo(),

@@ -76,7 +76,7 @@ define dso_local i32 @main() #0 !dbg !8 {
 ; CHECK-NEXT:    br label [[FOR_INCR3:%.*]], !dbg [[DBG13]]
 ; CHECK:       25:
 ; CHECK-NEXT:    [[TMP26:%.*]] = load i64, i64* [[NUM_DEPS]], align 8, !dbg [[DBG13]]
-; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_main0, %nanos6_task_invocation_info_t* @task_invocation_info_main0, i64 16, i8** [[TMP3]], i8** [[TMP2]], i64 0, i64 [[TMP26]]), !dbg [[DBG13]]
+; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_main0, %nanos6_task_invocation_info_t* @task_invocation_info_main0, i8* null, i64 16, i8** [[TMP3]], i8** [[TMP2]], i64 0, i64 [[TMP26]]), !dbg [[DBG13]]
 ; CHECK-NEXT:    [[TMP27:%.*]] = load %nanos6_task_args_main0*, %nanos6_task_args_main0** [[TMP1]], align 8, !dbg [[DBG13]]
 ; CHECK-NEXT:    [[TMP28:%.*]] = bitcast %nanos6_task_args_main0* [[TMP27]] to i8*, !dbg [[DBG13]]
 ; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, i8* [[TMP28]], i64 16, !dbg [[DBG13]]

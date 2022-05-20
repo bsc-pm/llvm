@@ -105,7 +105,7 @@ struct OSSTaskDataTy final {
   const Expr *Final = nullptr;
   const Expr *Cost = nullptr;
   const Expr *Priority = nullptr;
-  const Expr *Label = nullptr;
+  SmallVector<const Expr *, 2> Labels;
   bool Wait = false;
   const Expr *Onready = nullptr;
 
@@ -113,7 +113,7 @@ struct OSSTaskDataTy final {
     return DSAs.empty() && Deps.empty() &&
       Reductions.empty() &&
       !If && !Final && !Cost && !Priority &&
-      !Label && !Onready;
+      Labels.empty() && !Onready;
   }
 };
 

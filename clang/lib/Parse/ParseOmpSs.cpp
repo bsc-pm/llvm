@@ -91,13 +91,12 @@ static ExprResult *getSingleClause(
     OmpSsClauseKind CKind,
     ExprResult &IfRes, ExprResult &FinalRes,
     ExprResult &CostRes, ExprResult &PriorityRes,
-    ExprResult &LabelRes, ExprResult &OnreadyRes) {
+    ExprResult &OnreadyRes) {
 
     if (CKind == OSSC_if) return &IfRes;
     if (CKind == OSSC_final) return &FinalRes;
     if (CKind == OSSC_cost) return &CostRes;
     if (CKind == OSSC_priority) return &PriorityRes;
-    if (CKind == OSSC_label) return &LabelRes;
     if (CKind == OSSC_onready) return &OnreadyRes;
     return nullptr;
 }
@@ -167,8 +166,8 @@ static bool parseDeclareTaskClauses(
     Parser &P,
     ExprResult &IfRes, ExprResult &FinalRes,
     ExprResult &CostRes, ExprResult &PriorityRes,
-    ExprResult &LabelRes, ExprResult &OnreadyRes,
-    bool &Wait,
+    ExprResult &OnreadyRes, bool &Wait,
+    SmallVectorImpl<Expr *> &Labels,
     SmallVectorImpl<Expr *> &Ins, SmallVectorImpl<Expr *> &Outs,
     SmallVectorImpl<Expr *> &Inouts, SmallVectorImpl<Expr *> &Concurrents,
     SmallVectorImpl<Expr *> &Commutatives, SmallVectorImpl<Expr *> &WeakIns,
@@ -217,7 +216,6 @@ static bool parseDeclareTaskClauses(
     case OSSC_final:
     case OSSC_cost:
     case OSSC_priority:
-    case OSSC_label:
     case OSSC_onready: {
       P.ConsumeToken();
       if (FirstClauses[CKind]) {
@@ -226,9 +224,8 @@ static bool parseDeclareTaskClauses(
         IsError = true;
       }
       SourceLocation RLoc;
-      SingleClause = getSingleClause(CKind, IfRes, FinalRes,
-                                     CostRes, PriorityRes,
-                                     LabelRes, OnreadyRes);
+      SingleClause = getSingleClause(
+        CKind, IfRes, FinalRes, CostRes, PriorityRes, OnreadyRes);
       *SingleClause = P.ParseOmpSsParensExpr(getOmpSsClauseName(CKind), RLoc);
 
       if (SingleClause->isInvalid())
@@ -246,6 +243,19 @@ static bool parseDeclareTaskClauses(
         IsError = true;
       }
       Wait = true;
+      FirstClauses[CKind] = true;
+      break;
+    }
+    case OSSC_label: {
+      P.ConsumeToken();
+      if (FirstClauses[CKind]) {
+        P.Diag(Tok, diag::err_oss_more_one_clause)
+            << getOmpSsDirectiveName(OSSD_declare_task) << getOmpSsClauseName(CKind) << 0;
+        IsError = true;
+      }
+      SourceLocation RLoc;
+      if (P.ParseOmpSsFixedList<2>(OSSD_declare_task, CKind, Labels, RLoc))
+        IsError = true;
       FirstClauses[CKind] = true;
       break;
     }
@@ -341,9 +351,9 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
   ExprResult FinalRes;
   ExprResult CostRes;
   ExprResult PriorityRes;
-  ExprResult LabelRes;
   ExprResult OnreadyRes;
   bool Wait = false;
+  SmallVector<Expr *, 2> Labels;
   SmallVector<Expr *, 4> Ins;
   SmallVector<Expr *, 4> Outs;
   SmallVector<Expr *, 4> Inouts;
@@ -369,8 +379,8 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
       parseDeclareTaskClauses(*this,
                               IfRes, FinalRes,
                               CostRes, PriorityRes,
-                              LabelRes, OnreadyRes,
-                              Wait,
+                              OnreadyRes, Wait,
+                              Labels,
                               Ins, Outs, Inouts,
                               Concurrents, Commutatives,
                               WeakIns, WeakOuts, WeakInouts,
@@ -394,8 +404,8 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
       Ptr,
       IfRes.get(), FinalRes.get(),
       CostRes.get(), PriorityRes.get(),
-      LabelRes.get(), OnreadyRes.get(),
-      Wait,
+      OnreadyRes.get(), Wait,
+      Labels,
       Ins, Outs, Inouts,
       Concurrents, Commutatives,
       WeakIns, WeakOuts, WeakInouts,
@@ -811,7 +821,6 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
   case OSSC_final:
   case OSSC_cost:
   case OSSC_priority:
-  case OSSC_label:
   case OSSC_onready:
   case OSSC_chunksize:
   case OSSC_grainsize:
@@ -839,6 +848,14 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
       ErrorFound = true;
     }
     Clause = ParseOmpSsSimpleClause(CKind, WrongDirective);
+    break;
+  case OSSC_label:
+    if (!FirstClause) {
+      Diag(Tok, diag::err_oss_more_one_clause)
+          << getOmpSsDirectiveName(DKind) << getOmpSsClauseName(CKind) << 0;
+      ErrorFound = true;
+    }
+    Clause = ParseOmpSsFixedListClause<2>(DKind, CKind, WrongDirective);
     break;
   case OSSC_shared:
   case OSSC_private:
@@ -1232,6 +1249,73 @@ void Parser::ParseOmpSsReductionInitializerForDecl(VarDecl *OmpPrivParm) {
   }
 }
 
+/// Parses clauses with list with a max limit of N
+template<int N>
+bool Parser::ParseOmpSsFixedList(
+    OmpSsDirectiveKind DKind, OmpSsClauseKind Kind, SmallVectorImpl<Expr *> &Vars,
+    SourceLocation &RLoc) {
+  // Parse '('.
+  BalancedDelimiterTracker T(*this, tok::l_paren, tok::annot_pragma_ompss_end);
+  if (T.expectAndConsume(diag::err_expected_lparen_after,
+                         getOmpSsClauseName(Kind)))
+    return true;
+
+  bool IsComma = true;
+  auto Cond = [&](int i) {
+    return i < N &&
+      (IsComma
+       || (Tok.isNot(tok::r_paren)
+         && Tok.isNot(tok::colon)
+         && Tok.isNot(tok::annot_pragma_ompss_end)));
+  };
+
+  for (int i = 0; Cond(i); ++i) {
+
+    SourceLocation ELoc = Tok.getLocation();
+
+    // 1. Disable diagnostics for label clause. Emit a warning and keep going
+    // FIXME: this hides any typo correction diagnostic like:
+    // const char *blabla;
+    // #pragma oss task label(babla) <- hidden typo correction
+    if (i == 0 && Kind == OSSC_label)
+      Diags.setSuppressAllDiagnostics(true);
+
+    ExprResult Val =
+        Actions.CorrectDelayedTyposInExpr(ParseAssignmentExpression());
+
+    // See 1.
+    if (i == 0 && Kind == OSSC_label) {
+      Diags.setSuppressAllDiagnostics(false);
+
+      if (Val.isInvalid() || Val.get()->containsErrors()) {
+        Diag(ELoc, diag::warn_oss_label_error);
+        Val = ExprError();
+      }
+    }
+
+    if (Val.isUsable()) {
+      Vars.push_back(Val.get());
+    } else {
+      SkipUntil(tok::comma, tok::r_paren, tok::annot_pragma_ompss_end,
+                StopBeforeMatch);
+    }
+    // Skip ',' if any
+    IsComma = Tok.is(tok::comma);
+    if (IsComma)
+      ConsumeToken();
+    else if (Tok.isNot(tok::r_paren) &&
+             Tok.isNot(tok::annot_pragma_ompss_end))
+      Diag(Tok, diag::err_oss_expected_punc)
+          << getOmpSsClauseName(Kind);
+  }
+
+  // Parse ')'.
+  RLoc = Tok.getLocation();
+  if (!T.consumeClose())
+    RLoc = T.getCloseLocation();
+  return Vars.empty();
+}
+
 /// Parses clauses with list.
 bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
                                OmpSsClauseKind Kind,
@@ -1359,6 +1443,30 @@ bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
 
 /// Parsing of OmpSs
 ///
+///    label-clause:
+///      'label' '(' expression ' [, 'expression' ])'
+template<int N>
+OSSClause *Parser::ParseOmpSsFixedListClause(
+    OmpSsDirectiveKind DKind, OmpSsClauseKind Kind, bool ParseOnly) {
+  SourceLocation Loc = Tok.getLocation();
+  SourceLocation LOpen = ConsumeToken();
+  SourceLocation RLoc;
+  SmallVector<Expr *, 4> Vars;
+
+  if (ParseOmpSsFixedList<N>(DKind, Kind, Vars, RLoc)) {
+    return nullptr;
+  }
+
+  if (ParseOnly) {
+    return nullptr;
+  }
+  return Actions.ActOnOmpSsFixedListClause(
+      Kind, Vars, Loc, LOpen, RLoc);
+  return nullptr;
+}
+
+/// Parsing of OmpSs
+///
 ///    depend-clause:
 ///       'depend' '(' in | out | inout | mutexinoutset [ ,weak ] : ')'
 ///       'depend' '(' inoutset : ')'
@@ -1427,27 +1535,10 @@ ExprResult Parser::ParseOmpSsParensExpr(StringRef ClauseName,
 
   SourceLocation ELoc = Tok.getLocation();
 
-  // 1. Disable diagnostics for label clause. Emit a warning and keep going
-  // FIXME: this hides any typo correction diagnostic like:
-  // const char *blabla;
-  // #pragma oss task label(babla) <- hidden typo correction
-  if (ClauseName == "label")
-    Diags.setSuppressAllDiagnostics(true);
-
   ExprResult LHS(ParseCastExpression(
       AnyCastExpr, /*isAddressOfOperand=*/false, NotTypeCast));
   ExprResult Val(ParseRHSOfBinaryExpression(LHS, prec::Conditional));
   Val = Actions.ActOnFinishFullExpr(Val.get(), ELoc, /*DiscardedValue*/ false);
-
-  // See 1.
-  if (ClauseName == "label") {
-    Diags.setSuppressAllDiagnostics(false);
-
-    if (Val.isInvalid() || Val.get()->containsErrors()) {
-      Diag(ELoc, diag::warn_oss_label_error);
-      Val = ExprError();
-    }
-  }
 
   // Parse ')'.
   RLoc = Tok.getLocation();
@@ -1468,8 +1559,6 @@ ExprResult Parser::ParseOmpSsParensExpr(StringRef ClauseName,
 ///    if-clause:
 ///      'if' '(' expression ')'
 ///
-///    label-clause:
-///      'label' '(' expression ')'
 OSSClause *Parser::ParseOmpSsSingleExprClause(OmpSsClauseKind Kind,
                                               bool ParseOnly) {
   SourceLocation Loc = ConsumeToken();

@@ -714,9 +714,11 @@ void OSSClausePrinter::VisitOSSPriorityClause(OSSPriorityClause *Node) {
 }
 
 void OSSClausePrinter::VisitOSSLabelClause(OSSLabelClause *Node) {
-  OS << "label(";
-  Node->getExpression()->printPretty(OS, nullptr, Policy, 0);
-  OS << ")";
+  if (!Node->varlist_empty()) {
+    OS << "label";
+    VisitOSSClauseList(Node, '(');
+    OS << ")";
+  }
 }
 
 void OSSClausePrinter::VisitOSSChunksizeClause(OSSChunksizeClause *Node) {

@@ -213,6 +213,7 @@ struct DirectiveEnvironment {
   Value *Final = nullptr;
   Value *If = nullptr;
   Value *Label = nullptr;
+  Value *InstanceLabel = nullptr;
   Value *Wait = nullptr;
   DirectiveCapturedInfo CapturedInfo;
   DirectiveNonPODsInfo NonPODsInfo;
@@ -263,6 +264,7 @@ private:
   void verifyNonPODInfo();
   void verifyLoopInfo();
   void verifyMultiDependInfo();
+  void verifyLabelInfo();
 
 public:
   void verify();

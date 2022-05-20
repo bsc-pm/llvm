@@ -53,7 +53,7 @@ define dso_local i32 @main() #0 !dbg !6 {
 ; CHECK-NEXT:    [[TMP20:%.*]] = sext i32 [[TMP19]] to i64, !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP21:%.*]] = mul i64 1, [[TMP11]], !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP22:%.*]] = mul i64 [[TMP21]], [[TMP20]], !dbg [[DBG11]]
-; CHECK-NEXT:    call void @nanos6_create_loop(%nanos6_task_info_t* @task_info_var_main0, %nanos6_task_invocation_info_t* @task_invocation_info_main0, i64 16, i8** [[TMP2]], i8** [[TMP1]], i64 4, i64 [[TMP3]], i64 0, i64 [[TMP22]], i64 0, i64 0), !dbg [[DBG11]]
+; CHECK-NEXT:    call void @nanos6_create_loop(%nanos6_task_info_t* @task_info_var_main0, %nanos6_task_invocation_info_t* @task_invocation_info_main0, i8* null, i64 16, i8** [[TMP2]], i8** [[TMP1]], i64 4, i64 [[TMP3]], i64 0, i64 [[TMP22]], i64 0, i64 0), !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP23:%.*]] = load %nanos6_task_args_main0*, %nanos6_task_args_main0** [[TMP0]], align 8, !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP24:%.*]] = bitcast %nanos6_task_args_main0* [[TMP23]] to i8*, !dbg [[DBG11]]
 ; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, i8* [[TMP24]], i64 16, !dbg [[DBG11]]

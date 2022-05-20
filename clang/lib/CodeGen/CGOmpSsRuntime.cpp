@@ -2586,9 +2586,11 @@ void CGOmpSsRuntime::EmitDirectiveData(
     EmitScalarWrapperCallBundle(
       getBundleStr(OSSB_priority), "compute_priority", CGF, Data.Priority, TaskInfo);
   }
-  if (Data.Label) {
-    llvm::Value *V = CGF.EmitScalarExpr(Data.Label);
-    TaskInfo.emplace_back(getBundleStr(OSSB_label), V);
+  if (!Data.Labels.empty()) {
+    SmallVector<llvm::Value *, 2> LabelValues;
+    for (const Expr *E : Data.Labels)
+      LabelValues.push_back(CGF.EmitScalarExpr(E));
+    TaskInfo.emplace_back(getBundleStr(OSSB_label), LabelValues);
   }
   if (Data.Wait) {
     TaskInfo.emplace_back(
@@ -2905,7 +2907,7 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       EmitScalarWrapperCallBundle(
         getBundleStr(OSSB_priority), "compute_priority", CGF, E, TaskInfo);
     }
-    if (const Expr *E = Attr->getLabelExpr()) {
+    for (const Expr *E : Attr->labelExprs()) {
       llvm::Value *V = CGF.EmitScalarExpr(E);
       TaskInfo.emplace_back(getBundleStr(OSSB_label), V);
     }

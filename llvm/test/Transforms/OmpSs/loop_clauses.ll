@@ -103,10 +103,10 @@ entry:
   ret i32 1, !dbg !56
 }
 
-; CHECK: call void @nanos6_create_loop(%nanos6_task_info_t* @task_info_var_foo0, %nanos6_task_invocation_info_t* @task_invocation_info_foo0, i64 16, i8** %8, i8** %1, i64 8, i64 %9, i64 0, i64 %18, i64 0, i64 777)
-; CHECK: call void @nanos6_create_loop(%nanos6_task_info_t* @task_info_var_foo1, %nanos6_task_invocation_info_t* @task_invocation_info_foo1, i64 16, i8** %22, i8** %3, i64 12, i64 %23, i64 0, i64 %32, i64 0, i64 777)
-; CHECK: call void @nanos6_create_loop(%nanos6_task_info_t* @task_info_var_foo2, %nanos6_task_invocation_info_t* @task_invocation_info_foo2, i64 16, i8** %36, i8** %5, i64 4, i64 %37, i64 0, i64 %46, i64 777, i64 0)
-; CHECK: call void @nanos6_create_loop(%nanos6_task_info_t* @task_info_var_foo3, %nanos6_task_invocation_info_t* @task_invocation_info_foo3, i64 16, i8** %50, i8** %7, i64 12, i64 %51, i64 0, i64 %60, i64 777, i64 0)
+; CHECK: call void @nanos6_create_loop(%nanos6_task_info_t* @task_info_var_foo0, %nanos6_task_invocation_info_t* @task_invocation_info_foo0, i8* null, i64 16, i8** %8, i8** %1, i64 8, i64 %9, i64 0, i64 %18, i64 0, i64 777)
+; CHECK: call void @nanos6_create_loop(%nanos6_task_info_t* @task_info_var_foo1, %nanos6_task_invocation_info_t* @task_invocation_info_foo1, i8* null, i64 16, i8** %22, i8** %3, i64 12, i64 %23, i64 0, i64 %32, i64 0, i64 777)
+; CHECK: call void @nanos6_create_loop(%nanos6_task_info_t* @task_info_var_foo2, %nanos6_task_invocation_info_t* @task_invocation_info_foo2, i8* null, i64 16, i8** %36, i8** %5, i64 4, i64 %37, i64 0, i64 %46, i64 777, i64 0)
+; CHECK: call void @nanos6_create_loop(%nanos6_task_info_t* @task_info_var_foo3, %nanos6_task_invocation_info_t* @task_invocation_info_foo3, i8* null, i64 16, i8** %50, i8** %7, i64 12, i64 %51, i64 0, i64 %60, i64 777, i64 0)
 
 attributes #0 = { noinline nounwind optnone "frame-pointer"="none" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nounwind }

@@ -29,7 +29,7 @@ define void @foo(i32 %x, i32 %y) !dbg !6 {
 ; CHECK-NEXT:    [[TMP5:%.*]] = bitcast %nanos6_task_args_foo0** [[TMP3]] to i8**, [[DBG1]]
 ; CHECK-NEXT:    store i64 0, i64* [[NUM_DEPS]], align 8, [[DBG1]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = load i64, i64* [[NUM_DEPS]], align 8, [[DBG1]]
-; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_foo0, %nanos6_task_invocation_info_t* @task_invocation_info_foo0, i64 16, i8** [[TMP5]], i8** [[TMP4]], i64 0, i64 [[TMP6]]), [[DBG1]]
+; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_foo0, %nanos6_task_invocation_info_t* @task_invocation_info_foo0, i8* null, i64 16, i8** [[TMP5]], i8** [[TMP4]], i64 0, i64 [[TMP6]]), [[DBG1]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = load %nanos6_task_args_foo0*, %nanos6_task_args_foo0** [[TMP3]], align 8, [[DBG1]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = bitcast %nanos6_task_args_foo0* [[TMP7]] to i8*, [[DBG1]]
 ; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, i8* [[TMP8]], i64 16, [[DBG1]]

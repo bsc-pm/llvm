@@ -11624,7 +11624,7 @@ public:
   ExprResult
   CheckSignedIntegerValue(Expr *ValExpr);
   ExprResult
-  CheckIsConstCharPtrConvertibleExpr(Expr *E);
+  CheckIsConstCharPtrConvertibleExpr(Expr *E, bool ConstConstraint = false);
   ExprResult
   VerifyPositiveIntegerConstant(Expr *E,
                                 OmpSsClauseKind CKind,
@@ -11731,8 +11731,8 @@ public:
   DeclGroupPtrTy ActOnOmpSsDeclareTaskDirective(
       DeclGroupPtrTy DG,
       Expr *If, Expr *Final, Expr *Cost, Expr *Priority,
-      Expr *Label, Expr *Onready,
-      bool Wait,
+      Expr *Onready, bool Wait,
+      ArrayRef<Expr *> Labels,
       ArrayRef<Expr *> Ins, ArrayRef<Expr *> Outs, ArrayRef<Expr *> Inouts,
       ArrayRef<Expr *> Concurrents, ArrayRef<Expr *> Commutatives,
       ArrayRef<Expr *> WeakIns, ArrayRef<Expr *> WeakOuts,
@@ -11753,6 +11753,11 @@ public:
       SourceLocation DepLoc,
       CXXScopeSpec &ReductionIdScopeSpec,
       DeclarationNameInfo &ReductionId);
+
+  OSSClause *ActOnOmpSsFixedListClause(
+      OmpSsClauseKind Kind, ArrayRef<Expr *> Vars,
+      SourceLocation StartLoc, SourceLocation LParenLoc,
+      SourceLocation EndLoc);
 
   OSSClause *ActOnOmpSsSimpleClause(OmpSsClauseKind Kind,
                                     unsigned Argument,
@@ -11836,7 +11841,7 @@ public:
                                       SourceLocation LParenLoc,
                                       SourceLocation EndLoc);
   /// Called on well-formed 'label' clause.
-  OSSClause *ActOnOmpSsLabelClause(Expr *E, SourceLocation StartLoc,
+  OSSClause *ActOnOmpSsLabelClause(ArrayRef<Expr *> VarList, SourceLocation StartLoc,
                                    SourceLocation LParenLoc,
                                    SourceLocation EndLoc);
   /// Called on well-formed 'onready' clause.

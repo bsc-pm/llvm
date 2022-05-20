@@ -3210,6 +3210,18 @@ private:
   OSSClause *ParseOmpSsClause(OmpSsDirectiveKind DKind,
                               OmpSsClauseKind CKind, bool FirstClause);
 
+  /// Parses clause with the list of variables of a kind \a Kind with a
+  /// max limit of N
+  ///
+  /// \param Kind Kind of current clause.
+  /// \param ParseOnly true to skip the clause's semantic actions and return
+  /// \param N Specifies the maximum number of variables to be parsed.
+  /// nullptr.
+  ///
+  template<int N>
+  OSSClause *ParseOmpSsFixedListClause(
+    OmpSsDirectiveKind DKind, OmpSsClauseKind Kind, bool ParseOnly);
+
   /// Parses clause with the list of variables of a kind \a Kind.
   ///
   /// \param Kind Kind of current clause.
@@ -3269,6 +3281,12 @@ public:
     CXXScopeSpec ReductionIdScopeSpec;
     DeclarationNameInfo ReductionId;
   };
+
+  /// Parses clauses with list with a max limit of N
+  template<int N>
+  bool ParseOmpSsFixedList(
+    OmpSsDirectiveKind DKind, OmpSsClauseKind Kind,
+    SmallVectorImpl<Expr *> &Vars, SourceLocation &RLoc);
 
   /// Parses clauses with list.
   bool ParseOmpSsVarList(OmpSsDirectiveKind DKind, OmpSsClauseKind Kind,

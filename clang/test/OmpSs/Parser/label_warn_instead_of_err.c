@@ -8,8 +8,8 @@ void foo() {
 }
 
 // NOTE: This way to skip label clause hides typo correction, like...
+const char *const blabla = "X";
 void foo1() {
-   const char *blabla;
    #pragma oss task label(babla) // typo correction hidden
    {}
 }

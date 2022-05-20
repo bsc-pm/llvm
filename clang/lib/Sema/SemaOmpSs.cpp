@@ -2452,8 +2452,8 @@ static bool checkDependency(Sema &S, Expr *RefExpr, bool OSSSyntax, bool Outline
 Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     DeclGroupPtrTy DG,
     Expr *If, Expr *Final, Expr *Cost, Expr *Priority,
-    Expr *Label, Expr *Onready,
-    bool Wait,
+    Expr *Onready, bool Wait,
+    ArrayRef<Expr *> Labels,
     ArrayRef<Expr *> Ins, ArrayRef<Expr *> Outs, ArrayRef<Expr *> Inouts,
     ArrayRef<Expr *> Concurrents, ArrayRef<Expr *> Commutatives,
     ArrayRef<Expr *> WeakIns, ArrayRef<Expr *> WeakOuts,
@@ -2515,7 +2515,8 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     ++ParI;
   }
 
-  ExprResult IfRes, FinalRes, CostRes, PriorityRes, LabelRes, OnreadyRes;
+  SmallVector<Expr *, 2> LabelsRes;
+  ExprResult IfRes, FinalRes, CostRes, PriorityRes, OnreadyRes;
   if (If) {
     IfRes = VerifyBooleanConditionWithCleanups(If, If->getExprLoc());
   }
@@ -2529,8 +2530,12 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   if (Priority) {
     PriorityRes = CheckSignedIntegerValue(Priority);
   }
-  if (Label) {
-    LabelRes = CheckIsConstCharPtrConvertibleExpr(Label);
+  if (!Labels.empty()) {
+    LabelsRes.push_back(
+      CheckIsConstCharPtrConvertibleExpr(Labels[0], /*ConstConstraint=*/true).get());
+    if (Labels.size() == 2)
+      LabelsRes.push_back(
+        CheckIsConstCharPtrConvertibleExpr(Labels[1], /*ConstConstraint=*/false).get());
   }
   if (Onready) {
     OnreadyRes = Onready;
@@ -2599,9 +2604,8 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   auto *NewAttr = OSSTaskDeclAttr::CreateImplicit(
     Context,
     IfRes.get(), FinalRes.get(), CostRes.get(), PriorityRes.get(),
-    LabelRes.get(),
-    Wait,
-    OnreadyRes.get(),
+    Wait, OnreadyRes.get(),
+    const_cast<Expr **>(LabelsRes.data()), LabelsRes.size(),
     const_cast<Expr **>(Ins.data()), Ins.size(),
     const_cast<Expr **>(Outs.data()), Outs.size(),
     const_cast<Expr **>(Inouts.data()), Inouts.size(),
@@ -3668,6 +3672,24 @@ Sema::ActOnOmpSsVarListClause(
 }
 
 OSSClause *
+Sema::ActOnOmpSsFixedListClause(
+  OmpSsClauseKind Kind, ArrayRef<Expr *> Vars,
+  SourceLocation StartLoc, SourceLocation LParenLoc,
+  SourceLocation EndLoc) {
+
+  OSSClause *Res = nullptr;
+  switch (Kind) {
+  case OSSC_label:
+    Res = ActOnOmpSsLabelClause(Vars, StartLoc, LParenLoc, EndLoc);
+    break;
+  default:
+    llvm_unreachable("Clause is not allowed.");
+  }
+
+  return Res;
+}
+
+OSSClause *
 Sema::ActOnOmpSsSimpleClause(OmpSsClauseKind Kind,
                              unsigned Argument,
                              SourceLocation ArgumentLoc,
@@ -3993,7 +4015,7 @@ ExprResult Sema::VerifyBooleanConditionWithCleanups(
   return Condition;
 }
 
-ExprResult Sema::CheckIsConstCharPtrConvertibleExpr(Expr *E) {
+ExprResult Sema::CheckIsConstCharPtrConvertibleExpr(Expr *E, bool ConstConstraint) {
   const QualType &ConstCharPtrTy =
       Context.getPointerType(Context.CharTy.withConst());
 
@@ -4007,6 +4029,23 @@ ExprResult Sema::CheckIsConstCharPtrConvertibleExpr(Expr *E) {
                          /*DirectInit=*/false);
     if (!LabelVD->hasInit())
       return ExprError();
+
+    if (ConstConstraint) {
+      if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+        if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+          bool IsClassType;
+          // Only allow these cases
+          // const char* const k1 = "hola";
+          // const char k2[] = "hola";
+          if (!(VD->hasGlobalStorage()
+              && isConstNotMutableType(*this, VD->getType(), /*AcceptIfMutable*/ false, &IsClassType))
+              || !VD->hasInit() || !isa<StringLiteral>(VD->getInit()->IgnoreParenImpCasts())) {
+            Diag(E->getExprLoc(), diag::err_oss_non_const_variable);
+            return ExprError();
+          }
+        }
+      }
+    }
 
     return LabelVD->getInit();
   }
@@ -4100,15 +4139,28 @@ OSSClause *Sema::ActOnOmpSsPriorityClause(Expr *E,
   return new (Context) OSSPriorityClause(Res.get(), StartLoc, LParenLoc, EndLoc);
 }
 
-OSSClause *Sema::ActOnOmpSsLabelClause(Expr *E,
+OSSClause *Sema::ActOnOmpSsLabelClause(ArrayRef<Expr *> VarList,
                                        SourceLocation StartLoc,
                                        SourceLocation LParenLoc,
                                        SourceLocation EndLoc) {
-  ExprResult Res = CheckIsConstCharPtrConvertibleExpr(E);
-  if (Res.isInvalid())
+  SmallVector<Expr *, 2> ClauseVars;
+  ExprResult LabelRes;
+  ExprResult InstLabelRes;
+
+  LabelRes = CheckIsConstCharPtrConvertibleExpr(
+    VarList[0], /*ConstConstraint=*/true);
+  ClauseVars.push_back(LabelRes.get());
+
+  if (VarList.size() == 2) {
+    InstLabelRes = CheckIsConstCharPtrConvertibleExpr(
+      VarList[1], /*ConstConstraint=*/false);
+    ClauseVars.push_back(InstLabelRes.get());
+  }
+
+  if (LabelRes.isInvalid() || InstLabelRes.isInvalid())
     return nullptr;
 
-  return new (Context) OSSLabelClause(Res.get(), StartLoc, LParenLoc, EndLoc);
+  return OSSLabelClause::Create(Context, StartLoc, LParenLoc, EndLoc, ClauseVars);
 }
 
 OSSClause *Sema::ActOnOmpSsOnreadyClause(Expr *E,
@@ -4177,9 +4229,6 @@ OSSClause *Sema::ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind, Expr *Expr,
     break;
   case OSSC_priority:
     Res = ActOnOmpSsPriorityClause(Expr, StartLoc, LParenLoc, EndLoc);
-    break;
-  case OSSC_label:
-    Res = ActOnOmpSsLabelClause(Expr, StartLoc, LParenLoc, EndLoc);
     break;
   case OSSC_onready:
     Res = ActOnOmpSsOnreadyClause(Expr, StartLoc, LParenLoc, EndLoc);

@@ -3672,9 +3672,9 @@ def OSSTaskDecl : Attr {
   let Args = [
     ExprArgument<"IfExpr">, ExprArgument<"FinalExpr">,
     ExprArgument<"CostExpr">, ExprArgument<"PriorityExpr">,
-    ExprArgument<"LabelExpr">,
     BoolArgument<"Wait", 0>,
     ExprArgument<"OnreadyExpr">,
+    VariadicExprArgument<"LabelExprs">,
     // in()
     VariadicExprArgument<"Ins">, VariadicExprArgument<"Outs">,
     VariadicExprArgument<"Inouts">,

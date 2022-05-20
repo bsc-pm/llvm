@@ -151,12 +151,13 @@ static void AddPriorityData(const OSSExecutableDirective &S, const Expr * &Prior
   }
 }
 
-static void AddLabelData(const OSSExecutableDirective &S, const Expr * &LabelExpr) {
+static void AddLabelData(
+    const OSSExecutableDirective &S, SmallVectorImpl<const Expr *> &Labels) {
   bool Found = false;
   for (const auto *C : S.getClausesOfKind<OSSLabelClause>()) {
     assert(!Found);
     Found = true;
-    LabelExpr = C->getExpression();
+    Labels.append(C->varlist_begin(), C->varlist_end());
   }
 }
 
@@ -202,7 +203,7 @@ static void AddTaskData(const OSSExecutableDirective &S, OSSTaskDataTy &TaskData
   AddFinalData(S, TaskData.Final);
   AddCostData(S, TaskData.Cost);
   AddPriorityData(S, TaskData.Priority);
-  AddLabelData(S, TaskData.Label);
+  AddLabelData(S, TaskData.Labels);
   AddWaitData(S, TaskData.Wait);
   AddOnreadyData(S, TaskData.Onready);
   AddReductionData(S, TaskData.Reductions);

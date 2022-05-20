@@ -149,6 +149,7 @@ void OSSTaskDeclAttr::printPrettyPragma(
       OS << ")";
     }
   };
+  l("label", "(", labelExprs_size(), labelExprs_begin(), labelExprs_end(), OS, Policy);
   l("in", "(", ins_size(), ins_begin(), ins_end(), OS, Policy);
   l("out", "(", outs_size(), outs_begin(), outs_end(), OS, Policy);
   l("inout", "(", inouts_size(), inouts_begin(), inouts_end(), OS, Policy);
@@ -186,11 +187,6 @@ void OSSTaskDeclAttr::printPrettyPragma(
   }
   if (auto *E = getPriorityExpr()) {
     OS << " priority(";
-    E->printPretty(OS, nullptr, Policy);
-    OS << ")";
-  }
-  if (auto *E = getLabelExpr()) {
-    OS << " label(";
     E->printPretty(OS, nullptr, Policy);
     OS << ")";
   }

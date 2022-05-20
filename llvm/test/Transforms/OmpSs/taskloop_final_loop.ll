@@ -39,7 +39,7 @@ define dso_local void @taskloop(i32 %lb, i32 %ub, i32 %step) #0 !dbg !8 {
 ; CHECK-NEXT:    [[TMP11:%.*]] = add i32 [[TMP10]], 1, !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = sext i32 [[TMP11]] to i64, !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = mul i64 1, [[TMP12]], !dbg [[DBG12]]
-; CHECK-NEXT:    call void @nanos6_create_loop(%nanos6_task_info_t* @task_info_var_taskloop0, %nanos6_task_invocation_info_t* @task_invocation_info_taskloop0, i64 32, i8** [[TMP3]], i8** [[TMP2]], i64 4, i64 [[TMP4]], i64 0, i64 [[TMP13]], i64 0, i64 0), !dbg [[DBG12]]
+; CHECK-NEXT:    call void @nanos6_create_loop(%nanos6_task_info_t* @task_info_var_taskloop0, %nanos6_task_invocation_info_t* @task_invocation_info_taskloop0, i8* null, i64 32, i8** [[TMP3]], i8** [[TMP2]], i64 4, i64 [[TMP4]], i64 0, i64 [[TMP13]], i64 0, i64 0), !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = load %nanos6_task_args_taskloop0*, %nanos6_task_args_taskloop0** [[TMP1]], align 8, !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = bitcast %nanos6_task_args_taskloop0* [[TMP14]] to i8*, !dbg [[DBG12]]
 ; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, i8* [[TMP15]], i64 32, !dbg [[DBG12]]

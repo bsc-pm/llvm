@@ -31,10 +31,10 @@ target triple = "x86_64-unknown-linux-gnu"
 ; Function Attrs: noinline nounwind
 define dso_local i32 @main() #0 !dbg !6 {
 ; CHECK-LABEL: @main(
-; CHECK:    call void @nanos6_create_loop(%nanos6_task_info_t* nonnull @task_info_var_main0, %nanos6_task_invocation_info_t* nonnull @task_invocation_info_main0, i64 {{.*}}, i8** nonnull {{.*}}, i8** nonnull {{.*}}, i64 4, i64 0, i64 0, i64 100, i64 0, i64 0)
-; CHECK:    call void @nanos6_create_loop(%nanos6_task_info_t* nonnull @task_info_var_main1, %nanos6_task_invocation_info_t* nonnull @task_invocation_info_main1, i64 {{.*}}, i8** nonnull {{.*}}, i8** nonnull {{.*}}, i64 4, i64 0, i64 0, i64 90, i64 0, i64 0)
-; CHECK:    call void @nanos6_create_loop(%nanos6_task_info_t* nonnull @task_info_var_main2, %nanos6_task_invocation_info_t* nonnull @task_invocation_info_main2, i64 {{.*}}, i8** nonnull {{.*}}, i8** nonnull {{.*}}, i64 4, i64 0, i64 0, i64 90, i64 0, i64 0)
-; CHECK:    call void @nanos6_create_loop(%nanos6_task_info_t* nonnull @task_info_var_main3, %nanos6_task_invocation_info_t* nonnull @task_invocation_info_main3, i64 {{.*}}, i8** nonnull {{.*}}, i8** nonnull {{.*}}, i64 4, i64 0, i64 0, i64 100, i64 0, i64 0)
+; CHECK:    call void @nanos6_create_loop(%nanos6_task_info_t* nonnull @task_info_var_main0, %nanos6_task_invocation_info_t* nonnull @task_invocation_info_main0, i8* null, i64 {{.*}}, i8** nonnull {{.*}}, i8** nonnull {{.*}}, i64 4, i64 0, i64 0, i64 100, i64 0, i64 0)
+; CHECK:    call void @nanos6_create_loop(%nanos6_task_info_t* nonnull @task_info_var_main1, %nanos6_task_invocation_info_t* nonnull @task_invocation_info_main1, i8* null, i64 {{.*}}, i8** nonnull {{.*}}, i8** nonnull {{.*}}, i64 4, i64 0, i64 0, i64 90, i64 0, i64 0)
+; CHECK:    call void @nanos6_create_loop(%nanos6_task_info_t* nonnull @task_info_var_main2, %nanos6_task_invocation_info_t* nonnull @task_invocation_info_main2, i8* null, i64 {{.*}}, i8** nonnull {{.*}}, i8** nonnull {{.*}}, i64 4, i64 0, i64 0, i64 90, i64 0, i64 0)
+; CHECK:    call void @nanos6_create_loop(%nanos6_task_info_t* nonnull @task_info_var_main3, %nanos6_task_invocation_info_t* nonnull @task_invocation_info_main3, i8* null, i64 {{.*}}, i8** nonnull {{.*}}, i8** nonnull {{.*}}, i64 4, i64 0, i64 0, i64 100, i64 0, i64 0)
 entry:
   %i = alloca i32, align 4
   %j = alloca i32, align 4

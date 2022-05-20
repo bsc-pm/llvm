@@ -62,7 +62,7 @@ define dso_local void @foo(i32 %x, i32 %y, i32 %z) #0 !dbg !6 {
 ; CHECK-NEXT:    [[TMP18:%.*]] = add i64 [[TMP17]], 1, !dbg [[DBG15]]
 ; CHECK-NEXT:    store i64 [[TMP18]], i64* [[NUM_DEPS]], align 8, !dbg [[DBG15]]
 ; CHECK-NEXT:    [[TMP19:%.*]] = load i64, i64* [[NUM_DEPS]], align 8, !dbg [[DBG15]]
-; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_foo0, %nanos6_task_invocation_info_t* @task_invocation_info_foo0, i64 [[TMP16]], i8** [[TMP11]], i8** [[TMP10]], i64 0, i64 [[TMP19]]), !dbg [[DBG15]]
+; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_foo0, %nanos6_task_invocation_info_t* @task_invocation_info_foo0, i8* null, i64 [[TMP16]], i8** [[TMP11]], i8** [[TMP10]], i64 0, i64 [[TMP19]]), !dbg [[DBG15]]
 ; CHECK-NEXT:    [[TMP20:%.*]] = load %nanos6_task_args_foo0*, %nanos6_task_args_foo0** [[TMP9]], align 8, !dbg [[DBG15]]
 ; CHECK-NEXT:    [[TMP21:%.*]] = bitcast %nanos6_task_args_foo0* [[TMP20]] to i8*, !dbg [[DBG15]]
 ; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, i8* [[TMP21]], i64 32, !dbg [[DBG15]]

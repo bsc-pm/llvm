@@ -287,9 +287,11 @@ void DirectiveEnvironment::gatherPriorityInfo(OperandBundleDef &OB) {
 }
 
 void DirectiveEnvironment::gatherLabelInfo(OperandBundleDef &OB) {
-  assert(!Label && "Only allowed one OperandBundle with this Id");
-  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  assert((!Label || !InstanceLabel) && "Only allowed one OperandBundle with this Id");
+  assert(OB.input_size() <= 2 && "Only allowed one Value per OperandBundle");
   Label = OB.inputs()[0];
+  if (OB.input_size() == 2)
+    InstanceLabel = OB.inputs()[1];
 }
 
 void DirectiveEnvironment::gatherOnreadyInfo(OperandBundleDef &OB) {
@@ -564,6 +566,11 @@ void DirectiveEnvironment::verifyMultiDependInfo() {
             && !valueInCapturedBundle(CapturedInfo, V))
           llvm_unreachable("Multidependency value has no associated DSA or capture");
     }
+}
+
+void DirectiveEnvironment::verifyLabelInfo() {
+  if (Label && !isa<Constant>(Label))
+    llvm_unreachable("Expected a constant as a label");
 }
 
 void DirectiveEnvironment::verify() {

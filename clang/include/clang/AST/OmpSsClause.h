@@ -379,44 +379,53 @@ public:
 /// \endcode
 /// In this example directive '#pragma oss task' T1 has a 'label' 'string-literal' and
 /// a T2 a 'label' the string contained in variable 's'
-class OSSLabelClause : public OSSClause {
-  friend class OSSClauseReader;
+class OSSLabelClause final
+    : public OSSVarListClause<OSSLabelClause>,
+      private llvm::TrailingObjects<OSSLabelClause, Expr *> {
+  friend OSSVarListClause;
+  friend TrailingObjects;
 
-  /// Location of '('.
-  SourceLocation LParenLoc;
-
-  /// Expression of the 'label' clause.
-  Stmt *Expression = nullptr;
-
-  /// Set expression.
-  void setExpression(Expr *E) { Expression = E; }
-
-public:
-  /// Build 'label' clause with expression \a E.
+  /// Build clause with number of variables \a N.
   ///
   /// \param StartLoc Starting location of the clause.
   /// \param LParenLoc Location of '('.
-  /// \param E Expression of the clause.
   /// \param EndLoc Ending location of the clause.
-  OSSLabelClause(Expr *E, SourceLocation StartLoc, SourceLocation LParenLoc,
-                SourceLocation EndLoc)
-      : OSSClause(OSSC_label, StartLoc, EndLoc), LParenLoc(LParenLoc),
-        Expression(E) {}
+  /// \param N Number of the variables in the clause.
+  OSSLabelClause(SourceLocation StartLoc, SourceLocation LParenLoc,
+                  SourceLocation EndLoc, unsigned N)
+      : OSSVarListClause<OSSLabelClause>(OSSC_label, StartLoc, LParenLoc,
+                                          EndLoc, N) {}
 
   /// Build an empty clause.
-  OSSLabelClause()
-      : OSSClause(OSSC_label, SourceLocation(), SourceLocation()) {}
+  ///
+  /// \param N Number of variables.
+  explicit OSSLabelClause(unsigned N)
+      : OSSVarListClause<OSSLabelClause>(OSSC_label, SourceLocation(),
+                                          SourceLocation(), SourceLocation(),
+                                          N) {}
 
-  /// Sets the location of '('.
-  void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
+public:
+  /// Creates clause with a list of variables \a VL.
+  ///
+  /// \param C AST context.
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param EndLoc Ending location of the clause.
+  /// \param VL List of references to the variables.
+  static OSSLabelClause *Create(const ASTContext &C, SourceLocation StartLoc,
+                                 SourceLocation LParenLoc,
+                                 SourceLocation EndLoc, ArrayRef<Expr *> VL);
 
-  /// Returns the location of '('.
-  SourceLocation getLParenLoc() const { return LParenLoc; }
+  /// Creates an empty clause with \a N variables.
+  ///
+  /// \param C AST context.
+  /// \param N The number of variables.
+  static OSSLabelClause *CreateEmpty(const ASTContext &C, unsigned N);
 
-  /// Returns expression.
-  Expr *getExpression() const { return cast_or_null<Expr>(Expression); }
-
-  child_range children() { return child_range(&Expression, &Expression + 1); }
+  child_range children() {
+    return child_range(reinterpret_cast<Stmt **>(varlist_begin()),
+                       reinterpret_cast<Stmt **>(varlist_end()));
+  }
 
   static bool classof(const OSSClause *T) {
     return T->getClauseKind() == OSSC_label;
