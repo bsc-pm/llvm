@@ -1183,6 +1183,11 @@ static void __kmp_hyper_barrier_release(
     team = __kmp_threads[gtid]->th.th_team;
     KMP_DEBUG_ASSERT(team != NULL);
     tid = __kmp_tid_from_gtid(gtid);
+    //printf("Thread %d release from fork barrier. Executing for team %p\n", gtid, team);
+    //if(__kmp_threads[gtid]->th.th_current_task != &team->t.t_implicit_task_taskdata[tid]){
+        //printf("Thread %d Task from thread: %p Task from team: %p\n", gtid, __kmp_threads[gtid]->th.th_current_task, &team->t.t_implicit_task_taskdata[tid]);
+        //__kmp_threads[gtid]->th.th_current_task = &team->t.t_implicit_task_taskdata[tid];
+    //}
 
     TCW_4(thr_bar->b_go, KMP_INIT_BARRIER_STATE);
     KA_TRACE(20,

@@ -2716,6 +2716,7 @@ typedef struct KMP_ALIGN_CACHE kmp_base_info {
   std::atomic<omp_role_t> th_active_role; //Current role of this thread
   omp_role_t th_pending_role;
   std::atomic<bool> th_change_role; //Indicates the thread to change the role to th_pending_role ASAP
+  kmp_taskdata_t *th_next_task; // Implicit task when shifting from FA to worker.
 
   // List of teams we can enter as a free agent thread
   kmp_bootstrap_lock_t allowed_teams_lock;
@@ -4213,6 +4214,7 @@ extern void __kmp_set_thread_roles2(int tid, omp_role_t r); //Gives the roles r 
 extern int __kmp_get_thread_id(); //Returns the (global) thread id of the calling thread. Doesn't correspond to the gtid of the runtime.
 
 void __kmp_copy_global_allowed_teams_to_thread(kmp_info_t *this_thr);
+void __kmp_realloc_global_allowed_task_team();
 void __kmp_add_global_allowed_task_team(kmp_task_team_t *task_team);
 void __kmp_remove_global_allowed_task_team(kmp_task_team_t *task_team);
 void __kmp_realloc_thread_allowed_task_team(kmp_info_t *this_thr, int capacity, int copy);

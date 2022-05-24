@@ -4557,7 +4557,6 @@ kmp_info_t *__kmp_allocate_thread_common(kmp_root_t *root, kmp_team_t *team,
       KMP_DEBUG_ASSERT(new_gtid <= __kmp_hidden_helper_threads_num);
     }
   }
-
   /* allocate space for it. */
   new_thr = (kmp_info_t *)__kmp_allocate(sizeof(kmp_info_t));
 
@@ -4654,6 +4653,7 @@ kmp_info_t *__kmp_allocate_thread_common(kmp_root_t *root, kmp_team_t *team,
   new_thr->th.th_pending_role = OMP_ROLE_NONE;
   new_thr->th.th_change_role = false;
   new_thr->th.th_active_role = role;
+  new_thr->th.th_next_task = NULL;
   
   TCW_PTR(new_thr->th.th_sleep_loc, NULL);
   new_thr->th.th_sleep_loc_type = flag_unset;
@@ -5006,6 +5006,7 @@ kmp_info_t *__kmp_allocate_thread_middle_init(kmp_root_t *root, omp_role_t role,
 	new_thr->th.th_dispatch = NULL;
 	new_thr->th.th_cg_roots = NULL;
 	new_thr->th.th_current_task = NULL;
+    new_thr->th.th_next_task = NULL;
 
 	if(__kmp_adjust_gtid_mode){
 		if(__kmp_all_nth >= __kmp_tls_gtid_min){

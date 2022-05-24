@@ -400,6 +400,10 @@ __kmp_wait_template(kmp_info_t *this_thr,
     if(this_thr->th.th_change_role){
     	omp_role_t prv_role = KMP_ATOMIC_LD_RLX(&this_thr->th.th_active_role);
     	omp_role_t nxt_role = this_thr->th.th_pending_role;
+    	if(prv_role == OMP_ROLE_FREE_AGENT && nxt_role == OMP_ROLE_NONE){
+    	    this_thr->th.th_current_task = this_thr->th.th_next_task;
+    	    this_thr->th.th_next_task = NULL;
+    	}
     	KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
     	KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
         __kmp_unlock_suspend_mx(this_thr);
@@ -564,6 +568,10 @@ final_spin=FALSE)
     if(this_thr->th.th_change_role){
     	omp_role_t prv_role = KMP_ATOMIC_LD_RLX(&this_thr->th.th_active_role);
     	omp_role_t nxt_role = this_thr->th.th_pending_role;
+    	if(prv_role == OMP_ROLE_FREE_AGENT && nxt_role == OMP_ROLE_NONE){
+    	    this_thr->th.th_current_task = this_thr->th.th_next_task;
+    	    this_thr->th.th_next_task = NULL;
+    	}
     	KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
     	KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
         __kmp_unlock_suspend_mx(this_thr);
@@ -769,6 +777,10 @@ final_spin=FALSE)
       if(this_thr->th.th_change_role && this_thr->th.th_pending_role == OMP_ROLE_FREE_AGENT){
     	    omp_role_t prv_role = KMP_ATOMIC_LD_RLX(&this_thr->th.th_active_role);
     		omp_role_t nxt_role =  this_thr->th.th_pending_role;
+    	    if(prv_role == OMP_ROLE_FREE_AGENT && nxt_role == OMP_ROLE_NONE){
+    	        this_thr->th.th_current_task = this_thr->th.th_next_task;
+        	    this_thr->th.th_next_task = NULL;
+        	}
     		KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
     		KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
             __kmp_unlock_suspend_mx(this_thr);
@@ -795,6 +807,10 @@ final_spin=FALSE)
     	if(this_thr->th.th_change_role){
     	    omp_role_t prv_role = KMP_ATOMIC_LD_RLX(&this_thr->th.th_active_role);
     		omp_role_t nxt_role =  this_thr->th.th_pending_role;
+    	    if(prv_role == OMP_ROLE_FREE_AGENT && nxt_role == OMP_ROLE_NONE){
+    	        this_thr->th.th_current_task = this_thr->th.th_next_task;
+        	    this_thr->th.th_next_task = NULL;
+        	}
     		KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
     		KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
             __kmp_unlock_suspend_mx(this_thr);
@@ -836,6 +852,10 @@ final_spin=FALSE)
   if(this_thr->th.th_change_role){
     omp_role_t prv_role = KMP_ATOMIC_LD_RLX(&this_thr->th.th_active_role);
     omp_role_t nxt_role = this_thr->th.th_pending_role;
+    if(prv_role == OMP_ROLE_FREE_AGENT && nxt_role == OMP_ROLE_NONE){
+        this_thr->th.th_current_task = this_thr->th.th_next_task;
+        this_thr->th.th_next_task = NULL;
+    }
     KMP_ATOMIC_ST_RLX(&this_thr->th.th_change_role, false);
     KMP_ATOMIC_ST_RLX(&this_thr->th.th_active_role, nxt_role);
     __kmp_unlock_suspend_mx(this_thr);
