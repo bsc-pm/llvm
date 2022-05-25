@@ -4350,9 +4350,11 @@ static void __kmp_initialize_info(kmp_info_t *this_thr, kmp_team_t *team,
          ++i) // zero init the stack
       this_thr->th.th_task_state_memo_stack[i] = 0;
   }
-
-  KMP_DEBUG_ASSERT(!this_thr->th.th_spin_here);
-  KMP_DEBUG_ASSERT(this_thr->th.th_next_waiting == 0);
+  
+  if(KMP_ATOMIC_LD_RLX(&this_thr->th.th_active_role) != OMP_ROLE_FREE_AGENT){
+    KMP_DEBUG_ASSERT(!this_thr->th.th_spin_here); 
+    KMP_DEBUG_ASSERT(this_thr->th.th_next_waiting == 0);
+  }
 
   KMP_MB();
 }

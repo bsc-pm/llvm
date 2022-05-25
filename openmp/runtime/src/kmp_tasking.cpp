@@ -5001,7 +5001,7 @@ void __kmp_add_global_allowed_task_team(kmp_task_team_t *task_team) {
     KMP_DEBUG_ASSERT(__kmp_free_agent_allowed_teams_length <
                      __kmp_free_agent_allowed_teams_capacity);
   }
-  for(i = 0; i < __kmp_free_agent_allowed_teams_length; i ++){
+  /*for(i = 0; i < __kmp_free_agent_allowed_teams_length; i ++){
     if(__kmp_free_agent_allowed_teams[i] == NULL){
         __kmp_free_agent_allowed_teams[i] = task_team;
         break;
@@ -5010,7 +5010,9 @@ void __kmp_add_global_allowed_task_team(kmp_task_team_t *task_team) {
   if(i == __kmp_free_agent_allowed_teams_length){
     __kmp_free_agent_allowed_teams[i] = task_team;
     __kmp_free_agent_allowed_teams_length++;
-  }
+  }*/
+  __kmp_free_agent_allowed_teams[__kmp_free_agent_allowed_teams_length] = task_team;
+  __kmp_free_agent_allowed_teams_length++;
 }
 
 void __kmp_realloc_thread_allowed_task_team(kmp_info_t *this_thr, int capacity, int copy){
@@ -5045,14 +5047,25 @@ void __kmp_add_allowed_task_team(kmp_info_t *free_agent,
 void __kmp_remove_global_allowed_task_team(kmp_task_team_t *task_team) {
   KMP_DEBUG_ASSERT(__kmp_free_agent_allowed_teams_length > 0);
   int i;
+  //Remove the task team
   for(i = 0; i < __kmp_free_agent_allowed_teams_length; i++){
     if(__kmp_free_agent_allowed_teams[i] == task_team){
         __kmp_free_agent_allowed_teams[i] = NULL;
-        if(i == __kmp_free_agent_allowed_teams_length - 1)
+        break;
+        /*if(i == __kmp_free_agent_allowed_teams_length - 1)
             --__kmp_free_agent_allowed_teams_length;
-        return;
+        return;*/
     }
   }
+  //Compact the vector
+  int count = i;
+  for(; i < __kmp_free_agent_allowed_teams_length; i++){
+    kmp_task_team_t *tt = __kmp_free_agent_allowed_teams[i];
+    if(tt != NULL){
+        __kmp_free_agent_allowed_teams[count++] = tt;
+    }
+  }
+  __kmp_free_agent_allowed_teams_length = count;
 }
 
 void __kmp_remove_allowed_task_team(kmp_info_t *free_agent,
