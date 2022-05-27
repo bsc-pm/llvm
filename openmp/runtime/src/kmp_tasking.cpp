@@ -3793,9 +3793,6 @@ void __kmp_task_team_setup(kmp_info_t *this_thr, kmp_team_t *team, int always) {
   __kmp_acquire_bootstrap_lock(&__kmp_free_agent_allowed_teams_lock);
   kmp_task_team_t* task_team = team->t.t_task_team[this_thr->th.th_task_state];
   __kmp_add_global_allowed_task_team(task_team);
-  //if(other_task_team){
-  //    __kmp_add_global_allowed_task_team(other_task_team);
-  //}
   
   // Allow free agent threads to use this task team
   if(KMP_ATOMIC_LD_RLX(&__kmp_free_agent_active_nth) > 0){//Only if at least one free agent exists
@@ -4995,22 +4992,11 @@ void __kmp_realloc_global_allowed_task_team(){
 }
 
 void __kmp_add_global_allowed_task_team(kmp_task_team_t *task_team) {
-  int i;
   if(__kmp_free_agent_allowed_teams_length == __kmp_free_agent_allowed_teams_capacity){
     __kmp_realloc_global_allowed_task_team();
     KMP_DEBUG_ASSERT(__kmp_free_agent_allowed_teams_length <
                      __kmp_free_agent_allowed_teams_capacity);
   }
-  /*for(i = 0; i < __kmp_free_agent_allowed_teams_length; i ++){
-    if(__kmp_free_agent_allowed_teams[i] == NULL){
-        __kmp_free_agent_allowed_teams[i] = task_team;
-        break;
-    }
-  }
-  if(i == __kmp_free_agent_allowed_teams_length){
-    __kmp_free_agent_allowed_teams[i] = task_team;
-    __kmp_free_agent_allowed_teams_length++;
-  }*/
   __kmp_free_agent_allowed_teams[__kmp_free_agent_allowed_teams_length] = task_team;
   __kmp_free_agent_allowed_teams_length++;
 }
@@ -5052,9 +5038,6 @@ void __kmp_remove_global_allowed_task_team(kmp_task_team_t *task_team) {
     if(__kmp_free_agent_allowed_teams[i] == task_team){
         __kmp_free_agent_allowed_teams[i] = NULL;
         break;
-        /*if(i == __kmp_free_agent_allowed_teams_length - 1)
-            --__kmp_free_agent_allowed_teams_length;
-        return;*/
     }
   }
   //Compact the vector

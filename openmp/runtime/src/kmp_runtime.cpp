@@ -2325,8 +2325,7 @@ static void __kmp_transform_team_threads_to_FA(int gtid){
   	    task->td_allow_completion_event.pending_events_count = -1;
   	    task->td_allow_completion_event.ed.task = nullptr;
 
-  	    if (KMP_ATOMIC_LD_ACQ(&task->td_incomplete_child_tasks) != 0)
-      	    KMP_DEBUG_ASSERT(KMP_ATOMIC_LD_ACQ(&task->td_incomplete_child_tasks) == 0);
+      	KMP_DEBUG_ASSERT(KMP_ATOMIC_LD_ACQ(&task->td_incomplete_child_tasks) == 0);
   	    KMP_DEBUG_ASSERT(task->td_allocated_child_tasks == 0);
 	    gtid = new_thr->th.th_info.ds.ds_gtid;
 	    if(__kmp_free_agent_list_insert_pt != NULL){
@@ -5716,7 +5715,7 @@ __kmp_allocate_team(kmp_root_t *root, int new_nproc, int max_nproc,
           }
           if(!((thr->th.th_active_role == OMP_ROLE_FREE_AGENT) ||
               (thr->th.th_change_role && thr->th.th_pending_role == OMP_ROLE_FREE_AGENT))){ 
-          	__kmp_free_thread(team->t.t_threads[f]);
+            __kmp_free_thread(team->t.t_threads[f]);
           }
           team->t.t_threads[f] = NULL;
         }
