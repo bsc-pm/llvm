@@ -3438,7 +3438,11 @@ ExprResult Parser::ParseOSSMultiDepExpression() {
     tok::comma, tok::r_brace, LateParsedTokens,
     /* StopAtSemi=*/ false, /* ConsumeFinalToken= */false);
 
-  ParseScope OSSMultiDepScope(this, Scope::DeclScope | Scope::CompoundStmtScope);
+  // Multidep expressions scope are only allowed
+  // in OmpSs-2 directives, so add OmpSs-2 scope
+  // flag
+  ParseScope OSSMultiDepScope(
+    this, Scope::DeclScope | Scope::CompoundStmtScope | Scope::OmpSsDirectiveScope);
 
   SmallVector<Expr *, 2> MultiDepIterators;
   SmallVector<Expr *, 2> MultiDepInits;

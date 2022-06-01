@@ -12,4 +12,6 @@ void foo() {
   {}
   #pragma oss task in(array[0:1], array[0;1])
   {}
+  #pragma oss task in({ array[array[0]; array[1]], i=0;10 })
+  {}
 }
