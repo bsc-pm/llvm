@@ -1255,10 +1255,6 @@ void StmtProfiler::VisitOSSTaskForDirective(const OSSTaskForDirective *S) {
   VisitOSSLoopDirective(S);
 }
 
-void StmtProfiler::VisitOSSTaskIterDirective(const OSSTaskIterDirective *S) {
-  VisitOSSLoopDirective(S);
-}
-
 void StmtProfiler::VisitOSSTaskLoopDirective(const OSSTaskLoopDirective *S) {
   VisitOSSLoopDirective(S);
 }

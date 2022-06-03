@@ -149,10 +149,6 @@ void DirectiveEnvironment::gatherDirInfo(OperandBundleDef &OB) {
     DirectiveKind = OSSD_task;
   else if (DirectiveKindStringRef == "TASK.FOR")
     DirectiveKind = OSSD_task_for;
-  else if (DirectiveKindStringRef == "TASKITER.FOR")
-    DirectiveKind = OSSD_taskiter_for;
-  else if (DirectiveKindStringRef == "TASKITER.WHILE")
-    DirectiveKind = OSSD_taskiter_while;
   else if (DirectiveKindStringRef == "TASKLOOP")
     DirectiveKind = OSSD_taskloop;
   else if (DirectiveKindStringRef == "TASKLOOP.FOR")
@@ -406,28 +402,6 @@ void DirectiveEnvironment::gatherLoopGrainsizeInfo(OperandBundleDef &OB) {
   LoopInfo.Grainsize = OB.inputs()[0];
 }
 
-void DirectiveEnvironment::gatherLoopUnrollInfo(OperandBundleDef &OB) {
-  assert(!LoopInfo.Unroll && "Only allowed one OperandBundle with this Id");
-  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
-  LoopInfo.Unroll = OB.inputs()[0];
-}
-
-void DirectiveEnvironment::gatherLoopUpdateInfo(OperandBundleDef &OB) {
-  assert(!LoopInfo.Update && "Only allowed one OperandBundle with this Id");
-  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
-  LoopInfo.Update = OB.inputs()[0];
-}
-
-void DirectiveEnvironment::gatherWhileCondInfo(OperandBundleDef &OB) {
-  assert(WhileInfo.empty() && "Only allowed one OperandBundle with this Id");
-  assert(OB.input_size() > 0 &&
-    "WhileCond OperandBundle must have at least function");
-  ArrayRef<Value *> OBArgs = OB.inputs();
-  WhileInfo.Fun = cast<Function>(OBArgs[0]);
-  for (size_t i = 1; i < OBArgs.size(); ++i)
-    WhileInfo.Args.push_back(OBArgs[i]);
-}
-
 void DirectiveEnvironment::gatherMultiDependInfo(
     OperandBundleDef &OB, uint64_t Id) {
   // TODO: add asserts
@@ -557,39 +531,25 @@ void DirectiveEnvironment::verifyNonPODInfo() {
 }
 
 void DirectiveEnvironment::verifyLoopInfo() {
-  if (isOmpSsLoopDirective() || isOmpSsTaskIterForDirective()) {
-    if (LoopInfo.empty())
-      llvm_unreachable("LoopInfo is missing some information");
-    for (size_t i = 0; i < LoopInfo.IndVar.size(); ++i) {
-      if (!valueInDSABundles(DSAInfo, LoopInfo.IndVar[i]))
-        llvm_unreachable("Loop induction variable has no associated DSA");
-      for (size_t j = 0; j < LoopInfo.LBound[i].Args.size(); ++j) {
-        if (!valueInDSABundles(DSAInfo, LoopInfo.LBound[i].Args[j])
-            && !valueInCapturedBundle(CapturedInfo, LoopInfo.LBound[i].Args[j]))
-          llvm_unreachable("Loop lbound argument value has no associated DSA or capture");
-      }
-      for (size_t j = 0; j < LoopInfo.UBound[i].Args.size(); ++j) {
-        if (!valueInDSABundles(DSAInfo, LoopInfo.UBound[i].Args[j])
-            && !valueInCapturedBundle(CapturedInfo, LoopInfo.UBound[i].Args[j]))
-          llvm_unreachable("Loop ubound argument value has no associated DSA or capture");
-      }
-      for (size_t j = 0; j < LoopInfo.Step[i].Args.size(); ++j) {
-        if (!valueInDSABundles(DSAInfo, LoopInfo.Step[i].Args[j])
-            && !valueInCapturedBundle(CapturedInfo, LoopInfo.Step[i].Args[j]))
-          llvm_unreachable("Loop step argument value has no associated DSA or capture");
-      }
+  if (isOmpSsLoopDirective() && LoopInfo.empty())
+    llvm_unreachable("LoopInfo is missing some information");
+  for (size_t i = 0; i < LoopInfo.IndVar.size(); ++i) {
+    if (!valueInDSABundles(DSAInfo, LoopInfo.IndVar[i]))
+      llvm_unreachable("Loop induction variable has no associated DSA");
+    for (size_t j = 0; j < LoopInfo.LBound[i].Args.size(); ++j) {
+      if (!valueInDSABundles(DSAInfo, LoopInfo.LBound[i].Args[j])
+          && !valueInCapturedBundle(CapturedInfo, LoopInfo.LBound[i].Args[j]))
+        llvm_unreachable("Loop lbound argument value has no associated DSA or capture");
     }
-  }
-}
-
-void DirectiveEnvironment::verifyWhileInfo() {
-  if (isOmpSsTaskIterWhileDirective()) {
-    if (WhileInfo.empty())
-      llvm_unreachable("WhileInfo is missing some information");
-    for (size_t j = 0; j < WhileInfo.Args.size(); ++j) {
-      if (!valueInDSABundles(DSAInfo, WhileInfo.Args[j])
-          && !valueInCapturedBundle(CapturedInfo, WhileInfo.Args[j]))
-        llvm_unreachable("WhileCond argument value has no associated DSA or capture");
+    for (size_t j = 0; j < LoopInfo.UBound[i].Args.size(); ++j) {
+      if (!valueInDSABundles(DSAInfo, LoopInfo.UBound[i].Args[j])
+          && !valueInCapturedBundle(CapturedInfo, LoopInfo.UBound[i].Args[j]))
+        llvm_unreachable("Loop ubound argument value has no associated DSA or capture");
+    }
+    for (size_t j = 0; j < LoopInfo.Step[i].Args.size(); ++j) {
+      if (!valueInDSABundles(DSAInfo, LoopInfo.Step[i].Args[j])
+          && !valueInCapturedBundle(CapturedInfo, LoopInfo.Step[i].Args[j]))
+        llvm_unreachable("Loop step argument value has no associated DSA or capture");
     }
   }
 }
@@ -626,7 +586,6 @@ void DirectiveEnvironment::verify() {
   verifyOnreadyInfo();
   verifyNonPODInfo();
   verifyLoopInfo();
-  verifyWhileInfo();
   verifyMultiDependInfo();
 }
 
@@ -725,15 +684,6 @@ DirectiveEnvironment::DirectiveEnvironment(const Instruction *I) {
       break;
     case LLVMContext::OB_oss_loop_grainsize:
       gatherLoopGrainsizeInfo(OBDef);
-      break;
-    case LLVMContext::OB_oss_loop_unroll:
-      gatherLoopUnrollInfo(OBDef);
-      break;
-    case LLVMContext::OB_oss_loop_update:
-      gatherLoopUpdateInfo(OBDef);
-      break;
-    case LLVMContext::OB_oss_while_cond:
-      gatherWhileCondInfo(OBDef);
       break;
     case LLVMContext::OB_oss_multidep_range_in:
     case LLVMContext::OB_oss_multidep_range_out:

@@ -421,9 +421,6 @@ void CodeGenFunction::EmitStmt(const Stmt *S, ArrayRef<const Attr *> Attrs) {
   case Stmt::OSSTaskForDirectiveClass:
     EmitOSSTaskForDirective(cast<OSSTaskForDirective>(*S));
     break;
-  case Stmt::OSSTaskIterDirectiveClass:
-    EmitOSSTaskIterDirective(cast<OSSTaskIterDirective>(*S));
-    break;
   case Stmt::OSSTaskLoopDirectiveClass:
     EmitOSSTaskLoopDirective(cast<OSSTaskLoopDirective>(*S));
     break;

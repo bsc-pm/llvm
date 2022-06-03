@@ -309,7 +309,6 @@ static bool parseDeclareTaskClauses(
       break;
     case OSSC_chunksize:
     case OSSC_grainsize:
-    case OSSC_unroll:
     case OSSC_collapse:
     case OSSC_on:
     case OSSC_weakconcurrent:
@@ -326,9 +325,6 @@ static bool parseDeclareTaskClauses(
       P.ParseOmpSsVarList(OSSD_declare_task, CKind, TmpList, VarListData);
       break;
     }
-    case OSSC_update:
-      P.ConsumeToken();
-      break;
     }
 
     // Skip ',' if any.
@@ -556,8 +552,6 @@ Parser::DeclGroupPtrTy Parser::ParseOmpSsDeclarativeDirectiveWithExtDecl(
   }
   case OSSD_declare_task:
   case OSSD_task_for:
-  case OSSD_taskiter:
-  case OSSD_taskiter_while:
   case OSSD_taskloop:
   case OSSD_taskloop_for:
   case OSSD_taskwait:
@@ -656,8 +650,6 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
     HasAssociatedStatement = false;
     LLVM_FALLTHROUGH;
   case OSSD_task_for:
-  case OSSD_taskiter:
-  case OSSD_taskiter_while:
   case OSSD_taskloop:
   case OSSD_taskloop_for:
   case OSSD_task: {
@@ -700,9 +692,14 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
     }
     StackClauses.push_back(Clauses);
 
-    // Determine which taskiter is
-    if (DKind == OSSD_taskiter && Tok.is(tok::kw_while))
-      Actions.SetTaskiterKind(OSSD_taskiter_while);
+    if (isOmpSsLoopDirective(DKind)) {
+      if (Tok.isNot(tok::kw_for)) {
+        // loop clauses start by 'for'
+        // Our strategy is to just drop the tokens if we do not guess
+        // a for is comming.
+        OSSLateParsedToks.clear();
+      }
+    }
 
     StmtResult AssociatedStmt;
     if (HasAssociatedStatement) {
@@ -827,7 +824,6 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
   case OSSC_onready:
   case OSSC_chunksize:
   case OSSC_grainsize:
-  case OSSC_unroll:
   case OSSC_collapse:
     if (!FirstClause) {
       Diag(Tok, diag::err_oss_more_one_clause)
@@ -837,7 +833,6 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
     Clause = ParseOmpSsSingleExprClause(CKind, WrongDirective);
     break;
   case OSSC_wait:
-  case OSSC_update:
     if (!FirstClause) {
       Diag(Tok, diag::err_oss_more_one_clause)
           << getOmpSsDirectiveName(DKind) << getOmpSsClauseName(CKind) << 0;
@@ -1625,8 +1620,6 @@ OSSClause *Parser::ParseOmpSsSimpleClause(OmpSsClauseKind Kind,
 ///
 ///    wait-clause:
 ///         'wait'
-///    update-clause:
-///         'update'
 ///
 OSSClause *Parser::ParseOmpSsClause(OmpSsClauseKind Kind, bool ParseOnly) {
   SourceLocation Loc = Tok.getLocation();

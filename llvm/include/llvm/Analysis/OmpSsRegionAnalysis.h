@@ -183,8 +183,6 @@ struct DirectiveLoopInfo {
   SmallVector<BoundInfo> Step;
   Value *Chunksize = nullptr;
   Value *Grainsize = nullptr;
-  Value *Unroll = nullptr;
-  Value *Update = nullptr;
   bool empty() const {
     return IndVar.empty() && LBound.empty() &&
            UBound.empty() && Step.empty() &&
@@ -193,21 +191,10 @@ struct DirectiveLoopInfo {
   }
 };
 
-struct DirectiveWhileInfo {
-  Function *Fun = nullptr;
-  // The arguments of the call to function.
-  SmallVector<Value *, 4> Args;
-  // Used by transformation to store the result value
-  mutable Value *Result = nullptr;
-  bool empty() const { return !Fun && Args.empty(); };
-};
-
 struct DirectiveEnvironment {
   enum OmpSsDirectiveKind {
     OSSD_task = 0,
     OSSD_task_for,
-    OSSD_taskiter_for,
-    OSSD_taskiter_while,
     OSSD_taskloop,
     OSSD_taskloop_for,
     OSSD_taskwait,
@@ -231,8 +218,6 @@ struct DirectiveEnvironment {
   DirectiveCapturedInfo CapturedInfo;
   DirectiveNonPODsInfo NonPODsInfo;
   DirectiveLoopInfo LoopInfo;
-  // Used in taskiter (while)
-  DirectiveWhileInfo WhileInfo;
   StringRef DeclSourceStringRef;
   DirectiveEnvironment(const Instruction *I);
   // Different reductions may have same init/comb, assign the same ReductionIndex
@@ -267,9 +252,6 @@ private:
   void gatherLoopStepInfo(OperandBundleDef &OBDef);
   void gatherLoopChunksizeInfo(OperandBundleDef &OBDef);
   void gatherLoopGrainsizeInfo(OperandBundleDef &OBDef);
-  void gatherLoopUnrollInfo(OperandBundleDef &OBDef);
-  void gatherLoopUpdateInfo(OperandBundleDef &OBDef);
-  void gatherWhileCondInfo(OperandBundleDef &OBDef);
   void gatherMultiDependInfo(OperandBundleDef &OBDef, uint64_t Id);
   void gatherDeclSource(OperandBundleDef &OBDef);
 
@@ -281,7 +263,6 @@ private:
   void verifyOnreadyInfo();
   void verifyNonPODInfo();
   void verifyLoopInfo();
-  void verifyWhileInfo();
   void verifyMultiDependInfo();
   void verifyLabelInfo();
 
@@ -311,27 +292,9 @@ public:
            DirectiveKind == OSSD_taskloop_for;
   }
   // returns if directive is
-  // taskiter (for|while)
-  bool isOmpSsTaskIterDirective() const {
-    return DirectiveKind == OSSD_taskiter_for ||
-           DirectiveKind == OSSD_taskiter_while;
-  }
-  // returns if directive is
-  // taskiter for
-  bool isOmpSsTaskIterForDirective() const {
-    return DirectiveKind == OSSD_taskiter_for;
-  }
-  // returns if directive is
-  // taskiter while
-  bool isOmpSsTaskIterWhileDirective() const {
-    return DirectiveKind == OSSD_taskiter_while;
-  }
-  // returns if directive is
   // task, task for, taskloop, taskloop for
   bool isOmpSsTaskDirective() const {
-    return DirectiveKind == OSSD_task ||
-           isOmpSsLoopDirective() ||
-           isOmpSsTaskIterDirective();
+    return DirectiveKind == OSSD_task || isOmpSsLoopDirective();
   }
   // returns if directive is release
   bool isOmpSsReleaseDirective() const {

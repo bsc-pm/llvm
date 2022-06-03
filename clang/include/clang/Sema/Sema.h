@@ -11630,8 +11630,6 @@ public:
                                 OmpSsClauseKind CKind,
                                 bool StrictlyPositive);
   OmpSsDirectiveKind GetCurrentOmpSsDirective() const;
-  // Used to distinguish between for and while taskiter
-  void SetTaskiterKind(OmpSsDirectiveKind);
   bool IsEndOfTaskloop() const;
   /// Called on start of new data sharing attribute block.
   void StartOmpSsDSABlock(OmpSsDirectiveKind K,
@@ -11714,12 +11712,6 @@ public:
   /// associated statement.
   StmtResult
   ActOnOmpSsTaskForDirective(ArrayRef<OSSClause *> Clauses, Stmt *AStmt,
-                             SourceLocation StartLoc, SourceLocation EndLoc);
-
-  /// Called on well-formed '\#pragma oss taskiter' after parsing of the
-  /// associated statement.
-  StmtResult
-  ActOnOmpSsTaskIterDirective(ArrayRef<OSSClause *> Clauses, Stmt *AStmt,
                              SourceLocation StartLoc, SourceLocation EndLoc);
 
   /// Called on well-formed '\#pragma oss taskloop' after parsing of the
@@ -11865,11 +11857,6 @@ public:
                                        SourceLocation LParenLoc,
                                        SourceLocation EndLoc);
 
-  /// Called on well-formed 'unroll' clause.
-  OSSClause *ActOnOmpSsUnrollClause(Expr *E, SourceLocation StartLoc,
-                                    SourceLocation LParenLoc,
-                                    SourceLocation EndLoc);
-
   /// Called on well-formed 'collapse' clause.
   OSSClause *ActOnOmpSsCollapseClause(Expr *E, SourceLocation StartLoc,
                                       SourceLocation LParenLoc,
@@ -11879,9 +11866,6 @@ public:
                               SourceLocation EndLoc);
   /// Called on well-formed 'wait' clause.
   OSSClause *ActOnOmpSsWaitClause(SourceLocation StartLoc,
-                                    SourceLocation EndLoc);
-  /// Called on well-formed 'update' clause.
-  OSSClause *ActOnOmpSsUpdateClause(SourceLocation StartLoc,
                                     SourceLocation EndLoc);
 
 
