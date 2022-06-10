@@ -4206,11 +4206,11 @@ extern void __kmpc_error(ident_t *loc, int severity, const char *message);
 //Role-shifting threads APIs
 extern int __kmp_get_num_threads_role(omp_role_t r); //returns how many threads have the role r
 extern int __kmp_get_thread_roles(int tid, omp_role_t *r); //returns the number of roles of the thread with thread_id==tid,
-																													 //and r holds the actual roles of the thread.
+  														   //and r holds the actual potential roles of the thread.
 extern void __kmp_set_thread_roles1(int how_many, omp_role_t r); //Gives the roles r to how_many threads, if possible. 
-																														   //It overrides the previous roles of the threads.
+																 //It overrides the previous roles of the threads.
 extern void __kmp_set_thread_roles2(int tid, omp_role_t r); //Gives the roles r to the thread with thread_id==tid.
-																													//It overrides the previous roles of the threads.
+															//It overrides the previous roles of the thread.
 extern int __kmp_get_thread_id(); //Returns the (global) thread id of the calling thread. Doesn't correspond to the gtid of the runtime.
 
 void __kmp_copy_global_allowed_teams_to_thread(kmp_info_t *this_thr);

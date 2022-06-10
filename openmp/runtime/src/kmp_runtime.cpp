@@ -2282,7 +2282,7 @@ static void __kmp_transform_team_threads_to_FA(int gtid){
 	    for(b = 0; b < bs_last_barrier; ++b){
 	        if(balign[b].bb.wait_flag == KMP_BARRIER_PARENT_FLAG)
 		        balign[b].bb.wait_flag = KMP_BARRIER_SWITCH_TO_OWN_FLAG;
- 		    balign[b].bb.b_go = KMP_INIT_BARRIER_STATE;
+ 		    //balign[b].bb.b_go = KMP_INIT_BARRIER_STATE;
 		    balign[b].bb.team = NULL;
 		    balign[b].bb.leaf_kids = 0;
 	    }
@@ -4446,6 +4446,8 @@ kmp_info_t *__kmp_allocate_thread_common(kmp_root_t *root, kmp_team_t *team,
   if(__kmp_free_agent_list && (role != OMP_ROLE_FREE_AGENT)){
     new_thr = CCAST(kmp_info_t *, __kmp_free_agent_list);
     
+    __kmp_lock_suspend_mx(new_thr);
+
     __kmp_acquire_bootstrap_lock(&new_thr->th.allowed_teams_lock);
     new_thr->th.allowed_teams_length = 0;
     __kmp_release_bootstrap_lock(&new_thr->th.allowed_teams_lock);
@@ -4498,9 +4500,17 @@ kmp_info_t *__kmp_allocate_thread_common(kmp_root_t *root, kmp_team_t *team,
       KMP_DEBUG_ASSERT(balign[b].bb.wait_flag != KMP_BARRIER_PARENT_FLAG);
 #endif
     //Tell the free agent to change its role when possible
-    new_thr->th.th_pending_role = role;
     KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
-    KMP_ATOMIC_ST_SEQ(&new_thr->th.th_change_role, true);
+	//If the thread didn't had time to shift fo FA, just say it's not necessary to shift 
+	if(KMP_ATOMIC_LD_ACQ(&new_thr->th.th_change_role)){
+	    KMP_ATOMIC_ST_REL(&new_thr->th.th_change_role, false);
+	}
+	else{
+        new_thr->th.th_pending_role = role;
+        KMP_ATOMIC_ST_REL(&new_thr->th.th_change_role, true);
+    }
+
+    __kmp_unlock_suspend_mx(new_thr);
     
     KF_TRACE(10, ("__kmp_allocate_thread: T#%d using thread %p T#%d\n",
                   __kmp_get_gtid(), new_thr, new_thr->th.th_info.ds.ds_gtid));
