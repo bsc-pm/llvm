@@ -2796,6 +2796,9 @@ static kmp_task_t *__kmp_steal_task(kmp_info_t *victim_thr, kmp_int32 gtid,
   KMP_DEBUG_ASSERT(threads_data != NULL); // Caller should check this condition
 
   victim_tid = victim_thr->th.th_info.ds.ds_tid;
+  if(victim_tid >= victim_thr->th.th_team->t.t_nproc){
+    return NULL;
+  }
   victim_td = &threads_data[victim_tid];
 
   KA_TRACE(10, ("__kmp_steal_task(enter): T#%d try to steal from T#%d: "
