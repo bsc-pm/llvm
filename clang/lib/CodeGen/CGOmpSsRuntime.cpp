@@ -411,22 +411,26 @@ public:
       // Get the inner expr
       const Expr *TmpE = E;
       // First come OSSArraySection
+      bool FoundPointer = false;
       while (const OSSArraySectionExpr *ASE = dyn_cast<OSSArraySectionExpr>(TmpE->IgnoreParenImpCasts())) {
         // Stop in the innermost ArrayToPointerDecay
         TmpE = ASE->getBase();
-        // If we see a Pointer we must to add one dimension and done
+        // If we see a Pointer we must add one dimension and done
         if (TmpE->IgnoreParenImpCasts()->getType()->isPointerType()) {
           AddDimStartEnd();
+          FoundPointer = true;
           break;
         }
       }
-      while (const ArraySubscriptExpr *ASE = dyn_cast<ArraySubscriptExpr>(TmpE->IgnoreParenImpCasts())) {
-        // Stop in the innermost ArrayToPointerDecay
-        TmpE = ASE->getBase();
-        // If we see a Pointer we must to add one dimension and done
-        if (TmpE->IgnoreParenImpCasts()->getType()->isPointerType()) {
-          AddDimStartEnd();
-          break;
+      if (!FoundPointer) {
+        while (const ArraySubscriptExpr *ASE = dyn_cast<ArraySubscriptExpr>(TmpE->IgnoreParenImpCasts())) {
+          // Stop in the innermost ArrayToPointerDecay
+          TmpE = ASE->getBase();
+          // If we see a Pointer we must add one dimension and done
+          if (TmpE->IgnoreParenImpCasts()->getType()->isPointerType()) {
+            AddDimStartEnd();
+            break;
+          }
         }
       }
       RetTypes.insert(RetTypes.begin(), TmpE->getType());
@@ -645,6 +649,7 @@ public:
     // Get the inner expr
     const Expr *TmpE = E;
     // First come OSSArraySection
+    bool FoundPointer = false;
     while (const OSSArraySectionExpr *ASE = dyn_cast<OSSArraySectionExpr>(TmpE->IgnoreParenImpCasts())) {
       // Stop in the innermost ArrayToPointerDecay
       TmpE = ASE->getBase();
@@ -709,22 +714,25 @@ public:
       if (TmpE->IgnoreParenImpCasts()->getType()->isPointerType()) {
         assert(LengthUpper && "Sema should have forbidden unspecified sizes in pointers");
         Dims.push_back(CGF.Builder.CreateSExt(CGF.EmitScalarExpr(LengthUpper), OSSArgTy));
+        FoundPointer = true;
         break;
       }
     }
-    while (const ArraySubscriptExpr *ASE = dyn_cast<ArraySubscriptExpr>(TmpE->IgnoreParenImpCasts())) {
-      // Stop in the innermost ArrayToPointerDecay
-      TmpE = ASE->getBase();
-      // Add indexes
-      llvm::Value *Idx = CGF.EmitScalarExpr(ASE->getIdx());
-      Idx = CGF.Builder.CreateSExt(Idx, OSSArgTy);
-      llvm::Value *IdxEnd = CGF.Builder.CreateAdd(Idx, llvm::ConstantInt::getSigned(OSSArgTy, 1));
-      Starts.push_back(Idx);
-      Ends.push_back(IdxEnd);
-      // If we see a Pointer we must to add one dimension and done
-      if (TmpE->IgnoreParenImpCasts()->getType()->isPointerType()) {
-        Dims.push_back(llvm::ConstantInt::getSigned(OSSArgTy, 1));
-        break;
+    if (!FoundPointer) {
+      while (const ArraySubscriptExpr *ASE = dyn_cast<ArraySubscriptExpr>(TmpE->IgnoreParenImpCasts())) {
+        // Stop in the innermost ArrayToPointerDecay
+        TmpE = ASE->getBase();
+        // Add indexes
+        llvm::Value *Idx = CGF.EmitScalarExpr(ASE->getIdx());
+        Idx = CGF.Builder.CreateSExt(Idx, OSSArgTy);
+        llvm::Value *IdxEnd = CGF.Builder.CreateAdd(Idx, llvm::ConstantInt::getSigned(OSSArgTy, 1));
+        Starts.push_back(Idx);
+        Ends.push_back(IdxEnd);
+        // If we see a Pointer we must to add one dimension and done
+        if (TmpE->IgnoreParenImpCasts()->getType()->isPointerType()) {
+          Dims.push_back(llvm::ConstantInt::getSigned(OSSArgTy, 1));
+          break;
+        }
       }
     }
 

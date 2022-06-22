@@ -623,3 +623,28 @@ void bar() {
 // CHECK-NEXT:   %7 = load %struct._depend_unpack_t.24, %struct._depend_unpack_t.24* %retval, align 8
 // CHECK-NEXT:   ret %struct._depend_unpack_t.24 %7
 // CHECK-NEXT: }
+
+void foo1() {
+    int *array[10];
+    #pragma oss task in(array[2][3])
+    {}
+}
+
+// CHECK: define internal %struct._depend_unpack_t.25 @compute_dep.26([10 x i32*]* %array)
+// CHECK: entry:
+// CHECK-NEXT:   %retval = alloca %struct._depend_unpack_t.25, align 8
+// CHECK-NEXT:   %array.addr = alloca [10 x i32*]*, align 8
+// CHECK-NEXT:   store [10 x i32*]* %array, [10 x i32*]** %array.addr, align 8
+// CHECK-NEXT:   %arrayidx = getelementptr inbounds [10 x i32*], [10 x i32*]* %array, i64 0, i64 2
+// CHECK-NEXT:   %0 = load i32*, i32** %arrayidx, align 16
+// CHECK-NEXT:   %1 = getelementptr inbounds %struct._depend_unpack_t.25, %struct._depend_unpack_t.25* %retval, i32 0, i32 0
+// CHECK-NEXT:   store i32* %0, i32** %1, align 8
+// CHECK-NEXT:   %2 = getelementptr inbounds %struct._depend_unpack_t.25, %struct._depend_unpack_t.25* %retval, i32 0, i32 1
+// CHECK-NEXT:   store i64 4, i64* %2, align 8
+// CHECK-NEXT:   %3 = getelementptr inbounds %struct._depend_unpack_t.25, %struct._depend_unpack_t.25* %retval, i32 0, i32 2
+// CHECK-NEXT:   store i64 12, i64* %3, align 8
+// CHECK-NEXT:   %4 = getelementptr inbounds %struct._depend_unpack_t.25, %struct._depend_unpack_t.25* %retval, i32 0, i32 3
+// CHECK-NEXT:   store i64 16, i64* %4, align 8
+// CHECK-NEXT:   %5 = load %struct._depend_unpack_t.25, %struct._depend_unpack_t.25* %retval, align 8
+// CHECK-NEXT:   ret %struct._depend_unpack_t.25 %5
+// CHECK-NEXT: }
