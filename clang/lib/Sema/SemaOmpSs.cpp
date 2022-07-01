@@ -177,6 +177,10 @@ public:
     return Ret;
   }
 
+  void setCurrentDirective(OmpSsDirectiveKind DKind) {
+    Stack.back().Directive = DKind;
+  }
+
   /// Set collapse value for the region.
   void setAssociatedLoops(unsigned Val) {
     Stack.back().AssociatedLoops = Val;
@@ -787,6 +791,10 @@ void Sema::DestroyDataSharingAttributesStackOmpSs() { delete DSAStack; }
 
 OmpSsDirectiveKind Sema::GetCurrentOmpSsDirective() const {
   return DSAStack->getCurrentDirective();
+}
+
+void Sema::SetTaskiterKind(OmpSsDirectiveKind DKind) {
+  DSAStack->setCurrentDirective(DKind);
 }
 
 bool Sema::IsEndOfTaskloop() const {
@@ -1442,6 +1450,10 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
   case OSSD_task_for:
     Res = ActOnOmpSsTaskForDirective(ClausesWithImplicit, AStmt, StartLoc, EndLoc);
     break;
+  case OSSD_taskiter:
+  case OSSD_taskiter_while:
+    Res = ActOnOmpSsTaskIterDirective(ClausesWithImplicit, AStmt, StartLoc, EndLoc);
+    break;
   case OSSD_taskloop:
     Res = ActOnOmpSsTaskLoopDirective(ClausesWithImplicit, AStmt, StartLoc, EndLoc);
     break;
@@ -2031,19 +2043,23 @@ void Sema::ActOnOmpSsLoopInitialization(SourceLocation ForLoc, Stmt *Init) {
         const Expr *E = ISC.getLoopDeclRefExpr();
         auto *VD = dyn_cast<VarDecl>(D);
 
+        OmpSsClauseKind CKind = OSSC_private;
+        if (DSAStack->getCurrentDirective() == OSSD_taskiter)
+          CKind = OSSC_firstprivate;
+
         DSAStackTy::DSAVarData DVar = DSAStack->getCurrentDSA(D);
-        if (DVar.CKind != OSSC_unknown && DVar.CKind != OSSC_private &&
+        if (DVar.CKind != OSSC_unknown && DVar.CKind != CKind &&
             DVar.RefExpr) {
           Diag(E->getExprLoc(), diag::err_oss_wrong_dsa)
             << getOmpSsClauseName(DVar.CKind)
-            << getOmpSsClauseName(OSSC_private);
+            << getOmpSsClauseName(CKind);
             return;
         }
 
         // Register loop control variable
         if (!CurContext->isDependentContext()) {
           DSAStack->addLoopControlVariable(VD, E);
-          DSAStack->addDSA(VD, E, OSSC_private, /*Ignore=*/true, /*IsBase=*/true);
+          DSAStack->addDSA(VD, E, CKind, /*Ignore=*/true, /*IsBase=*/true);
         }
       }
     }
@@ -2274,6 +2290,27 @@ StmtResult Sema::ActOnOmpSsTaskForDirective(
     return StmtError();
 
   return OSSTaskForDirective::Create(Context, StartLoc, EndLoc, Clauses, AStmt, B);
+}
+
+StmtResult Sema::ActOnOmpSsTaskIterDirective(
+    ArrayRef<OSSClause *> Clauses, Stmt *AStmt,
+    SourceLocation StartLoc, SourceLocation EndLoc) {
+  if (!AStmt)
+    return StmtError();
+  SmallVector<OSSLoopDirective::HelperExprs> B(DSAStack->getAssociatedLoops());
+  if (isa<ForStmt>(AStmt)) {
+    // taskiter (for)
+    if (checkOmpSsLoop(OSSD_taskiter, AStmt, *this, *DSAStack, B))
+      return StmtError();
+  } else if (isa<WhileStmt>(AStmt)) {
+    // taskiter (while)
+    // do nothing
+  } else {
+    Diag(AStmt->getBeginLoc(), diag::err_oss_taskiter_for_while)
+        << getOmpSsDirectiveName(OSSD_taskiter);
+  }
+
+  return OSSTaskIterDirective::Create(Context, StartLoc, EndLoc, Clauses, AStmt, B);
 }
 
 StmtResult Sema::ActOnOmpSsTaskLoopDirective(
@@ -4199,6 +4236,19 @@ OSSClause *Sema::ActOnOmpSsGrainsizeClause(
   return new (Context) OSSGrainsizeClause(Res.get(), StartLoc, LParenLoc, EndLoc);
 }
 
+OSSClause *Sema::ActOnOmpSsUnrollClause(
+    Expr *E, SourceLocation StartLoc,
+    SourceLocation LParenLoc, SourceLocation EndLoc) {
+  // The parameter of the unroll() clause must be > 0
+  // expression.
+  ExprResult Res = CheckNonNegativeIntegerValue(
+    E, OSSC_grainsize, /*StrictlyPositive=*/false);
+  if (Res.isInvalid())
+    return nullptr;
+
+  return new (Context) OSSUnrollClause(Res.get(), StartLoc, LParenLoc, EndLoc);
+}
+
 OSSClause *Sema::ActOnOmpSsCollapseClause(
     Expr *E, SourceLocation StartLoc,
     SourceLocation LParenLoc, SourceLocation EndLoc) {
@@ -4239,6 +4289,9 @@ OSSClause *Sema::ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind, Expr *Expr,
   case OSSC_grainsize:
     Res = ActOnOmpSsGrainsizeClause(Expr, StartLoc, LParenLoc, EndLoc);
     break;
+  case OSSC_unroll:
+    Res = ActOnOmpSsUnrollClause(Expr, StartLoc, LParenLoc, EndLoc);
+    break;
   case OSSC_collapse:
     Res = ActOnOmpSsCollapseClause(Expr, StartLoc, LParenLoc, EndLoc);
     break;
@@ -4256,6 +4309,9 @@ OSSClause *Sema::ActOnOmpSsClause(OmpSsClauseKind Kind,
   case OSSC_wait:
     Res = ActOnOmpSsWaitClause(StartLoc, EndLoc);
     break;
+  case OSSC_update:
+    Res = ActOnOmpSsUpdateClause(StartLoc, EndLoc);
+    break;
   default:
     llvm_unreachable("Clause is not allowed.");
   }
@@ -4265,4 +4321,9 @@ OSSClause *Sema::ActOnOmpSsClause(OmpSsClauseKind Kind,
 OSSClause *Sema::ActOnOmpSsWaitClause(SourceLocation StartLoc,
                                       SourceLocation EndLoc) {
   return new (Context) OSSWaitClause(StartLoc, EndLoc);
+}
+
+OSSClause *Sema::ActOnOmpSsUpdateClause(SourceLocation StartLoc,
+                                        SourceLocation EndLoc) {
+  return new (Context) OSSUpdateClause(StartLoc, EndLoc);
 }

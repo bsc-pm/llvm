@@ -57,7 +57,7 @@ entry:
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
-; CHECK: define internal void @nanos6_ol_priority_main0(%nanos6_task_args_main0* %task_args) {
+; CHECK: define internal void @nanos6_ol_onready_main0(%nanos6_task_args_main0* %task_args) {
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   %gep_x = getelementptr %nanos6_task_args_main0, %nanos6_task_args_main0* %task_args, i32 0, i32 0
 ; CHECK-NEXT:   %gep_y = getelementptr %nanos6_task_args_main0, %nanos6_task_args_main0* %task_args, i32 0, i32 1

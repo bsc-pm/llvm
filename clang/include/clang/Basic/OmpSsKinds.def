@@ -30,6 +30,9 @@
 #ifndef OMPSS_TASK_FOR_CLAUSE
 #  define OMPSS_TASK_FOR_CLAUSE(Name)
 #endif
+#ifndef OMPSS_TASK_ITER_CLAUSE
+#  define OMPSS_TASK_ITER_CLAUSE(Name)
+#endif
 #ifndef OMPSS_TASKLOOP_CLAUSE
 #  define OMPSS_TASKLOOP_CLAUSE(Name)
 #endif
@@ -55,6 +58,7 @@
 // OmpSs directives.
 OMPSS_DIRECTIVE(task)
 OMPSS_DIRECTIVE(taskloop)
+OMPSS_DIRECTIVE(taskiter)
 OMPSS_DIRECTIVE(taskwait)
 OMPSS_DIRECTIVE(release)
 OMPSS_DIRECTIVE(assert)
@@ -66,6 +70,7 @@ OMPSS_CLAUSE(cost, OSSCostClause)
 OMPSS_CLAUSE(priority, OSSPriorityClause)
 OMPSS_CLAUSE(label, OSSLabelClause)
 OMPSS_CLAUSE(wait, OSSWaitClause)
+OMPSS_CLAUSE(update, OSSUpdateClause)
 OMPSS_CLAUSE(onready, OSSOnreadyClause)
 OMPSS_CLAUSE(default, OSSDefaultClause)
 OMPSS_CLAUSE(private, OSSPrivateClause)
@@ -75,11 +80,13 @@ OMPSS_CLAUSE(depend, OSSDependClause)
 OMPSS_CLAUSE(reduction, OSSReductionClause)
 OMPSS_CLAUSE(chunksize, OSSChunksizeClause)
 OMPSS_CLAUSE(grainsize, OSSGrainsizeClause)
+OMPSS_CLAUSE(unroll, OSSUnrollClause)
 OMPSS_CLAUSE(collapse,  OSSCollapseClause)
 OMPSS_DIRECTIVE_EXT(declare_reduction, "declare reduction")
 OMPSS_DIRECTIVE_EXT(declare_task, "task")
 OMPSS_DIRECTIVE_EXT(task_for, "task for")
 OMPSS_DIRECTIVE_EXT(taskloop_for, "taskloop for")
+OMPSS_DIRECTIVE_EXT(taskiter_while, "taskiter")
 
 // Static attributes for 'default' clause.
 OMPSS_DEFAULT_KIND(none)
@@ -172,6 +179,35 @@ OMPSS_TASK_FOR_CLAUSE(weakcommutative)
 OMPSS_TASK_FOR_CLAUSE(weakreduction)
 OMPSS_TASK_FOR_CLAUSE(chunksize)
 OMPSS_TASK_FOR_CLAUSE(collapse)
+
+// Clauses allowed for OmpSs directive 'taskiter'.
+OMPSS_TASK_ITER_CLAUSE(if)
+OMPSS_TASK_ITER_CLAUSE(final)
+OMPSS_TASK_ITER_CLAUSE(cost)
+OMPSS_TASK_ITER_CLAUSE(priority)
+OMPSS_TASK_ITER_CLAUSE(label)
+OMPSS_TASK_ITER_CLAUSE(wait)
+OMPSS_TASK_ITER_CLAUSE(update)
+OMPSS_TASK_ITER_CLAUSE(onready)
+OMPSS_TASK_ITER_CLAUSE(default)
+OMPSS_TASK_ITER_CLAUSE(private)
+OMPSS_TASK_ITER_CLAUSE(firstprivate)
+OMPSS_TASK_ITER_CLAUSE(shared)
+OMPSS_TASK_ITER_CLAUSE(depend)
+OMPSS_TASK_ITER_CLAUSE(reduction)
+OMPSS_TASK_ITER_CLAUSE(in)
+OMPSS_TASK_ITER_CLAUSE(out)
+OMPSS_TASK_ITER_CLAUSE(inout)
+OMPSS_TASK_ITER_CLAUSE(concurrent)
+OMPSS_TASK_ITER_CLAUSE(commutative)
+OMPSS_TASK_ITER_CLAUSE(weakin)
+OMPSS_TASK_ITER_CLAUSE(weakout)
+OMPSS_TASK_ITER_CLAUSE(weakinout)
+OMPSS_TASK_ITER_CLAUSE(weakcommutative)
+OMPSS_TASK_ITER_CLAUSE(weakreduction)
+OMPSS_TASK_ITER_CLAUSE(unroll)
+// TODO: enable?
+// OMPSS_TASK_ITER_CLAUSE(collapse)
 
 // Clauses allowed for OmpSs directive 'taskloop'.
 OMPSS_TASKLOOP_CLAUSE(if)
@@ -266,5 +302,6 @@ OMPSS_DECLARE_TASK_CLAUSE(weakcommutative)
 #undef OMPSS_TASK_CLAUSE
 #undef OMPSS_RELEASE_CLAUSE
 #undef OMPSS_TASK_FOR_CLAUSE
+#undef OMPSS_TASK_ITER_CLAUSE
 #undef OMPSS_TASKLOOP_CLAUSE
 #undef OMPSS_TASKLOOP_FOR_CLAUSE

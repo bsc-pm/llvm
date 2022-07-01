@@ -848,6 +848,7 @@ CXCursor cxcursor::MakeCXCursor(const Stmt *S, const Decl *Parent,
     // OmpSs
   case Stmt::OSSTaskDirectiveClass:
   case Stmt::OSSTaskForDirectiveClass:
+  case Stmt::OSSTaskIterDirectiveClass:
   case Stmt::OSSTaskLoopDirectiveClass:
   case Stmt::OSSTaskLoopForDirectiveClass:
   case Stmt::OSSTaskwaitDirectiveClass:

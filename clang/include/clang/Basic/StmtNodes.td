@@ -299,5 +299,6 @@ def OSSTaskwaitDirective : StmtNode<OSSExecutableDirective>;
 def OSSReleaseDirective : StmtNode<OSSExecutableDirective>;
 def OSSTaskDirective : StmtNode<OSSExecutableDirective>;
 def OSSTaskForDirective : StmtNode<OSSLoopDirective>;
+def OSSTaskIterDirective : StmtNode<OSSLoopDirective>;
 def OSSTaskLoopDirective : StmtNode<OSSLoopDirective>;
 def OSSTaskLoopForDirective : StmtNode<OSSLoopDirective>;

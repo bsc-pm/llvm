@@ -124,6 +124,8 @@ struct OSSLoopDataTy final {
   Expr *const *Step = nullptr;
   const Expr *Chunksize = nullptr;
   const Expr *Grainsize = nullptr;
+  const Expr *Unroll = nullptr;
+  bool Update = false;
   unsigned NumCollapses;
   llvm::Optional<bool> *TestIsLessOp;
   bool *TestIsStrictOp;
@@ -178,7 +180,7 @@ private:
   void BuildWrapperCallBundleList(
     std::string FuncName,
     CodeGenFunction &CGF, const Expr *E, QualType Q,
-    llvm::function_ref<void(CodeGenFunction &, Optional<llvm::Value *>)> Body,
+    llvm::function_ref<void(CodeGenFunction &, const Expr *E, Optional<llvm::Value *>)> Body,
     SmallVectorImpl<llvm::Value *> &List);
 
   // Builds a bundle of the with the form
@@ -186,12 +188,19 @@ private:
   void EmitWrapperCallBundle(
     std::string Name, std::string FuncName,
     CodeGenFunction &CGF, const Expr *E, QualType Q,
-    llvm::function_ref<void(CodeGenFunction &, Optional<llvm::Value *>)> Body,
+    llvm::function_ref<void(CodeGenFunction &, const Expr *E, Optional<llvm::Value *>)> Body,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
 
   // This is used by cost/priority/onready clauses to build a bundle with the form
   // (func_ptr, arg0, arg1... argN)
   void EmitScalarWrapperCallBundle(
+    std::string Name, std::string FuncName,
+    CodeGenFunction &CGF, const Expr *E,
+    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
+
+  // This is used by taskiter while to build a bundle with the form
+  // ((bool)func_ptr, arg0, arg1... argN)
+  void EmitBoolWrapperCallBundle(
     std::string Name, std::string FuncName,
     CodeGenFunction &CGF, const Expr *E,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
@@ -248,7 +257,7 @@ private:
   // Build bundles for all info inside Data
   void EmitDirectiveData(CodeGenFunction &CGF, const OSSTaskDataTy &Data,
       SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
-      const OSSLoopDataTy &LoopData = OSSLoopDataTy());
+      const OSSLoopDataTy &LoopData = OSSLoopDataTy(), const Expr *WhileCond = nullptr);
 
   // Emit debug info for the data-sharings in a directive
   void EmitDirectiveDbgInfo(CodeGenFunction &CGF, const OSSTaskDataTy &Data);
@@ -299,13 +308,14 @@ public:
 
   llvm::Function *createCallWrapperFunc(
       CodeGenFunction &CGF,
+      const Expr *E,
       const Decl *FunContext,
       const llvm::MapVector<const VarDecl *, LValue> &ExprInvolvedVarList,
       const llvm::MapVector<const Expr *, llvm::Value *> &VLASizeInvolvedMap,
       const llvm::DenseMap<const VarDecl *, Address> &CaptureInvolvedMap,
       ArrayRef<QualType> RetTypes,
       bool HasThis, bool HasSwitch, std::string FuncName, std::string RetName,
-      llvm::function_ref<void(CodeGenFunction &, Optional<llvm::Value *>)> Body);
+      llvm::function_ref<void(CodeGenFunction &, const Expr *E, Optional<llvm::Value *>)> Body);
 
   RValue emitTaskFunction(CodeGenFunction &CGF,
                           const FunctionDecl *FD,
