@@ -13,6 +13,7 @@
 #include "Parser.h"
 #include "AsmParserImpl.h"
 #include "mlir/IR/AffineMap.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/Verifier.h"
@@ -134,7 +135,7 @@ Parser::parseCommaSeparatedListUntil(Token::Kind rightToken,
   // Handle the empty case.
   if (getToken().is(rightToken)) {
     if (!allowEmptyList)
-      return emitError("expected list element");
+      return emitWrongTokenError("expected list element");
     consumeToken(rightToken);
     return success();
   }
@@ -147,6 +148,15 @@ Parser::parseCommaSeparatedListUntil(Token::Kind rightToken,
   return success();
 }
 
+InFlightDiagnostic Parser::emitError(const Twine &message) {
+  auto loc = state.curToken.getLoc();
+  if (state.curToken.isNot(Token::eof))
+    return emitError(loc, message);
+
+  // If the error is to be emitted at EOF, move it back one character.
+  return emitError(SMLoc::getFromPointer(loc.getPointer() - 1), message);
+}
+
 InFlightDiagnostic Parser::emitError(SMLoc loc, const Twine &message) {
   auto diag = mlir::emitError(getEncodedSourceLocation(loc), message);
 
@@ -157,13 +167,67 @@ InFlightDiagnostic Parser::emitError(SMLoc loc, const Twine &message) {
   return diag;
 }
 
+/// Emit an error about a "wrong token".  If the current token is at the
+/// start of a source line, this will apply heuristics to back up and report
+/// the error at the end of the previous line, which is where the expected
+/// token is supposed to be.
+InFlightDiagnostic Parser::emitWrongTokenError(const Twine &message) {
+  auto loc = state.curToken.getLoc();
+
+  // If the error is to be emitted at EOF, move it back one character.
+  if (state.curToken.is(Token::eof))
+    loc = SMLoc::getFromPointer(loc.getPointer() - 1);
+
+  // This is the location we were originally asked to report the error at.
+  auto originalLoc = loc;
+
+  // Determine if the token is at the start of the current line.
+  const char *bufferStart = state.lex.getBufferBegin();
+  const char *curPtr = loc.getPointer();
+
+  // Use this StringRef to keep track of what we are going to back up through,
+  // it provides nicer string search functions etc.
+  StringRef startOfBuffer(bufferStart, curPtr - bufferStart);
+
+  // Back up over entirely blank lines.
+  while (true) {
+    // Back up until we see a \n, but don't look past the buffer start.
+    startOfBuffer = startOfBuffer.rtrim(" \t");
+
+    // For tokens with no preceding source line, just emit at the original
+    // location.
+    if (startOfBuffer.empty())
+      return emitError(originalLoc, message);
+
+    // If we found something that isn't the end of line, then we're done.
+    if (startOfBuffer.back() != '\n' && startOfBuffer.back() != '\r')
+      return emitError(SMLoc::getFromPointer(startOfBuffer.end()), message);
+
+    // Drop the \n so we emit the diagnostic at the end of the line.
+    startOfBuffer = startOfBuffer.drop_back();
+
+    // Check to see if the preceding line has a comment on it.  We assume that a
+    // `//` is the start of a comment, which is mostly correct.
+    // TODO: This will do the wrong thing for // in a string literal.
+    auto prevLine = startOfBuffer;
+    size_t newLineIndex = prevLine.find_last_of("\n\r");
+    if (newLineIndex != StringRef::npos)
+      prevLine = prevLine.drop_front(newLineIndex);
+
+    // If we find a // in the current line, then emit the diagnostic before it.
+    size_t commentStart = prevLine.find("//");
+    if (commentStart != StringRef::npos)
+      startOfBuffer = startOfBuffer.drop_back(prevLine.size() - commentStart);
+  }
+}
+
 /// Consume the specified token if present and return success.  On failure,
 /// output a diagnostic and return failure.
 ParseResult Parser::parseToken(Token::Kind expectedToken,
                                const Twine &message) {
   if (consumeIf(expectedToken))
     return success();
-  return emitError(message);
+  return emitWrongTokenError(message);
 }
 
 /// Parse an optional integer value from the stream.
@@ -212,7 +276,7 @@ ParseResult Parser::parseFloatFromIntegerLiteral(
   }
 
   Optional<uint64_t> value = tok.getUInt64IntegerValue();
-  if (!value.hasValue())
+  if (!value)
     return emitError(loc, "hexadecimal float constant out of range for type");
 
   if (&semantics == &APFloat::IEEEdouble()) {
@@ -226,6 +290,48 @@ ParseResult Parser::parseFloatFromIntegerLiteral(
   result = APFloat(semantics, apInt);
 
   return success();
+}
+
+ParseResult Parser::parseOptionalKeyword(StringRef *keyword) {
+  // Check that the current token is a keyword.
+  if (!isCurrentTokenAKeyword())
+    return failure();
+
+  *keyword = getTokenSpelling();
+  consumeToken();
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// Resource Parsing
+
+FailureOr<AsmDialectResourceHandle>
+Parser::parseResourceHandle(const OpAsmDialectInterface *dialect,
+                            StringRef &name) {
+  assert(dialect && "expected valid dialect interface");
+  SMLoc nameLoc = getToken().getLoc();
+  if (failed(parseOptionalKeyword(&name)))
+    return emitError("expected identifier key for 'resource' entry");
+  auto &resources = getState().symbols.dialectResources;
+
+  // If this is the first time encountering this handle, ask the dialect to
+  // resolve a reference to this handle. This allows for us to remap the name of
+  // the handle if necessary.
+  std::pair<std::string, AsmDialectResourceHandle> &entry =
+      resources[dialect][name];
+  if (entry.first.empty()) {
+    FailureOr<AsmDialectResourceHandle> result = dialect->declareResource(name);
+    if (failed(result)) {
+      return emitError(nameLoc)
+             << "unknown 'resource' key '" << name << "' for dialect '"
+             << dialect->getDialect()->getNamespace() << "'";
+    }
+    entry.first = dialect->getResourceKey(*result);
+    entry.second = *result;
+  }
+
+  name = entry.first;
+  return entry.second;
 }
 
 //===----------------------------------------------------------------------===//
@@ -249,6 +355,7 @@ public:
   //===--------------------------------------------------------------------===//
 
   using UnresolvedOperand = OpAsmParser::UnresolvedOperand;
+  using Argument = OpAsmParser::Argument;
 
   struct DeferredLocInfo {
     SMLoc loc;
@@ -268,8 +375,10 @@ public:
   ParseResult
   parseOptionalSSAUseList(SmallVectorImpl<UnresolvedOperand> &results);
 
-  /// Parse a single SSA use into 'result'.
-  ParseResult parseSSAUse(UnresolvedOperand &result);
+  /// Parse a single SSA use into 'result'.  If 'allowResultNumber' is true then
+  /// we allow #42 syntax.
+  ParseResult parseSSAUse(UnresolvedOperand &result,
+                          bool allowResultNumber = true);
 
   /// Given a reference to an SSA value and its type, return a reference. This
   /// returns null on failure.
@@ -360,20 +469,15 @@ public:
   //===--------------------------------------------------------------------===//
 
   /// Parse a region into 'region' with the provided entry block arguments.
-  /// If non-empty, 'argLocations' contains an optional locations for each
-  /// argument. 'isIsolatedNameScope' indicates if the naming scope of this
-  /// region is isolated from those above.
-  ParseResult
-  parseRegion(Region &region,
-              ArrayRef<std::pair<UnresolvedOperand, Type>> entryArguments,
-              ArrayRef<Location> argLocations,
-              bool isIsolatedNameScope = false);
+  /// 'isIsolatedNameScope' indicates if the naming scope of this region is
+  /// isolated from those above.
+  ParseResult parseRegion(Region &region, ArrayRef<Argument> entryArguments,
+                          bool isIsolatedNameScope = false);
 
   /// Parse a region body into 'region'.
-  ParseResult
-  parseRegionBody(Region &region, SMLoc startLoc,
-                  ArrayRef<std::pair<UnresolvedOperand, Type>> entryArguments,
-                  ArrayRef<Location> argLocations, bool isIsolatedNameScope);
+  ParseResult parseRegionBody(Region &region, SMLoc startLoc,
+                              ArrayRef<Argument> entryArguments,
+                              bool isIsolatedNameScope);
 
   //===--------------------------------------------------------------------===//
   // Block Parsing
@@ -701,7 +805,8 @@ ParseResult OperationParser::parseOptionalSSAUseList(
 ///
 ///   ssa-use ::= ssa-id
 ///
-ParseResult OperationParser::parseSSAUse(UnresolvedOperand &result) {
+ParseResult OperationParser::parseSSAUse(UnresolvedOperand &result,
+                                         bool allowResultNumber) {
   result.name = getTokenSpelling();
   result.number = 0;
   result.location = getToken().getLoc();
@@ -710,8 +815,11 @@ ParseResult OperationParser::parseSSAUse(UnresolvedOperand &result) {
 
   // If we have an attribute ID, it is a result number.
   if (getToken().is(Token::hash_identifier)) {
+    if (!allowResultNumber)
+      return emitError("result number not allowed in argument list");
+
     if (auto value = getToken().getHashIdentifierNumber())
-      result.number = value.getValue();
+      result.number = *value;
     else
       return emitError("invalid SSA value result number");
     consumeToken(Token::hash_identifier);
@@ -870,23 +978,23 @@ ParseResult OperationParser::parseOperation() {
     // Parse the group of result ids.
     auto parseNextResult = [&]() -> ParseResult {
       // Parse the next result id.
-      if (!getToken().is(Token::percent_identifier))
-        return emitError("expected valid ssa identifier");
-
       Token nameTok = getToken();
-      consumeToken(Token::percent_identifier);
+      if (parseToken(Token::percent_identifier,
+                     "expected valid ssa identifier"))
+        return failure();
 
       // If the next token is a ':', we parse the expected result count.
       size_t expectedSubResults = 1;
       if (consumeIf(Token::colon)) {
         // Check that the next token is an integer.
         if (!getToken().is(Token::integer))
-          return emitError("expected integer number of results");
+          return emitWrongTokenError("expected integer number of results");
 
         // Check that number of results is > 0.
         auto val = getToken().getUInt64IntegerValue();
-        if (!val.hasValue() || val.getValue() < 1)
-          return emitError("expected named operation to have atleast 1 result");
+        if (!val || *val < 1)
+          return emitError(
+              "expected named operation to have at least 1 result");
         consumeToken(Token::integer);
         expectedSubResults = *val;
       }
@@ -910,7 +1018,7 @@ ParseResult OperationParser::parseOperation() {
   else if (nameTok.is(Token::string))
     op = parseGenericOperation();
   else
-    return emitError("expected operation name in quotes");
+    return emitWrongTokenError("expected operation name in quotes");
 
   // If parsing of the basic operation failed, then this whole thing fails.
   if (!op)
@@ -965,7 +1073,7 @@ ParseResult OperationParser::parseOperation() {
 ParseResult OperationParser::parseSuccessor(Block *&dest) {
   // Verify branch is identifier and get the matching block.
   if (!getToken().is(Token::caret_identifier))
-    return emitError("expected block name");
+    return emitWrongTokenError("expected block name");
   dest = getBlockNamed(getTokenSpelling(), getToken().getLoc());
   consumeToken();
   return success();
@@ -1049,8 +1157,7 @@ ParseResult OperationParser::parseGenericOperationAfterOpName(
       do {
         // Create temporary regions with the top level region as parent.
         result.regions.emplace_back(new Region(topLevelOp));
-        if (parseRegion(*result.regions.back(), /*entryArguments=*/{},
-                        /*argLocations=*/{}))
+        if (parseRegion(*result.regions.back(), /*entryArguments=*/{}))
           return failure();
       } while (consumeIf(Token::comma));
       if (parseToken(Token::r_paren, "expected ')' to end region list"))
@@ -1270,9 +1377,10 @@ public:
   //===--------------------------------------------------------------------===//
 
   /// Parse a single operand.
-  ParseResult parseOperand(UnresolvedOperand &result) override {
+  ParseResult parseOperand(UnresolvedOperand &result,
+                           bool allowResultNumber = true) override {
     OperationParser::UnresolvedOperand useInfo;
-    if (parser.parseSSAUse(useInfo))
+    if (parser.parseSSAUse(useInfo, allowResultNumber))
       return failure();
 
     result = {useInfo.location, useInfo.name, useInfo.number};
@@ -1280,29 +1388,20 @@ public:
   }
 
   /// Parse a single operand if present.
-  OptionalParseResult parseOptionalOperand(UnresolvedOperand &result) override {
+  OptionalParseResult
+  parseOptionalOperand(UnresolvedOperand &result,
+                       bool allowResultNumber = true) override {
     if (parser.getToken().is(Token::percent_identifier))
-      return parseOperand(result);
+      return parseOperand(result, allowResultNumber);
     return llvm::None;
   }
 
   /// Parse zero or more SSA comma-separated operand references with a specified
   /// surrounding delimiter, and an optional required operand count.
   ParseResult parseOperandList(SmallVectorImpl<UnresolvedOperand> &result,
-                               int requiredOperandCount = -1,
-                               Delimiter delimiter = Delimiter::None) override {
-    return parseOperandOrRegionArgList(result, /*isOperandList=*/true,
-                                       requiredOperandCount, delimiter);
-  }
-
-  /// Parse zero or more SSA comma-separated operand or region arguments with
-  ///  optional surrounding delimiter and required operand count.
-  ParseResult
-  parseOperandOrRegionArgList(SmallVectorImpl<UnresolvedOperand> &result,
-                              bool isOperandList, int requiredOperandCount = -1,
-                              Delimiter delimiter = Delimiter::None) {
-    auto startLoc = parser.getToken().getLoc();
-
+                               Delimiter delimiter = Delimiter::None,
+                               bool allowResultNumber = true,
+                               int requiredOperandCount = -1) override {
     // The no-delimiter case has some special handling for better diagnostics.
     if (delimiter == Delimiter::None) {
       // parseCommaSeparatedList doesn't handle the missing case for "none",
@@ -1314,22 +1413,17 @@ public:
           return success();
 
         // Otherwise, try to produce a nice error message.
-        if (parser.getToken().is(Token::l_paren) ||
-            parser.getToken().is(Token::l_square))
-          return emitError(startLoc, "unexpected delimiter");
-        return emitError(startLoc, "invalid operand");
+        if (parser.getToken().isAny(Token::l_paren, Token::l_square))
+          return parser.emitError("unexpected delimiter");
+        return parser.emitWrongTokenError("expected operand");
       }
     }
 
     auto parseOneOperand = [&]() -> ParseResult {
-      UnresolvedOperand operandOrArg;
-      if (isOperandList ? parseOperand(operandOrArg)
-                        : parseRegionArgument(operandOrArg))
-        return failure();
-      result.push_back(operandOrArg);
-      return success();
+      return parseOperand(result.emplace_back(), allowResultNumber);
     };
 
+    auto startLoc = parser.getToken().getLoc();
     if (parseCommaSeparatedList(delimiter, parseOneOperand, " in operand list"))
       return failure();
 
@@ -1337,23 +1431,6 @@ public:
     if (requiredOperandCount != -1 &&
         result.size() != static_cast<size_t>(requiredOperandCount))
       return emitError(startLoc, "expected ")
-             << requiredOperandCount << " operands";
-    return success();
-  }
-
-  /// Parse zero or more trailing SSA comma-separated trailing operand
-  /// references with a specified surrounding delimiter, and an optional
-  /// required operand count. A leading comma is expected before the operands.
-  ParseResult
-  parseTrailingOperandList(SmallVectorImpl<UnresolvedOperand> &result,
-                           int requiredOperandCount,
-                           Delimiter delimiter) override {
-    if (parser.getToken().is(Token::comma)) {
-      parseComma();
-      return parseOperandList(result, requiredOperandCount, delimiter);
-    }
-    if (requiredOperandCount != -1)
-      return emitError(parser.getToken().getLoc(), "expected ")
              << requiredOperandCount << " operands";
     return success();
   }
@@ -1422,82 +1499,91 @@ public:
   }
 
   //===--------------------------------------------------------------------===//
+  // Argument Parsing
+  //===--------------------------------------------------------------------===//
+
+  /// Parse a single argument with the following syntax:
+  ///
+  ///   `%ssaname : !type { optionalAttrDict} loc(optionalSourceLoc)`
+  ///
+  /// If `allowType` is false or `allowAttrs` are false then the respective
+  /// parts of the grammar are not parsed.
+  ParseResult parseArgument(Argument &result, bool allowType = false,
+                            bool allowAttrs = false) override {
+    NamedAttrList attrs;
+    if (parseOperand(result.ssaName, /*allowResultNumber=*/false) ||
+        (allowType && parseColonType(result.type)) ||
+        (allowAttrs && parseOptionalAttrDict(attrs)) ||
+        parseOptionalLocationSpecifier(result.sourceLoc))
+      return failure();
+    result.attrs = attrs.getDictionary(getContext());
+    return success();
+  }
+
+  /// Parse a single argument if present.
+  OptionalParseResult parseOptionalArgument(Argument &result, bool allowType,
+                                            bool allowAttrs) override {
+    if (parser.getToken().is(Token::percent_identifier))
+      return parseArgument(result, allowType, allowAttrs);
+    return llvm::None;
+  }
+
+  ParseResult parseArgumentList(SmallVectorImpl<Argument> &result,
+                                Delimiter delimiter, bool allowType,
+                                bool allowAttrs) override {
+    // The no-delimiter case has some special handling for the empty case.
+    if (delimiter == Delimiter::None &&
+        parser.getToken().isNot(Token::percent_identifier))
+      return success();
+
+    auto parseOneArgument = [&]() -> ParseResult {
+      return parseArgument(result.emplace_back(), allowType, allowAttrs);
+    };
+    return parseCommaSeparatedList(delimiter, parseOneArgument,
+                                   " in argument list");
+  }
+
+  //===--------------------------------------------------------------------===//
   // Region Parsing
   //===--------------------------------------------------------------------===//
 
   /// Parse a region that takes `arguments` of `argTypes` types.  This
   /// effectively defines the SSA values of `arguments` and assigns their type.
-  ParseResult parseRegion(Region &region, ArrayRef<UnresolvedOperand> arguments,
-                          ArrayRef<Type> argTypes,
-                          ArrayRef<Location> argLocations,
+  ParseResult parseRegion(Region &region, ArrayRef<Argument> arguments,
                           bool enableNameShadowing) override {
-    assert(arguments.size() == argTypes.size() &&
-           "mismatching number of arguments and types");
-
-    SmallVector<std::pair<OperationParser::UnresolvedOperand, Type>, 2>
-        regionArguments;
-    for (auto pair : llvm::zip(arguments, argTypes))
-      regionArguments.emplace_back(std::get<0>(pair), std::get<1>(pair));
-
     // Try to parse the region.
     (void)isIsolatedFromAbove;
     assert((!enableNameShadowing || isIsolatedFromAbove) &&
            "name shadowing is only allowed on isolated regions");
-    if (parser.parseRegion(region, regionArguments, argLocations,
-                           enableNameShadowing))
+    if (parser.parseRegion(region, arguments, enableNameShadowing))
       return failure();
     return success();
   }
 
   /// Parses a region if present.
   OptionalParseResult parseOptionalRegion(Region &region,
-                                          ArrayRef<UnresolvedOperand> arguments,
-                                          ArrayRef<Type> argTypes,
-                                          ArrayRef<Location> argLocations,
+                                          ArrayRef<Argument> arguments,
                                           bool enableNameShadowing) override {
     if (parser.getToken().isNot(Token::l_brace))
       return llvm::None;
-    return parseRegion(region, arguments, argTypes, argLocations,
-                       enableNameShadowing);
+    return parseRegion(region, arguments, enableNameShadowing);
   }
 
   /// Parses a region if present. If the region is present, a new region is
   /// allocated and placed in `region`. If no region is present, `region`
   /// remains untouched.
-  OptionalParseResult parseOptionalRegion(
-      std::unique_ptr<Region> &region, ArrayRef<UnresolvedOperand> arguments,
-      ArrayRef<Type> argTypes, bool enableNameShadowing = false) override {
+  OptionalParseResult
+  parseOptionalRegion(std::unique_ptr<Region> &region,
+                      ArrayRef<Argument> arguments,
+                      bool enableNameShadowing = false) override {
     if (parser.getToken().isNot(Token::l_brace))
       return llvm::None;
     std::unique_ptr<Region> newRegion = std::make_unique<Region>();
-    if (parseRegion(*newRegion, arguments, argTypes, /*argLocations=*/{},
-                    enableNameShadowing))
+    if (parseRegion(*newRegion, arguments, enableNameShadowing))
       return failure();
 
     region = std::move(newRegion);
     return success();
-  }
-
-  /// Parse a region argument. The type of the argument will be resolved later
-  /// by a call to `parseRegion`.
-  ParseResult parseRegionArgument(UnresolvedOperand &argument) override {
-    return parseOperand(argument);
-  }
-
-  /// Parse a region argument if present.
-  ParseResult
-  parseOptionalRegionArgument(UnresolvedOperand &argument) override {
-    if (parser.getToken().isNot(Token::percent_identifier))
-      return success();
-    return parseRegionArgument(argument);
-  }
-
-  ParseResult
-  parseRegionArgumentList(SmallVectorImpl<UnresolvedOperand> &result,
-                          int requiredOperandCount = -1,
-                          Delimiter delimiter = Delimiter::None) override {
-    return parseOperandOrRegionArgList(result, /*isOperandList=*/false,
-                                       requiredOperandCount, delimiter);
   }
 
   //===--------------------------------------------------------------------===//
@@ -1538,41 +1624,15 @@ public:
   /// Parse a list of assignments of the form
   ///   (%x1 = %y1, %x2 = %y2, ...).
   OptionalParseResult parseOptionalAssignmentList(
-      SmallVectorImpl<UnresolvedOperand> &lhs,
+      SmallVectorImpl<Argument> &lhs,
       SmallVectorImpl<UnresolvedOperand> &rhs) override {
     if (failed(parseOptionalLParen()))
       return llvm::None;
 
     auto parseElt = [&]() -> ParseResult {
-      UnresolvedOperand regionArg, operand;
-      if (parseRegionArgument(regionArg) || parseEqual() ||
-          parseOperand(operand))
+      if (parseArgument(lhs.emplace_back()) || parseEqual() ||
+          parseOperand(rhs.emplace_back()))
         return failure();
-      lhs.push_back(regionArg);
-      rhs.push_back(operand);
-      return success();
-    };
-    return parser.parseCommaSeparatedListUntil(Token::r_paren, parseElt);
-  }
-
-  /// Parse a list of assignments of the form
-  ///   (%x1 = %y1 : type1, %x2 = %y2 : type2, ...).
-  OptionalParseResult
-  parseOptionalAssignmentListWithTypes(SmallVectorImpl<UnresolvedOperand> &lhs,
-                                       SmallVectorImpl<UnresolvedOperand> &rhs,
-                                       SmallVectorImpl<Type> &types) override {
-    if (failed(parseOptionalLParen()))
-      return llvm::None;
-
-    auto parseElt = [&]() -> ParseResult {
-      UnresolvedOperand regionArg, operand;
-      Type type;
-      if (parseRegionArgument(regionArg) || parseEqual() ||
-          parseOperand(operand) || parseColon() || parseType(type))
-        return failure();
-      lhs.push_back(regionArg);
-      rhs.push_back(operand);
-      types.push_back(type);
       return success();
     };
     return parser.parseCommaSeparatedListUntil(Token::r_paren, parseElt);
@@ -1624,57 +1684,38 @@ FailureOr<OperationName> OperationParser::parseCustomOperationName() {
   std::string opName = getTokenSpelling().str();
   if (opName.empty())
     return (emitError("empty operation name is invalid"), failure());
-
   consumeToken();
 
+  // Check to see if this operation name is already registered.
   Optional<RegisteredOperationName> opInfo =
       RegisteredOperationName::lookup(opName, getContext());
-  StringRef defaultDialect = getState().defaultDialectStack.back();
-  Dialect *dialect = nullptr;
-  if (opInfo) {
-    dialect = &opInfo->getDialect();
-  } else {
-    if (StringRef(opName).contains('.')) {
-      // This op has a dialect, we try to check if we can register it in the
-      // context on the fly.
-      StringRef dialectName = StringRef(opName).split('.').first;
-      dialect = getContext()->getLoadedDialect(dialectName);
-      if (!dialect && (dialect = getContext()->getOrLoadDialect(dialectName)))
-        opInfo = RegisteredOperationName::lookup(opName, getContext());
-    } else {
-      // If the operation name has no namespace prefix we lookup the current
-      // default dialect (set through OpAsmOpInterface).
-      opInfo = RegisteredOperationName::lookup(
-          Twine(defaultDialect + "." + opName).str(), getContext());
-      // FIXME: Remove this in favor of using default dialects.
-      if (!opInfo && getContext()->getOrLoadDialect("func")) {
-        opInfo = RegisteredOperationName::lookup(Twine("func." + opName).str(),
-                                                 getContext());
-      }
-      if (opInfo) {
-        dialect = &opInfo->getDialect();
-        opName = opInfo->getStringRef().str();
-      } else if (!defaultDialect.empty()) {
-        dialect = getContext()->getOrLoadDialect(defaultDialect);
-        opName = (defaultDialect + "." + opName).str();
-      }
-    }
+  if (opInfo)
+    return *opInfo;
+
+  // If the operation doesn't have a dialect prefix try using the default
+  // dialect.
+  auto opNameSplit = StringRef(opName).split('.');
+  StringRef dialectName = opNameSplit.first;
+  if (opNameSplit.second.empty()) {
+    dialectName = getState().defaultDialectStack.back();
+    opName = (dialectName + "." + opName).str();
   }
 
+  // Try to load the dialect before returning the operation name to make sure
+  // the operation has a chance to be registered.
+  getContext()->getOrLoadDialect(dialectName);
   return OperationName(opName, getContext());
 }
 
 Operation *
 OperationParser::parseCustomOperation(ArrayRef<ResultRecord> resultIDs) {
   SMLoc opLoc = getToken().getLoc();
+  StringRef originalOpName = getTokenSpelling();
 
   FailureOr<OperationName> opNameInfo = parseCustomOperationName();
   if (failed(opNameInfo))
     return nullptr;
-
   StringRef opName = opNameInfo->getStringRef();
-  Dialect *dialect = opNameInfo->getDialect();
-  Optional<RegisteredOperationName> opInfo = opNameInfo->getRegisteredInfo();
 
   // This is the actual hook for the custom op parsing, usually implemented by
   // the op itself (`Op::parse()`). We retrieve it either from the
@@ -1683,7 +1724,7 @@ OperationParser::parseCustomOperation(ArrayRef<ResultRecord> resultIDs) {
   bool isIsolatedFromAbove = false;
 
   StringRef defaultDialect = "";
-  if (opInfo) {
+  if (auto opInfo = opNameInfo->getRegisteredInfo()) {
     parseAssemblyFn = opInfo->getParseAssemblyFn();
     isIsolatedFromAbove = opInfo->hasTrait<OpTrait::IsIsolatedFromAbove>();
     auto *iface = opInfo->getInterface<OpAsmOpInterface>();
@@ -1691,10 +1732,13 @@ OperationParser::parseCustomOperation(ArrayRef<ResultRecord> resultIDs) {
       defaultDialect = iface->getDefaultDialect();
   } else {
     Optional<Dialect::ParseOpHook> dialectHook;
-    if (dialect)
+    if (Dialect *dialect = opNameInfo->getDialect())
       dialectHook = dialect->getParseOperationHook(opName);
-    if (!dialectHook.hasValue()) {
-      emitError(opLoc) << "custom op '" << opName << "' is unknown";
+    if (!dialectHook) {
+      InFlightDiagnostic diag =
+          emitError(opLoc) << "custom op '" << originalOpName << "' is unknown";
+      if (originalOpName != opName)
+        diag << " (tried '" << opName << "' as well)";
       return nullptr;
     }
     parseAssemblyFn = *dialectHook;
@@ -1794,11 +1838,9 @@ OperationParser::parseTrailingLocationSpecifier(OpOrArgument opOrArgument) {
 // Region Parsing
 //===----------------------------------------------------------------------===//
 
-ParseResult OperationParser::parseRegion(
-    Region &region,
-    ArrayRef<std::pair<OperationParser::UnresolvedOperand, Type>>
-        entryArguments,
-    ArrayRef<Location> argLocations, bool isIsolatedNameScope) {
+ParseResult OperationParser::parseRegion(Region &region,
+                                         ArrayRef<Argument> entryArguments,
+                                         bool isIsolatedNameScope) {
   // Parse the '{'.
   Token lBraceTok = getToken();
   if (parseToken(Token::l_brace, "expected '{' to begin a region"))
@@ -1810,7 +1852,7 @@ ParseResult OperationParser::parseRegion(
 
   // Parse the region body.
   if ((!entryArguments.empty() || getToken().isNot(Token::r_brace)) &&
-      parseRegionBody(region, lBraceTok.getLoc(), entryArguments, argLocations,
+      parseRegionBody(region, lBraceTok.getLoc(), entryArguments,
                       isIsolatedNameScope)) {
     return failure();
   }
@@ -1823,12 +1865,9 @@ ParseResult OperationParser::parseRegion(
   return success();
 }
 
-ParseResult OperationParser::parseRegionBody(
-    Region &region, SMLoc startLoc,
-    ArrayRef<std::pair<OperationParser::UnresolvedOperand, Type>>
-        entryArguments,
-    ArrayRef<Location> argLocations, bool isIsolatedNameScope) {
-  assert(argLocations.empty() || argLocations.size() == entryArguments.size());
+ParseResult OperationParser::parseRegionBody(Region &region, SMLoc startLoc,
+                                             ArrayRef<Argument> entryArguments,
+                                             bool isIsolatedNameScope) {
   auto currentPt = opBuilder.saveInsertionPoint();
 
   // Push a new named value scope.
@@ -1844,16 +1883,14 @@ ParseResult OperationParser::parseRegionBody(
   if (state.asmState && getToken().isNot(Token::caret_identifier))
     state.asmState->addDefinition(block, startLoc);
 
-  // Add arguments to the entry block.
-  if (!entryArguments.empty()) {
+  // Add arguments to the entry block if we had the form with explicit names.
+  if (!entryArguments.empty() && !entryArguments[0].ssaName.name.empty()) {
     // If we had named arguments, then don't allow a block name.
     if (getToken().is(Token::caret_identifier))
       return emitError("invalid block name in region with named arguments");
 
-    for (const auto &it : llvm::enumerate(entryArguments)) {
-      size_t argIndex = it.index();
-      auto &placeholderArgPair = it.value();
-      auto &argInfo = placeholderArgPair.first;
+    for (auto &entryArg : entryArguments) {
+      auto &argInfo = entryArg.ssaName;
 
       // Ensure that the argument was not already defined.
       if (auto defLoc = getReferenceLoc(argInfo.name, argInfo.number)) {
@@ -1863,11 +1900,10 @@ ParseResult OperationParser::parseRegionBody(
                    .attachNote(getEncodedSourceLocation(*defLoc))
                << "previously referenced here";
       }
-      BlockArgument arg = block->addArgument(
-          placeholderArgPair.second,
-          argLocations.empty()
-              ? getEncodedSourceLocation(placeholderArgPair.first.location)
-              : argLocations[argIndex]);
+      Location loc = entryArg.sourceLoc.hasValue()
+                         ? entryArg.sourceLoc.getValue()
+                         : getEncodedSourceLocation(argInfo.location);
+      BlockArgument arg = block->addArgument(entryArg.type, loc);
 
       // Add a definition of this arg to the assembly state if provided.
       if (state.asmState)
@@ -2071,17 +2107,103 @@ public:
 
 private:
   /// Parse an attribute alias declaration.
+  ///
+  ///   attribute-alias-def ::= '#' alias-name `=` attribute-value
+  ///
   ParseResult parseAttributeAliasDef();
 
-  /// Parse an attribute alias declaration.
+  /// Parse a type alias declaration.
+  ///
+  ///   type-alias-def ::= '!' alias-name `=` type
+  ///
   ParseResult parseTypeAliasDef();
+
+  /// Parse a top-level file metadata dictionary.
+  ///
+  ///   file-metadata-dict ::= '{-#' file-metadata-entry* `#-}'
+  ///
+  ParseResult parseFileMetadataDictionary();
+
+  /// Parse a resource metadata dictionary.
+  ParseResult parseResourceFileMetadata(
+      function_ref<ParseResult(StringRef, SMLoc)> parseBody);
+  ParseResult parseDialectResourceFileMetadata();
+  ParseResult parseExternalResourceFileMetadata();
+};
+
+/// This class represents an implementation of a resource entry for the MLIR
+/// textual format.
+class ParsedResourceEntry : public AsmParsedResourceEntry {
+public:
+  ParsedResourceEntry(StringRef key, SMLoc keyLoc, Token value, Parser &p)
+      : key(key), keyLoc(keyLoc), value(value), p(p) {}
+  ~ParsedResourceEntry() override = default;
+
+  StringRef getKey() const final { return key; }
+
+  InFlightDiagnostic emitError() const final { return p.emitError(keyLoc); }
+
+  FailureOr<bool> parseAsBool() const final {
+    if (value.is(Token::kw_true))
+      return true;
+    if (value.is(Token::kw_false))
+      return false;
+    return p.emitError(value.getLoc(),
+                       "expected 'true' or 'false' value for key '" + key +
+                           "'");
+  }
+
+  FailureOr<std::string> parseAsString() const final {
+    if (value.isNot(Token::string))
+      return p.emitError(value.getLoc(),
+                         "expected string value for key '" + key + "'");
+    return value.getStringValue();
+  }
+
+  FailureOr<AsmResourceBlob>
+  parseAsBlob(BlobAllocatorFn allocator) const final {
+    // Blob data within then textual format is represented as a hex string.
+    // TODO: We could avoid an additional alloc+copy here if we pre-allocated
+    // the buffer to use during hex processing.
+    Optional<std::string> blobData =
+        value.is(Token::string) ? value.getHexStringValue() : llvm::None;
+    if (!blobData)
+      return p.emitError(value.getLoc(),
+                         "expected hex string blob for key '" + key + "'");
+
+    // Extract the alignment of the blob data, which gets stored at the
+    // beginning of the string.
+    if (blobData->size() < sizeof(uint32_t)) {
+      return p.emitError(value.getLoc(),
+                         "expected hex string blob for key '" + key +
+                             "' to encode alignment in first 4 bytes");
+    }
+    uint32_t align = 0;
+    memcpy(&align, blobData->data(), sizeof(uint32_t));
+
+    // Get the data portion of the blob.
+    StringRef data = StringRef(*blobData).drop_front(sizeof(uint32_t));
+    if (data.empty())
+      return AsmResourceBlob();
+
+    // Allocate memory for the blob using the provided allocator and copy the
+    // data into it.
+    AsmResourceBlob blob = allocator(data.size(), align);
+    assert(llvm::isAddrAligned(llvm::Align(align), blob.getData().data()) &&
+           blob.isMutable() &&
+           "blob allocator did not return a properly aligned address");
+    memcpy(blob.getMutableData().data(), data.data(), data.size());
+    return blob;
+  }
+
+private:
+  StringRef key;
+  SMLoc keyLoc;
+  Token value;
+  Parser &p;
 };
 } // namespace
 
-/// Parses an attribute alias declaration.
-///
-///   attribute-alias-def ::= '#' alias-name `=` attribute-value
-///
 ParseResult TopLevelOperationParser::parseAttributeAliasDef() {
   assert(getToken().is(Token::hash_identifier));
   StringRef aliasName = getTokenSpelling().drop_front();
@@ -2110,10 +2232,6 @@ ParseResult TopLevelOperationParser::parseAttributeAliasDef() {
   return success();
 }
 
-/// Parse a type alias declaration.
-///
-///   type-alias-def ::= '!' alias-name `=` 'type' type
-///
 ParseResult TopLevelOperationParser::parseTypeAliasDef() {
   assert(getToken().is(Token::exclamation_identifier));
   StringRef aliasName = getTokenSpelling().drop_front();
@@ -2126,12 +2244,10 @@ ParseResult TopLevelOperationParser::parseTypeAliasDef() {
   if (aliasName.contains('.'))
     return emitError("type names with a '.' are reserved for "
                      "dialect-defined names");
-
   consumeToken(Token::exclamation_identifier);
 
-  // Parse the '=' and 'type'.
-  if (parseToken(Token::equal, "expected '=' in type alias definition") ||
-      parseToken(Token::kw_type, "expected 'type' in type alias definition"))
+  // Parse the '='.
+  if (parseToken(Token::equal, "expected '=' in type alias definition"))
     return failure();
 
   // Parse the type.
@@ -2142,6 +2258,108 @@ ParseResult TopLevelOperationParser::parseTypeAliasDef() {
   // Register this alias with the parser state.
   state.symbols.typeAliasDefinitions.try_emplace(aliasName, aliasedType);
   return success();
+}
+
+ParseResult TopLevelOperationParser::parseFileMetadataDictionary() {
+  consumeToken(Token::file_metadata_begin);
+  return parseCommaSeparatedListUntil(
+      Token::file_metadata_end, [&]() -> ParseResult {
+        // Parse the key of the metadata dictionary.
+        SMLoc keyLoc = getToken().getLoc();
+        StringRef key;
+        if (failed(parseOptionalKeyword(&key)))
+          return emitError("expected identifier key in file "
+                           "metadata dictionary");
+        if (parseToken(Token::colon, "expected ':'"))
+          return failure();
+
+        // Process the metadata entry.
+        if (key == "dialect_resources")
+          return parseDialectResourceFileMetadata();
+        if (key == "external_resources")
+          return parseExternalResourceFileMetadata();
+        return emitError(keyLoc, "unknown key '" + key +
+                                     "' in file metadata dictionary");
+      });
+}
+
+ParseResult TopLevelOperationParser::parseResourceFileMetadata(
+    function_ref<ParseResult(StringRef, SMLoc)> parseBody) {
+  if (parseToken(Token::l_brace, "expected '{'"))
+    return failure();
+
+  return parseCommaSeparatedListUntil(Token::r_brace, [&]() -> ParseResult {
+    // Parse the top-level name entry.
+    SMLoc nameLoc = getToken().getLoc();
+    StringRef name;
+    if (failed(parseOptionalKeyword(&name)))
+      return emitError("expected identifier key for 'resource' entry");
+
+    if (parseToken(Token::colon, "expected ':'") ||
+        parseToken(Token::l_brace, "expected '{'"))
+      return failure();
+    return parseBody(name, nameLoc);
+  });
+}
+
+ParseResult TopLevelOperationParser::parseDialectResourceFileMetadata() {
+  return parseResourceFileMetadata([&](StringRef name,
+                                       SMLoc nameLoc) -> ParseResult {
+    // Lookup the dialect and check that it can handle a resource entry.
+    Dialect *dialect = getContext()->getOrLoadDialect(name);
+    if (!dialect)
+      return emitError(nameLoc, "dialect '" + name + "' is unknown");
+    const auto *handler = dyn_cast<OpAsmDialectInterface>(dialect);
+    if (!handler) {
+      return emitError() << "unexpected 'resource' section for dialect '"
+                         << dialect->getNamespace() << "'";
+    }
+
+    return parseCommaSeparatedListUntil(Token::r_brace, [&]() -> ParseResult {
+      // Parse the name of the resource entry.
+      SMLoc keyLoc = getToken().getLoc();
+      StringRef key;
+      if (failed(parseResourceHandle(handler, key)) ||
+          parseToken(Token::colon, "expected ':'"))
+        return failure();
+      Token valueTok = getToken();
+      consumeToken();
+
+      ParsedResourceEntry entry(key, keyLoc, valueTok, *this);
+      return handler->parseResource(entry);
+    });
+  });
+}
+
+ParseResult TopLevelOperationParser::parseExternalResourceFileMetadata() {
+  return parseResourceFileMetadata([&](StringRef name,
+                                       SMLoc nameLoc) -> ParseResult {
+    AsmResourceParser *handler = state.config.getResourceParser(name);
+
+    // TODO: Should we require handling external resources in some scenarios?
+    if (!handler) {
+      emitWarning(getEncodedSourceLocation(nameLoc))
+          << "ignoring unknown external resources for '" << name << "'";
+    }
+
+    return parseCommaSeparatedListUntil(Token::r_brace, [&]() -> ParseResult {
+      // Parse the name of the resource entry.
+      SMLoc keyLoc = getToken().getLoc();
+      StringRef key;
+      if (failed(parseOptionalKeyword(&key)))
+        return emitError(
+            "expected identifier key for 'external_resources' entry");
+      if (parseToken(Token::colon, "expected ':'"))
+        return failure();
+      Token valueTok = getToken();
+      consumeToken();
+
+      if (!handler)
+        return success();
+      ParsedResourceEntry entry(key, keyLoc, valueTok, *this);
+      return handler->parseResource(entry);
+    });
+  });
 }
 
 ParseResult TopLevelOperationParser::parse(Block *topLevelBlock,
@@ -2188,6 +2406,12 @@ ParseResult TopLevelOperationParser::parse(Block *topLevelBlock,
       if (parseTypeAliasDef())
         return failure();
       break;
+
+      // Parse a file-level metadata dictionary.
+    case Token::file_metadata_begin:
+      if (parseFileMetadataDictionary())
+        return failure();
+      break;
     }
   }
 }
@@ -2195,50 +2419,51 @@ ParseResult TopLevelOperationParser::parse(Block *topLevelBlock,
 //===----------------------------------------------------------------------===//
 
 LogicalResult mlir::parseSourceFile(const llvm::SourceMgr &sourceMgr,
-                                    Block *block, MLIRContext *context,
+                                    Block *block, const ParserConfig &config,
                                     LocationAttr *sourceFileLoc,
                                     AsmParserState *asmState) {
   const auto *sourceBuf = sourceMgr.getMemoryBuffer(sourceMgr.getMainFileID());
 
-  Location parserLoc = FileLineColLoc::get(
-      context, sourceBuf->getBufferIdentifier(), /*line=*/0, /*column=*/0);
+  Location parserLoc =
+      FileLineColLoc::get(config.getContext(), sourceBuf->getBufferIdentifier(),
+                          /*line=*/0, /*column=*/0);
   if (sourceFileLoc)
     *sourceFileLoc = parserLoc;
 
   SymbolState aliasState;
-  ParserState state(sourceMgr, context, aliasState, asmState);
+  ParserState state(sourceMgr, config, aliasState, asmState);
   return TopLevelOperationParser(state).parse(block, parserLoc);
 }
 
 LogicalResult mlir::parseSourceFile(llvm::StringRef filename, Block *block,
-                                    MLIRContext *context,
+                                    const ParserConfig &config,
                                     LocationAttr *sourceFileLoc) {
   llvm::SourceMgr sourceMgr;
-  return parseSourceFile(filename, sourceMgr, block, context, sourceFileLoc);
+  return parseSourceFile(filename, sourceMgr, block, config, sourceFileLoc);
 }
 
 LogicalResult mlir::parseSourceFile(llvm::StringRef filename,
                                     llvm::SourceMgr &sourceMgr, Block *block,
-                                    MLIRContext *context,
+                                    const ParserConfig &config,
                                     LocationAttr *sourceFileLoc,
                                     AsmParserState *asmState) {
   if (sourceMgr.getNumBuffers() != 0) {
     // TODO: Extend to support multiple buffers.
-    return emitError(mlir::UnknownLoc::get(context),
+    return emitError(mlir::UnknownLoc::get(config.getContext()),
                      "only main buffer parsed at the moment");
   }
   auto fileOrErr = llvm::MemoryBuffer::getFileOrSTDIN(filename);
   if (std::error_code error = fileOrErr.getError())
-    return emitError(mlir::UnknownLoc::get(context),
+    return emitError(mlir::UnknownLoc::get(config.getContext()),
                      "could not open input file " + filename);
 
   // Load the MLIR source file.
   sourceMgr.AddNewSourceBuffer(std::move(*fileOrErr), SMLoc());
-  return parseSourceFile(sourceMgr, block, context, sourceFileLoc, asmState);
+  return parseSourceFile(sourceMgr, block, config, sourceFileLoc, asmState);
 }
 
 LogicalResult mlir::parseSourceString(llvm::StringRef sourceStr, Block *block,
-                                      MLIRContext *context,
+                                      const ParserConfig &config,
                                       LocationAttr *sourceFileLoc) {
   auto memBuffer = MemoryBuffer::getMemBuffer(sourceStr);
   if (!memBuffer)
@@ -2246,5 +2471,5 @@ LogicalResult mlir::parseSourceString(llvm::StringRef sourceStr, Block *block,
 
   SourceMgr sourceMgr;
   sourceMgr.AddNewSourceBuffer(std::move(memBuffer), SMLoc());
-  return parseSourceFile(sourceMgr, block, context, sourceFileLoc);
+  return parseSourceFile(sourceMgr, block, config, sourceFileLoc);
 }

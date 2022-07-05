@@ -783,8 +783,8 @@ struct DSEState {
   DSEState(Function &F, AliasAnalysis &AA, MemorySSA &MSSA, DominatorTree &DT,
            PostDominatorTree &PDT, AssumptionCache &AC,
            const TargetLibraryInfo &TLI, const LoopInfo &LI)
-      : F(F), AA(AA), EI(DT, LI), BatchAA(AA, &EI), MSSA(MSSA), DT(DT),
-        PDT(PDT), TLI(TLI), DL(F.getParent()->getDataLayout()), LI(LI) {
+      : F(F), AA(AA), EI(DT, LI, EphValues), BatchAA(AA, &EI), MSSA(MSSA),
+        DT(DT), PDT(PDT), TLI(TLI), DL(F.getParent()->getDataLayout()), LI(LI) {
     // Collect blocks with throwing instructions not modeled in MemorySSA and
     // alloc-like objects.
     unsigned PO = 0;
@@ -1014,7 +1014,8 @@ struct DSEState {
       if (CB->isLifetimeStartOrEnd())
         return false;
 
-      return CB->use_empty() && CB->willReturn() && CB->doesNotThrow();
+      return CB->use_empty() && CB->willReturn() && CB->doesNotThrow() &&
+             !CB->isTerminator();
     }
 
     return false;
@@ -1795,10 +1796,9 @@ struct DSEState {
     if (!isRemovable(DefI))
       return false;
 
-    if (StoredConstant && isAllocationFn(DefUO, &TLI)) {
-      auto *CB = cast<CallBase>(DefUO);
-      auto *InitC = getInitialValueOfAllocation(CB, &TLI,
-                                                StoredConstant->getType());
+    if (StoredConstant) {
+      Constant *InitC =
+          getInitialValueOfAllocation(DefUO, &TLI, StoredConstant->getType());
       // If the clobbering access is LiveOnEntry, no instructions between them
       // can modify the memory location.
       if (InitC && InitC == StoredConstant)

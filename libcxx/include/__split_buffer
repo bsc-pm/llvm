@@ -118,19 +118,10 @@ public:
     void __construct_at_end(size_type __n);
     void __construct_at_end(size_type __n, const_reference __x);
     template <class _InputIter>
-        typename enable_if
-        <
-            __is_cpp17_input_iterator<_InputIter>::value &&
-           !__is_cpp17_forward_iterator<_InputIter>::value,
-            void
-        >::type
+    __enable_if_t<__is_cpp17_input_iterator<_InputIter>::value && !__is_cpp17_forward_iterator<_InputIter>::value>
         __construct_at_end(_InputIter __first, _InputIter __last);
     template <class _ForwardIterator>
-        typename enable_if
-        <
-            __is_cpp17_forward_iterator<_ForwardIterator>::value,
-            void
-        >::type
+    __enable_if_t<__is_cpp17_forward_iterator<_ForwardIterator>::value>
         __construct_at_end(_ForwardIterator __first, _ForwardIterator __last);
 
     _LIBCPP_INLINE_VISIBILITY void __destruct_at_begin(pointer __new_begin)
@@ -239,12 +230,7 @@ __split_buffer<_Tp, _Allocator>::__construct_at_end(size_type __n, const_referen
 
 template <class _Tp, class _Allocator>
 template <class _InputIter>
-typename enable_if
-<
-     __is_cpp17_input_iterator<_InputIter>::value &&
-    !__is_cpp17_forward_iterator<_InputIter>::value,
-    void
->::type
+__enable_if_t<__is_cpp17_input_iterator<_InputIter>::value && !__is_cpp17_forward_iterator<_InputIter>::value>
 __split_buffer<_Tp, _Allocator>::__construct_at_end(_InputIter __first, _InputIter __last)
 {
     __alloc_rr& __a = this->__alloc();
@@ -267,11 +253,7 @@ __split_buffer<_Tp, _Allocator>::__construct_at_end(_InputIter __first, _InputIt
 
 template <class _Tp, class _Allocator>
 template <class _ForwardIterator>
-typename enable_if
-<
-    __is_cpp17_forward_iterator<_ForwardIterator>::value,
-    void
->::type
+__enable_if_t<__is_cpp17_forward_iterator<_ForwardIterator>::value>
 __split_buffer<_Tp, _Allocator>::__construct_at_end(_ForwardIterator __first, _ForwardIterator __last)
 {
     _ConstructTransaction __tx(&this->__end_, _VSTD::distance(__first, __last));
@@ -319,7 +301,13 @@ template <class _Tp, class _Allocator>
 __split_buffer<_Tp, _Allocator>::__split_buffer(size_type __cap, size_type __start, __alloc_rr& __a)
     : __end_cap_(nullptr, __a)
 {
-    __first_ = __cap != 0 ? __alloc_traits::allocate(__alloc(), __cap) : nullptr;
+    if (__cap == 0) {
+        __first_ = nullptr;
+    } else {
+        auto __allocation = std::__allocate_at_least(__alloc(), __cap);
+        __first_ = __allocation.ptr;
+        __cap = __allocation.count;
+    }
     __begin_ = __end_ = __first_ + __start;
     __end_cap() = __first_ + __cap;
 }
@@ -385,10 +373,10 @@ __split_buffer<_Tp, _Allocator>::__split_buffer(__split_buffer&& __c, const __al
     }
     else
     {
-        size_type __cap = __c.size();
-        __first_ = __alloc_traits::allocate(__alloc(), __cap);
+        auto __allocation = std::__allocate_at_least(__alloc(), __c.size());
+        __first_ = __allocation.ptr;
         __begin_ = __end_ = __first_;
-        __end_cap() = __first_ + __cap;
+        __end_cap() = __first_ + __allocation.count;
         typedef move_iterator<iterator> _Ip;
         __construct_at_end(_Ip(__c.begin()), _Ip(__c.end()));
     }

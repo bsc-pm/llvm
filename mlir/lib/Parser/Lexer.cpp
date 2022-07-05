@@ -99,6 +99,10 @@ Token Lexer::lexToken() {
     case ')':
       return formToken(Token::r_paren, tokStart);
     case '{':
+      if (*curPtr == '-' && *(curPtr + 1) == '#') {
+        curPtr += 2;
+        return formToken(Token::file_metadata_begin, tokStart);
+      }
       return formToken(Token::l_brace, tokStart);
     case '}':
       return formToken(Token::r_brace, tokStart);
@@ -127,6 +131,9 @@ Token Lexer::lexToken() {
     case '?':
       return formToken(Token::question, tokStart);
 
+    case '|':
+      return formToken(Token::vertical_bar, tokStart);
+
     case '/':
       if (*curPtr == '/') {
         skipComment();
@@ -137,12 +144,14 @@ Token Lexer::lexToken() {
     case '@':
       return lexAtIdentifier(tokStart);
 
-    case '!':
-      LLVM_FALLTHROUGH;
-    case '^':
-      LLVM_FALLTHROUGH;
     case '#':
+      if (*curPtr == '-' && *(curPtr + 1) == '}') {
+        curPtr += 2;
+        return formToken(Token::file_metadata_end, tokStart);
+      }
       LLVM_FALLTHROUGH;
+    case '!':
+    case '^':
     case '%':
       return lexPrefixedIdentifier(tokStart);
     case '"':

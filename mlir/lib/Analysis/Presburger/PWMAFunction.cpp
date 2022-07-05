@@ -35,7 +35,7 @@ PresburgerSet PWMAFunction::getDomain() const {
 
 Optional<SmallVector<int64_t, 8>>
 MultiAffineFunction::valueAt(ArrayRef<int64_t> point) const {
-  assert(point.size() == getNumDimAndSymbolIds() &&
+  assert(point.size() == domainSet.getNumDimAndSymbolVars() &&
          "Point has incorrect dimensionality!");
 
   Optional<SmallVector<int64_t, 8>> maybeLocalValues =
@@ -47,7 +47,7 @@ MultiAffineFunction::valueAt(ArrayRef<int64_t> point) const {
   SmallVector<int64_t, 8> pointHomogenous{llvm::to_vector(point)};
   // The given point didn't include the values of locals which the output is a
   // function of; we have computed one possible set of values and use them
-  // here. The function is not allowed to have local ids that take more than
+  // here. The function is not allowed to have local vars that take more than
   // one possible value.
   pointHomogenous.append(*maybeLocalValues);
   // The matrix `output` has an affine expression in the ith row, corresponding
@@ -55,7 +55,7 @@ MultiAffineFunction::valueAt(ArrayRef<int64_t> point) const {
   // of the matrix contains the constant term. Let v be the input point with
   // a 1 appended at the end. We can see that output * v gives the desired
   // output vector.
-  pointHomogenous.push_back(1);
+  pointHomogenous.emplace_back(1);
   SmallVector<int64_t, 8> result =
       output.postMultiplyWithColumn(pointHomogenous);
   assert(result.size() == getNumOutputs());
@@ -74,7 +74,7 @@ PWMAFunction::valueAt(ArrayRef<int64_t> point) const {
 
 void MultiAffineFunction::print(raw_ostream &os) const {
   os << "Domain:";
-  IntegerPolyhedron::print(os);
+  domainSet.print(os);
   os << "Output:\n";
   output.print(os);
   os << "\n";
@@ -83,35 +83,24 @@ void MultiAffineFunction::print(raw_ostream &os) const {
 void MultiAffineFunction::dump() const { print(llvm::errs()); }
 
 bool MultiAffineFunction::isEqual(const MultiAffineFunction &other) const {
-  return isSpaceCompatible(other) && getDomain().isEqual(other.getDomain()) &&
+  return getDomainSpace().isCompatible(other.getDomainSpace()) &&
+         getDomain().isEqual(other.getDomain()) &&
          isEqualWhereDomainsOverlap(other);
 }
 
-unsigned MultiAffineFunction::insertId(IdKind kind, unsigned pos,
-                                       unsigned num) {
-  assert((kind != IdKind::Domain || num == 0) &&
-         "Domain has to be zero in a set");
-  unsigned absolutePos = getIdKindOffset(kind) + pos;
+unsigned MultiAffineFunction::insertVar(VarKind kind, unsigned pos,
+                                        unsigned num) {
+  assert(kind != VarKind::Domain && "Domain has to be zero in a set");
+  unsigned absolutePos = domainSet.getVarKindOffset(kind) + pos;
   output.insertColumns(absolutePos, num);
-  return IntegerPolyhedron::insertId(kind, pos, num);
+  return domainSet.insertVar(kind, pos, num);
 }
 
-void MultiAffineFunction::swapId(unsigned posA, unsigned posB) {
-  output.swapColumns(posA, posB);
-  IntegerPolyhedron::swapId(posA, posB);
-}
-
-void MultiAffineFunction::removeIdRange(IdKind kind, unsigned idStart,
-                                        unsigned idLimit) {
-  output.removeColumns(idStart + getIdKindOffset(kind), idLimit - idStart);
-  IntegerPolyhedron::removeIdRange(kind, idStart, idLimit);
-}
-
-void MultiAffineFunction::eliminateRedundantLocalId(unsigned posA,
-                                                    unsigned posB) {
-  unsigned localOffset = getIdKindOffset(IdKind::Local);
-  output.addToColumn(localOffset + posB, localOffset + posA, /*scale=*/1);
-  IntegerPolyhedron::eliminateRedundantLocalId(posA, posB);
+void MultiAffineFunction::removeVarRange(VarKind kind, unsigned varStart,
+                                         unsigned varLimit) {
+  output.removeColumns(varStart + domainSet.getVarKindOffset(kind),
+                       varLimit - varStart);
+  domainSet.removeVarRange(kind, varStart, varLimit);
 }
 
 void MultiAffineFunction::truncateOutput(unsigned count) {
@@ -126,25 +115,53 @@ void PWMAFunction::truncateOutput(unsigned count) {
   numOutputs = count;
 }
 
+void MultiAffineFunction::mergeLocalVars(MultiAffineFunction &other) {
+  // Merge output local vars of both functions without using division
+  // information i.e. append local vars of `other` to `this` and insert
+  // local vars of `this` to `other` at the start of it's local vars.
+  output.insertColumns(domainSet.getVarKindEnd(VarKind::Local),
+                       other.domainSet.getNumLocalVars());
+  other.output.insertColumns(other.domainSet.getVarKindOffset(VarKind::Local),
+                             domainSet.getNumLocalVars());
+
+  auto merge = [this, &other](unsigned i, unsigned j) -> bool {
+    // Merge local at position j into local at position i in function domain.
+    domainSet.eliminateRedundantLocalVar(i, j);
+    other.domainSet.eliminateRedundantLocalVar(i, j);
+
+    unsigned localOffset = domainSet.getVarKindOffset(VarKind::Local);
+
+    // Merge local at position j into local at position i in output domain.
+    output.addToColumn(localOffset + j, localOffset + i, 1);
+    output.removeColumn(localOffset + j);
+    other.output.addToColumn(localOffset + j, localOffset + i, 1);
+    other.output.removeColumn(localOffset + j);
+
+    return true;
+  };
+
+  presburger::mergeLocalVars(domainSet, other.domainSet, merge);
+}
+
 bool MultiAffineFunction::isEqualWhereDomainsOverlap(
     MultiAffineFunction other) const {
-  if (!isSpaceCompatible(other))
+  if (!getDomainSpace().isCompatible(other.getDomainSpace()))
     return false;
 
   // `commonFunc` has the same output as `this`.
   MultiAffineFunction commonFunc = *this;
-  // After this merge, `commonFunc` and `other` have the same local ids; they
+  // After this merge, `commonFunc` and `other` have the same local vars; they
   // are merged.
-  commonFunc.mergeLocalIds(other);
+  commonFunc.mergeLocalVars(other);
   // After this, the domain of `commonFunc` will be the intersection of the
   // domains of `this` and `other`.
-  commonFunc.IntegerPolyhedron::append(other);
+  commonFunc.domainSet.append(other.domainSet);
 
   // `commonDomainMatching` contains the subset of the common domain
   // where the outputs of `this` and `other` match.
   //
   // We want to add constraints equating the outputs of `this` and `other`.
-  // However, `this` may have difference local ids from `other`, whereas we
+  // However, `this` may have difference local vars from `other`, whereas we
   // need both to have the same locals. Accordingly, we use `commonFunc.output`
   // in place of `this->output`, since `commonFunc` has the same output but also
   // has its locals merged.
@@ -161,7 +178,7 @@ bool MultiAffineFunction::isEqualWhereDomainsOverlap(
 /// Two PWMAFunctions are equal if they have the same dimensionalities,
 /// the same domain, and take the same value at every point in the domain.
 bool PWMAFunction::isEqual(const PWMAFunction &other) const {
-  if (!isSpaceCompatible(other))
+  if (!space.isCompatible(other.space))
     return false;
 
   if (!this->getDomain().isEqual(other.getDomain()))
@@ -179,7 +196,7 @@ bool PWMAFunction::isEqual(const PWMAFunction &other) const {
 }
 
 void PWMAFunction::addPiece(const MultiAffineFunction &piece) {
-  assert(piece.isSpaceCompatible(*this) &&
+  assert(space.isCompatible(piece.getDomainSpace()) &&
          "Piece to be added is not compatible with this PWMAFunction!");
   assert(piece.isConsistent() && "Piece is internally inconsistent!");
   assert(this->getDomain()

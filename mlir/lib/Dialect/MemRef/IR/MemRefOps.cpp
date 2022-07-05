@@ -275,7 +275,7 @@ ParseResult AllocaScopeOp::parse(OpAsmParser &parser, OperationState &result) {
     return failure();
 
   // Parse the body region.
-  if (parser.parseRegion(*bodyRegion, /*arguments=*/{}, /*argTypes=*/{}))
+  if (parser.parseRegion(*bodyRegion, /*arguments=*/{}))
     return failure();
   AllocaScopeOp::ensureTerminator(*bodyRegion, parser.getBuilder(),
                                   result.location);
@@ -290,7 +290,7 @@ ParseResult AllocaScopeOp::parse(OpAsmParser &parser, OperationState &result) {
 void AllocaScopeOp::getSuccessorRegions(
     Optional<unsigned> index, ArrayRef<Attribute> operands,
     SmallVectorImpl<RegionSuccessor> &regions) {
-  if (index.hasValue()) {
+  if (index) {
     regions.push_back(RegionSuccessor(getResults()));
     return;
   }
@@ -756,13 +756,13 @@ Optional<int64_t> DimOp::getConstantIndex() {
 LogicalResult DimOp::verify() {
   // Assume unknown index to be in range.
   Optional<int64_t> index = getConstantIndex();
-  if (!index.hasValue())
+  if (!index)
     return success();
 
   // Check that constant index is not knowingly out of range.
   auto type = source().getType();
   if (auto memrefType = type.dyn_cast<MemRefType>()) {
-    if (index.getValue() >= memrefType.getRank())
+    if (*index >= memrefType.getRank())
       return emitOpError("index is out of range");
   } else if (type.isa<UnrankedMemRefType>()) {
     // Assume index to be in range.
@@ -1215,7 +1215,7 @@ ParseResult GenericAtomicRMWOp::parse(OpAsmParser &parser,
     return failure();
 
   Region *body = result.addRegion();
-  if (parser.parseRegion(*body, llvm::None, llvm::None) ||
+  if (parser.parseRegion(*body, {}) ||
       parser.parseOptionalAttrDict(result.attributes))
     return failure();
   result.types.push_back(memrefType.cast<MemRefType>().getElementType());
@@ -1316,7 +1316,7 @@ LogicalResult GlobalOp::verify() {
   }
 
   if (Optional<uint64_t> alignAttr = alignment()) {
-    uint64_t alignment = alignAttr.getValue();
+    uint64_t alignment = *alignAttr;
 
     if (!llvm::isPowerOf2_64(alignment))
       return emitError() << "alignment attribute value " << alignment
@@ -1415,7 +1415,7 @@ ParseResult PrefetchOp::parse(OpAsmParser &parser, OperationState &result) {
     return parser.emitError(parser.getNameLoc(),
                             "rw specifier has to be 'read' or 'write'");
   result.addAttribute(
-      PrefetchOp::getIsWriteAttrName(),
+      PrefetchOp::getIsWriteAttrStrName(),
       parser.getBuilder().getBoolAttr(readOrWrite.equals("write")));
 
   if (!cacheType.equals("data") && !cacheType.equals("instr"))
@@ -1423,7 +1423,7 @@ ParseResult PrefetchOp::parse(OpAsmParser &parser, OperationState &result) {
                             "cache type has to be 'data' or 'instr'");
 
   result.addAttribute(
-      PrefetchOp::getIsDataCacheAttrName(),
+      PrefetchOp::getIsDataCacheAttrStrName(),
       parser.getBuilder().getBoolAttr(cacheType.equals("data")));
 
   return success();
@@ -1734,9 +1734,10 @@ computeExpandedLayoutMap(MemRefType srcType, ArrayRef<int64_t> resultShape,
                                   .asStride();
     }
   }
-  return makeStridedLinearLayoutMap(
-      llvm::to_vector<8>(llvm::reverse(reverseResultStrides)), srcOffset,
-      srcType.getContext());
+  auto resultStrides = llvm::to_vector<8>(llvm::reverse(reverseResultStrides));
+  resultStrides.resize(resultShape.size(), 1);
+  return makeStridedLinearLayoutMap(resultStrides, srcOffset,
+                                    srcType.getContext());
 }
 
 static FailureOr<MemRefType>
@@ -1812,41 +1813,83 @@ void ExpandShapeOp::getCanonicalizationPatterns(RewritePatternSet &results,
 ///
 /// Note: All collapsed dims in a reassociation group must be contiguous. It is
 /// not possible to check this by inspecting a MemRefType in the general case.
-/// But it is assumed. If this is not the case, the behavior is undefined.
+/// If non-contiguity cannot be checked statically, the collapse is assumed to
+/// be valid (and thus accepted by this function) unless `strict = true`.
 static FailureOr<AffineMap>
 computeCollapsedLayoutMap(MemRefType srcType,
-                          ArrayRef<ReassociationIndices> reassociation) {
+                          ArrayRef<ReassociationIndices> reassociation,
+                          bool strict = false) {
   int64_t srcOffset;
   SmallVector<int64_t> srcStrides;
   auto srcShape = srcType.getShape();
   if (failed(getStridesAndOffset(srcType, srcStrides, srcOffset)))
     return failure();
 
-  // The result strides are exactly the strides of the last entry of each
-  // reassociation.
+  // The result stride of a reassociation group is the stride of the last entry
+  // of the reassociation. (TODO: Should be the minimum stride in the
+  // reassociation because strides are not necessarily sorted. E.g., when using
+  // memref.transpose.) Dimensions of size 1 should be skipped, because their
+  // strides are meaningless and could have any arbitrary value.
   SmallVector<int64_t> resultStrides;
   resultStrides.reserve(reassociation.size());
-  for (ReassociationIndices reassoc : reassociation)
-    resultStrides.push_back(srcStrides[reassoc.back()]);
+  for (const ReassociationIndices &reassoc : reassociation) {
+    ArrayRef<int64_t> ref = llvm::makeArrayRef(reassoc);
+    while (srcShape[ref.back()] == 1 && ref.size() > 1)
+      ref = ref.drop_back();
+    if (!ShapedType::isDynamic(srcShape[ref.back()]) || ref.size() == 1) {
+      resultStrides.push_back(srcStrides[ref.back()]);
+    } else {
+      // Dynamically-sized dims may turn out to be dims of size 1 at runtime, so
+      // the corresponding stride may have to be skipped. (See above comment.)
+      // Therefore, the result stride cannot be statically determined and must
+      // be dynamic.
+      resultStrides.push_back(ShapedType::kDynamicStrideOrOffset);
+    }
+  }
 
   // Validate that each reassociation group is contiguous.
   unsigned resultStrideIndex = resultStrides.size() - 1;
-  for (ReassociationIndices reassoc : llvm::reverse(reassociation)) {
+  for (const ReassociationIndices &reassoc : llvm::reverse(reassociation)) {
     auto trailingReassocs = ArrayRef<int64_t>(reassoc).drop_front();
     using saturated_arith::Wrapper;
     auto stride = Wrapper::stride(resultStrides[resultStrideIndex--]);
     for (int64_t idx : llvm::reverse(trailingReassocs)) {
       stride = stride * Wrapper::size(srcShape[idx]);
-      // Both are either static strides of the same value, or both are dynamic.
-      // The dynamic case is best effort atm : we can't check it statically.
-      // One exception to the dynamic check is when the srcShape is `1`, in
-      // which case it can never produce a non-contiguity.
-      if (stride != Wrapper::stride(srcStrides[idx - 1]) && srcShape[idx] != 1)
+
+      // Both source and result stride must have the same static value. In that
+      // case, we can be sure, that the dimensions are collapsible (because they
+      // are contiguous).
+      //
+      // One special case is when the srcShape is `1`, in which case it can
+      // never produce non-contiguity.
+      if (srcShape[idx] == 1)
+        continue;
+
+      // If `strict = false` (default during op verification), we accept cases
+      // where one or both strides are dynamic. This is best effort: We reject
+      // ops where obviously non-contiguous dims are collapsed, but accept ops
+      // where we cannot be sure statically. Such ops may fail at runtime. See
+      // the op documentation for details.
+      auto srcStride = Wrapper::stride(srcStrides[idx - 1]);
+      if (strict && (stride.saturated || srcStride.saturated))
+        return failure();
+
+      if (!stride.saturated && !srcStride.saturated && stride != srcStride)
         return failure();
     }
   }
   return makeStridedLinearLayoutMap(resultStrides, srcOffset,
                                     srcType.getContext());
+}
+
+bool CollapseShapeOp::isGuaranteedCollapsible(
+    MemRefType srcType, ArrayRef<ReassociationIndices> reassociation) {
+  // MemRefs with standard layout are always collapsible.
+  if (srcType.getLayout().isIdentity())
+    return true;
+
+  return succeeded(computeCollapsedLayoutMap(srcType, reassociation,
+                                             /*strict=*/true));
 }
 
 static MemRefType
@@ -1889,7 +1932,7 @@ void CollapseShapeOp::build(OpBuilder &b, OperationState &result, Value src,
   auto srcType = src.getType().cast<MemRefType>();
   MemRefType resultType = computeCollapsedType(srcType, reassociation);
   build(b, result, resultType, src, attrs);
-  result.addAttribute(getReassociationAttrName(),
+  result.addAttribute(::mlir::getReassociationAttrName(),
                       getReassociationIndicesAttribute(b, reassociation));
 }
 
@@ -2121,9 +2164,8 @@ Type SubViewOp::inferRankReducedResultType(unsigned resultRank,
       if (!dimsToProject.test(pos))
         projectedShape.push_back(shape[pos]);
 
-    AffineMap map = inferredType.getLayout().getAffineMap();
-    if (!map.isIdentity())
-      map = getProjectedMap(map, dimsToProject);
+    AffineMap map =
+        getProjectedMap(inferredType.getLayout().getAffineMap(), dimsToProject);
     inferredType =
         MemRefType::get(projectedShape, inferredType.getElementType(), map,
                         inferredType.getMemorySpace());
@@ -2280,7 +2322,7 @@ isRankReducedMemRefType(MemRefType originalType,
       originalType, candidateRankReducedType, sizes);
 
   // Sizes cannot be matched in case empty vector is returned.
-  if (!optionalUnusedDimsMask.hasValue())
+  if (!optionalUnusedDimsMask)
     return SliceVerificationResult::LayoutMismatch;
 
   if (originalType.getMemorySpace() !=
@@ -2409,7 +2451,7 @@ static MemRefType getCanonicalSubViewResultType(
   }
   AffineMap layoutMap = nonRankReducedType.getLayout().getAffineMap();
   if (!layoutMap.isIdentity())
-    layoutMap = getProjectedMap(layoutMap, unusedDims.getValue());
+    layoutMap = getProjectedMap(layoutMap, *unusedDims);
   return MemRefType::get(shape, nonRankReducedType.getElementType(), layoutMap,
                          nonRankReducedType.getMemorySpace());
 }
@@ -2456,7 +2498,7 @@ static bool isTrivialSubViewOp(SubViewOp subViewOp) {
   ArrayRef<int64_t> sourceShape = subViewOp.getSourceType().getShape();
   for (const auto &size : llvm::enumerate(mixedSizes)) {
     Optional<int64_t> intValue = getConstantIntValue(size.value());
-    if (!intValue || intValue.getValue() != sourceShape[size.index()])
+    if (!intValue || *intValue != sourceShape[size.index()])
       return false;
   }
   // All conditions met. The `SubViewOp` is foldable as a no-op.
@@ -2621,13 +2663,13 @@ void TransposeOp::build(OpBuilder &b, OperationState &result, Value in,
   MemRefType resultType = inferTransposeResultType(memRefType, permutationMap);
 
   build(b, result, resultType, in, attrs);
-  result.addAttribute(TransposeOp::getPermutationAttrName(), permutation);
+  result.addAttribute(TransposeOp::getPermutationAttrStrName(), permutation);
 }
 
 // transpose $in $permutation attr-dict : type($in) `to` type(results)
 void TransposeOp::print(OpAsmPrinter &p) {
   p << " " << in() << " " << permutation();
-  p.printOptionalAttrDict((*this)->getAttrs(), {getPermutationAttrName()});
+  p.printOptionalAttrDict((*this)->getAttrs(), {getPermutationAttrStrName()});
   p << " : " << in().getType() << " to " << getType();
 }
 
@@ -2643,7 +2685,7 @@ ParseResult TransposeOp::parse(OpAsmParser &parser, OperationState &result) {
       parser.addTypeToList(dstType, result.types))
     return failure();
 
-  result.addAttribute(TransposeOp::getPermutationAttrName(),
+  result.addAttribute(TransposeOp::getPermutationAttrStrName(),
                       AffineMapAttr::get(permutation));
   return success();
 }

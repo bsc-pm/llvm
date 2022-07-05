@@ -25,6 +25,7 @@
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
+#include "mlir/Support/ThreadLocalCache.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
@@ -39,6 +40,7 @@ namespace LLVM {
 // attribute definition itself.
 // TODO: this shouldn't be needed after we unify the attribute generation, i.e.
 // --gen-attr-* and --gen-attrdef-*.
+using cconv::CConv;
 using linkage::Linkage;
 } // namespace LLVM
 } // namespace mlir
@@ -72,6 +74,8 @@ struct LLVMDialectImpl;
 ///// Ops /////
 #define GET_OP_CLASSES
 #include "mlir/Dialect/LLVMIR/LLVMOps.h.inc"
+#define GET_OP_CLASSES
+#include "mlir/Dialect/LLVMIR/LLVMIntrinsicOps.h.inc"
 
 #include "mlir/Dialect/LLVMIR/LLVMOpsDialect.h.inc"
 

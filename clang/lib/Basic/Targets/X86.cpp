@@ -239,7 +239,6 @@ bool X86TargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
       HasAVX512ER = true;
     } else if (Feature == "+avx512fp16") {
       HasAVX512FP16 = true;
-      HasFloat16 = true;
     } else if (Feature == "+avx512pf") {
       HasAVX512PF = true;
     } else if (Feature == "+avx512dq") {
@@ -354,6 +353,8 @@ bool X86TargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
                            .Case("+sse", SSE1)
                            .Default(NoSSE);
     SSELevel = std::max(SSELevel, Level);
+
+    HasFloat16 = SSELevel >= SSE2;
 
     MMX3DNowEnum ThreeDNowLevel = llvm::StringSwitch<MMX3DNowEnum>(Feature)
                                       .Case("+3dnowa", AMD3DNowAthlon)
@@ -1490,8 +1491,8 @@ std::string X86TargetInfo::convertConstraint(const char *&Constraint) const {
     return std::string("{si}");
   case 'D':
     return std::string("{di}");
-  case 'p': // address
-    return std::string("im");
+  case 'p': // Keep 'p' constraint (address).
+    return std::string("p");
   case 't': // top of floating point stack.
     return std::string("{st}");
   case 'u':                        // second from top of floating point stack.

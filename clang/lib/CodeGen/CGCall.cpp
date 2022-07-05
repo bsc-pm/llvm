@@ -62,6 +62,8 @@ unsigned CodeGenTypes::ClangCallConvToLLVMCallConv(CallingConv CC) {
   // TODO: Add support for __vectorcall to LLVM.
   case CC_X86VectorCall: return llvm::CallingConv::X86_VectorCall;
   case CC_AArch64VectorCall: return llvm::CallingConv::AArch64_VectorCall;
+  case CC_AArch64SVEPCS: return llvm::CallingConv::AArch64_SVE_VectorCall;
+  case CC_AMDGPUKernelCall: return llvm::CallingConv::AMDGPU_KERNEL;
   case CC_SpirFunction: return llvm::CallingConv::SPIR_FUNC;
   case CC_OpenCLKernel: return CGM.getTargetCodeGenInfo().getOpenCLKernelCallingConv();
   case CC_PreserveMost: return llvm::CallingConv::PreserveMost;
@@ -227,6 +229,12 @@ static CallingConv getCallingConventionForDecl(const ObjCMethodDecl *D,
 
   if (D->hasAttr<AArch64VectorPcsAttr>())
     return CC_AArch64VectorCall;
+
+  if (D->hasAttr<AArch64SVEPcsAttr>())
+    return CC_AArch64SVEPCS;
+
+  if (D->hasAttr<AMDGPUKernelCallAttr>())
+    return CC_AMDGPUKernelCall;
 
   if (D->hasAttr<IntelOclBiccAttr>())
     return CC_IntelOclBicc;
@@ -1285,8 +1293,8 @@ static llvm::Value *CreateCoercedLoad(Address Src, llvm::Type *Ty,
   }
 
   // If coercing a fixed vector to a scalable vector for ABI compatibility, and
-  // the types match, use the llvm.experimental.vector.insert intrinsic to
-  // perform the conversion.
+  // the types match, use the llvm.vector.insert intrinsic to perform the
+  // conversion.
   if (auto *ScalableDst = dyn_cast<llvm::ScalableVectorType>(Ty)) {
     if (auto *FixedSrc = dyn_cast<llvm::FixedVectorType>(SrcTy)) {
       // If we are casting a fixed i8 vector to a scalable 16 x i1 predicate
@@ -1813,6 +1821,8 @@ void CodeGenModule::getDefaultFunctionAttributes(StringRef Name,
 
   if (AttrOnCallSite) {
     // Attributes that should go on the call site only.
+    // FIXME: Look for 'BuiltinAttr' on the function rather than re-checking
+    // the -fno-builtin-foo list.
     if (!CodeGenOpts.SimplifyLibCalls || LangOpts.isNoBuiltinFunc(Name))
       FuncAttrs.addAttribute(llvm::Attribute::NoBuiltin);
     if (!CodeGenOpts.TrapFuncName.empty())
@@ -1847,7 +1857,7 @@ void CodeGenModule::getDefaultFunctionAttributes(StringRef Name,
           CodeGenOpts.FP32DenormalMode.str());
     }
 
-    if (LangOpts.getFPExceptionMode() == LangOptions::FPE_Ignore)
+    if (LangOpts.getDefaultExceptionMode() == LangOptions::FPE_Ignore)
       FuncAttrs.addAttribute("no-trapping-math", "true");
 
     // TODO: Are these all needed?
@@ -2928,8 +2938,7 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
       // VLST arguments are coerced to VLATs at the function boundary for
       // ABI consistency. If this is a VLST that was coerced to
       // a VLAT at the function boundary and the types match up, use
-      // llvm.experimental.vector.extract to convert back to the original
-      // VLST.
+      // llvm.vector.extract to convert back to the original VLST.
       if (auto *VecTyTo = dyn_cast<llvm::FixedVectorType>(ConvertType(Ty))) {
         llvm::Value *Coerced = Fn->getArg(FirstIRArg);
         if (auto *VecTyFrom =
@@ -3236,7 +3245,8 @@ static llvm::StoreInst *findDominatingStoreToReturnValue(CodeGenFunction &CGF) {
   // ReturnValue to some other location.
   auto GetStoreIfValid = [&CGF](llvm::User *U) -> llvm::StoreInst * {
     auto *SI = dyn_cast<llvm::StoreInst>(U);
-    if (!SI || SI->getPointerOperand() != CGF.ReturnValue.getPointer())
+    if (!SI || SI->getPointerOperand() != CGF.ReturnValue.getPointer() ||
+        SI->getValueOperand()->getType() != CGF.ReturnValue.getElementType())
       return nullptr;
     // These aren't actually possible for non-coerced returns, and we
     // only care about non-coerced returns on this code path.
@@ -3250,28 +3260,19 @@ static llvm::StoreInst *findDominatingStoreToReturnValue(CodeGenFunction &CGF) {
   if (!CGF.ReturnValue.getPointer()->hasOneUse()) {
     llvm::BasicBlock *IP = CGF.Builder.GetInsertBlock();
     if (IP->empty()) return nullptr;
-    llvm::Instruction *I = &IP->back();
 
-    // Skip lifetime markers
-    for (llvm::BasicBlock::reverse_iterator II = IP->rbegin(),
-                                            IE = IP->rend();
-         II != IE; ++II) {
-      if (llvm::IntrinsicInst *Intrinsic =
-              dyn_cast<llvm::IntrinsicInst>(&*II)) {
-        if (Intrinsic->getIntrinsicID() == llvm::Intrinsic::lifetime_end) {
-          const llvm::Value *CastAddr = Intrinsic->getArgOperand(1);
-          ++II;
-          if (II == IE)
-            break;
-          if (isa<llvm::BitCastInst>(&*II) && (CastAddr == &*II))
-            continue;
-        }
-      }
-      I = &*II;
-      break;
+    // Look at directly preceding instruction, skipping bitcasts and lifetime
+    // markers.
+    for (llvm::Instruction &I : make_range(IP->rbegin(), IP->rend())) {
+      if (isa<llvm::BitCastInst>(&I))
+        continue;
+      if (auto *II = dyn_cast<llvm::IntrinsicInst>(&I))
+        if (II->getIntrinsicID() == llvm::Intrinsic::lifetime_end)
+          continue;
+
+      return GetStoreIfValid(&I);
     }
-
-    return GetStoreIfValid(I);
+    return nullptr;
   }
 
   llvm::StoreInst *store =
@@ -3472,7 +3473,7 @@ llvm::Value *CodeGenFunction::EmitCMSEClearRecord(llvm::Value *Src,
   int CharsPerElt =
       ATy->getArrayElementType()->getScalarSizeInBits() / CharWidth;
   int MaskIndex = 0;
-  llvm::Value *R = llvm::UndefValue::get(ATy);
+  llvm::Value *R = llvm::PoisonValue::get(ATy);
   for (int I = 0, N = ATy->getArrayNumElements(); I != N; ++I) {
     uint64_t Mask = buildMultiCharMask(Bits, MaskIndex, CharsPerElt, CharWidth,
                                        DataLayout.isBigEndian());
@@ -3646,7 +3647,7 @@ void CodeGenFunction::EmitFunctionEpilog(const CGFunctionInfo &FI,
       // Construct a return type that lacks padding elements.
       llvm::Type *returnType = RetAI.getUnpaddedCoerceAndExpandType();
 
-      RV = llvm::UndefValue::get(returnType);
+      RV = llvm::PoisonValue::get(returnType);
       for (unsigned i = 0, e = results.size(); i != e; ++i) {
         RV = Builder.CreateInsertValue(RV, results[i], i);
       }
@@ -3753,7 +3754,7 @@ static AggValueSlot createPlaceholderSlot(CodeGenFunction &CGF,
   // placeholders.
   llvm::Type *IRTy = CGF.ConvertTypeForMem(Ty);
   llvm::Type *IRPtrTy = IRTy->getPointerTo();
-  llvm::Value *Placeholder = llvm::UndefValue::get(IRPtrTy->getPointerTo());
+  llvm::Value *Placeholder = llvm::PoisonValue::get(IRPtrTy->getPointerTo());
 
   // FIXME: When we generate this IR in one pass, we shouldn't need
   // this win32-specific alignment hack.

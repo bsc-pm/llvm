@@ -1162,6 +1162,10 @@ public:
   /// Keep track of CUDA/HIP device-side variables ODR-used by host code.
   llvm::DenseSet<const VarDecl *> CUDADeviceVarODRUsedByHost;
 
+  /// Keep track of CUDA/HIP external kernels or device variables ODR-used by
+  /// host code.
+  llvm::DenseSet<const ValueDecl *> CUDAExternalDeviceDeclODRUsedByHost;
+
   ASTContext(LangOptions &LOpts, SourceManager &SM, IdentifierTable &idents,
              SelectorTable &sels, Builtin::Context &builtins,
              TranslationUnitKind TUKind);
@@ -2180,7 +2184,7 @@ public:
 
   TemplateName getQualifiedTemplateName(NestedNameSpecifier *NNS,
                                         bool TemplateKeyword,
-                                        TemplateDecl *Template) const;
+                                        TemplateName Template) const;
 
   TemplateName getDependentTemplateName(NestedNameSpecifier *NNS,
                                         const IdentifierInfo *Name) const;
@@ -2552,7 +2556,7 @@ public:
                                        bool IsParam) const {
     auto SubTnullability = SubT->getNullability(*this);
     auto SuperTnullability = SuperT->getNullability(*this);
-    if (SubTnullability.hasValue() == SuperTnullability.hasValue()) {
+    if (SubTnullability.has_value() == SuperTnullability.has_value()) {
       // Neither has nullability; return true
       if (!SubTnullability)
         return true;
@@ -3039,7 +3043,8 @@ public:
   DeclaratorDecl *getDeclaratorForUnnamedTagDecl(const TagDecl *TD);
 
   void setManglingNumber(const NamedDecl *ND, unsigned Number);
-  unsigned getManglingNumber(const NamedDecl *ND) const;
+  unsigned getManglingNumber(const NamedDecl *ND,
+                             bool ForAuxTarget = false) const;
 
   void setStaticLocalNumber(const VarDecl *VD, unsigned Number);
   unsigned getStaticLocalNumber(const VarDecl *VD) const;
@@ -3291,11 +3296,11 @@ public:
   /// Return a new OMPTraitInfo object owned by this context.
   OMPTraitInfo &getNewOMPTraitInfo();
 
-  /// Whether a C++ static variable may be externalized.
-  bool mayExternalizeStaticVar(const Decl *D) const;
+  /// Whether a C++ static variable or CUDA/HIP kernel may be externalized.
+  bool mayExternalize(const Decl *D) const;
 
-  /// Whether a C++ static variable should be externalized.
-  bool shouldExternalizeStaticVar(const Decl *D) const;
+  /// Whether a C++ static variable or CUDA/HIP kernel should be externalized.
+  bool shouldExternalize(const Decl *D) const;
 
   StringRef getCUIDHash() const;
 

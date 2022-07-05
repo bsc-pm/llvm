@@ -28,11 +28,12 @@ public:
 
   Builder builder;
 
-  Parser(ParserState &state) : builder(state.context), state(state) {}
+  Parser(ParserState &state)
+      : builder(state.config.getContext()), state(state) {}
 
   // Helper methods to get stuff from the parser-global state.
   ParserState &getState() const { return state; }
-  MLIRContext *getContext() const { return state.context; }
+  MLIRContext *getContext() const { return state.config.getContext(); }
   const llvm::SourceMgr &getSourceMgr() { return state.lex.getSourceMgr(); }
 
   /// Parse a comma-separated list of elements up until the specified end token.
@@ -68,16 +69,14 @@ public:
   //===--------------------------------------------------------------------===//
 
   /// Emit an error and return failure.
-  InFlightDiagnostic emitError(const Twine &message = {}) {
-    // If the error is to be emitted at EOF, move it back one character.
-    if (state.curToken.is(Token::eof)) {
-      return emitError(
-          SMLoc::getFromPointer(state.curToken.getLoc().getPointer() - 1),
-          message);
-    }
-    return emitError(state.curToken.getLoc(), message);
-  }
+  InFlightDiagnostic emitError(const Twine &message = {});
   InFlightDiagnostic emitError(SMLoc loc, const Twine &message = {});
+
+  /// Emit an error about a "wrong token".  If the current token is at the
+  /// start of a source line, this will apply heuristics to back up and report
+  /// the error at the end of the previous line, which is where the expected
+  /// token is supposed to be.
+  InFlightDiagnostic emitWrongTokenError(const Twine &message = {});
 
   /// Encode the specified source location information into an attribute for
   /// attachment to the IR.
@@ -155,6 +154,23 @@ public:
                                            const llvm::fltSemantics &semantics,
                                            size_t typeSizeInBits);
 
+  /// Returns true if the current token corresponds to a keyword.
+  bool isCurrentTokenAKeyword() const {
+    return getToken().isAny(Token::bare_identifier, Token::inttype) ||
+           getToken().isKeyword();
+  }
+
+  /// Parse a keyword, if present, into 'keyword'.
+  ParseResult parseOptionalKeyword(StringRef *keyword);
+
+  //===--------------------------------------------------------------------===//
+  // Resource Parsing
+  //===--------------------------------------------------------------------===//
+
+  /// Parse a handle to a dialect resource within the assembly format.
+  FailureOr<AsmDialectResourceHandle>
+  parseResourceHandle(const OpAsmDialectInterface *dialect, StringRef &name);
+
   //===--------------------------------------------------------------------===//
   // Type Parsing
   //===--------------------------------------------------------------------===//
@@ -205,7 +221,8 @@ public:
   ParseResult parseVectorDimensionList(SmallVectorImpl<int64_t> &dimensions,
                                        unsigned &numScalableDims);
   ParseResult parseDimensionListRanked(SmallVectorImpl<int64_t> &dimensions,
-                                       bool allowDynamic = true);
+                                       bool allowDynamic = true,
+                                       bool withTrailingX = true);
   ParseResult parseIntegerInDimensionList(int64_t &value);
   ParseResult parseXInDimensionList();
 
@@ -264,6 +281,9 @@ public:
   /// Parse a dense elements attribute.
   Attribute parseDenseElementsAttr(Type attrType);
   ShapedType parseElementsLiteralType(Type type);
+
+  /// Parse a DenseArrayAttr.
+  Attribute parseDenseArrayAttr();
 
   /// Parse a sparse elements attribute.
   Attribute parseSparseElementsAttr(Type attrType);

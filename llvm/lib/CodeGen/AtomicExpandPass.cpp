@@ -254,7 +254,8 @@ bool AtomicExpand::runOnFunction(Function &F) {
     }
 
     if (LI) {
-      if (LI->getType()->isFloatingPointTy()) {
+      if (TLI->shouldCastAtomicLoadInIR(LI) ==
+          TargetLoweringBase::AtomicExpansionKind::CastToInteger) {
         // TODO: add a TLI hook to control this so that each target can
         // convert to lowering the original type one at a time.
         LI = convertAtomicLoadToIntegerType(LI);
@@ -264,7 +265,8 @@ bool AtomicExpand::runOnFunction(Function &F) {
 
       MadeChange |= tryExpandAtomicLoad(LI);
     } else if (SI) {
-      if (SI->getValueOperand()->getType()->isFloatingPointTy()) {
+      if (TLI->shouldCastAtomicStoreInIR(SI) ==
+          TargetLoweringBase::AtomicExpansionKind::CastToInteger) {
         // TODO: add a TLI hook to control this so that each target can
         // convert to lowering the original type one at a time.
         SI = convertAtomicStoreToIntegerType(SI);
@@ -285,8 +287,8 @@ bool AtomicExpand::runOnFunction(Function &F) {
         MadeChange = true;
       } else {
         AtomicRMWInst::BinOp Op = RMWI->getOperation();
-        if (Op == AtomicRMWInst::Xchg &&
-            RMWI->getValOperand()->getType()->isFloatingPointTy()) {
+        if (TLI->shouldCastAtomicRMWIInIR(RMWI) ==
+            TargetLoweringBase::AtomicExpansionKind::CastToInteger) {
           // TODO: add a TLI hook to control this so that each target can
           // convert to lowering the original type one at a time.
           RMWI = convertAtomicXchgToIntegerType(RMWI);
@@ -385,7 +387,9 @@ AtomicExpand::convertAtomicXchgToIntegerType(AtomicRMWInst *RMWI) {
   Value *Val = RMWI->getValOperand();
   Type *PT = PointerType::get(NewTy, RMWI->getPointerAddressSpace());
   Value *NewAddr = Builder.CreateBitCast(Addr, PT);
-  Value *NewVal = Builder.CreateBitCast(Val, NewTy);
+  Value *NewVal = Val->getType()->isPointerTy()
+                      ? Builder.CreatePtrToInt(Val, NewTy)
+                      : Builder.CreateBitCast(Val, NewTy);
 
   auto *NewRMWI =
       Builder.CreateAtomicRMW(AtomicRMWInst::Xchg, NewAddr, NewVal,
@@ -393,7 +397,9 @@ AtomicExpand::convertAtomicXchgToIntegerType(AtomicRMWInst *RMWI) {
   NewRMWI->setVolatile(RMWI->isVolatile());
   LLVM_DEBUG(dbgs() << "Replaced " << *RMWI << " with " << *NewRMWI << "\n");
 
-  Value *NewRVal = Builder.CreateBitCast(NewRMWI, RMWI->getType());
+  Value *NewRVal = RMWI->getType()->isPointerTy()
+                       ? Builder.CreateIntToPtr(NewRMWI, RMWI->getType())
+                       : Builder.CreateBitCast(NewRMWI, RMWI->getType());
   RMWI->replaceAllUsesWith(NewRVal);
   RMWI->eraseFromParent();
   return NewRMWI;
@@ -525,6 +531,7 @@ static void createCmpXchgInstFun(IRBuilder<> &Builder, Value *Addr,
   Type *OrigTy = NewVal->getType();
 
   // This code can go away when cmpxchg supports FP types.
+  assert(!OrigTy->isPointerTy());
   bool NeedBitcast = OrigTy->isFloatingPointTy();
   if (NeedBitcast) {
     IntegerType *IntTy = Builder.getIntNTy(OrigTy->getPrimitiveSizeInBits());
@@ -544,47 +551,6 @@ static void createCmpXchgInstFun(IRBuilder<> &Builder, Value *Addr,
     NewLoaded = Builder.CreateBitCast(NewLoaded, OrigTy);
 }
 
-/// Emit IR to implement the given atomicrmw operation on values in registers,
-/// returning the new value.
-static Value *performAtomicOp(AtomicRMWInst::BinOp Op, IRBuilder<> &Builder,
-                              Value *Loaded, Value *Inc) {
-  Value *NewVal;
-  switch (Op) {
-  case AtomicRMWInst::Xchg:
-    return Inc;
-  case AtomicRMWInst::Add:
-    return Builder.CreateAdd(Loaded, Inc, "new");
-  case AtomicRMWInst::Sub:
-    return Builder.CreateSub(Loaded, Inc, "new");
-  case AtomicRMWInst::And:
-    return Builder.CreateAnd(Loaded, Inc, "new");
-  case AtomicRMWInst::Nand:
-    return Builder.CreateNot(Builder.CreateAnd(Loaded, Inc), "new");
-  case AtomicRMWInst::Or:
-    return Builder.CreateOr(Loaded, Inc, "new");
-  case AtomicRMWInst::Xor:
-    return Builder.CreateXor(Loaded, Inc, "new");
-  case AtomicRMWInst::Max:
-    NewVal = Builder.CreateICmpSGT(Loaded, Inc);
-    return Builder.CreateSelect(NewVal, Loaded, Inc, "new");
-  case AtomicRMWInst::Min:
-    NewVal = Builder.CreateICmpSLE(Loaded, Inc);
-    return Builder.CreateSelect(NewVal, Loaded, Inc, "new");
-  case AtomicRMWInst::UMax:
-    NewVal = Builder.CreateICmpUGT(Loaded, Inc);
-    return Builder.CreateSelect(NewVal, Loaded, Inc, "new");
-  case AtomicRMWInst::UMin:
-    NewVal = Builder.CreateICmpULE(Loaded, Inc);
-    return Builder.CreateSelect(NewVal, Loaded, Inc, "new");
-  case AtomicRMWInst::FAdd:
-    return Builder.CreateFAdd(Loaded, Inc, "new");
-  case AtomicRMWInst::FSub:
-    return Builder.CreateFSub(Loaded, Inc, "new");
-  default:
-    llvm_unreachable("Unknown atomic op");
-  }
-}
-
 bool AtomicExpand::tryExpandAtomicRMW(AtomicRMWInst *AI) {
   LLVMContext &Ctx = AI->getModule()->getContext();
   TargetLowering::AtomicExpansionKind Kind = TLI->shouldExpandAtomicRMWInIR(AI);
@@ -599,8 +565,8 @@ bool AtomicExpand::tryExpandAtomicRMW(AtomicRMWInst *AI) {
                               TargetLoweringBase::AtomicExpansionKind::LLSC);
     } else {
       auto PerformOp = [&](IRBuilder<> &Builder, Value *Loaded) {
-        return performAtomicOp(AI->getOperation(), Builder, Loaded,
-                               AI->getValOperand());
+        return buildAtomicRMWValue(AI->getOperation(), Builder, Loaded,
+                                   AI->getValOperand());
       };
       expandAtomicOpToLLSC(AI, AI->getType(), AI->getPointerOperand(),
                            AI->getAlign(), AI->getOrdering(), PerformOp);
@@ -810,7 +776,7 @@ static Value *performMaskedAtomicOp(AtomicRMWInst::BinOp Op,
   case AtomicRMWInst::Sub:
   case AtomicRMWInst::Nand: {
     // The other arithmetic ops need to be masked into place.
-    Value *NewVal = performAtomicOp(Op, Builder, Loaded, Shifted_Inc);
+    Value *NewVal = buildAtomicRMWValue(Op, Builder, Loaded, Shifted_Inc);
     Value *NewVal_Masked = Builder.CreateAnd(NewVal, PMV.Mask);
     Value *Loaded_MaskOut = Builder.CreateAnd(Loaded, PMV.Inv_Mask);
     Value *FinalVal = Builder.CreateOr(Loaded_MaskOut, NewVal_Masked);
@@ -824,7 +790,7 @@ static Value *performMaskedAtomicOp(AtomicRMWInst::BinOp Op,
     // truncate down to the original size, and expand out again after
     // doing the operation.
     Value *Loaded_Extract = extractMaskedValue(Builder, Loaded, PMV);
-    Value *NewVal = performAtomicOp(Op, Builder, Loaded_Extract, Inc);
+    Value *NewVal = buildAtomicRMWValue(Op, Builder, Loaded_Extract, Inc);
     Value *FinalVal = insertMaskedValue(Builder, Loaded, NewVal, PMV);
     return FinalVal;
   }
@@ -1558,8 +1524,8 @@ bool llvm::expandAtomicRMWToCmpXchg(AtomicRMWInst *AI,
       Builder, AI->getType(), AI->getPointerOperand(), AI->getAlign(),
       AI->getOrdering(), AI->getSyncScopeID(),
       [&](IRBuilder<> &Builder, Value *Loaded) {
-        return performAtomicOp(AI->getOperation(), Builder, Loaded,
-                               AI->getValOperand());
+        return buildAtomicRMWValue(AI->getOperation(), Builder, Loaded,
+                                   AI->getValOperand());
       },
       CreateCmpXchg);
 

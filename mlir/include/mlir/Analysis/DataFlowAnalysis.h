@@ -22,34 +22,17 @@
 #ifndef MLIR_ANALYSIS_DATAFLOWANALYSIS_H
 #define MLIR_ANALYSIS_DATAFLOWANALYSIS_H
 
+#include "mlir/Analysis/DataFlowFramework.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/Support/Allocator.h"
 
+/// TODO: Remove this file when SCCP and integer range analysis have been ported
+/// to the new framework.
+
 namespace mlir {
-//===----------------------------------------------------------------------===//
-// ChangeResult
-//===----------------------------------------------------------------------===//
-
-/// A result type used to indicate if a change happened. Boolean operations on
-/// ChangeResult behave as though `Change` is truthy.
-enum class ChangeResult {
-  NoChange,
-  Change,
-};
-inline ChangeResult operator|(ChangeResult lhs, ChangeResult rhs) {
-  return lhs == ChangeResult::Change ? lhs : rhs;
-}
-inline ChangeResult &operator|=(ChangeResult &lhs, ChangeResult rhs) {
-  lhs = lhs | rhs;
-  return lhs;
-}
-inline ChangeResult operator&(ChangeResult lhs, ChangeResult rhs) {
-  return lhs == ChangeResult::NoChange ? lhs : rhs;
-}
-
 //===----------------------------------------------------------------------===//
 // AbstractLatticeElement
 //===----------------------------------------------------------------------===//
@@ -120,7 +103,7 @@ public:
   }
 
   /// Returns true if the value of this lattice hasn't yet been initialized.
-  bool isUninitialized() const final { return !optimisticValue.hasValue(); }
+  bool isUninitialized() const final { return !optimisticValue; }
 
   /// Join the information contained in the 'rhs' lattice into this
   /// lattice. Returns if the state of the current lattice changed.
@@ -250,6 +233,15 @@ public:
                            ArrayRef<AbstractLatticeElement *> operands,
                            SmallVectorImpl<RegionSuccessor> &successors) = 0;
 
+  /// Given a operation with successor regions, one of those regions,
+  /// and the lattice elements corresponding to the operation's
+  /// arguments, compute the latice values for block arguments
+  /// that are not accounted for by the branching control flow (ex. the
+  /// bounds of loops).
+  virtual ChangeResult
+  visitNonControlFlowArguments(Operation *op, const RegionSuccessor &region,
+                               ArrayRef<AbstractLatticeElement *> operands) = 0;
+
   /// Create a new uninitialized lattice element. An optional value is provided
   /// which, if valid, should be used to initialize the known conservative state
   /// of the lattice.
@@ -347,6 +339,33 @@ protected:
     branch.getSuccessorRegions(sourceIndex, constantOperands, successors);
   }
 
+  /// Given a operation with successor regions, one of those regions,
+  /// and the lattice elements corresponding to the operation's
+  /// arguments, compute the latice values for block arguments
+  /// that are not accounted for by the branching control flow (ex. the
+  /// bounds of loops). By default, this method marks all such lattice elements
+  /// as having reached a pessimistic fixpoint. The region in the
+  /// RegionSuccessor and the operand latice elements are guaranteed to be
+  /// non-null.
+  virtual ChangeResult
+  visitNonControlFlowArguments(Operation *op, const RegionSuccessor &successor,
+                               ArrayRef<LatticeElement<ValueT> *> operands) {
+    ChangeResult result = ChangeResult::NoChange;
+    Region *region = successor.getSuccessor();
+    ValueRange succArgs = successor.getSuccessorInputs();
+    Block *block = &region->front();
+    Block::BlockArgListType arguments = block->getArguments();
+    if (arguments.size() != succArgs.size()) {
+      unsigned firstArgIdx =
+          succArgs.empty() ? 0
+                           : succArgs[0].cast<BlockArgument>().getArgNumber();
+      result |= markAllPessimisticFixpoint(arguments.take_front(firstArgIdx));
+      result |= markAllPessimisticFixpoint(
+          arguments.drop_front(firstArgIdx + succArgs.size()));
+    }
+    return result;
+  }
+
 private:
   /// Type-erased wrappers that convert the abstract lattice operands to derived
   /// lattices and invoke the virtual hooks operating on the derived lattices.
@@ -378,6 +397,14 @@ private:
     getSuccessorsForOperands(
         branch, sourceIndex,
         llvm::makeArrayRef(derivedOperandBase, operands.size()), successors);
+  }
+  ChangeResult visitNonControlFlowArguments(
+      Operation *op, const RegionSuccessor &region,
+      ArrayRef<detail::AbstractLatticeElement *> operands) final {
+    LatticeElement<ValueT> *const *derivedOperandBase =
+        reinterpret_cast<LatticeElement<ValueT> *const *>(operands.data());
+    return visitNonControlFlowArguments(
+        op, region, llvm::makeArrayRef(derivedOperandBase, operands.size()));
   }
 
   /// Create a new uninitialized lattice element. An optional value is provided,

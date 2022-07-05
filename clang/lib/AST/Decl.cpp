@@ -31,6 +31,8 @@
 #include "clang/AST/ODRHash.h"
 #include "clang/AST/PrettyDeclStackTrace.h"
 #include "clang/AST/PrettyPrinter.h"
+#include "clang/AST/Randstruct.h"
+#include "clang/AST/RecordLayout.h"
 #include "clang/AST/Redeclarable.h"
 #include "clang/AST/Stmt.h"
 #include "clang/AST/TemplateBase.h"
@@ -587,6 +589,7 @@ static bool isExportedFromModuleInterfaceUnit(const NamedDecl *D) {
   // FIXME: Handle isModulePrivate.
   switch (D->getModuleOwnershipKind()) {
   case Decl::ModuleOwnershipKind::Unowned:
+  case Decl::ModuleOwnershipKind::ReachableWhenImported:
   case Decl::ModuleOwnershipKind::ModulePrivate:
     return false;
   case Decl::ModuleOwnershipKind::Visible:
@@ -1850,7 +1853,7 @@ bool NamedDecl::hasLinkage() const {
 
 NamedDecl *NamedDecl::getUnderlyingDeclImpl() {
   NamedDecl *ND = this;
-  while (auto *UD = dyn_cast<UsingShadowDecl>(ND))
+  if (auto *UD = dyn_cast<UsingShadowDecl>(ND))
     ND = UD->getTargetDecl();
 
   if (auto *AD = dyn_cast<ObjCCompatibleAliasDecl>(ND))
@@ -2722,6 +2725,42 @@ VarDecl::needsDestruction(const ASTContext &Ctx) const {
   return getType().isDestructedType();
 }
 
+bool VarDecl::hasFlexibleArrayInit(const ASTContext &Ctx) const {
+  assert(hasInit() && "Expect initializer to check for flexible array init");
+  auto *Ty = getType()->getAs<RecordType>();
+  if (!Ty || !Ty->getDecl()->hasFlexibleArrayMember())
+    return false;
+  auto *List = dyn_cast<InitListExpr>(getInit()->IgnoreParens());
+  if (!List)
+    return false;
+  const Expr *FlexibleInit = List->getInit(List->getNumInits() - 1);
+  auto InitTy = Ctx.getAsConstantArrayType(FlexibleInit->getType());
+  if (!InitTy)
+    return false;
+  return InitTy->getSize() != 0;
+}
+
+CharUnits VarDecl::getFlexibleArrayInitChars(const ASTContext &Ctx) const {
+  assert(hasInit() && "Expect initializer to check for flexible array init");
+  auto *Ty = getType()->getAs<RecordType>();
+  if (!Ty || !Ty->getDecl()->hasFlexibleArrayMember())
+    return CharUnits::Zero();
+  auto *List = dyn_cast<InitListExpr>(getInit()->IgnoreParens());
+  if (!List)
+    return CharUnits::Zero();
+  const Expr *FlexibleInit = List->getInit(List->getNumInits() - 1);
+  auto InitTy = Ctx.getAsConstantArrayType(FlexibleInit->getType());
+  if (!InitTy)
+    return CharUnits::Zero();
+  CharUnits FlexibleArraySize = Ctx.getTypeSizeInChars(InitTy);
+  const ASTRecordLayout &RL = Ctx.getASTRecordLayout(Ty->getDecl());
+  CharUnits FlexibleArrayOffset =
+      Ctx.toCharUnitsFromBits(RL.getFieldOffset(RL.getFieldCount() - 1));
+  if (FlexibleArrayOffset + FlexibleArraySize < RL.getSize())
+    return CharUnits::Zero();
+  return FlexibleArrayOffset + FlexibleArraySize - RL.getSize();
+}
+
 MemberSpecializationInfo *VarDecl::getMemberSpecializationInfo() const {
   if (isStaticDataMember())
     // FIXME: Remove ?
@@ -2830,7 +2869,8 @@ Expr *ParmVarDecl::getDefaultArg() {
 
   Expr *Arg = getInit();
   if (auto *E = dyn_cast_or_null<FullExpr>(Arg))
-    return E->getSubExpr();
+    if (!isa<ConstantExpr>(E))
+      return E->getSubExpr();
 
   return Arg;
 }
@@ -2917,6 +2957,7 @@ FunctionDecl::FunctionDecl(Kind DK, ASTContext &C, DeclContext *DC,
   FunctionDeclBits.IsDefaulted = false;
   FunctionDeclBits.IsExplicitlyDefaulted = false;
   FunctionDeclBits.HasDefaultedFunctionInfo = false;
+  FunctionDeclBits.IsIneligibleOrNotSelected = false;
   FunctionDeclBits.HasImplicitReturnZero = false;
   FunctionDeclBits.IsLateTemplateParsed = false;
   FunctionDeclBits.ConstexprKind = static_cast<uint64_t>(ConstexprKind);
@@ -4584,6 +4625,7 @@ RecordDecl::RecordDecl(Kind DK, TagKind TK, const ASTContext &C,
   setHasNonTrivialToPrimitiveCopyCUnion(false);
   setParamDestroyedInCallee(false);
   setArgPassingRestrictions(APK_CanPassInRegs);
+  setIsRandomized(false);
 }
 
 RecordDecl *RecordDecl::Create(const ASTContext &C, TagKind TK, DeclContext *DC,
@@ -4665,6 +4707,12 @@ void RecordDecl::completeDefinition() {
 /// -mms-bitfields command-line option.
 bool RecordDecl::isMsStruct(const ASTContext &C) const {
   return hasAttr<MSStructAttr>() || C.getLangOpts().MSBitfields == 1;
+}
+
+void RecordDecl::reorderDecls(const SmallVectorImpl<Decl *> &Decls) {
+  std::tie(FirstDecl, LastDecl) = DeclContext::BuildDeclChain(Decls, false);
+  LastDecl->NextInContextAndBits.setPointer(nullptr);
+  setIsRandomized(true);
 }
 
 void RecordDecl::LoadFieldsFromExternalStorage() const {

@@ -9,7 +9,7 @@
 // Support for piece-wise multi-affine functions. These are functions that are
 // defined on a domain that is a union of IntegerPolyhedrons, and on each domain
 // the value of the function is a tuple of integers, with each value in the
-// tuple being an affine expression in the ids of the IntegerPolyhedron.
+// tuple being an affine expression in the vars of the IntegerPolyhedron.
 //
 //===----------------------------------------------------------------------===//
 
@@ -25,7 +25,7 @@ namespace presburger {
 /// This class represents a multi-affine function whose domain is given by an
 /// IntegerPolyhedron. This can be thought of as an IntegerPolyhedron with a
 /// tuple of integer values attached to every point in the polyhedron, with the
-/// value of each element of the tuple given by an affine expression in the ids
+/// value of each element of the tuple given by an affine expression in the vars
 /// of the polyhedron. For example we could have the domain
 ///
 /// (x, y) : (x >= 5, y >= x)
@@ -35,62 +35,42 @@ namespace presburger {
 /// (x, y) -> (x + 2, 2*x - 3y + 5, 2*x + y).
 ///
 /// In this way every point in the polyhedron has a tuple of integers associated
-/// with it. If the integer polyhedron has local ids, then the output
+/// with it. If the integer polyhedron has local vars, then the output
 /// expressions can use them as well. The output expressions are represented as
 /// a matrix with one row for every element in the output vector one column for
-/// each id, and an extra column at the end for the constant term.
+/// each var, and an extra column at the end for the constant term.
 ///
 /// Checking equality of two such functions is supported, as well as finding the
 /// value of the function at a specified point.
-class MultiAffineFunction : protected IntegerPolyhedron {
+class MultiAffineFunction {
 public:
-  /// We use protected inheritance to avoid inheriting the whole public
-  /// interface of IntegerPolyhedron. These using declarations explicitly make
-  /// only the relevant functions part of the public interface.
-  using IntegerPolyhedron::getNumDimAndSymbolIds;
-  using IntegerPolyhedron::getNumDimIds;
-  using IntegerPolyhedron::getNumIds;
-  using IntegerPolyhedron::getNumLocalIds;
-  using IntegerPolyhedron::getNumSymbolIds;
-  using PresburgerSpace::isSpaceCompatible;
-  using PresburgerSpace::isSpaceEqual;
-
   MultiAffineFunction(const IntegerPolyhedron &domain, const Matrix &output)
-      : IntegerPolyhedron(domain), output(output) {}
+      : domainSet(domain), output(output) {}
   MultiAffineFunction(const Matrix &output, const PresburgerSpace &space)
-      : IntegerPolyhedron(space), output(output) {}
+      : domainSet(space), output(output) {}
 
-  ~MultiAffineFunction() override = default;
-  Kind getKind() const override { return Kind::MultiAffineFunction; }
-  bool classof(const IntegerRelation *rel) const {
-    return rel->getKind() == Kind::MultiAffineFunction;
-  }
-
-  unsigned getNumInputs() const { return getNumDimAndSymbolIds(); }
+  unsigned getNumInputs() const { return domainSet.getNumDimAndSymbolVars(); }
   unsigned getNumOutputs() const { return output.getNumRows(); }
   bool isConsistent() const {
-    return output.getNumColumns() == getNumIds() + 1;
+    return output.getNumColumns() == domainSet.getNumVars() + 1;
   }
-  const IntegerPolyhedron &getDomain() const { return *this; }
+  const IntegerPolyhedron &getDomain() const { return domainSet; }
+  const PresburgerSpace &getDomainSpace() const { return domainSet.getSpace(); }
 
-  /// Insert `num` identifiers of the specified kind at position `pos`.
-  /// Positions are relative to the kind of identifier. The coefficient columns
-  /// corresponding to the added identifiers are initialized to zero. Return the
-  /// absolute column position (i.e., not relative to the kind of identifier)
-  /// of the first added identifier.
-  unsigned insertId(IdKind kind, unsigned pos, unsigned num = 1) override;
+  /// Insert `num` variables of the specified kind at position `pos`.
+  /// Positions are relative to the kind of variable. The coefficient columns
+  /// corresponding to the added variables are initialized to zero. Return the
+  /// absolute column position (i.e., not relative to the kind of variable)
+  /// of the first added variable.
+  unsigned insertVar(VarKind kind, unsigned pos, unsigned num = 1);
 
-  /// Swap the posA^th identifier with the posB^th identifier.
-  void swapId(unsigned posA, unsigned posB) override;
+  /// Remove the specified range of vars.
+  void removeVarRange(VarKind kind, unsigned varStart, unsigned varLimit);
 
-  /// Remove the specified range of ids.
-  void removeIdRange(IdKind kind, unsigned idStart, unsigned idLimit) override;
-  using IntegerRelation::removeIdRange;
-
-  /// Eliminate the `posB^th` local identifier, replacing every instance of it
-  /// with the `posA^th` local identifier. This should be used when the two
-  /// local variables are known to always take the same values.
-  void eliminateRedundantLocalId(unsigned posA, unsigned posB) override;
+  /// Given a MAF `other`, merges local variables such that both funcitons
+  /// have union of local vars, without changing the set of points in domain or
+  /// the output.
+  void mergeLocalVars(MultiAffineFunction &other);
 
   /// Return whether the outputs of `this` and `other` agree wherever both
   /// functions are defined, i.e., the outputs should be equal for all points in
@@ -108,13 +88,17 @@ public:
 
   /// Truncate the output dimensions to the first `count` dimensions.
   ///
-  /// TODO: refactor so that this can be accomplished through removeIdRange.
+  /// TODO: refactor so that this can be accomplished through removeVarRange.
   void truncateOutput(unsigned count);
 
   void print(raw_ostream &os) const;
   void dump() const;
 
 private:
+  /// The IntegerPolyhedron representing the domain over which the function is
+  /// defined.
+  IntegerPolyhedron domainSet;
+
   /// The function's output is a tuple of integers, with the ith element of the
   /// tuple defined by the affine expression given by the ith row of this output
   /// matrix.
@@ -134,19 +118,23 @@ private:
 /// this class is undefined. The domains need not cover all possible points;
 /// this represents a partial function and so could be undefined at some points.
 ///
-/// As in PresburgerSets, the input ids are partitioned into dimension ids and
-/// symbolic ids.
+/// As in PresburgerSets, the input vars are partitioned into dimension vars and
+/// symbolic vars.
 ///
 /// Support is provided to compare equality of two such functions as well as
 /// finding the value of the function at a point.
-class PWMAFunction : public PresburgerSpace {
+class PWMAFunction {
 public:
   PWMAFunction(const PresburgerSpace &space, unsigned numOutputs)
-      : PresburgerSpace(space), numOutputs(numOutputs) {
-    assert(getNumDomainIds() == 0 && "Set type space should zero domain ids.");
-    assert(getNumLocalIds() == 0 && "PWMAFunction cannot have local ids.");
+      : space(space), numOutputs(numOutputs) {
+    assert(space.getNumDomainVars() == 0 &&
+           "Set type space should have zero domain vars.");
+    assert(space.getNumLocalVars() == 0 &&
+           "PWMAFunction cannot have local vars.");
     assert(numOutputs >= 1 && "The function must output something!");
   }
+
+  const PresburgerSpace &getSpace() const { return space; }
 
   void addPiece(const MultiAffineFunction &piece);
   void addPiece(const IntegerPolyhedron &domain, const Matrix &output);
@@ -154,7 +142,7 @@ public:
   const MultiAffineFunction &getPiece(unsigned i) const { return pieces[i]; }
   unsigned getNumPieces() const { return pieces.size(); }
   unsigned getNumOutputs() const { return numOutputs; }
-  unsigned getNumInputs() const { return getNumIds(); }
+  unsigned getNumInputs() const { return space.getNumVars(); }
   MultiAffineFunction &getPiece(unsigned i) { return pieces[i]; }
 
   /// Return the domain of this piece-wise MultiAffineFunction. This is the
@@ -172,17 +160,19 @@ public:
 
   /// Truncate the output dimensions to the first `count` dimensions.
   ///
-  /// TODO: refactor so that this can be accomplished through removeIdRange.
+  /// TODO: refactor so that this can be accomplished through removeVarRange.
   void truncateOutput(unsigned count);
 
   void print(raw_ostream &os) const;
   void dump() const;
 
 private:
+  PresburgerSpace space;
+
   /// The list of pieces in this piece-wise MultiAffineFunction.
   SmallVector<MultiAffineFunction, 4> pieces;
 
-  /// The number of output ids.
+  /// The number of output vars.
   unsigned numOutputs;
 };
 
