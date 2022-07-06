@@ -13,9 +13,9 @@ entry:
     %task0_2 = add nsw i32 %task0_1, 1
     %task0_3 = add nsw i32 %arg, %task0_2
 
-    %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(i32* %func2) ]
-      %task1_1 = load i32, i32* %func2, align 4
-      %task1_2 = load i32, i32* %func3, align 4
+    %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr %func2, i32 undef) ]
+      %task1_1 = load i32, ptr %func2, align 4
+      %task1_2 = load i32, ptr %func3, align 4
     call void @llvm.directive.region.exit(token %1)
 
     %2 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00") ]
@@ -69,7 +69,7 @@ entry:
   br i1 1, label %if.then, label %if.else
 
 if.then:
-  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(i32* %func2) ]
+  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr %func2, i32 undef) ]
     %task0_1 = add nsw i32 %func1, 1
     %task0_2 = add nsw i32 %task0_1, 1
     %task0_3 = add nsw i32 %arg, %task0_2
@@ -77,9 +77,9 @@ if.then:
   br label %if.end
 
 if.else:
-  %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(i32* %func2) ]
-    %task1_1 = load i32, i32* %func2, align 4
-    %task1_2 = load i32, i32* %func3, align 4
+  %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr %func2, i32 undef) ]
+    %task1_1 = load i32, ptr %func2, align 4
+    %task1_2 = load i32, ptr %func3, align 4
     %task1_3 = add nsw i32 %arg, %task1_2
   call void @llvm.directive.region.exit(token %1)
   br label %if.end

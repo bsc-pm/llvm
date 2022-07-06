@@ -6,7 +6,7 @@
 // -fompss-2 option is specified
 #ifndef _OMPSS_2
 #error "No _OMPSS_2 macro is defined with -fompss-2 option"
-#elsif _OMPSS_2 != 1
+#elif _OMPSS_2 != 1
 #error "_OMPSS_2 has incorrect value"
 #endif //_OMPSS_2
 #else

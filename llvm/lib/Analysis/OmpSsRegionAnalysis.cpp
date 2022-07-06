@@ -56,27 +56,6 @@ PrintVerboseLevel("print-verbosity",
   clEnumValN(PV_ReductionInitsCombiners, "reduction_inits_combiners", "Print directive layout with reduction init and combiner functions"))
   );
 
-
-// returns if V is in DSAInfo
-static bool valueInDSABundles(const DirectiveDSAInfo& DSAInfo,
-                              const Value *V) {
-  auto SharedIt = find(DSAInfo.Shared, V);
-  auto PrivateIt = find(DSAInfo.Private, V);
-  auto FirstprivateIt = find(DSAInfo.Firstprivate, V);
-  if (SharedIt == DSAInfo.Shared.end()
-      && PrivateIt == DSAInfo.Private.end()
-      && FirstprivateIt == DSAInfo.Firstprivate.end())
-    return false;
-
-  return true;
-}
-
-// returns if V is in CapturedInfo
-static bool valueInCapturedBundle(const DirectiveCapturedInfo& CapturedInfo,
-                                  Value *const V) {
-  return CapturedInfo.count(V);
-}
-
 /// NOTE: from old OrderedInstructions
 static bool localDominates(
     const Instruction *InstA, const Instruction *InstB) {
@@ -166,18 +145,21 @@ void DirectiveEnvironment::gatherDirInfo(OperandBundleDef &OB) {
 }
 
 void DirectiveEnvironment::gatherSharedInfo(OperandBundleDef &OB) {
-  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  assert(OB.input_size() == 2 && "Only allowed two Values per OperandBundle");
   DSAInfo.Shared.insert(OB.inputs()[0]);
+  DSAInfo.SharedTy.push_back(OB.inputs()[1]->getType());
 }
 
 void DirectiveEnvironment::gatherPrivateInfo(OperandBundleDef &OB) {
-  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  assert(OB.input_size() == 2 && "Only allowed two Values per OperandBundle");
   DSAInfo.Private.insert(OB.inputs()[0]);
+  DSAInfo.PrivateTy.push_back(OB.inputs()[1]->getType());
 }
 
 void DirectiveEnvironment::gatherFirstprivateInfo(OperandBundleDef &OB) {
-  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  assert(OB.input_size() == 2 && "Only allowed two Values per OperandBundle");
   DSAInfo.Firstprivate.insert(OB.inputs()[0]);
+  DSAInfo.FirstprivateTy.push_back(OB.inputs()[1]->getType());
 }
 
 void DirectiveEnvironment::gatherVLADimsInfo(OperandBundleDef &OB) {
@@ -495,11 +477,11 @@ void DirectiveEnvironment::gatherDeclSource(OperandBundleDef &OB) {
 
 void DirectiveEnvironment::verifyVLADimsInfo() {
   for (const auto &VLAWithDimsMap : VLADimsInfo) {
-    if (!valueInDSABundles(DSAInfo, VLAWithDimsMap.first))
+    if (!valueInDSABundles(VLAWithDimsMap.first))
       llvm_unreachable("VLA dims OperandBundle must have an associated DSA");
     // VLA Dims that are not Captured is an error
     for (auto *V : VLAWithDimsMap.second) {
-      if (!valueInCapturedBundle(CapturedInfo, V))
+      if (!valueInCapturedBundle(V))
         llvm_unreachable("VLA dimension has not been captured");
     }
   }
@@ -507,11 +489,11 @@ void DirectiveEnvironment::verifyVLADimsInfo() {
 
 void DirectiveEnvironment::verifyDependInfo() {
   for (auto &DI : DependsInfo.List) {
-    if (!valueInDSABundles(DSAInfo, DI->Base))
+    if (!valueInDSABundles(DI->Base))
       llvm_unreachable("Dependency has no associated DSA");
     for (auto *V : DI->Args) {
-      if (!valueInDSABundles(DSAInfo, V)
-          && !valueInCapturedBundle(CapturedInfo, V))
+      if (!valueInDSABundles(V)
+          && !valueInCapturedBundle(V))
         llvm_unreachable("Dependency has no associated DSA or capture");
     }
   }
@@ -519,7 +501,7 @@ void DirectiveEnvironment::verifyDependInfo() {
 
 void DirectiveEnvironment::verifyReductionInitCombInfo() {
   for (const auto &RedInitCombMap : ReductionsInitCombInfo) {
-    if (!valueInDSABundles(DSAInfo, RedInitCombMap.first))
+    if (!valueInDSABundles(RedInitCombMap.first))
       llvm_unreachable(
         "Reduction init/combiner must have a Value matching a DSA and a function pointer Value");
     if (!RedInitCombMap.second.Init)
@@ -531,24 +513,24 @@ void DirectiveEnvironment::verifyReductionInitCombInfo() {
 
 void DirectiveEnvironment::verifyCostInfo() {
   for (auto *V : CostInfo.Args) {
-    if (!valueInDSABundles(DSAInfo, V)
-        && !valueInCapturedBundle(CapturedInfo, V))
+    if (!valueInDSABundles(V)
+        && !valueInCapturedBundle(V))
       llvm_unreachable("Cost function argument has no associated DSA or capture");
   }
 }
 
 void DirectiveEnvironment::verifyPriorityInfo() {
   for (auto *V : PriorityInfo.Args) {
-    if (!valueInDSABundles(DSAInfo, V)
-        && !valueInCapturedBundle(CapturedInfo, V))
+    if (!valueInDSABundles(V)
+        && !valueInCapturedBundle(V))
       llvm_unreachable("Priority function argument has no associated DSA or capture");
   }
 }
 
 void DirectiveEnvironment::verifyOnreadyInfo() {
   for (auto *V : OnreadyInfo.Args) {
-    if (!valueInDSABundles(DSAInfo, V)
-        && !valueInCapturedBundle(CapturedInfo, V))
+    if (!valueInDSABundles(V)
+        && !valueInCapturedBundle(V))
       llvm_unreachable("Onready function argument has no associated DSA or capture");
   }
 }
@@ -596,21 +578,21 @@ void DirectiveEnvironment::verifyLoopInfo() {
     if (LoopInfo.empty())
       llvm_unreachable("LoopInfo is missing some information");
     for (size_t i = 0; i < LoopInfo.IndVar.size(); ++i) {
-      if (!valueInDSABundles(DSAInfo, LoopInfo.IndVar[i]))
+      if (!valueInDSABundles(LoopInfo.IndVar[i]))
         llvm_unreachable("Loop induction variable has no associated DSA");
       for (size_t j = 0; j < LoopInfo.LBound[i].Args.size(); ++j) {
-        if (!valueInDSABundles(DSAInfo, LoopInfo.LBound[i].Args[j])
-            && !valueInCapturedBundle(CapturedInfo, LoopInfo.LBound[i].Args[j]))
+        if (!valueInDSABundles(LoopInfo.LBound[i].Args[j])
+            && !valueInCapturedBundle(LoopInfo.LBound[i].Args[j]))
           llvm_unreachable("Loop lbound argument value has no associated DSA or capture");
       }
       for (size_t j = 0; j < LoopInfo.UBound[i].Args.size(); ++j) {
-        if (!valueInDSABundles(DSAInfo, LoopInfo.UBound[i].Args[j])
-            && !valueInCapturedBundle(CapturedInfo, LoopInfo.UBound[i].Args[j]))
+        if (!valueInDSABundles(LoopInfo.UBound[i].Args[j])
+            && !valueInCapturedBundle(LoopInfo.UBound[i].Args[j]))
           llvm_unreachable("Loop ubound argument value has no associated DSA or capture");
       }
       for (size_t j = 0; j < LoopInfo.Step[i].Args.size(); ++j) {
-        if (!valueInDSABundles(DSAInfo, LoopInfo.Step[i].Args[j])
-            && !valueInCapturedBundle(CapturedInfo, LoopInfo.Step[i].Args[j]))
+        if (!valueInDSABundles(LoopInfo.Step[i].Args[j])
+            && !valueInCapturedBundle(LoopInfo.Step[i].Args[j]))
           llvm_unreachable("Loop step argument value has no associated DSA or capture");
       }
     }
@@ -622,8 +604,8 @@ void DirectiveEnvironment::verifyWhileInfo() {
     if (WhileInfo.empty())
       llvm_unreachable("WhileInfo is missing some information");
     for (size_t j = 0; j < WhileInfo.Args.size(); ++j) {
-      if (!valueInDSABundles(DSAInfo, WhileInfo.Args[j])
-          && !valueInCapturedBundle(CapturedInfo, WhileInfo.Args[j]))
+      if (!valueInDSABundles(WhileInfo.Args[j])
+          && !valueInCapturedBundle(WhileInfo.Args[j]))
         llvm_unreachable("WhileCond argument value has no associated DSA or capture");
     }
   }
@@ -633,12 +615,12 @@ void DirectiveEnvironment::verifyMultiDependInfo() {
   for (auto &DI : DependsInfo.List)
     if (auto *MDI = dyn_cast<MultiDependInfo>(DI.get())) {
       for (auto *V : MDI->Iters)
-        if (!valueInDSABundles(DSAInfo, V)
-            && !valueInCapturedBundle(CapturedInfo, V))
+        if (!valueInDSABundles(V)
+            && !valueInCapturedBundle(V))
           llvm_unreachable("Multidependency value has no associated DSA or capture");
       for (auto *V : MDI->Args)
-        if (!valueInDSABundles(DSAInfo, V)
-            && !valueInCapturedBundle(CapturedInfo, V))
+        if (!valueInDSABundles(V)
+            && !valueInCapturedBundle(V))
           llvm_unreachable("Multidependency value has no associated DSA or capture");
     }
 }
@@ -829,7 +811,7 @@ void OmpSsRegionAnalysis::print_verbose(
     }
     else if (PrintVerboseLevel == PV_DsaMissing) {
       for (auto *V : AnalysisInfo.UsesBeforeEntry) {
-        if (!valueInDSABundles(DirEnv.DSAInfo, V)) {
+        if (!DirEnv.valueInDSABundles(V)) {
           dbgs() << "\n";
           dbgs() << SpaceMultiplierStr;
           V->printAsOperand(dbgs(), false);
@@ -859,7 +841,7 @@ void OmpSsRegionAnalysis::print_verbose(
     else if (PrintVerboseLevel == PV_VLADimsCaptureMissing) {
       for (const auto &VLAWithDimsMap : DirEnv.VLADimsInfo) {
         for (auto *V : VLAWithDimsMap.second) {
-          if (!valueInCapturedBundle(DirEnv.CapturedInfo, V)) {
+          if (!DirEnv.valueInCapturedBundle(V)) {
             dbgs() << "\n";
             dbgs() << SpaceMultiplierStr;
             V->printAsOperand(dbgs(), false);
@@ -1035,8 +1017,8 @@ OmpSsRegionAnalysis::OmpSsRegionAnalysis(Function &F, DominatorTree &DT) {
             if (orderedInstructions(DT, I2, StackEntry)) {
               DAI.UsesBeforeEntry.insert(I2);
             if (!DisableChecks
-                && !valueInDSABundles(DirEnv.DSAInfo, I2)
-                && !valueInCapturedBundle(DirEnv.CapturedInfo, I2)) {
+                && !DirEnv.valueInDSABundles(I2)
+                && !DirEnv.valueInCapturedBundle(I2)) {
                 llvm_unreachable("Value supposed to be inside directive entry "
                                  "OperandBundle not found.");
               }
@@ -1044,8 +1026,8 @@ OmpSsRegionAnalysis::OmpSsRegionAnalysis(Function &F, DominatorTree &DT) {
           } else if (Argument *A = dyn_cast<Argument>(U.get())) {
             DAI.UsesBeforeEntry.insert(A);
             if (!DisableChecks
-                && !valueInDSABundles(DirEnv.DSAInfo, A)
-                && !valueInCapturedBundle(DirEnv.CapturedInfo, A)) {
+                && !DirEnv.valueInDSABundles(A)
+                && !DirEnv.valueInCapturedBundle(A)) {
               llvm_unreachable("Value supposed to be inside directive entry "
                                "OperandBundle not found.");
             }

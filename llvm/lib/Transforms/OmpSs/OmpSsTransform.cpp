@@ -148,7 +148,7 @@ struct OmpSs {
           "nanos6_task_invocation_info_t");
 
         // const char *invocation_source
-        Type *InvSourceTy = Type::getInt8PtrTy(M.getContext());
+        Type *InvSourceTy = PointerType::getUnqual(M.getContext());
 
         instance->Ty->setBody(InvSourceTy);
       }
@@ -176,19 +176,15 @@ struct OmpSs {
         // int device_type_id;
         Type *DeviceTypeIdTy = Type::getInt32Ty(M.getContext());
         // void (*run)(void *, void *, nanos6_address_translation_entry_t *);
-        Type *RunFuncTy =
-          FunctionType::get(Type::getVoidTy(M.getContext()),
-                            /*IsVarArgs=*/false)->getPointerTo();
+        Type *RunFuncTy = PointerType::getUnqual(M.getContext());
         // void (*get_constraints)(void *, nanos6_task_constraints_t *);
-        Type *GetConstraintsFuncTy =
-          FunctionType::get(Type::getVoidTy(M.getContext()),
-                            /*IsVarArgs=*/false)->getPointerTo();
+        Type *GetConstraintsFuncTy = PointerType::getUnqual(M.getContext());
         // const char *task_label;
-        Type *TaskLabelTy = Type::getInt8PtrTy(M.getContext());
+        Type *TaskLabelTy = PointerType::getUnqual(M.getContext());
         // const char *declaration_source;
-        Type *DeclSourceTy = Type::getInt8PtrTy(M.getContext());
+        Type *DeclSourceTy = PointerType::getUnqual(M.getContext());
         // const char *device_function_name;
-        Type *DevFuncTy = Type::getInt8PtrTy(M.getContext());
+        Type *DevFuncTy = PointerType::getUnqual(M.getContext());
         instance->Ty->setBody({DeviceTypeIdTy, RunFuncTy,
                               GetConstraintsFuncTy, TaskLabelTy,
                               DeclSourceTy, DevFuncTy});
@@ -217,56 +213,36 @@ struct OmpSs {
         // int num_symbols;
         Type *NumSymbolsTy = Type::getInt32Ty(M.getContext());;
         // void (*register_depinfo)(void *, void *);
-        Type *RegisterInfoFuncTy =
-          FunctionType::get(Type::getVoidTy(M.getContext()),
-                            /*IsVarArgs=*/false)->getPointerTo();
+        Type *RegisterInfoFuncTy = PointerType::getUnqual(M.getContext());
         // void (*onready_action)(void *args_block);
-        Type *OnreadyActionFuncTy =
-          FunctionType::get(Type::getVoidTy(M.getContext()),
-                            /*IsVarArgs=*/false)->getPointerTo();
+        Type *OnreadyActionFuncTy = PointerType::getUnqual(M.getContext());
         // void (*get_priority)(void *, nanos6_priority_t *);
         // void (*get_priority)(void *, long int *);
-        Type *GetPriorityFuncTy =
-          FunctionType::get(Type::getVoidTy(M.getContext()),
-                            /*IsVarArgs=*/false)->getPointerTo();
+        Type *GetPriorityFuncTy = PointerType::getUnqual(M.getContext());
         // int implementation_count;
         Type *ImplCountTy = Type::getInt32Ty(M.getContext());
         // nanos6_task_implementation_info_t *implementations;
-        Type *TaskImplInfoTy = StructType::get(M.getContext())->getPointerTo();
+        Type *TaskImplInfoTy = PointerType::getUnqual(M.getContext());
         // void (*destroy_args_block)(void *);
-        Type *DestroyArgsBlockFuncTy =
-          FunctionType::get(Type::getVoidTy(M.getContext()),
-                            /*IsVarArgs=*/false)->getPointerTo();
+        Type *DestroyArgsBlockFuncTy = PointerType::getUnqual(M.getContext());
         // void (*duplicate_args_block)(const void *, void **);
-        Type *DuplicateArgsBlockFuncTy =
-          FunctionType::get(Type::getVoidTy(M.getContext()),
-                            /*IsVarArgs=*/false)->getPointerTo();
+        Type *DuplicateArgsBlockFuncTy = PointerType::getUnqual(M.getContext());
         // void (**reduction_initializers)(void *, void *, size_t);
-        Type *ReductInitsFuncTy =
-          FunctionType::get(Type::getVoidTy(M.getContext()),
-                            /*IsVarArgs=*/false)->getPointerTo()->getPointerTo();
+        Type *ReductInitsFuncTy = PointerType::getUnqual(M.getContext());
         // void (**reduction_combiners)(void *, void *, size_t);
-        Type *ReductCombsFuncTy =
-          FunctionType::get(Type::getVoidTy(M.getContext()),
-                            /*IsVarArgs=*/false)->getPointerTo()->getPointerTo();
+        Type *ReductCombsFuncTy = PointerType::getUnqual(M.getContext());
         // void *task_type_data;
-        Type *TaskTypeDataTy =
-          Type::getInt8PtrTy(M.getContext());
+        Type *TaskTypeDataTy = PointerType::getUnqual(M.getContext());
         // void (*iter_condition)(void *, uint8_t *);
-        Type *IterConditionFuncTy =
-          FunctionType::get(Type::getVoidTy(M.getContext()),
-                            /*IsVarArgs=*/false)->getPointerTo();
+        Type *IterConditionFuncTy = PointerType::getUnqual(M.getContext());
         // int num_args;
         Type *NumArgsTy = Type::getInt32Ty(M.getContext());
         // int *sizeof_table;
-        Type *SizeofTableDataTy =
-          Type::getInt32Ty(M.getContext())->getPointerTo();
+        Type *SizeofTableDataTy = PointerType::getUnqual(M.getContext());
         // int *offset_table;
-        Type *OffsetTableDataTy =
-          Type::getInt32Ty(M.getContext())->getPointerTo();
+        Type *OffsetTableDataTy = PointerType::getUnqual(M.getContext());
         // int *arg_idx_table;
-        Type *ArgIdxTableDataTy =
-          Type::getInt32Ty(M.getContext())->getPointerTo();
+        Type *ArgIdxTableDataTy = PointerType::getUnqual(M.getContext());
 
         instance->Ty->setBody({NumSymbolsTy, RegisterInfoFuncTy, OnreadyActionFuncTy, GetPriorityFuncTy,
                                ImplCountTy, TaskImplInfoTy, DestroyArgsBlockFuncTy,
@@ -342,10 +318,10 @@ struct OmpSs {
         });
       }
       Params.append({
-        Type::getInt8PtrTy(M.getContext()),
+        PointerType::getUnqual(M.getContext()),
         Type::getInt32Ty(M.getContext()),
-        Type::getInt8PtrTy(M.getContext()),
-        Type::getInt8PtrTy(M.getContext())
+        PointerType::getUnqual(M.getContext()),
+        PointerType::getUnqual(M.getContext())
       });
       for (size_t i = 0; i < Ndims; ++i) {
         // long dimsize
@@ -367,7 +343,7 @@ struct OmpSs {
       //   ...);
 
       SmallVector<Type *, 8> Params;
-      Params.push_back(Type::getInt8PtrTy(M.getContext()));
+      Params.push_back(PointerType::getUnqual(M.getContext()));
       for (size_t i = 0; i < Ndims; ++i) {
         // long dimsize
         Params.push_back(Type::getInt64Ty(M.getContext()));
@@ -626,15 +602,13 @@ struct OmpSs {
 
   // Build a loop containing Single Entry Single Exit region Entry/Exit
   // and returns the LoopEntry and LoopExit
-  void buildLoopForTaskImpl(Module &M, Function &F, Instruction *Entry,
+  void buildLoopForTaskImpl(Module &M, Function &F, Type *IndVarTy, Instruction *Entry,
                         Instruction *Exit, const DirectiveLoopInfo &LoopInfo,
                         Instruction *&LoopEntryI, Instruction *&LoopExitI,
                         SmallVectorImpl<Instruction *> &CollapseStuff,
                         size_t LInfoIndex = 0) {
 
     IRBuilder<> IRB(Entry);
-    Type *IndVarTy = LoopInfo.IndVar[LInfoIndex]->getType()->getPointerElementType();
-
     IRB.CreateStore(createZSExtOrTrunc(IRB, LoopInfo.LBound[LInfoIndex].Result, IndVarTy, LoopInfo.LBoundSigned[LInfoIndex]), LoopInfo.IndVar[LInfoIndex]);
 
     BasicBlock *CondBB = Entry->getParent()->splitBasicBlock(Entry);
@@ -646,7 +620,7 @@ struct OmpSs {
     IRB.SetInsertPoint(Entry);
 
     Value *IndVarVal = IRB.CreateLoad(
-        LoopInfo.IndVar[LInfoIndex]->getType()->getPointerElementType(),
+        IndVarTy,
         LoopInfo.IndVar[LInfoIndex]);
     Value *LoopCmp = nullptr;
     switch (LoopInfo.LoopType[LInfoIndex]) {
@@ -716,7 +690,7 @@ struct OmpSs {
     // Add a br. to for.cond
     IRB.SetInsertPoint(IncrBB);
     IndVarVal = IRB.CreateLoad(
-        LoopInfo.IndVar[LInfoIndex]->getType()->getPointerElementType(),
+        IndVarTy,
         LoopInfo.IndVar[LInfoIndex]);
     auto p = buildInstructionSignDependent(
       IRB, M, IndVarVal, LoopInfo.Step[LInfoIndex].Result, LoopInfo.IndVarSigned[LInfoIndex], LoopInfo.StepSigned[LInfoIndex],
@@ -733,7 +707,7 @@ struct OmpSs {
   }
 
   Instruction *buildLoopForTask(
-      Module &M, Function &F, Instruction *Entry,
+      Module &M, Function &F, const DirectiveEnvironment &DirEnv, Instruction *Entry,
       Instruction *Exit, const DirectiveLoopInfo &LoopInfo) {
     Instruction *LoopEntryI = nullptr;
     Instruction *LoopExitI = nullptr;
@@ -741,11 +715,12 @@ struct OmpSs {
     SmallVector<Instruction *> CollapseStuff;
     for (int i = LoopInfo.LBound.size() - 1; i >= 0; --i) {
       IRBuilder<> IRB(Entry);
+      Type *IndVarTy = DirEnv.getDSAType(DirEnv.LoopInfo.IndVar[i]);
       LoopInfo.LBound[i].Result = IRB.CreateCall(LoopInfo.LBound[i].Fun, LoopInfo.LBound[i].Args);
       LoopInfo.UBound[i].Result = IRB.CreateCall(LoopInfo.UBound[i].Fun, LoopInfo.UBound[i].Args);
       LoopInfo.Step[i].Result = IRB.CreateCall(LoopInfo.Step[i].Fun, LoopInfo.Step[i].Args);
 
-      buildLoopForTaskImpl(M, F, Entry, Exit, LoopInfo, LoopEntryI, LoopExitI, CollapseStuff, i);
+      buildLoopForTaskImpl(M, F, IndVarTy, Entry, Exit, LoopInfo, LoopEntryI, LoopExitI, CollapseStuff, i);
       Entry = LoopEntryI;
       Exit = LoopExitI;
     }
@@ -800,19 +775,19 @@ struct OmpSs {
   }
 
   void buildLoopForMultiDep(
-      Module &M, Function &F, Instruction *Entry, Instruction *Exit,
+      Module &M, Function &F, const DirectiveEnvironment &DirEnv, Instruction *Entry, Instruction *Exit,
       const MultiDependInfo *MultiDepInfo) {
     DenseMap<Value *, Value *> IndToRemap;
     for (size_t i = 0; i < MultiDepInfo->Iters.size(); i++) {
       Value *IndVar = MultiDepInfo->Iters[i];
       buildLoopForMultiDepImpl(
-        M, F, Entry, Exit, IndVar, i, MultiDepInfo->ComputeMultiDepFun,
+        M, F, DirEnv, Entry, Exit, IndVar, i, MultiDepInfo->ComputeMultiDepFun,
         MultiDepInfo->Args, IndToRemap);
     }
   }
 
   void buildLoopForMultiDepImpl(
-      Module &M, Function &F, Instruction *Entry, Instruction *Exit,
+      Module &M, Function &F, const DirectiveEnvironment &DirEnv, Instruction *Entry, Instruction *Exit,
       Value *IndVar, int IterSelector, Function *ComputeMultiDepFun,
       ArrayRef<Value *> Args, DenseMap<Value *, Value *> &IndToRemap) {
 
@@ -823,7 +798,7 @@ struct OmpSs {
     TmpArgs.push_back(ConstantInt::get(Type::getInt64Ty(M.getContext()), IterSelector));
 
     IRBuilder<> IRB(Entry);
-    Type *IndVarTy = IndVar->getType()->getPointerElementType();
+    Type *IndVarTy = DirEnv.getDSAType(IndVar);
 
     AllocaInst *IndVarRemap = IRB.CreateAlloca(IndVarTy, nullptr, IndVar->getName() + ".remap");
     PostMoveInstructions.push_back(IndVarRemap);
@@ -845,7 +820,7 @@ struct OmpSs {
     IRB.SetInsertPoint(Entry);
 
     Value *IndVarVal =
-        IRB.CreateLoad(IndVar->getType()->getPointerElementType(), IndVar);
+        IRB.CreateLoad(IndVarTy, IndVar);
     Value *LoopCmp = IRB.CreateICmpSLE(IndVarVal, UBound);
 
     BasicBlock *BodyBB = IRB.saveIP().getBlock()->splitBasicBlock(IRB.saveIP().getPoint());
@@ -881,7 +856,7 @@ struct OmpSs {
     IRB.SetInsertPoint(IncrBB);
 
     IndVarVal =
-        IRB.CreateLoad(IndVar->getType()->getPointerElementType(), IndVar);
+        IRB.CreateLoad(IndVarTy, IndVar);
     Value *IndVarValPlusIncr = IRB.CreateAdd(IndVarVal, Incr);
     IRB.CreateStore(IndVarValPlusIncr, IndVar);
     IRB.CreateBr(CondBB);
@@ -934,7 +909,7 @@ struct OmpSs {
 
     for (const auto &DeinitMap : NonPODsInfo.Deinits) {
       auto *V = DeinitMap.first;
-      Type *Ty = V->getType()->getPointerElementType();
+      Type *Ty = DirInfo.DirEnv.getDSAType(V);
       // Compute num elements
       Value *NSize = ConstantInt::get(IRB.getInt64Ty(), 1);
       if (isa<ArrayType>(Ty)) {
@@ -1035,7 +1010,8 @@ struct OmpSs {
   }
 
   void unpackMultiRangeCall(
-      Module &M, const MultiDependInfo *MultiDepInfo,
+      Module &M, const DirectiveEnvironment &DirEnv,
+      const MultiDependInfo *MultiDepInfo,
       const DirectiveReductionsInitCombInfo &DRI,
       Function *F, const DirectiveLoopInfo &LoopInfo, ArrayRef<Value *> NewIndVarLBound, ArrayRef<Value *> NewIndVarUBound,
       bool IsTaskLoop) {
@@ -1064,7 +1040,7 @@ struct OmpSs {
     for (size_t i = 0; i < MultiDepInfo->Iters.size(); i++) {
       Value *IndVar = MultiDepInfo->Iters[i];
       buildLoopForMultiDepImpl(
-        M, *F, CallComputeDepStart, RegisterDepCall, IndVar, i, MultiDepInfo->ComputeMultiDepFun,
+        M, *F, DirEnv, CallComputeDepStart, RegisterDepCall, IndVar, i, MultiDepInfo->ComputeMultiDepFun,
         Args, IndToRemap);
     }
   }
@@ -1083,11 +1059,11 @@ struct OmpSs {
         // Multideps using loop iterator are assumed to be discrete
         if (IsTaskLoop && multidepUsesLoopIter(LoopInfo, *MultiDepInfo)) {
           unpackMultiRangeCall(
-            M, MultiDepInfo, DRI, F,
+            M, DirInfo.DirEnv, MultiDepInfo, DRI, F,
             LoopInfo, NewIndVarLBound, NewIndVarLBound, IsTaskLoop);
         } else {
           unpackMultiRangeCall(
-            M, MultiDepInfo, DRI, F,
+            M, DirInfo.DirEnv, MultiDepInfo, DRI, F,
             LoopInfo, NewIndVarLBound, NewIndVarUBound, IsTaskLoop);
         }
       } else {
@@ -1116,7 +1092,7 @@ struct OmpSs {
     bool IsTaskLoop = DirEnv.isOmpSsTaskLoopDirective();
 
     if (IsTaskLoop) {
-      Type *IndVarTy = LoopInfo.IndVar[0]->getType()->getPointerElementType();
+      Type *IndVarTy = DirInfo.DirEnv.getDSAType(LoopInfo.IndVar[0]);
 
       IRBuilder<> IRB(&Entry.front());
       Value *LoopBounds = &*(F->arg_end() - 2);
@@ -1125,18 +1101,18 @@ struct OmpSs {
       Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
       Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
       Value *LBoundField = IRB.CreateGEP(
-          LoopBounds->getType()->getPointerElementType(),
+          Nanos6LoopBounds::getInstance(M).getType(),
           LoopBounds, Idx, "lb_gep");
       LBoundField = IRB.CreateLoad(
-          LBoundField->getType()->getPointerElementType(), LBoundField);
+          Nanos6LoopBounds::getInstance(M).getType()->getElementType(1), LBoundField);
       LBoundField = IRB.CreateZExtOrTrunc(LBoundField, IndVarTy, "lb");
 
       Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 1);
       Value *UBoundField = IRB.CreateGEP(
-          LoopBounds->getType()->getPointerElementType(),
+          Nanos6LoopBounds::getInstance(M).getType(),
           LoopBounds, Idx, "ub_gep");
       UBoundField = IRB.CreateLoad(
-          UBoundField->getType()->getPointerElementType(), UBoundField);
+          Nanos6LoopBounds::getInstance(M).getType()->getElementType(2), UBoundField);
       UBoundField = IRB.CreateZExtOrTrunc(UBoundField, IndVarTy);
       UBoundField = IRB.CreateSub(UBoundField, ConstantInt::get(IndVarTy, 1), "ub");
 
@@ -1234,7 +1210,7 @@ struct OmpSs {
     Idx[1] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
 
     Value *GEPConstraints =
-        BBBuilder.CreateGEP(Constraints->getType()->getPointerElementType(),
+        BBBuilder.CreateGEP(Nanos6TaskConstraints::getInstance(M).getType(),
                             Constraints, Idx, "gep_" + Constraints->getName());
     Value *Cost = BBBuilder.CreateCall(CostInfo.Fun, CostInfo.Args);
     Value *CostCast = BBBuilder.CreateZExt(Cost, Nanos6TaskConstraints::getInstance(M).getType()->getElementType(0));
@@ -1405,38 +1381,36 @@ struct OmpSs {
   // Rewrites task_args using address_translation
   void translateDep(
       IRBuilder<> &IRBTranslate, IRBuilder<> &IRBReload, const DependInfo *DepInfo, Value *DSA,
-      Value *&UnpackedDSA, Value *AddrTranslationTable, int SymbolIndex) {
+      Value *&UnpackedDSA, Value *AddrTranslationTable, Type *AddrTranslationTableTy, int SymbolIndex) {
 
     llvm::Value *DepBase = UnpackedDSA;
     if (!isa<LoadInst>(UnpackedDSA))
       DepBase = IRBTranslate.CreateLoad(
-        DepBase->getType()->getPointerElementType(), DepBase);
+        IRBTranslate.getPtrTy(), DepBase);
 
     Value *Idx[2];
     Idx[0] = ConstantInt::get(Type::getInt32Ty(
       IRBTranslate.getContext()), SymbolIndex);
     Idx[1] = Constant::getNullValue(Type::getInt32Ty(IRBTranslate.getContext()));
     Value *LocalAddr = IRBTranslate.CreateGEP(
-        AddrTranslationTable->getType()->getPointerElementType(),
+        AddrTranslationTableTy,
         AddrTranslationTable, Idx, "local_lookup_" + DSA->getName());
     LocalAddr = IRBTranslate.CreateLoad(
-        LocalAddr->getType()->getPointerElementType(), LocalAddr);
+        IRBTranslate.getInt64Ty(), LocalAddr);
 
     Idx[1] = ConstantInt::get(Type::getInt32Ty(IRBTranslate.getContext()), 1);
     Value *DeviceAddr = IRBTranslate.CreateGEP(
-        AddrTranslationTable->getType()->getPointerElementType(),
+        AddrTranslationTableTy,
         AddrTranslationTable, Idx, "device_lookup_" + DSA->getName());
     DeviceAddr = IRBTranslate.CreateLoad(
-        DeviceAddr->getType()->getPointerElementType(), DeviceAddr);
+        IRBTranslate.getInt64Ty(), DeviceAddr);
 
     // Res = device_addr + (DSA_addr - local_addr)
-    Value *Translation = IRBTranslate.CreateBitCast(
-      DepBase, Type::getInt8PtrTy(IRBTranslate.getContext()));
+    Value *Translation =
+        IRBTranslate.CreateGEP(IRBTranslate.getInt8Ty(),
+                               DepBase, IRBTranslate.CreateNeg(LocalAddr));
     Translation =
-        IRBTranslate.CreateGEP(Translation->getType()->getPointerElementType(),
-                               Translation, IRBTranslate.CreateNeg(LocalAddr));
-    Translation =
-        IRBTranslate.CreateGEP(Translation->getType()->getPointerElementType(),
+        IRBTranslate.CreateGEP(IRBTranslate.getInt8Ty(),
                                Translation, DeviceAddr);
 
     // Store the translation
@@ -1445,11 +1419,11 @@ struct OmpSs {
       IRBTranslate.CreateStore(Translation, LUnpackedDSA->getPointerOperand());
       // Reload what we have translated
       UnpackedDSA = IRBReload.CreateLoad(
-          LUnpackedDSA->getPointerOperand()->getType()->getPointerElementType(),
+          IRBReload.getPtrTy(),
           LUnpackedDSA->getPointerOperand());
     } else {
       Translation = IRBTranslate.CreateBitCast(
-        Translation, UnpackedDSA->getType()->getPointerElementType());
+        Translation, IRBTranslate.getPtrTy());
       IRBTranslate.CreateStore(Translation, UnpackedDSA);
     }
   }
@@ -1458,6 +1432,7 @@ struct OmpSs {
   // DSAInfo and VLADimsInfo, it unpacks task args in Outline and fills UnpackedList
   // with those Values, used to call Unpack Functions
   void unpackDSAsWithVLADims(Module &M, const DirectiveInfo &DirInfo,
+                  Type *TaskArgsTy,
                   Function *OlFunc,
                   const MapVector<Value *, size_t> &StructToIdxMap,
                   SmallVectorImpl<Value *> &UnpackedList) {
@@ -1476,10 +1451,10 @@ struct OmpSs {
       Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
       Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), StructToIdxMap.lookup(V));
       Value *GEP = BBBuilder.CreateGEP(
-          OlDepsFuncTaskArgs->getType()->getPointerElementType(),
+          TaskArgsTy,
           OlDepsFuncTaskArgs, Idx, "gep_" + V->getName());
       Value *LGEP =
-          BBBuilder.CreateLoad(GEP->getType()->getPointerElementType(), GEP,
+          BBBuilder.CreateLoad(PointerType::getUnqual(M.getContext()), GEP,
                                "load_" + GEP->getName());
 
       UnpackedList.push_back(LGEP);
@@ -1489,13 +1464,12 @@ struct OmpSs {
       Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
       Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), StructToIdxMap.lookup(V));
       Value *GEP = BBBuilder.CreateGEP(
-          OlDepsFuncTaskArgs->getType()->getPointerElementType(),
+          TaskArgsTy,
           OlDepsFuncTaskArgs, Idx, "gep_" + V->getName());
 
       // VLAs
       if (VLADimsInfo.count(V))
-        GEP = BBBuilder.CreateLoad(GEP->getType()->getPointerElementType(), GEP,
-                                   "load_" + GEP->getName());
+        GEP = BBBuilder.CreateLoad(PointerType::getUnqual(M.getContext()), GEP, "load_" + GEP->getName());
 
       UnpackedList.push_back(GEP);
     }
@@ -1504,13 +1478,12 @@ struct OmpSs {
       Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
       Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), StructToIdxMap.lookup(V));
       Value *GEP = BBBuilder.CreateGEP(
-          OlDepsFuncTaskArgs->getType()->getPointerElementType(),
+          TaskArgsTy,
           OlDepsFuncTaskArgs, Idx, "gep_" + V->getName());
 
       // VLAs
       if (VLADimsInfo.count(V))
-        GEP = BBBuilder.CreateLoad(GEP->getType()->getPointerElementType(), GEP,
-                                   "load_" + GEP->getName());
+        GEP = BBBuilder.CreateLoad(PointerType::getUnqual(M.getContext()), GEP, "load_" + GEP->getName());
 
       UnpackedList.push_back(GEP);
     }
@@ -1519,11 +1492,10 @@ struct OmpSs {
       Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
       Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), StructToIdxMap.lookup(V));
       Value *GEP = BBBuilder.CreateGEP(
-          OlDepsFuncTaskArgs->getType()->getPointerElementType(),
+          TaskArgsTy,
           OlDepsFuncTaskArgs, Idx, "capt_gep" + V->getName());
       Value *LGEP =
-          BBBuilder.CreateLoad(GEP->getType()->getPointerElementType(), GEP,
-                               "load_" + GEP->getName());
+          BBBuilder.CreateLoad(V->getType(), GEP, "load_" + GEP->getName());
       UnpackedList.push_back(LGEP);
     }
   }
@@ -1547,19 +1519,18 @@ struct OmpSs {
       if (auto *LUnpackedDSA = dyn_cast<LoadInst>(UnpackedDSA)) {
         Value *NewDepBaseDSA =
           IRBEntry.CreateAlloca(
-            LUnpackedDSA->getType(), nullptr, "tlate." + LUnpackedDSA->getName());
+            IRBEntry.getPtrTy(), nullptr, "tlate." + LUnpackedDSA->getName());
         IRBEntry.CreateStore(LUnpackedDSA, NewDepBaseDSA);
 
         UnpackParams[Idx] =
-          IRBEntry.CreateLoad(LUnpackedDSA->getType(), NewDepBaseDSA);
+          IRBEntry.CreateLoad(IRBEntry.getPtrTy(), NewDepBaseDSA);
       } else {
         Value *NewDepBaseDSA =
           IRBEntry.CreateAlloca(
-            UnpackedDSA->getType()->getPointerElementType(),
-            nullptr, "tlate." + UnpackedDSA->getName());
+            IRBEntry.getPtrTy(), nullptr, "tlate." + UnpackedDSA->getName());
         IRBEntry.CreateStore(
           IRBEntry.CreateLoad(
-            UnpackedDSA->getType()->getPointerElementType(), UnpackedDSA),
+            IRBEntry.getPtrTy(), UnpackedDSA),
           NewDepBaseDSA);
 
         UnpackParams[Idx] = NewDepBaseDSA;
@@ -1570,8 +1541,10 @@ struct OmpSs {
   // Given an Outline and Unpack Functions it unpacks DSAs in Outline
   // and builds a call to Unpack
   void olCallToUnpack(Module &M, const DirectiveInfo &DirInfo,
+                      Type *TaskArgsTy,
                       const MapVector<Value *, size_t> &StructToIdxMap,
                       Function *OlFunc, Function *UnpackFunc,
+                      Type *AddrTranslationTableTy,
                       bool IsTaskFunc=false) {
     BasicBlock::Create(M.getContext(), "entry", OlFunc);
 
@@ -1579,7 +1552,7 @@ struct OmpSs {
     Function::arg_iterator AI = OlFunc->arg_begin();
     AI++;
     SmallVector<Value *, 4> UnpackParams;
-    unpackDSAsWithVLADims(M, DirInfo, OlFunc, StructToIdxMap, UnpackParams);
+    unpackDSAsWithVLADims(M, DirInfo, TaskArgsTy, OlFunc, StructToIdxMap, UnpackParams);
     while (AI != OlFunc->arg_end()) {
       UnpackParams.push_back(&*AI++);
     }
@@ -1588,7 +1561,6 @@ struct OmpSs {
       // Build call to compute_dep in order to have get the base dependency of
       // the reduction. The result is passed to unpack
       const DirectiveEnvironment &DirEnv = DirInfo.DirEnv;
-      const DirectiveDependsInfo &DependsInfo = DirEnv.DependsInfo;
       // Preserve the params before translation. And replace used after build all
       // compute_dep calls
       // NOTE: this assumes UnpackParams can be indexed with StructToIdxMap
@@ -1635,7 +1607,7 @@ struct OmpSs {
         translateDep(
           IRBIfThen, IRBIfEnd, DI, DepBaseDSA,
           UnpackParams[Idx],
-          AddrTranslationTable, SymbolIndex);
+          AddrTranslationTable, AddrTranslationTableTy, SymbolIndex);
       }
       // Replaces dsa uses by unpacked values
       for (Instruction &I : *IfThenBB) {
@@ -1673,11 +1645,10 @@ struct OmpSs {
     Function::arg_iterator AI = OlFunc->arg_begin();
     Value *TaskArgsSrc = &*AI++;
     Value *TaskArgsDst = &*AI++;
-    Value *TaskArgsDstL = IRB.CreateLoad(
-        TaskArgsDst->getType()->getPointerElementType(), TaskArgsDst);
+    Value *TaskArgsDstL = IRB.CreateLoad(PointerType::getUnqual(M.getContext()), TaskArgsDst);
 
     SmallVector<VLAAlign, 2> VLAAlignsInfo;
-    computeVLAsAlignOrder(M, VLAAlignsInfo, VLADimsInfo);
+    computeVLAsAlignOrder(M, VLAAlignsInfo, DirEnv, VLADimsInfo);
 
     Value *TaskArgsStructSizeOf = ConstantInt::get(IRB.getInt64Ty(), M.getDataLayout().getTypeAllocSize(TaskArgsTy));
 
@@ -1692,28 +1663,24 @@ struct OmpSs {
                       IRB.CreateNot(ConstantInt::get(IRB.getInt64Ty(), ALIGN - 1)));
     }
 
-    Value *TaskArgsDstLi8 = IRB.CreateBitCast(TaskArgsDstL, IRB.getInt8PtrTy());
     Value *TaskArgsDstLi8IdxGEP =
-        IRB.CreateGEP(TaskArgsDstLi8->getType()->getPointerElementType(),
-                      TaskArgsDstLi8, TaskArgsStructSizeOf, "args_end");
+      IRB.CreateGEP(IRB.getInt8Ty(), TaskArgsDstL, TaskArgsStructSizeOf, "args_end");
 
     // First point VLAs to its according space in task args
     for (const VLAAlign& VAlign : VLAAlignsInfo) {
       auto *V = VAlign.V;
+      Type *Ty = DirEnv.getDSAType(V);
       unsigned TyAlign = VAlign.Align;
-
-      Type *Ty = V->getType()->getPointerElementType();
 
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
       Idx[1] = ConstantInt::get(IRB.getInt32Ty(), StructToIdxMap.lookup(V));
       Value *GEP =
-          IRB.CreateGEP(TaskArgsDstL->getType()->getPointerElementType(),
+          IRB.CreateGEP(TaskArgsTy,
                         TaskArgsDstL, Idx, "gep_dst_" + V->getName());
 
       // Point VLA in task args to an aligned position of the extra space allocated
-      Value *GEPi8 = IRB.CreateBitCast(GEP, IRB.getInt8PtrTy()->getPointerTo());
-      IRB.CreateAlignedStore(TaskArgsDstLi8IdxGEP, GEPi8, Align(TyAlign));
+      IRB.CreateAlignedStore(TaskArgsDstLi8IdxGEP, GEP, Align(TyAlign));
       // Skip current VLA size
       unsigned SizeB = M.getDataLayout().getTypeAllocSize(Ty);
       Value *VLASize = ConstantInt::get(IRB.getInt64Ty(), SizeB);
@@ -1722,37 +1689,40 @@ struct OmpSs {
         Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
         Idx[1] = ConstantInt::get(IRB.getInt32Ty(), StructToIdxMap.lookup(Dim));
         Value *GEPDst =
-            IRB.CreateGEP(TaskArgsDstL->getType()->getPointerElementType(),
+            IRB.CreateGEP(TaskArgsTy,
                           TaskArgsDstL, Idx, "gep_dst_" + Dim->getName());
         GEPDst =
-            IRB.CreateLoad(GEPDst->getType()->getPointerElementType(), GEPDst);
+            IRB.CreateLoad(IRB.getInt64Ty(), GEPDst);
         VLASize = IRB.CreateNUWMul(VLASize, GEPDst);
       }
       TaskArgsDstLi8IdxGEP = IRB.CreateGEP(
-          TaskArgsDstLi8IdxGEP->getType()->getPointerElementType(),
+          IRB.getInt8Ty(),
           TaskArgsDstLi8IdxGEP, VLASize);
     }
 
-    for (auto *V : DSAInfo.Shared) {
+    for (size_t i = 0; i < DSAInfo.Shared.size(); ++i) {
+      Value *V = DSAInfo.Shared[i];
+
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
       Idx[1] = ConstantInt::get(IRB.getInt32Ty(), StructToIdxMap.lookup(V));
       Value *GEPSrc = IRB.CreateGEP(
-          TaskArgsSrc->getType()->getPointerElementType(),
+          TaskArgsTy,
           TaskArgsSrc, Idx, "gep_src_" + V->getName());
       Value *GEPDst = IRB.CreateGEP(
-          TaskArgsDstL->getType()->getPointerElementType(),
+          TaskArgsTy,
           TaskArgsDstL, Idx, "gep_dst_" + V->getName());
       IRB.CreateStore(
-          IRB.CreateLoad(GEPSrc->getType()->getPointerElementType(), GEPSrc),
+          IRB.CreateLoad(PointerType::getUnqual(M.getContext()), GEPSrc),
           GEPDst);
     }
-    for (auto *V : DSAInfo.Private) {
+    for (size_t i = 0; i < DSAInfo.Private.size(); ++i) {
+      Value *V = DSAInfo.Private[i];
+      Type *Ty = DSAInfo.PrivateTy[i];
       // Call custom constructor generated in clang in non-pods
       // Leave pods unititialized
       auto It = NonPODsInfo.Inits.find(V);
       if (It != NonPODsInfo.Inits.end()) {
-        Type *Ty = V->getType()->getPointerElementType();
         // Compute num elements
         Value *NSize = ConstantInt::get(IRB.getInt64Ty(), 1);
         if (isa<ArrayType>(Ty)) {
@@ -1769,10 +1739,9 @@ struct OmpSs {
             Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
             Idx[1] = ConstantInt::get(IRB.getInt32Ty(), StructToIdxMap.lookup(Dim));
             Value *GEPSrc =
-                IRB.CreateGEP(TaskArgsSrc->getType()->getPointerElementType(),
+                IRB.CreateGEP(TaskArgsTy,
                               TaskArgsSrc, Idx, "gep_src_" + Dim->getName());
-            GEPSrc = IRB.CreateLoad(GEPSrc->getType()->getPointerElementType(),
-                                    GEPSrc);
+            GEPSrc = IRB.CreateLoad(IRB.getInt64Ty(), GEPSrc);
             NSize = IRB.CreateNUWMul(NSize, GEPSrc);
           }
         }
@@ -1781,22 +1750,19 @@ struct OmpSs {
         Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
         Idx[1] = ConstantInt::get(IRB.getInt32Ty(), StructToIdxMap.lookup(V));
         Value *GEP =
-            IRB.CreateGEP(TaskArgsDstL->getType()->getPointerElementType(),
+            IRB.CreateGEP(TaskArgsTy,
                           TaskArgsDstL, Idx, "gep_" + V->getName());
 
         // VLAs
         if (VLADimsInfo.count(V))
-          GEP = IRB.CreateLoad(GEP->getType()->getPointerElementType(), GEP);
-
-        // Regular arrays have types like [10 x %struct.S]*
-        // Cast to %struct.S*
-        GEP = IRB.CreateBitCast(GEP, Ty->getPointerTo());
+          GEP = IRB.CreateLoad(PointerType::getUnqual(M.getContext()), GEP);
 
         IRB.CreateCall(FunctionCallee(cast<Function>(It->second)), ArrayRef<Value*>{GEP, NSize});
       }
     }
-    for (auto *V : DSAInfo.Firstprivate) {
-      Type *Ty = V->getType()->getPointerElementType();
+    for (size_t i = 0; i < DSAInfo.Firstprivate.size(); ++i) {
+      Value *V = DSAInfo.Firstprivate[i];
+      Type *Ty = DSAInfo.FirstprivateTy[i];
       unsigned TyAlign = M.getDataLayout().getPrefTypeAlignment(Ty);
 
       // Compute num elements
@@ -1815,10 +1781,10 @@ struct OmpSs {
           Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
           Idx[1] = ConstantInt::get(IRB.getInt32Ty(), StructToIdxMap.lookup(Dim));
           Value *GEPSrc =
-              IRB.CreateGEP(TaskArgsSrc->getType()->getPointerElementType(),
+              IRB.CreateGEP(TaskArgsTy,
                             TaskArgsSrc, Idx, "gep_src_" + Dim->getName());
-          GEPSrc = IRB.CreateLoad(GEPSrc->getType()->getPointerElementType(),
-                                  GEPSrc);
+          // VLA sizes are always i64
+          GEPSrc = IRB.CreateLoad(IRB.getInt64Ty(), GEPSrc);
           NSize = IRB.CreateNUWMul(NSize, GEPSrc);
         }
       }
@@ -1829,18 +1795,18 @@ struct OmpSs {
       Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
       Idx[1] = ConstantInt::get(IRB.getInt32Ty(), StructToIdxMap.lookup(V));
       Value *GEPSrc =
-          IRB.CreateGEP(TaskArgsSrc->getType()->getPointerElementType(),
+          IRB.CreateGEP(TaskArgsTy,
                         TaskArgsSrc, Idx, "gep_src_" + V->getName());
       Value *GEPDst =
-          IRB.CreateGEP(TaskArgsDstL->getType()->getPointerElementType(),
+          IRB.CreateGEP(TaskArgsTy,
                         TaskArgsDstL, Idx, "gep_dst_" + V->getName());
 
       // VLAs
       if (VLADimsInfo.count(V)) {
         GEPSrc =
-            IRB.CreateLoad(GEPSrc->getType()->getPointerElementType(), GEPSrc);
+            IRB.CreateLoad(PointerType::getUnqual(M.getContext()), GEPSrc);
         GEPDst =
-            IRB.CreateLoad(GEPDst->getType()->getPointerElementType(), GEPDst);
+            IRB.CreateLoad(PointerType::getUnqual(M.getContext()), GEPDst);
       }
 
       auto It = NonPODsInfo.Copies.find(V);
@@ -1866,13 +1832,13 @@ struct OmpSs {
       Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
       Idx[1] = ConstantInt::get(IRB.getInt32Ty(), StructToIdxMap.lookup(V));
       Value *GEPSrc =
-          IRB.CreateGEP(TaskArgsSrc->getType()->getPointerElementType(),
+          IRB.CreateGEP(TaskArgsTy,
                         TaskArgsSrc, Idx, "capt_gep_src_" + V->getName());
       Value *GEPDst =
-          IRB.CreateGEP(TaskArgsDstL->getType()->getPointerElementType(),
+          IRB.CreateGEP(TaskArgsTy,
                         TaskArgsDstL, Idx, "capt_gep_dst_" + V->getName());
       IRB.CreateStore(
-          IRB.CreateLoad(GEPSrc->getType()->getPointerElementType(), GEPSrc),
+          IRB.CreateLoad(V->getType(), GEPSrc),
           GEPDst);
     }
 
@@ -1880,10 +1846,10 @@ struct OmpSs {
   }
 
   Value *computeTaskArgsVLAsExtraSizeOf(
-      Module &M, IRBuilder<> &IRB, const DirectiveVLADimsInfo &VLADimsInfo) {
+      Module &M, const DirectiveEnvironment &DirEnv, IRBuilder<> &IRB, const DirectiveVLADimsInfo &VLADimsInfo) {
     Value *Sum = ConstantInt::get(IRB.getInt64Ty(), 0);
     for (const auto &VLAWithDimsMap : VLADimsInfo) {
-      Type *Ty = VLAWithDimsMap.first->getType()->getPointerElementType();
+      Type *Ty = DirEnv.getDSAType(VLAWithDimsMap.first);
       unsigned SizeB = M.getDataLayout().getTypeAllocSize(Ty);
       Value *ArraySize = ConstantInt::get(IRB.getInt64Ty(), SizeB);
       for (auto *V : VLAWithDimsMap.second) {
@@ -1928,23 +1894,27 @@ struct OmpSs {
     // Private and Firstprivate must be stored in the struct
     // Captured values (i.e. VLA dimensions) are not pointers
     for (Value *V : DSAInfo.Shared) {
-      TaskArgsMemberTy.push_back(V->getType());
+      TaskArgsMemberTy.push_back(PointerType::getUnqual(M.getContext()));
       StructToIdxMap[V] = TaskArgsIdx++;
     }
-    for (Value *V : DSAInfo.Private) {
+    for (size_t i = 0; i < DSAInfo.Private.size(); ++i) {
+      Value *V = DSAInfo.Private[i];
+      Type *Ty = DSAInfo.PrivateTy[i];
       // VLAs
       if (VLADimsInfo.count(V))
-        TaskArgsMemberTy.push_back(V->getType());
+        TaskArgsMemberTy.push_back(PointerType::getUnqual(M.getContext()));
       else
-        TaskArgsMemberTy.push_back(V->getType()->getPointerElementType());
+        TaskArgsMemberTy.push_back(Ty);
       StructToIdxMap[V] = TaskArgsIdx++;
     }
-    for (Value *V : DSAInfo.Firstprivate) {
+    for (size_t i = 0; i < DSAInfo.Firstprivate.size(); ++i) {
+      Value *V = DSAInfo.Firstprivate[i];
+      Type *Ty = DSAInfo.FirstprivateTy[i];
       // VLAs
       if (VLADimsInfo.count(V))
-        TaskArgsMemberTy.push_back(V->getType());
+        TaskArgsMemberTy.push_back(PointerType::getUnqual(M.getContext()));
       else
-        TaskArgsMemberTy.push_back(V->getType()->getPointerElementType());
+        TaskArgsMemberTy.push_back(Ty);
       StructToIdxMap[V] = TaskArgsIdx++;
     }
     for (Value *V : CapturedInfo) {
@@ -1977,12 +1947,15 @@ struct OmpSs {
       TaskNameList.push_back(V->getName());
     }
 
+    // TODO: move this to a class member
+    Type *Int32Ty = Type::getInt32Ty(M.getContext());
+
     // int *sizeof_table;
-    Type *SizeofTableTy = Nanos6TaskInfo::getInstance(M).getType()->getElementType(13);
+    // Type *SizeofTableTy = Nanos6TaskInfo::getInstance(M).getType()->getElementType(13);
     SizeofTableVar =
       cast<GlobalVariable>(M.getOrInsertGlobal(
         ("sizeof_table_var_" + F.getName() + Twine(taskNum)).str(),
-        ArrayType::get(SizeofTableTy->getPointerElementType(), TaskTypeList.size())));
+        ArrayType::get(Int32Ty, TaskTypeList.size())));
     SizeofTableVar->setLinkage(GlobalVariable::InternalLinkage);
     SizeofTableVar->setAlignment(Align(64));
     SizeofTableVar->setConstant(true);
@@ -1994,20 +1967,20 @@ struct OmpSs {
     for (Type *Ty : TaskElementTypes) {
       TaskSizeofList.push_back(
         ConstantInt::get(
-          SizeofTableTy->getPointerElementType(),
+          Int32Ty,
           M.getDataLayout().getTypeStoreSize(Ty).getFixedSize()));
     }
     SizeofTableVar->setInitializer(
       ConstantArray::get(
-        ArrayType::get(SizeofTableTy->getPointerElementType(), TaskTypeList.size()),
+        ArrayType::get(Int32Ty, TaskTypeList.size()),
         TaskSizeofList));
 
     // int *offset_table;
-    Type *OffsetTableTy = Nanos6TaskInfo::getInstance(M).getType()->getElementType(14);
+    // Type *OffsetTableTy = Nanos6TaskInfo::getInstance(M).getType()->getElementType(14);
     OffsetTableVar =
       cast<GlobalVariable>(M.getOrInsertGlobal(
         ("offset_table_var_" + F.getName() + Twine(taskNum)).str(),
-        ArrayType::get(OffsetTableTy->getPointerElementType(), TaskTypeList.size())));
+        ArrayType::get(Int32Ty, TaskTypeList.size())));
     OffsetTableVar->setLinkage(GlobalVariable::InternalLinkage);
     OffsetTableVar->setAlignment(Align(64));
     OffsetTableVar->setConstant(true);
@@ -2018,20 +1991,19 @@ struct OmpSs {
     SmallVector<Constant *, 4> TaskOffsetList;
     for (const uint64_t &val : MemberOffsetsList) {
       TaskOffsetList.push_back(
-        ConstantInt::get(
-          OffsetTableTy->getPointerElementType(), val));
+        ConstantInt::get(Int32Ty, val));
     }
     OffsetTableVar->setInitializer(
       ConstantArray::get(
-        ArrayType::get(OffsetTableTy->getPointerElementType(), TaskTypeList.size()),
+        ArrayType::get(Int32Ty, TaskTypeList.size()),
         TaskOffsetList));
 
     // int *arg_idx_table;
-    Type *ArgIdxTableTy = Nanos6TaskInfo::getInstance(M).getType()->getElementType(15);
+    // Type *ArgIdxTableTy = Nanos6TaskInfo::getInstance(M).getType()->getElementType(15);
     ArgIdxTableVar =
       cast<GlobalVariable>(M.getOrInsertGlobal(
         ("arg_idx_table_var_" + F.getName() + Twine(taskNum)).str(),
-        ArrayType::get(ArgIdxTableTy->getPointerElementType(), DirEnv.DependsInfo.NumSymbols)));
+        ArrayType::get(Int32Ty, DirEnv.DependsInfo.NumSymbols)));
     ArgIdxTableVar->setLinkage(GlobalVariable::InternalLinkage);
     ArgIdxTableVar->setAlignment(Align(64));
     ArgIdxTableVar->setConstant(true);
@@ -2043,13 +2015,11 @@ struct OmpSs {
       if (!DeviceInfo.empty())
         Idx -= DeviceArgsSize;
       TaskArgIdxList[SymbolIndex] =
-        ConstantInt::get(
-          ArgIdxTableTy->getPointerElementType(),
-          Idx);
+        ConstantInt::get(Int32Ty, Idx);
     }
     ArgIdxTableVar->setInitializer(
       ConstantArray::get(
-        ArrayType::get(ArgIdxTableTy->getPointerElementType(), DirEnv.DependsInfo.NumSymbols),
+        ArrayType::get(Int32Ty, DirEnv.DependsInfo.NumSymbols),
         TaskArgIdxList));
   }
 
@@ -2060,10 +2030,12 @@ struct OmpSs {
 
   // Greater alignemt go first
   void computeVLAsAlignOrder(
-      Module &M, SmallVectorImpl<VLAAlign> &VLAAlignsInfo, const DirectiveVLADimsInfo &VLADimsInfo) {
+      Module &M, SmallVectorImpl<VLAAlign> &VLAAlignsInfo,
+      const DirectiveEnvironment &DirEnv,
+      const DirectiveVLADimsInfo &VLADimsInfo) {
     for (const auto &VLAWithDimsMap : VLADimsInfo) {
       auto *V = VLAWithDimsMap.first;
-      Type *Ty = V->getType()->getPointerElementType();
+      Type *Ty = DirEnv.getDSAType(V);
 
       unsigned Align = M.getDataLayout().getPrefTypeAlignment(Ty);
 
@@ -2179,7 +2151,7 @@ struct OmpSs {
       if (IsLoop) {
         DirectiveLoopInfo FinalLoopInfo = InnerDirInfo.DirEnv.LoopInfo;
         rewriteDirInfoForFinal(FinalLoopInfo, FinalInfo);
-        buildLoopForTask(M, F, CloneEntryI, CloneExitI, FinalLoopInfo);
+        buildLoopForTask(M, F, InnerDirInfo.DirEnv, CloneEntryI, CloneExitI, FinalLoopInfo);
       } else if (IsWhile) {
         DirectiveWhileInfo FinalWhileInfo = InnerDirInfo.DirEnv.WhileInfo;
         rewriteDirInfoForFinal(FinalWhileInfo, FinalInfo);
@@ -2202,7 +2174,7 @@ struct OmpSs {
     if (IsLoop) {
       DirectiveLoopInfo FinalLoopInfo = DirInfo.DirEnv.LoopInfo;
       rewriteDirInfoForFinal(FinalLoopInfo, FinalInfo);
-      NewCloneEntryI = buildLoopForTask(M, F, CloneEntryI, CloneExitI, FinalLoopInfo);
+      NewCloneEntryI = buildLoopForTask(M, F, DirInfo.DirEnv, CloneEntryI, CloneExitI, FinalLoopInfo);
     } else if (IsWhile) {
       DirectiveWhileInfo FinalWhileInfo = DirInfo.DirEnv.WhileInfo;
       rewriteDirInfoForFinal(FinalWhileInfo, FinalInfo);
@@ -2391,7 +2363,7 @@ struct OmpSs {
       = createUnpackOlFunction(
         M, F, ("nanos6_ol_destroy_" + F.getName() + Twine(taskNum)).str(),
         {TaskArgsTy->getPointerTo()}, {"task_args"}, {}, {});
-    olCallToUnpack(M, DirInfo, TaskArgsToStructIdxMap, OlDestroyArgsFuncVar, UnpackDestroyArgsFuncVar);
+    olCallToUnpack(M, DirInfo, TaskArgsTy, TaskArgsToStructIdxMap, OlDestroyArgsFuncVar, UnpackDestroyArgsFuncVar, nullptr);
 
     return OlDestroyArgsFuncVar;
 
@@ -2445,8 +2417,9 @@ struct OmpSs {
       TaskExtraNameList.push_back("device_env");
     }
     // nanos6_address_translation_entry_t *address_translation_table
+    Type *TaskAddrTranslationEntryTy = Nanos6TaskAddrTranslationEntry::getInstance(M).getType();
     TaskExtraTypeList.push_back(
-      Nanos6TaskAddrTranslationEntry::getInstance(M).getType()->getPointerTo());
+      TaskAddrTranslationEntryTy->getPointerTo());
     TaskExtraNameList.push_back("address_translation_table");
 
     // CodeExtractor will create a entry block for us
@@ -2458,7 +2431,7 @@ struct OmpSs {
       M, F, ("nanos6_ol_task_region_" + F.getName() + Twine(taskNum)).str(),
       {TaskArgsTy->getPointerTo()}, {"task_args"}, TaskExtraTypeList, TaskExtraNameList);
 
-    olCallToUnpack(M, DirInfo, TaskArgsToStructIdxMap, OlFunc, UnpackFunc, /*IsTaskFunc=*/true);
+    olCallToUnpack(M, DirInfo, TaskArgsTy, TaskArgsToStructIdxMap, OlFunc, UnpackFunc, TaskAddrTranslationEntryTy, /*IsTaskFunc=*/true);
   }
 
   Function *createDepsOlFunc(
@@ -2498,7 +2471,7 @@ struct OmpSs {
                                ("nanos6_ol_deps_" + F.getName() + Twine(taskNum)).str(),
                                {TaskArgsTy->getPointerTo()}, {"task_args"},
                                TaskExtraTypeList, TaskExtraNameList);
-    olCallToUnpack(M, DirInfo, TaskArgsToStructIdxMap, OlDepsFuncVar, UnpackDepsFuncVar);
+    olCallToUnpack(M, DirInfo, TaskArgsTy, TaskArgsToStructIdxMap, OlDepsFuncVar, UnpackDepsFuncVar, nullptr);
 
     return OlDepsFuncVar;
   }
@@ -2533,7 +2506,7 @@ struct OmpSs {
                                ("nanos6_ol_constraints_" + F.getName() + Twine(taskNum)).str(),
                                {TaskArgsTy->getPointerTo()}, {"task_args"},
                                TaskExtraTypeList, TaskExtraNameList);
-    olCallToUnpack(M, DirInfo, TaskArgsToStructIdxMap, OlConstraintsFuncVar, UnpackConstraintsFuncVar);
+    olCallToUnpack(M, DirInfo, TaskArgsTy, TaskArgsToStructIdxMap, OlConstraintsFuncVar, UnpackConstraintsFuncVar, nullptr);
 
     return OlConstraintsFuncVar;
   }
@@ -2610,7 +2583,7 @@ struct OmpSs {
                                ("nanos6_ol_priority_" + F.getName() + Twine(taskNum)).str(),
                                {TaskArgsTy->getPointerTo()}, {"task_args"},
                                TaskExtraTypeList, TaskExtraNameList);
-    olCallToUnpack(M, DirInfo, TaskArgsToStructIdxMap, OlPriorityFuncVar, UnpackPriorityFuncVar);
+    olCallToUnpack(M, DirInfo, TaskArgsTy, TaskArgsToStructIdxMap, OlPriorityFuncVar, UnpackPriorityFuncVar, nullptr);
 
     return OlPriorityFuncVar;
   }
@@ -2637,7 +2610,7 @@ struct OmpSs {
                                ("nanos6_ol_onready_" + F.getName() + Twine(taskNum)).str(),
                                {TaskArgsTy->getPointerTo()}, {"task_args"},
                                {}, {});
-    olCallToUnpack(M, DirInfo, TaskArgsToStructIdxMap, OlOnreadyFuncVar, UnpackOnreadyFuncVar);
+    olCallToUnpack(M, DirInfo, TaskArgsTy, TaskArgsToStructIdxMap, OlOnreadyFuncVar, UnpackOnreadyFuncVar, nullptr);
 
     return OlOnreadyFuncVar;
   }
@@ -2672,7 +2645,7 @@ struct OmpSs {
                                ("nanos6_ol_while_cond_" + F.getName() + Twine(taskNum)).str(),
                                {TaskArgsTy->getPointerTo()}, {"task_args"},
                                TaskExtraTypeList, TaskExtraNameList);
-    olCallToUnpack(M, DirInfo, TaskArgsToStructIdxMap, OlWhileFuncVar, UnpackWhileFuncVar);
+    olCallToUnpack(M, DirInfo, TaskArgsTy, TaskArgsToStructIdxMap, OlWhileFuncVar, UnpackWhileFuncVar, nullptr);
 
     return OlWhileFuncVar;
   }
@@ -2733,14 +2706,6 @@ struct OmpSs {
               ConstantInt::get(IRB.getInt64Ty(), 1),
               3));
     }
-    if (DirEnv.isOmpSsTaskIterDirective()) {
-      TaskFlagsVar =
-        IRB.CreateOr(
-          TaskFlagsVar,
-          IRB.CreateShl(
-              ConstantInt::get(IRB.getInt64Ty(), 1),
-              4));
-    }
     if (DirEnv.Wait) {
       TaskFlagsVar =
         IRB.CreateOr(
@@ -2749,7 +2714,15 @@ struct OmpSs {
             IRB.CreateZExt(
               DirEnv.Wait,
               IRB.getInt64Ty()),
-              5));
+              4));
+    }
+    if (DirEnv.isOmpSsTaskIterDirective()) {
+      TaskFlagsVar =
+        IRB.CreateOr(
+          TaskFlagsVar,
+          IRB.CreateShl(
+              ConstantInt::get(IRB.getInt64Ty(), 1),
+              7));
     }
     if (LoopInfo.Update) {
       TaskFlagsVar =
@@ -2817,7 +2790,7 @@ struct OmpSs {
 
     IRBuilder<> IRB(DirInfo.Entry);
 
-    Type *IndVarTy = LoopInfo.IndVar[0]->getType()->getPointerElementType();
+    Type *IndVarTy = DirInfo.DirEnv.getDSAType(LoopInfo.IndVar[0]);
     // Non collapsed loops build a loop using the original type
     NewLoopInfo.LBoundSigned[0] = LoopInfo.IndVarSigned[0];
     NewLoopInfo.UBoundSigned[0] = LoopInfo.IndVarSigned[0];
@@ -2839,7 +2812,7 @@ struct OmpSs {
     NewLoopInfo.IndVar[0] = IRB.CreateAlloca(IndVarTy, nullptr, "loop");
     // unpacked_task_region loops are always SLT
     NewLoopInfo.LoopType[0] = DirectiveLoopInfo::LT;
-    buildLoopForTaskImpl(M, F, DirInfo.Entry, DirInfo.Exit, NewLoopInfo, NewEntryI, NewExitI, CollapseStuff);
+    buildLoopForTaskImpl(M, F, IndVarTy, DirInfo.Entry, DirInfo.Exit, NewLoopInfo, NewEntryI, NewExitI, CollapseStuff);
   }
 
   void lowerTaskImpl(
@@ -2926,7 +2899,7 @@ struct OmpSs {
     if (DirEnv.isOmpSsLoopDirective())
       buildUnpackedLoopForTask(DirInfo, M, F, NewLoopInfo, NewEntryI, NewExitI, NormalizedUBs, CollapseStuff);
     if (DirEnv.isOmpSsTaskIterForDirective()) {
-      Type *OrigIndVarTy = LoopInfo.IndVar[0]->getType()->getPointerElementType();
+      Type *OrigIndVarTy = DirInfo.DirEnv.getDSAType(LoopInfo.IndVar[0]);
       // Increment induction variable at the end of the taskiter for
       IRBuilder<> IRB(DirInfo.Exit);
       Instruction *IndVarVal = IRB.CreateLoad(OrigIndVarTy, LoopInfo.IndVar[0]);
@@ -3087,8 +3060,11 @@ struct OmpSs {
       UnpackTaskFuncVar->getBasicBlockList().push_back(newRootNode);
 
       if (DirEnv.isOmpSsLoopDirective()) {
-        Type *OrigIndVarTy = LoopInfo.IndVar[0]->getType()->getPointerElementType();
-        Type *NewIndVarTy = NewLoopInfo.IndVar[0]->getType()->getPointerElementType();
+        Type *OrigIndVarTy = DirInfo.DirEnv.getDSAType(LoopInfo.IndVar[0]);
+        Type *NewIndVarTy = OrigIndVarTy;
+        // Collapsed loops build a loop using size_t type to avoid overflows
+        if (LoopInfo.LBound.size() > 1)
+          NewIndVarTy = Type::getInt64Ty(M.getContext());
 
         IRBuilder<> IRB(&header->front());
         Value *LoopBounds = &*(UnpackTaskFuncVar->arg_end() - 2);
@@ -3097,18 +3073,18 @@ struct OmpSs {
         Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
         Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
         Value *LBoundField =
-            IRB.CreateGEP(LoopBounds->getType()->getPointerElementType(),
+            IRB.CreateGEP(Nanos6LoopBounds::getInstance(M).getType(),
                           LoopBounds, Idx, "lb_gep");
         LBoundField = IRB.CreateLoad(
-            LBoundField->getType()->getPointerElementType(), LBoundField);
+            Nanos6LoopBounds::getInstance(M).getType()->getElementType(1), LBoundField);
         LBoundField = IRB.CreateZExtOrTrunc(LBoundField, NewIndVarTy, "lb");
 
         Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 1);
         Value *UBoundField =
-            IRB.CreateGEP(LoopBounds->getType()->getPointerElementType(),
+            IRB.CreateGEP(Nanos6LoopBounds::getInstance(M).getType(),
                           LoopBounds, Idx, "ub_gep");
         UBoundField = IRB.CreateLoad(
-            UBoundField->getType()->getPointerElementType(), UBoundField);
+            Nanos6LoopBounds::getInstance(M).getType()->getElementType(2), UBoundField);
         UBoundField = IRB.CreateZExtOrTrunc(UBoundField, NewIndVarTy, "ub");
 
         // Replace loop bounds of the indvar, loop cond. and loop incr.
@@ -3132,7 +3108,7 @@ struct OmpSs {
           IRBuilder<> LoopBodyIRB(TmpEntry);
           if (!i)
             NormVal = LoopBodyIRB.CreateLoad(
-                NewLoopInfo.IndVar[0]->getType()->getPointerElementType(),
+                NewIndVarTy,
                 NewLoopInfo.IndVar[0]);
 
           // NOTE: NormalizedUBs values are nanos6_register_loop upper_bound type
@@ -3188,7 +3164,7 @@ struct OmpSs {
             Instruction *UBoundResult = LoopBodyIRB.CreateCall(LoopInfo.UBound[i].Fun, LoopInfo.UBound[i].Args);
 
             Instruction *IndVarVal = LoopBodyIRB.CreateLoad(
-                LoopInfo.IndVar[i]->getType()->getPointerElementType(),
+                DirInfo.DirEnv.getDSAType(LoopInfo.IndVar[i]),
                 LoopInfo.IndVar[i]);
             Value *LoopCmp = nullptr;
             switch (LoopInfo.LoopType[i]) {
@@ -3325,30 +3301,28 @@ struct OmpSs {
       // Here we have a valid codeReplacer BasicBlock with its terminator
       IRB.SetInsertPoint(codeReplacer->getTerminator());
 
-      AllocaInst *TaskArgsVar = IRB.CreateAlloca(TaskArgsTy->getPointerTo());
+      AllocaInst *TaskArgsVar = IRB.CreateAlloca(PointerType::getUnqual(M.getContext()));
       PostMoveInstructions.push_back(TaskArgsVar);
-      Value *TaskArgsVarCast = IRB.CreateBitCast(TaskArgsVar, IRB.getInt8PtrTy()->getPointerTo());
       Value *TaskFlagsVar = computeTaskFlags(IRB, DirEnv);
-      AllocaInst *TaskPtrVar = IRB.CreateAlloca(IRB.getInt8PtrTy());
+      AllocaInst *TaskPtrVar = IRB.CreateAlloca(PointerType::getUnqual(M.getContext()));
       PostMoveInstructions.push_back(TaskPtrVar);
 
-      Value *TaskArgsStructSizeOf = ConstantInt::get(IRB.getInt64Ty(), M.getDataLayout().getTypeAllocSize(TaskArgsTy));
+      Value *TaskArgsStructSizeOf = IRB.getInt64(M.getDataLayout().getTypeAllocSize(TaskArgsTy));
 
       // TODO: this forces an alignment of 16 for VLAs
       {
         const int ALIGN = 16;
         TaskArgsStructSizeOf =
-          IRB.CreateNUWAdd(TaskArgsStructSizeOf,
-                           ConstantInt::get(IRB.getInt64Ty(), ALIGN - 1));
+          IRB.CreateNUWAdd(TaskArgsStructSizeOf, IRB.getInt64(ALIGN - 1));
         TaskArgsStructSizeOf =
-          IRB.CreateAnd(TaskArgsStructSizeOf,
-                        IRB.CreateNot(ConstantInt::get(IRB.getInt64Ty(), ALIGN - 1)));
+          IRB.CreateAnd(TaskArgsStructSizeOf, IRB.CreateNot(IRB.getInt64(ALIGN - 1)));
       }
 
-      Value *TaskArgsVLAsExtraSizeOf = computeTaskArgsVLAsExtraSizeOf(M, IRB, VLADimsInfo);
+      Value *TaskArgsVLAsExtraSizeOf = computeTaskArgsVLAsExtraSizeOf(M, DirEnv, IRB, VLADimsInfo);
       Value *TaskArgsSizeOf = IRB.CreateNUWAdd(TaskArgsStructSizeOf, TaskArgsVLAsExtraSizeOf);
 
-      Instruction *NumDependencies = IRB.CreateAlloca(IRB.getInt64Ty(), nullptr, "num.deps");
+      Type *NumDependenciesTy = IRB.getInt64Ty();
+      Instruction *NumDependencies = IRB.CreateAlloca(NumDependenciesTy, nullptr, "num.deps");
       PostMoveInstructions.push_back(NumDependencies);
 
       if (DirEnv.isOmpSsTaskLoopDirective() && hasMultidepUsingLoopIter(LoopInfo, DependsInfo)) {
@@ -3359,8 +3333,7 @@ struct OmpSs {
         IRB.CreateStore(IRB.getInt64(0), NumDependencies);
         for (auto &DepInfo : DependsInfo.List) {
           Instruction *NumDependenciesLoad = IRB.CreateLoad(
-              NumDependencies->getType()->getPointerElementType(),
-              NumDependencies);
+              NumDependenciesTy, NumDependencies);
           Value *NumDependenciesIncr = IRB.CreateAdd(NumDependenciesLoad, IRB.getInt64(1));
           Instruction *NumDependenciesStore = IRB.CreateStore(NumDependenciesIncr, NumDependencies);
           if (const auto *MultiDepInfo = dyn_cast<MultiDependInfo>(DepInfo.get())) {
@@ -3375,7 +3348,7 @@ struct OmpSs {
             IRB.SetInsertPoint(AfterNumDependenciesStore);
 
             buildLoopForMultiDep(
-                M, F, NumDependenciesLoad, NumDependenciesStore,
+                M, F, DirEnv, NumDependenciesLoad, NumDependenciesStore,
                 MultiDepInfo);
           }
         }
@@ -3389,11 +3362,10 @@ struct OmpSs {
             ? IRB.CreateBitCast(DirEnv.InstanceLabel, IRB.getInt8PtrTy())
             : Constant::getNullValue(IRB.getInt8PtrTy()),
           TaskArgsSizeOf,
-          TaskArgsVarCast,
+          TaskArgsVar,
           TaskPtrVar,
           TaskFlagsVar,
-          IRB.CreateLoad(NumDependencies->getType()->getPointerElementType(),
-                         NumDependencies)
+          IRB.CreateLoad(NumDependenciesTy, NumDependencies)
       };
 
       if (DirEnv.isOmpSsLoopDirective()) {
@@ -3460,15 +3432,13 @@ struct OmpSs {
 
       // DSA capture
       Value *TaskArgsVarL = IRB.CreateLoad(
-          TaskArgsVar->getType()->getPointerElementType(), TaskArgsVar);
+          PointerType::getUnqual(M.getContext()), TaskArgsVar);
 
-      Value *TaskArgsVarLi8 = IRB.CreateBitCast(TaskArgsVarL, IRB.getInt8PtrTy());
       Value *TaskArgsVarLi8IdxGEP =
-          IRB.CreateGEP(TaskArgsVarLi8->getType()->getPointerElementType(),
-                        TaskArgsVarLi8, TaskArgsStructSizeOf, "args_end");
+        IRB.CreateGEP(IRB.getInt8Ty(), TaskArgsVarL, TaskArgsStructSizeOf, "args_end");
 
       SmallVector<VLAAlign, 2> VLAAlignsInfo;
-      computeVLAsAlignOrder(M, VLAAlignsInfo, VLADimsInfo);
+      computeVLAsAlignOrder(M, VLAAlignsInfo, DirEnv, VLADimsInfo);
 
       // TODO: is this a good place to put this?
       if (!DeviceInfo.empty()) {
@@ -3490,7 +3460,7 @@ struct OmpSs {
           for (size_t i = 0; i < PartNdrangeLength; ++i) {
             Idx[1] = ConstantInt::get(IRB.getInt32Ty(), DevGEPIdx++);
             GEP = IRB.CreateGEP(
-                TaskArgsVarL->getType()->getPointerElementType(),
+                TaskArgsTy,
                 TaskArgsVarL, Idx, ("gep_dev_ndrange" + Twine(i)).str());
             Value *V = ConstantInt::get(IRB.getInt64Ty(), -1);
             if (j <= DeviceInfo.HasLocalSize && i < NdrangeLength)
@@ -3505,7 +3475,7 @@ struct OmpSs {
         Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
         Idx[1] = ConstantInt::get(IRB.getInt32Ty(), DevGEPIdx++);
         GEP = IRB.CreateGEP(
-            TaskArgsVarL->getType()->getPointerElementType(),
+            TaskArgsTy,
             TaskArgsVarL, Idx, "gep_dev_shm");
         IRB.CreateStore(
           ConstantInt::get(IRB.getInt64Ty(), 0), GEP);
@@ -3514,27 +3484,25 @@ struct OmpSs {
       // First point VLAs to its according space in task args
       for (const auto& VAlign : VLAAlignsInfo) {
         auto *V = VAlign.V;
+        Type *Ty = DirEnv.getDSAType(V);
         unsigned TyAlign = VAlign.Align;
-
-        Type *Ty = V->getType()->getPointerElementType();
 
         Value *Idx[2];
         Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
         Idx[1] = ConstantInt::get(IRB.getInt32Ty(), TaskArgsToStructIdxMap[V]);
         Value *GEP =
-            IRB.CreateGEP(TaskArgsVarL->getType()->getPointerElementType(),
+            IRB.CreateGEP(TaskArgsTy,
                           TaskArgsVarL, Idx, "gep_" + V->getName());
 
         // Point VLA in task args to an aligned position of the extra space allocated
-        Value *GEPi8 = IRB.CreateBitCast(GEP, IRB.getInt8PtrTy()->getPointerTo());
-        IRB.CreateAlignedStore(TaskArgsVarLi8IdxGEP, GEPi8, Align(TyAlign));
+        IRB.CreateAlignedStore(TaskArgsVarLi8IdxGEP, GEP, Align(TyAlign));
         // Skip current VLA size
         unsigned SizeB = M.getDataLayout().getTypeAllocSize(Ty);
         Value *VLASize = ConstantInt::get(IRB.getInt64Ty(), SizeB);
         for (auto *Dim : VLADimsInfo.lookup(V))
           VLASize = IRB.CreateNUWMul(VLASize, Dim);
         TaskArgsVarLi8IdxGEP = IRB.CreateGEP(
-            TaskArgsVarLi8IdxGEP->getType()->getPointerElementType(),
+            IRB.getInt8Ty(),
             TaskArgsVarLi8IdxGEP, VLASize);
       }
 
@@ -3543,16 +3511,17 @@ struct OmpSs {
         Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
         Idx[1] = ConstantInt::get(IRB.getInt32Ty(), TaskArgsToStructIdxMap[V]);
         Value *GEP = IRB.CreateGEP(
-            TaskArgsVarL->getType()->getPointerElementType(),
+            TaskArgsTy,
             TaskArgsVarL, Idx, "gep_" + V->getName());
         IRB.CreateStore(V, GEP);
       }
-      for (Value *V : DSAInfo.Private) {
+      for (size_t i = 0; i < DSAInfo.Private.size(); ++i) {
+        Value *V = DSAInfo.Private[i];
+        Type *Ty = DSAInfo.PrivateTy[i];
         // Call custom constructor generated in clang in non-pods
         // Leave pods unititialized
         auto It = DirEnv.NonPODsInfo.Inits.find(V);
         if (It != DirEnv.NonPODsInfo.Inits.end()) {
-          Type *Ty = V->getType()->getPointerElementType();
           // Compute num elements
           Value *NSize = ConstantInt::get(IRB.getInt64Ty(), 1);
           if (isa<ArrayType>(Ty)) {
@@ -3572,22 +3541,19 @@ struct OmpSs {
           Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
           Idx[1] = ConstantInt::get(IRB.getInt32Ty(), TaskArgsToStructIdxMap[V]);
           Value *GEP = IRB.CreateGEP(
-              TaskArgsVarL->getType()->getPointerElementType(),
+              TaskArgsTy,
               TaskArgsVarL, Idx, "gep_" + V->getName());
 
           // VLAs
           if (VLADimsInfo.count(V))
-            GEP = IRB.CreateLoad(GEP->getType()->getPointerElementType(), GEP);
-
-          // Regular arrays have types like [10 x %struct.S]*
-          // Cast to %struct.S*
-          GEP = IRB.CreateBitCast(GEP, Ty->getPointerTo());
+            GEP = IRB.CreateLoad(PointerType::getUnqual(M.getContext()), GEP);
 
           IRB.CreateCall(FunctionCallee(cast<Function>(It->second)), ArrayRef<Value*>{GEP, NSize});
         }
       }
-      for (Value *V : DSAInfo.Firstprivate) {
-        Type *Ty = V->getType()->getPointerElementType();
+      for (size_t i = 0; i < DSAInfo.Firstprivate.size(); ++i) {
+        Value *V = DSAInfo.Firstprivate[i];
+        Type *Ty = DSAInfo.FirstprivateTy[i];
         unsigned TyAlign = M.getDataLayout().getPrefTypeAlignment(Ty);
 
         // Compute num elements
@@ -3611,12 +3577,12 @@ struct OmpSs {
         Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
         Idx[1] = ConstantInt::get(IRB.getInt32Ty(), TaskArgsToStructIdxMap[V]);
         Value *GEP = IRB.CreateGEP(
-            TaskArgsVarL->getType()->getPointerElementType(),
+            TaskArgsTy,
             TaskArgsVarL, Idx, "gep_" + V->getName());
 
         // VLAs
         if (VLADimsInfo.count(V))
-          GEP = IRB.CreateLoad(GEP->getType()->getPointerElementType(), GEP);
+          GEP = IRB.CreateLoad(PointerType::getUnqual(M.getContext()), GEP);
 
         auto It = DirEnv.NonPODsInfo.Copies.find(V);
         if (It != DirEnv.NonPODsInfo.Copies.end()) {
@@ -3640,13 +3606,13 @@ struct OmpSs {
         Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
         Idx[1] = ConstantInt::get(IRB.getInt32Ty(), TaskArgsToStructIdxMap[V]);
         Value *GEP = IRB.CreateGEP(
-            TaskArgsVarL->getType()->getPointerElementType(),
+            TaskArgsTy,
             TaskArgsVarL, Idx, "capt_gep_" + V->getName());
         IRB.CreateStore(V, GEP);
       }
 
       Value *TaskPtrVarL = IRB.CreateLoad(
-          TaskPtrVar->getType()->getPointerElementType(), TaskPtrVar);
+          IRB.getPtrTy(), TaskPtrVar);
 
       CallInst *TaskSubmitFuncCall = IRB.CreateCall(TaskSubmitFuncCallee, TaskPtrVarL);
       return TaskSubmitFuncCall;

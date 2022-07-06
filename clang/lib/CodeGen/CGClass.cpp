@@ -126,17 +126,6 @@ CodeGenModule::getDynamicOffsetAlignment(CharUnits actualBaseAlign,
 }
 
 Address CodeGenFunction::LoadCXXThisAddress() {
-  // NOTE: assuming 'this' is already set
-  // This is true since:
-  // 1. In a task inline it's been already set
-  // 2. In a task outline we set 'this' just before
-  //    starting the clauses
-  // 3. When building a wrapper function (for deps for example)
-  //    StartFunction will set it
-  if (getLangOpts().OmpSs
-      && CGM.getOmpSsRuntime().InDirectiveEmission)
-    return Address(LoadCXXThis(), LoadCXXThis()->getType()->getPointerElementType(), CXXThisAlignment);
-
   assert(CurFuncDecl && "loading 'this' without a func declaration?");
   auto *MD = cast<CXXMethodDecl>(CurFuncDecl);
 

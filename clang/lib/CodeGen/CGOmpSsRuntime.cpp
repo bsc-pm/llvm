@@ -403,7 +403,7 @@ public:
       } else if (VD->hasLinkage() || VD->isStaticDataMember()) {
         PossibleBase = CGF.CGM.GetAddrOfGlobalVar(VD);
         CharUnits Alignment = CGF.getContext().getDeclAlign(VD);
-        Address Addr(PossibleBase, PossibleBase->getType()->getPointerElementType(), Alignment);
+        Address Addr(PossibleBase, CGF.ConvertType(VD->getType()), Alignment);
         CaptureInvolvedMap.try_emplace(VD, Addr);
       } else {
         LValue LV = CGF.EmitDeclRefLValue(E);
@@ -871,6 +871,8 @@ void CGOmpSsRuntime::EmitCopyCtorFunc(
     const VarDecl *CopyD, const VarDecl *InitD,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
 
+  QualType Q = CopyD->getType();
+
   const CXXConstructorDecl *CtorD = cast<CXXConstructorDecl>(CtorE->getConstructor());
   // If we have already created the function we're done
   auto It = GenericCXXNonPodMethodDefs.find(CtorD);
@@ -923,7 +925,7 @@ void CGOmpSsRuntime::EmitCopyCtorFunc(
   llvm::Value *SrcBegin = SrcLV.getPointer(CGF);
   llvm::Value *DstBegin = DstLV.getPointer(CGF);
   llvm::Value *DstEnd = CGF.Builder.CreateInBoundsGEP(
-      DstBegin->getType()->getPointerElementType(), DstBegin, NelemsValue,
+      CGF.ConvertType(Q), DstBegin, NelemsValue,
       "arrayctor.dst.end");
 
   // Enter the loop, setting up a phi for the current location to initialize.
@@ -952,13 +954,13 @@ void CGOmpSsRuntime::EmitCopyCtorFunc(
 
   // Go to the next element. Move SrcBegin too
   llvm::Value *DstNext = CGF.Builder.CreateInBoundsGEP(
-      DstCur->getType()->getPointerElementType(), DstCur,
+      CGF.ConvertType(Q), DstCur,
       llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
       "arrayctor.dst.next");
   DstCur->addIncoming(DstNext, CGF.Builder.GetInsertBlock());
 
   llvm::Value *SrcDest = CGF.Builder.CreateInBoundsGEP(
-      SrcCur->getType()->getPointerElementType(), SrcCur,
+      CGF.ConvertType(Q), SrcCur,
       llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
       "arrayctor.src.next");
   SrcCur->addIncoming(SrcDest, CGF.Builder.GetInsertBlock());
@@ -996,7 +998,8 @@ void CGOmpSsRuntime::EmitCtorFunc(
   ASTContext &C = CGM.getContext();
   FunctionArgList Args;
 
-  QualType PQ = C.getPointerType(CopyD->getType());
+  QualType Q = CopyD->getType();
+  QualType PQ = C.getPointerType(Q);
   ImplicitParamDecl DstArg(C, PQ, ImplicitParamDecl::Other);
   ImplicitParamDecl NelemsArg(C, C.getSizeType(), ImplicitParamDecl::Other);
 
@@ -1028,7 +1031,7 @@ void CGOmpSsRuntime::EmitCtorFunc(
   // Find the end of the array.
   llvm::Value *DstBegin = DstLV.getPointer(CGF);
   llvm::Value *DstEnd = CGF.Builder.CreateInBoundsGEP(
-      DstBegin->getType()->getPointerElementType(), DstBegin, NelemsValue,
+      CGF.ConvertType(Q), DstBegin, NelemsValue,
       "arrayctor.dst.end");
 
   // Enter the loop, setting up a phi for the current location to initialize.
@@ -1045,7 +1048,7 @@ void CGOmpSsRuntime::EmitCtorFunc(
 
   // Go to the next element
   llvm::Value *DstNext = CGF.Builder.CreateInBoundsGEP(
-      DstCur->getType()->getPointerElementType(), DstCur,
+      CGF.ConvertType(Q), DstCur,
       llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
       "arrayctor.dst.next");
   DstCur->addIncoming(DstNext, CGF.Builder.GetInsertBlock());
@@ -1122,7 +1125,7 @@ void CGOmpSsRuntime::EmitDtorFunc(
   // Find the end of the array.
   llvm::Value *DstBegin = DstLV.getPointer(CGF);
   llvm::Value *DstEnd = CGF.Builder.CreateInBoundsGEP(
-      DstBegin->getType()->getPointerElementType(), DstBegin, NelemsValue,
+      CGF.ConvertType(Q), DstBegin, NelemsValue,
       "arraydtor.dst.end");
 
   // Enter the loop, setting up a phi for the current location to initialize.
@@ -1140,7 +1143,7 @@ void CGOmpSsRuntime::EmitDtorFunc(
 
   // Go to the next element
   llvm::Value *DstNext = CGF.Builder.CreateInBoundsGEP(
-      DstCur->getType()->getPointerElementType(), DstCur,
+      CGF.ConvertType(Q), DstCur,
       llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
       "arraydtor.dst.next");
   DstCur->addIncoming(DstNext, CGF.Builder.GetInsertBlock());
@@ -1164,6 +1167,7 @@ void CGOmpSsRuntime::EmitDSAShared(
   SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
   SmallVectorImpl<llvm::Value*> &CapturedList) {
 
+  SmallVector<llvm::Value *> DSABundleList;
   if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
     const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
     llvm::Value *DSAValue;
@@ -1176,10 +1180,14 @@ void CGOmpSsRuntime::EmitDSAShared(
       LValue LV = CGF.EmitDeclRefLValue(DRE);
       CaptureMapStack.back().try_emplace(VD, LV.getAddress(CGF));
       DSAValue = LV.getPointer(CGF);
-      TaskInfo.emplace_back(getBundleStr(OSSB_shared), DSAValue);
+      DSABundleList.push_back(DSAValue);
+      DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(DRE->getType())));
+      TaskInfo.emplace_back(getBundleStr(OSSB_shared), DSABundleList);
     } else {
       DSAValue = CGF.EmitDeclRefLValue(DRE).getPointer(CGF);
-      TaskInfo.emplace_back(getBundleStr(OSSB_shared), DSAValue);
+      DSABundleList.push_back(DSAValue);
+      DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(DRE->getType())));
+      TaskInfo.emplace_back(getBundleStr(OSSB_shared), DSABundleList);
     }
     QualType Q = VD->getType();
     // int (**p)[sizex][sizey] -> we need to capture sizex sizey only
@@ -1195,9 +1203,9 @@ void CGOmpSsRuntime::EmitDSAShared(
       TaskInfo.emplace_back(getBundleStr(OSSB_vladims), DimsWithValue);
 
   } else if (const CXXThisExpr *ThisE = dyn_cast<CXXThisExpr>(E)) {
-    TaskInfo.emplace_back(
-        getBundleStr(OSSB_shared),
-        CGF.EmitScalarExpr(ThisE));
+    DSABundleList.push_back(CGF.EmitScalarExpr(ThisE));
+    DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(ThisE->getType()->getPointeeType())));
+    TaskInfo.emplace_back(getBundleStr(OSSB_shared), DSABundleList);
   } else {
     llvm_unreachable("Unhandled expression");
   }
@@ -1211,6 +1219,7 @@ void CGOmpSsRuntime::EmitDSAPrivate(
   const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(PDataTy.Ref);
   const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
   llvm::Value *DSAValue;
+  SmallVector<llvm::Value *> DSABundleList;
   if ((VD->getType()->isReferenceType()
        || DRE->refersToEnclosingVariableOrCapture())
       && !getTaskCaptureAddr(VD).isValid()) {
@@ -1220,10 +1229,14 @@ void CGOmpSsRuntime::EmitDSAPrivate(
     LValue LV = CGF.EmitDeclRefLValue(DRE);
     CaptureMapStack.back().try_emplace(VD, LV.getAddress(CGF));
     DSAValue = LV.getPointer(CGF);
-    TaskInfo.emplace_back(getBundleStr(OSSB_private), DSAValue);
+    DSABundleList.push_back(DSAValue);
+    DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(DRE->getType())));
+    TaskInfo.emplace_back(getBundleStr(OSSB_private), DSABundleList);
   } else {
     DSAValue = CGF.EmitDeclRefLValue(DRE).getPointer(CGF);
-    TaskInfo.emplace_back(getBundleStr(OSSB_private), DSAValue);
+    DSABundleList.push_back(DSAValue);
+    DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(DRE->getType())));
+    TaskInfo.emplace_back(getBundleStr(OSSB_private), DSABundleList);
   }
   QualType Q = VD->getType();
   // int (**p)[sizex][sizey] -> we need to capture sizex sizey only
@@ -1260,6 +1273,7 @@ void CGOmpSsRuntime::EmitDSAFirstprivate(
   const DeclRefExpr *DRE = cast<DeclRefExpr>(FpDataTy.Ref);
   const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
   llvm::Value *DSAValue;
+  SmallVector<llvm::Value *> DSABundleList;
   if ((VD->getType()->isReferenceType()
        || DRE->refersToEnclosingVariableOrCapture())
       && !getTaskCaptureAddr(VD).isValid()) {
@@ -1269,10 +1283,14 @@ void CGOmpSsRuntime::EmitDSAFirstprivate(
     LValue LV = CGF.EmitDeclRefLValue(DRE);
     CaptureMapStack.back().try_emplace(VD, LV.getAddress(CGF));
     DSAValue = LV.getPointer(CGF);
-    TaskInfo.emplace_back(getBundleStr(OSSB_firstprivate), DSAValue);
+    DSABundleList.push_back(DSAValue);
+    DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(DRE->getType())));
+    TaskInfo.emplace_back(getBundleStr(OSSB_firstprivate), DSABundleList);
   } else {
     DSAValue = CGF.EmitDeclRefLValue(DRE).getPointer(CGF);
-    TaskInfo.emplace_back(getBundleStr(OSSB_firstprivate), DSAValue);
+    DSABundleList.push_back(DSAValue);
+    DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(DRE->getType())));
+    TaskInfo.emplace_back(getBundleStr(OSSB_firstprivate), DSABundleList);
   }
   QualType Q = VD->getType();
   // int (**p)[sizex][sizey] -> we need to capture sizex sizey only
@@ -1484,9 +1502,9 @@ static llvm::Value *emitDiscreteArray(
     Idx[1] = CGF.EmitScalarExpr(IterExpr);
     llvm::Value *Ptr = DiscreteArrLV.getPointer(CGF);
     llvm::Value *GEP = CGF.Builder.CreateGEP(
-        Ptr->getType()->getPointerElementType(), Ptr, Idx, "discreteidx");
+        CGF.ConvertType(VD->getType()), Ptr, Idx, "discreteidx");
     llvm::Value *LoadGEP = CGF.Builder.CreateLoad(
-        Address(GEP, GEP->getType()->getPointerElementType(),
+        Address(GEP, CGF.ConvertType(CGF.getContext().getBaseElementType(VD->getType())),
                 DiscreteArrLV.getAddress(CGF).getAlignment()));
     return LoadGEP;
   }
@@ -1902,6 +1920,10 @@ void CGOmpSsRuntime::EmitDependency(
     std::string Name, CodeGenFunction &CGF, const Decl *FunContext,
     const OSSDepDataTy &Dep, SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
 
+  // Save CurFuncDecl to get the 'this' address
+  const Decl *CurFuncDecl = CGF.CurFuncDecl;
+  CGF.CurFuncDecl = FunContext;
+
   SmallVector<llvm::Value*, 4> MultiDepData;
   SmallVector<llvm::Value*, 4> DepData;
   SmallVector<llvm::Value*, 4> MultiAndDepData;
@@ -1913,6 +1935,9 @@ void CGOmpSsRuntime::EmitDependency(
   }
 
   EmitDependencyList(CGF, FunContext, Dep, DepData);
+
+  // Restore CurFuncDecl
+  CGF.CurFuncDecl = CurFuncDecl;
 
   // Merge the two value lists
   MultiAndDepData.append(MultiDepData.begin(), MultiDepData.end());
@@ -1988,7 +2013,7 @@ static llvm::Value *emitReduceInitFunction(CodeGenModule &CGM,
   llvm::Value *OrigBegin = OrigLV.getPointer(CGF);
   llvm::Value *PrivBegin = PrivLV.getPointer(CGF);
   llvm::Value *PrivEnd = CGF.Builder.CreateInBoundsGEP(
-      PrivBegin->getType()->getPointerElementType(), PrivBegin, NelemsValue,
+      CGF.ConvertType(Q), PrivBegin, NelemsValue,
       "arrayctor.dst.end");
 
   // Enter the loop, setting up a phi for the current location to initialize.
@@ -2035,13 +2060,13 @@ static llvm::Value *emitReduceInitFunction(CodeGenModule &CGM,
 
   // Go to the next element. Move OrigBegin too
   llvm::Value *PrivNext = CGF.Builder.CreateInBoundsGEP(
-      PrivCur->getType()->getPointerElementType(), PrivCur,
+      CGF.ConvertType(Q), PrivCur,
       llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
       "arrayctor.dst.next");
   PrivCur->addIncoming(PrivNext, CGF.Builder.GetInsertBlock());
 
   llvm::Value *OrigDest = CGF.Builder.CreateInBoundsGEP(
-      OrigCur->getType()->getPointerElementType(), OrigCur,
+      CGF.ConvertType(Q), OrigCur,
       llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
       "arrayctor.src.next");
   OrigCur->addIncoming(OrigDest, CGF.Builder.GetInsertBlock());
@@ -2113,7 +2138,7 @@ static llvm::Value *emitReduceCombFunction(CodeGenModule &CGM,
   llvm::Value *InBegin = InLV.getPointer(CGF);
   llvm::Value *OutBegin = OutLV.getPointer(CGF);
   llvm::Value *OutEnd = CGF.Builder.CreateInBoundsGEP(
-      OutBegin->getType()->getPointerElementType(), OutBegin, NelemsValue,
+      CGF.ConvertType(Q), OutBegin, NelemsValue,
       "arrayctor.dst.end");
 
   // Enter the loop, setting up a phi for the current location to initialize.
@@ -2159,13 +2184,13 @@ static llvm::Value *emitReduceCombFunction(CodeGenModule &CGM,
 
   // Go to the next element. Move InBegin too
   llvm::Value *OutNext = CGF.Builder.CreateInBoundsGEP(
-      OutCur->getType()->getPointerElementType(), OutCur,
+      CGF.ConvertType(Q), OutCur,
       llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
       "arrayctor.dst.next");
   OutCur->addIncoming(OutNext, CGF.Builder.GetInsertBlock());
 
   llvm::Value *InDest = CGF.Builder.CreateInBoundsGEP(
-      InCur->getType()->getPointerElementType(), InCur,
+      CGF.ConvertType(Q), InCur,
       llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
       "arrayctor.src.next");
   InCur->addIncoming(InDest, CGF.Builder.GetInsertBlock());
@@ -2284,6 +2309,10 @@ void CGOmpSsRuntime::EmitReduction(
     CodeGenFunction &CGF, const Decl *FunContext,
     const OSSReductionDataTy &Red, SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
 
+  // Save CurFuncDecl to get the 'this' address
+  const Decl *CurFuncDecl = CGF.CurFuncDecl;
+  CGF.CurFuncDecl = FunContext;
+
   SmallVector<llvm::Value *, 4> List;
 
   llvm::ConstantInt *RedKind = reductionKindToNanos6Enum(CGF, Red.ReductionOp->getType(), Red.ReductionKind);
@@ -2315,6 +2344,10 @@ void CGOmpSsRuntime::EmitReduction(
   InDirectiveEmission = true;
 
   EmitDependencyList(CGF, FunContext, {/*OSSSyntax=*/true, Red.Ref}, List);
+
+  // Restore CurFuncDecl
+  CGF.CurFuncDecl = CurFuncDecl;
+
   // First operand has to be the DSA over the dependency is made
   llvm::Value *DepBaseDSA = List[0];
 
@@ -2946,7 +2979,10 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
     InitScope.setThis(This.getPointer(CGF), This.getAlignment());
 
     CaptureMapStack.back().try_emplace(cast<VarDecl>(cast<DeclRefExpr>(MEBase)->getDecl()), This.getAddress(CGF));
-    TaskInfo.emplace_back(getBundleStr(OSSB_shared), This.getPointer(CGF));
+    SmallVector<llvm::Value *> DSABundleList;
+    DSABundleList.push_back(This.getPointer(CGF));
+    DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(MEBase->getType())));
+    TaskInfo.emplace_back(getBundleStr(OSSB_shared), DSABundleList);
   }
 
   // NOTE: this should do only one iteration

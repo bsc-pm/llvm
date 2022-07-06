@@ -25,6 +25,9 @@ struct DirectiveDSAInfo {
   SetVector<Value *> Shared;
   SetVector<Value *> Private;
   SetVector<Value *> Firstprivate;
+  SmallVector<Type *, 4> SharedTy;
+  SmallVector<Type *, 4> PrivateTy;
+  SmallVector<Type *, 4> FirstprivateTy;
 };
 
 // <VLA, VLA_dims>
@@ -255,6 +258,39 @@ struct DirectiveEnvironment {
   int ReductionIndex = 0;
   // Map of Dependency symbols to Index
   std::map<Value *, std::pair<const DependInfo *, int>> DepSymToIdx;
+
+  // returns if V is in DSAInfo
+  bool valueInDSABundles(const Value *V) const {
+    auto SharedIt = find(DSAInfo.Shared, V);
+    auto PrivateIt = find(DSAInfo.Private, V);
+    auto FirstprivateIt = find(DSAInfo.Firstprivate, V);
+    if (SharedIt == DSAInfo.Shared.end()
+        && PrivateIt == DSAInfo.Private.end()
+        && FirstprivateIt == DSAInfo.Firstprivate.end())
+      return false;
+
+    return true;
+  }
+
+  // returns if the associated type of V
+  Type *getDSAType(const Value *V) const {
+    for (size_t i = 0; i < DSAInfo.Shared.size(); ++i)
+      if (DSAInfo.Shared[i] == V)
+        return DSAInfo.SharedTy[i];
+    for (size_t i = 0; i < DSAInfo.Private.size(); ++i)
+      if (DSAInfo.Private[i] == V)
+        return DSAInfo.PrivateTy[i];
+    for (size_t i = 0; i < DSAInfo.Firstprivate.size(); ++i)
+      if (DSAInfo.Firstprivate[i] == V)
+        return DSAInfo.FirstprivateTy[i];
+    llvm_unreachable("Expected Value to be in DSAInfo");
+  }
+
+  // returns if V is in CapturedInfo
+  bool valueInCapturedBundle(Value *const V) const {
+    return CapturedInfo.count(V);
+  }
+
 private:
   void gatherDirInfo(OperandBundleDef &OBDef);
   void gatherSharedInfo(OperandBundleDef &OBDef);
