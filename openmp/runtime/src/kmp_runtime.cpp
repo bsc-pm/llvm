@@ -9723,7 +9723,6 @@ static kmp_info_t* get_thread_from_thread_pool(int new_gtid){
         new_thr->th.th_active_in_pool = FALSE;
     }
 
-    KMP_ASSERT(!new_thr->th.th_team);
     KMP_DEBUG_ASSERT(__kmp_nth < __kmp_threads_capacity);
 
     TCW_4(__kmp_nth, __kmp_nth + 1);

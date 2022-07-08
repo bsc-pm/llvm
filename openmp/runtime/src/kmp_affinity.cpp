@@ -3961,8 +3961,9 @@ void __kmp_affinity_set_init_mask(int gtid, int isa_root) {
       mask = KMP_CPU_INDEX(__kmp_affinity_masks, i);
     }
   } else {
-    if ((!isa_root) || KMP_HIDDEN_HELPER_THREAD(gtid) ||
-        (__kmp_nested_proc_bind.bind_types[0] == proc_bind_false)) {
+    if (((!isa_root) || KMP_HIDDEN_HELPER_THREAD(gtid) ||
+        (__kmp_nested_proc_bind.bind_types[0] == proc_bind_false)) &&
+        (th->th.th_active_role != OMP_ROLE_FREE_AGENT)) {
 #if KMP_GROUP_AFFINITY
       if (__kmp_num_proc_groups > 1) {
         return;
