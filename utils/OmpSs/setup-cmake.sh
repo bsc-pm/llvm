@@ -465,6 +465,7 @@ run cmake -G "${BUILD_SYSTEM}" ${SRCDIR}/llvm \
    -DOPENMP_FILECHECK_EXECUTABLE="$(pwd)/bin/FileCheck" \
    -DOPENMP_NOT_EXECUTABLE="$(pwd)/bin/not" \
    -DOPENMP_LIT_ARGS="-sv --xunit-xml-output=xunit.xml" \
+   -DLIBOMP_OMPD_SUPPORT=OFF \
    -DLLVM_INSTALL_UTILS=ON \
    -DLLVM_ENABLE_ASSERTIONS=ON \
    -DLLVM_ENABLE_BINDINGS=OFF \
