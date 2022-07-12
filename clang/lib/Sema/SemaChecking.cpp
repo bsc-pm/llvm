@@ -15871,6 +15871,8 @@ void Sema::CheckArrayAccess(const Expr *BaseExpr, const Expr *IndexExpr,
   if (IsUnboundedArray) {
     if (EffectiveType->isFunctionType())
       return;
+    if (EffectiveType->isSpecificPlaceholderType(BuiltinType::OSSArraySection))
+      return;
     if (index.isUnsigned() || !index.isNegative()) {
       const auto &ASTC = getASTContext();
       unsigned AddrBits =
