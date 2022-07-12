@@ -23,6 +23,16 @@
 
 using namespace mlir;
 
+static ParseResult parsePDLOpTypedResults(
+    OpAsmParser &parser, SmallVectorImpl<Type> &types,
+    const SmallVectorImpl<OpAsmParser::UnresolvedOperand> &handles) {
+  types.resize(handles.size(), pdl::OperationType::get(parser.getContext()));
+  return success();
+}
+
+static void printPDLOpTypedResults(OpAsmPrinter &, Operation *, TypeRange,
+                                   ValueRange) {}
+
 #define GET_OP_CLASSES
 #include "mlir/Dialect/Transform/IR/TransformOps.cpp.inc"
 
@@ -287,6 +297,52 @@ DiagnosedSilenceableFailure transform::GetClosestIsolatedParentOp::apply(
 }
 
 //===----------------------------------------------------------------------===//
+// MergeHandlesOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform::MergeHandlesOp::apply(transform::TransformResults &results,
+                                 transform::TransformState &state) {
+  SmallVector<Operation *> operations;
+  for (Value operand : getHandles())
+    llvm::append_range(operations, state.getPayloadOps(operand));
+  if (!getDeduplicate()) {
+    results.set(getResult().cast<OpResult>(), operations);
+    return DiagnosedSilenceableFailure::success();
+  }
+
+  SetVector<Operation *> uniqued(operations.begin(), operations.end());
+  results.set(getResult().cast<OpResult>(), uniqued.getArrayRef());
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform::MergeHandlesOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  for (Value operand : getHandles()) {
+    effects.emplace_back(MemoryEffects::Read::get(), operand,
+                         transform::TransformMappingResource::get());
+    effects.emplace_back(MemoryEffects::Free::get(), operand,
+                         transform::TransformMappingResource::get());
+  }
+  effects.emplace_back(MemoryEffects::Allocate::get(), getResult(),
+                       transform::TransformMappingResource::get());
+  effects.emplace_back(MemoryEffects::Write::get(), getResult(),
+                       transform::TransformMappingResource::get());
+
+  // There are no effects on the Payload IR as this is only a handle
+  // manipulation.
+}
+
+OpFoldResult transform::MergeHandlesOp::fold(ArrayRef<Attribute> operands) {
+  if (getDeduplicate() || getHandles().size() != 1)
+    return {};
+
+  // If deduplication is not required and there is only one operand, it can be
+  // used directly instead of merging.
+  return getHandles().front();
+}
+
+//===----------------------------------------------------------------------===//
 // PDLMatchOp
 //===----------------------------------------------------------------------===//
 
@@ -306,6 +362,33 @@ transform::PDLMatchOp::apply(transform::TransformResults &results,
   }
   results.set(getResult().cast<OpResult>(), targets);
   return DiagnosedSilenceableFailure::success();
+}
+
+//===----------------------------------------------------------------------===//
+// ReplicateOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform::ReplicateOp::apply(transform::TransformResults &results,
+                              transform::TransformState &state) {
+  unsigned numRepetitions = state.getPayloadOps(getPattern()).size();
+  for (const auto &en : llvm::enumerate(getHandles())) {
+    Value handle = en.value();
+    ArrayRef<Operation *> current = state.getPayloadOps(handle);
+    SmallVector<Operation *> payload;
+    payload.reserve(numRepetitions * current.size());
+    for (unsigned i = 0; i < numRepetitions; ++i)
+      llvm::append_range(payload, current);
+    results.set(getReplicated()[en.index()].cast<OpResult>(), payload);
+  }
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform::ReplicateOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  onlyReadsHandle(getPattern(), effects);
+  consumesHandle(getHandles(), effects);
+  producesHandle(getReplicated(), effects);
 }
 
 //===----------------------------------------------------------------------===//

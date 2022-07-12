@@ -26,6 +26,7 @@
 #include "mlir/Dialect/SparseTensor/IR/SparseTensor.h"
 #include "mlir/Dialect/SparseTensor/Transforms/Passes.h"
 #include "mlir/Dialect/SparseTensor/Utils/Merger.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/TensorEncoding.h"
@@ -1831,6 +1832,46 @@ private:
   SparsificationOptions options;
 };
 
+/// Sparse rewriting rule for reshape operator.
+template <typename ReshapeOp>
+struct ReshapeRewriter : public OpRewritePattern<ReshapeOp> {
+public:
+  using OpRewritePattern<ReshapeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(ReshapeOp op,
+                                PatternRewriter &rewriter) const override {
+    Location loc = op->getLoc();
+    auto encDst = getSparseTensorEncoding(op.getResult().getType());
+    auto encSrc = getSparseTensorEncoding(op.getSrc().getType());
+    // Since a pure dense expansion is very cheap (change of view), for
+    // a sparse2dense or dense2sparse, we can simply unfuse a sparse
+    // conversion from the reshape operation itself.
+    // All other cases are handled elsewhere.
+    if (encDst && encSrc) {
+      return failure();
+    } else if (encSrc) {
+      RankedTensorType rtp =
+          op.getSrc().getType().template cast<RankedTensorType>();
+      auto denseTp =
+          RankedTensorType::get(rtp.getShape(), rtp.getElementType());
+      auto convert = rewriter.create<ConvertOp>(loc, denseTp, op.getSrc());
+      op->setOperand(0, convert);
+      return success();
+    } else if (encDst) {
+      RankedTensorType rtp =
+          op.getResult().getType().template cast<RankedTensorType>();
+      auto denseTp =
+          RankedTensorType::get(rtp.getShape(), rtp.getElementType());
+      auto reshape = rewriter.create<ReshapeOp>(loc, denseTp, op.getSrc(),
+                                                op.getReassociation());
+      Value convert = rewriter.create<ConvertOp>(loc, rtp, reshape);
+      rewriter.replaceOp(op, convert);
+      return success();
+    }
+    return failure();
+  }
+};
+
 } // namespace
 
 /// Populates the given patterns list with rewriting rules required for
@@ -1838,4 +1879,6 @@ private:
 void mlir::populateSparsificationPatterns(
     RewritePatternSet &patterns, const SparsificationOptions &options) {
   patterns.add<GenericOpSparsifier>(patterns.getContext(), options);
+  patterns.add<ReshapeRewriter<tensor::ExpandShapeOp>,
+               ReshapeRewriter<tensor::CollapseShapeOp>>(patterns.getContext());
 }

@@ -183,6 +183,10 @@ OPTIONS
 
   When disassembling, do not print the raw bytes of each instruction.
 
+.. option:: --offloading
+
+  Display the content of the LLVM offloading section.
+
 .. option:: --prefix=<prefix>
 
   When disassembling with the :option:`--source` option, prepend ``prefix`` to

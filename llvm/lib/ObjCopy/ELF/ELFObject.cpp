@@ -468,8 +468,9 @@ Error ELFSectionWriter<ELFT>::visit(const DecompressedSection &Sec) {
       Sec.OriginalData.size() - DataOffset);
 
   SmallVector<char, 128> DecompressedContent;
-  if (Error Err = zlib::uncompress(CompressedContent, DecompressedContent,
-                                   static_cast<size_t>(Sec.Size)))
+  if (Error Err =
+          compression::zlib::uncompress(CompressedContent, DecompressedContent,
+                                        static_cast<size_t>(Sec.Size)))
     return createStringError(errc::invalid_argument,
                              "'" + Sec.Name + "': " + toString(std::move(Err)));
 
@@ -544,9 +545,10 @@ CompressedSection::CompressedSection(const SectionBase &Sec,
                                      DebugCompressionType CompressionType)
     : SectionBase(Sec), CompressionType(CompressionType),
       DecompressedSize(Sec.OriginalData.size()), DecompressedAlign(Sec.Align) {
-  zlib::compress(StringRef(reinterpret_cast<const char *>(OriginalData.data()),
-                           OriginalData.size()),
-                 CompressedData);
+  compression::zlib::compress(
+      StringRef(reinterpret_cast<const char *>(OriginalData.data()),
+                OriginalData.size()),
+      CompressedData);
 
   assert(CompressionType != DebugCompressionType::None);
   Flags |= ELF::SHF_COMPRESSED;
@@ -2643,9 +2645,12 @@ Error BinaryWriter::finalize() {
   // MinAddr will be skipped.
   uint64_t MinAddr = UINT64_MAX;
   for (SectionBase &Sec : Obj.allocSections()) {
+    // If Sec's type is changed from SHT_NOBITS due to --set-section-flags,
+    // Offset may not be aligned. Align it to max(Align, 1).
     if (Sec.ParentSegment != nullptr)
-      Sec.Addr =
-          Sec.Offset - Sec.ParentSegment->Offset + Sec.ParentSegment->PAddr;
+      Sec.Addr = alignTo(Sec.Offset - Sec.ParentSegment->Offset +
+                             Sec.ParentSegment->PAddr,
+                         std::max(Sec.Align, uint64_t(1)));
     if (Sec.Type != SHT_NOBITS && Sec.Size > 0)
       MinAddr = std::min(MinAddr, Sec.Addr);
   }

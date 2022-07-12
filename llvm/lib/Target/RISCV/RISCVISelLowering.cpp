@@ -526,6 +526,10 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
           {ISD::VP_FPTOSI, ISD::VP_FPTOUI, ISD::VP_TRUNCATE, ISD::VP_SETCC}, VT,
           Custom);
       setOperationAction(ISD::VECTOR_REVERSE, VT, Custom);
+
+      setOperationPromotedToType(
+          ISD::VECTOR_SPLICE, VT,
+          MVT::getVectorVT(MVT::i8, VT.getVectorElementCount()));
     }
 
     for (MVT VT : IntVecVTs) {
@@ -1157,6 +1161,37 @@ bool RISCVTargetLowering::hasBitTest(SDValue X, SDValue Y) const {
   return C && C->getAPIntValue().ule(10);
 }
 
+bool RISCVTargetLowering::shouldConvertConstantLoadToIntImm(const APInt &Imm,
+                                                            Type *Ty) const {
+  assert(Ty->isIntegerTy());
+
+  unsigned BitSize = Ty->getIntegerBitWidth();
+  if (BitSize > Subtarget.getXLen())
+    return false;
+
+  // Fast path, assume 32-bit immediates are cheap.
+  int64_t Val = Imm.getSExtValue();
+  if (isInt<32>(Val))
+    return true;
+
+  // A constant pool entry may be more aligned thant he load we're trying to
+  // replace. If we don't support unaligned scalar mem, prefer the constant
+  // pool.
+  // TODO: Can the caller pass down the alignment?
+  if (!Subtarget.enableUnalignedScalarMem())
+    return true;
+
+  // Prefer to keep the load if it would require many instructions.
+  // This uses the same threshold we use for constant pools but doesn't
+  // check useConstantPoolForLargeInts.
+  // TODO: Should we keep the load only when we're definitely going to emit a
+  // constant pool?
+
+  RISCVMatInt::InstSeq Seq =
+      RISCVMatInt::generateInstSeq(Val, Subtarget.getFeatureBits());
+  return Seq.size() <= Subtarget.getMaxBuildIntsCost();
+}
+
 bool RISCVTargetLowering::
     shouldProduceAndByConstByHoistingConstFromShiftsLHSOfAnd(
         SDValue X, ConstantSDNode *XC, ConstantSDNode *CC, SDValue Y,
@@ -1659,7 +1694,7 @@ static SDValue convertFromScalableVector(EVT VT, SDValue V, SelectionDAG &DAG,
 /// Return the type of the mask type suitable for masking the provided
 /// vector type.  This is simply an i1 element type vector of the same
 /// (possibly scalable) length.
-static MVT getMaskTypeFor(EVT VecVT) {
+static MVT getMaskTypeFor(MVT VecVT) {
   assert(VecVT.isVector());
   ElementCount EC = VecVT.getVectorElementCount();
   return MVT::getVectorVT(MVT::i1, EC);
@@ -5748,8 +5783,7 @@ SDValue RISCVTargetLowering::lowerVECTOR_SPLICE(SDValue Op,
       DAG.getNode(RISCVISD::VSLIDEDOWN_VL, DL, VecVT, DAG.getUNDEF(VecVT), V1,
                   DownOffset, TrueMask, UpOffset);
   return DAG.getNode(RISCVISD::VSLIDEUP_VL, DL, VecVT, SlideDown, V2, UpOffset,
-                     TrueMask,
-                     DAG.getTargetConstant(RISCV::VLMaxSentinel, DL, XLenVT));
+                     TrueMask, DAG.getRegister(RISCV::X0, XLenVT));
 }
 
 SDValue
@@ -9152,10 +9186,10 @@ SDValue RISCVTargetLowering::PerformDAGCombine(SDNode *N,
     // FIXME: Support FP.
     if (Val.getOpcode() == RISCVISD::VMV_X_S) {
       SDValue Src = Val.getOperand(0);
-      EVT VecVT = Src.getValueType();
+      MVT VecVT = Src.getSimpleValueType();
       EVT MemVT = Store->getMemoryVT();
       // The memory VT and the element type must match.
-      if (VecVT.getVectorElementType() == MemVT) {
+      if (MemVT == VecVT.getVectorElementType()) {
         SDLoc DL(N);
         MVT MaskVT = getMaskTypeFor(VecVT);
         return DAG.getStoreVP(
@@ -9864,7 +9898,7 @@ EmitLoweredCascadedSelect(MachineInstr &First, MachineInstr &Second,
   Register FLHS = First.getOperand(1).getReg();
   Register FRHS = First.getOperand(2).getReg();
   // Insert appropriate branch.
-  BuildMI(ThisMBB, DL, TII.getBrCond(FirstCC))
+  BuildMI(FirstMBB, DL, TII.getBrCond(FirstCC))
       .addReg(FLHS)
       .addReg(FRHS)
       .addMBB(SinkMBB);
@@ -9876,7 +9910,7 @@ EmitLoweredCascadedSelect(MachineInstr &First, MachineInstr &Second,
 
   auto SecondCC = static_cast<RISCVCC::CondCode>(Second.getOperand(3).getImm());
   // Insert appropriate branch.
-  BuildMI(FirstMBB, DL, TII.getBrCond(SecondCC))
+  BuildMI(ThisMBB, DL, TII.getBrCond(SecondCC))
       .addReg(SLHS)
       .addReg(SRHS)
       .addMBB(SinkMBB);
@@ -9884,9 +9918,9 @@ EmitLoweredCascadedSelect(MachineInstr &First, MachineInstr &Second,
   Register DestReg = Second.getOperand(0).getReg();
   Register Op2Reg4 = Second.getOperand(4).getReg();
   BuildMI(*SinkMBB, SinkMBB->begin(), DL, TII.get(RISCV::PHI), DestReg)
-      .addReg(Op1Reg4)
-      .addMBB(ThisMBB)
       .addReg(Op2Reg4)
+      .addMBB(ThisMBB)
+      .addReg(Op1Reg4)
       .addMBB(FirstMBB)
       .addReg(Op1Reg5)
       .addMBB(SecondMBB);

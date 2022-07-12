@@ -571,6 +571,9 @@ public:
                                             MachineInstr &MI,
                                             MachineBasicBlock *BB) const;
   MachineBasicBlock *EmitZero(MachineInstr &MI, MachineBasicBlock *BB) const;
+  MachineBasicBlock *EmitAddVectorToTile(unsigned Opc, unsigned BaseReg,
+                                         MachineInstr &MI,
+                                         MachineBasicBlock *BB) const;
 
   MachineBasicBlock *
   EmitInstrWithCustomInserter(MachineInstr &MI,
@@ -1150,10 +1153,6 @@ private:
   // with BITCAST used otherwise.
   // This function does not handle predicate bitcasts.
   SDValue getSVESafeBitCast(EVT VT, SDValue Op, SelectionDAG &DAG) const;
-
-  // Returns a safe bitcast between two scalable vector predicates, where
-  // any newly created lanes from a widening bitcast are defined as zero.
-  SDValue getSVEPredicateBitCast(EVT VT, SDValue Op, SelectionDAG &DAG) const;
 
   bool isConstantUnsignedBitfieldExtractLegal(unsigned Opc, LLT Ty1,
                                               LLT Ty2) const override;

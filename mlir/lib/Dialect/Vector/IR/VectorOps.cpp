@@ -687,6 +687,9 @@ static LogicalResult verifyOutputShape(
     MLIRContext *ctx = op.getContext();
     AffineMap lhsMap = op.getIndexingMaps()[0];
     AffineMap rhsMap = op.getIndexingMaps()[1];
+    if (getUnusedDimsBitVector({lhsMap, rhsMap}).any())
+      return op.emitOpError(
+          "expected all dimensions to be either a LHS or a RHS dimension");
     SmallVector<AffineExpr, 4> extents(lhsMap.getNumInputs());
     for (auto pair :
          {std::make_pair(lhsType, lhsMap), std::make_pair(rhsType, rhsMap)}) {
@@ -699,8 +702,8 @@ static LogicalResult verifyOutputShape(
       }
     }
     if (!llvm::all_of(extents, [](AffineExpr e) { return e; }))
-      return op.emitOpError("expected all input dimensions to be used by "
-                            "either the LHS or the RHS");
+      return op.emitOpError("expected all dimensions to get an extent as "
+                            "either a LHS or a RHS dimension");
 
     AffineMap resMap = op.getIndexingMaps()[2];
     auto extentsMap = AffineMap::get(/*dimCount=*/extents.size(),
@@ -2028,11 +2031,32 @@ public:
   }
 };
 
+/// Pattern to rewrite a InsertOp(SplatOp, SplatOp) to SplatOp.
+class InsertSplatToSplat final : public OpRewritePattern<InsertOp> {
+public:
+  using OpRewritePattern<InsertOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(InsertOp op,
+                                PatternRewriter &rewriter) const override {
+    auto srcSplat = op.getSource().getDefiningOp<SplatOp>();
+    auto dstSplat = op.getDest().getDefiningOp<SplatOp>();
+
+    if (!srcSplat || !dstSplat)
+      return failure();
+
+    if (srcSplat.getInput() != dstSplat.getInput())
+      return failure();
+
+    rewriter.replaceOpWithNewOp<SplatOp>(op, op.getType(), srcSplat.getInput());
+    return success();
+  }
+};
+
 } // namespace
 
 void InsertOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                            MLIRContext *context) {
-  results.add<InsertToBroadcast, BroadcastFolder>(context);
+  results.add<InsertToBroadcast, BroadcastFolder, InsertSplatToSplat>(context);
 }
 
 // Eliminates insert operations that produce values identical to their source
