@@ -1381,12 +1381,15 @@ struct OmpSs {
   // Rewrites task_args using address_translation
   void translateDep(
       IRBuilder<> &IRBTranslate, IRBuilder<> &IRBReload, const DependInfo *DepInfo, Value *DSA,
+      bool IsShared,
       Value *&UnpackedDSA, Value *AddrTranslationTable, Type *AddrTranslationTableTy, int SymbolIndex) {
 
     llvm::Value *DepBase = UnpackedDSA;
-    if (!isa<LoadInst>(UnpackedDSA))
+    if (!IsShared) {
+      assert(!isa<LoadInst>(UnpackedDSA));
       DepBase = IRBTranslate.CreateLoad(
         IRBTranslate.getPtrTy(), DepBase);
+    }
 
     Value *Idx[2];
     Idx[0] = ConstantInt::get(Type::getInt32Ty(
@@ -1414,7 +1417,8 @@ struct OmpSs {
                                Translation, DeviceAddr);
 
     // Store the translation
-    if (auto *LUnpackedDSA = dyn_cast<LoadInst>(UnpackedDSA)) {
+    if (IsShared) {
+      auto *LUnpackedDSA = cast<LoadInst>(UnpackedDSA);
       Translation = IRBTranslate.CreateBitCast(Translation, LUnpackedDSA->getType());
       IRBTranslate.CreateStore(Translation, LUnpackedDSA->getPointerOperand());
       // Reload what we have translated
@@ -1422,8 +1426,6 @@ struct OmpSs {
           IRBReload.getPtrTy(),
           LUnpackedDSA->getPointerOperand());
     } else {
-      Translation = IRBTranslate.CreateBitCast(
-        Translation, IRBTranslate.getPtrTy());
       IRBTranslate.CreateStore(Translation, UnpackedDSA);
     }
   }
@@ -1600,12 +1602,15 @@ struct OmpSs {
         const DependInfo *DI = p.second.first;
         int SymbolIndex = p.second.second;
 
+        bool IsShared = DirInfo.DirEnv.DSAInfo.Shared.count(DepBaseDSA);
+
         size_t Idx = StructToIdxMap.lookup(DepBaseDSA);
         if (HasDevice)
           Idx -= DeviceArgsSize;
 
         translateDep(
           IRBIfThen, IRBIfEnd, DI, DepBaseDSA,
+          IsShared,
           UnpackParams[Idx],
           AddrTranslationTable, AddrTranslationTableTy, SymbolIndex);
       }
