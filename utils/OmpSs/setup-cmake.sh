@@ -459,6 +459,7 @@ fi
 info "Running cmake..."
 run cmake -G "${BUILD_SYSTEM}" ${SRCDIR}/llvm \
    -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} \
+   -DCLANG_DEFAULT_PIE_ON_LINUX=OFF \
    ${LLVM_ENABLE_PROJECTS} \
    -DLLVM_ENABLE_RUNTIMES="${EXTRA_RUNTIMES}" \
    -DOPENMP_LLVM_LIT_EXECUTABLE="$(pwd)/bin/llvm-lit" \
