@@ -600,8 +600,8 @@ handleUserSection(const NewSectionInfo &NewSection,
 static Error handleArgs(const CommonConfig &Config, const ELFConfig &ELFConfig,
                         Object &Obj) {
   if (Config.OutputArch) {
-    Obj.Machine = Config.OutputArch.getValue().EMachine;
-    Obj.OSABI = Config.OutputArch.getValue().OSABI;
+    Obj.Machine = Config.OutputArch.value().EMachine;
+    Obj.OSABI = Config.OutputArch.value().OSABI;
   }
 
   if (!Config.SplitDWO.empty() && Config.ExtractDWO) {
@@ -675,14 +675,17 @@ static Error handleArgs(const CommonConfig &Config, const ELFConfig &ELFConfig,
   for (const NewSymbolInfo &SI : Config.SymbolsToAdd)
     addSymbol(Obj, SI, ELFConfig.NewSymbolVisibility);
 
-  // --set-section-flags works with sections added by --add-section.
-  if (!Config.SetSectionFlags.empty()) {
+  // --set-section-{flags,type} work with sections added by --add-section.
+  if (!Config.SetSectionFlags.empty() || !Config.SetSectionType.empty()) {
     for (auto &Sec : Obj.sections()) {
       const auto Iter = Config.SetSectionFlags.find(Sec.Name);
       if (Iter != Config.SetSectionFlags.end()) {
         const SectionFlagsUpdate &SFU = Iter->second;
         setSectionFlagsAndType(Sec, SFU.NewFlags);
       }
+      auto It2 = Config.SetSectionType.find(Sec.Name);
+      if (It2 != Config.SetSectionType.end())
+        Sec.Type = It2->second;
     }
   }
 
@@ -696,7 +699,7 @@ static Error handleArgs(const CommonConfig &Config, const ELFConfig &ELFConfig,
         const SectionRename &SR = Iter->second;
         Sec.Name = std::string(SR.NewName);
         if (SR.NewFlags)
-          setSectionFlagsAndType(Sec, SR.NewFlags.getValue());
+          setSectionFlagsAndType(Sec, SR.NewFlags.value());
         RenamedSections.insert(&Sec);
       } else if (RelocSec && !(Sec.Flags & SHF_ALLOC))
         // Postpone processing relocation sections which are not specified in
@@ -808,7 +811,7 @@ Error objcopy::elf::executeObjcopyOnBinary(const CommonConfig &Config,
     return Obj.takeError();
   // Prefer OutputArch (-O<format>) if set, otherwise infer it from the input.
   const ElfType OutputElfType =
-      Config.OutputArch ? getOutputElfType(Config.OutputArch.getValue())
+      Config.OutputArch ? getOutputElfType(Config.OutputArch.value())
                         : getOutputElfType(In);
 
   if (Error E = handleArgs(Config, ELFConfig, **Obj))

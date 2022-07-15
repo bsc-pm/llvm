@@ -242,7 +242,7 @@ llvm::Optional<OMPDeclareTargetDeclAttr::MapTypeTy>
 OMPDeclareTargetDeclAttr::isDeclareTargetDeclaration(const ValueDecl *VD) {
   llvm::Optional<OMPDeclareTargetDeclAttr *> ActiveAttr = getActiveAttr(VD);
   if (ActiveAttr)
-    return ActiveAttr.getValue()->getMapType();
+    return ActiveAttr.value()->getMapType();
   return llvm::None;
 }
 
@@ -250,7 +250,7 @@ llvm::Optional<OMPDeclareTargetDeclAttr::DevTypeTy>
 OMPDeclareTargetDeclAttr::getDeviceType(const ValueDecl *VD) {
   llvm::Optional<OMPDeclareTargetDeclAttr *> ActiveAttr = getActiveAttr(VD);
   if (ActiveAttr)
-    return ActiveAttr.getValue()->getDevType();
+    return ActiveAttr.value()->getDevType();
   return llvm::None;
 }
 
@@ -258,7 +258,7 @@ llvm::Optional<SourceLocation>
 OMPDeclareTargetDeclAttr::getLocation(const ValueDecl *VD) {
   llvm::Optional<OMPDeclareTargetDeclAttr *> ActiveAttr = getActiveAttr(VD);
   if (ActiveAttr)
-    return ActiveAttr.getValue()->getRange().getBegin();
+    return ActiveAttr.value()->getRange().getBegin();
   return llvm::None;
 }
 

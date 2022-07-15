@@ -8,12 +8,14 @@
 
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -277,6 +279,45 @@ LogicalResult transform::InterchangeOp::verify() {
 }
 
 //===---------------------------------------------------------------------===//
+// MultiTileSizesOp
+//===---------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure transform::MultiTileSizesOp::applyToOne(
+    LinalgOp target, SmallVector<Operation *> &results, TransformState &state) {
+  OpBuilder builder(target.getContext());
+  builder.setInsertionPoint(target);
+  OpFoldResult targetSize = builder.getIndexAttr(getTargetSize());
+  OpFoldResult divisor = builder.getIndexAttr(getDivisor());
+  FailureOr<MultiSizeSpecification> spec = computeMultiTileSizes(
+      builder, target, getDimension(), targetSize, divisor);
+  if (failed(spec)) {
+    return emitSilenceableError() << "could not generate tile size computation";
+  }
+
+  AffineExpr s0 = builder.getAffineSymbolExpr(0);
+  AffineExpr s1 = builder.getAffineSymbolExpr(1);
+  Operation *splitPoint =
+      makeComposedAffineApply(builder, target.getLoc(), s0 * s1,
+                              {spec->lowTileSize, spec->lowTripCount});
+  Operation *lowTileSize = spec->lowTileSize.getDefiningOp();
+  Operation *highTileSize = spec->highTileSize.getDefiningOp();
+  assert(lowTileSize && highTileSize && splitPoint &&
+         "tile sizes are not produced by operations");
+  results.reserve(results.size() + 3);
+  results.push_back(lowTileSize);
+  results.push_back(highTileSize);
+  results.push_back(splitPoint);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform::MultiTileSizesOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  onlyReadsHandle(getTarget(), effects);
+  producesHandle(getResults(), effects);
+  modifiesPayload(effects);
+}
+
+//===---------------------------------------------------------------------===//
 // PadOp
 //===---------------------------------------------------------------------===//
 
@@ -383,6 +424,41 @@ LogicalResult transform::PadOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// PromoteOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform::PromoteOp::applyToOne(linalg::LinalgOp target,
+                                 SmallVectorImpl<Operation *> &results,
+                                 transform::TransformState &state) {
+  LinalgPromotionOptions promotionOptions;
+  if (!getOperandsToPromote().empty())
+    promotionOptions = promotionOptions.setOperandsToPromote(
+        extractFromI64ArrayAttr(getOperandsToPromote()));
+  if (getUseFullTilesByDefault())
+    promotionOptions = promotionOptions.setUseFullTileBuffersByDefault(
+        getUseFullTilesByDefault());
+  if (getUseAlloca())
+    promotionOptions = promotionOptions.setUseAlloca(getUseAlloca());
+  if (!getUseFullTileBuffers().empty())
+    promotionOptions = promotionOptions.setUseFullTileBuffers(
+        llvm::to_vector(getUseFullTileBuffers().getAsValueRange<BoolAttr>()));
+  if (getAlignment().hasValue())
+    promotionOptions = promotionOptions.setAlignment(*getAlignment());
+
+  if (failed(promoteSubviewsPrecondition(target, promotionOptions)))
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+
+  SimpleRewriter rewriter(target->getContext());
+  rewriter.setInsertionPoint(target);
+  FailureOr<LinalgOp> res = promoteSubViews(rewriter, target, promotionOptions);
+  if (failed(res))
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+  results.push_back(target);
+  return DiagnosedSilenceableFailure(success());
+}
+
+//===----------------------------------------------------------------------===//
 // ScalarizeOp
 //===----------------------------------------------------------------------===//
 
@@ -476,28 +552,11 @@ DiagnosedSilenceableFailure SplitOp::apply(TransformResults &results,
 
 void SplitOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  // The target handle is consumed.
-  effects.emplace_back(MemoryEffects::Read::get(), getTarget(),
-                       TransformMappingResource::get());
-  effects.emplace_back(MemoryEffects::Free::get(), getTarget(),
-                       TransformMappingResource::get());
-
-  // The dynamic split point handle is not consumed.
-  if (getDynamicSplitPoint()) {
-    effects.emplace_back(MemoryEffects::Read::get(), getDynamicSplitPoint(),
-                         TransformMappingResource::get());
-  }
-
-  // The resulting handles are produced.
-  for (Value result : getResults()) {
-    effects.emplace_back(MemoryEffects::Allocate::get(), result,
-                         TransformMappingResource::get());
-    effects.emplace_back(MemoryEffects::Write::get(), result,
-                         TransformMappingResource::get());
-  }
-
-  effects.emplace_back(MemoryEffects::Read::get(), PayloadIRResource::get());
-  effects.emplace_back(MemoryEffects::Write::get(), PayloadIRResource::get());
+  consumesHandle(getTarget(), effects);
+  if (getDynamicSplitPoint())
+    onlyReadsHandle(getDynamicSplitPoint(), effects);
+  producesHandle(getResults(), effects);
+  modifiesPayload(effects);
 }
 
 ParseResult SplitOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -782,6 +841,7 @@ class LinalgTransformDialectExtension
           LinalgTransformDialectExtension> {
 public:
   LinalgTransformDialectExtension() {
+    declareDependentDialect<AffineDialect>();
     declareDependentDialect<arith::ArithmeticDialect>();
     declareDependentDialect<pdl::PDLDialect>();
     declareDependentDialect<scf::SCFDialect>();
