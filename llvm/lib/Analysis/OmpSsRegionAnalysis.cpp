@@ -171,7 +171,7 @@ void DirectiveEnvironment::gatherVLADimsInfo(OperandBundleDef &OB) {
 }
 
 static void gatherDependInfo(
-    ArrayRef<Value *> OBArgs, std::map<Value *, std::pair<const DependInfo *, int>> &DepSymToIdx,
+    ArrayRef<Value *> OBArgs, std::map<Value *, int> &DepSymToIdx,
     DirectiveDependsInfo &DependsInfo, DependInfo &DI, uint64_t Id) {
   DI.DepType = getDependTypeFromId(Id);
 
@@ -196,10 +196,10 @@ static void gatherDependInfo(
   }
 
   if (!DepSymToIdx.count(DI.Base)) {
-    DepSymToIdx[DI.Base] = std::make_pair(&DI, DepSymToIdx.size());
+    DepSymToIdx[DI.Base] = DepSymToIdx.size();
     DependsInfo.NumSymbols++;
   }
-  DI.SymbolIndex = DepSymToIdx[DI.Base].second;
+  DI.SymbolIndex = DepSymToIdx[DI.Base];
 
 }
 
