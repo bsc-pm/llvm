@@ -68,6 +68,10 @@ Major New Features
 
       Randomizing structure layout is a C-only feature.
 
+- Clang now supports the ``-fstrict-flex-arrays=<arg>`` option to control which
+  array bounds lead to flexible array members. The option yields more accurate
+  ``__builtin_object_size`` and ``__builtin_dynamic_object_size`` results in
+  most cases but may be overly conservative for some legacy code.
 - Experimental support for HLSL has been added. The implementation is
   incomplete and highly experimental. For more information about the ongoing
   work to support HLSL see the `documentation
@@ -188,6 +192,8 @@ Bug Fixes
   Fixes `Issue 56310 <https://github.com/llvm/llvm-project/issues/56310>`_.
 - Clang will now look through type sugar when checking a member function is a
   move assignment operator. Fixes `Issue 56456 <https://github.com/llvm/llvm-project/issues/56456>`_.
+- Fixed a crash when a variable with a bool enum type that has no definition
+  used in comparison operators. Fixes `Issue 56560 <https://github.com/llvm/llvm-project/issues/56560>`_.
 
 Improvements to Clang's diagnostics
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
