@@ -866,7 +866,9 @@ void RewriteInstance::discoverFileObjects() {
 
   llvm::stable_sort(SortedFileSymbols, CompareSymbols);
 
-  auto LastSymbol = SortedFileSymbols.end() - 1;
+  auto LastSymbol = SortedFileSymbols.end();
+  if (!SortedFileSymbols.empty())
+    --LastSymbol;
 
   // For aarch64, the ABI defines mapping symbols so we identify data in the
   // code section (see IHI0056B). $d identifies data contents.
@@ -912,13 +914,16 @@ void RewriteInstance::discoverFileObjects() {
     LastSymbol = std::stable_partition(
         SortedFileSymbols.begin(), SortedFileSymbols.end(),
         [this](const SymbolRef &Symbol) { return !BC->isMarker(Symbol); });
-    --LastSymbol;
+    if (!SortedFileSymbols.empty())
+      --LastSymbol;
   }
 
   BinaryFunction *PreviousFunction = nullptr;
   unsigned AnonymousId = 0;
 
-  const auto SortedSymbolsEnd = std::next(LastSymbol);
+  const auto SortedSymbolsEnd = LastSymbol == SortedFileSymbols.end()
+                                    ? LastSymbol
+                                    : std::next(LastSymbol);
   for (auto ISym = SortedFileSymbols.begin(); ISym != SortedSymbolsEnd;
        ++ISym) {
     const SymbolRef &Symbol = *ISym;
@@ -4465,6 +4470,14 @@ void RewriteInstance::updateELFSymbolTable(
   std::vector<ELFSymTy> Symbols;
 
   auto getNewSectionIndex = [&](uint32_t OldIndex) {
+    // For dynamic symbol table, the section index could be wrong on the input,
+    // and its value is ignored by the runtime if it's different from
+    // SHN_UNDEF and SHN_ABS.
+    // However, we still need to update dynamic symbol table, so return a
+    // section index, even though the index is broken.
+    if (IsDynSym && OldIndex >= NewSectionIndex.size())
+      return OldIndex;
+
     assert(OldIndex < NewSectionIndex.size() && "section index out of bounds");
     const uint32_t NewIndex = NewSectionIndex[OldIndex];
 

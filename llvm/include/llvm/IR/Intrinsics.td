@@ -495,7 +495,7 @@ def int_objc_arc_annotation_bottomup_bbend  : Intrinsic<[],
 // Returns the location of the Swift asynchronous context (usually stored just
 // before the frame pointer), and triggers the creation of a null context if it
 // would otherwise be unneeded.
-def int_swift_async_context_addr : Intrinsic<[llvm_ptrptr_ty], [], [IntrNoMem]>;
+def int_swift_async_context_addr : Intrinsic<[llvm_ptrptr_ty], [], []>;
 
 //===--------------------- Code Generator Intrinsics ----------------------===//
 //
@@ -1758,6 +1758,12 @@ def int_type_test : DefaultAttrsIntrinsic<[llvm_i1_ty], [llvm_ptr_ty, llvm_metad
 def int_type_checked_load : DefaultAttrsIntrinsic<[llvm_ptr_ty, llvm_i1_ty],
                                       [llvm_ptr_ty, llvm_i32_ty, llvm_metadata_ty],
                                       [IntrNoMem, IntrWillReturn]>;
+
+// Test whether a pointer is associated with a type metadata identifier. Used
+// for public visibility classes that may later be refined to private
+// visibility.
+def int_public_type_test : DefaultAttrsIntrinsic<[llvm_i1_ty], [llvm_ptr_ty, llvm_metadata_ty],
+                              [IntrNoMem, IntrWillReturn, IntrSpeculatable]>;
 
 // Create a branch funnel that implements an indirect call to a limited set of
 // callees. This needs to be a musttail call.
