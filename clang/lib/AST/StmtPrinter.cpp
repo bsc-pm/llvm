@@ -2478,7 +2478,8 @@ void StmtPrinter::VisitLambdaExpr(LambdaExpr *Node) {
       OS << "...";
 
     if (Node->isInitCapture(C)) {
-      VarDecl *D = C->getCapturedVar();
+      // Init captures are always VarDecl.
+      auto *D = cast<VarDecl>(C->getCapturedVar());
 
       llvm::StringRef Pre;
       llvm::StringRef Post;

@@ -510,6 +510,10 @@ static bool FixupInvocation(CompilerInvocation &Invocation,
     Diags.Report(diag::err_drv_argument_not_allowed_with)
         << "-fgnu89-inline" << GetInputKindName(IK);
 
+  if (Args.hasArg(OPT_hlsl_entrypoint) && !LangOpts.HLSL)
+    Diags.Report(diag::err_drv_argument_not_allowed_with)
+        << "-hlsl-entry" << GetInputKindName(IK);
+
   if (Args.hasArg(OPT_fgpu_allow_device_init) && !LangOpts.HIP)
     Diags.Report(diag::warn_ignored_hip_only_option)
         << Args.getLastArg(OPT_fgpu_allow_device_init)->getAsString(Args);
@@ -4550,7 +4554,10 @@ bool CompilerInvocation::CreateFromArgs(CompilerInvocation &Invocation,
         return CreateFromArgsImpl(Invocation, CommandLineArgs, Diags, Argv0);
       },
       [](CompilerInvocation &Invocation, SmallVectorImpl<const char *> &Args,
-         StringAllocator SA) { Invocation.generateCC1CommandLine(Args, SA); },
+         StringAllocator SA) {
+        Args.push_back("-cc1");
+        Invocation.generateCC1CommandLine(Args, SA);
+      },
       Invocation, DummyInvocation, CommandLineArgs, Diags, Argv0);
 }
 

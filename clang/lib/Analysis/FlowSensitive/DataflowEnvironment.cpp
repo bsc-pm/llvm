@@ -154,7 +154,8 @@ Environment::Environment(DataflowAnalysisContext &DACtx)
     : DACtx(&DACtx), FlowConditionToken(&DACtx.makeFlowConditionToken()) {}
 
 Environment::Environment(const Environment &Other)
-    : DACtx(Other.DACtx), DeclToLoc(Other.DeclToLoc),
+    : DACtx(Other.DACtx), ReturnLoc(Other.ReturnLoc),
+      ThisPointeeLoc(Other.ThisPointeeLoc), DeclToLoc(Other.DeclToLoc),
       ExprToLoc(Other.ExprToLoc), LocToVal(Other.LocToVal),
       MemberLocToStruct(Other.MemberLocToStruct),
       FlowConditionToken(&DACtx->forkFlowCondition(*Other.FlowConditionToken)) {
@@ -179,6 +180,9 @@ Environment::Environment(DataflowAnalysisContext &DACtx,
       if (Value *ParamVal = createValue(ParamDecl->getType()))
         setValue(ParamLoc, *ParamVal);
     }
+
+    QualType ReturnType = FuncDecl->getReturnType();
+    ReturnLoc = &createStorageLocation(ReturnType);
   }
 
   if (const auto *MethodDecl = dyn_cast<CXXMethodDecl>(&DeclCtx)) {
@@ -191,10 +195,9 @@ Environment::Environment(DataflowAnalysisContext &DACtx,
       QualType ThisPointeeType = MethodDecl->getThisObjectType();
       // FIXME: Add support for union types.
       if (!ThisPointeeType->isUnionType()) {
-        auto &ThisPointeeLoc = createStorageLocation(ThisPointeeType);
-        DACtx.setThisPointeeStorageLocation(ThisPointeeLoc);
+        ThisPointeeLoc = &createStorageLocation(ThisPointeeType);
         if (Value *ThisPointeeVal = createValue(ThisPointeeType))
-          setValue(ThisPointeeLoc, *ThisPointeeVal);
+          setValue(*ThisPointeeLoc, *ThisPointeeVal);
       }
     }
   }
@@ -202,20 +205,19 @@ Environment::Environment(DataflowAnalysisContext &DACtx,
 
 Environment Environment::pushCall(const CallExpr *Call) const {
   Environment Env(*this);
-
-  // FIXME: Currently this only works if the callee is never a method and the
-  // same callee is never analyzed from multiple separate callsites. To
-  // generalize this, we'll need to store a "context" field (probably a stack of
-  // `const CallExpr *`s) in the `Environment`, and then change the
-  // `DataflowAnalysisContext` class to hold a map from contexts to "frames",
-  // where each frame stores its own version of what are currently the
-  // `DeclToLoc`, `ExprToLoc`, and `ThisPointeeLoc` fields.
+  // FIXME: Support references here.
+  Env.ReturnLoc = Env.getStorageLocation(*Call, SkipPast::Reference);
 
   const auto *FuncDecl = Call->getDirectCallee();
   assert(FuncDecl != nullptr);
-  assert(FuncDecl->getBody() != nullptr);
   // FIXME: In order to allow the callee to reference globals, we probably need
   // to call `initGlobalVars` here in some way.
+
+  if (const auto *MethodCall = dyn_cast<CXXMemberCallExpr>(Call)) {
+    if (const Expr *Arg = MethodCall->getImplicitObjectArgument()) {
+      Env.ThisPointeeLoc = Env.getStorageLocation(*Arg, SkipPast::Reference);
+    }
+  }
 
   auto ParamIt = FuncDecl->param_begin();
   auto ArgIt = Call->arg_begin();
@@ -226,19 +228,50 @@ Environment Environment::pushCall(const CallExpr *Call) const {
   for (; ArgIt != ArgEnd; ++ParamIt, ++ArgIt) {
     assert(ParamIt != FuncDecl->param_end());
 
-    const VarDecl *Param = *ParamIt;
     const Expr *Arg = *ArgIt;
     auto *ArgLoc = Env.getStorageLocation(*Arg, SkipPast::Reference);
     assert(ArgLoc != nullptr);
-    Env.setStorageLocation(*Param, *ArgLoc);
+
+    const VarDecl *Param = *ParamIt;
+    auto &Loc = Env.createStorageLocation(*Param);
+    Env.setStorageLocation(*Param, Loc);
+
+    QualType ParamType = Param->getType();
+    if (ParamType->isReferenceType()) {
+      auto &Val = Env.takeOwnership(std::make_unique<ReferenceValue>(*ArgLoc));
+      Env.setValue(Loc, Val);
+    } else if (auto *ArgVal = Env.getValue(*ArgLoc)) {
+      Env.setValue(Loc, *ArgVal);
+    } else if (Value *Val = Env.createValue(ParamType)) {
+      Env.setValue(Loc, *Val);
+    }
   }
 
   return Env;
 }
 
+void Environment::popCall(const Environment &CalleeEnv) {
+  // We ignore `DACtx` because it's already the same in both. We don't want the
+  // callee's `ReturnLoc` or `ThisPointeeLoc`. We don't bring back `DeclToLoc`
+  // and `ExprToLoc` because we want to be able to later analyze the same callee
+  // in a different context, and `setStorageLocation` requires there to not
+  // already be a storage location assigned. Conceptually, these maps capture
+  // information from the local scope, so when popping that scope, we do not
+  // propagate the maps.
+  this->LocToVal = std::move(CalleeEnv.LocToVal);
+  this->MemberLocToStruct = std::move(CalleeEnv.MemberLocToStruct);
+  this->FlowConditionToken = std::move(CalleeEnv.FlowConditionToken);
+}
+
 bool Environment::equivalentTo(const Environment &Other,
                                Environment::ValueModel &Model) const {
   assert(DACtx == Other.DACtx);
+
+  if (ReturnLoc != Other.ReturnLoc)
+    return false;
+
+  if (ThisPointeeLoc != Other.ThisPointeeLoc)
+    return false;
 
   if (DeclToLoc != Other.DeclToLoc)
     return false;
@@ -269,10 +302,15 @@ bool Environment::equivalentTo(const Environment &Other,
 LatticeJoinEffect Environment::join(const Environment &Other,
                                     Environment::ValueModel &Model) {
   assert(DACtx == Other.DACtx);
+  assert(ReturnLoc == Other.ReturnLoc);
+  assert(ThisPointeeLoc == Other.ThisPointeeLoc);
 
   auto Effect = LatticeJoinEffect::Unchanged;
 
   Environment JoinedEnv(*DACtx);
+
+  JoinedEnv.ReturnLoc = ReturnLoc;
+  JoinedEnv.ThisPointeeLoc = ThisPointeeLoc;
 
   JoinedEnv.DeclToLoc = intersectDenseMaps(DeclToLoc, Other.DeclToLoc);
   if (DeclToLoc.size() != JoinedEnv.DeclToLoc.size())
@@ -321,7 +359,7 @@ LatticeJoinEffect Environment::join(const Environment &Other,
 }
 
 StorageLocation &Environment::createStorageLocation(QualType Type) {
-  return DACtx->getStableStorageLocation(Type);
+  return DACtx->createStorageLocation(Type);
 }
 
 StorageLocation &Environment::createStorageLocation(const VarDecl &D) {
@@ -363,7 +401,11 @@ StorageLocation *Environment::getStorageLocation(const Expr &E,
 }
 
 StorageLocation *Environment::getThisPointeeStorageLocation() const {
-  return DACtx->getThisPointeeStorageLocation();
+  return ThisPointeeLoc;
+}
+
+StorageLocation *Environment::getReturnStorageLocation() const {
+  return ReturnLoc;
 }
 
 PointerValue &Environment::getOrCreateNullPointerValue(QualType PointeeType) {

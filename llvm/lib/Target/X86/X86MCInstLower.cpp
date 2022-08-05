@@ -982,6 +982,15 @@ void X86MCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI) const {
           X86II::isX86_64ExtendedReg(OutMI.getOperand(2).getReg()))
         std::swap(OutMI.getOperand(1), OutMI.getOperand(2));
     }
+    // Add an REP prefix to BSF instructions so that new processors can
+    // recognize as TZCNT, which has better performance than BSF.
+    if (X86::isBSF(OutMI.getOpcode()) && !MF.getFunction().hasOptSize()) {
+      // BSF and TZCNT have different interpretations on ZF bit. So make sure
+      // it won't be used later.
+      const MachineOperand *FlagDef = MI->findRegisterDefOperand(X86::EFLAGS);
+      if (FlagDef && FlagDef->isDead())
+        OutMI.setFlags(X86::IP_HAS_REPEAT);
+    }
     break;
   }
   }
@@ -1313,10 +1322,9 @@ void X86AsmPrinter::LowerFAULTING_OP(const MachineInstr &FaultingMI,
   if (DefRegister != X86::NoRegister)
     MI.addOperand(MCOperand::createReg(DefRegister));
 
-  for (auto I = FaultingMI.operands_begin() + OperandsBeginIdx,
-            E = FaultingMI.operands_end();
-       I != E; ++I)
-    if (auto MaybeOperand = MCIL.LowerMachineOperand(&FaultingMI, *I))
+  for (const MachineOperand &MO :
+       llvm::drop_begin(FaultingMI.operands(), OperandsBeginIdx))
+    if (auto MaybeOperand = MCIL.LowerMachineOperand(&FaultingMI, MO))
       MI.addOperand(*MaybeOperand);
 
   OutStreamer->AddComment("on-fault: " + HandlerLabel->getName());
@@ -2441,6 +2449,9 @@ void X86AsmPrinter::emitInstruction(const MachineInstr *MI) {
   if (OutStreamer->isVerboseAsm())
     addConstantComments(MI, *OutStreamer);
 
+  bool IndCS =
+      MF->getMMI().getModule()->getModuleFlag("indirect_branch_cs_prefix");
+
   switch (MI->getOpcode()) {
   case TargetOpcode::DBG_VALUE:
     llvm_unreachable("Should be handled target independently");
@@ -2489,13 +2500,16 @@ void X86AsmPrinter::emitInstruction(const MachineInstr *MI) {
     break;
   }
 
+  case X86::TAILJMPd64:
+    if (IndCS && MI->hasRegisterImplicitUseOperand(X86::R11))
+      EmitAndCountInstruction(MCInstBuilder(X86::CS_PREFIX));
+    LLVM_FALLTHROUGH;
   case X86::TAILJMPr:
   case X86::TAILJMPm:
   case X86::TAILJMPd:
   case X86::TAILJMPd_CC:
   case X86::TAILJMPr64:
   case X86::TAILJMPm64:
-  case X86::TAILJMPd64:
   case X86::TAILJMPd64_CC:
   case X86::TAILJMPr64_REX:
   case X86::TAILJMPm64_REX:
@@ -2669,6 +2683,10 @@ void X86AsmPrinter::emitInstruction(const MachineInstr *MI) {
                                 .addImm(MI->getOperand(0).getImm())
                                 .addReg(X86::NoRegister));
     return;
+  case X86::CALL64pcrel32:
+    if (IndCS && MI->hasRegisterImplicitUseOperand(X86::R11))
+      EmitAndCountInstruction(MCInstBuilder(X86::CS_PREFIX));
+    break;
   }
 
   MCInst TmpInst;

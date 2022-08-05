@@ -1,7 +1,7 @@
 add_header_library(
   array
   HDRS
-    Array.h
+    array.h
 )
 
 add_header_library(
@@ -41,13 +41,13 @@ add_header_library(
 add_header_library(
   functional
   HDRS
-    Functional.h
+    functional.h
 )
 
 add_header_library(
   limits
   HDRS
-    Limits.h
+    limits.h
   DEPENDS
     .uint
 )
@@ -69,9 +69,15 @@ add_header_library(
 )
 
 add_header_library(
+  optional
+  HDRS
+    optional.h
+)
+
+add_header_library(
   type_traits
   HDRS
-    TypeTraits.h
+    type_traits.h
   DEPENDS
     .uint
 )
@@ -79,7 +85,7 @@ add_header_library(
 add_header_library(
   utility
   HDRS
-    Utility.h
+    utility.h
 )
 
 add_header_library(
