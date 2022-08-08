@@ -63,7 +63,7 @@ void CompileUnit::ForeachFunction(
   sorted_functions.reserve(m_functions_by_uid.size());
   for (auto &p : m_functions_by_uid)
     sorted_functions.push_back(p.second);
-  llvm::sort(sorted_functions.begin(), sorted_functions.end(),
+  llvm::sort(sorted_functions,
              [](const lldb::FunctionSP &a, const lldb::FunctionSP &b) {
                return a->GetID() < b->GetID();
              });
@@ -249,7 +249,7 @@ void CompileUnit::ResolveSymbolContext(
     const SourceLocationSpec &src_location_spec,
     SymbolContextItem resolve_scope, SymbolContextList &sc_list) {
   const FileSpec file_spec = src_location_spec.GetFileSpec();
-  const uint32_t line = src_location_spec.GetLine().getValueOr(0);
+  const uint32_t line = src_location_spec.GetLine().value_or(0);
   const bool check_inlines = src_location_spec.GetCheckInlines();
 
   // First find all of the file indexes that match our "file_spec". If
@@ -287,6 +287,9 @@ void CompileUnit::ResolveSymbolContext(
   if (num_file_indexes == 0)
     return;
 
+  // Found a matching source file in this compile unit load its debug info.
+  GetModule()->GetSymbolFile()->SetLoadDebugInfoEnabled();
+
   LineTable *line_table = sc.comp_unit->GetLineTable();
 
   if (line_table == nullptr) {
@@ -312,15 +315,20 @@ void CompileUnit::ResolveSymbolContext(
     line_idx = line_table->FindLineEntryIndexByFileIndex(
         0, file_indexes, src_location_spec, &line_entry);
   }
-  
+
   // If "exact == true", then "found_line" will be the same as "line". If
   // "exact == false", the "found_line" will be the closest line entry
   // with a line number greater than "line" and we will use this for our
   // subsequent line exact matches below.
   const bool inlines = false;
   const bool exact = true;
-  SourceLocationSpec found_entry(line_entry.file, line_entry.line,
-                                 line_entry.column, inlines, exact);
+  const llvm::Optional<uint16_t> column =
+      src_location_spec.GetColumn()
+          ? llvm::Optional<uint16_t>(line_entry.column)
+          : llvm::None;
+
+  SourceLocationSpec found_entry(line_entry.file, line_entry.line, column,
+                                 inlines, exact);
 
   while (line_idx != UINT32_MAX) {
     // If they only asked for the line entry, then we're done, we can

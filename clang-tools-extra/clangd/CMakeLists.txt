@@ -83,6 +83,7 @@ add_clang_library(clangDaemon
   HeaderSourceSwitch.cpp
   HeuristicResolver.cpp
   Hover.cpp
+  IncludeCleaner.cpp
   IncludeFixer.cpp
   InlayHints.cpp
   JSONTransport.cpp
@@ -118,6 +119,7 @@ add_clang_library(clangDaemon
   index/Ref.cpp
   index/Relation.cpp
   index/Serialization.cpp
+  index/StdLib.cpp
   index/Symbol.cpp
   index/SymbolCollector.cpp
   index/SymbolID.cpp
@@ -130,6 +132,7 @@ add_clang_library(clangDaemon
   index/dex/PostingList.cpp
   index/dex/Trigram.cpp
 
+  refactor/InsertionPoint.cpp
   refactor/Rename.cpp
   refactor/Tweak.cpp
 
@@ -167,6 +170,8 @@ target_link_libraries(clangDaemon
   clangTidy
 
   clangdSupport
+
+  clangPseudo
   )
 if(CLANGD_TIDY_CHECKS)
   target_link_libraries(clangDaemon PRIVATE ${ALL_CLANG_TIDY_CHECKS})

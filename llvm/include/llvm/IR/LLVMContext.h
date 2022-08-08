@@ -15,6 +15,7 @@
 #define LLVM_IR_LLVMCONTEXT_H
 
 #include "llvm-c/Types.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/IR/DiagnosticHandler.h"
 #include "llvm/Support/CBindingWrapping.h"
 #include <cstdint>
@@ -32,11 +33,9 @@ class Module;
 class OptPassGate;
 template <typename T> class SmallVectorImpl;
 template <typename T> class StringMapEntry;
-class SMDiagnostic;
 class StringRef;
 class Twine;
 class LLVMRemarkStreamer;
-class raw_ostream;
 
 namespace remarks {
 class RemarkStreamer;
@@ -94,55 +93,62 @@ public:
     OB_preallocated = 4,           // "preallocated"
     OB_gc_live = 5,                // "gc-live"
     OB_clang_arc_attachedcall = 6, // "clang.arc.attachedcall"
+    OB_ptrauth = 7,                // "ptrauth"
     // OmpSs IDs
-    OB_oss_dir = 7,                               // "oss_dir"
-    OB_oss_shared = 8,                            // "oss_shared"
-    OB_oss_private = 9,                           // "oss_private"
-    OB_oss_firstprivate = 10,                     // "oss_firstprivate"
-    OB_oss_vla_dims = 11,                         // "oss_vla_dims"
-    OB_oss_dep_in = 12,                           // "OB_oss_dep_in"
-    OB_oss_dep_out = 13,                          // "OB_oss_dep_out"
-    OB_oss_dep_inout = 14,                        // "OB_oss_dep_inout"
-    OB_oss_dep_concurrent = 15,                   // "OB_oss_dep_concurrent"
-    OB_oss_dep_commutative = 16,                  // "OB_oss_dep_commutative"
-    OB_oss_dep_weakin = 17,                       // "OB_oss_dep_weakin"
-    OB_oss_dep_weakout = 18,                      // "OB_oss_dep_weakout"
-    OB_oss_dep_weakinout = 19,                    // "OB_oss_dep_weakinout"
-    OB_oss_dep_weakconcurrent = 20,               // "OB_oss_dep_weakconcurrent"
-    OB_oss_dep_weakcommutative = 21,              // "OB_oss_dep_weakcommutative"
-    OB_oss_dep_reduction = 22,                    // "OB_oss_dep_reduction"
-    OB_oss_dep_weakreduction = 23,                // "OB_oss_dep_weakreduction"
-    OB_oss_reduction_init = 24,                   // "OB_oss_reduction_init"
-    OB_oss_reduction_comb = 25,                   // "OB_oss_reduction_comb"
-    OB_oss_final = 26,                            // "OB_oss_final"
-    OB_oss_if = 27,                               // "OB_oss_if"
-    OB_oss_cost = 28,                             // "OB_oss_cost"
-    OB_oss_priority = 29,                         // "OB_oss_priority"
-    OB_oss_label = 30,                            // "OB_oss_label"
-    OB_oss_wait = 31,                             // "OB_oss_wait"
-    OB_oss_captured = 32,                         // "OB_oss_captured"
-    OB_oss_init = 33,                             // "OB_oss_init"
-    OB_oss_deinit = 34,                           // "OB_oss_deinit"
-    OB_oss_copy = 35,                             // "OB_oss_copy"
-    OB_oss_loop_type = 36,                        // "OB_oss_loop_type"
-    OB_oss_loop_ind_var = 37,                     // "OB_oss_loop_ind_var"
-    OB_oss_loop_lower_bound = 38,                 // "OB_oss_loop_lower_bound"
-    OB_oss_loop_upper_bound = 39,                 // "OB_oss_loop_upper_bound"
-    OB_oss_loop_step = 40,                        // "OB_oss_loop_step"
-    OB_oss_loop_chunksize = 41,                   // "OB_oss_loop_chunksize"
-    OB_oss_loop_grainsize = 42,                   // "OB_oss_loop_grainsize"
-    OB_oss_multidep_range_in = 43,                // "OB_oss_multidep_range_in"
-    OB_oss_multidep_range_out = 44,               // "OB_oss_multidep_range_out"
-    OB_oss_multidep_range_inout = 45,             // "OB_oss_multidep_range_inout"
-    OB_oss_multidep_range_concurrent = 46,        // "OB_oss_multidep_range_concurrent"
-    OB_oss_multidep_range_commutative = 47,       // "OB_oss_multidep_range_commutative"
-    OB_oss_multidep_range_weakin = 48,            // "OB_oss_multidep_range_weakin"
-    OB_oss_multidep_range_weakout = 49,           // "OB_oss_multidep_range_weakout"
-    OB_oss_multidep_range_weakinout = 50,         // "OB_oss_multidep_range_weakinout"
-    OB_oss_multidep_range_weakconcurrent = 51,    // "OB_oss_multidep_range_weakconcurrent"
-    OB_oss_multidep_range_weakcommutative = 52,   // "OB_oss_multidep_range_weakcommutative"
-    OB_oss_decl_source = 53,                      // "OB_oss_decl_source"
-    OB_oss_onready = 54,                          // "OB_oss_onready"
+    OB_oss_dir = 8,                               // "oss_dir"
+    OB_oss_shared = 9,                            // "oss_shared"
+    OB_oss_private = 10,                           // "oss_private"
+    OB_oss_firstprivate = 11,                     // "oss_firstprivate"
+    OB_oss_vla_dims = 12,                         // "oss_vla_dims"
+    OB_oss_dep_in = 13,                           // "OB_oss_dep_in"
+    OB_oss_dep_out = 14,                          // "OB_oss_dep_out"
+    OB_oss_dep_inout = 15,                        // "OB_oss_dep_inout"
+    OB_oss_dep_concurrent = 16,                   // "OB_oss_dep_concurrent"
+    OB_oss_dep_commutative = 17,                  // "OB_oss_dep_commutative"
+    OB_oss_dep_weakin = 18,                       // "OB_oss_dep_weakin"
+    OB_oss_dep_weakout = 19,                      // "OB_oss_dep_weakout"
+    OB_oss_dep_weakinout = 20,                    // "OB_oss_dep_weakinout"
+    OB_oss_dep_weakconcurrent = 21,               // "OB_oss_dep_weakconcurrent"
+    OB_oss_dep_weakcommutative = 22,              // "OB_oss_dep_weakcommutative"
+    OB_oss_dep_reduction = 23,                    // "OB_oss_dep_reduction"
+    OB_oss_dep_weakreduction = 24,                // "OB_oss_dep_weakreduction"
+    OB_oss_reduction_init = 25,                   // "OB_oss_reduction_init"
+    OB_oss_reduction_comb = 26,                   // "OB_oss_reduction_comb"
+    OB_oss_final = 27,                            // "OB_oss_final"
+    OB_oss_if = 28,                               // "OB_oss_if"
+    OB_oss_cost = 29,                             // "OB_oss_cost"
+    OB_oss_priority = 30,                         // "OB_oss_priority"
+    OB_oss_label = 31,                            // "OB_oss_label"
+    OB_oss_wait = 32,                             // "OB_oss_wait"
+    OB_oss_captured = 33,                         // "OB_oss_captured"
+    OB_oss_init = 34,                             // "OB_oss_init"
+    OB_oss_deinit = 35,                           // "OB_oss_deinit"
+    OB_oss_copy = 36,                             // "OB_oss_copy"
+    OB_oss_loop_type = 37,                        // "OB_oss_loop_type"
+    OB_oss_loop_ind_var = 38,                     // "OB_oss_loop_ind_var"
+    OB_oss_loop_lower_bound = 39,                 // "OB_oss_loop_lower_bound"
+    OB_oss_loop_upper_bound = 40,                 // "OB_oss_loop_upper_bound"
+    OB_oss_loop_step = 41,                        // "OB_oss_loop_step"
+    OB_oss_loop_chunksize = 42,                   // "OB_oss_loop_chunksize"
+    OB_oss_loop_grainsize = 43,                   // "OB_oss_loop_grainsize"
+    OB_oss_loop_unroll = 44,                      // "OB_oss_loop_unroll"
+    OB_oss_loop_update = 45,                      // "OB_oss_loop_update"
+    OB_oss_while_cond = 46,                       // "OB_oss_while_cond"
+    OB_oss_multidep_range_in = 47,                // "OB_oss_multidep_range_in"
+    OB_oss_multidep_range_out = 48,               // "OB_oss_multidep_range_out"
+    OB_oss_multidep_range_inout = 49,             // "OB_oss_multidep_range_inout"
+    OB_oss_multidep_range_concurrent = 50,        // "OB_oss_multidep_range_concurrent"
+    OB_oss_multidep_range_commutative = 51,       // "OB_oss_multidep_range_commutative"
+    OB_oss_multidep_range_weakin = 52,            // "OB_oss_multidep_range_weakin"
+    OB_oss_multidep_range_weakout = 53,           // "OB_oss_multidep_range_weakout"
+    OB_oss_multidep_range_weakinout = 54,         // "OB_oss_multidep_range_weakinout"
+    OB_oss_multidep_range_weakconcurrent = 55,    // "OB_oss_multidep_range_weakconcurrent"
+    OB_oss_multidep_range_weakcommutative = 56,   // "OB_oss_multidep_range_weakcommutative"
+    OB_oss_decl_source = 57,                      // "OB_oss_decl_source"
+    OB_oss_onready = 58,                          // "OB_oss_onready"
+    OB_oss_device = 59,                           // "OB_oss_device"
+    OB_oss_device_ndrange = 60,                   // "OB_oss_device_ndrange"
+    OB_oss_device_dev_func = 61,                  // "OB_oss_device_dev_func"
   };
 
   /// getMDKindID - Return a unique non-zero ID for the specified metadata kind.
@@ -251,6 +257,11 @@ public:
   /// diagnostics.
   void setDiagnosticsHotnessRequested(bool Requested);
 
+  bool getMisExpectWarningRequested() const;
+  void setMisExpectWarningRequested(bool Requested);
+  void setDiagnosticsMisExpectTolerance(Optional<uint64_t> Tolerance);
+  uint64_t getDiagnosticsMisExpectTolerance() const;
+
   /// Return the minimum hotness value a diagnostic would need in order
   /// to be included in optimization diagnostics.
   ///
@@ -353,6 +364,15 @@ public:
   /// The lifetime of the object must be guaranteed to extend as long as the
   /// LLVMContext is used by compilation.
   void setOptPassGate(OptPassGate&);
+
+  /// Whether we've decided on using opaque pointers or typed pointers yet.
+  bool hasSetOpaquePointersValue() const;
+
+  /// Set whether opaque pointers are enabled. The method may be called multiple
+  /// times, but only with the same value. Note that creating a pointer type or
+  /// otherwise querying the opaque pointer mode performs an implicit set to
+  /// the default value.
+  void setOpaquePointers(bool Enable) const;
 
   /// Whether typed pointers are supported. If false, all pointers are opaque.
   bool supportsTypedPointers() const;

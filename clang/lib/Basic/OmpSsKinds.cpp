@@ -82,6 +82,11 @@ unsigned clang::getOmpSsSimpleClauseType(OmpSsClauseKind Kind,
 #define OMPSS_DEPEND_KIND(Name) .Case(#Name, OSSC_DEPEND_##Name)
 #include "clang/Basic/OmpSsKinds.def"
         .Default(OSSC_DEPEND_unknown);
+  case OSSC_device:
+    return llvm::StringSwitch<OmpSsDeviceClauseKind>(Str)
+#define OMPSS_DEVICE_KIND(Name) .Case(#Name, OSSC_DEVICE_##Name)
+#include "clang/Basic/OmpSsKinds.def"
+        .Default(OSSC_DEVICE_unknown);
   case OSSC_unknown:
   case OSSC_if:
   case OSSC_final:
@@ -89,6 +94,7 @@ unsigned clang::getOmpSsSimpleClauseType(OmpSsClauseKind Kind,
   case OSSC_priority:
   case OSSC_label:
   case OSSC_wait:
+  case OSSC_update:
   case OSSC_onready:
   case OSSC_private:
   case OSSC_firstprivate:
@@ -99,6 +105,7 @@ unsigned clang::getOmpSsSimpleClauseType(OmpSsClauseKind Kind,
   case OSSC_inout:
   case OSSC_concurrent:
   case OSSC_commutative:
+  case OSSC_on:
   case OSSC_weakin:
   case OSSC_weakout:
   case OSSC_weakinout:
@@ -107,7 +114,9 @@ unsigned clang::getOmpSsSimpleClauseType(OmpSsClauseKind Kind,
   case OSSC_weakreduction:
   case OSSC_chunksize:
   case OSSC_grainsize:
+  case OSSC_unroll:
   case OSSC_collapse:
+  case OSSC_ndrange:
     break;
   }
   llvm_unreachable("Invalid OmpSs simple clause kind");
@@ -136,6 +145,16 @@ const char *clang::getOmpSsSimpleClauseTypeName(OmpSsClauseKind Kind,
 #include "clang/Basic/OmpSsKinds.def"
     }
     llvm_unreachable("Invalid OmpSs 'depend' clause type");
+  case OSSC_device:
+    switch (Type) {
+    case OSSC_DEVICE_unknown:
+      return "unknown";
+#define OMPSS_DEVICE_KIND(Name)                                             \
+  case OSSC_DEVICE_##Name:                                                   \
+    return #Name;
+#include "clang/Basic/OmpSsKinds.def"
+    }
+    llvm_unreachable("Invalid OmpSs 'device' clause type");
   case OSSC_unknown:
   case OSSC_if:
   case OSSC_final:
@@ -143,6 +162,7 @@ const char *clang::getOmpSsSimpleClauseTypeName(OmpSsClauseKind Kind,
   case OSSC_priority:
   case OSSC_label:
   case OSSC_wait:
+  case OSSC_update:
   case OSSC_onready:
   case OSSC_private:
   case OSSC_firstprivate:
@@ -153,6 +173,7 @@ const char *clang::getOmpSsSimpleClauseTypeName(OmpSsClauseKind Kind,
   case OSSC_inout:
   case OSSC_concurrent:
   case OSSC_commutative:
+  case OSSC_on:
   case OSSC_weakin:
   case OSSC_weakout:
   case OSSC_weakinout:
@@ -161,7 +182,9 @@ const char *clang::getOmpSsSimpleClauseTypeName(OmpSsClauseKind Kind,
   case OSSC_weakreduction:
   case OSSC_chunksize:
   case OSSC_grainsize:
+  case OSSC_unroll:
   case OSSC_collapse:
+  case OSSC_ndrange:
     break;
   }
   llvm_unreachable("Invalid OmpSs simple clause kind");
@@ -185,6 +208,17 @@ bool clang::isAllowedClauseForDirective(OmpSsDirectiveKind DKind,
   case OSSD_task_for:
     switch (CKind) {
 #define OMPSS_TASK_FOR_CLAUSE(Name)                                           \
+  case OSSC_##Name:                                                            \
+    return true;
+#include "clang/Basic/OmpSsKinds.def"
+    default:
+      break;
+    }
+    break;
+  case OSSD_taskiter:
+  case OSSD_taskiter_while:
+    switch (CKind) {
+#define OMPSS_TASK_ITER_CLAUSE(Name)                                           \
   case OSSC_##Name:                                                            \
     return true;
 #include "clang/Basic/OmpSsKinds.def"
@@ -262,7 +296,7 @@ bool clang::isOmpSsTaskingDirective(OmpSsDirectiveKind Kind) {
 
 bool clang::isOmpSsLoopDirective(OmpSsDirectiveKind Kind) {
   return Kind == OSSD_taskloop || Kind == OSSD_taskloop_for ||
-         Kind == OSSD_task_for;
+         Kind == OSSD_task_for || Kind == OSSD_taskiter;
 }
 
 bool clang::isOmpSsTaskLoopDirective(OmpSsDirectiveKind Kind) {

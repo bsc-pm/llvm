@@ -16,6 +16,8 @@
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/IntrinsicInst.h"
 
+#include <map>
+
 namespace llvm {
 
 // Data-sharing lists.
@@ -23,6 +25,9 @@ struct DirectiveDSAInfo {
   SetVector<Value *> Shared;
   SetVector<Value *> Private;
   SetVector<Value *> Firstprivate;
+  SmallVector<Type *, 4> SharedTy;
+  SmallVector<Type *, 4> PrivateTy;
+  SmallVector<Type *, 4> FirstprivateTy;
 };
 
 // <VLA, VLA_dims>
@@ -150,6 +155,20 @@ struct DirectiveOnreadyInfo {
   SmallVector<Value *, 4> Args;
 };
 
+struct DirectiveDeviceInfo {
+  Value *Kind = nullptr;
+  // The arguments of the call to function.
+  int64_t NumDims = 0;
+  SmallVector<Value *, 4> Ndrange;
+  bool HasLocalSize = true;
+  StringRef DevFuncStringRef;
+  bool empty() const {
+    // Not set or set to smp → 0
+    return !Kind
+      || cast<ConstantInt>(Kind)->getSExtValue() == 0;
+  }
+};
+
 struct DirectiveLoopInfo {
   enum {
     LT, // <
@@ -181,6 +200,8 @@ struct DirectiveLoopInfo {
   SmallVector<BoundInfo> Step;
   Value *Chunksize = nullptr;
   Value *Grainsize = nullptr;
+  Value *Unroll = nullptr;
+  Value *Update = nullptr;
   bool empty() const {
     return IndVar.empty() && LBound.empty() &&
            UBound.empty() && Step.empty() &&
@@ -189,10 +210,21 @@ struct DirectiveLoopInfo {
   }
 };
 
+struct DirectiveWhileInfo {
+  Function *Fun = nullptr;
+  // The arguments of the call to function.
+  SmallVector<Value *, 4> Args;
+  // Used by transformation to store the result value
+  mutable Value *Result = nullptr;
+  bool empty() const { return !Fun && Args.empty(); };
+};
+
 struct DirectiveEnvironment {
   enum OmpSsDirectiveKind {
     OSSD_task = 0,
     OSSD_task_for,
+    OSSD_taskiter_for,
+    OSSD_taskiter_while,
     OSSD_taskloop,
     OSSD_taskloop_for,
     OSSD_taskwait,
@@ -211,17 +243,54 @@ struct DirectiveEnvironment {
   Value *Final = nullptr;
   Value *If = nullptr;
   Value *Label = nullptr;
+  Value *InstanceLabel = nullptr;
   Value *Wait = nullptr;
+  DirectiveDeviceInfo DeviceInfo;
   DirectiveCapturedInfo CapturedInfo;
   DirectiveNonPODsInfo NonPODsInfo;
   DirectiveLoopInfo LoopInfo;
+  // Used in taskiter (while)
+  DirectiveWhileInfo WhileInfo;
   StringRef DeclSourceStringRef;
   DirectiveEnvironment(const Instruction *I);
   // Different reductions may have same init/comb, assign the same ReductionIndex
   DenseMap<Value *, int> SeenInits;
   int ReductionIndex = 0;
   // Map of Dependency symbols to Index
-  std::map<Value *, int> DepSymToIdx;
+  std::map<Value *, std::pair<const DependInfo *, int>> DepSymToIdx;
+
+  // returns if V is in DSAInfo
+  bool valueInDSABundles(const Value *V) const {
+    auto SharedIt = find(DSAInfo.Shared, V);
+    auto PrivateIt = find(DSAInfo.Private, V);
+    auto FirstprivateIt = find(DSAInfo.Firstprivate, V);
+    if (SharedIt == DSAInfo.Shared.end()
+        && PrivateIt == DSAInfo.Private.end()
+        && FirstprivateIt == DSAInfo.Firstprivate.end())
+      return false;
+
+    return true;
+  }
+
+  // returns if the associated type of V
+  Type *getDSAType(const Value *V) const {
+    for (size_t i = 0; i < DSAInfo.Shared.size(); ++i)
+      if (DSAInfo.Shared[i] == V)
+        return DSAInfo.SharedTy[i];
+    for (size_t i = 0; i < DSAInfo.Private.size(); ++i)
+      if (DSAInfo.Private[i] == V)
+        return DSAInfo.PrivateTy[i];
+    for (size_t i = 0; i < DSAInfo.Firstprivate.size(); ++i)
+      if (DSAInfo.Firstprivate[i] == V)
+        return DSAInfo.FirstprivateTy[i];
+    llvm_unreachable("Expected Value to be in DSAInfo");
+  }
+
+  // returns if V is in CapturedInfo
+  bool valueInCapturedBundle(Value *const V) const {
+    return CapturedInfo.count(V);
+  }
+
 private:
   void gatherDirInfo(OperandBundleDef &OBDef);
   void gatherSharedInfo(OperandBundleDef &OBDef);
@@ -238,6 +307,9 @@ private:
   void gatherLabelInfo(OperandBundleDef &OBDef);
   void gatherOnreadyInfo(OperandBundleDef &OBDef);
   void gatherWaitInfo(OperandBundleDef &OBDef);
+  void gatherDeviceInfo(OperandBundleDef &OBDef);
+  void gatherDeviceNdrangeInfo(OperandBundleDef &OBDef);
+  void gatherDeviceDevFuncInfo(OperandBundleDef &OBDef);
   void gatherCapturedInfo(OperandBundleDef &OBDef);
   void gatherNonPODInitInfo(OperandBundleDef &OBDef);
   void gatherNonPODDeinitInfo(OperandBundleDef &OBDef);
@@ -249,6 +321,9 @@ private:
   void gatherLoopStepInfo(OperandBundleDef &OBDef);
   void gatherLoopChunksizeInfo(OperandBundleDef &OBDef);
   void gatherLoopGrainsizeInfo(OperandBundleDef &OBDef);
+  void gatherLoopUnrollInfo(OperandBundleDef &OBDef);
+  void gatherLoopUpdateInfo(OperandBundleDef &OBDef);
+  void gatherWhileCondInfo(OperandBundleDef &OBDef);
   void gatherMultiDependInfo(OperandBundleDef &OBDef, uint64_t Id);
   void gatherDeclSource(OperandBundleDef &OBDef);
 
@@ -258,9 +333,12 @@ private:
   void verifyCostInfo();
   void verifyPriorityInfo();
   void verifyOnreadyInfo();
+  void verifyDeviceInfo();
   void verifyNonPODInfo();
   void verifyLoopInfo();
+  void verifyWhileInfo();
   void verifyMultiDependInfo();
+  void verifyLabelInfo();
 
 public:
   void verify();
@@ -288,9 +366,27 @@ public:
            DirectiveKind == OSSD_taskloop_for;
   }
   // returns if directive is
+  // taskiter (for|while)
+  bool isOmpSsTaskIterDirective() const {
+    return DirectiveKind == OSSD_taskiter_for ||
+           DirectiveKind == OSSD_taskiter_while;
+  }
+  // returns if directive is
+  // taskiter for
+  bool isOmpSsTaskIterForDirective() const {
+    return DirectiveKind == OSSD_taskiter_for;
+  }
+  // returns if directive is
+  // taskiter while
+  bool isOmpSsTaskIterWhileDirective() const {
+    return DirectiveKind == OSSD_taskiter_while;
+  }
+  // returns if directive is
   // task, task for, taskloop, taskloop for
   bool isOmpSsTaskDirective() const {
-    return DirectiveKind == OSSD_task || isOmpSsLoopDirective();
+    return DirectiveKind == OSSD_task ||
+           isOmpSsLoopDirective() ||
+           isOmpSsTaskIterDirective();
   }
   // returns if directive is release
   bool isOmpSsReleaseDirective() const {

@@ -19,5 +19,20 @@ void foo6(int *p) {}
 void foo7(int *p) {}
 #pragma oss task reduction(+: *p) weakreduction(+: *p) // expected-error {{unexpected OmpSs-2 clause 'reduction' in directive '#pragma oss task'}} expected-error {{unexpected OmpSs-2 clause 'weakreduction' in directive '#pragma oss task'}}
 void foo8(int *p) {}
+#pragma oss task on([1]p) // expected-error {{unexpected OmpSs-2 clause 'on' in directive '#pragma oss task'}}
+void foo9(int *p) {}
+
+struct S0 {
+  // expected-error@+2 {{field 'foo' declared as a function}}
+  #pragma oss task
+  void foo();
+};
+
+struct S1 {
+  // expected-error@+3 {{field 'bar' declared as a function}}
+  // expected-error@+2 {{expected ';' at end of declaration list}}
+  #pragma oss task
+  void bar() {}
+};
 
 #pragma oss task // expected-error {{function declaration is expected after 'task' function directive}}

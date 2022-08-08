@@ -19,7 +19,6 @@ def apple_silicon():
 
 class TestLaunchProcessPosixSpawn(TestBase):
     NO_DEBUG_INFO_TESTCASE = True
-    mydir = TestBase.compute_mydir(__file__)
 
     def no_haswell(self):
         if not haswell():
@@ -36,13 +35,14 @@ class TestLaunchProcessPosixSpawn(TestBase):
         self.runCmd('run')
 
         process = self.dbg.GetSelectedTarget().process
-        self.assertEqual(process.GetState(), lldb.eStateExited)
+        self.assertState(process.GetState(), lldb.eStateExited)
         self.assertIn('slice: {}'.format(arch), process.GetSTDOUT(1000))
 
     @skipUnlessDarwin
     @skipIfDarwinEmbedded
+    @skipIfLLVMTargetMissing("AArch64")
+    @skipIfLLVMTargetMissing("X86")
     @skipTestIfFn(no_haswell)
-    @skipIfReproducer # Test relies on inferior output
     def test_haswell(self):
         self.build()
         exe = self.getBuildArtifact("fat.out")
@@ -51,8 +51,9 @@ class TestLaunchProcessPosixSpawn(TestBase):
 
     @skipUnlessDarwin
     @skipIfDarwinEmbedded
+    @skipIfLLVMTargetMissing("AArch64")
+    @skipIfLLVMTargetMissing("X86")
     @skipTestIfFn(no_apple_silicon)
-    @skipIfReproducer # Test relies on inferior output
     def test_apple_silicon(self):
         self.build()
         exe = self.getBuildArtifact("fat.out")

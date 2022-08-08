@@ -1,4 +1,3 @@
-; RUN: opt -ompss-2-regions -analyze -disable-checks -print-verbosity=reduction_inits_combiners -enable-new-pm=0 < %s 2>&1 | FileCheck %s
 ; RUN: opt -passes='print<ompss-2-regions>' -disable-checks -print-verbosity=reduction_inits_combiners < %s 2>&1 | FileCheck %s
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 
@@ -19,13 +18,13 @@ define i32 @main() {
 entry:
   %x = alloca i32, align 4
   %y = alloca i32, align 4
-  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %x), "QUAL.OSS.SHARED"(i32* %y), "QUAL.OSS.DEP.REDUCTION"(i32 6000, i32* %x, [2 x i8] c"x\00", %struct._depend_unpack_t (i32*)* @compute_dep, i32* %x), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %x, void (i32*, i32*, i64)* @red_init), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %x, void (i32*, i32*, i64)* @red_comb), "QUAL.OSS.DEP.REDUCTION"(i32 6000, i32* %y, [2 x i8] c"y\00", %struct._depend_unpack_t.0 (i32*)* @compute_dep.1, i32* %y), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %y, void (i32*, i32*, i64)* @red_init), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %y, void (i32*, i32*, i64)* @red_comb) ]
+  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr %x, i32 undef), "QUAL.OSS.SHARED"(ptr %y, i32 undef), "QUAL.OSS.DEP.REDUCTION"(i32 6000, ptr %x, [2 x i8] c"x\00", %struct._depend_unpack_t (ptr)* @compute_dep, ptr %x), "QUAL.OSS.DEP.REDUCTION.INIT"(ptr %x, ptr @red_init), "QUAL.OSS.DEP.REDUCTION.COMBINE"(ptr %x, ptr @red_comb), "QUAL.OSS.DEP.REDUCTION"(i32 6000, ptr %y, [2 x i8] c"y\00", %struct._depend_unpack_t.0 (ptr)* @compute_dep.1, ptr %y), "QUAL.OSS.DEP.REDUCTION.INIT"(ptr %y, ptr @red_init), "QUAL.OSS.DEP.REDUCTION.COMBINE"(ptr %y, ptr @red_comb) ]
   call void @llvm.directive.region.exit(token %0)
-  %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %x), "QUAL.OSS.SHARED"(i32* %y), "QUAL.OSS.DEP.REDUCTION"(i32 6000, i32* %x, [2 x i8] c"x\00", %struct._depend_unpack_t.1 (i32*)* @compute_dep.2, i32* %x), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %x, void (i32*, i32*, i64)* @red_init), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %x, void (i32*, i32*, i64)* @red_comb), "QUAL.OSS.DEP.REDUCTION"(i32 6000, i32* %y, [2 x i8] c"y\00", %struct._depend_unpack_t.2 (i32*)* @compute_dep.3, i32* %y), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %y, void (i32*, i32*, i64)* @red_init), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %y, void (i32*, i32*, i64)* @red_comb) ]
+  %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr %x, i32 undef), "QUAL.OSS.SHARED"(ptr %y, i32 undef), "QUAL.OSS.DEP.REDUCTION"(i32 6000, ptr %x, [2 x i8] c"x\00", %struct._depend_unpack_t.1 (ptr)* @compute_dep.2, ptr %x), "QUAL.OSS.DEP.REDUCTION.INIT"(ptr %x, ptr @red_init), "QUAL.OSS.DEP.REDUCTION.COMBINE"(ptr %x, ptr @red_comb), "QUAL.OSS.DEP.REDUCTION"(i32 6000, ptr %y, [2 x i8] c"y\00", %struct._depend_unpack_t.2 (ptr)* @compute_dep.3, ptr %y), "QUAL.OSS.DEP.REDUCTION.INIT"(ptr %y, ptr @red_init), "QUAL.OSS.DEP.REDUCTION.COMBINE"(ptr %y, ptr @red_comb) ]
   call void @llvm.directive.region.exit(token %1)
-  %2 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %x), "QUAL.OSS.SHARED"(i32* %y), "QUAL.OSS.DEP.REDUCTION"(i32 -1, i32* %x, [2 x i8] c"x\00", %struct._depend_unpack_t.3 (i32*)* @compute_dep.6, i32* %x), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %x, void (i32*, i32*, i64)* @red_init.4), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %x, void (i32*, i32*, i64)* @red_comb.5), "QUAL.OSS.DEP.REDUCTION"(i32 -1, i32* %y, [2 x i8] c"y\00", %struct._depend_unpack_t.4 (i32*)* @compute_dep.7, i32* %y), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %y, void (i32*, i32*, i64)* @red_init.4), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %y, void (i32*, i32*, i64)* @red_comb.5) ]
+  %2 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr %x, i32 undef), "QUAL.OSS.SHARED"(ptr %y, i32 undef), "QUAL.OSS.DEP.REDUCTION"(i32 -1, ptr %x, [2 x i8] c"x\00", %struct._depend_unpack_t.3 (ptr)* @compute_dep.6, ptr %x), "QUAL.OSS.DEP.REDUCTION.INIT"(ptr %x, ptr @red_init.4), "QUAL.OSS.DEP.REDUCTION.COMBINE"(ptr %x, ptr @red_comb.5), "QUAL.OSS.DEP.REDUCTION"(i32 -1, ptr %y, [2 x i8] c"y\00", %struct._depend_unpack_t.4 (ptr)* @compute_dep.7, ptr %y), "QUAL.OSS.DEP.REDUCTION.INIT"(ptr %y, ptr @red_init.4), "QUAL.OSS.DEP.REDUCTION.COMBINE"(ptr %y, ptr @red_comb.5) ]
   call void @llvm.directive.region.exit(token %2)
-  %3 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %x), "QUAL.OSS.SHARED"(i32* %y), "QUAL.OSS.DEP.REDUCTION"(i32 -1, i32* %x, [2 x i8] c"x\00", %struct._depend_unpack_t.5 (i32*)* @compute_dep.8, i32* %x), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %x, void (i32*, i32*, i64)* @red_init.4), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %x, void (i32*, i32*, i64)* @red_comb.5), "QUAL.OSS.DEP.REDUCTION"(i32 -1, i32* %y, [2 x i8] c"y\00", %struct._depend_unpack_t.6 (i32*)* @compute_dep.9, i32* %y), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %y, void (i32*, i32*, i64)* @red_init.4), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %y, void (i32*, i32*, i64)* @red_comb.5) ]
+  %3 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr %x, i32 undef), "QUAL.OSS.SHARED"(ptr %y, i32 undef), "QUAL.OSS.DEP.REDUCTION"(i32 -1, ptr %x, [2 x i8] c"x\00", %struct._depend_unpack_t.5 (ptr)* @compute_dep.8, ptr %x), "QUAL.OSS.DEP.REDUCTION.INIT"(ptr %x, ptr @red_init.4), "QUAL.OSS.DEP.REDUCTION.COMBINE"(ptr %x, ptr @red_comb.5), "QUAL.OSS.DEP.REDUCTION"(i32 -1, ptr %y, [2 x i8] c"y\00", %struct._depend_unpack_t.6 (ptr)* @compute_dep.9, ptr %y), "QUAL.OSS.DEP.REDUCTION.INIT"(ptr %y, ptr @red_init.4), "QUAL.OSS.DEP.REDUCTION.COMBINE"(ptr %y, ptr @red_comb.5) ]
   call void @llvm.directive.region.exit(token %3)
   ret i32 0
 }
@@ -49,25 +48,25 @@ declare token @llvm.directive.region.entry() #1
 declare void @llvm.directive.region.exit(token) #1
 
 ; Function Attrs: noinline norecurse nounwind
-declare void @red_init(i32* %0, i32* %1, i64 %2)
-declare void @red_comb(i32* %0, i32* %1, i64 %2)
-declare void @red_init.4(i32* %0, i32* %1, i64 %2)
-declare void @red_comb.5(i32* %0, i32* %1, i64 %2)
+declare void @red_init(ptr %0, ptr %1, i64 %2)
+declare void @red_comb(ptr %0, ptr %1, i64 %2)
+declare void @red_init.4(ptr %0, ptr %1, i64 %2)
+declare void @red_comb.5(ptr %0, ptr %1, i64 %2)
 
-%struct._depend_unpack_t = type { i32*, i64, i64, i64 }
-%struct._depend_unpack_t.0 = type { i32*, i64, i64, i64 }
-%struct._depend_unpack_t.1 = type { i32*, i64, i64, i64 }
-%struct._depend_unpack_t.2 = type { i32*, i64, i64, i64 }
-%struct._depend_unpack_t.3 = type { i32*, i64, i64, i64 }
-%struct._depend_unpack_t.4 = type { i32*, i64, i64, i64 }
-%struct._depend_unpack_t.5 = type { i32*, i64, i64, i64 }
-%struct._depend_unpack_t.6 = type { i32*, i64, i64, i64 }
+%struct._depend_unpack_t = type { ptr, i64, i64, i64 }
+%struct._depend_unpack_t.0 = type { ptr, i64, i64, i64 }
+%struct._depend_unpack_t.1 = type { ptr, i64, i64, i64 }
+%struct._depend_unpack_t.2 = type { ptr, i64, i64, i64 }
+%struct._depend_unpack_t.3 = type { ptr, i64, i64, i64 }
+%struct._depend_unpack_t.4 = type { ptr, i64, i64, i64 }
+%struct._depend_unpack_t.5 = type { ptr, i64, i64, i64 }
+%struct._depend_unpack_t.6 = type { ptr, i64, i64, i64 }
 
-declare %struct._depend_unpack_t @compute_dep(i32* %x)
-declare %struct._depend_unpack_t.0 @compute_dep.1(i32* %y)
-declare %struct._depend_unpack_t.1 @compute_dep.2(i32* %x)
-declare %struct._depend_unpack_t.2 @compute_dep.3(i32* %y)
-declare %struct._depend_unpack_t.3 @compute_dep.6(i32* %x)
-declare %struct._depend_unpack_t.4 @compute_dep.7(i32* %y)
-declare %struct._depend_unpack_t.5 @compute_dep.8(i32* %x)
-declare %struct._depend_unpack_t.6 @compute_dep.9(i32* %y)
+declare %struct._depend_unpack_t @compute_dep(ptr %x)
+declare %struct._depend_unpack_t.0 @compute_dep.1(ptr %y)
+declare %struct._depend_unpack_t.1 @compute_dep.2(ptr %x)
+declare %struct._depend_unpack_t.2 @compute_dep.3(ptr %y)
+declare %struct._depend_unpack_t.3 @compute_dep.6(ptr %x)
+declare %struct._depend_unpack_t.4 @compute_dep.7(ptr %y)
+declare %struct._depend_unpack_t.5 @compute_dep.8(ptr %x)
+declare %struct._depend_unpack_t.6 @compute_dep.9(ptr %y)

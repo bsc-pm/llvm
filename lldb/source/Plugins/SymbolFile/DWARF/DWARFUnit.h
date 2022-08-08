@@ -11,8 +11,9 @@
 
 #include "DWARFDIE.h"
 #include "DWARFDebugInfoEntry.h"
-#include "lldb/lldb-enumerations.h"
 #include "lldb/Utility/XcodeSDK.h"
+#include "lldb/lldb-enumerations.h"
+#include "llvm/DebugInfo/DWARF/DWARFDebugRnglists.h"
 #include "llvm/Support/RWMutex.h"
 #include <atomic>
 
@@ -29,7 +30,8 @@ enum DWARFProducer {
   eProducerClang,
   eProducerGCC,
   eProducerLLVMGCC,
-  eProcucerOther
+  eProducerSwift,
+  eProducerOther
 };
 
 /// Base class describing the header of any kind of "unit."  Some information
@@ -67,7 +69,8 @@ public:
   dw_offset_t GetTypeOffset() const { return m_type_offset; }
   uint64_t GetDWOId() const { return m_dwo_id; }
   bool IsTypeUnit() const {
-    return m_unit_type == DW_UT_type || m_unit_type == DW_UT_split_type;
+    return m_unit_type == llvm::dwarf::DW_UT_type ||
+           m_unit_type == llvm::dwarf::DW_UT_split_type;
   }
   uint32_t GetNextUnitOffset() const { return m_offset + m_length + 4; }
 
@@ -152,7 +155,7 @@ public:
   const DWARFAbbreviationDeclarationSet *GetAbbreviations() const;
   dw_offset_t GetAbbrevOffset() const;
   uint8_t GetAddressByteSize() const { return m_header.GetAddressByteSize(); }
-  dw_addr_t GetAddrBase() const { return m_addr_base ? *m_addr_base : 0; }
+  dw_addr_t GetAddrBase() const { return m_addr_base.value_or(0); }
   dw_addr_t GetBaseAddress() const { return m_base_addr; }
   dw_offset_t GetLineTableOffset();
   dw_addr_t GetRangesBase() const { return m_ranges_base; }
@@ -162,6 +165,8 @@ public:
   void SetRangesBase(dw_addr_t ranges_base);
   void SetStrOffsetsBase(dw_offset_t str_offsets_base);
   virtual void BuildAddressRangeTable(DWARFDebugAranges *debug_aranges) = 0;
+
+  dw_addr_t ReadAddressFromDebugAddrSection(uint32_t index) const;
 
   lldb::ByteOrder GetByteOrder() const;
 
@@ -195,11 +200,7 @@ public:
 
   DWARFProducer GetProducer();
 
-  uint32_t GetProducerVersionMajor();
-
-  uint32_t GetProducerVersionMinor();
-
-  uint32_t GetProducerVersionUpdate();
+  llvm::VersionTuple GetProducerVersion();
 
   uint64_t GetDWARFLanguageType();
 
@@ -272,7 +273,7 @@ protected:
     ExtractUnitDIENoDwoIfNeeded();
     // m_first_die_mutex is not required as m_first_die is never cleared.
     if (!m_first_die)
-      return NULL;
+      return nullptr;
     return &m_first_die;
   }
 
@@ -280,11 +281,13 @@ protected:
   const DWARFDebugInfoEntry *DIEPtr() {
     ExtractDIEsIfNeeded();
     if (m_die_array.empty())
-      return NULL;
+      return nullptr;
     return &m_die_array[0];
   }
 
   const llvm::Optional<llvm::DWARFDebugRnglistTable> &GetRnglistTable();
+
+  lldb_private::DWARFDataExtractor GetRnglistData() const;
 
   SymbolFileDWARF &m_dwarf;
   std::shared_ptr<DWARFUnit> m_dwo;
@@ -309,9 +312,7 @@ protected:
   std::unique_ptr<DWARFDebugAranges> m_func_aranges_up;
   dw_addr_t m_base_addr = 0;
   DWARFProducer m_producer = eProducerInvalid;
-  uint32_t m_producer_version_major = 0;
-  uint32_t m_producer_version_minor = 0;
-  uint32_t m_producer_version_update = 0;
+  llvm::VersionTuple m_producer_version;
   llvm::Optional<uint64_t> m_language_type;
   lldb_private::LazyBool m_is_optimized = lldb_private::eLazyBoolCalculate;
   llvm::Optional<lldb_private::FileSpec> m_comp_dir;

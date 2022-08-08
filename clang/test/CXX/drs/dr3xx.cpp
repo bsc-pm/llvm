@@ -163,9 +163,9 @@ namespace dr308 { // dr308: yes
   void f() {
     try {
       throw D();
-    } catch (const A&) { // expected-note {{for type 'const dr308::A &'}}
+    } catch (const A&) { // expected-note {{for type 'const A &'}}
       // unreachable
-    } catch (const B&) { // expected-warning {{exception of type 'const dr308::B &' will be caught by earlier handler}}
+    } catch (const B&) { // expected-warning {{exception of type 'const B &' will be caught by earlier handler}}
       // get here instead
     }
   }
@@ -373,10 +373,19 @@ namespace dr330 { // dr330: 7
     q = p; // ok
     q2 = p; // ok
     r = p; // expected-error {{incompatible}}
-    s = p; // expected-error {{incompatible}} (for now)
+    s = p;
+#if __cplusplus < 202002
+    // expected-error@-2 {{incompatible}} (fixed by p0388)
+#endif
     t = p; // expected-error {{incompatible}}
-    s = q; // expected-error {{incompatible}}
-    s = q2; // expected-error {{incompatible}}
+    s = q;
+#if __cplusplus < 202002
+    // expected-error@-2 {{incompatible}} (fixed by p0388)
+#endif
+    s = q2;
+#if __cplusplus < 202002
+    // expected-error@-2 {{incompatible}} (fixed by p0388)
+#endif
     s = t; // ok, adding const
     t = s; // expected-error {{discards qualifiers}}
     (void) const_cast<P>(q);

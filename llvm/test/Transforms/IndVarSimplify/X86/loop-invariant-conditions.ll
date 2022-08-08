@@ -311,14 +311,12 @@ for.end:                                          ; preds = %if.end, %entry
 define void @test3_neg(i64 %start) {
 ; CHECK-LABEL: @test3_neg(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[START:%.*]], i64 -1)
-; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[SMAX]], 1
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ [[START]], [[ENTRY:%.*]] ], [ [[INDVARS_IV_NEXT:%.*]], [[LOOP]] ]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add i64 [[INDVARS_IV]], 1
-; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i64 [[INDVARS_IV_NEXT]], [[TMP0]]
-; CHECK-NEXT:    br i1 [[EXITCOND]], label [[LOOP]], label [[FOR_END:%.*]]
+; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ [[START:%.*]], [[ENTRY:%.*]] ], [ [[INDVARS_IV_NEXT:%.*]], [[LOOP]] ]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nsw i64 [[INDVARS_IV]], 1
+; CHECK-NEXT:    [[CMP1:%.*]] = icmp slt i64 [[INDVARS_IV]], -1
+; CHECK-NEXT:    br i1 [[CMP1]], label [[LOOP]], label [[FOR_END:%.*]]
 ; CHECK:       for.end:
 ; CHECK-NEXT:    ret void
 ;
@@ -338,18 +336,16 @@ for.end:                                          ; preds = %if.end, %entry
 define void @test4_neg(i64 %start) {
 ; CHECK-LABEL: @test4_neg(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[START:%.*]], i64 0)
-; CHECK-NEXT:    [[TMP0:%.*]] = add nuw i64 [[SMAX]], 1
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ [[START]], [[ENTRY:%.*]] ], [ [[INDVARS_IV_NEXT:%.*]], [[BACKEDGE:%.*]] ]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add i64 [[INDVARS_IV]], 1
+; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ [[START:%.*]], [[ENTRY:%.*]] ], [ [[INDVARS_IV_NEXT:%.*]], [[BACKEDGE:%.*]] ]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nsw i64 [[INDVARS_IV]], 1
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], 25
 ; CHECK-NEXT:    br i1 [[CMP]], label [[BACKEDGE]], label [[FOR_END:%.*]]
 ; CHECK:       backedge:
 ; CHECK-NEXT:    call void @foo()
-; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], [[TMP0]]
-; CHECK-NEXT:    br i1 [[EXITCOND]], label [[FOR_END]], label [[LOOP]]
+; CHECK-NEXT:    [[CMP1:%.*]] = icmp sgt i64 [[INDVARS_IV]], -1
+; CHECK-NEXT:    br i1 [[CMP1]], label [[FOR_END]], label [[LOOP]]
 ; CHECK:       for.end:
 ; CHECK-NEXT:    ret void
 ;
@@ -478,15 +474,12 @@ define void @test10() {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[PHI1:%.*]] = phi i32 [ [[PHI2:%.*]], [[LATCH:%.*]] ], [ 0, [[ENTRY:%.*]] ]
-; CHECK-NEXT:    [[DEC:%.*]] = add nuw nsw i32 [[PHI1]], -1
 ; CHECK-NEXT:    br i1 false, label [[LEFT:%.*]], label [[RIGHT:%.*]]
 ; CHECK:       left:
-; CHECK-NEXT:    br label [[LATCH]]
+; CHECK-NEXT:    br label [[LATCH:%.*]]
 ; CHECK:       right:
 ; CHECK-NEXT:    br label [[LATCH]]
 ; CHECK:       latch:
-; CHECK-NEXT:    [[PHI2]] = phi i32 [ [[PHI1]], [[LEFT]] ], [ [[DEC]], [[RIGHT]] ]
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp slt i32 -1, undef
 ; CHECK-NEXT:    br i1 true, label [[EXIT:%.*]], label [[LOOP]]
 ; CHECK:       exit:

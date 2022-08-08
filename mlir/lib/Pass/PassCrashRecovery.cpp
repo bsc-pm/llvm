@@ -9,7 +9,9 @@
 #include "PassDetail.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Dialect.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/Verifier.h"
+#include "mlir/Parser/Parser.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/FileUtilities.h"
 #include "llvm/ADT/STLExtras.h"
@@ -18,7 +20,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/CrashRecoveryContext.h"
 #include "llvm/Support/Mutex.h"
-#include "llvm/Support/Parallel.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/Threading.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -117,17 +118,16 @@ void RecoveryReproducerContext::generate(std::string &description) {
   }
   descOS << "reproducer generated at `" << stream->description() << "`";
 
-  // Output the current pass manager configuration to the crash stream.
-  auto &os = stream->os();
-  os << "// configuration: -pass-pipeline='" << pipeline << "'";
-  if (disableThreads)
-    os << " -mlir-disable-threading";
-  if (verifyPasses)
-    os << " -verify-each";
-  os << '\n';
+  AsmState state(preCrashOperation);
+  state.attachResourcePrinter(
+      "mlir_reproducer", [&](Operation *op, AsmResourceBuilder &builder) {
+        builder.buildString("pipeline", pipeline);
+        builder.buildBool("disable_threading", disableThreads);
+        builder.buildBool("verify_each", verifyPasses);
+      });
 
   // Output the .mlir module.
-  preCrashOperation->print(os);
+  preCrashOperation->print(stream->os(), state);
 }
 
 void RecoveryReproducerContext::disable() {
@@ -154,8 +154,7 @@ void RecoveryReproducerContext::crashHandler(void *) {
     context->generate(description);
 
     // Emit an error using information only available within the context.
-    context->preCrashOperation->getContext()->printOpOnDiagnostic(false);
-    context->preCrashOperation->emitError()
+    emitError(context->preCrashOperation->getLoc())
         << "A failure has been detected while processing the MLIR module:"
         << description;
   }
@@ -182,7 +181,7 @@ struct PassCrashReproducerGenerator::Impl {
 
   /// Flag indicating if reproducer generation should be localized to the
   /// failing pass.
-  bool localReproducer;
+  bool localReproducer = false;
 
   /// A record of all of the currently active reproducer contexts.
   SmallVector<std::unique_ptr<RecoveryReproducerContext>> activeContexts;
@@ -192,13 +191,13 @@ struct PassCrashReproducerGenerator::Impl {
   SetVector<std::pair<Pass *, Operation *>> runningPasses;
 
   /// Various pass manager flags that get emitted when generating a reproducer.
-  bool pmFlagVerifyPasses;
+  bool pmFlagVerifyPasses = false;
 };
 
 PassCrashReproducerGenerator::PassCrashReproducerGenerator(
     PassManager::ReproducerStreamFactory &streamFactory, bool localReproducer)
     : impl(std::make_unique<Impl>(streamFactory, localReproducer)) {}
-PassCrashReproducerGenerator::~PassCrashReproducerGenerator() {}
+PassCrashReproducerGenerator::~PassCrashReproducerGenerator() = default;
 
 void PassCrashReproducerGenerator::initialize(
     iterator_range<PassManager::pass_iterator> passes, Operation *op,
@@ -228,17 +227,17 @@ formatPassOpReproducerMessage(Diagnostic &os,
 
 void PassCrashReproducerGenerator::finalize(Operation *rootOp,
                                             LogicalResult executionResult) {
+  // Don't generate a reproducer if we have no active contexts.
+  if (impl->activeContexts.empty())
+    return;
+
   // If the pass manager execution succeeded, we don't generate any reproducers.
   if (succeeded(executionResult))
     return impl->activeContexts.clear();
 
-  MLIRContext *context = rootOp->getContext();
-  bool shouldPrintOnOp = context->shouldPrintOpOnDiagnostic();
-  context->printOpOnDiagnostic(false);
-  InFlightDiagnostic diag = rootOp->emitError()
+  InFlightDiagnostic diag = emitError(rootOp->getLoc())
                             << "Failures have been detected while "
                                "processing an MLIR pass pipeline";
-  context->printOpOnDiagnostic(shouldPrintOnOp);
 
   // If we are generating a global reproducer, we include all of the running
   // passes in the error message for the only active context.
@@ -346,25 +345,25 @@ struct CrashReproducerInstrumentation : public PassInstrumentation {
       : generator(generator) {}
   ~CrashReproducerInstrumentation() override = default;
 
-  /// A callback to run before a pass is executed.
   void runBeforePass(Pass *pass, Operation *op) override {
     if (!isa<OpToOpPassAdaptor>(pass))
       generator.prepareReproducerFor(pass, op);
   }
 
-  /// A callback to run after a pass is successfully executed. This function
-  /// takes a pointer to the pass to be executed, as well as the current
-  /// operation being operated on.
   void runAfterPass(Pass *pass, Operation *op) override {
     if (!isa<OpToOpPassAdaptor>(pass))
       generator.removeLastReproducerFor(pass, op);
+  }
+
+  void runAfterPassFailed(Pass *pass, Operation *op) override {
+    generator.finalize(op, /*executionResult=*/failure());
   }
 
 private:
   /// The generator used to create crash reproducers.
   PassCrashReproducerGenerator &generator;
 };
-} // end anonymous namespace
+} // namespace
 
 //===----------------------------------------------------------------------===//
 // FileReproducerStream
@@ -388,7 +387,7 @@ private:
   /// ToolOutputFile corresponding to opened `filename`.
   std::unique_ptr<llvm::ToolOutputFile> outputFile = nullptr;
 };
-} // end anonymous namespace
+} // namespace
 
 //===----------------------------------------------------------------------===//
 // PassManager
@@ -438,4 +437,39 @@ void PassManager::enableCrashReproducerGeneration(
       factory, genLocalReproducer);
   addInstrumentation(
       std::make_unique<CrashReproducerInstrumentation>(*crashReproGenerator));
+}
+
+//===----------------------------------------------------------------------===//
+// Asm Resource
+//===----------------------------------------------------------------------===//
+
+void mlir::attachPassReproducerAsmResource(ParserConfig &config,
+                                           PassManager &pm,
+                                           bool &enableThreading) {
+  auto parseFn = [&](AsmParsedResourceEntry &entry) -> LogicalResult {
+    if (entry.getKey() == "pipeline") {
+      FailureOr<std::string> pipeline = entry.parseAsString();
+      if (failed(pipeline))
+        return failure();
+      return parsePassPipeline(*pipeline, pm);
+    }
+    if (entry.getKey() == "disable_threading") {
+      FailureOr<bool> value = entry.parseAsBool();
+
+      // FIXME: We should just update the context directly, but some places
+      // force disable threading during parsing.
+      if (succeeded(value))
+        enableThreading = !(*value);
+      return value;
+    }
+    if (entry.getKey() == "verify_each") {
+      FailureOr<bool> value = entry.parseAsBool();
+      if (succeeded(value))
+        pm.enableVerifier(*value);
+      return value;
+    }
+    return entry.emitError() << "unknown 'mlir_reproducer' resource key '"
+                             << entry.getKey() << "'";
+  };
+  config.attachResourceParser("mlir_reproducer", parseFn);
 }

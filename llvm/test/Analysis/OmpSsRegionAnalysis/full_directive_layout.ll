@@ -1,19 +1,18 @@
-; RUN: opt -ompss-2-regions -analyze -disable-checks -enable-new-pm=0 < %s 2>&1 | FileCheck %s
 ; RUN: opt -passes='print<ompss-2-regions>' -disable-checks < %s 2>&1 | FileCheck %s
 define i32 @main() {
 entry:
   %i2 = alloca i32, align 4
   %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00") ]
   %i = alloca i32, align 4
-  store i32 0, i32* %i, align 4
-  %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 ()* @compute_lb), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 ()* @compute_ub), "QUAL.OSS.LOOP.STEP"(i32 ()* @compute_step), "QUAL.OSS.LOOP.TYPE"(i64
+  store i32 0, ptr %i, align 4
+  %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(ptr %i, i32 undef), "QUAL.OSS.LOOP.IND.VAR"(ptr %i), "QUAL.OSS.LOOP.LOWER.BOUND"(ptr @compute_lb), "QUAL.OSS.LOOP.UPPER.BOUND"(ptr @compute_ub), "QUAL.OSS.LOOP.STEP"(ptr @compute_step), "QUAL.OSS.LOOP.TYPE"(i64
 0, i64 1, i64 1, i64 1, i64 1) ]
   %2 = call i1 @llvm.directive.marker() [ "DIR.OSS"([8 x i8] c"RELEASE\00") ]
   call void @llvm.directive.region.exit(token %1)
   %3 = call i1 @llvm.directive.marker() [ "DIR.OSS"([9 x i8] c"TASKWAIT\00") ]
   call void @llvm.directive.region.exit(token %0)
-  store i32 0, i32* %i2, align 4
-  %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.PRIVATE"(i32* %i2), "QUAL.OSS.LOOP.IND.VAR"(i32* %i2), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 ()* @compute_lb.1), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 ()* @compute_ub.2), "QUAL.OSS.LOOP.STEP"(i32 ()* @compute_step.3), "QUAL.OSS.LOOP.TYPE"(i64 0, i64 1, i64 1, i64 1, i64 1) ]
+  store i32 0, ptr %i2, align 4
+  %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.PRIVATE"(ptr %i2, i32 undef), "QUAL.OSS.LOOP.IND.VAR"(ptr %i2), "QUAL.OSS.LOOP.LOWER.BOUND"(ptr @compute_lb.1), "QUAL.OSS.LOOP.UPPER.BOUND"(ptr @compute_ub.2), "QUAL.OSS.LOOP.STEP"(ptr @compute_step.3), "QUAL.OSS.LOOP.TYPE"(i64 0, i64 1, i64 1, i64 1, i64 1) ]
   call void @llvm.directive.region.exit(token %4)
   ret i32 0
 }

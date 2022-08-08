@@ -1,14 +1,21 @@
 // RUN: %clang_cc1 -verify -fompss-2 -ast-dump -ferror-limit 100 %s | FileCheck %s
 // expected-no-diagnostics
 
-void foo1(int &rx) {}
-int main() {
-    int x;
-    foo1(x);
-}
+struct S {
+    #pragma oss task in(*y)
+    void foo(int *y);
+};
 
-// CHECK: CallExpr 0x{{.*}} <line:{{.*}}:{{.*}}, col:{{.*}}> 'void'
-// CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'void (*)(int &)' <FunctionToPointerDecay>
-// CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'void (int &)' lvalue Function 0x{{.*}} 'foo1' 'void (int &)'
-// CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int' lvalue Var 0x{{.*}} 'x' 'int'
+#pragma oss task if(rx)
+void foo1(int &rx) {}
+
+// CHECK: OSSTaskDeclAttr 0x{{.*}} <line:{{.*}}:{{.*}}, col:{{.*}}> Implicit
+// CHECK: UnaryOperator 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int' lvalue prefix '*' cannot overflow
+// CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'int *' <LValueToRValue>
+// CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int *' lvalue ParmVar 0x{{.*}} 'y' 'int *'
+
+// CHECK: OSSTaskDeclAttr 0x{{.*}} <line:{{.*}}:{{.*}}, col:{{.*}}> Implicit
+// CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'bool' <IntegralToBoolean>
+// CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'int' <LValueToRValue>
+// CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int' lvalue ParmVar 0x{{.*}} 'rx' 'int &'
 

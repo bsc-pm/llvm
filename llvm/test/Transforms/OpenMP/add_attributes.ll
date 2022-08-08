@@ -626,9 +626,9 @@ declare void @__kmpc_destroy_allocator(i32, i8*)
 
 declare void @__kmpc_push_target_tripcount_mapper(%struct.ident_t*, i64, i64)
 
-declare i32 @__kmpc_warp_active_thread_mask()
+declare i64 @__kmpc_warp_active_thread_mask()
 
-declare void @__kmpc_syncwarp(i32)
+declare void @__kmpc_syncwarp(i64)
 
 declare i32 @__tgt_target_mapper(%struct.ident_t*, i64, i8*, i32, i8**, i8**, i64*, i64*, i8**, i8**)
 
@@ -773,8 +773,8 @@ attributes #0 = { noinline cold }
 ; CHECK-NOT: Function Attrs
 ; CHECK: declare dso_local void @omp_init_nest_lock_with_hint(%struct.omp_nest_lock_t*, i32)
 
-; CHECK-NOT: Function Attrs
-; CHECK: declare dso_local double @omp_get_wtime()
+; CHECK: ; Function Attrs: nounwind
+; CHECK-NEXT: declare dso_local double @omp_get_wtime()
 
 ; CHECK-NOT: Function Attrs
 ; CHECK: declare dso_local void @use_double(double)
@@ -1149,10 +1149,10 @@ attributes #0 = { noinline cold }
 ; CHECK-NEXT: declare void @__kmpc_push_target_tripcount_mapper(%struct.ident_t*, i64, i64)
 
 ; CHECK: ; Function Attrs: convergent nounwind
-; CHECK-NEXT: declare i32 @__kmpc_warp_active_thread_mask()
+; CHECK-NEXT: declare i64 @__kmpc_warp_active_thread_mask()
 
 ; CHECK: ; Function Attrs: convergent nounwind
-; CHECK-NEXT: declare void @__kmpc_syncwarp(i32)
+; CHECK-NEXT: declare void @__kmpc_syncwarp(i64)
 
 ; CHECK: ; Function Attrs: nounwind
 ; CHECK-NEXT: declare i32 @__tgt_target_mapper(%struct.ident_t*, i64, i8*, i32, i8**, i8**, i64*, i64*, i8**, i8**)
@@ -1208,7 +1208,7 @@ attributes #0 = { noinline cold }
 ; CHECK: ; Function Attrs: nounwind
 ; CHECK-NEXT: declare void @__kmpc_proxy_task_completed_ooo(i8*)
 
-; CHECK: ; Function Attrs: cold convergent nounwind
+; CHECK: ; Function Attrs: cold convergent noinline nounwind
 ; CHECK-NEXT: declare void @__kmpc_barrier_simple_spmd(%struct.ident_t* nocapture nofree readonly, i32)
 
 ; OPTIMISTIC: ; Function Attrs: inaccessiblememonly nofree nosync nounwind willreturn writeonly
@@ -1313,8 +1313,8 @@ attributes #0 = { noinline cold }
 ; OPTIMISTIC-NOT: Function Attrs
 ; OPTIMISTIC: declare dso_local void @omp_init_nest_lock_with_hint(%struct.omp_nest_lock_t*, i32)
 
-; OPTIMISTIC-NOT: Function Attrs
-; OPTIMISTIC: declare dso_local double @omp_get_wtime()
+; OPTIMISTIC: ; Function Attrs: inaccessiblememonly nofree nosync nounwind readonly willreturn
+; OPTIMISTIC-NEXT: declare dso_local double @omp_get_wtime()
 
 ; OPTIMISTIC-NOT: Function Attrs
 ; OPTIMISTIC: declare dso_local void @use_double(double)
@@ -1677,10 +1677,10 @@ attributes #0 = { noinline cold }
 ; OPTIMISTIC-NEXT: declare void @__kmpc_push_target_tripcount_mapper(%struct.ident_t*, i64, i64)
 
 ; OPTIMISTIC: ; Function Attrs: convergent nounwind
-; OPTIMISTIC-NEXT: declare i32 @__kmpc_warp_active_thread_mask()
+; OPTIMISTIC-NEXT: declare i64 @__kmpc_warp_active_thread_mask()
 
 ; OPTIMISTIC: ; Function Attrs: convergent nounwind
-; OPTIMISTIC-NEXT: declare void @__kmpc_syncwarp(i32)
+; OPTIMISTIC-NEXT: declare void @__kmpc_syncwarp(i64)
 
 ; OPTIMISTIC: ; Function Attrs: nounwind
 ; OPTIMISTIC-NEXT: declare i32 @__tgt_target_mapper(%struct.ident_t*, i64, i8*, i32, i8**, i8**, i64*, i64*, i8**, i8**)
@@ -1736,7 +1736,7 @@ attributes #0 = { noinline cold }
 ; OPTIMISTIC: ; Function Attrs: nofree nosync nounwind willreturn
 ; OPTIMISTIC-NEXT: declare void @__kmpc_proxy_task_completed_ooo(i8*)
 
-; OPTIMISTIC: ; Function Attrs: cold convergent nounwind 
+; OPTIMISTIC: ; Function Attrs: cold convergent noinline nounwind
 ; OPTIMISTIC-NEXT: declare void @__kmpc_barrier_simple_spmd(%struct.ident_t* nocapture nofree readonly, i32)
 
 !llvm.module.flags = !{!0}

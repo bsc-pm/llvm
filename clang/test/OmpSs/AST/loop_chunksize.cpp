@@ -45,7 +45,7 @@ void bar(int n) {
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int' <LValueToRValue>
 // CHECK-NEXT: ArraySubscriptExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int' lvalue
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'int *' <ArrayToPointerDecay>
-// CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int [n]' lvalue Var 0x{{.*}} 'vla' 'int [n]'
+// CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int[n]' lvalue Var 0x{{.*}} 'vla' 'int[n]'
 // CHECK-NEXT: IntegerLiteral 0x{{.*}} <col:{{.*}}> 'int' 1
 
 // CHECK: OSSTaskLoopForDirective 0x{{.*}} <line:{{.*}}:{{.*}}, <invalid sloc>> ompss-2
@@ -53,5 +53,5 @@ void bar(int n) {
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int' <LValueToRValue>
 // CHECK-NEXT: ArraySubscriptExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int' lvalue
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'int *' <ArrayToPointerDecay>
-// CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int [n]' lvalue Var 0x{{.*}} 'vla' 'int [n]'
+// CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int[n]' lvalue Var 0x{{.*}} 'vla' 'int[n]'
 // CHECK-NEXT: IntegerLiteral 0x{{.*}} <col:{{.*}}> 'int' 1

@@ -1,9 +1,10 @@
 add_mlir_unittest(MLIRIRTests
   AttributeTest.cpp
   DialectTest.cpp
+  InterfaceTest.cpp
   InterfaceAttachmentTest.cpp
-  MemRefTypeTest.cpp
   OperationSupportTest.cpp
+  PatternMatchTest.cpp
   ShapedTypeTest.cpp
   SubElementInterfaceTest.cpp
 

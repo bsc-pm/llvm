@@ -12,6 +12,10 @@ void task_priority();
 void task_wait();
 #pragma oss task label("L1") label("L2") // expected-error {{directive '#pragma oss task' cannot contain more than one 'label' clause}}
 void task_label();
+#pragma oss task device(smp) device(cuda) // expected-error {{directive '#pragma oss task' cannot contain more than one 'device' clause}}
+void task_label();
+#pragma oss task ndrange(1,1,1) ndrange(1,1,1) // expected-error {{directive '#pragma oss task' cannot contain more than one 'ndrange' clause}}
+void task_label();
 
 void bar() {
   #pragma oss task if(1) if(0) // expected-error {{directive '#pragma oss task' cannot contain more than one 'if' clause}}
@@ -30,4 +34,8 @@ void bar() {
   for (int i = 0; i < 10; ++i) {}
   #pragma oss taskloop for grainsize(0) grainsize(0) // expected-error {{directive '#pragma oss taskloop for' cannot contain more than one 'grainsize' clause}}
   for (int i = 0; i < 10; ++i) {}
+  // TODO: collapse is specia because it's preparsed
+  // #pragma oss taskloop for collapse(2) grainsize(2)
+  // for (int i = 0; i < 10; ++i)
+  //     for (int j = 0; j < 10; ++j) {}
 }

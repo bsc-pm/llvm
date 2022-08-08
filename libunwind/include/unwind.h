@@ -1,4 +1,4 @@
-//===------------------------------- unwind.h -----------------------------===//
+//===----------------------------------------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -64,7 +64,7 @@ typedef struct _Unwind_Context _Unwind_Context;   // opaque
 typedef _Unwind_Reason_Code (*_Unwind_Stop_Fn)
     (int version,
      _Unwind_Action actions,
-     uint64_t exceptionClass,
+     _Unwind_Exception_Class exceptionClass,
      _Unwind_Exception* exceptionObject,
      struct _Unwind_Context* context,
      void* stop_parameter);
@@ -160,7 +160,7 @@ extern const void *_Unwind_Find_FDE(const void *pc, struct dwarf_eh_bases *);
 extern void *_Unwind_FindEnclosingFunction(void *pc);
 
 // Mac OS X does not support text-rel and data-rel addressing so these functions
-// are unimplemented
+// are unimplemented.
 extern uintptr_t _Unwind_GetDataRelBase(struct _Unwind_Context *context)
     LIBUNWIND_UNAVAIL;
 extern uintptr_t _Unwind_GetTextRelBase(struct _Unwind_Context *context)

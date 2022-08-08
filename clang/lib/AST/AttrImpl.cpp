@@ -60,7 +60,7 @@ std::string LoopHintAttr::getValueString(const PrintingPolicy &Policy) const {
   else
     OS << "disable";
   OS << ")";
-  return OS.str();
+  return ValueName;
 }
 
 // Return a string suitable for identifying this attribute in diagnostics.
@@ -149,6 +149,7 @@ void OSSTaskDeclAttr::printPrettyPragma(
       OS << ")";
     }
   };
+  l("label", "(", labelExprs_size(), labelExprs_begin(), labelExprs_end(), OS, Policy);
   l("in", "(", ins_size(), ins_begin(), ins_end(), OS, Policy);
   l("out", "(", outs_size(), outs_begin(), outs_end(), OS, Policy);
   l("inout", "(", inouts_size(), inouts_begin(), inouts_end(), OS, Policy);
@@ -169,6 +170,7 @@ void OSSTaskDeclAttr::printPrettyPragma(
   l("depend(weak, inout", ":", depWeakInouts_size(), depWeakInouts_begin(), depWeakInouts_end(), OS, Policy);
   l("depend(weak, inoutset", ":", depWeakConcurrents_size(), depWeakConcurrents_begin(), depWeakConcurrents_end(), OS, Policy);
   l("depend(weak, mutexinoutset", ":", depWeakCommutatives_size(), depWeakCommutatives_begin(), depWeakCommutatives_end(), OS, Policy);
+  l("ndrange", "(", ndranges_size(), ndranges_begin(), ndranges_end(), OS, Policy);
   if (auto *E = getIfExpr()) {
     OS << " if(";
     E->printPretty(OS, nullptr, Policy);
@@ -189,16 +191,16 @@ void OSSTaskDeclAttr::printPrettyPragma(
     E->printPretty(OS, nullptr, Policy);
     OS << ")";
   }
-  if (auto *E = getLabelExpr()) {
-    OS << " label(";
-    E->printPretty(OS, nullptr, Policy);
-    OS << ")";
-  }
   if (getWait())
       OS << " wait";
   if (auto *E = getOnreadyExpr()) {
     OS << " onready(";
     E->printPretty(OS, nullptr, Policy);
+    OS << ")";
+  }
+  if (getDevice() != DeviceType::Unknown) {
+    OS << " device(";
+    OS << ConvertDeviceTypeToStr(getDevice());
     OS << ")";
   }
 }
@@ -210,6 +212,13 @@ void OMPDeclareTargetDeclAttr::printPrettyPragma(
     OS << " device_type(" << ConvertDevTypeTyToStr(getDevType()) << ")";
   if (getMapType() != MT_To)
     OS << ' ' << ConvertMapTypeTyToStr(getMapType());
+  if (Expr *E = getIndirectExpr()) {
+    OS << " indirect(";
+    E->printPretty(OS, nullptr, Policy);
+    OS << ")";
+  } else if (getIndirect()) {
+    OS << " indirect";
+  }
 }
 
 llvm::Optional<OMPDeclareTargetDeclAttr *>
@@ -232,24 +241,24 @@ OMPDeclareTargetDeclAttr::getActiveAttr(const ValueDecl *VD) {
 llvm::Optional<OMPDeclareTargetDeclAttr::MapTypeTy>
 OMPDeclareTargetDeclAttr::isDeclareTargetDeclaration(const ValueDecl *VD) {
   llvm::Optional<OMPDeclareTargetDeclAttr *> ActiveAttr = getActiveAttr(VD);
-  if (ActiveAttr.hasValue())
-    return ActiveAttr.getValue()->getMapType();
+  if (ActiveAttr)
+    return ActiveAttr.value()->getMapType();
   return llvm::None;
 }
 
 llvm::Optional<OMPDeclareTargetDeclAttr::DevTypeTy>
 OMPDeclareTargetDeclAttr::getDeviceType(const ValueDecl *VD) {
   llvm::Optional<OMPDeclareTargetDeclAttr *> ActiveAttr = getActiveAttr(VD);
-  if (ActiveAttr.hasValue())
-    return ActiveAttr.getValue()->getDevType();
+  if (ActiveAttr)
+    return ActiveAttr.value()->getDevType();
   return llvm::None;
 }
 
 llvm::Optional<SourceLocation>
 OMPDeclareTargetDeclAttr::getLocation(const ValueDecl *VD) {
   llvm::Optional<OMPDeclareTargetDeclAttr *> ActiveAttr = getActiveAttr(VD);
-  if (ActiveAttr.hasValue())
-    return ActiveAttr.getValue()->getRange().getBegin();
+  if (ActiveAttr)
+    return ActiveAttr.value()->getRange().getBegin();
   return llvm::None;
 }
 
@@ -266,6 +275,40 @@ void OMPDeclareVariantAttr::printPrettyPragma(
     OS << ")";
   }
   OS << " match(" << traitInfos << ")";
+
+  auto PrintExprs = [&OS, &Policy](Expr **Begin, Expr **End) {
+    for (Expr **I = Begin; I != End; ++I) {
+      assert(*I && "Expected non-null Stmt");
+      if (I != Begin)
+        OS << ",";
+      (*I)->printPretty(OS, nullptr, Policy);
+    }
+  };
+  if (adjustArgsNothing_size()) {
+    OS << " adjust_args(nothing:";
+    PrintExprs(adjustArgsNothing_begin(), adjustArgsNothing_end());
+    OS << ")";
+  }
+  if (adjustArgsNeedDevicePtr_size()) {
+    OS << " adjust_args(need_device_ptr:";
+    PrintExprs(adjustArgsNeedDevicePtr_begin(), adjustArgsNeedDevicePtr_end());
+    OS << ")";
+  }
+
+  auto PrintInteropTypes = [&OS](InteropType *Begin, InteropType *End) {
+    for (InteropType *I = Begin; I != End; ++I) {
+      if (I != Begin)
+        OS << ", ";
+      OS << "interop(";
+      OS << ConvertInteropTypeToStr(*I);
+      OS << ")";
+    }
+  };
+  if (appendArgs_size()) {
+    OS << " append_args(";
+    PrintInteropTypes(appendArgs_begin(), appendArgs_end());
+    OS << ")";
+  }
 }
 
 #include "clang/AST/AttrImpl.inc"

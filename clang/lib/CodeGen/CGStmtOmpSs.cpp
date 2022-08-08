@@ -151,18 +151,24 @@ static void AddPriorityData(const OSSExecutableDirective &S, const Expr * &Prior
   }
 }
 
-static void AddLabelData(const OSSExecutableDirective &S, const Expr * &LabelExpr) {
+static void AddLabelData(
+    const OSSExecutableDirective &S, SmallVectorImpl<const Expr *> &Labels) {
   bool Found = false;
   for (const auto *C : S.getClausesOfKind<OSSLabelClause>()) {
     assert(!Found);
     Found = true;
-    LabelExpr = C->getExpression();
+    Labels.append(C->varlist_begin(), C->varlist_end());
   }
 }
 
 static void AddWaitData(const OSSExecutableDirective &S, bool &Wait) {
   assert(!Wait);
   Wait = !llvm::empty(S.getClausesOfKind<OSSWaitClause>());
+}
+
+static void AddUpdateLoopData(const OSSExecutableDirective &S, bool &Update) {
+  assert(!Update);
+  Update = !llvm::empty(S.getClausesOfKind<OSSUpdateClause>());
 }
 
 static void AddOnreadyData(const OSSExecutableDirective &S, const Expr * &OnreadyExpr) {
@@ -194,6 +200,17 @@ static void AddReductionData(const OSSExecutableDirective &S, OSSTaskReductionDa
   }
 }
 
+static void AddDeviceData(const OSSExecutableDirective &S, OSSTaskDeviceDataTy &Devices) {
+  bool Found = false;
+  for (const auto *C : S.getClausesOfKind<OSSDeviceClause>()) {
+    assert(!Found);
+    Found = true;
+    Devices.DvKind = C->getDeviceKind();
+  }
+  if (!llvm::empty(S.getClausesOfKind<OSSNdrangeClause>()))
+    llvm_unreachable("Ndrange is not supported in inline constructs");
+}
+
 // Convenience function to add all info from a task directive
 static void AddTaskData(const OSSExecutableDirective &S, OSSTaskDataTy &TaskData) {
   AddDSAData(S, TaskData.DSAs);
@@ -202,10 +219,11 @@ static void AddTaskData(const OSSExecutableDirective &S, OSSTaskDataTy &TaskData
   AddFinalData(S, TaskData.Final);
   AddCostData(S, TaskData.Cost);
   AddPriorityData(S, TaskData.Priority);
-  AddLabelData(S, TaskData.Label);
+  AddLabelData(S, TaskData.Labels);
   AddWaitData(S, TaskData.Wait);
   AddOnreadyData(S, TaskData.Onready);
   AddReductionData(S, TaskData.Reductions);
+  AddDeviceData(S, TaskData.Devices);
 }
 
 static void AddChunksizeLoopData(const OSSLoopDirective &S, const Expr * &ChunksizeExpr) {
@@ -226,6 +244,15 @@ static void AddGrainsizeLoopData(const OSSLoopDirective &S, const Expr * &Grains
   }
 }
 
+static void AddUnrollLoopData(const OSSLoopDirective &S, const Expr * &UnrollExpr) {
+  bool Found = false;
+  for (const auto *C : S.getClausesOfKind<OSSUnrollClause>()) {
+    assert(!Found);
+    Found = true;
+    UnrollExpr = C->getExpression();
+  }
+}
+
 // Convenience function to add all info from a loop directive
 static void AddLoopData(const OSSLoopDirective &S, OSSLoopDataTy &LoopData) {
   LoopData.IndVar = S.getIterationVariable();
@@ -237,6 +264,8 @@ static void AddLoopData(const OSSLoopDirective &S, OSSLoopDataTy &LoopData) {
   LoopData.NumCollapses = S.getNumCollapses();
   AddChunksizeLoopData(S, LoopData.Chunksize);
   AddGrainsizeLoopData(S, LoopData.Grainsize);
+  AddUnrollLoopData(S, LoopData.Unroll);
+  AddUpdateLoopData(S, LoopData.Update);
 }
 
 void CodeGenFunction::EmitOSSTaskwaitDirective(const OSSTaskwaitDirective &S) {
@@ -263,6 +292,16 @@ void CodeGenFunction::EmitOSSTaskDirective(const OSSTaskDirective &S) {
 }
 
 void CodeGenFunction::EmitOSSTaskForDirective(const OSSTaskForDirective &S) {
+  OSSTaskDataTy Data;
+  OSSLoopDataTy LoopData;
+
+  AddTaskData(S, Data);
+  AddLoopData(S, LoopData);
+
+  CGM.getOmpSsRuntime().emitLoopCall(*this, S, S.getBeginLoc(), Data, LoopData);
+}
+
+void CodeGenFunction::EmitOSSTaskIterDirective(const OSSTaskIterDirective &S) {
   OSSTaskDataTy Data;
   OSSLoopDataTy LoopData;
 

@@ -271,6 +271,18 @@ then
  fi
  info "Using split DWARF because we are using clang"
  CMAKE_INVOCATION_EXTRA_FLAGS+=(-DLLVM_USE_SPLIT_DWARF=ON)
+
+ CLANG_BINDIR="$(dirname ${CC})"
+ if [ -x "${CLANG_BINDIR}/llvm-ar" ];
+ then
+   LLVM_AR="${CLANG_BINDIR}/llvm-ar"
+   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_AR=${LLVM_AR}")
+ fi
+ if [ -x "${CLANG_BINDIR}/llvm-ranlib" ];
+ then
+   LLVM_RANLIB="${CLANG_BINDIR}/llvm-ranlib"
+   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_RANLIB=${LLVM_RANLIB}")
+ fi
 else
   info "Using GNU ld because we are using gcc"
 fi
@@ -353,6 +365,9 @@ fi
 ################################################################################
 
 LIT_ARGS="-DLLVM_LIT_ARGS=-sv --xunit-xml-output=xunit.xml"
+# This flag has stopped working due to psutil module missing in some machines.
+# We could enable it depending on the maching though 
+# LIT_ARGS+=" --timeout=300"
 
 if [ -n "${LLVM_LIT_THREADS}" ];
 then
@@ -444,12 +459,14 @@ fi
 info "Running cmake..."
 run cmake -G "${BUILD_SYSTEM}" ${SRCDIR}/llvm \
    -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} \
+   -DCLANG_DEFAULT_PIE_ON_LINUX=OFF \
    ${LLVM_ENABLE_PROJECTS} \
    -DLLVM_ENABLE_RUNTIMES="${EXTRA_RUNTIMES}" \
    -DOPENMP_LLVM_LIT_EXECUTABLE="$(pwd)/bin/llvm-lit" \
    -DOPENMP_FILECHECK_EXECUTABLE="$(pwd)/bin/FileCheck" \
    -DOPENMP_NOT_EXECUTABLE="$(pwd)/bin/not" \
    -DOPENMP_LIT_ARGS="-sv --xunit-xml-output=xunit.xml" \
+   -DLIBOMP_OMPD_SUPPORT=OFF \
    -DLLVM_INSTALL_UTILS=ON \
    -DLLVM_ENABLE_ASSERTIONS=ON \
    -DLLVM_ENABLE_BINDINGS=OFF \

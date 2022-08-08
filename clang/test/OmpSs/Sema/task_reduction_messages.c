@@ -3,7 +3,7 @@
 int incomplete[];
 
 void test() {
-#pragma oss task reduction(+ : incomplete) // expected-error {{expression has incomplete type 'int []'}}
+#pragma oss task reduction(+ : incomplete) // expected-error {{expression has incomplete type 'int[]'}}
   ;
 }
 

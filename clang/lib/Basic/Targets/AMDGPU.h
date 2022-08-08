@@ -353,6 +353,8 @@ public:
 
   LangAS getCUDABuiltinAddressSpace(unsigned AS) const override {
     switch (AS) {
+    case 0:
+      return LangAS::Default;
     case 1:
       return LangAS::cuda_device;
     case 3:
@@ -366,6 +368,17 @@ public:
 
   llvm::Optional<LangAS> getConstantAddressSpace() const override {
     return getLangASFromTargetAS(Constant);
+  }
+
+  const llvm::omp::GV &getGridValue() const override {
+    switch (WavefrontSize) {
+    case 32:
+      return llvm::omp::getAMDGPUGridValues<32>();
+    case 64:
+      return llvm::omp::getAMDGPUGridValues<64>();
+    default:
+      llvm_unreachable("getGridValue not implemented for this wavesize");
+    }
   }
 
   /// \returns Target specific vtbl ptr address space.
@@ -398,6 +411,7 @@ public:
       return CCCR_Warning;
     case CC_C:
     case CC_OpenCLKernel:
+    case CC_AMDGPUKernelCall:
       return CCCR_OK;
     }
   }
@@ -413,7 +427,7 @@ public:
 
   void setAuxTarget(const TargetInfo *Aux) override;
 
-  bool hasExtIntType() const override { return true; }
+  bool hasBitIntType() const override { return true; }
 
   // Record offload arch features since they are needed for defining the
   // pre-defined macros.
@@ -421,17 +435,17 @@ public:
                             DiagnosticsEngine &Diags) override {
     auto TargetIDFeatures =
         getAllPossibleTargetIDFeatures(getTriple(), getArchNameAMDGCN(GPUKind));
-    llvm::for_each(Features, [&](const auto &F) {
+    for (const auto &F : Features) {
       assert(F.front() == '+' || F.front() == '-');
       if (F == "+wavefrontsize64")
         WavefrontSize = 64;
       bool IsOn = F.front() == '+';
       StringRef Name = StringRef(F).drop_front();
-      if (llvm::find(TargetIDFeatures, Name) == TargetIDFeatures.end())
-        return;
+      if (!llvm::is_contained(TargetIDFeatures, Name))
+        continue;
       assert(OffloadArchFeatures.find(Name) == OffloadArchFeatures.end());
       OffloadArchFeatures[Name] = IsOn;
-    });
+    }
     return true;
   }
 

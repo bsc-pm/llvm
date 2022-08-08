@@ -20,7 +20,7 @@ int main() {
 // CHECK: OSSMultiDepExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int' lvalue
 // CHECK-NEXT: ArraySubscriptExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int' lvalue
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'int *' <ArrayToPointerDecay>
-// CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int [10]' lvalue Var 0x{{.*}} 'v' 'int [10]'
+// CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int[10]' lvalue Var 0x{{.*}} 'v' 'int[10]'
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'int' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int' lvalue Var 0x{{.*}} 'i' 'int'
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int' lvalue Var 0x{{.*}} 'i' 'int'
@@ -37,7 +37,7 @@ int main() {
 // CHECK: OSSMultiDepExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int' lvalue
 // CHECK-NEXT: ArraySubscriptExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int' lvalue
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'int *' <ArrayToPointerDecay>
-// CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int [10]' lvalue Var 0x{{.*}} 'v' 'int [10]'
+// CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int[10]' lvalue Var 0x{{.*}} 'v' 'int[10]'
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'int' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int' lvalue Var 0x{{.*}} 'i' 'int'
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int' lvalue Var 0x{{.*}} 'i' 'int'
@@ -66,11 +66,11 @@ int main() {
 // CHECK: OSSMultiDepExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int' lvalue
 // CHECK-NEXT: ArraySubscriptExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int' lvalue
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'int *' <ArrayToPointerDecay>
-// CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int [10]' lvalue Var 0x{{.*}} 'v' 'int [10]'
+// CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int[10]' lvalue Var 0x{{.*}} 'v' 'int[10]'
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'int' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int' lvalue Var 0x{{.*}} 'i' 'int'
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int' lvalue Var 0x{{.*}} 'i' 'int'
-// CHECK-NEXT: InitListExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int [3]'
+// CHECK-NEXT: InitListExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int[3]'
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'int' <IntegralCast>
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'short' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'short' lvalue Var 0x{{.*}} 'lb' 'short'
@@ -86,16 +86,16 @@ int main() {
 // CHECK: OSSMultiDepExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int' lvalue
 // CHECK-NEXT: ArraySubscriptExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int' lvalue
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int *' <ArrayToPointerDecay>
-// CHECK-NEXT: ArraySubscriptExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int [10]' lvalue
+// CHECK-NEXT: ArraySubscriptExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int[10]' lvalue
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'int (*)[10]' <ArrayToPointerDecay>
-// CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int [10][10]' lvalue Var 0x{{.*}} 'M' 'int [10][10]'
+// CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int[10][10]' lvalue Var 0x{{.*}} 'M' 'int[10][10]'
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'int' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int' lvalue Var 0x{{.*}} 'i' 'int'
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'int' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int' lvalue Var 0x{{.*}} 'j' 'int'
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int' lvalue Var 0x{{.*}} 'i' 'int'
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int' lvalue Var 0x{{.*}} 'j' 'int'
-// CHECK-NEXT: InitListExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int [3]'
+// CHECK-NEXT: InitListExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int[3]'
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'int' <IntegralCast>
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'short' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'short' lvalue Var 0x{{.*}} 'lb' 'short'
@@ -105,7 +105,7 @@ int main() {
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'int' <IntegralCast>
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'short' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'short' lvalue Var 0x{{.*}} 'step' 'short'
-// CHECK-NEXT: InitListExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int [1]'
+// CHECK-NEXT: InitListExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int[1]'
 // CHECK-NEXT: BinaryOperator 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int' '+'
 // CHECK-NEXT: BinaryOperator 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int' '+'
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'int' <IntegralCast>

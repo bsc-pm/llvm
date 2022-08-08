@@ -25,6 +25,7 @@
 #include "lldb/Target/Target.h"
 #include "lldb/Target/Thread.h"
 #include "lldb/Utility/DataBuffer.h"
+#include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/Log.h"
 #include "lldb/Utility/State.h"
 
@@ -48,12 +49,7 @@ using namespace lldb_private;
 
 LLDB_PLUGIN_DEFINE(ProcessMachCore)
 
-ConstString ProcessMachCore::GetPluginNameStatic() {
-  static ConstString g_name("mach-o-core");
-  return g_name;
-}
-
-const char *ProcessMachCore::GetPluginDescriptionStatic() {
+llvm::StringRef ProcessMachCore::GetPluginDescriptionStatic() {
   return "Mach-O core file debugging plug-in.";
 }
 
@@ -116,7 +112,7 @@ ProcessMachCore::ProcessMachCore(lldb::TargetSP target_sp,
     : PostMortemProcess(target_sp, listener_sp), m_core_aranges(),
       m_core_range_infos(), m_core_module_sp(), m_core_file(core_file),
       m_dyld_addr(LLDB_INVALID_ADDRESS),
-      m_mach_kernel_addr(LLDB_INVALID_ADDRESS), m_dyld_plugin_name() {}
+      m_mach_kernel_addr(LLDB_INVALID_ADDRESS) {}
 
 // Destructor
 ProcessMachCore::~ProcessMachCore() {
@@ -128,14 +124,8 @@ ProcessMachCore::~ProcessMachCore() {
   Finalize();
 }
 
-// PluginInterface
-ConstString ProcessMachCore::GetPluginName() { return GetPluginNameStatic(); }
-
-uint32_t ProcessMachCore::GetPluginVersion() { return 1; }
-
 bool ProcessMachCore::GetDynamicLoaderAddress(lldb::addr_t addr) {
-  Log *log(lldb_private::GetLogIfAnyCategoriesSet(LIBLLDB_LOG_DYNAMIC_LOADER |
-                                                  LIBLLDB_LOG_PROCESS));
+  Log *log(GetLog(LLDBLog::DynamicLoader | LLDBLog::Process));
   llvm::MachO::mach_header header;
   Status error;
   if (DoReadMemory(addr, &header, sizeof(header), error) != sizeof(header))
@@ -190,63 +180,9 @@ bool ProcessMachCore::GetDynamicLoaderAddress(lldb::addr_t addr) {
   return false;
 }
 
-// We have a hint about a binary -- a UUID, possibly a load address.
-// Try to load a file with that UUID into lldb, and if we have a load
-// address, set it correctly.  Else assume that the binary was loaded
-// with no slide.
-static bool load_standalone_binary(UUID uuid, addr_t addr, Target &target) {
-  if (uuid.IsValid()) {
-    ModuleSpec module_spec;
-    module_spec.GetUUID() = uuid;
-
-    // Look up UUID in global module cache before attempting
-    // dsymForUUID-like action.
-    ModuleSP module_sp;
-    Status error = ModuleList::GetSharedModule(module_spec, module_sp, nullptr,
-                                               nullptr, nullptr);
-
-    if (!module_sp.get()) {
-      // Force a a dsymForUUID lookup, if that tool is available.
-      if (!module_spec.GetSymbolFileSpec())
-        Symbols::DownloadObjectAndSymbolFile(module_spec, true);
-
-      if (FileSystem::Instance().Exists(module_spec.GetFileSpec())) {
-        module_sp = std::make_shared<Module>(module_spec);
-      }
-    }
-
-    if (module_sp.get() && module_sp->GetObjectFile()) {
-      target.SetArchitecture(module_sp->GetObjectFile()->GetArchitecture());
-      target.GetImages().AppendIfNeeded(module_sp, false);
-
-      Address base_addr = module_sp->GetObjectFile()->GetBaseAddress();
-      addr_t slide = 0;
-      if (addr != LLDB_INVALID_ADDRESS && base_addr.IsValid()) {
-        addr_t file_load_addr = base_addr.GetFileAddress();
-        slide = addr - file_load_addr;
-      }
-      bool changed = false;
-      module_sp->SetLoadAddress(target, slide, true, changed);
-
-      ModuleList added_module;
-      added_module.Append(module_sp, false);
-      target.ModulesDidLoad(added_module);
-
-      // Flush info in the process (stack frames, etc).
-      ProcessSP process_sp(target.GetProcessSP());
-      if (process_sp)
-        process_sp->Flush();
-
-      return true;
-    }
-  }
-  return false;
-}
-
 // Process Control
 Status ProcessMachCore::DoLoadCore() {
-  Log *log(lldb_private::GetLogIfAnyCategoriesSet(LIBLLDB_LOG_DYNAMIC_LOADER |
-                                                  LIBLLDB_LOG_PROCESS));
+  Log *log(GetLog(LLDBLog::DynamicLoader | LLDBLog::Process));
   Status error;
   if (!m_core_module_sp) {
     error.SetErrorString("invalid core module");
@@ -289,7 +225,7 @@ Status ProcessMachCore::DoLoadCore() {
   addr_t vm_addr = 0;
   for (uint32_t i = 0; i < num_sections; ++i) {
     Section *section = section_list->GetSectionAtIndex(i).get();
-    if (section) {
+    if (section && section->GetFileSize() > 0) {
       lldb::addr_t section_vm_addr = section->GetFileAddress();
       FileRange file_range(section->GetFileOffset(), section->GetFileSize());
       VMRangeToFileOffset::Entry range_entry(
@@ -299,20 +235,12 @@ Status ProcessMachCore::DoLoadCore() {
         ranges_are_sorted = false;
       vm_addr = section->GetFileAddress();
       VMRangeToFileOffset::Entry *last_entry = m_core_aranges.Back();
-      //            printf ("LC_SEGMENT[%u] arange=[0x%16.16" PRIx64 " -
-      //            0x%16.16" PRIx64 "), frange=[0x%8.8x - 0x%8.8x)\n",
-      //                    i,
-      //                    range_entry.GetRangeBase(),
-      //                    range_entry.GetRangeEnd(),
-      //                    range_entry.data.GetRangeBase(),
-      //                    range_entry.data.GetRangeEnd());
 
       if (last_entry &&
           last_entry->GetRangeEnd() == range_entry.GetRangeBase() &&
           last_entry->data.GetRangeEnd() == range_entry.data.GetRangeBase()) {
         last_entry->SetRangeEnd(range_entry.GetRangeEnd());
         last_entry->data.SetRangeEnd(range_entry.data.GetRangeEnd());
-        // puts("combine");
       } else {
         m_core_aranges.Append(range_entry);
       }
@@ -334,36 +262,36 @@ Status ProcessMachCore::DoLoadCore() {
 
   bool found_main_binary_definitively = false;
 
-  addr_t objfile_binary_addr;
+  addr_t objfile_binary_value;
+  bool objfile_binary_value_is_offset;
   UUID objfile_binary_uuid;
   ObjectFile::BinaryType type;
-  if (core_objfile->GetCorefileMainBinaryInfo(objfile_binary_addr,
+  if (core_objfile->GetCorefileMainBinaryInfo(objfile_binary_value,
+                                              objfile_binary_value_is_offset,
                                               objfile_binary_uuid, type)) {
     if (log) {
       log->Printf(
           "ProcessMachCore::DoLoadCore: using binary hint from 'main bin spec' "
-          "LC_NOTE with UUID %s address 0x%" PRIx64 " and type %d",
-          objfile_binary_uuid.GetAsString().c_str(), objfile_binary_addr, type);
+          "LC_NOTE with UUID %s value 0x%" PRIx64
+          " value is offset %d and type %d",
+          objfile_binary_uuid.GetAsString().c_str(), objfile_binary_value,
+          objfile_binary_value_is_offset, type);
     }
-    if (objfile_binary_addr != LLDB_INVALID_ADDRESS) {
-      if (type == ObjectFile::eBinaryTypeUser) {
-        m_dyld_addr = objfile_binary_addr;
-        m_dyld_plugin_name = DynamicLoaderMacOSXDYLD::GetPluginNameStatic();
-        found_main_binary_definitively = true;
-      }
-      if (type == ObjectFile::eBinaryTypeKernel) {
-        m_mach_kernel_addr = objfile_binary_addr;
-        m_dyld_plugin_name = DynamicLoaderDarwinKernel::GetPluginNameStatic();
-        found_main_binary_definitively = true;
-      }
+    const bool force_symbol_search = true;
+    const bool notify = true;
+    if (DynamicLoader::LoadBinaryWithUUIDAndAddress(
+            this, objfile_binary_uuid, objfile_binary_value,
+            objfile_binary_value_is_offset, force_symbol_search, notify)) {
+      found_main_binary_definitively = true;
+      m_dyld_plugin_name = DynamicLoaderStatic::GetPluginNameStatic();
     }
-    if (!found_main_binary_definitively) {
-      // ObjectFile::eBinaryTypeStandalone, undeclared types
-      if (load_standalone_binary(objfile_binary_uuid, objfile_binary_addr,
-                                 GetTarget())) {
-        found_main_binary_definitively = true;
-        m_dyld_plugin_name = DynamicLoaderStatic::GetPluginNameStatic();
-      }
+    if (type == ObjectFile::eBinaryTypeUser) {
+      m_dyld_addr = objfile_binary_value;
+      m_dyld_plugin_name = DynamicLoaderMacOSXDYLD::GetPluginNameStatic();
+    }
+    if (type == ObjectFile::eBinaryTypeKernel) {
+      m_mach_kernel_addr = objfile_binary_value;
+      m_dyld_plugin_name = DynamicLoaderDarwinKernel::GetPluginNameStatic();
     }
   }
 
@@ -406,17 +334,24 @@ Status ProcessMachCore::DoLoadCore() {
       m_mach_kernel_addr = ident_binary_addr;
       found_main_binary_definitively = true;
     } else if (ident_uuid.IsValid()) {
-      if (load_standalone_binary(ident_uuid, ident_binary_addr, GetTarget())) {
+      // We have no address specified, only a UUID.  Load it at the file
+      // address.
+      const bool value_is_offset = false;
+      const bool force_symbol_search = true;
+      const bool notify = true;
+      if (DynamicLoader::LoadBinaryWithUUIDAndAddress(
+              this, ident_uuid, ident_binary_addr, value_is_offset,
+              force_symbol_search, notify)) {
         found_main_binary_definitively = true;
         m_dyld_plugin_name = DynamicLoaderStatic::GetPluginNameStatic();
       }
     }
   }
 
+  bool did_load_extra_binaries = core_objfile->LoadCoreFileImages(*this);
   // If we have a "all image infos" LC_NOTE, try to load all of the
   // binaries listed, and set their Section load addresses in the Target.
-  if (found_main_binary_definitively == false &&
-      core_objfile->LoadCoreFileImages(*this)) {
+  if (found_main_binary_definitively == false && did_load_extra_binaries) {
     m_dyld_plugin_name = DynamicLoaderDarwinKernel::GetPluginNameStatic();
     found_main_binary_definitively = true;
   }
@@ -481,7 +416,7 @@ Status ProcessMachCore::DoLoadCore() {
     }
   }
 
-  if (m_dyld_plugin_name.IsEmpty()) {
+  if (m_dyld_plugin_name.empty()) {
     // If we found both a user-process dyld and a kernel binary, we need to
     // decide which to prefer.
     if (GetCorefilePreference() == eKernelCorefile) {
@@ -551,9 +486,7 @@ Status ProcessMachCore::DoLoadCore() {
 
 lldb_private::DynamicLoader *ProcessMachCore::GetDynamicLoader() {
   if (m_dyld_up.get() == nullptr)
-    m_dyld_up.reset(DynamicLoader::FindPlugin(
-        this, m_dyld_plugin_name.IsEmpty() ? nullptr
-                                           : m_dyld_plugin_name.GetCString()));
+    m_dyld_up.reset(DynamicLoader::FindPlugin(this, m_dyld_plugin_name));
   return m_dyld_up.get();
 }
 
@@ -653,8 +586,8 @@ size_t ProcessMachCore::DoReadMemory(addr_t addr, void *buf, size_t size,
   return bytes_read;
 }
 
-Status ProcessMachCore::GetMemoryRegionInfo(addr_t load_addr,
-                                            MemoryRegionInfo &region_info) {
+Status ProcessMachCore::DoGetMemoryRegionInfo(addr_t load_addr,
+                                              MemoryRegionInfo &region_info) {
   region_info.Clear();
   const VMRangeToPermissions::Entry *permission_entry =
       m_core_range_infos.FindEntryThatContainsOrFollows(load_addr);

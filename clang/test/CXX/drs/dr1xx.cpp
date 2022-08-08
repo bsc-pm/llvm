@@ -370,13 +370,10 @@ namespace dr128 { // dr128: yes
 // dr129: dup 616
 // dr130: na
 
-namespace dr131 { // dr131: yes
+namespace dr131 { // dr131: sup P1949
   const char *a_with_\u0e8c = "\u0e8c";
   const char *b_with_\u0e8d = "\u0e8d";
   const char *c_with_\u0e8e = "\u0e8e";
-#if __cplusplus < 201103L
-  // expected-error@-4 {{expected ';'}} expected-error@-2 {{expected ';'}}
-#endif
 }
 
 namespace dr132 { // dr132: no
@@ -480,7 +477,7 @@ namespace dr140 { // dr140: yes
 
 namespace dr141 { // dr141: yes
   template<typename T> void f();
-  template<typename T> struct S { int n; };
+  template<typename T> struct S { int n; }; // expected-note {{'::dr141::S<int>::n' declared here}}
   struct A : S<int> {
     template<typename T> void f();
     template<typename T> struct S {};
@@ -488,7 +485,7 @@ namespace dr141 { // dr141: yes
   struct B : S<int> {} b;
   void g() {
     a.f<int>();
-    (void)a.S<int>::n; // expected-error {{no member named 'n'}}
+    (void)a.S<int>::n; // expected-error {{no member named 'n' in 'dr141::A::S<int>'; did you mean '::dr141::S<int>::n'?}}
 #if __cplusplus < 201103L
     // expected-error@-2 {{ambiguous}}
     // expected-note@-11 {{lookup from the current scope}}
@@ -869,7 +866,7 @@ namespace dr177 { // dr177: yes
   struct B {};
   struct A {
     A(A &); // expected-note 0-1{{not viable: expects an lvalue}}
-    A(const B &); // expected-note 0-1{{not viable: no known conversion from 'dr177::A' to}}
+    A(const B &); // expected-note 0-1{{not viable: no known conversion from 'A' to}}
   };
   B b;
   A a = b;
@@ -881,7 +878,7 @@ namespace dr177 { // dr177: yes
   struct D : C {};
   struct E { operator D(); };
   E e;
-  C c = e; // expected-error {{no viable constructor copying variable of type 'dr177::D'}}
+  C c = e; // expected-error {{no viable constructor copying variable of type 'D'}}
 }
 
 namespace dr178 { // dr178: yes

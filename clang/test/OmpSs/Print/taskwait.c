@@ -2,9 +2,11 @@
 // expected-no-diagnostics
 
 int main(void) {
-    #pragma oss taskwait
+    int *p;
+    #pragma oss taskwait on([1]p)
 }
 
-// CHECK: int main() {
-// CHECK-NEXT:     #pragma oss taskwait
+// CHECK: int main(void) {
+// CHECK-NEXT:     int *p;
+// CHECK-NEXT:     #pragma oss taskwait inout([1]p)
 // CHECK-NEXT: }

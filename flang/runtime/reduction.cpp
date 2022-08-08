@@ -12,11 +12,10 @@
 // DOT_PRODUCT, FINDLOC, MATMUL, SUM, and PRODUCT are in their own eponymous
 // source files.
 // NORM2, MAXLOC, MINLOC, MAXVAL, and MINVAL are in extrema.cpp.
-//
-// TODO: IALL, IANY
 
-#include "reduction.h"
+#include "flang/Runtime/reduction.h"
 #include "reduction-templates.h"
+#include "flang/Runtime/descriptor.h"
 #include <cinttypes>
 
 namespace Fortran::runtime {
@@ -229,7 +228,7 @@ inline auto GetTotalLogicalReduction(const Descriptor &x, const char *source,
     typename ACCUMULATOR::Type {
   Terminator terminator{source, line};
   if (dim < 0 || dim > 1) {
-    terminator.Crash("%s: bad DIM=%d", intrinsic, dim);
+    terminator.Crash("%s: bad DIM=%d for ARRAY with rank=1", intrinsic, dim);
   }
   SubscriptValue xAt[maxRank];
   x.GetLowerBounds(xAt);

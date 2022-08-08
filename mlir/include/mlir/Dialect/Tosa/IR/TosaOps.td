@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file defines the operation set for the TOSA dialect as defined in
-// the TOSA specfication (https://developer.mlplatform.org/w/tosa/). 
+// the TOSA specfication (https://developer.mlplatform.org/w/tosa/).
 //
 //===----------------------------------------------------------------------===//
 
@@ -58,7 +58,7 @@ def Tosa_ArgMaxOp : Tosa_Op<"argmax", [
 //===----------------------------------------------------------------------===//
 def Tosa_AvgPool2dOp : Tosa_Op<"avg_pool2d", [
     DeclareOpInterfaceMethods<InferShapedTypeOpInterface,
-                              ["inferReturnTypeComponents"]>, 
+                              ["inferReturnTypeComponents"]>,
     NoSideEffect]> {
   let summary = "Performs max pooling on the input.";
 
@@ -82,6 +82,7 @@ def Tosa_AvgPool2dOp : Tosa_Op<"avg_pool2d", [
   );
 
   let builders = [Tosa_AvgPool2dOpQuantInfoBuilder];
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -114,8 +115,7 @@ def Tosa_Conv2DOp : Tosa_Op<"conv2d", [
   );
 
   let builders = [Tosa_ConvOpQuantInfoBuilder];
-
-  let verifier = [{ return verifyConvOp(*this); }];
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -147,8 +147,7 @@ def Tosa_Conv3DOp : Tosa_Op<"conv3d", [
   );
 
   let builders = [Tosa_ConvOpQuantInfoBuilder];
-
-  let verifier = [{ return verifyConvOp(*this); }];
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -181,8 +180,7 @@ def Tosa_DepthwiseConv2DOp : Tosa_Op<"depthwise_conv2d", [
   );
 
   let builders = [Tosa_ConvOpQuantInfoBuilder];
-
-  let verifier = [{ return verifyConvOp(*this); }];
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -210,8 +208,7 @@ def Tosa_FullyConnectedOp : Tosa_Op<"fully_connected", [
   );
 
   let builders = [Tosa_FCOpQuantInfoBuilder];
-
-  let verifier = [{ return verifyConvOp(*this); }];
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -269,6 +266,8 @@ def Tosa_MaxPool2dOp : Tosa_Op<"max_pool2d", [
   let results = (outs
     Tosa_Tensor4D:$output
   );
+
+  let hasCanonicalizer = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -290,9 +289,8 @@ def Tosa_TransposeConv2DOp : Tosa_Op<"transpose_conv2d", [
     Tosa_Tensor4D:$filter,
     Tosa_Tensor1D:$bias,
 
-    Tosa_IntArrayAttr2:$out_pad,
+    Tosa_IntArrayAttr4:$out_pad,
     Tosa_IntArrayAttr2:$stride,
-    Tosa_IntArrayAttr2:$dilation,
     Tosa_IntArrayAttrUpto4:$out_shape,
     OptionalAttr<Tosa_ConvOpQuantizationAttr>:$quantization_info
   );
@@ -319,9 +317,11 @@ def Tosa_ClampOp : Tosa_Op<"clamp", [
   let summary = "Computes clamp(features, min, max).";
 
   let description = [{
-    Clamp to an arbitrary minimum and maximum value. Note that the maximum and
-    minimum values are specified as signed quantized values, no scaling happens
-    before or after this operation.
+    Clamp to an arbitrary minimum and maximum value.
+    Maximum and minimum values are specified as values in the range of the
+    input type.
+    No zero point subtraction is done to the values, thus to clamp to the zero
+    point value, the zero point itself should be supplied as the minimum value.
   }];
 
   let arguments = (ins
@@ -335,6 +335,8 @@ def Tosa_ClampOp : Tosa_Op<"clamp", [
   let results = (outs
     Tosa_Tensor:$output
   );
+
+  let hasCanonicalizer = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -429,7 +431,7 @@ def Tosa_AddOp : Tosa_Op<"add", [
 
   let description = [{
     Elementwise addition of input1 and input2. Axis of size 1 will be broadcast,
-    as necessary.  Rank of input tensors must match.
+    as necessary.
   }];
 
   let arguments = (ins
@@ -440,6 +442,8 @@ def Tosa_AddOp : Tosa_Op<"add", [
   let results = (outs
     Tosa_Tensor:$output
   );
+
+  let hasCanonicalizer = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -453,8 +457,7 @@ def Tosa_ArithmeticRightShiftOp : Tosa_Op<"arithmetic_right_shift", [
 
   let description = [{
     Elementwise arithmetic right shift of input1 by the amount specified in
-    input2. Axis of size 1 will be broadcast, as necessary.  Rank of input
-    tensors must match.
+    input2. Axis of size 1 will be broadcast, as necessary.
   }];
 
   let arguments = (ins
@@ -479,7 +482,7 @@ def Tosa_BitwiseAndOp : Tosa_Op<"bitwise_and", [
 
   let description = [{
     Elementwise bitwise AND of input1 and input2. Axis of size 1
-    will be broadcast as necessary. Rank of input tensors must match.
+    will be broadcast as necessary.
   }];
 
   let arguments = (ins
@@ -503,7 +506,7 @@ def Tosa_BitwiseOrOp : Tosa_Op<"bitwise_or", [
 
   let description = [{
     Elementwise bitwise OR of input1 and input2. Axis of size 1 will be
-    broadcast as necessary. Rank of input tensors must match.
+    broadcast as necessary.
   }];
 
   let arguments = (ins
@@ -527,7 +530,7 @@ def Tosa_BitwiseXorOp : Tosa_Op<"bitwise_xor", [
 
   let description = [{
     Elementwise bitwise XOR of input1 and input2. Axis of size 1 will be
-    broadcast as necessary. Rank of input tensors must match.
+    broadcast as necessary.
   }];
 
   let arguments = (ins
@@ -551,7 +554,7 @@ def Tosa_DivOp : Tosa_Op<"div", [
 
   let description = [{
     Elementwise integer divide operator of input1 by input2. Axis of size 1
-    will be broadcast, as necessary. Rank of input tensors must match.
+    will be broadcast, as necessary.
   }];
 
   let arguments = (ins
@@ -575,7 +578,7 @@ def Tosa_LogicalAndOp : Tosa_Op<"logical_and", [
 
   let description = [{
     Elementwise logical AND of input1 and input2. Axis of size 1 will be
-    broadcast, as necessary.  Rank of input tensors must match.
+    broadcast, as necessary.
   }];
 
   let arguments = (ins
@@ -599,7 +602,7 @@ def Tosa_LogicalLeftShiftOp : Tosa_Op<"logical_left_shift", [
 
   let description = [{
     Elementwise left shift of input1 and input2. Axis of size 1 will be
-    broadcast, as necessary. Rank of input tensors must match.
+    broadcast, as necessary.
   }];
 
   let arguments = (ins
@@ -624,7 +627,6 @@ def Tosa_LogicalRightShiftOp : Tosa_Op<"logical_right_shift", [
   let description = [{
     Elementwise logical right shift of input1 by the amount specified in input2.
     Axis of size 1 will be broadcast, as necessary.
-    Rank of input tensors must match.
   }];
 
   let arguments = (ins
@@ -648,7 +650,7 @@ def Tosa_LogicalOrOp : Tosa_Op<"logical_or", [
 
   let description = [{
     Elementwise logical OR of input1 and input2. Axis of size 1 will be
-    broadcast as necessary. Rank of input tensors must match.
+    broadcast as necessary.
   }];
 
   let arguments = (ins
@@ -672,7 +674,7 @@ def Tosa_LogicalXorOp : Tosa_Op<"logical_xor", [
 
   let description = [{
     Elementwise logical XOR of input1 and input2.  Axis of size 1 will be
-    broadcast as necessary. Rank of input tensors must match.
+    broadcast as necessary.
   }];
 
   let arguments = (ins
@@ -696,7 +698,7 @@ def Tosa_MaximumOp : Tosa_Op<"maximum", [
 
   let description = [{
     Elementwise max of input1 and input2. Axis of size 1 will be broadcast, as
-    necessary.  Rank of input tensors must match.
+    necessary.
   }];
 
   let arguments = (ins
@@ -720,7 +722,7 @@ def Tosa_MinimumOp : Tosa_Op<"minimum", [
 
   let description = [{
     Elementwise minimum of input1 and input2. Axis of size 1
-    will be broadcast, as necessary.  Rank of input tensors must match.
+    will be broadcast, as necessary.
   }];
 
   let arguments = (ins
@@ -745,7 +747,6 @@ def Tosa_MulOp : Tosa_Op<"mul", [
   let description = [{
     Elementwise multiplication (Hadamard product) of input1 and input2.
     Axis of size 1 will be broadcast, as necessary.
-    Rank of input tensors must match.
   }];
 
   let arguments = (ins
@@ -757,6 +758,8 @@ def Tosa_MulOp : Tosa_Op<"mul", [
   let results = (outs
     Tosa_Tensor:$output
   );
+
+  let hasCanonicalizer = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -771,7 +774,6 @@ def Tosa_PowOp : Tosa_Op<"pow", [
   let description = [{
     Elementwise input1 raised to the power of input2.
     Axis of size 1 will be broadcast, as necessary.
-    Rank of input tensors must match.
   }];
 
   let arguments = (ins
@@ -795,7 +797,7 @@ def Tosa_SubOp : Tosa_Op<"sub", [
 
   let description = [{
     Elementwise subtraction of input1 and input2. Axis of size 1 will be
-    broadcast as necessary.  Rank of input tensors must match.
+    broadcast as necessary.
   }];
 
   let arguments = (ins
@@ -1117,14 +1119,16 @@ def Tosa_SelectOp : Tosa_Op<"select", [
   }];
 
   let arguments = (ins
-    I1Tensor:$input1,
-    Tosa_Tensor:$input2,
-    Tosa_Tensor:$input3
+    I1Tensor:$pred,
+    Tosa_Tensor:$on_true,
+    Tosa_Tensor:$on_false
   );
 
   let results = (outs
     Tosa_Tensor:$output
   );
+  let hasCanonicalizeMethod = 1;
+  let hasFolder = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1371,17 +1375,17 @@ def Tosa_ConcatOp : Tosa_Op<"concat", [
   let summary = "Concatenates tensors along one dimension.";
 
   let description = [{
-    Concatenate a variadic amount of tensors along a given axis. No data 
+    Concatenate a variadic amount of tensors along a given axis. No data
     conversion happens during a concat operation.
   }];
 
   let arguments = (ins
-    Variadic<Tosa_RankedTensor>:$input1,
+    Variadic<Tosa_Tensor>:$input1,
     I64Attr:$axis
   );
 
   let results = (outs
-    Tosa_RankedTensor:$output
+    Tosa_Tensor:$output
   );
 
   let hasCanonicalizer = 1;
@@ -1394,15 +1398,16 @@ def Tosa_PadOp : Tosa_Op<"pad", [
     DeclareOpInterfaceMethods<InferShapedTypeOpInterface,
                               ["inferReturnTypeComponents"]>,
     NoSideEffect]> {
-  let summary = "Pads a tensor with zeros.";
+  let summary = "Pads a tensor with value specified.";
 
   let description = [{
-    Zero-pads a tensor along borders of each dimension.
+    Pads a tensor along borders of each dimension with pad_value.
   }];
 
   let arguments = (ins
     Tosa_RankedTensor:$input1,
     Tosa_Int32Or64Tensor:$padding,
+    Optional<Tosa_ScalarTensor>:$pad_const,
     OptionalAttr<Tosa_PadOpQuantizationAttr>:$quantization_info
   );
 
@@ -1410,7 +1415,11 @@ def Tosa_PadOp : Tosa_Op<"pad", [
     Tosa_RankedTensor:$output
   );
 
-  let builders = [Tosa_PadOpQuantInfoBuilder];
+  let builders = [Tosa_PadOpQuantInfoBuilder,
+                  Tosa_ExplicitValuePadOpQuantInfoBuilder];
+
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1497,7 +1506,7 @@ def Tosa_SliceOp: Tosa_Op<"slice", [
 //===----------------------------------------------------------------------===//
 def Tosa_TileOp: Tosa_Op<"tile", [
       DeclareOpInterfaceMethods<InferShapedTypeOpInterface,
-                              ["inferReturnTypeComponents"]>, 
+                              ["inferReturnTypeComponents"]>,
       NoSideEffect]> {
   let summary = "Tile operator";
 
@@ -1521,7 +1530,7 @@ def Tosa_TileOp: Tosa_Op<"tile", [
 //===----------------------------------------------------------------------===//
 def Tosa_TransposeOp : Tosa_Op<"transpose", [
       DeclareOpInterfaceMethods<InferShapedTypeOpInterface,
-                              ["inferReturnTypeComponents"]>, 
+                              ["inferReturnTypeComponents"]>,
       NoSideEffect]> {
   let summary = "Transpose operator";
 
@@ -1538,6 +1547,7 @@ def Tosa_TransposeOp : Tosa_Op<"transpose", [
     outs Tosa_Tensor1Dto6D:$output
   );
 
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
@@ -1551,7 +1561,7 @@ def Tosa_TransposeOp : Tosa_Op<"transpose", [
 //===----------------------------------------------------------------------===//
 def Tosa_GatherOp : Tosa_Op<"gather", [
       DeclareOpInterfaceMethods<InferShapedTypeOpInterface,
-                              ["inferReturnTypeComponents"]>, 
+                              ["inferReturnTypeComponents"]>,
       NoSideEffect]> {
   let summary = "Gather operation,";
 
@@ -1683,7 +1693,7 @@ def Tosa_CastOp: Tosa_Op<"cast", [NoSideEffect,
 //===----------------------------------------------------------------------===//
 // Operator: rescale
 //===----------------------------------------------------------------------===//
-def Tosa_RescaleOp: Tosa_Op<"rescale", [NoSideEffect, 
+def Tosa_RescaleOp: Tosa_Op<"rescale", [NoSideEffect,
       DeclareOpInterfaceMethods<InferShapedTypeOpInterface,
                               ["inferReturnTypeComponents"]>]> {
   let summary = "Tosa rescale operator";
@@ -1846,6 +1856,8 @@ def Tosa_IfOp : Tosa_Op<"cond_if", [
 //===----------------------------------------------------------------------===//
 def Tosa_WhileOp : Tosa_Op<"while_loop", [
        DeclareOpInterfaceMethods<LoopLikeOpInterface>,
+       DeclareOpInterfaceMethods<InferShapedTypeOpInterface,
+                                 ["inferReturnTypeComponents"]>,
        SingleBlockImplicitTerminator<"YieldOp">,
        RecursiveSideEffects]> {
   let summary = "output = input; While (Cond(output)) {output = Body(output)}";

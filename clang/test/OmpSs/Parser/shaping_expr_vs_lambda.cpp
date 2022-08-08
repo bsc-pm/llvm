@@ -21,7 +21,7 @@ void foo2(int x) {
   {}
   #pragma oss task depend(in : [x + x]() {} ) // expected-error {{expected ',' or ']' in lambda capture list}}
   {}
-  #pragma oss task depend(in : [x,](array),  [x,](array){}, [3](x, array)) // expected-error {{expected variable name or 'this' in lambda capture list}} expected-warning {{expression result unused}}
+  #pragma oss task depend(in : [x,](array),  [x,](array){}, [3](x, array)) // expected-error {{expected variable name or 'this' in lambda capture list}} expected-warning {{left operand of comma operator has no effect}}
   {}
   #pragma oss task depend(in : [x](int a) {} ) // expected-error {{expected addressable lvalue expression, array element, array shape or array section}}
   {}

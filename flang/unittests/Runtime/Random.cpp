@@ -1,4 +1,4 @@
-//===-- flang/unittests/RuntimeGTest/Random.cpp -----------------*- C++ -*-===//
+//===-- flang/unittests/Runtime/Random.cpp ----------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,10 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "../../runtime/random.h"
+#include "flang/Runtime//random.h"
 #include "gtest/gtest.h"
-#include "../../runtime/descriptor.h"
-#include "../../runtime/type-code.h"
+#include "flang/Runtime/descriptor.h"
+#include "flang/Runtime/type-code.h"
 #include <cmath>
 
 using namespace Fortran::runtime;

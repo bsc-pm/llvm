@@ -1,4 +1,4 @@
-//===-- flang/unittests/RuntimeGTest/CharacterTest.cpp ----------*- C++ -*-===//
+//===-- flang/unittests/Runtime/CharacterTest.cpp ---------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -9,9 +9,9 @@
 // Basic sanity tests of CHARACTER API; exhaustive testing will be done
 // in Fortran.
 
-#include "../../runtime/character.h"
+#include "flang/Runtime/character.h"
 #include "gtest/gtest.h"
-#include "../../runtime/descriptor.h"
+#include "flang/Runtime/descriptor.h"
 #include <cstring>
 #include <functional>
 #include <tuple>

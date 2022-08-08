@@ -73,6 +73,7 @@ int main(int argc, char **argv, char *env[]) {
   #pragma oss task in(argv[0;][;]) // expected-error {{section length is unspecified and cannot be inferred because subscripted value is not an array}}
   #pragma oss task in(env[0;][;]) // expected-error {{section length is unspecified and cannot be inferred because subscripted value is an array of unknown bound}}
   #pragma oss task in( argv[ ; argc][1 ; argc - 1]) // expected-error {{pointer types only allow one-level array sections}}
+  #pragma oss task on(argc) // expected-error {{unexpected OmpSs-2 clause 'on' in directive '#pragma oss task'}}
   #pragma oss task mutexinoutset(argc) // expected-warning {{extra tokens at the end of '#pragma oss task' are ignored}}
   #pragma oss task inoutset(argc) // expected-warning {{extra tokens at the end of '#pragma oss task' are ignored}}
 
@@ -92,6 +93,7 @@ int main(int argc, char **argv, char *env[]) {
   #pragma oss task depend(weak, mutexinoutset: argc)
   #pragma oss task depend(kk, inoutset: argc) // expected-error {{dependency type 'inoutset' cannot be combined with others}}
   #pragma oss task depend(kk: argc) // expected-error {{expected 'in', 'out', 'inout', 'inoutset' or 'mutexinoutset' in OmpSs-2 clause 'depend'}}
+  #pragma oss task depend(on: argc) // expected-error {{expected 'in', 'out', 'inout', 'inoutset' or 'mutexinoutset' in OmpSs-2 clause 'depend'}}
   foo();
 
   return 0;

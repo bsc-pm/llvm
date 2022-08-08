@@ -35,6 +35,23 @@ OSSClause::child_range OSSClause::children() {
   llvm_unreachable("unknown OSSClause");
 }
 
+OSSLabelClause *OSSLabelClause::Create(const ASTContext &C,
+                                         SourceLocation StartLoc,
+                                         SourceLocation LParenLoc,
+                                         SourceLocation EndLoc,
+                                         ArrayRef<Expr *> VL) {
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(VL.size()));
+  OSSLabelClause *Clause =
+      new (Mem) OSSLabelClause(StartLoc, LParenLoc, EndLoc, VL.size());
+  Clause->setVarRefs(VL);
+  return Clause;
+}
+
+OSSLabelClause *OSSLabelClause::CreateEmpty(const ASTContext &C, unsigned N) {
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(N));
+  return new (Mem) OSSLabelClause(N);
+}
+
 void OSSPrivateClause::setPrivateCopies(ArrayRef<Expr *> VL) {
   assert(VL.size() == varlist_size() &&
          "Number of private copies is not the same as the preallocated buffer");
@@ -180,3 +197,19 @@ OSSReductionClause *OSSReductionClause::CreateEmpty(const ASTContext &C,
   return new (Mem) OSSReductionClause(N);
 }
 
+OSSNdrangeClause *OSSNdrangeClause::Create(const ASTContext &C,
+                                         SourceLocation StartLoc,
+                                         SourceLocation LParenLoc,
+                                         SourceLocation EndLoc,
+                                         ArrayRef<Expr *> VL) {
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(VL.size()));
+  OSSNdrangeClause *Clause =
+      new (Mem) OSSNdrangeClause(StartLoc, LParenLoc, EndLoc, VL.size());
+  Clause->setVarRefs(VL);
+  return Clause;
+}
+
+OSSNdrangeClause *OSSNdrangeClause::CreateEmpty(const ASTContext &C, unsigned N) {
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(N));
+  return new (Mem) OSSNdrangeClause(N);
+}

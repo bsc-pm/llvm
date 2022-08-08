@@ -12,9 +12,8 @@ import json
 
 class UbsanBasicTestCase(TestBase):
 
-    mydir = TestBase.compute_mydir(__file__)
-
     @skipUnlessUndefinedBehaviorSanitizer
+    @no_debug_info_test
     def test(self):
         self.build()
         self.ubsan_tests()
@@ -42,7 +41,7 @@ class UbsanBasicTestCase(TestBase):
                     substrs=['stopped', 'stop reason ='])
 
         stop_reason = thread.GetStopReason()
-        self.assertEqual(stop_reason, lldb.eStopReasonInstrumentation)
+        self.assertStopReason(stop_reason, lldb.eStopReasonInstrumentation)
 
         # test that the UBSan dylib is present
         self.expect(

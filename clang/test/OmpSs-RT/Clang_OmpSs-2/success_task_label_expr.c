@@ -29,7 +29,7 @@
 
 const char text[] = "CoronaTask";
 
-#pragma oss task label(str)
+#pragma oss task label(text)
 void foo(const char *str) {}
 
 int main() {

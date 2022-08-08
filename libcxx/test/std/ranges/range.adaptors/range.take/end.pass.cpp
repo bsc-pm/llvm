@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
-// UNSUPPORTED: libcpp-no-concepts
 // UNSUPPORTED: libcpp-has-no-incomplete-ranges
 
 // constexpr auto end() requires (!simple-view<V>)
@@ -52,7 +51,7 @@ constexpr bool test() {
 
   // !sized_range
   {
-    std::ranges::take_view<ContiguousView> tv(ContiguousView{buffer}, 4);
+    std::ranges::take_view<MoveOnlyView> tv(MoveOnlyView{buffer}, 4);
     assert(tv.end() == std::ranges::next(tv.begin(), 4));
 
     // The <sentinel> type.
@@ -61,7 +60,7 @@ constexpr bool test() {
   }
 
   {
-    const std::ranges::take_view<ContiguousView> tv(ContiguousView{buffer}, 5);
+    const std::ranges::take_view<MoveOnlyView> tv(MoveOnlyView{buffer}, 5);
     assert(tv.end() == std::ranges::next(tv.begin(), 5));
   }
 

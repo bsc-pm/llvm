@@ -5,14 +5,18 @@ add_mlir_library(MLIRIR
   Attributes.cpp
   Block.cpp
   Builders.cpp
+  BuiltinAttributeInterfaces.cpp
   BuiltinAttributes.cpp
   BuiltinDialect.cpp
   BuiltinTypes.cpp
+  BuiltinTypeInterfaces.cpp
   Diagnostics.cpp
   Dialect.cpp
+  DialectResourceBlobManager.cpp
   Dominance.cpp
+  ExtensibleDialect.cpp
   FunctionImplementation.cpp
-  FunctionSupport.cpp
+  FunctionInterfaces.cpp
   IntegerSet.cpp
   Location.cpp
   MLIRContext.cpp
@@ -28,6 +32,7 @@ add_mlir_library(MLIRIR
   TypeRange.cpp
   TypeUtilities.cpp
   Value.cpp
+  ValueRange.cpp
   Verifier.cpp
   Visitors.cpp
 
@@ -36,6 +41,7 @@ add_mlir_library(MLIRIR
 
   DEPENDS
   MLIRBuiltinAttributesIncGen
+  MLIRBuiltinAttributeInterfacesIncGen
   MLIRBuiltinDialectIncGen
   MLIRBuiltinLocationAttributesIncGen
   MLIRBuiltinOpsIncGen

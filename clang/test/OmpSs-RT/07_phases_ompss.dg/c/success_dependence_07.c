@@ -24,8 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: %oss-compile
-// RUN: %oss-O2-compile
+// RUN: %oss-compile -std=c89
+// RUN: %oss-O2-compile -std=c89
 
 /*
 <testinfo>

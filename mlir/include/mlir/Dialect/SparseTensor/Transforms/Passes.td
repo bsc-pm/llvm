@@ -36,15 +36,15 @@ def Sparsification : Pass<"sparsification", "ModuleOp"> {
     }
 
     // Multiply a sparse matrix A with a dense vector b into a dense vector x.
-    func @kernel_matvec(%arga: tensor<?x?xf64, #SparseMatrix>,
+    func.func @kernel_matvec(%arga: tensor<?x?xf64, #SparseMatrix>,
                         %argb: tensor<?xf64>,
                         %argx: tensor<?xf64>) -> tensor<?xf64> {
       %0 = linalg.generic #matvec
         ins(%arga, %argb: tensor<?x?xf64, #SparseMatrix>, tensor<?xf64>)
         outs(%argx: tensor<?xf64>) {
         ^bb(%a: f64, %b: f64, %x: f64):
-          %0 = mulf %a, %b : f64
-          %1 = addf %x, %0 : f64
+          %0 = arith.mulf %a, %b : f64
+          %1 = arith.addf %x, %0 : f64
           linalg.yield %1 : f64
       } -> tensor<?xf64>
       return %0 : tensor<?xf64>
@@ -53,6 +53,9 @@ def Sparsification : Pass<"sparsification", "ModuleOp"> {
   }];
   let constructor = "mlir::createSparsificationPass()";
   let dependentDialects = [
+    "AffineDialect",
+    "arith::ArithmeticDialect",
+    "bufferization::BufferizationDialect",
     "LLVM::LLVMDialect",
     "memref::MemRefDialect",
     "scf::SCFDialect",
@@ -67,7 +70,9 @@ def Sparsification : Pass<"sparsification", "ModuleOp"> {
     Option<"vectorLength", "vl", "int32_t", "1",
            "Set the vector length">,
     Option<"enableSIMDIndex32", "enable-simd-index32", "bool", "false",
-           "Enable i32 indexing into vectors (for efficiency)">
+           "Enable i32 indexing into vectors (for efficiency)">,
+    Option<"enableVLAVectorization", "enable-vla-vectorization", "bool",
+           "false", "Enable vector length agnostic vectorization">
   ];
 }
 
@@ -87,7 +92,7 @@ def SparseTensorConversion : Pass<"sparse-tensor-conversion", "ModuleOp"> {
 
     ```mlir
       Before:
-        %c1 = constant 1 : index
+        %c1 = arith.constant 1 : index
         %0 = sparse_tensor.pointers %arg0, %c1
           : tensor<8x8xf32, #sparse_tensor.encoding<{
               dimLevelType = [ "dense", "compressed" ],
@@ -96,17 +101,24 @@ def SparseTensorConversion : Pass<"sparse-tensor-conversion", "ModuleOp"> {
             }>> to memref<?xindex>
 
       After:
-        %c1 = constant 1 : index
+        %c1 = arith.constant 1 : index
         %0 = call @sparsePointers(%arg0, %c1) : (!llvm.ptr<i8>, index) -> memref<?xindex>
     ```
   }];
   let constructor = "mlir::createSparseTensorConversionPass()";
   let dependentDialects = [
+    "arith::ArithmeticDialect",
+    "bufferization::BufferizationDialect",
     "LLVM::LLVMDialect",
+    "linalg::LinalgDialect",
     "memref::MemRefDialect",
     "scf::SCFDialect",
     "sparse_tensor::SparseTensorDialect",
     "vector::VectorDialect",
+  ];
+  let options = [
+    Option<"sparseToSparse", "s2s-strategy", "int32_t", "0",
+           "Set the strategy for sparse-to-sparse conversion">,
   ];
 }
 

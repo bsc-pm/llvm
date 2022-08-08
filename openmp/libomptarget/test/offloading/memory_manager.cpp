@@ -1,6 +1,8 @@
 // RUN: %libomptarget-compilexx-run-and-check-generic
 
-// XFAIL: *
+// UNSUPPORTED: x86_64-pc-linux-gnu
+// UNSUPPORTED: x86_64-pc-linux-gnu-oldDriver
+// UNSUPPORTED: x86_64-pc-linux-gnu-LTO
 
 #include <omp.h>
 

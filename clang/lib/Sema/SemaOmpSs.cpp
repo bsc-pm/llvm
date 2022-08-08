@@ -177,6 +177,10 @@ public:
     return Ret;
   }
 
+  void setCurrentDirective(OmpSsDirectiveKind DKind) {
+    Stack.back().Directive = DKind;
+  }
+
   /// Set collapse value for the region.
   void setAssociatedLoops(unsigned Val) {
     Stack.back().AssociatedLoops = Val;
@@ -629,6 +633,10 @@ public:
   }
 
   void VisitCXXThisExpr(CXXThisExpr *ThisE) {
+    // The dep base may use this:
+    // out(this->array[i])
+    IsFirstDecl = false;
+
     // Add DSA to 'this' if is the first time we see it
     if (!Stack->getThisExpr()) {
       Stack->setThisExpr(ThisE);
@@ -783,6 +791,10 @@ void Sema::DestroyDataSharingAttributesStackOmpSs() { delete DSAStack; }
 
 OmpSsDirectiveKind Sema::GetCurrentOmpSsDirective() const {
   return DSAStack->getCurrentDirective();
+}
+
+void Sema::SetTaskiterKind(OmpSsDirectiveKind DKind) {
+  DSAStack->setCurrentDirective(DKind);
 }
 
 bool Sema::IsEndOfTaskloop() const {
@@ -1438,6 +1450,10 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
   case OSSD_task_for:
     Res = ActOnOmpSsTaskForDirective(ClausesWithImplicit, AStmt, StartLoc, EndLoc);
     break;
+  case OSSD_taskiter:
+  case OSSD_taskiter_while:
+    Res = ActOnOmpSsTaskIterDirective(ClausesWithImplicit, AStmt, StartLoc, EndLoc);
+    break;
   case OSSD_taskloop:
     Res = ActOnOmpSsTaskLoopDirective(ClausesWithImplicit, AStmt, StartLoc, EndLoc);
     break;
@@ -2027,19 +2043,23 @@ void Sema::ActOnOmpSsLoopInitialization(SourceLocation ForLoc, Stmt *Init) {
         const Expr *E = ISC.getLoopDeclRefExpr();
         auto *VD = dyn_cast<VarDecl>(D);
 
+        OmpSsClauseKind CKind = OSSC_private;
+        if (DSAStack->getCurrentDirective() == OSSD_taskiter)
+          CKind = OSSC_firstprivate;
+
         DSAStackTy::DSAVarData DVar = DSAStack->getCurrentDSA(D);
-        if (DVar.CKind != OSSC_unknown && DVar.CKind != OSSC_private &&
+        if (DVar.CKind != OSSC_unknown && DVar.CKind != CKind &&
             DVar.RefExpr) {
           Diag(E->getExprLoc(), diag::err_oss_wrong_dsa)
             << getOmpSsClauseName(DVar.CKind)
-            << getOmpSsClauseName(OSSC_private);
+            << getOmpSsClauseName(CKind);
             return;
         }
 
         // Register loop control variable
         if (!CurContext->isDependentContext()) {
           DSAStack->addLoopControlVariable(VD, E);
-          DSAStack->addDSA(VD, E, OSSC_private, /*Ignore=*/true, /*IsBase=*/true);
+          DSAStack->addDSA(VD, E, CKind, /*Ignore=*/true, /*IsBase=*/true);
         }
       }
     }
@@ -2264,6 +2284,7 @@ StmtResult Sema::ActOnOmpSsTaskForDirective(
     SourceLocation StartLoc, SourceLocation EndLoc) {
   if (!AStmt)
     return StmtError();
+
   SmallVector<OSSLoopDirective::HelperExprs> B(DSAStack->getAssociatedLoops());
   if (checkOmpSsLoop(OSSD_task_for, AStmt, *this, *DSAStack, B))
     return StmtError();
@@ -2271,11 +2292,33 @@ StmtResult Sema::ActOnOmpSsTaskForDirective(
   return OSSTaskForDirective::Create(Context, StartLoc, EndLoc, Clauses, AStmt, B);
 }
 
+StmtResult Sema::ActOnOmpSsTaskIterDirective(
+    ArrayRef<OSSClause *> Clauses, Stmt *AStmt,
+    SourceLocation StartLoc, SourceLocation EndLoc) {
+  if (!AStmt)
+    return StmtError();
+  SmallVector<OSSLoopDirective::HelperExprs> B(DSAStack->getAssociatedLoops());
+  if (isa<ForStmt>(AStmt)) {
+    // taskiter (for)
+    if (checkOmpSsLoop(OSSD_taskiter, AStmt, *this, *DSAStack, B))
+      return StmtError();
+  } else if (isa<WhileStmt>(AStmt)) {
+    // taskiter (while)
+    // do nothing
+  } else {
+    Diag(AStmt->getBeginLoc(), diag::err_oss_taskiter_for_while)
+        << getOmpSsDirectiveName(OSSD_taskiter);
+  }
+
+  return OSSTaskIterDirective::Create(Context, StartLoc, EndLoc, Clauses, AStmt, B);
+}
+
 StmtResult Sema::ActOnOmpSsTaskLoopDirective(
     ArrayRef<OSSClause *> Clauses, Stmt *AStmt,
     SourceLocation StartLoc, SourceLocation EndLoc) {
   if (!AStmt)
     return StmtError();
+
   SmallVector<OSSLoopDirective::HelperExprs> B(DSAStack->getAssociatedLoops());
   if (checkOmpSsLoop(OSSD_taskloop, AStmt, *this, *DSAStack, B))
     return StmtError();
@@ -2309,6 +2352,7 @@ StmtResult Sema::ActOnOmpSsTaskLoopForDirective(
     SourceLocation StartLoc, SourceLocation EndLoc) {
   if (!AStmt)
     return StmtError();
+
   SmallVector<OSSLoopDirective::HelperExprs> B(DSAStack->getAssociatedLoops());
   if (checkOmpSsLoop(OSSD_taskloop_for, AStmt, *this, *DSAStack, B))
     return StmtError();
@@ -2337,43 +2381,160 @@ StmtResult Sema::ActOnOmpSsTaskLoopForDirective(
   return OSSTaskLoopForDirective::Create(Context, StartLoc, EndLoc, Clauses, AStmt, B);
 }
 
-static void checkOutlineDependency(Sema &S, Expr *RefExpr, bool OSSSyntax=false) {
+static bool checkDependency(Sema &S, Expr *RefExpr, bool OSSSyntax, bool Outline) {
   SourceLocation ELoc = RefExpr->getExprLoc();
   Expr *SimpleExpr = RefExpr->IgnoreParenCasts();
-  if (RefExpr->isTypeDependent() || RefExpr->isValueDependent() ||
-      RefExpr->containsUnexpandedParameterPack()) {
+  if (RefExpr->containsUnexpandedParameterPack()) {
+    S.Diag(RefExpr->getExprLoc(), diag::err_oss_variadic_templates_not_clause_allowed);
+    return false;
+  } else if (RefExpr->isTypeDependent() || RefExpr->isValueDependent()) {
     // It will be analyzed later.
-    return;
+    return true;
   }
+
+  if (S.RequireCompleteExprType(RefExpr, diag::err_oss_incomplete_type))
+    return false;
+
   auto *ASE = dyn_cast<ArraySubscriptExpr>(SimpleExpr);
-  if (!RefExpr->IgnoreParenImpCasts()->isLValue() ||
+  // Allow only LValues, forbid ArraySubscripts over things
+  // that are not an array like:
+  //   typedef float V __attribute__((vector_size(16)));
+  //   V a;
+  //   #pragma oss task in(a[3])
+  // and functions:
+  //   void foo() { #pragma oss task in(foo) {} }
+  if (RefExpr->IgnoreParenImpCasts()->getType()->isFunctionType() ||
+      !RefExpr->IgnoreParenImpCasts()->isLValue() ||
       (ASE &&
        !ASE->getBase()->getType().getNonReferenceType()->isPointerType() &&
        !ASE->getBase()->getType().getNonReferenceType()->isArrayType())) {
-    S.Diag(ELoc, diag::err_oss_expected_dereference_or_array_item)
-        << RefExpr->getSourceRange();
-    return;
+    if (!Outline)
+      S.Diag(ELoc, diag::err_oss_expected_addressable_lvalue_or_array_item)
+          << RefExpr->getSourceRange();
+    else
+      S.Diag(ELoc, diag::err_oss_expected_lvalue_reference_dereference_or_array_item)
+          << RefExpr->getSourceRange();
+    return false;
   }
-  if (isa<DeclRefExpr>(SimpleExpr) || isa<MemberExpr>(SimpleExpr)) {
-    S.Diag(ELoc, diag::err_oss_expected_dereference_or_array_item)
-        << RefExpr->getSourceRange();
-    return;
+
+  if (Outline) {
+    if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(RefExpr->IgnoreParenImpCasts())) {
+      if (const VarDecl *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+        if (!VD->getType()->isReferenceType())
+          S.Diag(ELoc, diag::err_oss_expected_lvalue_reference_dereference_or_array_item)
+              << RefExpr->getSourceRange();
+      }
+    }
   }
+
+  class CheckCallExpr
+      : public ConstStmtVisitor<CheckCallExpr, bool> {
+  // This Visitor checks the base of the
+  // dependency is over a CallExpr, which is error.
+  // int *get();
+  // auto l = []() -> int * {...};
+  // #pragma oss task in(get()[1], l()[3])
+  public:
+    bool VisitOSSMultiDepExpr(const OSSMultiDepExpr *E) {
+      return Visit(E->getDepExpr());
+    }
+
+    bool VisitOSSArrayShapingExpr(const OSSArrayShapingExpr *E) {
+      return Visit(E->getBase());
+    }
+
+    bool VisitOSSArraySectionExpr(const OSSArraySectionExpr *E) {
+      return Visit(E->getBase());
+    }
+
+    bool VisitArraySubscriptExpr(const ArraySubscriptExpr *E) {
+      return Visit(E->getBase());
+    }
+
+    bool VisitUnaryOperator(const UnaryOperator *E) {
+      return Visit(E->getSubExpr());
+    }
+
+    bool VisitMemberExpr(const MemberExpr *E) {
+      return Visit(E->getBase());
+    }
+
+    bool VisitCallExpr(const CallExpr *E) {
+      return true;
+    }
+  };
+  CheckCallExpr CCE;
+  if (CCE.Visit(RefExpr)) {
+    S.Diag(ELoc, diag::err_oss_call_expr_support)
+        << RefExpr->getSourceRange();
+    return false;
+  }
+
+  bool InvalidArraySection = false;
   while (auto *OASE = dyn_cast<OSSArraySectionExpr>(SimpleExpr)) {
     if (!OASE->isColonForm() && !OSSSyntax) {
       S.Diag(OASE->getColonLoc(), diag::err_oss_section_invalid_form)
           << RefExpr->getSourceRange();
-      return;
+      // Only diagnose the first error
+      InvalidArraySection = true;
+      break;
     }
-    SimpleExpr = OASE->getBase()->IgnoreParenCasts();
+    SimpleExpr = OASE->getBase()->IgnoreParenImpCasts();
   }
+  if (InvalidArraySection)
+    return false;
+  return true;
+}
+
+static bool checkNdrange(
+    Sema &S, SourceLocation Loc, ArrayRef<Expr *> VL,
+    SmallVectorImpl<Expr *> &ClauseVars) {
+
+  ClauseVars.append(VL.begin(), VL.end());
+
+  Expr *NumDimsE = ClauseVars[0];
+  // The parameter of the collapse clause must be a constant
+  // positive integer expression.
+  ExprResult NumDimsResult =
+      S.VerifyPositiveIntegerConstant(NumDimsE, OSSC_ndrange, /*StrictlyPositive=*/true);
+  if (NumDimsResult.isInvalid())
+    return false;
+  NumDimsE = NumDimsResult.get();
+  if (!isa<ConstantExpr>(NumDimsE))
+    return true;
+
+  int64_t NumDims = cast<ConstantExpr>(NumDimsE)->getResultAsAPSInt().getExtValue();
+  if (!(NumDims >= 1 && NumDims <= 3)) {
+    S.Diag(NumDimsE->getExprLoc(), diag::err_oss_clause_expect_constant_between)
+        << 1 << 3 << getOmpSsClauseName(OSSC_ndrange)
+        << NumDimsE->getSourceRange();
+    return false;
+  }
+  if (NumDims + 1 != ClauseVars.size() &&
+      NumDims*2 + 1 != ClauseVars.size()) {
+    S.Diag(Loc, diag::err_oss_ndrange_expect_nelems)
+      << NumDims << NumDims << NumDims*2 << ClauseVars.size() - 1;
+    return false;
+  }
+  ClauseVars[0] = NumDimsE;
+  bool ErrorFound = false;
+  for (int i = 1; i < ClauseVars.size(); ++i) {
+    // TODO: check global[i] >= local[i]
+    ExprResult Res = S.CheckNonNegativeIntegerValue(
+      ClauseVars[i], OSSC_ndrange, /*StrictlyPositive=*/true);
+    if (Res.isInvalid())
+      ErrorFound = true;
+    ClauseVars[i] = Res.get();
+  }
+  return !ErrorFound;
 }
 
 Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     DeclGroupPtrTy DG,
     Expr *If, Expr *Final, Expr *Cost, Expr *Priority,
-    Expr *Label, Expr *Onready,
-    bool Wait,
+    Expr *Onready, bool Wait,
+    unsigned Device, SourceLocation DeviceLoc,
+    ArrayRef<Expr *> Labels,
     ArrayRef<Expr *> Ins, ArrayRef<Expr *> Outs, ArrayRef<Expr *> Inouts,
     ArrayRef<Expr *> Concurrents, ArrayRef<Expr *> Commutatives,
     ArrayRef<Expr *> WeakIns, ArrayRef<Expr *> WeakOuts,
@@ -2384,6 +2545,7 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     ArrayRef<Expr *> DepWeakIns, ArrayRef<Expr *> DepWeakOuts,
     ArrayRef<Expr *> DepWeakInouts,
     ArrayRef<Expr *> DepWeakConcurrents, ArrayRef<Expr *> DepWeakCommutatives,
+    ArrayRef<Expr *> Ndranges, SourceLocation NdrangeLoc,
     SourceRange SR) {
   if (!DG || DG.get().isNull())
     return DeclGroupPtrTy();
@@ -2406,6 +2568,15 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
         || isa<CXXDestructorDecl>(MD)
         || MD->isOverloadedOperator()) {
       Diag(ADecl->getLocation(), diag::err_oss_function_expected) << 1;
+      return DeclGroupPtrTy();
+    }
+    // Member tasks outlines with device != smp are
+    // not supported
+    const unsigned DeviceNotSeen = OSSC_DEVICE_unknown + 1;
+    if (!(Device == OSSC_DEVICE_smp
+        || Device == DeviceNotSeen)) {
+      Diag(DeviceLoc, diag::err_oss_member_device_no_smp)
+        << getOmpSsSimpleClauseTypeName(OSSC_device, Device);
       return DeclGroupPtrTy();
     }
   }
@@ -2435,7 +2606,10 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     ++ParI;
   }
 
-  ExprResult IfRes, FinalRes, CostRes, PriorityRes, LabelRes, OnreadyRes;
+  ExprResult IfRes, FinalRes, CostRes, PriorityRes, OnreadyRes;
+  SmallVector<Expr *, 2> LabelsRes;
+  SmallVector<Expr *, 4> NdrangesRes;
+  OSSTaskDeclAttr::DeviceType DevType = OSSTaskDeclAttr::DeviceType::Unknown;
   if (If) {
     IfRes = VerifyBooleanConditionWithCleanups(If, If->getExprLoc());
   }
@@ -2449,79 +2623,109 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   if (Priority) {
     PriorityRes = CheckSignedIntegerValue(Priority);
   }
-  if (Label) {
-    LabelRes = CheckIsConstCharPtrConvertibleExpr(Label);
+  if (!Labels.empty()) {
+    LabelsRes.push_back(
+      CheckIsConstCharPtrConvertibleExpr(Labels[0], /*ConstConstraint=*/true).get());
+    if (Labels.size() == 2)
+      LabelsRes.push_back(
+        CheckIsConstCharPtrConvertibleExpr(Labels[1], /*ConstConstraint=*/false).get());
   }
   if (Onready) {
     OnreadyRes = Onready;
   }
+  switch (Device) {
+  case OSSC_DEVICE_smp:
+    DevType = OSSTaskDeclAttr::DeviceType::Smp;
+    break;
+  case OSSC_DEVICE_cuda:
+    DevType = OSSTaskDeclAttr::DeviceType::Cuda;
+    break;
+  case OSSC_DEVICE_opencl:
+    DevType = OSSTaskDeclAttr::DeviceType::Opencl;
+    break;
+  case OSSC_DEVICE_fpga:
+    DevType = OSSTaskDeclAttr::DeviceType::Fpga;
+    break;
+  case OSSC_DEVICE_unknown:
+    Diag(DeviceLoc, diag::err_oss_unexpected_clause_value)
+        << getListOfPossibleValues(OSSC_device, /*First=*/0,
+                                   /*Last=*/OSSC_DEVICE_unknown)
+        << getOmpSsClauseName(OSSC_device);
+  }
   for (Expr *RefExpr : Ins) {
-    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
   }
   for (Expr *RefExpr : Outs) {
-    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
   }
   for (Expr *RefExpr : Inouts) {
-    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
   }
   for (Expr *RefExpr : Concurrents) {
-    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
   }
   for (Expr *RefExpr : Commutatives) {
-    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
   }
   for (Expr *RefExpr : WeakIns) {
-    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
   }
   for (Expr *RefExpr : WeakOuts) {
-    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
   }
   for (Expr *RefExpr : WeakInouts) {
-    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
   }
   for (Expr *RefExpr : WeakConcurrents) {
-    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
   }
   for (Expr *RefExpr : WeakCommutatives) {
-    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
   }
   for (Expr *RefExpr : DepIns) {
-    checkOutlineDependency(*this, RefExpr);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
   }
   for (Expr *RefExpr : DepOuts) {
-    checkOutlineDependency(*this, RefExpr);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
   }
   for (Expr *RefExpr : DepInouts) {
-    checkOutlineDependency(*this, RefExpr);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
   }
   for (Expr *RefExpr : DepConcurrents) {
-    checkOutlineDependency(*this, RefExpr);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
   }
   for (Expr *RefExpr : DepCommutatives) {
-    checkOutlineDependency(*this, RefExpr);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
   }
   for (Expr *RefExpr : DepWeakIns) {
-    checkOutlineDependency(*this, RefExpr);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
   }
   for (Expr *RefExpr : DepWeakOuts) {
-    checkOutlineDependency(*this, RefExpr);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
   }
   for (Expr *RefExpr : DepWeakInouts) {
-    checkOutlineDependency(*this, RefExpr);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
   }
   for (Expr *RefExpr : DepWeakConcurrents) {
-    checkOutlineDependency(*this, RefExpr);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
   }
   for (Expr *RefExpr : DepWeakCommutatives) {
-    checkOutlineDependency(*this, RefExpr);
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
+  }
+  if (!Ndranges.empty()) {
+    if (!(DevType == OSSTaskDeclAttr::DeviceType::Cuda
+        || DevType == OSSTaskDeclAttr::DeviceType::Opencl))
+      Diag(DeviceLoc, diag::err_oss_ndrange_incompatible_device);
+
+    checkNdrange(*this, NdrangeLoc, Ndranges, NdrangesRes);
   }
 
   auto *NewAttr = OSSTaskDeclAttr::CreateImplicit(
     Context,
     IfRes.get(), FinalRes.get(), CostRes.get(), PriorityRes.get(),
-    LabelRes.get(),
-    Wait,
+    Wait, DevType,
     OnreadyRes.get(),
+    const_cast<Expr **>(LabelsRes.data()), LabelsRes.size(),
     const_cast<Expr **>(Ins.data()), Ins.size(),
     const_cast<Expr **>(Outs.data()), Outs.size(),
     const_cast<Expr **>(Inouts.data()), Inouts.size(),
@@ -2542,6 +2746,7 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     const_cast<Expr **>(DepWeakInouts.data()), DepWeakInouts.size(),
     const_cast<Expr **>(DepWeakConcurrents.data()), DepWeakConcurrents.size(),
     const_cast<Expr **>(DepWeakCommutatives.data()), DepWeakCommutatives.size(),
+    const_cast<Expr **>(NdrangesRes.data()), NdrangesRes.size(),
     SR);
   ADecl->addAttr(NewAttr);
   return DG;
@@ -3335,8 +3540,7 @@ static bool actOnOSSReductionKindClause(
           Type = ComplexTy->getElementType();
         if (Type->isRealFloatingType()) {
           llvm::APFloat InitValue = llvm::APFloat::getAllOnesValue(
-              Context.getFloatTypeSemantics(Type),
-              Context.getTypeSize(Type));
+              Context.getFloatTypeSemantics(Type));
           Init = FloatingLiteral::Create(Context, InitValue, /*isexact=*/true,
                                          Type, ELoc);
         } else if (Type->isScalarType()) {
@@ -3496,96 +3700,8 @@ Sema::ActOnOmpSsDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLoc
     return nullptr;
 
   for (Expr *RefExpr : VarList) {
-    SourceLocation ELoc = RefExpr->getExprLoc();
-    Expr *SimpleExpr = RefExpr->IgnoreParenCasts();
-    if (RefExpr->containsUnexpandedParameterPack()) {
-      Diag(RefExpr->getExprLoc(), diag::err_oss_variadic_templates_not_clause_allowed);
-      continue;
-    } else if (RefExpr->isTypeDependent() || RefExpr->isValueDependent()) {
-      // It will be analyzed later.
-      ClauseVars.push_back(RefExpr);
-      continue;
-    }
-
-    if (RequireCompleteExprType(RefExpr, diag::err_oss_incomplete_type))
-      continue;
-
-    // TODO: check with OSSArraySectionExpr
-    auto *ASE = dyn_cast<ArraySubscriptExpr>(SimpleExpr);
-    // Allow only LValues, forbid ArraySubscripts over things
-    // that are not an array like:
-    //   typedef float V __attribute__((vector_size(16)));
-    //   V a;
-    //   #pragma oss task in(a[3])
-    // and functions:
-    //   void foo() { #pragma oss task in(foo) {} }
-    if (RefExpr->IgnoreParenImpCasts()->getType()->isFunctionType() ||
-        !RefExpr->IgnoreParenImpCasts()->isLValue() ||
-        (ASE &&
-         !ASE->getBase()->getType().getNonReferenceType()->isPointerType() &&
-         !ASE->getBase()->getType().getNonReferenceType()->isArrayType())) {
-      Diag(ELoc, diag::err_oss_expected_addressable_lvalue_or_array_item)
-          << RefExpr->getSourceRange();
-      continue;
-    }
-
-    class CheckCallExpr
-        : public ConstStmtVisitor<CheckCallExpr, bool> {
-    // This Visitor checks the base of the
-    // dependency is over a CallExpr, which is error.
-    // int *get();
-    // auto l = []() -> int * {...};
-    // #pragma oss task in(get()[1], l()[3])
-    public:
-      bool VisitOSSMultiDepExpr(const OSSMultiDepExpr *E) {
-        return Visit(E->getDepExpr());
-      }
-
-      bool VisitOSSArrayShapingExpr(const OSSArrayShapingExpr *E) {
-        return Visit(E->getBase());
-      }
-
-      bool VisitOSSArraySectionExpr(const OSSArraySectionExpr *E) {
-        return Visit(E->getBase());
-      }
-
-      bool VisitArraySubscriptExpr(const ArraySubscriptExpr *E) {
-        return Visit(E->getBase());
-      }
-
-      bool VisitUnaryOperator(const UnaryOperator *E) {
-        return Visit(E->getSubExpr());
-      }
-
-      bool VisitMemberExpr(const MemberExpr *E) {
-        return Visit(E->getBase());
-      }
-
-      bool VisitCallExpr(const CallExpr *E) {
-        return true;
-      }
-    };
-    CheckCallExpr CCE;
-    if (CCE.Visit(RefExpr)) {
-      Diag(ELoc, diag::err_oss_call_expr_support)
-          << RefExpr->getSourceRange();
-      continue;
-    }
-
-    bool InvalidArraySection = false;
-    while (auto *OASE = dyn_cast<OSSArraySectionExpr>(SimpleExpr)) {
-      if (!OASE->isColonForm() && !OSSSyntax) {
-        Diag(OASE->getColonLoc(), diag::err_oss_section_invalid_form)
-            << RefExpr->getSourceRange();
-        // Only diagnose the first error
-        InvalidArraySection = true;
-        break;
-      }
-      SimpleExpr = OASE->getBase()->IgnoreParenImpCasts();
-    }
-    if (InvalidArraySection)
-      continue;
-    ClauseVars.push_back(RefExpr->IgnoreParenImpCasts());
+    if (checkDependency(*this, RefExpr, OSSSyntax, /*Outline=*/false))
+      ClauseVars.push_back(RefExpr->IgnoreParenImpCasts());
   }
   return OSSDependClause::Create(Context, StartLoc, LParenLoc, EndLoc,
                                  DepKinds, DepKindsOrdered,
@@ -3612,6 +3728,9 @@ Sema::ActOnOmpSsVarListClause(
     break;
   case OSSC_firstprivate:
     Res = ActOnOmpSsFirstprivateClause(Vars, StartLoc, LParenLoc, EndLoc);
+    break;
+  case OSSC_ndrange:
+    Res = ActOnOmpSsNdrangeClause(Vars, StartLoc, LParenLoc, EndLoc);
     break;
   case OSSC_depend:
     Res = ActOnOmpSsDependClause(DepKinds, DepLoc, ColonLoc, Vars,
@@ -3640,6 +3759,10 @@ Sema::ActOnOmpSsVarListClause(
     break;
   case OSSC_commutative:
     Res = ActOnOmpSsDependClause({ OSSC_DEPEND_mutexinoutset }, DepLoc, ColonLoc, Vars,
+                                 StartLoc, LParenLoc, EndLoc, /*OSSSyntax=*/true);
+    break;
+  case OSSC_on:
+    Res = ActOnOmpSsDependClause({ OSSC_DEPEND_inout }, DepLoc, ColonLoc, Vars,
                                  StartLoc, LParenLoc, EndLoc, /*OSSSyntax=*/true);
     break;
   case OSSC_weakin:
@@ -3673,6 +3796,24 @@ Sema::ActOnOmpSsVarListClause(
 }
 
 OSSClause *
+Sema::ActOnOmpSsFixedListClause(
+  OmpSsClauseKind Kind, ArrayRef<Expr *> Vars,
+  SourceLocation StartLoc, SourceLocation LParenLoc,
+  SourceLocation EndLoc) {
+
+  OSSClause *Res = nullptr;
+  switch (Kind) {
+  case OSSC_label:
+    Res = ActOnOmpSsLabelClause(Vars, StartLoc, LParenLoc, EndLoc);
+    break;
+  default:
+    llvm_unreachable("Clause is not allowed.");
+  }
+
+  return Res;
+}
+
+OSSClause *
 Sema::ActOnOmpSsSimpleClause(OmpSsClauseKind Kind,
                              unsigned Argument,
                              SourceLocation ArgumentLoc,
@@ -3684,6 +3825,11 @@ Sema::ActOnOmpSsSimpleClause(OmpSsClauseKind Kind,
   case OSSC_default:
     Res =
     ActOnOmpSsDefaultClause(static_cast<OmpSsDefaultClauseKind>(Argument),
+                                 ArgumentLoc, StartLoc, LParenLoc, EndLoc);
+    break;
+  case OSSC_device:
+    Res =
+    ActOnOmpSsDeviceClause(static_cast<OmpSsDeviceClauseKind>(Argument),
                                  ArgumentLoc, StartLoc, LParenLoc, EndLoc);
     break;
   default:
@@ -3713,6 +3859,32 @@ OSSClause *Sema::ActOnOmpSsDefaultClause(OmpSsDefaultClauseKind Kind,
   }
   return new (Context)
       OSSDefaultClause(Kind, KindKwLoc, StartLoc, LParenLoc, EndLoc);
+}
+
+OSSClause *Sema::ActOnOmpSsDeviceClause(OmpSsDeviceClauseKind Kind,
+                                          SourceLocation KindKwLoc,
+                                          SourceLocation StartLoc,
+                                          SourceLocation LParenLoc,
+                                          SourceLocation EndLoc) {
+  switch (Kind) {
+  case OSSC_DEVICE_smp:
+  case OSSC_DEVICE_opencl:
+  case OSSC_DEVICE_cuda:
+    break;
+  case OSSC_DEVICE_fpga:
+    // TODO: an an error for task inline fpga
+    Diag(KindKwLoc, diag::err_oss_inline_device_not_supported)
+      << getOmpSsSimpleClauseTypeName(OSSC_device, Kind);
+    break;
+  case OSSC_DEVICE_unknown:
+    Diag(KindKwLoc, diag::err_oss_unexpected_clause_value)
+        << getListOfPossibleValues(OSSC_device, /*First=*/0,
+                                   /*Last=*/OSSC_DEVICE_unknown)
+        << getOmpSsClauseName(OSSC_device);
+    return nullptr;
+  }
+  return new (Context)
+      OSSDeviceClause(Kind, KindKwLoc, StartLoc, LParenLoc, EndLoc);
 }
 
 ExprResult Sema::PerformOmpSsImplicitIntegerConversion(SourceLocation Loc,
@@ -3955,6 +4127,19 @@ Sema::ActOnOmpSsFirstprivateClause(ArrayRef<Expr *> Vars,
                                        ClauseVars, PrivateCopies, Inits);
 }
 
+OSSClause *
+Sema::ActOnOmpSsNdrangeClause(ArrayRef<Expr *> Vars,
+                       SourceLocation StartLoc,
+                       SourceLocation LParenLoc,
+                       SourceLocation EndLoc) {
+  SmallVector<Expr *, 4> ClauseVars;
+  if (!checkNdrange(*this, StartLoc, Vars, ClauseVars))
+    return nullptr;
+
+  return OSSNdrangeClause::Create(
+      Context, StartLoc, LParenLoc, EndLoc, ClauseVars);
+}
+
 ExprResult Sema::CheckNonNegativeIntegerValue(Expr *ValExpr,
                                       OmpSsClauseKind CKind,
                                       bool StrictlyPositive) {
@@ -3998,7 +4183,7 @@ ExprResult Sema::VerifyBooleanConditionWithCleanups(
   return Condition;
 }
 
-ExprResult Sema::CheckIsConstCharPtrConvertibleExpr(Expr *E) {
+ExprResult Sema::CheckIsConstCharPtrConvertibleExpr(Expr *E, bool ConstConstraint) {
   const QualType &ConstCharPtrTy =
       Context.getPointerType(Context.CharTy.withConst());
 
@@ -4012,6 +4197,23 @@ ExprResult Sema::CheckIsConstCharPtrConvertibleExpr(Expr *E) {
                          /*DirectInit=*/false);
     if (!LabelVD->hasInit())
       return ExprError();
+
+    if (ConstConstraint) {
+      if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+        if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+          bool IsClassType;
+          // Only allow these cases
+          // const char* const k1 = "hola";
+          // const char k2[] = "hola";
+          if (!(VD->hasGlobalStorage()
+              && isConstNotMutableType(*this, VD->getType(), /*AcceptIfMutable*/ false, &IsClassType))
+              || !VD->hasInit() || !isa<StringLiteral>(VD->getInit()->IgnoreParenImpCasts())) {
+            Diag(E->getExprLoc(), diag::err_oss_non_const_variable);
+            return ExprError();
+          }
+        }
+      }
+    }
 
     return LabelVD->getInit();
   }
@@ -4037,10 +4239,8 @@ ExprResult Sema::VerifyPositiveIntegerConstant(
         << E->getSourceRange();
     return ExprError();
   }
-  if (CKind == OSSC_collapse && DSAStack->getAssociatedLoops() == 1) {
+  if (CKind == OSSC_collapse && DSAStack->getAssociatedLoops() == 1)
     DSAStack->setAssociatedLoops(Result.getExtValue());
-    DSAStack->setSeenAssociatedLoops(0);
-  }
   return ICE;
 }
 
@@ -4107,15 +4307,28 @@ OSSClause *Sema::ActOnOmpSsPriorityClause(Expr *E,
   return new (Context) OSSPriorityClause(Res.get(), StartLoc, LParenLoc, EndLoc);
 }
 
-OSSClause *Sema::ActOnOmpSsLabelClause(Expr *E,
+OSSClause *Sema::ActOnOmpSsLabelClause(ArrayRef<Expr *> VarList,
                                        SourceLocation StartLoc,
                                        SourceLocation LParenLoc,
                                        SourceLocation EndLoc) {
-  ExprResult Res = CheckIsConstCharPtrConvertibleExpr(E);
-  if (Res.isInvalid())
+  SmallVector<Expr *, 2> ClauseVars;
+  ExprResult LabelRes;
+  ExprResult InstLabelRes;
+
+  LabelRes = CheckIsConstCharPtrConvertibleExpr(
+    VarList[0], /*ConstConstraint=*/true);
+  ClauseVars.push_back(LabelRes.get());
+
+  if (VarList.size() == 2) {
+    InstLabelRes = CheckIsConstCharPtrConvertibleExpr(
+      VarList[1], /*ConstConstraint=*/false);
+    ClauseVars.push_back(InstLabelRes.get());
+  }
+
+  if (LabelRes.isInvalid() || InstLabelRes.isInvalid())
     return nullptr;
 
-  return new (Context) OSSLabelClause(Res.get(), StartLoc, LParenLoc, EndLoc);
+  return OSSLabelClause::Create(Context, StartLoc, LParenLoc, EndLoc, ClauseVars);
 }
 
 OSSClause *Sema::ActOnOmpSsOnreadyClause(Expr *E,
@@ -4154,6 +4367,19 @@ OSSClause *Sema::ActOnOmpSsGrainsizeClause(
   return new (Context) OSSGrainsizeClause(Res.get(), StartLoc, LParenLoc, EndLoc);
 }
 
+OSSClause *Sema::ActOnOmpSsUnrollClause(
+    Expr *E, SourceLocation StartLoc,
+    SourceLocation LParenLoc, SourceLocation EndLoc) {
+  // The parameter of the unroll() clause must be > 0
+  // expression.
+  ExprResult Res = CheckNonNegativeIntegerValue(
+    E, OSSC_grainsize, /*StrictlyPositive=*/false);
+  if (Res.isInvalid())
+    return nullptr;
+
+  return new (Context) OSSUnrollClause(Res.get(), StartLoc, LParenLoc, EndLoc);
+}
+
 OSSClause *Sema::ActOnOmpSsCollapseClause(
     Expr *E, SourceLocation StartLoc,
     SourceLocation LParenLoc, SourceLocation EndLoc) {
@@ -4185,9 +4411,6 @@ OSSClause *Sema::ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind, Expr *Expr,
   case OSSC_priority:
     Res = ActOnOmpSsPriorityClause(Expr, StartLoc, LParenLoc, EndLoc);
     break;
-  case OSSC_label:
-    Res = ActOnOmpSsLabelClause(Expr, StartLoc, LParenLoc, EndLoc);
-    break;
   case OSSC_onready:
     Res = ActOnOmpSsOnreadyClause(Expr, StartLoc, LParenLoc, EndLoc);
     break;
@@ -4196,6 +4419,9 @@ OSSClause *Sema::ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind, Expr *Expr,
     break;
   case OSSC_grainsize:
     Res = ActOnOmpSsGrainsizeClause(Expr, StartLoc, LParenLoc, EndLoc);
+    break;
+  case OSSC_unroll:
+    Res = ActOnOmpSsUnrollClause(Expr, StartLoc, LParenLoc, EndLoc);
     break;
   case OSSC_collapse:
     Res = ActOnOmpSsCollapseClause(Expr, StartLoc, LParenLoc, EndLoc);
@@ -4214,6 +4440,9 @@ OSSClause *Sema::ActOnOmpSsClause(OmpSsClauseKind Kind,
   case OSSC_wait:
     Res = ActOnOmpSsWaitClause(StartLoc, EndLoc);
     break;
+  case OSSC_update:
+    Res = ActOnOmpSsUpdateClause(StartLoc, EndLoc);
+    break;
   default:
     llvm_unreachable("Clause is not allowed.");
   }
@@ -4223,4 +4452,9 @@ OSSClause *Sema::ActOnOmpSsClause(OmpSsClauseKind Kind,
 OSSClause *Sema::ActOnOmpSsWaitClause(SourceLocation StartLoc,
                                       SourceLocation EndLoc) {
   return new (Context) OSSWaitClause(StartLoc, EndLoc);
+}
+
+OSSClause *Sema::ActOnOmpSsUpdateClause(SourceLocation StartLoc,
+                                        SourceLocation EndLoc) {
+  return new (Context) OSSUpdateClause(StartLoc, EndLoc);
 }

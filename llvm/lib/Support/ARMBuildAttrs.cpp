@@ -7,6 +7,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/ARMBuildAttributes.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/Twine.h"
+#include "llvm/Support/LEB128.h"
+#include <iomanip>
+#include <sstream>
 
 using namespace llvm;
 
@@ -50,6 +55,10 @@ static const TagNameItem tagData[] = {
     {ARMBuildAttrs::MPextension_use, "Tag_MPextension_use"},
     {ARMBuildAttrs::DIV_use, "Tag_DIV_use"},
     {ARMBuildAttrs::DSP_extension, "Tag_DSP_extension"},
+    {ARMBuildAttrs::PAC_extension, "Tag_PAC_extension"},
+    {ARMBuildAttrs::BTI_extension, "Tag_BTI_extension"},
+    {ARMBuildAttrs::BTI_use, "Tag_BTI_use"},
+    {ARMBuildAttrs::PACRET_use, "Tag_PACRET_use"},
     {ARMBuildAttrs::nodefaults, "Tag_nodefaults"},
     {ARMBuildAttrs::also_compatible_with, "Tag_also_compatible_with"},
     {ARMBuildAttrs::T2EE_use, "Tag_T2EE_use"},
@@ -66,4 +75,40 @@ static const TagNameItem tagData[] = {
 constexpr TagNameMap ARMAttributeTags{tagData};
 const TagNameMap &llvm::ARMBuildAttrs::getARMAttributeTags() {
   return ARMAttributeTags;
+}
+
+static std::string getEncodedULEB128AsText(const uint8_t *Value,
+                                           unsigned Size) {
+  std::stringstream SS;
+  for (unsigned i = 0; i < Size; ++i) {
+    SS << "\\" << std::setfill('0') << std::setw(3) << std::oct
+       << int(Value[i]);
+  }
+  return SS.str();
+}
+
+std::string
+llvm::ARMBuildAttrs::encodeAttrTagValuePair(StringRef OriginalString) {
+  auto BytesBegin = reinterpret_cast<const uint8_t *>(OriginalString.data());
+  auto BytesEnd = BytesBegin + OriginalString.size();
+
+  unsigned N = 0;
+  const char *Error = nullptr;
+  unsigned Tag = decodeULEB128(BytesBegin, &N, BytesEnd, &Error);
+  if (Error)
+    report_fatal_error("Could not decode Tag value: " + Twine(Error));
+
+  std::string EncodedPair = getEncodedULEB128AsText(BytesBegin, N);
+  switch (Tag) {
+  case ARMBuildAttrs::CPU_raw_name:
+  case ARMBuildAttrs::CPU_name:
+  case ARMBuildAttrs::compatibility:
+  case ARMBuildAttrs::conformance:
+    EncodedPair += OriginalString.substr(N);
+    break;
+  default:
+    EncodedPair +=
+        getEncodedULEB128AsText(BytesBegin + N, OriginalString.size() - N);
+  }
+  return EncodedPair;
 }

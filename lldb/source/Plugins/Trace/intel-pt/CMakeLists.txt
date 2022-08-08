@@ -16,10 +16,16 @@ lldb_tablegen(TraceIntelPTCommandOptions.inc -gen-lldb-option-defs
 add_lldb_library(lldbPluginTraceIntelPT PLUGIN
   CommandObjectTraceStartIntelPT.cpp
   DecodedThread.cpp
-  IntelPTDecoder.cpp
+  TaskTimer.cpp
+  LibiptDecoder.cpp
+  PerfContextSwitchDecoder.cpp
+  ThreadDecoder.cpp
   TraceCursorIntelPT.cpp
   TraceIntelPT.cpp
-  TraceIntelPTSessionFileParser.cpp
+  TraceIntelPTJSONStructs.cpp
+  TraceIntelPTMultiCpuDecoder.cpp
+  TraceIntelPTBundleLoader.cpp
+  TraceIntelPTBundleSaver.cpp
 
   LINK_LIBS
     lldbCore
