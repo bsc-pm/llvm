@@ -1959,8 +1959,10 @@ kmp_int32 __kmp_omp_task(kmp_int32 gtid, kmp_task_t *new_task,
   } else if (__kmp_dflt_blocktime != KMP_MAX_BLOCKTIME &&
              __kmp_wpolicy_passive) {
     kmp_info_t *this_thr = __kmp_threads[gtid];
-    kmp_team_t *team = this_thr->th.th_team;
-    kmp_int32 nthreads = this_thr->th.th_team_nproc;
+    kmp_team_t *team = (this_thr->th.th_active_role == OMP_ROLE_FREE_AGENT) 
+                       ? this_thr->th.th_task_team->tt.tt_threads_data[this_thr->th.victim_tid].td.td_thr->th.th_team 
+                       : this_thr->th.th_team;
+    kmp_int32 nthreads = team->t.t_nproc;
     for (int i = 0; i < nthreads; ++i) {
       kmp_info_t *thread = team->t.t_threads[i];
       if (thread == this_thr)
