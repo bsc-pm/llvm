@@ -474,6 +474,9 @@ static kmp_int32 __kmp_push_priority_task(kmp_int32 gtid, kmp_info_t *thread,
                 thread_data->td.td_deque_head, thread_data->td.td_deque_tail));
   __kmp_release_bootstrap_lock(&thread_data->td.td_deque_lock);
   task_team->tt.tt_num_task_pri++; // atomic inc
+  
+  wake_up_one_free_agent();
+
   return TASK_SUCCESSFULLY_PUSHED;
 }
 
@@ -2906,8 +2909,10 @@ static kmp_task_t *__kmp_get_priority_task(kmp_int32 gtid,
   }
   do {
     // decrement num_tasks to "reserve" one task to get for execution
-    if (__kmp_atomic_compare_store(&task_team->tt.tt_num_task_pri, ntasks,
-                                   ntasks - 1))
+    //if (__kmp_atomic_compare_store(&task_team->tt.tt_num_task_pri, ntasks,
+    //                               ntasks - 1))
+      if(task_team->tt.tt_num_task_pri.compare_exchange_strong(ntasks, ntasks - 1,
+            std::memory_order_acq_rel, std::memory_order_relaxed))
       break;
   } while (ntasks > 0);
   if (ntasks == 0) {
