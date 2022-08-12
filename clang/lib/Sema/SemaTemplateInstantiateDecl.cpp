@@ -775,7 +775,7 @@ static bool isRelevantAttr(Sema &S, const Decl *D, const Attr *A) {
           FD->getReturnType()->isLValueReferenceType()) {
         return false;
       }
-      LLVM_FALLTHROUGH;
+      [[fallthrough]];
     case Builtin::BImove:
     case Builtin::BImove_if_noexcept:
       // HACK: Super-old versions of libc++ (3.1 and earlier) provide
@@ -6391,6 +6391,8 @@ NamedDecl *Sema::FindInstantiatedDecl(SourceLocation Loc, NamedDecl *D,
 
       // Move to the outer template scope.
       if (FunctionDecl *FD = dyn_cast<FunctionDecl>(DC)) {
+        // FIXME: We should use `getNonTransparentDeclContext()` here instead
+        // of `getDeclContext()` once we find the invalid test case.
         if (FD->getFriendObjectKind() && FD->getDeclContext()->isFileContext()){
           DC = FD->getLexicalDeclContext();
           continue;

@@ -408,7 +408,7 @@ const char *const optionalAttrParserCode = R"(
   {
     ::mlir::OptionalParseResult parseResult =
       parser.parseOptionalAttribute({0}Attr, {1}, "{0}", result.attributes);
-    if (parseResult.hasValue() && failed(*parseResult))
+    if (parseResult.has_value() && failed(*parseResult))
       return ::mlir::failure();
   }
 )";
@@ -445,7 +445,7 @@ const char *const enumAttrParserCode = R"(
         parser.parseOptionalAttribute(attrVal,
                                       parser.getBuilder().getNoneType(),
                                       "{0}", attrStorage);
-      if (parseResult.hasValue()) {{
+      if (parseResult.has_value()) {{
         if (failed(*parseResult))
           return ::mlir::failure();
         attrStr = attrVal.getValue();
@@ -479,7 +479,7 @@ const char *const optionalOperandParserCode = R"(
     ::mlir::OpAsmParser::UnresolvedOperand operand;
     ::mlir::OptionalParseResult parseResult =
                                     parser.parseOptionalOperand(operand);
-    if (parseResult.hasValue()) {
+    if (parseResult.has_value()) {
       if (failed(*parseResult))
         return ::mlir::failure();
       {0}Operands.push_back(operand);
@@ -532,7 +532,7 @@ const char *const optionalTypeParserCode = R"(
     ::mlir::Type optionalType;
     ::mlir::OptionalParseResult parseResult =
                                     parser.parseOptionalType(optionalType);
-    if (parseResult.hasValue()) {
+    if (parseResult.has_value()) {
       if (failed(*parseResult))
         return ::mlir::failure();
       {0}Types.push_back(optionalType);
@@ -584,7 +584,7 @@ const char *regionListParserCode = R"(
   {
     std::unique_ptr<::mlir::Region> region;
     auto firstRegionResult = parser.parseOptionalRegion(region);
-    if (firstRegionResult.hasValue()) {
+    if (firstRegionResult.has_value()) {
       if (failed(*firstRegionResult))
         return ::mlir::failure();
       {0}Regions.emplace_back(std::move(region));
@@ -622,7 +622,7 @@ const char *regionListEnsureSingleBlockParserCode = R"(
 const char *optionalRegionParserCode = R"(
   {
      auto parseResult = parser.parseOptionalRegion(*{0}Region);
-     if (parseResult.hasValue() && failed(*parseResult))
+     if (parseResult.has_value() && failed(*parseResult))
        return ::mlir::failure();
   }
 )";
@@ -656,7 +656,7 @@ const char *successorListParserCode = R"(
   {
     ::mlir::Block *succ;
     auto firstSucc = parser.parseOptionalSuccessor(succ);
-    if (firstSucc.hasValue()) {
+    if (firstSucc.has_value()) {
       if (failed(*firstSucc))
         return ::mlir::failure();
       {0}Successors.emplace_back(succ);
@@ -1558,7 +1558,7 @@ void OperationFormat::genParserVariadicSegmentResolution(Operator &op,
   if (!allOperands) {
     if (op.getTrait("::mlir::OpTrait::AttrSizedOperandSegments")) {
       body << "  result.addAttribute(\"operand_segment_sizes\", "
-           << "parser.getBuilder().getI32VectorAttr({";
+           << "parser.getBuilder().getDenseI32ArrayAttr({";
       auto interleaveFn = [&](const NamedTypeConstraint &operand) {
         // If the operand is variadic emit the parsed size.
         if (operand.isVariableLength())
@@ -1574,7 +1574,7 @@ void OperationFormat::genParserVariadicSegmentResolution(Operator &op,
         continue;
       body << llvm::formatv(
           "  result.addAttribute(\"{0}\", "
-          "parser.getBuilder().getI32TensorAttr({1}OperandGroupSizes));\n",
+          "parser.getBuilder().getDenseI32ArrayAttr({1}OperandGroupSizes));\n",
           operand.constraint.getVariadicOfVariadicSegmentSizeAttr(),
           operand.name);
     }
@@ -1583,7 +1583,7 @@ void OperationFormat::genParserVariadicSegmentResolution(Operator &op,
   if (!allResultTypes &&
       op.getTrait("::mlir::OpTrait::AttrSizedResultSegments")) {
     body << "  result.addAttribute(\"result_segment_sizes\", "
-         << "parser.getBuilder().getI32VectorAttr({";
+         << "parser.getBuilder().getDenseI32ArrayAttr({";
     auto interleaveFn = [&](const NamedTypeConstraint &result) {
       // If the result is variadic emit the parsed size.
       if (result.isVariableLength())

@@ -162,8 +162,7 @@ getReassociationMapForFoldingUnitDims(ArrayRef<OpFoldResult> mixedSizes);
 enum class LinalgTilingLoopType {
   Loops = 0,
   AffineLoops = 1,
-  ParallelLoops = 2,
-  TiledLoops = 3,
+  ParallelLoops = 2
 };
 
 /// Checks whether the specific `producer` is the last write to exactly the
@@ -216,14 +215,17 @@ Value materializeOpFoldResult(OpBuilder &b, Location loc,
 
 /// A struct containg offsets-sizes-strides arguments of the tiled shape.
 struct SliceParameters {
-  SmallVector<OpFoldResult, 3> offsets;
-  SmallVector<OpFoldResult, 3> sizes;
-  SmallVector<OpFoldResult, 3> strides;
+  SmallVector<OpFoldResult> offsets;
+  SmallVector<OpFoldResult> sizes;
+  SmallVector<OpFoldResult> strides;
 };
 
-/// Computes SliceParameters for a single `valueToTile`. `omitPartialTileCheck`
-/// controls whether to omit the partial/boundary tile condition check in cases
-/// where we statically know that it is unnecessary.
+/// Computes SliceParameters for a single `valueToTile` assuming that its user
+/// is being tiled with the given loop bounds `lbs` and `ubs` and the tile sizes
+/// `tileSizes`.
+///
+/// `omitPartialTileCheck` controls whether to omit the partial/boundary tile
+/// condition check in cases where we statically know that it is unnecessary.
 SliceParameters
 computeSliceParameters(OpBuilder &builder, Location loc, Value valueToTile,
                        ArrayRef<OpFoldResult> tileSizes, AffineMap map,
@@ -231,13 +233,9 @@ computeSliceParameters(OpBuilder &builder, Location loc, Value valueToTile,
                        ArrayRef<OpFoldResult> subShapeSizes,
                        bool omitPartialTileCheck);
 
-/// Computes SliceParamaters for all `valuesToTile` of the given
-/// `linalgOp`, assuming `linalgOp` is being fused into a loop
-/// nest for tiling with the given induction variables `ivs` and tile sizes
-/// `tileSizes`. `sizeBounds` are the iteration space bounds for *all* the
-/// implicit loops in `linalgOp`. `omitPartialTileCheck` controls whether to
-/// omit the partial/boundary tile condition check in cases where we statically
-/// know that it is unnecessary.
+/// Computes SliceParamaters for all `valuesToTile` of the given `linalgOp`,
+/// assuming `linalgOp` is being fused into a loop nest. Calls
+/// `computeSliceParameters` for every individual value.
 ///
 /// Note that a constant zero in `tileSizes` means no tiling at that implicit
 /// loop. The number of non-zero values in `tileSizes` should be equal to the

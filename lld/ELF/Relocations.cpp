@@ -812,9 +812,9 @@ void elf::reportUndefinedSymbols() {
   }
 
   // Enable spell corrector for the first 2 diagnostics.
-  for (auto it : enumerate(undefs))
-    if (!it.value().locs.empty())
-      reportUndefinedSymbol(it.value(), it.index() < 2);
+  for (const auto &[i, undef] : llvm::enumerate(undefs))
+    if (!undef.locs.empty())
+      reportUndefinedSymbol(undef, i < 2);
   undefs.clear();
 }
 
@@ -1712,7 +1712,8 @@ static bool mergeCmp(const InputSection *a, const InputSection *b) {
   if (a->outSecOff < b->outSecOff)
     return true;
 
-  if (a->outSecOff == b->outSecOff) {
+  // FIXME dyn_cast<ThunkSection> is non-null for any SyntheticSection.
+  if (a->outSecOff == b->outSecOff && a != b) {
     auto *ta = dyn_cast<ThunkSection>(a);
     auto *tb = dyn_cast<ThunkSection>(b);
 
