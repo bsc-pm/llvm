@@ -1696,7 +1696,7 @@ void CodeGenModule::SetLLVMFunctionAttributes(GlobalDecl GD,
   F->setCallingConv(static_cast<llvm::CallingConv::ID>(CallingConv));
   if (getLangOpts().HLSL) {
     if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(GD.getDecl()))
-      getHLSLRuntime().setHLSLFnuctionAttributes(F, FD);
+      getHLSLRuntime().setHLSLFunctionAttributes(F, FD);
   }
 }
 
@@ -5491,7 +5491,7 @@ CodeGenModule::GetAddrOfConstantCFString(const StringLiteral *Literal) {
 
     switch (CFRuntime) {
     default: break;
-    case LangOptions::CoreFoundationABI::Swift: LLVM_FALLTHROUGH;
+    case LangOptions::CoreFoundationABI::Swift: [[fallthrough]];
     case LangOptions::CoreFoundationABI::Swift5_0:
       CFConstantStringClassName =
           Triple.isOSDarwin() ? "$s15SwiftFoundation19_NSCFConstantStringCN"
@@ -6148,7 +6148,7 @@ void CodeGenModule::EmitTopLevelDecl(Decl *D) {
               TSK_ExplicitInstantiationDefinition &&
           Spec->hasDefinition())
         DI->completeTemplateDefinition(*Spec);
-  } LLVM_FALLTHROUGH;
+  } [[fallthrough]];
   case Decl::CXXRecord: {
     CXXRecordDecl *CRD = cast<CXXRecordDecl>(D);
     if (CGDebugInfo *DI = getModuleDebugInfo()) {

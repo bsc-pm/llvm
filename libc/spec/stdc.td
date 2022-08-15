@@ -806,7 +806,7 @@ def StdC : StandardSpec<"stdc"> {
               "thrd_join",
               RetValSpec<IntType>,
               [
-                  ArgSpec<ThrdTTypePtr>,
+                  ArgSpec<ThrdTType>,
                   ArgSpec<IntPtr>,
               ]
           >,
@@ -824,7 +824,12 @@ def StdC : StandardSpec<"stdc"> {
               "thrd_equal",
               RetValSpec<IntType>,
               [ArgSpec<ThrdTType>, ArgSpec<ThrdTType>]
-          >
+          >,
+          FunctionSpec<
+              "thrd_exit",
+              RetValSpec<VoidType>,
+              [ArgSpec<IntType>]
+          >,
       ]
   >;
 

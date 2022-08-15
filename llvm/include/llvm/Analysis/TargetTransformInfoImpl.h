@@ -50,8 +50,8 @@ public:
                              TTI::TargetCostKind CostKind) const {
     // In the basic model, we just assume that all-constant GEPs will be folded
     // into their uses via addressing modes.
-    for (unsigned Idx = 0, Size = Operands.size(); Idx != Size; ++Idx)
-      if (!isa<Constant>(Operands[Idx]))
+    for (const Value *Operand : Operands)
+      if (!isa<Constant>(Operand))
         return TTI::TCC_Basic;
 
     return TTI::TCC_Free;
@@ -449,7 +449,7 @@ public:
   getCacheSize(TargetTransformInfo::CacheLevel Level) const {
     switch (Level) {
     case TargetTransformInfo::CacheLevel::L1D:
-      LLVM_FALLTHROUGH;
+      [[fallthrough]];
     case TargetTransformInfo::CacheLevel::L2D:
       return llvm::Optional<unsigned>();
     }
@@ -460,7 +460,7 @@ public:
   getCacheAssociativity(TargetTransformInfo::CacheLevel Level) const {
     switch (Level) {
     case TargetTransformInfo::CacheLevel::L1D:
-      LLVM_FALLTHROUGH;
+      [[fallthrough]];
     case TargetTransformInfo::CacheLevel::L2D:
       return llvm::Optional<unsigned>();
     }
@@ -816,6 +816,8 @@ public:
   bool shouldExpandReduction(const IntrinsicInst *II) const { return true; }
 
   unsigned getGISelRematGlobalCost() const { return 1; }
+
+  unsigned getMinTripCountTailFoldingThreshold() const { return 0; }
 
   bool supportsScalableVectors() const { return false; }
 

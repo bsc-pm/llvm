@@ -135,6 +135,11 @@ static cl::opt<bool> EnableShrinkLoadReplaceStoreWithStore(
     cl::desc("DAG combiner enable load/<replace bytes>/store with "
              "a narrower store"));
 
+static cl::opt<bool> EnableVectorFCopySignExtendRound(
+    "combiner-vector-fcopysign-extend-round", cl::Hidden, cl::init(false),
+    cl::desc(
+        "Enable merging extends and rounds into FCOPYSIGN on vector types"));
+
 namespace {
 
   class DAGCombiner {
@@ -1962,7 +1967,7 @@ SDValue DAGCombiner::visitTokenFactor(SDNode *N) {
           Changed = true;
           break;
         }
-        LLVM_FALLTHROUGH;
+        [[fallthrough]];
 
       default:
         // Only add if it isn't already in the list.
@@ -5326,6 +5331,21 @@ SDValue DAGCombiner::hoistLogicOpWithSameOpcodeHands(SDNode *N) {
     return DAG.getNode(HandOpcode, DL, VT, Logic);
   }
 
+  // For funnel shifts FSHL/FSHR:
+  // logic_op (OP x, x1, s), (OP y, y1, s) -->
+  // --> OP (logic_op x, y), (logic_op, x1, y1), s
+  if ((HandOpcode == ISD::FSHL || HandOpcode == ISD::FSHR) &&
+      N0.getOperand(2) == N1.getOperand(2)) {
+    if (!N0.hasOneUse() || !N1.hasOneUse())
+      return SDValue();
+    SDValue X1 = N0.getOperand(1);
+    SDValue Y1 = N1.getOperand(1);
+    SDValue S = N0.getOperand(2);
+    SDValue Logic0 = DAG.getNode(LogicOpcode, DL, VT, X, Y);
+    SDValue Logic1 = DAG.getNode(LogicOpcode, DL, VT, X1, Y1);
+    return DAG.getNode(HandOpcode, DL, VT, Logic0, Logic1, S);
+  }
+
   // Simplify xor/and/or (bitcast(A), bitcast(B)) -> bitcast(op (A,B))
   // Only perform this optimization up until type legalization, before
   // LegalizeVectorOprs. LegalizeVectorOprs promotes vector operations by
@@ -6358,7 +6378,8 @@ SDValue DAGCombiner::visitAND(SDNode *N) {
     SDValue Extendee = Ext->getOperand(0);
 
     unsigned ScalarWidth = Extendee.getValueType().getScalarSizeInBits();
-    if (N1C->getAPIntValue().isMask(ScalarWidth)) {
+    if (N1C->getAPIntValue().isMask(ScalarWidth) &&
+        (!LegalOperations || TLI.isOperationLegal(ISD::ZERO_EXTEND, ExtVT))) {
       //    (and (extract_subvector (zext|anyext|sext v) _) iN_mask)
       // => (extract_subvector (iN_zeroext v))
       SDValue ZeroExtExtendee =
@@ -13848,13 +13869,40 @@ SDValue DAGCombiner::visitFREEZE(SDNode *N) {
   if (DAG.isGuaranteedNotToBeUndefOrPoison(N0, /*PoisonOnly*/ false))
     return N0;
 
-  // Fold freeze(bitcast(x)) -> bitcast(freeze(x)).
-  // TODO: Replace with pushFreezeToPreventPoisonFromPropagating fold.
-  if (N0.getOpcode() == ISD::BITCAST)
-    return DAG.getBitcast(N->getValueType(0),
-                          DAG.getNode(ISD::FREEZE, SDLoc(N0),
-                                      N0.getOperand(0).getValueType(),
-                                      N0.getOperand(0)));
+  // Fold freeze(op(x,y,z)) -> op(freeze(x),y,z).
+  // Try to push freeze through instructions that propagate but don't produce
+  // poison as far as possible. If an operand of freeze follows three
+  // conditions 1) one-use, 2) does not produce poison, and 3) has all but one
+  // guaranteed-non-poison operands then push the freeze through to the one
+  // operand that is not guaranteed non-poison.
+  if (!DAG.canCreateUndefOrPoison(N0, /*PoisonOnly*/ false) &&
+      N0->getNumValues() == 1 && N0->hasOneUse()) {
+    SDValue MaybePoisonOperand;
+    for (SDValue Op : N0->ops()) {
+      if (DAG.isGuaranteedNotToBeUndefOrPoison(Op, /*PoisonOnly*/ false))
+        continue;
+      if ((!MaybePoisonOperand && N0->isOnlyUserOf(Op.getNode())) ||
+          MaybePoisonOperand == Op) {
+        MaybePoisonOperand = Op;
+        continue;
+      }
+      // Multiple maybe-poison ops - bail out.
+      MaybePoisonOperand = SDValue();
+      break;
+    }
+    if (MaybePoisonOperand) {
+      // Recreate the node with the frozen maybe-poison operand.
+      // TODO: Drop the isOnlyUserOf constraint and replace all users of
+      // MaybePoisonOperand with FrozenMaybePoisonOperand
+      // to match pushFreezeToPreventPoisonFromPropagating behavior.
+      SDValue FrozenMaybePoisonOperand = DAG.getFreeze(MaybePoisonOperand);
+      SmallVector<SDValue> Ops(N0->op_begin(), N0->op_end());
+      for (SDValue &Op : Ops)
+        if (Op == MaybePoisonOperand)
+          Op = FrozenMaybePoisonOperand;
+      return DAG.getNode(N0.getOpcode(), SDLoc(N0), N0->getVTList(), Ops);
+    }
+  }
 
   return SDValue();
 }
@@ -14972,7 +15020,7 @@ SDValue DAGCombiner::visitFMUL(SDNode *N) {
       case ISD::SETLT:
       case ISD::SETLE:
         std::swap(TrueOpnd, FalseOpnd);
-        LLVM_FALLTHROUGH;
+        [[fallthrough]];
       case ISD::SETOGT:
       case ISD::SETUGT:
       case ISD::SETOGE:
@@ -15404,11 +15452,7 @@ static inline bool CanCombineFCOPYSIGN_EXTEND_ROUND(SDNode *N) {
     if (N1Op0VT == MVT::f128)
       return false;
 
-    // Avoid mismatched vector operand types, for better instruction selection.
-    if (N1Op0VT.isVector())
-      return false;
-
-    return true;
+    return !N1Op0VT.isVector() || EnableVectorFCopySignExtendRound;
   }
   return false;
 }
@@ -19421,7 +19465,7 @@ SDValue DAGCombiner::combineInsertEltToShuffle(SDNode *N, unsigned InsIndex) {
     }
 
     if (ElementOffset != -1) {
-      SmallVector<int, 16> NewMask(Mask.begin(), Mask.end());
+      SmallVector<int, 16> NewMask(Mask);
 
       auto *ExtrIndex = cast<ConstantSDNode>(InsertVal.getOperand(1));
       NewMask[InsIndex] = ElementOffset + ExtrIndex->getZExtValue();
@@ -22401,7 +22445,7 @@ static SDValue replaceShuffleOfInsert(ShuffleVectorSDNode *Shuf,
   // First, check if we are taking one element of a vector and shuffling that
   // element into another vector.
   ArrayRef<int> Mask = Shuf->getMask();
-  SmallVector<int, 16> CommutedMask(Mask.begin(), Mask.end());
+  SmallVector<int, 16> CommutedMask(Mask);
   SDValue Op0 = Shuf->getOperand(0);
   SDValue Op1 = Shuf->getOperand(1);
   int ShufOp0Index = getShuffleMaskIndexOfOneElementFromOp0IntoOp1(Mask);
@@ -22712,7 +22756,7 @@ SDValue DAGCombiner::visitVECTOR_SHUFFLE(SDNode *N) {
       if (SDValue InsertN1 = ShuffleToInsert(N0, N1, Mask))
         return InsertN1;
     if (N0.getOpcode() == ISD::CONCAT_VECTORS) {
-      SmallVector<int> CommuteMask(Mask.begin(), Mask.end());
+      SmallVector<int> CommuteMask(Mask);
       ShuffleVectorSDNode::commuteMask(CommuteMask);
       if (SDValue InsertN0 = ShuffleToInsert(N1, N0, CommuteMask))
         return InsertN0;
@@ -22748,6 +22792,7 @@ SDValue DAGCombiner::visitVECTOR_SHUFFLE(SDNode *N) {
       SDLoc DL(N);
       EVT IntVT = VT.changeVectorElementTypeToInteger();
       EVT IntSVT = VT.getVectorElementType().changeTypeToInteger();
+      IntSVT = TLI.getTypeToTransformTo(*DAG.getContext(), IntSVT);
       SDValue ZeroElt = DAG.getConstant(0, DL, IntSVT);
       SDValue AllOnesElt = DAG.getAllOnesConstant(DL, IntSVT);
       SmallVector<SDValue, 16> AndMask(NumElts, DAG.getUNDEF(IntSVT));

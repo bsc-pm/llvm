@@ -47,14 +47,18 @@ std::unique_ptr<TarWriter> elf::tar;
 
 // Returns "<internal>", "foo.a(bar.o)" or "baz.o".
 std::string lld::toString(const InputFile *f) {
+  static std::mutex mu;
   if (!f)
     return "<internal>";
 
-  if (f->toStringCache.empty()) {
-    if (f->archiveName.empty())
-      f->toStringCache = f->getName();
-    else
-      (f->archiveName + "(" + f->getName() + ")").toVector(f->toStringCache);
+  {
+    std::lock_guard<std::mutex> lock(mu);
+    if (f->toStringCache.empty()) {
+      if (f->archiveName.empty())
+        f->toStringCache = f->getName();
+      else
+        (f->archiveName + "(" + f->getName() + ")").toVector(f->toStringCache);
+    }
   }
   return std::string(f->toStringCache);
 }
@@ -278,7 +282,7 @@ template <class ELFT> static void doParseFile(InputFile *file) {
   // LLVM bitcode file
   if (auto *f = dyn_cast<BitcodeFile>(file)) {
     ctx->bitcodeFiles.push_back(f);
-    f->parse<ELFT>();
+    f->parse();
     return;
   }
 
@@ -768,7 +772,7 @@ void ObjFile<ELFT>::initializeSections(bool ignoreComdats,
       break;
     case SHT_LLVM_SYMPART:
       ctx->hasSympart.store(true, std::memory_order_relaxed);
-      LLVM_FALLTHROUGH;
+      [[fallthrough]];
     default:
       this->sections[i] =
           createInputSection(i, sec, check(obj.getSectionName(sec, shstrtab)));
@@ -1628,7 +1632,6 @@ static uint8_t mapVisibility(GlobalValue::VisibilityTypes gvVisibility) {
   llvm_unreachable("unknown visibility");
 }
 
-template <class ELFT>
 static void
 createBitcodeSymbol(Symbol *&sym, const std::vector<bool> &keptComdats,
                     const lto::InputFile::Symbol &objSym, BitcodeFile &f) {
@@ -1659,7 +1662,7 @@ createBitcodeSymbol(Symbol *&sym, const std::vector<bool> &keptComdats,
   }
 }
 
-template <class ELFT> void BitcodeFile::parse() {
+void BitcodeFile::parse() {
   for (std::pair<StringRef, Comdat::SelectionKind> s : obj->getComdatTable()) {
     keptComdats.push_back(
         s.second == Comdat::NoDeduplicate ||
@@ -1670,16 +1673,12 @@ template <class ELFT> void BitcodeFile::parse() {
   symbols.resize(obj->symbols().size());
   // Process defined symbols first. See the comment in
   // ObjFile<ELFT>::initializeSymbols.
-  for (auto it : llvm::enumerate(obj->symbols()))
-    if (!it.value().isUndefined()) {
-      Symbol *&sym = symbols[it.index()];
-      createBitcodeSymbol<ELFT>(sym, keptComdats, it.value(), *this);
-    }
-  for (auto it : llvm::enumerate(obj->symbols()))
-    if (it.value().isUndefined()) {
-      Symbol *&sym = symbols[it.index()];
-      createBitcodeSymbol<ELFT>(sym, keptComdats, it.value(), *this);
-    }
+  for (auto [i, irSym] : llvm::enumerate(obj->symbols()))
+    if (!irSym.isUndefined())
+      createBitcodeSymbol(symbols[i], keptComdats, irSym, *this);
+  for (auto [i, irSym] : llvm::enumerate(obj->symbols()))
+    if (irSym.isUndefined())
+      createBitcodeSymbol(symbols[i], keptComdats, irSym, *this);
 
   for (auto l : obj->getDependentLibraries())
     addDependentLibrary(l, this);
@@ -1688,22 +1687,21 @@ template <class ELFT> void BitcodeFile::parse() {
 void BitcodeFile::parseLazy() {
   SymbolTable &symtab = *elf::symtab;
   symbols.resize(obj->symbols().size());
-  for (auto it : llvm::enumerate(obj->symbols()))
-    if (!it.value().isUndefined()) {
-      auto *sym = symtab.insert(saver().save(it.value().getName()));
+  for (auto [i, irSym] : llvm::enumerate(obj->symbols()))
+    if (!irSym.isUndefined()) {
+      auto *sym = symtab.insert(saver().save(irSym.getName()));
       sym->resolve(LazyObject{*this});
-      symbols[it.index()] = sym;
+      symbols[i] = sym;
     }
 }
 
 void BitcodeFile::postParse() {
-  for (auto it : llvm::enumerate(obj->symbols())) {
-    const Symbol &sym = *symbols[it.index()];
-    const auto &objSym = it.value();
-    if (sym.file == this || !sym.isDefined() || objSym.isUndefined() ||
-        objSym.isCommon() || objSym.isWeak())
+  for (auto [i, irSym] : llvm::enumerate(obj->symbols())) {
+    const Symbol &sym = *symbols[i];
+    if (sym.file == this || !sym.isDefined() || irSym.isUndefined() ||
+        irSym.isCommon() || irSym.isWeak())
       continue;
-    int c = objSym.getComdatIndex();
+    int c = irSym.getComdatIndex();
     if (c != -1 && !keptComdats[c])
       continue;
     reportDuplicate(sym, this, nullptr, 0);
@@ -1798,11 +1796,6 @@ std::string elf::replaceThinLTOSuffix(StringRef path) {
     return (path + repl).str();
   return std::string(path);
 }
-
-template void BitcodeFile::parse<ELF32LE>();
-template void BitcodeFile::parse<ELF32BE>();
-template void BitcodeFile::parse<ELF64LE>();
-template void BitcodeFile::parse<ELF64BE>();
 
 template class elf::ObjFile<ELF32LE>;
 template class elf::ObjFile<ELF32BE>;
