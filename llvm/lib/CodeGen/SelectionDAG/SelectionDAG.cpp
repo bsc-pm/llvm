@@ -291,6 +291,31 @@ bool ISD::isBuildVectorOfConstantFPSDNodes(const SDNode *N) {
   return true;
 }
 
+bool ISD::isVectorShrinkable(const SDNode *N, unsigned NewEltSize,
+                             bool Signed) {
+  if (N->getOpcode() != ISD::BUILD_VECTOR)
+    return false;
+
+  unsigned EltSize = N->getValueType(0).getScalarSizeInBits();
+  if (EltSize <= NewEltSize)
+    return false;
+
+  for (const SDValue &Op : N->op_values()) {
+    if (Op.isUndef())
+      continue;
+    if (!isa<ConstantSDNode>(Op))
+      return false;
+
+    APInt C = cast<ConstantSDNode>(Op)->getAPIntValue().trunc(EltSize);
+    if (Signed && C.trunc(NewEltSize).sext(EltSize) != C)
+      return false;
+    if (!Signed && C.trunc(NewEltSize).zext(EltSize) != C)
+      return false;
+  }
+
+  return true;
+}
+
 bool ISD::allOperandsUndef(const SDNode *N) {
   // Return false if the node has no operands.
   // This is "logically inconsistent" with the definition of "all" but
@@ -4508,6 +4533,9 @@ bool SelectionDAG::isGuaranteedNotToBeUndefOrPoison(SDValue Op,
     return true;
 
   switch (Opcode) {
+  case ISD::VALUETYPE:
+    return true;
+
   case ISD::UNDEF:
     return PoisonOnly;
 
@@ -4564,7 +4592,12 @@ bool SelectionDAG::canCreateUndefOrPoison(SDValue Op, const APInt &DemandedElts,
 
   unsigned Opcode = Op.getOpcode();
   switch (Opcode) {
+  case ISD::AssertSext:
+  case ISD::AssertZext:
   case ISD::FREEZE:
+  case ISD::AND:
+  case ISD::OR:
+  case ISD::XOR:
   case ISD::BSWAP:
   case ISD::CTPOP:
   case ISD::BITREVERSE:
@@ -4572,8 +4605,25 @@ bool SelectionDAG::canCreateUndefOrPoison(SDValue Op, const APInt &DemandedElts,
   case ISD::SIGN_EXTEND:
   case ISD::ZERO_EXTEND:
   case ISD::TRUNCATE:
+  case ISD::SIGN_EXTEND_INREG:
   case ISD::BITCAST:
     return false;
+
+  case ISD::ADD:
+  case ISD::SUB:
+  case ISD::MUL:
+    // Matches hasPoisonGeneratingFlags().
+    return ConsiderFlags && (Op->getFlags().hasNoSignedWrap() ||
+                             Op->getFlags().hasNoUnsignedWrap());
+
+  case ISD::SHL:
+    // If the max shift amount isn't in range, then the shift can create poison.
+    if (!getValidMaximumShiftAmountConstant(Op, DemandedElts))
+      return true;
+
+    // Matches hasPoisonGeneratingFlags().
+    return ConsiderFlags && (Op->getFlags().hasNoSignedWrap() ||
+                             Op->getFlags().hasNoUnsignedWrap());
 
   default:
     // Allow the target to implement this method for its nodes.
@@ -5908,11 +5958,11 @@ void SelectionDAG::canonicalizeCommutativeBinop(unsigned Opcode, SDValue &N1,
 
   // Canonicalize:
   //   binop(const, nonconst) -> binop(nonconst, const)
-  bool IsN1C = isConstantIntBuildVectorOrConstantInt(N1);
-  bool IsN2C = isConstantIntBuildVectorOrConstantInt(N2);
-  bool IsN1CFP = isConstantFPBuildVectorOrConstantFP(N1);
-  bool IsN2CFP = isConstantFPBuildVectorOrConstantFP(N2);
-  if ((IsN1C && !IsN2C) || (IsN1CFP && !IsN2CFP))
+  SDNode *N1C = isConstantIntBuildVectorOrConstantInt(N1);
+  SDNode *N2C = isConstantIntBuildVectorOrConstantInt(N2);
+  SDNode *N1CFP = isConstantFPBuildVectorOrConstantFP(N1);
+  SDNode *N2CFP = isConstantFPBuildVectorOrConstantFP(N2);
+  if ((N1C && !N2C) || (N1CFP && !N2CFP))
     std::swap(N1, N2);
 
   // Canonicalize:

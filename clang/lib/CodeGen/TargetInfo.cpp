@@ -11549,6 +11549,92 @@ public:
 } // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
+// BPF ABI Implementation
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+class BPFABIInfo : public DefaultABIInfo {
+public:
+  BPFABIInfo(CodeGenTypes &CGT) : DefaultABIInfo(CGT) {}
+
+  ABIArgInfo classifyArgumentType(QualType Ty) const {
+    Ty = useFirstFieldIfTransparentUnion(Ty);
+
+    if (isAggregateTypeForABI(Ty)) {
+      uint64_t Bits = getContext().getTypeSize(Ty);
+      if (Bits == 0)
+        return ABIArgInfo::getIgnore();
+
+      // If the aggregate needs 1 or 2 registers, do not use reference.
+      if (Bits <= 128) {
+        llvm::Type *CoerceTy;
+        if (Bits <= 64) {
+          CoerceTy =
+              llvm::IntegerType::get(getVMContext(), llvm::alignTo(Bits, 8));
+        } else {
+          llvm::Type *RegTy = llvm::IntegerType::get(getVMContext(), 64);
+          CoerceTy = llvm::ArrayType::get(RegTy, 2);
+        }
+        return ABIArgInfo::getDirect(CoerceTy);
+      } else {
+        return getNaturalAlignIndirect(Ty);
+      }
+    }
+
+    if (const EnumType *EnumTy = Ty->getAs<EnumType>())
+      Ty = EnumTy->getDecl()->getIntegerType();
+
+    ASTContext &Context = getContext();
+    if (const auto *EIT = Ty->getAs<BitIntType>())
+      if (EIT->getNumBits() > Context.getTypeSize(Context.Int128Ty))
+        return getNaturalAlignIndirect(Ty);
+
+    return (isPromotableIntegerTypeForABI(Ty) ? ABIArgInfo::getExtend(Ty)
+                                              : ABIArgInfo::getDirect());
+  }
+
+  ABIArgInfo classifyReturnType(QualType RetTy) const {
+    if (RetTy->isVoidType())
+      return ABIArgInfo::getIgnore();
+
+    if (isAggregateTypeForABI(RetTy))
+      return getNaturalAlignIndirect(RetTy);
+
+    // Treat an enum type as its underlying type.
+    if (const EnumType *EnumTy = RetTy->getAs<EnumType>())
+      RetTy = EnumTy->getDecl()->getIntegerType();
+
+    ASTContext &Context = getContext();
+    if (const auto *EIT = RetTy->getAs<BitIntType>())
+      if (EIT->getNumBits() > Context.getTypeSize(Context.Int128Ty))
+        return getNaturalAlignIndirect(RetTy);
+
+    // Caller will do necessary sign/zero extension.
+    return ABIArgInfo::getDirect();
+  }
+
+  void computeInfo(CGFunctionInfo &FI) const override {
+    FI.getReturnInfo() = classifyReturnType(FI.getReturnType());
+    for (auto &I : FI.arguments())
+      I.info = classifyArgumentType(I.type);
+  }
+
+};
+
+class BPFTargetCodeGenInfo : public TargetCodeGenInfo {
+public:
+  BPFTargetCodeGenInfo(CodeGenTypes &CGT)
+      : TargetCodeGenInfo(std::make_unique<BPFABIInfo>(CGT)) {}
+
+  const BPFABIInfo &getABIInfo() const {
+    return static_cast<const BPFABIInfo&>(TargetCodeGenInfo::getABIInfo());
+  }
+};
+
+}
+
+//===----------------------------------------------------------------------===//
 // Driver code
 //===----------------------------------------------------------------------===//
 
@@ -11776,6 +11862,9 @@ const TargetCodeGenInfo &CodeGenModule::getTargetCodeGenInfo() {
                                                       : hasFP64   ? 64
                                                                   : 32));
   }
+  case llvm::Triple::bpfeb:
+  case llvm::Triple::bpfel:
+    return SetCGInfo(new BPFTargetCodeGenInfo(Types));
   }
 }
 

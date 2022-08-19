@@ -27,8 +27,7 @@ using namespace llvm;
 
 #define DEBUG_TYPE "riscv-isel"
 
-namespace llvm {
-namespace RISCV {
+namespace llvm::RISCV {
 #define GET_RISCVVSSEGTable_IMPL
 #define GET_RISCVVLSEGTable_IMPL
 #define GET_RISCVVLXSEGTable_IMPL
@@ -39,8 +38,7 @@ namespace RISCV {
 #define GET_RISCVVSXTable_IMPL
 #define GET_RISCVMaskedPseudosTable_IMPL
 #include "RISCVGenSearchableTables.inc"
-} // namespace RISCV
-} // namespace llvm
+} // namespace llvm::RISCV
 
 void RISCVDAGToDAGISel::PreprocessISelDAG() {
   SelectionDAG::allnodes_iterator Position = CurDAG->allnodes_end();
@@ -2595,6 +2593,7 @@ bool RISCVDAGToDAGISel::doPeepholeMaskedRVV(SDNode *N) {
     Ops.push_back(SDValue(TGlued, TGlued->getNumValues() - 1));
 
   SDNode *Result = CurDAG->getMachineNode(Opc, SDLoc(N), N->getVTList(), Ops);
+  Result->setFlags(N->getFlags());
   ReplaceUses(N, Result);
 
   return true;
@@ -2697,6 +2696,7 @@ bool RISCVDAGToDAGISel::doPeepholeMergeVVMFold() {
 
     SDNode *Result =
         CurDAG->getMachineNode(MaskedOpc, DL, True->getVTList(), Ops);
+    Result->setFlags(True->getFlags());
 
     // Replace vmerge.vvm node by Result.
     ReplaceUses(SDValue(N, 0), SDValue(Result, 0));

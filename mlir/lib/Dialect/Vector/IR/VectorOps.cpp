@@ -393,9 +393,9 @@ void vector::ReductionOp::build(OpBuilder &builder, OperationState &result,
 }
 
 LogicalResult ReductionOp::verify() {
-  // Verify for 1-D vector.
+  // Verify for 0-D and 1-D vector.
   int64_t rank = getVectorType().getRank();
-  if (rank != 1)
+  if (rank > 1)
     return emitOpError("unsupported reduction rank: ") << rank;
 
   // Verify supported reduction kind.
@@ -2100,7 +2100,7 @@ void InsertStridedSliceOp::build(OpBuilder &builder, OperationState &result,
   result.addAttribute(getStridesAttrStrName(), stridesAttr);
 }
 
-// TODO: Should be moved to Tablegen Confined attributes.
+// TODO: Should be moved to Tablegen ConfinedAttr attributes.
 template <typename OpType>
 static LogicalResult isIntegerArrayAttrSmallerThanShape(OpType op,
                                                         ArrayAttr arrayAttr,
