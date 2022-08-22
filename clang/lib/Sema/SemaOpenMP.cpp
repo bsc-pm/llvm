@@ -3788,9 +3788,8 @@ public:
                   // Variable is used if it has been marked as an array, array
                   // section, array shaping or the variable iself.
                   return StackComponents.size() == 1 ||
-                         std::all_of(
-                             std::next(StackComponents.rbegin()),
-                             StackComponents.rend(),
+                         llvm::all_of(
+                             llvm::drop_begin(llvm::reverse(StackComponents)),
                              [](const OMPClauseMappableExprCommon::
                                     MappableComponent &MC) {
                                return MC.getAssociatedDeclaration() ==
@@ -17353,8 +17352,7 @@ static bool isValidInteropVariable(Sema &SemaRef, Expr *InteropVarExpr,
 }
 
 OMPClause *
-Sema::ActOnOpenMPInitClause(Expr *InteropVar, ArrayRef<Expr *> PrefExprs,
-                            bool IsTarget, bool IsTargetSync,
+Sema::ActOnOpenMPInitClause(Expr *InteropVar, OMPInteropInfo &InteropInfo,
                             SourceLocation StartLoc, SourceLocation LParenLoc,
                             SourceLocation VarLoc, SourceLocation EndLoc) {
 
@@ -17363,7 +17361,7 @@ Sema::ActOnOpenMPInitClause(Expr *InteropVar, ArrayRef<Expr *> PrefExprs,
 
   // Check prefer_type values.  These foreign-runtime-id values are either
   // string literals or constant integral expressions.
-  for (const Expr *E : PrefExprs) {
+  for (const Expr *E : InteropInfo.PreferTypes) {
     if (E->isValueDependent() || E->isTypeDependent() ||
         E->isInstantiationDependent() || E->containsUnexpandedParameterPack())
       continue;
@@ -17375,9 +17373,8 @@ Sema::ActOnOpenMPInitClause(Expr *InteropVar, ArrayRef<Expr *> PrefExprs,
     return nullptr;
   }
 
-  return OMPInitClause::Create(Context, InteropVar, PrefExprs, IsTarget,
-                               IsTargetSync, StartLoc, LParenLoc, VarLoc,
-                               EndLoc);
+  return OMPInitClause::Create(Context, InteropVar, InteropInfo, StartLoc,
+                               LParenLoc, VarLoc, EndLoc);
 }
 
 OMPClause *Sema::ActOnOpenMPUseClause(Expr *InteropVar, SourceLocation StartLoc,
