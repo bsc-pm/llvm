@@ -554,7 +554,7 @@ public:
 class OSSClauseDSAChecker final : public StmtVisitor<OSSClauseDSAChecker, void> {
   DSAStackTy *Stack;
   Sema &SemaRef;
-  OSSClause *CurClause;
+  OmpSsClauseKind CKind;
   bool ErrorFound = false;
   // Map to record that one variable has been used in a reduction/dependency.
   // Strong restriction (true) is when the variable is the symbol reduced:
@@ -581,10 +581,13 @@ public:
 
   void VisitOSSMultiDepExpr(OSSMultiDepExpr *E) {
     IsPlainDeclRef = false;
-    // Ignore iterators
-    for (auto *E : E->getDepIterators()) {
-      auto *VD = cast<VarDecl>(cast<DeclRefExpr>(E)->getDecl());
-      Stack->addDSA(VD, E, OSSC_private, /*Ignore=*/true, /*IsBase=*/true);
+
+    if (Stack) {
+      // Ignore iterators
+      for (auto *E : E->getDepIterators()) {
+        auto *VD = cast<VarDecl>(cast<DeclRefExpr>(E)->getDecl());
+        Stack->addDSA(VD, E, OSSC_private, /*Ignore=*/true, /*IsBase=*/true);
+      }
     }
 
     Visit(E->getDepExpr());
@@ -638,7 +641,7 @@ public:
     IsFirstDecl = false;
 
     // Add DSA to 'this' if is the first time we see it
-    if (!Stack->getThisExpr()) {
+    if (Stack && !Stack->getThisExpr()) {
       Stack->setThisExpr(ThisE);
     }
   }
@@ -653,8 +656,6 @@ public:
 
       SourceLocation ELoc = E->getExprLoc();
       SourceRange ERange = E->getSourceRange();
-
-      DSAStackTy::DSAVarData DVarCurrent = Stack->getCurrentDSA(VD);
 
       // inout(x)              | shared(x)        | int x;
       // inout(p[i])           | firstprivate(p)  | int *p;
@@ -680,8 +681,8 @@ public:
       // We have to emit a diagnostic if a strong restriction
       // is used in other places.
       bool IsReduction = false;
-      if (CurClause->getClauseKind() == OSSC_reduction
-          || CurClause->getClauseKind() == OSSC_weakreduction)
+      if (CKind == OSSC_reduction
+          || CKind == OSSC_weakreduction)
         IsReduction = true;
 
       bool CurIsStrongRestric = IsReduction && CurIsFirstDecl;
@@ -696,6 +697,10 @@ public:
       }
       SeenStrongRestric[VD] = SeenStrongRestric[VD] || CurIsStrongRestric;
 
+      if (!Stack)
+        return;
+
+      DSAStackTy::DSAVarData DVarCurrent = Stack->getCurrentDSA(VD);
       bool ExistsCurrent = DVarCurrent.RefExpr;
       if (!ExistsCurrent) {
         // No DSA in current directive, give assign one and done
@@ -725,10 +730,17 @@ public:
   void VisitClause(OSSClause *Clause) {
     for (Stmt *Child : Clause->children()) {
       reset();
-      CurClause = Clause;
+      CKind = Clause->getClauseKind();
       if (Child)
         Visit(Child);
     }
+  }
+
+  void VisitClauseExpr(Expr *E, OmpSsClauseKind CKind) {
+    reset();
+    this->CKind = CKind;
+    if (E)
+      Visit(E);
   }
 
   void VisitStmt(Stmt *S) {
@@ -739,7 +751,7 @@ public:
   }
 
   void reset() {
-    CurClause = nullptr;
+    CKind = OSSC_unknown;
     IsFirstDecl = true;
     IsPlainDeclRef = true;
   }
@@ -2529,6 +2541,56 @@ static bool checkNdrange(
   return !ErrorFound;
 }
 
+namespace {
+/// Data for the reduction-based clauses.
+struct ReductionData {
+  /// List of original reduction items.
+  SmallVector<Expr *, 8> Vars;
+  /// LHS expressions for the reduction_op expressions.
+  SmallVector<Expr *, 8> LHSs;
+  /// RHS expressions for the reduction_op expressions.
+  SmallVector<Expr *, 8> RHSs;
+  /// Reduction operation expression.
+  SmallVector<Expr *, 8> ReductionOps;
+  /// Reduction operation kind. BO_Comma stands for UDR
+  SmallVector<BinaryOperatorKind, 8> ReductionKinds;
+  ReductionData() = delete;
+  /// Reserves required memory for the reduction data.
+  ReductionData(unsigned Size) {
+    Vars.reserve(Size);
+    LHSs.reserve(Size);
+    RHSs.reserve(Size);
+    ReductionOps.reserve(Size);
+    ReductionKinds.reserve(Size);
+  }
+  /// Stores reduction item and reduction operation only (required for dependent
+  /// reduction item).
+  void push(Expr *Item, Expr *ReductionOp) {
+    Vars.emplace_back(Item);
+    LHSs.emplace_back(nullptr);
+    RHSs.emplace_back(nullptr);
+    ReductionOps.emplace_back(ReductionOp);
+    ReductionKinds.emplace_back(BO_Comma);
+  }
+  /// Stores reduction data.
+  void push(Expr *Item, Expr *LHS, Expr *RHS, Expr *ReductionOp,
+            BinaryOperatorKind BOK) {
+    Vars.emplace_back(Item);
+    LHSs.emplace_back(LHS);
+    RHSs.emplace_back(RHS);
+    ReductionOps.emplace_back(ReductionOp);
+    ReductionKinds.emplace_back(BOK);
+  }
+};
+} // namespace
+
+// Fwd declaration
+static bool actOnOSSReductionKindClause(
+    Sema &S, DSAStackTy *Stack, OmpSsClauseKind ClauseKind,
+    ArrayRef<Expr *> VarList, CXXScopeSpec &ReductionIdScopeSpec,
+    const DeclarationNameInfo &ReductionId, ArrayRef<Expr *> UnresolvedReductions,
+    ReductionData &RD);
+
 Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     DeclGroupPtrTy DG,
     Expr *If, Expr *Final, Expr *Cost, Expr *Priority,
@@ -2545,8 +2607,14 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     ArrayRef<Expr *> DepWeakIns, ArrayRef<Expr *> DepWeakOuts,
     ArrayRef<Expr *> DepWeakInouts,
     ArrayRef<Expr *> DepWeakConcurrents, ArrayRef<Expr *> DepWeakCommutatives,
+    ArrayRef<unsigned> ReductionListSizes,
+    ArrayRef<Expr *> Reductions,
+    ArrayRef<unsigned> ReductionClauseType,
+    ArrayRef<CXXScopeSpec> ReductionCXXScopeSpecs,
+    ArrayRef<DeclarationNameInfo> ReductionIds,
     ArrayRef<Expr *> Ndranges, SourceLocation NdrangeLoc,
-    SourceRange SR) {
+    SourceRange SR,
+    ArrayRef<Expr *> UnresolvedReductions) {
   if (!DG || DG.get().isNull())
     return DeclGroupPtrTy();
 
@@ -2652,65 +2720,115 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
                                    /*Last=*/OSSC_DEVICE_unknown)
         << getOmpSsClauseName(OSSC_device);
   }
+  OSSClauseDSAChecker OSSClauseChecker(/*Stack=*/nullptr, *this);
   for (Expr *RefExpr : Ins) {
     checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
+    OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_in);
   }
   for (Expr *RefExpr : Outs) {
     checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
+    OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_out);
   }
   for (Expr *RefExpr : Inouts) {
     checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
+    OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_inout);
   }
   for (Expr *RefExpr : Concurrents) {
     checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
+    OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_concurrent);
   }
   for (Expr *RefExpr : Commutatives) {
     checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
+    OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_commutative);
   }
   for (Expr *RefExpr : WeakIns) {
     checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
+    OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_weakin);
   }
   for (Expr *RefExpr : WeakOuts) {
     checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
+    OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_weakout);
   }
   for (Expr *RefExpr : WeakInouts) {
     checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
+    OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_weakinout);
   }
   for (Expr *RefExpr : WeakConcurrents) {
     checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
+    OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_weakconcurrent);
   }
   for (Expr *RefExpr : WeakCommutatives) {
     checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
+    OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_weakcommutative);
   }
   for (Expr *RefExpr : DepIns) {
     checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
+    OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_in);
   }
   for (Expr *RefExpr : DepOuts) {
     checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
+    OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_out);
   }
   for (Expr *RefExpr : DepInouts) {
     checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
+    OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_inout);
   }
   for (Expr *RefExpr : DepConcurrents) {
     checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
+    OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_concurrent);
   }
   for (Expr *RefExpr : DepCommutatives) {
     checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
+    OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_commutative);
   }
   for (Expr *RefExpr : DepWeakIns) {
     checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
+    OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_weakin);
   }
   for (Expr *RefExpr : DepWeakOuts) {
     checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
+    OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_weakout);
   }
   for (Expr *RefExpr : DepWeakInouts) {
     checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
+    OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_weakinout);
   }
   for (Expr *RefExpr : DepWeakConcurrents) {
     checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
+    OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_weakconcurrent);
   }
   for (Expr *RefExpr : DepWeakCommutatives) {
     checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
+    OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_weakcommutative);
+  }
+  ReductionData RD(Reductions.size());
+  SmallVector<NestedNameSpecifierLoc, 4> ReductionNSLoc;
+  auto UnresolvedReductions_it = UnresolvedReductions.begin();
+  auto Reductions_it = Reductions.begin();
+  for (size_t i = 0; i < ReductionListSizes.size(); ++i) {
+    ArrayRef<Expr *> TmpList(Reductions_it, Reductions_it + ReductionListSizes[i]);
+    OmpSsClauseKind CKind = (OmpSsClauseKind)ReductionClauseType[i];
+    CXXScopeSpec ScopeSpec = ReductionCXXScopeSpecs[i];
+    // UnresolvedReductions is llvm::None when parsing the first time. Pass
+    // llvm::None.
+    // In instantiation we will get an array with all the info for the reductions, build
+    // the subarray associated to each reduction list (like with TmpList
+    if (UnresolvedReductions.empty()) {
+      actOnOSSReductionKindClause(
+        *this, DSAStack, CKind, TmpList, ScopeSpec, ReductionIds[i],
+        llvm::None, RD);
+    } else {
+      actOnOSSReductionKindClause(
+        *this, DSAStack, CKind, TmpList, ScopeSpec, ReductionIds[i],
+        ArrayRef<Expr *>(UnresolvedReductions_it, UnresolvedReductions_it + ReductionListSizes[i]), RD);
+    }
+
+    for (Expr *RefExpr : TmpList)
+      OSSClauseChecker.VisitClauseExpr(RefExpr, CKind);
+
+    ReductionNSLoc.push_back(ReductionCXXScopeSpecs[i].getWithLocInContext(Context));
+    Reductions_it += ReductionListSizes[i];
+    UnresolvedReductions_it += ReductionListSizes[i];
   }
   if (!Ndranges.empty()) {
     if (!(DevType == OSSTaskDeclAttr::DeviceType::Cuda
@@ -2719,6 +2837,14 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
 
     checkNdrange(*this, NdrangeLoc, Ndranges, NdrangesRes);
   }
+
+  // FIXME: the specs says the underlying type of a enum
+  // is implementation defined. I do this to be able to compile
+  // but it has to be done in a better way. TableGen does not
+  // have a BinaryOperatorKind type.
+  SmallVector<unsigned, 4> TmpReductionKinds;
+  for (BinaryOperatorKind &b : RD.ReductionKinds)
+    TmpReductionKinds.push_back(b);
 
   auto *NewAttr = OSSTaskDeclAttr::CreateImplicit(
     Context,
@@ -2746,6 +2872,15 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     const_cast<Expr **>(DepWeakInouts.data()), DepWeakInouts.size(),
     const_cast<Expr **>(DepWeakConcurrents.data()), DepWeakConcurrents.size(),
     const_cast<Expr **>(DepWeakCommutatives.data()), DepWeakCommutatives.size(),
+    const_cast<unsigned *>(ReductionListSizes.data()), ReductionListSizes.size(),
+    const_cast<Expr **>(RD.Vars.data()), RD.Vars.size(),
+    const_cast<Expr **>(RD.LHSs.data()), RD.LHSs.size(),
+    const_cast<Expr **>(RD.RHSs.data()), RD.RHSs.size(),
+    const_cast<Expr **>(RD.ReductionOps.data()), RD.ReductionOps.size(),
+    const_cast<unsigned *>(TmpReductionKinds.data()), RD.ReductionKinds.size(),
+    const_cast<unsigned *>(ReductionClauseType.data()), ReductionClauseType.size(),
+    const_cast<NestedNameSpecifierLoc *>(ReductionNSLoc.data()), ReductionNSLoc.size(),
+    const_cast<DeclarationNameInfo *>(ReductionIds.data()), ReductionIds.size(),
     const_cast<Expr **>(NdrangesRes.data()), NdrangesRes.size(),
     SR);
   ADecl->addAttr(NewAttr);
@@ -3248,55 +3383,11 @@ buildDeclareReductionRef(Sema &SemaRef, SourceLocation Loc, SourceRange Range,
   return ExprEmpty();
 }
 
-namespace {
-/// Data for the reduction-based clauses.
-struct ReductionData {
-  /// List of original reduction items.
-  SmallVector<Expr *, 8> Vars;
-  /// LHS expressions for the reduction_op expressions.
-  SmallVector<Expr *, 8> LHSs;
-  /// RHS expressions for the reduction_op expressions.
-  SmallVector<Expr *, 8> RHSs;
-  /// Reduction operation expression.
-  SmallVector<Expr *, 8> ReductionOps;
-  /// Reduction operation kind. BO_Comma stands for UDR
-  SmallVector<BinaryOperatorKind, 8> ReductionKinds;
-  ReductionData() = delete;
-  /// Reserves required memory for the reduction data.
-  ReductionData(unsigned Size) {
-    Vars.reserve(Size);
-    LHSs.reserve(Size);
-    RHSs.reserve(Size);
-    ReductionOps.reserve(Size);
-    ReductionKinds.reserve(Size);
-  }
-  /// Stores reduction item and reduction operation only (required for dependent
-  /// reduction item).
-  void push(Expr *Item, Expr *ReductionOp) {
-    Vars.emplace_back(Item);
-    LHSs.emplace_back(nullptr);
-    RHSs.emplace_back(nullptr);
-    ReductionOps.emplace_back(ReductionOp);
-    ReductionKinds.emplace_back(BO_Comma);
-  }
-  /// Stores reduction data.
-  void push(Expr *Item, Expr *LHS, Expr *RHS, Expr *ReductionOp,
-            BinaryOperatorKind BOK) {
-    Vars.emplace_back(Item);
-    LHSs.emplace_back(LHS);
-    RHSs.emplace_back(RHS);
-    ReductionOps.emplace_back(ReductionOp);
-    ReductionKinds.emplace_back(BOK);
-  }
-};
-} // namespace
-
 static bool actOnOSSReductionKindClause(
     Sema &S, DSAStackTy *Stack, OmpSsClauseKind ClauseKind,
-    ArrayRef<Expr *> VarList, SourceLocation StartLoc, SourceLocation LParenLoc,
-    SourceLocation ColonLoc, SourceLocation EndLoc,
-    CXXScopeSpec &ReductionIdScopeSpec, const DeclarationNameInfo &ReductionId,
-    ArrayRef<Expr *> UnresolvedReductions, ReductionData &RD) {
+    ArrayRef<Expr *> VarList, CXXScopeSpec &ReductionIdScopeSpec,
+    const DeclarationNameInfo &ReductionId, ArrayRef<Expr *> UnresolvedReductions,
+    ReductionData &RD) {
   DeclarationName DN = ReductionId.getName();
   OverloadedOperatorKind OOK = DN.getCXXOverloadedOperator();
   BinaryOperatorKind BOK = BO_Comma;
@@ -3677,7 +3768,6 @@ Sema::ActOnOmpSsReductionClause(OmpSsClauseKind Kind, ArrayRef<Expr *> VarList,
                        ArrayRef<Expr *> UnresolvedReductions) {
   ReductionData RD(VarList.size());
   if (actOnOSSReductionKindClause(*this, DSAStack, Kind, VarList,
-                                  StartLoc, LParenLoc, ColonLoc, EndLoc,
                                   ReductionIdScopeSpec, ReductionId,
                                   UnresolvedReductions, RD))
     return nullptr;

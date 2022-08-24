@@ -12084,8 +12084,14 @@ public:
       ArrayRef<Expr *> DepWeakIns, ArrayRef<Expr *> DepWeakOuts,
       ArrayRef<Expr *> DepWeakInouts,
       ArrayRef<Expr *> DepWeakConcurrents, ArrayRef<Expr *> DepWeakCommutatives,
+      ArrayRef<unsigned> ReductionListSizes,
+      ArrayRef<Expr *> Reductions,
+      ArrayRef<unsigned> ReductionClauseType,
+      ArrayRef<CXXScopeSpec> ReductionCXXScopeSpecs,
+      ArrayRef<DeclarationNameInfo> ReductionIds,
       ArrayRef<Expr *> Ndranges, SourceLocation NdrangeLoc,
-      SourceRange SR);
+      SourceRange SR,
+      ArrayRef<Expr *> UnresolvedReductions = llvm::None);
 
   OSSClause *ActOnOmpSsVarListClause(
       OmpSsClauseKind Kind, ArrayRef<Expr *> Vars,

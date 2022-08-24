@@ -162,8 +162,7 @@ static OmpSsClauseKind getOmpSsClauseFromDependKinds(ArrayRef<OmpSsDependClauseK
 ///       | inout-clause | concurrent-clause | commutative-clause
 ///       | weakin-clause | weakout-clause | weakinout-clause
 ///       | weakconcurrent-clause | weakcommutative-clause
-static bool parseDeclareTaskClauses(
-    Parser &P,
+bool Parser::ParseDeclareTaskClauses(
     ExprResult &IfRes, ExprResult &FinalRes,
     ExprResult &CostRes, ExprResult &PriorityRes,
     ExprResult &OnreadyRes, bool &Wait,
@@ -179,8 +178,13 @@ static bool parseDeclareTaskClauses(
     SmallVectorImpl<Expr *> &DepCommutatives, SmallVectorImpl<Expr *> &DepWeakIns,
     SmallVectorImpl<Expr *> &DepWeakOuts, SmallVectorImpl<Expr *> &DepWeakInouts,
     SmallVectorImpl<Expr *> &DepWeakConcurrents, SmallVectorImpl<Expr *> &DepWeakCommutatives,
+    SmallVectorImpl<unsigned> &ReductionListSizes,
+    SmallVectorImpl<Expr *> &Reductions,
+    SmallVectorImpl<unsigned> &ReductionClauseType,
+    SmallVectorImpl<CXXScopeSpec> &ReductionCXXScopeSpecs,
+    SmallVectorImpl<DeclarationNameInfo> &ReductionIds,
     SmallVectorImpl<Expr *> &Ndrange, SourceLocation &NdrangeLoc) {
-  const Token &Tok = P.getCurToken();
+  const Token &Tok = getCurToken();
   bool IsError = false;
 
   SmallVector<bool, 4> FirstClauses(OSSC_unknown + 1);
@@ -208,7 +212,7 @@ static bool parseDeclareTaskClauses(
 
     // Check if clause is allowed for the given directive.
     if (CKind != OSSC_unknown && !isAllowedClauseForDirective(OSSD_declare_task, CKind)) {
-      P.Diag(Tok, diag::err_oss_unexpected_clause) << getOmpSsClauseName(CKind)
+      Diag(Tok, diag::err_oss_unexpected_clause) << getOmpSsClauseName(CKind)
                                                  << getOmpSsDirectiveName(OSSD_declare_task);
       IsError = true;
     }
@@ -219,16 +223,16 @@ static bool parseDeclareTaskClauses(
     case OSSC_cost:
     case OSSC_priority:
     case OSSC_onready: {
-      P.ConsumeToken();
+      ConsumeToken();
       if (FirstClauses[CKind]) {
-        P.Diag(Tok, diag::err_oss_more_one_clause)
+        Diag(Tok, diag::err_oss_more_one_clause)
             << getOmpSsDirectiveName(OSSD_declare_task) << getOmpSsClauseName(CKind) << 0;
         IsError = true;
       }
       SourceLocation RLoc;
       SingleClause = getSingleClause(
         CKind, IfRes, FinalRes, CostRes, PriorityRes, OnreadyRes);
-      *SingleClause = P.ParseOmpSsParensExpr(getOmpSsClauseName(CKind), RLoc);
+      *SingleClause = ParseOmpSsParensExpr(getOmpSsClauseName(CKind), RLoc);
 
       if (SingleClause->isInvalid())
         IsError = true;
@@ -238,9 +242,9 @@ static bool parseDeclareTaskClauses(
     }
     case OSSC_wait: {
       SourceLocation Loc = Tok.getLocation();
-      P.ConsumeToken();
+      ConsumeToken();
       if (FirstClauses[CKind]) {
-        P.Diag(Loc, diag::err_oss_more_one_clause)
+        Diag(Loc, diag::err_oss_more_one_clause)
             << getOmpSsDirectiveName(OSSD_declare_task) << getOmpSsClauseName(CKind) << 0;
         IsError = true;
       }
@@ -249,28 +253,28 @@ static bool parseDeclareTaskClauses(
       break;
     }
     case OSSC_label: {
-      P.ConsumeToken();
+      ConsumeToken();
       if (FirstClauses[CKind]) {
-        P.Diag(Tok, diag::err_oss_more_one_clause)
+        Diag(Tok, diag::err_oss_more_one_clause)
             << getOmpSsDirectiveName(OSSD_declare_task) << getOmpSsClauseName(CKind) << 0;
         IsError = true;
       }
       SourceLocation RLoc;
-      if (P.ParseOmpSsFixedList<2>(OSSD_declare_task, CKind, Labels, RLoc))
+      if (ParseOmpSsFixedList<2>(OSSD_declare_task, CKind, Labels, RLoc))
         IsError = true;
       FirstClauses[CKind] = true;
       break;
     }
     case OSSC_depend: {
-      P.ConsumeToken();
+      ConsumeToken();
 
-      Sema::AllowShapingsRAII AllowShapings(P.getActions(), []() { return true; });
+      Sema::AllowShapingsRAII AllowShapings(getActions(), []() { return true; });
 
       SmallVector<Expr *, 4> TmpList;
       SmallVector<OmpSsDependClauseKind, 2> DepKindsOrdered;
-      if (P.ParseOmpSsVarList(OSSD_declare_task, CKind, TmpList, VarListData))
+      if (ParseOmpSsVarList(OSSD_declare_task, CKind, TmpList, VarListData))
         IsError = true;
-      if (!P.getActions().ActOnOmpSsDependKinds(VarListData.DepKinds, DepKindsOrdered, VarListData.DepLoc))
+      if (!getActions().ActOnOmpSsDependKinds(VarListData.DepKinds, DepKindsOrdered, VarListData.DepLoc))
         IsError = true;
 
       if (!IsError) {
@@ -284,15 +288,33 @@ static bool parseDeclareTaskClauses(
       }
       break;
     }
+    case OSSC_reduction:
+    case OSSC_weakreduction: {
+      ConsumeToken();
+
+      Sema::AllowShapingsRAII AllowShapings(getActions(), []() { return true; });
+
+      SmallVector<Expr *, 4> TmpList;
+      if (ParseOmpSsVarList(OSSD_declare_task, CKind, TmpList, VarListData))
+        IsError = true;
+      if (!IsError) {
+        Reductions.append(TmpList.begin(), TmpList.end());
+        ReductionClauseType.push_back(CKind);
+        ReductionListSizes.push_back(TmpList.size());
+        ReductionCXXScopeSpecs.push_back(VarListData.ReductionIdScopeSpec);
+        ReductionIds.push_back(VarListData.ReductionId);
+      }
+      break;
+    }
     case OSSC_ndrange:
       NdrangeLoc = Tok.getLocation();
-      P.ConsumeToken();
+      ConsumeToken();
       if (FirstClauses[CKind]) {
-        P.Diag(Tok, diag::err_oss_more_one_clause)
+        Diag(Tok, diag::err_oss_more_one_clause)
             << getOmpSsDirectiveName(OSSD_declare_task) << getOmpSsClauseName(CKind) << 0;
         IsError = true;
       }
-      if (P.ParseOmpSsVarList(OSSD_declare_task, CKind, Ndrange, VarListData))
+      if (ParseOmpSsVarList(OSSD_declare_task, CKind, Ndrange, VarListData))
         IsError = true;
       FirstClauses[CKind] = true;
       break;
@@ -305,25 +327,25 @@ static bool parseDeclareTaskClauses(
     case OSSC_weakout:
     case OSSC_weakinout:
     case OSSC_weakcommutative: {
-      P.ConsumeToken();
+      ConsumeToken();
 
-      Sema::AllowShapingsRAII AllowShapings(P.getActions(), []() { return true; });
-      if (P.ParseOmpSsVarList(OSSD_declare_task, CKind, *Vars, VarListData))
+      Sema::AllowShapingsRAII AllowShapings(getActions(), []() { return true; });
+      if (ParseOmpSsVarList(OSSD_declare_task, CKind, *Vars, VarListData))
         IsError = true;
       break;
     }
     case OSSC_unknown:
-      P.Diag(Tok, diag::warn_oss_extra_tokens_at_eol)
+      Diag(Tok, diag::warn_oss_extra_tokens_at_eol)
           << getOmpSsDirectiveName(OSSD_declare_task);
-      P.SkipUntil(tok::annot_pragma_ompss_end, P.StopBeforeMatch);
+      SkipUntil(tok::annot_pragma_ompss_end, StopBeforeMatch);
       break;
     case OSSC_device:
       if (FirstClauses[CKind]) {
-        P.Diag(Tok, diag::err_oss_more_one_clause)
+        Diag(Tok, diag::err_oss_more_one_clause)
             << getOmpSsDirectiveName(OSSD_declare_task) << getOmpSsClauseName(CKind) << 0;
         IsError = true;
       }
-      if (P.ParseOmpSsSimpleClauseImpl(CKind, SimpleData)) {
+      if (ParseOmpSsSimpleClauseImpl(CKind, SimpleData)) {
         IsError = true;
       } else {
         Device = SimpleData.Type;
@@ -333,7 +355,7 @@ static bool parseDeclareTaskClauses(
       break;
     // Not allowed clauses
     case OSSC_default:
-      P.ParseOmpSsSimpleClauseImpl(CKind, SimpleData);
+      ParseOmpSsSimpleClauseImpl(CKind, SimpleData);
       break;
     case OSSC_chunksize:
     case OSSC_grainsize:
@@ -341,27 +363,25 @@ static bool parseDeclareTaskClauses(
     case OSSC_collapse:
     case OSSC_on:
     case OSSC_weakconcurrent:
-    case OSSC_reduction:
-    case OSSC_weakreduction:
     case OSSC_shared:
     case OSSC_private:
     case OSSC_firstprivate: {
-      P.ConsumeToken();
+      ConsumeToken();
 
-      Sema::AllowShapingsRAII AllowShapings(P.getActions(), []() { return true; });
+      Sema::AllowShapingsRAII AllowShapings(getActions(), []() { return true; });
 
       SmallVector<Expr *, 4> TmpList;
-      P.ParseOmpSsVarList(OSSD_declare_task, CKind, TmpList, VarListData);
+      ParseOmpSsVarList(OSSD_declare_task, CKind, TmpList, VarListData);
       break;
     }
     case OSSC_update:
-      P.ConsumeToken();
+      ConsumeToken();
       break;
     }
 
     // Skip ',' if any.
     if (Tok.is(tok::comma))
-      P.ConsumeToken();
+      ConsumeToken();
   }
   return IsError;
 }
@@ -411,11 +431,15 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
   SmallVector<Expr *, 4> DepWeakInouts;
   SmallVector<Expr *, 4> DepWeakConcurrents;
   SmallVector<Expr *, 4> DepWeakCommutatives;
+  SmallVector<unsigned, 4> ReductionListSizes;
+  SmallVector<Expr *, 4> Reductions;
+  SmallVector<unsigned, 4> ReductionClauseType;
+  SmallVector<CXXScopeSpec, 4> ReductionCXXScopeSpecs;
+  SmallVector<DeclarationNameInfo, 4> ReductionIds;
   SmallVector<Expr *, 4> Ndranges;
 
   bool IsError =
-      parseDeclareTaskClauses(*this,
-                              IfRes, FinalRes,
+      ParseDeclareTaskClauses(IfRes, FinalRes,
                               CostRes, PriorityRes,
                               OnreadyRes, Wait,
                               Device, DeviceLoc,
@@ -428,7 +452,9 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
                               DepConcurrents, DepCommutatives,
                               DepWeakIns, DepWeakOuts, DepWeakInouts,
                               DepWeakConcurrents, DepWeakCommutatives,
-                              Ndranges, NdrangeLoc);
+                              ReductionListSizes, Reductions,
+                              ReductionClauseType, ReductionCXXScopeSpecs,
+                              ReductionIds, Ndranges, NdrangeLoc);
   // Need to check for extra tokens.
   if (Tok.isNot(tok::annot_pragma_ompss_end)) {
     Diag(Tok, diag::warn_oss_extra_tokens_at_eol)
@@ -455,7 +481,9 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
       DepConcurrents, DepCommutatives,
       DepWeakIns, DepWeakOuts, DepWeakInouts,
       DepWeakConcurrents, DepWeakCommutatives,
-      Ndranges, NdrangeLoc,
+      ReductionListSizes, Reductions,
+      ReductionClauseType, ReductionCXXScopeSpecs,
+      ReductionIds, Ndranges, NdrangeLoc,
       SourceRange(Loc, EndLoc));
   return Ptr;
 }
@@ -545,6 +573,13 @@ Parser::DeclGroupPtrTy Parser::ParseOmpSsDeclarativeDirectiveWithExtDecl(
         ParsingDeclSpec PDS(*this);
         Ptr = ParseExternalDeclaration(Attrs, &PDS);
       } else {
+        // Some member functions like void foo(int *x)
+        // are not late parsed because they do not need it
+        // in our case the oss directive could use
+        // a later defined class member so just force late parsing
+        // Ideally we would check if the directive uses a late defined variable but we're
+        // not gonna do it now.
+        Parser::ParsingClass::OmpSsForceDelayRAII OmpSsForceDelay(getCurrentClass());
         Ptr =
             ParseCXXClassMemberDeclarationWithPragmas(AS, Attrs, TagType, Tag);
       }
@@ -553,7 +588,16 @@ Parser::DeclGroupPtrTy Parser::ParseOmpSsDeclarativeDirectiveWithExtDecl(
       Diag(Loc, diag::err_oss_decl_in_task);
       return DeclGroupPtrTy();
     }
-    Parser::DeclGroupPtrTy Ret = ParseOSSDeclareTaskClauses(Ptr, Toks, Loc);
+
+    Parser::DeclGroupPtrTy Ret = Ptr;
+    if (AS == AS_none) {
+      Ret = ParseOSSDeclareTaskClauses(Ret, Toks, Loc);
+    } else {
+      // Store cached tokens to be parsed at the end of the class
+      getCurrentClass().OmpSsLateParsedToks.DirDGs.push_back(Ptr);
+      getCurrentClass().OmpSsLateParsedToks.DirToks.push_back(Toks);
+      getCurrentClass().OmpSsLateParsedToks.DirLocs.push_back(Loc);
+    }
 
     Actions.EndOmpSsDSABlock(nullptr);
     return Ret;
