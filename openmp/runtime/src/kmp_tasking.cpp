@@ -4232,9 +4232,10 @@ void __kmp_task_team_wait(
              "setting active to false, setting local and team's pointer to NULL\n",
              __kmp_gtid_from_thread(this_thr), task_team));
         KMP_DEBUG_ASSERT(task_team->tt.tt_nproc > 1 ||
-                         task_team->tt.tt_found_proxy_tasks == TRUE);
+                         task_team->tt.tt_found_proxy_tasks == TRUE ||
+                         task_team->tt.tt_hidden_helper_task_encountered == TRUE);
         TCW_SYNC_4(task_team->tt.tt_found_proxy_tasks, FALSE);
-		    TCW_SYNC_4(task_team->tt.tt_hidden_helper_task_encountered, FALSE);
+		TCW_SYNC_4(task_team->tt.tt_hidden_helper_task_encountered, FALSE);
         KMP_CHECK_UPDATE(task_team->tt.tt_untied_task_encountered, 0);
         TCW_SYNC_4(task_team->tt.tt_active, FALSE);
         KMP_MB();
