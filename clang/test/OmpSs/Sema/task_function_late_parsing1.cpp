@@ -7,7 +7,8 @@
 // the instantiation occurs when building the templated task outline,
 // and it has not been assigned to the FunctionDecl
 
-// expected-error {{TODO}}
+// expected-error@+3 {{implicit instantiation of template 'S<int>' within its own definition}}
+// expected-note@+4 {{in instantiation of template class 'S<int>' requested here}}
 template<typename T>
 struct S {
   #pragma oss declare reduction(asdf : T : omp_out += omp_in) initializer(omp_priv = 0)

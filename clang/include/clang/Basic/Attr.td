@@ -3712,13 +3712,25 @@ def CapturedRecord : InheritableAttr {
 }
 
 // OmpSs
+def OSSTaskDeclSentinel : Attr {
+  let Spellings = [Pragma<"oss", "task">];
+  let SemaHandler = 0;
+  // Clang CFE documentation says this is only needed for Parser::ParseGNUAttributeArgs()
+  // let HasCustomParsing = 1;
+  let Documentation = [Undocumented];
+  let AdditionalMembers = [{
+    void printPrettyPragma(raw_ostream & OS, const PrintingPolicy &Policy) const {
+      llvm_unreachable("This attribute must not be able to persist after parsing");
+    }
+  }];
+}
+
 def OSSTaskDecl : Attr {
   let Spellings = [Pragma<"oss", "task">];
   let Subjects = SubjectList<[Function]>;
   let SemaHandler = 0;
   // Clang CFE documentation says this is only needed for Parser::ParseGNUAttributeArgs()
   // let HasCustomParsing = 1;
-  // let Documentation = [OSSDeclareSimdDocs];
   let Documentation = [Undocumented];
   let Args = [
     ExprArgument<"IfExpr">, ExprArgument<"FinalExpr">,

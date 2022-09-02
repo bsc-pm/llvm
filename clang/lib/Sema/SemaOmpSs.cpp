@@ -2674,6 +2674,10 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     ++ParI;
   }
 
+  // Add dummy to catch potential instantiations of the class that contains us
+  // or our associated function
+  ADecl->addAttr(OSSTaskDeclSentinelAttr::CreateImplicit(Context, SR));
+
   ExprResult IfRes, FinalRes, CostRes, PriorityRes, OnreadyRes;
   SmallVector<Expr *, 2> LabelsRes;
   SmallVector<Expr *, 4> NdrangesRes;
@@ -2883,6 +2887,7 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     const_cast<DeclarationNameInfo *>(ReductionIds.data()), ReductionIds.size(),
     const_cast<Expr **>(NdrangesRes.data()), NdrangesRes.size(),
     SR);
+  ADecl->dropAttr<OSSTaskDeclSentinelAttr>();
   ADecl->addAttr(NewAttr);
   return DG;
 }

@@ -943,6 +943,15 @@ void Sema::InstantiateAttrs(const MultiLevelTemplateArgumentList &TemplateArgs,
     }
 
     // OmpSs
+    if (const auto *OSSAttr = dyn_cast<OSSTaskDeclSentinelAttr>(TmplAttr)) {
+      auto *MD = cast<CXXMethodDecl>(New);
+      auto *TD = cast<TagDecl>(MD->getParent());
+      Diag(TD->getLocation(),
+           diag::err_template_instantiate_within_definition)
+        << /*implicit|explicit*/0 << Context.getTypeDeclType(TD);
+      continue;
+    }
+
     if (const auto *OSSAttr = dyn_cast<OSSTaskDeclAttr>(TmplAttr)) {
       InstantiateOSSDeclareTaskAttr(TemplateArgs, *OSSAttr, New);
       continue;
