@@ -201,6 +201,8 @@ class DeclArgument<DeclNode kind, string name, bit opt = 0, bit fake = 0>
     : Argument<name, opt, fake> {
   DeclNode Kind = kind;
 }
+class NestedNameSpecifierLocArgument<string name> : Argument<name, 0>;
+class DeclarationNameInfoArgument<string name> : Argument<name, 0>;
 
 // An argument of a OMPDeclareVariantAttr that represents the `match`
 // clause of the declare variant by keeping the information (incl. nesting) in
@@ -228,6 +230,8 @@ class VariadicUnsignedArgument<string name> : Argument<name, 1>;
 class VariadicExprArgument<string name> : Argument<name, 1>;
 class VariadicStringArgument<string name> : Argument<name, 1>;
 class VariadicIdentifierArgument<string name> : Argument<name, 1>;
+class VariadicNestedNameSpecifierLocArgument<string name> : Argument<name, 1>;
+class VariadicDeclarationNameInfoArgument<string name> : Argument<name, 1>;
 
 // Like VariadicUnsignedArgument except values are ParamIdx.
 class VariadicParamIdxArgument<string name> : Argument<name, 1>;
@@ -3708,13 +3712,25 @@ def CapturedRecord : InheritableAttr {
 }
 
 // OmpSs
+def OSSTaskDeclSentinel : Attr {
+  let Spellings = [Pragma<"oss", "task">];
+  let SemaHandler = 0;
+  // Clang CFE documentation says this is only needed for Parser::ParseGNUAttributeArgs()
+  // let HasCustomParsing = 1;
+  let Documentation = [Undocumented];
+  let AdditionalMembers = [{
+    void printPrettyPragma(raw_ostream & OS, const PrintingPolicy &Policy) const {
+      llvm_unreachable("This attribute must not be able to persist after parsing");
+    }
+  }];
+}
+
 def OSSTaskDecl : Attr {
   let Spellings = [Pragma<"oss", "task">];
   let Subjects = SubjectList<[Function]>;
   let SemaHandler = 0;
   // Clang CFE documentation says this is only needed for Parser::ParseGNUAttributeArgs()
   // let HasCustomParsing = 1;
-  // let Documentation = [OSSDeclareSimdDocs];
   let Documentation = [Undocumented];
   let Args = [
     ExprArgument<"IfExpr">, ExprArgument<"FinalExpr">,
@@ -3739,6 +3755,15 @@ def OSSTaskDecl : Attr {
     VariadicExprArgument<"DepWeakIns">, VariadicExprArgument<"DepWeakOuts">,
     VariadicExprArgument<"DepWeakInouts">,
     VariadicExprArgument<"DepWeakConcurrents">, VariadicExprArgument<"DepWeakCommutatives">,
+    VariadicUnsignedArgument<"ReductionListSizes">,
+    VariadicExprArgument<"Reductions">,
+    VariadicExprArgument<"ReductionLHSs">,
+    VariadicExprArgument<"ReductionRHSs">,
+    VariadicExprArgument<"ReductionOps">,
+    VariadicUnsignedArgument<"ReductionKinds">,
+    VariadicUnsignedArgument<"ReductionClauseType">,
+    VariadicNestedNameSpecifierLocArgument<"NameSpecifierLocs">,
+    VariadicDeclarationNameInfoArgument<"DeclNameInfos">,
     VariadicExprArgument<"Ndranges">
   ];
   let AdditionalMembers = [{

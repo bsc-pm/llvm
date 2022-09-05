@@ -346,6 +346,7 @@ void Sema::InstantiateOSSDeclareTaskAttr(
   SmallVector<Expr *, 4> DepWeakInouts;
   SmallVector<Expr *, 4> DepWeakConcurrents;
   SmallVector<Expr *, 4> DepWeakCommutatives;
+  SmallVector<Expr *, 4> Reductions;
   SmallVector<Expr *, 4> Labels;
   SmallVector<Expr *, 4> Ndranges;
 
@@ -400,6 +401,7 @@ void Sema::InstantiateOSSDeclareTaskAttr(
     l(Attr.depWeakInouts_size(), Attr.depWeakInouts_begin(), Attr.depWeakInouts_end(), DepWeakInouts);
     l(Attr.depWeakConcurrents_size(), Attr.depWeakConcurrents_begin(), Attr.depWeakConcurrents_end(), DepWeakConcurrents);
     l(Attr.depWeakCommutatives_size(), Attr.depWeakCommutatives_begin(), Attr.depWeakCommutatives_end(), DepWeakCommutatives);
+    l(Attr.reductions_size(), Attr.reductions_begin(), Attr.reductions_end(), Reductions);
   }
 
   l(Attr.labelExprs_size(), Attr.labelExprs_begin(), Attr.labelExprs_end(), Labels);
@@ -423,6 +425,51 @@ void Sema::InstantiateOSSDeclareTaskAttr(
   if (Attr.getDevice() != OSSTaskDeclAttr::DeviceType::Unknown)
     Device = Attr.getDevice();
 
+  SmallVector<CXXScopeSpec, 4> ReductionCXXScopeSpecs;
+  for (auto &S : Attr.nameSpecifierLocs()) {
+    CXXScopeSpec ReductionIdScopeSpec;
+    ReductionIdScopeSpec.Adopt(S);
+    ReductionCXXScopeSpecs.push_back(ReductionIdScopeSpec);
+  }
+
+  SmallVector<DeclarationNameInfo, 4> ReductionIds;
+  for (auto &NameInfo : Attr.declNameInfos()) {
+    if (NameInfo.getName())
+      NameInfo = SubstDeclarationNameInfo(NameInfo, TemplateArgs);
+    ReductionIds.push_back(NameInfo);
+  }
+
+  // Build a list of all UDR decls with the same names ranged by the Scopes.
+  // The Scope boundary is a duplication of the previous decl.
+  llvm::SmallVector<Expr *, 16> UnresolvedReductions;
+  auto reductionOps_it = Attr.reductionOps_begin();
+  for (unsigned i = 0; i < Attr.reductionListSizes_size(); ++i) {
+    auto S = *(Attr.nameSpecifierLocs_begin() + i);
+    auto NameInfo = *(Attr.declNameInfos_begin() + i);
+    for (unsigned j = 0; j < *(Attr.reductionListSizes_begin() + i); ++j) {
+      auto *E = *(reductionOps_it++);
+      // Transform all the decls.
+      if (E) {
+        auto *ULE = cast<UnresolvedLookupExpr>(E);
+        UnresolvedSet<8> Decls;
+        for (auto *D : ULE->decls()) {
+          // NamedDecl *InstD =
+          //     cast<NamedDecl>(TransformDecl(E->getExprLoc(), D));
+          NamedDecl *InstD =
+              FindInstantiatedDecl(E->getExprLoc(), D, TemplateArgs);
+          Decls.addDecl(InstD, InstD->getAccess());
+        }
+        UnresolvedReductions.push_back(
+         UnresolvedLookupExpr::Create(
+            Context, /*NamingClass=*/nullptr,
+            S,
+            NameInfo, /*ADL=*/true, ULE->isOverloaded(),
+            Decls.begin(), Decls.end()));
+      } else
+        UnresolvedReductions.push_back(nullptr);
+    }
+  }
+
   (void)ActOnOmpSsDeclareTaskDirective(
     ConvertDeclToDeclGroup(New),
     IfRes.get(), FinalRes.get(),
@@ -438,8 +485,13 @@ void Sema::InstantiateOSSDeclareTaskAttr(
     DepConcurrents, DepCommutatives,
     DepWeakIns, DepWeakOuts, DepWeakInouts,
     DepWeakConcurrents, DepWeakCommutatives,
+    ArrayRef<unsigned>(Attr.reductionListSizes_begin(), Attr.reductionListSizes_end()),
+    Reductions,
+    ArrayRef<unsigned>(Attr.reductionClauseType_begin(), Attr.reductionClauseType_end()),
+    ReductionCXXScopeSpecs, ReductionIds,
     Ndranges, SourceLocation(), // TODO
-    Attr.getRange());
+    Attr.getRange(),
+    UnresolvedReductions);
 }
 
 static void
@@ -891,6 +943,15 @@ void Sema::InstantiateAttrs(const MultiLevelTemplateArgumentList &TemplateArgs,
     }
 
     // OmpSs
+    if (const auto *OSSAttr = dyn_cast<OSSTaskDeclSentinelAttr>(TmplAttr)) {
+      auto *MD = cast<CXXMethodDecl>(New);
+      auto *TD = cast<TagDecl>(MD->getParent());
+      Diag(TD->getLocation(),
+           diag::err_template_instantiate_within_definition)
+        << /*implicit|explicit*/0 << Context.getTypeDeclType(TD);
+      continue;
+    }
+
     if (const auto *OSSAttr = dyn_cast<OSSTaskDeclAttr>(TmplAttr)) {
       InstantiateOSSDeclareTaskAttr(TemplateArgs, *OSSAttr, New);
       continue;

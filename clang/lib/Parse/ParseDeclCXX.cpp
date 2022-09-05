@@ -2240,7 +2240,7 @@ void Parser::HandleMemberFunctionDeclDelays(Declarator &DeclaratorInfo,
     }
   }
 
-  if (NeedLateParse) {
+  if (NeedLateParse || getCurrentClass().OmpSsForceDelay) {
     // Push this method onto the stack of late-parsed method
     // declarations.
     auto LateMethod = new LateParsedMethodDeclaration(this, ThisDecl);
