@@ -374,9 +374,9 @@ namespace {
       } else if (type == "OMPTraitInfo *") {
         OS << "    OS << \" \" << SA->get" << getUpperName() << "();\n";
       } else if (type == "NestedNameSpecifierLoc") {
-        // OS << "    OS << \" \" << SA->get" << getUpperName() << "();\n";
+        OS << "    OS << \" \";\n";
       } else if (type == "DeclarationNameInfo") {
-        // OS << "    OS << \" \" << SA->get" << getUpperName() << "();\n";
+        OS << "    OS << \" \";\n";
       } else {
         llvm_unreachable("Unknown SimpleArgument type!");
       }
