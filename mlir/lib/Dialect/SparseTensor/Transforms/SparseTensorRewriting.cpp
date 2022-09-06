@@ -34,11 +34,9 @@ using namespace mlir::sparse_tensor;
 // Helper to detect a sparse tensor type operand.
 static bool isSparseTensor(OpOperand *op) {
   if (auto enc = getSparseTensorEncoding(op->get().getType())) {
-    ArrayRef<SparseTensorEncodingAttr::DimLevelType> dimTypes =
-        enc.getDimLevelType();
-    for (auto dimType : dimTypes)
-      if (dimType == SparseTensorEncodingAttr::DimLevelType::Compressed)
-        return true; // at least one compressed
+    if (llvm::is_contained(enc.getDimLevelType(),
+                           SparseTensorEncodingAttr::DimLevelType::Compressed))
+      return true;
   }
   return false;
 }
@@ -128,9 +126,15 @@ public:
         !isAlloc(op.getOutputOperand(0), /*isZero=*/false) || !isZeroYield(op))
       return failure();
     auto outputType = op.getResult(0).getType().cast<RankedTensorType>();
-    if (!outputType.hasStaticShape() || getSparseTensorEncoding(outputType))
-      return failure();
+    // Yielding zero on newly allocated (all-zero) sparse tensors can be
+    // optimized out directly (regardless of dynamic or static size).
+    if (getSparseTensorEncoding(outputType)) {
+      rewriter.replaceOp(op, op.getOutputOperand(0)->get());
+      return success();
+    }
     // Incorporate zero value into allocation copy.
+    if (!outputType.hasStaticShape())
+      return failure();
     Value zero = constantZero(rewriter, op.getLoc(), op.getResult(0).getType());
     AllocTensorOp a =
         op.getOutputOperand(0)->get().getDefiningOp<AllocTensorOp>();
