@@ -158,7 +158,7 @@ struct DirectiveOnreadyInfo {
 struct DirectiveDeviceInfo {
   Value *Kind = nullptr;
   // The arguments of the call to function.
-  int64_t NumDims = 0;
+  size_t NumDims = 0;
   SmallVector<Value *, 4> Ndrange;
   bool HasLocalSize = true;
   StringRef DevFuncStringRef;
