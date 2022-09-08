@@ -10198,6 +10198,8 @@ void __kmp_set_thread_roles2(int tid, omp_role_t r){
 			    KMP_DEBUG_ASSERT((th->th.th_next_pool == NULL) ||
 			                        (th->th.th_info.ds.ds_gtid < th->th.th_next_pool->th.th_info.ds.ds_gtid));
 			    TCW_4(th->th.th_in_pool, TRUE);
+                th->th.th_team = NULL;
+
 			    if(th->th.th_active == TRUE){
 			        KMP_ATOMIC_INC(&__kmp_thread_pool_active_nth);
 			        th->th.th_active_in_pool = TRUE;
@@ -10244,6 +10246,7 @@ void __kmp_set_thread_roles2(int tid, omp_role_t r){
 }
 
 int __kmp_get_thread_id(){
+    if(!TCR_4(__kmp_init_gtid)) return KMP_GTID_SHUTDOWN;
 	int gtid = __kmp_entry_gtid();
 	return __kmp_threads[gtid]->th.th_info.ds.ds_thread_id;
 }
