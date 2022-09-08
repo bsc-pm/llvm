@@ -125,12 +125,12 @@ attributes #1 = { nounwind }
 ; CHECK:       codeRepl:
 ; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS]], align 8, !dbg [[DBG9]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG9]]
-; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_fold_if0, ptr @task_invocation_info_fold_if0, ptr null, i64 16, ptr [[TMP0]], ptr [[TMP1]], i64 1, i64 [[TMP2]]), !dbg [[DBG9]]
+; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_fold_if, ptr @task_invocation_info_fold_if, ptr null, i64 16, ptr [[TMP0]], ptr [[TMP1]], i64 1, i64 [[TMP2]]), !dbg [[DBG9]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[TMP0]], align 8, !dbg [[DBG9]]
 ; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP3]], i64 16, !dbg [[DBG9]]
-; CHECK-NEXT:    [[GEP_A_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOLD_IF0:%.*]], ptr [[TMP3]], i32 0, i32 0, !dbg [[DBG9]]
+; CHECK-NEXT:    [[GEP_A_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOLD_IF:%.*]], ptr [[TMP3]], i32 0, i32 0, !dbg [[DBG9]]
 ; CHECK-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 4 [[GEP_A_ADDR]], ptr align 4 [[A_ADDR]], i64 4, i1 false), !dbg [[DBG9]]
-; CHECK-NEXT:    [[GEP_B_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOLD_IF0]], ptr [[TMP3]], i32 0, i32 1, !dbg [[DBG9]]
+; CHECK-NEXT:    [[GEP_B_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOLD_IF]], ptr [[TMP3]], i32 0, i32 1, !dbg [[DBG9]]
 ; CHECK-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 4 [[GEP_B_ADDR]], ptr align 4 [[B_ADDR]], i64 4, i1 false), !dbg [[DBG9]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[TMP1]], align 8, !dbg [[DBG9]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP4]]), !dbg [[DBG9]]
@@ -179,18 +179,7 @@ attributes #1 = { nounwind }
 ; CHECK-NEXT:    ret i32 0, !dbg [[DBG23:![0-9]+]]
 ;
 ;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_register_task_info() {
-; CHECK-NEXT:  entry:
-; CHECK-NEXT:    call void @nanos6_register_task_info(ptr @task_info_var_fold_if0)
-; CHECK-NEXT:    ret void
-;
-;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_register_assert() {
-; CHECK-NEXT:  entry:
-; CHECK-NEXT:    ret void
-;
-;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_fold_if0
+; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_fold_if
 ; CHECK-SAME: (ptr [[A_ADDR:%.*]], ptr [[B_ADDR:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG24:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
 ; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG25:![0-9]+]]
@@ -226,16 +215,22 @@ attributes #1 = { nounwind }
 ; CHECK-NEXT:    ret void
 ;
 ;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_fold_if0
+; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_fold_if
 ; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) {
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[GEP_A_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOLD_IF0:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
-; CHECK-NEXT:    [[GEP_B_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOLD_IF0]], ptr [[TASK_ARGS]], i32 0, i32 1
+; CHECK-NEXT:    [[GEP_A_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOLD_IF:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
+; CHECK-NEXT:    [[GEP_B_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOLD_IF]], ptr [[TASK_ARGS]], i32 0, i32 1
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
 ; CHECK-NEXT:    br i1 [[TMP0]], label [[TMP1:%.*]], label [[TMP2:%.*]]
 ; CHECK:       1:
 ; CHECK-NEXT:    br label [[TMP2]]
 ; CHECK:       2:
-; CHECK-NEXT:    call void @nanos6_unpacked_task_region_fold_if0(ptr [[GEP_A_ADDR]], ptr [[GEP_B_ADDR]], ptr [[DEVICE_ENV]], ptr [[ADDRESS_TRANSLATION_TABLE]])
+; CHECK-NEXT:    call void @nanos6_unpacked_task_region_fold_if(ptr [[GEP_A_ADDR]], ptr [[GEP_B_ADDR]], ptr [[DEVICE_ENV]], ptr [[ADDRESS_TRANSLATION_TABLE]])
+; CHECK-NEXT:    ret void
+;
+;
+; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_register_task_info() {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    call void @nanos6_register_task_info(ptr @task_info_var_fold_if)
 ; CHECK-NEXT:    ret void
 ;

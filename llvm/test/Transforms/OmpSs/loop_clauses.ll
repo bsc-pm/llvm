@@ -183,10 +183,10 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG10]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = alloca ptr, align 8, !dbg [[DBG11:![0-9]+]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = alloca ptr, align 8, !dbg [[DBG11]]
-; CHECK-NEXT:    [[NUM_DEPS31:%.*]] = alloca i64, align 8, !dbg [[DBG11]]
+; CHECK-NEXT:    [[NUM_DEPS17:%.*]] = alloca i64, align 8, !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = alloca ptr, align 8, !dbg [[DBG12:![0-9]+]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = alloca ptr, align 8, !dbg [[DBG12]]
-; CHECK-NEXT:    [[NUM_DEPS38:%.*]] = alloca i64, align 8, !dbg [[DBG12]]
+; CHECK-NEXT:    [[NUM_DEPS31:%.*]] = alloca i64, align 8, !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = alloca ptr, align 8, !dbg [[DBG13:![0-9]+]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = alloca ptr, align 8, !dbg [[DBG13]]
 ; CHECK-NEXT:    [[NUM_DEPS45:%.*]] = alloca i64, align 8, !dbg [[DBG13]]
@@ -203,18 +203,18 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[TMP15:%.*]] = add i32 [[TMP14]], 1, !dbg [[DBG10]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = sext i32 [[TMP15]] to i64, !dbg [[DBG10]]
 ; CHECK-NEXT:    [[TMP17:%.*]] = mul i64 1, [[TMP16]], !dbg [[DBG10]]
-; CHECK-NEXT:    call void @nanos6_create_loop(ptr @task_info_var_foo0, ptr @task_invocation_info_foo0, ptr null, i64 16, ptr [[TMP0]], ptr [[TMP1]], i64 8, i64 [[TMP8]], i64 0, i64 [[TMP17]], i64 0, i64 777), !dbg [[DBG10]]
+; CHECK-NEXT:    call void @nanos6_create_loop(ptr @task_info_var_foo, ptr @task_invocation_info_foo, ptr null, i64 16, ptr [[TMP0]], ptr [[TMP1]], i64 8, i64 [[TMP8]], i64 0, i64 [[TMP17]], i64 0, i64 777), !dbg [[DBG10]]
 ; CHECK-NEXT:    [[TMP18:%.*]] = load ptr, ptr [[TMP0]], align 8, !dbg [[DBG10]]
 ; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP18]], i64 16, !dbg [[DBG10]]
 ; CHECK-NEXT:    [[TMP19:%.*]] = load ptr, ptr [[TMP1]], align 8, !dbg [[DBG10]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP19]]), !dbg [[DBG10]]
-; CHECK-NEXT:    br label [[FOR_END24:%.*]], !dbg [[DBG10]]
+; CHECK-NEXT:    br label [[FOR_END3:%.*]], !dbg [[DBG10]]
 ; CHECK:       final.end:
 ; CHECK-NEXT:    store i32 0, ptr [[I1]], align 4, !dbg [[DBG14:![0-9]+]]
-; CHECK-NEXT:    br label [[FINAL_COND6:%.*]], !dbg [[DBG11]]
-; CHECK:       codeRepl30:
-; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS31]], align 8, !dbg [[DBG11]]
-; CHECK-NEXT:    [[TMP20:%.*]] = load i64, ptr [[NUM_DEPS31]], align 8, !dbg [[DBG11]]
+; CHECK-NEXT:    br label [[FINAL_COND10:%.*]], !dbg [[DBG11]]
+; CHECK:       codeRepl16:
+; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS17]], align 8, !dbg [[DBG11]]
+; CHECK-NEXT:    [[TMP20:%.*]] = load i64, ptr [[NUM_DEPS17]], align 8, !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP21:%.*]] = call i32 @compute_lb.1(), !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP22:%.*]] = call i32 @compute_ub.2(), !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP23:%.*]] = call i32 @compute_step.3(), !dbg [[DBG11]]
@@ -224,18 +224,18 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[TMP27:%.*]] = add i32 [[TMP26]], 1, !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP28:%.*]] = sext i32 [[TMP27]] to i64, !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP29:%.*]] = mul i64 1, [[TMP28]], !dbg [[DBG11]]
-; CHECK-NEXT:    call void @nanos6_create_loop(ptr @task_info_var_foo1, ptr @task_invocation_info_foo1, ptr null, i64 16, ptr [[TMP2]], ptr [[TMP3]], i64 12, i64 [[TMP20]], i64 0, i64 [[TMP29]], i64 0, i64 777), !dbg [[DBG11]]
+; CHECK-NEXT:    call void @nanos6_create_loop(ptr @task_info_var_foo.10, ptr @task_invocation_info_foo.6, ptr null, i64 16, ptr [[TMP2]], ptr [[TMP3]], i64 12, i64 [[TMP20]], i64 0, i64 [[TMP29]], i64 0, i64 777), !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP30:%.*]] = load ptr, ptr [[TMP2]], align 8, !dbg [[DBG11]]
-; CHECK-NEXT:    [[ARGS_END32:%.*]] = getelementptr i8, ptr [[TMP30]], i64 16, !dbg [[DBG11]]
+; CHECK-NEXT:    [[ARGS_END18:%.*]] = getelementptr i8, ptr [[TMP30]], i64 16, !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP31:%.*]] = load ptr, ptr [[TMP3]], align 8, !dbg [[DBG11]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP31]]), !dbg [[DBG11]]
-; CHECK-NEXT:    br label [[FOR_END28:%.*]], !dbg [[DBG11]]
-; CHECK:       final.end5:
+; CHECK-NEXT:    br label [[FOR_END14:%.*]], !dbg [[DBG11]]
+; CHECK:       final.end9:
 ; CHECK-NEXT:    store i32 0, ptr [[I2]], align 4, !dbg [[DBG15:![0-9]+]]
-; CHECK-NEXT:    br label [[FINAL_COND13:%.*]], !dbg [[DBG12]]
-; CHECK:       codeRepl37:
-; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS38]], align 8, !dbg [[DBG12]]
-; CHECK-NEXT:    [[TMP32:%.*]] = load i64, ptr [[NUM_DEPS38]], align 8, !dbg [[DBG12]]
+; CHECK-NEXT:    br label [[FINAL_COND24:%.*]], !dbg [[DBG12]]
+; CHECK:       codeRepl30:
+; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS31]], align 8, !dbg [[DBG12]]
+; CHECK-NEXT:    [[TMP32:%.*]] = load i64, ptr [[NUM_DEPS31]], align 8, !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP33:%.*]] = call i32 @compute_lb.4(), !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP34:%.*]] = call i32 @compute_ub.5(), !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP35:%.*]] = call i32 @compute_step.6(), !dbg [[DBG12]]
@@ -245,15 +245,15 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[TMP39:%.*]] = add i32 [[TMP38]], 1, !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP40:%.*]] = sext i32 [[TMP39]] to i64, !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP41:%.*]] = mul i64 1, [[TMP40]], !dbg [[DBG12]]
-; CHECK-NEXT:    call void @nanos6_create_loop(ptr @task_info_var_foo2, ptr @task_invocation_info_foo2, ptr null, i64 16, ptr [[TMP4]], ptr [[TMP5]], i64 4, i64 [[TMP32]], i64 0, i64 [[TMP41]], i64 777, i64 0), !dbg [[DBG12]]
+; CHECK-NEXT:    call void @nanos6_create_loop(ptr @task_info_var_foo.20, ptr @task_invocation_info_foo.16, ptr null, i64 16, ptr [[TMP4]], ptr [[TMP5]], i64 4, i64 [[TMP32]], i64 0, i64 [[TMP41]], i64 777, i64 0), !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP42:%.*]] = load ptr, ptr [[TMP4]], align 8, !dbg [[DBG12]]
-; CHECK-NEXT:    [[ARGS_END39:%.*]] = getelementptr i8, ptr [[TMP42]], i64 16, !dbg [[DBG12]]
+; CHECK-NEXT:    [[ARGS_END32:%.*]] = getelementptr i8, ptr [[TMP42]], i64 16, !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP43:%.*]] = load ptr, ptr [[TMP5]], align 8, !dbg [[DBG12]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP43]]), !dbg [[DBG12]]
-; CHECK-NEXT:    br label [[FOR_END35:%.*]], !dbg [[DBG12]]
-; CHECK:       final.end12:
+; CHECK-NEXT:    br label [[FOR_END28:%.*]], !dbg [[DBG12]]
+; CHECK:       final.end23:
 ; CHECK-NEXT:    store i32 0, ptr [[I3]], align 4, !dbg [[DBG16:![0-9]+]]
-; CHECK-NEXT:    br label [[FINAL_COND20:%.*]], !dbg [[DBG13]]
+; CHECK-NEXT:    br label [[FINAL_COND38:%.*]], !dbg [[DBG13]]
 ; CHECK:       codeRepl44:
 ; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS45]], align 8, !dbg [[DBG13]]
 ; CHECK-NEXT:    [[TMP44:%.*]] = load i64, ptr [[NUM_DEPS45]], align 8, !dbg [[DBG13]]
@@ -266,13 +266,13 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[TMP51:%.*]] = add i32 [[TMP50]], 1, !dbg [[DBG13]]
 ; CHECK-NEXT:    [[TMP52:%.*]] = sext i32 [[TMP51]] to i64, !dbg [[DBG13]]
 ; CHECK-NEXT:    [[TMP53:%.*]] = mul i64 1, [[TMP52]], !dbg [[DBG13]]
-; CHECK-NEXT:    call void @nanos6_create_loop(ptr @task_info_var_foo3, ptr @task_invocation_info_foo3, ptr null, i64 16, ptr [[TMP6]], ptr [[TMP7]], i64 12, i64 [[TMP44]], i64 0, i64 [[TMP53]], i64 777, i64 0), !dbg [[DBG13]]
+; CHECK-NEXT:    call void @nanos6_create_loop(ptr @task_info_var_foo.30, ptr @task_invocation_info_foo.26, ptr null, i64 16, ptr [[TMP6]], ptr [[TMP7]], i64 12, i64 [[TMP44]], i64 0, i64 [[TMP53]], i64 777, i64 0), !dbg [[DBG13]]
 ; CHECK-NEXT:    [[TMP54:%.*]] = load ptr, ptr [[TMP6]], align 8, !dbg [[DBG13]]
 ; CHECK-NEXT:    [[ARGS_END46:%.*]] = getelementptr i8, ptr [[TMP54]], i64 16, !dbg [[DBG13]]
 ; CHECK-NEXT:    [[TMP55:%.*]] = load ptr, ptr [[TMP7]], align 8, !dbg [[DBG13]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP55]]), !dbg [[DBG13]]
 ; CHECK-NEXT:    br label [[FOR_END42:%.*]], !dbg [[DBG13]]
-; CHECK:       final.end19:
+; CHECK:       final.end37:
 ; CHECK-NEXT:    ret void, !dbg [[DBG17:![0-9]+]]
 ; CHECK:       final.then:
 ; CHECK-NEXT:    [[TMP56:%.*]] = call i32 @compute_lb(), !dbg [[DBG10]]
@@ -288,48 +288,48 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    br label [[FOR_BODY:%.*]], !dbg [[DBG10]]
 ; CHECK:       for.body:
 ; CHECK-NEXT:    br label [[FOR_INCR:%.*]], !dbg [[DBG14]]
-; CHECK:       final.then7:
+; CHECK:       final.then11:
 ; CHECK-NEXT:    [[TMP62:%.*]] = call i32 @compute_lb.1(), !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP63:%.*]] = call i32 @compute_ub.2(), !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP64:%.*]] = call i32 @compute_step.3(), !dbg [[DBG11]]
 ; CHECK-NEXT:    store i32 [[TMP62]], ptr [[I1]], align 4, !dbg [[DBG11]]
-; CHECK-NEXT:    br label [[FOR_COND1:%.*]], !dbg [[DBG11]]
-; CHECK:       for.cond1:
+; CHECK-NEXT:    br label [[FOR_COND5:%.*]], !dbg [[DBG11]]
+; CHECK:       for.cond5:
 ; CHECK-NEXT:    [[TMP65:%.*]] = load i32, ptr [[I1]], align 4, !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP66:%.*]] = icmp slt i32 [[TMP65]], [[TMP63]], !dbg [[DBG11]]
-; CHECK-NEXT:    br i1 [[TMP66]], label [[TMP67:%.*]], label [[FOR_END3:%.*]], !dbg [[DBG11]]
+; CHECK-NEXT:    br i1 [[TMP66]], label [[TMP67:%.*]], label [[FOR_END7:%.*]], !dbg [[DBG11]]
 ; CHECK:       67:
-; CHECK-NEXT:    br label [[FOR_BODY2:%.*]], !dbg [[DBG11]]
-; CHECK:       for.body2:
-; CHECK-NEXT:    br label [[FOR_INCR4:%.*]], !dbg [[DBG15]]
-; CHECK:       final.then14:
+; CHECK-NEXT:    br label [[FOR_BODY6:%.*]], !dbg [[DBG11]]
+; CHECK:       for.body6:
+; CHECK-NEXT:    br label [[FOR_INCR8:%.*]], !dbg [[DBG15]]
+; CHECK:       final.then25:
 ; CHECK-NEXT:    [[TMP68:%.*]] = call i32 @compute_lb.4(), !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP69:%.*]] = call i32 @compute_ub.5(), !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP70:%.*]] = call i32 @compute_step.6(), !dbg [[DBG12]]
 ; CHECK-NEXT:    store i32 [[TMP68]], ptr [[I2]], align 4, !dbg [[DBG12]]
-; CHECK-NEXT:    br label [[FOR_COND8:%.*]], !dbg [[DBG12]]
-; CHECK:       for.cond8:
+; CHECK-NEXT:    br label [[FOR_COND19:%.*]], !dbg [[DBG12]]
+; CHECK:       for.cond19:
 ; CHECK-NEXT:    [[TMP71:%.*]] = load i32, ptr [[I2]], align 4, !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP72:%.*]] = icmp slt i32 [[TMP71]], [[TMP69]], !dbg [[DBG12]]
-; CHECK-NEXT:    br i1 [[TMP72]], label [[TMP73:%.*]], label [[FOR_END10:%.*]], !dbg [[DBG12]]
+; CHECK-NEXT:    br i1 [[TMP72]], label [[TMP73:%.*]], label [[FOR_END21:%.*]], !dbg [[DBG12]]
 ; CHECK:       73:
-; CHECK-NEXT:    br label [[FOR_BODY9:%.*]], !dbg [[DBG12]]
-; CHECK:       for.body9:
-; CHECK-NEXT:    br label [[FOR_INCR11:%.*]], !dbg [[DBG16]]
-; CHECK:       final.then21:
+; CHECK-NEXT:    br label [[FOR_BODY20:%.*]], !dbg [[DBG12]]
+; CHECK:       for.body20:
+; CHECK-NEXT:    br label [[FOR_INCR22:%.*]], !dbg [[DBG16]]
+; CHECK:       final.then39:
 ; CHECK-NEXT:    [[TMP74:%.*]] = call i32 @compute_lb.7(), !dbg [[DBG13]]
 ; CHECK-NEXT:    [[TMP75:%.*]] = call i32 @compute_ub.8(), !dbg [[DBG13]]
 ; CHECK-NEXT:    [[TMP76:%.*]] = call i32 @compute_step.9(), !dbg [[DBG13]]
 ; CHECK-NEXT:    store i32 [[TMP74]], ptr [[I3]], align 4, !dbg [[DBG13]]
-; CHECK-NEXT:    br label [[FOR_COND15:%.*]], !dbg [[DBG13]]
-; CHECK:       for.cond15:
+; CHECK-NEXT:    br label [[FOR_COND33:%.*]], !dbg [[DBG13]]
+; CHECK:       for.cond33:
 ; CHECK-NEXT:    [[TMP77:%.*]] = load i32, ptr [[I3]], align 4, !dbg [[DBG13]]
 ; CHECK-NEXT:    [[TMP78:%.*]] = icmp slt i32 [[TMP77]], [[TMP75]], !dbg [[DBG13]]
-; CHECK-NEXT:    br i1 [[TMP78]], label [[TMP79:%.*]], label [[FOR_END17:%.*]], !dbg [[DBG13]]
+; CHECK-NEXT:    br i1 [[TMP78]], label [[TMP79:%.*]], label [[FOR_END35:%.*]], !dbg [[DBG13]]
 ; CHECK:       79:
-; CHECK-NEXT:    br label [[FOR_BODY16:%.*]], !dbg [[DBG13]]
-; CHECK:       for.body16:
-; CHECK-NEXT:    br label [[FOR_INCR18:%.*]], !dbg [[DBG17]]
+; CHECK-NEXT:    br label [[FOR_BODY34:%.*]], !dbg [[DBG13]]
+; CHECK:       for.body34:
+; CHECK-NEXT:    br label [[FOR_INCR36:%.*]], !dbg [[DBG17]]
 ; CHECK:       for.end:
 ; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG10]]
 ; CHECK:       for.incr:
@@ -342,46 +342,46 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[TMP83:%.*]] = icmp ne i32 [[TMP82]], 0, !dbg [[DBG10]]
 ; CHECK-NEXT:    br i1 [[TMP83]], label [[FINAL_THEN:%.*]], label [[CODEREPL:%.*]], !dbg [[DBG10]]
 ; CHECK:       for.end3:
-; CHECK-NEXT:    br label [[FINAL_END5:%.*]], !dbg [[DBG11]]
-; CHECK:       for.incr4:
+; CHECK-NEXT:    br label [[FINAL_END]], !dbg [[DBG10]]
+; CHECK:       for.end7:
+; CHECK-NEXT:    br label [[FINAL_END9:%.*]], !dbg [[DBG11]]
+; CHECK:       for.incr8:
 ; CHECK-NEXT:    [[TMP84:%.*]] = load i32, ptr [[I1]], align 4, !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP85:%.*]] = add i32 [[TMP84]], [[TMP64]], !dbg [[DBG11]]
 ; CHECK-NEXT:    store i32 [[TMP85]], ptr [[I1]], align 4, !dbg [[DBG11]]
-; CHECK-NEXT:    br label [[FOR_COND1]], !dbg [[DBG11]]
-; CHECK:       final.cond6:
+; CHECK-NEXT:    br label [[FOR_COND5]], !dbg [[DBG11]]
+; CHECK:       final.cond10:
 ; CHECK-NEXT:    [[TMP86:%.*]] = call i32 @nanos6_in_final(), !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP87:%.*]] = icmp ne i32 [[TMP86]], 0, !dbg [[DBG11]]
-; CHECK-NEXT:    br i1 [[TMP87]], label [[FINAL_THEN7:%.*]], label [[CODEREPL30:%.*]], !dbg [[DBG11]]
-; CHECK:       for.end10:
-; CHECK-NEXT:    br label [[FINAL_END12:%.*]], !dbg [[DBG12]]
-; CHECK:       for.incr11:
+; CHECK-NEXT:    br i1 [[TMP87]], label [[FINAL_THEN11:%.*]], label [[CODEREPL16:%.*]], !dbg [[DBG11]]
+; CHECK:       for.end14:
+; CHECK-NEXT:    br label [[FINAL_END9]], !dbg [[DBG11]]
+; CHECK:       for.end21:
+; CHECK-NEXT:    br label [[FINAL_END23:%.*]], !dbg [[DBG12]]
+; CHECK:       for.incr22:
 ; CHECK-NEXT:    [[TMP88:%.*]] = load i32, ptr [[I2]], align 4, !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP89:%.*]] = add i32 [[TMP88]], [[TMP70]], !dbg [[DBG12]]
 ; CHECK-NEXT:    store i32 [[TMP89]], ptr [[I2]], align 4, !dbg [[DBG12]]
-; CHECK-NEXT:    br label [[FOR_COND8]], !dbg [[DBG12]]
-; CHECK:       final.cond13:
+; CHECK-NEXT:    br label [[FOR_COND19]], !dbg [[DBG12]]
+; CHECK:       final.cond24:
 ; CHECK-NEXT:    [[TMP90:%.*]] = call i32 @nanos6_in_final(), !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP91:%.*]] = icmp ne i32 [[TMP90]], 0, !dbg [[DBG12]]
-; CHECK-NEXT:    br i1 [[TMP91]], label [[FINAL_THEN14:%.*]], label [[CODEREPL37:%.*]], !dbg [[DBG12]]
-; CHECK:       for.end17:
-; CHECK-NEXT:    br label [[FINAL_END19:%.*]], !dbg [[DBG13]]
-; CHECK:       for.incr18:
+; CHECK-NEXT:    br i1 [[TMP91]], label [[FINAL_THEN25:%.*]], label [[CODEREPL30:%.*]], !dbg [[DBG12]]
+; CHECK:       for.end28:
+; CHECK-NEXT:    br label [[FINAL_END23]], !dbg [[DBG12]]
+; CHECK:       for.end35:
+; CHECK-NEXT:    br label [[FINAL_END37:%.*]], !dbg [[DBG13]]
+; CHECK:       for.incr36:
 ; CHECK-NEXT:    [[TMP92:%.*]] = load i32, ptr [[I3]], align 4, !dbg [[DBG13]]
 ; CHECK-NEXT:    [[TMP93:%.*]] = add i32 [[TMP92]], [[TMP76]], !dbg [[DBG13]]
 ; CHECK-NEXT:    store i32 [[TMP93]], ptr [[I3]], align 4, !dbg [[DBG13]]
-; CHECK-NEXT:    br label [[FOR_COND15]], !dbg [[DBG13]]
-; CHECK:       final.cond20:
+; CHECK-NEXT:    br label [[FOR_COND33]], !dbg [[DBG13]]
+; CHECK:       final.cond38:
 ; CHECK-NEXT:    [[TMP94:%.*]] = call i32 @nanos6_in_final(), !dbg [[DBG13]]
 ; CHECK-NEXT:    [[TMP95:%.*]] = icmp ne i32 [[TMP94]], 0, !dbg [[DBG13]]
-; CHECK-NEXT:    br i1 [[TMP95]], label [[FINAL_THEN21:%.*]], label [[CODEREPL44:%.*]], !dbg [[DBG13]]
-; CHECK:       for.end24:
-; CHECK-NEXT:    br label [[FINAL_END]], !dbg [[DBG10]]
-; CHECK:       for.end28:
-; CHECK-NEXT:    br label [[FINAL_END5]], !dbg [[DBG11]]
-; CHECK:       for.end35:
-; CHECK-NEXT:    br label [[FINAL_END12]], !dbg [[DBG12]]
+; CHECK-NEXT:    br i1 [[TMP95]], label [[FINAL_THEN39:%.*]], label [[CODEREPL44:%.*]], !dbg [[DBG13]]
 ; CHECK:       for.end42:
-; CHECK-NEXT:    br label [[FINAL_END19]], !dbg [[DBG13]]
+; CHECK-NEXT:    br label [[FINAL_END37]], !dbg [[DBG13]]
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@compute_lb
@@ -456,21 +456,7 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    ret i32 1, !dbg [[DBG52:![0-9]+]]
 ;
 ;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_register_task_info() {
-; CHECK-NEXT:  entry:
-; CHECK-NEXT:    call void @nanos6_register_task_info(ptr @task_info_var_foo0)
-; CHECK-NEXT:    call void @nanos6_register_task_info(ptr @task_info_var_foo1)
-; CHECK-NEXT:    call void @nanos6_register_task_info(ptr @task_info_var_foo2)
-; CHECK-NEXT:    call void @nanos6_register_task_info(ptr @task_info_var_foo3)
-; CHECK-NEXT:    ret void
-;
-;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_register_assert() {
-; CHECK-NEXT:  entry:
-; CHECK-NEXT:    ret void
-;
-;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_foo0
+; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_foo
 ; CHECK-SAME: (ptr [[I:%.*]], ptr [[LOOP_BOUNDS:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG54:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
 ; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG55:![0-9]+]]
@@ -491,8 +477,8 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[TMP10:%.*]] = sext i32 [[TMP9]] to i64, !dbg [[DBG55]]
 ; CHECK-NEXT:    [[LOOP:%.*]] = alloca i32, align 4, !dbg [[DBG55]]
 ; CHECK-NEXT:    store i32 [[LB]], ptr [[LOOP]], align 4, !dbg [[DBG55]]
-; CHECK-NEXT:    br label [[FOR_COND22:%.*]], !dbg [[DBG55]]
-; CHECK:       for.cond22:
+; CHECK-NEXT:    br label [[FOR_COND1:%.*]], !dbg [[DBG55]]
+; CHECK:       for.cond1:
 ; CHECK-NEXT:    [[TMP11:%.*]] = load i32, ptr [[LOOP]], align 4, !dbg [[DBG55]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp slt i32 [[TMP11]], [[UB]], !dbg [[DBG55]]
 ; CHECK-NEXT:    br i1 [[TMP12]], label [[TMP13:%.*]], label [[DOTEXITSTUB:%.*]], !dbg [[DBG55]]
@@ -509,32 +495,41 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[TMP23:%.*]] = sub i64 [[TMP22]], [[TMP21]], !dbg [[DBG55]]
 ; CHECK-NEXT:    [[TMP24:%.*]] = trunc i64 [[TMP20]] to i32, !dbg [[DBG55]]
 ; CHECK-NEXT:    store i32 [[TMP24]], ptr [[I]], align 4, !dbg [[DBG55]]
-; CHECK-NEXT:    br label [[FOR_BODY23:%.*]], !dbg [[DBG55]]
-; CHECK:       for.body23:
-; CHECK-NEXT:    br label [[FOR_INCR25:%.*]], !dbg [[DBG56:![0-9]+]]
-; CHECK:       for.incr25:
+; CHECK-NEXT:    br label [[FOR_BODY2:%.*]], !dbg [[DBG55]]
+; CHECK:       for.body2:
+; CHECK-NEXT:    br label [[FOR_INCR4:%.*]], !dbg [[DBG56:![0-9]+]]
+; CHECK:       for.incr4:
 ; CHECK-NEXT:    [[TMP25:%.*]] = load i32, ptr [[LOOP]], align 4, !dbg [[DBG55]]
 ; CHECK-NEXT:    [[TMP26:%.*]] = add i32 [[TMP25]], 1, !dbg [[DBG55]]
 ; CHECK-NEXT:    store i32 [[TMP26]], ptr [[LOOP]], align 4, !dbg [[DBG55]]
-; CHECK-NEXT:    br label [[FOR_COND22]], !dbg [[DBG55]]
+; CHECK-NEXT:    br label [[FOR_COND1]], !dbg [[DBG55]]
 ; CHECK:       .exitStub:
 ; CHECK-NEXT:    ret void
 ;
 ;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_foo0
+; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_foo
 ; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[LOOP_BOUNDS:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) {
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[GEP_I:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO0:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
+; CHECK-NEXT:    [[GEP_I:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
 ; CHECK-NEXT:    br i1 [[TMP0]], label [[TMP1:%.*]], label [[TMP2:%.*]]
 ; CHECK:       1:
 ; CHECK-NEXT:    br label [[TMP2]]
 ; CHECK:       2:
-; CHECK-NEXT:    call void @nanos6_unpacked_task_region_foo0(ptr [[GEP_I]], ptr [[LOOP_BOUNDS]], ptr [[ADDRESS_TRANSLATION_TABLE]])
+; CHECK-NEXT:    call void @nanos6_unpacked_task_region_foo(ptr [[GEP_I]], ptr [[LOOP_BOUNDS]], ptr [[ADDRESS_TRANSLATION_TABLE]])
 ; CHECK-NEXT:    ret void
 ;
 ;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_foo1
+; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_register_task_info() {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    call void @nanos6_register_task_info(ptr @task_info_var_foo)
+; CHECK-NEXT:    call void @nanos6_register_task_info(ptr @task_info_var_foo.10)
+; CHECK-NEXT:    call void @nanos6_register_task_info(ptr @task_info_var_foo.20)
+; CHECK-NEXT:    call void @nanos6_register_task_info(ptr @task_info_var_foo.30)
+; CHECK-NEXT:    ret void
+;
+;
+; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_foo.4
 ; CHECK-SAME: (ptr [[I1:%.*]], ptr [[LOOP_BOUNDS:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG57:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
 ; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG58:![0-9]+]]
@@ -555,8 +550,8 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[TMP10:%.*]] = sext i32 [[TMP9]] to i64, !dbg [[DBG58]]
 ; CHECK-NEXT:    [[LOOP:%.*]] = alloca i32, align 4, !dbg [[DBG58]]
 ; CHECK-NEXT:    store i32 [[LB]], ptr [[LOOP]], align 4, !dbg [[DBG58]]
-; CHECK-NEXT:    br label [[FOR_COND26:%.*]], !dbg [[DBG58]]
-; CHECK:       for.cond26:
+; CHECK-NEXT:    br label [[FOR_COND12:%.*]], !dbg [[DBG58]]
+; CHECK:       for.cond12:
 ; CHECK-NEXT:    [[TMP11:%.*]] = load i32, ptr [[LOOP]], align 4, !dbg [[DBG58]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp slt i32 [[TMP11]], [[UB]], !dbg [[DBG58]]
 ; CHECK-NEXT:    br i1 [[TMP12]], label [[TMP13:%.*]], label [[DOTEXITSTUB:%.*]], !dbg [[DBG58]]
@@ -573,32 +568,32 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[TMP23:%.*]] = sub i64 [[TMP22]], [[TMP21]], !dbg [[DBG58]]
 ; CHECK-NEXT:    [[TMP24:%.*]] = trunc i64 [[TMP20]] to i32, !dbg [[DBG58]]
 ; CHECK-NEXT:    store i32 [[TMP24]], ptr [[I1]], align 4, !dbg [[DBG58]]
-; CHECK-NEXT:    br label [[FOR_BODY27:%.*]], !dbg [[DBG58]]
-; CHECK:       for.body27:
-; CHECK-NEXT:    br label [[FOR_INCR29:%.*]], !dbg [[DBG59:![0-9]+]]
-; CHECK:       for.incr29:
+; CHECK-NEXT:    br label [[FOR_BODY13:%.*]], !dbg [[DBG58]]
+; CHECK:       for.body13:
+; CHECK-NEXT:    br label [[FOR_INCR15:%.*]], !dbg [[DBG59:![0-9]+]]
+; CHECK:       for.incr15:
 ; CHECK-NEXT:    [[TMP25:%.*]] = load i32, ptr [[LOOP]], align 4, !dbg [[DBG58]]
 ; CHECK-NEXT:    [[TMP26:%.*]] = add i32 [[TMP25]], 1, !dbg [[DBG58]]
 ; CHECK-NEXT:    store i32 [[TMP26]], ptr [[LOOP]], align 4, !dbg [[DBG58]]
-; CHECK-NEXT:    br label [[FOR_COND26]], !dbg [[DBG58]]
+; CHECK-NEXT:    br label [[FOR_COND12]], !dbg [[DBG58]]
 ; CHECK:       .exitStub:
 ; CHECK-NEXT:    ret void
 ;
 ;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_foo1
+; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_foo.5
 ; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[LOOP_BOUNDS:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) {
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[GEP_I1:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO1:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
+; CHECK-NEXT:    [[GEP_I1:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO_0:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
 ; CHECK-NEXT:    br i1 [[TMP0]], label [[TMP1:%.*]], label [[TMP2:%.*]]
 ; CHECK:       1:
 ; CHECK-NEXT:    br label [[TMP2]]
 ; CHECK:       2:
-; CHECK-NEXT:    call void @nanos6_unpacked_task_region_foo1(ptr [[GEP_I1]], ptr [[LOOP_BOUNDS]], ptr [[ADDRESS_TRANSLATION_TABLE]])
+; CHECK-NEXT:    call void @nanos6_unpacked_task_region_foo.4(ptr [[GEP_I1]], ptr [[LOOP_BOUNDS]], ptr [[ADDRESS_TRANSLATION_TABLE]])
 ; CHECK-NEXT:    ret void
 ;
 ;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_foo2
+; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_foo.14
 ; CHECK-SAME: (ptr [[I2:%.*]], ptr [[LOOP_BOUNDS:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG60:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
 ; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG61:![0-9]+]]
@@ -619,8 +614,8 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[TMP10:%.*]] = sext i32 [[TMP9]] to i64, !dbg [[DBG61]]
 ; CHECK-NEXT:    [[LOOP:%.*]] = alloca i32, align 4, !dbg [[DBG61]]
 ; CHECK-NEXT:    store i32 [[LB]], ptr [[LOOP]], align 4, !dbg [[DBG61]]
-; CHECK-NEXT:    br label [[FOR_COND33:%.*]], !dbg [[DBG61]]
-; CHECK:       for.cond33:
+; CHECK-NEXT:    br label [[FOR_COND26:%.*]], !dbg [[DBG61]]
+; CHECK:       for.cond26:
 ; CHECK-NEXT:    [[TMP11:%.*]] = load i32, ptr [[LOOP]], align 4, !dbg [[DBG61]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp slt i32 [[TMP11]], [[UB]], !dbg [[DBG61]]
 ; CHECK-NEXT:    br i1 [[TMP12]], label [[TMP13:%.*]], label [[DOTEXITSTUB:%.*]], !dbg [[DBG61]]
@@ -637,32 +632,32 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[TMP23:%.*]] = sub i64 [[TMP22]], [[TMP21]], !dbg [[DBG61]]
 ; CHECK-NEXT:    [[TMP24:%.*]] = trunc i64 [[TMP20]] to i32, !dbg [[DBG61]]
 ; CHECK-NEXT:    store i32 [[TMP24]], ptr [[I2]], align 4, !dbg [[DBG61]]
-; CHECK-NEXT:    br label [[FOR_BODY34:%.*]], !dbg [[DBG61]]
-; CHECK:       for.body34:
-; CHECK-NEXT:    br label [[FOR_INCR36:%.*]], !dbg [[DBG62:![0-9]+]]
-; CHECK:       for.incr36:
+; CHECK-NEXT:    br label [[FOR_BODY27:%.*]], !dbg [[DBG61]]
+; CHECK:       for.body27:
+; CHECK-NEXT:    br label [[FOR_INCR29:%.*]], !dbg [[DBG62:![0-9]+]]
+; CHECK:       for.incr29:
 ; CHECK-NEXT:    [[TMP25:%.*]] = load i32, ptr [[LOOP]], align 4, !dbg [[DBG61]]
 ; CHECK-NEXT:    [[TMP26:%.*]] = add i32 [[TMP25]], 1, !dbg [[DBG61]]
 ; CHECK-NEXT:    store i32 [[TMP26]], ptr [[LOOP]], align 4, !dbg [[DBG61]]
-; CHECK-NEXT:    br label [[FOR_COND33]], !dbg [[DBG61]]
+; CHECK-NEXT:    br label [[FOR_COND26]], !dbg [[DBG61]]
 ; CHECK:       .exitStub:
 ; CHECK-NEXT:    ret void
 ;
 ;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_foo2
+; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_foo.15
 ; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[LOOP_BOUNDS:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) {
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[GEP_I2:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO2:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
+; CHECK-NEXT:    [[GEP_I2:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO_1:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
 ; CHECK-NEXT:    br i1 [[TMP0]], label [[TMP1:%.*]], label [[TMP2:%.*]]
 ; CHECK:       1:
 ; CHECK-NEXT:    br label [[TMP2]]
 ; CHECK:       2:
-; CHECK-NEXT:    call void @nanos6_unpacked_task_region_foo2(ptr [[GEP_I2]], ptr [[LOOP_BOUNDS]], ptr [[ADDRESS_TRANSLATION_TABLE]])
+; CHECK-NEXT:    call void @nanos6_unpacked_task_region_foo.14(ptr [[GEP_I2]], ptr [[LOOP_BOUNDS]], ptr [[ADDRESS_TRANSLATION_TABLE]])
 ; CHECK-NEXT:    ret void
 ;
 ;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_foo3
+; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_foo.24
 ; CHECK-SAME: (ptr [[I3:%.*]], ptr [[LOOP_BOUNDS:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG63:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
 ; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG64:![0-9]+]]
@@ -713,15 +708,15 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    ret void
 ;
 ;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_foo3
+; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_foo.25
 ; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[LOOP_BOUNDS:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) {
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[GEP_I3:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO3:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
+; CHECK-NEXT:    [[GEP_I3:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO_2:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
 ; CHECK-NEXT:    br i1 [[TMP0]], label [[TMP1:%.*]], label [[TMP2:%.*]]
 ; CHECK:       1:
 ; CHECK-NEXT:    br label [[TMP2]]
 ; CHECK:       2:
-; CHECK-NEXT:    call void @nanos6_unpacked_task_region_foo3(ptr [[GEP_I3]], ptr [[LOOP_BOUNDS]], ptr [[ADDRESS_TRANSLATION_TABLE]])
+; CHECK-NEXT:    call void @nanos6_unpacked_task_region_foo.24(ptr [[GEP_I3]], ptr [[LOOP_BOUNDS]], ptr [[ADDRESS_TRANSLATION_TABLE]])
 ; CHECK-NEXT:    ret void
 ;

@@ -43,11 +43,6 @@ attributes #0 = { noinline nounwind optnone "frame-pointer"="none" "min-legal-ve
 ; CHECK-NEXT:    ret i32 0, !dbg [[DBG14:![0-9]+]]
 ;
 ;
-; CHECK-LABEL: @nanos6_constructor_register_task_info(
-; CHECK-NEXT:  entry:
-; CHECK-NEXT:    ret void
-;
-;
 ; CHECK-LABEL: @nanos6_constructor_register_assert(
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    call void @nanos6_config_assert(ptr @[[GLOB0:[0-9]+]])

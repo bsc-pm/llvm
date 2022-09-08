@@ -3176,6 +3176,33 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       Dep.E = E;
       EmitDependency(getBundleStr(OSSB_weakcommutative), CGF, FD, Dep, TaskInfo);
     }
+    assert(Attr->reductions_size() == Attr->reductionLHSs_size() &&
+           Attr->reductions_size() == Attr->reductionRHSs_size() &&
+           Attr->reductions_size() == Attr->reductionOps_size() &&
+           Attr->reductions_size() == Attr->reductionKinds_size());
+    assert(Attr->reductionListSizes_size() == Attr->reductionClauseType_size() &&
+           Attr->reductionListSizes_size() == Attr->nameSpecifierLocs_size() &&
+           Attr->reductionListSizes_size() == Attr->declNameInfos_size());
+    auto reductions_it = Attr->reductions_begin();
+    auto reductionLHSs_it = Attr->reductionLHSs_begin();
+    auto reductionRHSs_it = Attr->reductionRHSs_begin();
+    auto reductionOps_it = Attr->reductionOps_begin();
+    auto reductionKinds_it = Attr->reductionKinds_begin();
+    for (unsigned i = 0; i < Attr->reductionListSizes_size(); ++i) {
+      OmpSsClauseKind CKind = (OmpSsClauseKind)*(Attr->reductionClauseType_begin() + i);
+      for (unsigned j = 0; j < *(Attr->reductionListSizes_begin() + i); ++j) {
+        const Expr *Ref = *(reductions_it++);
+        const Expr *LHS = *(reductionLHSs_it++);
+        const Expr *RHS = *(reductionRHSs_it++);
+        const Expr *ReductionOp = *(reductionOps_it++);
+        BinaryOperatorKind ReductionKind = (BinaryOperatorKind)*(reductionKinds_it++);
+        OSSReductionDataTy Red{Ref, LHS, RHS, ReductionOp, ReductionKind};
+        EmitReduction(getBundleStr(CKind == OSSC_weakreduction ? OSSB_weakreduction : OSSB_reduction),
+                      getBundleStr(OSSB_redinit),
+                      getBundleStr(OSSB_redcomb),
+                      CGF, FD, Red, TaskInfo);
+      }
+    }
     if (!CapturedList.empty())
       TaskInfo.emplace_back(getBundleStr(OSSB_captured), CapturedList);
 
@@ -3315,7 +3342,7 @@ void CGOmpSsRuntime::emitLoopCall(CodeGenFunction &CGF,
   else if (isa<OSSTaskIterDirective>(D)) {
     if (isa<WhileStmt>(D.getAssociatedStmt()))
       LoopDirectiveBundleKind = OSSB_taskiter_while;
-    else 
+    else
       LoopDirectiveBundleKind = OSSB_taskiter_for;
   }
   else if (isa<OSSTaskLoopDirective>(D)) LoopDirectiveBundleKind = OSSB_taskloop;

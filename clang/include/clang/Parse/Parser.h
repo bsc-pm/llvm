@@ -1455,6 +1455,40 @@ private:
     /// nested classes that contain pieces whose parsing will be delayed until
     /// the top-level class is fully defined.
     LateParsedDeclarationsContainer LateParsedDeclarations;
+
+    /// OmpSs-2 data structure to delay some directives parsing until
+    /// the end of the class. Used in task outline.
+    struct OmpSsLateParsedToksInfo {
+      SmallVector<DeclGroupPtrTy> DirDGs;
+      SmallVector<CachedTokens> DirToks;
+      SmallVector<SourceLocation> DirLocs;
+    };
+    OmpSsLateParsedToksInfo OmpSsLateParsedToks;
+
+    /// Method declarations are not delayed if not needed.
+    /// This variable will force the delay in task outline.
+    bool OmpSsForceDelay = false;
+
+    /// RAII to handle OmpSsForceDelay
+    class OmpSsForceDelayRAII {
+      ParsingClass &Class;
+      bool OldVal;
+    public:
+      OmpSsForceDelayRAII(ParsingClass &c, bool Value = true)
+        : Class(c), OldVal(c.OmpSsForceDelay) {
+        Class.OmpSsForceDelay = Value;
+      }
+
+      /// restore - This can be used to restore the state early, before the dtor
+      /// is run.
+      void restore() {
+        Class.OmpSsForceDelay = OldVal;
+      }
+
+      ~OmpSsForceDelayRAII() {
+        restore();
+      }
+    };
   };
 
   /// The stack of classes that is currently being
@@ -3247,6 +3281,29 @@ private:
   ///
   OSSClause *ParseOmpSsClause(OmpSsDirectiveKind DKind,
                               OmpSsClauseKind CKind, bool FirstClause);
+
+  bool ParseDeclareTaskClauses(
+      ExprResult &IfRes, ExprResult &FinalRes,
+      ExprResult &CostRes, ExprResult &PriorityRes,
+      ExprResult &OnreadyRes, bool &Wait,
+      unsigned &Device, SourceLocation &DeviceLoc,
+      SmallVectorImpl<Expr *> &Labels,
+      SmallVectorImpl<Expr *> &Ins, SmallVectorImpl<Expr *> &Outs,
+      SmallVectorImpl<Expr *> &Inouts, SmallVectorImpl<Expr *> &Concurrents,
+      SmallVectorImpl<Expr *> &Commutatives, SmallVectorImpl<Expr *> &WeakIns,
+      SmallVectorImpl<Expr *> &WeakOuts, SmallVectorImpl<Expr *> &WeakInouts,
+      SmallVectorImpl<Expr *> &WeakConcurrents, SmallVectorImpl<Expr *> &WeakCommutatives,
+      SmallVectorImpl<Expr *> &DepIns, SmallVectorImpl<Expr *> &DepOuts,
+      SmallVectorImpl<Expr *> &DepInouts, SmallVectorImpl<Expr *> &DepConcurrents,
+      SmallVectorImpl<Expr *> &DepCommutatives, SmallVectorImpl<Expr *> &DepWeakIns,
+      SmallVectorImpl<Expr *> &DepWeakOuts, SmallVectorImpl<Expr *> &DepWeakInouts,
+      SmallVectorImpl<Expr *> &DepWeakConcurrents, SmallVectorImpl<Expr *> &DepWeakCommutatives,
+      SmallVectorImpl<unsigned> &ReductionListSizes,
+      SmallVectorImpl<Expr *> &Reductions,
+      SmallVectorImpl<unsigned> &ReductionClauseType,
+      SmallVectorImpl<CXXScopeSpec> &ReductionCXXScopeSpecs,
+      SmallVectorImpl<DeclarationNameInfo> &ReductionIds,
+      SmallVectorImpl<Expr *> &Ndrange, SourceLocation &NdrangeLoc);
 
   /// Parses clause with the list of variables of a kind \a Kind with a
   /// max limit of N

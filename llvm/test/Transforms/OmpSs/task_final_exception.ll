@@ -237,10 +237,10 @@ attributes #4 = { noinline norecurse nounwind "frame-pointer"="none" "min-legal-
 ; CHECK:       codeRepl:
 ; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS]], align 8, !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG12]]
-; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_main0, ptr @task_invocation_info_main0, ptr null, i64 16, ptr [[TMP0]], ptr [[TMP1]], i64 0, i64 [[TMP2]]), !dbg [[DBG12]]
+; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_main, ptr @task_invocation_info_main, ptr null, i64 16, ptr [[TMP0]], ptr [[TMP1]], i64 0, i64 [[TMP2]]), !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[TMP0]], align 8, !dbg [[DBG12]]
 ; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP3]], i64 16, !dbg [[DBG12]]
-; CHECK-NEXT:    [[GEP_S:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN0:%.*]], ptr [[TMP3]], i32 0, i32 0, !dbg [[DBG12]]
+; CHECK-NEXT:    [[GEP_S:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN:%.*]], ptr [[TMP3]], i32 0, i32 0, !dbg [[DBG12]]
 ; CHECK-NEXT:    call void @oss_copy_ctor_ZN1SC1ERKS_(ptr [[S]], ptr [[GEP_S]], i64 1), !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[TMP1]], align 8, !dbg [[DBG12]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP4]]), !dbg [[DBG12]]
@@ -366,44 +366,33 @@ attributes #4 = { noinline norecurse nounwind "frame-pointer"="none" "min-legal-
 ; CHECK-NEXT:    ret void, !dbg [[DBG35:![0-9]+]]
 ;
 ;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_register_task_info() {
-; CHECK-NEXT:  entry:
-; CHECK-NEXT:    call void @nanos6_register_task_info(ptr @task_info_var_main0)
-; CHECK-NEXT:    ret void
-;
-;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_register_assert() {
-; CHECK-NEXT:  entry:
-; CHECK-NEXT:    ret void
-;
-;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_destroy_main0
+; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_destroy_main
 ; CHECK-SAME: (ptr [[S:%.*]]) {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    call void @oss_dtor_ZN1SD1Ev(ptr [[S]], i64 1)
 ; CHECK-NEXT:    ret void
 ;
 ;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_destroy_main0
+; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_destroy_main
 ; CHECK-SAME: (ptr [[TASK_ARGS:%.*]]) {
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[GEP_S:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN0:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
-; CHECK-NEXT:    call void @nanos6_unpacked_destroy_main0(ptr [[GEP_S]])
+; CHECK-NEXT:    [[GEP_S:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
+; CHECK-NEXT:    call void @nanos6_unpacked_destroy_main(ptr [[GEP_S]])
 ; CHECK-NEXT:    ret void
 ;
 ;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_duplicate_main0
+; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_duplicate_main
 ; CHECK-SAME: (ptr [[TASK_ARGS_SRC:%.*]], ptr [[TASK_ARGS_DST:%.*]]) {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[TASK_ARGS_DST]], align 8
 ; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP0]], i64 16
-; CHECK-NEXT:    [[GEP_SRC_S:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN0:%.*]], ptr [[TASK_ARGS_SRC]], i32 0, i32 0
-; CHECK-NEXT:    [[GEP_DST_S:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN0]], ptr [[TMP0]], i32 0, i32 0
+; CHECK-NEXT:    [[GEP_SRC_S:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN:%.*]], ptr [[TASK_ARGS_SRC]], i32 0, i32 0
+; CHECK-NEXT:    [[GEP_DST_S:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN]], ptr [[TMP0]], i32 0, i32 0
 ; CHECK-NEXT:    call void @oss_copy_ctor_ZN1SC1ERKS_(ptr [[GEP_SRC_S]], ptr [[GEP_DST_S]], i64 1)
 ; CHECK-NEXT:    ret void
 ;
 ;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_main0
+; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_main
 ; CHECK-SAME: (ptr [[S:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG36:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
 ; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG37:![0-9]+]]
@@ -414,15 +403,21 @@ attributes #4 = { noinline norecurse nounwind "frame-pointer"="none" "min-legal-
 ; CHECK-NEXT:    ret void
 ;
 ;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_main0
+; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_main
 ; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) {
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[GEP_S:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN0:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
+; CHECK-NEXT:    [[GEP_S:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
 ; CHECK-NEXT:    br i1 [[TMP0]], label [[TMP1:%.*]], label [[TMP2:%.*]]
 ; CHECK:       1:
 ; CHECK-NEXT:    br label [[TMP2]]
 ; CHECK:       2:
-; CHECK-NEXT:    call void @nanos6_unpacked_task_region_main0(ptr [[GEP_S]], ptr [[DEVICE_ENV]], ptr [[ADDRESS_TRANSLATION_TABLE]])
+; CHECK-NEXT:    call void @nanos6_unpacked_task_region_main(ptr [[GEP_S]], ptr [[DEVICE_ENV]], ptr [[ADDRESS_TRANSLATION_TABLE]])
+; CHECK-NEXT:    ret void
+;
+;
+; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_register_task_info() {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    call void @nanos6_register_task_info(ptr @task_info_var_main)
 ; CHECK-NEXT:    ret void
 ;

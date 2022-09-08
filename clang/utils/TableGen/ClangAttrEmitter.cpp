@@ -108,6 +108,8 @@ static std::string ReadPCHRecord(StringRef type) {
       .Case("StringRef", "Record.readString()")
       .Case("ParamIdx", "ParamIdx::deserialize(Record.readInt())")
       .Case("OMPTraitInfo *", "Record.readOMPTraitInfo()")
+      .Case("NestedNameSpecifierLoc", "NestedNameSpecifierLoc()")
+      .Case("DeclarationNameInfo", "DeclarationNameInfo()")
       .Default("Record.readInt()");
 }
 
@@ -133,6 +135,8 @@ static std::string WritePCHRecord(StringRef type, StringRef name) {
                    "push_back(" + std::string(name) + ".serialize());\n")
              .Case("OMPTraitInfo *",
                    "writeOMPTraitInfo(" + std::string(name) + ");\n")
+             .Case("NestedNameSpecifierLoc", "AddString(\"\");\n")
+             .Case("DeclarationNameInfo", "AddString(\"\");\n")
              .Default("push_back(" + std::string(name) + ");\n");
 }
 
@@ -369,6 +373,10 @@ namespace {
            << "().getSourceIndex();\n";
       } else if (type == "OMPTraitInfo *") {
         OS << "    OS << \" \" << SA->get" << getUpperName() << "();\n";
+      } else if (type == "NestedNameSpecifierLoc") {
+        // OS << "    OS << \" \" << SA->get" << getUpperName() << "();\n";
+      } else if (type == "DeclarationNameInfo") {
+        // OS << "    OS << \" \" << SA->get" << getUpperName() << "();\n";
       } else {
         llvm_unreachable("Unknown SimpleArgument type!");
       }
@@ -818,6 +826,36 @@ namespace {
 
     void writeDumpImpl(raw_ostream &OS) const override {
       OS << "      OS << \" \" << Val.getSourceIndex();\n";
+    }
+  };
+
+  class VariadicNestedNameSpecifierLocArgument : public VariadicArgument {
+  public:
+    VariadicNestedNameSpecifierLocArgument(const Record &Arg, StringRef Attr)
+        : VariadicArgument(Arg, Attr, "NestedNameSpecifierLoc") {}
+
+  public:
+    void writeValueImpl(raw_ostream &OS) const override {
+      OS << "    ;\n";
+    }
+
+    void writeDumpImpl(raw_ostream &OS) const override {
+      OS << "      ;\n";
+    }
+  };
+
+  class VariadicDeclarationNameInfoArgument : public VariadicArgument {
+  public:
+    VariadicDeclarationNameInfoArgument(const Record &Arg, StringRef Attr)
+        : VariadicArgument(Arg, Attr, "DeclarationNameInfo") {}
+
+  public:
+    void writeValueImpl(raw_ostream &OS) const override {
+      OS << "    ;\n";
+    }
+
+    void writeDumpImpl(raw_ostream &OS) const override {
+      OS << "      ;\n";
     }
   };
 
@@ -1374,6 +1412,14 @@ createArgument(const Record &Arg, StringRef Attr,
     Ptr = std::make_unique<VersionArgument>(Arg, Attr);
   else if (ArgName == "OMPTraitInfoArgument")
     Ptr = std::make_unique<SimpleArgument>(Arg, Attr, "OMPTraitInfo *");
+  else if (ArgName == "NestedNameSpecifierLocArgument")
+    Ptr = std::make_unique<SimpleArgument>(Arg, Attr, "NestedNameSpecifierLoc");
+  else if (ArgName == "VariadicNestedNameSpecifierLocArgument")
+    Ptr = std::make_unique<VariadicNestedNameSpecifierLocArgument>(Arg, Attr);
+  else if (ArgName == "DeclarationNameInfoArgument")
+    Ptr = std::make_unique<SimpleArgument>(Arg, Attr, "DeclarationNameInfo");
+  else if (ArgName == "VariadicDeclarationNameInfoArgument")
+    Ptr = std::make_unique<VariadicDeclarationNameInfoArgument>(Arg, Attr);
 
   if (!Ptr) {
     // Search in reverse order so that the most-derived type is handled first.

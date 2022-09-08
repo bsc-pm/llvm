@@ -55,7 +55,7 @@ attributes #1 = { nounwind }
 ; CHECK:       codeRepl:
 ; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS]], align 8, !dbg [[DBG9]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG9]]
-; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_main0, ptr @task_invocation_info_main0, ptr null, i64 0, ptr [[TMP0]], ptr [[TMP1]], i64 0, i64 [[TMP2]]), !dbg [[DBG9]]
+; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_main, ptr @task_invocation_info_main, ptr null, i64 0, ptr [[TMP0]], ptr [[TMP1]], i64 0, i64 [[TMP2]]), !dbg [[DBG9]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[TMP0]], align 8, !dbg [[DBG9]]
 ; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP3]], i64 0, !dbg [[DBG9]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[TMP1]], align 8, !dbg [[DBG9]]
@@ -71,18 +71,7 @@ attributes #1 = { nounwind }
 ; CHECK-NEXT:    br i1 [[TMP6]], label [[FINAL_THEN:%.*]], label [[CODEREPL:%.*]], !dbg [[DBG9]]
 ;
 ;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_register_task_info() {
-; CHECK-NEXT:  entry:
-; CHECK-NEXT:    call void @nanos6_register_task_info(ptr @task_info_var_main0)
-; CHECK-NEXT:    ret void
-;
-;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_register_assert() {
-; CHECK-NEXT:  entry:
-; CHECK-NEXT:    ret void
-;
-;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_main0
+; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_main
 ; CHECK-SAME: (ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG11:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
 ; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG12:![0-9]+]]
@@ -92,7 +81,7 @@ attributes #1 = { nounwind }
 ; CHECK-NEXT:    ret void
 ;
 ;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_main0
+; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_main
 ; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
@@ -100,7 +89,13 @@ attributes #1 = { nounwind }
 ; CHECK:       1:
 ; CHECK-NEXT:    br label [[TMP2]]
 ; CHECK:       2:
-; CHECK-NEXT:    call void @nanos6_unpacked_task_region_main0(ptr [[DEVICE_ENV]], ptr [[ADDRESS_TRANSLATION_TABLE]])
+; CHECK-NEXT:    call void @nanos6_unpacked_task_region_main(ptr [[DEVICE_ENV]], ptr [[ADDRESS_TRANSLATION_TABLE]])
+; CHECK-NEXT:    ret void
+;
+;
+; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_register_task_info() {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    call void @nanos6_register_task_info(ptr @task_info_var_main)
 ; CHECK-NEXT:    ret void
 ;
 ;
@@ -114,7 +109,7 @@ attributes #1 = { nounwind }
 ; CHECK-NEW:       codeRepl:
 ; CHECK-NEW-NEXT:    store i64 0, ptr [[NUM_DEPS]], align 8, !dbg [[DBG9]]
 ; CHECK-NEW-NEXT:    [[TMP2:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG9]]
-; CHECK-NEW-NEXT:    call void @nanos6_create_task(ptr @task_info_var_main0, ptr @task_invocation_info_main0, ptr null, i64 0, ptr [[TMP0]], ptr [[TMP1]], i64 0, i64 [[TMP2]]), !dbg [[DBG9]]
+; CHECK-NEW-NEXT:    call void @nanos6_create_task(ptr @task_info_var_main, ptr @task_invocation_info_main, ptr null, i64 0, ptr [[TMP0]], ptr [[TMP1]], i64 0, i64 [[TMP2]]), !dbg [[DBG9]]
 ; CHECK-NEW-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[TMP0]], align 8, !dbg [[DBG9]]
 ; CHECK-NEW-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP3]], i64 0, !dbg [[DBG9]]
 ; CHECK-NEW-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[TMP1]], align 8, !dbg [[DBG9]]
@@ -130,18 +125,7 @@ attributes #1 = { nounwind }
 ; CHECK-NEW-NEXT:    br i1 [[TMP6]], label [[FINAL_THEN:%.*]], label [[CODEREPL:%.*]], !dbg [[DBG9]]
 ;
 ;
-; CHECK-NEW-LABEL: define {{[^@]+}}@nanos6_constructor_register_task_info() {
-; CHECK-NEW-NEXT:  entry:
-; CHECK-NEW-NEXT:    call void @nanos6_register_task_info(ptr @task_info_var_main0)
-; CHECK-NEW-NEXT:    ret void
-;
-;
-; CHECK-NEW-LABEL: define {{[^@]+}}@nanos6_constructor_register_assert() {
-; CHECK-NEW-NEXT:  entry:
-; CHECK-NEW-NEXT:    ret void
-;
-;
-; CHECK-NEW-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_main0
+; CHECK-NEW-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_main
 ; CHECK-NEW-SAME: (ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG11:![0-9]+]] {
 ; CHECK-NEW-NEXT:  newFuncRoot:
 ; CHECK-NEW-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG12:![0-9]+]]
@@ -151,7 +135,7 @@ attributes #1 = { nounwind }
 ; CHECK-NEW-NEXT:    ret void
 ;
 ;
-; CHECK-NEW-LABEL: define {{[^@]+}}@nanos6_ol_task_region_main0
+; CHECK-NEW-LABEL: define {{[^@]+}}@nanos6_ol_task_region_main
 ; CHECK-NEW-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) {
 ; CHECK-NEW-NEXT:  entry:
 ; CHECK-NEW-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
@@ -159,6 +143,12 @@ attributes #1 = { nounwind }
 ; CHECK-NEW:       1:
 ; CHECK-NEW-NEXT:    br label [[TMP2]]
 ; CHECK-NEW:       2:
-; CHECK-NEW-NEXT:    call void @nanos6_unpacked_task_region_main0(ptr [[DEVICE_ENV]], ptr [[ADDRESS_TRANSLATION_TABLE]])
+; CHECK-NEW-NEXT:    call void @nanos6_unpacked_task_region_main(ptr [[DEVICE_ENV]], ptr [[ADDRESS_TRANSLATION_TABLE]])
+; CHECK-NEW-NEXT:    ret void
+;
+;
+; CHECK-NEW-LABEL: define {{[^@]+}}@nanos6_constructor_register_task_info() {
+; CHECK-NEW-NEXT:  entry:
+; CHECK-NEW-NEXT:    call void @nanos6_register_task_info(ptr @task_info_var_main)
 ; CHECK-NEW-NEXT:    ret void
 ;

@@ -1,5 +1,6 @@
 add_llvm_component_library(LLVMOmpSs
   OmpSsTransform.cpp
+  Nanos6API.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${LLVM_MAIN_INCLUDE_DIR}/llvm/Transforms

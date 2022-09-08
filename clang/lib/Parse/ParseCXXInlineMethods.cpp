@@ -516,6 +516,26 @@ void Parser::ParseLexedMethodDeclaration(LateParsedMethodDeclaration &LM) {
 
   // Finish the delayed C++ method declaration.
   Actions.ActOnFinishDelayedCXXMethodDeclaration(getCurScope(), LM.Method);
+
+  {
+    ParsingOmpSsDirectiveRAII DirScope(*this);
+    ParenBraceBracketBalancer BalancerRAIIObj(*this);
+
+    SmallVectorImpl<DeclGroupPtrTy> &DirDGs =
+      getCurrentClass().OmpSsLateParsedToks.DirDGs;
+    SmallVectorImpl<CachedTokens> &DirToks =
+      getCurrentClass().OmpSsLateParsedToks.DirToks;
+    SmallVectorImpl<SourceLocation> &DirLocs =
+      getCurrentClass().OmpSsLateParsedToks.DirLocs;
+
+    for (size_t i = 0; i < DirToks.size(); ++i) {
+      if (DirDGs[i].get().getSingleDecl() == LM.Method) {
+        Actions.StartOmpSsDSABlock(OSSD_task, Actions.getCurScope(), DirLocs[i]);
+        ParseOSSDeclareTaskClauses(DirDGs[i], DirToks[i], DirLocs[i]);
+        Actions.EndOmpSsDSABlock(nullptr);
+      }
+    }
+  }
 }
 
 /// ParseLexedMethodDefs - We finished parsing the member specification of a top
@@ -531,7 +551,6 @@ void Parser::ParseLexedMethodDefs(ParsingClass &Class) {
 void Parser::ParseLexedMethodDef(LexedMethod &LM) {
   // If this is a member template, introduce the template parameter scope.
   ReenterTemplateScopeRAII InFunctionTemplateScope(*this, LM.D);
-
   ParenBraceBracketBalancer BalancerRAIIObj(*this);
 
   assert(!LM.Toks.empty() && "Empty body!");

@@ -257,7 +257,7 @@ struct DirectiveEnvironment {
   DenseMap<Value *, int> SeenInits;
   int ReductionIndex = 0;
   // Map of Dependency symbols to Index
-  std::map<Value *, std::pair<const DependInfo *, int>> DepSymToIdx;
+  std::map<Value *, int> DepSymToIdx;
 
   // returns if V is in DSAInfo
   bool valueInDSABundles(const Value *V) const {

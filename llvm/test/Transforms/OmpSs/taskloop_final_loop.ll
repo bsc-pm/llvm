@@ -119,16 +119,16 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[TMP10:%.*]] = add i32 [[TMP9]], 1, !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = sext i32 [[TMP10]] to i64, !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = mul i64 1, [[TMP11]], !dbg [[DBG12]]
-; CHECK-NEXT:    call void @nanos6_create_loop(ptr @task_info_var_taskloop0, ptr @task_invocation_info_taskloop0, ptr null, i64 32, ptr [[TMP1]], ptr [[TMP2]], i64 4, i64 [[TMP3]], i64 0, i64 [[TMP12]], i64 0, i64 0), !dbg [[DBG12]]
+; CHECK-NEXT:    call void @nanos6_create_loop(ptr @task_info_var_taskloop, ptr @task_invocation_info_taskloop, ptr null, i64 32, ptr [[TMP1]], ptr [[TMP2]], i64 4, i64 [[TMP3]], i64 0, i64 [[TMP12]], i64 0, i64 0), !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = load ptr, ptr [[TMP1]], align 8, !dbg [[DBG12]]
 ; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP13]], i64 32, !dbg [[DBG12]]
-; CHECK-NEXT:    [[GEP_SUM:%.*]] = getelementptr [[NANOS6_TASK_ARGS_TASKLOOP0:%.*]], ptr [[TMP13]], i32 0, i32 0, !dbg [[DBG12]]
+; CHECK-NEXT:    [[GEP_SUM:%.*]] = getelementptr [[NANOS6_TASK_ARGS_TASKLOOP:%.*]], ptr [[TMP13]], i32 0, i32 0, !dbg [[DBG12]]
 ; CHECK-NEXT:    store ptr @sum, ptr [[GEP_SUM]], align 8, !dbg [[DBG12]]
-; CHECK-NEXT:    [[GEP_LB_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_TASKLOOP0]], ptr [[TMP13]], i32 0, i32 2, !dbg [[DBG12]]
+; CHECK-NEXT:    [[GEP_LB_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_TASKLOOP]], ptr [[TMP13]], i32 0, i32 2, !dbg [[DBG12]]
 ; CHECK-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 4 [[GEP_LB_ADDR]], ptr align 4 [[LB_ADDR]], i64 4, i1 false), !dbg [[DBG12]]
-; CHECK-NEXT:    [[GEP_UB_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_TASKLOOP0]], ptr [[TMP13]], i32 0, i32 3, !dbg [[DBG12]]
+; CHECK-NEXT:    [[GEP_UB_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_TASKLOOP]], ptr [[TMP13]], i32 0, i32 3, !dbg [[DBG12]]
 ; CHECK-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 4 [[GEP_UB_ADDR]], ptr align 4 [[UB_ADDR]], i64 4, i1 false), !dbg [[DBG12]]
-; CHECK-NEXT:    [[GEP_STEP_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_TASKLOOP0]], ptr [[TMP13]], i32 0, i32 4, !dbg [[DBG12]]
+; CHECK-NEXT:    [[GEP_STEP_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_TASKLOOP]], ptr [[TMP13]], i32 0, i32 4, !dbg [[DBG12]]
 ; CHECK-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 4 [[GEP_STEP_ADDR]], ptr align 4 [[STEP_ADDR]], i64 4, i1 false), !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = load ptr, ptr [[TMP2]], align 8, !dbg [[DBG12]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP14]]), !dbg [[DBG12]]
@@ -195,18 +195,7 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    ret i32 [[TMP0]], !dbg [[DBG21]]
 ;
 ;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_register_task_info() {
-; CHECK-NEXT:  entry:
-; CHECK-NEXT:    call void @nanos6_register_task_info(ptr @task_info_var_taskloop0)
-; CHECK-NEXT:    ret void
-;
-;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_register_assert() {
-; CHECK-NEXT:  entry:
-; CHECK-NEXT:    ret void
-;
-;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_taskloop0
+; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_taskloop
 ; CHECK-SAME: (ptr [[SUM:%.*]], ptr [[I:%.*]], ptr [[LB_ADDR:%.*]], ptr [[UB_ADDR:%.*]], ptr [[STEP_ADDR:%.*]], ptr [[LOOP_BOUNDS:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG22:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
 ; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG23:![0-9]+]]
@@ -261,20 +250,26 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    ret void
 ;
 ;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_taskloop0
+; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_taskloop
 ; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[LOOP_BOUNDS:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) {
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[GEP_SUM:%.*]] = getelementptr [[NANOS6_TASK_ARGS_TASKLOOP0:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
+; CHECK-NEXT:    [[GEP_SUM:%.*]] = getelementptr [[NANOS6_TASK_ARGS_TASKLOOP:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
 ; CHECK-NEXT:    [[LOAD_GEP_SUM:%.*]] = load ptr, ptr [[GEP_SUM]], align 8
-; CHECK-NEXT:    [[GEP_I:%.*]] = getelementptr [[NANOS6_TASK_ARGS_TASKLOOP0]], ptr [[TASK_ARGS]], i32 0, i32 1
-; CHECK-NEXT:    [[GEP_LB_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_TASKLOOP0]], ptr [[TASK_ARGS]], i32 0, i32 2
-; CHECK-NEXT:    [[GEP_UB_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_TASKLOOP0]], ptr [[TASK_ARGS]], i32 0, i32 3
-; CHECK-NEXT:    [[GEP_STEP_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_TASKLOOP0]], ptr [[TASK_ARGS]], i32 0, i32 4
+; CHECK-NEXT:    [[GEP_I:%.*]] = getelementptr [[NANOS6_TASK_ARGS_TASKLOOP]], ptr [[TASK_ARGS]], i32 0, i32 1
+; CHECK-NEXT:    [[GEP_LB_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_TASKLOOP]], ptr [[TASK_ARGS]], i32 0, i32 2
+; CHECK-NEXT:    [[GEP_UB_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_TASKLOOP]], ptr [[TASK_ARGS]], i32 0, i32 3
+; CHECK-NEXT:    [[GEP_STEP_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_TASKLOOP]], ptr [[TASK_ARGS]], i32 0, i32 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
 ; CHECK-NEXT:    br i1 [[TMP0]], label [[TMP1:%.*]], label [[TMP2:%.*]]
 ; CHECK:       1:
 ; CHECK-NEXT:    br label [[TMP2]]
 ; CHECK:       2:
-; CHECK-NEXT:    call void @nanos6_unpacked_task_region_taskloop0(ptr [[LOAD_GEP_SUM]], ptr [[GEP_I]], ptr [[GEP_LB_ADDR]], ptr [[GEP_UB_ADDR]], ptr [[GEP_STEP_ADDR]], ptr [[LOOP_BOUNDS]], ptr [[ADDRESS_TRANSLATION_TABLE]])
+; CHECK-NEXT:    call void @nanos6_unpacked_task_region_taskloop(ptr [[LOAD_GEP_SUM]], ptr [[GEP_I]], ptr [[GEP_LB_ADDR]], ptr [[GEP_UB_ADDR]], ptr [[GEP_STEP_ADDR]], ptr [[LOOP_BOUNDS]], ptr [[ADDRESS_TRANSLATION_TABLE]])
+; CHECK-NEXT:    ret void
+;
+;
+; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_register_task_info() {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    call void @nanos6_register_task_info(ptr @task_info_var_taskloop)
 ; CHECK-NEXT:    ret void
 ;
