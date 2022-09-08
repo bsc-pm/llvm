@@ -46,6 +46,7 @@ add_flang_library(FortranSemantics
   DEPENDS
   acc_gen
   omp_gen
+  oss_gen
 
   LINK_LIBS
   FortranCommon
@@ -54,6 +55,7 @@ add_flang_library(FortranSemantics
 
   LINK_COMPONENTS
   Support
+  FrontendOmpSs
   FrontendOpenMP
   FrontendOpenACC
 )

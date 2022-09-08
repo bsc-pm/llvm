@@ -27,6 +27,7 @@
 #include "flang/Common/indirection.h"
 #include "llvm/Frontend/OpenACC/ACC.h.inc"
 #include "llvm/Frontend/OpenMP/OMPConstants.h"
+#include "llvm/Frontend/OmpSs/OSS.h.inc"
 #include <cinttypes>
 #include <list>
 #include <memory>
@@ -264,6 +265,12 @@ struct OpenACCDeclarativeConstruct;
 struct OpenMPConstruct;
 struct OpenMPDeclarativeConstruct;
 struct OmpEndLoopDirective;
+
+struct OmpSsConstruct;
+struct OSSEndLoopDirective;
+
+struct OmpSsOutlineTask;
+struct OmpSsOutlineTaskConstruct;
 
 // Cooked character stream locations
 using Location = const char *;
@@ -522,7 +529,9 @@ struct ExecutableConstruct {
       common::Indirection<OpenACCConstruct>,
       common::Indirection<AccEndCombinedDirective>,
       common::Indirection<OpenMPConstruct>,
-      common::Indirection<OmpEndLoopDirective>>
+      common::Indirection<OmpEndLoopDirective>,
+      common::Indirection<OmpSsConstruct>,
+      common::Indirection<OSSEndLoopDirective>>
       u;
 };
 
@@ -548,6 +557,7 @@ struct ProgramUnit {
   UNION_CLASS_BOILERPLATE(ProgramUnit);
   std::variant<common::Indirection<MainProgram>,
       common::Indirection<FunctionSubprogram>,
+      common::Indirection<OmpSsOutlineTask>,
       common::Indirection<SubroutineSubprogram>, common::Indirection<Module>,
       common::Indirection<Submodule>, common::Indirection<BlockData>,
       common::Indirection<CompilerDirective>>
@@ -2857,6 +2867,7 @@ WRAPPER_CLASS(ModuleStmt, Name);
 struct ModuleSubprogram {
   UNION_CLASS_BOILERPLATE(ModuleSubprogram);
   std::variant<common::Indirection<FunctionSubprogram>,
+      common::Indirection<OmpSsOutlineTask>,
       common::Indirection<SubroutineSubprogram>,
       common::Indirection<SeparateModuleSubprogram>>
       u;
@@ -3093,7 +3104,14 @@ struct InterfaceBody {
         common::Indirection<SpecificationPart>, Statement<EndSubroutineStmt>>
         t;
   };
-  std::variant<Function, Subroutine> u;
+  struct OmpSsIfaceOutlineTask {
+    TUPLE_CLASS_BOILERPLATE(OmpSsIfaceOutlineTask);
+    std::tuple<Statement<common::Indirection<OmpSsOutlineTaskConstruct>>,
+        Statement<SubroutineStmt>,
+        common::Indirection<SpecificationPart>, Statement<EndSubroutineStmt>>
+        t;
+  };
+  std::variant<Function, Subroutine, OmpSsIfaceOutlineTask> u;
 };
 
 // R1506 procedure-stmt -> [MODULE] PROCEDURE [::] specific-procedure-list
@@ -4128,6 +4146,169 @@ struct OpenACCConstruct {
       OpenACCLoopConstruct, OpenACCStandaloneConstruct, OpenACCCacheConstruct,
       OpenACCWaitConstruct, OpenACCAtomicConstruct>
       u;
+};
+
+// ----------------------------------------------------------------------------
+// OmpSs-2
+// ----------------------------------------------------------------------------
+
+struct OSSObject {
+  UNION_CLASS_BOILERPLATE(OSSObject);
+  std::variant<Designator, /*common block*/ Name> u;
+  mutable size_t elemSize;
+};
+
+WRAPPER_CLASS(OSSObjectList, std::list<OSSObject>);
+
+struct OSSDefaultClause {
+  ENUM_CLASS(Type, Private, Firstprivate, Shared, None)
+  WRAPPER_CLASS_BOILERPLATE(OSSDefaultClause, Type);
+};
+
+struct OSSDependenceType {
+  ENUM_CLASS(Type,
+             In, Out, Inout, Inoutset, Mutexinoutset,
+             Weakin, Weakout, Weakinout, Weakinoutset, Weakmutexinoutset)
+  WRAPPER_CLASS_BOILERPLATE(OSSDependenceType, Type);
+};
+
+struct OSSDependClause {
+  UNION_CLASS_BOILERPLATE(OSSDependClause);
+  struct InOut {
+    TUPLE_CLASS_BOILERPLATE(InOut);
+    std::tuple<OSSDependenceType, OSSObjectList> t;
+  };
+  std::variant<InOut> u;
+};
+
+struct OSSReductionOperator {
+  UNION_CLASS_BOILERPLATE(OSSReductionOperator);
+  std::variant<DefinedOperator, ProcedureDesignator> u;
+};
+
+struct OSSReductionClause {
+  TUPLE_CLASS_BOILERPLATE(OSSReductionClause);
+  std::tuple<OSSReductionOperator, std::list<Designator>> t;
+};
+
+// OmpSs-2 Clauses
+struct OSSClause {
+  UNION_CLASS_BOILERPLATE(OSSClause);
+
+#define GEN_FLANG_CLAUSE_PARSER_CLASSES
+#include "llvm/Frontend/OmpSs/OSS.inc"
+
+  CharBlock source;
+
+  std::variant<
+#define GEN_FLANG_CLAUSE_PARSER_CLASSES_LIST
+#include "llvm/Frontend/OmpSs/OSS.inc"
+      >
+      u;
+};
+
+struct OSSClauseList {
+  WRAPPER_CLASS_BOILERPLATE(OSSClauseList, std::list<OSSClause>);
+  CharBlock source;
+};
+
+struct OSSSimpleStandaloneDirective {
+  WRAPPER_CLASS_BOILERPLATE(OSSSimpleStandaloneDirective, llvm::oss::Directive);
+  CharBlock source;
+};
+
+struct OmpSsSimpleStandaloneConstruct {
+  TUPLE_CLASS_BOILERPLATE(OmpSsSimpleStandaloneConstruct);
+  CharBlock source;
+  std::tuple<OSSSimpleStandaloneDirective, OSSClauseList> t;
+};
+
+struct OmpSsStandaloneConstruct {
+  UNION_CLASS_BOILERPLATE(OmpSsStandaloneConstruct);
+  CharBlock source;
+  std::variant<OmpSsSimpleStandaloneConstruct> u;
+};
+
+struct OSSBlockDirective {
+  WRAPPER_CLASS_BOILERPLATE(OSSBlockDirective, llvm::oss::Directive);
+  CharBlock source;
+};
+
+struct OSSBeginBlockDirective {
+  TUPLE_CLASS_BOILERPLATE(OSSBeginBlockDirective);
+  std::tuple<OSSBlockDirective, OSSClauseList> t;
+  CharBlock source;
+};
+
+struct OSSEndBlockDirective {
+  TUPLE_CLASS_BOILERPLATE(OSSEndBlockDirective);
+  std::tuple<OSSBlockDirective, OSSClauseList> t;
+  CharBlock source;
+};
+
+struct OmpSsBlockConstruct {
+  TUPLE_CLASS_BOILERPLATE(OmpSsBlockConstruct);
+  std::tuple<OSSBeginBlockDirective, Block, OSSEndBlockDirective> t;
+};
+
+// OmpSs-2 directives that associate with loop(s)
+struct OSSLoopDirective {
+  WRAPPER_CLASS_BOILERPLATE(OSSLoopDirective, llvm::oss::Directive);
+  CharBlock source;
+};
+
+struct OSSBeginLoopDirective {
+  TUPLE_CLASS_BOILERPLATE(OSSBeginLoopDirective);
+  std::tuple<OSSLoopDirective, OSSClauseList> t;
+  CharBlock source;
+};
+
+struct OSSEndLoopDirective {
+  TUPLE_CLASS_BOILERPLATE(OSSEndLoopDirective);
+  std::tuple<OSSLoopDirective, OSSClauseList> t;
+  CharBlock source;
+};
+
+// OmpSs-2 directives enclosing do loop
+struct OmpSsLoopConstruct {
+  TUPLE_CLASS_BOILERPLATE(OmpSsLoopConstruct);
+  OmpSsLoopConstruct(OSSBeginLoopDirective &&a)
+      : t({std::move(a), std::nullopt, std::nullopt}) {}
+  std::tuple<OSSBeginLoopDirective, std::optional<DoConstruct>,
+      std::optional<OSSEndLoopDirective>>
+      t;
+};
+
+// OmpSs-2 directives that associate with outline tasks
+struct OSSSimpleOutlineTaskDirective {
+  WRAPPER_CLASS_BOILERPLATE(OSSSimpleOutlineTaskDirective, llvm::oss::Directive);
+  CharBlock source;
+};
+
+struct OmpSsSimpleOutlineTaskConstruct {
+  TUPLE_CLASS_BOILERPLATE(OmpSsSimpleOutlineTaskConstruct);
+  CharBlock source;
+  std::tuple<OSSSimpleOutlineTaskDirective, OSSClauseList> t;
+};
+
+struct OmpSsOutlineTaskConstruct {
+  TUPLE_CLASS_BOILERPLATE(OmpSsOutlineTaskConstruct);
+  CharBlock source;
+  std::tuple<OmpSsSimpleOutlineTaskConstruct> t;
+};
+
+struct OmpSsOutlineTask {
+  TUPLE_CLASS_BOILERPLATE(OmpSsOutlineTask);
+  std::tuple<Statement<OmpSsOutlineTaskConstruct>,
+      common::Indirection<SubroutineSubprogram>>
+      t;
+};
+
+struct OmpSsConstruct {
+  UNION_CLASS_BOILERPLATE(OmpSsConstruct);
+  std::variant<
+      OmpSsStandaloneConstruct, OmpSsBlockConstruct, OmpSsLoopConstruct
+      > u;
 };
 
 } // namespace Fortran::parser

@@ -53,6 +53,8 @@ constexpr auto executableConstruct{
         construct<ExecutableConstruct>(indirect(openmpConstruct)),
         construct<ExecutableConstruct>(indirect(accEndCombinedDirective)),
         construct<ExecutableConstruct>(indirect(openaccConstruct)),
+        construct<ExecutableConstruct>(indirect(ossEndLoopDirective)),
+        construct<ExecutableConstruct>(indirect(ompssConstruct)),
         construct<ExecutableConstruct>(indirect(compilerDirective)))};
 
 // R510 execution-part-construct ->

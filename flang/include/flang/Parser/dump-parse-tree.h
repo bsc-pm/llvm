@@ -383,6 +383,7 @@ public:
   NODE(parser, InterfaceBody)
   NODE(InterfaceBody, Function)
   NODE(InterfaceBody, Subroutine)
+  NODE(InterfaceBody, OmpSsIfaceOutlineTask)
   NODE(parser, InterfaceSpecification)
   NODE(parser, InterfaceStmt)
   NODE(parser, InternalSubprogram)
@@ -717,6 +718,61 @@ public:
   NODE(parser, WhereConstructStmt)
   NODE(parser, WhereStmt)
   NODE(parser, WriteStmt)
+
+  // OmpSs-2
+  NODE(parser, OSSObject)
+  NODE(parser, OSSObjectList)
+
+  NODE(parser, OSSClause)
+  NODE(parser, OSSClauseList)
+
+  static std::string GetNodeName(const llvm::oss::Directive &x) {
+    return llvm::Twine(
+        "llvm::oss::Directive = ", llvm::oss::getOmpSsDirectiveName(x))
+        .str();
+  }
+  static std::string GetNodeName(const llvm::oss::Clause &x) {
+    return llvm::Twine(
+        "llvm::oss::Clause = ", llvm::oss::getOmpSsClauseName(x))
+        .str();
+  }
+
+#define GEN_FLANG_DUMP_PARSE_TREE_CLAUSES
+#include "llvm/Frontend/OmpSs/OSS.inc"
+
+  NODE(parser, OSSDependClause)
+  NODE(OSSDependClause, InOut)
+  NODE(parser, OSSDependenceType)
+  NODE_ENUM(OSSDependenceType, Type)
+
+  NODE(parser, OSSDefaultClause)
+  NODE_ENUM(OSSDefaultClause, Type)
+
+  NODE(parser, OSSReductionOperator)
+  NODE(parser, OSSReductionClause)
+
+  NODE(parser, OSSSimpleStandaloneDirective)
+
+  NODE(parser, OSSBlockDirective)
+  NODE(parser, OSSBeginBlockDirective)
+  NODE(parser, OSSEndBlockDirective)
+
+  NODE(parser, OSSLoopDirective)
+  NODE(parser, OSSBeginLoopDirective)
+  NODE(parser, OSSEndLoopDirective)
+  NODE(parser, OSSSimpleOutlineTaskDirective)
+
+  NODE(parser, OmpSsSimpleStandaloneConstruct)
+  NODE(parser, OmpSsStandaloneConstruct)
+  NODE(parser, OmpSsBlockConstruct)
+  NODE(parser, OmpSsLoopConstruct)
+
+  NODE(parser, OmpSsSimpleOutlineTaskConstruct)
+  NODE(parser, OmpSsOutlineTaskConstruct)
+  NODE(parser, OmpSsOutlineTask)
+
+  NODE(parser, OmpSsConstruct)
+
 #undef NODE
 #undef NODE_NAME
 

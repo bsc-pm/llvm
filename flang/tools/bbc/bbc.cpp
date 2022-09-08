@@ -116,6 +116,10 @@ static llvm::cl::opt<bool> pftDumpTest(
     llvm::cl::desc("parse the input, create a PFT, dump it, and exit"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> enableOmpSs("fompss-2",
+                                        llvm::cl::desc("enable ompss-2"),
+                                        llvm::cl::init(false));
+
 static llvm::cl::opt<bool> enableOpenMP("fopenmp",
                                         llvm::cl::desc("enable openmp"),
                                         llvm::cl::init(false));
@@ -306,6 +310,12 @@ int main(int argc, char **argv) {
                                       std::string{FLANG_VERSION_MINOR_STRING});
   options.predefinitions.emplace_back(
       "__flang_patchlevel__"s, std::string{FLANG_VERSION_PATCHLEVEL_STRING});
+
+  // enable parsing of OmpSs
+  if (enableOmpSs) {
+    options.features.Enable(Fortran::common::LanguageFeature::OmpSs);
+    options.predefinitions.emplace_back("_OMPSS_2", "1");
+  }
 
   // enable parsing of OpenMP
   if (enableOpenMP) {

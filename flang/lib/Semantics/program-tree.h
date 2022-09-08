@@ -38,6 +38,7 @@ public:
   static ProgramTree Build(const parser::MainProgram &);
   static ProgramTree Build(const parser::FunctionSubprogram &);
   static ProgramTree Build(const parser::SubroutineSubprogram &);
+  static ProgramTree Build(const parser::OmpSsOutlineTask &);
   static ProgramTree Build(const parser::SeparateModuleSubprogram &);
   static ProgramTree Build(const parser::Module &);
   static ProgramTree Build(const parser::Submodule &);

@@ -45,6 +45,7 @@ add_flang_library(flangFrontend
   Option
   Support
   Target
+  FrontendOmpSs
   FrontendOpenACC
   FrontendOpenMP
 )

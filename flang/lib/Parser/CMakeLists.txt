@@ -10,6 +10,7 @@ add_flang_library(FortranParser
   instrumented-parser.cpp
   io-parsers.cpp
   message.cpp
+  ompss-parsers.cpp
   openacc-parsers.cpp
   openmp-parsers.cpp
   parse-tree.cpp
@@ -34,4 +35,5 @@ add_flang_library(FortranParser
   DEPENDS
   omp_gen
   acc_gen
+  oss_gen
 )

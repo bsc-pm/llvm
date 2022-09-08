@@ -25,7 +25,7 @@ ENUM_CLASS(LanguageFeature, BackslashEscapes, OldDebugLines,
     SignedPrimary, FileName, Carriagecontrol, Convert, Dispose,
     IOListLeadingComma, AbbreviatedEditDescriptor, ProgramParentheses,
     PercentRefAndVal, OmitFunctionDummies, CrayPointer, Hollerith, ArithmeticIF,
-    Assign, AssignedGOTO, Pause, OpenACC, OpenMP, CruftAfterAmpersand,
+    Assign, AssignedGOTO, Pause, OmpSs, OpenACC, OpenMP, CruftAfterAmpersand,
     ClassicCComments, AdditionalFormats, BigIntLiterals, RealDoControls,
     EquivalenceNumericWithCharacter, EquivalenceNonDefaultNumeric,
     EquivalenceSameNonSequence, AdditionalIntrinsics, AnonymousParents,
@@ -41,6 +41,7 @@ public:
   LanguageFeatureControl() {
     // These features must be explicitly enabled by command line options.
     disable_.set(LanguageFeature::OldDebugLines);
+    disable_.set(LanguageFeature::OmpSs);
     disable_.set(LanguageFeature::OpenACC);
     disable_.set(LanguageFeature::OpenMP);
     disable_.set(LanguageFeature::ImplicitNoneTypeNever);
@@ -60,7 +61,7 @@ public:
   bool IsEnabled(LanguageFeature f) const { return !disable_.test(f); }
   bool ShouldWarn(LanguageFeature f) const {
     return (warnAll_ && f != LanguageFeature::OpenMP &&
-               f != LanguageFeature::OpenACC) ||
+               f != LanguageFeature::OpenACC && f != LanguageFeature::OmpSs) ||
         warn_.test(f);
   }
   // Return all spellings of operators names, depending on features enabled
