@@ -303,7 +303,7 @@ void DirectiveEnvironment::gatherDeviceInfo(OperandBundleDef &OB) {
 
 void DirectiveEnvironment::gatherDeviceNdrangeInfo(OperandBundleDef &OB) {
   assert(DeviceInfo.Ndrange.empty() && "Only allowed one OperandBundle with this Id");
-  DeviceInfo.NumDims = cast<ConstantInt>(OB.inputs()[0])->getSExtValue();
+  DeviceInfo.NumDims = cast<ConstantInt>(OB.inputs()[0])->getZExtValue();
   for (size_t i = 1; i < OB.input_size(); i++)
     DeviceInfo.Ndrange.push_back(OB.inputs()[i]);
 }

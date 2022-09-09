@@ -1535,11 +1535,11 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
   auto Body = [](CodeGenFunction &NewCGF, const Expr *E, Optional<llvm::Value *> Switch) {
     auto *MDExpr = cast<OSSMultiDepExpr>(E);
     uint64_t SwitchTyBits =
-      NewCGF.CGM.getDataLayout().getTypeSizeInBits(Switch.getValue()->getType());
+      NewCGF.CGM.getDataLayout().getTypeSizeInBits(Switch.value()->getType());
 
     llvm::BasicBlock *ContBB = NewCGF.createBasicBlock("", NewCGF.CurFn);
     llvm::BasicBlock *FallBack = NewCGF.createBasicBlock("", NewCGF.CurFn);
-    llvm::SwitchInst *SI = NewCGF.Builder.CreateSwitch(Switch.getValue(), FallBack);
+    llvm::SwitchInst *SI = NewCGF.Builder.CreateSwitch(Switch.value(), FallBack);
     NewCGF.Builder.SetInsertPoint(FallBack);
     NewCGF.Builder.CreateBr(ContBB);
 
@@ -2558,7 +2558,7 @@ static DeclRefExpr *emitTaskCallArg(
   VD->setReferenced();
   VD->markUsed(Ctx);
   VD->setInitStyle(VarDecl::CInit);
-  if (InitE.hasValue())
+  if (InitE.has_value())
     VD->setInit(const_cast<Expr *>(*InitE));
 
   CGF.EmitVarDecl(*VD);

@@ -137,7 +137,7 @@ void Sema::NoteDeletedFunction(FunctionDecl *Decl) {
 /// Determine whether a FunctionDecl was ever declared with an
 /// explicit storage class.
 static bool hasAnyExplicitStorageClass(const FunctionDecl *D) {
-  for (auto I : D->redecls()) {
+  for (auto *I : D->redecls()) {
     if (I->getStorageClass() != SC_None)
       return true;
   }
@@ -284,8 +284,7 @@ bool Sema::DiagnoseUseOfDecl(NamedDecl *D, ArrayRef<SourceLocation> Locs,
     // definition.
     if (FD->getTrailingRequiresClause()) {
       ConstraintSatisfaction Satisfaction;
-      if (CheckFunctionConstraints(FD, Satisfaction, Loc,
-                                   /*ForOverloadResolution*/ true))
+      if (CheckFunctionConstraints(FD, Satisfaction, Loc))
         // A diagnostic will have already been generated (non-constant
         // constraint expression, for example)
         return true;
@@ -2961,7 +2960,7 @@ ExprResult Sema::BuildIvarRefExpr(Scope *S, SourceLocation Loc,
         !Diags.isIgnored(diag::warn_arc_repeated_use_of_weak, Loc))
       getCurFunction()->recordUseOfWeak(Result);
   }
-  if (getLangOpts().ObjCAutoRefCount)
+  if (getLangOpts().ObjCAutoRefCount && !isUnevaluatedContext())
     if (const BlockDecl *BD = CurContext->getInnermostBlockDecl())
       ImplicitlyRetainedSelfLocs.push_back({Loc, BD});
 
@@ -16598,7 +16597,7 @@ void Sema::ActOnBlockArguments(SourceLocation CaretLoc, Declarator &ParamInfo,
   ProcessDeclAttributes(CurScope, CurBlock->TheDecl, ParamInfo);
 
   // Put the parameter variables in scope.
-  for (auto AI : CurBlock->TheDecl->parameters()) {
+  for (auto *AI : CurBlock->TheDecl->parameters()) {
     AI->setOwningFunction(CurBlock->TheDecl);
 
     // If this has an identifier, add it to the scope stack.
@@ -17907,6 +17906,11 @@ static void RemoveNestedImmediateInvocation(
       DRSet.erase(E);
       return E;
     }
+    ExprResult TransformLambdaExpr(LambdaExpr *E) {
+      // Do not rebuild lambdas to avoid creating a new type.
+      // Lambdas have already been processed inside their eval context.
+      return E;
+    }
     bool AlwaysRebuild() { return false; }
     bool ReplacingOriginal() { return true; }
     bool AllowSkippingCXXConstructExpr() {
@@ -17974,7 +17978,7 @@ HandleImmediateInvocations(Sema &SemaRef,
   for (auto CE : Rec.ImmediateInvocationCandidates)
     if (!CE.getInt())
       EvaluateAndDiagnoseImmediateInvocation(SemaRef, CE);
-  for (auto DR : Rec.ReferenceToConsteval) {
+  for (auto *DR : Rec.ReferenceToConsteval) {
     auto *FD = cast<FunctionDecl>(DR->getDecl());
     SemaRef.Diag(DR->getBeginLoc(), diag::err_invalid_consteval_take_address)
         << FD;
@@ -18415,7 +18419,7 @@ void Sema::MarkFunctionReferenced(SourceLocation Loc, FunctionDecl *Func,
         }
       } else {
         // Walk redefinitions, as some of them may be instantiable.
-        for (auto i : Func->redecls()) {
+        for (auto *i : Func->redecls()) {
           if (!i->isUsed(false) && i->isImplicitlyInstantiable())
             MarkFunctionReferenced(Loc, i, MightBeOdrUse);
         }
@@ -19990,8 +19994,8 @@ void Sema::MarkDeclRefReferenced(DeclRefExpr *E, const Expr *Base) {
 
   if (auto *FD = dyn_cast<FunctionDecl>(E->getDecl()))
     if (!isUnevaluatedContext() && !isConstantEvaluated() &&
-        FD->isConsteval() && !RebuildingImmediateInvocation &&
-        !FD->isDependentContext())
+        !isImmediateFunctionContext() && FD->isConsteval() &&
+        !RebuildingImmediateInvocation && !FD->isDependentContext())
       ExprEvalContexts.back().ReferenceToConsteval.insert(E);
   MarkExprReferenced(*this, E->getLocation(), E->getDecl(), E, OdrUse,
                      RefsMinusAssignments);
