@@ -291,6 +291,8 @@ enum NodeType : unsigned {
   SMULL,
   UMULL,
 
+  PMULL,
+
   // Reciprocal estimates and steps.
   FRECPE,
   FRECPS,
@@ -740,11 +742,11 @@ public:
     return true;
   }
 
-  bool isCheapToSpeculateCttz() const override {
+  bool isCheapToSpeculateCttz(Type *) const override {
     return true;
   }
 
-  bool isCheapToSpeculateCtlz() const override {
+  bool isCheapToSpeculateCtlz(Type *) const override {
     return true;
   }
 
@@ -811,6 +813,8 @@ public:
   bool supportSwiftError() const override {
     return true;
   }
+
+  bool supportKCFIBundles() const override { return true; }
 
   /// Enable aggressive FMA fusion on targets that want it.
   bool enableAggressiveFMAFusion(EVT VT) const override;

@@ -87,6 +87,11 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
          "ptrauth operand bundle id drifted!");
   (void)PtrauthEntry;
 
+  auto *KCFIEntry = pImpl->getOrInsertBundleTag("kcfi");
+  assert(KCFIEntry->second == LLVMContext::OB_kcfi &&
+         "kcfi operand bundle id drifted!");
+  (void)KCFIEntry;
+
   // OmpSs IDs
   auto *OSSDirEntry = pImpl->getOrInsertBundleTag("DIR.OSS");
   assert(OSSDirEntry->second == LLVMContext::OB_oss_dir &&

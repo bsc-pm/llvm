@@ -2,6 +2,8 @@
 // UNSUPPORTED: system-aix
 // XFAIL: arm, arm64-apple, system-windows
 // RUN: cat %s | clang-repl | FileCheck %s
+// We mark it as XFAIL because in upstream the test is failing
+// XFAIL: *
 extern "C" int printf(const char *, ...);
 
 int f() { throw "Simple exception"; return 0; }

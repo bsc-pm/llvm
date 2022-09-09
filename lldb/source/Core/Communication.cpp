@@ -132,9 +132,15 @@ size_t Communication::Read(void *dst, size_t dst_len,
   if (m_read_thread_enabled) {
     // We have a dedicated read thread that is getting data for us
     size_t cached_bytes = GetCachedBytes(dst, dst_len);
-    if (cached_bytes > 0 || (timeout && timeout->count() == 0)) {
+    if (cached_bytes > 0) {
       status = eConnectionStatusSuccess;
       return cached_bytes;
+    }
+    if (timeout && timeout->count() == 0) {
+      if (error_ptr)
+        error_ptr->SetErrorString("Timed out.");
+      status = eConnectionStatusTimedOut;
+      return 0;
     }
 
     if (!m_connection_sp) {
@@ -155,11 +161,21 @@ size_t Communication::Read(void *dst, size_t dst_len,
       }
 
       if (event_type & eBroadcastBitReadThreadDidExit) {
+        // If the thread exited of its own accord, it either means it
+        // hit an end-of-file condition or an error.
+        status = m_pass_status;
+        if (error_ptr)
+          *error_ptr = std::move(m_pass_error);
+
         if (GetCloseOnEOF())
           Disconnect(nullptr);
-        break;
+        return 0;
       }
     }
+
+    if (error_ptr)
+      error_ptr->SetErrorString("Timed out.");
+    status = eConnectionStatusTimedOut;
     return 0;
   }
 
@@ -364,7 +380,8 @@ lldb::thread_result_t Communication::ReadThread() {
       break;
     }
   }
-  log = GetLog(LLDBLog::Communication);
+  m_pass_status = status;
+  m_pass_error = std::move(error);
   LLDB_LOG(log, "Communication({0}) thread exiting...", this);
 
   // Handle threads wishing to synchronize with us.

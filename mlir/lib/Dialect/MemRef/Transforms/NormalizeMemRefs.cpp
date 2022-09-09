@@ -11,7 +11,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "PassDetail.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -19,6 +18,13 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/Support/Debug.h"
+
+namespace mlir {
+namespace memref {
+#define GEN_PASS_DEF_NORMALIZEMEMREFS
+#include "mlir/Dialect/MemRef/Transforms/Passes.h.inc"
+} // namespace memref
+} // namespace mlir
 
 #define DEBUG_TYPE "normalize-memrefs"
 
@@ -32,7 +38,8 @@ namespace {
 /// such functions as normalizable. Also, if a normalizable function is known
 /// to call a non-normalizable function, we treat that function as
 /// non-normalizable as well. We assume external functions to be normalizable.
-struct NormalizeMemRefs : public NormalizeMemRefsBase<NormalizeMemRefs> {
+struct NormalizeMemRefs
+    : public memref::impl::NormalizeMemRefsBase<NormalizeMemRefs> {
   void runOnOperation() override;
   void normalizeFuncOpMemRefs(func::FuncOp funcOp, ModuleOp moduleOp);
   bool areMemRefsNormalizable(func::FuncOp funcOp);
@@ -157,10 +164,7 @@ bool NormalizeMemRefs::areMemRefsNormalizable(func::FuncOp funcOp) {
   if (funcOp
           .walk([&](memref::AllocOp allocOp) -> WalkResult {
             Value oldMemRef = allocOp.getResult();
-            if (!oldMemRef.getType()
-                     .cast<MemRefType>()
-                     .getLayout()
-                     .isIdentity() &&
+            if (!allocOp.getType().getLayout().isIdentity() &&
                 !isMemRefNormalizable(oldMemRef.getUsers()))
               return WalkResult::interrupt();
             return WalkResult::advance();
@@ -173,11 +177,9 @@ bool NormalizeMemRefs::areMemRefsNormalizable(func::FuncOp funcOp) {
             for (unsigned resIndex :
                  llvm::seq<unsigned>(0, callOp.getNumResults())) {
               Value oldMemRef = callOp.getResult(resIndex);
-              if (oldMemRef.getType().isa<MemRefType>())
-                if (!oldMemRef.getType()
-                         .cast<MemRefType>()
-                         .getLayout()
-                         .isIdentity() &&
+              if (auto oldMemRefType =
+                      oldMemRef.getType().dyn_cast<MemRefType>())
+                if (!oldMemRefType.getLayout().isIdentity() &&
                     !isMemRefNormalizable(oldMemRef.getUsers()))
                   return WalkResult::interrupt();
             }
@@ -188,8 +190,8 @@ bool NormalizeMemRefs::areMemRefsNormalizable(func::FuncOp funcOp) {
 
   for (unsigned argIndex : llvm::seq<unsigned>(0, funcOp.getNumArguments())) {
     BlockArgument oldMemRef = funcOp.getArgument(argIndex);
-    if (oldMemRef.getType().isa<MemRefType>())
-      if (!oldMemRef.getType().cast<MemRefType>().getLayout().isIdentity() &&
+    if (auto oldMemRefType = oldMemRef.getType().dyn_cast<MemRefType>())
+      if (!oldMemRefType.getLayout().isIdentity() &&
           !isMemRefNormalizable(oldMemRef.getUsers()))
         return false;
   }

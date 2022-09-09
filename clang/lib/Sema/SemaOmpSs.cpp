@@ -1685,15 +1685,15 @@ bool OmpSsIterationSpaceChecker::setStep(Expr *NewStep, bool Subtract) {
     bool IsConstZero = Result && !Result->getBoolValue();
 
     if (UB && (IsConstZero ||
-               (TestIsLessOp.getValue() ?
+               (TestIsLessOp.value() ?
                   (IsConstNeg || (IsUnsigned && Subtract)) :
                   (IsConstPos || (IsUnsigned && !Subtract))))) {
       SemaRef.Diag(NewStep->getExprLoc(),
                    diag::err_oss_loop_incr_not_compatible)
-          << LCDecl << TestIsLessOp.getValue() << NewStep->getSourceRange();
+          << LCDecl << TestIsLessOp.value() << NewStep->getSourceRange();
       SemaRef.Diag(ConditionLoc,
                    diag::note_oss_loop_cond_requres_compatible_incr)
-          << TestIsLessOp.getValue() << ConditionSrcRange;
+          << TestIsLessOp.value() << ConditionSrcRange;
       return true;
     }
     if (Subtract) {
@@ -2515,7 +2515,7 @@ static bool checkNdrange(
   if (!isa<ConstantExpr>(NumDimsE))
     return true;
 
-  int64_t NumDims = cast<ConstantExpr>(NumDimsE)->getResultAsAPSInt().getExtValue();
+  uint64_t NumDims = cast<ConstantExpr>(NumDimsE)->getResultAsAPSInt().getExtValue();
   if (!(NumDims >= 1 && NumDims <= 3)) {
     S.Diag(NumDimsE->getExprLoc(), diag::err_oss_clause_expect_constant_between)
         << 1 << 3 << getOmpSsClauseName(OSSC_ndrange)
@@ -2530,7 +2530,7 @@ static bool checkNdrange(
   }
   ClauseVars[0] = NumDimsE;
   bool ErrorFound = false;
-  for (int i = 1; i < ClauseVars.size(); ++i) {
+  for (size_t i = 1; i < ClauseVars.size(); ++i) {
     // TODO: check global[i] >= local[i]
     ExprResult Res = S.CheckNonNegativeIntegerValue(
       ClauseVars[i], OSSC_ndrange, /*StrictlyPositive=*/true);
