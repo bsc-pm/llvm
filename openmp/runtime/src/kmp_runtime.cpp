@@ -10152,73 +10152,73 @@ void __kmp_set_thread_roles2(int tid, omp_role_t r){
 			th->th.th_pending_role = OMP_ROLE_NONE;
 			if(act_r == OMP_ROLE_FREE_AGENT){
 			    KMP_ATOMIC_DEC(&__kmp_free_agent_active_nth);
-			}
+			    kmp_info_t *new_thr = CCAST(kmp_info_t *, __kmp_free_agent_list);
+			    kmp_info_t *prev = NULL;
+			    while(new_thr != NULL && new_thr != th){
+			        prev = new_thr;
+			        new_thr = new_thr->th.th_next_free_agent;
+			    }
+			    if(prev == NULL)
+			        __kmp_free_agent_list = new_thr->th.th_next_free_agent;
+			    else
+			        prev->th.th_next_free_agent = new_thr->th.th_next_free_agent;
+			    if(new_thr == __kmp_free_agent_list_insert_pt)
+			        __kmp_free_agent_list_insert_pt = NULL;
+			    
+			    th->th.th_next_free_agent = NULL;
+			    KMP_DEBUG_ASSERT((new_thr->th.th_next_free_agent == NULL) ||
+			                     (new_thr->th.th_info.ds.ds_gtid < 
+			                      new_thr->th.th_next_free_agent->th.th_info.ds.ds_gtid));
+			    if(r == OMP_ROLE_NONE){
+			    //Removing all the roles from an actual free agent. Placing it into the thread pool
+			        kmp_info_t **scan;
+			        if(__kmp_thread_pool_insert_pt != NULL){
+			            KMP_DEBUG_ASSERT(__kmp_thread_pool != NULL);
+			            if(__kmp_thread_pool_insert_pt->th.th_info.ds.ds_gtid > gtid){
+			                __kmp_thread_pool_insert_pt = NULL;
+			            }
+			        }
+			        if(__kmp_thread_pool_insert_pt != NULL){
+			            scan = &(__kmp_thread_pool_insert_pt->th.th_next_pool);
+			        }
+			        else{
+			            scan = CCAST(kmp_info_t **, &__kmp_thread_pool);
+			        }
+			        for(; (*scan != NULL) && ((*scan)->th.th_info.ds.ds_gtid < gtid);
+			                scan = &((*scan)->th.th_next_pool));
+			        TCW_PTR(th->th.th_next_pool, *scan);
+			        __kmp_thread_pool_insert_pt = *scan = th;
+			        KMP_DEBUG_ASSERT((th->th.th_next_pool == NULL) ||
+			                            (th->th.th_info.ds.ds_gtid < th->th.th_next_pool->th.th_info.ds.ds_gtid));
+			        TCW_4(th->th.th_in_pool, TRUE);
+                    th->th.th_team = NULL;
+
+			        if(th->th.th_active == TRUE){
+			            KMP_ATOMIC_INC(&__kmp_thread_pool_active_nth);
+			            th->th.th_active_in_pool = TRUE;
+			        }
+#if KMP_DEBUG
+                    else{
+                        KMP_DEBUG_ASSERT(th->th.th_active_in_pool == FALSE);
+                    }
+#endif
+                    TCW_4(__kmp_nth, __kmp_nth - 1);
+#ifdef KMP_ADJUST_BLOCKTIME
+                    if(!__kmp_env_blocktime && (__kmp_avail_proc > 0)){
+                        KMP_DEBUG_ASSERT(__kmp_avail_proc > 0);
+                        if(__kmp_nth <= __kmp_avail_proc){
+                            __kmp_zero_bt = FALSE;
+                        }
+                    }
+#endif
+                }
+            }
 			KMP_ATOMIC_ST_REL(&th->th.th_change_role, true);
 		}
 	}
 	if(th->th.th_potential_roles & OMP_ROLE_FREE_AGENT){
 		if(!(r & OMP_ROLE_FREE_AGENT)){ //Decreasing the number of potential FA
-			kmp_info_t *new_thr = CCAST(kmp_info_t *, __kmp_free_agent_list);
-			kmp_info_t *prev = NULL;
-			while(new_thr != NULL && new_thr != th){
-			    prev = new_thr;
-			    new_thr = new_thr->th.th_next_free_agent;
-			}
-			if(prev == NULL)
-			    __kmp_free_agent_list = new_thr->th.th_next_free_agent;
-			else
-			    prev->th.th_next_free_agent = new_thr->th.th_next_free_agent;
-			if(new_thr == __kmp_free_agent_list_insert_pt)
-			    __kmp_free_agent_list_insert_pt = NULL;
-			
-			th->th.th_next_free_agent = NULL;
-			KMP_DEBUG_ASSERT((new_thr->th.th_next_free_agent == NULL) ||
-			                 (new_thr->th.th_info.ds.ds_gtid < 
-			                  new_thr->th.th_next_free_agent->th.th_info.ds.ds_gtid));
 			--__kmp_free_agent_num_threads;
-			if(act_r == OMP_ROLE_FREE_AGENT && r == OMP_ROLE_NONE){
-			//Removing all the roles from an actual free agent. Placing it into the thread pool
-			    kmp_info_t **scan;
-			    if(__kmp_thread_pool_insert_pt != NULL){
-			        KMP_DEBUG_ASSERT(__kmp_thread_pool != NULL);
-			        if(__kmp_thread_pool_insert_pt->th.th_info.ds.ds_gtid > gtid){
-			            __kmp_thread_pool_insert_pt = NULL;
-			        }
-			    }
-			    if(__kmp_thread_pool_insert_pt != NULL){
-			        scan = &(__kmp_thread_pool_insert_pt->th.th_next_pool);
-			    }
-			    else{
-			        scan = CCAST(kmp_info_t **, &__kmp_thread_pool);
-			    }
-			    for(; (*scan != NULL) && ((*scan)->th.th_info.ds.ds_gtid < gtid);
-			            scan = &((*scan)->th.th_next_pool));
-			    TCW_PTR(th->th.th_next_pool, *scan);
-			    __kmp_thread_pool_insert_pt = *scan = th;
-			    KMP_DEBUG_ASSERT((th->th.th_next_pool == NULL) ||
-			                        (th->th.th_info.ds.ds_gtid < th->th.th_next_pool->th.th_info.ds.ds_gtid));
-			    TCW_4(th->th.th_in_pool, TRUE);
-                th->th.th_team = NULL;
-
-			    if(th->th.th_active == TRUE){
-			        KMP_ATOMIC_INC(&__kmp_thread_pool_active_nth);
-			        th->th.th_active_in_pool = TRUE;
-			    }
-#if KMP_DEBUG
-                else{
-                    KMP_DEBUG_ASSERT(th->th.th_active_in_pool == FALSE);
-                }
-#endif
-                TCW_4(__kmp_nth, __kmp_nth - 1);
-#ifdef KMP_ADJUST_BLOCKTIME
-                if(!__kmp_env_blocktime && (__kmp_avail_proc > 0)){
-                    KMP_DEBUG_ASSERT(__kmp_avail_proc > 0);
-                    if(__kmp_nth <= __kmp_avail_proc){
-                        __kmp_zero_bt = FALSE;
-                    }
-                }
-#endif
-			}
 		}
 	}
 	else{
