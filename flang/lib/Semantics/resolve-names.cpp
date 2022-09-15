@@ -821,6 +821,9 @@ public:
   void Post(const parser::InterfaceBody::Subroutine &);
   bool Pre(const parser::InterfaceBody::Function &);
   void Post(const parser::InterfaceBody::Function &);
+  bool Pre(const parser::InterfaceBody::OmpSsIfaceOutlineTask &);
+  void Post(const parser::InterfaceBody::OmpSsIfaceOutlineTask &);
+  bool Pre(const parser::OmpSsOutlineTaskConstruct &) { return false; }
   bool Pre(const parser::Suffix &);
   bool Pre(const parser::PrefixSpec &);
 
@@ -1409,12 +1412,112 @@ void OmpVisitor::Post(const parser::OpenMPBlockConstruct &x) {
   }
 }
 
+// Create scopes for OmpSs constructs
+class OSSVisitor : public virtual DeclarationVisitor {
+public:
+  void AddOSSSourceRange(const parser::CharBlock &);
+
+  static bool NeedsScope(const parser::OmpSsBlockConstruct &);
+
+  bool Pre(const parser::OmpSsBlockConstruct &);
+  void Post(const parser::OmpSsBlockConstruct &);
+  bool Pre(const parser::OSSBeginBlockDirective &x) {
+    AddOSSSourceRange(x.source);
+    return true;
+  }
+  void Post(const parser::OSSBeginBlockDirective &) {
+    messageHandler().set_currStmtSource(std::nullopt);
+  }
+  bool Pre(const parser::OSSEndBlockDirective &x) {
+    AddOSSSourceRange(x.source);
+    return true;
+  }
+  void Post(const parser::OSSEndBlockDirective &) {
+    messageHandler().set_currStmtSource(std::nullopt);
+  }
+
+  bool Pre(const parser::OmpSsLoopConstruct &) {
+    PushScope(Scope::Kind::OtherConstruct, nullptr);
+    return true;
+  }
+  void Post(const parser::OmpSsLoopConstruct &) { PopScope(); }
+  bool Pre(const parser::OSSBeginLoopDirective &x) {
+    AddOSSSourceRange(x.source);
+    return true;
+  }
+  void Post(const parser::OSSBeginLoopDirective &) {
+    messageHandler().set_currStmtSource(std::nullopt);
+  }
+  bool Pre(const parser::OSSEndLoopDirective &x) {
+    AddOSSSourceRange(x.source);
+    return true;
+  }
+  void Post(const parser::OSSEndLoopDirective &) {
+    messageHandler().set_currStmtSource(std::nullopt);
+  }
+
+  bool Pre(const parser::OmpSsSimpleStandaloneConstruct &) {
+    PushScope(Scope::Kind::OtherConstruct, nullptr);
+    return true;
+  }
+  void Post(const parser::OmpSsSimpleStandaloneConstruct &) { PopScope(); }
+  bool Pre(const parser::OSSSimpleStandaloneDirective &x) {
+    AddOSSSourceRange(x.source);
+    return true;
+  }
+  void Post(const parser::OSSSimpleStandaloneDirective &) {
+    messageHandler().set_currStmtSource(std::nullopt);
+  }
+
+  bool Pre(const parser::OmpSsSimpleOutlineTaskConstruct &) {
+    PushScope(Scope::Kind::OtherConstruct, nullptr);
+    return true;
+  }
+  void Post(const parser::OmpSsSimpleOutlineTaskConstruct &) { PopScope(); }
+  bool Pre(const parser::OSSSimpleOutlineTaskDirective &x) {
+    AddOSSSourceRange(x.source);
+    return true;
+  }
+  void Post(const parser::OSSSimpleOutlineTaskDirective &) {
+    messageHandler().set_currStmtSource(std::nullopt);
+  }
+};
+
+bool OSSVisitor::NeedsScope(const parser::OmpSsBlockConstruct &x) {
+  const auto &beginBlockDir{std::get<parser::OSSBeginBlockDirective>(x.t)};
+  const auto &beginDir{std::get<parser::OSSBlockDirective>(beginBlockDir.t)};
+  switch (beginDir.v) {
+  // TODO: what directives do not need scope?
+  default:
+    return true;
+  }
+}
+
+void OSSVisitor::AddOSSSourceRange(const parser::CharBlock &source) {
+  messageHandler().set_currStmtSource(source);
+  currScope().AddSourceRange(source);
+}
+
+bool OSSVisitor::Pre(const parser::OmpSsBlockConstruct &x) {
+  if (NeedsScope(x)) {
+    PushScope(Scope::Kind::OtherConstruct, nullptr);
+  }
+  return true;
+}
+
+void OSSVisitor::Post(const parser::OmpSsBlockConstruct &x) {
+  if (NeedsScope(x)) {
+    PopScope();
+  }
+}
+
 // Walk the parse tree and resolve names to symbols.
 class ResolveNamesVisitor : public virtual ScopeHandler,
                             public ModuleVisitor,
                             public SubprogramVisitor,
                             public ConstructVisitor,
                             public OmpVisitor,
+                            public OSSVisitor,
                             public AccVisitor {
 public:
   using AccVisitor::Post;
@@ -1432,6 +1535,8 @@ public:
   using ModuleVisitor::Pre;
   using OmpVisitor::Post;
   using OmpVisitor::Pre;
+  using OSSVisitor::Post;
+  using OSSVisitor::Pre;
   using ScopeHandler::Post;
   using ScopeHandler::Pre;
   using SubprogramVisitor::Post;
@@ -1480,6 +1585,9 @@ public:
     llvm_unreachable("This node is handled in ProgramUnit");
   }
   bool Pre(const parser::SubroutineSubprogram &) {
+    llvm_unreachable("This node is handled in ProgramUnit");
+  }
+  bool Pre(const parser::OmpSsOutlineTask &) {
     llvm_unreachable("This node is handled in ProgramUnit");
   }
   bool Pre(const parser::SeparateModuleSubprogram &) {
@@ -3335,6 +3443,14 @@ void SubprogramVisitor::Post(const parser::InterfaceBody::Function &x) {
   const auto &maybeSuffix{
       std::get<std::optional<parser::Suffix>>(stmt.statement.t)};
   EndSubprogram(stmt.source, maybeSuffix ? &maybeSuffix->binding : nullptr);
+}
+bool SubprogramVisitor::Pre(const parser::InterfaceBody::OmpSsIfaceOutlineTask &x) {
+  const auto &name{std::get<parser::Name>(
+      std::get<parser::Statement<parser::SubroutineStmt>>(x.t).statement.t)};
+  return BeginSubprogram(name, Symbol::Flag::Subroutine);
+}
+void SubprogramVisitor::Post(const parser::InterfaceBody::OmpSsIfaceOutlineTask &) {
+  EndSubprogram();
 }
 
 bool SubprogramVisitor::Pre(const parser::SubroutineStmt &stmt) {
@@ -7441,6 +7557,7 @@ bool ResolveNamesVisitor::Pre(const parser::ProgramUnit &x) {
   ResolveExecutionParts(root);
   ResolveAccParts(context(), x);
   ResolveOmpParts(context(), x);
+  ResolveOSSParts(context(), x);
   return false;
 }
 

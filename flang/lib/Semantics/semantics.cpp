@@ -11,6 +11,7 @@
 #include "canonicalize-acc.h"
 #include "canonicalize-do.h"
 #include "canonicalize-omp.h"
+#include "canonicalize-oss.h"
 #include "check-acc-structure.h"
 #include "check-allocate.h"
 #include "check-arithmeticif.h"
@@ -25,6 +26,7 @@
 #include "check-namelist.h"
 #include "check-nullify.h"
 #include "check-omp-structure.h"
+#include "check-oss-structure.h"
 #include "check-purity.h"
 #include "check-return.h"
 #include "check-select-rank.h"
@@ -160,7 +162,7 @@ using StatementSemanticsPass2 = SemanticsVisitor<AccStructureChecker,
     AllocateChecker, ArithmeticIfStmtChecker, AssignmentChecker, CaseChecker,
     CoarrayChecker, DataChecker, DeallocateChecker, DoForallChecker,
     IfStmtChecker, IoChecker, MiscChecker, NamelistChecker, NullifyChecker,
-    OmpStructureChecker, PurityChecker, ReturnStmtChecker,
+    OmpStructureChecker, OSSStructureChecker, PurityChecker, ReturnStmtChecker,
     SelectRankConstructChecker, SelectTypeChecker, StopChecker>;
 
 static bool PerformStatementSemantics(
@@ -491,6 +493,7 @@ bool Semantics::Perform() {
       parser::CanonicalizeDo(program_) && // force line break
       CanonicalizeAcc(context_.messages(), program_) &&
       CanonicalizeOmp(context_.messages(), program_) &&
+      CanonicalizeOSS(context_.messages(), program_) &&
       PerformStatementSemantics(context_, program_) &&
       ModFileWriter{context_}.WriteAll();
 }

@@ -536,6 +536,10 @@ public:
       AccCopyIn, AccCopyOut, AccCreate, AccDelete, AccPresent,
       // OpenACC miscellaneous flags
       AccCommonBlock, AccThreadPrivate, AccReduction, AccNone, AccPreDetermined,
+      // OmpSs-2 data-sharing attribute
+      OSSShared, OSSPrivate, OSSFirstPrivate,
+      // OmpSs-2 miscellaneous flags
+      OSSNone, OSSOutlineTask,
       // OpenMP data-sharing attribute
       OmpShared, OmpPrivate, OmpLinear, OmpFirstPrivate, OmpLastPrivate,
       // OpenMP data-mapping attribute
