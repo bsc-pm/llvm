@@ -308,6 +308,7 @@ LogicalResult verifyResultSizeAttr(Operation *op, StringRef sizeAttrName);
 LogicalResult verifyNoRegionArguments(Operation *op);
 LogicalResult verifyElementwise(Operation *op);
 LogicalResult verifyIsIsolatedFromAbove(Operation *op);
+LogicalResult verifyIsNoFreeVariables(Operation *op);
 } // namespace impl
 
 /// Helper class for implementing traits.  Clients are not expected to interact
@@ -1209,6 +1210,19 @@ class IsIsolatedFromAbove
 public:
   static LogicalResult verifyRegionTrait(Operation *op) {
     return impl::verifyIsIsolatedFromAbove(op);
+  }
+};
+
+/// This class provides the API for ops that are known to be isolated from
+/// above. It's similar to IsolatedFromAbove, but adding checks for operation
+/// operands
+template <typename ConcreteType>
+class IsNoFreeVariables
+    : public TraitBase<ConcreteType, IsNoFreeVariables> {
+
+public:
+  static LogicalResult verifyRegionTrait(Operation *op) {
+    return impl::verifyIsNoFreeVariables(op);
   }
 };
 

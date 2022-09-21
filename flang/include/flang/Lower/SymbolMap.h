@@ -338,7 +338,7 @@ public:
   /// Dump the map. For debugging.
   LLVM_DUMP_METHOD void dump() const { llvm::errs() << *this << '\n'; }
 
-private:
+// private:
   /// Add `symbol` to the current map and bind a `box`.
   void makeSym(semantics::SymbolRef symRef, const SymbolBox &box,
                bool force = false) {

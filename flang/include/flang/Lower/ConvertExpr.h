@@ -35,6 +35,7 @@ class ShapeOp;
 namespace Fortran::lower {
 
 class AbstractConverter;
+class CallerInterface;
 class ExplicitIterSpace;
 class ImplicitIterSpace;
 class StatementContext;
@@ -222,6 +223,25 @@ mlir::Value createSubroutineCall(AbstractConverter &converter,
                                  ImplicitIterSpace &implicitIterSpace,
                                  SymMap &symMap, StatementContext &stmtCtx,
                                  bool isUserDefAssignment);
+
+// TODO: place this in other place
+void emitOSSCopyExpr(
+  AbstractConverter &, const Fortran::semantics::Symbol &, Fortran::lower::StatementContext &stmtCtx);
+
+// TODO: place this in other place
+void fill_mapping(
+                      Fortran::lower::SymMap &,
+                      const Fortran::evaluate::ProcedureRef &,
+                      Fortran::lower::AbstractConverter &,
+                      Fortran::lower::SymMap &,
+                      Fortran::lower::StatementContext &);
+
+// TODO: place this in other place
+llvm::SmallVector<mlir::Value> fillDSAs(
+                      Fortran::lower::CallerInterface &caller,
+                      Fortran::lower::AbstractConverter &converter,
+                      Fortran::lower::SymMap &symMap,
+                      Fortran::lower::StatementContext &stmtCtx);
 
 // Attribute for an alloca that is a trivial adaptor for converting a value to
 // pass-by-ref semantics for a VALUE parameter. The optimizer may be able to

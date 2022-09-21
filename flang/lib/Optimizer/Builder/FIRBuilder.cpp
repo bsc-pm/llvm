@@ -17,6 +17,7 @@
 #include "flang/Optimizer/Dialect/FIROpsSupport.h"
 #include "flang/Optimizer/Support/FatalError.h"
 #include "flang/Optimizer/Support/InternalNames.h"
+#include "mlir/Dialect/OmpSs/OmpSsDialect.h"
 #include "mlir/Dialect/OpenMP/OpenMPDialect.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringExtras.h"
@@ -196,9 +197,16 @@ mlir::Value fir::FirOpBuilder::allocateLocal(
 
 /// Get the block for adding Allocas.
 mlir::Block *fir::FirOpBuilder::getAllocaBlock() {
-  auto iface =
+  auto ifaceOmp =
       getRegion().getParentOfType<mlir::omp::OutlineableOpenMPOpInterface>();
-  return iface ? iface.getAllocaBlock() : getEntryBlock();
+  auto ifaceOss =
+      getRegion().getParentOfType<mlir::oss::OutlineableOmpSsOpInterface>();
+  mlir::Block *block = getEntryBlock();
+  if (ifaceOmp)
+    block = ifaceOmp.getAllocaBlock();
+  else if (ifaceOss)
+    block = ifaceOss.getAllocaBlock();
+  return block;
 }
 
 /// Create a temporary variable on the stack. Anonymous temporaries have no
@@ -222,7 +230,8 @@ fir::FirOpBuilder::createTemporary(mlir::Location loc, mlir::Type type,
   // If the alloca is inside an OpenMP Op which will be outlined then pin the
   // alloca here.
   const bool pinned =
-      getRegion().getParentOfType<mlir::omp::OutlineableOpenMPOpInterface>();
+      getRegion().getParentOfType<mlir::omp::OutlineableOpenMPOpInterface>() ||
+      getRegion().getParentOfType<mlir::oss::OutlineableOmpSsOpInterface>();
   assert(!type.isa<fir::ReferenceType>() && "cannot be a reference");
   auto ae =
       create<fir::AllocaOp>(loc, type, /*unique_name=*/llvm::StringRef{}, name,

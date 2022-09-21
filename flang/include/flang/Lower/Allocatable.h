@@ -72,6 +72,9 @@ bool isWholeAllocatable(const SomeExpr &expr);
 /// Is \p expr a reference to an entity with the POINTER attribute?
 bool isWholePointer(const SomeExpr &expr);
 
+void emitOSSDeinitExpr(AbstractConverter &converter,
+                       const fir::MutableBoxValue &box, mlir::Location loc);
+
 } // namespace lower
 } // namespace Fortran
 

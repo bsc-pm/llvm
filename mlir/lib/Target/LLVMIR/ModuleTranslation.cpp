@@ -17,6 +17,7 @@
 #include "mlir/Dialect/DLTI/DLTI.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/LLVMIR/Transforms/LegalizeForExport.h"
+#include "mlir/Dialect/OmpSs/OmpSsDialect.h"
 #include "mlir/Dialect/OpenMP/OpenMPDialect.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -401,6 +402,8 @@ ModuleTranslation::ModuleTranslation(Operation *module,
 ModuleTranslation::~ModuleTranslation() {
   if (ompBuilder)
     ompBuilder->finalize();
+  if (ossBuilder)
+    ossBuilder->finalize();
 }
 
 void ModuleTranslation::forgetMapping(Region &region) {

@@ -712,3 +712,11 @@ bool Fortran::lower::isWholePointer(const Fortran::lower::SomeExpr &expr) {
     return Fortran::semantics::IsPointer(*sym);
   return false;
 }
+
+void Fortran::lower::emitOSSDeinitExpr(
+    AbstractConverter &converter, const fir::MutableBoxValue &box, mlir::Location loc) {
+  fir::FirOpBuilder &builder = converter.getFirOpBuilder();
+  ErrorManager errorManager;
+  errorManager.init(converter, loc, nullptr, nullptr);
+  genDeallocate(builder, loc, box, errorManager);
+}

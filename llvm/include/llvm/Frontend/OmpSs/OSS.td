@@ -173,6 +173,34 @@ def OSS_TaskWait : Directive<"taskwait"> {
   ];
 }
 
+def OSS_OutlineTask : Directive<"outline task"> {
+  let allowedClauses = [
+    VersionedClause<OSSC_Private>,
+    VersionedClause<OSSC_FirstPrivate>,
+    VersionedClause<OSSC_Shared>,
+    VersionedClause<OSSC_Depend>,
+    VersionedClause<OSSC_In>,
+    VersionedClause<OSSC_Out>,
+    VersionedClause<OSSC_Inout>,
+    VersionedClause<OSSC_Concurrent>,
+    VersionedClause<OSSC_Commutative>,
+    VersionedClause<OSSC_WeakIn>,
+    VersionedClause<OSSC_WeakOut>,
+    VersionedClause<OSSC_WeakInout>,
+    VersionedClause<OSSC_WeakConcurrent>,
+    VersionedClause<OSSC_WeakCommutative>,
+    VersionedClause<OSSC_Reduction>,
+  ];
+  let allowedOnceClauses = [
+    VersionedClause<OSSC_Default>,
+    VersionedClause<OSSC_If>,
+    VersionedClause<OSSC_Final>,
+    VersionedClause<OSSC_Cost>,
+    VersionedClause<OSSC_Priority>,
+    VersionedClause<OSSC_Label>,
+    VersionedClause<OSSC_Wait>,
+  ];
+}
 def OSS_Release : Directive<"release"> {
   let allowedClauses = [
     VersionedClause<OSSC_Depend>,
@@ -270,34 +298,6 @@ def OSS_TaskLoopFor : Directive<"taskloop for"> {
     VersionedClause<OSSC_Wait>,
     VersionedClause<OSSC_ChunkSize>,
     VersionedClause<OSSC_GrainSize>,
-  ];
-}
-def OSS_OutlineTask : Directive<"outline task"> {
-  let allowedClauses = [
-    VersionedClause<OSSC_Private>,
-    VersionedClause<OSSC_FirstPrivate>,
-    VersionedClause<OSSC_Shared>,
-    VersionedClause<OSSC_Depend>,
-    VersionedClause<OSSC_In>,
-    VersionedClause<OSSC_Out>,
-    VersionedClause<OSSC_Inout>,
-    VersionedClause<OSSC_Concurrent>,
-    VersionedClause<OSSC_Commutative>,
-    VersionedClause<OSSC_WeakIn>,
-    VersionedClause<OSSC_WeakOut>,
-    VersionedClause<OSSC_WeakInout>,
-    VersionedClause<OSSC_WeakConcurrent>,
-    VersionedClause<OSSC_WeakCommutative>,
-    VersionedClause<OSSC_Reduction>,
-  ];
-  let allowedOnceClauses = [
-    VersionedClause<OSSC_Default>,
-    VersionedClause<OSSC_If>,
-    VersionedClause<OSSC_Final>,
-    VersionedClause<OSSC_Cost>,
-    VersionedClause<OSSC_Priority>,
-    VersionedClause<OSSC_Label>,
-    VersionedClause<OSSC_Wait>,
   ];
 }
 def OSS_Unknown : Directive<"unknown"> {

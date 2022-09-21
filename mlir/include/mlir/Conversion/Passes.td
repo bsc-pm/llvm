@@ -595,6 +595,15 @@ def ConvertNVGPUToNVVM : Pass<"convert-nvgpu-to-nvvm"> {
   ];
 }
 
+//===----------------------------------------------------------------------===//
+// OmpSsToLLVM
+//===----------------------------------------------------------------------===//
+
+def ConvertOmpSsToLLVM : Pass<"convert-ompss-2-to-llvm", "ModuleOp"> {
+  let summary = "Convert the OmpSs-2 ops to OmpSs-2 ops with LLVM dialect";
+  let constructor = "mlir::createConvertOmpSsToLLVMPass()";
+  let dependentDialects = ["LLVM::LLVMDialect"];
+}
 
 //===----------------------------------------------------------------------===//
 // OpenACCToSCF

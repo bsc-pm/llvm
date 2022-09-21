@@ -21,6 +21,7 @@
 #include "flang/Lower/IO.h"
 #include "flang/Lower/IterationSpace.h"
 #include "flang/Lower/Mangler.h"
+#include "flang/Lower/OmpSs.h"
 #include "flang/Lower/OpenACC.h"
 #include "flang/Lower/OpenMP.h"
 #include "flang/Lower/PFTBuilder.h"
@@ -205,6 +206,14 @@ public:
       : Fortran::lower::AbstractConverter(bridge.getLoweringOptions()),
         bridge{bridge}, foldingContext{bridge.createFoldingContext()} {}
   virtual ~FirConverter() = default;
+
+  // TODO: huge hacks
+  Fortran::lower::SymMap &getLocalSymbols() {
+    return localSymbols;
+  }
+  fir::ExtendedValue getExtended(Fortran::lower::SymbolBox sb) {
+    return getExtendedValue(sb);
+  }
 
   /// Convert the PFT to FIR.
   void run(Fortran::lower::pft::Program &pft) {
@@ -930,6 +939,34 @@ private:
     Fortran::lower::pft::Evaluation &eval = getEval();
     setCurrentPosition(stmt.v.source);
     assert(stmt.typedCall && "Call was not analyzed");
+
+    // Check if is outline task
+    const Fortran::parser::Call &call{stmt.v};
+    const auto &designator{std::get<Fortran::parser::ProcedureDesignator>(call.t)};
+    const auto &name{std::get<Fortran::parser::Name>(designator.u)};
+    auto &ultimate{name.symbol->GetUltimate()};
+    if (ultimate.test(Fortran::semantics::Symbol::Flag::OSSOutlineTask)) {
+      auto *details{ultimate.detailsIf<Fortran::semantics::SubprogramDetails>()};
+      const auto *outlineTask{details->getOutlineTask()};
+
+      auto insertPt = builder->saveInsertionPoint();
+      localSymbols.pushScope();
+
+      genOmpSsTaskSubroutine(*this,
+          const_cast<Fortran::semantics::SemanticsContext&>(bridge.getSemanticsContext()),
+          *stmt.typedCall, localSymbols, stmtCtx, eval, *outlineTask);
+      // Call statement lowering shares code with function call lowering.
+      mlir::Value res = Fortran::lower::createSubroutineCall(
+          *this, *stmt.typedCall, explicitIterSpace, implicitIterSpace,
+          localSymbols, stmtCtx, /*isUserDefAssignment=*/false);
+      if (res)
+        llvm_unreachable("Unexpected call");
+
+      localSymbols.popScope();
+      builder->restoreInsertionPoint(insertPt);
+      return;
+    }
+
     // Call statement lowering shares code with function call lowering.
     mlir::Value res = Fortran::lower::createSubroutineCall(
         *this, *stmt.typedCall, explicitIterSpace, implicitIterSpace,
@@ -1684,6 +1721,79 @@ private:
 
   void genFIR(const Fortran::parser::CompilerDirective &) {
     mlir::emitWarning(toLocation(), "ignoring all compiler directives");
+  }
+
+  void genFIR(const Fortran::parser::OmpSsConstruct &oss) {
+    auto insertPt = builder->saveInsertionPoint();
+    localSymbols.pushScope();
+
+    Fortran::lower::ImplicitDSAs implicitDSAs;
+
+    std::visit(
+        Fortran::common::visitors{
+            [&](const Fortran::parser::OmpSsStandaloneConstruct &standaloneConstruct) {
+              const auto &simpleConstruct{std::get<Fortran::parser::OmpSsSimpleStandaloneConstruct>(standaloneConstruct.u)};
+              const auto &dir{std::get<Fortran::parser::OSSSimpleStandaloneDirective>(simpleConstruct.t)};
+              const Fortran::semantics::Scope &scope = bridge.getSemanticsContext().FindScope(dir.source);
+              for (Fortran::evaluate::SymbolRef sym : scope.GetSymbols()) {
+                if (sym->test(Fortran::semantics::Symbol::Flag::OSSShared))
+                  implicitDSAs.sharedList.push_back(sym);
+                else if (sym->test(Fortran::semantics::Symbol::Flag::OSSPrivate))
+                  implicitDSAs.privateList.push_back(sym);
+                else if (sym->test(Fortran::semantics::Symbol::Flag::OSSFirstPrivate))
+                  implicitDSAs.firstprivateList.push_back(sym);
+              }
+            },
+            [&](const Fortran::parser::OmpSsLoopConstruct &loopConstruct) {
+              const auto &beginLoopDir{std::get<Fortran::parser::OSSBeginLoopDirective>(loopConstruct.t)};
+              const auto &beginDir{std::get<Fortran::parser::OSSLoopDirective>(beginLoopDir.t)};
+              const Fortran::semantics::Scope &scope = bridge.getSemanticsContext().FindScope(beginDir.source);
+              for (Fortran::evaluate::SymbolRef sym : scope.GetSymbols()) {
+                if (sym->test(Fortran::semantics::Symbol::Flag::OSSShared))
+                  implicitDSAs.sharedList.push_back(sym);
+                else if (sym->test(Fortran::semantics::Symbol::Flag::OSSPrivate))
+                  implicitDSAs.privateList.push_back(sym);
+                else if (sym->test(Fortran::semantics::Symbol::Flag::OSSFirstPrivate))
+                  implicitDSAs.firstprivateList.push_back(sym);
+              }
+            },
+            [&](const Fortran::parser::OmpSsBlockConstruct &blockConstruct) {
+              const auto &beginBlockDir{std::get<Fortran::parser::OSSBeginBlockDirective>(blockConstruct.t)};
+              const auto &beginDir{std::get<Fortran::parser::OSSBlockDirective>(beginBlockDir.t)};
+              const Fortran::semantics::Scope &scope = bridge.getSemanticsContext().FindScope(beginDir.source);
+              for (Fortran::evaluate::SymbolRef sym : scope.GetSymbols()) {
+                if (sym->test(Fortran::semantics::Symbol::Flag::OSSShared))
+                  implicitDSAs.sharedList.push_back(sym);
+                else if (sym->test(Fortran::semantics::Symbol::Flag::OSSPrivate))
+                  implicitDSAs.privateList.push_back(sym);
+                else if (sym->test(Fortran::semantics::Symbol::Flag::OSSFirstPrivate))
+                  implicitDSAs.firstprivateList.push_back(sym);
+              }
+            },
+        },
+        oss.u);
+
+    genOmpSsConstruct(*this, getEval(), oss, implicitDSAs, const_cast<Fortran::semantics::SemanticsContext&>(bridge.getSemanticsContext()));
+
+    std::visit(
+        Fortran::common::visitors{
+            [&](const Fortran::parser::OmpSsStandaloneConstruct &) { return; },
+            [&](const Fortran::parser::OmpSsLoopConstruct &loopConstruct) {
+              auto &doConsEval{getEval().getFirstNestedEvaluation()};
+              // Loop body code - NonLabelDoStmt and EndDoStmt code is generated here.
+              // Their genFIR calls are nops except for block management in some cases.
+              for (auto &e : *doConsEval.evaluationList)
+                genFIR(e);
+            },
+            [&](const Fortran::parser::OmpSsBlockConstruct &blockConstruct) {
+              for (auto &e : getEval().getNestedEvaluations())
+                genFIR(e);
+            },
+        },
+        oss.u);
+
+    localSymbols.popScope();
+    builder->restoreInsertionPoint(insertPt);
   }
 
   void genFIR(const Fortran::parser::OpenACCConstruct &acc) {
@@ -2651,6 +2761,7 @@ private:
   void genFIR(const Fortran::parser::IfThenStmt &) {}          // nop
   void genFIR(const Fortran::parser::NonLabelDoStmt &) {}      // nop
   void genFIR(const Fortran::parser::OmpEndLoopDirective &) {} // nop
+  void genFIR(const Fortran::parser::OSSEndLoopDirective &) {} // nop
 
   void genFIR(const Fortran::parser::NamelistStmt &) {
     TODO(toLocation(), "NamelistStmt lowering");

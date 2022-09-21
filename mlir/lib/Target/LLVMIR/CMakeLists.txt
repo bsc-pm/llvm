@@ -24,6 +24,7 @@ add_mlir_translation_library(MLIRTargetLLVMIRExport
   LINK_COMPONENTS
   Core
   FrontendOpenMP
+  FrontendOmpSs
   TransformUtils
 
   LINK_LIBS PUBLIC
@@ -43,6 +44,7 @@ add_mlir_translation_library(MLIRToLLVMIRTranslationRegistration
   MLIRX86VectorToLLVMIRTranslation
   MLIRLLVMToLLVMIRTranslation
   MLIRNVVMToLLVMIRTranslation
+  MLIROmpSsToLLVMIRTranslation
   MLIROpenACCToLLVMIRTranslation
   MLIROpenMPToLLVMIRTranslation
   MLIRROCDLToLLVMIRTranslation

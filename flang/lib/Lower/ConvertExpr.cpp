@@ -7809,6 +7809,53 @@ mlir::Value Fortran::lower::createSubroutineCall(
   return fir::getBase(res);
 }
 
+void Fortran::lower::emitOSSCopyExpr(
+    AbstractConverter &converter, const Fortran::semantics::Symbol &sym,
+    Fortran::lower::StatementContext &stmtCtx) {
+  Fortran::evaluate::Expr rhs{Fortran::evaluate::AsGenericExpr(sym).value()};
+  Fortran::evaluate::Expr lhs{Fortran::evaluate::AsGenericExpr(*sym.getOssAdditionalSym()).value()};
+  Fortran::lower::SymMap &symMap = converter.getLocalSymbols();
+  Fortran::lower::ExplicitIterSpace explicitIterSpace;
+  Fortran::lower::ImplicitIterSpace implicitIterSpace;
+  ArrayExprLowering::lowerAllocatableArrayAssignment(
+    converter, symMap, stmtCtx, lhs, rhs, explicitIterSpace, implicitIterSpace);
+}
+
+// TODO: place this in other place
+void Fortran::lower::fill_mapping(
+                      Fortran::lower::SymMap &localSymbols,
+                      const Fortran::evaluate::ProcedureRef &procRef,
+                      Fortran::lower::AbstractConverter &converter,
+                      Fortran::lower::SymMap &symMap,
+                      Fortran::lower::StatementContext &stmtCtx){
+  const auto *iface = procRef.proc().GetInterfaceSymbol();
+  const auto &dummies = iface->get<semantics::SubprogramDetails>().dummyArgs();
+  auto loc = converter.getCurrentLocation();
+
+  for (size_t i = 0; i < procRef.arguments().size(); ++i){
+    const auto *expr = procRef.arguments()[i]->UnwrapExpr();
+    auto argAddr = ScalarExprLowering{loc, converter, symMap, stmtCtx}.genExtAddr(*expr);
+    localSymbols.addSymbol(*dummies[i], argAddr);
+  }
+}
+
+// TODO: place this in other place
+llvm::SmallVector<mlir::Value> Fortran::lower::fillDSAs(
+                      Fortran::lower::CallerInterface &caller,
+                      Fortran::lower::AbstractConverter &converter,
+                      Fortran::lower::SymMap &symMap,
+                      Fortran::lower::StatementContext &stmtCtx){
+  llvm::SmallVector<mlir::Value> val_firstprivate;
+  for (const auto &arg : caller.getPassedArguments()) {
+    const auto *actual = arg.entity;
+    const auto *expr = actual->UnwrapExpr();
+    auto loc = converter.getCurrentLocation();
+    auto argAddr = ScalarExprLowering{loc, converter, symMap, stmtCtx}.genExtAddr(*expr);
+    val_firstprivate.push_back(fir::getBase(argAddr));
+  }
+  return val_firstprivate;
+}
+
 template <typename A>
 fir::ArrayLoadOp genArrayLoad(mlir::Location loc,
                               Fortran::lower::AbstractConverter &converter,

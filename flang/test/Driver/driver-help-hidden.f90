@@ -42,7 +42,7 @@
 ! CHECK-NEXT: -fno-automatic         Implies the SAVE attribute for non-automatic local objects in subprograms unless RECURSIVE
 ! CHECK-NEXT: -fno-color-diagnostics  Disable colors in diagnostics
 ! CHECK-NEXT: -fno-integrated-as     Disable the integrated assembler
-! CHECK-NEXT: -fompss-2              Enable OmpSs-2
+! CHECK-NEXT: -fompss-2              Parse OmpSs-2 pragmas and generate parallel code.
 ! CHECK-NEXT: -fopenacc              Enable OpenACC
 ! CHECK-NEXT: -fopenmp               Parse OpenMP pragmas and generate parallel code.
 ! CHECK-NEXT: -fsyntax-only          Run the preprocessor, parser and semantic analysis stages

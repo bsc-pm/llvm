@@ -90,7 +90,15 @@ protected:
     GetContext().associatedLoopLevel = level;
   }
   Symbol &MakeAssocSymbol(const SourceName &name, Symbol &prev, Scope &scope) {
-    const auto pair{scope.try_emplace(name, Attrs{}, HostAssocDetails{prev})};
+    const auto pair{scope.try_emplace(name, prev.attrs(), HostAssocDetails{prev})};
+    return *pair.first->second;
+  }
+  Symbol &OSSMakeAssocSymbol(
+      const SourceName &name, Symbol &prev, Scope &scope) {
+    const auto pair{scope.try_emplace(name, prev.attrs(), HostAssocDetails{prev})};
+    // Create a temporal symbol without inserting it in a scope
+    Symbol &tmpSym{scope.MakeSymbol(name, prev.attrs(), common::Clone(prev.details()))};
+    pair.first->second->set_ossAdditionalSym(tmpSym);
     return *pair.first->second;
   }
   Symbol &MakeAssocSymbol(const SourceName &name, Symbol &prev) {
@@ -114,6 +122,7 @@ protected:
   Symbol *DeclarePrivateAccessEntity(
       const parser::Name &, Symbol::Flag, Scope &);
   Symbol *DeclarePrivateAccessEntity(Symbol &, Symbol::Flag, Scope &);
+  Symbol *OSSDeclarePrivateAccessEntity(Symbol &, Symbol::Flag, Scope &);
   Symbol *DeclareOrMarkOtherAccessEntity(const parser::Name &, Symbol::Flag);
 
   UnorderedSymbolSet dataSharingAttributeObjects_; // on one directive
@@ -806,6 +815,8 @@ private:
   static constexpr Symbol::Flags dataSharingAttributeFlags{
       Symbol::Flag::OSSShared, Symbol::Flag::OSSPrivate,
       Symbol::Flag::OSSFirstPrivate};
+  static constexpr Symbol::Flags firstprivateAttributeFlags{
+      Symbol::Flag::OSSFirstPrivate};
 
   // Materialize DSAs computed from clauses.
   void MaterializeDSAs(DirContext &context);
@@ -885,6 +896,19 @@ Symbol *DirectiveAttributeVisitor<T>::DeclarePrivateAccessEntity(
       // The symbol in copyin clause must be threadprivate entity.
       symbol.set(Symbol::Flag::OmpThreadprivate);
     }
+    return &symbol;
+  } else {
+    object.set(flag);
+    return &object;
+  }
+}
+
+template <typename T>
+Symbol *DirectiveAttributeVisitor<T>::OSSDeclarePrivateAccessEntity(
+    Symbol &object, Symbol::Flag flag, Scope &scope) {
+  if (object.owner() != currScope()) {
+    auto &symbol{OSSMakeAssocSymbol(object.name(), object, scope)};
+    symbol.set(flag);
     return &symbol;
   } else {
     object.set(flag);
@@ -2224,9 +2248,8 @@ bool OSSOutlineVisitor::Pre(const parser::OmpSsOutlineTask &x){
 
   auto symbol = name.symbol;
   symbol->set(Symbol::Flag::OSSOutlineTask);
-  // auto *details{symbol->detailsIf<semantics::SubprogramDetails>()};
-  #pragma message("TODO: setOutlineTask was used in Bridge. We may rework this later so at this time we don't need this")
-  // details->setOutlineTask(stmt.statement);
+  auto *details{symbol->detailsIf<semantics::SubprogramDetails>()};
+  details->setOutlineTask(stmt.statement);
   scope_ = symbol->scope();
 
   Walk(simpleConstruct.t);
@@ -2243,9 +2266,8 @@ bool OSSOutlineVisitor::Pre(const parser::InterfaceBody::OmpSsIfaceOutlineTask &
 
   auto symbol = name.symbol;
   symbol->set(Symbol::Flag::OSSOutlineTask);
-  // auto *details{symbol->detailsIf<semantics::SubprogramDetails>()};
-  #pragma message("TODO: setOutlineTask was used in Bridge. We may rework this later so at this time we don't need this")
-  // details->setOutlineTask(stmt.statement);
+  auto *details{symbol->detailsIf<semantics::SubprogramDetails>()};
+  details->setOutlineTask(stmt.statement.value());
   scope_ = symbol->scope();
 
   Walk(simpleConstruct.t);
@@ -2695,7 +2717,9 @@ Symbol *OSSAttributeVisitor::ResolveOSS(
 
 Symbol *OSSAttributeVisitor::ResolveOSS(
     Symbol &symbol, Symbol::Flag ossFlag, Scope &scope) {
-  if (dataSharingAttributeFlags.test(ossFlag)) {
+  if (firstprivateAttributeFlags.test(ossFlag)) {
+    return OSSDeclarePrivateAccessEntity(symbol, ossFlag, scope);
+  } else if (dataSharingAttributeFlags.test(ossFlag)) {
     return DeclarePrivateAccessEntity(symbol, ossFlag, scope);
   }
   return nullptr;

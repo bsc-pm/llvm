@@ -28,6 +28,7 @@ class raw_ostream;
 }
 namespace Fortran::parser {
 struct Expr;
+struct OmpSsOutlineTaskConstruct;
 }
 
 namespace Fortran::semantics {
@@ -105,6 +106,8 @@ public:
   Symbol *moduleInterface() { return moduleInterface_; }
   const Symbol *moduleInterface() const { return moduleInterface_; }
   void set_moduleInterface(Symbol &);
+  void setOutlineTask(const parser::OmpSsOutlineTaskConstruct &x) { outlineTask_ = &x; }
+  const parser::OmpSsOutlineTaskConstruct *getOutlineTask() { return outlineTask_; }
 
 private:
   bool isInterface_{false}; // true if this represents an interface-body
@@ -117,6 +120,7 @@ private:
   // interface.  For MODULE PROCEDURE, this is the declared interface if it
   // appeared in an ancestor (sub)module.
   Symbol *moduleInterface_{nullptr};
+  const parser::OmpSsOutlineTaskConstruct *outlineTask_{nullptr};
 
   friend llvm::raw_ostream &operator<<(
       llvm::raw_ostream &, const SubprogramDetails &);
@@ -599,6 +603,11 @@ public:
   // Only allowed in certain cases.
   void set_details(Details &&);
 
+  void set_ossAdditionalSym(Symbol &sym) {
+    ossAdditionalSym_ = &sym;
+  }
+  Symbol *getOssAdditionalSym() const { return ossAdditionalSym_; }
+
   // Can the details of this symbol be replaced with the given details?
   bool CanReplaceDetails(const Details &details) const;
 
@@ -688,6 +697,7 @@ private:
   std::size_t size_{0}; // size in bytes
   std::size_t offset_{0}; // byte offset in scope or common block
   Details details_;
+  Symbol *ossAdditionalSym_{nullptr};
 
   Symbol() {} // only created in class Symbols
   const std::string GetDetailsName() const;

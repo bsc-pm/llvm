@@ -31,7 +31,8 @@ void Flang::AddFortranDialectOptions(const ArgList &Args,
                                      ArgStringList &CmdArgs) const {
   Args.AddAllArgs(
       CmdArgs, {options::OPT_ffixed_form, options::OPT_ffree_form,
-                options::OPT_ffixed_line_length_EQ, options::OPT_fopenmp,
+                options::OPT_ffixed_line_length_EQ, options::OPT_fompss,
+                options::OPT_fopenmp,
                 options::OPT_fopenacc, options::OPT_finput_charset_EQ,
                 options::OPT_fimplicit_none, options::OPT_fno_implicit_none,
                 options::OPT_fbackslash, options::OPT_fno_backslash,

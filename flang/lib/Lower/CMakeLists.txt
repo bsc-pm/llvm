@@ -16,6 +16,7 @@ add_flang_library(FortranLower
   IO.cpp
   IterationSpace.cpp
   Mangler.cpp
+  OmpSs.cpp
   OpenACC.cpp
   OpenMP.cpp
   PFTBuilder.cpp

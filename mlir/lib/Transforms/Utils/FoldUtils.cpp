@@ -30,6 +30,7 @@ getInsertionRegion(DialectInterfaceCollection<DialectFoldInterface> &interfaces,
     //  * The parent is a top-level operation.
     auto *parentOp = region->getParentOp();
     if (parentOp->mightHaveTrait<OpTrait::IsIsolatedFromAbove>() ||
+        parentOp->mightHaveTrait<OpTrait::IsNoFreeVariables>() ||
         !parentOp->getBlock())
       return region;
 

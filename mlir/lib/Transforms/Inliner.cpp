@@ -725,7 +725,8 @@ LogicalResult InlinerPass::optimizeSCC(CallGraph &cg, CGUseList &useList,
     // We also won't apply simplifications to nodes that can't have passes
     // scheduled on them.
     auto *region = node->getCallableRegion();
-    if (!region->getParentOp()->hasTrait<OpTrait::IsIsolatedFromAbove>())
+    if (!region->getParentOp()->hasTrait<OpTrait::IsIsolatedFromAbove>() ||
+        !region->getParentOp()->hasTrait<OpTrait::IsNoFreeVariables>())
       continue;
     nodesToVisit.push_back(node);
   }

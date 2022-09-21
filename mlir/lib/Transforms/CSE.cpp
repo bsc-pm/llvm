@@ -258,7 +258,8 @@ void CSE::simplifyBlock(ScopedMapTy &knownValues, Block *bb,
     // If this operation is isolated above, we can't process nested regions with
     // the given 'knownValues' map. This would cause the insertion of implicit
     // captures in explicit capture only regions.
-    if (op.mightHaveTrait<OpTrait::IsIsolatedFromAbove>()) {
+    if (op.mightHaveTrait<OpTrait::IsIsolatedFromAbove>() ||
+        op.mightHaveTrait<OpTrait::IsNoFreeVariables>()) {
       ScopedMapTy nestedKnownValues;
       for (auto &region : op.getRegions())
         simplifyRegion(nestedKnownValues, region);

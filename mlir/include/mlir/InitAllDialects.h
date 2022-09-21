@@ -42,6 +42,7 @@
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
+#include "mlir/Dialect/OmpSs/OmpSsDialect.h"
 #include "mlir/Dialect/OpenACC/OpenACC.h"
 #include "mlir/Dialect/OpenMP/OpenMPDialect.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
@@ -92,6 +93,7 @@ inline void registerAllDialects(DialectRegistry &registry) {
                   ml_program::MLProgramDialect,
                   nvgpu::NVGPUDialect,
                   scf::SCFDialect,
+                  oss::OmpSsDialect,
                   omp::OpenMPDialect,
                   pdl::PDLDialect,
                   pdl_interp::PDLInterpDialect,

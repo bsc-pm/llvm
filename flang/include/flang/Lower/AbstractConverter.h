@@ -55,6 +55,8 @@ class DerivedTypeSpec;
 } // namespace semantics
 
 namespace lower {
+class SymMap;
+struct SymbolBox;
 namespace pft {
 struct Variable;
 }
@@ -72,6 +74,9 @@ class StatementContext;
 /// MLIR.
 class AbstractConverter {
 public:
+  // TODO: huge hacks
+  virtual Fortran::lower::SymMap &getLocalSymbols() = 0;
+  virtual fir::ExtendedValue getExtended(Fortran::lower::SymbolBox) = 0;
   //===--------------------------------------------------------------------===//
   // Symbols
   //===--------------------------------------------------------------------===//

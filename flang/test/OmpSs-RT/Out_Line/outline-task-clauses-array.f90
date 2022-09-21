@@ -1,0 +1,33 @@
+! RUN: %oss-compile-and-run
+
+! <testinfo>
+! test_generator=config/mercurium-nanos6-regions
+! </testinfo>
+
+!$OSS TASK INOUT(X)
+SUBROUTINE S1(X)
+  IMPLICIT NONE
+  INTEGER :: X(10)
+  X = 2
+END SUBROUTINE S1
+
+MODULE MOO
+CONTAINS
+  !$OSS TASK INOUT(X)
+  SUBROUTINE S2(X)
+    IMPLICIT NONE
+    INTEGER :: X(10)
+    X = 3
+  END SUBROUTINE S2
+END MODULE MOO
+
+PROGRAM MAIN
+  USE MOO, ONLY : S2
+  IMPLICIT NONE
+  INTEGER :: X(10)
+  X = 1
+  CALL S1(X)
+  CALL S2(X)
+  !$OSS TASKWAIT
+  IF (ANY(X /= 3)) STOP "ERROR"
+END PROGRAM MAIN 

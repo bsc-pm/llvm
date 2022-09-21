@@ -1123,6 +1123,54 @@ LogicalResult OpTrait::impl::verifyIsIsolatedFromAbove(Operation *isolatedOp) {
   return success();
 }
 
+LogicalResult OpTrait::impl::verifyIsNoFreeVariables(Operation *isolatedOp) {
+  assert(isolatedOp->hasTrait<OpTrait::IsNoFreeVariables>() &&
+         "Intended to check NoFreeVariables ops");
+
+  ValueRange outerOperands = isolatedOp->getOperands();
+
+  // List of regions to analyze.  Each region is processed independently, with
+  // respect to the common `limit` region, so we can look at them in any order.
+  // Therefore, use a simple vector and push/pop back the current region.
+  SmallVector<Region *, 8> pendingRegions;
+  for (auto &region : isolatedOp->getRegions()) {
+    pendingRegions.push_back(&region);
+
+    // Traverse all operations in the region.
+    while (!pendingRegions.empty()) {
+      for (Operation &op : pendingRegions.pop_back_val()->getOps()) {
+        for (Value operand : op.getOperands()) {
+          bool inOuter =
+            std::find(outerOperands.begin(), outerOperands.end(), operand)
+            != outerOperands.end();
+
+          // Check that any value that is used by an operation is defined in the
+          // same region as either an operation result.
+          auto *operandRegion = operand.getParentRegion();
+          if (!operandRegion)
+            return op.emitError("operation's operand is unlinked");
+          if (!region.isAncestor(operandRegion) && !inOuter) {
+            return op.emitOpError("using value defined outside the region")
+                       .attachNote(isolatedOp->getLoc())
+                   << "required by region isolation constraints";
+          }
+        }
+
+        // Schedule any regions in the operation for further checking.  Don't
+        // recurse into other IsolatedFromAbove ops, because they will check
+        // themselves.
+        if (op.getNumRegions() &&
+            !op.hasTrait<OpTrait::IsNoFreeVariables>()) {
+          for (Region &subRegion : op.getRegions())
+            pendingRegions.push_back(&subRegion);
+        }
+      }
+    }
+  }
+
+  return success();
+}
+
 bool OpTrait::hasElementwiseMappableTraits(Operation *op) {
   return op->hasTrait<Elementwise>() && op->hasTrait<Scalarizable>() &&
          op->hasTrait<Vectorizable>() && op->hasTrait<Tensorizable>();

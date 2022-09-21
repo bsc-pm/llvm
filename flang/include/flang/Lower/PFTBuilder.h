@@ -135,7 +135,8 @@ using Constructs =
                parser::ForallConstruct>;
 
 using Directives =
-    std::tuple<parser::CompilerDirective, parser::OpenACCConstruct,
+    std::tuple<parser::CompilerDirective, parser::OmpSsConstruct,
+               parser::OSSEndLoopDirective, parser::OpenACCConstruct,
                parser::OpenACCDeclarativeConstruct, parser::OpenMPConstruct,
                parser::OpenMPDeclarativeConstruct, parser::OmpEndLoopDirective>;
 
@@ -176,8 +177,8 @@ static constexpr bool isNopConstructStmt{common::HasMember<
 
 template <typename A>
 static constexpr bool isExecutableDirective{common::HasMember<
-    A, std::tuple<parser::CompilerDirective, parser::OpenACCConstruct,
-                  parser::OpenMPConstruct>>};
+    A, std::tuple<parser::CompilerDirective, parser::OmpSsConstruct,
+                  parser::OpenACCConstruct, parser::OpenMPConstruct>>};
 
 template <typename A>
 static constexpr bool isFunctionLike{common::HasMember<

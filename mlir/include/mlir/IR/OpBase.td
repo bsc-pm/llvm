@@ -1803,6 +1803,9 @@ def Involution : NativeOpTrait<"IsInvolution">;
 def ConstantLike : NativeOpTrait<"ConstantLike">;
 // Op is isolated from above.
 def IsolatedFromAbove : NativeOpTrait<"IsIsolatedFromAbove">;
+// Op has no SSA values from any other Region than it own one
+// or Op parameters. Also can use values from symbols.
+def NoFreeVariables : NativeOpTrait<"IsNoFreeVariables">;
 // Op results are float or vectors/tensors thereof.
 def ResultsAreFloatLike : NativeOpTrait<"ResultsAreFloatLike">;
 // Op has the same operand type.

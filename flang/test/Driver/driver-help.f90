@@ -40,7 +40,7 @@
 ! HELP-NEXT: -fno-automatic         Implies the SAVE attribute for non-automatic local objects in subprograms unless RECURSIVE
 ! HELP-NEXT: -fno-color-diagnostics  Disable colors in diagnostics
 ! HELP-NEXT: -fno-integrated-as      Disable the integrated assembler
-! HELP-NEXT: -fompss-2              Enable OmpSs-2
+! HELP-NEXT: -fompss-2              Parse OmpSs-2 pragmas and generate parallel code.
 ! HELP-NEXT: -fopenacc              Enable OpenACC
 ! HELP-NEXT: -fopenmp               Parse OpenMP pragmas and generate parallel code.
 ! HELP-NEXT: -fsyntax-only          Run the preprocessor, parser and semantic analysis stages
@@ -119,7 +119,7 @@
 ! HELP-FC1-NEXT: -fno-automatic         Implies the SAVE attribute for non-automatic local objects in subprograms unless RECURSIVE
 ! HELP-FC1-NEXT: -fno-debug-pass-manager Disables debug printing for the new pass manager
 ! HELP-FC1-NEXT: -fno-reformat          Dump the cooked character stream in -E mode
-! HELP-FC1-NEXT: -fompss-2              Enable OmpSs-2
+! HELP-FC1-NEXT: -fompss-2              Parse OmpSs-2 pragmas and generate parallel code.
 ! HELP-FC1-NEXT: -fopenacc              Enable OpenACC
 ! HELP-FC1-NEXT: -fopenmp               Parse OpenMP pragmas and generate parallel code.
 ! HELP-FC1-NEXT: -fsyntax-only          Run the preprocessor, parser and semantic analysis stages

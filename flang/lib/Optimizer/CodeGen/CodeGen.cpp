@@ -26,8 +26,10 @@
 #include "mlir/Conversion/MathToFuncs/MathToFuncs.h"
 #include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
 #include "mlir/Conversion/MathToLibm/MathToLibm.h"
+#include "mlir/Conversion/OmpSsToLLVM/ConvertOmpSsToLLVM.h"
 #include "mlir/Conversion/OpenMPToLLVM/ConvertOpenMPToLLVM.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/OmpSs/OmpSsDialect.h"
 #include "mlir/Dialect/OpenMP/OpenMPDialect.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
@@ -1077,16 +1079,20 @@ template <typename OP>
 struct EmboxCommonConversion : public FIROpConversion<OP> {
   using FIROpConversion<OP>::FIROpConversion;
 
-  // Find the LLVMFuncOp in whose entry block the alloca should be inserted.
+  // Find the Block in LLVMFuncOp where the alloca should be inserted.
+  // NOTE: OmpSs-2 directives have priority.
   // The order to find the LLVMFuncOp is as follows:
   // 1. The parent operation of the current block if it is a LLVMFuncOp.
   // 2. The first ancestor that is a LLVMFuncOp.
-  mlir::LLVM::LLVMFuncOp
-  getFuncForAllocaInsert(mlir::ConversionPatternRewriter &rewriter) const {
+  mlir::Block *
+  getBlockForAllocaInsert(mlir::ConversionPatternRewriter &rewriter) const {
     mlir::Operation *parentOp = rewriter.getInsertionBlock()->getParentOp();
+    if (auto ifaceOss =
+        mlir::dyn_cast<mlir::oss::OutlineableOmpSsOpInterface>(parentOp))
+      return ifaceOss.getAllocaBlock();
     return mlir::isa<mlir::LLVM::LLVMFuncOp>(parentOp)
-               ? mlir::cast<mlir::LLVM::LLVMFuncOp>(parentOp)
-               : parentOp->getParentOfType<mlir::LLVM::LLVMFuncOp>();
+               ? &mlir::cast<mlir::LLVM::LLVMFuncOp>(parentOp).front()
+               : &parentOp->getParentOfType<mlir::LLVM::LLVMFuncOp>().front();
   }
 
   // Generate an alloca of size 1 and type \p toTy.
@@ -1094,8 +1100,8 @@ struct EmboxCommonConversion : public FIROpConversion<OP> {
   genAllocaWithType(mlir::Location loc, mlir::Type toTy, unsigned alignment,
                     mlir::ConversionPatternRewriter &rewriter) const {
     auto thisPt = rewriter.saveInsertionPoint();
-    mlir::LLVM::LLVMFuncOp func = getFuncForAllocaInsert(rewriter);
-    rewriter.setInsertionPointToStart(&func.front());
+    mlir::Block *block = getBlockForAllocaInsert(rewriter);
+    rewriter.setInsertionPointToStart(block);
     auto size = this->genI32Constant(loc, rewriter, 1);
     auto al = rewriter.create<mlir::LLVM::AllocaOp>(loc, toTy, size, alignment);
     rewriter.restoreInsertionPoint(thisPt);
@@ -3341,6 +3347,7 @@ public:
         XEmboxOpConversion, XReboxOpConversion, ZeroOpConversion>(typeConverter,
                                                                   options);
     mlir::populateFuncToLLVMConversionPatterns(typeConverter, pattern);
+    mlir::populateOmpSsToLLVMConversionPatterns(typeConverter, pattern);
     mlir::populateOpenMPToLLVMConversionPatterns(typeConverter, pattern);
     mlir::arith::populateArithmeticToLLVMConversionPatterns(typeConverter,
                                                             pattern);
@@ -3352,6 +3359,7 @@ public:
     mlir::populateMathToLibmConversionPatterns(pattern, /*benefit=*/0);
     mlir::ConversionTarget target{*context};
     target.addLegalDialect<mlir::LLVM::LLVMDialect>();
+    mlir::configureOmpSsToLLVMConversionLegality(target, typeConverter);
     // The OpenMP dialect is legal for Operations without regions, for those
     // which contains regions it is legal if the region contains only the
     // LLVM dialect. Add OpenMP dialect as a legal dialect for conversion and
