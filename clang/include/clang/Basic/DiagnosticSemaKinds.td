@@ -11466,6 +11466,8 @@ def err_oss_expected_base_var_name : Error<
 def err_oss_reduction_wrong_type : Error<"reduction type cannot be %select{qualified with 'const', 'volatile' or 'restrict'|a function|a reference|an array}0 type">;
 def err_oss_declare_reduction_redefinition : Error<"redefinition of user-defined reduction for type %0">;
 
+def err_oss_global_variable : Error<
+  "global variables are not allowed here">;
 def err_oss_non_const_variable : Error<
   "this variable cannot be used here">;
 def err_oss_const_variable : Error<
