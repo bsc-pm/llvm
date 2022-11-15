@@ -3305,14 +3305,6 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       EmitDependency(getBundleStr(OSSB_weakcommutative), CGF, FD, Dep, TaskInfo);
     }
 
-    for (const Expr *E : OutlineGlobalVarVisitor.getSharedGlobals()) {
-      SmallVector<llvm::Value *> DSABundleList;
-      llvm::Value *DSAValue = CGF.EmitLValue(E).getPointer(CGF);
-      DSABundleList.push_back(DSAValue);
-      DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(E->getType())));
-      TaskInfo.emplace_back(getBundleStr(OSSB_shared), DSABundleList);
-    }
-
     assert(Attr->reductions_size() == Attr->reductionLHSs_size() &&
            Attr->reductions_size() == Attr->reductionRHSs_size() &&
            Attr->reductions_size() == Attr->reductionOps_size() &&
@@ -3332,6 +3324,9 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
         const Expr *LHS = *(reductionLHSs_it++);
         const Expr *RHS = *(reductionRHSs_it++);
         const Expr *ReductionOp = *(reductionOps_it++);
+
+        OutlineGlobalVarVisitor.Visit(Ref);
+
         BinaryOperatorKind ReductionKind = (BinaryOperatorKind)*(reductionKinds_it++);
         OSSReductionDataTy Red{Ref, LHS, RHS, ReductionOp, ReductionKind};
         EmitReduction(getBundleStr(CKind == OSSC_weakreduction ? OSSB_weakreduction : OSSB_reduction),
@@ -3340,6 +3335,15 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
                       CGF, FD, Red, TaskInfo);
       }
     }
+
+    for (const Expr *E : OutlineGlobalVarVisitor.getSharedGlobals()) {
+      SmallVector<llvm::Value *> DSABundleList;
+      llvm::Value *DSAValue = CGF.EmitLValue(E).getPointer(CGF);
+      DSABundleList.push_back(DSAValue);
+      DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(E->getType())));
+      TaskInfo.emplace_back(getBundleStr(OSSB_shared), DSABundleList);
+    }
+
     if (!CapturedList.empty())
       TaskInfo.emplace_back(getBundleStr(OSSB_captured), CapturedList);
 

@@ -2502,8 +2502,8 @@ static bool checkDependency(Sema &S, Expr *RefExpr, bool OSSSyntax, bool Outline
       S.Diag(ELoc, diag::err_oss_expected_addressable_lvalue_or_array_item)
           << RefExpr->getSourceRange();
     else
-      S.Diag(ELoc, diag::err_oss_expected_lvalue_reference_dereference_or_array_item)
-          << RefExpr->getSourceRange();
+      S.Diag(ELoc, diag::err_oss_expected_lvalue_reference_or_global_or_dereference_or_array_item)
+          << 0 << RefExpr->getSourceRange();
     return false;
   }
 
@@ -2511,8 +2511,8 @@ static bool checkDependency(Sema &S, Expr *RefExpr, bool OSSSyntax, bool Outline
     if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(RefExpr->IgnoreParenImpCasts())) {
       if (const VarDecl *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
         if (!(VD->getType()->isReferenceType() || VD->hasGlobalStorage())) {
-          S.Diag(ELoc, diag::err_oss_expected_lvalue_reference_dereference_or_array_item)
-              << DRE->getSourceRange();
+          S.Diag(ELoc, diag::err_oss_expected_lvalue_reference_or_global_or_dereference_or_array_item)
+              << 0 << DRE->getSourceRange();
           return false;
         }
       }
@@ -2669,7 +2669,7 @@ static bool actOnOSSReductionKindClause(
     Sema &S, DSAStackTy *Stack, OmpSsClauseKind ClauseKind,
     ArrayRef<Expr *> VarList, CXXScopeSpec &ReductionIdScopeSpec,
     const DeclarationNameInfo &ReductionId, ArrayRef<Expr *> UnresolvedReductions,
-    ReductionData &RD);
+    ReductionData &RD, bool Outline);
 
 Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     DeclGroupPtrTy DG,
@@ -2900,11 +2900,12 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     if (UnresolvedReductions.empty()) {
       actOnOSSReductionKindClause(
         *this, DSAStack, CKind, TmpList, ScopeSpec, ReductionIds[i],
-        llvm::None, RD);
+        llvm::None, RD, /*Outline=*/true);
     } else {
       actOnOSSReductionKindClause(
         *this, DSAStack, CKind, TmpList, ScopeSpec, ReductionIds[i],
-        ArrayRef<Expr *>(UnresolvedReductions_it, UnresolvedReductions_it + ReductionListSizes[i]), RD);
+        ArrayRef<Expr *>(UnresolvedReductions_it, UnresolvedReductions_it + ReductionListSizes[i]),
+        RD, /*Outline=*/true);
     }
 
     for (Expr *RefExpr : TmpList)
@@ -3472,7 +3473,7 @@ static bool actOnOSSReductionKindClause(
     Sema &S, DSAStackTy *Stack, OmpSsClauseKind ClauseKind,
     ArrayRef<Expr *> VarList, CXXScopeSpec &ReductionIdScopeSpec,
     const DeclarationNameInfo &ReductionId, ArrayRef<Expr *> UnresolvedReductions,
-    ReductionData &RD) {
+    ReductionData &RD, bool Outline) {
   DeclarationName DN = ReductionId.getName();
   OverloadedOperatorKind OOK = DN.getCXXOverloadedOperator();
   BinaryOperatorKind BOK = BO_Comma;
@@ -3623,6 +3624,18 @@ static bool actOnOSSReductionKindClause(
     if (!Type.isPODType(S.Context)) {
       S.Diag(ELoc, diag::err_oss_non_pod_reduction);
       continue;
+    }
+
+    if (Outline) {
+      if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(RefExpr->IgnoreParenImpCasts())) {
+        if (const VarDecl *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+          if (!(VD->getType()->isReferenceType() || VD->hasGlobalStorage())) {
+            S.Diag(ELoc, diag::err_oss_expected_lvalue_reference_or_global_or_dereference_or_array_item)
+              << 1 << DRE->getSourceRange();
+            return false;
+          }
+        }
+      }
     }
 
     // Try to find 'declare reduction' corresponding construct before using
@@ -3854,7 +3867,7 @@ Sema::ActOnOmpSsReductionClause(OmpSsClauseKind Kind, ArrayRef<Expr *> VarList,
   ReductionData RD(VarList.size());
   if (actOnOSSReductionKindClause(*this, DSAStack, Kind, VarList,
                                   ReductionIdScopeSpec, ReductionId,
-                                  UnresolvedReductions, RD))
+                                  UnresolvedReductions, RD, /*Outline=*/false))
     return nullptr;
   return OSSReductionClause::Create(
       Context, StartLoc, LParenLoc, ColonLoc, EndLoc, RD.Vars,
