@@ -492,12 +492,13 @@ public:
     }
   }
 
-  void VisitLambdaExpr(LambdaExpr *E) {
-    CXXMethodDecl *MD = E->getCallOperator();
+  void VisitLambdaExpr(LambdaExpr *LE) {
+    CXXMethodDecl *MD = LE->getCallOperator();
     for (ParmVarDecl *param : MD->parameters()) {
       InnerDecls.insert(param);
     }
-    Visit(E->getCompoundStmtBody());
+    for (Expr *E : LE->capture_inits())
+      Visit(E);
   }
 
   void VisitCXXCatchStmt(CXXCatchStmt *Node) {
