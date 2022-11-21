@@ -11909,9 +11909,10 @@ public:
   ExprResult
   CheckNonNegativeIntegerValue(Expr *ValExpr,
                                OmpSsClauseKind CKind,
-                               bool StrictlyPositive);
+                               bool StrictlyPositive,
+                               bool Outline);
   ExprResult
-  CheckSignedIntegerValue(Expr *ValExpr);
+  CheckSignedIntegerValue(Expr *ValExpr, bool Outline);
   ExprResult
   CheckIsConstCharPtrConvertibleExpr(Expr *E, bool ConstConstraint = false);
   ExprResult
