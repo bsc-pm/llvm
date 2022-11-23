@@ -383,6 +383,8 @@ CMAKE_INVOCATION_EXTRA_FLAGS+=("${LIT_ARGS}")
 if [ "${ENABLE_SANITIZER}" = 1 ];
 then
   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_USE_SANITIZER=Address;Undefined")
+  # We only run sanitizers on X86, so try to shave as much compilation time as possible
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_TARGETS_TO_BUILD=X86")
 fi
 
 ################################################################################
