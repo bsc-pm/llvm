@@ -1593,7 +1593,9 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
 #endif
   // TODO: What would be the balance between the conditions in the function and
   // an atomic operation?
-  if (__kmp_track_children_task(taskdata)) {
+  kmp_task_team_t *task_team =
+      thread->th.th_task_team; // might be NULL for serial teams...
+  if (__kmp_track_children_task(taskdata) || (task_team && task_team->tt.tt_found_proxy_tasks)) {
     KMP_ATOMIC_INC(&parent_task->td_incomplete_child_tasks);
     if (parent_task->td_taskgroup)
       KMP_ATOMIC_INC(&parent_task->td_taskgroup->count);
