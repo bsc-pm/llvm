@@ -92,10 +92,12 @@ bool GenerateHeaderIncludeBlock(Callable &&Diag, llvm::raw_ostream &outputFile,
 
 template <class Callable>
 bool GeneratePragmaOSS(Callable &&Diag, llvm::raw_ostream &outputFile,
-                       FunctionDecl *FD, LangOptions const &LO) {
-  outputFile << "#pragma oss";
-  FD->getAttr<OSSTaskDeclAttr>()->printPrettyPragma(outputFile,
-                                                    PrintingPolicy(LO));
+                       FunctionDecl *FD, SourceManager &SourceMgr) {
+  outputFile << "#pragma ";
+  auto range = FD->getAttr<OSSTaskDeclAttr>()->getRange();
+  outputFile << llvm::StringRef(SourceMgr.getCharacterData(range.getBegin()),
+                                SourceMgr.getFileOffset(range.getEnd()) -
+                                    SourceMgr.getFileOffset(range.getBegin()));
   outputFile << "\n";
   return true;
 }
@@ -154,7 +156,7 @@ bool Sema::ActOnOmpSsDeclareTaskDirectiveWithFpga(Decl *ADecl) {
   auto [start, end] = std::pair{range.getBegin(), range.getEnd()};
 
   return GenerateHeaderIncludeBlock(diag, outputFile, PP, SourceMgr, start) &&
-         GeneratePragmaOSS(diag, outputFile, FD, LangOpts) &&
+         GeneratePragmaOSS(diag, outputFile, FD, SourceMgr) &&
          GenerateOriginalFuncionBody(diag, outputFile, FD, funcName, start, end,
                                      SourceMgr);
 }
