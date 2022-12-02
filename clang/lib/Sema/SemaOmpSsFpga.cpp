@@ -20,10 +20,12 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclOmpSs.h"
+#include "clang/AST/PrettyPrinter.h"
 #include "clang/AST/StmtCXX.h"
 #include "clang/AST/StmtOmpSs.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/Basic/FileManager.h"
+#include "clang/Basic/LangOptions.h"
 #include "clang/Basic/OmpSsKinds.h"
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Basic/SourceManager.h"
@@ -89,6 +91,16 @@ bool GenerateHeaderIncludeBlock(Callable &&Diag, llvm::raw_ostream &outputFile,
 }
 
 template <class Callable>
+bool GeneratePragmaOSS(Callable &&Diag, llvm::raw_ostream &outputFile,
+                       FunctionDecl *FD, LangOptions const &LO) {
+  outputFile << "#pragma oss";
+  FD->getAttr<OSSTaskDeclAttr>()->printPrettyPragma(outputFile,
+                                                    PrintingPolicy(LO));
+  outputFile << "\n";
+  return true;
+}
+
+template <class Callable>
 bool GenerateOriginalFuncionBody(Callable &&Diag, llvm::raw_ostream &outputFile,
                                  FunctionDecl *FD, llvm::StringRef funcName,
                                  SourceLocation start, SourceLocation end,
@@ -142,6 +154,7 @@ bool Sema::ActOnOmpSsDeclareTaskDirectiveWithFpga(Decl *ADecl) {
   auto [start, end] = std::pair{range.getBegin(), range.getEnd()};
 
   return GenerateHeaderIncludeBlock(diag, outputFile, PP, SourceMgr, start) &&
+         GeneratePragmaOSS(diag, outputFile, FD, LangOpts) &&
          GenerateOriginalFuncionBody(diag, outputFile, FD, funcName, start, end,
                                      SourceMgr);
 }
