@@ -14,6 +14,7 @@
 #include "TreeTransform.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/ASTMutationListener.h"
+#include "clang/AST/Attrs.inc"
 #include "clang/AST/CXXInheritance.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
@@ -4602,6 +4603,22 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     SR);
   ADecl->dropAttr<OSSTaskDeclSentinelAttr>();
   ADecl->addAttr(NewAttr);
+  switch (OSSTaskDeclAttr::DeviceType(Device)) {
+  case OSSTaskDeclAttr::Fpga:
+    if (!ActOnOmpSsDeclareTaskDirectiveWithFpga(ADecl)) {
+      ADecl->dropAttr<OSSTaskDeclAttr>(); // The target device does not support
+                                          // this kind of function. Let's
+                                          // generate a normal function, and
+                                          // assume that the Act function has
+                                          // emitted errors.
+    }
+    break;
+  case OSSTaskDeclAttr::Smp:
+  case OSSTaskDeclAttr::Cuda:
+  case OSSTaskDeclAttr::Opencl:
+  case OSSTaskDeclAttr::Unknown:
+    break;
+  }
   return DG;
 }
 
