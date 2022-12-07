@@ -1125,28 +1125,29 @@ private:
     // Check if is outline task
     const Fortran::parser::Call &call{stmt.v};
     const auto &designator{std::get<Fortran::parser::ProcedureDesignator>(call.t)};
-    const auto &name{std::get<Fortran::parser::Name>(designator.u)};
-    auto &ultimate{name.symbol->GetUltimate()};
-    if (ultimate.test(Fortran::semantics::Symbol::Flag::OSSOutlineTask)) {
-      auto *details{ultimate.detailsIf<Fortran::semantics::SubprogramDetails>()};
-      const auto *outlineTask{details->getOutlineTask()};
+    if (const auto *name{std::get_if<Fortran::parser::Name>(&designator.u)}) {
+      auto &ultimate{name->symbol->GetUltimate()};
+      if (ultimate.test(Fortran::semantics::Symbol::Flag::OSSOutlineTask)) {
+        auto *details{ultimate.detailsIf<Fortran::semantics::SubprogramDetails>()};
+        const auto *outlineTask{details->getOutlineTask()};
 
-      auto insertPt = builder->saveInsertionPoint();
-      localSymbols.pushScope();
+        auto insertPt = builder->saveInsertionPoint();
+        localSymbols.pushScope();
 
-      genOmpSsTaskSubroutine(*this,
-          const_cast<Fortran::semantics::SemanticsContext&>(bridge.getSemanticsContext()),
-          *stmt.typedCall, localSymbols, stmtCtx, eval, *outlineTask);
-      // Call statement lowering shares code with function call lowering.
-      mlir::Value res = Fortran::lower::createSubroutineCall(
-          *this, *stmt.typedCall, explicitIterSpace, implicitIterSpace,
-          localSymbols, stmtCtx, /*isUserDefAssignment=*/false);
-      if (res)
-        llvm_unreachable("Unexpected call");
+        genOmpSsTaskSubroutine(*this,
+            const_cast<Fortran::semantics::SemanticsContext&>(bridge.getSemanticsContext()),
+            *stmt.typedCall, localSymbols, stmtCtx, eval, *outlineTask);
+        // Call statement lowering shares code with function call lowering.
+        mlir::Value res = Fortran::lower::createSubroutineCall(
+            *this, *stmt.typedCall, explicitIterSpace, implicitIterSpace,
+            localSymbols, stmtCtx, /*isUserDefAssignment=*/false);
+        if (res)
+          llvm_unreachable("Unexpected call");
 
-      localSymbols.popScope();
-      builder->restoreInsertionPoint(insertPt);
-      return;
+        localSymbols.popScope();
+        builder->restoreInsertionPoint(insertPt);
+        return;
+      }
     }
 
     mlir::Value res{};
