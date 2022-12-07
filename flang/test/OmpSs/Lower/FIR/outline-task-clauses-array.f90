@@ -34,12 +34,12 @@ END PROGRAM MAIN
 
 !FIRDialect:  %[[DEP_0:.*]] = oss.dependency base(%[[VAR_X]] : !fir.ref<!fir.array<10xi32>>) function(@compute.dep0) arguments(%[[VAR_X]] : !fir.ref<!fir.array<10xi32>>) -> i32
 !FIRDialect-NEXT:  oss.task shared(%[[VAR_X]] : !fir.ref<!fir.array<10xi32>>) inout(%[[DEP_0]] : i32)
-!FIRDialect-NEXT:  fir.call @_QPs1(%[[VAR_X]]) : (!fir.ref<!fir.array<10xi32>>) -> ()
+!FIRDialect-NEXT:  fir.call @_QPs1(%[[VAR_X]]) fastmath<contract> : (!fir.ref<!fir.array<10xi32>>) -> ()
 !FIRDialect-NEXT:  oss.terminator
 
 !FIRDialect:  %[[DEP_1:.*]] = oss.dependency base(%[[VAR_X]] : !fir.ref<!fir.array<10xi32>>) function(@compute.dep1) arguments(%[[VAR_X]] : !fir.ref<!fir.array<10xi32>>) -> i32
 !FIRDialect-NEXT:  oss.task shared(%[[VAR_X]] : !fir.ref<!fir.array<10xi32>>) inout(%[[DEP_1]] : i32)
-!FIRDialect-NEXT:  fir.call @_QMmooPs2(%[[VAR_X]]) : (!fir.ref<!fir.array<10xi32>>) -> ()
+!FIRDialect-NEXT:  fir.call @_QMmooPs2(%[[VAR_X]]) fastmath<contract> : (!fir.ref<!fir.array<10xi32>>) -> ()
 !FIRDialect-NEXT:  oss.terminator
 
 !FIRDialect-LABEL: func @compute.dep0(%arg0: !fir.ref<!fir.array<10xi32>>) -> (!fir.ref<!fir.array<10xi32>>, i64, i64, i64)

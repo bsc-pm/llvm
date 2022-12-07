@@ -21,7 +21,7 @@ END PROGRAM
 ! This tests checks allocas inside the directive
 
 !LLVMIR: %{{.*}} = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00")
-!LLVMIR:  br label %oss.taskfor.region, !dbg !10
+!LLVMIR:  br label %oss.taskfor.region
 !LLVMIR: oss.taskfor.region:                               ; preds = %0
-!LLVMIR:   %{{.*}} = alloca i32, i64 1, align 4, !dbg !12
+!LLVMIR:   %{{.*}} = alloca i32, i64 1, align 4
 

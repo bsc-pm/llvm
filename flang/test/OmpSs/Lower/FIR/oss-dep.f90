@@ -75,9 +75,9 @@ end program
 
 !FIRDialect-LABEL: func @_QQmain()
 !FIRDialect:  %[[VAR_ARRAY:.*]] = fir.address_of(@_QFEarray) : !fir.ref<!fir.array<10xi32>>
-!FIRDialect:  %[[VAR_ARRAY1:.*]] = fir.address_of(@_QFEarray1) : !fir.ref<!fir.array<6xi32>>
+!FIRDialect:  %[[VAR_ARRAY1:.*]] = fir.alloca !fir.array<6xi32> {bindc_name = "array1", uniq_name = "_QFEarray1"}
 !FIRDialect:  %[[VAR_I:.*]] = fir.alloca i32 {bindc_name = "i", uniq_name = "_QFEi"}
-!FIRDialect:  %[[VAR_T:.*]] = fir.alloca !fir.type<_QFTty{x:i32,array:!fir.array<10xi32>}> {bindc_name = "t", uniq_name = "_QFEt"}
+!FIRDialect:  %[[VAR_T:.*]] = fir.address_of(@_QFEt) : !fir.ref<!fir.type<_QFTty{x:i32,array:!fir.array<10xi32>}>>
 !FIRDialect:  %[[DEP_0:.*]] = oss.dependency base(%[[VAR_I]] : !fir.ref<i32>) function(@compute.dep0) arguments(%[[VAR_I]] : !fir.ref<i32>) -> i32
 !FIRDialect:  oss.task_for
 !FIRDialect-SAME:  shared(%[[VAR_I]] : !fir.ref<i32>)

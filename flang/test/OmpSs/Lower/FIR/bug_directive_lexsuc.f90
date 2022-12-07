@@ -33,7 +33,7 @@ END PROGRAM P
 !FIRDialect-NEXT:  %[[CONSTANT_1_0:.*]] = arith.constant 1 : i32
 !FIRDialect-NEXT:  %[[FALSE_0:.*]] = arith.constant false
 !FIRDialect-NEXT:  %[[FALSE_1:.*]] = arith.constant false
-!FIRDialect-NEXT:  %[[STOP:.*]] = fir.call @_FortranAStopStatement(%[[CONSTANT_1_0]], %[[FALSE_0]], %[[FALSE_1]]) : (i32, i1, i1) -> none
+!FIRDialect-NEXT:  %[[STOP:.*]] = fir.call @_FortranAStopStatement(%[[CONSTANT_1_0]], %[[FALSE_0]], %[[FALSE_1]]) fastmath<contract> : (i32, i1, i1) -> none
 !FIRDialect-NEXT:  fir.unreachable
 !FIRDialect: ^bb2:  // pred: ^bb0
 !FIRDialect-NEXT:  oss.task
