@@ -27,6 +27,7 @@
 
 // RUN: %oss-compile-and-run
 // RUN: %oss-O2-compile-and-run
+// UNSUPPORTED: true
 
 // Test that lowering builds the instructions taking into
 // account the signedness and signextension
