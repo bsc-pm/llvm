@@ -383,6 +383,8 @@ CMAKE_INVOCATION_EXTRA_FLAGS+=("${LIT_ARGS}")
 if [ "${ENABLE_SANITIZER}" = 1 ];
 then
   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_USE_SANITIZER=Address;Undefined")
+  # We only run sanitizers on X86, so try to shave as much compilation time as possible
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_TARGETS_TO_BUILD=X86")
 fi
 
 ################################################################################
@@ -470,6 +472,7 @@ run cmake -G "${BUILD_SYSTEM}" ${SRCDIR}/llvm \
    -DLLVM_INSTALL_UTILS=ON \
    -DLLVM_ENABLE_ASSERTIONS=ON \
    -DLLVM_ENABLE_BINDINGS=OFF \
+   -DLLVM_ENABLE_LIBXML2=OFF \
    -DOPENMP_TEST_C_COMPILER_PATH="$(pwd)/bin/clang" \
    -DOPENMP_TEST_CXX_COMPILER_PATH="$(pwd)/bin/clang++" \
    "${CMAKE_INVOCATION_EXTRA_FLAGS[@]}"

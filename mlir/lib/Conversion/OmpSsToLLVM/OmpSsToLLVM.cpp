@@ -8,7 +8,7 @@
 
 #include "mlir/Conversion/OmpSsToLLVM/ConvertOmpSsToLLVM.h"
 
-#include "mlir/Conversion/ArithmeticToLLVM/ArithmeticToLLVM.h"
+#include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVMPass.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
@@ -119,7 +119,7 @@ void ConvertOmpSsToLLVMPass::runOnOperation() {
   // Convert to OmpSs-2 operations with LLVM IR dialect
   RewritePatternSet patterns(&getContext());
   LLVMTypeConverter converter(&getContext());
-  mlir::arith::populateArithmeticToLLVMConversionPatterns(converter, patterns);
+  arith::populateArithToLLVMConversionPatterns(converter, patterns);
   populateFuncToLLVMConversionPatterns(converter, patterns);
   populateOmpSsToLLVMConversionPatterns(converter, patterns);
 

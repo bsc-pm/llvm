@@ -173,9 +173,7 @@ void MCMachOStreamer::changeSection(MCSection *Section,
   if (SegName == "__DWARF")
     CreatedADWARFSection = true;
   else if (Created && DWARFMustBeAtTheEnd && !canGoAfterDWARF(MSec))
-    assert((!CreatedADWARFSection ||
-            Section == getContext().getObjectFileInfo()->getStackMapSection())
-           && "Creating regular section after DWARF");
+    assert(!CreatedADWARFSection && "Creating regular section after DWARF");
 
   // Output a linker-local symbol so we don't need section-relative local
   // relocations. The linker hates us when we do that.
@@ -360,6 +358,7 @@ bool MCMachOStreamer::emitSymbolAttribute(MCSymbol *Sym,
   case MCSA_Local:
   case MCSA_LGlobal:
   case MCSA_Exported:
+  case MCSA_Memtag:
     return false;
 
   case MCSA_Global:
@@ -467,7 +466,7 @@ void MCMachOStreamer::emitZerofill(MCSection *Section, MCSymbol *Symbol,
 
   // The symbol may not be present, which only creates the section.
   if (Symbol) {
-    emitValueToAlignment(ByteAlignment, 0, 1, 0);
+    emitValueToAlignment(Align(ByteAlignment), 0, 1, 0);
     emitLabel(Symbol);
     emitZeros(Size);
   }

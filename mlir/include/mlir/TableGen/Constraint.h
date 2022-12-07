@@ -71,12 +71,16 @@ public:
 
   Kind getKind() const { return kind; }
 
+  /// Return the underlying def.
+  const llvm::Record &getDef() const { return *def; }
+
 protected:
   // The TableGen definition of this constraint.
   const llvm::Record *def;
 
 private:
-  /// Return the name of the base def if there is one, or None otherwise.
+  /// Return the name of the base def if there is one, or std::nullopt
+  /// otherwise.
   Optional<StringRef> getBaseDefName() const;
 
   // What kind of constraint this is.

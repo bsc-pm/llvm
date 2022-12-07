@@ -188,6 +188,7 @@ public:
 struct VectorizationFactor {
   /// Vector width with best cost.
   ElementCount Width;
+
   /// Cost of the loop with that width.
   InstructionCost Cost;
 
@@ -294,8 +295,8 @@ public:
       : OrigLoop(L), LI(LI), TLI(TLI), TTI(TTI), Legal(Legal), CM(CM), IAI(IAI),
         PSE(PSE), Hints(Hints), ORE(ORE) {}
 
-  /// Plan how to best vectorize, return the best VF and its cost, or None if
-  /// vectorization and interleaving should be avoided up front.
+  /// Plan how to best vectorize, return the best VF and its cost, or
+  /// std::nullopt if vectorization and interleaving should be avoided up front.
   Optional<VectorizationFactor> plan(ElementCount UserVF, unsigned UserIC);
 
   /// Use the VPlan-native path to plan how to best vectorize, return the best

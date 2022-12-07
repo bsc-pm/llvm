@@ -343,6 +343,13 @@ public:
     return true;
   }
   void Post(const parser::OpenMPDeclareSimdConstruct &) { PopContext(); }
+
+  bool Pre(const parser::OpenMPRequiresConstruct &x) {
+    PushContext(x.source, llvm::omp::Directive::OMPD_requires);
+    return true;
+  }
+  void Post(const parser::OpenMPRequiresConstruct &) { PopContext(); }
+
   bool Pre(const parser::OpenMPThreadprivate &);
   void Post(const parser::OpenMPThreadprivate &) { PopContext(); }
 
@@ -2001,7 +2008,9 @@ void OmpAttributeVisitor::ResolveOmpObject(
               // 2.15.3 When a named common block appears in a list, it has the
               // same meaning as if every explicit member of the common block
               // appeared in the list
-              for (auto &object : symbol->get<CommonBlockDetails>().objects()) {
+              auto &details{symbol->get<CommonBlockDetails>()};
+              unsigned index{0};
+              for (auto &object : details.objects()) {
                 if (auto *resolvedObject{
                         ResolveOmp(*object, ompFlag, currScope())}) {
                   if (dataCopyingAttributeFlags.test(ompFlag)) {
@@ -2009,7 +2018,9 @@ void OmpAttributeVisitor::ResolveOmpObject(
                   } else {
                     AddToContextObjectWithDSA(*resolvedObject, ompFlag);
                   }
+                  details.replace_object(*resolvedObject, index);
                 }
+                index++;
               }
             } else {
               context_.Say(name.source, // 2.15.3

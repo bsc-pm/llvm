@@ -4,7 +4,7 @@ struct S {
   static int x;
   int y;
   void f() {
-    #pragma oss task shared(this, *this, y, this->y, this->x) // expected-error {{expected variable name or data member of current class}} expected-error {{expected variable name or data member of current class}} expected-error {{expected variable name or data member of current class}} expected-error {{expected variable name or data member of current class}} expected-error {{expected variable name or data member of current class}}
+    #pragma oss task shared(this, *this, y, this->y, this->x) // expected-error {{expected variable name or static data member of current class}} expected-error {{expected variable name or static data member of current class}} expected-error {{expected variable name or static data member of current class}} expected-error {{expected variable name or static data member of current class}} expected-error {{expected variable name or static data member of current class}}
     { /* ERROR */ }
     #pragma oss task shared(x, S::x)
     { /* FINE */ }

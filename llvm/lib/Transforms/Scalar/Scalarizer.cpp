@@ -113,7 +113,7 @@ private:
   unsigned Size;
 };
 
-// FCmpSpliiter(FCI)(Builder, X, Y, Name) uses Builder to create an FCmp
+// FCmpSplitter(FCI)(Builder, X, Y, Name) uses Builder to create an FCmp
 // called Name that compares X and Y in the same way as FCI.
 struct FCmpSplitter {
   FCmpSplitter(FCmpInst &fci) : FCI(fci) {}
@@ -126,7 +126,7 @@ struct FCmpSplitter {
   FCmpInst &FCI;
 };
 
-// ICmpSpliiter(ICI)(Builder, X, Y, Name) uses Builder to create an ICmp
+// ICmpSplitter(ICI)(Builder, X, Y, Name) uses Builder to create an ICmp
 // called Name that compares X and Y in the same way as ICI.
 struct ICmpSplitter {
   ICmpSplitter(ICmpInst &ici) : ICI(ici) {}
@@ -139,7 +139,7 @@ struct ICmpSplitter {
   ICmpInst &ICI;
 };
 
-// UnarySpliiter(UO)(Builder, X, Name) uses Builder to create
+// UnarySplitter(UO)(Builder, X, Name) uses Builder to create
 // a unary operator like UO called Name with operand X.
 struct UnarySplitter {
   UnarySplitter(UnaryOperator &uo) : UO(uo) {}
@@ -151,7 +151,7 @@ struct UnarySplitter {
   UnaryOperator &UO;
 };
 
-// BinarySpliiter(BO)(Builder, X, Y, Name) uses Builder to create
+// BinarySplitter(BO)(Builder, X, Y, Name) uses Builder to create
 // a binary operator like BO called Name with operands X and Y.
 struct BinarySplitter {
   BinarySplitter(BinaryOperator &bo) : BO(bo) {}
@@ -481,7 +481,8 @@ void ScalarizerVisitor::transferMetadataAndIRFlags(Instruction *Op,
 }
 
 // Try to fill in Layout from Ty, returning true on success.  Alignment is
-// the alignment of the vector, or None if the ABI default should be used.
+// the alignment of the vector, or std::nullopt if the ABI default should be
+// used.
 Optional<VectorLayout>
 ScalarizerVisitor::getVectorLayout(Type *Ty, Align Alignment,
                                    const DataLayout &DL) {
@@ -489,11 +490,11 @@ ScalarizerVisitor::getVectorLayout(Type *Ty, Align Alignment,
   // Make sure we're dealing with a vector.
   Layout.VecTy = dyn_cast<VectorType>(Ty);
   if (!Layout.VecTy)
-    return None;
+    return std::nullopt;
   // Check that we're dealing with full-byte elements.
   Layout.ElemTy = Layout.VecTy->getElementType();
   if (!DL.typeSizeEqualsStoreSize(Layout.ElemTy))
-    return None;
+    return std::nullopt;
   Layout.VecAlign = Alignment;
   Layout.ElemSize = DL.getTypeStoreSize(Layout.ElemTy);
   return Layout;
@@ -848,7 +849,7 @@ bool ScalarizerVisitor::visitExtractElementInst(ExtractElementInst &EEI) {
   if (!ScalarizeVariableInsertExtract)
     return false;
 
-  Value *Res = UndefValue::get(VT->getElementType());
+  Value *Res = PoisonValue::get(VT->getElementType());
   for (unsigned I = 0; I < NumSrcElems; ++I) {
     Value *ShouldExtract =
         Builder.CreateICmpEQ(ExtIdx, ConstantInt::get(ExtIdx->getType(), I),

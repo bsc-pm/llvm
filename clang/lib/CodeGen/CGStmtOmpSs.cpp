@@ -163,12 +163,12 @@ static void AddLabelData(
 
 static void AddWaitData(const OSSExecutableDirective &S, bool &Wait) {
   assert(!Wait);
-  Wait = !llvm::empty(S.getClausesOfKind<OSSWaitClause>());
+  Wait = !S.getClausesOfKind<OSSWaitClause>().empty();
 }
 
 static void AddUpdateLoopData(const OSSExecutableDirective &S, bool &Update) {
   assert(!Update);
-  Update = !llvm::empty(S.getClausesOfKind<OSSUpdateClause>());
+  Update = !S.getClausesOfKind<OSSUpdateClause>().empty();
 }
 
 static void AddOnreadyData(const OSSExecutableDirective &S, const Expr * &OnreadyExpr) {
@@ -207,7 +207,7 @@ static void AddDeviceData(const OSSExecutableDirective &S, OSSTaskDeviceDataTy &
     Found = true;
     Devices.DvKind = C->getDeviceKind();
   }
-  if (!llvm::empty(S.getClausesOfKind<OSSNdrangeClause>()))
+  if (!S.getClausesOfKind<OSSNdrangeClause>().empty())
     llvm_unreachable("Ndrange is not supported in inline constructs");
 }
 

@@ -69,7 +69,7 @@ public:
   /// this will simply insert the #include in front of the first #include of the
   /// same category in the code that should be sorted after \p IncludeName. If
   /// \p IncludeName already exists (with exactly the same spelling), this
-  /// returns None.
+  /// returns std::nullopt.
   llvm::Optional<tooling::Replacement> insert(llvm::StringRef Header,
                                               bool IsAngled) const;
 
@@ -78,6 +78,9 @@ public:
   /// This doesn't resolve the header file path; it only deletes #includes with
   /// exactly the same spelling.
   tooling::Replacements remove(llvm::StringRef Header, bool IsAngled) const;
+
+  // Matches a whole #include directive.
+  static const llvm::Regex IncludeRegex;
 
 private:
   struct Include {
@@ -124,9 +127,6 @@ private:
 
   // All possible priorities.
   std::set<int> Priorities;
-
-  // Matches a whole #include directive.
-  llvm::Regex IncludeRegex;
 };
 
 } // namespace tooling

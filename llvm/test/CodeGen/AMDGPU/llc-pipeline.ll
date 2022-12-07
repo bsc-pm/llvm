@@ -26,6 +26,9 @@
 ; GCN-O0-NEXT:Machine Branch Probability Analysis
 ; GCN-O0-NEXT:  ModulePass Manager
 ; GCN-O0-NEXT:    Pre-ISel Intrinsic Lowering
+; GCN-O0-NEXT:    FunctionPass Manager
+; GCN-O0-NEXT:      Expand large div/rem
+; GCN-O0-NEXT:      Expand large fp convert
 ; GCN-O0-NEXT:    AMDGPU Printf lowering
 ; GCN-O0-NEXT:      FunctionPass Manager
 ; GCN-O0-NEXT:        Dominator Tree Construction
@@ -81,6 +84,9 @@
 ; GCN-O0-NEXT:        Memory SSA
 ; GCN-O0-NEXT:        AMDGPU Annotate Uniform Values
 ; GCN-O0-NEXT:        SI annotate control flow
+; GCN-O0-NEXT:        Post-Dominator Tree Construction
+; GCN-O0-NEXT:        Legacy Divergence Analysis
+; GCN-O0-NEXT:        AMDGPU Rewrite Undef for PHI
 ; GCN-O0-NEXT:        LCSSA Verifier
 ; GCN-O0-NEXT:        Loop-Closed SSA Form Pass
 ; GCN-O0-NEXT:      DummyCGSCCPass
@@ -134,6 +140,7 @@
 ; GCN-O0-NEXT:        Branch relaxation pass
 ; GCN-O0-NEXT:        Register Usage Information Collector Pass
 ; GCN-O0-NEXT:        Live DEBUG_VALUE analysis
+; GCN-O0-NEXT:        Machine Sanitizer Binary Metadata
 ; GCN-O0-NEXT:    Function register usage analysis
 ; GCN-O0-NEXT:    FunctionPass Manager
 ; GCN-O0-NEXT:      Lazy Machine Block Frequency Analysis
@@ -159,8 +166,12 @@
 ; GCN-O1-NEXT:Machine Branch Probability Analysis
 ; GCN-O1-NEXT:Register Usage Information Storage
 ; GCN-O1-NEXT:Default Regalloc Eviction Advisor
+; GCN-O1-NEXT:Default Regalloc Priority Advisor
 ; GCN-O1-NEXT:  ModulePass Manager
 ; GCN-O1-NEXT:    Pre-ISel Intrinsic Lowering
+; GCN-O1-NEXT:    FunctionPass Manager
+; GCN-O1-NEXT:      Expand large div/rem
+; GCN-O1-NEXT:      Expand large fp convert
 ; GCN-O1-NEXT:    AMDGPU Printf lowering
 ; GCN-O1-NEXT:      FunctionPass Manager
 ; GCN-O1-NEXT:        Dominator Tree Construction
@@ -259,6 +270,9 @@
 ; GCN-O1-NEXT:        Memory SSA
 ; GCN-O1-NEXT:        AMDGPU Annotate Uniform Values
 ; GCN-O1-NEXT:        SI annotate control flow
+; GCN-O1-NEXT:        Post-Dominator Tree Construction
+; GCN-O1-NEXT:        Legacy Divergence Analysis
+; GCN-O1-NEXT:        AMDGPU Rewrite Undef for PHI
 ; GCN-O1-NEXT:        LCSSA Verifier
 ; GCN-O1-NEXT:        Loop-Closed SSA Form Pass
 ; GCN-O1-NEXT:      DummyCGSCCPass
@@ -391,6 +405,7 @@
 ; GCN-O1-NEXT:        Branch relaxation pass
 ; GCN-O1-NEXT:        Register Usage Information Collector Pass
 ; GCN-O1-NEXT:        Live DEBUG_VALUE analysis
+; GCN-O1-NEXT:        Machine Sanitizer Binary Metadata
 ; GCN-O1-NEXT:    Function register usage analysis
 ; GCN-O1-NEXT:    FunctionPass Manager
 ; GCN-O1-NEXT:      Lazy Machine Block Frequency Analysis
@@ -416,8 +431,12 @@
 ; GCN-O1-OPTS-NEXT:Machine Branch Probability Analysis
 ; GCN-O1-OPTS-NEXT:Register Usage Information Storage
 ; GCN-O1-OPTS-NEXT:Default Regalloc Eviction Advisor
+; GCN-O1-OPTS-NEXT:Default Regalloc Priority Advisor
 ; GCN-O1-OPTS-NEXT:  ModulePass Manager
 ; GCN-O1-OPTS-NEXT:    Pre-ISel Intrinsic Lowering
+; GCN-O1-OPTS-NEXT:    FunctionPass Manager
+; GCN-O1-OPTS-NEXT:      Expand large div/rem
+; GCN-O1-OPTS-NEXT:      Expand large fp convert
 ; GCN-O1-OPTS-NEXT:    AMDGPU Printf lowering
 ; GCN-O1-OPTS-NEXT:      FunctionPass Manager
 ; GCN-O1-OPTS-NEXT:        Dominator Tree Construction
@@ -540,6 +559,9 @@
 ; GCN-O1-OPTS-NEXT:        Memory SSA
 ; GCN-O1-OPTS-NEXT:        AMDGPU Annotate Uniform Values
 ; GCN-O1-OPTS-NEXT:        SI annotate control flow
+; GCN-O1-OPTS-NEXT:        Post-Dominator Tree Construction
+; GCN-O1-OPTS-NEXT:        Legacy Divergence Analysis
+; GCN-O1-OPTS-NEXT:        AMDGPU Rewrite Undef for PHI
 ; GCN-O1-OPTS-NEXT:        LCSSA Verifier
 ; GCN-O1-OPTS-NEXT:        Loop-Closed SSA Form Pass
 ; GCN-O1-OPTS-NEXT:      DummyCGSCCPass
@@ -680,6 +702,7 @@
 ; GCN-O1-OPTS-NEXT:        Branch relaxation pass
 ; GCN-O1-OPTS-NEXT:        Register Usage Information Collector Pass
 ; GCN-O1-OPTS-NEXT:        Live DEBUG_VALUE analysis
+; GCN-O1-OPTS-NEXT:        Machine Sanitizer Binary Metadata
 ; GCN-O1-OPTS-NEXT:    Function register usage analysis
 ; GCN-O1-OPTS-NEXT:    FunctionPass Manager
 ; GCN-O1-OPTS-NEXT:      Lazy Machine Block Frequency Analysis
@@ -705,8 +728,12 @@
 ; GCN-O2-NEXT:Machine Branch Probability Analysis
 ; GCN-O2-NEXT:Register Usage Information Storage
 ; GCN-O2-NEXT:Default Regalloc Eviction Advisor
+; GCN-O2-NEXT:Default Regalloc Priority Advisor
 ; GCN-O2-NEXT:  ModulePass Manager
 ; GCN-O2-NEXT:    Pre-ISel Intrinsic Lowering
+; GCN-O2-NEXT:    FunctionPass Manager
+; GCN-O2-NEXT:      Expand large div/rem
+; GCN-O2-NEXT:      Expand large fp convert
 ; GCN-O2-NEXT:    AMDGPU Printf lowering
 ; GCN-O2-NEXT:      FunctionPass Manager
 ; GCN-O2-NEXT:        Dominator Tree Construction
@@ -829,6 +856,9 @@
 ; GCN-O2-NEXT:        Memory SSA
 ; GCN-O2-NEXT:        AMDGPU Annotate Uniform Values
 ; GCN-O2-NEXT:        SI annotate control flow
+; GCN-O2-NEXT:        Post-Dominator Tree Construction
+; GCN-O2-NEXT:        Legacy Divergence Analysis
+; GCN-O2-NEXT:        AMDGPU Rewrite Undef for PHI
 ; GCN-O2-NEXT:        LCSSA Verifier
 ; GCN-O2-NEXT:        Loop-Closed SSA Form Pass
 ; GCN-O2-NEXT:      Analysis if a function is memory bound
@@ -972,6 +1002,7 @@
 ; GCN-O2-NEXT:        Branch relaxation pass
 ; GCN-O2-NEXT:        Register Usage Information Collector Pass
 ; GCN-O2-NEXT:        Live DEBUG_VALUE analysis
+; GCN-O2-NEXT:        Machine Sanitizer Binary Metadata
 ; GCN-O2-NEXT:    Function register usage analysis
 ; GCN-O2-NEXT:    FunctionPass Manager
 ; GCN-O2-NEXT:      Lazy Machine Block Frequency Analysis
@@ -997,8 +1028,12 @@
 ; GCN-O3-NEXT:Machine Branch Probability Analysis
 ; GCN-O3-NEXT:Register Usage Information Storage
 ; GCN-O3-NEXT:Default Regalloc Eviction Advisor
+; GCN-O3-NEXT:Default Regalloc Priority Advisor
 ; GCN-O3-NEXT:  ModulePass Manager
 ; GCN-O3-NEXT:    Pre-ISel Intrinsic Lowering
+; GCN-O3-NEXT:    FunctionPass Manager
+; GCN-O3-NEXT:      Expand large div/rem
+; GCN-O3-NEXT:      Expand large fp convert
 ; GCN-O3-NEXT:    AMDGPU Printf lowering
 ; GCN-O3-NEXT:      FunctionPass Manager
 ; GCN-O3-NEXT:        Dominator Tree Construction
@@ -1133,6 +1168,9 @@
 ; GCN-O3-NEXT:        Memory SSA
 ; GCN-O3-NEXT:        AMDGPU Annotate Uniform Values
 ; GCN-O3-NEXT:        SI annotate control flow
+; GCN-O3-NEXT:        Post-Dominator Tree Construction
+; GCN-O3-NEXT:        Legacy Divergence Analysis
+; GCN-O3-NEXT:        AMDGPU Rewrite Undef for PHI
 ; GCN-O3-NEXT:        LCSSA Verifier
 ; GCN-O3-NEXT:        Loop-Closed SSA Form Pass
 ; GCN-O3-NEXT:      Analysis if a function is memory bound
@@ -1276,6 +1314,7 @@
 ; GCN-O3-NEXT:        Branch relaxation pass
 ; GCN-O3-NEXT:        Register Usage Information Collector Pass
 ; GCN-O3-NEXT:        Live DEBUG_VALUE analysis
+; GCN-O3-NEXT:        Machine Sanitizer Binary Metadata
 ; GCN-O3-NEXT:    Function register usage analysis
 ; GCN-O3-NEXT:    FunctionPass Manager
 ; GCN-O3-NEXT:      Lazy Machine Block Frequency Analysis

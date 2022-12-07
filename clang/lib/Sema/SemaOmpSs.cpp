@@ -492,16 +492,18 @@ public:
     }
   }
 
+  void VisitLambdaExpr(LambdaExpr *LE) {
+    CXXMethodDecl *MD = LE->getCallOperator();
+    for (ParmVarDecl *param : MD->parameters()) {
+      InnerDecls.insert(param);
+    }
+    for (Expr *E : LE->capture_inits())
+      Visit(E);
+  }
+
   void VisitCXXCatchStmt(CXXCatchStmt *Node) {
     InnerDecls.insert(Node->getExceptionDecl());
     Visit(Node->getHandlerBlock());
-  }
-
-  void VisitExpr(Expr *E) {
-    for (Stmt *Child : E->children()) {
-      if (Child)
-        Visit(Child);
-    }
   }
 
   void VisitOSSClause(OSSClause *Clause) {
@@ -2393,6 +2395,91 @@ StmtResult Sema::ActOnOmpSsTaskLoopForDirective(
   return OSSTaskLoopForDirective::Create(Context, StartLoc, EndLoc, Clauses, AStmt, B);
 }
 
+namespace {
+// This visitor looks for global variables in a expression
+// and gives an error
+class OSSGlobalFinderVisitor
+  : public ConstStmtVisitor<OSSGlobalFinderVisitor, void> {
+  Sema &S;
+  bool ErrorFound = false;
+
+public:
+  OSSGlobalFinderVisitor(Sema &S)
+    : S(S)
+      {}
+
+  //===--------------------------------------------------------------------===//
+  //                            Visitor Methods
+  //===--------------------------------------------------------------------===//
+
+  void VisitStmt(const Stmt *S) {
+    for (const Stmt *C : S->children()) {
+      if (C) {
+        Visit(C);
+      }
+    }
+  }
+
+  void VisitOSSMultiDepExpr(const OSSMultiDepExpr *E) {
+    Visit(E->getDepExpr());
+
+    for (size_t i = 0; i < E->getDepInits().size(); ++i) {
+      Visit(E->getDepInits()[i]);
+      if (E->getDepSizes()[i])
+        Visit(E->getDepSizes()[i]);
+      if (E->getDepSteps()[i])
+        Visit(E->getDepSteps()[i]);
+    }
+  }
+
+  void VisitOSSArrayShapingExpr(const OSSArrayShapingExpr *E) {
+    Visit(E->getBase());
+
+    for (const Expr *S : E->getShapes())
+      Visit(S);
+  }
+
+  void VisitOSSArraySectionExpr(const OSSArraySectionExpr *E) {
+    Visit(E->getBase());
+
+    if (E->getLowerBound())
+      Visit(E->getLowerBound());
+    if (E->getLengthUpper())
+      Visit(E->getLengthUpper());
+  }
+
+  void VisitArraySubscriptExpr(const ArraySubscriptExpr *E) {
+    Visit(E->getBase());
+    Visit(E->getIdx());
+  }
+
+  void VisitUnaryOperator(const UnaryOperator *E) {
+    Visit(E->getSubExpr());
+  }
+
+  void VisitMemberExpr(const MemberExpr *E) {
+    Visit(E->getBase());
+  }
+
+  void VisitDeclRefExpr(const DeclRefExpr *E) {
+    if (E->isTypeDependent() || E->isValueDependent() ||
+        E->containsUnexpandedParameterPack() || E->isInstantiationDependent())
+      return;
+    if (E->isNonOdrUse() == NOUR_Unevaluated)
+      return;
+    if (const VarDecl *VD = dyn_cast<VarDecl>(E->getDecl())) {
+      if (VD->hasGlobalStorage()) {
+        S.Diag(E->getExprLoc(), diag::err_oss_global_variable)
+            << E->getSourceRange();
+        ErrorFound = true;
+      }
+    }
+  }
+
+  bool isErrorFound() const { return ErrorFound; }
+};
+} // end namespace
+
 static bool checkDependency(Sema &S, Expr *RefExpr, bool OSSSyntax, bool Outline) {
   SourceLocation ELoc = RefExpr->getExprLoc();
   Expr *SimpleExpr = RefExpr->IgnoreParenCasts();
@@ -2424,17 +2511,19 @@ static bool checkDependency(Sema &S, Expr *RefExpr, bool OSSSyntax, bool Outline
       S.Diag(ELoc, diag::err_oss_expected_addressable_lvalue_or_array_item)
           << RefExpr->getSourceRange();
     else
-      S.Diag(ELoc, diag::err_oss_expected_lvalue_reference_dereference_or_array_item)
-          << RefExpr->getSourceRange();
+      S.Diag(ELoc, diag::err_oss_expected_lvalue_reference_or_global_or_dereference_or_array_item)
+          << 0 << RefExpr->getSourceRange();
     return false;
   }
 
   if (Outline) {
     if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(RefExpr->IgnoreParenImpCasts())) {
       if (const VarDecl *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
-        if (!VD->getType()->isReferenceType())
-          S.Diag(ELoc, diag::err_oss_expected_lvalue_reference_dereference_or_array_item)
-              << RefExpr->getSourceRange();
+        if (!(VD->getType()->isReferenceType() || VD->hasGlobalStorage())) {
+          S.Diag(ELoc, diag::err_oss_expected_lvalue_reference_or_global_or_dereference_or_array_item)
+              << 0 << DRE->getSourceRange();
+          return false;
+        }
       }
     }
   }
@@ -2500,7 +2589,7 @@ static bool checkDependency(Sema &S, Expr *RefExpr, bool OSSSyntax, bool Outline
 
 static bool checkNdrange(
     Sema &S, SourceLocation Loc, ArrayRef<Expr *> VL,
-    SmallVectorImpl<Expr *> &ClauseVars) {
+    SmallVectorImpl<Expr *> &ClauseVars, bool Outline) {
 
   ClauseVars.append(VL.begin(), VL.end());
 
@@ -2533,7 +2622,7 @@ static bool checkNdrange(
   for (size_t i = 1; i < ClauseVars.size(); ++i) {
     // TODO: check global[i] >= local[i]
     ExprResult Res = S.CheckNonNegativeIntegerValue(
-      ClauseVars[i], OSSC_ndrange, /*StrictlyPositive=*/true);
+      ClauseVars[i], OSSC_ndrange, /*StrictlyPositive=*/true, Outline);
     if (Res.isInvalid())
       ErrorFound = true;
     ClauseVars[i] = Res.get();
@@ -2589,7 +2678,7 @@ static bool actOnOSSReductionKindClause(
     Sema &S, DSAStackTy *Stack, OmpSsClauseKind ClauseKind,
     ArrayRef<Expr *> VarList, CXXScopeSpec &ReductionIdScopeSpec,
     const DeclarationNameInfo &ReductionId, ArrayRef<Expr *> UnresolvedReductions,
-    ReductionData &RD);
+    ReductionData &RD, bool Outline);
 
 Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     DeclGroupPtrTy DG,
@@ -2690,10 +2779,10 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   }
   if (Cost) {
     CostRes = CheckNonNegativeIntegerValue(
-      Cost, OSSC_cost, /*StrictlyPositive=*/false);
+      Cost, OSSC_cost, /*StrictlyPositive=*/false, /*Outline=*/true);
   }
   if (Priority) {
-    PriorityRes = CheckSignedIntegerValue(Priority);
+    PriorityRes = CheckSignedIntegerValue(Priority, /*Outline=*/true);
   }
   if (!Labels.empty()) {
     LabelsRes.push_back(
@@ -2820,11 +2909,12 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     if (UnresolvedReductions.empty()) {
       actOnOSSReductionKindClause(
         *this, DSAStack, CKind, TmpList, ScopeSpec, ReductionIds[i],
-        llvm::None, RD);
+        llvm::None, RD, /*Outline=*/true);
     } else {
       actOnOSSReductionKindClause(
         *this, DSAStack, CKind, TmpList, ScopeSpec, ReductionIds[i],
-        ArrayRef<Expr *>(UnresolvedReductions_it, UnresolvedReductions_it + ReductionListSizes[i]), RD);
+        ArrayRef<Expr *>(UnresolvedReductions_it, UnresolvedReductions_it + ReductionListSizes[i]),
+        RD, /*Outline=*/true);
     }
 
     for (Expr *RefExpr : TmpList)
@@ -2839,7 +2929,7 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
         || DevType == OSSTaskDeclAttr::DeviceType::Opencl))
       Diag(DeviceLoc, diag::err_oss_ndrange_incompatible_device);
 
-    checkNdrange(*this, NdrangeLoc, Ndranges, NdrangesRes);
+    checkNdrange(*this, NdrangeLoc, Ndranges, NdrangesRes, /*Outline=*/true);
   }
 
   // FIXME: the specs says the underlying type of a enum
@@ -3392,7 +3482,7 @@ static bool actOnOSSReductionKindClause(
     Sema &S, DSAStackTy *Stack, OmpSsClauseKind ClauseKind,
     ArrayRef<Expr *> VarList, CXXScopeSpec &ReductionIdScopeSpec,
     const DeclarationNameInfo &ReductionId, ArrayRef<Expr *> UnresolvedReductions,
-    ReductionData &RD) {
+    ReductionData &RD, bool Outline) {
   DeclarationName DN = ReductionId.getName();
   OverloadedOperatorKind OOK = DN.getCXXOverloadedOperator();
   BinaryOperatorKind BOK = BO_Comma;
@@ -3543,6 +3633,18 @@ static bool actOnOSSReductionKindClause(
     if (!Type.isPODType(S.Context)) {
       S.Diag(ELoc, diag::err_oss_non_pod_reduction);
       continue;
+    }
+
+    if (Outline) {
+      if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(RefExpr->IgnoreParenImpCasts())) {
+        if (const VarDecl *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+          if (!(VD->getType()->isReferenceType() || VD->hasGlobalStorage())) {
+            S.Diag(ELoc, diag::err_oss_expected_lvalue_reference_or_global_or_dereference_or_array_item)
+              << 1 << DRE->getSourceRange();
+            return false;
+          }
+        }
+      }
     }
 
     // Try to find 'declare reduction' corresponding construct before using
@@ -3774,7 +3876,7 @@ Sema::ActOnOmpSsReductionClause(OmpSsClauseKind Kind, ArrayRef<Expr *> VarList,
   ReductionData RD(VarList.size());
   if (actOnOSSReductionKindClause(*this, DSAStack, Kind, VarList,
                                   ReductionIdScopeSpec, ReductionId,
-                                  UnresolvedReductions, RD))
+                                  UnresolvedReductions, RD, /*Outline=*/false))
     return nullptr;
   return OSSReductionClause::Create(
       Context, StartLoc, LParenLoc, ColonLoc, EndLoc, RD.Vars,
@@ -4228,7 +4330,7 @@ Sema::ActOnOmpSsNdrangeClause(ArrayRef<Expr *> Vars,
                        SourceLocation LParenLoc,
                        SourceLocation EndLoc) {
   SmallVector<Expr *, 4> ClauseVars;
-  if (!checkNdrange(*this, StartLoc, Vars, ClauseVars))
+  if (!checkNdrange(*this, StartLoc, Vars, ClauseVars, /*Outline=*/false))
     return nullptr;
 
   return OSSNdrangeClause::Create(
@@ -4237,8 +4339,9 @@ Sema::ActOnOmpSsNdrangeClause(ArrayRef<Expr *> Vars,
 
 ExprResult Sema::CheckNonNegativeIntegerValue(Expr *ValExpr,
                                       OmpSsClauseKind CKind,
-                                      bool StrictlyPositive) {
-  ExprResult Res = CheckSignedIntegerValue(ValExpr);
+                                      bool StrictlyPositive,
+                                      bool Outline) {
+  ExprResult Res = CheckSignedIntegerValue(ValExpr, Outline);
   if (Res.isInvalid())
     return ExprError();
 
@@ -4368,14 +4471,14 @@ OSSClause *Sema::ActOnOmpSsCostClause(Expr *E,
   // The parameter of the cost() clause must be > 0
   // expression.
   ExprResult Res = CheckNonNegativeIntegerValue(
-    E, OSSC_cost, /*StrictlyPositive=*/false);
+    E, OSSC_cost, /*StrictlyPositive=*/false, /*Outline=*/false);
   if (Res.isInvalid())
     return nullptr;
 
   return new (Context) OSSCostClause(Res.get(), StartLoc, LParenLoc, EndLoc);
 }
 
-ExprResult Sema::CheckSignedIntegerValue(Expr *ValExpr) {
+ExprResult Sema::CheckSignedIntegerValue(Expr *ValExpr, bool Outline) {
   if (!ValExpr->isTypeDependent() && !ValExpr->isValueDependent() &&
       !ValExpr->isInstantiationDependent() &&
       !ValExpr->containsUnexpandedParameterPack()) {
@@ -4384,6 +4487,12 @@ ExprResult Sema::CheckSignedIntegerValue(Expr *ValExpr) {
         PerformOmpSsImplicitIntegerConversion(Loc, ValExpr);
     if (Value.isInvalid())
       return ExprError();
+    if (Outline) {
+      OSSGlobalFinderVisitor GlobalFinderVisitor(*this);
+      GlobalFinderVisitor.Visit(ValExpr);
+      if (GlobalFinderVisitor.isErrorFound())
+        return ExprError();
+    }
     return Value.get();
   }
   return ValExpr;
@@ -4395,7 +4504,7 @@ OSSClause *Sema::ActOnOmpSsPriorityClause(Expr *E,
                                       SourceLocation EndLoc) {
   // The parameter of the priority() clause must be integer signed
   // expression.
-  ExprResult Res = CheckSignedIntegerValue(E);
+  ExprResult Res = CheckSignedIntegerValue(E, /*Outline=*/false);
   if (Res.isInvalid())
     return nullptr;
 
@@ -4442,7 +4551,7 @@ OSSClause *Sema::ActOnOmpSsChunksizeClause(
   // The parameter of the chunksize() clause must be > 0
   // expression.
   ExprResult Res = CheckNonNegativeIntegerValue(
-    E, OSSC_chunksize, /*StrictlyPositive=*/false);
+    E, OSSC_chunksize, /*StrictlyPositive=*/false, /*Outline=*/false);
   if (Res.isInvalid())
     return nullptr;
 
@@ -4455,7 +4564,7 @@ OSSClause *Sema::ActOnOmpSsGrainsizeClause(
   // The parameter of the grainsize() clause must be > 0
   // expression.
   ExprResult Res = CheckNonNegativeIntegerValue(
-    E, OSSC_grainsize, /*StrictlyPositive=*/false);
+    E, OSSC_grainsize, /*StrictlyPositive=*/false, /*Outline=*/false);
   if (Res.isInvalid())
     return nullptr;
 
@@ -4468,7 +4577,7 @@ OSSClause *Sema::ActOnOmpSsUnrollClause(
   // The parameter of the unroll() clause must be > 0
   // expression.
   ExprResult Res = CheckNonNegativeIntegerValue(
-    E, OSSC_grainsize, /*StrictlyPositive=*/false);
+    E, OSSC_grainsize, /*StrictlyPositive=*/false, /*Outline=*/false);
   if (Res.isInvalid())
     return nullptr;
 

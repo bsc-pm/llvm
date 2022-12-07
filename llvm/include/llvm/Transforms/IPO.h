@@ -111,12 +111,6 @@ Pass *createFunctionInliningPass(unsigned OptLevel, unsigned SizeOptLevel,
 Pass *createFunctionInliningPass(InlineParams &Params);
 
 //===----------------------------------------------------------------------===//
-/// createPruneEHPass - Return a new pass object which transforms invoke
-/// instructions into calls, if the callee can _not_ unwind the stack.
-///
-Pass *createPruneEHPass();
-
-//===----------------------------------------------------------------------===//
 /// createInternalizePass - This pass loops over all of the functions in the
 /// input module, internalizing all globals (functions and variables) it can.
 ////
@@ -144,10 +138,6 @@ ModulePass *createDeadArgEliminationPass();
 /// functions as well.  This is definitely not safe, and should only be used by
 /// bugpoint.
 ModulePass *createDeadArgHackingPass();
-
-//===----------------------------------------------------------------------===//
-/// createOpenMPOptLegacyPass - OpenMP specific optimizations.
-Pass *createOpenMPOptCGSCCLegacyPass();
 
 //===----------------------------------------------------------------------===//
 /// createIPSCCPPass - This pass propagates constants from call sites into the
