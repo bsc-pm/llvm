@@ -1025,14 +1025,20 @@ struct OmpSsDirective {
 
     // Build debug info in task unpack
     if (IsTask) {
+      DICompileUnit *CU = nullptr;
+      DIFile *File = nullptr;
       DISubprogram *OldSP = F.getSubprogram();
-      DIBuilder DIB(M, /*AllowUnresolved=*/false, OldSP->getUnit());
+      if (OldSP) {
+        CU = OldSP->getUnit();
+        File = OldSP->getFile();
+      }
+      DIBuilder DIB(M, /*AllowUnresolved=*/false, CU);
       auto SPType = DIB.createSubroutineType(DIB.getOrCreateTypeArray(None));
       DISubprogram::DISPFlags SPFlags = DISubprogram::SPFlagDefinition |
                                         DISubprogram::SPFlagOptimized |
                                         DISubprogram::SPFlagLocalToUnit;
       DISubprogram *NewSP = DIB.createFunction(
-          OldSP->getUnit(), FuncVar->getName(), FuncVar->getName(), OldSP->getFile(),
+          CU, FuncVar->getName(), FuncVar->getName(), File,
           /*LineNo=*/0, SPType, /*ScopeLine=*/0, DINode::FlagZero, SPFlags);
       FuncVar->setSubprogram(NewSP);
       DIB.finalizeSubprogram(NewSP);
@@ -1650,8 +1656,13 @@ struct OmpSsDirective {
     FunctionCallee Func = M.getOrInsertFunction(
         "nanos6_taskwait", IRB.getVoidTy(), PtrTy);
     // 2. Build String
-    unsigned Line = DirInfo.Entry->getDebugLoc().getLine();
-    unsigned Col = DirInfo.Entry->getDebugLoc().getCol();
+    unsigned Line = 0;
+    unsigned Col = 0;
+    DebugLoc DLoc = DirInfo.Entry->getDebugLoc();
+    if (DLoc) {
+      Line = DLoc.getLine();
+      Col = DLoc.getCol();
+    }
 
     std::string FileNamePlusLoc = (M.getSourceFileName()
                                    + ":" + Twine(Line)
@@ -2627,8 +2638,12 @@ struct OmpSsDirective {
     }
 
     DebugLoc DLoc = Entry->getDebugLoc();
-    unsigned Line = DLoc.getLine();
-    unsigned Col = DLoc.getCol();
+    unsigned Line = 0;
+    unsigned Col = 0;
+    if (DLoc) {
+      Line = DLoc.getLine();
+      Col = DLoc.getCol();
+    }
     std::string FileNamePlusLoc = (M.getSourceFileName()
                                    + ":" + Twine(Line)
                                    + ":" + Twine(Col)).str();
