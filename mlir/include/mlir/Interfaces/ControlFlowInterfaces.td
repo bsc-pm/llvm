@@ -79,7 +79,7 @@ def BranchOpInterface : OpInterface<"BranchOpInterface"> {
                 opaqueOp->getSuccessor(i)))
             return arg;
         }
-        return ::llvm::None;
+        return ::std::nullopt;
       }]
     >,
     InterfaceMethod<[{
@@ -140,7 +140,7 @@ def RegionBranchOpInterface : OpInterface<"RegionBranchOpInterface"> {
         `getSuccessorRegions`.
       }],
       "::mlir::OperandRange", "getSuccessorEntryOperands",
-      (ins "::llvm::Optional<unsigned>":$index), [{}], 
+      (ins "::llvm::Optional<unsigned>":$index), [{}],
       /*defaultImplementation=*/[{
         auto operandEnd = this->getOperation()->operand_end();
         return ::mlir::OperandRange(operandEnd, operandEnd);

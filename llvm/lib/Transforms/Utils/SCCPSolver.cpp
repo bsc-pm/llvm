@@ -270,6 +270,8 @@ private:
   void handleCallOverdefined(CallBase &CB);
   void handleCallResult(CallBase &CB);
   void handleCallArguments(CallBase &CB);
+  void handleExtractOfWithOverflow(ExtractValueInst &EVI,
+                                   const WithOverflowInst *WO, unsigned Idx);
 
 private:
   friend class InstVisitor<SCCPInstVisitor>;
@@ -337,6 +339,13 @@ public:
     if (A == AnalysisResults.end())
       return nullptr;
     return A->second.PredInfo->getPredicateInfoFor(I);
+  }
+
+  const LoopInfo &getLoopInfo(Function &F) {
+    auto A = AnalysisResults.find(&F);
+    assert(A != AnalysisResults.end() && A->second.LI &&
+           "Need LoopInfo analysis results for function.");
+    return *A->second.LI;
   }
 
   DomTreeUpdater getDTU(Function &F) {
@@ -442,6 +451,7 @@ public:
   bool isStructLatticeConstant(Function *F, StructType *STy);
 
   Constant *getConstant(const ValueLatticeElement &LV) const;
+  ConstantRange getConstantRange(const ValueLatticeElement &LV, Type *Ty) const;
 
   SmallPtrSetImpl<Function *> &getArgumentTrackedFunctions() {
     return TrackingIncomingArguments;
@@ -520,6 +530,15 @@ Constant *SCCPInstVisitor::getConstant(const ValueLatticeElement &LV) const {
       return ConstantInt::get(Ctx, *CR.getSingleElement());
   }
   return nullptr;
+}
+
+ConstantRange
+SCCPInstVisitor::getConstantRange(const ValueLatticeElement &LV,
+                                  Type *Ty) const {
+  assert(Ty->isIntOrIntVectorTy() && "Should be int or int vector");
+  if (LV.isConstantRange())
+    return LV.getConstantRange();
+  return ConstantRange::getFull(Ty->getScalarSizeInBits());
 }
 
 void SCCPInstVisitor::markArgInFuncSpecialization(
@@ -820,13 +839,10 @@ void SCCPInstVisitor::visitCastInst(CastInst &I) {
     // Fold the constant as we build.
     Constant *C = ConstantFoldCastOperand(I.getOpcode(), OpC, I.getType(), DL);
     markConstant(&I, C);
-  } else if (I.getDestTy()->isIntegerTy()) {
+  } else if (I.getDestTy()->isIntegerTy() &&
+             I.getSrcTy()->isIntOrIntVectorTy()) {
     auto &LV = getValueState(&I);
-    ConstantRange OpRange =
-        OpSt.isConstantRange()
-            ? OpSt.getConstantRange()
-            : ConstantRange::getFull(
-                  I.getOperand(0)->getType()->getScalarSizeInBits());
+    ConstantRange OpRange = getConstantRange(OpSt, I.getSrcTy());
 
     Type *DestTy = I.getDestTy();
     // Vectors where all elements have the same known constant range are treated
@@ -844,6 +860,33 @@ void SCCPInstVisitor::visitCastInst(CastInst &I) {
     mergeInValue(LV, &I, ValueLatticeElement::getRange(Res));
   } else
     markOverdefined(&I);
+}
+
+void SCCPInstVisitor::handleExtractOfWithOverflow(ExtractValueInst &EVI,
+                                                  const WithOverflowInst *WO,
+                                                  unsigned Idx) {
+  Value *LHS = WO->getLHS(), *RHS = WO->getRHS();
+  ValueLatticeElement L = getValueState(LHS);
+  ValueLatticeElement R = getValueState(RHS);
+  addAdditionalUser(LHS, &EVI);
+  addAdditionalUser(RHS, &EVI);
+  if (L.isUnknownOrUndef() || R.isUnknownOrUndef())
+    return; // Wait to resolve.
+
+  Type *Ty = LHS->getType();
+  ConstantRange LR = getConstantRange(L, Ty);
+  ConstantRange RR = getConstantRange(R, Ty);
+  if (Idx == 0) {
+    ConstantRange Res = LR.binaryOp(WO->getBinaryOp(), RR);
+    mergeInValue(&EVI, ValueLatticeElement::getRange(Res));
+  } else {
+    assert(Idx == 1 && "Index can only be 0 or 1");
+    ConstantRange NWRegion = ConstantRange::makeGuaranteedNoWrapRegion(
+        WO->getBinaryOp(), RR, WO->getNoWrapKind());
+    if (NWRegion.contains(LR))
+      return (void)markConstant(&EVI, ConstantInt::getFalse(EVI.getType()));
+    markOverdefined(&EVI);
+  }
 }
 
 void SCCPInstVisitor::visitExtractValueInst(ExtractValueInst &EVI) {
@@ -864,6 +907,8 @@ void SCCPInstVisitor::visitExtractValueInst(ExtractValueInst &EVI) {
   Value *AggVal = EVI.getAggregateOperand();
   if (AggVal->getType()->isStructTy()) {
     unsigned i = *EVI.idx_begin();
+    if (auto *WO = dyn_cast<WithOverflowInst>(AggVal))
+      return handleExtractOfWithOverflow(EVI, WO, i);
     ValueLatticeElement EltVal = getStructValueState(AggVal, i);
     mergeInValue(getValueState(&EVI), &EVI, EltVal);
   } else {
@@ -1005,13 +1050,8 @@ void SCCPInstVisitor::visitBinaryOperator(Instruction &I) {
     return markOverdefined(&I);
 
   // Try to simplify to a constant range.
-  ConstantRange A = ConstantRange::getFull(I.getType()->getScalarSizeInBits());
-  ConstantRange B = ConstantRange::getFull(I.getType()->getScalarSizeInBits());
-  if (V1State.isConstantRange())
-    A = V1State.getConstantRange();
-  if (V2State.isConstantRange())
-    B = V2State.getConstantRange();
-
+  ConstantRange A = getConstantRange(V1State, I.getType());
+  ConstantRange B = getConstantRange(V2State, I.getType());
   ConstantRange R = A.binaryOp(cast<BinaryOperator>(&I)->getOpcode(), B);
   mergeInValue(&I, ValueLatticeElement::getRange(R));
 
@@ -1035,11 +1075,8 @@ void SCCPInstVisitor::visitCmpInst(CmpInst &I) {
   auto V1State = getValueState(Op1);
   auto V2State = getValueState(Op2);
 
-  Constant *C = V1State.getCompare(I.getPredicate(), I.getType(), V2State);
+  Constant *C = V1State.getCompare(I.getPredicate(), I.getType(), V2State, DL);
   if (C) {
-    // TODO: getCompare() currently has incorrect handling for unknown/undef.
-    if (isa<UndefValue>(C))
-      return;
     ValueLatticeElement CV;
     CV.markConstant(C);
     mergeInValue(&I, CV);
@@ -1191,6 +1228,8 @@ void SCCPInstVisitor::handleCallOverdefined(CallBase &CB) {
     for (const Use &A : CB.args()) {
       if (A.get()->getType()->isStructTy())
         return markOverdefined(&CB); // Can't handle struct args.
+      if (A.get()->getType()->isMetadataTy())
+        continue;                    // Carried in CB, not allowed in Operands.
       ValueLatticeElement State = getValueState(A);
 
       if (State.isUnknownOrUndef())
@@ -1287,10 +1326,7 @@ void SCCPInstVisitor::handleCallResult(CallBase &CB) {
 
         // Combine range info for the original value with the new range from the
         // condition.
-        auto CopyOfCR = CopyOfVal.isConstantRange()
-                            ? CopyOfVal.getConstantRange()
-                            : ConstantRange::getFull(
-                                  DL.getTypeSizeInBits(CopyOf->getType()));
+        auto CopyOfCR = getConstantRange(CopyOfVal, CopyOf->getType());
         auto NewCR = ImposedCR.intersectWith(CopyOfCR);
         // If the existing information is != x, do not use the information from
         // a chained predicate, as the != x information is more likely to be
@@ -1308,9 +1344,10 @@ void SCCPInstVisitor::handleCallResult(CallBase &CB) {
             IV, &CB,
             ValueLatticeElement::getRange(NewCR, /*MayIncludeUndef*/ false));
         return;
-      } else if (Pred == CmpInst::ICMP_EQ && CondVal.isConstant()) {
+      } else if (Pred == CmpInst::ICMP_EQ &&
+                 (CondVal.isConstant() || CondVal.isNotConstant())) {
         // For non-integer values or integer constant expressions, only
-        // propagate equal constants.
+        // propagate equal constants or not-constants.
         addAdditionalUser(OtherOp, &CB);
         mergeInValue(IV, &CB, CondVal);
         return;
@@ -1332,11 +1369,7 @@ void SCCPInstVisitor::handleCallResult(CallBase &CB) {
       SmallVector<ConstantRange, 2> OpRanges;
       for (Value *Op : II->args()) {
         const ValueLatticeElement &State = getValueState(Op);
-        if (State.isConstantRange())
-          OpRanges.push_back(State.getConstantRange());
-        else
-          OpRanges.push_back(
-              ConstantRange::getFull(Op->getType()->getScalarSizeInBits()));
+        OpRanges.push_back(getConstantRange(State, Op->getType()));
       }
 
       ConstantRange Result =
@@ -1523,6 +1556,10 @@ bool SCCPSolver::markBlockExecutable(BasicBlock *BB) {
 
 const PredicateBase *SCCPSolver::getPredicateInfoFor(Instruction *I) {
   return Visitor->getPredicateInfoFor(I);
+}
+
+const LoopInfo &SCCPSolver::getLoopInfo(Function &F) {
+  return Visitor->getLoopInfo(F);
 }
 
 DomTreeUpdater SCCPSolver::getDTU(Function &F) { return Visitor->getDTU(F); }

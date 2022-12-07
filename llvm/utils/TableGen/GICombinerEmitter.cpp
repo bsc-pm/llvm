@@ -647,7 +647,7 @@ void GICombinerEmitter::emitNameMatcher(raw_ostream &OS) const {
   StringMatcher Matcher("RuleIdentifier", Cases, OS);
   Matcher.Emit();
   OS << "#endif // ifndef NDEBUG\n\n"
-     << "  return None;\n"
+     << "  return std::nullopt;\n"
      << "}\n";
 }
 
@@ -764,6 +764,29 @@ void GICombinerEmitter::generateCodeForTree(raw_ostream &OS,
 
     OS << Indent << "  if (1\n";
 
+    // Emit code for C++ Predicates.
+    if (RuleDef.getValue("Predicates")) {
+      ListInit *Preds = RuleDef.getValueAsListInit("Predicates");
+      for (Init *I : Preds->getValues()) {
+        if (DefInit *Pred = dyn_cast<DefInit>(I)) {
+          Record *Def = Pred->getDef();
+          if (!Def->isSubClassOf("Predicate")) {
+            PrintError(Def->getLoc(), "Unknown 'Predicate' Type");
+            return;
+          }
+
+          StringRef CondString = Def->getValueAsString("CondString");
+          if (CondString.empty())
+            continue;
+
+          OS << Indent << "      && (\n"
+             << Indent << "           // Predicate: " << Def->getName() << "\n"
+             << Indent << "           " << CondString << "\n"
+             << Indent << "         )\n";
+        }
+      }
+    }
+
     // Attempt to emit code for any untested predicates left over. Note that
     // isFullyTested() will remain false even if we succeed here and therefore
     // combine rule elision will not be performed. This is because we do not
@@ -800,16 +823,19 @@ void GICombinerEmitter::generateCodeForTree(raw_ostream &OS,
          << Indent << "      "
          << CodeExpander(Rule->getMatchingFixupCode()->getValue(), Expansions,
                          RuleDef.getLoc(), ShowExpansions)
-         << "\n"
+         << '\n'
          << Indent << "      return true;\n"
          << Indent << "  }()";
     }
-    OS << ") {\n" << Indent << "   ";
+    OS << Indent << "     ) {\n" << Indent << "   ";
 
     if (const StringInit *Code = dyn_cast<StringInit>(Applyer->getArg(0))) {
-      OS << CodeExpander(Code->getAsUnquotedString(), Expansions,
+      OS << "    LLVM_DEBUG(dbgs() << \"Applying rule '"
+         << RuleDef.getName()
+         << "'\\n\");\n"
+         << CodeExpander(Code->getAsUnquotedString(), Expansions,
                          RuleDef.getLoc(), ShowExpansions)
-         << "\n"
+         << '\n'
          << Indent << "    return true;\n"
          << Indent << "  }\n";
     } else {
@@ -934,7 +960,7 @@ void GICombinerEmitter::run(raw_ostream &OS) {
      << "    const auto Last = "
         "getRuleIdxForIdentifier(RangePair.second);\n"
      << "    if (!First || !Last)\n"
-     << "      return None;\n"
+     << "      return std::nullopt;\n"
      << "    if (First >= Last)\n"
      << "      report_fatal_error(\"Beginning of range should be before "
         "end of range\");\n"
@@ -945,7 +971,7 @@ void GICombinerEmitter::run(raw_ostream &OS) {
      << "  }\n"
      << "  const auto I = getRuleIdxForIdentifier(RangePair.first);\n"
      << "  if (!I)\n"
-     << "    return None;\n"
+     << "    return std::nullopt;\n"
      << "  return {{*I, *I + 1}};\n"
      << "}\n\n";
 

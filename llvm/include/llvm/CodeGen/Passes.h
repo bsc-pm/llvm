@@ -79,6 +79,10 @@ namespace llvm {
   /// matching during instruction selection.
   FunctionPass *createCodeGenPreparePass();
 
+  /// This pass implements generation of target-specific intrinsics to support
+  /// handling of complex number arithmetic
+  FunctionPass *createComplexDeinterleavingPass(const TargetMachine *TM);
+
   /// AtomicExpandID -- Lowers atomic operations in terms of either cmpxchg
   /// load-linked/store-conditional loops.
   extern char &AtomicExpandID;
@@ -405,8 +409,15 @@ namespace llvm {
   /// the intrinsic for later emission to the StackMap.
   extern char &StackMapLivenessID;
 
+  // MachineSanitizerBinaryMetadata - appends/finalizes sanitizer binary
+  // metadata after llvm SanitizerBinaryMetadata pass.
+  extern char &MachineSanitizerBinaryMetadataID;
+
   /// RemoveRedundantDebugValues pass.
   extern char &RemoveRedundantDebugValuesID;
+
+  /// MachineCFGPrinter pass.
+  extern char &MachineCFGPrinterID;
 
   /// LiveDebugValues pass
   extern char &LiveDebugValuesID;
@@ -486,6 +497,9 @@ namespace llvm {
 
   // Expands large div/rem instructions.
   FunctionPass *createExpandLargeDivRemPass();
+
+  // Expands large div/rem instructions.
+  FunctionPass *createExpandLargeFpConvertPass();
 
   // This pass expands memcmp() to load/stores.
   FunctionPass *createExpandMemCmpPass();

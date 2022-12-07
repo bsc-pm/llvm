@@ -280,6 +280,7 @@ class LLVM_EXTERNAL_VISIBILITY MachineFunction {
   // Keep track of the function section.
   MCSection *Section = nullptr;
 
+  // Catchpad unwind destination info for wasm EH.
   // Keeps track of Wasm exception handling related data. This will be null for
   // functions that aren't using a wasm EH personality.
   WasmEHFuncInfo *WasmEHInfo = nullptr;
@@ -1028,11 +1029,10 @@ public:
   ///
   /// This is allocated on the function's allocator and so lives the life of
   /// the function.
-  MachineInstr::ExtraInfo *
-  createMIExtraInfo(ArrayRef<MachineMemOperand *> MMOs,
-                    MCSymbol *PreInstrSymbol = nullptr,
-                    MCSymbol *PostInstrSymbol = nullptr,
-                    MDNode *HeapAllocMarker = nullptr, uint32_t CFIType = 0);
+  MachineInstr::ExtraInfo *createMIExtraInfo(
+      ArrayRef<MachineMemOperand *> MMOs, MCSymbol *PreInstrSymbol = nullptr,
+      MCSymbol *PostInstrSymbol = nullptr, MDNode *HeapAllocMarker = nullptr,
+      MDNode *PCSections = nullptr, uint32_t CFIType = 0);
 
   /// Allocate a string and populate it with the given external symbol name.
   const char *createExternalSymbolName(StringRef Name);
