@@ -940,7 +940,7 @@ void tools::addOmpSsRuntimeLibs(
     return;
 
   std::string RuntimeDefaultHome(CLANG_DEFAULT_NANOS6_HOME);
-  Optional<std::string> RuntimeHome =
+  std::optional<std::string> RuntimeHome =
     llvm::sys::Process::GetEnv("NANOS6_HOME");
 
   // First look at environment NANOS6_HOME,
@@ -982,7 +982,7 @@ void tools::addOmpSsRuntimeInclude(
     return;
 
   std::string RuntimeDefaultHome(CLANG_DEFAULT_NANOS6_HOME);
-  Optional<std::string> RuntimeHome =
+  std::optional<std::string> RuntimeHome =
     llvm::sys::Process::GetEnv("NANOS6_HOME");
 
   // First look at environment NANOS6_HOME,
