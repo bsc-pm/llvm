@@ -1,6 +1,7 @@
 // clang-format off
 // UNSUPPORTED: system-aix
-// XFAIL: arm, arm64-apple, system-windows
+// XFAIL for arm and arm64, or running on Windows.
+// XFAIL: target=arm{{.*}}, system-windows
 // RUN: cat %s | clang-repl | FileCheck %s
 // We mark it as XFAIL because in upstream the test is failing
 // XFAIL: *

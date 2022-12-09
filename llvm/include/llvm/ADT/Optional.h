@@ -18,17 +18,13 @@
 
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/None.h"
-#include "llvm/ADT/STLForwardCompat.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/type_traits.h"
 #include <cassert>
 #include <new>
-#include <optional>
 #include <utility>
 
 namespace llvm {
-
-class raw_ostream;
 
 namespace optional_detail {
 
@@ -477,28 +473,6 @@ constexpr bool operator>=(const Optional<T> &X, const T &Y) {
 template <typename T>
 constexpr bool operator>=(const T &X, const Optional<T> &Y) {
   return !(X < Y);
-}
-
-raw_ostream &operator<<(raw_ostream &OS, std::nullopt_t);
-
-template <typename T, typename = decltype(std::declval<raw_ostream &>()
-                                          << std::declval<const T &>())>
-raw_ostream &operator<<(raw_ostream &OS, const Optional<T> &O) {
-  if (O)
-    OS << *O;
-  else
-    OS << std::nullopt;
-  return OS;
-}
-
-template <typename T, typename = decltype(std::declval<raw_ostream &>()
-                                          << std::declval<const T &>())>
-raw_ostream &operator<<(raw_ostream &OS, const std::optional<T> &O) {
-  if (O)
-    OS << *O;
-  else
-    OS << std::nullopt;
-  return OS;
 }
 
 } // end namespace llvm

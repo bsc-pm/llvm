@@ -790,7 +790,7 @@ def LLVM_CondBrOp : LLVM_TerminatorOp<"cond_br",
 // ReturnOp
 //===----------------------------------------------------------------------===//
 
-def LLVM_ReturnOp : LLVM_TerminatorOp<"return", [Pure]> {
+def LLVM_ReturnOp : LLVM_TerminatorOp<"return", [Pure, ReturnLike]> {
   let arguments = (ins Optional<LLVM_Type>:$arg);
   let assemblyFormat = "attr-dict ($arg^ `:` type($arg))?";
 
@@ -1308,7 +1308,9 @@ def LLVM_LLVMFuncOp : LLVM_Op<"func", [
     DefaultValuedAttr<CConv, "CConv::C">:$CConv,
     OptionalAttr<FlatSymbolRefAttr>:$personality,
     OptionalAttr<StrAttr>:$garbageCollector,
-    OptionalAttr<ArrayAttr>:$passthrough
+    OptionalAttr<ArrayAttr>:$passthrough,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
   );
 
   let regions = (region AnyRegion:$body);
@@ -1337,8 +1339,9 @@ def LLVM_LLVMFuncOp : LLVM_Op<"func", [
     /// Returns the result types of this function.
     ArrayRef<Type> getResultTypes() { return getFunctionType().getReturnTypes(); }
 
-    /// Returns the callable region, which is the function body.
-    Region *getCallableRegion() { return &getBody(); }
+    /// Returns the callable region, which is the function body. If the function
+    /// is external, returns null.
+    Region *getCallableRegion();
 
     /// Returns the callable result type, which is the function return type.
     ArrayRef<Type> getCallableResults() { return getFunctionType().getReturnTypes(); }
