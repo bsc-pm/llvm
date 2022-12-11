@@ -458,6 +458,8 @@ Retry:
     ProhibitAttributes(GNUAttrs);
     return HandlePragmaCaptured();
 
+  case tok::annot_pragma_hls:
+    return ParseHlsPragma(StmtCtx);
   case tok::annot_pragma_ompss:
     // Prohibit attributes that are not OmpSs-2 attributes, but only before
     // processing a #pragma omp clause.

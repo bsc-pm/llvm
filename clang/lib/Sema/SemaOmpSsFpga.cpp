@@ -111,6 +111,10 @@ bool GenerateOriginalFuncionBody(Callable &&Diag, llvm::raw_ostream &outputFile,
   // The current approach is very much ad-hoc. Once we add support for
   // reprinting the #pragma HLS directives, we should switch to using the AST
   // itself
+  std::string out;
+  llvm::raw_string_ostream stream(out);
+  FD->print(stream);
+  llvm::outs() << out;
 
   auto [startOffset, endOffset] =
       std::pair{SourceMgr.getFileOffset(start), SourceMgr.getFileOffset(end)};

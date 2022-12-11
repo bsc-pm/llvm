@@ -1287,6 +1287,7 @@ void StmtProfiler::VisitOMPTargetParallelGenericLoopDirective(
 }
 
 // OmpSs
+void StmtProfiler::VisitHlsDirective(const HlsDirective *S) { VisitStmt(S); }
 
 void
 StmtProfiler::VisitOSSExecutableDirective(const OSSExecutableDirective *S) {

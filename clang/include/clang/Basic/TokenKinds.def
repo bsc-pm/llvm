@@ -926,6 +926,9 @@ PRAGMA_ANNOTATION(pragma_openmp_end)
 ANNOTATION(pragma_ompss)
 ANNOTATION(pragma_ompss_end)
 
+PRAGMA_ANNOTATION(pragma_hls)
+PRAGMA_ANNOTATION(pragma_hls_end)
+
 // Annotations for loop pragma directives #pragma clang loop ...
 // The lexer produces these so that they only take effect when the parser
 // handles #pragma loop ... directives.

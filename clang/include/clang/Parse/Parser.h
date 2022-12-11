@@ -187,6 +187,7 @@ class Parser : public CodeCompletionHandler {
   std::unique_ptr<PragmaHandler> OpenCLExtensionHandler;
   std::unique_ptr<PragmaHandler> OpenMPHandler;
   std::unique_ptr<PragmaHandler> OmpSsHandler;
+  std::unique_ptr<PragmaHandler> HlsHandlerStub;
   std::unique_ptr<PragmaHandler> PCSectionHandler;
   std::unique_ptr<PragmaHandler> MSCommentHandler;
   std::unique_ptr<PragmaHandler> MSDetectMismatchHandler;
@@ -3354,11 +3355,12 @@ private:
   DeclGroupPtrTy ParseOSSDeclareTaskClauses(DeclGroupPtrTy Ptr,
                                             CachedTokens &Toks,
                                             SourceLocation Loc);
-
+  /// Parse a stub hls directive
+  StmtResult ParseHlsPragma(ParsedStmtContext Allowed);
   /// Parses declarative OmpSs directives.
   DeclGroupPtrTy ParseOmpSsDeclarativeDirectiveWithExtDecl(
-      AccessSpecifier &AS, ParsedAttributes &Attrs,
-      bool Delayed = false, DeclSpec::TST TagType = DeclSpec::TST_unspecified,
+      AccessSpecifier &AS, ParsedAttributes &Attrs, bool Delayed = false,
+      DeclSpec::TST TagType = DeclSpec::TST_unspecified,
       Decl *TagDecl = nullptr);
   /// Parse 'oss declare reduction' construct.
   DeclGroupPtrTy ParseOmpSsDeclareReductionDirective(AccessSpecifier AS);

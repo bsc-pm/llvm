@@ -11,13 +11,17 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/StmtHlsStub.h"
 #include "clang/AST/StmtOmpSs.h"
 #include "clang/Basic/OmpSsKinds.h"
 #include "clang/Parse/ParseDiagnostic.h"
 #include "clang/Parse/Parser.h"
 #include "clang/Parse/RAIIObjectsForParser.h"
+#include "clang/Sema/DeclSpec.h"
 #include "clang/Sema/Scope.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringRef.h"
 
 using namespace clang;
 using namespace llvm::oss;
@@ -740,6 +744,21 @@ void Parser::PreParseCollapse() {
       ConsumeToken();
   }
   ConsumeAnnotationToken();
+}
+
+StmtResult Parser::ParseHlsPragma(ParsedStmtContext Allowed) {
+  assert(Tok.is(tok::annot_pragma_ompss) && "Not an OmpSs directive!");
+  SourceLocation StartLoc = ConsumeAnnotationToken(), EndLoc;
+  clang::CachedTokens tokens;
+  ConsumeAndStoreUntil(tok::annot_pragma_hls_end, tokens, false, false);
+  EndLoc = ConsumeAnnotationToken();
+  auto &SourceMgr = PP.getSourceManager();
+  StringRef content(SourceMgr.getCharacterData(StartLoc),
+                    SourceMgr.getFileOffset(EndLoc) -
+                        SourceMgr.getFileOffset(StartLoc));
+
+  return HlsDirective::Create(Actions.BumpAlloc, StartLoc, EndLoc,
+                              std::move(content));
 }
 
 /// Parsing of declarative or executable OmpSs directives.

@@ -12,9 +12,10 @@
 
 #include "clang/AST/TextNodeDumper.h"
 #include "clang/AST/APValue.h"
+#include "clang/AST/ASTFwd.h"
 #include "clang/AST/DeclFriend.h"
-#include "clang/AST/DeclOpenMP.h"
 #include "clang/AST/DeclOmpSs.h"
+#include "clang/AST/DeclOpenMP.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/LocInfoType.h"
 #include "clang/AST/Type.h"
@@ -1958,6 +1959,10 @@ void TextNodeDumper::VisitOMPCapturedExprDecl(const OMPCapturedExprDecl *D) {
 void TextNodeDumper::VisitOSSExecutableDirective(
     const OSSExecutableDirective *D) {
   OS << " ompss-2";
+}
+
+void TextNodeDumper::VisitHlsDirective(const HlsDirective *D) {
+  OS << D->getContent();
 }
 
 void TextNodeDumper::VisitOSSDeclareReductionDecl(

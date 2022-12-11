@@ -20,31 +20,32 @@
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclFriend.h"
 #include "clang/AST/DeclObjC.h"
-#include "clang/AST/DeclOpenMP.h"
 #include "clang/AST/DeclOmpSs.h"
+#include "clang/AST/DeclOpenMP.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/DeclarationName.h"
 #include "clang/AST/Expr.h"
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/ExprConcepts.h"
 #include "clang/AST/ExprObjC.h"
-#include "clang/AST/ExprOpenMP.h"
 #include "clang/AST/ExprOmpSs.h"
+#include "clang/AST/ExprOpenMP.h"
 #include "clang/AST/LambdaCapture.h"
 #include "clang/AST/NestedNameSpecifier.h"
 #include "clang/AST/OpenMPClause.h"
 #include "clang/AST/Stmt.h"
 #include "clang/AST/StmtCXX.h"
+#include "clang/AST/StmtHlsStub.h"
 #include "clang/AST/StmtObjC.h"
-#include "clang/AST/StmtOpenMP.h"
 #include "clang/AST/StmtOmpSs.h"
+#include "clang/AST/StmtOpenMP.h"
 #include "clang/AST/TemplateBase.h"
 #include "clang/AST/TemplateName.h"
 #include "clang/AST/Type.h"
 #include "clang/AST/TypeLoc.h"
 #include "clang/Basic/LLVM.h"
-#include "clang/Basic/OpenMPKinds.h"
 #include "clang/Basic/OmpSsKinds.h"
+#include "clang/Basic/OpenMPKinds.h"
 #include "clang/Basic/Specifiers.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallVector.h"
@@ -3884,6 +3885,11 @@ bool RecursiveASTVisitor<Derived>::VisitOMPXDynCGroupMemClause(
     OMPXDynCGroupMemClause *C) {
   TRY_TO(VisitOMPClauseWithPreInit(C));
   TRY_TO(TraverseStmt(C->getSize()));
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::TraverseHlsDirective(
+    HlsDirective *S, DataRecursionQueue *Queue) {
   return true;
 }
 

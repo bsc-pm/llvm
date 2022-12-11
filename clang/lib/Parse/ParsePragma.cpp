@@ -189,6 +189,12 @@ struct PragmaOmpSsHandler : public PragmaHandler {
                     Token &FirstToken) override;
 };
 
+struct PragmaHlsStubHandler : public PragmaHandler {
+  PragmaHlsStubHandler() : PragmaHandler("HLS") {}
+  void HandlePragma(Preprocessor &PP, PragmaIntroducer Introducer,
+                    Token &FirstToken) override;
+};
+
 /// PragmaCommentHandler - "\#pragma comment ...".
 struct PragmaCommentHandler : public PragmaHandler {
   PragmaCommentHandler(Sema &Actions)
@@ -435,10 +441,12 @@ void Parser::initializePragmaHandlers() {
   PP.AddPragmaHandler(OpenMPHandler.get());
 
   // OmpSs
-  if (getLangOpts().OmpSs)
+  if (getLangOpts().OmpSs) {
+    HlsHandlerStub.reset(new PragmaHlsStubHandler());
+    PP.AddPragmaHandler(HlsHandlerStub.get());
     OmpSsHandler.reset(new PragmaOmpSsHandler());
-  else
-    OmpSsHandler.reset(new PragmaNoOmpSsHandler());
+  } else
+        OmpSsHandler.reset(new PragmaNoOmpSsHandler());
   PP.AddPragmaHandler(OmpSsHandler.get());
 
   if (getLangOpts().MicrosoftExt ||
@@ -2683,6 +2691,33 @@ PragmaOmpSsHandler::HandlePragma(Preprocessor &PP,
   std::copy(Pragma.begin(), Pragma.end(), Toks.get());
   PP.EnterTokenStream(std::move(Toks), Pragma.size(),
                       /*DisableMacroExpansion=*/false, /*IsReinject=*/false);
+}
+
+/// Handle '#pragma hls ...' when OmpSs is enabled.
+///
+void PragmaHlsStubHandler::HandlePragma(Preprocessor &PP,
+                                        PragmaIntroducer Introducer,
+                                        Token &FirstTok) {
+  SmallVector<Token, 16> Pragma;
+  Token Tok;
+  Tok.startToken();
+  Tok.setKind(tok::annot_pragma_hls);
+  Tok.setLocation(FirstTok.getLocation());
+
+  while (Tok.isNot(tok::eod) && Tok.isNot(tok::eof)) {
+    Pragma.push_back(Tok);
+    PP.Lex(Tok);
+  }
+  SourceLocation EodLoc = Tok.getLocation();
+  Tok.startToken();
+  Tok.setKind(tok::annot_pragma_hls_end);
+  Tok.setLocation(EodLoc);
+  Pragma.push_back(Tok);
+
+  auto Toks = std::make_unique<Token[]>(Pragma.size());
+  std::copy(Pragma.begin(), Pragma.end(), Toks.get());
+  PP.EnterTokenStream(std::move(Toks), Pragma.size(),
+                      /*DisableMacroExpansion=*/true, /*IsReinject=*/true);
 }
 
 /// Handle '#pragma omp ...' when OpenMP is disabled.

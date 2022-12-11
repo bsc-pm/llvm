@@ -15,12 +15,13 @@
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/ASTDumperUtils.h"
+#include "clang/AST/ASTFwd.h"
 #include "clang/AST/AttrVisitor.h"
 #include "clang/AST/CommentCommandTraits.h"
 #include "clang/AST/CommentVisitor.h"
 #include "clang/AST/DeclVisitor.h"
-#include "clang/AST/ExprConcepts.h"
 #include "clang/AST/ExprCXX.h"
+#include "clang/AST/ExprConcepts.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/AST/TemplateArgumentVisitor.h"
 #include "clang/AST/Type.h"
@@ -350,6 +351,7 @@ public:
   void VisitOMPRequiresDecl(const OMPRequiresDecl *D);
   void VisitOMPCapturedExprDecl(const OMPCapturedExprDecl *D);
   // OmpSs
+  void VisitHlsDirective(const HlsDirective *D);
   void VisitOSSExecutableDirective(const OSSExecutableDirective *D);
   void VisitOSSDeclareReductionDecl(const OSSDeclareReductionDecl *D);
   void VisitNamespaceDecl(const NamespaceDecl *D);

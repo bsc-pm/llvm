@@ -12,22 +12,23 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/ASTFwd.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclBase.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
-#include "clang/AST/DeclOpenMP.h"
 #include "clang/AST/DeclOmpSs.h"
+#include "clang/AST/DeclOpenMP.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/Expr.h"
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/ExprObjC.h"
-#include "clang/AST/ExprOpenMP.h"
 #include "clang/AST/ExprOmpSs.h"
+#include "clang/AST/ExprOpenMP.h"
 #include "clang/AST/NestedNameSpecifier.h"
-#include "clang/AST/OpenMPClause.h"
 #include "clang/AST/OmpSsClause.h"
+#include "clang/AST/OpenMPClause.h"
 #include "clang/AST/PrettyPrinter.h"
 #include "clang/AST/Stmt.h"
 #include "clang/AST/StmtCXX.h"
@@ -134,6 +135,7 @@ namespace {
                                      bool ForceNoStmt = false);
     void PrintFPPragmas(CompoundStmt *S);
     // OmpSs
+    void PrintHlsDirective(HlsDirective *S);
     void PrintOSSExecutableDirective(OSSExecutableDirective *S);
     void PrintOSSLoopDirective(OSSLoopDirective *S);
 
@@ -1149,6 +1151,12 @@ void StmtPrinter::PrintOSSExecutableDirective(OSSExecutableDirective *S) {
   if (S->hasAssociatedStmt())
     PrintStmt(S->getAssociatedStmt());
   return;
+}
+
+void StmtPrinter::PrintHlsDirective(HlsDirective *S) { VisitHlsDirective(S); }
+
+void StmtPrinter::VisitHlsDirective(HlsDirective *Node) {
+  Indent() << "#pragma " << Node->getContent() << NL;
 }
 
 void StmtPrinter::PrintOSSLoopDirective(OSSLoopDirective *S) {

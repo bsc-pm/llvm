@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "clang/Sema/SemaInternal.h"
 #include "clang/AST/ASTMutationListener.h"
 #include "clang/AST/CXXInheritance.h"
 #include "clang/AST/Expr.h"
@@ -18,7 +17,9 @@
 #include "clang/AST/StmtObjC.h"
 #include "clang/AST/TypeLoc.h"
 #include "clang/Basic/Diagnostic.h"
+#include "clang/Basic/ExceptionSpecificationType.h"
 #include "clang/Basic/SourceManager.h"
+#include "clang/Sema/SemaInternal.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
 #include <optional>
@@ -1417,7 +1418,7 @@ CanThrowResult Sema::canThrow(const Stmt *S) {
   case Expr::MSPropertySubscriptExprClass:
     llvm_unreachable("Invalid class for expression");
 
-    // Most statements can throw if any substatement can throw.
+  // Most statements can throw if any substatement can throw.
   case Stmt::AttributedStmtClass:
   case Stmt::BreakStmtClass:
   case Stmt::CapturedStmtClass:
@@ -1609,6 +1610,7 @@ CanThrowResult Sema::canThrow(const Stmt *S) {
     return mergeCanThrow(CT, canThrow(TS->getTryBody()));
   }
 
+  case Stmt::HlsDirectiveClass:
   case Stmt::SYCLUniqueStableNameExprClass:
     return CT_Cannot;
   case Stmt::NoStmtClass:

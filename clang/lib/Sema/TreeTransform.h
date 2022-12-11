@@ -22,11 +22,12 @@
 #include "clang/AST/ExprConcepts.h"
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/ExprObjC.h"
+#include "clang/AST/ExprOmpSs.h"
 #include "clang/AST/ExprOpenMP.h"
 #include "clang/AST/OpenMPClause.h"
-#include "clang/AST/ExprOmpSs.h"
 #include "clang/AST/Stmt.h"
 #include "clang/AST/StmtCXX.h"
+#include "clang/AST/StmtHlsStub.h"
 #include "clang/AST/StmtObjC.h"
 #include "clang/AST/StmtOmpSs.h"
 #include "clang/AST/StmtOpenMP.h"
@@ -10999,6 +11000,11 @@ OMPClause *TreeTransform<Derived>::TransformOMPXDynCGroupMemClause(
 //===----------------------------------------------------------------------===//
 // OmpSs directive transformation
 //===----------------------------------------------------------------------===//
+
+template <typename Derived>
+StmtResult TreeTransform<Derived>::TransformHlsDirective(HlsDirective *D) {
+  return D;
+}
 
 template <typename Derived>
 StmtResult TreeTransform<Derived>::TransformOSSExecutableDirective(

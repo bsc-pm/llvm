@@ -15,6 +15,7 @@
 #ifndef LLVM_CLANG_AST_ASTNODETRAVERSER_H
 #define LLVM_CLANG_AST_ASTNODETRAVERSER_H
 
+#include "clang/AST/ASTFwd.h"
 #include "clang/AST/ASTTypeTraits.h"
 #include "clang/AST/AttrVisitor.h"
 #include "clang/AST/CommentVisitor.h"
@@ -732,6 +733,8 @@ public:
   }
 
   // OmpSs
+  void VisitHls(const HlsDirective *Node) {}
+
   void VisitOSSExecutableDirective(const OSSExecutableDirective *Node) {
     for (const auto *C : Node->clauses())
       Visit(C);
