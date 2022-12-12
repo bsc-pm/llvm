@@ -3246,15 +3246,19 @@ public:
   //===--------------------------------------------------------------------===//
 
   /// Entry point for assignment to allocatable array.
+  //  NOTE: DoNotInitialize is used to only do a shallow copy
+  //  of the data. That is, the descriptor is initialized and
+  //  the buffer is (re)allocated, but not initialized
   static void lowerAllocatableArrayAssignment(
       Fortran::lower::AbstractConverter &converter,
       Fortran::lower::SymMap &symMap, Fortran::lower::StatementContext &stmtCtx,
       const Fortran::lower::SomeExpr &lhs, const Fortran::lower::SomeExpr &rhs,
       Fortran::lower::ExplicitIterSpace &explicitSpace,
-      Fortran::lower::ImplicitIterSpace &implicitSpace) {
+      Fortran::lower::ImplicitIterSpace &implicitSpace,
+      bool DoNotInitialize = false) {
     ArrayExprLowering ael(converter, stmtCtx, symMap,
                           ConstituentSemantics::CopyInCopyOut, &explicitSpace,
-                          &implicitSpace);
+                          &implicitSpace, DoNotInitialize);
     ael.lowerAllocatableArrayAssignment(lhs, rhs);
   }
 
@@ -3342,8 +3346,15 @@ public:
       // The lambda will be called repeatedly by genReallocIfNeeded().
       lowerAllocatableArrayAssignment(newLhs, rhsCC);
     };
-    fir::factory::MutableBoxReallocation realloc =
-        fir::factory::genReallocIfNeeded(builder, loc, mutableBox, destShape,
+
+    auto nopAssign = [&](fir::ExtendedValue newLhs) {
+    };
+    fir::factory::MutableBoxReallocation realloc;
+    if (DoNotInitialize)
+      realloc = fir::factory::genReallocIfNeeded(builder, loc, mutableBox, destShape,
+                                         lengthParams, nopAssign);
+    else
+      realloc = fir::factory::genReallocIfNeeded(builder, loc, mutableBox, destShape,
                                          lengthParams, assignToStorage);
     if (explicitSpaceIsActive()) {
       explicitSpace->finalizeContext();
@@ -6960,12 +6971,13 @@ private:
                              Fortran::lower::SymMap &symMap,
                              ConstituentSemantics sem,
                              Fortran::lower::ExplicitIterSpace *expSpace,
-                             Fortran::lower::ImplicitIterSpace *impSpace)
+                             Fortran::lower::ImplicitIterSpace *impSpace,
+                             bool DoNotInitialize = false)
       : converter{converter}, builder{converter.getFirOpBuilder()},
         stmtCtx{stmtCtx}, symMap{symMap},
         explicitSpace((expSpace && expSpace->isActive()) ? expSpace : nullptr),
         implicitSpace((impSpace && !impSpace->empty()) ? impSpace : nullptr),
-        semant{sem} {
+        semant{sem}, DoNotInitialize{DoNotInitialize} {
     // Generate any mask expressions, as necessary. This is the compute step
     // that creates the effective masks. See 10.2.3.2 in particular.
     genMasks();
@@ -7071,6 +7083,8 @@ private:
   // ProcedureRef currently being lowered. Used to retrieve the iteration shape
   // in elemental context with passed object.
   const Fortran::evaluate::ProcedureRef *loweredProcRef = nullptr;
+  // Used to do shallow copies of arrays
+  bool DoNotInitialize = false;
 };
 } // namespace
 
@@ -7396,14 +7410,14 @@ mlir::Value Fortran::lower::createSubroutineCall(
 
 void Fortran::lower::emitOSSCopyExpr(
     AbstractConverter &converter, const Fortran::semantics::Symbol &sym,
-    Fortran::lower::StatementContext &stmtCtx) {
+    Fortran::lower::StatementContext &stmtCtx, bool DoNotInitialize) {
   Fortran::evaluate::Expr rhs{Fortran::evaluate::AsGenericExpr(sym).value()};
   Fortran::evaluate::Expr lhs{Fortran::evaluate::AsGenericExpr(*sym.getOssAdditionalSym()).value()};
   Fortran::lower::SymMap &symMap = converter.getLocalSymbols();
   Fortran::lower::ExplicitIterSpace explicitIterSpace;
   Fortran::lower::ImplicitIterSpace implicitIterSpace;
   ArrayExprLowering::lowerAllocatableArrayAssignment(
-    converter, symMap, stmtCtx, lhs, rhs, explicitIterSpace, implicitIterSpace);
+    converter, symMap, stmtCtx, lhs, rhs, explicitIterSpace, implicitIterSpace, DoNotInitialize);
 }
 
 // TODO: place this in other place

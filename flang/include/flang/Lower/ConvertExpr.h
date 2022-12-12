@@ -220,7 +220,7 @@ mlir::Value createSubroutineCall(AbstractConverter &converter,
 
 // TODO: place this in other place
 void emitOSSCopyExpr(
-  AbstractConverter &, const Fortran::semantics::Symbol &, Fortran::lower::StatementContext &stmtCtx);
+  AbstractConverter &, const Fortran::semantics::Symbol &, Fortran::lower::StatementContext &stmtCtx, bool);
 
 // TODO: place this in other place
 void fill_mapping(

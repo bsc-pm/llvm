@@ -433,6 +433,14 @@ fir::factory::genMutableBoxRead(fir::FirOpBuilder &builder, mlir::Location loc,
 }
 
 mlir::Value
+fir::factory::getMutableIRBoxBaseAddress(fir::FirOpBuilder &builder,
+                                         mlir::Location loc,
+                                         const fir::MutableBoxValue &box) {
+  return MutablePropertyReader(builder, loc, box).readBaseAddress();
+}
+
+
+mlir::Value
 fir::factory::genIsAllocatedOrAssociatedTest(fir::FirOpBuilder &builder,
                                              mlir::Location loc,
                                              const fir::MutableBoxValue &box) {

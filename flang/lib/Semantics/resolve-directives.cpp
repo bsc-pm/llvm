@@ -822,8 +822,8 @@ private:
   static constexpr Symbol::Flags dataSharingAttributeFlags{
       Symbol::Flag::OSSShared, Symbol::Flag::OSSPrivate,
       Symbol::Flag::OSSFirstPrivate};
-  static constexpr Symbol::Flags firstprivateAttributeFlags{
-      Symbol::Flag::OSSFirstPrivate};
+  static constexpr Symbol::Flags privateAttributeFlags{
+      Symbol::Flag::OSSPrivate, Symbol::Flag::OSSFirstPrivate};
 
   // Materialize DSAs computed from clauses.
   void MaterializeDSAs(DirContext &context);
@@ -2731,7 +2731,7 @@ Symbol *OSSAttributeVisitor::ResolveOSS(
 
 Symbol *OSSAttributeVisitor::ResolveOSS(
     Symbol &symbol, Symbol::Flag ossFlag, Scope &scope) {
-  if (firstprivateAttributeFlags.test(ossFlag)) {
+  if (privateAttributeFlags.test(ossFlag)) {
     return OSSDeclarePrivateAccessEntity(symbol, ossFlag, scope);
   } else if (dataSharingAttributeFlags.test(ossFlag)) {
     return DeclarePrivateAccessEntity(symbol, ossFlag, scope);

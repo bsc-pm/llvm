@@ -1,12 +1,14 @@
 ! RUN: %oss-compile-and-run | FileCheck %s
 
 program pp
+   integer, pointer :: s(:)
+   integer, pointer :: fp(:)
+   integer, pointer :: p(:)
 
-call test()
-
+   call test(s, fp, p)
 
 contains
-subroutine test
+subroutine test(s, fp, p)
 
    implicit none
    integer, target :: array(10)

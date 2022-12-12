@@ -321,15 +321,15 @@ struct OmpSsDirective {
   // Converts all ConstantExpr users of GV in Blocks to instructions
   static void constantExprToInstruction(
       GlobalValue *GV, const SetVector<BasicBlock *> &Blocks) {
-    SmallVector<ConstantExpr*,4> UsersStack;
+    SmallVector<Constant*,4> UsersStack;
     SmallVector<Constant*,4> Worklist;
     Worklist.push_back(GV);
     while (!Worklist.empty()) {
       Constant *C = Worklist.pop_back_val();
       for (auto *U : C->users()) {
-        if (ConstantExpr *CC = dyn_cast<ConstantExpr>(U)) {
-          UsersStack.insert(UsersStack.begin(), CC);
-          Worklist.push_back(CC);
+        if (isa<ConstantExpr>(U) || isa<ConstantAggregate>(U)) {
+          UsersStack.insert(UsersStack.begin(), cast<Constant>(U));
+          Worklist.push_back(cast<Constant>(U));
         }
       }
     }
@@ -341,9 +341,20 @@ struct OmpSsDirective {
       for (auto *UU : UUsers) {
         if (Instruction *UI = dyn_cast<Instruction>(UU)) {
           if (Blocks.count(UI->getParent())) {
-            Instruction *NewU = U->getAsInstruction();
-            NewU->insertBefore(UI);
-            UI->replaceUsesOfWith(U, NewU);
+            if (ConstantExpr *CE = dyn_cast<ConstantExpr>(U)) {
+              Instruction *NewU = CE->getAsInstruction();
+              NewU->insertBefore(UI);
+              UI->replaceUsesOfWith(U, NewU);
+            } else if (ConstantAggregate *CE = dyn_cast<ConstantAggregate>(U)) {
+              // Convert the whole constant to a set of InsertValueInst
+              Value *NewU = UndefValue::get(CE->getType());
+              unsigned Idx = 0;
+              while (auto Elt = CE->getAggregateElement(Idx)) {
+                NewU = InsertValueInst::Create(NewU, Elt, Idx, "", UI);
+                ++Idx;
+              }
+              UI->replaceUsesOfWith(U, NewU);
+            }
           }
         }
       }

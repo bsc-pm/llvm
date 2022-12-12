@@ -135,8 +135,7 @@ end program
 !FIRDialect-NEXT:  return %arg0, %3, %4, %5 : !fir.ref<i32>, i64, i64, i64
 
 !FIRDialect-LABEL: func @compute.dep1(%arg0: !fir.ref<!fir.array<10xi32>>) -> (!fir.ref<!fir.array<10xi32>>, i64, i64, i64)
-!FIRDialect:  %c10 = arith.constant 10 : index
-!FIRDialect-NEXT:  %c10_i64 = arith.constant 10 : i64
+!FIRDialect:  %c10_i64 = arith.constant 10 : i64
 !FIRDialect-NEXT:  %c1_i64 = arith.constant 1 : i64
 !FIRDialect-NEXT:  %c10_i64_0 = arith.constant 10 : i64
 !FIRDialect-NEXT:  %c1_i64_1 = arith.constant 1 : i64
@@ -150,8 +149,7 @@ end program
 !FIRDialect-NEXT:  return %arg0, %3, %4, %5 : !fir.ref<!fir.array<10xi32>>, i64, i64, i64
 
 !FIRDialect-LABEL: func @compute.dep2(%arg0: !fir.ref<!fir.array<10xi32>>, %arg1: !fir.ref<i32>) -> (!fir.ref<!fir.array<10xi32>>, i64, i64, i64)
-!FIRDialect:  %c10 = arith.constant 10 : index
-!FIRDialect-NEXT:  %c1_i64 = arith.constant 1 : i64
+!FIRDialect:  %c1_i64 = arith.constant 1 : i64
 !FIRDialect-NEXT:  %c10_i64 = arith.constant 10 : i64
 !FIRDialect-NEXT:  %0 = fir.load %arg1 : !fir.ref<i32>
 !FIRDialect-NEXT:  %1 = fir.convert %0 : (i32) -> i64
@@ -197,9 +195,7 @@ end program
 !FIRDialect-NEXT:   return %1, %5, %6, %7 : !fir.ref<!fir.array<10xi32>>, i64, i64, i64
 
 !FIRDialect-LABEL: func @compute.dep5(%arg0: !fir.ref<!fir.array<6xi32>>) -> (!fir.ref<!fir.array<6xi32>>, i64, i64, i64)
-!FIRDialect:  %c5 = arith.constant 5 : index
-!FIRDialect-NEXT:  %c6 = arith.constant 6 : index
-!FIRDialect-NEXT:  %c6_i64 = arith.constant 6 : i64
+!FIRDialect:  %c6_i64 = arith.constant 6 : i64
 !FIRDialect-NEXT:  %c5_i64 = arith.constant 5 : i64
 !FIRDialect-NEXT:  %c10_i64 = arith.constant 10 : i64
 !FIRDialect-NEXT:  %c1_i64 = arith.constant 1 : i64
@@ -213,8 +209,7 @@ end program
 !FIRDialect-NEXT:  return %arg0, %3, %4, %5 : !fir.ref<!fir.array<6xi32>>, i64, i64, i64
 
 !FIRDialect-LABEL: func @compute.dep6(%arg0: !fir.ref<!fir.array<10xi32>>, %arg1: !fir.ref<i32>) -> (!fir.ref<!fir.array<10xi32>>, i64, i64, i64)
-!FIRDialect:  %c10 = arith.constant 10 : index
-!FIRDialect-NEXT:  %c1_i64 = arith.constant 1 : i64
+!FIRDialect:  %c1_i64 = arith.constant 1 : i64
 !FIRDialect-NEXT:  %c10_i64 = arith.constant 10 : i64
 !FIRDialect-NEXT:  %0 = fir.load %arg1 : !fir.ref<i32>
 !FIRDialect-NEXT:  %1 = fir.convert %0 : (i32) -> i64
@@ -233,8 +228,7 @@ end program
 !FIRDialect-NEXT:  return %arg0, %8, %9, %10 : !fir.ref<!fir.array<10xi32>>, i64, i64, i64
 
 !FIRDialect-LABEL: func @compute.dep7(%arg0: !fir.ref<!fir.array<10xi32>>) -> (!fir.ref<!fir.array<10xi32>>, i64, i64, i64)
-!FIRDialect:  %c10 = arith.constant 10 : index
-!FIRDialect-NEXT:  %c1_i64 = arith.constant 1 : i64
+!FIRDialect:  %c1_i64 = arith.constant 1 : i64
 !FIRDialect-NEXT:  %c10_i64 = arith.constant 10 : i64
 !FIRDialect-NEXT:  %c10_i64_0 = arith.constant 10 : i64
 !FIRDialect-NEXT:  %c1_i64_1 = arith.constant 1 : i64

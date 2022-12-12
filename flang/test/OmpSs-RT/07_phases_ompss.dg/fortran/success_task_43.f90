@@ -1,5 +1,4 @@
 ! RUN: %oss-compile-and-run
-! XFAIL: true
 ! <testinfo>
 ! test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatibility")
 ! test_FFLAGS="--no-copy-deps"
