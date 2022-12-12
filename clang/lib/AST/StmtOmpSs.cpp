@@ -13,88 +13,95 @@
 
 #include "clang/AST/StmtOmpSs.h"
 
-#include "clang/AST/ASTContext.h"
-
 using namespace clang;
 
-void OSSExecutableDirective::setClauses(ArrayRef<OSSClause *> Clauses) {
-  assert(Clauses.size() == getNumClauses() &&
+size_t OSSChildren::size(unsigned NumClauses, bool HasAssociatedStmt,
+                         unsigned NumChildren) {
+  return llvm::alignTo(
+      totalSizeToAlloc<OSSClause *, Stmt *>(
+          NumClauses, NumChildren + (HasAssociatedStmt ? 1 : 0)),
+      alignof(OSSChildren));
+}
+
+void OSSChildren::setClauses(ArrayRef<OSSClause *> Clauses) {
+  assert(Clauses.size() == NumClauses &&
          "Number of clauses is not the same as the preallocated buffer");
-  std::copy(Clauses.begin(), Clauses.end(), getClauses().begin());
+  llvm::copy(Clauses, getTrailingObjects<OSSClause *>());
+}
+
+MutableArrayRef<Stmt *> OSSChildren::getChildren() {
+  return llvm::makeMutableArrayRef(getTrailingObjects<Stmt *>(), NumChildren);
+}
+
+OSSChildren *OSSChildren::Create(void *Mem, ArrayRef<OSSClause *> Clauses) {
+  auto *Data = CreateEmpty(Mem, Clauses.size());
+  Data->setClauses(Clauses);
+  return Data;
+}
+
+OSSChildren *OSSChildren::Create(void *Mem, ArrayRef<OSSClause *> Clauses,
+                                 Stmt *S, unsigned NumChildren) {
+  auto *Data = CreateEmpty(Mem, Clauses.size(), S, NumChildren);
+  Data->setClauses(Clauses);
+  if (S)
+    Data->setAssociatedStmt(S);
+  return Data;
+}
+
+OSSChildren *OSSChildren::CreateEmpty(void *Mem, unsigned NumClauses,
+                                      bool HasAssociatedStmt,
+                                      unsigned NumChildren) {
+  return new (Mem) OSSChildren(NumClauses, NumChildren, HasAssociatedStmt);
 }
 
 OSSTaskwaitDirective *
 OSSTaskwaitDirective::Create(const ASTContext &C, SourceLocation StartLoc,
                              SourceLocation EndLoc, ArrayRef<OSSClause *> Clauses) {
-  unsigned Size = llvm::alignTo(sizeof(OSSTaskwaitDirective), alignof(OSSClause *));
-  void *Mem = C.Allocate(Size + sizeof(OSSClause *) * Clauses.size());
-  OSSTaskwaitDirective *Dir =
-      new (Mem) OSSTaskwaitDirective(StartLoc, EndLoc, Clauses.size());
-  Dir->setClauses(Clauses);
-  return Dir;
+  return createDirective<OSSTaskwaitDirective>(
+      C, Clauses, /*AssociatedStmt=*/nullptr, /*NumChildren=*/0, StartLoc,
+      EndLoc);
 }
 
 OSSTaskwaitDirective *OSSTaskwaitDirective::CreateEmpty(const ASTContext &C,
                                                         unsigned NumClauses,
                                                         EmptyShell) {
-  unsigned Size = llvm::alignTo(sizeof(OSSTaskwaitDirective), alignof(OSSClause *));
-  void *Mem = C.Allocate(Size + sizeof(OSSClause *) * NumClauses);
-  return new (Mem) OSSTaskwaitDirective(NumClauses);
+  return createEmptyDirective<OSSTaskwaitDirective>(C, NumClauses);
 }
 
 OSSReleaseDirective *
 OSSReleaseDirective::Create(const ASTContext &C, SourceLocation StartLoc,
                              SourceLocation EndLoc, ArrayRef<OSSClause *> Clauses) {
-  unsigned Size = llvm::alignTo(sizeof(OSSReleaseDirective), alignof(OSSClause *));
-  void *Mem = C.Allocate(Size + sizeof(OSSClause *) * Clauses.size());
-  OSSReleaseDirective *Dir =
-      new (Mem) OSSReleaseDirective(StartLoc, EndLoc, Clauses.size());
-  Dir->setClauses(Clauses);
-  return Dir;
+  return createDirective<OSSReleaseDirective>(
+      C, Clauses, /*AssociatedStmt=*/nullptr, /*NumChildren=*/0, StartLoc,
+      EndLoc);
 }
 
 OSSReleaseDirective *OSSReleaseDirective::CreateEmpty(const ASTContext &C,
                                                       unsigned NumClauses,
                                                       EmptyShell) {
-  unsigned Size = llvm::alignTo(sizeof(OSSReleaseDirective), alignof(OSSClause *));
-  void *Mem = C.Allocate(Size + sizeof(OSSClause *) * NumClauses);
-  return new (Mem) OSSReleaseDirective(NumClauses);
+  return createEmptyDirective<OSSReleaseDirective>(C, NumClauses);
 }
 
 OSSTaskDirective *
 OSSTaskDirective::Create(const ASTContext &C, SourceLocation StartLoc,
                          SourceLocation EndLoc, ArrayRef<OSSClause *> Clauses, Stmt *AStmt) {
-  unsigned Size = llvm::alignTo(sizeof(OSSTaskDirective), alignof(OSSClause *));
-  void *Mem =
-      C.Allocate(Size + sizeof(OSSClause *) * Clauses.size() + sizeof(Stmt *));
-  OSSTaskDirective *Dir =
-      new (Mem) OSSTaskDirective(StartLoc, EndLoc, Clauses.size());
-  Dir->setClauses(Clauses);
-  Dir->setAssociatedStmt(AStmt);
-  return Dir;
+  return createDirective<OSSTaskDirective>(
+      C, Clauses, AStmt, /*NumChildren=*/0, StartLoc, EndLoc);
 }
 
 OSSTaskDirective *OSSTaskDirective::CreateEmpty(const ASTContext &C,
                                                 unsigned NumClauses,
                                                 EmptyShell) {
-  unsigned Size = llvm::alignTo(sizeof(OSSTaskDirective), alignof(OSSClause *));
-  void *Mem =
-      C.Allocate(Size + sizeof(OSSClause *) * NumClauses + sizeof(Stmt *));
-  return new (Mem) OSSTaskDirective(NumClauses);
+  return createEmptyDirective<OSSTaskDirective>(
+      C, NumClauses, /*HasAssociatedStmt=*/true);
 }
 
 OSSTaskForDirective *
 OSSTaskForDirective::Create(const ASTContext &C, SourceLocation StartLoc,
                          SourceLocation EndLoc, ArrayRef<OSSClause *> Clauses, Stmt *AStmt,
                          const SmallVectorImpl<HelperExprs> &Exprs) {
-  unsigned Size = llvm::alignTo(sizeof(OSSTaskForDirective), alignof(OSSClause *));
-  void *Mem =
-      C.Allocate(Size + sizeof(OSSClause *) * Clauses.size() + sizeof(Stmt *));
-  OSSTaskForDirective *Dir =
-      new (Mem) OSSTaskForDirective(StartLoc, EndLoc, Clauses.size(), Exprs.size());
-  Dir->setClauses(Clauses);
-  Dir->setAssociatedStmt(AStmt);
-
+  auto *Dir = createDirective<OSSTaskForDirective>(
+      C, Clauses, AStmt, /*NumChildren=*/0, StartLoc, EndLoc, Exprs.size());
   Expr **IndVar;
   Expr **LB;
   Expr **UB;
@@ -126,25 +133,18 @@ OSSTaskForDirective::Create(const ASTContext &C, SourceLocation StartLoc,
 
 OSSTaskForDirective *OSSTaskForDirective::CreateEmpty(const ASTContext &C,
                                                 unsigned NumClauses,
+                                                unsigned NumCollapses,
                                                 EmptyShell) {
-  unsigned Size = llvm::alignTo(sizeof(OSSTaskForDirective), alignof(OSSClause *));
-  void *Mem =
-      C.Allocate(Size + sizeof(OSSClause *) * NumClauses + sizeof(Stmt *));
-  return new (Mem) OSSTaskForDirective(NumClauses);
+  return createEmptyDirective<OSSTaskForDirective>(
+      C, NumClauses, /*HasAssociatedStmt=*/true, /*NumChildren=*/0, NumCollapses);
 }
 
 OSSTaskIterDirective *
 OSSTaskIterDirective::Create(const ASTContext &C, SourceLocation StartLoc,
                          SourceLocation EndLoc, ArrayRef<OSSClause *> Clauses, Stmt *AStmt,
                          const SmallVectorImpl<HelperExprs> &Exprs) {
-  unsigned Size = llvm::alignTo(sizeof(OSSTaskIterDirective), alignof(OSSClause *));
-  void *Mem =
-      C.Allocate(Size + sizeof(OSSClause *) * Clauses.size() + sizeof(Stmt *));
-  OSSTaskIterDirective *Dir =
-      new (Mem) OSSTaskIterDirective(StartLoc, EndLoc, Clauses.size(), Exprs.size());
-  Dir->setClauses(Clauses);
-  Dir->setAssociatedStmt(AStmt);
-
+  auto *Dir = createDirective<OSSTaskIterDirective>(
+      C, Clauses, AStmt, /*NumChildren=*/0, StartLoc, EndLoc, Exprs.size());
   if (!Exprs.empty()) {
     // taskiter (for)
     Expr **IndVar;
@@ -179,25 +179,18 @@ OSSTaskIterDirective::Create(const ASTContext &C, SourceLocation StartLoc,
 
 OSSTaskIterDirective *OSSTaskIterDirective::CreateEmpty(const ASTContext &C,
                                                 unsigned NumClauses,
+                                                unsigned NumCollapses,
                                                 EmptyShell) {
-  unsigned Size = llvm::alignTo(sizeof(OSSTaskIterDirective), alignof(OSSClause *));
-  void *Mem =
-      C.Allocate(Size + sizeof(OSSClause *) * NumClauses + sizeof(Stmt *));
-  return new (Mem) OSSTaskIterDirective(NumClauses);
+  return createEmptyDirective<OSSTaskIterDirective>(
+      C, NumClauses, /*HasAssociatedStmt=*/true, /*NumChildren=*/0, NumCollapses);
 }
 
 OSSTaskLoopDirective *
 OSSTaskLoopDirective::Create(const ASTContext &C, SourceLocation StartLoc,
                          SourceLocation EndLoc, ArrayRef<OSSClause *> Clauses, Stmt *AStmt,
                          const SmallVectorImpl<HelperExprs> &Exprs) {
-  unsigned Size = llvm::alignTo(sizeof(OSSTaskLoopDirective), alignof(OSSClause *));
-  void *Mem =
-      C.Allocate(Size + sizeof(OSSClause *) * Clauses.size() + sizeof(Stmt *));
-  OSSTaskLoopDirective *Dir =
-      new (Mem) OSSTaskLoopDirective(StartLoc, EndLoc, Clauses.size(), Exprs.size());
-  Dir->setClauses(Clauses);
-  Dir->setAssociatedStmt(AStmt);
-
+  auto *Dir = createDirective<OSSTaskLoopDirective>(
+      C, Clauses, AStmt, /*NumChildren=*/0, StartLoc, EndLoc, Exprs.size());
   Expr **IndVar;
   Expr **LB;
   Expr **UB;
@@ -229,25 +222,18 @@ OSSTaskLoopDirective::Create(const ASTContext &C, SourceLocation StartLoc,
 
 OSSTaskLoopDirective *OSSTaskLoopDirective::CreateEmpty(const ASTContext &C,
                                                 unsigned NumClauses,
+                                                unsigned NumCollapses,
                                                 EmptyShell) {
-  unsigned Size = llvm::alignTo(sizeof(OSSTaskLoopDirective), alignof(OSSClause *));
-  void *Mem =
-      C.Allocate(Size + sizeof(OSSClause *) * NumClauses + sizeof(Stmt *));
-  return new (Mem) OSSTaskLoopDirective(NumClauses);
+  return createEmptyDirective<OSSTaskLoopDirective>(
+      C, NumClauses, /*HasAssociatedStmt=*/true, /*NumChildren=*/0, NumCollapses);
 }
 
 OSSTaskLoopForDirective *
 OSSTaskLoopForDirective::Create(const ASTContext &C, SourceLocation StartLoc,
                          SourceLocation EndLoc, ArrayRef<OSSClause *> Clauses, Stmt *AStmt,
                          const SmallVectorImpl<HelperExprs> &Exprs) {
-  unsigned Size = llvm::alignTo(sizeof(OSSTaskLoopForDirective), alignof(OSSClause *));
-  void *Mem =
-      C.Allocate(Size + sizeof(OSSClause *) * Clauses.size() + sizeof(Stmt *));
-  OSSTaskLoopForDirective *Dir =
-      new (Mem) OSSTaskLoopForDirective(StartLoc, EndLoc, Clauses.size(), Exprs.size());
-  Dir->setClauses(Clauses);
-  Dir->setAssociatedStmt(AStmt);
-
+  auto *Dir = createDirective<OSSTaskLoopForDirective>(
+      C, Clauses, AStmt, /*NumChildren=*/0, StartLoc, EndLoc, Exprs.size());
   Expr **IndVar;
   Expr **LB;
   Expr **UB;
@@ -279,9 +265,8 @@ OSSTaskLoopForDirective::Create(const ASTContext &C, SourceLocation StartLoc,
 
 OSSTaskLoopForDirective *OSSTaskLoopForDirective::CreateEmpty(const ASTContext &C,
                                                 unsigned NumClauses,
+                                                unsigned NumCollapses,
                                                 EmptyShell) {
-  unsigned Size = llvm::alignTo(sizeof(OSSTaskLoopForDirective), alignof(OSSClause *));
-  void *Mem =
-      C.Allocate(Size + sizeof(OSSClause *) * NumClauses + sizeof(Stmt *));
-  return new (Mem) OSSTaskLoopForDirective(NumClauses);
+  return createEmptyDirective<OSSTaskLoopForDirective>(
+      C, NumClauses, /*HasAssociatedStmt=*/true, /*NumChildren=*/0, NumCollapses);
 }

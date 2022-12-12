@@ -15,6 +15,7 @@
 #ifndef LLVM_CLANG_AST_STMTOMPSS_H
 #define LLVM_CLANG_AST_STMTOMPSS_H
 
+#include "clang/AST/ASTContext.h"
 #include "clang/AST/Expr.h"
 #include "clang/AST/OmpSsClause.h"
 #include "clang/AST/Stmt.h"
@@ -38,23 +39,17 @@ class OSSExecutableDirective : public Stmt {
   SourceLocation StartLoc;
   /// Ending location of the directive.
   SourceLocation EndLoc;
-  /// Numbers of clauses.
-  const unsigned NumClauses;
-  /// Number of child expressions/stmts.
-  const unsigned NumChildren;
-  /// Offset from this to the start of clauses.
-  /// There are NumClauses pointers to clauses, they are followed by
-  /// NumChildren pointers to child stmts/exprs (if the directive type
-  /// requires an associated stmt, then it has to be the first of them).
-  const unsigned ClausesOffset;
 
   /// Get the clauses storage.
   MutableArrayRef<OSSClause *> getClauses() {
-    OSSClause **ClauseStorage = reinterpret_cast<OSSClause **>(
-        reinterpret_cast<char *>(this) + ClausesOffset);
-    return MutableArrayRef<OSSClause *>(ClauseStorage, NumClauses);
+    if (!Data)
+      return std::nullopt;
+    return Data->getClauses();
   }
 protected:
+  /// Data, associated with the directive.
+  OSSChildren *Data = nullptr;
+
   /// Build instance of directive of class \a K.
   ///
   /// \param SC Statement class.
@@ -62,28 +57,57 @@ protected:
   /// \param StartLoc Starting location of the directive (directive keyword).
   /// \param EndLoc Ending location of the directive.
   ///
-  template <typename T>
-  OSSExecutableDirective(const T *, StmtClass SC, OmpSsDirectiveKind K,
-                         SourceLocation StartLoc, SourceLocation EndLoc,
-                         unsigned NumClauses, unsigned NumChildren)
+  OSSExecutableDirective(StmtClass SC, OmpSsDirectiveKind K,
+                         SourceLocation StartLoc, SourceLocation EndLoc)
       : Stmt(SC), Kind(K), StartLoc(std::move(StartLoc)),
-        EndLoc(std::move(EndLoc)), NumClauses(NumClauses),
-        NumChildren(NumChildren),
-        ClausesOffset(llvm::alignTo(sizeof(T), alignof(OSSClause *))) {}
+        EndLoc(std::move(EndLoc)) {}
 
-  /// Sets the list of variables for this clause.
-  ///
-  /// \param Clauses The list of clauses for the directive.
-  ///
-  void setClauses(ArrayRef<OSSClause *> Clauses);
+  template <typename T, typename... Params>
+  static T *createDirective(const ASTContext &C, ArrayRef<OSSClause *> Clauses,
+                            Stmt *AssociatedStmt, unsigned NumChildren,
+                            Params &&... P) {
+    void *Mem =
+        C.Allocate(sizeof(T) + OSSChildren::size(Clauses.size(), AssociatedStmt,
+                                                 NumChildren),
+                   alignof(T));
 
-  /// Set the associated statement for the directive.
-  ///
-  /// /param S Associated statement.
-  ///
-  void setAssociatedStmt(Stmt *S) {
-    assert(hasAssociatedStmt() && "no associated statement.");
-    *child_begin() = S;
+    auto *Data = OSSChildren::Create(reinterpret_cast<T *>(Mem) + 1, Clauses,
+                                     AssociatedStmt, NumChildren);
+    auto *Inst = new (Mem) T(std::forward<Params>(P)...);
+    Inst->Data = Data;
+    return Inst;
+  }
+
+  template <typename T, typename... Params>
+  static T *createEmptyDirective(const ASTContext &C, unsigned NumClauses,
+                                 bool HasAssociatedStmt, unsigned NumChildren,
+                                 Params &&... P) {
+    void *Mem =
+        C.Allocate(sizeof(T) + OSSChildren::size(NumClauses, HasAssociatedStmt,
+                                                 NumChildren),
+                   alignof(T));
+    auto *Data =
+        OSSChildren::CreateEmpty(reinterpret_cast<T *>(Mem) + 1, NumClauses,
+                                 HasAssociatedStmt, NumChildren);
+    auto *Inst = new (Mem) T(std::forward<Params>(P)...);
+    Inst->Data = Data;
+    return Inst;
+  }
+
+  template <typename T>
+  static T *createEmptyDirective(const ASTContext &C, unsigned NumClauses,
+                                 bool HasAssociatedStmt = false,
+                                 unsigned NumChildren = 0) {
+    void *Mem =
+        C.Allocate(sizeof(T) + OSSChildren::size(NumClauses, HasAssociatedStmt,
+                                                 NumChildren),
+                   alignof(T));
+    auto *Data =
+        OSSChildren::CreateEmpty(reinterpret_cast<T *>(Mem) + 1, NumClauses,
+                                 HasAssociatedStmt, NumChildren);
+    auto *Inst = new (Mem) T;
+    Inst->Data = Data;
+    return Inst;
   }
 
 public:
@@ -180,7 +204,11 @@ public:
   void setLocEnd(SourceLocation Loc) { EndLoc = Loc; }
 
   /// Get number of clauses.
-  unsigned getNumClauses() const { return NumClauses; }
+  unsigned getNumClauses() const {
+    if (!Data)
+      return 0;
+    return Data->getNumClauses();
+  }
 
   /// Returns specified clause.
   ///
@@ -189,7 +217,7 @@ public:
   OSSClause *getClause(unsigned i) const { return clauses()[i]; }
 
   /// Returns true if directive has associated statement.
-  bool hasAssociatedStmt() const { return NumChildren > 0; }
+  bool hasAssociatedStmt() const { return Data && Data->hasAssociatedStmt(); }
 
   /// Returns statement associated with the directive.
   const Stmt *getAssociatedStmt() const {
@@ -209,18 +237,19 @@ public:
   }
 
   child_range children() {
-    if (!hasAssociatedStmt())
+    if (!Data)
       return child_range(child_iterator(), child_iterator());
-    Stmt **ChildStorage = reinterpret_cast<Stmt **>(getClauses().end());
-    /// Do not mark all the special expression/statements as children, except
-    /// for the associated statement.
-    return child_range(ChildStorage, ChildStorage + 1);
+    return Data->getAssociatedStmtAsRange();
   }
 
-  ArrayRef<OSSClause *> clauses() { return getClauses(); }
+  const_child_range children() const {
+    return const_cast<OSSExecutableDirective *>(this)->children();
+  }
 
   ArrayRef<OSSClause *> clauses() const {
-    return const_cast<OSSExecutableDirective *>(this)->getClauses();
+    if (!Data)
+      return std::nullopt;
+    return Data->getClauses();
   }
 };
 
@@ -232,23 +261,21 @@ public:
 ///
 class OSSTaskwaitDirective : public OSSExecutableDirective {
   friend class ASTStmtReader;
+  friend class OSSExecutableDirective;
   /// Build directive with the given start and end location.
   ///
   /// \param StartLoc Starting location of the directive kind.
   /// \param EndLoc Ending location of the directive.
-  /// \param NumClauses Number of clauses.
   ///
-  OSSTaskwaitDirective(SourceLocation StartLoc, SourceLocation EndLoc, unsigned NumClauses)
-      : OSSExecutableDirective(this, OSSTaskwaitDirectiveClass, OSSD_taskwait,
-                               StartLoc, EndLoc, NumClauses, 0) {}
+  OSSTaskwaitDirective(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSExecutableDirective(OSSTaskwaitDirectiveClass, OSSD_taskwait,
+                               StartLoc, EndLoc) {}
 
   /// Build an empty directive.
   ///
-  /// \param NumClauses Number of clauses.
-  ///
-  explicit OSSTaskwaitDirective(unsigned NumClauses)
-      : OSSExecutableDirective(this, OSSTaskwaitDirectiveClass, OSSD_taskwait,
-                               SourceLocation(), SourceLocation(), NumClauses, 0) {}
+  explicit OSSTaskwaitDirective()
+      : OSSExecutableDirective(OSSTaskwaitDirectiveClass, OSSD_taskwait,
+                               SourceLocation(), SourceLocation()) {}
 
 public:
   /// Creates directive.
@@ -283,23 +310,21 @@ public:
 ///
 class OSSReleaseDirective : public OSSExecutableDirective {
   friend class ASTStmtReader;
+  friend class OSSExecutableDirective;
   /// Build directive with the given start and end location.
   ///
   /// \param StartLoc Starting location of the directive kind.
   /// \param EndLoc Ending location of the directive.
-  /// \param NumClauses Number of clauses.
   ///
-  OSSReleaseDirective(SourceLocation StartLoc, SourceLocation EndLoc, unsigned NumClauses)
-      : OSSExecutableDirective(this, OSSReleaseDirectiveClass, OSSD_release,
-                               StartLoc, EndLoc, NumClauses, 0) {}
+  OSSReleaseDirective(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSExecutableDirective(OSSReleaseDirectiveClass, OSSD_release,
+                               StartLoc, EndLoc) {}
 
   /// Build an empty directive.
   ///
-  /// \param NumClauses Number of clauses.
-  ///
-  explicit OSSReleaseDirective(unsigned NumClauses)
-      : OSSExecutableDirective(this, OSSReleaseDirectiveClass, OSSD_release,
-                               SourceLocation(), SourceLocation(), NumClauses, 0) {}
+  explicit OSSReleaseDirective()
+      : OSSExecutableDirective(OSSReleaseDirectiveClass, OSSD_release,
+                               SourceLocation(), SourceLocation()) {}
 
 public:
   /// Creates directive.
@@ -328,23 +353,21 @@ public:
 
 class OSSTaskDirective : public OSSExecutableDirective {
   friend class ASTStmtReader;
+  friend class OSSExecutableDirective;
   /// Build directive with the given start and end location.
   ///
   /// \param StartLoc Starting location of the directive kind.
   /// \param EndLoc Ending location of the directive.
-  /// \param NumClauses Number of clauses.
   ///
-  OSSTaskDirective(SourceLocation StartLoc, SourceLocation EndLoc, unsigned NumClauses)
-      : OSSExecutableDirective(this, OSSTaskDirectiveClass, OSSD_task,
-                               StartLoc, EndLoc, NumClauses, 1) {}
+  OSSTaskDirective(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSExecutableDirective(OSSTaskDirectiveClass, OSSD_task,
+                               StartLoc, EndLoc) {}
 
   /// Build an empty directive.
   ///
-  /// \param NumClauses Number of clauses.
-  ///
-  explicit OSSTaskDirective(unsigned NumClauses)
-      : OSSExecutableDirective(this, OSSTaskDirectiveClass, OSSD_task,
-                               SourceLocation(), SourceLocation(), NumClauses, 1) {}
+  explicit OSSTaskDirective()
+      : OSSExecutableDirective(OSSTaskDirectiveClass, OSSD_task,
+                               SourceLocation(), SourceLocation()) {}
 
 public:
   /// Creates directive with a list of \a Clauses.
@@ -379,12 +402,6 @@ public:
 ///
 class OSSLoopDirective : public OSSExecutableDirective {
   friend class ASTStmtReader;
-  /// Build directive with the given start and end location.
-  ///
-  /// \param StartLoc Starting location of the directive kind.
-  /// \param EndLoc Ending location of the directive.
-  /// \param NumClauses Number of clauses.
-  ///
   /// The Induction variable of the loop directive
   Expr **IndVarExpr;
   /// The lower bound of the loop directive
@@ -407,13 +424,12 @@ protected:
   /// \param Kind Kind of OpenMP directive.
   /// \param StartLoc Starting location of the directive (directive keyword).
   /// \param EndLoc Ending location of the directive.
-  /// \param NumClauses Number of clauses.
+  /// \param NumCollapses Number of collapsed loops from 'collapse' clause.
   ///
-  template <typename T>
-  OSSLoopDirective(const T *That, StmtClass SC, OmpSsDirectiveKind Kind,
+  OSSLoopDirective(StmtClass SC, OmpSsDirectiveKind Kind,
                    SourceLocation StartLoc, SourceLocation EndLoc,
-                   unsigned NumClauses, unsigned NumCollapses)
-      : OSSExecutableDirective(That, SC, Kind, StartLoc, EndLoc, NumClauses, 1),
+                   unsigned NumCollapses)
+      : OSSExecutableDirective(SC, Kind, StartLoc, EndLoc),
         NumCollapses(NumCollapses)
         {}
 
@@ -484,24 +500,24 @@ public:
 
 class OSSTaskForDirective : public OSSLoopDirective {
   friend class ASTStmtReader;
+  friend class OSSExecutableDirective;
   /// Build directive with the given start and end location.
   ///
   /// \param StartLoc Starting location of the directive kind.
   /// \param EndLoc Ending location of the directive.
-  /// \param NumClauses Number of clauses.
+  /// \param NumCollapses Number of collapsed loops from 'collapse' clause.
   ///
-  OSSTaskForDirective(SourceLocation StartLoc, SourceLocation EndLoc, unsigned NumClauses,
+  OSSTaskForDirective(SourceLocation StartLoc, SourceLocation EndLoc,
                       unsigned NumCollapses)
-      : OSSLoopDirective(this, OSSTaskForDirectiveClass, OSSD_task_for,
-                         StartLoc, EndLoc, NumClauses, NumCollapses) {}
+      : OSSLoopDirective(OSSTaskForDirectiveClass, OSSD_task_for,
+                         StartLoc, EndLoc, NumCollapses) {}
 
   /// Build an empty directive.
+  /// \param NumCollapses Number of collapsed loops from 'collapse' clause.
   ///
-  /// \param NumClauses Number of clauses.
-  ///
-  explicit OSSTaskForDirective(unsigned NumClauses)
-      : OSSLoopDirective(this, OSSTaskForDirectiveClass, OSSD_task_for,
-                         SourceLocation(), SourceLocation(), NumClauses, 0) {}
+  explicit OSSTaskForDirective(unsigned NumCollapses)
+      : OSSLoopDirective(OSSTaskForDirectiveClass, OSSD_task_for,
+                         SourceLocation(), SourceLocation(), NumCollapses) {}
 
 public:
   /// Creates directive with a list of \a Clauses.
@@ -524,9 +540,11 @@ public:
   ///
   /// \param C AST context.
   /// \param NumClauses Number of clauses.
+  /// \param NumCollapses Number of collapsed loops from 'collapse' clause.
   ///
   static OSSTaskForDirective *CreateEmpty(
-      const ASTContext &C, unsigned NumClauses, EmptyShell);
+      const ASTContext &C, unsigned NumClauses,
+      unsigned NumCollapses, EmptyShell);
 
   static bool classof(const Stmt *T) {
     return T->getStmtClass() == OSSTaskForDirectiveClass;
@@ -535,24 +553,25 @@ public:
 
 class OSSTaskIterDirective : public OSSLoopDirective {
   friend class ASTStmtReader;
+  friend class OSSExecutableDirective;
   /// Build directive with the given start and end location.
   ///
   /// \param StartLoc Starting location of the directive kind.
   /// \param EndLoc Ending location of the directive.
-  /// \param NumClauses Number of clauses.
+  /// \param NumCollapses Number of collapsed loops from 'collapse' clause.
   ///
-  OSSTaskIterDirective(SourceLocation StartLoc, SourceLocation EndLoc, unsigned NumClauses,
+  OSSTaskIterDirective(SourceLocation StartLoc, SourceLocation EndLoc,
                       unsigned NumCollapses)
-      : OSSLoopDirective(this, OSSTaskIterDirectiveClass, OSSD_taskiter,
-                         StartLoc, EndLoc, NumClauses, NumCollapses) {}
+      : OSSLoopDirective(OSSTaskIterDirectiveClass, OSSD_taskiter,
+                         StartLoc, EndLoc, NumCollapses) {}
 
   /// Build an empty directive.
   ///
-  /// \param NumClauses Number of clauses.
+  /// \param NumCollapses Number of collapsed loops from 'collapse' clause.
   ///
-  explicit OSSTaskIterDirective(unsigned NumClauses)
-      : OSSLoopDirective(this, OSSTaskIterDirectiveClass, OSSD_taskiter,
-                         SourceLocation(), SourceLocation(), NumClauses, 0) {}
+  explicit OSSTaskIterDirective(unsigned NumCollapses)
+      : OSSLoopDirective(OSSTaskIterDirectiveClass, OSSD_taskiter,
+                         SourceLocation(), SourceLocation(), NumCollapses) {}
 
 public:
   /// Creates directive with a list of \a Clauses.
@@ -575,9 +594,11 @@ public:
   ///
   /// \param C AST context.
   /// \param NumClauses Number of clauses.
+  /// \param NumCollapses Number of collapsed loops from 'collapse' clause.
   ///
   static OSSTaskIterDirective *CreateEmpty(
-      const ASTContext &C, unsigned NumClauses, EmptyShell);
+      const ASTContext &C, unsigned NumClauses,
+      unsigned NumCollapses, EmptyShell);
 
   static bool classof(const Stmt *T) {
     return T->getStmtClass() == OSSTaskIterDirectiveClass;
@@ -586,24 +607,23 @@ public:
 
 class OSSTaskLoopDirective : public OSSLoopDirective {
   friend class ASTStmtReader;
+  friend class OSSExecutableDirective;
   /// Build directive with the given start and end location.
   ///
   /// \param StartLoc Starting location of the directive kind.
   /// \param EndLoc Ending location of the directive.
-  /// \param NumClauses Number of clauses.
   ///
-  OSSTaskLoopDirective(SourceLocation StartLoc, SourceLocation EndLoc, unsigned NumClauses,
+  OSSTaskLoopDirective(SourceLocation StartLoc, SourceLocation EndLoc,
                        unsigned NumCollapses)
-      : OSSLoopDirective(this, OSSTaskLoopDirectiveClass, OSSD_taskloop,
-                         StartLoc, EndLoc, NumClauses, NumCollapses) {}
+      : OSSLoopDirective(OSSTaskLoopDirectiveClass, OSSD_taskloop,
+                         StartLoc, EndLoc, NumCollapses) {}
 
   /// Build an empty directive.
+  /// \param NumCollapses Number of collapsed loops from 'collapse' clause.
   ///
-  /// \param NumClauses Number of clauses.
-  ///
-  explicit OSSTaskLoopDirective(unsigned NumClauses)
-      : OSSLoopDirective(this, OSSTaskLoopDirectiveClass, OSSD_taskloop,
-                         SourceLocation(), SourceLocation(), NumClauses, 0) {}
+  explicit OSSTaskLoopDirective(unsigned NumCollapses)
+      : OSSLoopDirective(OSSTaskLoopDirectiveClass, OSSD_taskloop,
+                         SourceLocation(), SourceLocation(), NumCollapses) {}
 
 public:
   /// Creates directive with a list of \a Clauses.
@@ -626,9 +646,11 @@ public:
   ///
   /// \param C AST context.
   /// \param NumClauses Number of clauses.
+  /// \param NumCollapses Number of collapsed loops from 'collapse' clause.
   ///
   static OSSTaskLoopDirective *CreateEmpty(
-      const ASTContext &C, unsigned NumClauses, EmptyShell);
+      const ASTContext &C, unsigned NumClauses,
+      unsigned NumCollapses, EmptyShell);
 
   static bool classof(const Stmt *T) {
     return T->getStmtClass() == OSSTaskLoopDirectiveClass;
@@ -637,24 +659,24 @@ public:
 
 class OSSTaskLoopForDirective : public OSSLoopDirective {
   friend class ASTStmtReader;
+  friend class OSSExecutableDirective;
   /// Build directive with the given start and end location.
   ///
   /// \param StartLoc Starting location of the directive kind.
   /// \param EndLoc Ending location of the directive.
-  /// \param NumClauses Number of clauses.
+  /// \param NumCollapses Number of collapsed loops from 'collapse' clause.
   ///
-  OSSTaskLoopForDirective(SourceLocation StartLoc, SourceLocation EndLoc, unsigned NumClauses,
+  OSSTaskLoopForDirective(SourceLocation StartLoc, SourceLocation EndLoc,
                           unsigned NumCollapses)
-      : OSSLoopDirective(this, OSSTaskLoopForDirectiveClass, OSSD_taskloop_for,
-                         StartLoc, EndLoc, NumClauses, NumCollapses) {}
+      : OSSLoopDirective(OSSTaskLoopForDirectiveClass, OSSD_taskloop_for,
+                         StartLoc, EndLoc, NumCollapses) {}
 
   /// Build an empty directive.
+  /// \param NumCollapses Number of collapsed loops from 'collapse' clause.
   ///
-  /// \param NumClauses Number of clauses.
-  ///
-  explicit OSSTaskLoopForDirective(unsigned NumClauses)
-      : OSSLoopDirective(this, OSSTaskLoopForDirectiveClass, OSSD_taskloop_for,
-                         SourceLocation(), SourceLocation(), NumClauses, 0) {}
+  explicit OSSTaskLoopForDirective(unsigned NumCollapses)
+      : OSSLoopDirective(OSSTaskLoopForDirectiveClass, OSSD_taskloop_for,
+                         SourceLocation(), SourceLocation(), NumCollapses) {}
 
 public:
   /// Creates directive with a list of \a Clauses.
@@ -677,10 +699,11 @@ public:
   ///
   /// \param C AST context.
   /// \param NumClauses Number of clauses.
+  /// \param NumCollapses Number of collapsed loops from 'collapse' clause.
   ///
   static OSSTaskLoopForDirective *CreateEmpty(
       const ASTContext &C, unsigned NumClauses,
-      EmptyShell);
+      unsigned NumCollapses, EmptyShell);
 
   static bool classof(const Stmt *T) {
     return T->getStmtClass() == OSSTaskLoopForDirectiveClass;
