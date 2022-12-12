@@ -3918,6 +3918,9 @@ DEF_TRAVERSE_STMT(OSSReleaseDirective,
 DEF_TRAVERSE_STMT(OSSTaskDirective,
                   { TRY_TO(TraverseOSSExecutableDirective(S)); })
 
+DEF_TRAVERSE_STMT(OSSCriticalDirective,
+                  { TRY_TO(TraverseOSSExecutableDirective(S)); })
+
 DEF_TRAVERSE_STMT(OSSTaskForDirective,
                   { TRY_TO(TraverseOSSLoopDirective(S)); })
 

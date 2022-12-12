@@ -1368,6 +1368,16 @@ void StmtPrinter::VisitOSSTaskDirective(OSSTaskDirective *Node) {
   PrintOSSExecutableDirective(Node);
 }
 
+void StmtPrinter::VisitOSSCriticalDirective(OSSCriticalDirective *Node) {
+  Indent() << "#pragma oss critical";
+  if (Node->getDirectiveName().getName()) {
+    OS << " (";
+    Node->getDirectiveName().printName(OS, Policy);
+    OS << ")";
+  }
+  PrintOSSExecutableDirective(Node);
+}
+
 void StmtPrinter::VisitOSSTaskForDirective(OSSTaskForDirective *Node) {
   Indent() << "#pragma oss task for";
   PrintOSSLoopDirective(Node);

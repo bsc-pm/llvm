@@ -291,6 +291,10 @@ void CodeGenFunction::EmitOSSTaskDirective(const OSSTaskDirective &S) {
   CGM.getOmpSsRuntime().emitTaskCall(*this, S, S.getBeginLoc(), Data);
 }
 
+void CodeGenFunction::EmitOSSCriticalDirective(const OSSCriticalDirective &S) {
+  CGM.getOmpSsRuntime().emitCriticalCall(*this, S, S.getBeginLoc(), S.getDirectiveName());
+}
+
 void CodeGenFunction::EmitOSSTaskForDirective(const OSSTaskForDirective &S) {
   OSSTaskDataTy Data;
   OSSLoopDataTy LoopData;

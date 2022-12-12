@@ -11469,6 +11469,10 @@ def err_objc_type_args_wrong_arity : Error<
 
 let CategoryName = "OmpSs Issue" in {
 // OmpSs support.
+def note_oss_protected_structured_block
+    : Note<"jump bypasses OmpSs-2 structured block">;
+def note_oss_exits_structured_block
+    : Note<"jump exits scope of OmpSs-2 structured block">;
 def err_oss_negative_expression_in_clause : Error<
   "argument to '%0' clause must be a %select{non-negative|strictly positive}1 integer value">;
 def err_oss_unexpected_clause_value : Error<

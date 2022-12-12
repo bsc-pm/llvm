@@ -2721,6 +2721,10 @@ void ASTStmtReader::VisitOSSTaskDirective(OSSTaskDirective *D) {
   llvm_unreachable("Not supported yet");
 }
 
+void ASTStmtReader::VisitOSSCriticalDirective(OSSCriticalDirective *D) {
+  llvm_unreachable("Not supported yet");
+}
+
 void ASTStmtReader::VisitOSSTaskForDirective(OSSTaskForDirective *D) {
   llvm_unreachable("Not supported yet");
 }

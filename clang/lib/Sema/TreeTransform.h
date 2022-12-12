@@ -1645,6 +1645,7 @@ public:
   /// By default, performs semantic analysis to build the new statement.
   /// Subclasses may override this routine to provide different behavior.
   StmtResult RebuildOSSExecutableDirective(ArrayRef<OSSClause *> Clauses,
+                                           DeclarationNameInfo DirName,
                                            OmpSsDirectiveKind Kind,
                                            Stmt *AStmt,
                                            SourceLocation StartLoc,
@@ -1655,7 +1656,7 @@ public:
     }
     getSema().ActOnOmpSsAfterClauseGathering(RebuiltClauses);
     return getSema().ActOnOmpSsExecutableDirective(RebuiltClauses,
-        Kind, AStmt, StartLoc, EndLoc);
+         DirName, Kind, AStmt, StartLoc, EndLoc);
   }
 
   /// Build a new OmpSs 'if' clause.
@@ -10943,8 +10944,15 @@ StmtResult TreeTransform<Derived>::TransformOSSExecutableDirective(
     return StmtError();
   }
 
+  // Transform directive name for 'omp critical' directive.
+  DeclarationNameInfo DirName;
+  if (D->getDirectiveKind() == OSSD_critical) {
+    DirName = cast<OSSCriticalDirective>(D)->getDirectiveName();
+    DirName = getDerived().TransformDeclarationNameInfo(DirName);
+  }
+
   return getDerived().RebuildOSSExecutableDirective(
-      TClauses, D->getDirectiveKind(), AssociatedStmt.get(),
+      TClauses, DirName, D->getDirectiveKind(), AssociatedStmt.get(),
       D->getBeginLoc(), D->getEndLoc());
 }
 
@@ -10974,6 +10982,16 @@ TreeTransform<Derived>::TransformOSSTaskDirective(OSSTaskDirective *D) {
   DeclarationNameInfo DirName;
   getDerived().getSema().StartOmpSsDSABlock(OSSD_task, nullptr,
                                             D->getBeginLoc());
+  StmtResult Res = getDerived().TransformOSSExecutableDirective(D);
+  getDerived().getSema().EndOmpSsDSABlock(Res.get());
+  return Res;
+}
+
+template <typename Derived>
+StmtResult
+TreeTransform<Derived>::TransformOSSCriticalDirective(OSSCriticalDirective *D) {
+  getDerived().getSema().StartOmpSsDSABlock(
+      OSSD_critical, nullptr, D->getBeginLoc());
   StmtResult Res = getDerived().TransformOSSExecutableDirective(D);
   getDerived().getSema().EndOmpSsDSABlock(Res.get());
   return Res;

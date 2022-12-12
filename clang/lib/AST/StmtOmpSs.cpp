@@ -96,6 +96,22 @@ OSSTaskDirective *OSSTaskDirective::CreateEmpty(const ASTContext &C,
       C, NumClauses, /*HasAssociatedStmt=*/true);
 }
 
+OSSCriticalDirective *OSSCriticalDirective::Create(
+    const ASTContext &C, const DeclarationNameInfo &Name,
+    SourceLocation StartLoc, SourceLocation EndLoc,
+    ArrayRef<OSSClause *> Clauses, Stmt *AssociatedStmt) {
+  return createDirective<OSSCriticalDirective>(C, Clauses, AssociatedStmt,
+                                               /*NumChildren=*/0, Name,
+                                               StartLoc, EndLoc);
+}
+
+OSSCriticalDirective *OSSCriticalDirective::CreateEmpty(const ASTContext &C,
+                                                        unsigned NumClauses,
+                                                        EmptyShell) {
+  return createEmptyDirective<OSSCriticalDirective>(C, NumClauses,
+                                                    /*HasAssociatedStmt=*/true);
+}
+
 OSSTaskForDirective *
 OSSTaskForDirective::Create(const ASTContext &C, SourceLocation StartLoc,
                          SourceLocation EndLoc, ArrayRef<OSSClause *> Clauses, Stmt *AStmt,

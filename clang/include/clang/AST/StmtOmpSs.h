@@ -396,6 +396,74 @@ public:
   }
 };
 
+/// This represents '#pragma oss critical' directive.
+///
+/// \code
+/// #pragma oss critical
+/// \endcode
+///
+class OSSCriticalDirective : public OSSExecutableDirective {
+  friend class ASTStmtReader;
+  friend class OSSExecutableDirective;
+  /// Name of the directive.
+  DeclarationNameInfo DirName;
+  /// Build directive with the given start and end location.
+  ///
+  /// \param Name Name of the directive.
+  /// \param StartLoc Starting location of the directive kind.
+  /// \param EndLoc Ending location of the directive.
+  ///
+  OSSCriticalDirective(const DeclarationNameInfo &Name, SourceLocation StartLoc,
+                       SourceLocation EndLoc)
+      : OSSExecutableDirective(OSSCriticalDirectiveClass,
+                               OSSD_critical, StartLoc, EndLoc),
+        DirName(Name) {}
+
+  /// Build an empty directive.
+  ///
+  explicit OSSCriticalDirective()
+      : OSSExecutableDirective(OSSCriticalDirectiveClass,
+                               OSSD_critical, SourceLocation(),
+                               SourceLocation()) {}
+
+  /// Set name of the directive.
+  ///
+  /// \param Name Name of the directive.
+  ///
+  void setDirectiveName(const DeclarationNameInfo &Name) { DirName = Name; }
+
+public:
+  /// Creates directive.
+  ///
+  /// \param C AST context.
+  /// \param Name Name of the directive.
+  /// \param StartLoc Starting location of the directive kind.
+  /// \param EndLoc Ending Location of the directive.
+  /// \param Clauses List of clauses.
+  /// \param AssociatedStmt Statement, associated with the directive.
+  ///
+  static OSSCriticalDirective *
+  Create(const ASTContext &C, const DeclarationNameInfo &Name,
+         SourceLocation StartLoc, SourceLocation EndLoc,
+         ArrayRef<OSSClause *> Clauses, Stmt *AssociatedStmt);
+
+  /// Creates an empty directive.
+  ///
+  /// \param C AST context.
+  /// \param NumClauses Number of clauses.
+  ///
+  static OSSCriticalDirective *CreateEmpty(const ASTContext &C,
+                                           unsigned NumClauses, EmptyShell);
+
+  /// Return name of the directive.
+  ///
+  DeclarationNameInfo getDirectiveName() const { return DirName; }
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == OSSCriticalDirectiveClass;
+  }
+};
+
 /// This is a common base class for loop directives ('oss task for',
 /// oss taskloop', 'oss taskloop for' etc.).
 /// It is responsible for the loop code generation.

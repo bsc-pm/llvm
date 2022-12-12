@@ -12214,7 +12214,8 @@ public:
   // Used to pop the fake FunctionScopeInfo
   void ActOnOmpSsExecutableDirectiveEnd();
   StmtResult ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
-      OmpSsDirectiveKind Kind, Stmt *AStmt, SourceLocation StartLoc, SourceLocation EndLoc);
+      const DeclarationNameInfo &DirName, OmpSsDirectiveKind Kind, Stmt *AStmt,
+      SourceLocation StartLoc, SourceLocation EndLoc);
 
   /// Called on well-formed '\#pragma oss taskwait'.
   StmtResult ActOnOmpSsTaskwaitDirective(ArrayRef<OSSClause *> Clauses,
@@ -12226,12 +12227,19 @@ public:
                                         SourceLocation StartLoc,
                                         SourceLocation EndLoc);
 
-  /// Called on well-formed '\#pragma omp task' after parsing of the
+  /// Called on well-formed '\#pragma oss task' after parsing of the
   /// associated statement.
   StmtResult ActOnOmpSsTaskDirective(ArrayRef<OSSClause *> Clauses,
                                      Stmt *AStmt,
                                      SourceLocation StartLoc,
                                      SourceLocation EndLoc);
+
+  /// Called on well-formed '\#pragma oss critical' after parsing of the
+  /// associated statement.
+  StmtResult ActOnOmpSsCriticalDirective(const DeclarationNameInfo &DirName,
+                                         ArrayRef<OSSClause *> Clauses,
+                                         Stmt *AStmt, SourceLocation StartLoc,
+                                         SourceLocation EndLoc);
 
   /// Called on well-formed '\#pragma oss task for' after parsing of the
   /// associated statement.

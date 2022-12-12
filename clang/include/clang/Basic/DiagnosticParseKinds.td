@@ -1329,6 +1329,8 @@ def err_openclcxx_virtual_function : Error<
   "virtual functions are not supported in C++ for OpenCL">;
 
 // OmpSs support.
+def err_oss_expected_identifier_for_critical : Error<
+  "expected identifier specifying the name of the 'oss critical' directive">;
 def warn_oss_label_error : Warning<
   "expecting an expression convertible to 'const char *', ignoring">,
   InGroup<OmpSsClauses>;

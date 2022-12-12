@@ -638,6 +638,7 @@ Parser::DeclGroupPtrTy Parser::ParseOmpSsDeclarativeDirectiveWithExtDecl(
     break;
   }
   case OSSD_declare_task:
+  case OSSD_critical:
   case OSSD_task_for:
   case OSSD_taskiter:
   case OSSD_taskiter_while:
@@ -731,6 +732,8 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
 
   OSSClauseList Clauses;
   OmpSsDirectiveKind DKind = parseOmpSsDirectiveKind(*this);
+  // Name of critical directive.
+  DeclarationNameInfo DirName;
   StmtResult Directive = StmtError();
   bool HasAssociatedStatement = true;
   switch (DKind) {
@@ -743,6 +746,7 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
   case OSSD_taskiter_while:
   case OSSD_taskloop:
   case OSSD_taskloop_for:
+  case OSSD_critical:
   case OSSD_task: {
 
     if (isOmpSsLoopDirective(DKind))
@@ -779,6 +783,22 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
     } else {
       ConsumeToken();
 
+      // Parse directive name of the 'critical' directive if any.
+      if (DKind == OSSD_critical) {
+        BalancedDelimiterTracker T(*this, tok::l_paren,
+                                   tok::annot_pragma_ompss_end);
+        if (!T.consumeOpen()) {
+          if (Tok.isAnyIdentifier()) {
+            DirName =
+                DeclarationNameInfo(Tok.getIdentifierInfo(), Tok.getLocation());
+            ConsumeAnyToken();
+          } else {
+            Diag(Tok, diag::err_oss_expected_identifier_for_critical);
+          }
+          T.consumeClose();
+        }
+      }
+
       Clauses = ParseOmpSsClauses(DKind, EndLoc);
     }
     StackClauses.push_back(Clauses);
@@ -797,11 +817,8 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
     Clauses = StackClauses.back();
     StackClauses.pop_back();
 
-    Directive = Actions.ActOnOmpSsExecutableDirective(Clauses,
-                                                      DKind,
-                                                      AssociatedStmt.get(),
-                                                      Loc,
-                                                      EndLoc);
+    Directive = Actions.ActOnOmpSsExecutableDirective(
+      Clauses, DirName, DKind, AssociatedStmt.get(), Loc, EndLoc);
 
     // Exit scope.
     Actions.EndOmpSsDSABlock(Directive.get());

@@ -344,7 +344,11 @@ public:
                             const OSSExecutableDirective &D,
                             SourceLocation Loc,
                             const OSSTaskDataTy &Data);
-
+  /// Emit code for 'critical' directive.
+  virtual void emitCriticalCall(CodeGenFunction &CGF,
+                                const OSSExecutableDirective &D,
+                                SourceLocation Loc,
+                                const DeclarationNameInfo &DirName);
   /// Emit code for 'task' directive.
   virtual void emitLoopCall(CodeGenFunction &CGF,
                             const OSSLoopDirective &D,
