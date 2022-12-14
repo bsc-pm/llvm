@@ -1522,6 +1522,7 @@ CanThrowResult Sema::canThrow(const Stmt *S) {
   case Stmt::OSSTaskIterDirectiveClass:
   case Stmt::OSSTaskLoopDirectiveClass:
   case Stmt::OSSTaskLoopForDirectiveClass:
+  case Stmt::OSSAtomicDirectiveClass:
   case Stmt::ReturnStmtClass:
   case Stmt::SEHExceptStmtClass:
   case Stmt::SEHFinallyStmtClass:

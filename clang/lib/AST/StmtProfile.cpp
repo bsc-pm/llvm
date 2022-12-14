@@ -1312,6 +1312,10 @@ void StmtProfiler::VisitOSSTaskLoopForDirective(const OSSTaskLoopForDirective *S
   VisitOSSLoopDirective(S);
 }
 
+void StmtProfiler::VisitOSSAtomicDirective(const OSSAtomicDirective *S) {
+  VisitOSSExecutableDirective(S);
+}
+
 void StmtProfiler::VisitExpr(const Expr *S) {
   VisitStmt(S);
 }

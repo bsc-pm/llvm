@@ -912,6 +912,38 @@ void OSSClausePrinter::VisitOSSNdrangeClause(OSSNdrangeClause *Node) {
   }
 }
 
+void OSSClausePrinter::VisitOSSReadClause(OSSReadClause *Node) { OS << "read"; }
+
+void OSSClausePrinter::VisitOSSWriteClause(OSSWriteClause *Node) { OS << "write"; }
+
+void OSSClausePrinter::VisitOSSCaptureClause(OSSCaptureClause *Node) {
+  OS << "capture";
+}
+
+void OSSClausePrinter::VisitOSSCompareClause(OSSCompareClause *Node) {
+  OS << "compare";
+}
+
+void OSSClausePrinter::VisitOSSSeqCstClause(OSSSeqCstClause *Node) {
+  OS << "seq_cst";
+}
+
+void OSSClausePrinter::VisitOSSAcqRelClause(OSSAcqRelClause *Node) {
+  OS << "acq_rel";
+}
+
+void OSSClausePrinter::VisitOSSAcquireClause(OSSAcquireClause *Node) {
+  OS << "acquire";
+}
+
+void OSSClausePrinter::VisitOSSReleaseClause(OSSReleaseClause *Node) {
+  OS << "release";
+}
+
+void OSSClausePrinter::VisitOSSRelaxedClause(OSSRelaxedClause *Node) {
+  OS << "relaxed";
+}
+
 //===----------------------------------------------------------------------===//
 //  OpenMP directives printing methods
 //===----------------------------------------------------------------------===//
@@ -1396,6 +1428,11 @@ void StmtPrinter::VisitOSSTaskLoopDirective(OSSTaskLoopDirective *Node) {
 void StmtPrinter::VisitOSSTaskLoopForDirective(OSSTaskLoopForDirective *Node) {
   Indent() << "#pragma oss taskloop for";
   PrintOSSLoopDirective(Node);
+}
+
+void StmtPrinter::VisitOSSAtomicDirective(OSSAtomicDirective *Node) {
+  Indent() << "#pragma oss atomic";
+  PrintOSSExecutableDirective(Node);
 }
 
 //===----------------------------------------------------------------------===//

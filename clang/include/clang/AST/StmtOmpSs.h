@@ -778,6 +778,207 @@ public:
   }
 };
 
+/// This represents '#pragma omp atomic' directive.
+///
+/// \code
+/// #pragma oss atomic capture
+/// \endcode
+/// In this example directive '#pragma oss atomic' has clause 'capture'.
+///
+class OSSAtomicDirective : public OSSExecutableDirective {
+  friend class ASTStmtReader;
+  friend class OSSExecutableDirective;
+
+  struct FlagTy {
+    /// Used for 'atomic update' or 'atomic capture' constructs. They may
+    /// have atomic expressions of forms:
+    /// \code
+    /// x = x binop expr;
+    /// x = expr binop x;
+    /// \endcode
+    /// This field is 1 for the first form of the expression and 0 for the
+    /// second. Required for correct codegen of non-associative operations (like
+    /// << or >>).
+    uint8_t IsXLHSInRHSPart : 1;
+    /// Used for 'atomic update' or 'atomic capture' constructs. They may
+    /// have atomic expressions of forms:
+    /// \code
+    /// v = x; <update x>;
+    /// <update x>; v = x;
+    /// \endcode
+    /// This field is 1 for the first(postfix) form of the expression and 0
+    /// otherwise.
+    uint8_t IsPostfixUpdate : 1;
+    /// 1 if 'v' is updated only when the condition is false (compare capture
+    /// only).
+    uint8_t IsFailOnly : 1;
+  } Flags;
+
+  /// Build directive with the given start and end location.
+  ///
+  /// \param StartLoc Starting location of the directive kind.
+  /// \param EndLoc Ending location of the directive.
+  ///
+  OSSAtomicDirective(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSExecutableDirective(OSSAtomicDirectiveClass, OSSD_atomic,
+                               StartLoc, EndLoc) {}
+
+  /// Build an empty directive.
+  ///
+  explicit OSSAtomicDirective()
+      : OSSExecutableDirective(OSSAtomicDirectiveClass, OSSD_atomic,
+                               SourceLocation(), SourceLocation()) {}
+
+  enum DataPositionTy : size_t {
+    POS_X = 0,
+    POS_V,
+    POS_E,
+    POS_UpdateExpr,
+    POS_D,
+    POS_Cond,
+    POS_R,
+  };
+
+  /// Set 'x' part of the associated expression/statement.
+  void setX(Expr *X) { Data->getChildren()[DataPositionTy::POS_X] = X; }
+  /// Set helper expression of the form
+  /// 'OpaqueValueExpr(x) binop OpaqueValueExpr(expr)' or
+  /// 'OpaqueValueExpr(expr) binop OpaqueValueExpr(x)'.
+  void setUpdateExpr(Expr *UE) {
+    Data->getChildren()[DataPositionTy::POS_UpdateExpr] = UE;
+  }
+  /// Set 'v' part of the associated expression/statement.
+  void setV(Expr *V) { Data->getChildren()[DataPositionTy::POS_V] = V; }
+  /// Set 'r' part of the associated expression/statement.
+  void setR(Expr *R) { Data->getChildren()[DataPositionTy::POS_R] = R; }
+  /// Set 'expr' part of the associated expression/statement.
+  void setExpr(Expr *E) { Data->getChildren()[DataPositionTy::POS_E] = E; }
+  /// Set 'd' part of the associated expression/statement.
+  void setD(Expr *D) { Data->getChildren()[DataPositionTy::POS_D] = D; }
+  /// Set conditional expression in `atomic compare`.
+  void setCond(Expr *C) { Data->getChildren()[DataPositionTy::POS_Cond] = C; }
+
+public:
+  struct Expressions {
+    /// 'x' part of the associated expression/statement.
+    Expr *X = nullptr;
+    /// 'v' part of the associated expression/statement.
+    Expr *V = nullptr;
+    // 'r' part of the associated expression/statement.
+    Expr *R = nullptr;
+    /// 'expr' part of the associated expression/statement.
+    Expr *E = nullptr;
+    /// UE Helper expression of the form:
+    /// 'OpaqueValueExpr(x) binop OpaqueValueExpr(expr)' or
+    /// 'OpaqueValueExpr(expr) binop OpaqueValueExpr(x)'.
+    Expr *UE = nullptr;
+    /// 'd' part of the associated expression/statement.
+    Expr *D = nullptr;
+    /// Conditional expression in `atomic compare` construct.
+    Expr *Cond = nullptr;
+    /// True if UE has the first form and false if the second.
+    bool IsXLHSInRHSPart;
+    /// True if original value of 'x' must be stored in 'v', not an updated one.
+    bool IsPostfixUpdate;
+    /// True if 'v' is updated only when the condition is false (compare capture
+    /// only).
+    bool IsFailOnly;
+  };
+
+  /// Creates directive with a list of \a Clauses and 'x', 'v' and 'expr'
+  /// parts of the atomic construct (see Section 2.12.6, atomic Construct, for
+  /// detailed description of 'x', 'v' and 'expr').
+  ///
+  /// \param C AST context.
+  /// \param StartLoc Starting location of the directive kind.
+  /// \param EndLoc Ending Location of the directive.
+  /// \param Clauses List of clauses.
+  /// \param AssociatedStmt Statement, associated with the directive.
+  /// \param Exprs Associated expressions or statements.
+  static OSSAtomicDirective *Create(const ASTContext &C,
+                                    SourceLocation StartLoc,
+                                    SourceLocation EndLoc,
+                                    ArrayRef<OSSClause *> Clauses,
+                                    Stmt *AssociatedStmt, Expressions Exprs);
+
+  /// Creates an empty directive with the place for \a NumClauses
+  /// clauses.
+  ///
+  /// \param C AST context.
+  /// \param NumClauses Number of clauses.
+  ///
+  static OSSAtomicDirective *CreateEmpty(const ASTContext &C,
+                                         unsigned NumClauses, EmptyShell);
+
+  /// Get 'x' part of the associated expression/statement.
+  Expr *getX() {
+    return cast_or_null<Expr>(Data->getChildren()[DataPositionTy::POS_X]);
+  }
+  const Expr *getX() const {
+    return cast_or_null<Expr>(Data->getChildren()[DataPositionTy::POS_X]);
+  }
+  /// Get helper expression of the form
+  /// 'OpaqueValueExpr(x) binop OpaqueValueExpr(expr)' or
+  /// 'OpaqueValueExpr(expr) binop OpaqueValueExpr(x)'.
+  Expr *getUpdateExpr() {
+    return cast_or_null<Expr>(
+        Data->getChildren()[DataPositionTy::POS_UpdateExpr]);
+  }
+  const Expr *getUpdateExpr() const {
+    return cast_or_null<Expr>(
+        Data->getChildren()[DataPositionTy::POS_UpdateExpr]);
+  }
+  /// Return true if helper update expression has form
+  /// 'OpaqueValueExpr(x) binop OpaqueValueExpr(expr)' and false if it has form
+  /// 'OpaqueValueExpr(expr) binop OpaqueValueExpr(x)'.
+  bool isXLHSInRHSPart() const { return Flags.IsXLHSInRHSPart; }
+  /// Return true if 'v' expression must be updated to original value of
+  /// 'x', false if 'v' must be updated to the new value of 'x'.
+  bool isPostfixUpdate() const { return Flags.IsPostfixUpdate; }
+  /// Return true if 'v' is updated only when the condition is evaluated false
+  /// (compare capture only).
+  bool isFailOnly() const { return Flags.IsFailOnly; }
+  /// Get 'v' part of the associated expression/statement.
+  Expr *getV() {
+    return cast_or_null<Expr>(Data->getChildren()[DataPositionTy::POS_V]);
+  }
+  const Expr *getV() const {
+    return cast_or_null<Expr>(Data->getChildren()[DataPositionTy::POS_V]);
+  }
+  /// Get 'r' part of the associated expression/statement.
+  Expr *getR() {
+    return cast_or_null<Expr>(Data->getChildren()[DataPositionTy::POS_R]);
+  }
+  const Expr *getR() const {
+    return cast_or_null<Expr>(Data->getChildren()[DataPositionTy::POS_R]);
+  }
+  /// Get 'expr' part of the associated expression/statement.
+  Expr *getExpr() {
+    return cast_or_null<Expr>(Data->getChildren()[DataPositionTy::POS_E]);
+  }
+  const Expr *getExpr() const {
+    return cast_or_null<Expr>(Data->getChildren()[DataPositionTy::POS_E]);
+  }
+  /// Get 'd' part of the associated expression/statement.
+  Expr *getD() {
+    return cast_or_null<Expr>(Data->getChildren()[DataPositionTy::POS_D]);
+  }
+  Expr *getD() const {
+    return cast_or_null<Expr>(Data->getChildren()[DataPositionTy::POS_D]);
+  }
+  /// Get the 'cond' part of the source atomic expression.
+  Expr *getCondExpr() {
+    return cast_or_null<Expr>(Data->getChildren()[DataPositionTy::POS_Cond]);
+  }
+  Expr *getCondExpr() const {
+    return cast_or_null<Expr>(Data->getChildren()[DataPositionTy::POS_Cond]);
+  }
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == OSSAtomicDirectiveClass;
+  }
+};
+
 } // end namespace clang
 
 #endif

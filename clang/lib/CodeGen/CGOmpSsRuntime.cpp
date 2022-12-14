@@ -3637,6 +3637,14 @@ void CGOmpSsRuntime::emitLoopCall(CodeGenFunction &CGF,
   }
 }
 
+/// Emit code for 'flush' "directive".
+void CGOmpSsRuntime::emitFlush(CodeGenFunction &CGF, llvm::AtomicOrdering AO) {
+  llvm::Function *Callee = CGM.getIntrinsic(llvm::Intrinsic::directive_marker);
+  llvm::Instruction *Call = CGF.Builder.CreateCall(Callee);
+  new llvm::FenceInst(CGF.CGM.getLLVMContext(), AO, llvm::SyncScope::System, Call);
+  Call->eraseFromParent();
+}
+
 void CGOmpSsRuntime::addMetadata(ArrayRef<llvm::Metadata *> List) {
   MetadataList.append(List.begin(), List.end());
 }
@@ -3645,4 +3653,8 @@ llvm::MDNode *CGOmpSsRuntime::getMetadataNode() {
   if (MetadataList.empty())
     return nullptr;
   return llvm::MDTuple::get(CGM.getLLVMContext(), MetadataList);
+}
+
+llvm::AtomicOrdering CGOmpSsRuntime::getDefaultMemoryOrdering() const {
+  return RequiresAtomicOrdering;
 }

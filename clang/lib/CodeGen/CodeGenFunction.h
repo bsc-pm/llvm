@@ -3487,6 +3487,24 @@ public:
   void EmitOSSTaskIterDirective(const OSSTaskIterDirective &S);
   void EmitOSSTaskLoopDirective(const OSSTaskLoopDirective &S);
   void EmitOSSTaskLoopForDirective(const OSSTaskLoopForDirective &S);
+  void EmitOSSAtomicDirective(const OSSAtomicDirective &S);
+  /// Emit atomic update code for constructs: \a X = \a X \a BO \a E or
+  /// \a X = \a E \a BO \a E.
+  ///
+  /// \param X Value to be updated.
+  /// \param E Update value.
+  /// \param BO Binary operation for update operation.
+  /// \param IsXLHSInRHSPart true if \a X is LHS in RHS part of the update
+  /// expression, false otherwise.
+  /// \param AO Atomic ordering of the generated atomic instructions.
+  /// \param CommonGen Code generator for complex expressions that cannot be
+  /// expressed through atomicrmw instruction.
+  /// \returns <true, OldAtomicValue> if simple 'atomicrmw' instruction was
+  /// generated, <false, RValue::get(nullptr)> otherwise.
+  std::pair<bool, RValue> EmitOSSAtomicSimpleUpdateExpr(
+      LValue X, RValue E, BinaryOperatorKind BO, bool IsXLHSInRHSPart,
+      llvm::AtomicOrdering AO, SourceLocation Loc,
+      const llvm::function_ref<RValue(RValue)> CommonGen);
 
   /// Emit simple code for OpenMP directives in Simd-only mode.
   void EmitSimpleOMPExecutableDirective(const OMPExecutableDirective &D);

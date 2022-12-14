@@ -308,3 +308,4 @@ def OSSTaskForDirective : StmtNode<OSSLoopDirective>;
 def OSSTaskIterDirective : StmtNode<OSSLoopDirective>;
 def OSSTaskLoopDirective : StmtNode<OSSLoopDirective>;
 def OSSTaskLoopForDirective : StmtNode<OSSLoopDirective>;
+def OSSAtomicDirective : StmtNode<OSSExecutableDirective>;

@@ -11038,6 +11038,17 @@ TreeTransform<Derived>::TransformOSSTaskLoopForDirective(OSSTaskLoopForDirective
   return Res;
 }
 
+template <typename Derived>
+StmtResult
+TreeTransform<Derived>::TransformOSSAtomicDirective(OSSAtomicDirective *D) {
+  DeclarationNameInfo DirName;
+  getDerived().getSema().StartOmpSsDSABlock(OSSD_atomic, nullptr,
+                                            D->getBeginLoc());
+  StmtResult Res = getDerived().TransformOSSExecutableDirective(D);
+  getDerived().getSema().EndOmpSsDSABlock(Res.get());
+  return Res;
+}
+
 //===----------------------------------------------------------------------===//
 // OmpSs clause transformation
 //===----------------------------------------------------------------------===//
@@ -11299,6 +11310,67 @@ OSSClause *TreeTransform<Derived>::TransformOSSNdrangeClause(
   }
   return getDerived().RebuildOSSNdrangeClause(
       Vars, C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSReadClause(OSSReadClause *C) {
+  // No need to rebuild this clause, no template-dependent parameters.
+  return C;
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSWriteClause(OSSWriteClause *C) {
+  // No need to rebuild this clause, no template-dependent parameters.
+  return C;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSCaptureClause(OSSCaptureClause *C) {
+  // No need to rebuild this clause, no template-dependent parameters.
+  return C;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSCompareClause(OSSCompareClause *C) {
+  // No need to rebuild this clause, no template-dependent parameters.
+  return C;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSSeqCstClause(OSSSeqCstClause *C) {
+  // No need to rebuild this clause, no template-dependent parameters.
+  return C;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSAcqRelClause(OSSAcqRelClause *C) {
+  // No need to rebuild this clause, no template-dependent parameters.
+  return C;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSAcquireClause(OSSAcquireClause *C) {
+  // No need to rebuild this clause, no template-dependent parameters.
+  return C;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSReleaseClause(OSSReleaseClause *C) {
+  // No need to rebuild this clause, no template-dependent parameters.
+  return C;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSRelaxedClause(OSSRelaxedClause *C) {
+  // No need to rebuild this clause, no template-dependent parameters.
+  return C;
 }
 
 //===----------------------------------------------------------------------===//

@@ -286,3 +286,29 @@ OSSTaskLoopForDirective *OSSTaskLoopForDirective::CreateEmpty(const ASTContext &
   return createEmptyDirective<OSSTaskLoopForDirective>(
       C, NumClauses, /*HasAssociatedStmt=*/true, /*NumChildren=*/0, NumCollapses);
 }
+
+OSSAtomicDirective *
+OSSAtomicDirective::Create(const ASTContext &C, SourceLocation StartLoc,
+                           SourceLocation EndLoc, ArrayRef<OSSClause *> Clauses,
+                           Stmt *AssociatedStmt, Expressions Exprs) {
+  auto *Dir = createDirective<OSSAtomicDirective>(
+      C, Clauses, AssociatedStmt, /*NumChildren=*/7, StartLoc, EndLoc);
+  Dir->setX(Exprs.X);
+  Dir->setV(Exprs.V);
+  Dir->setR(Exprs.R);
+  Dir->setExpr(Exprs.E);
+  Dir->setUpdateExpr(Exprs.UE);
+  Dir->setD(Exprs.D);
+  Dir->setCond(Exprs.Cond);
+  Dir->Flags.IsXLHSInRHSPart = Exprs.IsXLHSInRHSPart ? 1 : 0;
+  Dir->Flags.IsPostfixUpdate = Exprs.IsPostfixUpdate ? 1 : 0;
+  Dir->Flags.IsFailOnly = Exprs.IsFailOnly ? 1 : 0;
+  return Dir;
+}
+
+OSSAtomicDirective *OSSAtomicDirective::CreateEmpty(const ASTContext &C,
+                                                    unsigned NumClauses,
+                                                    EmptyShell) {
+  return createEmptyDirective<OSSAtomicDirective>(
+      C, NumClauses, /*HasAssociatedStmt=*/true, /*NumChildren=*/7);
+}

@@ -117,6 +117,15 @@ unsigned clang::getOmpSsSimpleClauseType(OmpSsClauseKind Kind,
   case OSSC_unroll:
   case OSSC_collapse:
   case OSSC_ndrange:
+  case OSSC_read:
+  case OSSC_write:
+  case OSSC_capture:
+  case OSSC_compare:
+  case OSSC_seq_cst:
+  case OSSC_acq_rel:
+  case OSSC_acquire:
+  case OSSC_release:
+  case OSSC_relaxed:
     break;
   }
   llvm_unreachable("Invalid OmpSs simple clause kind");
@@ -185,6 +194,15 @@ const char *clang::getOmpSsSimpleClauseTypeName(OmpSsClauseKind Kind,
   case OSSC_unroll:
   case OSSC_collapse:
   case OSSC_ndrange:
+  case OSSC_read:
+  case OSSC_write:
+  case OSSC_capture:
+  case OSSC_compare:
+  case OSSC_seq_cst:
+  case OSSC_acq_rel:
+  case OSSC_acquire:
+  case OSSC_release:
+  case OSSC_relaxed:
     break;
   }
   llvm_unreachable("Invalid OmpSs simple clause kind");
@@ -269,6 +287,16 @@ bool clang::isAllowedClauseForDirective(OmpSsDirectiveKind DKind,
   case OSSD_release:
     switch (CKind) {
 #define OMPSS_RELEASE_CLAUSE(Name)                                           \
+  case OSSC_##Name:                                                            \
+    return true;
+#include "clang/Basic/OmpSsKinds.def"
+    default:
+      break;
+    }
+    break;
+  case OSSD_atomic:
+    switch (CKind) {
+#define OMPSS_ATOMIC_CLAUSE(Name)                                           \
   case OSSC_##Name:                                                            \
     return true;
 #include "clang/Basic/OmpSsKinds.def"

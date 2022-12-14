@@ -452,6 +452,9 @@ void CodeGenFunction::EmitStmt(const Stmt *S, ArrayRef<const Attr *> Attrs) {
   case Stmt::OSSTaskLoopForDirectiveClass:
     EmitOSSTaskLoopForDirective(cast<OSSTaskLoopForDirective>(*S));
     break;
+  case Stmt::OSSAtomicDirectiveClass:
+    EmitOSSAtomicDirective(cast<OSSAtomicDirective>(*S));
+    break;
   }
 }
 

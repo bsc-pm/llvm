@@ -2741,6 +2741,11 @@ void ASTStmtReader::VisitOSSTaskLoopForDirective(OSSTaskLoopForDirective *D) {
   llvm_unreachable("Not supported yet");
 }
 
+void ASTStmtReader::VisitOSSAtomicDirective(OSSAtomicDirective *D) {
+  llvm_unreachable("Not supported yet");
+}
+
+
 //===----------------------------------------------------------------------===//
 // ASTReader Implementation
 //===----------------------------------------------------------------------===//

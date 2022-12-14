@@ -1404,7 +1404,7 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
   llvm::SmallVector<OSSClause *, 8> ClausesWithImplicit;
   ClausesWithImplicit.append(Clauses.begin(), Clauses.end());
   if (AStmt && !CurContext->isDependentContext() &&
-      Kind != OSSD_critical) {
+      Kind != OSSD_critical && Kind != OSSD_atomic) {
     // Check default data sharing attributes for referenced variables.
     DSAAttrChecker DSAChecker(DSAStack, *this);
 
@@ -1479,6 +1479,9 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
     break;
   case OSSD_taskloop_for:
     Res = ActOnOmpSsTaskLoopForDirective(ClausesWithImplicit, AStmt, StartLoc, EndLoc);
+    break;
+  case OSSD_atomic:
+    Res = ActOnOmpSsAtomicDirective(ClausesWithImplicit, AStmt, StartLoc, EndLoc);
     break;
   case OSSD_declare_task:
   case OSSD_declare_reduction:
@@ -2414,6 +2417,1593 @@ StmtResult Sema::ActOnOmpSsTaskLoopForDirective(
 
   setFunctionHasBranchProtectedScope();
   return OSSTaskLoopForDirective::Create(Context, StartLoc, EndLoc, Clauses, AStmt, B);
+}
+
+namespace {
+/// Helper class for checking expression in 'omp atomic [update]'
+/// construct.
+class OmpSsAtomicUpdateChecker {
+  /// Error results for atomic update expressions.
+  enum ExprAnalysisErrorCode {
+    /// A statement is not an expression statement.
+    NotAnExpression,
+    /// Expression is not builtin binary or unary operation.
+    NotABinaryOrUnaryExpression,
+    /// Unary operation is not post-/pre- increment/decrement operation.
+    NotAnUnaryIncDecExpression,
+    /// An expression is not of scalar type.
+    NotAScalarType,
+    /// A binary operation is not an assignment operation.
+    NotAnAssignmentOp,
+    /// RHS part of the binary operation is not a binary expression.
+    NotABinaryExpression,
+    /// RHS part is not additive/multiplicative/shift/biwise binary
+    /// expression.
+    NotABinaryOperator,
+    /// RHS binary operation does not have reference to the updated LHS
+    /// part.
+    NotAnUpdateExpression,
+    /// No errors is found.
+    NoError
+  };
+  /// Reference to Sema.
+  Sema &SemaRef;
+  /// A location for note diagnostics (when error is found).
+  SourceLocation NoteLoc;
+  /// 'x' lvalue part of the source atomic expression.
+  Expr *X;
+  /// 'expr' rvalue part of the source atomic expression.
+  Expr *E;
+  /// Helper expression of the form
+  /// 'OpaqueValueExpr(x) binop OpaqueValueExpr(expr)' or
+  /// 'OpaqueValueExpr(expr) binop OpaqueValueExpr(x)'.
+  Expr *UpdateExpr;
+  /// Is 'x' a LHS in a RHS part of full update expression. It is
+  /// important for non-associative operations.
+  bool IsXLHSInRHSPart;
+  BinaryOperatorKind Op;
+  SourceLocation OpLoc;
+  /// true if the source expression is a postfix unary operation, false
+  /// if it is a prefix unary operation.
+  bool IsPostfixUpdate;
+
+public:
+  OmpSsAtomicUpdateChecker(Sema &SemaRef)
+      : SemaRef(SemaRef), X(nullptr), E(nullptr), UpdateExpr(nullptr),
+        IsXLHSInRHSPart(false), Op(BO_PtrMemD), IsPostfixUpdate(false) {}
+  /// Check specified statement that it is suitable for 'atomic update'
+  /// constructs and extract 'x', 'expr' and Operation from the original
+  /// expression. If DiagId and NoteId == 0, then only check is performed
+  /// without error notification.
+  /// \param DiagId Diagnostic which should be emitted if error is found.
+  /// \param NoteId Diagnostic note for the main error message.
+  /// \return true if statement is not an update expression, false otherwise.
+  bool checkStatement(Stmt *S, unsigned DiagId = 0, unsigned NoteId = 0);
+  /// Return the 'x' lvalue part of the source atomic expression.
+  Expr *getX() const { return X; }
+  /// Return the 'expr' rvalue part of the source atomic expression.
+  Expr *getExpr() const { return E; }
+  /// Return the update expression used in calculation of the updated
+  /// value. Always has form 'OpaqueValueExpr(x) binop OpaqueValueExpr(expr)' or
+  /// 'OpaqueValueExpr(expr) binop OpaqueValueExpr(x)'.
+  Expr *getUpdateExpr() const { return UpdateExpr; }
+  /// Return true if 'x' is LHS in RHS part of full update expression,
+  /// false otherwise.
+  bool isXLHSInRHSPart() const { return IsXLHSInRHSPart; }
+
+  /// true if the source expression is a postfix unary operation, false
+  /// if it is a prefix unary operation.
+  bool isPostfixUpdate() const { return IsPostfixUpdate; }
+
+private:
+  bool checkBinaryOperation(BinaryOperator *AtomicBinOp, unsigned DiagId = 0,
+                            unsigned NoteId = 0);
+};
+
+bool OmpSsAtomicUpdateChecker::checkBinaryOperation(
+    BinaryOperator *AtomicBinOp, unsigned DiagId, unsigned NoteId) {
+  ExprAnalysisErrorCode ErrorFound = NoError;
+  SourceLocation ErrorLoc, NoteLoc;
+  SourceRange ErrorRange, NoteRange;
+  // Allowed constructs are:
+  //  x = x binop expr;
+  //  x = expr binop x;
+  if (AtomicBinOp->getOpcode() == BO_Assign) {
+    X = AtomicBinOp->getLHS();
+    if (const auto *AtomicInnerBinOp = dyn_cast<BinaryOperator>(
+            AtomicBinOp->getRHS()->IgnoreParenImpCasts())) {
+      if (AtomicInnerBinOp->isMultiplicativeOp() ||
+          AtomicInnerBinOp->isAdditiveOp() || AtomicInnerBinOp->isShiftOp() ||
+          AtomicInnerBinOp->isBitwiseOp()) {
+        Op = AtomicInnerBinOp->getOpcode();
+        OpLoc = AtomicInnerBinOp->getOperatorLoc();
+        Expr *LHS = AtomicInnerBinOp->getLHS();
+        Expr *RHS = AtomicInnerBinOp->getRHS();
+        llvm::FoldingSetNodeID XId, LHSId, RHSId;
+        X->IgnoreParenImpCasts()->Profile(XId, SemaRef.getASTContext(),
+                                          /*Canonical=*/true);
+        LHS->IgnoreParenImpCasts()->Profile(LHSId, SemaRef.getASTContext(),
+                                            /*Canonical=*/true);
+        RHS->IgnoreParenImpCasts()->Profile(RHSId, SemaRef.getASTContext(),
+                                            /*Canonical=*/true);
+        if (XId == LHSId) {
+          E = RHS;
+          IsXLHSInRHSPart = true;
+        } else if (XId == RHSId) {
+          E = LHS;
+          IsXLHSInRHSPart = false;
+        } else {
+          ErrorLoc = AtomicInnerBinOp->getExprLoc();
+          ErrorRange = AtomicInnerBinOp->getSourceRange();
+          NoteLoc = X->getExprLoc();
+          NoteRange = X->getSourceRange();
+          ErrorFound = NotAnUpdateExpression;
+        }
+      } else {
+        ErrorLoc = AtomicInnerBinOp->getExprLoc();
+        ErrorRange = AtomicInnerBinOp->getSourceRange();
+        NoteLoc = AtomicInnerBinOp->getOperatorLoc();
+        NoteRange = SourceRange(NoteLoc, NoteLoc);
+        ErrorFound = NotABinaryOperator;
+      }
+    } else {
+      NoteLoc = ErrorLoc = AtomicBinOp->getRHS()->getExprLoc();
+      NoteRange = ErrorRange = AtomicBinOp->getRHS()->getSourceRange();
+      ErrorFound = NotABinaryExpression;
+    }
+  } else {
+    ErrorLoc = AtomicBinOp->getExprLoc();
+    ErrorRange = AtomicBinOp->getSourceRange();
+    NoteLoc = AtomicBinOp->getOperatorLoc();
+    NoteRange = SourceRange(NoteLoc, NoteLoc);
+    ErrorFound = NotAnAssignmentOp;
+  }
+  if (ErrorFound != NoError && DiagId != 0 && NoteId != 0) {
+    SemaRef.Diag(ErrorLoc, DiagId) << ErrorRange;
+    SemaRef.Diag(NoteLoc, NoteId) << ErrorFound << NoteRange;
+    return true;
+  }
+  if (SemaRef.CurContext->isDependentContext())
+    E = X = UpdateExpr = nullptr;
+  return ErrorFound != NoError;
+}
+
+bool OmpSsAtomicUpdateChecker::checkStatement(Stmt *S, unsigned DiagId,
+                                               unsigned NoteId) {
+  ExprAnalysisErrorCode ErrorFound = NoError;
+  SourceLocation ErrorLoc, NoteLoc;
+  SourceRange ErrorRange, NoteRange;
+  // Allowed constructs are:
+  //  x++;
+  //  x--;
+  //  ++x;
+  //  --x;
+  //  x binop= expr;
+  //  x = x binop expr;
+  //  x = expr binop x;
+  if (auto *AtomicBody = dyn_cast<Expr>(S)) {
+    AtomicBody = AtomicBody->IgnoreParenImpCasts();
+    if (AtomicBody->getType()->isScalarType() ||
+        AtomicBody->isInstantiationDependent()) {
+      if (const auto *AtomicCompAssignOp = dyn_cast<CompoundAssignOperator>(
+              AtomicBody->IgnoreParenImpCasts())) {
+        // Check for Compound Assignment Operation
+        Op = BinaryOperator::getOpForCompoundAssignment(
+            AtomicCompAssignOp->getOpcode());
+        OpLoc = AtomicCompAssignOp->getOperatorLoc();
+        E = AtomicCompAssignOp->getRHS();
+        X = AtomicCompAssignOp->getLHS()->IgnoreParens();
+        IsXLHSInRHSPart = true;
+      } else if (auto *AtomicBinOp = dyn_cast<BinaryOperator>(
+                     AtomicBody->IgnoreParenImpCasts())) {
+        // Check for Binary Operation
+        if (checkBinaryOperation(AtomicBinOp, DiagId, NoteId))
+          return true;
+      } else if (const auto *AtomicUnaryOp = dyn_cast<UnaryOperator>(
+                     AtomicBody->IgnoreParenImpCasts())) {
+        // Check for Unary Operation
+        if (AtomicUnaryOp->isIncrementDecrementOp()) {
+          IsPostfixUpdate = AtomicUnaryOp->isPostfix();
+          Op = AtomicUnaryOp->isIncrementOp() ? BO_Add : BO_Sub;
+          OpLoc = AtomicUnaryOp->getOperatorLoc();
+          X = AtomicUnaryOp->getSubExpr()->IgnoreParens();
+          E = SemaRef.ActOnIntegerConstant(OpLoc, /*uint64_t Val=*/1).get();
+          IsXLHSInRHSPart = true;
+        } else {
+          ErrorFound = NotAnUnaryIncDecExpression;
+          ErrorLoc = AtomicUnaryOp->getExprLoc();
+          ErrorRange = AtomicUnaryOp->getSourceRange();
+          NoteLoc = AtomicUnaryOp->getOperatorLoc();
+          NoteRange = SourceRange(NoteLoc, NoteLoc);
+        }
+      } else if (!AtomicBody->isInstantiationDependent()) {
+        ErrorFound = NotABinaryOrUnaryExpression;
+        NoteLoc = ErrorLoc = AtomicBody->getExprLoc();
+        NoteRange = ErrorRange = AtomicBody->getSourceRange();
+      }
+    } else {
+      ErrorFound = NotAScalarType;
+      NoteLoc = ErrorLoc = AtomicBody->getBeginLoc();
+      NoteRange = ErrorRange = SourceRange(NoteLoc, NoteLoc);
+    }
+  } else {
+    ErrorFound = NotAnExpression;
+    NoteLoc = ErrorLoc = S->getBeginLoc();
+    NoteRange = ErrorRange = SourceRange(NoteLoc, NoteLoc);
+  }
+  if (ErrorFound != NoError && DiagId != 0 && NoteId != 0) {
+    SemaRef.Diag(ErrorLoc, DiagId) << ErrorRange;
+    SemaRef.Diag(NoteLoc, NoteId) << ErrorFound << NoteRange;
+    return true;
+  }
+  if (SemaRef.CurContext->isDependentContext())
+    E = X = UpdateExpr = nullptr;
+  if (ErrorFound == NoError && E && X) {
+    // Build an update expression of form 'OpaqueValueExpr(x) binop
+    // OpaqueValueExpr(expr)' or 'OpaqueValueExpr(expr) binop
+    // OpaqueValueExpr(x)' and then cast it to the type of the 'x' expression.
+    auto *OVEX = new (SemaRef.getASTContext())
+        OpaqueValueExpr(X->getExprLoc(), X->getType(), VK_PRValue);
+    auto *OVEExpr = new (SemaRef.getASTContext())
+        OpaqueValueExpr(E->getExprLoc(), E->getType(), VK_PRValue);
+    ExprResult Update =
+        SemaRef.CreateBuiltinBinOp(OpLoc, Op, IsXLHSInRHSPart ? OVEX : OVEExpr,
+                                   IsXLHSInRHSPart ? OVEExpr : OVEX);
+    if (Update.isInvalid())
+      return true;
+    Update = SemaRef.PerformImplicitConversion(Update.get(), X->getType(),
+                                               Sema::AA_Casting);
+    if (Update.isInvalid())
+      return true;
+    UpdateExpr = Update.get();
+  }
+  return ErrorFound != NoError;
+}
+
+/// Get the node id of the fixed point of an expression \a S.
+llvm::FoldingSetNodeID getNodeId(ASTContext &Context, const Expr *S) {
+  llvm::FoldingSetNodeID Id;
+  S->IgnoreParenImpCasts()->Profile(Id, Context, true);
+  return Id;
+}
+
+/// Check if two expressions are same.
+bool checkIfTwoExprsAreSame(ASTContext &Context, const Expr *LHS,
+                            const Expr *RHS) {
+  return getNodeId(Context, LHS) == getNodeId(Context, RHS);
+}
+
+class OmpSsAtomicCompareChecker {
+public:
+  /// All kinds of errors that can occur in `atomic compare`
+  enum ErrorTy {
+    /// Empty compound statement.
+    NoStmt = 0,
+    /// More than one statement in a compound statement.
+    MoreThanOneStmt,
+    /// Not an assignment binary operator.
+    NotAnAssignment,
+    /// Not a conditional operator.
+    NotCondOp,
+    /// Wrong false expr. According to the spec, 'x' should be at the false
+    /// expression of a conditional expression.
+    WrongFalseExpr,
+    /// The condition of a conditional expression is not a binary operator.
+    NotABinaryOp,
+    /// Invalid binary operator (not <, >, or ==).
+    InvalidBinaryOp,
+    /// Invalid comparison (not x == e, e == x, x ordop expr, or expr ordop x).
+    InvalidComparison,
+    /// X is not a lvalue.
+    XNotLValue,
+    /// Not a scalar.
+    NotScalar,
+    /// Not an integer.
+    NotInteger,
+    /// 'else' statement is not expected.
+    UnexpectedElse,
+    /// Not an equality operator.
+    NotEQ,
+    /// Invalid assignment (not v == x).
+    InvalidAssignment,
+    /// Not if statement
+    NotIfStmt,
+    /// More than two statements in a compund statement.
+    MoreThanTwoStmts,
+    /// Not a compound statement.
+    NotCompoundStmt,
+    /// No else statement.
+    NoElse,
+    /// Not 'if (r)'.
+    InvalidCondition,
+    /// No error.
+    NoError,
+  };
+
+  struct ErrorInfoTy {
+    ErrorTy Error;
+    SourceLocation ErrorLoc;
+    SourceRange ErrorRange;
+    SourceLocation NoteLoc;
+    SourceRange NoteRange;
+  };
+
+  OmpSsAtomicCompareChecker(Sema &S) : ContextRef(S.getASTContext()) {}
+
+  /// Check if statement \a S is valid for <tt>atomic compare</tt>.
+  bool checkStmt(Stmt *S, ErrorInfoTy &ErrorInfo);
+
+  Expr *getX() const { return X; }
+  Expr *getE() const { return E; }
+  Expr *getD() const { return D; }
+  Expr *getCond() const { return C; }
+  bool isXBinopExpr() const { return IsXBinopExpr; }
+
+protected:
+  /// Reference to ASTContext
+  ASTContext &ContextRef;
+  /// 'x' lvalue part of the source atomic expression.
+  Expr *X = nullptr;
+  /// 'expr' or 'e' rvalue part of the source atomic expression.
+  Expr *E = nullptr;
+  /// 'd' rvalue part of the source atomic expression.
+  Expr *D = nullptr;
+  /// 'cond' part of the source atomic expression. It is in one of the following
+  /// forms:
+  /// expr ordop x
+  /// x ordop expr
+  /// x == e
+  /// e == x
+  Expr *C = nullptr;
+  /// True if the cond expr is in the form of 'x ordop expr'.
+  bool IsXBinopExpr = true;
+
+  /// Check if it is a valid conditional update statement (cond-update-stmt).
+  bool checkCondUpdateStmt(IfStmt *S, ErrorInfoTy &ErrorInfo);
+
+  /// Check if it is a valid conditional expression statement (cond-expr-stmt).
+  bool checkCondExprStmt(Stmt *S, ErrorInfoTy &ErrorInfo);
+
+  /// Check if all captured values have right type.
+  bool checkType(ErrorInfoTy &ErrorInfo) const;
+
+  static bool CheckValue(const Expr *E, ErrorInfoTy &ErrorInfo,
+                         bool ShouldBeLValue, bool ShouldBeInteger = false) {
+    if (E->isInstantiationDependent())
+      return true;
+
+    if (ShouldBeLValue && !E->isLValue()) {
+      ErrorInfo.Error = ErrorTy::XNotLValue;
+      ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = E->getExprLoc();
+      ErrorInfo.ErrorRange = ErrorInfo.NoteRange = E->getSourceRange();
+      return false;
+    }
+
+    QualType QTy = E->getType();
+    if (!QTy->isScalarType()) {
+      ErrorInfo.Error = ErrorTy::NotScalar;
+      ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = E->getExprLoc();
+      ErrorInfo.ErrorRange = ErrorInfo.NoteRange = E->getSourceRange();
+      return false;
+    }
+    if (ShouldBeInteger && !QTy->isIntegerType()) {
+      ErrorInfo.Error = ErrorTy::NotInteger;
+      ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = E->getExprLoc();
+      ErrorInfo.ErrorRange = ErrorInfo.NoteRange = E->getSourceRange();
+      return false;
+    }
+
+    return true;
+  }
+  };
+
+bool OmpSsAtomicCompareChecker::checkCondUpdateStmt(IfStmt *S,
+                                                     ErrorInfoTy &ErrorInfo) {
+  auto *Then = S->getThen();
+  if (auto *CS = dyn_cast<CompoundStmt>(Then)) {
+    if (CS->body_empty()) {
+      ErrorInfo.Error = ErrorTy::NoStmt;
+      ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = CS->getBeginLoc();
+      ErrorInfo.ErrorRange = ErrorInfo.NoteRange = CS->getSourceRange();
+      return false;
+    }
+    if (CS->size() > 1) {
+      ErrorInfo.Error = ErrorTy::MoreThanOneStmt;
+      ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = CS->getBeginLoc();
+      ErrorInfo.ErrorRange = ErrorInfo.NoteRange = S->getSourceRange();
+      return false;
+    }
+    Then = CS->body_front();
+  }
+
+  auto *BO = dyn_cast<BinaryOperator>(Then);
+  if (!BO) {
+    ErrorInfo.Error = ErrorTy::NotAnAssignment;
+    ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = Then->getBeginLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange = Then->getSourceRange();
+    return false;
+  }
+  if (BO->getOpcode() != BO_Assign) {
+    ErrorInfo.Error = ErrorTy::NotAnAssignment;
+    ErrorInfo.ErrorLoc = BO->getExprLoc();
+    ErrorInfo.NoteLoc = BO->getOperatorLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange = BO->getSourceRange();
+    return false;
+  }
+
+  X = BO->getLHS();
+
+  auto *Cond = dyn_cast<BinaryOperator>(S->getCond());
+  if (!Cond) {
+    ErrorInfo.Error = ErrorTy::NotABinaryOp;
+    ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = S->getCond()->getExprLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange = S->getCond()->getSourceRange();
+    return false;
+  }
+
+  switch (Cond->getOpcode()) {
+  case BO_EQ: {
+    C = Cond;
+    D = BO->getRHS();
+    if (checkIfTwoExprsAreSame(ContextRef, X, Cond->getLHS())) {
+      E = Cond->getRHS();
+    } else if (checkIfTwoExprsAreSame(ContextRef, X, Cond->getRHS())) {
+      E = Cond->getLHS();
+    } else {
+      ErrorInfo.Error = ErrorTy::InvalidComparison;
+      ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = Cond->getExprLoc();
+      ErrorInfo.ErrorRange = ErrorInfo.NoteRange = Cond->getSourceRange();
+      return false;
+    }
+    break;
+  }
+  case BO_LT:
+  case BO_GT: {
+    E = BO->getRHS();
+    if (checkIfTwoExprsAreSame(ContextRef, X, Cond->getLHS()) &&
+        checkIfTwoExprsAreSame(ContextRef, E, Cond->getRHS())) {
+      C = Cond;
+    } else if (checkIfTwoExprsAreSame(ContextRef, E, Cond->getLHS()) &&
+               checkIfTwoExprsAreSame(ContextRef, X, Cond->getRHS())) {
+      C = Cond;
+      IsXBinopExpr = false;
+    } else {
+      ErrorInfo.Error = ErrorTy::InvalidComparison;
+      ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = Cond->getExprLoc();
+      ErrorInfo.ErrorRange = ErrorInfo.NoteRange = Cond->getSourceRange();
+      return false;
+    }
+    break;
+  }
+  default:
+    ErrorInfo.Error = ErrorTy::InvalidBinaryOp;
+    ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = Cond->getExprLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange = Cond->getSourceRange();
+    return false;
+  }
+
+  if (S->getElse()) {
+    ErrorInfo.Error = ErrorTy::UnexpectedElse;
+    ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = S->getElse()->getBeginLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange = S->getElse()->getSourceRange();
+    return false;
+  }
+
+  return true;
+}
+
+bool OmpSsAtomicCompareChecker::checkCondExprStmt(Stmt *S,
+                                                   ErrorInfoTy &ErrorInfo) {
+  auto *BO = dyn_cast<BinaryOperator>(S);
+  if (!BO) {
+    ErrorInfo.Error = ErrorTy::NotAnAssignment;
+    ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = S->getBeginLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange = S->getSourceRange();
+    return false;
+  }
+  if (BO->getOpcode() != BO_Assign) {
+    ErrorInfo.Error = ErrorTy::NotAnAssignment;
+    ErrorInfo.ErrorLoc = BO->getExprLoc();
+    ErrorInfo.NoteLoc = BO->getOperatorLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange = BO->getSourceRange();
+    return false;
+  }
+
+  X = BO->getLHS();
+
+  auto *CO = dyn_cast<ConditionalOperator>(BO->getRHS()->IgnoreParenImpCasts());
+  if (!CO) {
+    ErrorInfo.Error = ErrorTy::NotCondOp;
+    ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = BO->getRHS()->getExprLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange = BO->getRHS()->getSourceRange();
+    return false;
+  }
+
+  if (!checkIfTwoExprsAreSame(ContextRef, X, CO->getFalseExpr())) {
+    ErrorInfo.Error = ErrorTy::WrongFalseExpr;
+    ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = CO->getFalseExpr()->getExprLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange =
+        CO->getFalseExpr()->getSourceRange();
+    return false;
+  }
+
+  auto *Cond = dyn_cast<BinaryOperator>(CO->getCond());
+  if (!Cond) {
+    ErrorInfo.Error = ErrorTy::NotABinaryOp;
+    ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = CO->getCond()->getExprLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange =
+        CO->getCond()->getSourceRange();
+    return false;
+  }
+
+  switch (Cond->getOpcode()) {
+  case BO_EQ: {
+    C = Cond;
+    D = CO->getTrueExpr();
+    if (checkIfTwoExprsAreSame(ContextRef, X, Cond->getLHS())) {
+      E = Cond->getRHS();
+    } else if (checkIfTwoExprsAreSame(ContextRef, X, Cond->getRHS())) {
+      E = Cond->getLHS();
+    } else {
+      ErrorInfo.Error = ErrorTy::InvalidComparison;
+      ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = Cond->getExprLoc();
+      ErrorInfo.ErrorRange = ErrorInfo.NoteRange = Cond->getSourceRange();
+      return false;
+    }
+    break;
+  }
+  case BO_LT:
+  case BO_GT: {
+    E = CO->getTrueExpr();
+    if (checkIfTwoExprsAreSame(ContextRef, X, Cond->getLHS()) &&
+        checkIfTwoExprsAreSame(ContextRef, E, Cond->getRHS())) {
+      C = Cond;
+    } else if (checkIfTwoExprsAreSame(ContextRef, E, Cond->getLHS()) &&
+               checkIfTwoExprsAreSame(ContextRef, X, Cond->getRHS())) {
+      C = Cond;
+      IsXBinopExpr = false;
+    } else {
+      ErrorInfo.Error = ErrorTy::InvalidComparison;
+      ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = Cond->getExprLoc();
+      ErrorInfo.ErrorRange = ErrorInfo.NoteRange = Cond->getSourceRange();
+      return false;
+    }
+    break;
+  }
+  default:
+    ErrorInfo.Error = ErrorTy::InvalidBinaryOp;
+    ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = Cond->getExprLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange = Cond->getSourceRange();
+    return false;
+  }
+
+  return true;
+}
+
+bool OmpSsAtomicCompareChecker::checkType(ErrorInfoTy &ErrorInfo) const {
+  // 'x' and 'e' cannot be nullptr
+  assert(X && E && "X and E cannot be nullptr");
+
+  if (!CheckValue(X, ErrorInfo, true))
+    return false;
+
+  if (!CheckValue(E, ErrorInfo, false))
+    return false;
+
+  if (D && !CheckValue(D, ErrorInfo, false))
+    return false;
+
+  return true;
+}
+
+bool OmpSsAtomicCompareChecker::checkStmt(
+    Stmt *S, OmpSsAtomicCompareChecker::ErrorInfoTy &ErrorInfo) {
+  auto *CS = dyn_cast<CompoundStmt>(S);
+  if (CS) {
+    if (CS->body_empty()) {
+      ErrorInfo.Error = ErrorTy::NoStmt;
+      ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = CS->getBeginLoc();
+      ErrorInfo.ErrorRange = ErrorInfo.NoteRange = CS->getSourceRange();
+      return false;
+    }
+
+    if (CS->size() != 1) {
+      ErrorInfo.Error = ErrorTy::MoreThanOneStmt;
+      ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = CS->getBeginLoc();
+      ErrorInfo.ErrorRange = ErrorInfo.NoteRange = CS->getSourceRange();
+      return false;
+    }
+    S = CS->body_front();
+  }
+
+  auto Res = false;
+
+  if (auto *IS = dyn_cast<IfStmt>(S)) {
+    // Check if the statement is in one of the following forms
+    // (cond-update-stmt):
+    // if (expr ordop x) { x = expr; }
+    // if (x ordop expr) { x = expr; }
+    // if (x == e) { x = d; }
+    Res = checkCondUpdateStmt(IS, ErrorInfo);
+  } else {
+    // Check if the statement is in one of the following forms (cond-expr-stmt):
+    // x = expr ordop x ? expr : x;
+    // x = x ordop expr ? expr : x;
+    // x = x == e ? d : x;
+    Res = checkCondExprStmt(S, ErrorInfo);
+  }
+
+  if (!Res)
+    return false;
+
+  return checkType(ErrorInfo);
+}
+
+class OmpSsAtomicCompareCaptureChecker final
+    : public OmpSsAtomicCompareChecker {
+public:
+  OmpSsAtomicCompareCaptureChecker(Sema &S) : OmpSsAtomicCompareChecker(S) {}
+
+  Expr *getV() const { return V; }
+  Expr *getR() const { return R; }
+  bool isFailOnly() const { return IsFailOnly; }
+  bool isPostfixUpdate() const { return IsPostfixUpdate; }
+
+  /// Check if statement \a S is valid for <tt>atomic compare capture</tt>.
+  bool checkStmt(Stmt *S, ErrorInfoTy &ErrorInfo);
+
+private:
+  bool checkType(ErrorInfoTy &ErrorInfo);
+
+  // NOTE: Form 3, 4, 5 in the following comments mean the 3rd, 4th, and 5th
+  // form of 'conditional-update-capture-atomic' structured block on the v5.2
+  // spec p.p. 82:
+  // (1) { v = x; cond-update-stmt }
+  // (2) { cond-update-stmt v = x; }
+  // (3) if(x == e) { x = d; } else { v = x; }
+  // (4) { r = x == e; if(r) { x = d; } }
+  // (5) { r = x == e; if(r) { x = d; } else { v = x; } }
+
+  /// Check if it is valid 'if(x == e) { x = d; } else { v = x; }' (form 3)
+  bool checkForm3(IfStmt *S, ErrorInfoTy &ErrorInfo);
+
+  /// Check if it is valid '{ r = x == e; if(r) { x = d; } }',
+  /// or '{ r = x == e; if(r) { x = d; } else { v = x; } }' (form 4 and 5)
+  bool checkForm45(Stmt *S, ErrorInfoTy &ErrorInfo);
+
+  /// 'v' lvalue part of the source atomic expression.
+  Expr *V = nullptr;
+  /// 'r' lvalue part of the source atomic expression.
+  Expr *R = nullptr;
+  /// If 'v' is only updated when the comparison fails.
+  bool IsFailOnly = false;
+  /// If original value of 'x' must be stored in 'v', not an updated one.
+  bool IsPostfixUpdate = false;
+};
+
+bool OmpSsAtomicCompareCaptureChecker::checkType(ErrorInfoTy &ErrorInfo) {
+  if (!OmpSsAtomicCompareChecker::checkType(ErrorInfo))
+    return false;
+
+  if (V && !CheckValue(V, ErrorInfo, true))
+    return false;
+
+  if (R && !CheckValue(R, ErrorInfo, true, true))
+    return false;
+
+  return true;
+}
+
+bool OmpSsAtomicCompareCaptureChecker::checkForm3(IfStmt *S,
+                                                   ErrorInfoTy &ErrorInfo) {
+  IsFailOnly = true;
+
+  auto *Then = S->getThen();
+  if (auto *CS = dyn_cast<CompoundStmt>(Then)) {
+    if (CS->body_empty()) {
+      ErrorInfo.Error = ErrorTy::NoStmt;
+      ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = CS->getBeginLoc();
+      ErrorInfo.ErrorRange = ErrorInfo.NoteRange = CS->getSourceRange();
+      return false;
+    }
+    if (CS->size() > 1) {
+      ErrorInfo.Error = ErrorTy::MoreThanOneStmt;
+      ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = CS->getBeginLoc();
+      ErrorInfo.ErrorRange = ErrorInfo.NoteRange = CS->getSourceRange();
+      return false;
+    }
+    Then = CS->body_front();
+  }
+
+  auto *BO = dyn_cast<BinaryOperator>(Then);
+  if (!BO) {
+    ErrorInfo.Error = ErrorTy::NotAnAssignment;
+    ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = Then->getBeginLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange = Then->getSourceRange();
+    return false;
+  }
+  if (BO->getOpcode() != BO_Assign) {
+    ErrorInfo.Error = ErrorTy::NotAnAssignment;
+    ErrorInfo.ErrorLoc = BO->getExprLoc();
+    ErrorInfo.NoteLoc = BO->getOperatorLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange = BO->getSourceRange();
+    return false;
+  }
+
+  X = BO->getLHS();
+  D = BO->getRHS();
+
+  auto *Cond = dyn_cast<BinaryOperator>(S->getCond());
+  if (!Cond) {
+    ErrorInfo.Error = ErrorTy::NotABinaryOp;
+    ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = S->getCond()->getExprLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange = S->getCond()->getSourceRange();
+    return false;
+  }
+  if (Cond->getOpcode() != BO_EQ) {
+    ErrorInfo.Error = ErrorTy::NotEQ;
+    ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = Cond->getExprLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange = Cond->getSourceRange();
+    return false;
+  }
+
+  if (checkIfTwoExprsAreSame(ContextRef, X, Cond->getLHS())) {
+    E = Cond->getRHS();
+  } else if (checkIfTwoExprsAreSame(ContextRef, X, Cond->getRHS())) {
+    E = Cond->getLHS();
+  } else {
+    ErrorInfo.Error = ErrorTy::InvalidComparison;
+    ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = Cond->getExprLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange = Cond->getSourceRange();
+    return false;
+  }
+
+  C = Cond;
+
+  if (!S->getElse()) {
+    ErrorInfo.Error = ErrorTy::NoElse;
+    ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = S->getBeginLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange = S->getSourceRange();
+    return false;
+  }
+
+  auto *Else = S->getElse();
+  if (auto *CS = dyn_cast<CompoundStmt>(Else)) {
+    if (CS->body_empty()) {
+      ErrorInfo.Error = ErrorTy::NoStmt;
+      ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = CS->getBeginLoc();
+      ErrorInfo.ErrorRange = ErrorInfo.NoteRange = CS->getSourceRange();
+      return false;
+    }
+    if (CS->size() > 1) {
+      ErrorInfo.Error = ErrorTy::MoreThanOneStmt;
+      ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = CS->getBeginLoc();
+      ErrorInfo.ErrorRange = ErrorInfo.NoteRange = S->getSourceRange();
+      return false;
+    }
+    Else = CS->body_front();
+  }
+
+  auto *ElseBO = dyn_cast<BinaryOperator>(Else);
+  if (!ElseBO) {
+    ErrorInfo.Error = ErrorTy::NotAnAssignment;
+    ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = Else->getBeginLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange = Else->getSourceRange();
+    return false;
+  }
+  if (ElseBO->getOpcode() != BO_Assign) {
+    ErrorInfo.Error = ErrorTy::NotAnAssignment;
+    ErrorInfo.ErrorLoc = ElseBO->getExprLoc();
+    ErrorInfo.NoteLoc = ElseBO->getOperatorLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange = ElseBO->getSourceRange();
+    return false;
+  }
+
+  if (!checkIfTwoExprsAreSame(ContextRef, X, ElseBO->getRHS())) {
+    ErrorInfo.Error = ErrorTy::InvalidAssignment;
+    ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = ElseBO->getRHS()->getExprLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange =
+        ElseBO->getRHS()->getSourceRange();
+    return false;
+  }
+
+  V = ElseBO->getLHS();
+
+  return checkType(ErrorInfo);
+}
+
+bool OmpSsAtomicCompareCaptureChecker::checkForm45(Stmt *S,
+                                                    ErrorInfoTy &ErrorInfo) {
+  // We don't check here as they should be already done before call this
+  // function.
+  auto *CS = cast<CompoundStmt>(S);
+  assert(CS->size() == 2 && "CompoundStmt size is not expected");
+  auto *S1 = cast<BinaryOperator>(CS->body_front());
+  auto *S2 = cast<IfStmt>(CS->body_back());
+  assert(S1->getOpcode() == BO_Assign && "unexpected binary operator");
+
+  if (!checkIfTwoExprsAreSame(ContextRef, S1->getLHS(), S2->getCond())) {
+    ErrorInfo.Error = ErrorTy::InvalidCondition;
+    ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = S2->getCond()->getExprLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange = S1->getLHS()->getSourceRange();
+    return false;
+  }
+
+  R = S1->getLHS();
+
+  auto *Then = S2->getThen();
+  if (auto *ThenCS = dyn_cast<CompoundStmt>(Then)) {
+    if (ThenCS->body_empty()) {
+      ErrorInfo.Error = ErrorTy::NoStmt;
+      ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = ThenCS->getBeginLoc();
+      ErrorInfo.ErrorRange = ErrorInfo.NoteRange = ThenCS->getSourceRange();
+      return false;
+    }
+    if (ThenCS->size() > 1) {
+      ErrorInfo.Error = ErrorTy::MoreThanOneStmt;
+      ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = ThenCS->getBeginLoc();
+      ErrorInfo.ErrorRange = ErrorInfo.NoteRange = ThenCS->getSourceRange();
+      return false;
+    }
+    Then = ThenCS->body_front();
+  }
+
+  auto *ThenBO = dyn_cast<BinaryOperator>(Then);
+  if (!ThenBO) {
+    ErrorInfo.Error = ErrorTy::NotAnAssignment;
+    ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = S2->getBeginLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange = S2->getSourceRange();
+    return false;
+  }
+  if (ThenBO->getOpcode() != BO_Assign) {
+    ErrorInfo.Error = ErrorTy::NotAnAssignment;
+    ErrorInfo.ErrorLoc = ThenBO->getExprLoc();
+    ErrorInfo.NoteLoc = ThenBO->getOperatorLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange = ThenBO->getSourceRange();
+    return false;
+  }
+
+  X = ThenBO->getLHS();
+  D = ThenBO->getRHS();
+
+  auto *BO = cast<BinaryOperator>(S1->getRHS()->IgnoreImpCasts());
+  if (BO->getOpcode() != BO_EQ) {
+    ErrorInfo.Error = ErrorTy::NotEQ;
+    ErrorInfo.ErrorLoc = BO->getExprLoc();
+    ErrorInfo.NoteLoc = BO->getOperatorLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange = BO->getSourceRange();
+    return false;
+  }
+
+  C = BO;
+
+  if (checkIfTwoExprsAreSame(ContextRef, X, BO->getLHS())) {
+    E = BO->getRHS();
+  } else if (checkIfTwoExprsAreSame(ContextRef, X, BO->getRHS())) {
+    E = BO->getLHS();
+  } else {
+    ErrorInfo.Error = ErrorTy::InvalidComparison;
+    ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = BO->getExprLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange = BO->getSourceRange();
+    return false;
+  }
+
+  if (S2->getElse()) {
+    IsFailOnly = true;
+
+    auto *Else = S2->getElse();
+    if (auto *ElseCS = dyn_cast<CompoundStmt>(Else)) {
+      if (ElseCS->body_empty()) {
+        ErrorInfo.Error = ErrorTy::NoStmt;
+        ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = ElseCS->getBeginLoc();
+        ErrorInfo.ErrorRange = ErrorInfo.NoteRange = ElseCS->getSourceRange();
+        return false;
+      }
+      if (ElseCS->size() > 1) {
+        ErrorInfo.Error = ErrorTy::MoreThanOneStmt;
+        ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = ElseCS->getBeginLoc();
+        ErrorInfo.ErrorRange = ErrorInfo.NoteRange = ElseCS->getSourceRange();
+        return false;
+      }
+      Else = ElseCS->body_front();
+    }
+
+    auto *ElseBO = dyn_cast<BinaryOperator>(Else);
+    if (!ElseBO) {
+      ErrorInfo.Error = ErrorTy::NotAnAssignment;
+      ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = Else->getBeginLoc();
+      ErrorInfo.ErrorRange = ErrorInfo.NoteRange = Else->getSourceRange();
+      return false;
+    }
+    if (ElseBO->getOpcode() != BO_Assign) {
+      ErrorInfo.Error = ErrorTy::NotAnAssignment;
+      ErrorInfo.ErrorLoc = ElseBO->getExprLoc();
+      ErrorInfo.NoteLoc = ElseBO->getOperatorLoc();
+      ErrorInfo.ErrorRange = ErrorInfo.NoteRange = ElseBO->getSourceRange();
+      return false;
+    }
+    if (!checkIfTwoExprsAreSame(ContextRef, X, ElseBO->getRHS())) {
+      ErrorInfo.Error = ErrorTy::InvalidAssignment;
+      ErrorInfo.ErrorLoc = ElseBO->getRHS()->getExprLoc();
+      ErrorInfo.NoteLoc = X->getExprLoc();
+      ErrorInfo.ErrorRange = ElseBO->getRHS()->getSourceRange();
+      ErrorInfo.NoteRange = X->getSourceRange();
+      return false;
+    }
+
+    V = ElseBO->getLHS();
+  }
+
+  return checkType(ErrorInfo);
+}
+
+bool OmpSsAtomicCompareCaptureChecker::checkStmt(Stmt *S,
+                                                  ErrorInfoTy &ErrorInfo) {
+  // if(x == e) { x = d; } else { v = x; }
+  if (auto *IS = dyn_cast<IfStmt>(S))
+    return checkForm3(IS, ErrorInfo);
+
+  auto *CS = dyn_cast<CompoundStmt>(S);
+  if (!CS) {
+    ErrorInfo.Error = ErrorTy::NotCompoundStmt;
+    ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = S->getBeginLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange = S->getSourceRange();
+    return false;
+  }
+  if (CS->body_empty()) {
+    ErrorInfo.Error = ErrorTy::NoStmt;
+    ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = CS->getBeginLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange = CS->getSourceRange();
+    return false;
+  }
+
+  // { if(x == e) { x = d; } else { v = x; } }
+  if (CS->size() == 1) {
+    auto *IS = dyn_cast<IfStmt>(CS->body_front());
+    if (!IS) {
+      ErrorInfo.Error = ErrorTy::NotIfStmt;
+      ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = CS->body_front()->getBeginLoc();
+      ErrorInfo.ErrorRange = ErrorInfo.NoteRange =
+          CS->body_front()->getSourceRange();
+      return false;
+    }
+
+    return checkForm3(IS, ErrorInfo);
+  } else if (CS->size() == 2) {
+    auto *S1 = CS->body_front();
+    auto *S2 = CS->body_back();
+
+    Stmt *UpdateStmt = nullptr;
+    Stmt *CondUpdateStmt = nullptr;
+    Stmt *CondExprStmt = nullptr;
+
+    if (auto *BO = dyn_cast<BinaryOperator>(S1)) {
+      // It could be one of the following cases:
+      // { v = x; cond-update-stmt }
+      // { v = x; cond-expr-stmt }
+      // { cond-expr-stmt; v = x; }
+      // form 45
+      if (isa<BinaryOperator>(BO->getRHS()->IgnoreImpCasts()) ||
+          isa<ConditionalOperator>(BO->getRHS()->IgnoreImpCasts())) {
+        // check if form 45
+        if (isa<IfStmt>(S2))
+          return checkForm45(CS, ErrorInfo);
+        // { cond-expr-stmt; v = x; }
+        CondExprStmt = S1;
+        UpdateStmt = S2;
+      } else {
+        IsPostfixUpdate = true;
+        UpdateStmt = S1;
+        if (isa<IfStmt>(S2)) {
+          // { v = x; cond-update-stmt }
+          CondUpdateStmt = S2;
+        } else {
+          // { v = x; cond-expr-stmt }
+          CondExprStmt = S2;
+        }
+      }
+    } else {
+      // { cond-update-stmt v = x; }
+      UpdateStmt = S2;
+      CondUpdateStmt = S1;
+    }
+
+    auto CheckCondUpdateStmt = [this, &ErrorInfo](Stmt *CUS) {
+      auto *IS = dyn_cast<IfStmt>(CUS);
+      if (!IS) {
+        ErrorInfo.Error = ErrorTy::NotIfStmt;
+        ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = CUS->getBeginLoc();
+        ErrorInfo.ErrorRange = ErrorInfo.NoteRange = CUS->getSourceRange();
+        return false;
+      }
+
+      return checkCondUpdateStmt(IS, ErrorInfo);
+    };
+
+    // CheckUpdateStmt has to be called *after* CheckCondUpdateStmt.
+    auto CheckUpdateStmt = [this, &ErrorInfo](Stmt *US) {
+      auto *BO = dyn_cast<BinaryOperator>(US);
+      if (!BO) {
+        ErrorInfo.Error = ErrorTy::NotAnAssignment;
+        ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = US->getBeginLoc();
+        ErrorInfo.ErrorRange = ErrorInfo.NoteRange = US->getSourceRange();
+        return false;
+      }
+      if (BO->getOpcode() != BO_Assign) {
+        ErrorInfo.Error = ErrorTy::NotAnAssignment;
+        ErrorInfo.ErrorLoc = BO->getExprLoc();
+        ErrorInfo.NoteLoc = BO->getOperatorLoc();
+        ErrorInfo.ErrorRange = ErrorInfo.NoteRange = BO->getSourceRange();
+        return false;
+      }
+      if (!checkIfTwoExprsAreSame(ContextRef, this->X, BO->getRHS())) {
+        ErrorInfo.Error = ErrorTy::InvalidAssignment;
+        ErrorInfo.ErrorLoc = BO->getRHS()->getExprLoc();
+        ErrorInfo.NoteLoc = this->X->getExprLoc();
+        ErrorInfo.ErrorRange = BO->getRHS()->getSourceRange();
+        ErrorInfo.NoteRange = this->X->getSourceRange();
+        return false;
+      }
+
+      this->V = BO->getLHS();
+
+      return true;
+    };
+
+    if (CondUpdateStmt && !CheckCondUpdateStmt(CondUpdateStmt))
+      return false;
+    if (CondExprStmt && !checkCondExprStmt(CondExprStmt, ErrorInfo))
+      return false;
+    if (!CheckUpdateStmt(UpdateStmt))
+      return false;
+  } else {
+    ErrorInfo.Error = ErrorTy::MoreThanTwoStmts;
+    ErrorInfo.ErrorLoc = ErrorInfo.NoteLoc = CS->getBeginLoc();
+    ErrorInfo.ErrorRange = ErrorInfo.NoteRange = CS->getSourceRange();
+    return false;
+  }
+
+  return checkType(ErrorInfo);
+}
+} // namespace
+
+StmtResult Sema::ActOnOmpSsAtomicDirective(ArrayRef<OSSClause *> Clauses,
+                                            Stmt *AStmt,
+                                            SourceLocation StartLoc,
+                                            SourceLocation EndLoc) {
+  if (!AStmt)
+    return StmtError();
+
+  // 1.2.2 OmpSs-2 Language Terminology
+  // Structured block - An executable statement with a single entry at the
+  // top and a single exit at the bottom.
+  // The point of exit cannot be a branch out of the structured block.
+  // longjmp() and throw() must not violate the entry/exit criteria.
+  OmpSsClauseKind AtomicKind = OSSC_unknown;
+  SourceLocation AtomicKindLoc;
+  OmpSsClauseKind MemOrderKind = OSSC_unknown;
+  SourceLocation MemOrderLoc;
+  bool MutexClauseEncountered = false;
+  llvm::SmallSet<OmpSsClauseKind, 2> EncounteredAtomicKinds;
+  for (const OSSClause *C : Clauses) {
+    switch (C->getClauseKind()) {
+    case OSSC_read:
+    case OSSC_write:
+    case OSSC_update:
+      MutexClauseEncountered = true;
+      [[fallthrough]];
+    case OSSC_capture:
+    case OSSC_compare: {
+      if (AtomicKind != OSSC_unknown && MutexClauseEncountered) {
+        Diag(C->getBeginLoc(), diag::err_oss_atomic_several_clauses)
+            << SourceRange(C->getBeginLoc(), C->getEndLoc());
+        Diag(AtomicKindLoc, diag::note_oss_previous_mem_order_clause)
+            << getOmpSsClauseName(AtomicKind);
+      } else {
+        AtomicKind = C->getClauseKind();
+        AtomicKindLoc = C->getBeginLoc();
+        if (!EncounteredAtomicKinds.insert(C->getClauseKind()).second) {
+          Diag(C->getBeginLoc(), diag::err_oss_atomic_several_clauses)
+              << SourceRange(C->getBeginLoc(), C->getEndLoc());
+          Diag(AtomicKindLoc, diag::note_oss_previous_mem_order_clause)
+              << getOmpSsClauseName(AtomicKind);
+        }
+      }
+      break;
+    }
+    case OSSC_seq_cst:
+    case OSSC_acq_rel:
+    case OSSC_acquire:
+    case OSSC_release:
+    case OSSC_relaxed: {
+      if (MemOrderKind != OSSC_unknown) {
+        Diag(C->getBeginLoc(), diag::err_oss_several_mem_order_clauses)
+            << getOmpSsDirectiveName(OSSD_atomic) << 0
+            << SourceRange(C->getBeginLoc(), C->getEndLoc());
+        Diag(MemOrderLoc, diag::note_oss_previous_mem_order_clause)
+            << getOmpSsClauseName(MemOrderKind);
+      } else {
+        MemOrderKind = C->getClauseKind();
+        MemOrderLoc = C->getBeginLoc();
+      }
+      break;
+    }
+    default:
+      llvm_unreachable("unknown clause is encountered");
+    }
+  }
+  bool IsCompareCapture = false;
+  if (EncounteredAtomicKinds.contains(OSSC_compare) &&
+      EncounteredAtomicKinds.contains(OSSC_capture)) {
+    IsCompareCapture = true;
+    AtomicKind = OSSC_compare;
+  }
+  // OmpSs-2, 2.17.7 atomic Construct, Restrictions
+  // If atomic-clause is read then memory-order-clause must not be acq_rel or
+  // release.
+  // If atomic-clause is write then memory-order-clause must not be acq_rel or
+  // acquire.
+  // If atomic-clause is update or not present then memory-order-clause must not
+  // be acq_rel or acquire.
+  if ((AtomicKind == OSSC_read &&
+       (MemOrderKind == OSSC_acq_rel || MemOrderKind == OSSC_release)) ||
+      ((AtomicKind == OSSC_write || AtomicKind == OSSC_update ||
+        AtomicKind == OSSC_unknown) &&
+       (MemOrderKind == OSSC_acq_rel || MemOrderKind == OSSC_acquire))) {
+    SourceLocation Loc = AtomicKindLoc;
+    if (AtomicKind == OSSC_unknown)
+      Loc = StartLoc;
+    Diag(Loc, diag::err_oss_atomic_incompatible_mem_order_clause)
+        << getOmpSsClauseName(AtomicKind)
+        << (AtomicKind == OSSC_unknown ? 1 : 0)
+        << getOmpSsClauseName(MemOrderKind);
+    Diag(MemOrderLoc, diag::note_oss_previous_mem_order_clause)
+        << getOmpSsClauseName(MemOrderKind);
+  }
+
+  Stmt *Body = AStmt;
+  if (auto *EWC = dyn_cast<ExprWithCleanups>(Body))
+    Body = EWC->getSubExpr();
+
+  Expr *X = nullptr;
+  Expr *V = nullptr;
+  Expr *E = nullptr;
+  Expr *UE = nullptr;
+  Expr *D = nullptr;
+  Expr *CE = nullptr;
+  Expr *R = nullptr;
+  bool IsXLHSInRHSPart = false;
+  bool IsPostfixUpdate = false;
+  bool IsFailOnly = false;
+  // OmpSs-2 [2.12.6, atomic Construct]
+  // In the next expressions:
+  // * x and v (as applicable) are both l-value expressions with scalar type.
+  // * During the execution of an atomic region, multiple syntactic
+  // occurrences of x must designate the same storage location.
+  // * Neither of v and expr (as applicable) may access the storage location
+  // designated by x.
+  // * Neither of x and expr (as applicable) may access the storage location
+  // designated by v.
+  // * expr is an expression with scalar type.
+  // * binop is one of +, *, -, /, &, ^, |, <<, or >>.
+  // * binop, binop=, ++, and -- are not overloaded operators.
+  // * The expression x binop expr must be numerically equivalent to x binop
+  // (expr). This requirement is satisfied if the operators in expr have
+  // precedence greater than binop, or by using parentheses around expr or
+  // subexpressions of expr.
+  // * The expression expr binop x must be numerically equivalent to (expr)
+  // binop x. This requirement is satisfied if the operators in expr have
+  // precedence equal to or greater than binop, or by using parentheses around
+  // expr or subexpressions of expr.
+  // * For forms that allow multiple occurrences of x, the number of times
+  // that x is evaluated is unspecified.
+  if (AtomicKind == OSSC_read) {
+    enum {
+      NotAnExpression,
+      NotAnAssignmentOp,
+      NotAScalarType,
+      NotAnLValue,
+      NoError
+    } ErrorFound = NoError;
+    SourceLocation ErrorLoc, NoteLoc;
+    SourceRange ErrorRange, NoteRange;
+    // If clause is read:
+    //  v = x;
+    if (const auto *AtomicBody = dyn_cast<Expr>(Body)) {
+      const auto *AtomicBinOp =
+          dyn_cast<BinaryOperator>(AtomicBody->IgnoreParenImpCasts());
+      if (AtomicBinOp && AtomicBinOp->getOpcode() == BO_Assign) {
+        X = AtomicBinOp->getRHS()->IgnoreParenImpCasts();
+        V = AtomicBinOp->getLHS()->IgnoreParenImpCasts();
+        if ((X->isInstantiationDependent() || X->getType()->isScalarType()) &&
+            (V->isInstantiationDependent() || V->getType()->isScalarType())) {
+          if (!X->isLValue() || !V->isLValue()) {
+            const Expr *NotLValueExpr = X->isLValue() ? V : X;
+            ErrorFound = NotAnLValue;
+            ErrorLoc = AtomicBinOp->getExprLoc();
+            ErrorRange = AtomicBinOp->getSourceRange();
+            NoteLoc = NotLValueExpr->getExprLoc();
+            NoteRange = NotLValueExpr->getSourceRange();
+          }
+        } else if (!X->isInstantiationDependent() ||
+                   !V->isInstantiationDependent()) {
+          const Expr *NotScalarExpr =
+              (X->isInstantiationDependent() || X->getType()->isScalarType())
+                  ? V
+                  : X;
+          ErrorFound = NotAScalarType;
+          ErrorLoc = AtomicBinOp->getExprLoc();
+          ErrorRange = AtomicBinOp->getSourceRange();
+          NoteLoc = NotScalarExpr->getExprLoc();
+          NoteRange = NotScalarExpr->getSourceRange();
+        }
+      } else if (!AtomicBody->isInstantiationDependent()) {
+        ErrorFound = NotAnAssignmentOp;
+        ErrorLoc = AtomicBody->getExprLoc();
+        ErrorRange = AtomicBody->getSourceRange();
+        NoteLoc = AtomicBinOp ? AtomicBinOp->getOperatorLoc()
+                              : AtomicBody->getExprLoc();
+        NoteRange = AtomicBinOp ? AtomicBinOp->getSourceRange()
+                                : AtomicBody->getSourceRange();
+      }
+    } else {
+      ErrorFound = NotAnExpression;
+      NoteLoc = ErrorLoc = Body->getBeginLoc();
+      NoteRange = ErrorRange = SourceRange(NoteLoc, NoteLoc);
+    }
+    if (ErrorFound != NoError) {
+      Diag(ErrorLoc, diag::err_oss_atomic_read_not_expression_statement)
+          << ErrorRange;
+      Diag(NoteLoc, diag::note_oss_atomic_read_write)
+          << ErrorFound << NoteRange;
+      return StmtError();
+    }
+    if (CurContext->isDependentContext())
+      V = X = nullptr;
+  } else if (AtomicKind == OSSC_write) {
+    enum {
+      NotAnExpression,
+      NotAnAssignmentOp,
+      NotAScalarType,
+      NotAnLValue,
+      NoError
+    } ErrorFound = NoError;
+    SourceLocation ErrorLoc, NoteLoc;
+    SourceRange ErrorRange, NoteRange;
+    // If clause is write:
+    //  x = expr;
+    if (const auto *AtomicBody = dyn_cast<Expr>(Body)) {
+      const auto *AtomicBinOp =
+          dyn_cast<BinaryOperator>(AtomicBody->IgnoreParenImpCasts());
+      if (AtomicBinOp && AtomicBinOp->getOpcode() == BO_Assign) {
+        X = AtomicBinOp->getLHS();
+        E = AtomicBinOp->getRHS();
+        if ((X->isInstantiationDependent() || X->getType()->isScalarType()) &&
+            (E->isInstantiationDependent() || E->getType()->isScalarType())) {
+          if (!X->isLValue()) {
+            ErrorFound = NotAnLValue;
+            ErrorLoc = AtomicBinOp->getExprLoc();
+            ErrorRange = AtomicBinOp->getSourceRange();
+            NoteLoc = X->getExprLoc();
+            NoteRange = X->getSourceRange();
+          }
+        } else if (!X->isInstantiationDependent() ||
+                   !E->isInstantiationDependent()) {
+          const Expr *NotScalarExpr =
+              (X->isInstantiationDependent() || X->getType()->isScalarType())
+                  ? E
+                  : X;
+          ErrorFound = NotAScalarType;
+          ErrorLoc = AtomicBinOp->getExprLoc();
+          ErrorRange = AtomicBinOp->getSourceRange();
+          NoteLoc = NotScalarExpr->getExprLoc();
+          NoteRange = NotScalarExpr->getSourceRange();
+        }
+      } else if (!AtomicBody->isInstantiationDependent()) {
+        ErrorFound = NotAnAssignmentOp;
+        ErrorLoc = AtomicBody->getExprLoc();
+        ErrorRange = AtomicBody->getSourceRange();
+        NoteLoc = AtomicBinOp ? AtomicBinOp->getOperatorLoc()
+                              : AtomicBody->getExprLoc();
+        NoteRange = AtomicBinOp ? AtomicBinOp->getSourceRange()
+                                : AtomicBody->getSourceRange();
+      }
+    } else {
+      ErrorFound = NotAnExpression;
+      NoteLoc = ErrorLoc = Body->getBeginLoc();
+      NoteRange = ErrorRange = SourceRange(NoteLoc, NoteLoc);
+    }
+    if (ErrorFound != NoError) {
+      Diag(ErrorLoc, diag::err_oss_atomic_write_not_expression_statement)
+          << ErrorRange;
+      Diag(NoteLoc, diag::note_oss_atomic_read_write)
+          << ErrorFound << NoteRange;
+      return StmtError();
+    }
+    if (CurContext->isDependentContext())
+      E = X = nullptr;
+  } else if (AtomicKind == OSSC_update || AtomicKind == OSSC_unknown) {
+    // If clause is update:
+    //  x++;
+    //  x--;
+    //  ++x;
+    //  --x;
+    //  x binop= expr;
+    //  x = x binop expr;
+    //  x = expr binop x;
+    OmpSsAtomicUpdateChecker Checker(*this);
+    if (Checker.checkStatement(
+            Body,
+            (AtomicKind == OSSC_update)
+                ? diag::err_oss_atomic_update_not_expression_statement
+                : diag::err_oss_atomic_not_expression_statement,
+            diag::note_oss_atomic_update))
+      return StmtError();
+    if (!CurContext->isDependentContext()) {
+      E = Checker.getExpr();
+      X = Checker.getX();
+      UE = Checker.getUpdateExpr();
+      IsXLHSInRHSPart = Checker.isXLHSInRHSPart();
+    }
+  } else if (AtomicKind == OSSC_capture) {
+    enum {
+      NotAnAssignmentOp,
+      NotACompoundStatement,
+      NotTwoSubstatements,
+      NotASpecificExpression,
+      NoError
+    } ErrorFound = NoError;
+    SourceLocation ErrorLoc, NoteLoc;
+    SourceRange ErrorRange, NoteRange;
+    if (const auto *AtomicBody = dyn_cast<Expr>(Body)) {
+      // If clause is a capture:
+      //  v = x++;
+      //  v = x--;
+      //  v = ++x;
+      //  v = --x;
+      //  v = x binop= expr;
+      //  v = x = x binop expr;
+      //  v = x = expr binop x;
+      const auto *AtomicBinOp =
+          dyn_cast<BinaryOperator>(AtomicBody->IgnoreParenImpCasts());
+      if (AtomicBinOp && AtomicBinOp->getOpcode() == BO_Assign) {
+        V = AtomicBinOp->getLHS();
+        Body = AtomicBinOp->getRHS()->IgnoreParenImpCasts();
+        OmpSsAtomicUpdateChecker Checker(*this);
+        if (Checker.checkStatement(
+                Body, diag::err_oss_atomic_capture_not_expression_statement,
+                diag::note_oss_atomic_update))
+          return StmtError();
+        E = Checker.getExpr();
+        X = Checker.getX();
+        UE = Checker.getUpdateExpr();
+        IsXLHSInRHSPart = Checker.isXLHSInRHSPart();
+        IsPostfixUpdate = Checker.isPostfixUpdate();
+      } else if (!AtomicBody->isInstantiationDependent()) {
+        ErrorLoc = AtomicBody->getExprLoc();
+        ErrorRange = AtomicBody->getSourceRange();
+        NoteLoc = AtomicBinOp ? AtomicBinOp->getOperatorLoc()
+                              : AtomicBody->getExprLoc();
+        NoteRange = AtomicBinOp ? AtomicBinOp->getSourceRange()
+                                : AtomicBody->getSourceRange();
+        ErrorFound = NotAnAssignmentOp;
+      }
+      if (ErrorFound != NoError) {
+        Diag(ErrorLoc, diag::err_oss_atomic_capture_not_expression_statement)
+            << ErrorRange;
+        Diag(NoteLoc, diag::note_oss_atomic_capture) << ErrorFound << NoteRange;
+        return StmtError();
+      }
+      if (CurContext->isDependentContext())
+        UE = V = E = X = nullptr;
+    } else {
+      // If clause is a capture:
+      //  { v = x; x = expr; }
+      //  { v = x; x++; }
+      //  { v = x; x--; }
+      //  { v = x; ++x; }
+      //  { v = x; --x; }
+      //  { v = x; x binop= expr; }
+      //  { v = x; x = x binop expr; }
+      //  { v = x; x = expr binop x; }
+      //  { x++; v = x; }
+      //  { x--; v = x; }
+      //  { ++x; v = x; }
+      //  { --x; v = x; }
+      //  { x binop= expr; v = x; }
+      //  { x = x binop expr; v = x; }
+      //  { x = expr binop x; v = x; }
+      if (auto *CS = dyn_cast<CompoundStmt>(Body)) {
+        // Check that this is { expr1; expr2; }
+        if (CS->size() == 2) {
+          Stmt *First = CS->body_front();
+          Stmt *Second = CS->body_back();
+          if (auto *EWC = dyn_cast<ExprWithCleanups>(First))
+            First = EWC->getSubExpr()->IgnoreParenImpCasts();
+          if (auto *EWC = dyn_cast<ExprWithCleanups>(Second))
+            Second = EWC->getSubExpr()->IgnoreParenImpCasts();
+          // Need to find what subexpression is 'v' and what is 'x'.
+          OmpSsAtomicUpdateChecker Checker(*this);
+          bool IsUpdateExprFound = !Checker.checkStatement(Second);
+          BinaryOperator *BinOp = nullptr;
+          if (IsUpdateExprFound) {
+            BinOp = dyn_cast<BinaryOperator>(First);
+            IsUpdateExprFound = BinOp && BinOp->getOpcode() == BO_Assign;
+          }
+          if (IsUpdateExprFound && !CurContext->isDependentContext()) {
+            //  { v = x; x++; }
+            //  { v = x; x--; }
+            //  { v = x; ++x; }
+            //  { v = x; --x; }
+            //  { v = x; x binop= expr; }
+            //  { v = x; x = x binop expr; }
+            //  { v = x; x = expr binop x; }
+            // Check that the first expression has form v = x.
+            Expr *PossibleX = BinOp->getRHS()->IgnoreParenImpCasts();
+            llvm::FoldingSetNodeID XId, PossibleXId;
+            Checker.getX()->Profile(XId, Context, /*Canonical=*/true);
+            PossibleX->Profile(PossibleXId, Context, /*Canonical=*/true);
+            IsUpdateExprFound = XId == PossibleXId;
+            if (IsUpdateExprFound) {
+              V = BinOp->getLHS();
+              X = Checker.getX();
+              E = Checker.getExpr();
+              UE = Checker.getUpdateExpr();
+              IsXLHSInRHSPart = Checker.isXLHSInRHSPart();
+              IsPostfixUpdate = true;
+            }
+          }
+          if (!IsUpdateExprFound) {
+            IsUpdateExprFound = !Checker.checkStatement(First);
+            BinOp = nullptr;
+            if (IsUpdateExprFound) {
+              BinOp = dyn_cast<BinaryOperator>(Second);
+              IsUpdateExprFound = BinOp && BinOp->getOpcode() == BO_Assign;
+            }
+            if (IsUpdateExprFound && !CurContext->isDependentContext()) {
+              //  { x++; v = x; }
+              //  { x--; v = x; }
+              //  { ++x; v = x; }
+              //  { --x; v = x; }
+              //  { x binop= expr; v = x; }
+              //  { x = x binop expr; v = x; }
+              //  { x = expr binop x; v = x; }
+              // Check that the second expression has form v = x.
+              Expr *PossibleX = BinOp->getRHS()->IgnoreParenImpCasts();
+              llvm::FoldingSetNodeID XId, PossibleXId;
+              Checker.getX()->Profile(XId, Context, /*Canonical=*/true);
+              PossibleX->Profile(PossibleXId, Context, /*Canonical=*/true);
+              IsUpdateExprFound = XId == PossibleXId;
+              if (IsUpdateExprFound) {
+                V = BinOp->getLHS();
+                X = Checker.getX();
+                E = Checker.getExpr();
+                UE = Checker.getUpdateExpr();
+                IsXLHSInRHSPart = Checker.isXLHSInRHSPart();
+                IsPostfixUpdate = false;
+              }
+            }
+          }
+          if (!IsUpdateExprFound) {
+            //  { v = x; x = expr; }
+            auto *FirstExpr = dyn_cast<Expr>(First);
+            auto *SecondExpr = dyn_cast<Expr>(Second);
+            if (!FirstExpr || !SecondExpr ||
+                !(FirstExpr->isInstantiationDependent() ||
+                  SecondExpr->isInstantiationDependent())) {
+              auto *FirstBinOp = dyn_cast<BinaryOperator>(First);
+              if (!FirstBinOp || FirstBinOp->getOpcode() != BO_Assign) {
+                ErrorFound = NotAnAssignmentOp;
+                NoteLoc = ErrorLoc = FirstBinOp ? FirstBinOp->getOperatorLoc()
+                                                : First->getBeginLoc();
+                NoteRange = ErrorRange = FirstBinOp
+                                             ? FirstBinOp->getSourceRange()
+                                             : SourceRange(ErrorLoc, ErrorLoc);
+              } else {
+                auto *SecondBinOp = dyn_cast<BinaryOperator>(Second);
+                if (!SecondBinOp || SecondBinOp->getOpcode() != BO_Assign) {
+                  ErrorFound = NotAnAssignmentOp;
+                  NoteLoc = ErrorLoc = SecondBinOp
+                                           ? SecondBinOp->getOperatorLoc()
+                                           : Second->getBeginLoc();
+                  NoteRange = ErrorRange =
+                      SecondBinOp ? SecondBinOp->getSourceRange()
+                                  : SourceRange(ErrorLoc, ErrorLoc);
+                } else {
+                  Expr *PossibleXRHSInFirst =
+                      FirstBinOp->getRHS()->IgnoreParenImpCasts();
+                  Expr *PossibleXLHSInSecond =
+                      SecondBinOp->getLHS()->IgnoreParenImpCasts();
+                  llvm::FoldingSetNodeID X1Id, X2Id;
+                  PossibleXRHSInFirst->Profile(X1Id, Context,
+                                               /*Canonical=*/true);
+                  PossibleXLHSInSecond->Profile(X2Id, Context,
+                                                /*Canonical=*/true);
+                  IsUpdateExprFound = X1Id == X2Id;
+                  if (IsUpdateExprFound) {
+                    V = FirstBinOp->getLHS();
+                    X = SecondBinOp->getLHS();
+                    E = SecondBinOp->getRHS();
+                    UE = nullptr;
+                    IsXLHSInRHSPart = false;
+                    IsPostfixUpdate = true;
+                  } else {
+                    ErrorFound = NotASpecificExpression;
+                    ErrorLoc = FirstBinOp->getExprLoc();
+                    ErrorRange = FirstBinOp->getSourceRange();
+                    NoteLoc = SecondBinOp->getLHS()->getExprLoc();
+                    NoteRange = SecondBinOp->getRHS()->getSourceRange();
+                  }
+                }
+              }
+            }
+          }
+        } else {
+          NoteLoc = ErrorLoc = Body->getBeginLoc();
+          NoteRange = ErrorRange =
+              SourceRange(Body->getBeginLoc(), Body->getBeginLoc());
+          ErrorFound = NotTwoSubstatements;
+        }
+      } else {
+        NoteLoc = ErrorLoc = Body->getBeginLoc();
+        NoteRange = ErrorRange =
+            SourceRange(Body->getBeginLoc(), Body->getBeginLoc());
+        ErrorFound = NotACompoundStatement;
+      }
+    }
+    if (ErrorFound != NoError) {
+      Diag(ErrorLoc, diag::err_oss_atomic_capture_not_compound_statement)
+          << ErrorRange;
+      Diag(NoteLoc, diag::note_oss_atomic_capture) << ErrorFound << NoteRange;
+      return StmtError();
+    }
+    if (CurContext->isDependentContext())
+      UE = V = E = X = nullptr;
+  } else if (AtomicKind == OSSC_compare) {
+    if (IsCompareCapture) {
+      OmpSsAtomicCompareCaptureChecker::ErrorInfoTy ErrorInfo;
+      OmpSsAtomicCompareCaptureChecker Checker(*this);
+      if (!Checker.checkStmt(Body, ErrorInfo)) {
+        Diag(ErrorInfo.ErrorLoc, diag::err_oss_atomic_compare_capture)
+            << ErrorInfo.ErrorRange;
+        Diag(ErrorInfo.NoteLoc, diag::note_oss_atomic_compare)
+            << ErrorInfo.Error << ErrorInfo.NoteRange;
+        return StmtError();
+      }
+      X = Checker.getX();
+      E = Checker.getE();
+      D = Checker.getD();
+      CE = Checker.getCond();
+      V = Checker.getV();
+      R = Checker.getR();
+      // We reuse IsXLHSInRHSPart to tell if it is in the form 'x ordop expr'.
+      IsXLHSInRHSPart = Checker.isXBinopExpr();
+      IsFailOnly = Checker.isFailOnly();
+      IsPostfixUpdate = Checker.isPostfixUpdate();
+    } else {
+      OmpSsAtomicCompareChecker::ErrorInfoTy ErrorInfo;
+      OmpSsAtomicCompareChecker Checker(*this);
+      if (!Checker.checkStmt(Body, ErrorInfo)) {
+        Diag(ErrorInfo.ErrorLoc, diag::err_oss_atomic_compare)
+            << ErrorInfo.ErrorRange;
+        Diag(ErrorInfo.NoteLoc, diag::note_oss_atomic_compare)
+          << ErrorInfo.Error << ErrorInfo.NoteRange;
+        return StmtError();
+      }
+      X = Checker.getX();
+      E = Checker.getE();
+      D = Checker.getD();
+      CE = Checker.getCond();
+      // We reuse IsXLHSInRHSPart to tell if it is in the form 'x ordop expr'.
+      IsXLHSInRHSPart = Checker.isXBinopExpr();
+    }
+  }
+
+  setFunctionHasBranchProtectedScope();
+
+  return OSSAtomicDirective::Create(
+      Context, StartLoc, EndLoc, Clauses, AStmt,
+      {X, V, R, E, UE, D, CE, IsXLHSInRHSPart, IsPostfixUpdate, IsFailOnly});
 }
 
 namespace {
@@ -4667,6 +6257,33 @@ OSSClause *Sema::ActOnOmpSsClause(OmpSsClauseKind Kind,
   case OSSC_update:
     Res = ActOnOmpSsUpdateClause(StartLoc, EndLoc);
     break;
+  case OSSC_read:
+    Res = ActOnOmpSsReadClause(StartLoc, EndLoc);
+    break;
+  case OSSC_write:
+    Res = ActOnOmpSsWriteClause(StartLoc, EndLoc);
+    break;
+  case OSSC_capture:
+    Res = ActOnOmpSsCaptureClause(StartLoc, EndLoc);
+    break;
+  case OSSC_compare:
+    Res = ActOnOmpSsCompareClause(StartLoc, EndLoc);
+    break;
+  case OSSC_seq_cst:
+    Res = ActOnOmpSsSeqCstClause(StartLoc, EndLoc);
+    break;
+  case OSSC_acq_rel:
+    Res = ActOnOmpSsAcqRelClause(StartLoc, EndLoc);
+    break;
+  case OSSC_acquire:
+    Res = ActOnOmpSsAcquireClause(StartLoc, EndLoc);
+    break;
+  case OSSC_release:
+    Res = ActOnOmpSsReleaseClause(StartLoc, EndLoc);
+    break;
+  case OSSC_relaxed:
+    Res = ActOnOmpSsRelaxedClause(StartLoc, EndLoc);
+    break;
   default:
     llvm_unreachable("Clause is not allowed.");
   }
@@ -4682,3 +6299,49 @@ OSSClause *Sema::ActOnOmpSsUpdateClause(SourceLocation StartLoc,
                                         SourceLocation EndLoc) {
   return new (Context) OSSUpdateClause(StartLoc, EndLoc);
 }
+
+OSSClause *Sema::ActOnOmpSsReadClause(SourceLocation StartLoc,
+                                       SourceLocation EndLoc) {
+  return new (Context) OSSReadClause(StartLoc, EndLoc);
+}
+
+OSSClause *Sema::ActOnOmpSsWriteClause(SourceLocation StartLoc,
+                                        SourceLocation EndLoc) {
+  return new (Context) OSSWriteClause(StartLoc, EndLoc);
+}
+
+OSSClause *Sema::ActOnOmpSsCaptureClause(SourceLocation StartLoc,
+                                          SourceLocation EndLoc) {
+  return new (Context) OSSCaptureClause(StartLoc, EndLoc);
+}
+
+OSSClause *Sema::ActOnOmpSsCompareClause(SourceLocation StartLoc,
+                                          SourceLocation EndLoc) {
+  return new (Context) OSSCompareClause(StartLoc, EndLoc);
+}
+
+OSSClause *Sema::ActOnOmpSsSeqCstClause(SourceLocation StartLoc,
+                                         SourceLocation EndLoc) {
+  return new (Context) OSSSeqCstClause(StartLoc, EndLoc);
+}
+
+OSSClause *Sema::ActOnOmpSsAcqRelClause(SourceLocation StartLoc,
+                                         SourceLocation EndLoc) {
+  return new (Context) OSSAcqRelClause(StartLoc, EndLoc);
+}
+
+OSSClause *Sema::ActOnOmpSsAcquireClause(SourceLocation StartLoc,
+                                          SourceLocation EndLoc) {
+  return new (Context) OSSAcquireClause(StartLoc, EndLoc);
+}
+
+OSSClause *Sema::ActOnOmpSsReleaseClause(SourceLocation StartLoc,
+                                          SourceLocation EndLoc) {
+  return new (Context) OSSReleaseClause(StartLoc, EndLoc);
+}
+
+OSSClause *Sema::ActOnOmpSsRelaxedClause(SourceLocation StartLoc,
+                                          SourceLocation EndLoc) {
+  return new (Context) OSSRelaxedClause(StartLoc, EndLoc);
+}
+

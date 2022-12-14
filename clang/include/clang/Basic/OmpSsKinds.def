@@ -54,6 +54,9 @@
 #ifndef OMPSS_DEVICE_KIND
 #  define OMPSS_DEVICE_KIND(Name)
 #endif
+#ifndef OMPSS_ATOMIC_CLAUSE
+#  define OMPSS_ATOMIC_CLAUSE(Name)
+#endif
 #ifndef OMPSS_CLAUSE_ALIAS
 #define OMPSS_CLAUSE_ALIAS(Alias, Name)
 #endif
@@ -66,6 +69,7 @@ OMPSS_DIRECTIVE(taskiter)
 OMPSS_DIRECTIVE(taskwait)
 OMPSS_DIRECTIVE(release)
 OMPSS_DIRECTIVE(assert)
+OMPSS_DIRECTIVE(atomic)
 
 // OmpSs clauses.
 OMPSS_CLAUSE(if, OSSIfClause)
@@ -88,6 +92,15 @@ OMPSS_CLAUSE(grainsize, OSSGrainsizeClause)
 OMPSS_CLAUSE(unroll, OSSUnrollClause)
 OMPSS_CLAUSE(collapse,  OSSCollapseClause)
 OMPSS_CLAUSE(ndrange,  OSSNdrangeClause)
+OMPSS_CLAUSE(read,  OSSReadClause)
+OMPSS_CLAUSE(write,  OSSWriteClause)
+OMPSS_CLAUSE(capture,  OSSCaptureClause)
+OMPSS_CLAUSE(compare,  OSSCompareClause)
+OMPSS_CLAUSE(seq_cst,  OSSSeqCstClause)
+OMPSS_CLAUSE(acq_rel,  OSSAcqRelClause)
+OMPSS_CLAUSE(acquire,  OSSAcquireClause)
+OMPSS_CLAUSE(release,  OSSReleaseClause)
+OMPSS_CLAUSE(relaxed,  OSSRelaxedClause)
 OMPSS_DIRECTIVE_EXT(declare_reduction, "declare reduction")
 OMPSS_DIRECTIVE_EXT(declare_task, "task")
 OMPSS_DIRECTIVE_EXT(task_for, "task for")
@@ -308,6 +321,19 @@ OMPSS_DECLARE_TASK_CLAUSE(weakcommutative)
 OMPSS_DECLARE_TASK_CLAUSE(weakreduction)
 OMPSS_DECLARE_TASK_CLAUSE(ndrange)
 
+OMPSS_ATOMIC_CLAUSE(read)
+OMPSS_ATOMIC_CLAUSE(write)
+OMPSS_ATOMIC_CLAUSE(update)
+OMPSS_ATOMIC_CLAUSE(capture)
+// TODO: CodeGen support
+// OMPSS_ATOMIC_CLAUSE(compare)
+OMPSS_ATOMIC_CLAUSE(seq_cst)
+OMPSS_ATOMIC_CLAUSE(acq_rel)
+OMPSS_ATOMIC_CLAUSE(acquire)
+OMPSS_ATOMIC_CLAUSE(release)
+OMPSS_ATOMIC_CLAUSE(relaxed)
+
+#undef OMPSS_ATOMIC_CLAUSE
 #undef OMPSS_DEVICE_KIND
 #undef OMPSS_DEPEND_KIND
 #undef OMPSS_DEFAULT_KIND

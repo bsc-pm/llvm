@@ -3933,6 +3933,9 @@ DEF_TRAVERSE_STMT(OSSTaskLoopDirective,
 DEF_TRAVERSE_STMT(OSSTaskLoopForDirective,
                   { TRY_TO(TraverseOSSLoopDirective(S)); })
 
+DEF_TRAVERSE_STMT(OSSAtomicDirective,
+                  { TRY_TO(TraverseOSSExecutableDirective(S)); })
+
 #undef DEF_TRAVERSE_STMT
 #undef TRAVERSE_STMT
 #undef TRAVERSE_STMT_BASE
