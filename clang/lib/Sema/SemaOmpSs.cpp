@@ -1403,7 +1403,8 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
 
   llvm::SmallVector<OSSClause *, 8> ClausesWithImplicit;
   ClausesWithImplicit.append(Clauses.begin(), Clauses.end());
-  if (AStmt && !CurContext->isDependentContext()) {
+  if (AStmt && !CurContext->isDependentContext() &&
+      Kind != OSSD_critical) {
     // Check default data sharing attributes for referenced variables.
     DSAAttrChecker DSAChecker(DSAStack, *this);
 

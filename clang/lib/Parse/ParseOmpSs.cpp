@@ -889,7 +889,8 @@ Parser::OSSClauseList Parser::ParseOmpSsClauses(OmpSsDirectiveKind DKind, Source
   ConsumeAnnotationToken();
 
   // 'release' does not need clause analysis
-  if (DKind != OSSD_release)
+  if (DKind != OSSD_release &&
+      DKind != OSSD_critical)
     Actions.ActOnOmpSsAfterClauseGathering(Clauses);
 
   return Clauses;

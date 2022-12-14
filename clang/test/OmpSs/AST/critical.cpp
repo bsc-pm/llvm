@@ -3,17 +3,20 @@
 
 template<typename T>
 void foo() {
+  int x;
+  #pragma oss task
   #pragma oss critical(asdf)
-  {}
+  x++;
 }
 
 void bar() {
+  int x;
   #pragma oss critical(asdf)
-  {}
+  x++;
   foo<int>();
 }
 
-// CHECK: OSSCriticalDirective 0x{{.*}} <line:{{.*}}:{{.*}}, col:{{.*}}>
-// CHECK: OSSCriticalDirective 0x{{.*}} <line:{{.*}}:{{.*}}, col:{{.*}}>
-// CHECK: OSSCriticalDirective 0x{{.*}} <line:{{.*}}:{{.*}}, col:{{.*}}>
-
+// CHECK: OSSCriticalDirective
+// CHECK: OSSCriticalDirective
+// CHECK-NOT: OSSFirstprivateClause
+// CHECK: OSSCriticalDirective
