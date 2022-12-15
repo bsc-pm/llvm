@@ -807,7 +807,8 @@ namespace {
 
     void writeValue(raw_ostream &OS) const override {
       OS << "\";\n";
-      OS << "  for (const auto &Val : " << RangeName << "()) {\n"
+      OS << "  for ([[maybe_unused]] const auto &Val : " << RangeName
+         << "()) {\n"
          << "    DelimitAttributeArgument(OS, IsFirstArgument);\n";
       writeValueImpl(OS);
       OS << "  }\n";
@@ -815,7 +816,8 @@ namespace {
     }
 
     void writeDump(raw_ostream &OS) const override {
-      OS << "    for (const auto &Val : SA->" << RangeName << "())\n";
+      OS << "    for ([[maybe_unused]] const auto &Val : SA->" << RangeName
+         << "())\n";
       writeDumpImpl(OS);
     }
   };
