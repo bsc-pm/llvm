@@ -114,6 +114,10 @@ struct OSSTaskDataTy final {
   const Expr *Final = nullptr;
   const Expr *Cost = nullptr;
   const Expr *Priority = nullptr;
+  const Expr *NumInstances = nullptr;
+  const Expr *Onto = nullptr;
+  const Expr *NumRepetitions = nullptr;
+  const Expr *Period = nullptr;
   SmallVector<const Expr *, 2> Labels;
   bool Wait = false;
   const Expr *Onready = nullptr;

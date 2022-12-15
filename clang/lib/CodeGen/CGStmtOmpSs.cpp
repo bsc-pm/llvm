@@ -117,7 +117,7 @@ static void AddDepData(const OSSExecutableDirective &S, OSSTaskDepDataTy &Deps) 
 }
 
 static void AddIfData(const OSSExecutableDirective &S, const Expr *&IfExpr) {
-  bool Found = false;
+  [[maybe_unused]] bool Found = false;
   for (const auto *C : S.getClausesOfKind<OSSIfClause>()) {
     assert(!Found);
     Found = true;
@@ -126,7 +126,7 @@ static void AddIfData(const OSSExecutableDirective &S, const Expr *&IfExpr) {
 }
 
 static void AddFinalData(const OSSExecutableDirective &S, const Expr * &FinalExpr) {
-  bool Found = false;
+  [[maybe_unused]] bool Found = false;
   for (const auto *C : S.getClausesOfKind<OSSFinalClause>()) {
     assert(!Found);
     Found = true;
@@ -135,7 +135,7 @@ static void AddFinalData(const OSSExecutableDirective &S, const Expr * &FinalExp
 }
 
 static void AddCostData(const OSSExecutableDirective &S, const Expr * &CostExpr) {
-  bool Found = false;
+  [[maybe_unused]] bool Found = false;
   for (const auto *C : S.getClausesOfKind<OSSCostClause>()) {
     assert(!Found);
     Found = true;
@@ -144,7 +144,7 @@ static void AddCostData(const OSSExecutableDirective &S, const Expr * &CostExpr)
 }
 
 static void AddPriorityData(const OSSExecutableDirective &S, const Expr * &PriorityExpr) {
-  bool Found = false;
+  [[maybe_unused]] bool Found = false;
   for (const auto *C : S.getClausesOfKind<OSSPriorityClause>()) {
     assert(!Found);
     Found = true;
@@ -152,9 +152,47 @@ static void AddPriorityData(const OSSExecutableDirective &S, const Expr * &Prior
   }
 }
 
+static void AddNumInstancesData(const OSSExecutableDirective &S,
+                                const Expr *&Expr) {
+  [[maybe_unused]] bool Found = false;
+  for (const auto *C : S.getClausesOfKind<OSSNumInstancesClause>()) {
+    assert(!Found);
+    Found = true;
+    Expr = C->getExpression();
+  }
+}
+
+static void AddOntoData(const OSSExecutableDirective &S, const Expr *&Expr) {
+  [[maybe_unused]] bool Found = false;
+  for (const auto *C : S.getClausesOfKind<OSSOntoClause>()) {
+    assert(!Found);
+    Found = true;
+    Expr = C->getExpression();
+  }
+}
+
+static void AddNumRepetitionsData(const OSSExecutableDirective &S,
+                                  const Expr *&Expr) {
+  [[maybe_unused]] bool Found = false;
+  for (const auto *C : S.getClausesOfKind<OSSNumRepetitionsClause>()) {
+    assert(!Found);
+    Found = true;
+    Expr = C->getExpression();
+  }
+}
+
+static void AddPeriodData(const OSSExecutableDirective &S, const Expr *&Expr) {
+  [[maybe_unused]] bool Found = false;
+  for (const auto *C : S.getClausesOfKind<OSSPeriodClause>()) {
+    assert(!Found);
+    Found = true;
+    Expr = C->getExpression();
+  }
+}
+
 static void AddLabelData(
     const OSSExecutableDirective &S, SmallVectorImpl<const Expr *> &Labels) {
-  bool Found = false;
+  [[maybe_unused]] bool Found = false;
   for (const auto *C : S.getClausesOfKind<OSSLabelClause>()) {
     assert(!Found);
     Found = true;
@@ -173,7 +211,7 @@ static void AddUpdateLoopData(const OSSExecutableDirective &S, bool &Update) {
 }
 
 static void AddOnreadyData(const OSSExecutableDirective &S, const Expr * &OnreadyExpr) {
-  bool Found = false;
+  [[maybe_unused]] bool Found = false;
   for (const auto *C : S.getClausesOfKind<OSSOnreadyClause>()) {
     assert(!Found);
     Found = true;
@@ -202,7 +240,7 @@ static void AddReductionData(const OSSExecutableDirective &S, OSSTaskReductionDa
 }
 
 static void AddDeviceData(const OSSExecutableDirective &S, OSSTaskDeviceDataTy &Devices) {
-  bool Found = false;
+  [[maybe_unused]] bool Found = false;
   for (const auto *C : S.getClausesOfKind<OSSDeviceClause>()) {
     assert(!Found);
     Found = true;
@@ -225,10 +263,14 @@ static void AddTaskData(const OSSExecutableDirective &S, OSSTaskDataTy &TaskData
   AddOnreadyData(S, TaskData.Onready);
   AddReductionData(S, TaskData.Reductions);
   AddDeviceData(S, TaskData.Devices);
+  AddNumInstancesData(S, TaskData.NumInstances);
+  AddOntoData(S, TaskData.Onto);
+  AddNumRepetitionsData(S, TaskData.NumRepetitions);
+  AddPeriodData(S, TaskData.Period);
 }
 
 static void AddChunksizeLoopData(const OSSLoopDirective &S, const Expr * &ChunksizeExpr) {
-  bool Found = false;
+  [[maybe_unused]] bool Found = false;
   for (const auto *C : S.getClausesOfKind<OSSChunksizeClause>()) {
     assert(!Found);
     Found = true;
@@ -237,7 +279,7 @@ static void AddChunksizeLoopData(const OSSLoopDirective &S, const Expr * &Chunks
 }
 
 static void AddGrainsizeLoopData(const OSSLoopDirective &S, const Expr * &GrainsizeExpr) {
-  bool Found = false;
+  [[maybe_unused]] bool Found = false;
   for (const auto *C : S.getClausesOfKind<OSSGrainsizeClause>()) {
     assert(!Found);
     Found = true;
@@ -246,7 +288,7 @@ static void AddGrainsizeLoopData(const OSSLoopDirective &S, const Expr * &Grains
 }
 
 static void AddUnrollLoopData(const OSSLoopDirective &S, const Expr * &UnrollExpr) {
-  bool Found = false;
+  [[maybe_unused]] bool Found = false;
   for (const auto *C : S.getClausesOfKind<OSSUnrollClause>()) {
     assert(!Found);
     Found = true;

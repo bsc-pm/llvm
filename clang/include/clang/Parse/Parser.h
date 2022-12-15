@@ -15,13 +15,14 @@
 
 #include "clang/AST/Availability.h"
 #include "clang/Basic/BitmaskEnum.h"
-#include "clang/Basic/OpenMPKinds.h"
 #include "clang/Basic/OmpSsKinds.h"
+#include "clang/Basic/OpenMPKinds.h"
 #include "clang/Basic/OperatorPrecedence.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Lex/CodeCompletionHandler.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Sema/DeclSpec.h"
+#include "clang/Sema/Ownership.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Frontend/OpenMP/OMPContext.h"
@@ -3388,21 +3389,26 @@ private:
                               OmpSsClauseKind CKind, bool FirstClause);
 
   bool ParseDeclareTaskClauses(
-      ExprResult &IfRes, ExprResult &FinalRes,
-      ExprResult &CostRes, ExprResult &PriorityRes,
-      ExprResult &OnreadyRes, bool &Wait,
+      ExprResult &IfRes, ExprResult &FinalRes, ExprResult &CostRes,
+      ExprResult &PriorityRes, ExprResult &OnreadyRes,
+      ExprResult &NumInstancesRes, ExprResult &OntoRes,
+      ExprResult &NumRepetitionsRes, ExprResult &PeriodRes, bool &Wait,
       unsigned &Device, SourceLocation &DeviceLoc,
-      SmallVectorImpl<Expr *> &Labels,
-      SmallVectorImpl<Expr *> &Ins, SmallVectorImpl<Expr *> &Outs,
-      SmallVectorImpl<Expr *> &Inouts, SmallVectorImpl<Expr *> &Concurrents,
+      SmallVectorImpl<Expr *> &Labels, SmallVectorImpl<Expr *> &Ins,
+      SmallVectorImpl<Expr *> &Outs, SmallVectorImpl<Expr *> &Inouts,
+      SmallVectorImpl<Expr *> &Concurrents,
       SmallVectorImpl<Expr *> &Commutatives, SmallVectorImpl<Expr *> &WeakIns,
       SmallVectorImpl<Expr *> &WeakOuts, SmallVectorImpl<Expr *> &WeakInouts,
-      SmallVectorImpl<Expr *> &WeakConcurrents, SmallVectorImpl<Expr *> &WeakCommutatives,
+      SmallVectorImpl<Expr *> &WeakConcurrents,
+      SmallVectorImpl<Expr *> &WeakCommutatives,
       SmallVectorImpl<Expr *> &DepIns, SmallVectorImpl<Expr *> &DepOuts,
-      SmallVectorImpl<Expr *> &DepInouts, SmallVectorImpl<Expr *> &DepConcurrents,
-      SmallVectorImpl<Expr *> &DepCommutatives, SmallVectorImpl<Expr *> &DepWeakIns,
-      SmallVectorImpl<Expr *> &DepWeakOuts, SmallVectorImpl<Expr *> &DepWeakInouts,
-      SmallVectorImpl<Expr *> &DepWeakConcurrents, SmallVectorImpl<Expr *> &DepWeakCommutatives,
+      SmallVectorImpl<Expr *> &DepInouts,
+      SmallVectorImpl<Expr *> &DepConcurrents,
+      SmallVectorImpl<Expr *> &DepCommutatives,
+      SmallVectorImpl<Expr *> &DepWeakIns, SmallVectorImpl<Expr *> &DepWeakOuts,
+      SmallVectorImpl<Expr *> &DepWeakInouts,
+      SmallVectorImpl<Expr *> &DepWeakConcurrents,
+      SmallVectorImpl<Expr *> &DepWeakCommutatives,
       SmallVectorImpl<unsigned> &ReductionListSizes,
       SmallVectorImpl<Expr *> &Reductions,
       SmallVectorImpl<unsigned> &ReductionClauseType,

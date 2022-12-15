@@ -1631,6 +1631,207 @@ public:
   }
 };
 
+/// This represents 'num_instances' clause in the '#pragma oss ...' directive.
+///
+/// \code
+/// #pragma oss task device(fpga) num_instances(1)
+/// \endcode
+/// In this example directive '#pragma oss task device(fpga)' has num_instances
+/// at 1
+class OSSNumInstancesClause : public OSSClause {
+  friend class OSSClauseReader;
+
+  /// Location of '('.
+  SourceLocation LParenLoc;
+
+  /// Expression of the 'num_instances' clause.
+  Stmt *Expression = nullptr;
+
+  /// Set expression.
+  void setExpression(Expr *E) { Expression = E; }
+
+public:
+  /// Build 'num_instances' clause with argument \a A.
+  ///
+  /// \param A Argument of the clause (a number).
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param EndLoc Ending location of the clause.
+  OSSNumInstancesClause(Stmt *A, SourceLocation StartLoc,
+                        SourceLocation LParenLoc, SourceLocation EndLoc)
+      : OSSClause(OSSC_num_instances, StartLoc, EndLoc), LParenLoc(LParenLoc),
+        Expression(A) {}
+
+  /// Build an empty clause.
+  OSSNumInstancesClause()
+      : OSSClause(OSSC_num_instances, SourceLocation(), SourceLocation()) {}
+
+  /// Sets the location of '('.
+  void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
+
+  /// Returns the location of '('.
+  SourceLocation getLParenLoc() const { return LParenLoc; }
+
+  /// Returns expression.
+  Expr *getExpression() const { return cast_or_null<Expr>(Expression); }
+
+  child_range children() { return child_range(&Expression, &Expression + 1); }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == OSSC_num_instances;
+  }
+};
+
+/// This represents 'onto' clause in the '#pragma oss ...' directive.
+///
+/// \code
+/// #pragma oss task device(fpga) onto(0x200000000)
+/// \endcode
+/// In this example directive '#pragma oss task device(fpga)' has onto
+class OSSOntoClause : public OSSClause {
+  friend class OSSClauseReader;
+
+  /// Location of '('.
+  SourceLocation LParenLoc;
+
+  /// Expression of the 'onto' clause.
+  Stmt *Expression = nullptr;
+
+  /// Set expression.
+  void setExpression(Expr *E) { Expression = E; }
+
+public:
+  /// Build 'onto' clause with argument \a A.
+  ///
+  /// \param A Argument of the clause (a number).
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param EndLoc Ending location of the clause.
+  OSSOntoClause(Stmt *A, SourceLocation StartLoc, SourceLocation LParenLoc,
+                SourceLocation EndLoc)
+      : OSSClause(OSSC_onto, StartLoc, EndLoc), LParenLoc(LParenLoc),
+        Expression(A) {}
+
+  /// Build an empty clause.
+  OSSOntoClause() : OSSClause(OSSC_onto, SourceLocation(), SourceLocation()) {}
+
+  /// Sets the location of '('.
+  void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
+
+  /// Returns the location of '('.
+  SourceLocation getLParenLoc() const { return LParenLoc; }
+
+  /// Returns expression.
+  Expr *getExpression() const { return cast_or_null<Expr>(Expression); }
+
+  child_range children() { return child_range(&Expression, &Expression + 1); }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == OSSC_onto;
+  }
+};
+
+/// This represents 'num_repetitions' clause in the '#pragma oss ...' directive.
+///
+/// \code
+/// #pragma oss task device(fpga) num_repetitions(3)
+/// \endcode
+/// In this example directive '#pragma oss task device(fpga)' has
+/// num_repetitions
+class OSSNumRepetitionsClause : public OSSClause {
+  friend class OSSClauseReader;
+
+  /// Location of '('.
+  SourceLocation LParenLoc;
+
+  /// Expression of the 'num_repetitions' clause.
+  Stmt *Expression = nullptr;
+
+  /// Set expression.
+  void setExpression(Expr *E) { Expression = E; }
+
+public:
+  /// Build 'num_repetitions' clause with argument \a A.
+  ///
+  /// \param A Argument of the clause (a number).
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param EndLoc Ending location of the clause.
+  OSSNumRepetitionsClause(Stmt *A, SourceLocation StartLoc,
+                          SourceLocation LParenLoc, SourceLocation EndLoc)
+      : OSSClause(OSSC_num_repetitions, StartLoc, EndLoc), LParenLoc(LParenLoc),
+        Expression(A) {}
+
+  /// Build an empty clause.
+  OSSNumRepetitionsClause()
+      : OSSClause(OSSC_num_repetitions, SourceLocation(), SourceLocation()) {}
+
+  /// Sets the location of '('.
+  void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
+
+  /// Returns the location of '('.
+  SourceLocation getLParenLoc() const { return LParenLoc; }
+
+  /// Returns expression.
+  Expr *getExpression() const { return cast_or_null<Expr>(Expression); }
+
+  child_range children() { return child_range(&Expression, &Expression + 1); }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == OSSC_num_repetitions;
+  }
+};
+
+/// This represents 'period' clause in the '#pragma oss ...' directive.
+///
+/// \code
+/// #pragma oss task device(fpga) period(100)
+/// \endcode
+/// In this example directive '#pragma oss task device(fpga)' has period
+class OSSPeriodClause : public OSSClause {
+  friend class OSSClauseReader;
+
+  /// Location of '('.
+  SourceLocation LParenLoc;
+
+  /// Expression of the 'period' clause.
+  Stmt *Expression = nullptr;
+
+  /// Set expression.
+  void setExpression(Expr *E) { Expression = E; }
+
+public:
+  /// Build 'period' clause with argument \a A.
+  ///
+  /// \param A Argument of the clause (a number).
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param EndLoc Ending location of the clause.
+  OSSPeriodClause(Stmt *A, SourceLocation StartLoc, SourceLocation LParenLoc,
+                  SourceLocation EndLoc)
+      : OSSClause(OSSC_period, StartLoc, EndLoc), LParenLoc(LParenLoc),
+        Expression(A) {}
+
+  /// Build an empty clause.
+  OSSPeriodClause()
+      : OSSClause(OSSC_period, SourceLocation(), SourceLocation()) {}
+
+  /// Sets the location of '('.
+  void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
+
+  /// Returns the location of '('.
+  SourceLocation getLParenLoc() const { return LParenLoc; }
+
+  /// Returns expression.
+  Expr *getExpression() const { return cast_or_null<Expr>(Expression); }
+
+  child_range children() { return child_range(&Expression, &Expression + 1); }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == OSSC_period;
+  }
+};
+
 /// This represents 'ndrange' clause in the
 /// '#pragma oss task' directive.
 ///

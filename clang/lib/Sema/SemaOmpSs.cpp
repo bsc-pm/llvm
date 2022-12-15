@@ -19,6 +19,7 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclOmpSs.h"
+#include "clang/AST/OmpSsClause.h"
 #include "clang/AST/StmtCXX.h"
 #include "clang/AST/StmtOmpSs.h"
 #include "clang/AST/StmtVisitor.h"
@@ -4305,28 +4306,24 @@ static bool actOnOSSReductionKindClause(
     ReductionData &RD, bool Outline);
 
 Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
-    DeclGroupPtrTy DG,
-    Expr *If, Expr *Final, Expr *Cost, Expr *Priority,
-    Expr *Onready, bool Wait,
-    unsigned Device, SourceLocation DeviceLoc,
-    ArrayRef<Expr *> Labels,
-    ArrayRef<Expr *> Ins, ArrayRef<Expr *> Outs, ArrayRef<Expr *> Inouts,
-    ArrayRef<Expr *> Concurrents, ArrayRef<Expr *> Commutatives,
-    ArrayRef<Expr *> WeakIns, ArrayRef<Expr *> WeakOuts,
-    ArrayRef<Expr *> WeakInouts,
+    DeclGroupPtrTy DG, Expr *If, Expr *Final, Expr *Cost, Expr *Priority,
+    Expr *Onready, Expr *NumInstances, Expr *Onto, Expr *NumRepetitions,
+    Expr *Period, bool Wait, unsigned Device, SourceLocation DeviceLoc,
+    ArrayRef<Expr *> Labels, ArrayRef<Expr *> Ins, ArrayRef<Expr *> Outs,
+    ArrayRef<Expr *> Inouts, ArrayRef<Expr *> Concurrents,
+    ArrayRef<Expr *> Commutatives, ArrayRef<Expr *> WeakIns,
+    ArrayRef<Expr *> WeakOuts, ArrayRef<Expr *> WeakInouts,
     ArrayRef<Expr *> WeakConcurrents, ArrayRef<Expr *> WeakCommutatives,
-    ArrayRef<Expr *> DepIns, ArrayRef<Expr *> DepOuts, ArrayRef<Expr *> DepInouts,
-    ArrayRef<Expr *> DepConcurrents, ArrayRef<Expr *> DepCommutatives,
-    ArrayRef<Expr *> DepWeakIns, ArrayRef<Expr *> DepWeakOuts,
-    ArrayRef<Expr *> DepWeakInouts,
+    ArrayRef<Expr *> DepIns, ArrayRef<Expr *> DepOuts,
+    ArrayRef<Expr *> DepInouts, ArrayRef<Expr *> DepConcurrents,
+    ArrayRef<Expr *> DepCommutatives, ArrayRef<Expr *> DepWeakIns,
+    ArrayRef<Expr *> DepWeakOuts, ArrayRef<Expr *> DepWeakInouts,
     ArrayRef<Expr *> DepWeakConcurrents, ArrayRef<Expr *> DepWeakCommutatives,
-    ArrayRef<unsigned> ReductionListSizes,
-    ArrayRef<Expr *> Reductions,
+    ArrayRef<unsigned> ReductionListSizes, ArrayRef<Expr *> Reductions,
     ArrayRef<unsigned> ReductionClauseType,
     ArrayRef<CXXScopeSpec> ReductionCXXScopeSpecs,
-    ArrayRef<DeclarationNameInfo> ReductionIds,
-    ArrayRef<Expr *> Ndranges, SourceLocation NdrangeLoc,
-    SourceRange SR,
+    ArrayRef<DeclarationNameInfo> ReductionIds, ArrayRef<Expr *> Ndranges,
+    SourceLocation NdrangeLoc, SourceRange SR,
     ArrayRef<Expr *> UnresolvedReductions) {
   if (!DG || DG.get().isNull())
     return DeclGroupPtrTy();
@@ -4391,7 +4388,8 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   // or our associated function
   ADecl->addAttr(OSSTaskDeclSentinelAttr::CreateImplicit(Context, SR));
 
-  ExprResult IfRes, FinalRes, CostRes, PriorityRes, OnreadyRes;
+  ExprResult IfRes, FinalRes, CostRes, PriorityRes, OnreadyRes, NumInstancesRes,
+      OntoRes, NumRepetitionsRes, PeriodRes;
   SmallVector<Expr *, 2> LabelsRes;
   SmallVector<Expr *, 4> NdrangesRes;
   OSSTaskDeclAttr::DeviceType DevType = OSSTaskDeclAttr::DeviceType::Unknown;
@@ -4436,6 +4434,34 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
         << getListOfPossibleValues(OSSC_device, /*First=*/0,
                                    /*Last=*/OSSC_DEVICE_unknown)
         << getOmpSsClauseName(OSSC_device);
+  }
+  if (NumInstances) {
+    NumInstancesRes = CheckNonNegativeIntegerValue(
+        NumInstances, OSSC_num_instances, /*StrictlyPositive=*/true,
+        /*Outline=*/true);
+    if (DevType != OSSTaskDeclAttr::Fpga)
+      Diag(DeviceLoc, diag::err_oss_num_instances_incompatible_device);
+  }
+  if (Onto) {
+    OntoRes = CheckNonNegativeIntegerValue(Onto, OSSC_onto,
+                                           /*StrictlyPositive=*/false,
+                                           /*Outline=*/true);
+    if (DevType != OSSTaskDeclAttr::Fpga)
+      Diag(DeviceLoc, diag::err_oss_onto_incompatible_device);
+  }
+  if (NumRepetitions) {
+    NumRepetitionsRes = CheckNonNegativeIntegerValue(
+        NumRepetitions, OSSC_num_repetitions, /*StrictlyPositive=*/true,
+        /*Outline=*/true);
+    if (DevType != OSSTaskDeclAttr::Fpga)
+      Diag(DeviceLoc, diag::err_oss_num_repetitions_incompatible_device);
+  }
+  if (Period) {
+    PeriodRes = CheckNonNegativeIntegerValue(Period, OSSC_period,
+                                             /*StrictlyPositive=*/true,
+                                             /*Outline=*/true);
+    if (DevType != OSSTaskDeclAttr::Fpga)
+      Diag(DeviceLoc, diag::err_oss_period_incompatible_device);
   }
   OSSClauseDSAChecker OSSClauseChecker(/*Stack=*/nullptr, *this);
   for (Expr *RefExpr : Ins) {
@@ -4565,42 +4591,45 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     TmpReductionKinds.push_back(b);
 
   auto *NewAttr = OSSTaskDeclAttr::CreateImplicit(
-    Context,
-    IfRes.get(), FinalRes.get(), CostRes.get(), PriorityRes.get(),
-    Wait, DevType,
-    OnreadyRes.get(),
-    const_cast<Expr **>(LabelsRes.data()), LabelsRes.size(),
-    const_cast<Expr **>(Ins.data()), Ins.size(),
-    const_cast<Expr **>(Outs.data()), Outs.size(),
-    const_cast<Expr **>(Inouts.data()), Inouts.size(),
-    const_cast<Expr **>(Concurrents.data()), Concurrents.size(),
-    const_cast<Expr **>(Commutatives.data()), Commutatives.size(),
-    const_cast<Expr **>(WeakIns.data()), WeakIns.size(),
-    const_cast<Expr **>(WeakOuts.data()), WeakOuts.size(),
-    const_cast<Expr **>(WeakInouts.data()), WeakInouts.size(),
-    const_cast<Expr **>(WeakConcurrents.data()), WeakConcurrents.size(),
-    const_cast<Expr **>(WeakCommutatives.data()), WeakCommutatives.size(),
-    const_cast<Expr **>(DepIns.data()), DepIns.size(),
-    const_cast<Expr **>(DepOuts.data()), DepOuts.size(),
-    const_cast<Expr **>(DepInouts.data()), DepInouts.size(),
-    const_cast<Expr **>(DepConcurrents.data()), DepConcurrents.size(),
-    const_cast<Expr **>(DepCommutatives.data()), DepCommutatives.size(),
-    const_cast<Expr **>(DepWeakIns.data()), DepWeakIns.size(),
-    const_cast<Expr **>(DepWeakOuts.data()), DepWeakOuts.size(),
-    const_cast<Expr **>(DepWeakInouts.data()), DepWeakInouts.size(),
-    const_cast<Expr **>(DepWeakConcurrents.data()), DepWeakConcurrents.size(),
-    const_cast<Expr **>(DepWeakCommutatives.data()), DepWeakCommutatives.size(),
-    const_cast<unsigned *>(ReductionListSizes.data()), ReductionListSizes.size(),
-    const_cast<Expr **>(RD.Vars.data()), RD.Vars.size(),
-    const_cast<Expr **>(RD.LHSs.data()), RD.LHSs.size(),
-    const_cast<Expr **>(RD.RHSs.data()), RD.RHSs.size(),
-    const_cast<Expr **>(RD.ReductionOps.data()), RD.ReductionOps.size(),
-    const_cast<unsigned *>(TmpReductionKinds.data()), RD.ReductionKinds.size(),
-    const_cast<unsigned *>(ReductionClauseType.data()), ReductionClauseType.size(),
-    const_cast<NestedNameSpecifierLoc *>(ReductionNSLoc.data()), ReductionNSLoc.size(),
-    const_cast<DeclarationNameInfo *>(ReductionIds.data()), ReductionIds.size(),
-    const_cast<Expr **>(NdrangesRes.data()), NdrangesRes.size(),
-    SR);
+      Context, IfRes.get(), FinalRes.get(), CostRes.get(), PriorityRes.get(),
+      Wait, DevType, OnreadyRes.get(), NumInstancesRes.get(), OntoRes.get(),
+      NumRepetitionsRes.get(), PeriodRes.get(),
+      const_cast<Expr **>(LabelsRes.data()), LabelsRes.size(),
+      const_cast<Expr **>(Ins.data()), Ins.size(),
+      const_cast<Expr **>(Outs.data()), Outs.size(),
+      const_cast<Expr **>(Inouts.data()), Inouts.size(),
+      const_cast<Expr **>(Concurrents.data()), Concurrents.size(),
+      const_cast<Expr **>(Commutatives.data()), Commutatives.size(),
+      const_cast<Expr **>(WeakIns.data()), WeakIns.size(),
+      const_cast<Expr **>(WeakOuts.data()), WeakOuts.size(),
+      const_cast<Expr **>(WeakInouts.data()), WeakInouts.size(),
+      const_cast<Expr **>(WeakConcurrents.data()), WeakConcurrents.size(),
+      const_cast<Expr **>(WeakCommutatives.data()), WeakCommutatives.size(),
+      const_cast<Expr **>(DepIns.data()), DepIns.size(),
+      const_cast<Expr **>(DepOuts.data()), DepOuts.size(),
+      const_cast<Expr **>(DepInouts.data()), DepInouts.size(),
+      const_cast<Expr **>(DepConcurrents.data()), DepConcurrents.size(),
+      const_cast<Expr **>(DepCommutatives.data()), DepCommutatives.size(),
+      const_cast<Expr **>(DepWeakIns.data()), DepWeakIns.size(),
+      const_cast<Expr **>(DepWeakOuts.data()), DepWeakOuts.size(),
+      const_cast<Expr **>(DepWeakInouts.data()), DepWeakInouts.size(),
+      const_cast<Expr **>(DepWeakConcurrents.data()), DepWeakConcurrents.size(),
+      const_cast<Expr **>(DepWeakCommutatives.data()),
+      DepWeakCommutatives.size(),
+      const_cast<unsigned *>(ReductionListSizes.data()),
+      ReductionListSizes.size(), const_cast<Expr **>(RD.Vars.data()),
+      RD.Vars.size(), const_cast<Expr **>(RD.LHSs.data()), RD.LHSs.size(),
+      const_cast<Expr **>(RD.RHSs.data()), RD.RHSs.size(),
+      const_cast<Expr **>(RD.ReductionOps.data()), RD.ReductionOps.size(),
+      const_cast<unsigned *>(TmpReductionKinds.data()),
+      RD.ReductionKinds.size(),
+      const_cast<unsigned *>(ReductionClauseType.data()),
+      ReductionClauseType.size(),
+      const_cast<NestedNameSpecifierLoc *>(ReductionNSLoc.data()),
+      ReductionNSLoc.size(),
+      const_cast<DeclarationNameInfo *>(ReductionIds.data()),
+      ReductionIds.size(), const_cast<Expr **>(NdrangesRes.data()),
+      NdrangesRes.size(), SR);
   ADecl->dropAttr<OSSTaskDeclSentinelAttr>();
   ADecl->addAttr(NewAttr);
   switch (OSSTaskDeclAttr::DeviceType(Device)) {
@@ -6158,6 +6187,49 @@ OSSClause *Sema::ActOnOmpSsPriorityClause(Expr *E,
     return nullptr;
 
   return new (Context) OSSPriorityClause(Res.get(), StartLoc, LParenLoc, EndLoc);
+}
+
+OSSClause *Sema::ActOnOmpSsNumInstancesClause(Expr *E, SourceLocation StartLoc,
+                                              SourceLocation LParenLoc,
+                                              SourceLocation EndLoc) {
+  ExprResult Res = CheckSignedIntegerValue(E, /*Outline=*/false);
+  if (Res.isInvalid())
+    return nullptr;
+
+  return new (Context)
+      OSSNumInstancesClause(Res.get(), StartLoc, LParenLoc, EndLoc);
+}
+
+OSSClause *Sema::ActOnOmpSsOntoClause(Expr *E, SourceLocation StartLoc,
+                                      SourceLocation LParenLoc,
+                                      SourceLocation EndLoc) {
+  ExprResult Res = CheckSignedIntegerValue(E, /*Outline=*/false);
+  if (Res.isInvalid())
+    return nullptr;
+
+  return new (Context) OSSOntoClause(Res.get(), StartLoc, LParenLoc, EndLoc);
+}
+
+OSSClause *Sema::ActOnOmpSsNumRepetitionsClause(Expr *E,
+                                                SourceLocation StartLoc,
+                                                SourceLocation LParenLoc,
+                                                SourceLocation EndLoc) {
+  ExprResult Res = CheckSignedIntegerValue(E, /*Outline=*/false);
+  if (Res.isInvalid())
+    return nullptr;
+
+  return new (Context)
+      OSSNumRepetitionsClause(Res.get(), StartLoc, LParenLoc, EndLoc);
+}
+
+OSSClause *Sema::ActOnOmpSsPeriodClause(Expr *E, SourceLocation StartLoc,
+                                        SourceLocation LParenLoc,
+                                        SourceLocation EndLoc) {
+  ExprResult Res = CheckSignedIntegerValue(E, /*Outline=*/false);
+  if (Res.isInvalid())
+    return nullptr;
+
+  return new (Context) OSSPeriodClause(Res.get(), StartLoc, LParenLoc, EndLoc);
 }
 
 OSSClause *Sema::ActOnOmpSsLabelClause(ArrayRef<Expr *> VarList,

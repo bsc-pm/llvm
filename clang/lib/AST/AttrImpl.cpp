@@ -204,6 +204,26 @@ void OSSTaskDeclAttr::printPrettyPragma(
     OS << ConvertDeviceTypeToStr(getDevice());
     OS << ")";
   }
+  if (auto *E = getNumInstances()) {
+    OS << " num_instances(";
+    E->printPretty(OS, nullptr, Policy);
+    OS << ")";
+  }
+  if (auto *E = getOnto()) {
+    OS << " onto(";
+    E->printPretty(OS, nullptr, Policy);
+    OS << ")";
+  }
+  if (auto *E = getNumRepetitions()) {
+    OS << " num_repetitions(";
+    E->printPretty(OS, nullptr, Policy);
+    OS << ")";
+  }
+  if (auto *E = getPeriod()) {
+    OS << " period(";
+    E->printPretty(OS, nullptr, Policy);
+    OS << ")";
+  }
 }
 
 void OMPDeclareTargetDeclAttr::printPrettyPragma(

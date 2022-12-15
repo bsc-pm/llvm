@@ -318,11 +318,8 @@ void Sema::InstantiateOSSDeclareTaskAttr(
       /*ForDefinition*/ false);
   addInstantiatedParametersToScope(FD, Pattern, Local, TemplateArgs);
 
-  ExprResult IfRes;
-  ExprResult FinalRes;
-  ExprResult CostRes;
-  ExprResult PriorityRes;
-  ExprResult OnreadyRes;
+  ExprResult IfRes, FinalRes, CostRes, PriorityRes, OnreadyRes, NumInstancesRes,
+      OntoRes, NumRepetitionsRes, PeriodRes;
   bool Wait = Attr.getWait();
   // This value means no clause seen
   unsigned Device = OSSC_DEVICE_unknown + 1;
@@ -423,6 +420,15 @@ void Sema::InstantiateOSSDeclareTaskAttr(
   if (auto *E = Attr.getOnreadyExpr())
     OnreadyRes = Subst(E);
 
+  if (auto *E = Attr.getNumInstances())
+    NumInstancesRes = Subst(E);
+  if (auto *E = Attr.getOnto())
+    OntoRes = Subst(E);
+  if (auto *E = Attr.getNumRepetitions())
+    NumRepetitionsRes = Subst(E);
+  if (auto *E = Attr.getPeriod())
+    PeriodRes = Subst(E);
+
   if (Attr.getDevice() != OSSTaskDeclAttr::DeviceType::Unknown)
     Device = Attr.getDevice();
 
@@ -472,27 +478,20 @@ void Sema::InstantiateOSSDeclareTaskAttr(
   }
 
   (void)ActOnOmpSsDeclareTaskDirective(
-    ConvertDeclToDeclGroup(New),
-    IfRes.get(), FinalRes.get(),
-    CostRes.get(), PriorityRes.get(),
-    OnreadyRes.get(), Wait,
-    Device, SourceLocation(),
-    Labels,
-    Ins, Outs, Inouts,
-    Concurrents, Commutatives,
-    WeakIns, WeakOuts, WeakInouts,
-    WeakConcurrents, WeakCommutatives,
-    DepIns, DepOuts, DepInouts,
-    DepConcurrents, DepCommutatives,
-    DepWeakIns, DepWeakOuts, DepWeakInouts,
-    DepWeakConcurrents, DepWeakCommutatives,
-    ArrayRef<unsigned>(Attr.reductionListSizes_begin(), Attr.reductionListSizes_end()),
-    Reductions,
-    ArrayRef<unsigned>(Attr.reductionClauseType_begin(), Attr.reductionClauseType_end()),
-    ReductionCXXScopeSpecs, ReductionIds,
-    Ndranges, SourceLocation(), // TODO
-    Attr.getRange(),
-    UnresolvedReductions);
+      ConvertDeclToDeclGroup(New), IfRes.get(), FinalRes.get(), CostRes.get(),
+      PriorityRes.get(), OnreadyRes.get(), NumInstancesRes.get(), OntoRes.get(),
+      NumRepetitionsRes.get(), PeriodRes.get(), Wait, Device, SourceLocation(),
+      Labels, Ins, Outs, Inouts, Concurrents, Commutatives, WeakIns, WeakOuts,
+      WeakInouts, WeakConcurrents, WeakCommutatives, DepIns, DepOuts, DepInouts,
+      DepConcurrents, DepCommutatives, DepWeakIns, DepWeakOuts, DepWeakInouts,
+      DepWeakConcurrents, DepWeakCommutatives,
+      ArrayRef<unsigned>(Attr.reductionListSizes_begin(),
+                         Attr.reductionListSizes_end()),
+      Reductions,
+      ArrayRef<unsigned>(Attr.reductionClauseType_begin(),
+                         Attr.reductionClauseType_end()),
+      ReductionCXXScopeSpecs, ReductionIds, Ndranges, SourceLocation(), // TODO
+      Attr.getRange(), UnresolvedReductions);
 }
 
 static void

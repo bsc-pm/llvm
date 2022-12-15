@@ -1726,6 +1726,52 @@ public:
                                           EndLoc);
   }
 
+  /// Build a new OmpSs 'num_instances' clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSNumInstancesClause(Expr *Condition,
+                                          SourceLocation StartLoc,
+                                          SourceLocation LParenLoc,
+                                          SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsNumInstancesClause(Condition, StartLoc,
+                                                  LParenLoc, EndLoc);
+  }
+
+  /// Build a new OmpSs 'onto' clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSOntoClause(Expr *Condition, SourceLocation StartLoc,
+                                  SourceLocation LParenLoc,
+                                  SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsOntoClause(Condition, StartLoc, LParenLoc,
+                                          EndLoc);
+  }
+
+  /// Build a new OmpSs 'num_repetitions' clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSNumRepetitionsClause(Expr *Condition,
+                                            SourceLocation StartLoc,
+                                            SourceLocation LParenLoc,
+                                            SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsNumRepetitionsClause(Condition, StartLoc,
+                                                    LParenLoc, EndLoc);
+  }
+
+  /// Build a new OmpSs 'period' clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSPeriodClause(Expr *Condition, SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsPeriodClause(Condition, StartLoc, LParenLoc,
+                                            EndLoc);
+  }
+
   /// Build a new OmpSs 'label' clause.
   ///
   /// By default, performs semantic analysis to build the new OmpSs clause.
@@ -11183,6 +11229,45 @@ OSSClause *TreeTransform<Derived>::TransformOSSPriorityClause(OSSPriorityClause 
     return nullptr;
   return getDerived().RebuildOSSPriorityClause(E.get(), C->getBeginLoc(),
                                                C->getLParenLoc(), C->getEndLoc());
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSNumInstancesClause(
+    OSSNumInstancesClause *C) {
+  ExprResult E = getDerived().TransformExpr(C->getExpression());
+  if (E.isInvalid())
+    return nullptr;
+  return getDerived().RebuildOSSNumInstancesClause(
+      E.get(), C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSOntoClause(OSSOntoClause *C) {
+  ExprResult E = getDerived().TransformExpr(C->getExpression());
+  if (E.isInvalid())
+    return nullptr;
+  return getDerived().RebuildOSSOntoClause(E.get(), C->getBeginLoc(),
+                                           C->getLParenLoc(), C->getEndLoc());
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSNumRepetitionsClause(
+    OSSNumRepetitionsClause *C) {
+  ExprResult E = getDerived().TransformExpr(C->getExpression());
+  if (E.isInvalid())
+    return nullptr;
+  return getDerived().RebuildOSSNumRepetitionsClause(
+      E.get(), C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSPeriodClause(OSSPeriodClause *C) {
+  ExprResult E = getDerived().TransformExpr(C->getExpression());
+  if (E.isInvalid())
+    return nullptr;
+  return getDerived().RebuildOSSPeriodClause(E.get(), C->getBeginLoc(),
+                                             C->getLParenLoc(), C->getEndLoc());
 }
 
 template <typename Derived>

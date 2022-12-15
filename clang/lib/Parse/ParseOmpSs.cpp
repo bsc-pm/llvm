@@ -112,18 +112,34 @@ static OmpSsDirectiveKind parseOmpSsDirectiveKind(Parser &P) {
              : OSSD_unknown;
 }
 
-static ExprResult *getSingleClause(
-    OmpSsClauseKind CKind,
-    ExprResult &IfRes, ExprResult &FinalRes,
-    ExprResult &CostRes, ExprResult &PriorityRes,
-    ExprResult &OnreadyRes) {
-
-    if (CKind == OSSC_if) return &IfRes;
-    if (CKind == OSSC_final) return &FinalRes;
-    if (CKind == OSSC_cost) return &CostRes;
-    if (CKind == OSSC_priority) return &PriorityRes;
-    if (CKind == OSSC_onready) return &OnreadyRes;
+static ExprResult *
+getSingleClause(OmpSsClauseKind CKind, ExprResult &IfRes, ExprResult &FinalRes,
+                ExprResult &CostRes, ExprResult &PriorityRes,
+                ExprResult &OnreadyRes, ExprResult &NumInstancesRes,
+                ExprResult &OntoRes, ExprResult &NumRepetitionsRes,
+                ExprResult &PeriodRes) {
+  switch (CKind) {
+  case OSSC_if:
+    return &IfRes;
+  case OSSC_final:
+    return &FinalRes;
+  case OSSC_cost:
+    return &CostRes;
+  case OSSC_priority:
+    return &PriorityRes;
+  case OSSC_onready:
+    return &OnreadyRes;
+  case OSSC_num_instances:
+    return &NumInstancesRes;
+  case OSSC_onto:
+    return &OntoRes;
+  case OSSC_num_repetitions:
+    return &NumRepetitionsRes;
+  case OSSC_period:
+    return &PeriodRes;
+  default:
     return nullptr;
+  };
 }
 
 static SmallVectorImpl<Expr *> *getClauseList(
@@ -188,21 +204,25 @@ static OmpSsClauseKind getOmpSsClauseFromDependKinds(ArrayRef<OmpSsDependClauseK
 ///       | weakin-clause | weakout-clause | weakinout-clause
 ///       | weakconcurrent-clause | weakcommutative-clause
 bool Parser::ParseDeclareTaskClauses(
-    ExprResult &IfRes, ExprResult &FinalRes,
-    ExprResult &CostRes, ExprResult &PriorityRes,
-    ExprResult &OnreadyRes, bool &Wait,
+    ExprResult &IfRes, ExprResult &FinalRes, ExprResult &CostRes,
+    ExprResult &PriorityRes, ExprResult &OnreadyRes,
+    ExprResult &NumInstancesRes, ExprResult &OntoRes,
+    ExprResult &NumRepetitionsRes, ExprResult &PeriodRes, bool &Wait,
     unsigned &Device, SourceLocation &DeviceLoc,
-    SmallVectorImpl<Expr *> &Labels,
-    SmallVectorImpl<Expr *> &Ins, SmallVectorImpl<Expr *> &Outs,
-    SmallVectorImpl<Expr *> &Inouts, SmallVectorImpl<Expr *> &Concurrents,
-    SmallVectorImpl<Expr *> &Commutatives, SmallVectorImpl<Expr *> &WeakIns,
-    SmallVectorImpl<Expr *> &WeakOuts, SmallVectorImpl<Expr *> &WeakInouts,
-    SmallVectorImpl<Expr *> &WeakConcurrents, SmallVectorImpl<Expr *> &WeakCommutatives,
-    SmallVectorImpl<Expr *> &DepIns, SmallVectorImpl<Expr *> &DepOuts,
-    SmallVectorImpl<Expr *> &DepInouts, SmallVectorImpl<Expr *> &DepConcurrents,
-    SmallVectorImpl<Expr *> &DepCommutatives, SmallVectorImpl<Expr *> &DepWeakIns,
-    SmallVectorImpl<Expr *> &DepWeakOuts, SmallVectorImpl<Expr *> &DepWeakInouts,
-    SmallVectorImpl<Expr *> &DepWeakConcurrents, SmallVectorImpl<Expr *> &DepWeakCommutatives,
+    SmallVectorImpl<Expr *> &Labels, SmallVectorImpl<Expr *> &Ins,
+    SmallVectorImpl<Expr *> &Outs, SmallVectorImpl<Expr *> &Inouts,
+    SmallVectorImpl<Expr *> &Concurrents, SmallVectorImpl<Expr *> &Commutatives,
+    SmallVectorImpl<Expr *> &WeakIns, SmallVectorImpl<Expr *> &WeakOuts,
+    SmallVectorImpl<Expr *> &WeakInouts,
+    SmallVectorImpl<Expr *> &WeakConcurrents,
+    SmallVectorImpl<Expr *> &WeakCommutatives, SmallVectorImpl<Expr *> &DepIns,
+    SmallVectorImpl<Expr *> &DepOuts, SmallVectorImpl<Expr *> &DepInouts,
+    SmallVectorImpl<Expr *> &DepConcurrents,
+    SmallVectorImpl<Expr *> &DepCommutatives,
+    SmallVectorImpl<Expr *> &DepWeakIns, SmallVectorImpl<Expr *> &DepWeakOuts,
+    SmallVectorImpl<Expr *> &DepWeakInouts,
+    SmallVectorImpl<Expr *> &DepWeakConcurrents,
+    SmallVectorImpl<Expr *> &DepWeakCommutatives,
     SmallVectorImpl<unsigned> &ReductionListSizes,
     SmallVectorImpl<Expr *> &Reductions,
     SmallVectorImpl<unsigned> &ReductionClauseType,
@@ -247,7 +267,11 @@ bool Parser::ParseDeclareTaskClauses(
     case OSSC_final:
     case OSSC_cost:
     case OSSC_priority:
-    case OSSC_onready: {
+    case OSSC_onready:
+    case OSSC_num_instances:
+    case OSSC_onto:
+    case OSSC_num_repetitions:
+    case OSSC_period: {
       ConsumeToken();
       if (FirstClauses[unsigned(CKind)]) {
         Diag(Tok, diag::err_oss_more_one_clause)
@@ -255,8 +279,9 @@ bool Parser::ParseDeclareTaskClauses(
         IsError = true;
       }
       SourceLocation RLoc;
-      SingleClause = getSingleClause(
-        CKind, IfRes, FinalRes, CostRes, PriorityRes, OnreadyRes);
+      SingleClause = getSingleClause(CKind, IfRes, FinalRes, CostRes,
+                                     PriorityRes, OnreadyRes, NumInstancesRes,
+                                     OntoRes, NumRepetitionsRes, PeriodRes);
       *SingleClause = ParseOmpSsParensExpr(getOmpSsClauseName(CKind), RLoc);
 
       if (SingleClause->isInvalid())
@@ -438,6 +463,10 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
   ExprResult CostRes;
   ExprResult PriorityRes;
   ExprResult OnreadyRes;
+  ExprResult NumInstancesRes;
+  ExprResult OntoRes;
+  ExprResult NumRepetitionsRes;
+  ExprResult PeriodRes;
   bool Wait = false;
   // This value means no clause seen
   unsigned Device = OSSC_DEVICE_unknown + 1;
@@ -472,23 +501,15 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
   SmallVector<DeclarationNameInfo, 4> ReductionIds;
   SmallVector<Expr *, 4> Ndranges;
 
-  bool IsError =
-      ParseDeclareTaskClauses(IfRes, FinalRes,
-                              CostRes, PriorityRes,
-                              OnreadyRes, Wait,
-                              Device, DeviceLoc,
-                              Labels,
-                              Ins, Outs, Inouts,
-                              Concurrents, Commutatives,
-                              WeakIns, WeakOuts, WeakInouts,
-                              WeakConcurrents, WeakCommutatives,
-                              DepIns, DepOuts, DepInouts,
-                              DepConcurrents, DepCommutatives,
-                              DepWeakIns, DepWeakOuts, DepWeakInouts,
-                              DepWeakConcurrents, DepWeakCommutatives,
-                              ReductionListSizes, Reductions,
-                              ReductionClauseType, ReductionCXXScopeSpecs,
-                              ReductionIds, Ndranges, NdrangeLoc);
+  bool IsError = ParseDeclareTaskClauses(
+      IfRes, FinalRes, CostRes, PriorityRes, OnreadyRes, NumInstancesRes,
+      OntoRes, NumRepetitionsRes, PeriodRes, Wait, Device, DeviceLoc, Labels,
+      Ins, Outs, Inouts, Concurrents, Commutatives, WeakIns, WeakOuts,
+      WeakInouts, WeakConcurrents, WeakCommutatives, DepIns, DepOuts, DepInouts,
+      DepConcurrents, DepCommutatives, DepWeakIns, DepWeakOuts, DepWeakInouts,
+      DepWeakConcurrents, DepWeakCommutatives, ReductionListSizes, Reductions,
+      ReductionClauseType, ReductionCXXScopeSpecs, ReductionIds, Ndranges,
+      NdrangeLoc);
   // Need to check for extra tokens.
   if (Tok.isNot(tok::annot_pragma_ompss_end)) {
     Diag(Tok, diag::warn_oss_extra_tokens_at_eol)
@@ -501,24 +522,15 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
   if (IsError)
     return Ptr;
   return Actions.ActOnOmpSsDeclareTaskDirective(
-      Ptr,
-      IfRes.get(), FinalRes.get(),
-      CostRes.get(), PriorityRes.get(),
-      OnreadyRes.get(), Wait,
-      Device, DeviceLoc,
-      Labels,
-      Ins, Outs, Inouts,
-      Concurrents, Commutatives,
-      WeakIns, WeakOuts, WeakInouts,
-      WeakConcurrents, WeakCommutatives,
-      DepIns, DepOuts, DepInouts,
-      DepConcurrents, DepCommutatives,
-      DepWeakIns, DepWeakOuts, DepWeakInouts,
-      DepWeakConcurrents, DepWeakCommutatives,
-      ReductionListSizes, Reductions,
-      ReductionClauseType, ReductionCXXScopeSpecs,
-      ReductionIds, Ndranges, NdrangeLoc,
-      SourceRange(Loc, EndLoc));
+      Ptr, IfRes.get(), FinalRes.get(), CostRes.get(), PriorityRes.get(),
+      OnreadyRes.get(), NumInstancesRes.get(), OntoRes.get(),
+      NumRepetitionsRes.get(), PeriodRes.get(), Wait, Device, DeviceLoc, Labels,
+      Ins, Outs, Inouts, Concurrents, Commutatives, WeakIns, WeakOuts,
+      WeakInouts, WeakConcurrents, WeakCommutatives, DepIns, DepOuts, DepInouts,
+      DepConcurrents, DepCommutatives, DepWeakIns, DepWeakOuts, DepWeakInouts,
+      DepWeakConcurrents, DepWeakCommutatives, ReductionListSizes, Reductions,
+      ReductionClauseType, ReductionCXXScopeSpecs, ReductionIds, Ndranges,
+      NdrangeLoc, SourceRange(Loc, EndLoc));
   return Ptr;
 }
 
@@ -981,6 +993,10 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
   case OSSC_grainsize:
   case OSSC_unroll:
   case OSSC_collapse:
+  case OSSC_num_instances:
+  case OSSC_onto:
+  case OSSC_num_repetitions:
+  case OSSC_period:
     if (!FirstClause) {
       Diag(Tok, diag::err_oss_more_one_clause)
           << getOmpSsDirectiveName(DKind) << getOmpSsClauseName(CKind) << 0;

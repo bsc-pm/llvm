@@ -11549,6 +11549,14 @@ def err_oss_ndrange_expect_nelems : Error<
   "'ndrange(%0, argument-list)' clause requires %1 or %2 arguments in argument-list, but got %3">;
 def err_oss_ndrange_incompatible_device : Error<
   "ndrange cannot be used with other devices than cuda and opencl">;
+def err_oss_num_instances_incompatible_device : Error<
+  "num_instances cannot be used with other devices than fpga">;
+def err_oss_onto_incompatible_device : Error<
+  "onto cannot be used with other devices than fpga">;
+def err_oss_num_repetitions_incompatible_device : Error<
+  "num_repetitions cannot be used with other devices than fpga">;
+def err_oss_period_incompatible_device : Error<
+  "period cannot be used with other devices than fpga">;
 def err_oss_inline_device_not_supported : Error<
   "device(%0) is not supported in inline directives">;
 
