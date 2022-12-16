@@ -222,6 +222,8 @@ struct DirectiveWhileInfo {
 struct DirectiveEnvironment {
   enum OmpSsDirectiveKind {
     OSSD_task = 0,
+    OSSD_critical_start,
+    OSSD_critical_end,
     OSSD_task_for,
     OSSD_taskiter_for,
     OSSD_taskiter_while,
@@ -232,6 +234,7 @@ struct DirectiveEnvironment {
     OSSD_unknown
   };
   OmpSsDirectiveKind DirectiveKind = OSSD_unknown;
+  StringRef CriticalNameStringRef;
   StringRef DirectiveKindStringRef;
   DirectiveDSAInfo DSAInfo;
   DirectiveVLADimsInfo VLADimsInfo;
@@ -387,6 +390,19 @@ public:
     return DirectiveKind == OSSD_task ||
            isOmpSsLoopDirective() ||
            isOmpSsTaskIterDirective();
+  }
+  // returns if directive is critical
+  bool isOmpSsCriticalStartDirective() const {
+    return DirectiveKind == OSSD_critical_start;
+  }
+  // returns if directive is critical
+  bool isOmpSsCriticalEndDirective() const {
+    return DirectiveKind == OSSD_critical_end;
+  }
+  // returns if directive is critical
+  bool isOmpSsCriticalDirective() const {
+    return isOmpSsCriticalStartDirective() ||
+           isOmpSsCriticalEndDirective();
   }
   // returns if directive is release
   bool isOmpSsReleaseDirective() const {

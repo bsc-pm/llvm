@@ -21,6 +21,7 @@
 #include <__memory/addressof.h>
 #include <__memory/allocation_guard.h>
 #include <__memory/allocator.h>
+#include <__memory/allocator_destructor.h>
 #include <__memory/allocator_traits.h>
 #include <__memory/auto_ptr.h>
 #include <__memory/compressed_pair.h>
@@ -42,31 +43,11 @@
 #  include <atomic>
 #endif
 
-
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #  pragma GCC system_header
 #endif
 
 _LIBCPP_BEGIN_NAMESPACE_STD
-
-template <class _Alloc>
-class __allocator_destructor
-{
-    typedef _LIBCPP_NODEBUG allocator_traits<_Alloc> __alloc_traits;
-public:
-    typedef _LIBCPP_NODEBUG typename __alloc_traits::pointer pointer;
-    typedef _LIBCPP_NODEBUG typename __alloc_traits::size_type size_type;
-private:
-    _Alloc& __alloc_;
-    size_type __s_;
-public:
-    _LIBCPP_INLINE_VISIBILITY __allocator_destructor(_Alloc& __a, size_type __s)
-             _NOEXCEPT
-        : __alloc_(__a), __s_(__s) {}
-    _LIBCPP_INLINE_VISIBILITY
-    void operator()(pointer __p) _NOEXCEPT
-        {__alloc_traits::deallocate(__alloc_, __p, __s_);}
-};
 
 // NOTE: Relaxed and acq/rel atomics (for increment and decrement respectively)
 // should be sufficient for thread safety.
@@ -690,7 +671,7 @@ public:
         {
             typedef typename __shared_ptr_default_allocator<_Yp>::type _AllocT;
             typedef __shared_ptr_pointer<typename unique_ptr<_Yp, _Dp>::pointer,
-                                        reference_wrapper<typename remove_reference<_Dp>::type>,
+                                        reference_wrapper<__libcpp_remove_reference_t<_Dp> >,
                                         _AllocT> _CntrlBlk;
             __cntrl_ = new _CntrlBlk(__r.get(), _VSTD::ref(__r.get_deleter()), _AllocT());
             __enable_weak_this(__r.get(), __r.get());
@@ -805,7 +786,7 @@ public:
     }
 
     _LIBCPP_HIDE_FROM_ABI
-    typename add_lvalue_reference<element_type>::type operator*() const _NOEXCEPT
+    __add_lvalue_reference_t<element_type> operator*() const _NOEXCEPT
     {
         return *__ptr_;
     }
@@ -858,7 +839,7 @@ public:
 
 #if _LIBCPP_STD_VER > 14
     _LIBCPP_HIDE_FROM_ABI
-    typename add_lvalue_reference<element_type>::type operator[](ptrdiff_t __i) const
+    __add_lvalue_reference_t<element_type> operator[](ptrdiff_t __i) const
     {
             static_assert(is_array<_Tp>::value,
                           "std::shared_ptr<T>::operator[] is only valid when T is an array type.");
@@ -907,7 +888,7 @@ private:
     _LIBCPP_HIDE_FROM_ABI
     void __enable_weak_this(const enable_shared_from_this<_Yp>* __e, _OrigPtr* __ptr) _NOEXCEPT
     {
-        typedef typename remove_cv<_Yp>::type _RawYp;
+        typedef __remove_cv_t<_Yp> _RawYp;
         if (__e && __e->__weak_this_.expired())
         {
             __e->__weak_this_ = shared_ptr<_RawYp>(*this,

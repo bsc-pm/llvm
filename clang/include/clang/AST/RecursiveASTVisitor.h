@@ -280,8 +280,7 @@ public:
   ///
   /// \returns false if the visitation was terminated early, true otherwise.
   // FIXME: take a TemplateArgumentLoc* (or TemplateArgumentListInfo) instead.
-  bool TraverseTemplateArguments(const TemplateArgument *Args,
-                                 unsigned NumArgs);
+  bool TraverseTemplateArguments(ArrayRef<TemplateArgument> Args);
 
   /// Recursively visit a base specifier. This can be overridden by a
   /// subclass.
@@ -881,8 +880,7 @@ bool RecursiveASTVisitor<Derived>::TraverseTemplateArgument(
     return getDerived().TraverseStmt(Arg.getAsExpr());
 
   case TemplateArgument::Pack:
-    return getDerived().TraverseTemplateArguments(Arg.pack_begin(),
-                                                  Arg.pack_size());
+    return getDerived().TraverseTemplateArguments(Arg.pack_elements());
   }
 
   return true;
@@ -922,8 +920,7 @@ bool RecursiveASTVisitor<Derived>::TraverseTemplateArgumentLoc(
     return getDerived().TraverseStmt(ArgLoc.getSourceExpression());
 
   case TemplateArgument::Pack:
-    return getDerived().TraverseTemplateArguments(Arg.pack_begin(),
-                                                  Arg.pack_size());
+    return getDerived().TraverseTemplateArguments(Arg.pack_elements());
   }
 
   return true;
@@ -931,10 +928,9 @@ bool RecursiveASTVisitor<Derived>::TraverseTemplateArgumentLoc(
 
 template <typename Derived>
 bool RecursiveASTVisitor<Derived>::TraverseTemplateArguments(
-    const TemplateArgument *Args, unsigned NumArgs) {
-  for (unsigned I = 0; I != NumArgs; ++I) {
-    TRY_TO(TraverseTemplateArgument(Args[I]));
-  }
+    ArrayRef<TemplateArgument> Args) {
+  for (const TemplateArgument &Arg : Args)
+    TRY_TO(TraverseTemplateArgument(Arg));
 
   return true;
 }
@@ -1078,7 +1074,7 @@ DEF_TRAVERSE_TYPE(TypedefType, {})
 DEF_TRAVERSE_TYPE(TypeOfExprType,
                   { TRY_TO(TraverseStmt(T->getUnderlyingExpr())); })
 
-DEF_TRAVERSE_TYPE(TypeOfType, { TRY_TO(TraverseType(T->getUnderlyingType())); })
+DEF_TRAVERSE_TYPE(TypeOfType, { TRY_TO(TraverseType(T->getUnmodifiedType())); })
 
 DEF_TRAVERSE_TYPE(DecltypeType,
                   { TRY_TO(TraverseStmt(T->getUnderlyingExpr())); })
@@ -1091,7 +1087,7 @@ DEF_TRAVERSE_TYPE(UnaryTransformType, {
 DEF_TRAVERSE_TYPE(AutoType, {
   TRY_TO(TraverseType(T->getDeducedType()));
   if (T->isConstrained()) {
-    TRY_TO(TraverseTemplateArguments(T->getArgs(), T->getNumArgs()));
+    TRY_TO(TraverseTemplateArguments(T->getTypeConstraintArguments()));
   }
 })
 DEF_TRAVERSE_TYPE(DeducedTemplateSpecializationType, {
@@ -1111,7 +1107,7 @@ DEF_TRAVERSE_TYPE(SubstTemplateTypeParmPackType, {
 
 DEF_TRAVERSE_TYPE(TemplateSpecializationType, {
   TRY_TO(TraverseTemplateName(T->getTemplateName()));
-  TRY_TO(TraverseTemplateArguments(T->getArgs(), T->getNumArgs()));
+  TRY_TO(TraverseTemplateArguments(T->template_arguments()));
 })
 
 DEF_TRAVERSE_TYPE(InjectedClassNameType, {})
@@ -1139,7 +1135,7 @@ DEF_TRAVERSE_TYPE(DependentNameType,
 
 DEF_TRAVERSE_TYPE(DependentTemplateSpecializationType, {
   TRY_TO(TraverseNestedNameSpecifier(T->getQualifier()));
-  TRY_TO(TraverseTemplateArguments(T->getArgs(), T->getNumArgs()));
+  TRY_TO(TraverseTemplateArguments(T->template_arguments()));
 })
 
 DEF_TRAVERSE_TYPE(PackExpansionType, { TRY_TO(TraverseType(T->getPattern())); })
@@ -1353,7 +1349,7 @@ DEF_TRAVERSE_TYPELOC(TypeOfExprType,
                      { TRY_TO(TraverseStmt(TL.getUnderlyingExpr())); })
 
 DEF_TRAVERSE_TYPELOC(TypeOfType, {
-  TRY_TO(TraverseTypeLoc(TL.getUnderlyingTInfo()->getTypeLoc()));
+  TRY_TO(TraverseTypeLoc(TL.getUnmodifiedTInfo()->getTypeLoc()));
 })
 
 // FIXME: location of underlying expr
@@ -1546,12 +1542,16 @@ DEF_TRAVERSE_DECL(CapturedDecl, {
 
 DEF_TRAVERSE_DECL(EmptyDecl, {})
 
+DEF_TRAVERSE_DECL(HLSLBufferDecl, {})
+
 DEF_TRAVERSE_DECL(LifetimeExtendedTemporaryDecl, {
   TRY_TO(TraverseStmt(D->getTemporaryExpr()));
 })
 
 DEF_TRAVERSE_DECL(FileScopeAsmDecl,
                   { TRY_TO(TraverseStmt(D->getAsmString())); })
+
+DEF_TRAVERSE_DECL(TopLevelStmtDecl, { TRY_TO(TraverseStmt(D->getStmt())); })
 
 DEF_TRAVERSE_DECL(ImportDecl, {})
 
@@ -1730,7 +1730,8 @@ DEF_TRAVERSE_DECL(UsingDecl, {
   TRY_TO(TraverseDeclarationNameInfo(D->getNameInfo()));
 })
 
-DEF_TRAVERSE_DECL(UsingEnumDecl, {})
+DEF_TRAVERSE_DECL(UsingEnumDecl,
+                  { TRY_TO(TraverseTypeLoc(D->getEnumTypeLoc())); })
 
 DEF_TRAVERSE_DECL(UsingPackDecl, {})
 
@@ -2323,6 +2324,10 @@ DEF_TRAVERSE_DECL(ParmVarDecl, {
 })
 
 DEF_TRAVERSE_DECL(RequiresExprBodyDecl, {})
+
+DEF_TRAVERSE_DECL(ImplicitConceptSpecializationDecl, {
+  TRY_TO(TraverseTemplateArguments(D->getTemplateArguments()));
+})
 
 #undef DEF_TRAVERSE_DECL
 
@@ -3177,6 +3182,10 @@ DEF_TRAVERSE_STMT(OMPParallelGenericLoopDirective,
 
 DEF_TRAVERSE_STMT(OMPTargetParallelGenericLoopDirective,
                   { TRY_TO(TraverseOMPExecutableDirective(S)); })
+
+DEF_TRAVERSE_STMT(OMPErrorDirective,
+                  { TRY_TO(TraverseOMPExecutableDirective(S)); })
+
 // OpenMP clauses.
 template <typename Derived>
 bool RecursiveASTVisitor<Derived>::TraverseOMPClause(OMPClause *C) {
@@ -3327,6 +3336,22 @@ bool RecursiveASTVisitor<Derived>::VisitOMPDynamicAllocatorsClause(
 template <typename Derived>
 bool RecursiveASTVisitor<Derived>::VisitOMPAtomicDefaultMemOrderClause(
     OMPAtomicDefaultMemOrderClause *) {
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOMPAtClause(OMPAtClause *) {
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOMPSeverityClause(OMPSeverityClause *) {
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOMPMessageClause(OMPMessageClause *C) {
+  TRY_TO(TraverseStmt(C->getMessageString()));
   return true;
 }
 
@@ -3898,6 +3923,9 @@ DEF_TRAVERSE_STMT(OSSReleaseDirective,
                   { TRY_TO(TraverseOSSExecutableDirective(S)); })
 
 DEF_TRAVERSE_STMT(OSSTaskDirective,
+                  { TRY_TO(TraverseOSSExecutableDirective(S)); })
+
+DEF_TRAVERSE_STMT(OSSCriticalDirective,
                   { TRY_TO(TraverseOSSExecutableDirective(S)); })
 
 DEF_TRAVERSE_STMT(OSSTaskForDirective,

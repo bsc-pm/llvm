@@ -21,6 +21,7 @@ namespace llvm {
 
 template <typename T> class DomTreeNodeBase;
 using DomTreeNode = DomTreeNodeBase<BasicBlock>;
+class AssumptionCache;
 class StringRef;
 class AnalysisUsage;
 class TargetTransformInfo;
@@ -170,8 +171,8 @@ bool sinkRegionForLoopNest(DomTreeNode *, AAResults *, LoopInfo *,
 /// \p AllowSpeculation is whether values should be hoisted even if they are not
 /// guaranteed to execute in the loop, but are safe to speculatively execute.
 bool hoistRegion(DomTreeNode *, AAResults *, LoopInfo *, DominatorTree *,
-                 TargetLibraryInfo *, Loop *, MemorySSAUpdater &,
-                 ScalarEvolution *, ICFLoopSafetyInfo *,
+                 AssumptionCache *, TargetLibraryInfo *, Loop *,
+                 MemorySSAUpdater &, ScalarEvolution *, ICFLoopSafetyInfo *,
                  SinkAndHoistLICMFlags &, OptimizationRemarkEmitter *, bool,
                  bool AllowSpeculation);
 
@@ -208,9 +209,10 @@ void breakLoopBackedge(Loop *L, DominatorTree &DT, ScalarEvolution &SE,
 bool promoteLoopAccessesToScalars(
     const SmallSetVector<Value *, 8> &, SmallVectorImpl<BasicBlock *> &,
     SmallVectorImpl<Instruction *> &, SmallVectorImpl<MemoryAccess *> &,
-    PredIteratorCache &, LoopInfo *, DominatorTree *, const TargetLibraryInfo *,
-    Loop *, MemorySSAUpdater &, ICFLoopSafetyInfo *,
-    OptimizationRemarkEmitter *, bool AllowSpeculation);
+    PredIteratorCache &, LoopInfo *, DominatorTree *, AssumptionCache *AC,
+    const TargetLibraryInfo *, TargetTransformInfo *, Loop *,
+    MemorySSAUpdater &, ICFLoopSafetyInfo *, OptimizationRemarkEmitter *,
+    bool AllowSpeculation);
 
 /// Does a BFS from a given node to all of its children inside a given loop.
 /// The returned vector of nodes includes the starting point.
@@ -223,7 +225,7 @@ SmallVector<Instruction *, 8> findDefsUsedOutsideOfLoop(Loop *L);
 /// Find a combination of metadata ("llvm.loop.vectorize.width" and
 /// "llvm.loop.vectorize.scalable.enable") for a loop and use it to construct a
 /// ElementCount. If the metadata "llvm.loop.vectorize.width" cannot be found
-/// then None is returned.
+/// then std::nullopt is returned.
 Optional<ElementCount>
 getOptionalElementCountLoopAttribute(const Loop *TheLoop);
 
@@ -307,8 +309,8 @@ void addStringMetadataToLoop(Loop *TheLoop, const char *MDString,
 /// Returns a loop's estimated trip count based on branch weight metadata.
 /// In addition if \p EstimatedLoopInvocationWeight is not null it is
 /// initialized with weight of loop's latch leading to the exit.
-/// Returns 0 when the count is estimated to be 0, or None when a meaningful
-/// estimate can not be made.
+/// Returns 0 when the count is estimated to be 0, or std::nullopt when a
+/// meaningful estimate can not be made.
 Optional<unsigned>
 getLoopEstimatedTripCount(Loop *L,
                           unsigned *EstimatedLoopInvocationWeight = nullptr);
@@ -539,8 +541,10 @@ struct IVConditionInfo {
 /// If the branch condition of the header is partially invariant, return a pair
 /// containing the instructions to duplicate and a boolean Constant to update
 /// the condition in the loops created for the true or false successors.
-Optional<IVConditionInfo> hasPartialIVCondition(Loop &L, unsigned MSSAThreshold,
-                                                MemorySSA &MSSA, AAResults &AA);
+Optional<IVConditionInfo> hasPartialIVCondition(const Loop &L,
+                                                unsigned MSSAThreshold,
+                                                const MemorySSA &MSSA,
+                                                AAResults &AA);
 
 } // end namespace llvm
 

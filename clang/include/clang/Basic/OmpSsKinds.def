@@ -60,6 +60,7 @@
 
 // OmpSs directives.
 OMPSS_DIRECTIVE(task)
+OMPSS_DIRECTIVE(critical)
 OMPSS_DIRECTIVE(taskloop)
 OMPSS_DIRECTIVE(taskiter)
 OMPSS_DIRECTIVE(taskwait)

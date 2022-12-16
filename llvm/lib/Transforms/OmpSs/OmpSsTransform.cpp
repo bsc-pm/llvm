@@ -2825,6 +2825,30 @@ struct OmpSsDirective {
     DirInfo.Entry->eraseFromParent();
   }
 
+  void lowerCritical() {
+    IRBuilder<> IRB(DirInfo.Entry);
+    unsigned Line = DirInfo.Entry->getDebugLoc().getLine();
+    unsigned Col = DirInfo.Entry->getDebugLoc().getCol();
+
+    std::string FileNamePlusLoc = (M.getSourceFileName()
+                                   + ":" + Twine(Line)
+                                   + ":" + Twine(Col)).str();
+    Constant *Nanos6CriticalLocStr = IRB.CreateGlobalStringPtr(FileNamePlusLoc);
+
+    GlobalVariable *GLock = cast<GlobalVariable>(
+      M.getOrInsertGlobal(DirEnv.CriticalNameStringRef, PtrTy));
+    GLock->setLinkage(GlobalValue::WeakAnyLinkage);
+    GLock->setInitializer(Constant::getNullValue(PtrTy));
+
+    if (DirEnv.isOmpSsCriticalStartDirective()) {
+      IRB.CreateCall(nanos6Api::userLockFuncCallee(M), {GLock, Nanos6CriticalLocStr});
+    } else {
+      IRB.CreateCall(nanos6Api::userUnlockFuncCallee(M), {GLock});
+    }
+
+    DirInfo.Entry->eraseFromParent();
+  }
+
   void lowerFinalCode() {
     // Skip non task directives
     if (!DirEnv.isOmpSsTaskDirective())
@@ -2961,6 +2985,8 @@ struct OmpSsDirective {
       lowerRelease();
     else if (DirEnv.isOmpSsTaskDirective())
       lowerTask();
+    else if (DirEnv.isOmpSsCriticalDirective())
+      lowerCritical();
 
     return true;
   }

@@ -22,8 +22,8 @@ namespace std {
 
     // 20.7.2.1, constructors
     constexpr variant() noexcept(see below);
-    variant(const variant&);                // constexpr in C++20
-    variant(variant&&) noexcept(see below); // constexpr in C++20
+    constexpr variant(const variant&);
+    constexpr variant(variant&&) noexcept(see below);
 
     template <class T> constexpr variant(T&&) noexcept(see below);
 
@@ -45,8 +45,8 @@ namespace std {
     ~variant();
 
     // 20.7.2.3, assignment
-    variant& operator=(const variant&);                // constexpr in C++20
-    variant& operator=(variant&&) noexcept(see below); // constexpr in C++20
+    constexpr variant& operator=(const variant&);
+    constexpr variant& operator=(variant&&) noexcept(see below);
 
     template <class T> variant& operator=(T&&) noexcept(see below);
 
@@ -165,7 +165,7 @@ namespace std {
   template <class... Types>
   constexpr bool operator>=(const variant<Types...>&, const variant<Types...>&);
 
-  template <class... Types>
+  template <class... Types> requires (three_way_comparable<Types> && ...)
   constexpr common_comparison_category_t<compare_three_way_result_t<Types>...>
     operator<=>(const variant<Types...>&, const variant<Types...>&);           // since C++20
 
@@ -228,6 +228,8 @@ namespace std {
 #include <version>
 
 // standard-mandated includes
+
+// [variant.syn]
 #include <compare>
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
@@ -538,8 +540,8 @@ private:
   template <class... _Fs>
   _LIBCPP_HIDE_FROM_ABI
   static constexpr auto __make_farray(_Fs&&... __fs) {
-    __std_visit_visitor_return_type_check<__uncvref_t<_Fs>...>();
-    using __result = __farray<common_type_t<__uncvref_t<_Fs>...>, sizeof...(_Fs)>;
+    __std_visit_visitor_return_type_check<__remove_cvref_t<_Fs>...>();
+    using __result = __farray<common_type_t<__remove_cvref_t<_Fs>...>, sizeof...(_Fs)>;
     return __result{{_VSTD::forward<_Fs>(__fs)...}};
   }
 
@@ -576,8 +578,8 @@ private:
   template <class _Fp, class _Vp, class... _Vs>
   _LIBCPP_HIDE_FROM_ABI
   static constexpr auto __make_fdiagonal() {
-    constexpr size_t _Np = __uncvref_t<_Vp>::__size();
-    static_assert(__all<(_Np == __uncvref_t<_Vs>::__size())...>::value);
+    constexpr size_t _Np = __remove_cvref_t<_Vp>::__size();
+    static_assert(__all<(_Np == __remove_cvref_t<_Vs>::__size())...>::value);
     return __make_fdiagonal_impl<_Fp, _Vp, _Vs...>(make_index_sequence<_Np>{});
   }
 
@@ -600,7 +602,7 @@ private:
   _LIBCPP_HIDE_FROM_ABI
   static constexpr auto __make_fmatrix() {
     return __make_fmatrix_impl<_Fp, _Vs...>(
-        index_sequence<>{}, make_index_sequence<__uncvref_t<_Vs>::__size()>{}...);
+        index_sequence<>{}, make_index_sequence<__remove_cvref_t<_Vs>::__size()>{}...);
   }
 };
 
@@ -861,7 +863,7 @@ _LIBCPP_VARIANT_DESTRUCTOR(
       if (!this->valueless_by_exception()) {
         __visitation::__base::__visit_alt(
             [](auto& __alt) noexcept {
-              using __alt_type = __uncvref_t<decltype(__alt)>;
+              using __alt_type = __remove_cvref_t<decltype(__alt)>;
               __alt.~__alt_type();
             },
             *this);
@@ -1233,7 +1235,7 @@ struct __overload {
 
 template <class _Tp, size_t>
 struct __overload_bool  {
-  template <class _Up, class _Ap = __uncvref_t<_Up>>
+  template <class _Up, class _Ap = __remove_cvref_t<_Up>>
   auto operator()(bool, _Up&&) const
       -> enable_if_t<is_same_v<_Ap, bool>, __type_identity<_Tp>>;
 };
@@ -1305,14 +1307,14 @@ public:
   constexpr variant() noexcept(is_nothrow_default_constructible_v<__first_type>)
       : __impl_(in_place_index<0>) {}
 
-  variant(const variant&) = default;
-  variant(variant&&) = default;
+  constexpr variant(const variant&) = default;
+  constexpr variant(variant&&) = default;
 
   template <
       class _Arg,
-      enable_if_t<!is_same_v<__uncvref_t<_Arg>, variant>, int> = 0,
-      enable_if_t<!__is_inplace_type<__uncvref_t<_Arg>>::value, int> = 0,
-      enable_if_t<!__is_inplace_index<__uncvref_t<_Arg>>::value, int> = 0,
+      enable_if_t<!is_same_v<__remove_cvref_t<_Arg>, variant>, int> = 0,
+      enable_if_t<!__is_inplace_type<__remove_cvref_t<_Arg>>::value, int> = 0,
+      enable_if_t<!__is_inplace_index<__remove_cvref_t<_Arg>>::value, int> = 0,
       class _Tp = __variant_detail::__best_match_t<_Arg, _Types...>,
       size_t _Ip =
           __find_detail::__find_unambiguous_index_sfinae<_Tp, _Types...>::value,
@@ -1377,12 +1379,12 @@ public:
 
   ~variant() = default;
 
-  variant& operator=(const variant&) = default;
-  variant& operator=(variant&&) = default;
+  constexpr variant& operator=(const variant&) = default;
+  constexpr variant& operator=(variant&&) = default;
 
   template <
       class _Arg,
-      enable_if_t<!is_same_v<__uncvref_t<_Arg>, variant>, int> = 0,
+      enable_if_t<!is_same_v<__remove_cvref_t<_Arg>, variant>, int> = 0,
       class _Tp = __variant_detail::__best_match_t<_Arg, _Types...>,
       size_t _Ip =
           __find_detail::__find_unambiguous_index_sfinae<_Tp, _Types...>::value,
@@ -1636,7 +1638,7 @@ constexpr bool operator==(const variant<_Types...>& __lhs,
 
 #  if _LIBCPP_STD_VER > 17
 
-template <class... _Types>
+template <class... _Types> requires (three_way_comparable<_Types> && ...)
 _LIBCPP_HIDE_FROM_ABI constexpr common_comparison_category_t<compare_three_way_result_t<_Types>...>
 operator<=>(const variant<_Types...>& __lhs, const variant<_Types...>& __rhs) {
   using __variant_detail::__visitation::__variant;
@@ -1774,7 +1776,7 @@ struct _LIBCPP_TEMPLATE_VIS hash<
                ? 299792458 // Random value chosen by the universe upon creation
                : __variant::__visit_alt(
                      [](const auto& __alt) {
-                       using __alt_type = __uncvref_t<decltype(__alt)>;
+                       using __alt_type = __remove_cvref_t<decltype(__alt)>;
                        using __value_type = remove_const_t<
                          typename __alt_type::__value_type>;
                        return hash<__value_type>{}(__alt.__value);

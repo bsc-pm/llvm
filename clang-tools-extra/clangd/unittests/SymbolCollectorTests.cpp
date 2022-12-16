@@ -877,7 +877,7 @@ TEST_F(SymbolCollectorTest, RefContainers) {
           return Ref;
       }
     }
-    return llvm::None;
+    return std::nullopt;
   };
   auto Container = [&](llvm::StringRef RangeName) {
     auto Ref = FindRefWithRange(Code.range(RangeName));
@@ -1316,6 +1316,11 @@ TEST_F(SymbolCollectorTest, IncludeEnums) {
       Black
     };
     }
+    class Color3 {
+      enum {
+        Blue
+      };
+    };
   )";
   runSymbolCollector(Header, /*Main=*/"");
   EXPECT_THAT(Symbols,
@@ -1324,9 +1329,11 @@ TEST_F(SymbolCollectorTest, IncludeEnums) {
                   AllOf(qName("Color"), forCodeCompletion(true)),
                   AllOf(qName("Green"), forCodeCompletion(true)),
                   AllOf(qName("Color2"), forCodeCompletion(true)),
-                  AllOf(qName("Color2::Yellow"), forCodeCompletion(false)),
+                  AllOf(qName("Color2::Yellow"), forCodeCompletion(true)),
                   AllOf(qName("ns"), forCodeCompletion(true)),
-                  AllOf(qName("ns::Black"), forCodeCompletion(true))));
+                  AllOf(qName("ns::Black"), forCodeCompletion(true)),
+                  AllOf(qName("Color3"), forCodeCompletion(true)),
+                  AllOf(qName("Color3::Blue"), forCodeCompletion(true))));
 }
 
 TEST_F(SymbolCollectorTest, NamelessSymbols) {

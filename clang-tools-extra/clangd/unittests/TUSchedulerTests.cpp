@@ -891,7 +891,7 @@ TEST_F(TUSchedulerTests, MissingHeader) {
                         << "Didn't expect new diagnostics when adding a/foo.h";
                   });
 
-  // Forcing the reload should should cause a rebuild.
+  // Forcing the reload should cause a rebuild.
   Inputs.ForceRebuild = true;
   updateWithDiags(
       S, Source, Inputs, WantDiagnostics::Yes,
@@ -1206,7 +1206,7 @@ TEST_F(TUSchedulerTests, IncluderCache) {
     llvm::Optional<tooling::CompileCommand>
     getCompileCommand(PathRef File) const override {
       if (File == NoCmd || File == NotIncluded || FailAll)
-        return llvm::None;
+        return std::nullopt;
       auto Basic = getFallbackCommand(File);
       Basic.Heuristic.clear();
       if (File == Unreliable) {
@@ -1227,12 +1227,15 @@ TEST_F(TUSchedulerTests, IncluderCache) {
   auto GetFlags = [&](PathRef Header) {
     S.update(Header, getInputs(Header, ";"), WantDiagnostics::Yes);
     EXPECT_TRUE(S.blockUntilIdle(timeoutSeconds(10)));
+    Notification CmdDone;
     tooling::CompileCommand Cmd;
     S.runWithPreamble("GetFlags", Header, TUScheduler::StaleOrAbsent,
                       [&](llvm::Expected<InputsAndPreamble> Inputs) {
                         ASSERT_FALSE(!Inputs) << Inputs.takeError();
                         Cmd = std::move(Inputs->Command);
+                        CmdDone.notify();
                       });
+    CmdDone.wait();
     EXPECT_TRUE(S.blockUntilIdle(timeoutSeconds(10)));
     return Cmd.CommandLine;
   };

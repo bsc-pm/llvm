@@ -43,6 +43,8 @@ namespace {
 enum OmpSsBundleKind {
   OSSB_directive,
   OSSB_task,
+  OSSB_critical_start,
+  OSSB_critical_end,
   OSSB_task_for,
   OSSB_taskiter_for,
   OSSB_taskiter_while,
@@ -112,6 +114,10 @@ const char *getBundleStr(OmpSsBundleKind Kind) {
     return "DIR.OSS";
   case OSSB_task:
     return "TASK";
+  case OSSB_critical_start:
+    return "CRITICAL.START";
+  case OSSB_critical_end:
+    return "CRITICAL.END";
   case OSSB_task_for:
     return "TASK.FOR";
   case OSSB_taskiter_for:
@@ -3466,6 +3472,45 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   CaptureMapStack.pop_back();
   TaskAllocaInsertPt->eraseFromParent();
 
+}
+
+void CGOmpSsRuntime::emitCriticalCall(CodeGenFunction &CGF,
+                                      const OSSExecutableDirective &D,
+                                      SourceLocation Loc,
+                                      const DeclarationNameInfo &DirName) {
+  llvm::Function *Callee = CGM.getIntrinsic(llvm::Intrinsic::directive_marker);
+
+  std::string CriticalName = "default";
+  if (!DirName.getAsString().empty())
+    CriticalName = DirName.getAsString();
+
+  llvm::Value *CriticalNameValue =
+    llvm::ConstantDataArray::getString(
+      CGM.getLLVMContext(), (Twine("nanos6_critical_") + CriticalName).str());
+
+  CGF.Builder.CreateCall(
+      Callee, {},
+      {
+        llvm::OperandBundleDef(
+          std::string(getBundleStr(OSSB_directive)),
+          ArrayRef<llvm::Value *>{
+            llvm::ConstantDataArray::getString(
+              CGM.getLLVMContext(), getBundleStr(OSSB_critical_start)),
+            CriticalNameValue
+          })
+      });
+  CGF.EmitStmt(D.getAssociatedStmt());
+  CGF.Builder.CreateCall(
+      Callee, {},
+      {
+        llvm::OperandBundleDef(
+          std::string(getBundleStr(OSSB_directive)),
+          ArrayRef<llvm::Value *>{
+            llvm::ConstantDataArray::getString(
+              CGM.getLLVMContext(), getBundleStr(OSSB_critical_end)),
+            CriticalNameValue
+          })
+      });
 }
 
 void CGOmpSsRuntime::emitLoopCall(CodeGenFunction &CGF,

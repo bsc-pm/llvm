@@ -66,8 +66,8 @@ static OmpSsDirectiveKind parseOmpSsDirectiveKind(Parser &P) {
   if (DKind == OSSD_unknown)
     return OSSD_unknown;
 
-  for (unsigned I = 0; I < llvm::array_lengthof(F); ++I) {
-    if (DKind != F[I][0])
+  for (const auto &I : F) {
+    if (DKind != I[0])
       continue;
 
     Tok = P.getPreprocessor().LookAhead(0);
@@ -78,9 +78,9 @@ static OmpSsDirectiveKind parseOmpSsDirectiveKind(Parser &P) {
     if (SDKind == OSSD_unknown)
       continue;
 
-    if (SDKind == F[I][1]) {
+    if (SDKind == I[1]) {
       P.ConsumeToken();
-      DKind = F[I][2];
+      DKind = I[2];
     }
   }
   return DKind < OSSD_unknown ? static_cast<OmpSsDirectiveKind>(DKind)
@@ -569,9 +569,10 @@ Parser::DeclGroupPtrTy Parser::ParseOmpSsDeclarativeDirectiveWithExtDecl(
       // Here we expect to see some function declaration.
       if (AS == AS_none) {
         assert(TagType == DeclSpec::TST_unspecified);
+        ParsedAttributes EmptyDeclSpecAttrs(AttrFactory);
         MaybeParseCXX11Attributes(Attrs);
         ParsingDeclSpec PDS(*this);
-        Ptr = ParseExternalDeclaration(Attrs, &PDS);
+        Ptr = ParseExternalDeclaration(Attrs, EmptyDeclSpecAttrs, &PDS);
       } else {
         // Some member functions like void foo(int *x)
         // are not late parsed because they do not need it
@@ -637,6 +638,7 @@ Parser::DeclGroupPtrTy Parser::ParseOmpSsDeclarativeDirectiveWithExtDecl(
     break;
   }
   case OSSD_declare_task:
+  case OSSD_critical:
   case OSSD_task_for:
   case OSSD_taskiter:
   case OSSD_taskiter_while:
@@ -730,6 +732,8 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
 
   OSSClauseList Clauses;
   OmpSsDirectiveKind DKind = parseOmpSsDirectiveKind(*this);
+  // Name of critical directive.
+  DeclarationNameInfo DirName;
   StmtResult Directive = StmtError();
   bool HasAssociatedStatement = true;
   switch (DKind) {
@@ -742,6 +746,7 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
   case OSSD_taskiter_while:
   case OSSD_taskloop:
   case OSSD_taskloop_for:
+  case OSSD_critical:
   case OSSD_task: {
 
     if (isOmpSsLoopDirective(DKind))
@@ -778,6 +783,22 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
     } else {
       ConsumeToken();
 
+      // Parse directive name of the 'critical' directive if any.
+      if (DKind == OSSD_critical) {
+        BalancedDelimiterTracker T(*this, tok::l_paren,
+                                   tok::annot_pragma_ompss_end);
+        if (!T.consumeOpen()) {
+          if (Tok.isAnyIdentifier()) {
+            DirName =
+                DeclarationNameInfo(Tok.getIdentifierInfo(), Tok.getLocation());
+            ConsumeAnyToken();
+          } else {
+            Diag(Tok, diag::err_oss_expected_identifier_for_critical);
+          }
+          T.consumeClose();
+        }
+      }
+
       Clauses = ParseOmpSsClauses(DKind, EndLoc);
     }
     StackClauses.push_back(Clauses);
@@ -796,11 +817,8 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
     Clauses = StackClauses.back();
     StackClauses.pop_back();
 
-    Directive = Actions.ActOnOmpSsExecutableDirective(Clauses,
-                                                      DKind,
-                                                      AssociatedStmt.get(),
-                                                      Loc,
-                                                      EndLoc);
+    Directive = Actions.ActOnOmpSsExecutableDirective(
+      Clauses, DirName, DKind, AssociatedStmt.get(), Loc, EndLoc);
 
     // Exit scope.
     Actions.EndOmpSsDSABlock(Directive.get());
@@ -871,7 +889,8 @@ Parser::OSSClauseList Parser::ParseOmpSsClauses(OmpSsDirectiveKind DKind, Source
   ConsumeAnnotationToken();
 
   // 'release' does not need clause analysis
-  if (DKind != OSSD_release)
+  if (DKind != OSSD_release &&
+      DKind != OSSD_critical)
     Actions.ActOnOmpSsAfterClauseGathering(Clauses);
 
   return Clauses;
@@ -1289,7 +1308,6 @@ void Parser::ParseOmpSsReductionInitializerForDecl(VarDecl *OmpPrivParm) {
     T.consumeOpen();
 
     ExprVector Exprs;
-    CommaLocsTy CommaLocs;
 
     SourceLocation LParLoc = T.getOpenLocation();
     auto RunSignatureHelp = [this, OmpPrivParm, LParLoc, &Exprs]() {
@@ -1299,7 +1317,7 @@ void Parser::ParseOmpSsReductionInitializerForDecl(VarDecl *OmpPrivParm) {
       CalledSignatureHelp = true;
       return PreferredType;
     };
-    if (ParseExpressionList(Exprs, CommaLocs, [&] {
+    if (ParseExpressionList(Exprs, [&] {
           PreferredType.enterFunctionArgument(Tok.getLocation(),
                                               RunSignatureHelp);
         })) {
@@ -1312,9 +1330,6 @@ void Parser::ParseOmpSsReductionInitializerForDecl(VarDecl *OmpPrivParm) {
       SourceLocation RLoc = Tok.getLocation();
       if (!T.consumeClose())
         RLoc = T.getCloseLocation();
-
-      assert(!Exprs.empty() && Exprs.size() - 1 == CommaLocs.size() &&
-             "Unexpected number of commas!");
 
       ExprResult Initializer =
           Actions.ActOnParenListExpr(T.getOpenLocation(), RLoc, Exprs);

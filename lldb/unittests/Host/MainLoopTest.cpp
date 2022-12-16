@@ -171,6 +171,17 @@ TEST_F(MainLoopTest, PendingCallbackTrigger) {
   ASSERT_TRUE(callback2_called);
 }
 
+// Regression test for assertion failure if a lot of callbacks end up
+// being queued after loop exits.
+TEST_F(MainLoopTest, PendingCallbackAfterLoopExited) {
+  MainLoop loop;
+  Status error;
+  ASSERT_TRUE(loop.Run().Success());
+  // Try to fill the pipe buffer in.
+  for (int i = 0; i < 65536; ++i)
+    loop.AddPendingCallback([&](MainLoopBase &loop) {});
+}
+
 #ifdef LLVM_ON_UNIX
 TEST_F(MainLoopTest, DetectsEOF) {
 
@@ -197,7 +208,7 @@ TEST_F(MainLoopTest, Signal) {
 
   auto handle = loop.RegisterSignal(SIGUSR1, make_callback(), error);
   ASSERT_TRUE(error.Success());
-  pthread_kill(pthread_self(), SIGUSR1);
+  kill(getpid(), SIGUSR1);
   ASSERT_TRUE(loop.Run().Success());
   ASSERT_EQ(1u, callback_count);
 }
@@ -215,8 +226,8 @@ TEST_F(MainLoopTest, UnmonitoredSignal) {
 
   auto handle = loop.RegisterSignal(SIGUSR1, make_callback(), error);
   ASSERT_TRUE(error.Success());
-  pthread_kill(pthread_self(), SIGUSR2);
-  pthread_kill(pthread_self(), SIGUSR1);
+  kill(getpid(), SIGUSR2);
+  kill(getpid(), SIGUSR1);
   ASSERT_TRUE(loop.Run().Success());
   ASSERT_EQ(1u, callback_count);
 }
@@ -238,7 +249,7 @@ TEST_F(MainLoopTest, TwoSignalCallbacks) {
         SIGUSR1, [&](MainLoopBase &loop) { ++callback2_count; }, error);
     ASSERT_TRUE(error.Success());
 
-    pthread_kill(pthread_self(), SIGUSR1);
+    kill(getpid(), SIGUSR1);
     ASSERT_TRUE(loop.Run().Success());
     ASSERT_EQ(1u, callback_count);
     ASSERT_EQ(1u, callback2_count);
@@ -251,7 +262,7 @@ TEST_F(MainLoopTest, TwoSignalCallbacks) {
         SIGUSR1, [&](MainLoopBase &loop) { ++callback3_count; }, error);
     ASSERT_TRUE(error.Success());
 
-    pthread_kill(pthread_self(), SIGUSR1);
+    kill(getpid(), SIGUSR1);
     ASSERT_TRUE(loop.Run().Success());
     ASSERT_EQ(2u, callback_count);
     ASSERT_EQ(1u, callback2_count);
@@ -259,7 +270,7 @@ TEST_F(MainLoopTest, TwoSignalCallbacks) {
   }
 
   // Both extra callbacks should be unregistered now.
-  pthread_kill(pthread_self(), SIGUSR1);
+  kill(getpid(), SIGUSR1);
   ASSERT_TRUE(loop.Run().Success());
   ASSERT_EQ(3u, callback_count);
   ASSERT_EQ(1u, callback2_count);

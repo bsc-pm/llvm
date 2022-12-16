@@ -29,7 +29,7 @@ using namespace lldb_private;
 
 // CommunicationKDP constructor
 CommunicationKDP::CommunicationKDP(const char *comm_name)
-    : Communication(comm_name), m_addr_byte_size(4),
+    : Communication(), m_addr_byte_size(4),
       m_byte_order(eByteOrderLittle), m_packet_timeout(5), m_sequence_mutex(),
       m_is_running(false), m_session_key(0u), m_request_sequence_id(0u),
       m_exception_sequence_id(0u), m_kdp_version_version(0u),
@@ -189,7 +189,7 @@ size_t CommunicationKDP::WaitForPacketWithTimeoutMicroSecondsNoLock(
     lldb::ConnectionStatus status = eConnectionStatusNoConnection;
     size_t bytes_read = Read(buffer, sizeof(buffer),
                              timeout_usec == UINT32_MAX
-                                 ? Timeout<std::micro>(llvm::None)
+                                 ? Timeout<std::micro>(std::nullopt)
                                  : std::chrono::microseconds(timeout_usec),
                              status, &error);
 

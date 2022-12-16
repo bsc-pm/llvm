@@ -319,6 +319,13 @@ def hi_f16_elt : PatLeaf<
 }]>;
 
 //===----------------------------------------------------------------------===//
+// PatLeafs for zero immediate
+//===----------------------------------------------------------------------===//
+
+def immzero : PatLeaf<(imm), [{ return N->isZero(); }]>;
+def fpimmzero : PatLeaf<(fpimm), [{ return N->isZero(); }]>;
+
+//===----------------------------------------------------------------------===//
 // PatLeafs for floating-point comparisons
 //===----------------------------------------------------------------------===//
 
@@ -548,14 +555,64 @@ multiclass noret_op {
     (!cast<SDPatternOperator>(NAME) node:$ptr, node:$data)>;
 }
 
-defm int_amdgcn_flat_atomic_fadd : noret_op;
+multiclass global_addr_space_atomic_op {
+  def "_noret_global_addrspace" :
+    PatFrag<(ops node:$ptr, node:$data),
+            (!cast<SDPatternOperator>(NAME) node:$ptr, node:$data)>{
+      let HasNoUse = true;
+      let AddressSpaces = LoadAddress_global.AddrSpaces;
+      let IsAtomic = 1;
+    }
+    def "_global_addrspace" :
+    PatFrag<(ops node:$ptr, node:$data),
+            (!cast<SDPatternOperator>(NAME) node:$ptr, node:$data)>{
+      let AddressSpaces = LoadAddress_global.AddrSpaces;
+      let IsAtomic = 1;
+    }
+}
+
+multiclass flat_addr_space_atomic_op {
+  def "_noret_flat_addrspace" :
+    PatFrag<(ops node:$ptr, node:$data),
+            (!cast<SDPatternOperator>(NAME) node:$ptr, node:$data)>{
+      let HasNoUse = true;
+      let AddressSpaces = LoadAddress_flat.AddrSpaces;
+      let IsAtomic = 1;
+    }
+    def "_flat_addrspace" :
+    PatFrag<(ops node:$ptr, node:$data),
+            (!cast<SDPatternOperator>(NAME) node:$ptr, node:$data)>{
+      let AddressSpaces = LoadAddress_flat.AddrSpaces;
+      let IsAtomic = 1;
+    }
+}
+
+multiclass local_addr_space_atomic_op {
+  def "_noret_local_addrspace" :
+    PatFrag<(ops node:$ptr, node:$data),
+            (!cast<SDPatternOperator>(NAME) node:$ptr, node:$data)>{
+      let HasNoUse = true;
+      let AddressSpaces = LoadAddress_local.AddrSpaces;
+      let IsAtomic = 1;
+    }
+    def "_local_addrspace" :
+    PatFrag<(ops node:$ptr, node:$data),
+            (!cast<SDPatternOperator>(NAME) node:$ptr, node:$data)>{
+      let AddressSpaces = LoadAddress_local.AddrSpaces;
+      let IsAtomic = 1;
+    }
+}
+
+defm int_amdgcn_flat_atomic_fadd : flat_addr_space_atomic_op;
 defm int_amdgcn_flat_atomic_fadd_v2bf16 : noret_op;
 defm int_amdgcn_flat_atomic_fmin : noret_op;
 defm int_amdgcn_flat_atomic_fmax : noret_op;
-defm int_amdgcn_global_atomic_fadd : noret_op;
+defm int_amdgcn_global_atomic_fadd : global_addr_space_atomic_op;
+defm int_amdgcn_flat_atomic_fadd : global_addr_space_atomic_op;
 defm int_amdgcn_global_atomic_fadd_v2bf16 : noret_op;
 defm int_amdgcn_global_atomic_fmin : noret_op;
 defm int_amdgcn_global_atomic_fmax : noret_op;
+defm int_amdgcn_flat_atomic_fadd : local_addr_space_atomic_op;
 defm int_amdgcn_ds_fadd_v2bf16 : noret_op;
 
 multiclass noret_binary_atomic_op<SDNode atomic_op, bit IsInt = 1> {
@@ -748,6 +805,25 @@ def fminnum_like : PatFrags<(ops node:$src0, node:$src1),
 
 // Instructions which select to the same v_max_f*
 def fmaxnum_like : PatFrags<(ops node:$src0, node:$src1),
+  [(fmaxnum_ieee node:$src0, node:$src1),
+   (fmaxnum node:$src0, node:$src1)]
+>;
+
+class NeverNaNPats<dag ops, list<dag> frags> : PatFrags<ops, frags> {
+  let PredicateCode = [{
+    return CurDAG->isKnownNeverNaN(SDValue(N,0));
+  }];
+  let GISelPredicateCode = [{
+    return isKnownNeverNaN(MI.getOperand(0).getReg(), MRI);
+  }];
+}
+
+def fminnum_like_nnan : NeverNaNPats<(ops node:$src0, node:$src1),
+  [(fminnum_ieee node:$src0, node:$src1),
+   (fminnum node:$src0, node:$src1)]
+>;
+
+def fmaxnum_like_nnan : NeverNaNPats<(ops node:$src0, node:$src1),
   [(fmaxnum_ieee node:$src0, node:$src1),
    (fmaxnum node:$src0, node:$src1)]
 >;

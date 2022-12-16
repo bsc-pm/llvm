@@ -1396,13 +1396,15 @@ void Sema::ActOnOmpSsExecutableDirectiveEnd() {
 }
 
 StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
-    OmpSsDirectiveKind Kind, Stmt *AStmt, SourceLocation StartLoc, SourceLocation EndLoc) {
+    const DeclarationNameInfo &DirName, OmpSsDirectiveKind Kind, Stmt *AStmt,
+    SourceLocation StartLoc, SourceLocation EndLoc) {
 
   bool ErrorFound = false;
 
   llvm::SmallVector<OSSClause *, 8> ClausesWithImplicit;
   ClausesWithImplicit.append(Clauses.begin(), Clauses.end());
-  if (AStmt && !CurContext->isDependentContext()) {
+  if (AStmt && !CurContext->isDependentContext() &&
+      Kind != OSSD_critical) {
     // Check default data sharing attributes for referenced variables.
     DSAAttrChecker DSAChecker(DSAStack, *this);
 
@@ -1461,6 +1463,10 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
   case OSSD_task:
     Res = ActOnOmpSsTaskDirective(ClausesWithImplicit, AStmt, StartLoc, EndLoc);
     break;
+  case OSSD_critical:
+    Res = ActOnOmpSsCriticalDirective(DirName, ClausesWithImplicit, AStmt,
+                                      StartLoc, EndLoc);
+    break;
   case OSSD_task_for:
     Res = ActOnOmpSsTaskForDirective(ClausesWithImplicit, AStmt, StartLoc, EndLoc);
     break;
@@ -1507,7 +1513,18 @@ StmtResult Sema::ActOnOmpSsTaskDirective(ArrayRef<OSSClause *> Clauses,
                                          SourceLocation EndLoc) {
   if (!AStmt)
     return StmtError();
+  setFunctionHasBranchProtectedScope();
   return OSSTaskDirective::Create(Context, StartLoc, EndLoc, Clauses, AStmt);
+}
+
+StmtResult Sema::ActOnOmpSsCriticalDirective(
+    const DeclarationNameInfo &DirName, ArrayRef<OSSClause *> Clauses,
+    Stmt *AStmt, SourceLocation StartLoc, SourceLocation EndLoc) {
+  if (!AStmt)
+    return StmtError();
+  setFunctionHasBranchProtectedScope();
+  return OSSCriticalDirective::Create(Context, DirName, StartLoc, EndLoc,
+                                      Clauses, AStmt);
 }
 
 namespace {
@@ -2303,6 +2320,7 @@ StmtResult Sema::ActOnOmpSsTaskForDirective(
   if (checkOmpSsLoop(OSSD_task_for, AStmt, *this, *DSAStack, B))
     return StmtError();
 
+  setFunctionHasBranchProtectedScope();
   return OSSTaskForDirective::Create(Context, StartLoc, EndLoc, Clauses, AStmt, B);
 }
 
@@ -2324,6 +2342,7 @@ StmtResult Sema::ActOnOmpSsTaskIterDirective(
         << getOmpSsDirectiveName(OSSD_taskiter);
   }
 
+  setFunctionHasBranchProtectedScope();
   return OSSTaskIterDirective::Create(Context, StartLoc, EndLoc, Clauses, AStmt, B);
 }
 
@@ -2358,6 +2377,7 @@ StmtResult Sema::ActOnOmpSsTaskLoopDirective(
     }
   }
 
+  setFunctionHasBranchProtectedScope();
   return OSSTaskLoopDirective::Create(Context, StartLoc, EndLoc, Clauses, AStmt, B);
 }
 
@@ -2392,6 +2412,7 @@ StmtResult Sema::ActOnOmpSsTaskLoopForDirective(
     }
   }
 
+  setFunctionHasBranchProtectedScope();
   return OSSTaskLoopForDirective::Create(Context, StartLoc, EndLoc, Clauses, AStmt, B);
 }
 
@@ -4069,7 +4090,6 @@ OSSClause *Sema::ActOnOmpSsDeviceClause(OmpSsDeviceClauseKind Kind,
   case OSSC_DEVICE_cuda:
     break;
   case OSSC_DEVICE_fpga:
-    // TODO: an an error for task inline fpga
     Diag(KindKwLoc, diag::err_oss_inline_device_not_supported)
       << getOmpSsSimpleClauseTypeName(OSSC_device, Kind);
     break;

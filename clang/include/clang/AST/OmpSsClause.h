@@ -167,6 +167,94 @@ public:
   }
 };
 
+/// Contains data for OmpSs-2 directives: clauses, children
+/// expressions/statements (helpers for codegen) and associated statement, if
+/// any.
+class OSSChildren final
+    : private llvm::TrailingObjects<OSSChildren, OSSClause *, Stmt *> {
+  friend TrailingObjects;
+  friend class OSSClauseReader;
+  friend class OSSExecutableDirective;
+
+  /// Numbers of clauses.
+  unsigned NumClauses = 0;
+  /// Number of child expressions/stmts.
+  unsigned NumChildren = 0;
+  /// true if the directive has associated statement.
+  bool HasAssociatedStmt = false;
+
+  /// Define the sizes of each trailing object array except the last one. This
+  /// is required for TrailingObjects to work properly.
+  size_t numTrailingObjects(OverloadToken<OSSClause *>) const {
+    return NumClauses;
+  }
+
+  OSSChildren() = delete;
+
+  OSSChildren(unsigned NumClauses, unsigned NumChildren, bool HasAssociatedStmt)
+      : NumClauses(NumClauses), NumChildren(NumChildren),
+        HasAssociatedStmt(HasAssociatedStmt) {}
+
+  static size_t size(unsigned NumClauses, bool HasAssociatedStmt,
+                     unsigned NumChildren);
+
+  static OSSChildren *Create(void *Mem, ArrayRef<OSSClause *> Clauses);
+  static OSSChildren *Create(void *Mem, ArrayRef<OSSClause *> Clauses, Stmt *S,
+                             unsigned NumChildren = 0);
+  static OSSChildren *CreateEmpty(void *Mem, unsigned NumClauses,
+                                  bool HasAssociatedStmt = false,
+                                  unsigned NumChildren = 0);
+
+public:
+  unsigned getNumClauses() const { return NumClauses; }
+  unsigned getNumChildren() const { return NumChildren; }
+  bool hasAssociatedStmt() const { return HasAssociatedStmt; }
+
+  /// Set associated statement.
+  void setAssociatedStmt(Stmt *S) {
+    getTrailingObjects<Stmt *>()[NumChildren] = S;
+  }
+
+  void setChildren(ArrayRef<Stmt *> Children);
+
+  /// Sets the list of variables for this clause.
+  ///
+  /// \param Clauses The list of clauses for the directive.
+  ///
+  void setClauses(ArrayRef<OSSClause *> Clauses);
+
+  /// Returns statement associated with the directive.
+  const Stmt *getAssociatedStmt() const {
+    return const_cast<OSSChildren *>(this)->getAssociatedStmt();
+  }
+  Stmt *getAssociatedStmt() {
+    assert(HasAssociatedStmt &&
+           "Expected directive with the associated statement.");
+    return getTrailingObjects<Stmt *>()[NumChildren];
+  }
+
+  /// Get the clauses storage.
+  MutableArrayRef<OSSClause *> getClauses() {
+    return llvm::makeMutableArrayRef(getTrailingObjects<OSSClause *>(),
+                                     NumClauses);
+  }
+  ArrayRef<OSSClause *> getClauses() const {
+    return const_cast<OSSChildren *>(this)->getClauses();
+  }
+
+  MutableArrayRef<Stmt *> getChildren();
+  ArrayRef<Stmt *> getChildren() const {
+    return const_cast<OSSChildren *>(this)->getChildren();
+  }
+
+  Stmt::child_range getAssociatedStmtAsRange() {
+    if (!HasAssociatedStmt)
+      return Stmt::child_range(Stmt::child_iterator(), Stmt::child_iterator());
+    return Stmt::child_range(&getTrailingObjects<Stmt *>()[NumChildren],
+                             &getTrailingObjects<Stmt *>()[NumChildren + 1]);
+  }
+};
+
 /// This represents 'if' clause in the '#pragma oss ...' directive.
 ///
 /// \code

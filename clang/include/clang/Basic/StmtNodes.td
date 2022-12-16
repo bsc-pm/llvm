@@ -296,13 +296,14 @@ def OMPTeamsGenericLoopDirective : StmtNode<OMPLoopDirective>;
 def OMPTargetTeamsGenericLoopDirective : StmtNode<OMPLoopDirective>;
 def OMPParallelGenericLoopDirective : StmtNode<OMPLoopDirective>;
 def OMPTargetParallelGenericLoopDirective : StmtNode<OMPLoopDirective>;
-
+def OMPErrorDirective : StmtNode<OMPExecutableDirective>;
 // OmpSs Directives
 def OSSExecutableDirective : StmtNode<Stmt, 1>;
 def OSSLoopDirective : StmtNode<OSSExecutableDirective, 1>;
 def OSSTaskwaitDirective : StmtNode<OSSExecutableDirective>;
 def OSSReleaseDirective : StmtNode<OSSExecutableDirective>;
 def OSSTaskDirective : StmtNode<OSSExecutableDirective>;
+def OSSCriticalDirective : StmtNode<OSSExecutableDirective>;
 def OSSTaskForDirective : StmtNode<OSSLoopDirective>;
 def OSSTaskIterDirective : StmtNode<OSSLoopDirective>;
 def OSSTaskLoopDirective : StmtNode<OSSLoopDirective>;

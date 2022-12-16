@@ -499,6 +499,7 @@ public:
   bool parseAlignment(uint64_t &Alignment);
   bool parseAddrspace(unsigned &Addrspace);
   bool parseSectionID(Optional<MBBSectionID> &SID);
+  bool parseBBID(Optional<unsigned> &BBID);
   bool parseOperandsOffset(MachineOperand &Op);
   bool parseIRValue(const Value *&V);
   bool parseMemoryOperandFlag(MachineMemOperand::Flags &Flags);
@@ -509,6 +510,7 @@ public:
   bool parseMachineMemoryOperand(MachineMemOperand *&Dest);
   bool parsePreOrPostInstrSymbol(MCSymbol *&Symbol);
   bool parseHeapAllocMarker(MDNode *&Node);
+  bool parsePCSections(MDNode *&Node);
 
   bool parseTargetImmMnemonic(const unsigned OpCode, const unsigned OpIdx,
                               MachineOperand &Dest, const MIRFormatter &MF);
@@ -594,7 +596,7 @@ bool MIParser::error(StringRef::iterator Loc, const Twine &Msg) {
   // Create a diagnostic for a YAML string literal.
   Error = SMDiagnostic(SM, SMLoc(), Buffer.getBufferIdentifier(), 1,
                        Loc - Source.data(), SourceMgr::DK_Error, Msg.str(),
-                       Source, None, None);
+                       Source, std::nullopt, std::nullopt);
   return true;
 }
 
@@ -661,6 +663,18 @@ bool MIParser::parseSectionID(Optional<MBBSectionID> &SID) {
   return false;
 }
 
+// Parse Machine Basic Block ID.
+bool MIParser::parseBBID(Optional<unsigned> &BBID) {
+  assert(Token.is(MIToken::kw_bb_id));
+  lex();
+  unsigned Value = 0;
+  if (getUnsigned(Value))
+    return error("Unknown BB ID");
+  BBID = Value;
+  lex();
+  return false;
+}
+
 bool MIParser::parseBasicBlockDefinition(
     DenseMap<unsigned, MachineBasicBlock *> &MBBSlots) {
   assert(Token.is(MIToken::MachineBasicBlockLabel));
@@ -677,6 +691,7 @@ bool MIParser::parseBasicBlockDefinition(
   bool IsEHFuncletEntry = false;
   Optional<MBBSectionID> SectionID;
   uint64_t Alignment = 0;
+  Optional<unsigned> BBID;
   BasicBlock *BB = nullptr;
   if (consumeIfPresent(MIToken::lparen)) {
     do {
@@ -717,6 +732,10 @@ bool MIParser::parseBasicBlockDefinition(
         if (parseSectionID(SectionID))
           return true;
         break;
+      case MIToken::kw_bb_id:
+        if (parseBBID(BBID))
+          return true;
+        break;
       default:
         break;
       }
@@ -753,6 +772,13 @@ bool MIParser::parseBasicBlockDefinition(
   if (SectionID) {
     MBB->setSectionID(SectionID.value());
     MF.setBBSectionsType(BasicBlockSection::List);
+  }
+  if (BBID.has_value()) {
+    // BBSectionsType is set to `List` if any basic blocks has `SectionID`.
+    // Here, we set it to `Labels` if it hasn't been set above.
+    if (!MF.hasBBSections())
+      MF.setBBSectionsType(BasicBlockSection::Labels);
+    MBB->setBBID(BBID.value());
   }
   return false;
 }
@@ -1016,6 +1042,7 @@ bool MIParser::parse(MachineInstr *&MI) {
   while (!Token.isNewlineOrEOF() && Token.isNot(MIToken::kw_pre_instr_symbol) &&
          Token.isNot(MIToken::kw_post_instr_symbol) &&
          Token.isNot(MIToken::kw_heap_alloc_marker) &&
+         Token.isNot(MIToken::kw_pcsections) &&
          Token.isNot(MIToken::kw_cfi_type) &&
          Token.isNot(MIToken::kw_debug_location) &&
          Token.isNot(MIToken::kw_debug_instr_number) &&
@@ -1045,6 +1072,10 @@ bool MIParser::parse(MachineInstr *&MI) {
   MDNode *HeapAllocMarker = nullptr;
   if (Token.is(MIToken::kw_heap_alloc_marker))
     if (parseHeapAllocMarker(HeapAllocMarker))
+      return true;
+  MDNode *PCSections = nullptr;
+  if (Token.is(MIToken::kw_pcsections))
+    if (parsePCSections(PCSections))
       return true;
 
   unsigned CFIType = 0;
@@ -1140,6 +1171,8 @@ bool MIParser::parse(MachineInstr *&MI) {
     MI->setPostInstrSymbol(MF, PostInstrSymbol);
   if (HeapAllocMarker)
     MI->setHeapAllocMarker(MF, HeapAllocMarker);
+  if (PCSections)
+    MI->setPCSections(MF, PCSections);
   if (CFIType)
     MI->setCFIType(MF, CFIType);
   if (!MemOperands.empty())
@@ -1348,7 +1381,7 @@ bool MIParser::parseMetadata(Metadata *&MD) {
   // Forward reference.
   auto &FwdRef = PFS.MachineForwardRefMDNodes[ID];
   FwdRef = std::make_pair(
-      MDTuple::getTemporary(MF.getFunction().getContext(), None), Loc);
+      MDTuple::getTemporary(MF.getFunction().getContext(), std::nullopt), Loc);
   PFS.MachineMetadataNodes[ID].reset(FwdRef.first.get());
   MD = FwdRef.first.get();
 
@@ -3408,6 +3441,22 @@ bool MIParser::parseHeapAllocMarker(MDNode *&Node) {
   parseMDNode(Node);
   if (!Node)
     return error("expected a MDNode after 'heap-alloc-marker'");
+  if (Token.isNewlineOrEOF() || Token.is(MIToken::coloncolon) ||
+      Token.is(MIToken::lbrace))
+    return false;
+  if (Token.isNot(MIToken::comma))
+    return error("expected ',' before the next machine operand");
+  lex();
+  return false;
+}
+
+bool MIParser::parsePCSections(MDNode *&Node) {
+  assert(Token.is(MIToken::kw_pcsections) &&
+         "Invalid token for a PC sections!");
+  lex();
+  parseMDNode(Node);
+  if (!Node)
+    return error("expected a MDNode after 'pcsections'");
   if (Token.isNewlineOrEOF() || Token.is(MIToken::coloncolon) ||
       Token.is(MIToken::lbrace))
     return false;

@@ -1048,6 +1048,11 @@ void StmtPrinter::VisitOMPTaskwaitDirective(OMPTaskwaitDirective *Node) {
   PrintOMPExecutableDirective(Node);
 }
 
+void StmtPrinter::VisitOMPErrorDirective(OMPErrorDirective *Node) {
+  Indent() << "#pragma omp error";
+  PrintOMPExecutableDirective(Node);
+}
+
 void StmtPrinter::VisitOMPTaskgroupDirective(OMPTaskgroupDirective *Node) {
   Indent() << "#pragma omp taskgroup";
   PrintOMPExecutableDirective(Node);
@@ -1363,6 +1368,16 @@ void StmtPrinter::VisitOSSTaskDirective(OSSTaskDirective *Node) {
   PrintOSSExecutableDirective(Node);
 }
 
+void StmtPrinter::VisitOSSCriticalDirective(OSSCriticalDirective *Node) {
+  Indent() << "#pragma oss critical";
+  if (Node->getDirectiveName().getName()) {
+    OS << " (";
+    Node->getDirectiveName().printName(OS, Policy);
+    OS << ")";
+  }
+  PrintOSSExecutableDirective(Node);
+}
+
 void StmtPrinter::VisitOSSTaskForDirective(OSSTaskForDirective *Node) {
   Indent() << "#pragma oss task for";
   PrintOSSLoopDirective(Node);
@@ -1542,6 +1557,7 @@ void StmtPrinter::VisitIntegerLiteral(IntegerLiteral *Node) {
   case BuiltinType::Char_S:
   case BuiltinType::Char_U:    OS << "i8"; break;
   case BuiltinType::UChar:     OS << "Ui8"; break;
+  case BuiltinType::SChar:     OS << "i8"; break;
   case BuiltinType::Short:     OS << "i16"; break;
   case BuiltinType::UShort:    OS << "Ui16"; break;
   case BuiltinType::Int:       break; // no suffix.
@@ -1554,6 +1570,9 @@ void StmtPrinter::VisitIntegerLiteral(IntegerLiteral *Node) {
     break; // no suffix.
   case BuiltinType::UInt128:
     break; // no suffix.
+  case BuiltinType::WChar_S:
+  case BuiltinType::WChar_U:
+    break; // no suffix
   }
 }
 

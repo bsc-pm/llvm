@@ -22,21 +22,63 @@
 namespace llvm {
 namespace exegesis {
 
-LLVMState::LLVMState(const std::string &Triple, const std::string &CpuName,
-                     const std::string &Features) {
+Expected<LLVMState> LLVMState::Create(std::string TripleName,
+                                      std::string CpuName,
+                                      const StringRef Features) {
+  if (TripleName.empty())
+    TripleName = Triple::normalize(sys::getDefaultTargetTriple());
+
+  Triple TheTriple(TripleName);
+
+  // Get the target specific parser.
   std::string Error;
-  const Target *const TheTarget = TargetRegistry::lookupTarget(Triple, Error);
-  assert(TheTarget && "unknown target for host");
-  const TargetOptions Options;
-  TheTargetMachine.reset(
-      static_cast<LLVMTargetMachine *>(TheTarget->createTargetMachine(
-          Triple, CpuName, Features, Options, Reloc::Model::Static)));
-  assert(TheTargetMachine && "unable to create target machine");
-  TheExegesisTarget = ExegesisTarget::lookup(TheTargetMachine->getTargetTriple());
-  if (!TheExegesisTarget) {
-    errs() << "no exegesis target for " << Triple << ", using default\n";
-    TheExegesisTarget = &ExegesisTarget::getDefault();
+  const Target *TheTarget =
+      TargetRegistry::lookupTarget(/*MArch=*/"", TheTriple, Error);
+  if (!TheTarget) {
+    return llvm::make_error<llvm::StringError>("no LLVM target for triple " +
+                                                   TripleName,
+                                               llvm::inconvertibleErrorCode());
   }
+
+  // Update Triple with the updated triple from the target lookup.
+  TripleName = TheTriple.str();
+
+  if (CpuName == "native")
+    CpuName = std::string(llvm::sys::getHostCPUName());
+
+  std::unique_ptr<MCSubtargetInfo> STI(
+      TheTarget->createMCSubtargetInfo(TripleName, CpuName, ""));
+  assert(STI && "Unable to create subtarget info!");
+  if (!STI->isCPUStringValid(CpuName)) {
+    return llvm::make_error<llvm::StringError>(Twine("invalid CPU name (")
+                                                   .concat(CpuName)
+                                                   .concat(") for triple ")
+                                                   .concat(TripleName),
+                                               llvm::inconvertibleErrorCode());
+  }
+  const TargetOptions Options;
+  std::unique_ptr<const TargetMachine> TM(
+      static_cast<LLVMTargetMachine *>(TheTarget->createTargetMachine(
+          TripleName, CpuName, Features, Options, Reloc::Model::Static)));
+  if (!TM) {
+    return llvm::make_error<llvm::StringError>(
+        "unable to create target machine", llvm::inconvertibleErrorCode());
+  }
+
+  const ExegesisTarget *ET =
+      TripleName.empty() ? &ExegesisTarget::getDefault()
+                         : ExegesisTarget::lookup(TM->getTargetTriple());
+  if (!ET) {
+    return llvm::make_error<llvm::StringError>(
+        "no Exegesis target for triple " + TripleName,
+        llvm::inconvertibleErrorCode());
+  }
+  return LLVMState(std::move(TM), ET, CpuName);
+}
+
+LLVMState::LLVMState(std::unique_ptr<const TargetMachine> TM,
+                     const ExegesisTarget *ET, const StringRef CpuName)
+    : TheExegesisTarget(ET), TheTargetMachine(std::move(TM)) {
   PfmCounters = &TheExegesisTarget->getPfmCounters(CpuName);
 
   BitVector ReservedRegs = getFunctionReservedRegs(getTargetMachine());
@@ -46,10 +88,6 @@ LLVMState::LLVMState(const std::string &Triple, const std::string &CpuName,
       new RegisterAliasingTrackerCache(getRegInfo(), std::move(ReservedRegs)));
   IC.reset(new InstructionsCache(getInstrInfo(), getRATC()));
 }
-
-LLVMState::LLVMState(const std::string &CpuName)
-    : LLVMState(sys::getProcessTriple(),
-                CpuName.empty() ? sys::getHostCPUName().str() : CpuName, "") {}
 
 std::unique_ptr<LLVMTargetMachine> LLVMState::createTargetMachine() const {
   return std::unique_ptr<LLVMTargetMachine>(static_cast<LLVMTargetMachine *>(

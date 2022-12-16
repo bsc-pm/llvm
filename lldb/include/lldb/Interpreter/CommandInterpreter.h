@@ -239,6 +239,14 @@ public:
     eCommandTypesAllThem = 0xFFFF  //< all commands
   };
 
+  // The CommandAlias and CommandInterpreter both have a hand in 
+  // substituting for alias commands.  They work by writing special tokens
+  // in the template form of the Alias command, and then detecting them when the
+  // command is executed.  These are the special tokens:
+  static const char *g_no_argument;
+  static const char *g_need_argument;
+  static const char *g_argument;
+
   CommandInterpreter(Debugger &debugger, bool synchronous_execution);
 
   ~CommandInterpreter() override = default;
@@ -551,6 +559,9 @@ public:
   bool GetSaveSessionOnQuit() const;
   void SetSaveSessionOnQuit(bool enable);
 
+  bool GetOpenTranscriptInEditor() const;
+  void SetOpenTranscriptInEditor(bool enable);
+
   FileSpec GetSaveSessionDirectory() const;
   void SetSaveSessionDirectory(llvm::StringRef path);
 
@@ -616,7 +627,7 @@ public:
   /// \return \b true if the session transcript was successfully written to
   /// disk, \b false otherwise.
   bool SaveTranscript(CommandReturnObject &result,
-                      llvm::Optional<std::string> output_file = llvm::None);
+                      llvm::Optional<std::string> output_file = std::nullopt);
 
   FileSpec GetCurrentSourceDir();
 

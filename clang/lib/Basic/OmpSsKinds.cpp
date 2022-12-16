@@ -276,6 +276,7 @@ bool clang::isAllowedClauseForDirective(OmpSsDirectiveKind DKind,
       break;
     }
     break;
+  case OSSD_critical:
   case OSSD_declare_reduction:
   case OSSD_assert:
   case OSSD_unknown:

@@ -835,27 +835,51 @@ enum affinity_top_method {
   affinity_top_method_default
 };
 
-#define affinity_respect_mask_default (-1)
+#define affinity_respect_mask_default (2)
 
-extern enum affinity_type __kmp_affinity_type; /* Affinity type */
-extern kmp_hw_t __kmp_affinity_gran; /* Affinity granularity */
-extern int __kmp_affinity_gran_levels; /* corresponding int value */
-extern int __kmp_affinity_dups; /* Affinity duplicate masks */
+typedef struct kmp_affinity_flags_t {
+  unsigned dups : 1;
+  unsigned verbose : 1;
+  unsigned warnings : 1;
+  unsigned respect : 2;
+  unsigned reset : 1;
+  unsigned initialized : 1;
+  unsigned reserved : 25;
+} kmp_affinity_flags_t;
+KMP_BUILD_ASSERT(sizeof(kmp_affinity_flags_t) == 4);
+
+typedef struct kmp_affinity_t {
+  char *proclist;
+  enum affinity_type type;
+  kmp_hw_t gran;
+  int gran_levels;
+  int compact;
+  int offset;
+  kmp_affinity_flags_t flags;
+  unsigned num_masks;
+  kmp_affin_mask_t *masks;
+  unsigned num_os_id_masks;
+  kmp_affin_mask_t *os_id_masks;
+  const char *env_var;
+} kmp_affinity_t;
+
+#define KMP_AFFINITY_INIT(env)                                                 \
+  {                                                                            \
+    nullptr, affinity_default, KMP_HW_UNKNOWN, -1, 0, 0,                       \
+        {TRUE, FALSE, TRUE, affinity_respect_mask_default, FALSE, FALSE}, 0,   \
+        nullptr, 0, nullptr, env                                               \
+  }
+
 extern enum affinity_top_method __kmp_affinity_top_method;
-extern int __kmp_affinity_compact; /* Affinity 'compact' value */
-extern int __kmp_affinity_offset; /* Affinity offset value  */
-extern int __kmp_affinity_verbose; /* Was verbose specified for KMP_AFFINITY? */
-extern int __kmp_affinity_warnings; /* KMP_AFFINITY warnings enabled ? */
-extern int __kmp_affinity_respect_mask; // Respect process' init affinity mask?
-extern char *__kmp_affinity_proclist; /* proc ID list */
-extern kmp_affin_mask_t *__kmp_affinity_masks;
-extern unsigned __kmp_affinity_num_masks;
+extern kmp_affinity_t __kmp_affinity;
+extern kmp_affinity_t __kmp_hh_affinity;
+extern kmp_affinity_t *__kmp_affinities[2];
+
 extern void __kmp_affinity_bind_thread(int which);
 
 extern kmp_affin_mask_t *__kmp_affin_fullMask;
 extern kmp_affin_mask_t *__kmp_affin_origMask;
 extern char *__kmp_cpuinfo_file;
-extern bool __kmp_affin_reset;
 
 #endif /* KMP_AFFINITY_SUPPORTED */
 
@@ -894,7 +918,7 @@ extern char *__kmp_tool_libraries;
 #define KMP_AFFINITY_NON_PROC_BIND                                             \
   ((__kmp_nested_proc_bind.bind_types[0] == proc_bind_false ||                 \
     __kmp_nested_proc_bind.bind_types[0] == proc_bind_intel) &&                \
-   (__kmp_affinity_num_masks > 0 || __kmp_affinity_type == affinity_balanced))
+   (__kmp_affinity.num_masks > 0 || __kmp_affinity.type == affinity_balanced))
 #endif /* KMP_AFFINITY_SUPPORTED */
 
 extern int __kmp_affinity_num_places;
@@ -1484,6 +1508,7 @@ static inline void __kmp_x86_pause(void) { _mm_pause(); }
 // requested. Uses a timed TPAUSE, and exponential backoff. If TPAUSE isn't
 // available, fall back to the regular CPU pause and yield combination.
 #if KMP_HAVE_UMWAIT
+#define KMP_TPAUSE_MAX_MASK ((kmp_uint64)0xFFFF)
 #define KMP_YIELD_OVERSUB_ELSE_SPIN(count, time)                               \
   {                                                                            \
     if (__kmp_tpause_enabled) {                                                \
@@ -1492,7 +1517,7 @@ static inline void __kmp_x86_pause(void) { _mm_pause(); }
       } else {                                                                 \
         __kmp_tpause(__kmp_tpause_hint, (time));                               \
       }                                                                        \
-      (time) *= 2;                                                             \
+      (time) = (time << 1 | 1) & KMP_TPAUSE_MAX_MASK;                          \
     } else {                                                                   \
       KMP_CPU_PAUSE();                                                         \
       if ((KMP_TRY_YIELD_OVERSUB)) {                                           \
@@ -3636,7 +3661,7 @@ extern void __kmp_check_stack_overlap(kmp_info_t *thr);
 extern void __kmp_expand_host_name(char *buffer, size_t size);
 extern void __kmp_expand_file_name(char *result, size_t rlen, char *pattern);
 
-#if KMP_ARCH_X86 || KMP_ARCH_X86_64 || (KMP_OS_WINDOWS && KMP_ARCH_AARCH64)
+#if KMP_ARCH_X86 || KMP_ARCH_X86_64 || (KMP_OS_WINDOWS && (KMP_ARCH_AARCH64 || KMP_ARCH_ARM))
 extern void
 __kmp_initialize_system_tick(void); /* Initialize timer tick value */
 #endif
@@ -3650,7 +3675,7 @@ extern char *__kmp_affinity_print_mask(char *buf, int buf_len,
                                        kmp_affin_mask_t *mask);
 extern kmp_str_buf_t *__kmp_affinity_str_buf_mask(kmp_str_buf_t *buf,
                                                   kmp_affin_mask_t *mask);
-extern void __kmp_affinity_initialize(void);
+extern void __kmp_affinity_initialize(kmp_affinity_t &affinity);
 extern void __kmp_affinity_uninitialize(void);
 extern void __kmp_affinity_set_init_mask(
     int gtid, int isa_root); /* set affinity according to KMP_AFFINITY */
@@ -3675,6 +3700,8 @@ static inline void __kmp_assign_root_init_mask() {
   }
 }
 static inline void __kmp_reset_root_init_mask(int gtid) {
+  if (!KMP_AFFINITY_CAPABLE())
+    return;
   kmp_info_t *th = __kmp_threads[gtid];
   kmp_root_t *r = th->th.th_root;
   if (r->r.r_uber_thread == th && r->r.r_affinity_assigned) {
@@ -4020,6 +4047,10 @@ KMP_EXPORT void __kmpc_omp_task_complete_if0(ident_t *loc_ref, kmp_int32 gtid,
 KMP_EXPORT kmp_int32 __kmpc_omp_task_parts(ident_t *loc_ref, kmp_int32 gtid,
                                            kmp_task_t *new_task);
 KMP_EXPORT kmp_int32 __kmpc_omp_taskwait(ident_t *loc_ref, kmp_int32 gtid);
+/* __kmpc_omp_taskwait_51 : Function for OpenMP 5.1 nowait clause.
+ *                          Placeholder for taskwait with nowait clause.*/
+KMP_EXPORT kmp_int32 __kmpc_omp_taskwait_51(ident_t *loc_ref, kmp_int32 gtid,
+                                            kmp_int32 has_no_wait);
 
 KMP_EXPORT kmp_int32 __kmpc_omp_taskyield(ident_t *loc_ref, kmp_int32 gtid,
                                           int end_part);
@@ -4044,6 +4075,15 @@ KMP_EXPORT void __kmpc_omp_wait_deps(ident_t *loc_ref, kmp_int32 gtid,
                                      kmp_depend_info_t *dep_list,
                                      kmp_int32 ndeps_noalias,
                                      kmp_depend_info_t *noalias_dep_list);
+/* __kmpc_omp_taskwait_deps_51 : Function for OpenMP 5.1 nowait clause.
+ *                               Placeholder for taskwait with nowait clause.*/
+KMP_EXPORT void __kmpc_omp_taskwait_deps_51(ident_t *loc_ref, kmp_int32 gtid,
+                                            kmp_int32 ndeps,
+                                            kmp_depend_info_t *dep_list,
+                                            kmp_int32 ndeps_noalias,
+                                            kmp_depend_info_t *noalias_dep_list,
+                                            kmp_int32 has_no_wait);
+
 extern kmp_int32 __kmp_omp_task(kmp_int32 gtid, kmp_task_t *new_task,
                                 bool serialize_immediate);
 
@@ -4307,6 +4347,9 @@ extern void __kmp_hidden_helper_main_thread_release();
 
 #define KMP_HIDDEN_HELPER_WORKER_THREAD(gtid)                                  \
   ((gtid) > 1 && (gtid) <= __kmp_hidden_helper_threads_num)
+
+#define KMP_HIDDEN_HELPER_MAIN_THREAD(gtid)                                    \
+  ((gtid) == 1 && (gtid) <= __kmp_hidden_helper_threads_num)
 
 #define KMP_HIDDEN_HELPER_TEAM(team)                                           \
   (team->t.t_threads[0] == __kmp_hidden_helper_main_thread)

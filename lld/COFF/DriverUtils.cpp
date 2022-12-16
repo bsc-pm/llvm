@@ -17,7 +17,6 @@
 #include "Symbols.h"
 #include "lld/Common/ErrorHandler.h"
 #include "lld/Common/Memory.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/BinaryFormat/COFF.h"
@@ -35,6 +34,7 @@
 #include "llvm/WindowsManifest/WindowsManifestMerger.h"
 #include <limits>
 #include <memory>
+#include <optional>
 
 using namespace llvm::COFF;
 using namespace llvm;
@@ -104,9 +104,7 @@ void parseGuard(StringRef fullArg) {
       config->guardCF &= ~GuardCFLevel::LongJmp;
     else if (arg.equals_insensitive("noehcont"))
       config->guardCF &= ~GuardCFLevel::EHCont;
-    else if (arg.equals_insensitive("cf"))
-      config->guardCF = GuardCFLevel::CF;
-    else if (arg.equals_insensitive("longjmp"))
+    else if (arg.equals_insensitive("cf") || arg.equals_insensitive("longjmp"))
       config->guardCF |= GuardCFLevel::CF | GuardCFLevel::LongJmp;
     else if (arg.equals_insensitive("ehcont"))
       config->guardCF |= GuardCFLevel::CF | GuardCFLevel::EHCont;
@@ -779,7 +777,7 @@ MemoryBufferRef convertResToCOFF(ArrayRef<MemoryBufferRef> mbs,
 #undef PREFIX
 
 // Create table mapping all options defined in Options.td
-static const llvm::opt::OptTable::Info infoTable[] = {
+static constexpr llvm::opt::OptTable::Info infoTable[] = {
 #define OPTION(X1, X2, ID, KIND, GROUP, ALIAS, X7, X8, X9, X10, X11, X12)      \
   {X1, X2, X10,         X11,         OPT_##ID, llvm::opt::Option::KIND##Class, \
    X9, X8, OPT_##GROUP, OPT_##ALIAS, X7,       X12},
@@ -857,8 +855,13 @@ opt::InputArgList ArgParser::parse(ArrayRef<const char *> argv) {
   }
 
   // Save the command line after response file expansion so we can write it to
-  // the PDB if necessary.
-  config->argv = {expandedArgv.begin(), expandedArgv.end()};
+  // the PDB if necessary. Mimic MSVC, which skips input files.
+  config->argv = {argv[0]};
+  for (opt::Arg *arg : args) {
+    if (arg->getOption().getKind() != opt::Option::InputClass) {
+      config->argv.push_back(args.getArgString(arg->getIndex()));
+    }
+  }
 
   // Handle /WX early since it converts missing argument warnings to errors.
   errorHandler().fatalWarnings = args.hasFlag(OPT_WX, OPT_WX_no, false);
@@ -929,11 +932,11 @@ ParsedDirectives ArgParser::parseDirectives(StringRef s) {
 // So you can pass extra arguments using them.
 void ArgParser::addLINK(SmallVector<const char *, 256> &argv) {
   // Concatenate LINK env and command line arguments, and then parse them.
-  if (Optional<std::string> s = Process::GetEnv("LINK")) {
+  if (std::optional<std::string> s = Process::GetEnv("LINK")) {
     std::vector<const char *> v = tokenize(*s);
     argv.insert(std::next(argv.begin()), v.begin(), v.end());
   }
-  if (Optional<std::string> s = Process::GetEnv("_LINK_")) {
+  if (std::optional<std::string> s = Process::GetEnv("_LINK_")) {
     std::vector<const char *> v = tokenize(*s);
     argv.insert(std::next(argv.begin()), v.begin(), v.end());
   }

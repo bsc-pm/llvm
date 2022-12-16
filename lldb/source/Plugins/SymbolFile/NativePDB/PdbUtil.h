@@ -13,7 +13,6 @@
 #include "lldb/Symbol/Variable.h"
 #include "lldb/lldb-enumerations.h"
 
-#include "llvm/ADT/Optional.h"
 #include "llvm/DebugInfo/CodeView/CodeView.h"
 #include "llvm/DebugInfo/CodeView/SymbolRecord.h"
 #include "llvm/DebugInfo/CodeView/TypeRecord.h"
@@ -103,7 +102,7 @@ struct SegmentOffsetLength {
 struct VariableInfo {
   llvm::StringRef name;
   llvm::codeview::TypeIndex type;
-  llvm::Optional<DWARFExpressionList> location;
+  DWARFExpressionList location;
   bool is_param;
 };
 

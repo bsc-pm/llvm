@@ -14,7 +14,6 @@
 #include "mlir/TableGen/CodeGenHelpers.h"
 #include "mlir/TableGen/Operator.h"
 #include "mlir/TableGen/Pattern.h"
-#include "llvm/ADT/SetVector.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Path.h"
 #include "llvm/TableGen/Record.h"
@@ -78,11 +77,11 @@ StringRef StaticVerifierFunctionEmitter::getTypeConstraintFn(
 }
 
 // Find a uniqued attribute constraint. Since not all attribute constraints can
-// be uniqued, return None if one was not found.
-Optional<StringRef> StaticVerifierFunctionEmitter::getAttrConstraintFn(
+// be uniqued, return std::nullopt if one was not found.
+std::optional<StringRef> StaticVerifierFunctionEmitter::getAttrConstraintFn(
     const Constraint &constraint) const {
   auto it = attrConstraints.find(constraint);
-  return it == attrConstraints.end() ? Optional<StringRef>()
+  return it == attrConstraints.end() ? std::optional<StringRef>()
                                      : StringRef(it->second);
 }
 

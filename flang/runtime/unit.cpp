@@ -58,7 +58,7 @@ ExternalFileUnit *ExternalFileUnit::LookUpOrCreateAnonymous(int unit,
     IoErrorHandler handler{terminator};
     result->OpenAnonymousUnit(
         dir == Direction::Input ? OpenStatus::Unknown : OpenStatus::Replace,
-        Action::ReadWrite, Position::Rewind, Convert::Native, handler);
+        Action::ReadWrite, Position::Rewind, Convert::Unknown, handler);
     result->isUnformatted = isUnformatted;
   }
   return result;
@@ -92,7 +92,7 @@ ExternalFileUnit &ExternalFileUnit::NewUnit(
 void ExternalFileUnit::OpenUnit(std::optional<OpenStatus> status,
     std::optional<Action> action, Position position, OwningPtr<char> &&newPath,
     std::size_t newPathLength, Convert convert, IoErrorHandler &handler) {
-  if (executionEnvironment.conversion != Convert::Unknown) {
+  if (convert == Convert::Unknown) {
     convert = executionEnvironment.conversion;
   }
   swapEndianness_ = convert == Convert::Swap ||
@@ -714,8 +714,7 @@ bool ExternalFileUnit::SetDirectRec(
 void ExternalFileUnit::EndIoStatement() {
   io_.reset();
   u_.emplace<std::monostate>();
-  CriticalSection critical{lock_};
-  isBusy_ = false;
+  lock_.Drop();
 }
 
 void ExternalFileUnit::BeginSequentialVariableUnformattedInputRecord(

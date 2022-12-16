@@ -250,7 +250,7 @@ const EHPersonality &EHPersonality::get(CodeGenFunction &CGF) {
   // For outlined finallys and filters, use the SEH personality in case they
   // contain more SEH. This mostly only affects finallys. Filters could
   // hypothetically use gnu statement expressions to sneak in nested SEH.
-  FD = FD ? FD : CGF.CurSEHParent;
+  FD = FD ? FD : CGF.CurSEHParent.getDecl();
   return get(CGF.CGM, dyn_cast_or_null<FunctionDecl>(FD));
 }
 
@@ -1246,8 +1246,7 @@ void CodeGenFunction::ExitCXXTryStmt(const CXXTryStmt &S, bool IsFnTryBlock) {
   // Wasm uses Windows-style EH instructions, but merges all catch clauses into
   // one big catchpad. So we save the old funclet pad here before we traverse
   // each catch handler.
-  SaveAndRestore<llvm::Instruction *> RestoreCurrentFuncletPad(
-      CurrentFuncletPad);
+  SaveAndRestore RestoreCurrentFuncletPad(CurrentFuncletPad);
   llvm::BasicBlock *WasmCatchStartBlock = nullptr;
   if (EHPersonality::get(*this).isWasmPersonality()) {
     auto *CatchSwitch =
@@ -1280,8 +1279,7 @@ void CodeGenFunction::ExitCXXTryStmt(const CXXTryStmt &S, bool IsFnTryBlock) {
     RunCleanupsScope CatchScope(*this);
 
     // Initialize the catch variable and set up the cleanups.
-    SaveAndRestore<llvm::Instruction *> RestoreCurrentFuncletPad(
-        CurrentFuncletPad);
+    SaveAndRestore RestoreCurrentFuncletPad(CurrentFuncletPad);
     CGM.getCXXABI().emitBeginCatch(*this, C);
 
     // Emit the PGO counter increment.
@@ -1630,8 +1628,7 @@ llvm::BasicBlock *CodeGenFunction::getTerminateFunclet() {
 
   // Create the cleanuppad using the current parent pad as its token. Use 'none'
   // if this is a top-level terminate scope, which is the common case.
-  SaveAndRestore<llvm::Instruction *> RestoreCurrentFuncletPad(
-      CurrentFuncletPad);
+  SaveAndRestore RestoreCurrentFuncletPad(CurrentFuncletPad);
   llvm::Value *ParentPad = CurrentFuncletPad;
   if (!ParentPad)
     ParentPad = llvm::ConstantTokenNone::get(CGM.getLLVMContext());
@@ -2053,7 +2050,7 @@ void CodeGenFunction::startOutlinedSEHHelper(CodeGenFunction &ParentCGF,
   SmallString<128> Name;
   {
     llvm::raw_svector_ostream OS(Name);
-    const NamedDecl *ParentSEHFn = ParentCGF.CurSEHParent;
+    GlobalDecl ParentSEHFn = ParentCGF.CurSEHParent;
     assert(ParentSEHFn && "No CurSEHParent!");
     MangleContext &Mangler = CGM.getCXXABI().getMangleContext();
     if (IsFilter)
