@@ -70,10 +70,12 @@ struct BitFields4_packed {
 typedef float float2 __attribute__((ext_vector_type(2)));
 float2 float2x;
 
+#ifdef __x86_64__
 // Register "0" is currently an invalid register for global register variables.
 // Use "esp" instead of "0".
 // register int rix __asm__("0");
 register int rix __asm__("esp");
+#endif
 
 // CHECK-LABEL: @main(
 // CHECK-NEXT:  entry:
@@ -418,8 +420,10 @@ int main(void) {
   ldv = bfx4_packed.b;
 #pragma oss atomic read
   ulv = float2x.x;
+#ifdef __x86_64__
 #pragma oss atomic read seq_cst
   dv = rix;
+#endif
   return 0;
 }
 

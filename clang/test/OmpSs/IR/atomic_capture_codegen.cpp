@@ -70,10 +70,12 @@ struct BitFields4_packed {
 typedef float float2 __attribute__((ext_vector_type(2)));
 float2 float2x;
 
+#ifdef __x86_64__
 // Register "0" is currently an invalid register for global register variables.
 // Use "esp" instead of "0".
 // register int rix __asm__("0");
 register int rix __asm__("esp");
+#endif
 
 // CHECK-LABEL: @main(
 // CHECK-NEXT:  entry:
@@ -1045,10 +1047,12 @@ int main(void) {
   iv = bfx4_packed.b += ldv;
 #pragma oss atomic capture acq_rel
   {fv = float2x.x; float2x.x = ulv - float2x.x;}
+#ifdef __x86_64__
 #pragma oss atomic capture seq_cst
   {rix = dv / rix; iv = rix;}
 #pragma oss atomic capture
   {rix = ix; ix = 5;}
+#endif
   return 0;
 }
 #endif
