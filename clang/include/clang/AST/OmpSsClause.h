@@ -558,7 +558,7 @@ public:
   }
 };
 
-/// This represents 'update' clause in the '#pragma oss taskiter' directive.
+/// This represents 'update' clause in the '#pragma oss taskiter|atomic' directive.
 ///
 /// \code
 /// #pragma oss taskiter update
@@ -1696,6 +1696,371 @@ public:
 
   static bool classof(const OSSClause *T) {
     return T->getClauseKind() == OSSC_ndrange;
+  }
+};
+
+/// This represents 'read' clause in the '#pragma oss atomic' directive.
+///
+/// \code
+/// #pragma oss atomic read
+/// \endcode
+/// In this example directive '#pragma oss atomic' has 'read' clause.
+class OSSReadClause : public OSSClause {
+public:
+  /// Build 'read' clause.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSReadClause(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSClause(OSSC_read, StartLoc, EndLoc) {}
+
+  /// Build an empty clause.
+  OSSReadClause()
+      : OSSClause(OSSC_read, SourceLocation(), SourceLocation()) {}
+
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+
+  const_child_range children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  child_range used_children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+  const_child_range used_children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == OSSC_read;
+  }
+};
+
+/// This represents 'write' clause in the '#pragma oss atomic' directive.
+///
+/// \code
+/// #pragma oss atomic write
+/// \endcode
+/// In this example directive '#pragma oss atomic' has 'write' clause.
+class OSSWriteClause : public OSSClause {
+public:
+  /// Build 'write' clause.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSWriteClause(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSClause(OSSC_write, StartLoc, EndLoc) {}
+
+  /// Build an empty clause.
+  OSSWriteClause()
+      : OSSClause(OSSC_write, SourceLocation(), SourceLocation()) {}
+
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+
+  const_child_range children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  child_range used_children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+  const_child_range used_children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == OSSC_write;
+  }
+};
+
+/// This represents 'capture' clause in the '#pragma oss atomic'
+/// directive.
+///
+/// \code
+/// #pragma oss atomic capture
+/// \endcode
+/// In this example directive '#pragma oss atomic' has 'capture' clause.
+class OSSCaptureClause : public OSSClause {
+public:
+  /// Build 'capture' clause.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSCaptureClause(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSClause(OSSC_capture, StartLoc, EndLoc) {}
+
+  /// Build an empty clause.
+  OSSCaptureClause()
+      : OSSClause(OSSC_capture, SourceLocation(), SourceLocation()) {
+  }
+
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+
+  const_child_range children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  child_range used_children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+  const_child_range used_children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == OSSC_capture;
+  }
+};
+
+/// This represents 'compare' clause in the '#pragma oss atomic'
+/// directive.
+///
+/// \code
+/// #pragma oss atomic compare
+/// \endcode
+/// In this example directive '#pragma oss atomic' has 'compare' clause.
+class OSSCompareClause final : public OSSClause {
+public:
+  /// Build 'compare' clause.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSCompareClause(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSClause(OSSC_compare, StartLoc, EndLoc) {}
+
+  /// Build an empty clause.
+  OSSCompareClause()
+      : OSSClause(OSSC_compare, SourceLocation(), SourceLocation()) {
+  }
+
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+
+  const_child_range children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  child_range used_children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+  const_child_range used_children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == OSSC_compare;
+  }
+};
+
+/// This represents 'seq_cst' clause in the '#pragma oss atomic'
+/// directive.
+///
+/// \code
+/// #pragma oss atomic seq_cst
+/// \endcode
+/// In this example directive '#pragma oss atomic' has 'seq_cst' clause.
+class OSSSeqCstClause : public OSSClause {
+public:
+  /// Build 'seq_cst' clause.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSSeqCstClause(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSClause(OSSC_seq_cst, StartLoc, EndLoc) {}
+
+  /// Build an empty clause.
+  OSSSeqCstClause()
+      : OSSClause(OSSC_seq_cst, SourceLocation(), SourceLocation()) {
+  }
+
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+
+  const_child_range children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  child_range used_children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+  const_child_range used_children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == OSSC_seq_cst;
+  }
+};
+
+/// This represents 'acq_rel' clause in the '#pragma oss atomic'
+/// directives.
+///
+/// \code
+/// #pragma oss atomic acq_rel
+/// \endcode
+/// In this example directive '#pragma oss atomic' has 'acq_rel' clause.
+class OSSAcqRelClause final : public OSSClause {
+public:
+  /// Build 'ack_rel' clause.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSAcqRelClause(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSClause(OSSC_acq_rel, StartLoc, EndLoc) {}
+
+  /// Build an empty clause.
+  OSSAcqRelClause()
+      : OSSClause(OSSC_acq_rel, SourceLocation(), SourceLocation()) {
+  }
+
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+
+  const_child_range children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  child_range used_children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+  const_child_range used_children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == OSSC_acq_rel;
+  }
+};
+
+/// This represents 'acquire' clause in the '#pragma oss atomic'
+/// directives.
+///
+/// \code
+/// #pragma oss atomic acquire
+/// \endcode
+/// In this example directive '#pragma oss atomic' has 'acquire' clause.
+class OSSAcquireClause final : public OSSClause {
+public:
+  /// Build 'acquire' clause.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSAcquireClause(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSClause(OSSC_acquire, StartLoc, EndLoc) {}
+
+  /// Build an empty clause.
+  OSSAcquireClause()
+      : OSSClause(OSSC_acquire, SourceLocation(), SourceLocation()) {
+  }
+
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+
+  const_child_range children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  child_range used_children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+  const_child_range used_children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == OSSC_acquire;
+  }
+};
+
+/// This represents 'release' clause in the '#pragma oss atomic'
+/// directives.
+///
+/// \code
+/// #pragma oss atomic release
+/// \endcode
+/// In this example directive '#pragma oss atomic' has 'release' clause.
+class OSSReleaseClause final : public OSSClause {
+public:
+  /// Build 'release' clause.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSReleaseClause(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSClause(OSSC_release, StartLoc, EndLoc) {}
+
+  /// Build an empty clause.
+  OSSReleaseClause()
+      : OSSClause(OSSC_release, SourceLocation(), SourceLocation()) {
+  }
+
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+
+  const_child_range children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  child_range used_children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+  const_child_range used_children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == OSSC_release;
+  }
+};
+
+/// This represents 'relaxed' clause in the '#pragma oss atomic'
+/// directives.
+///
+/// \code
+/// #pragma oss atomic relaxed
+/// \endcode
+/// In this example directive '#pragma oss atomic' has 'relaxed' clause.
+class OSSRelaxedClause final : public OSSClause {
+public:
+  /// Build 'relaxed' clause.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSRelaxedClause(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSClause(OSSC_relaxed, StartLoc, EndLoc) {}
+
+  /// Build an empty clause.
+  OSSRelaxedClause()
+      : OSSClause(OSSC_relaxed, SourceLocation(), SourceLocation()) {
+  }
+
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+
+  const_child_range children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  child_range used_children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+  const_child_range used_children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == OSSC_relaxed;
   }
 };
 

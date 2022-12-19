@@ -11638,6 +11638,57 @@ def err_oss_multidep_iterator_scope : Error<
   "iterator variable of a multidependence cannot be used in its own %select{lower-bound|size|upper-bound|step}0 expression">;
 def err_oss_invalid_scope : Error <
   "'#pragma oss %0' directive must appear only in file scope">;
+def err_oss_atomic_read_not_expression_statement : Error<
+  "the statement for 'atomic read' must be an expression statement of form 'v = x;',"
+  " where v and x are both lvalue expressions with scalar type">;
+def note_oss_atomic_read_write: Note<
+  "%select{expected an expression statement|expected built-in assignment operator|expected expression of scalar type|expected lvalue expression}0">;
+def err_oss_atomic_write_not_expression_statement : Error<
+  "the statement for 'atomic write' must be an expression statement of form 'x = expr;',"
+  " where x is a lvalue expression with scalar type">;
+def err_oss_atomic_update_not_expression_statement : Error<
+  "the statement for 'atomic update' must be an expression statement of form '++x;', '--x;', 'x++;', 'x--;', 'x binop= expr;', 'x = x binop expr' or 'x = expr binop x',"
+  " where x is an lvalue expression with scalar type">;
+def err_oss_atomic_not_expression_statement : Error<
+  "the statement for 'atomic' must be an expression statement of form '++x;', '--x;', 'x++;', 'x--;', 'x binop= expr;', 'x = x binop expr' or 'x = expr binop x',"
+  " where x is an lvalue expression with scalar type">;
+def note_oss_atomic_update: Note<
+  "%select{expected an expression statement|expected built-in binary or unary operator|expected unary decrement/increment operation|"
+  "expected expression of scalar type|expected assignment expression|expected built-in binary operator|"
+  "expected one of '+', '*', '-', '/', '&', '^', '%|', '<<', or '>>' built-in operations|expected in right hand side of expression}0">;
+def err_oss_atomic_capture_not_expression_statement : Error<
+  "the statement for 'atomic capture' must be an expression statement of form 'v = ++x;', 'v = --x;', 'v = x++;', 'v = x--;', 'v = x binop= expr;', 'v = x = x binop expr' or 'v = x = expr binop x',"
+  " where x and v are both lvalue expressions with scalar type">;
+def err_oss_atomic_capture_not_compound_statement : Error<
+  "the statement for 'atomic capture' must be a compound statement of form '{v = x; x binop= expr;}', '{x binop= expr; v = x;}',"
+  " '{v = x; x = x binop expr;}', '{v = x; x = expr binop x;}', '{x = x binop expr; v = x;}', '{x = expr binop x; v = x;}' or '{v = x; x = expr;}',"
+  " '{v = x; x++;}', '{v = x; ++x;}', '{++x; v = x;}', '{x++; v = x;}', '{v = x; x--;}', '{v = x; --x;}', '{--x; v = x;}', '{x--; v = x;}'"
+  " where x is an lvalue expression with scalar type">;
+def note_oss_atomic_capture: Note<
+  "%select{expected assignment expression|expected compound statement|expected exactly two expression statements|expected in right hand side of the first expression}0">;
+def err_oss_atomic_compare : Error<
+  "the statement for 'atomic compare' must be a compound statement of form '{x = expr ordop x ? expr : x;}', '{x = x ordop expr? expr : x;}',"
+  " '{x = x == e ? d : x;}', '{x = e == x ? d : x;}', or 'if(expr ordop x) {x = expr;}', 'if(x ordop expr) {x = expr;}', 'if(x == e) {x = d;}',"
+  " 'if(e == x) {x = d;}' where 'x' is an lvalue expression with scalar type, 'expr', 'e', and 'd' are expressions with scalar type,"
+  " and 'ordop' is one of '<' or '>'.">;
+def err_oss_atomic_compare_capture : Error<
+  "the statement for 'atomic compare capture' must be a compound statement of form '{v = x; cond-up-stmt}', ''{cond-up-stmt v = x;}', '{if(x == e) {x = d;} else {v = x;}}',"
+  " '{r = x == e; if(r) {x = d;}}', or '{r = x == e; if(r) {x = d;} else {v = x;}}', where 'cond-update-stmt' can have one of the following forms: 'if(expr ordop x) {x = expr;}',"
+  " 'if(x ordop expr) {x = expr;}', 'if(x == e) {x = d;}', or 'if(e == x) {x = d;}' where 'x', 'r', and 'v' are lvalue expressions with scalar type, 'expr', 'e', and 'd' are expressions with scalar type,"
+  " and 'ordop' is one of '<' or '>'.">;
+def note_oss_atomic_compare: Note<
+  "%select{expected compound statement|expected exactly one expression statement|expected assignment statement|expected conditional operator|expect result value to be at false expression|"
+  "expect binary operator in conditional expression|expect '<', '>' or '==' as order operator|expect comparison in a form of 'x == e', 'e == x', 'x ordop expr', or 'expr ordop x'|"
+  "expect lvalue for result value|expect scalar value|expect integer value|unexpected 'else' statement|expect '==' operator|expect an assignment statement 'v = x'|"
+  "expect a 'if' statement|expect no more than two statements|expect a compound statement|expect 'else' statement|expect a form 'r = x == e; if (r) ...'}0">;
+def err_oss_atomic_several_clauses : Error<
+  "directive '#pragma oss atomic' cannot contain more than one 'read', 'write', 'update', 'capture', or 'compare' clause">;
+def err_oss_several_mem_order_clauses : Error<
+  "directive '#pragma oss %0' cannot contain more than one %select{'seq_cst', 'relaxed', |}1'acq_rel', 'acquire' or 'release' clause">;
+def err_oss_atomic_incompatible_mem_order_clause : Error<
+  "directive '#pragma oss atomic%select{ %0|}1' cannot be used with '%2' clause">;
+def note_oss_previous_mem_order_clause : Note<
+  "'%0' clause used here">;
 def warn_oss_decl_shadow :
   Warning<"declaration shadows a %select{"
           "local variable|"

@@ -1800,12 +1800,14 @@ void ExprEngine::Visit(const Stmt *S, ExplodedNode *Pred,
     case Stmt::OMPTargetParallelGenericLoopDirectiveClass:
       // OmpSs
     case Stmt::OSSTaskDirectiveClass:
+    case Stmt::OSSCriticalDirectiveClass:
     case Stmt::OSSTaskwaitDirectiveClass:
     case Stmt::OSSReleaseDirectiveClass:
     case Stmt::OSSTaskForDirectiveClass:
     case Stmt::OSSTaskIterDirectiveClass:
     case Stmt::OSSTaskLoopDirectiveClass:
     case Stmt::OSSTaskLoopForDirectiveClass:
+    case Stmt::OSSAtomicDirectiveClass:
     case Stmt::OSSMultiDepExprClass:
     case Stmt::CapturedStmtClass:
     case Stmt::OMPUnrollDirectiveClass:

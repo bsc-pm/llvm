@@ -876,6 +876,7 @@ CXCursor cxcursor::MakeCXCursor(const Stmt *S, const Decl *Parent,
   case Stmt::OSSTaskIterDirectiveClass:
   case Stmt::OSSTaskLoopDirectiveClass:
   case Stmt::OSSTaskLoopForDirectiveClass:
+  case Stmt::OSSAtomicDirectiveClass:
   case Stmt::OSSTaskwaitDirectiveClass:
   case Stmt::OSSReleaseDirectiveClass:
     llvm_unreachable("unsupported");

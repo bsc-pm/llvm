@@ -375,6 +375,15 @@ bool Parser::ParseDeclareTaskClauses(
       break;
     }
     case OSSC_update:
+    case OSSC_read:
+    case OSSC_write:
+    case OSSC_capture:
+    case OSSC_compare:
+    case OSSC_seq_cst:
+    case OSSC_acq_rel:
+    case OSSC_acquire:
+    case OSSC_release:
+    case OSSC_relaxed:
       ConsumeToken();
       break;
     }
@@ -645,6 +654,7 @@ Parser::DeclGroupPtrTy Parser::ParseOmpSsDeclarativeDirectiveWithExtDecl(
   case OSSD_taskloop:
   case OSSD_taskloop_for:
   case OSSD_taskwait:
+  case OSSD_atomic:
   case OSSD_release:
     Diag(Tok, diag::err_oss_unexpected_directive)
         << 1 << getOmpSsDirectiveName(DKind);
@@ -747,6 +757,7 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
   case OSSD_taskloop:
   case OSSD_taskloop_for:
   case OSSD_critical:
+  case OSSD_atomic:
   case OSSD_task: {
 
     if (isOmpSsLoopDirective(DKind))
@@ -890,7 +901,7 @@ Parser::OSSClauseList Parser::ParseOmpSsClauses(OmpSsDirectiveKind DKind, Source
 
   // 'release' does not need clause analysis
   if (DKind != OSSD_release &&
-      DKind != OSSD_critical)
+      DKind != OSSD_critical && DKind != OSSD_atomic)
     Actions.ActOnOmpSsAfterClauseGathering(Clauses);
 
   return Clauses;
@@ -939,6 +950,15 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
     break;
   case OSSC_wait:
   case OSSC_update:
+  case OSSC_read:
+  case OSSC_write:
+  case OSSC_capture:
+  case OSSC_compare:
+  case OSSC_seq_cst:
+  case OSSC_acq_rel:
+  case OSSC_acquire:
+  case OSSC_release:
+  case OSSC_relaxed:
     if (!FirstClause) {
       Diag(Tok, diag::err_oss_more_one_clause)
           << getOmpSsDirectiveName(DKind) << getOmpSsClauseName(CKind) << 0;
@@ -1726,6 +1746,24 @@ OSSClause *Parser::ParseOmpSsSimpleClause(OmpSsClauseKind Kind,
 ///         'wait'
 ///    update-clause:
 ///         'update'
+///    read-clause:
+///         'read'
+///    write-clause:
+///         'write'
+///    capture-clause:
+///         'capture'
+///    compare-clause:
+///         'compare'
+///    seq_cst-clause:
+///         'seq_cst'
+///    acq_rel-clause:
+///         'acq_rel'
+///    acquire-clause:
+///         'acquire'
+///    release-clause:
+///         'release'
+///    relaxed-clause:
+///         'relaxed'
 ///
 OSSClause *Parser::ParseOmpSsClause(OmpSsClauseKind Kind, bool ParseOnly) {
   SourceLocation Loc = Tok.getLocation();

@@ -2725,6 +2725,10 @@ void ASTStmtWriter::VisitOSSTaskLoopForDirective(OSSTaskLoopForDirective *D) {
   llvm_unreachable("Not supported yet");
 }
 
+void ASTStmtWriter::VisitOSSAtomicDirective(OSSAtomicDirective *D) {
+  llvm_unreachable("Not supported yet");
+}
+
 //===----------------------------------------------------------------------===//
 // ASTWriter Implementation
 //===----------------------------------------------------------------------===//

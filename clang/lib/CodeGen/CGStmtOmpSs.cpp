@@ -335,3 +335,506 @@ void CodeGenFunction::EmitOSSTaskLoopForDirective(const OSSTaskLoopForDirective 
   CGM.getOmpSsRuntime().emitLoopCall(*this, S, S.getBeginLoc(), Data, LoopData);
 }
 
+static llvm::Value *convertToScalarValue(CodeGenFunction &CGF, RValue Val,
+                                         QualType SrcType, QualType DestType,
+                                         SourceLocation Loc) {
+  assert(CGF.hasScalarEvaluationKind(DestType) &&
+         "DestType must have scalar evaluation kind.");
+  assert(!Val.isAggregate() && "Must be a scalar or complex.");
+  return Val.isScalar() ? CGF.EmitScalarConversion(Val.getScalarVal(), SrcType,
+                                                   DestType, Loc)
+                        : CGF.EmitComplexToScalarConversion(
+                              Val.getComplexVal(), SrcType, DestType, Loc);
+}
+
+static CodeGenFunction::ComplexPairTy
+convertToComplexValue(CodeGenFunction &CGF, RValue Val, QualType SrcType,
+                      QualType DestType, SourceLocation Loc) {
+  assert(CGF.getEvaluationKind(DestType) == TEK_Complex &&
+         "DestType must have complex evaluation kind.");
+  CodeGenFunction::ComplexPairTy ComplexVal;
+  if (Val.isScalar()) {
+    // Convert the input element to the element type of the complex.
+    QualType DestElementType =
+        DestType->castAs<ComplexType>()->getElementType();
+    llvm::Value *ScalarVal = CGF.EmitScalarConversion(
+        Val.getScalarVal(), SrcType, DestElementType, Loc);
+    ComplexVal = CodeGenFunction::ComplexPairTy(
+        ScalarVal, llvm::Constant::getNullValue(ScalarVal->getType()));
+  } else {
+    assert(Val.isComplex() && "Must be a scalar or complex.");
+    QualType SrcElementType = SrcType->castAs<ComplexType>()->getElementType();
+    QualType DestElementType =
+        DestType->castAs<ComplexType>()->getElementType();
+    ComplexVal.first = CGF.EmitScalarConversion(
+        Val.getComplexVal().first, SrcElementType, DestElementType, Loc);
+    ComplexVal.second = CGF.EmitScalarConversion(
+        Val.getComplexVal().second, SrcElementType, DestElementType, Loc);
+  }
+  return ComplexVal;
+}
+
+static void emitSimpleAtomicStore(CodeGenFunction &CGF, llvm::AtomicOrdering AO,
+                                  LValue LVal, RValue RVal) {
+  if (LVal.isGlobalReg())
+    CGF.EmitStoreThroughGlobalRegLValue(RVal, LVal);
+  else
+    CGF.EmitAtomicStore(RVal, LVal, AO, LVal.isVolatile(), /*isInit=*/false);
+}
+
+static RValue emitSimpleAtomicLoad(CodeGenFunction &CGF,
+                                   llvm::AtomicOrdering AO, LValue LVal,
+                                   SourceLocation Loc) {
+  if (LVal.isGlobalReg())
+    return CGF.EmitLoadOfLValue(LVal, Loc);
+  return CGF.EmitAtomicLoad(
+      LVal, Loc, llvm::AtomicCmpXchgInst::getStrongestFailureOrdering(AO),
+      LVal.isVolatile());
+}
+
+static void emitOSSSimpleStore(CodeGenFunction &CGF,
+                               LValue LVal, RValue RVal, QualType RValTy,
+                               SourceLocation Loc) {
+  switch (CGF.getEvaluationKind(LVal.getType())) {
+  case TEK_Scalar:
+    CGF.EmitStoreThroughLValue(RValue::get(convertToScalarValue(
+                               CGF, RVal, RValTy, LVal.getType(), Loc)),
+                           LVal);
+    break;
+  case TEK_Complex:
+    CGF.EmitStoreOfComplex(
+        convertToComplexValue(CGF, RVal, RValTy, LVal.getType(), Loc), LVal,
+        /*isInit=*/false);
+    break;
+  case TEK_Aggregate:
+    llvm_unreachable("Must be a scalar or complex.");
+  }
+}
+
+static void emitOSSAtomicReadExpr(CodeGenFunction &CGF, llvm::AtomicOrdering AO,
+                                  const Expr *X, const Expr *V,
+                                  SourceLocation Loc) {
+  // v = x;
+  assert(V->isLValue() && "V of 'omp atomic read' is not lvalue");
+  assert(X->isLValue() && "X of 'omp atomic read' is not lvalue");
+  LValue XLValue = CGF.EmitLValue(X);
+  LValue VLValue = CGF.EmitLValue(V);
+  RValue Res = emitSimpleAtomicLoad(CGF, AO, XLValue, Loc);
+  // OmpSs-2, 2.17.7, atomic Construct
+  // If the read or capture clause is specified and the acquire, acq_rel, or
+  // seq_cst clause is specified then the strong flush on exit from the atomic
+  // operation is also an acquire flush.
+  switch (AO) {
+  case llvm::AtomicOrdering::Acquire:
+  case llvm::AtomicOrdering::AcquireRelease:
+  case llvm::AtomicOrdering::SequentiallyConsistent:
+    CGF.CGM.getOmpSsRuntime().emitFlush(CGF, llvm::AtomicOrdering::Acquire);
+    break;
+  case llvm::AtomicOrdering::Monotonic:
+  case llvm::AtomicOrdering::Release:
+    break;
+  case llvm::AtomicOrdering::NotAtomic:
+  case llvm::AtomicOrdering::Unordered:
+    llvm_unreachable("Unexpected ordering.");
+  }
+  emitOSSSimpleStore(CGF, VLValue, Res, X->getType().getNonReferenceType(), Loc);
+}
+
+static void emitOSSAtomicWriteExpr(CodeGenFunction &CGF,
+                                   llvm::AtomicOrdering AO, const Expr *X,
+                                   const Expr *E, SourceLocation Loc) {
+  // x = expr;
+  assert(X->isLValue() && "X of 'omp atomic write' is not lvalue");
+  emitSimpleAtomicStore(CGF, AO, CGF.EmitLValue(X), CGF.EmitAnyExpr(E));
+  // OmpSs-2, 2.17.7, atomic Construct
+  // If the write, update, or capture clause is specified and the release,
+  // acq_rel, or seq_cst clause is specified then the strong flush on entry to
+  // the atomic operation is also a release flush.
+  switch (AO) {
+  case llvm::AtomicOrdering::Release:
+  case llvm::AtomicOrdering::AcquireRelease:
+  case llvm::AtomicOrdering::SequentiallyConsistent:
+    CGF.CGM.getOmpSsRuntime().emitFlush(CGF, llvm::AtomicOrdering::Release);
+    break;
+  case llvm::AtomicOrdering::Acquire:
+  case llvm::AtomicOrdering::Monotonic:
+    break;
+  case llvm::AtomicOrdering::NotAtomic:
+  case llvm::AtomicOrdering::Unordered:
+    llvm_unreachable("Unexpected ordering.");
+  }
+}
+
+static std::pair<bool, RValue> emitOSSAtomicRMW(CodeGenFunction &CGF, LValue X,
+                                                RValue Update,
+                                                BinaryOperatorKind BO,
+                                                llvm::AtomicOrdering AO,
+                                                bool IsXLHSInRHSPart) {
+  ASTContext &Context = CGF.getContext();
+  // Allow atomicrmw only if 'x' and 'update' are integer values, lvalue for 'x'
+  // expression is simple and atomic is allowed for the given type for the
+  // target platform.
+  if (BO == BO_Comma || !Update.isScalar() || !X.isSimple() ||
+      (!isa<llvm::ConstantInt>(Update.getScalarVal()) &&
+       (Update.getScalarVal()->getType() !=
+        X.getAddress(CGF).getElementType())) ||
+      !Context.getTargetInfo().hasBuiltinAtomic(
+          Context.getTypeSize(X.getType()), Context.toBits(X.getAlignment())))
+    return std::make_pair(false, RValue::get(nullptr));
+
+  auto &&CheckAtomicSupport = [&CGF](llvm::Type *T, BinaryOperatorKind BO) {
+    if (T->isIntegerTy())
+      return true;
+
+    if (T->isFloatingPointTy() && (BO == BO_Add || BO == BO_Sub))
+      return llvm::isPowerOf2_64(CGF.CGM.getDataLayout().getTypeStoreSize(T));
+
+    return false;
+  };
+
+  if (!CheckAtomicSupport(Update.getScalarVal()->getType(), BO) ||
+      !CheckAtomicSupport(X.getAddress(CGF).getElementType(), BO))
+    return std::make_pair(false, RValue::get(nullptr));
+
+  bool IsInteger = X.getAddress(CGF).getElementType()->isIntegerTy();
+  llvm::AtomicRMWInst::BinOp RMWOp;
+  switch (BO) {
+  case BO_Add:
+    RMWOp = IsInteger ? llvm::AtomicRMWInst::Add : llvm::AtomicRMWInst::FAdd;
+    break;
+  case BO_Sub:
+    if (!IsXLHSInRHSPart)
+      return std::make_pair(false, RValue::get(nullptr));
+    RMWOp = IsInteger ? llvm::AtomicRMWInst::Sub : llvm::AtomicRMWInst::FSub;
+    break;
+  case BO_And:
+    RMWOp = llvm::AtomicRMWInst::And;
+    break;
+  case BO_Or:
+    RMWOp = llvm::AtomicRMWInst::Or;
+    break;
+  case BO_Xor:
+    RMWOp = llvm::AtomicRMWInst::Xor;
+    break;
+  case BO_LT:
+    if (IsInteger)
+      RMWOp = X.getType()->hasSignedIntegerRepresentation()
+                  ? (IsXLHSInRHSPart ? llvm::AtomicRMWInst::Min
+                                     : llvm::AtomicRMWInst::Max)
+                  : (IsXLHSInRHSPart ? llvm::AtomicRMWInst::UMin
+                                     : llvm::AtomicRMWInst::UMax);
+    else
+      RMWOp = IsXLHSInRHSPart ? llvm::AtomicRMWInst::FMin
+                              : llvm::AtomicRMWInst::FMax;
+    break;
+  case BO_GT:
+    if (IsInteger)
+      RMWOp = X.getType()->hasSignedIntegerRepresentation()
+                  ? (IsXLHSInRHSPart ? llvm::AtomicRMWInst::Max
+                                     : llvm::AtomicRMWInst::Min)
+                  : (IsXLHSInRHSPart ? llvm::AtomicRMWInst::UMax
+                                     : llvm::AtomicRMWInst::UMin);
+    else
+      RMWOp = IsXLHSInRHSPart ? llvm::AtomicRMWInst::FMax
+                              : llvm::AtomicRMWInst::FMin;
+    break;
+  case BO_Assign:
+    RMWOp = llvm::AtomicRMWInst::Xchg;
+    break;
+  case BO_Mul:
+  case BO_Div:
+  case BO_Rem:
+  case BO_Shl:
+  case BO_Shr:
+  case BO_LAnd:
+  case BO_LOr:
+    return std::make_pair(false, RValue::get(nullptr));
+  case BO_PtrMemD:
+  case BO_PtrMemI:
+  case BO_LE:
+  case BO_GE:
+  case BO_EQ:
+  case BO_NE:
+  case BO_Cmp:
+  case BO_AddAssign:
+  case BO_SubAssign:
+  case BO_AndAssign:
+  case BO_OrAssign:
+  case BO_XorAssign:
+  case BO_MulAssign:
+  case BO_DivAssign:
+  case BO_RemAssign:
+  case BO_ShlAssign:
+  case BO_ShrAssign:
+  case BO_Comma:
+    llvm_unreachable("Unsupported atomic update operation");
+  }
+  llvm::Value *UpdateVal = Update.getScalarVal();
+  if (auto *IC = dyn_cast<llvm::ConstantInt>(UpdateVal)) {
+    if (IsInteger)
+      UpdateVal = CGF.Builder.CreateIntCast(
+          IC, X.getAddress(CGF).getElementType(),
+          X.getType()->hasSignedIntegerRepresentation());
+    else
+      UpdateVal = CGF.Builder.CreateCast(llvm::Instruction::CastOps::UIToFP, IC,
+                                         X.getAddress(CGF).getElementType());
+  }
+  llvm::Value *Res =
+      CGF.Builder.CreateAtomicRMW(RMWOp, X.getPointer(CGF), UpdateVal, AO);
+  return std::make_pair(true, RValue::get(Res));
+}
+
+std::pair<bool, RValue> CodeGenFunction::EmitOSSAtomicSimpleUpdateExpr(
+    LValue X, RValue E, BinaryOperatorKind BO, bool IsXLHSInRHSPart,
+    llvm::AtomicOrdering AO, SourceLocation Loc,
+    const llvm::function_ref<RValue(RValue)> CommonGen) {
+  // Update expressions are allowed to have the following forms:
+  // x binop= expr; -> xrval + expr;
+  // x++, ++x -> xrval + 1;
+  // x--, --x -> xrval - 1;
+  // x = x binop expr; -> xrval binop expr
+  // x = expr Op x; - > expr binop xrval;
+  auto Res = emitOSSAtomicRMW(*this, X, E, BO, AO, IsXLHSInRHSPart);
+  if (!Res.first) {
+    if (X.isGlobalReg()) {
+      // Emit an update expression: 'xrval' binop 'expr' or 'expr' binop
+      // 'xrval'.
+      EmitStoreThroughLValue(CommonGen(EmitLoadOfLValue(X, Loc)), X);
+    } else {
+      // Perform compare-and-swap procedure.
+      EmitAtomicUpdate(X, AO, CommonGen, X.getType().isVolatileQualified());
+    }
+  }
+  return Res;
+}
+
+static void emitOSSAtomicUpdateExpr(CodeGenFunction &CGF,
+                                    llvm::AtomicOrdering AO, const Expr *X,
+                                    const Expr *E, const Expr *UE,
+                                    bool IsXLHSInRHSPart, SourceLocation Loc) {
+  assert(isa<BinaryOperator>(UE->IgnoreImpCasts()) &&
+         "Update expr in 'atomic update' must be a binary operator.");
+  const auto *BOUE = cast<BinaryOperator>(UE->IgnoreImpCasts());
+  // Update expressions are allowed to have the following forms:
+  // x binop= expr; -> xrval + expr;
+  // x++, ++x -> xrval + 1;
+  // x--, --x -> xrval - 1;
+  // x = x binop expr; -> xrval binop expr
+  // x = expr Op x; - > expr binop xrval;
+  assert(X->isLValue() && "X of 'omp atomic update' is not lvalue");
+  LValue XLValue = CGF.EmitLValue(X);
+  RValue ExprRValue = CGF.EmitAnyExpr(E);
+  const auto *LHS = cast<OpaqueValueExpr>(BOUE->getLHS()->IgnoreImpCasts());
+  const auto *RHS = cast<OpaqueValueExpr>(BOUE->getRHS()->IgnoreImpCasts());
+  const OpaqueValueExpr *XRValExpr = IsXLHSInRHSPart ? LHS : RHS;
+  const OpaqueValueExpr *ERValExpr = IsXLHSInRHSPart ? RHS : LHS;
+  auto &&Gen = [&CGF, UE, ExprRValue, XRValExpr, ERValExpr](RValue XRValue) {
+    CodeGenFunction::OpaqueValueMapping MapExpr(CGF, ERValExpr, ExprRValue);
+    CodeGenFunction::OpaqueValueMapping MapX(CGF, XRValExpr, XRValue);
+    return CGF.EmitAnyExpr(UE);
+  };
+  (void)CGF.EmitOSSAtomicSimpleUpdateExpr(
+      XLValue, ExprRValue, BOUE->getOpcode(), IsXLHSInRHSPart, AO, Loc, Gen);
+  // OmpSs-2, 2.17.7, atomic Construct
+  // If the write, update, or capture clause is specified and the release,
+  // acq_rel, or seq_cst clause is specified then the strong flush on entry to
+  // the atomic operation is also a release flush.
+  switch (AO) {
+  case llvm::AtomicOrdering::Release:
+  case llvm::AtomicOrdering::AcquireRelease:
+  case llvm::AtomicOrdering::SequentiallyConsistent:
+    CGF.CGM.getOmpSsRuntime().emitFlush(CGF, llvm::AtomicOrdering::Release);
+    break;
+  case llvm::AtomicOrdering::Acquire:
+  case llvm::AtomicOrdering::Monotonic:
+    break;
+  case llvm::AtomicOrdering::NotAtomic:
+  case llvm::AtomicOrdering::Unordered:
+    llvm_unreachable("Unexpected ordering.");
+  }
+}
+
+static RValue convertToType(CodeGenFunction &CGF, RValue Value,
+                            QualType SourceType, QualType ResType,
+                            SourceLocation Loc) {
+  switch (CGF.getEvaluationKind(ResType)) {
+  case TEK_Scalar:
+    return RValue::get(
+        convertToScalarValue(CGF, Value, SourceType, ResType, Loc));
+  case TEK_Complex: {
+    auto Res = convertToComplexValue(CGF, Value, SourceType, ResType, Loc);
+    return RValue::getComplex(Res.first, Res.second);
+  }
+  case TEK_Aggregate:
+    break;
+  }
+  llvm_unreachable("Must be a scalar or complex.");
+}
+
+static void emitOSSAtomicCaptureExpr(CodeGenFunction &CGF,
+                                     llvm::AtomicOrdering AO,
+                                     bool IsPostfixUpdate, const Expr *V,
+                                     const Expr *X, const Expr *E,
+                                     const Expr *UE, bool IsXLHSInRHSPart,
+                                     SourceLocation Loc) {
+  assert(X->isLValue() && "X of 'omp atomic capture' is not lvalue");
+  assert(V->isLValue() && "V of 'omp atomic capture' is not lvalue");
+  RValue NewVVal;
+  LValue VLValue = CGF.EmitLValue(V);
+  LValue XLValue = CGF.EmitLValue(X);
+  RValue ExprRValue = CGF.EmitAnyExpr(E);
+  QualType NewVValType;
+  if (UE) {
+    // 'x' is updated with some additional value.
+    assert(isa<BinaryOperator>(UE->IgnoreImpCasts()) &&
+           "Update expr in 'atomic capture' must be a binary operator.");
+    const auto *BOUE = cast<BinaryOperator>(UE->IgnoreImpCasts());
+    // Update expressions are allowed to have the following forms:
+    // x binop= expr; -> xrval + expr;
+    // x++, ++x -> xrval + 1;
+    // x--, --x -> xrval - 1;
+    // x = x binop expr; -> xrval binop expr
+    // x = expr Op x; - > expr binop xrval;
+    const auto *LHS = cast<OpaqueValueExpr>(BOUE->getLHS()->IgnoreImpCasts());
+    const auto *RHS = cast<OpaqueValueExpr>(BOUE->getRHS()->IgnoreImpCasts());
+    const OpaqueValueExpr *XRValExpr = IsXLHSInRHSPart ? LHS : RHS;
+    NewVValType = XRValExpr->getType();
+    const OpaqueValueExpr *ERValExpr = IsXLHSInRHSPart ? RHS : LHS;
+    auto &&Gen = [&CGF, &NewVVal, UE, ExprRValue, XRValExpr, ERValExpr,
+                  IsPostfixUpdate](RValue XRValue) {
+      CodeGenFunction::OpaqueValueMapping MapExpr(CGF, ERValExpr, ExprRValue);
+      CodeGenFunction::OpaqueValueMapping MapX(CGF, XRValExpr, XRValue);
+      RValue Res = CGF.EmitAnyExpr(UE);
+      NewVVal = IsPostfixUpdate ? XRValue : Res;
+      return Res;
+    };
+    auto Res = CGF.EmitOSSAtomicSimpleUpdateExpr(
+        XLValue, ExprRValue, BOUE->getOpcode(), IsXLHSInRHSPart, AO, Loc, Gen);
+    if (Res.first) {
+      // 'atomicrmw' instruction was generated.
+      if (IsPostfixUpdate) {
+        // Use old value from 'atomicrmw'.
+        NewVVal = Res.second;
+      } else {
+        // 'atomicrmw' does not provide new value, so evaluate it using old
+        // value of 'x'.
+        CodeGenFunction::OpaqueValueMapping MapExpr(CGF, ERValExpr, ExprRValue);
+        CodeGenFunction::OpaqueValueMapping MapX(CGF, XRValExpr, Res.second);
+        NewVVal = CGF.EmitAnyExpr(UE);
+      }
+    }
+  } else {
+    // 'x' is simply rewritten with some 'expr'.
+    NewVValType = X->getType().getNonReferenceType();
+    ExprRValue = convertToType(CGF, ExprRValue, E->getType(),
+                               X->getType().getNonReferenceType(), Loc);
+    auto &&Gen = [&NewVVal, ExprRValue](RValue XRValue) {
+      NewVVal = XRValue;
+      return ExprRValue;
+    };
+    // Try to perform atomicrmw xchg, otherwise simple exchange.
+    auto Res = CGF.EmitOSSAtomicSimpleUpdateExpr(
+        XLValue, ExprRValue, /*BO=*/BO_Assign, /*IsXLHSInRHSPart=*/false, AO,
+        Loc, Gen);
+    if (Res.first) {
+      // 'atomicrmw' instruction was generated.
+      NewVVal = IsPostfixUpdate ? Res.second : ExprRValue;
+    }
+  }
+  // Emit post-update store to 'v' of old/new 'x' value.
+  emitOSSSimpleStore(CGF, VLValue, NewVVal, NewVValType, Loc);
+}
+
+static void emitOSSAtomicExpr(CodeGenFunction &CGF, OmpSsClauseKind Kind,
+                              llvm::AtomicOrdering AO, bool IsPostfixUpdate,
+                              const Expr *X, const Expr *V, const Expr *R,
+                              const Expr *E, const Expr *UE, const Expr *D,
+                              const Expr *CE, bool IsXLHSInRHSPart,
+                              bool IsFailOnly, SourceLocation Loc) {
+  switch (Kind) {
+  case OSSC_read:
+    emitOSSAtomicReadExpr(CGF, AO, X, V, Loc);
+    break;
+  case OSSC_write:
+    emitOSSAtomicWriteExpr(CGF, AO, X, E, Loc);
+    break;
+  case OSSC_unknown:
+  case OSSC_update:
+    emitOSSAtomicUpdateExpr(CGF, AO, X, E, UE, IsXLHSInRHSPart, Loc);
+    break;
+  case OSSC_capture:
+    emitOSSAtomicCaptureExpr(CGF, AO, IsPostfixUpdate, V, X, E, UE,
+                             IsXLHSInRHSPart, Loc);
+    break;
+  case OSSC_compare: {
+    llvm_unreachable("unsupported");
+    break;
+  }
+  default:
+    llvm_unreachable("Clause is not allowed in 'omp atomic'.");
+  }
+}
+
+void CodeGenFunction::EmitOSSAtomicDirective(const OSSAtomicDirective &S) {
+  llvm::AtomicOrdering AO = llvm::AtomicOrdering::Monotonic;
+  bool MemOrderingSpecified = false;
+  if (S.getSingleClause<OSSSeqCstClause>()) {
+    AO = llvm::AtomicOrdering::SequentiallyConsistent;
+    MemOrderingSpecified = true;
+  } else if (S.getSingleClause<OSSAcqRelClause>()) {
+    AO = llvm::AtomicOrdering::AcquireRelease;
+    MemOrderingSpecified = true;
+  } else if (S.getSingleClause<OSSAcquireClause>()) {
+    AO = llvm::AtomicOrdering::Acquire;
+    MemOrderingSpecified = true;
+  } else if (S.getSingleClause<OSSReleaseClause>()) {
+    AO = llvm::AtomicOrdering::Release;
+    MemOrderingSpecified = true;
+  } else if (S.getSingleClause<OSSRelaxedClause>()) {
+    AO = llvm::AtomicOrdering::Monotonic;
+    MemOrderingSpecified = true;
+  }
+  llvm::SmallSet<OmpSsClauseKind, 2> KindsEncountered;
+  OmpSsClauseKind Kind = OSSC_unknown;
+  for (const OSSClause *C : S.clauses()) {
+    // Find first clause (skip seq_cst|acq_rel|aqcuire|release|relaxed clause,
+    // if it is first).
+    OmpSsClauseKind K = C->getClauseKind();
+    if (K == OSSC_seq_cst || K == OSSC_acq_rel || K == OSSC_acquire ||
+        K == OSSC_release || K == OSSC_relaxed)
+      continue;
+    Kind = K;
+    KindsEncountered.insert(K);
+  }
+  // We just need to correct Kind here. No need to set a bool saying it is
+  // actually compare capture because we can tell from whether V and R are
+  // nullptr.
+  if (KindsEncountered.contains(OSSC_compare) &&
+      KindsEncountered.contains(OSSC_capture))
+    Kind = OSSC_compare;
+  if (!MemOrderingSpecified) {
+    llvm::AtomicOrdering DefaultOrder =
+        CGM.getOmpSsRuntime().getDefaultMemoryOrdering();
+    if (DefaultOrder == llvm::AtomicOrdering::Monotonic ||
+        DefaultOrder == llvm::AtomicOrdering::SequentiallyConsistent ||
+        (DefaultOrder == llvm::AtomicOrdering::AcquireRelease &&
+         Kind == OSSC_capture)) {
+      AO = DefaultOrder;
+    } else if (DefaultOrder == llvm::AtomicOrdering::AcquireRelease) {
+      if (Kind == OSSC_unknown || Kind == OSSC_update || Kind == OSSC_write) {
+        AO = llvm::AtomicOrdering::Release;
+      } else if (Kind == OSSC_read) {
+        assert(Kind == OSSC_read && "Unexpected atomic kind.");
+        AO = llvm::AtomicOrdering::Acquire;
+      }
+    }
+  }
+
+  LexicalScope Scope(*this, S.getSourceRange());
+  EmitStopPoint(S.getAssociatedStmt());
+  emitOSSAtomicExpr(*this, Kind, AO, S.isPostfixUpdate(), S.getX(), S.getV(),
+                    S.getR(), S.getExpr(), S.getUpdateExpr(), S.getD(),
+                    S.getCondExpr(), S.isXLHSInRHSPart(), S.isFailOnly(),
+                    S.getBeginLoc());
+}
+

@@ -12270,6 +12270,12 @@ public:
   ActOnOmpSsTaskLoopForDirective(ArrayRef<OSSClause *> Clauses, Stmt *AStmt,
                                  SourceLocation StartLoc, SourceLocation EndLoc);
 
+  /// Called on well-formed '\#pragma oss atomic' after parsing of the
+  /// associated statement.
+  StmtResult ActOnOmpSsAtomicDirective(ArrayRef<OSSClause *> Clauses,
+                                       Stmt *AStmt, SourceLocation StartLoc,
+                                       SourceLocation EndLoc);
+
   /// Called on well-formed '\#pragma oss task' after parsing of
   /// the associated method/function.
   DeclGroupPtrTy ActOnOmpSsDeclareTaskDirective(
@@ -12439,6 +12445,33 @@ public:
                                     SourceLocation EndLoc);
   /// Called on well-formed 'update' clause.
   OSSClause *ActOnOmpSsUpdateClause(SourceLocation StartLoc,
+                                    SourceLocation EndLoc);
+  /// Called on well-formed 'read' clause.
+  OSSClause *ActOnOmpSsReadClause(SourceLocation StartLoc,
+                                    SourceLocation EndLoc);
+  /// Called on well-formed 'write' clause.
+  OSSClause *ActOnOmpSsWriteClause(SourceLocation StartLoc,
+                                    SourceLocation EndLoc);
+  /// Called on well-formed 'capture' clause.
+  OSSClause *ActOnOmpSsCaptureClause(SourceLocation StartLoc,
+                                    SourceLocation EndLoc);
+  /// Called on well-formed 'compare' clause.
+  OSSClause *ActOnOmpSsCompareClause(SourceLocation StartLoc,
+                                    SourceLocation EndLoc);
+  /// Called on well-formed 'seq_cst' clause.
+  OSSClause *ActOnOmpSsSeqCstClause(SourceLocation StartLoc,
+                                    SourceLocation EndLoc);
+  /// Called on well-formed 'acq_rel' clause.
+  OSSClause *ActOnOmpSsAcqRelClause(SourceLocation StartLoc,
+                                    SourceLocation EndLoc);
+  /// Called on well-formed 'acquire' clause.
+  OSSClause *ActOnOmpSsAcquireClause(SourceLocation StartLoc,
+                                    SourceLocation EndLoc);
+  /// Called on well-formed 'release' clause.
+  OSSClause *ActOnOmpSsReleaseClause(SourceLocation StartLoc,
+                                    SourceLocation EndLoc);
+  /// Called on well-formed 'relaxed' clause.
+  OSSClause *ActOnOmpSsRelaxedClause(SourceLocation StartLoc,
                                     SourceLocation EndLoc);
 
 

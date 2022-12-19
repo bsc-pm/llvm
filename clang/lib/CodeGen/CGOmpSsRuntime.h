@@ -185,6 +185,9 @@ private:
   // List of OmpSs-2 specific metadata to be added to llvm.module.flags
   SmallVector<llvm::Metadata *, 4> MetadataList;
 
+  /// Atomic ordering from the omp requires directive.
+  llvm::AtomicOrdering RequiresAtomicOrdering = llvm::AtomicOrdering::Monotonic;
+
   // List of the with the form
   // (func_ptr, arg0, arg1... argN)
   void BuildWrapperCallBundleList(
@@ -356,10 +359,15 @@ public:
                             const OSSTaskDataTy &Data,
                             const OSSLoopDataTy &LoopData);
 
+  /// Emit code for 'flush' "directive".
+  virtual void emitFlush(CodeGenFunction &CGF, llvm::AtomicOrdering);
+
   // Add all the metadata to OmpSs-2 metadata list.
   void addMetadata(ArrayRef<llvm::Metadata *> List);
   // Get OmpSs-2 metadata list as a single metadata node.
   llvm::MDNode *getMetadataNode();
+
+  llvm::AtomicOrdering getDefaultMemoryOrdering() const;
 
 };
 
