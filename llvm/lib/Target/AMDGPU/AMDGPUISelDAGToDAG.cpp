@@ -119,7 +119,7 @@ FunctionPass *llvm::createAMDGPUISelDag(TargetMachine *TM,
 AMDGPUDAGToDAGISel::AMDGPUDAGToDAGISel(
     TargetMachine *TM /*= nullptr*/,
     CodeGenOpt::Level OptLevel /*= CodeGenOpt::Default*/)
-    : SelectionDAGISel(*TM, OptLevel) {
+    : SelectionDAGISel(ID, *TM, OptLevel) {
   EnableLateStructurizeCFG = AMDGPUTargetMachine::EnableLateStructurizeCFG;
 }
 
@@ -356,7 +356,7 @@ const TargetRegisterClass *AMDGPUDAGToDAGISel::getOperandRegClass(SDNode *N,
 
       const SIRegisterInfo *TRI
         = static_cast<const GCNSubtarget *>(Subtarget)->getRegisterInfo();
-      return TRI->getPhysRegClass(Reg);
+      return TRI->getPhysRegBaseClass(Reg);
     }
 
     return nullptr;
@@ -1358,7 +1358,7 @@ std::pair<SDValue, SDValue> AMDGPUDAGToDAGISel::foldFrameIndex(SDValue N) const 
   // use constant 0 for soffset. This value must be retained until
   // frame elimination and eliminateFrameIndex will choose the appropriate
   // frame register if need be.
-  return std::make_pair(TFI, CurDAG->getTargetConstant(0, DL, MVT::i32));
+  return std::pair(TFI, CurDAG->getTargetConstant(0, DL, MVT::i32));
 }
 
 bool AMDGPUDAGToDAGISel::SelectMUBUFScratchOffen(SDNode *Parent,
@@ -1429,8 +1429,10 @@ bool AMDGPUDAGToDAGISel::SelectMUBUFScratchOffen(SDNode *Parent,
 static bool IsCopyFromSGPR(const SIRegisterInfo &TRI, SDValue Val) {
   if (Val.getOpcode() != ISD::CopyFromReg)
     return false;
-  auto RC =
-      TRI.getPhysRegClass(cast<RegisterSDNode>(Val.getOperand(1))->getReg());
+  auto Reg = cast<RegisterSDNode>(Val.getOperand(1))->getReg();
+  if (!Reg.isPhysical())
+    return false;
+  auto RC = TRI.getPhysRegBaseClass(Reg);
   return RC && TRI.isSGPRClass(RC);
 }
 
@@ -1904,7 +1906,7 @@ bool AMDGPUDAGToDAGISel::SelectSMRDOffset(SDValue ByteOffsetNode,
   // GFX9 and GFX10 have signed byte immediate offsets. The immediate
   // offset for S_BUFFER instructions is unsigned.
   int64_t ByteOffset = IsBuffer ? C->getZExtValue() : C->getSExtValue();
-  Optional<int64_t> EncodedOffset =
+  std::optional<int64_t> EncodedOffset =
       AMDGPU::getSMRDEncodedOffset(*Subtarget, ByteOffset, IsBuffer);
   if (EncodedOffset && Offset && !Imm32Only) {
     *Offset = CurDAG->getTargetConstant(*EncodedOffset, SL, MVT::i32);
@@ -3001,3 +3003,5 @@ void AMDGPUDAGToDAGISel::PostprocessISelDAG() {
     CurDAG->RemoveDeadNodes();
   } while (IsModified);
 }
+
+char AMDGPUDAGToDAGISel::ID = 0;

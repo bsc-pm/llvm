@@ -2482,13 +2482,12 @@ public:
   ///
   /// By default, performs semantic analysis to build the new OpenMP clause.
   /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPOrderClause(OpenMPOrderClauseKind Kind,
-                                   SourceLocation KindKwLoc,
-                                   SourceLocation StartLoc,
-                                   SourceLocation LParenLoc,
-                                   SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPOrderClause(Kind, KindKwLoc, StartLoc,
-                                            LParenLoc, EndLoc);
+  OMPClause *RebuildOMPOrderClause(
+      OpenMPOrderClauseKind Kind, SourceLocation KindKwLoc,
+      SourceLocation StartLoc, SourceLocation LParenLoc, SourceLocation EndLoc,
+      OpenMPOrderClauseModifier Modifier, SourceLocation ModifierKwLoc) {
+    return getSema().ActOnOpenMPOrderClause(Modifier, Kind, StartLoc, LParenLoc,
+                                            ModifierKwLoc, KindKwLoc, EndLoc);
   }
 
   /// Build a new OpenMP 'init' clause.
@@ -3821,9 +3820,10 @@ public:
   }
 
   concepts::NestedRequirement *
-  RebuildNestedRequirement(
-      concepts::Requirement::SubstitutionDiagnostic *SubstDiag) {
-    return SemaRef.BuildNestedRequirement(SubstDiag);
+  RebuildNestedRequirement(StringRef InvalidConstraintEntity,
+                           const ASTConstraintSatisfaction &Satisfaction) {
+    return SemaRef.BuildNestedRequirement(InvalidConstraintEntity,
+                                          Satisfaction);
   }
 
   concepts::NestedRequirement *RebuildNestedRequirement(Expr *Constraint) {
@@ -4121,6 +4121,16 @@ public:
   ExprResult RebuildEmptyCXXFoldExpr(SourceLocation EllipsisLoc,
                                      BinaryOperatorKind Operator) {
     return getSema().BuildEmptyCXXFoldExpr(EllipsisLoc, Operator);
+  }
+
+  ExprResult RebuildCXXParenListInitExpr(ArrayRef<Expr *> Args, QualType T,
+                                         unsigned NumUserSpecifiedExprs,
+                                         SourceLocation InitLoc,
+                                         SourceLocation LParenLoc,
+                                         SourceLocation RParenLoc) {
+    return CXXParenListInitExpr::Create(getSema().Context, Args, T,
+                                        NumUserSpecifiedExprs, InitLoc,
+                                        LParenLoc, RParenLoc);
   }
 
   /// Build a new atomic operation expression.
@@ -10898,9 +10908,9 @@ TreeTransform<Derived>::TransformOMPAffinityClause(OMPAffinityClause *C) {
 
 template <typename Derived>
 OMPClause *TreeTransform<Derived>::TransformOMPOrderClause(OMPOrderClause *C) {
-  return getDerived().RebuildOMPOrderClause(C->getKind(), C->getKindKwLoc(),
-                                            C->getBeginLoc(), C->getLParenLoc(),
-                                            C->getEndLoc());
+  return getDerived().RebuildOMPOrderClause(
+      C->getKind(), C->getKindKwLoc(), C->getBeginLoc(), C->getLParenLoc(),
+      C->getEndLoc(), C->getModifier(), C->getModifierKwLoc());
 }
 
 template <typename Derived>
@@ -13742,10 +13752,10 @@ template<typename Derived>
 concepts::NestedRequirement *
 TreeTransform<Derived>::TransformNestedRequirement(
     concepts::NestedRequirement *Req) {
-  if (Req->isSubstitutionFailure()) {
+  if (Req->hasInvalidConstraint()) {
     if (getDerived().AlwaysRebuild())
       return getDerived().RebuildNestedRequirement(
-          Req->getSubstitutionDiagnostic());
+          Req->getInvalidConstraintEntity(), Req->getConstraintSatisfaction());
     return Req;
   }
   ExprResult TransConstraint =
@@ -14926,6 +14936,20 @@ TreeTransform<Derived>::TransformCXXFoldExpr(CXXFoldExpr *E) {
                                                 E->getOperator());
 
   return Result;
+}
+
+template <typename Derived>
+ExprResult
+TreeTransform<Derived>::TransformCXXParenListInitExpr(CXXParenListInitExpr *E) {
+  SmallVector<Expr *, 4> TransformedInits;
+  ArrayRef<Expr *> InitExprs = E->getInitExprs();
+  if (TransformExprs(InitExprs.data(), InitExprs.size(), true,
+                     TransformedInits))
+    return ExprError();
+
+  return getDerived().RebuildCXXParenListInitExpr(
+      TransformedInits, E->getType(), E->getUserSpecifiedInitExprs().size(),
+      E->getInitLoc(), E->getBeginLoc(), E->getEndLoc());
 }
 
 template<typename Derived>

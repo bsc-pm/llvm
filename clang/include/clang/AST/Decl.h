@@ -914,7 +914,10 @@ public:
     CallInit,
 
     /// Direct list-initialization (C++11)
-    ListInit
+    ListInit,
+
+    /// Parenthesized list-initialization (C++20)
+    ParenListInit
   };
 
   /// Kinds of thread-local storage.
@@ -1888,7 +1891,8 @@ enum class MultiVersionKind {
   Target,
   CPUSpecific,
   CPUDispatch,
-  TargetClones
+  TargetClones,
+  TargetVersion
 };
 
 /// Represents a function declaration or definition.

@@ -596,14 +596,15 @@ struct OmpSsDirective {
     if (Func->empty()) {
       Func->setLinkage(GlobalValue::InternalLinkage);
       BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", Func);
-      EntryBB->getInstList().push_back(ReturnInst::Create(Ctx));
+      Instruction *RetInst = ReturnInst::Create(Ctx);
+      RetInst->insertInto(EntryBB, EntryBB->end());
 
       appendToGlobalCtors(M, Func, 65535);
     }
 
     BasicBlock &Entry = Func->getEntryBlock();
 
-    IRBuilder<> BBBuilder(&Entry.getInstList().back());
+    IRBuilder<> BBBuilder(&Entry.back());
     BBBuilder.CreateCall(nanos6Api::taskInfoRegisterFuncCallee(M), TaskInfoVar);
   }
 
@@ -809,7 +810,8 @@ struct OmpSsDirective {
     BasicBlock &Entry = UnpackFunc->getEntryBlock();
 
     // add the terminator so IRBuilder inserts just before it
-    UnpackFunc->getEntryBlock().getInstList().push_back(ReturnInst::Create(Ctx));
+    Instruction *RetInst = ReturnInst::Create(Ctx);
+    RetInst->insertInto(&Entry, Entry.end());
 
     SmallVector<Value *, 2> NewIndVarLBounds;
     SmallVector<Value *, 2> NewIndVarUBounds;
@@ -877,7 +879,8 @@ struct OmpSsDirective {
       Function *UnpackFunc, const MapVector<Value *, size_t> &StructToIdxMap) {
     BasicBlock::Create(Ctx, "entry", UnpackFunc);
     BasicBlock &Entry = UnpackFunc->getEntryBlock();
-    UnpackFunc->getEntryBlock().getInstList().push_back(ReturnInst::Create(Ctx));
+    Instruction *RetInst = ReturnInst::Create(Ctx);
+    RetInst->insertInto(&Entry, Entry.end());
     IRBuilder<> BBBuilder(&UnpackFunc->getEntryBlock().back());
     Value *Constraints = &*(UnpackFunc->arg_end() - 1);
     Value *Idx[2];
@@ -904,7 +907,8 @@ struct OmpSsDirective {
       Function *UnpackFunc, const MapVector<Value *, size_t> &StructToIdxMap) {
     BasicBlock::Create(Ctx, "entry", UnpackFunc);
     BasicBlock &Entry = UnpackFunc->getEntryBlock();
-    UnpackFunc->getEntryBlock().getInstList().push_back(ReturnInst::Create(Ctx));
+    Instruction *RetInst = ReturnInst::Create(Ctx);
+    RetInst->insertInto(&Entry, Entry.end());
     IRBuilder<> BBBuilder(&UnpackFunc->getEntryBlock().back());
     Value *PriorityArg = &*(UnpackFunc->arg_end() - 1);
 
@@ -925,7 +929,8 @@ struct OmpSsDirective {
       Function *UnpackFunc, const MapVector<Value *, size_t> &StructToIdxMap) {
     BasicBlock::Create(Ctx, "entry", UnpackFunc);
     BasicBlock &Entry = UnpackFunc->getEntryBlock();
-    UnpackFunc->getEntryBlock().getInstList().push_back(ReturnInst::Create(Ctx));
+    Instruction *RetInst = ReturnInst::Create(Ctx);
+    RetInst->insertInto(&Entry, Entry.end());
     IRBuilder<> BBBuilder(&UnpackFunc->getEntryBlock().back());
 
     BBBuilder.CreateCall(OnreadyInfo.Fun, OnreadyInfo.Args);
@@ -943,7 +948,8 @@ struct OmpSsDirective {
       Function *UnpackFunc, const MapVector<Value *, size_t> &StructToIdxMap) {
     BasicBlock::Create(Ctx, "entry", UnpackFunc);
     BasicBlock &Entry = UnpackFunc->getEntryBlock();
-    UnpackFunc->getEntryBlock().getInstList().push_back(ReturnInst::Create(Ctx));
+    Instruction *RetInst = ReturnInst::Create(Ctx);
+    RetInst->insertInto(&Entry, Entry.end());
     IRBuilder<> BBBuilder(&UnpackFunc->getEntryBlock().back());
     Value *ResArg = &*(UnpackFunc->arg_end() - 1);
 
@@ -1027,7 +1033,7 @@ struct OmpSsDirective {
     if (IsTask) {
       DISubprogram *OldSP = F.getSubprogram();
       DIBuilder DIB(M, /*AllowUnresolved=*/false, OldSP->getUnit());
-      auto SPType = DIB.createSubroutineType(DIB.getOrCreateTypeArray(None));
+      auto SPType = DIB.createSubroutineType(DIB.getOrCreateTypeArray(std::nullopt));
       DISubprogram::DISPFlags SPFlags = DISubprogram::SPFlagDefinition |
                                         DISubprogram::SPFlagOptimized |
                                         DISubprogram::SPFlagLocalToUnit;
@@ -2158,7 +2164,7 @@ struct OmpSsDirective {
     // Placeholders
     BasicBlock *header, BasicBlock *newRootNode, BasicBlock *newHeader,
     Function *oldFunction, const SetVector<BasicBlock *> &Blocks) {
-    UnpackTaskFuncVar->getBasicBlockList().push_back(newRootNode);
+    UnpackTaskFuncVar->insert(UnpackTaskFuncVar->end(), newRootNode);
 
     if (DirEnv.isOmpSsLoopDirective()) {
       Type *OrigIndVarTy = DirEnv.getDSAType(LoopInfo.IndVar[0]);
@@ -3132,16 +3138,16 @@ struct OmpSsModule {
     Function *Func = cast<Function>(nanos6Api::registerCtorAssertFuncCallee(M).getCallee());
     if (Func->empty()) {
       Func->setLinkage(GlobalValue::InternalLinkage);
-      BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry",
-        Func);
-      EntryBB->getInstList().push_back(ReturnInst::Create(Ctx));
+      BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", Func);
+      Instruction *RetInst = ReturnInst::Create(Ctx);
+      RetInst->insertInto(EntryBB, EntryBB->end());
 
       appendToGlobalCtors(M, Func, 65535);
 
     }
     BasicBlock &Entry = Func->getEntryBlock();
 
-    IRBuilder<> BBBuilder(&Entry.getInstList().back());
+    IRBuilder<> BBBuilder(&Entry.back());
     Constant *StringPtr = BBBuilder.CreateGlobalStringPtr(Str);
     BBBuilder.CreateCall(nanos6Api::registerAssertFuncCallee(M), StringPtr);
   }

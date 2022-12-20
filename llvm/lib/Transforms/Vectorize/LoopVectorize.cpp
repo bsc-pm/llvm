@@ -65,8 +65,6 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/None.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallSet.h"
@@ -403,7 +401,8 @@ static Constant *getSignedIntOrFpConstant(Type *Ty, int64_t C) {
 ///   2) Returns expected trip count according to profile data if any.
 ///   3) Returns upper bound estimate if it is known.
 ///   4) Returns std::nullopt if all of the above failed.
-static Optional<unsigned> getSmallBestKnownTC(ScalarEvolution &SE, Loop *L) {
+static std::optional<unsigned> getSmallBestKnownTC(ScalarEvolution &SE,
+                                                   Loop *L) {
   // Check if exact trip count is known.
   if (unsigned ExpectedTC = SE.getSmallConstantTripCount(L))
     return ExpectedTC;
@@ -411,7 +410,7 @@ static Optional<unsigned> getSmallBestKnownTC(ScalarEvolution &SE, Loop *L) {
   // Check if there is an expected trip count available from profile data.
   if (LoopVectorizeWithBlockFrequency)
     if (auto EstimatedTC = getLoopEstimatedTripCount(L))
-      return EstimatedTC;
+      return *EstimatedTC;
 
   // Check if upper bound estimate is known.
   if (unsigned ExpectedTC = SE.getSmallConstantMaxTripCount(L))
@@ -656,9 +655,6 @@ protected:
 
   /// Dominator Tree.
   DominatorTree *DT;
-
-  /// Alias Analysis.
-  AAResults *AA;
 
   /// Target Library Info.
   const TargetLibraryInfo *TLI;
@@ -1637,7 +1633,7 @@ private:
 
   /// Return the cost of instructions in an inloop reduction pattern, if I is
   /// part of that pattern.
-  Optional<InstructionCost>
+  std::optional<InstructionCost>
   getReductionPatternCost(Instruction *I, ElementCount VF, Type *VectorTy,
                           TTI::TargetCostKind CostKind);
 
@@ -2209,7 +2205,6 @@ struct LoopVectorize : public FunctionPass {
     auto *BFI = &getAnalysis<BlockFrequencyInfoWrapperPass>().getBFI();
     auto *TLIP = getAnalysisIfAvailable<TargetLibraryInfoWrapperPass>();
     auto *TLI = TLIP ? &TLIP->getTLI(F) : nullptr;
-    auto *AA = &getAnalysis<AAResultsWrapperPass>().getAAResults();
     auto *AC = &getAnalysis<AssumptionCacheTracker>().getAssumptionCache(F);
     auto &LAIs = getAnalysis<LoopAccessLegacyAnalysis>().getLAIs();
     auto *DB = &getAnalysis<DemandedBitsWrapperPass>().getDemandedBits();
@@ -2217,8 +2212,7 @@ struct LoopVectorize : public FunctionPass {
     auto *PSI = &getAnalysis<ProfileSummaryInfoWrapperPass>().getPSI();
 
     return Impl
-        .runImpl(F, *SE, *LI, *TTI, *DT, *BFI, TLI, *DB, *AA, *AC, LAIs, *ORE,
-                 PSI)
+        .runImpl(F, *SE, *LI, *TTI, *DT, *BFI, TLI, *DB, *AC, LAIs, *ORE, PSI)
         .MadeAnyChange;
   }
 
@@ -2229,7 +2223,6 @@ struct LoopVectorize : public FunctionPass {
     AU.addRequired<LoopInfoWrapperPass>();
     AU.addRequired<ScalarEvolutionWrapperPass>();
     AU.addRequired<TargetTransformInfoWrapperPass>();
-    AU.addRequired<AAResultsWrapperPass>();
     AU.addRequired<LoopAccessLegacyAnalysis>();
     AU.addRequired<DemandedBitsWrapperPass>();
     AU.addRequired<OptimizationRemarkEmitterWrapperPass>();
@@ -4919,8 +4912,8 @@ LoopVectorizationCostModel::getMaxLegalScalableVF(unsigned MaxSafeElements) {
   if (!MaxVScale && TheFunction->hasFnAttribute(Attribute::VScaleRange))
     MaxVScale =
         TheFunction->getFnAttribute(Attribute::VScaleRange).getVScaleRangeMax();
-  MaxScalableVF = ElementCount::getScalable(
-      MaxVScale ? (MaxSafeElements / MaxVScale.value()) : 0);
+  MaxScalableVF =
+      ElementCount::getScalable(MaxVScale ? (MaxSafeElements / *MaxVScale) : 0);
   if (!MaxScalableVF)
     reportVectorizationInfo(
         "Max legal vector width too small, scalable vectorization "
@@ -5182,7 +5175,7 @@ ElementCount LoopVectorizationCostModel::getMaximizedVFForTarget(
     unsigned ConstTripCount, unsigned SmallestType, unsigned WidestType,
     ElementCount MaxSafeVF, bool FoldTailByMasking) {
   bool ComputeScalableMaxVF = MaxSafeVF.isScalable();
-  TypeSize WidestRegister = TTI.getRegisterBitWidth(
+  const TypeSize WidestRegister = TTI.getRegisterBitWidth(
       ComputeScalableMaxVF ? TargetTransformInfo::RGK_ScalableVector
                            : TargetTransformInfo::RGK_FixedWidthVector);
 
@@ -5209,9 +5202,14 @@ ElementCount LoopVectorizationCostModel::getMaximizedVFForTarget(
     return ElementCount::getFixed(1);
   }
 
-  const auto TripCountEC = ElementCount::getFixed(ConstTripCount);
-  if (ConstTripCount &&
-      ElementCount::isKnownLE(TripCountEC, MaxVectorElementCount) &&
+  unsigned WidestRegisterMinEC = MaxVectorElementCount.getKnownMinValue();
+  if (MaxVectorElementCount.isScalable() &&
+      TheFunction->hasFnAttribute(Attribute::VScaleRange)) {
+    auto Attr = TheFunction->getFnAttribute(Attribute::VScaleRange);
+    auto Min = Attr.getVScaleRangeMin();
+    WidestRegisterMinEC *= Min;
+  }
+  if (ConstTripCount && ConstTripCount <= WidestRegisterMinEC &&
       (!FoldTailByMasking || isPowerOf2_32(ConstTripCount))) {
     // If loop trip count (TC) is known at compile time there is no point in
     // choosing VF greater than TC (as done in the loop below). Select maximum
@@ -5315,9 +5313,9 @@ bool LoopVectorizationCostModel::isMoreProfitable(
   unsigned EstimatedWidthB = B.Width.getKnownMinValue();
   if (std::optional<unsigned> VScale = getVScaleForTuning()) {
     if (A.Width.isScalable())
-      EstimatedWidthA *= VScale.value();
+      EstimatedWidthA *= *VScale;
     if (B.Width.isScalable())
-      EstimatedWidthB *= VScale.value();
+      EstimatedWidthB *= *VScale;
   }
 
   // Assume vscale may be larger than 1 (or the value being tuned for),
@@ -6552,7 +6550,8 @@ LoopVectorizationCostModel::getInterleaveGroupCost(Instruction *I,
   return Cost;
 }
 
-Optional<InstructionCost> LoopVectorizationCostModel::getReductionPatternCost(
+std::optional<InstructionCost>
+LoopVectorizationCostModel::getReductionPatternCost(
     Instruction *I, ElementCount VF, Type *Ty, TTI::TargetCostKind CostKind) {
   using namespace llvm::PatternMatch;
   // Early exit for no inloop reductions
@@ -6721,7 +6720,7 @@ Optional<InstructionCost> LoopVectorizationCostModel::getReductionPatternCost(
     }
   }
 
-  return I == RetI ? Optional<InstructionCost>(BaseCost) : std::nullopt;
+  return I == RetI ? std::optional<InstructionCost>(BaseCost) : std::nullopt;
 }
 
 InstructionCost
@@ -7353,7 +7352,6 @@ static const char lv_name[] = "Loop Vectorization";
 INITIALIZE_PASS_BEGIN(LoopVectorize, LV_NAME, lv_name, false, false)
 INITIALIZE_PASS_DEPENDENCY(TargetTransformInfoWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(BasicAAWrapperPass)
-INITIALIZE_PASS_DEPENDENCY(AAResultsWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(GlobalsAAWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(AssumptionCacheTracker)
 INITIALIZE_PASS_DEPENDENCY(BlockFrequencyInfoWrapperPass)
@@ -7502,7 +7500,7 @@ LoopVectorizationPlanner::planInVPlanNativePath(ElementCount UserVF) {
   return VectorizationFactor::Disabled();
 }
 
-Optional<VectorizationFactor>
+std::optional<VectorizationFactor>
 LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
   assert(OrigLoop->isInnermost() && "Inner loop expected.");
   FixedScalableVFPair MaxFactors = CM.computeMaxVF(UserVF, UserIC);
@@ -7679,7 +7677,7 @@ void LoopVectorizationPlanner::executePlan(ElementCount BestVF, unsigned BestUF,
   // replace the vectorizer-specific hints below).
   MDNode *OrigLoopID = OrigLoop->getLoopID();
 
-  Optional<MDNode *> VectorizedLoopID =
+  std::optional<MDNode *> VectorizedLoopID =
       makeFollowupLoopID(OrigLoopID, {LLVMLoopVectorizeFollowupAll,
                                       LLVMLoopVectorizeFollowupVectorized});
 
@@ -7687,7 +7685,7 @@ void LoopVectorizationPlanner::executePlan(ElementCount BestVF, unsigned BestUF,
       BestVPlan.getVectorLoopRegion()->getEntryBasicBlock();
   Loop *L = LI->getLoopFor(State.CFG.VPBB2IRBB[HeaderVPBB]);
   if (VectorizedLoopID)
-    L->setLoopID(VectorizedLoopID.value());
+    L->setLoopID(*VectorizedLoopID);
   else {
     // Keep all loop hints from the original loop on the vector loop (we'll
     // replace the vectorizer-specific hints below).
@@ -10197,7 +10195,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
 
   // Check if it is legal to vectorize the loop.
   LoopVectorizationRequirements Requirements;
-  LoopVectorizationLegality LVL(L, PSE, DT, TTI, TLI, AA, F, *LAIs, LI, ORE,
+  LoopVectorizationLegality LVL(L, PSE, DT, TTI, TLI, F, *LAIs, LI, ORE,
                                 &Requirements, &Hints, DB, AC, BFI, PSI);
   if (!LVL.canVectorize(EnableVPlanNativePath)) {
     LLVM_DEBUG(dbgs() << "LV: Not vectorizing: Cannot prove legality.\n");
@@ -10318,7 +10316,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
   unsigned UserIC = Hints.getInterleave();
 
   // Plan how to best vectorize, return the best VF and its cost.
-  Optional<VectorizationFactor> MaybeVF = LVP.plan(UserVF, UserIC);
+  std::optional<VectorizationFactor> MaybeVF = LVP.plan(UserVF, UserIC);
 
   VectorizationFactor VF = VectorizationFactor::Disabled();
   unsigned IC = 1;
@@ -10537,11 +10535,11 @@ bool LoopVectorizePass::processLoop(Loop *L) {
       checkMixedPrecision(L, ORE);
   }
 
-  Optional<MDNode *> RemainderLoopID =
+  std::optional<MDNode *> RemainderLoopID =
       makeFollowupLoopID(OrigLoopID, {LLVMLoopVectorizeFollowupAll,
                                       LLVMLoopVectorizeFollowupEpilogue});
   if (RemainderLoopID) {
-    L->setLoopID(RemainderLoopID.value());
+    L->setLoopID(*RemainderLoopID);
   } else {
     if (DisableRuntimeUnroll)
       AddRuntimeUnrollDisableMetaData(L);
@@ -10557,16 +10555,14 @@ bool LoopVectorizePass::processLoop(Loop *L) {
 LoopVectorizeResult LoopVectorizePass::runImpl(
     Function &F, ScalarEvolution &SE_, LoopInfo &LI_, TargetTransformInfo &TTI_,
     DominatorTree &DT_, BlockFrequencyInfo &BFI_, TargetLibraryInfo *TLI_,
-    DemandedBits &DB_, AAResults &AA_, AssumptionCache &AC_,
-    LoopAccessInfoManager &LAIs_, OptimizationRemarkEmitter &ORE_,
-    ProfileSummaryInfo *PSI_) {
+    DemandedBits &DB_, AssumptionCache &AC_, LoopAccessInfoManager &LAIs_,
+    OptimizationRemarkEmitter &ORE_, ProfileSummaryInfo *PSI_) {
   SE = &SE_;
   LI = &LI_;
   TTI = &TTI_;
   DT = &DT_;
   BFI = &BFI_;
   TLI = TLI_;
-  AA = &AA_;
   AC = &AC_;
   LAIs = &LAIs_;
   DB = &DB_;
@@ -10632,7 +10628,6 @@ PreservedAnalyses LoopVectorizePass::run(Function &F,
     auto &DT = AM.getResult<DominatorTreeAnalysis>(F);
     auto &BFI = AM.getResult<BlockFrequencyAnalysis>(F);
     auto &TLI = AM.getResult<TargetLibraryAnalysis>(F);
-    auto &AA = AM.getResult<AAManager>(F);
     auto &AC = AM.getResult<AssumptionAnalysis>(F);
     auto &DB = AM.getResult<DemandedBitsAnalysis>(F);
     auto &ORE = AM.getResult<OptimizationRemarkEmitterAnalysis>(F);
@@ -10642,7 +10637,7 @@ PreservedAnalyses LoopVectorizePass::run(Function &F,
     ProfileSummaryInfo *PSI =
         MAMProxy.getCachedResult<ProfileSummaryAnalysis>(*F.getParent());
     LoopVectorizeResult Result =
-        runImpl(F, SE, LI, TTI, DT, BFI, &TLI, DB, AA, AC, LAIs, ORE, PSI);
+        runImpl(F, SE, LI, TTI, DT, BFI, &TLI, DB, AC, LAIs, ORE, PSI);
     if (!Result.MadeAnyChange)
       return PreservedAnalyses::all();
     PreservedAnalyses PA;

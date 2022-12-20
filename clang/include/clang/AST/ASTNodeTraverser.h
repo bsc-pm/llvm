@@ -256,7 +256,7 @@ public:
                     .getTypeConstraint()
                     ->getImmediatelyDeclaredConstraint());
       } else if (auto *NR = dyn_cast<concepts::NestedRequirement>(R)) {
-        if (!NR->isSubstitutionFailure())
+        if (!NR->hasInvalidConstraint())
           Visit(NR->getConstraintExpr());
       }
     });
@@ -731,6 +731,12 @@ public:
 
   void VisitInitListExpr(const InitListExpr *ILE) {
     if (auto *Filler = ILE->getArrayFiller()) {
+      Visit(Filler, "array_filler");
+    }
+  }
+
+  void VisitCXXParenListInitExpr(const CXXParenListInitExpr *PLIE) {
+    if (auto *Filler = PLIE->getArrayFiller()) {
       Visit(Filler, "array_filler");
     }
   }

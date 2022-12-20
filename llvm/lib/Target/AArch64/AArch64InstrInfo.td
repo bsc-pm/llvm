@@ -125,7 +125,6 @@ def HasRAS           : Predicate<"Subtarget->hasRAS()">,
                                  AssemblerPredicateWithAll<(all_of FeatureRAS), "ras">;
 def HasRDM           : Predicate<"Subtarget->hasRDM()">,
                                  AssemblerPredicateWithAll<(all_of FeatureRDM), "rdm">;
-def HasPerfMon       : Predicate<"Subtarget->hasPerfMon()">;
 def HasFullFP16      : Predicate<"Subtarget->hasFullFP16()">,
                                  AssemblerPredicateWithAll<(all_of FeatureFullFP16), "fullfp16">;
 def HasFP16FML       : Predicate<"Subtarget->hasFP16FML()">,
@@ -1526,9 +1525,8 @@ def HWASAN_CHECK_MEMACCESS_SHORTGRANULES : Pseudo<
   Sched<[]>;
 }
 
-// The cycle counter PMC register is PMCCNTR_EL0.
-let Predicates = [HasPerfMon] in
-def : Pat<(readcyclecounter), (MRS 0xdce8)>;
+// The virtual cycle counter register is CNTVCT_EL0.
+def : Pat<(readcyclecounter), (MRS 0xdf02)>;
 
 // FPCR register
 let Uses = [FPCR] in
@@ -1956,6 +1954,26 @@ def : Pat<(i64 (sub GPR64:$Ra, (smullwithsignbits GPR64:$Rn, GPR64:$Rm))),
           (SMSUBLrrr (EXTRACT_SUBREG $Rn, sub_32), (EXTRACT_SUBREG $Rm, sub_32), GPR64:$Ra)>;
 def : Pat<(i64 (sub GPR64:$Ra, (smullwithsignbits GPR64:$Rn, (sext GPR32:$Rm)))),
           (SMSUBLrrr (EXTRACT_SUBREG $Rn, sub_32), $Rm, GPR64:$Ra)>;
+
+def : Pat<(i64 (mul top32Zero:$Rn, top32Zero:$Rm)),
+          (UMADDLrrr (EXTRACT_SUBREG $Rn, sub_32), (EXTRACT_SUBREG $Rm, sub_32), XZR)>;
+def : Pat<(i64 (mul top32Zero:$Rn, (zext GPR32:$Rm))),
+          (UMADDLrrr (EXTRACT_SUBREG $Rn, sub_32), $Rm, XZR)>;
+
+def : Pat<(i64 (add (mul top32Zero:$Rn, top32Zero:$Rm), GPR64:$Ra)),
+          (UMADDLrrr (EXTRACT_SUBREG $Rn, sub_32), (EXTRACT_SUBREG $Rm, sub_32), GPR64:$Ra)>;
+def : Pat<(i64 (add (mul top32Zero:$Rn, (zext GPR32:$Rm)), GPR64:$Ra)),
+          (UMADDLrrr (EXTRACT_SUBREG $Rn, sub_32), $Rm, GPR64:$Ra)>;
+
+def : Pat<(i64 (ineg (mul top32Zero:$Rn, top32Zero:$Rm))),
+          (UMSUBLrrr (EXTRACT_SUBREG $Rn, sub_32), (EXTRACT_SUBREG $Rm, sub_32), XZR)>;
+def : Pat<(i64 (ineg (mul top32Zero:$Rn, (zext GPR32:$Rm)))),
+          (UMSUBLrrr (EXTRACT_SUBREG $Rn, sub_32), $Rm, XZR)>;
+
+def : Pat<(i64 (sub GPR64:$Ra, (mul top32Zero:$Rn, top32Zero:$Rm))),
+          (UMSUBLrrr (EXTRACT_SUBREG $Rn, sub_32), (EXTRACT_SUBREG $Rm, sub_32), GPR64:$Ra)>;
+def : Pat<(i64 (sub GPR64:$Ra, (mul GPR64:$Rn, (zext GPR32:$Rm)))),
+          (UMSUBLrrr (EXTRACT_SUBREG $Rn, sub_32), $Rm, GPR64:$Ra)>;
 } // AddedComplexity = 5
 
 def : MulAccumWAlias<"mul", MADDWrrr>;

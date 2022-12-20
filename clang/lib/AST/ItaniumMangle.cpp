@@ -4256,6 +4256,7 @@ recurse:
   case Expr::OSSArrayShapingExprClass:
   case Expr::OSSMultiDepExprClass:
   case Expr::CXXInheritedCtorInitExprClass:
+  case Expr::CXXParenListInitExprClass:
     llvm_unreachable("unexpected statement kind");
 
   case Expr::ConstantExprClass:

@@ -217,6 +217,8 @@ static const char *isInvalidOpcode(const Instruction &Instr) {
   case X86::LSS32rm:
   case X86::LSS64rm:
   case X86::SYSENTER:
+  case X86::WRFSBASE:
+  case X86::WRFSBASE64:
     return "unsupported opcode";
   default:
     break;
@@ -880,6 +882,35 @@ std::vector<MCInst> ExegesisX86Target::setRegTo(const MCSubtargetInfo &STI,
     return {loadImmediate(Reg, 32, Value)};
   if (X86::GR64RegClass.contains(Reg))
     return {loadImmediate(Reg, 64, Value)};
+  if (X86::VK8RegClass.contains(Reg) || X86::VK16RegClass.contains(Reg) ||
+      X86::VK32RegClass.contains(Reg) || X86::VK64RegClass.contains(Reg)) {
+    switch (Value.getBitWidth()) {
+    case 8:
+      if (STI.getFeatureBits()[X86::FeatureDQI]) {
+        ConstantInliner CI(Value);
+        return CI.loadAndFinalize(Reg, Value.getBitWidth(), X86::KMOVBkm);
+      }
+      [[fallthrough]];
+    case 16:
+      if (STI.getFeatureBits()[X86::FeatureAVX512]) {
+        ConstantInliner CI(Value.zextOrTrunc(16));
+        return CI.loadAndFinalize(Reg, 16, X86::KMOVWkm);
+      }
+      break;
+    case 32:
+      if (STI.getFeatureBits()[X86::FeatureBWI]) {
+        ConstantInliner CI(Value);
+        return CI.loadAndFinalize(Reg, Value.getBitWidth(), X86::KMOVDkm);
+      }
+      break;
+    case 64:
+      if (STI.getFeatureBits()[X86::FeatureBWI]) {
+        ConstantInliner CI(Value);
+        return CI.loadAndFinalize(Reg, Value.getBitWidth(), X86::KMOVQkm);
+      }
+      break;
+    }
+  }
   ConstantInliner CI(Value);
   if (X86::VR64RegClass.contains(Reg))
     return CI.loadAndFinalize(Reg, 64, X86::MMX_MOVQ64rm);

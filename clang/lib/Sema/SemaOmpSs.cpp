@@ -845,7 +845,7 @@ void Sema::EndOmpSsDSABlock(Stmt *CurDirective) {
 
 static std::string
 getListOfPossibleValues(OmpSsClauseKind K, unsigned First, unsigned Last,
-                        ArrayRef<unsigned> Exclude = llvm::None) {
+                        ArrayRef<unsigned> Exclude = std::nullopt) {
   SmallString<256> Buffer;
   llvm::raw_svector_ostream Out(Buffer);
   unsigned Skipped = Exclude.size();
@@ -4526,14 +4526,14 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     ArrayRef<Expr *> TmpList(Reductions_it, Reductions_it + ReductionListSizes[i]);
     OmpSsClauseKind CKind = (OmpSsClauseKind)ReductionClauseType[i];
     CXXScopeSpec ScopeSpec = ReductionCXXScopeSpecs[i];
-    // UnresolvedReductions is llvm::None when parsing the first time. Pass
-    // llvm::None.
+    // UnresolvedReductions is std::nullopt when parsing the first time. Pass
+    // std::nullopt.
     // In instantiation we will get an array with all the info for the reductions, build
     // the subarray associated to each reduction list (like with TmpList
     if (UnresolvedReductions.empty()) {
       actOnOSSReductionKindClause(
         *this, DSAStack, CKind, TmpList, ScopeSpec, ReductionIds[i],
-        llvm::None, RD, /*Outline=*/true);
+        std::nullopt, RD, /*Outline=*/true);
     } else {
       actOnOSSReductionKindClause(
         *this, DSAStack, CKind, TmpList, ScopeSpec, ReductionIds[i],
