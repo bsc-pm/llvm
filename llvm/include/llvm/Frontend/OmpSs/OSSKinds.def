@@ -1,0 +1,34 @@
+//===--- OSSKinds.def - OmpSs directives, clauses, rt-calls -*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+/// \file
+///
+/// This file is under transition to OSS.td with TableGen code generation.
+///
+//===----------------------------------------------------------------------===//
+
+/// Default kinds
+///
+///{
+
+#ifndef OSS_DEFAULT_KIND
+#define OSS_DEFAULT_KIND(Enum, Str)
+#endif
+
+#define __OSS_DEFAULT_KIND(Name) OSS_DEFAULT_KIND(OSS_DEFAULT_##Name, #Name)
+
+__OSS_DEFAULT_KIND(none)
+__OSS_DEFAULT_KIND(shared)
+__OSS_DEFAULT_KIND(private)
+__OSS_DEFAULT_KIND(firstprivate)
+__OSS_DEFAULT_KIND(unknown)
+
+#undef __OSS_DEFAULT_KIND
+#undef OSS_DEFAULT_KIND
+
+///}
+

@@ -12320,7 +12320,7 @@ public:
                                     SourceLocation EndLoc);
 
   /// Called on well-formed 'default' clause.
-  OSSClause *ActOnOmpSsDefaultClause(OmpSsDefaultClauseKind Kind,
+  OSSClause *ActOnOmpSsDefaultClause(llvm::oss::DefaultKind Kind,
                                       SourceLocation KindLoc,
                                       SourceLocation StartLoc,
                                       SourceLocation LParenLoc,

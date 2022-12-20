@@ -268,13 +268,13 @@ class OSSTaskwaitDirective : public OSSExecutableDirective {
   /// \param EndLoc Ending location of the directive.
   ///
   OSSTaskwaitDirective(SourceLocation StartLoc, SourceLocation EndLoc)
-      : OSSExecutableDirective(OSSTaskwaitDirectiveClass, OSSD_taskwait,
+      : OSSExecutableDirective(OSSTaskwaitDirectiveClass, llvm::oss::OSSD_taskwait,
                                StartLoc, EndLoc) {}
 
   /// Build an empty directive.
   ///
   explicit OSSTaskwaitDirective()
-      : OSSExecutableDirective(OSSTaskwaitDirectiveClass, OSSD_taskwait,
+      : OSSExecutableDirective(OSSTaskwaitDirectiveClass, llvm::oss::OSSD_taskwait,
                                SourceLocation(), SourceLocation()) {}
 
 public:
@@ -317,13 +317,13 @@ class OSSReleaseDirective : public OSSExecutableDirective {
   /// \param EndLoc Ending location of the directive.
   ///
   OSSReleaseDirective(SourceLocation StartLoc, SourceLocation EndLoc)
-      : OSSExecutableDirective(OSSReleaseDirectiveClass, OSSD_release,
+      : OSSExecutableDirective(OSSReleaseDirectiveClass, llvm::oss::OSSD_release,
                                StartLoc, EndLoc) {}
 
   /// Build an empty directive.
   ///
   explicit OSSReleaseDirective()
-      : OSSExecutableDirective(OSSReleaseDirectiveClass, OSSD_release,
+      : OSSExecutableDirective(OSSReleaseDirectiveClass, llvm::oss::OSSD_release,
                                SourceLocation(), SourceLocation()) {}
 
 public:
@@ -360,13 +360,13 @@ class OSSTaskDirective : public OSSExecutableDirective {
   /// \param EndLoc Ending location of the directive.
   ///
   OSSTaskDirective(SourceLocation StartLoc, SourceLocation EndLoc)
-      : OSSExecutableDirective(OSSTaskDirectiveClass, OSSD_task,
+      : OSSExecutableDirective(OSSTaskDirectiveClass, llvm::oss::OSSD_task,
                                StartLoc, EndLoc) {}
 
   /// Build an empty directive.
   ///
   explicit OSSTaskDirective()
-      : OSSExecutableDirective(OSSTaskDirectiveClass, OSSD_task,
+      : OSSExecutableDirective(OSSTaskDirectiveClass, llvm::oss::OSSD_task,
                                SourceLocation(), SourceLocation()) {}
 
 public:
@@ -416,14 +416,14 @@ class OSSCriticalDirective : public OSSExecutableDirective {
   OSSCriticalDirective(const DeclarationNameInfo &Name, SourceLocation StartLoc,
                        SourceLocation EndLoc)
       : OSSExecutableDirective(OSSCriticalDirectiveClass,
-                               OSSD_critical, StartLoc, EndLoc),
+                               llvm::oss::OSSD_critical, StartLoc, EndLoc),
         DirName(Name) {}
 
   /// Build an empty directive.
   ///
   explicit OSSCriticalDirective()
       : OSSExecutableDirective(OSSCriticalDirectiveClass,
-                               OSSD_critical, SourceLocation(),
+                               llvm::oss::OSSD_critical, SourceLocation(),
                                SourceLocation()) {}
 
   /// Set name of the directive.
@@ -577,14 +577,14 @@ class OSSTaskForDirective : public OSSLoopDirective {
   ///
   OSSTaskForDirective(SourceLocation StartLoc, SourceLocation EndLoc,
                       unsigned NumCollapses)
-      : OSSLoopDirective(OSSTaskForDirectiveClass, OSSD_task_for,
+      : OSSLoopDirective(OSSTaskForDirectiveClass, llvm::oss::OSSD_task_for,
                          StartLoc, EndLoc, NumCollapses) {}
 
   /// Build an empty directive.
   /// \param NumCollapses Number of collapsed loops from 'collapse' clause.
   ///
   explicit OSSTaskForDirective(unsigned NumCollapses)
-      : OSSLoopDirective(OSSTaskForDirectiveClass, OSSD_task_for,
+      : OSSLoopDirective(OSSTaskForDirectiveClass, llvm::oss::OSSD_task_for,
                          SourceLocation(), SourceLocation(), NumCollapses) {}
 
 public:
@@ -630,7 +630,7 @@ class OSSTaskIterDirective : public OSSLoopDirective {
   ///
   OSSTaskIterDirective(SourceLocation StartLoc, SourceLocation EndLoc,
                       unsigned NumCollapses)
-      : OSSLoopDirective(OSSTaskIterDirectiveClass, OSSD_taskiter,
+      : OSSLoopDirective(OSSTaskIterDirectiveClass, llvm::oss::OSSD_taskiter,
                          StartLoc, EndLoc, NumCollapses) {}
 
   /// Build an empty directive.
@@ -638,7 +638,7 @@ class OSSTaskIterDirective : public OSSLoopDirective {
   /// \param NumCollapses Number of collapsed loops from 'collapse' clause.
   ///
   explicit OSSTaskIterDirective(unsigned NumCollapses)
-      : OSSLoopDirective(OSSTaskIterDirectiveClass, OSSD_taskiter,
+      : OSSLoopDirective(OSSTaskIterDirectiveClass, llvm::oss::OSSD_taskiter,
                          SourceLocation(), SourceLocation(), NumCollapses) {}
 
 public:
@@ -683,14 +683,14 @@ class OSSTaskLoopDirective : public OSSLoopDirective {
   ///
   OSSTaskLoopDirective(SourceLocation StartLoc, SourceLocation EndLoc,
                        unsigned NumCollapses)
-      : OSSLoopDirective(OSSTaskLoopDirectiveClass, OSSD_taskloop,
+      : OSSLoopDirective(OSSTaskLoopDirectiveClass, llvm::oss::OSSD_taskloop,
                          StartLoc, EndLoc, NumCollapses) {}
 
   /// Build an empty directive.
   /// \param NumCollapses Number of collapsed loops from 'collapse' clause.
   ///
   explicit OSSTaskLoopDirective(unsigned NumCollapses)
-      : OSSLoopDirective(OSSTaskLoopDirectiveClass, OSSD_taskloop,
+      : OSSLoopDirective(OSSTaskLoopDirectiveClass, llvm::oss::OSSD_taskloop,
                          SourceLocation(), SourceLocation(), NumCollapses) {}
 
 public:
@@ -736,14 +736,14 @@ class OSSTaskLoopForDirective : public OSSLoopDirective {
   ///
   OSSTaskLoopForDirective(SourceLocation StartLoc, SourceLocation EndLoc,
                           unsigned NumCollapses)
-      : OSSLoopDirective(OSSTaskLoopForDirectiveClass, OSSD_taskloop_for,
+      : OSSLoopDirective(OSSTaskLoopForDirectiveClass, llvm::oss::OSSD_taskloop_for,
                          StartLoc, EndLoc, NumCollapses) {}
 
   /// Build an empty directive.
   /// \param NumCollapses Number of collapsed loops from 'collapse' clause.
   ///
   explicit OSSTaskLoopForDirective(unsigned NumCollapses)
-      : OSSLoopDirective(OSSTaskLoopForDirectiveClass, OSSD_taskloop_for,
+      : OSSLoopDirective(OSSTaskLoopForDirectiveClass, llvm::oss::OSSD_taskloop_for,
                          SourceLocation(), SourceLocation(), NumCollapses) {}
 
 public:
@@ -820,13 +820,13 @@ class OSSAtomicDirective : public OSSExecutableDirective {
   /// \param EndLoc Ending location of the directive.
   ///
   OSSAtomicDirective(SourceLocation StartLoc, SourceLocation EndLoc)
-      : OSSExecutableDirective(OSSAtomicDirectiveClass, OSSD_atomic,
+      : OSSExecutableDirective(OSSAtomicDirectiveClass, llvm::oss::OSSD_atomic,
                                StartLoc, EndLoc) {}
 
   /// Build an empty directive.
   ///
   explicit OSSAtomicDirective()
-      : OSSExecutableDirective(OSSAtomicDirectiveClass, OSSD_atomic,
+      : OSSExecutableDirective(OSSAtomicDirectiveClass, llvm::oss::OSSD_atomic,
                                SourceLocation(), SourceLocation()) {}
 
   enum DataPositionTy : size_t {

@@ -3584,11 +3584,11 @@ ExprResult Parser::ParseOSSAssignmentExpression(
   if (!isOmpSsTaskingDirective(DKind))
     return ParseAssignmentExpression();
   if (Tok.is(tok::l_brace) &&
-      (CKind == OSSC_depend
-       || CKind == OSSC_in || CKind == OSSC_out || CKind == OSSC_inout
-       || CKind == OSSC_concurrent || CKind == OSSC_commutative
-       || CKind == OSSC_weakin || CKind == OSSC_weakout || CKind == OSSC_weakinout
-       || CKind == OSSC_weakconcurrent || CKind == OSSC_weakcommutative))
+      (CKind == llvm::oss::OSSC_depend
+       || CKind == llvm::oss::OSSC_in || CKind == llvm::oss::OSSC_out || CKind == llvm::oss::OSSC_inout
+       || CKind == llvm::oss::OSSC_concurrent || CKind == llvm::oss::OSSC_commutative
+       || CKind == llvm::oss::OSSC_weakin || CKind == llvm::oss::OSSC_weakout || CKind == llvm::oss::OSSC_weakinout
+       || CKind == llvm::oss::OSSC_weakconcurrent || CKind == llvm::oss::OSSC_weakcommutative))
     return ParseOSSMultiDepExpression();
   return ParseAssignmentExpression();
 }

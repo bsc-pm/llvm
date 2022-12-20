@@ -2,7 +2,7 @@
 
 int main() {
   int x;
-  #pragma oss task default(asdf) // expected-error {{expected 'none' or 'shared' in OmpSs-2 clause 'default'}}
+  #pragma oss task default(asdf) // expected-error {{expected 'none', 'shared', 'private' or 'firstprivate' in OmpSs-2 clause 'default'}}
   #pragma oss task default(shared)
   #pragma oss task default(none)
   #pragma oss task default(none) default(shared) // expected-error {{directive '#pragma oss task' cannot contain more than one 'default' clause}}

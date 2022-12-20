@@ -16506,7 +16506,7 @@ OMPClause *Sema::ActOnOpenMPSimpleClause(
   OMPClause *Res = nullptr;
   switch (Kind) {
   case OMPC_default:
-    Res = ActOnOpenMPDefaultClause(static_cast<DefaultKind>(Argument),
+    Res = ActOnOpenMPDefaultClause(static_cast<llvm::omp::DefaultKind>(Argument),
                                    ArgumentLoc, StartLoc, LParenLoc, EndLoc);
     break;
   case OMPC_proc_bind:
@@ -16641,7 +16641,7 @@ getListOfPossibleValues(OpenMPClauseKind K, unsigned First, unsigned Last,
   return std::string(Out.str());
 }
 
-OMPClause *Sema::ActOnOpenMPDefaultClause(DefaultKind Kind,
+OMPClause *Sema::ActOnOpenMPDefaultClause(llvm::omp::DefaultKind Kind,
                                           SourceLocation KindKwLoc,
                                           SourceLocation StartLoc,
                                           SourceLocation LParenLoc,

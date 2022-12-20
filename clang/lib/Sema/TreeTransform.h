@@ -44,6 +44,7 @@
 #include <algorithm>
 
 using namespace llvm::omp;
+using namespace llvm::oss;
 
 namespace clang {
 using namespace sema;
@@ -796,10 +797,11 @@ public:
   OMPClause *Transform##Class(Class *S);
 #include "llvm/Frontend/OpenMP/OMP.inc"
 
-#define OMPSS_CLAUSE(Name, Class)                        \
-  LLVM_ATTRIBUTE_NOINLINE \
-  OSSClause *Transform ## Class(Class *S);
-#include "clang/Basic/OmpSsKinds.def"
+#define GEN_CLANG_CLAUSE_CLASS
+#define CLAUSE_CLASS(Enum, Str, Class)                                         \
+  LLVM_ATTRIBUTE_NOINLINE                                                      \
+  OSSClause *Transform##Class(Class *S);
+#include "llvm/Frontend/OmpSs/OSS.inc"
 
   /// Build a new qualified type given its unqualified type and type location.
   ///
@@ -1965,7 +1967,7 @@ public:
   ///
   /// By default, performs semantic analysis to build the new OpenMP clause.
   /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPDefaultClause(DefaultKind Kind, SourceLocation KindKwLoc,
+  OMPClause *RebuildOMPDefaultClause(llvm::omp::DefaultKind Kind, SourceLocation KindKwLoc,
                                      SourceLocation StartLoc,
                                      SourceLocation LParenLoc,
                                      SourceLocation EndLoc) {
@@ -4222,10 +4224,11 @@ OSSClause *TreeTransform<Derived>::TransformOSSClause(OSSClause *S) {
   switch (S->getClauseKind()) {
   default: break;
   // Transform individual clause nodes
-#define OMPSS_CLAUSE(Name, Class)                                             \
-  case OSSC_ ## Name :                                                         \
-    return getDerived().Transform ## Class(cast<Class>(S));
-#include "clang/Basic/OmpSsKinds.def"
+#define GEN_CLANG_CLAUSE_CLASS
+#define CLAUSE_CLASS(Enum, Str, Class)                                         \
+  case Enum:                                                                   \
+    return getDerived().Transform##Class(cast<Class>(S));
+#include "llvm/Frontend/OmpSs/OSS.inc"
   }
 
   return S;

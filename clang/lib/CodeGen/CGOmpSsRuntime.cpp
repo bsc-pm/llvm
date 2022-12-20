@@ -19,6 +19,7 @@
 #include "ConstantEmitter.h"
 #include "clang/CodeGen/ConstantInitBuilder.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/OmpSsClause.h"
 #include "clang/AST/StmtOmpSs.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/Basic/BitmaskEnum.h"
@@ -37,6 +38,7 @@
 
 using namespace clang;
 using namespace CodeGen;
+using namespace llvm::oss;
 
 namespace {
 
