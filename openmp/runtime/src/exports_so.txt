@@ -92,10 +92,6 @@ VERSION {
     __kmp_set_thread_roles1;
     __kmp_set_thread_roles2;
     __kmp_get_thread_id;
-    __kmp_get_num_free_agent_threads;
-    __kmp_get_num_free_agent_threads;
-    __kmp_set_free_agent_thread_active_status;
-    __kmp_get_free_agent_id;
 
     local: # Non-exported symbols.
 
