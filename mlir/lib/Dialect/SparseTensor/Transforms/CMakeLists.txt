@@ -1,11 +1,14 @@
 add_mlir_dialect_library(MLIRSparseTensorTransforms
   BufferizableOpInterfaceImpl.cpp
+  CodegenEnv.cpp
   CodegenUtils.cpp
   SparseBufferRewriting.cpp
+  SparseStorageSpecifierToLLVM.cpp
   SparseTensorCodegen.cpp
   SparseTensorConversion.cpp
   SparseTensorPasses.cpp
   SparseTensorRewriting.cpp
+  SparseTensorStorageLayout.cpp
   SparseVectorization.cpp
   Sparsification.cpp
   SparsificationAndBufferizationPass.cpp

@@ -326,6 +326,9 @@ Bug Fixes
 - Fix bug where constant evaluation treated a pointer to member that points to
   a weak member as never being null. Such comparisons are now treated as
   non-constant.
+- Fix sanity check when value initializing an empty union so that it takes into
+  account anonymous structs which is a GNU extension. This fixes
+  `Issue 58800 <https://github.com/llvm/llvm-project/issues/58800>`_
 
 Improvements to Clang's diagnostics
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -800,6 +803,8 @@ X86 Support in Clang
 - ``-march=raptorlake`` and ``-march=meteorlake`` are now supported.
 - ``-march=sierraforest``, ``-march=graniterapids`` and ``-march=grandridge`` are now supported.
 - Lift _BitInt() supported max width from 128 to 8388608.
+- Support intrinsics of ``_mm(256)_reduce_(add|mul|or|and)_epi8/16``.
+- Support intrinsics of ``_mm(256)_reduce_(max|min)_ep[i|u]8/16``.
 
 WebAssembly Support in Clang
 ----------------------------
