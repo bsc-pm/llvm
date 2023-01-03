@@ -38,6 +38,7 @@
 #include "Target.h"
 #include "Writer.h"
 #include "lld/Common/Args.h"
+#include "lld/Common/CommonLinkerContext.h"
 #include "lld/Common/Driver.h"
 #include "lld/Common/ErrorHandler.h"
 #include "lld/Common/Filesystem.h"
@@ -2785,15 +2786,6 @@ void LinkerDriver::link(opt::InputArgList &args) {
   config->commonPageSize = getCommonPageSize(args);
 
   config->imageBase = getImageBase(args);
-
-  if (config->emachine == EM_ARM) {
-    // FIXME: These warnings can be removed when lld only uses these features
-    // when the input objects have been compiled with an architecture that
-    // supports them.
-    if (config->armHasBlx == false)
-      warn("lld uses blx instruction, no object with architecture supporting "
-           "feature detected");
-  }
 
   // This adds a .comment section containing a version string.
   if (!config->relocatable)

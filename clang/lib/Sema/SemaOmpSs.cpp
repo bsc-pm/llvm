@@ -29,7 +29,9 @@
 #include "clang/Sema/ScopeInfo.h"
 #include "clang/Sema/SemaInternal.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
+
 using namespace clang;
+using namespace llvm::oss;
 
 namespace {
 /// Default data sharing attributes, which can be applied to directive.
@@ -37,6 +39,8 @@ enum DefaultDataSharingAttributes {
   DSA_unspecified = 0, /// Data sharing attribute not specified.
   DSA_none = 1 << 0,   /// Default data sharing attribute 'none'.
   DSA_shared = 1 << 1, /// Default data sharing attribute 'shared'.
+  DSA_private = 1 << 2, /// Default data sharing attribute 'private'.
+  DSA_firstprivate = 1 << 3, /// Default data sharing attribute 'firstprivate'.
 };
 
 /// Stack for tracking declarations used in OmpSs directives and
@@ -145,9 +149,10 @@ public:
     Stack.back().DefaultAttrLoc = Loc;
   }
   /// Set default data sharing attribute to shared.
-  void setDefaultDSAShared(SourceLocation Loc) {
+  void setDefault(
+      DefaultDataSharingAttributes DefaultAttr, SourceLocation Loc) {
     assert(!isStackEmpty());
-    Stack.back().DefaultAttr = DSA_shared;
+    Stack.back().DefaultAttr = DefaultAttr;
     Stack.back().DefaultAttrLoc = Loc;
   }
   void setThisExpr(CXXThisExpr *ThisE) {
@@ -466,6 +471,14 @@ public:
         case DSA_shared:
           // Record DSA as Ignored to avoid making the same node again
           Stack->addDSA(VD, E, OSSC_shared, /*Ignore=*/false, /*IsBase=*/true);
+          break;
+        case DSA_private:
+          // Record DSA as Ignored to avoid making the same node again
+          Stack->addDSA(VD, E, OSSC_private, /*Ignore=*/false, /*IsBase=*/true);
+          break;
+        case DSA_firstprivate:
+          // Record DSA as Ignored to avoid making the same node again
+          Stack->addDSA(VD, E, OSSC_firstprivate, /*Ignore=*/false, /*IsBase=*/true);
           break;
         case DSA_none:
           SemaRef.Diag(E->getExprLoc(), diag::err_oss_not_defined_dsa_when_default_none) << E->getDecl();
@@ -832,7 +845,7 @@ void Sema::EndOmpSsDSABlock(Stmt *CurDirective) {
 
 static std::string
 getListOfPossibleValues(OmpSsClauseKind K, unsigned First, unsigned Last,
-                        ArrayRef<unsigned> Exclude = llvm::None) {
+                        ArrayRef<unsigned> Exclude = std::nullopt) {
   SmallString<256> Buffer;
   llvm::raw_svector_ostream Out(Buffer);
   unsigned Skipped = Exclude.size();
@@ -4513,14 +4526,14 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     ArrayRef<Expr *> TmpList(Reductions_it, Reductions_it + ReductionListSizes[i]);
     OmpSsClauseKind CKind = (OmpSsClauseKind)ReductionClauseType[i];
     CXXScopeSpec ScopeSpec = ReductionCXXScopeSpecs[i];
-    // UnresolvedReductions is llvm::None when parsing the first time. Pass
-    // llvm::None.
+    // UnresolvedReductions is std::nullopt when parsing the first time. Pass
+    // std::nullopt.
     // In instantiation we will get an array with all the info for the reductions, build
     // the subarray associated to each reduction list (like with TmpList
     if (UnresolvedReductions.empty()) {
       actOnOSSReductionKindClause(
         *this, DSAStack, CKind, TmpList, ScopeSpec, ReductionIds[i],
-        llvm::None, RD, /*Outline=*/true);
+        std::nullopt, RD, /*Outline=*/true);
     } else {
       actOnOSSReductionKindClause(
         *this, DSAStack, CKind, TmpList, ScopeSpec, ReductionIds[i],
@@ -5632,7 +5645,7 @@ Sema::ActOnOmpSsSimpleClause(OmpSsClauseKind Kind,
   switch (Kind) {
   case OSSC_default:
     Res =
-    ActOnOmpSsDefaultClause(static_cast<OmpSsDefaultClauseKind>(Argument),
+    ActOnOmpSsDefaultClause(static_cast<llvm::oss::DefaultKind>(Argument),
                                  ArgumentLoc, StartLoc, LParenLoc, EndLoc);
     break;
   case OSSC_device:
@@ -5646,24 +5659,34 @@ Sema::ActOnOmpSsSimpleClause(OmpSsClauseKind Kind,
   return Res;
 }
 
-OSSClause *Sema::ActOnOmpSsDefaultClause(OmpSsDefaultClauseKind Kind,
+OSSClause *Sema::ActOnOmpSsDefaultClause(llvm::oss::DefaultKind Kind,
                                           SourceLocation KindKwLoc,
                                           SourceLocation StartLoc,
                                           SourceLocation LParenLoc,
                                           SourceLocation EndLoc) {
-  switch (Kind) {
-  case OSSC_DEFAULT_none:
-    DSAStack->setDefaultDSANone(KindKwLoc);
-    break;
-  case OSSC_DEFAULT_shared:
-    DSAStack->setDefaultDSAShared(KindKwLoc);
-    break;
-  case OSSC_DEFAULT_unknown:
+  if (Kind == OSS_DEFAULT_unknown) {
     Diag(KindKwLoc, diag::err_oss_unexpected_clause_value)
         << getListOfPossibleValues(OSSC_default, /*First=*/0,
-                                   /*Last=*/OSSC_DEFAULT_unknown)
+                                   /*Last=*/unsigned(OSS_DEFAULT_unknown))
         << getOmpSsClauseName(OSSC_default);
     return nullptr;
+  }
+
+  switch (Kind) {
+  case OSS_DEFAULT_none:
+    DSAStack->setDefaultDSANone(KindKwLoc);
+    break;
+  case OSS_DEFAULT_shared:
+    DSAStack->setDefault(DSA_shared, KindKwLoc);
+    break;
+  case OSS_DEFAULT_private:
+    DSAStack->setDefault(DSA_private, KindKwLoc);
+    break;
+  case OSS_DEFAULT_firstprivate:
+    DSAStack->setDefault(DSA_firstprivate, KindKwLoc);
+    break;
+  default:
+    llvm_unreachable("DSA unexpected in OmpSs-2 default clause");
   }
   return new (Context)
       OSSDefaultClause(Kind, KindKwLoc, StartLoc, LParenLoc, EndLoc);

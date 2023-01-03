@@ -61,10 +61,8 @@ public:
   AMDGPUToolChain(const Driver &D, const llvm::Triple &Triple,
                   const llvm::opt::ArgList &Args);
   unsigned GetDefaultDwarfVersion() const override { return 5; }
-  bool IsIntegratedAssemblerDefault() const override { return true; }
-  bool IsMathErrnoDefault() const override { return false; }
 
-  bool useIntegratedAs() const override { return true; }
+  bool IsMathErrnoDefault() const override { return false; }
   bool isCrossCompiling() const override { return true; }
   bool isPICDefault() const override { return false; }
   bool isPIEDefault(const llvm::opt::ArgList &Args) const override {
@@ -107,6 +105,9 @@ public:
   llvm::Error getSystemGPUArch(const llvm::opt::ArgList &Args,
                                std::string &GPUArch) const;
 
+  llvm::Error detectSystemGPUs(const llvm::opt::ArgList &Args,
+                               SmallVector<std::string, 1> &GPUArchs) const;
+
 protected:
   /// Check and diagnose invalid target ID specified by -mcpu.
   virtual void checkTargetID(const llvm::opt::ArgList &DriverArgs) const;
@@ -126,8 +127,6 @@ protected:
   /// Get GPU arch from -mcpu without checking.
   StringRef getGPUArch(const llvm::opt::ArgList &DriverArgs) const;
 
-  llvm::Error detectSystemGPUs(const llvm::opt::ArgList &Args,
-                               SmallVector<std::string, 1> &GPUArchs) const;
 };
 
 class LLVM_LIBRARY_VISIBILITY ROCMToolChain : public AMDGPUToolChain {

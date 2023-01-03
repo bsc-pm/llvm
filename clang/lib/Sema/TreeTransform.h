@@ -44,6 +44,7 @@
 #include <algorithm>
 
 using namespace llvm::omp;
+using namespace llvm::oss;
 
 namespace clang {
 using namespace sema;
@@ -796,10 +797,11 @@ public:
   OMPClause *Transform##Class(Class *S);
 #include "llvm/Frontend/OpenMP/OMP.inc"
 
-#define OMPSS_CLAUSE(Name, Class)                        \
-  LLVM_ATTRIBUTE_NOINLINE \
-  OSSClause *Transform ## Class(Class *S);
-#include "clang/Basic/OmpSsKinds.def"
+#define GEN_CLANG_CLAUSE_CLASS
+#define CLAUSE_CLASS(Enum, Str, Class)                                         \
+  LLVM_ATTRIBUTE_NOINLINE                                                      \
+  OSSClause *Transform##Class(Class *S);
+#include "llvm/Frontend/OmpSs/OSS.inc"
 
   /// Build a new qualified type given its unqualified type and type location.
   ///
@@ -1965,7 +1967,7 @@ public:
   ///
   /// By default, performs semantic analysis to build the new OpenMP clause.
   /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPDefaultClause(DefaultKind Kind, SourceLocation KindKwLoc,
+  OMPClause *RebuildOMPDefaultClause(llvm::omp::DefaultKind Kind, SourceLocation KindKwLoc,
                                      SourceLocation StartLoc,
                                      SourceLocation LParenLoc,
                                      SourceLocation EndLoc) {
@@ -2480,13 +2482,12 @@ public:
   ///
   /// By default, performs semantic analysis to build the new OpenMP clause.
   /// Subclasses may override this routine to provide different behavior.
-  OMPClause *RebuildOMPOrderClause(OpenMPOrderClauseKind Kind,
-                                   SourceLocation KindKwLoc,
-                                   SourceLocation StartLoc,
-                                   SourceLocation LParenLoc,
-                                   SourceLocation EndLoc) {
-    return getSema().ActOnOpenMPOrderClause(Kind, KindKwLoc, StartLoc,
-                                            LParenLoc, EndLoc);
+  OMPClause *RebuildOMPOrderClause(
+      OpenMPOrderClauseKind Kind, SourceLocation KindKwLoc,
+      SourceLocation StartLoc, SourceLocation LParenLoc, SourceLocation EndLoc,
+      OpenMPOrderClauseModifier Modifier, SourceLocation ModifierKwLoc) {
+    return getSema().ActOnOpenMPOrderClause(Modifier, Kind, StartLoc, LParenLoc,
+                                            ModifierKwLoc, KindKwLoc, EndLoc);
   }
 
   /// Build a new OpenMP 'init' clause.
@@ -3830,9 +3831,10 @@ public:
   }
 
   concepts::NestedRequirement *
-  RebuildNestedRequirement(
-      concepts::Requirement::SubstitutionDiagnostic *SubstDiag) {
-    return SemaRef.BuildNestedRequirement(SubstDiag);
+  RebuildNestedRequirement(StringRef InvalidConstraintEntity,
+                           const ASTConstraintSatisfaction &Satisfaction) {
+    return SemaRef.BuildNestedRequirement(InvalidConstraintEntity,
+                                          Satisfaction);
   }
 
   concepts::NestedRequirement *RebuildNestedRequirement(Expr *Constraint) {
@@ -4132,6 +4134,16 @@ public:
     return getSema().BuildEmptyCXXFoldExpr(EllipsisLoc, Operator);
   }
 
+  ExprResult RebuildCXXParenListInitExpr(ArrayRef<Expr *> Args, QualType T,
+                                         unsigned NumUserSpecifiedExprs,
+                                         SourceLocation InitLoc,
+                                         SourceLocation LParenLoc,
+                                         SourceLocation RParenLoc) {
+    return CXXParenListInitExpr::Create(getSema().Context, Args, T,
+                                        NumUserSpecifiedExprs, InitLoc,
+                                        LParenLoc, RParenLoc);
+  }
+
   /// Build a new atomic operation expression.
   ///
   /// By default, performs semantic analysis to build the new expression.
@@ -4233,10 +4245,11 @@ OSSClause *TreeTransform<Derived>::TransformOSSClause(OSSClause *S) {
   switch (S->getClauseKind()) {
   default: break;
   // Transform individual clause nodes
-#define OMPSS_CLAUSE(Name, Class)                                             \
-  case OSSC_ ## Name :                                                         \
-    return getDerived().Transform ## Class(cast<Class>(S));
-#include "clang/Basic/OmpSsKinds.def"
+#define GEN_CLANG_CLAUSE_CLASS
+#define CLAUSE_CLASS(Enum, Str, Class)                                         \
+  case Enum:                                                                   \
+    return getDerived().Transform##Class(cast<Class>(S));
+#include "llvm/Frontend/OmpSs/OSS.inc"
   }
 
   return S;
@@ -10906,9 +10919,9 @@ TreeTransform<Derived>::TransformOMPAffinityClause(OMPAffinityClause *C) {
 
 template <typename Derived>
 OMPClause *TreeTransform<Derived>::TransformOMPOrderClause(OMPOrderClause *C) {
-  return getDerived().RebuildOMPOrderClause(C->getKind(), C->getKindKwLoc(),
-                                            C->getBeginLoc(), C->getLParenLoc(),
-                                            C->getEndLoc());
+  return getDerived().RebuildOMPOrderClause(
+      C->getKind(), C->getKindKwLoc(), C->getBeginLoc(), C->getLParenLoc(),
+      C->getEndLoc(), C->getModifier(), C->getModifierKwLoc());
 }
 
 template <typename Derived>
@@ -13759,10 +13772,10 @@ template<typename Derived>
 concepts::NestedRequirement *
 TreeTransform<Derived>::TransformNestedRequirement(
     concepts::NestedRequirement *Req) {
-  if (Req->isSubstitutionFailure()) {
+  if (Req->hasInvalidConstraint()) {
     if (getDerived().AlwaysRebuild())
       return getDerived().RebuildNestedRequirement(
-          Req->getSubstitutionDiagnostic());
+          Req->getInvalidConstraintEntity(), Req->getConstraintSatisfaction());
     return Req;
   }
   ExprResult TransConstraint =
@@ -14943,6 +14956,20 @@ TreeTransform<Derived>::TransformCXXFoldExpr(CXXFoldExpr *E) {
                                                 E->getOperator());
 
   return Result;
+}
+
+template <typename Derived>
+ExprResult
+TreeTransform<Derived>::TransformCXXParenListInitExpr(CXXParenListInitExpr *E) {
+  SmallVector<Expr *, 4> TransformedInits;
+  ArrayRef<Expr *> InitExprs = E->getInitExprs();
+  if (TransformExprs(InitExprs.data(), InitExprs.size(), true,
+                     TransformedInits))
+    return ExprError();
+
+  return getDerived().RebuildCXXParenListInitExpr(
+      TransformedInits, E->getType(), E->getUserSpecifiedInitExprs().size(),
+      E->getInitLoc(), E->getBeginLoc(), E->getEndLoc());
 }
 
 template<typename Derived>

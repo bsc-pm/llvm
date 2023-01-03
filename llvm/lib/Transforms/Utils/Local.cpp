@@ -17,7 +17,6 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -456,7 +455,6 @@ bool llvm::wouldInstructionBeTriviallyDead(Instruction *I,
     case Intrinsic::wasm_trunc_unsigned:
     case Intrinsic::ptrauth_auth:
     case Intrinsic::ptrauth_resign:
-    case Intrinsic::ptrauth_sign:
       return true;
     default:
       return false;
@@ -3031,9 +3029,9 @@ struct BitPart {
 ///
 /// Because we pass around references into \c BPS, we must use a container that
 /// does not invalidate internal references (std::map instead of DenseMap).
-static const Optional<BitPart> &
+static const std::optional<BitPart> &
 collectBitParts(Value *V, bool MatchBSwaps, bool MatchBitReversals,
-                std::map<Value *, Optional<BitPart>> &BPS, int Depth,
+                std::map<Value *, std::optional<BitPart>> &BPS, int Depth,
                 bool &FoundRoot) {
   auto I = BPS.find(V);
   if (I != BPS.end())
@@ -3283,7 +3281,7 @@ bool llvm::recognizeBSwapOrBitReverseIdiom(
 
   // Try to find all the pieces corresponding to the bswap.
   bool FoundRoot = false;
-  std::map<Value *, Optional<BitPart>> BPS;
+  std::map<Value *, std::optional<BitPart>> BPS;
   const auto &Res =
       collectBitParts(I, MatchBSwaps, MatchBitReversals, BPS, 0, FoundRoot);
   if (!Res)

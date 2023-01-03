@@ -278,6 +278,14 @@ struct CUDADeviceTy : public GenericDeviceTy {
                                  GridValues.GV_Warp_Size))
       return Err;
 
+    if (auto Err = getDeviceAttr(CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR,
+                                 ComputeCapability.Major))
+      return Err;
+
+    if (auto Err = getDeviceAttr(CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR,
+                                 ComputeCapability.Minor))
+      return Err;
+
     return Plugin::success();
   }
 
@@ -484,6 +492,24 @@ struct CUDADeviceTy : public GenericDeviceTy {
     AsyncInfo.Queue = nullptr;
 
     return Plugin::check(Res, "Error in cuStreamSynchronize: %s");
+  }
+
+  /// Query for the completion of the pending operations on the async info.
+  Error queryAsyncImpl(__tgt_async_info &AsyncInfo) override {
+    CUstream Stream = reinterpret_cast<CUstream>(AsyncInfo.Queue);
+    CUresult Res = cuStreamQuery(Stream);
+
+    // Not ready streams must be considered as successful operations.
+    if (Res == CUDA_ERROR_NOT_READY)
+      return Plugin::success();
+
+    // Once the stream is synchronized and the operations completed (or an error
+    // occurs), return it to stream pool and reset AsyncInfo. This is to make
+    // sure the synchronization only works for its own tasks.
+    CUDAStreamManager.returnResource(Stream);
+    AsyncInfo.Queue = nullptr;
+
+    return Plugin::check(Res, "Error in cuStreamQuery: %s");
   }
 
   /// Submit data to the device (host to device transfer).
@@ -776,6 +802,9 @@ struct CUDADeviceTy : public GenericDeviceTy {
     return Plugin::check(Res, "Error in cuDeviceGetAttribute: %s");
   }
 
+  /// See GenericDeviceTy::getArch().
+  std::string getArch() const override { return ComputeCapability.str(); }
+
 private:
   using CUDAStreamManagerTy = GenericDeviceResourceManagerTy<CUDAStreamRef>;
   using CUDAEventManagerTy = GenericDeviceResourceManagerTy<CUDAEventRef>;
@@ -792,6 +821,15 @@ private:
 
   /// The CUDA device handler.
   CUdevice Device = CU_DEVICE_INVALID;
+
+  /// The compute capability of the corresponding CUDA device.
+  struct ComputeCapabilityTy {
+    uint32_t Major;
+    uint32_t Minor;
+    std::string str() const {
+      return "sm_" + std::to_string(Major * 10 + Minor);
+    }
+  } ComputeCapability;
 };
 
 Error CUDAKernelTy::launchImpl(GenericDeviceTy &GenericDevice,
@@ -889,6 +927,11 @@ struct CUDAPluginTy final : public GenericPluginTy {
 
   /// Get the ELF code for recognizing the compatible image binary.
   uint16_t getMagicElfBits() const override { return ELF::EM_CUDA; }
+
+  Triple::ArchType getTripleArch() const override {
+    // TODO: I think we can drop the support for 32-bit NVPTX devices.
+    return Triple::nvptx64;
+  }
 
   /// Check whether the image is compatible with the available CUDA devices.
   Expected<bool> isImageCompatible(__tgt_image_info *Info) const override {

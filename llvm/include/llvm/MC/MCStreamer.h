@@ -667,10 +667,9 @@ public:
   ///
   /// \param Symbol - The common symbol to emit.
   /// \param Size - The size of the common symbol.
-  /// \param ByteAlignment - The alignment of the symbol if
-  /// non-zero. This must be a power of 2.
+  /// \param ByteAlignment - The alignment of the symbol.
   virtual void emitCommonSymbol(MCSymbol *Symbol, uint64_t Size,
-                                unsigned ByteAlignment) = 0;
+                                Align ByteAlignment) = 0;
 
   /// Emit a local common (.lcomm) symbol.
   ///
@@ -758,11 +757,11 @@ public:
 
   /// Special case of EmitULEB128Value that avoids the client having to
   /// pass in a MCExpr for constant integers.
-  void emitULEB128IntValue(uint64_t Value, unsigned PadTo = 0);
+  unsigned emitULEB128IntValue(uint64_t Value, unsigned PadTo = 0);
 
   /// Special case of EmitSLEB128Value that avoids the client having to
   /// pass in a MCExpr for constant integers.
-  void emitSLEB128IntValue(int64_t Value);
+  unsigned emitSLEB128IntValue(int64_t Value);
 
   /// Special case of EmitValue that avoids the client having to pass in
   /// a MCExpr for MCSymbols.

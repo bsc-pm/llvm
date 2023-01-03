@@ -16,10 +16,12 @@
 #include "CodeGenFunction.h"
 #include "CodeGenModule.h"
 #include "TargetInfo.h"
+#include "clang/AST/OmpSsClause.h"
 #include "clang/AST/Stmt.h"
 #include "clang/AST/StmtOmpSs.h"
 using namespace clang;
 using namespace CodeGen;
+using namespace llvm::oss;
 
 static void AddDSASharedData(const OSSExecutableDirective &S, SmallVectorImpl<const Expr *> &Data) {
   // All DSAs are DeclRefExpr or CXXThisExpr

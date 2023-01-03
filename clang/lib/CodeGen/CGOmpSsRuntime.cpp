@@ -19,6 +19,7 @@
 #include "ConstantEmitter.h"
 #include "clang/CodeGen/ConstantInitBuilder.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/OmpSsClause.h"
 #include "clang/AST/StmtOmpSs.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/Basic/BitmaskEnum.h"
@@ -37,6 +38,7 @@
 
 using namespace clang;
 using namespace CodeGen;
+using namespace llvm::oss;
 
 namespace {
 
@@ -2509,8 +2511,10 @@ void CGOmpSsRuntime::setTaskNormalCleanupDestSlot(Address Addr) {
 // Borrowed brom CodeGenFunction.cpp
 static void EmitIfUsed(CodeGenFunction &CGF, llvm::BasicBlock *BB) {
   if (!BB) return;
-  if (!BB->use_empty())
-    return CGF.CurFn->getBasicBlockList().push_back(BB);
+  if (!BB->use_empty()) {
+    CGF.CurFn->insert(CGF.CurFn->end(), BB);
+    return;
+  }
   delete BB;
 }
 
@@ -2551,7 +2555,7 @@ static VarDecl *createImplicitVarDecl(
 
 static DeclRefExpr *emitTaskCallArg(
     CodeGenFunction &CGF, StringRef Name, QualType Q, SourceLocation Loc,
-    llvm::Optional<const Expr *> InitE = llvm::None) {
+    llvm::Optional<const Expr *> InitE = std::nullopt) {
 
   ASTContext &Ctx = CGF.getContext();
 

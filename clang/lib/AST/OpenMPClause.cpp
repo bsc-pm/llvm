@@ -315,7 +315,7 @@ OMPClause::child_range OMPNumTasksClause::used_children() {
 OMPClause::child_range OMPFinalClause::used_children() {
   if (Stmt **C = getAddrOfExprAsWritten(getPreInitStmt()))
     return child_range(C, C + 1);
-  return child_range(&Condition, &Condition + 1);
+  return children();
 }
 
 OMPClause::child_range OMPPriorityClause::used_children() {
@@ -327,13 +327,13 @@ OMPClause::child_range OMPPriorityClause::used_children() {
 OMPClause::child_range OMPNovariantsClause::used_children() {
   if (Stmt **C = getAddrOfExprAsWritten(getPreInitStmt()))
     return child_range(C, C + 1);
-  return child_range(&Condition, &Condition + 1);
+  return children();
 }
 
 OMPClause::child_range OMPNocontextClause::used_children() {
   if (Stmt **C = getAddrOfExprAsWritten(getPreInitStmt()))
     return child_range(C, C + 1);
-  return child_range(&Condition, &Condition + 1);
+  return children();
 }
 
 OMPOrderedClause *OMPOrderedClause::Create(const ASTContext &C, Expr *Num,
@@ -2372,8 +2372,12 @@ void OMPClausePrinter::VisitOMPNontemporalClause(OMPNontemporalClause *Node) {
 }
 
 void OMPClausePrinter::VisitOMPOrderClause(OMPOrderClause *Node) {
-  OS << "order(" << getOpenMPSimpleClauseTypeName(OMPC_order, Node->getKind())
-     << ")";
+  OS << "order(";
+  if (Node->getModifier() != OMPC_ORDER_MODIFIER_unknown) {
+    OS << getOpenMPSimpleClauseTypeName(OMPC_order, Node->getModifier());
+    OS << ": ";
+  }
+  OS << getOpenMPSimpleClauseTypeName(OMPC_order, Node->getKind()) << ")";
 }
 
 void OMPClausePrinter::VisitOMPInclusiveClause(OMPInclusiveClause *Node) {

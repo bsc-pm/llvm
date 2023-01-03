@@ -530,7 +530,7 @@ void Parser::ParseLexedMethodDeclaration(LateParsedMethodDeclaration &LM) {
 
     for (size_t i = 0; i < DirToks.size(); ++i) {
       if (DirDGs[i].get().getSingleDecl() == LM.Method) {
-        Actions.StartOmpSsDSABlock(OSSD_task, Actions.getCurScope(), DirLocs[i]);
+        Actions.StartOmpSsDSABlock(llvm::oss::OSSD_task, Actions.getCurScope(), DirLocs[i]);
         ParseOSSDeclareTaskClauses(DirDGs[i], DirToks[i], DirLocs[i]);
         Actions.EndOmpSsDSABlock(nullptr);
       }
