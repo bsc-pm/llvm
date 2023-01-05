@@ -346,7 +346,7 @@ public:
 
   // Walk down into the type and look for VLA expressions.
   void FillTypeVLASizes(const Expr *E) {
-    QualType type = E->getType();
+    QualType type = E->getType().getCanonicalType();
     while (type->isVariablyModifiedType()) {
       if (type->isPointerType()) {
         type = type->getPointeeType();
