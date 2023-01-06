@@ -4235,7 +4235,7 @@ static Value *simplifyWithOpReplaced(Value *V, Value *Op, Value *RepOp,
 
     if (auto *GEP = dyn_cast<GetElementPtrInst>(I))
       return PreventSelfSimplify(simplifyGEPInst(
-          GEP->getSourceElementType(), NewOps[0], makeArrayRef(NewOps).slice(1),
+          GEP->getSourceElementType(), NewOps[0], ArrayRef(NewOps).slice(1),
           GEP->isInBounds(), Q, MaxRecurse - 1));
 
     if (isa<SelectInst>(I))
@@ -4604,6 +4604,23 @@ static Value *simplifySelectInst(Value *Cond, Value *TrueVal, Value *FalseVal,
   // select ?, X, X -> X
   if (TrueVal == FalseVal)
     return TrueVal;
+
+  if (Cond == TrueVal) {
+    // select i1 X, i1 X, i1 false --> X (logical-and)
+    if (match(FalseVal, m_ZeroInt()))
+      return Cond;
+    // select i1 X, i1 X, i1 true --> true
+    if (match(FalseVal, m_One()))
+      return ConstantInt::getTrue(Cond->getType());
+  }
+  if (Cond == FalseVal) {
+    // select i1 X, i1 true, i1 X --> X (logical-or)
+    if (match(TrueVal, m_One()))
+      return Cond;
+    // select i1 X, i1 false, i1 X --> false
+    if (match(TrueVal, m_ZeroInt()))
+      return ConstantInt::getFalse(Cond->getType());
+  }
 
   // If the true or false value is poison, we can fold to the other value.
   // If the true or false value is undef, we can fold to the other value as
@@ -6608,8 +6625,7 @@ static Value *simplifyInstructionWithOperands(Instruction *I,
   case Instruction::GetElementPtr: {
     auto *GEPI = cast<GetElementPtrInst>(I);
     return simplifyGEPInst(GEPI->getSourceElementType(), NewOps[0],
-                           makeArrayRef(NewOps).slice(1), GEPI->isInBounds(),
-                           Q);
+                           ArrayRef(NewOps).slice(1), GEPI->isInBounds(), Q);
   }
   case Instruction::InsertValue: {
     InsertValueInst *IV = cast<InsertValueInst>(I);
