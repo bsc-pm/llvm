@@ -9,6 +9,7 @@
 #include "gtest/gtest.h"
 
 #include <initializer_list>
+#include <optional>
 #include <tuple>
 
 #include "Plugins/Platform/FreeBSD/PlatformFreeBSD.h"
@@ -67,7 +68,7 @@ public:
     }
 
     EXPECT_EQ(total_offset, offset * 8);
-    EXPECT_EQ(field_type.GetByteSize(nullptr), llvm::Optional<uint64_t>(size));
+    EXPECT_EQ(field_type.GetByteSize(nullptr), std::optional<uint64_t>(size));
   }
 
   void ExpectFields(const CompilerType &container,
@@ -81,15 +82,19 @@ public:
 
     switch (arch.GetTriple().getOS()) {
     case llvm::Triple::FreeBSD:
-      platform_sp =
-          platform_freebsd::PlatformFreeBSD::CreateInstance(true, &arch);
+      platform_sp = platform_freebsd::PlatformFreeBSD::CreateInstance(
+          true, &arch, /*debugger=*/nullptr,
+          /*metadata=*/nullptr);
       break;
     case llvm::Triple::Linux:
-      platform_sp = platform_linux::PlatformLinux::CreateInstance(true, &arch);
+      platform_sp = platform_linux::PlatformLinux::CreateInstance(
+          true, &arch, /*debugger=*/nullptr,
+          /*metadata=*/nullptr);
       break;
     case llvm::Triple::NetBSD:
-      platform_sp =
-          platform_netbsd::PlatformNetBSD::CreateInstance(true, &arch);
+      platform_sp = platform_netbsd::PlatformNetBSD::CreateInstance(
+          true, &arch, /*debugger=*/nullptr,
+          /*metadata=*/nullptr);
       break;
     default:
       llvm_unreachable("unknown ostype in triple");

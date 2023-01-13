@@ -13,6 +13,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -20,6 +21,7 @@
 #include "lldb/Core/UserSettingsController.h"
 #include "lldb/Host/File.h"
 #include "lldb/Interpreter/Options.h"
+#include "lldb/Interpreter/ScriptedMetadata.h"
 #include "lldb/Utility/ArchSpec.h"
 #include "lldb/Utility/ConstString.h"
 #include "lldb/Utility/FileSpec.h"
@@ -98,7 +100,8 @@ public:
 
   static void SetHostPlatform(const lldb::PlatformSP &platform_sp);
 
-  static lldb::PlatformSP Create(llvm::StringRef name);
+  static lldb::PlatformSP Create(llvm::StringRef name, const Debugger *debugger,
+                                 const ScriptedMetadata *metadata);
 
   /// Augments the triple either with information from platform or the host
   /// system (if platform is null).
@@ -203,9 +206,9 @@ public:
 
   bool SetOSVersion(llvm::VersionTuple os_version);
 
-  llvm::Optional<std::string> GetOSBuildString();
+  std::optional<std::string> GetOSBuildString();
 
-  llvm::Optional<std::string> GetOSKernelDescription();
+  std::optional<std::string> GetOSKernelDescription();
 
   // Returns the name of the platform
   llvm::StringRef GetName() { return GetPluginName(); }
@@ -231,11 +234,11 @@ public:
   // HostInfo::GetOSVersion().
   virtual bool GetRemoteOSVersion() { return false; }
 
-  virtual llvm::Optional<std::string> GetRemoteOSBuildString() {
+  virtual std::optional<std::string> GetRemoteOSBuildString() {
     return std::nullopt;
   }
 
-  virtual llvm::Optional<std::string> GetRemoteOSKernelDescription() {
+  virtual std::optional<std::string> GetRemoteOSKernelDescription() {
     return std::nullopt;
   }
 
@@ -973,7 +976,7 @@ private:
 
 class PlatformList {
 public:
-  PlatformList() = default;
+  PlatformList(Debugger &debugger) : m_debugger(debugger) {}
 
   ~PlatformList() = default;
 
@@ -1028,13 +1031,16 @@ public:
     }
   }
 
-  lldb::PlatformSP GetOrCreate(llvm::StringRef name);
+  lldb::PlatformSP GetOrCreate(llvm::StringRef name,
+                               const ScriptedMetadata *metadata);
   lldb::PlatformSP GetOrCreate(const ArchSpec &arch,
                                const ArchSpec &process_host_arch,
-                               ArchSpec *platform_arch_ptr, Status &error);
+                               ArchSpec *platform_arch_ptr, Status &error,
+                               const ScriptedMetadata *metadata);
   lldb::PlatformSP GetOrCreate(const ArchSpec &arch,
                                const ArchSpec &process_host_arch,
-                               ArchSpec *platform_arch_ptr);
+                               ArchSpec *platform_arch_ptr,
+                               const ScriptedMetadata *metadata);
 
   /// Get the platform for the given list of architectures.
   ///
@@ -1050,9 +1056,11 @@ public:
   /// given architecture.
   lldb::PlatformSP GetOrCreate(llvm::ArrayRef<ArchSpec> archs,
                                const ArchSpec &process_host_arch,
-                               std::vector<lldb::PlatformSP> &candidates);
+                               std::vector<lldb::PlatformSP> &candidates,
+                               const ScriptedMetadata *metadata);
 
-  lldb::PlatformSP Create(llvm::StringRef name);
+  lldb::PlatformSP Create(llvm::StringRef name,
+                          const ScriptedMetadata *metadata);
 
   /// Detect a binary in memory that will determine which Platform and
   /// DynamicLoader should be used in this target/process, and update
@@ -1089,6 +1097,7 @@ protected:
 private:
   PlatformList(const PlatformList &) = delete;
   const PlatformList &operator=(const PlatformList &) = delete;
+  Debugger &m_debugger;
 };
 
 class OptionGroupPlatformRSync : public lldb_private::OptionGroup {
