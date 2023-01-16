@@ -30,6 +30,7 @@ def Vector_Dialect : Dialect {
   let useDefaultAttributePrinterParser = 1;
   let hasConstantMaterializer = 1;
   let dependentDialects = ["arith::ArithDialect"];
+  let useFoldAPI = kEmitFoldAdaptorFolder;
 }
 
 // Base class for Vector dialect ops.
@@ -575,8 +576,6 @@ def Vector_ExtractElementOp :
   let builders = [
     // 0-D builder.
     OpBuilder<(ins "Value":$source)>,
-    // 1-D + position builder.
-    OpBuilder<(ins "Value":$source, "Value":$position)>,
   ];
   let extraClassDeclaration = [{
     VectorType getVectorType() {

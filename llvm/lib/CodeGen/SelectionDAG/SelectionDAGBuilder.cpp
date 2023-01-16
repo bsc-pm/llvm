@@ -3948,7 +3948,7 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
           DAG.getDataLayout().getTypeAllocSize(GTI.getIndexedType());
       // We intentionally mask away the high bits here; ElementSize may not
       // fit in IdxTy.
-      APInt ElementMul(IdxSize, ElementSize.getKnownMinSize());
+      APInt ElementMul(IdxSize, ElementSize.getKnownMinValue());
       bool ElementScalable = ElementSize.isScalable();
 
       // If this is a scalar constant or a splat vector of constants,
@@ -5579,17 +5579,20 @@ bool SelectionDAGBuilder::EmitFuncArgumentDbgValue(
       // For VRegs, in instruction referencing mode, create a DBG_INSTR_REF
       // pointing at the VReg, which will be patched up later.
       auto &Inst = TII->get(TargetOpcode::DBG_INSTR_REF);
-      auto MIB = BuildMI(MF, DL, Inst);
-      MIB.addReg(Reg);
-      MIB.addImm(0);
-      MIB.addMetadata(Variable);
+      SmallVector<MachineOperand, 1> MOs({MachineOperand::CreateReg(
+          /* Reg */ Reg, /* isDef */ false, /* isImp */ false,
+          /* isKill */ false, /* isDead */ false,
+          /* isUndef */ false, /* isEarlyClobber */ false,
+          /* SubReg */ 0, /* isDebug */ true)});
+
       auto *NewDIExpr = FragExpr;
       // We don't have an "Indirect" field in DBG_INSTR_REF, fold that into
       // the DIExpression.
       if (Indirect)
         NewDIExpr = DIExpression::prepend(FragExpr, DIExpression::DerefBefore);
-      MIB.addMetadata(NewDIExpr);
-      return MIB;
+      SmallVector<uint64_t, 2> Ops({dwarf::DW_OP_LLVM_arg, 0});
+      NewDIExpr = DIExpression::prependOpcodes(NewDIExpr, Ops);
+      return BuildMI(MF, DL, Inst, false, MOs, Variable, NewDIExpr);
     } else {
       // Create a completely standard DBG_VALUE.
       auto &Inst = TII->get(TargetOpcode::DBG_VALUE);
@@ -7781,11 +7784,13 @@ void SelectionDAGBuilder::visitVectorPredicationIntrinsic(
     setValue(&VPIntrin, N);
     break;
   }
+  case ISD::VP_ABS:
   case ISD::VP_CTLZ:
   case ISD::VP_CTLZ_ZERO_UNDEF:
   case ISD::VP_CTTZ:
   case ISD::VP_CTTZ_ZERO_UNDEF: {
-    // Pop is_zero_poison operand.
+    // Pop is_zero_poison operand for cp.ctlz/cttz or
+    // is_int_min_poison operand for vp.abs.
     OpValues.pop_back();
     SDValue Result = DAG.getNode(Opcode, DL, VTs, OpValues);
     setValue(&VPIntrin, Result);
@@ -8893,7 +8898,7 @@ void SelectionDAGBuilder::visitInlineAsm(const CallBase &Call,
   // memory and is nonvolatile.
   SDValue Flag, Chain = (HasSideEffect) ? getRoot() : DAG.getRoot();
 
-  bool EmitEHLabels = isa<InvokeInst>(Call) && IA->canThrow();
+  bool EmitEHLabels = isa<InvokeInst>(Call);
   if (EmitEHLabels) {
     assert(EHPadBB && "InvokeInst must have an EHPadBB");
   }
@@ -10140,7 +10145,7 @@ TargetLowering::LowerCallTo(TargetLowering::CallLoweringInfo &CLI) const {
         ISD::OutputArg MyFlags(
             Flags, Parts[j].getValueType().getSimpleVT(), VT,
             i < CLI.NumFixedArgs, i,
-            j * Parts[j].getValueType().getStoreSize().getKnownMinSize());
+            j * Parts[j].getValueType().getStoreSize().getKnownMinValue());
         if (NumParts > 1 && j == 0)
           MyFlags.Flags.setSplit();
         else if (j != 0) {
@@ -10667,8 +10672,9 @@ void SelectionDAGISel::LowerArguments(const Function &F) {
         // For scalable vectors, use the minimum size; individual targets
         // are responsible for handling scalable vector arguments and
         // return values.
-        ISD::InputArg MyFlags(Flags, RegisterVT, VT, isArgValueUsed,
-                 ArgNo, PartBase+i*RegisterVT.getStoreSize().getKnownMinSize());
+        ISD::InputArg MyFlags(
+            Flags, RegisterVT, VT, isArgValueUsed, ArgNo,
+            PartBase + i * RegisterVT.getStoreSize().getKnownMinValue());
         if (NumRegs > 1 && i == 0)
           MyFlags.Flags.setSplit();
         // if it isn't first piece, alignment must be 1
@@ -10681,7 +10687,7 @@ void SelectionDAGISel::LowerArguments(const Function &F) {
       }
       if (NeedsRegBlock && Value == NumValues - 1)
         Ins[Ins.size() - 1].Flags.setInConsecutiveRegsLast();
-      PartBase += VT.getStoreSize().getKnownMinSize();
+      PartBase += VT.getStoreSize().getKnownMinValue();
     }
   }
 

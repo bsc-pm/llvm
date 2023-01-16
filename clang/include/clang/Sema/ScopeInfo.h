@@ -1044,7 +1044,7 @@ public:
   }
 
   void visitPotentialCaptures(
-      llvm::function_ref<void(VarDecl *, Expr *)> Callback) const;
+      llvm::function_ref<void(ValueDecl *, Expr *)> Callback) const;
 };
 
 FunctionScopeInfo::WeakObjectProfileTy::WeakObjectProfileTy()

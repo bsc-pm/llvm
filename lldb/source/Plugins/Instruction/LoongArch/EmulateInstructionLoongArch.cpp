@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include <cstdlib>
+#include <optional>
 
 #include "EmulateInstructionLoongArch.h"
 #include "Plugins/Process/Utility/InstructionUtils.h"
@@ -65,6 +66,16 @@ EmulateInstructionLoongArch::GetOpcodeForInstruction(uint32_t inst) {
     if ((g_opcodes[i].mask & inst) == g_opcodes[i].value)
       return &g_opcodes[i];
   return nullptr;
+}
+
+bool EmulateInstructionLoongArch::TestExecute(uint32_t inst) {
+  Opcode *opcode_data = GetOpcodeForInstruction(inst);
+  if (!opcode_data)
+    return false;
+  // Call the Emulate... function.
+  if (!(this->*opcode_data->callback)(inst))
+    return false;
+  return true;
 }
 
 bool EmulateInstructionLoongArch::EvaluateInstruction(uint32_t options) {
@@ -129,7 +140,7 @@ bool EmulateInstructionLoongArch::WritePC(lldb::addr_t pc) {
                                LLDB_REGNUM_GENERIC_PC, pc);
 }
 
-llvm::Optional<RegisterInfo>
+std::optional<RegisterInfo>
 EmulateInstructionLoongArch::GetRegisterInfo(lldb::RegisterKind reg_kind,
                                              uint32_t reg_index) {
   if (reg_kind == eRegisterKindGeneric) {

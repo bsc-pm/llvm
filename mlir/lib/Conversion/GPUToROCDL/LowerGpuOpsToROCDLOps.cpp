@@ -224,6 +224,8 @@ void mlir::populateGpuToROCDLConversionPatterns(
                                    "__ocml_atan_f64");
   populateOpPatterns<math::Atan2Op>(converter, patterns, "__ocml_atan2_f32",
                                     "__ocml_atan2_f64");
+  populateOpPatterns<math::CbrtOp>(converter, patterns, "__ocml_cbrt_f32",
+                                   "__ocml_cbrt_f64");
   populateOpPatterns<math::CeilOp>(converter, patterns, "__ocml_ceil_f32",
                                    "__ocml_ceil_f64");
   populateOpPatterns<math::CosOp>(converter, patterns, "__ocml_cos_f32",
@@ -254,6 +256,8 @@ void mlir::populateGpuToROCDLConversionPatterns(
                                    "__ocml_sqrt_f64");
   populateOpPatterns<math::TanhOp>(converter, patterns, "__ocml_tanh_f32",
                                    "__ocml_tanh_f64");
+  populateOpPatterns<math::TanOp>(converter, patterns, "__ocml_tan_f32",
+                                  "__ocml_tan_f64");
 }
 
 std::unique_ptr<OperationPass<gpu::GPUModuleOp>>

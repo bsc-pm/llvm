@@ -5305,7 +5305,7 @@ QualType ASTContext::getObjCObjectType(QualType BaseType,
                                        ObjCProtocolDecl * const *Protocols,
                                        unsigned NumProtocols) const {
   return getObjCObjectType(BaseType, {},
-                           llvm::makeArrayRef(Protocols, NumProtocols),
+                           llvm::ArrayRef(Protocols, NumProtocols),
                            /*isKindOf=*/false);
 }
 

@@ -1,20 +1,20 @@
 ; RUN: mlir-translate -import-llvm -mlir-print-debuginfo -split-input-file %s | FileCheck %s
 
-; CHECK-LABEL: @unknown(
-define i32 @unknown(i32 %0) {
+; CHECK: #[[$MODULELOC:.+]] = loc({{.*}}debug-info.ll{{.*}}:0:0)
+
+; CHECK-LABEL: @module_loc(
+define i32 @module_loc(i32 %0) {
 entry:
   br label %next
 end:
-  ; CHECK: ^{{.*}}(%{{.+}}: i32 loc(unknown)):
+  ; CHECK: ^{{.*}}(%{{.+}}: i32 loc({{.*}}debug-info.ll{{.*}}:0:0)):
   %1 = phi i32 [ %2, %next ]
   ret i32 %1
 next:
-  ; CHECK: = llvm.mul %{{.+}}, %{{.+}} : i32 loc(#[[UNKNOWNLOC:.+]])
+  ; CHECK: = llvm.mul %{{.+}}, %{{.+}} : i32 loc(#[[$MODULELOC]])
   %2 = mul i32 %0, %0
   br label %end
 }
-
-; CHECK: #[[UNKNOWNLOC:.+]] = loc(unknown)
 
 ; // -----
 
@@ -269,3 +269,24 @@ declare void @llvm.dbg.declare(metadata, metadata, metadata)
 !7 = !DILocation(line: 1, column: 2, scope: !3)
 !8 = !DILocation(line: 2, column: 2, scope: !3)
 !9 = !DILocation(line: 3, column: 2, scope: !3)
+
+; // -----
+
+; CHECK-LABEL: @class_method
+define void @class_method(ptr %arg1) {
+  ; CHECK: llvm.return loc(#[[LOC:.+]])
+  ret void, !dbg !5
+}
+
+; CHECK: #[[COMP:.+]] = #llvm.di_composite_type<tag = DW_TAG_class_type, name = "class_name", file = #{{.*}}, line = 42, flags = "TypePassByReference|NonTrivial">
+; CHECK: #[[SP:.+]] = #llvm.di_subprogram<compileUnit = #{{.*}}, scope = #[[COMP]], name = "class_method", file = #{{.*}}, subprogramFlags = Definition>
+; CHECK: #[[LOC]] = loc(fused<#[[SP]]>
+
+!llvm.dbg.cu = !{!1}
+!llvm.module.flags = !{!0}
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2)
+!2 = !DIFile(filename: "debug-info.ll", directory: "/")
+!3 = !DICompositeType(tag: DW_TAG_class_type, name: "class_name", file: !2, line: 42, flags: DIFlagTypePassByReference | DIFlagNonTrivial)
+!4 = distinct !DISubprogram(name: "class_method", scope: !3, file: !2, spFlags: DISPFlagDefinition, unit: !1)
+!5 = !DILocation(line: 1, column: 2, scope: !4)

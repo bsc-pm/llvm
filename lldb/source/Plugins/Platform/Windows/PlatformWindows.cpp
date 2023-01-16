@@ -9,6 +9,7 @@
 #include "PlatformWindows.h"
 
 #include <cstdio>
+#include <optional>
 #if defined(_WIN32)
 #include "lldb/Host/windows/windows.h"
 #include <winsock2.h>
@@ -40,8 +41,9 @@ LLDB_PLUGIN_DEFINE(PlatformWindows)
 
 static uint32_t g_initialize_count = 0;
 
-PlatformSP PlatformWindows::CreateInstance(bool force,
-                                           const lldb_private::ArchSpec *arch) {
+PlatformSP PlatformWindows::CreateInstance(bool force, const ArchSpec *arch,
+                                           const Debugger *debugger,
+                                           const ScriptedMetadata *metadata) {
   // The only time we create an instance is when we are creating a remote
   // windows platform
   const bool is_host = false;
@@ -136,10 +138,12 @@ Status PlatformWindows::ConnectRemote(Args &args) {
         "can't connect to the host platform '{0}', always connected",
         GetPluginName());
   } else {
-    if (!m_remote_platform_sp)
+    if (!m_remote_platform_sp) {
       m_remote_platform_sp =
           platform_gdb_server::PlatformRemoteGDBServer::CreateInstance(
-              /*force=*/true, nullptr);
+              /*force=*/true, /*arch=*/nullptr, /*debugger=*/nullptr,
+              /*metadata=*/nullptr);
+    }
 
     if (m_remote_platform_sp) {
       if (error.Success()) {
@@ -225,7 +229,7 @@ uint32_t PlatformWindows::DoLoadImage(Process *process,
 
   /* Inject paths parameter into inferior */
   lldb::addr_t injected_paths{0x0};
-  llvm::Optional<llvm::detail::scope_exit<std::function<void()>>> paths_cleanup;
+  std::optional<llvm::detail::scope_exit<std::function<void()>>> paths_cleanup;
   if (paths) {
     llvm::SmallVector<llvm::UTF16, 261> search_paths;
 
@@ -335,19 +339,21 @@ uint32_t PlatformWindows::DoLoadImage(Process *process,
     return LLDB_INVALID_IMAGE_TOKEN;
   }
 
-  auto parameter_cleanup = llvm::make_scope_exit([invocation, &context, injected_parameters]() {
-    invocation->DeallocateFunctionResults(context, injected_parameters);
-  });
+  auto parameter_cleanup =
+      llvm::make_scope_exit([invocation, &context, injected_parameters]() {
+        invocation->DeallocateFunctionResults(context, injected_parameters);
+      });
 
-  TypeSystemClang *ast =
+  TypeSystemClangSP scratch_ts_sp =
       ScratchTypeSystemClang::GetForTarget(process->GetTarget());
-  if (!ast) {
+  if (!scratch_ts_sp) {
     error.SetErrorString("LoadLibrary error: unable to get (clang) type system");
     return LLDB_INVALID_IMAGE_TOKEN;
   }
 
   /* Setup Return Type */
-  CompilerType VoidPtrTy = ast->GetBasicType(eBasicTypeVoid).GetPointerType();
+  CompilerType VoidPtrTy =
+      scratch_ts_sp->GetBasicType(eBasicTypeVoid).GetPointerType();
 
   Value value;
   value.SetCompilerType(VoidPtrTy);
@@ -682,12 +688,15 @@ void * __lldb_LoadLibraryHelper(const wchar_t *name, const wchar_t *paths,
     return nullptr;
   }
 
-  TypeSystemClang *ast = ScratchTypeSystemClang::GetForTarget(target);
-  if (!ast)
+  TypeSystemClangSP scratch_ts_sp =
+      ScratchTypeSystemClang::GetForTarget(target);
+  if (!scratch_ts_sp)
     return nullptr;
 
-  CompilerType VoidPtrTy = ast->GetBasicType(eBasicTypeVoid).GetPointerType();
-  CompilerType WCharPtrTy = ast->GetBasicType(eBasicTypeWChar).GetPointerType();
+  CompilerType VoidPtrTy =
+      scratch_ts_sp->GetBasicType(eBasicTypeVoid).GetPointerType();
+  CompilerType WCharPtrTy =
+      scratch_ts_sp->GetBasicType(eBasicTypeWChar).GetPointerType();
 
   ValueList parameters;
 

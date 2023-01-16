@@ -550,13 +550,6 @@ static BasicBlock *HandleCallsInBlockInlinedThroughInvoke(
     if (!CI || CI->doesNotThrow())
       continue;
 
-    if (CI->isInlineAsm()) {
-      InlineAsm *IA = cast<InlineAsm>(CI->getCalledOperand());
-      if (!IA->canThrow()) {
-        continue;
-      }
-    }
-
     // We do not need to (and in fact, cannot) convert possibly throwing calls
     // to @llvm.experimental_deoptimize (resp. @llvm.experimental.guard) into
     // invokes.  The caller's "segment" of the deoptimization continuation
@@ -2511,7 +2504,7 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
         if (!AllocaTypeSize.isScalable() &&
             AllocaArraySize != std::numeric_limits<uint64_t>::max() &&
             std::numeric_limits<uint64_t>::max() / AllocaArraySize >=
-                AllocaTypeSize.getFixedSize()) {
+                AllocaTypeSize.getFixedValue()) {
           AllocaSize = ConstantInt::get(Type::getInt64Ty(AI->getContext()),
                                         AllocaArraySize * AllocaTypeSize);
         }

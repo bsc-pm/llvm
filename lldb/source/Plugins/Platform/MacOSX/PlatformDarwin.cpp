@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <memory>
 #include <mutex>
+#include <optional>
 
 #include "lldb/Breakpoint/BreakpointLocation.h"
 #include "lldb/Breakpoint/BreakpointSite.h"
@@ -105,9 +106,11 @@ llvm::StringRef PlatformDarwin::GetDescriptionStatic() {
   return "Darwin platform plug-in.";
 }
 
-PlatformSP PlatformDarwin::CreateInstance(bool force, const ArchSpec *arch) {
-   // We only create subclasses of the PlatformDarwin plugin.
-   return PlatformSP();
+PlatformSP PlatformDarwin::CreateInstance(bool force, const ArchSpec *arch,
+                                          const Debugger *debugger,
+                                          const ScriptedMetadata *metadata) {
+  // We only create subclasses of the PlatformDarwin plugin.
+  return PlatformSP();
 }
 
 #define LLDB_PROPERTIES_platformdarwin
@@ -601,7 +604,7 @@ static llvm::ArrayRef<const char *> GetCompatibleArchs(ArchSpec::Core core) {
 /// distinct names (e.g. armv7f) but armv7 binaries run fine on an armv7f
 /// processor.
 void PlatformDarwin::ARMGetSupportedArchitectures(
-    std::vector<ArchSpec> &archs, llvm::Optional<llvm::Triple::OSType> os) {
+    std::vector<ArchSpec> &archs, std::optional<llvm::Triple::OSType> os) {
   const ArchSpec system_arch = GetSystemArchitecture();
   const ArchSpec::Core system_core = system_arch.GetCore();
   for (const char *arch : GetCompatibleArchs(system_core)) {
