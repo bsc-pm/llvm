@@ -161,7 +161,7 @@ class OSSAssertDecl final
     Decl(DK, DC, L), NumVars(0) { }
 
   ArrayRef<const Expr *> getVars() const {
-    return llvm::makeArrayRef(getTrailingObjects<Expr *>(), NumVars);
+    return llvm::ArrayRef(getTrailingObjects<Expr *>(), NumVars);
   }
 
   MutableArrayRef<Expr *> getVars() {

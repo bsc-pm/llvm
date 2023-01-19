@@ -1581,7 +1581,7 @@ struct OmpSsDirective {
       TaskSizeofList.push_back(
         ConstantInt::get(
           Int32Ty,
-          DL.getTypeStoreSize(Ty).getFixedSize()));
+          DL.getTypeStoreSize(Ty).getFixedValue()));
     }
     SizeofTableVar =
       new GlobalVariable(M, ArrayType::get(Int32Ty, TaskTypeList.size()),
