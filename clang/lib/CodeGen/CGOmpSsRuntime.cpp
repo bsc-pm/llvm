@@ -2908,10 +2908,23 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
     Expr *ParmRef = emitTaskCallArg(CGF, "call_arg", ParQ, Loc, *ArgI);
 
     if (!ParQ->isReferenceType()) {
-      ParmRef =
-        ImplicitCastExpr::Create(Ctx, ParmRef->getType(), CK_LValueToRValue,
-                                 ParmRef, /*BasePath=*/nullptr,
-                                 VK_PRValue, FPOptionsOverride());
+      switch (CGF.getEvaluationKind(ParQ)) {
+      case TEK_Complex:
+      case TEK_Scalar: {
+        ParmRef =
+          ImplicitCastExpr::Create(Ctx, ParmRef->getType(), CK_LValueToRValue,
+                                   ParmRef, /*BasePath=*/nullptr,
+                                   VK_PRValue, FPOptionsOverride());
+        break;
+      }
+      case TEK_Aggregate: {
+        ParmRef =
+          ImplicitCastExpr::Create(Ctx, ParmRef->getType(), CK_NoOp,
+                                   ParmRef, /*BasePath=*/nullptr,
+                                   VK_PRValue, FPOptionsOverride());
+        break;
+      }
+      }
       FirstprivateCopies.push_back(ParmRef);
 
       LValue ParmLV = CGF.EmitLValue(ParmRef);
