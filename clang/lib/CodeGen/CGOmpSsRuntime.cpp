@@ -1951,7 +1951,7 @@ void CGOmpSsRuntime::EmitDependency(
   MultiAndDepData.append(MultiDepData.begin(), MultiDepData.end());
   MultiAndDepData.append(DepData.begin(), DepData.end());
 
-  TaskInfo.emplace_back(Name, llvm::makeArrayRef(MultiAndDepData));
+  TaskInfo.emplace_back(Name, llvm::ArrayRef(MultiAndDepData));
 }
 
 /// Check if the combiner is a call to UDR and if it is so return the
@@ -2361,7 +2361,7 @@ void CGOmpSsRuntime::EmitReduction(
 
   List.insert(List.begin(), RedKind);
 
-  TaskInfo.emplace_back(RedName, makeArrayRef(List));
+  TaskInfo.emplace_back(RedName, ArrayRef(List));
   TaskInfo.emplace_back(RedInitName, ArrayRef<llvm::Value *>{DepBaseDSA, RedInit});
   TaskInfo.emplace_back(RedCombName, ArrayRef<llvm::Value *>{DepBaseDSA, RedComb});
 }
@@ -2402,7 +2402,7 @@ void CGOmpSsRuntime::emitTaskwaitCall(CodeGenFunction &CGF,
     InDirectiveEmission = false;
 
     llvm::Instruction *Result =
-      CGF.Builder.CreateCall(EntryCallee, {}, llvm::makeArrayRef(TaskInfo));
+      CGF.Builder.CreateCall(EntryCallee, {}, llvm::ArrayRef(TaskInfo));
     CGF.Builder.CreateCall(ExitCallee, Result);
 
     // Pop Task Stack
@@ -2429,7 +2429,7 @@ void CGOmpSsRuntime::emitReleaseCall(
   InDirectiveEmission = false;
 
   llvm::Function *Callee = CGM.getIntrinsic(llvm::Intrinsic::directive_marker);
-  CGF.Builder.CreateCall(Callee, {}, llvm::makeArrayRef(ReleaseInfo));
+  CGF.Builder.CreateCall(Callee, {}, llvm::ArrayRef(ReleaseInfo));
 
   // Pop Task Stack
   TaskStack.pop_back();
@@ -2908,10 +2908,23 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
     Expr *ParmRef = emitTaskCallArg(CGF, "call_arg", ParQ, Loc, *ArgI);
 
     if (!ParQ->isReferenceType()) {
-      ParmRef =
-        ImplicitCastExpr::Create(Ctx, ParmRef->getType(), CK_LValueToRValue,
-                                 ParmRef, /*BasePath=*/nullptr,
-                                 VK_PRValue, FPOptionsOverride());
+      switch (CGF.getEvaluationKind(ParQ)) {
+      case TEK_Complex:
+      case TEK_Scalar: {
+        ParmRef =
+          ImplicitCastExpr::Create(Ctx, ParmRef->getType(), CK_LValueToRValue,
+                                   ParmRef, /*BasePath=*/nullptr,
+                                   VK_PRValue, FPOptionsOverride());
+        break;
+      }
+      case TEK_Aggregate: {
+        ParmRef =
+          ImplicitCastExpr::Create(Ctx, ParmRef->getType(), CK_NoOp,
+                                   ParmRef, /*BasePath=*/nullptr,
+                                   VK_PRValue, FPOptionsOverride());
+        break;
+      }
+      }
       FirstprivateCopies.push_back(ParmRef);
 
       LValue ParmLV = CGF.EmitLValue(ParmRef);
@@ -3371,7 +3384,7 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   InDirectiveEmission = false;
 
   llvm::Instruction *Result =
-    CGF.Builder.CreateCall(EntryCallee, {}, llvm::makeArrayRef(TaskInfo));
+    CGF.Builder.CreateCall(EntryCallee, {}, llvm::ArrayRef(TaskInfo));
 
   llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
   llvm::Instruction *TaskAllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "taskallocapt", Result->getParent());
@@ -3448,7 +3461,7 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   InDirectiveEmission = false;
 
   llvm::Instruction *Result =
-    CGF.Builder.CreateCall(EntryCallee, {}, llvm::makeArrayRef(TaskInfo));
+    CGF.Builder.CreateCall(EntryCallee, {}, llvm::ArrayRef(TaskInfo));
 
   llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
   llvm::Instruction *TaskAllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "taskallocapt", Result->getParent());
@@ -3561,7 +3574,7 @@ void CGOmpSsRuntime::emitLoopCall(CodeGenFunction &CGF,
     InDirectiveEmission = false;
 
     llvm::Instruction *Result =
-      CGF.Builder.CreateCall(EntryCallee, {}, llvm::makeArrayRef(TaskInfo));
+      CGF.Builder.CreateCall(EntryCallee, {}, llvm::ArrayRef(TaskInfo));
 
     llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
     llvm::Instruction *TaskAllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "taskallocapt", Result->getParent());
@@ -3611,7 +3624,7 @@ void CGOmpSsRuntime::emitLoopCall(CodeGenFunction &CGF,
     InDirectiveEmission = false;
 
     llvm::Instruction *Result =
-      CGF.Builder.CreateCall(EntryCallee, {}, llvm::makeArrayRef(TaskInfo));
+      CGF.Builder.CreateCall(EntryCallee, {}, llvm::ArrayRef(TaskInfo));
 
     llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
     llvm::Instruction *TaskAllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "taskallocapt", Result->getParent());
