@@ -1340,7 +1340,7 @@ llvm::Function *CGOmpSsRuntime::createCallWrapperFunc(
     const llvm::DenseMap<const VarDecl *, Address> &CaptureInvolvedMap,
     ArrayRef<QualType> RetTypes,
     bool HasThis, bool HasSwitch, std::string FuncName, std::string RetName,
-    llvm::function_ref<void(CodeGenFunction &, const Expr *E, Optional<llvm::Value *>)> Body) {
+    llvm::function_ref<void(CodeGenFunction &, const Expr *E, std::optional<llvm::Value *>)> Body) {
 
   InDirectiveEmission = false;
 
@@ -1485,7 +1485,7 @@ llvm::Function *CGOmpSsRuntime::createCallWrapperFunc(
     (void)InitScope.Privatize();
 
     // Function body generation
-    Optional<llvm::Value *> SwitchValue;
+    std::optional<llvm::Value *> SwitchValue;
     if (HasSwitch)
       SwitchValue = &*(FuncVar->arg_end() - 1);
     Body(NewCGF, E, SwitchValue);
@@ -1540,7 +1540,7 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
   // For each iterator we have {init, remap, ub, step}
   SmallVector<QualType, 3 + 1> MultiDepRetTypes(
     MDExpr->getDepInits().size()*(3 + 1), CGF.getContext().IntTy);
-  auto Body = [](CodeGenFunction &NewCGF, const Expr *E, Optional<llvm::Value *> Switch) {
+  auto Body = [](CodeGenFunction &NewCGF, const Expr *E, std::optional<llvm::Value *> Switch) {
     auto *MDExpr = cast<OSSMultiDepExpr>(E);
     uint64_t SwitchTyBits =
       NewCGF.CGM.getDataLayout().getTypeSizeInBits(Switch.value()->getType());
@@ -1655,7 +1655,7 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
 void CGOmpSsRuntime::BuildWrapperCallBundleList(
     std::string FuncName,
     CodeGenFunction &CGF, const Expr *E, QualType Q,
-    llvm::function_ref<void(CodeGenFunction &, const Expr *E, Optional<llvm::Value *>)> Body,
+    llvm::function_ref<void(CodeGenFunction &, const Expr *E, std::optional<llvm::Value *>)> Body,
     SmallVectorImpl<llvm::Value *> &List) {
 
   OSSExprInfoGathering CallVisitor(CGF);
@@ -1700,7 +1700,7 @@ void CGOmpSsRuntime::BuildWrapperCallBundleList(
 void CGOmpSsRuntime::EmitWrapperCallBundle(
     std::string Name, std::string FuncName,
     CodeGenFunction &CGF, const Expr *E, QualType Q,
-    llvm::function_ref<void(CodeGenFunction &, const Expr *E, Optional<llvm::Value *>)> Body,
+    llvm::function_ref<void(CodeGenFunction &, const Expr *E, std::optional<llvm::Value *>)> Body,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
 
   SmallVector<llvm::Value *, 4> List;
@@ -1713,7 +1713,7 @@ void CGOmpSsRuntime::EmitScalarWrapperCallBundle(
     CodeGenFunction &CGF, const Expr *E,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
 
-  auto Body = [](CodeGenFunction &NewCGF, const Expr *E, Optional<llvm::Value *>) {
+  auto Body = [](CodeGenFunction &NewCGF, const Expr *E, std::optional<llvm::Value *>) {
     llvm::Value *V = NewCGF.EmitScalarExpr(E);
 
     Address RetAddr = NewCGF.ReturnValue;
@@ -1728,7 +1728,7 @@ void CGOmpSsRuntime::EmitBoolWrapperCallBundle(
     CodeGenFunction &CGF, const Expr *E,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
 
-  auto Body = [](CodeGenFunction &NewCGF, const Expr *E, Optional<llvm::Value *>) {
+  auto Body = [](CodeGenFunction &NewCGF, const Expr *E, std::optional<llvm::Value *>) {
     llvm::Value *V = NewCGF.EvaluateExprAsBool(E);
 
     Address RetAddr = NewCGF.ReturnValue;
@@ -1743,7 +1743,7 @@ void CGOmpSsRuntime::EmitIgnoredWrapperCallBundle(
     CodeGenFunction &CGF, const Expr *E,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
 
-  auto Body = [](CodeGenFunction &NewCGF, const Expr *E, Optional<llvm::Value *>) {
+  auto Body = [](CodeGenFunction &NewCGF, const Expr *E, std::optional<llvm::Value *>) {
     if (const auto *DRE = dyn_cast<DeclRefExpr>(E)) {
       if (DRE->isNonOdrUse() == NOUR_Unevaluated)
         return;
@@ -1770,7 +1770,7 @@ void CGOmpSsRuntime::EmitDependencyList(
 
   CodeGenFunction NewCGF(CGF.CGM);
 
-  auto Body = [&Dep](CodeGenFunction &NewCGF, const Expr *E, Optional<llvm::Value *>) {
+  auto Body = [&Dep](CodeGenFunction &NewCGF, const Expr *E, std::optional<llvm::Value *>) {
     SmallVector<llvm::Value *, 4> List;
     // C long -> LLVM long
     llvm::Type *OSSArgTy = NewCGF.ConvertType(NewCGF.getContext().LongTy);
@@ -2555,7 +2555,7 @@ static VarDecl *createImplicitVarDecl(
 
 static DeclRefExpr *emitTaskCallArg(
     CodeGenFunction &CGF, StringRef Name, QualType Q, SourceLocation Loc,
-    llvm::Optional<const Expr *> InitE = std::nullopt) {
+    std::optional<const Expr *> InitE = std::nullopt) {
 
   ASTContext &Ctx = CGF.getContext();
 
@@ -2731,7 +2731,7 @@ void CGOmpSsRuntime::EmitDirectiveData(
     SmallVector<llvm::Value *> LTypeList;
     for (unsigned i = 0; i < LoopData.NumCollapses; ++i) {
       IndVarList.push_back(CGF.EmitLValue(LoopData.IndVar[i]).getPointer(CGF));
-      auto Body = [](CodeGenFunction &NewCGF, const Expr *E, Optional<llvm::Value *>) {
+      auto Body = [](CodeGenFunction &NewCGF, const Expr *E, std::optional<llvm::Value *>) {
         llvm::Value *V = NewCGF.EmitScalarExpr(E);
 
         Address RetAddr = NewCGF.ReturnValue;

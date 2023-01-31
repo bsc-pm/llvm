@@ -336,8 +336,11 @@ static bool isDimOpValidSymbol(ShapedDimOpInterface dimOp, Region *region) {
   // The dim op is also okay if its operand memref is a view/subview whose
   // corresponding size is a valid symbol.
   std::optional<int64_t> index = getConstantIntValue(dimOp.getDimension());
-  assert(index.has_value() &&
-         "expect only `dim` operations with a constant index");
+
+  // Be conservative if we can't understand the dimension.
+  if (!index.has_value())
+    return false;
+
   int64_t i = index.value();
   return TypeSwitch<Operation *, bool>(dimOp.getShapedValue().getDefiningOp())
       .Case<memref::ViewOp, memref::SubViewOp, memref::AllocOp>(
@@ -3255,7 +3258,6 @@ struct CanonicalizeAffineMinMaxOpExprAndTermOrder : public OpRewritePattern<T> {
     AffineMap map = affineOp.getAffineMap();
     if (failed(canonicalizeMapExprAndTermOrder(map)))
       return failure();
-
     rewriter.replaceOpWithNewOp<T>(affineOp, map, affineOp.getMapOperands());
     return success();
   }

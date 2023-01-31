@@ -25,6 +25,7 @@
 #include <__iterator/next.h>
 #include <__iterator/prev.h>
 #include <__iterator/readable_traits.h>
+#include <__iterator/segmented_iterator.h>
 #include <__memory/addressof.h>
 #include <__ranges/access.h>
 #include <__ranges/concepts.h>
@@ -201,12 +202,6 @@ public:
     }
 #endif // _LIBCPP_STD_VER > 17
 };
-
-template <class _Iter>
-struct __is_reverse_iterator : false_type {};
-
-template <class _Iter>
-struct __is_reverse_iterator<reverse_iterator<_Iter> > : true_type {};
 
 template <class _Iter1, class _Iter2>
 inline _LIBCPP_INLINE_VISIBILITY _LIBCPP_CONSTEXPR_SINCE_CXX17
@@ -484,9 +479,6 @@ public:
     return __lhs.base() <= __rhs.base();
   }
 };
-
-template <class _Iter>
-struct __is_reverse_iterator<__unconstrained_reverse_iterator<_Iter>> : true_type {};
 
 #endif // _LIBCPP_STD_VER <= 17
 

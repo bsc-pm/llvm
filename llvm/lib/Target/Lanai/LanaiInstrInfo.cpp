@@ -476,7 +476,7 @@ static MachineInstr *canFoldIntoSelect(Register Reg,
     // MI can't have any tied operands, that would conflict with predication.
     if (MO.isTied())
       return nullptr;
-    if (Register::isPhysicalRegister(MO.getReg()))
+    if (MO.getReg().isPhysical())
       return nullptr;
     if (MO.isDef() && !MO.isDead())
       return nullptr;
@@ -514,7 +514,7 @@ LanaiInstrInfo::optimizeSelect(MachineInstr &MI,
   // Copy all the DefMI operands, excluding its (null) predicate.
   const MCInstrDesc &DefDesc = DefMI->getDesc();
   for (unsigned i = 1, e = DefDesc.getNumOperands();
-       i != e && !DefDesc.OpInfo[i].isPredicate(); ++i)
+       i != e && !DefDesc.operands()[i].isPredicate(); ++i)
     NewMI.add(DefMI->getOperand(i));
 
   unsigned CondCode = MI.getOperand(3).getImm();

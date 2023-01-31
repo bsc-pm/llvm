@@ -70,6 +70,7 @@
 #include "llvm/Support/TimeProfiler.h"
 #include "llvm/Support/X86TargetParser.h"
 #include "llvm/Support/xxhash.h"
+#include <optional>
 
 using namespace clang;
 using namespace CodeGen;
@@ -3100,7 +3101,7 @@ bool CodeGenModule::MayBeEmittedEagerly(const ValueDecl *Global) {
   // we have if the level of the declare target attribute is -1. Note that we
   // check somewhere else if we should emit this at all.
   if (LangOpts.OpenMP >= 50 && !LangOpts.OpenMPSimd) {
-    llvm::Optional<OMPDeclareTargetDeclAttr *> ActiveAttr =
+    std::optional<OMPDeclareTargetDeclAttr *> ActiveAttr =
         OMPDeclareTargetDeclAttr::getActiveAttr(Global);
     if (!ActiveAttr || (*ActiveAttr)->getLevel() != (unsigned)-1)
       return false;
@@ -3333,7 +3334,8 @@ void CodeGenModule::EmitGlobal(GlobalDecl GD) {
       if (MustBeEmitted(Global))
         EmitOMPDeclareReduction(DRD);
       return;
-    } else if (auto *DMD = dyn_cast<OMPDeclareMapperDecl>(Global)) {
+    }
+    if (auto *DMD = dyn_cast<OMPDeclareMapperDecl>(Global)) {
       if (MustBeEmitted(Global))
         EmitOMPDeclareMapper(DMD);
       return;
@@ -3364,7 +3366,7 @@ void CodeGenModule::EmitGlobal(GlobalDecl GD) {
         !Context.isMSStaticDataMemberInlineDefinition(VD)) {
       if (LangOpts.OpenMP) {
         // Emit declaration of the must-be-emitted declare target variable.
-        if (llvm::Optional<OMPDeclareTargetDeclAttr::MapTypeTy> Res =
+        if (std::optional<OMPDeclareTargetDeclAttr::MapTypeTy> Res =
                 OMPDeclareTargetDeclAttr::isDeclareTargetDeclaration(VD)) {
           bool UnifiedMemoryEnabled =
               getOpenMPRuntime().hasRequiresUnifiedSharedMemory();
@@ -4581,7 +4583,7 @@ CodeGenModule::GetAddrOfGlobal(GlobalDecl GD, ForDefinition_t IsForDefinition) {
 
 llvm::GlobalVariable *CodeGenModule::CreateOrReplaceCXXRuntimeVariable(
     StringRef Name, llvm::Type *Ty, llvm::GlobalValue::LinkageTypes Linkage,
-    unsigned Alignment) {
+    llvm::Align Alignment) {
   llvm::GlobalVariable *GV = getModule().getNamedGlobal(Name);
   llvm::GlobalVariable *OldGV = nullptr;
 
@@ -4617,7 +4619,7 @@ llvm::GlobalVariable *CodeGenModule::CreateOrReplaceCXXRuntimeVariable(
       !GV->hasAvailableExternallyLinkage())
     GV->setComdat(TheModule.getOrInsertComdat(GV->getName()));
 
-  GV->setAlignment(llvm::MaybeAlign(Alignment));
+  GV->setAlignment(Alignment);
 
   return GV;
 }
@@ -4702,16 +4704,17 @@ LangAS CodeGenModule::GetGlobalVarAddressSpace(const VarDecl *D) {
     return LangAS::sycl_global;
 
   if (LangOpts.CUDA && LangOpts.CUDAIsDevice) {
-    if (D && D->hasAttr<CUDAConstantAttr>())
-      return LangAS::cuda_constant;
-    else if (D && D->hasAttr<CUDASharedAttr>())
-      return LangAS::cuda_shared;
-    else if (D && D->hasAttr<CUDADeviceAttr>())
-      return LangAS::cuda_device;
-    else if (D && D->getType().isConstQualified())
-      return LangAS::cuda_constant;
-    else
-      return LangAS::cuda_device;
+    if (D) {
+      if (D->hasAttr<CUDAConstantAttr>())
+        return LangAS::cuda_constant;
+      if (D->hasAttr<CUDASharedAttr>())
+        return LangAS::cuda_shared;
+      if (D->hasAttr<CUDADeviceAttr>())
+        return LangAS::cuda_device;
+      if (D->getType().isConstQualified())
+        return LangAS::cuda_constant;
+    }
+    return LangAS::cuda_device;
   }
 
   if (LangOpts.OpenMP) {
@@ -4858,7 +4861,7 @@ void CodeGenModule::EmitGlobalVarDefinition(const VarDecl *D,
   const VarDecl *InitDecl;
   const Expr *InitExpr = D->getAnyInitializer(InitDecl);
 
-  Optional<ConstantEmitter> emitter;
+  std::optional<ConstantEmitter> emitter;
 
   // CUDA E.2.4.1 "__shared__ variables cannot have an initialization
   // as part of their declaration."  Sema has already checked for
@@ -5018,7 +5021,7 @@ void CodeGenModule::EmitGlobalVarDefinition(const VarDecl *D,
 
   CharUnits AlignVal = getContext().getDeclAlign(D);
   // Check for alignment specifed in an 'omp allocate' directive.
-  if (llvm::Optional<CharUnits> AlignValFromAllocate =
+  if (std::optional<CharUnits> AlignValFromAllocate =
           getOMPAllocateAlignment(D))
     AlignVal = *AlignValFromAllocate;
   GV->setAlignment(AlignVal.getAsAlign());
@@ -6072,7 +6075,7 @@ ConstantAddress CodeGenModule::GetAddrOfGlobalTemporary(
   LangAS AddrSpace =
       VD ? GetGlobalVarAddressSpace(VD) : MaterializedType.getAddressSpace();
 
-  Optional<ConstantEmitter> emitter;
+  std::optional<ConstantEmitter> emitter;
   llvm::Constant *InitialValue = nullptr;
   bool Constant = false;
   llvm::Type *Type;

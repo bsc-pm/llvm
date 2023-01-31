@@ -3,6 +3,7 @@
 #include "clang/Basic/SourceManager.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Lex/Lexer.h"
+#include <optional>
 
 using namespace clang;
 
@@ -740,7 +741,7 @@ void JSONNodeDumper::VisitObjCInterfaceType(const ObjCInterfaceType *OIT) {
 }
 
 void JSONNodeDumper::VisitPackExpansionType(const PackExpansionType *PET) {
-  if (llvm::Optional<unsigned> N = PET->getNumExpansions())
+  if (std::optional<unsigned> N = PET->getNumExpansions())
     JOS.attribute("numExpansions", *N);
 }
 

@@ -1314,7 +1314,7 @@ struct OmpSsDirective {
     for (const VLAAlign& VAlign : VLAAlignsInfo) {
       auto *V = VAlign.V;
       Type *Ty = DirEnv.getDSAType(V);
-      unsigned TyAlign = VAlign.Align;
+      Align TyAlign = VAlign.TyAlign;
 
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Int32Ty);
@@ -1324,7 +1324,7 @@ struct OmpSsDirective {
                         TaskArgsDstL, Idx, "gep_dst_" + V->getName());
 
       // Point VLA in task args to an aligned position of the extra space allocated
-      IRB.CreateAlignedStore(TaskArgsDstLi8IdxGEP, GEP, Align(TyAlign));
+      IRB.CreateAlignedStore(TaskArgsDstLi8IdxGEP, GEP, TyAlign);
       // Skip current VLA size
       unsigned SizeB = DL.getTypeAllocSize(Ty);
       Value *VLASize = ConstantInt::get(Int64Ty, SizeB);
@@ -1404,7 +1404,7 @@ struct OmpSsDirective {
     for (size_t i = 0; i < DSAInfo.Firstprivate.size(); ++i) {
       Value *V = DSAInfo.Firstprivate[i];
       Type *Ty = DSAInfo.FirstprivateTy[i];
-      unsigned TyAlign = DL.getPrefTypeAlignment(Ty);
+      Align TyAlign = DL.getPrefTypeAlign(Ty);
 
       // Compute num elements
       Value *NSize = ConstantInt::get(Int64Ty, 1);
@@ -1457,7 +1457,7 @@ struct OmpSsDirective {
       } else {
         unsigned SizeB = DL.getTypeAllocSize(Ty);
         Value *NSizeB = IRB.CreateNUWMul(NSize, ConstantInt::get(Int64Ty, SizeB));
-        IRB.CreateMemCpy(GEPDst, Align(TyAlign), GEPSrc, Align(TyAlign), NSizeB);
+        IRB.CreateMemCpy(GEPDst, TyAlign, GEPSrc, TyAlign, NSizeB);
       }
     }
     for (Value *V : CapturedInfo) {
@@ -1631,7 +1631,7 @@ struct OmpSsDirective {
 
   struct VLAAlign {
     Value *V;
-    unsigned Align;
+    Align TyAlign;
   };
 
   // Greater alignemt go first
@@ -1640,13 +1640,13 @@ struct OmpSsDirective {
       auto *V = VLAWithDimsMap.first;
       Type *Ty = DirEnv.getDSAType(V);
 
-      unsigned Align = DL.getPrefTypeAlignment(Ty);
+      Align TyAlign = DL.getPrefTypeAlign(Ty);
 
       auto It = VLAAlignsInfo.begin();
-      while (It != VLAAlignsInfo.end() && It->Align >= Align)
+      while (It != VLAAlignsInfo.end() && It->TyAlign >= TyAlign)
         ++It;
 
-      VLAAlignsInfo.insert(It, {V, Align});
+      VLAAlignsInfo.insert(It, {V, TyAlign});
     }
   }
 
@@ -2499,7 +2499,7 @@ struct OmpSsDirective {
     for (const auto& VAlign : VLAAlignsInfo) {
       auto *V = VAlign.V;
       Type *Ty = DirEnv.getDSAType(V);
-      unsigned TyAlign = VAlign.Align;
+      Align TyAlign = VAlign.TyAlign;
 
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Int32Ty);
@@ -2509,7 +2509,7 @@ struct OmpSsDirective {
                         TaskArgsVarL, Idx, "gep_" + V->getName());
 
       // Point VLA in task args to an aligned position of the extra space allocated
-      IRB.CreateAlignedStore(TaskArgsVarLi8IdxGEP, GEP, Align(TyAlign));
+      IRB.CreateAlignedStore(TaskArgsVarLi8IdxGEP, GEP, TyAlign);
       // Skip current VLA size
       unsigned SizeB = DL.getTypeAllocSize(Ty);
       Value *VLASize = ConstantInt::get(Int64Ty, SizeB);
@@ -2565,7 +2565,7 @@ struct OmpSsDirective {
     for (size_t i = 0; i < DSAInfo.Firstprivate.size(); ++i) {
       Value *V = DSAInfo.Firstprivate[i];
       Type *Ty = DSAInfo.FirstprivateTy[i];
-      unsigned TyAlign = DL.getPrefTypeAlignment(Ty);
+      Align TyAlign = DL.getPrefTypeAlign(Ty);
 
       // Compute num elements
       Value *NSize = ConstantInt::get(Int64Ty, 1);
@@ -2602,7 +2602,7 @@ struct OmpSsDirective {
       } else {
         unsigned SizeB = DL.getTypeAllocSize(Ty);
         Value *NSizeB = IRB.CreateNUWMul(NSize, ConstantInt::get(Int64Ty, SizeB));
-        IRB.CreateMemCpy(GEP, Align(TyAlign), V, Align(TyAlign), NSizeB);
+        IRB.CreateMemCpy(GEP, TyAlign, V, TyAlign, NSizeB);
       }
     }
     for (Value *V : CapturedInfo) {

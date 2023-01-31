@@ -268,7 +268,7 @@ public:
         !isAlloc(op.getDpsInitOperand(0), /*isZero=*/false) ||
         !isZeroYield(op) || !op.getDpsInitOperand(0)->get().hasOneUse())
       return failure();
-    auto outputType = op.getResult(0).getType().cast<RankedTensorType>();
+    auto outputType = getRankedTensorType(op.getResult(0));
     // Yielding zero on newly allocated (all-zero) sparse tensors can be
     // optimized out directly (regardless of dynamic or static size).
     if (getSparseTensorEncoding(outputType)) {
@@ -405,8 +405,8 @@ public:
                                 PatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
     Value srcTensor = op.getSrc();
-    auto srcTp = srcTensor.getType().template cast<RankedTensorType>();
-    auto dstTp = op.getResult().getType().template cast<RankedTensorType>();
+    auto srcTp = getRankedTensorType(srcTensor);
+    auto dstTp = getRankedTensorType(op.getResult());
     SparseTensorEncodingAttr encSrc = getSparseTensorEncoding(srcTp);
     SparseTensorEncodingAttr encDst = getSparseTensorEncoding(dstTp);
     if (!encDst || !encSrc) {
@@ -483,8 +483,7 @@ public:
       return failure();
     }
     if (encSrc) {
-      RankedTensorType rtp =
-          op.getSrc().getType().template cast<RankedTensorType>();
+      auto rtp = getRankedTensorType(op.getSrc());
       auto denseTp =
           RankedTensorType::get(rtp.getShape(), rtp.getElementType());
       auto convert = rewriter.create<ConvertOp>(loc, denseTp, op.getSrc());
@@ -492,8 +491,7 @@ public:
       return success();
     }
     if (encDst) {
-      RankedTensorType rtp =
-          op.getResult().getType().template cast<RankedTensorType>();
+      auto rtp = getRankedTensorType(op.getResult());
       auto denseTp =
           RankedTensorType::get(rtp.getShape(), rtp.getElementType());
       auto reshape = rewriter.create<ReshapeOp>(loc, denseTp, op.getSrc(),
@@ -511,7 +509,7 @@ struct ConcatenateRewriter : public OpRewritePattern<ConcatenateOp> {
   LogicalResult matchAndRewrite(ConcatenateOp op,
                                 PatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
-    auto dstTp = op.getType().cast<RankedTensorType>();
+    auto dstTp = getRankedTensorType(op);
     uint64_t conDim = op.getDimension().getZExtValue();
     SmallVector<Value> sizes;
     concatSizesFromInputs(rewriter, sizes, loc, dstTp, op.getInputs(), conDim);
@@ -532,8 +530,11 @@ struct ConcatenateRewriter : public OpRewritePattern<ConcatenateOp> {
     SparseTensorEncodingAttr encDst = getSparseTensorEncoding(dstTp);
     Value dst; // Destination tensor for inserting source tensor values.
     bool needTmpCOO = true;
+    bool allDense = false;
+    Value annotatedDenseDst;
+    int64_t rank = dstTp.getRank();
     if (encDst) {
-      bool allDense = encDst.isAllDense();
+      allDense = encDst.isAllDense();
       bool allOrdered = false;
       // When concatenating on dimension 0, and all inputs are sorted and have
       // an identity dimOrdering, the concatenate will generate coords in
@@ -544,7 +545,7 @@ struct ConcatenateRewriter : public OpRewritePattern<ConcatenateOp> {
       // CSC matrices along column).
       if (!allDense && conDim == 0 && encDst.hasIdDimOrdering()) {
         for (auto i : op.getInputs()) {
-          auto rtp = i.getType().cast<RankedTensorType>();
+          auto rtp = getRankedTensorType(i);
           auto srcEnc = getSparseTensorEncoding(rtp);
           if (isAllDimOrdered(rtp) && (!srcEnc || srcEnc.hasIdDimOrdering())) {
             allOrdered = true;
@@ -564,16 +565,25 @@ struct ConcatenateRewriter : public OpRewritePattern<ConcatenateOp> {
         encDst = getSparseTensorEncoding(tp);
       }
       dst = rewriter.create<AllocTensorOp>(loc, tp, dynSizes).getResult();
+      if (allDense) {
+        // Create a view of the values buffer to match the unannotated dense
+        // tensor.
+        Value valuesBuffer = genToValues(rewriter, loc, dst);
+        Value idxBuffer = genAlloca(
+            rewriter, loc, rank, rewriter.getIndexType(), /*staticShape=*/true);
+        annotatedDenseDst = dst;
+        dst = reshapeValuesToLevels(rewriter, loc, encDst, sizes, valuesBuffer,
+                                    idxBuffer);
+      }
     } else {
       // TODO: Dense buffers should be allocated/deallocated via the callback
       // in BufferizationOptions.
       dst = allocDenseTensor(rewriter, loc, dstTp, sizes);
     }
 
-    int64_t rank = dstTp.getRank();
     Value offset = constantIndex(rewriter, loc, 0);
     SmallVector<Value> initArgs;
-    if (encDst)
+    if (encDst && !allDense)
       initArgs.push_back(dst);
     ForeachOp foreachOp;
     for (Value input : op.getInputs()) {
@@ -591,7 +601,7 @@ struct ConcatenateRewriter : public OpRewritePattern<ConcatenateOp> {
                 idx = builder.create<arith::AddIOp>(loc, idx, offset);
               indices[toStoredDim(encDst, i)] = idx;
             }
-            if (encDst) {
+            if (encDst && !allDense) {
               Value cond = genIsNonzero(rewriter, loc, v);
               scf::IfOp ifOp = builder.create<scf::IfOp>(
                   loc, TypeRange(reduc.front().getType()), cond, /*else*/ true);
@@ -611,22 +621,27 @@ struct ConcatenateRewriter : public OpRewritePattern<ConcatenateOp> {
       // Accumulates the offset. Note that only static-shaped inputs are allowed
       // by concatenate op verifier, which saves us from computing the offset
       // dynamically.
-      int64_t d = input.getType().cast<RankedTensorType>().getShape()[conDim];
+      int64_t d = getRankedTensorType(input).getShape()[conDim];
       assert(!ShapedType::isDynamic(d));
       offset = rewriter.create<arith::AddIOp>(loc, offset,
                                               constantIndex(rewriter, loc, d));
-      if (encDst) {
+      if (encDst && !allDense) {
         dst = foreachOp.getResult(0);
         initArgs[0] = dst;
       }
     }
 
     if (encDst) {
-      dst = rewriter.create<LoadOp>(loc, dst, true);
-      if (needTmpCOO) {
-        Value tmpCoo = dst;
-        dst = rewriter.create<ConvertOp>(loc, dstTp, tmpCoo).getResult();
-        rewriter.create<DeallocTensorOp>(loc, tmpCoo);
+      if (!allDense) {
+        dst = rewriter.create<LoadOp>(loc, dst, true);
+        if (needTmpCOO) {
+          Value tmpCoo = dst;
+          dst = rewriter.create<ConvertOp>(loc, dstTp, tmpCoo).getResult();
+          rewriter.create<DeallocTensorOp>(loc, tmpCoo);
+        }
+      } else {
+        dst = rewriter.create<ConvertOp>(loc, dstTp, annotatedDenseDst)
+                  .getResult();
       }
       rewriter.replaceOp(op, dst);
     } else {
@@ -682,7 +697,7 @@ private:
                                     PatternRewriter &rewriter) const {
     Location loc = op.getLoc();
     Value src = op.getSource();
-    RankedTensorType dstTp = op.getType().cast<RankedTensorType>();
+    auto dstTp = getRankedTensorType(op);
     SmallVector<Value> sizes;
     sizesFromSrc(rewriter, sizes, loc, src);
     SmallVector<Value> dynSizes;
@@ -752,9 +767,9 @@ private:
   LogicalResult sparse2DenseRewrite(ConvertOp op,
                                     PatternRewriter &rewriter) const {
     Location loc = op->getLoc();
-    RankedTensorType dstTp = op.getType().cast<RankedTensorType>();
+    RankedTensorType dstTp = getRankedTensorType(op);
     Value src = op.getSource();
-    RankedTensorType srcTp = src.getType().cast<RankedTensorType>();
+    RankedTensorType srcTp = getRankedTensorType(src);
 
     SmallVector<Value> sizes;
     sizesForTensor(rewriter, sizes, loc, srcTp, src);
@@ -791,8 +806,8 @@ private:
                                      PatternRewriter &rewriter) const {
     Location loc = op->getLoc();
     Value src = op.getSource();
-    RankedTensorType srcTp = src.getType().cast<RankedTensorType>();
-    RankedTensorType dstTp = op.getType().cast<RankedTensorType>();
+    RankedTensorType srcTp = getRankedTensorType(src);
+    RankedTensorType dstTp = getRankedTensorType(op);
     SparseTensorEncodingAttr encDst = getSparseTensorEncoding(dstTp);
     int64_t rank = dstTp.getRank();
 
@@ -851,9 +866,9 @@ private:
             get1DMemRefType(getIndexOverheadType(rewriter, encSrc),
                             /*withLayout=*/false);
         Value xs = rewriter.create<ToIndicesBufferOp>(loc, indTp, src);
-        rewriter.create<SortCooOp>(loc, nnz, xs, ValueRange{y},
-                                   rewriter.getIndexAttr(rank),
-                                   rewriter.getIndexAttr(0));
+        rewriter.create<SortCooOp>(
+            loc, nnz, xs, ValueRange{y}, rewriter.getIndexAttr(rank),
+            rewriter.getIndexAttr(0), SparseTensorSortKind::HybridQuickSort);
       } else {
         // Gather the indices-arrays in the dst tensor storage order.
         SmallVector<Value> xs(rank, Value());
@@ -862,7 +877,8 @@ private:
           xs[toStoredDim(encDst, orgDim)] =
               genToIndices(rewriter, loc, src, i, /*cooStart=*/0);
         }
-        rewriter.create<SortOp>(loc, nnz, xs, ValueRange{y});
+        rewriter.create<SortOp>(loc, nnz, xs, ValueRange{y},
+                                SparseTensorSortKind::HybridQuickSort);
       }
     }
 
@@ -911,7 +927,7 @@ public:
     auto loc = op.getLoc();
     Value input = op.getTensor();
     SmallVector<Value> reduc = op.getInitArgs();
-    auto rtp = input.getType().cast<RankedTensorType>();
+    auto rtp = getRankedTensorType(input);
     int64_t rank = rtp.getRank();
 
     // Special-case: for each over a sparse constant uses its own rewriting
@@ -998,7 +1014,7 @@ struct NewRewriter : public OpRewritePattern<NewOp> {
   LogicalResult matchAndRewrite(NewOp op,
                                 PatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
-    auto dstTp = op.getResult().getType().template cast<RankedTensorType>();
+    auto dstTp = getRankedTensorType(op.getResult());
     SparseTensorEncodingAttr encDst = getSparseTensorEncoding(dstTp);
     if (!encDst)
       return failure();
@@ -1121,7 +1137,7 @@ struct OutRewriter : public OpRewritePattern<OutOp> {
     Value nnz = rewriter.create<NumberOfEntriesOp>(loc, src);
 
     // Allocate a temporary buffer for storing dimension sizes and indices.
-    auto srcTp = src.getType().template cast<RankedTensorType>();
+    auto srcTp = getRankedTensorType(src);
     uint64_t rank = srcTp.getRank();
     Type indexTp = rewriter.getIndexType();
     Value dimSizes = genAlloca(rewriter, loc, rank, indexTp);

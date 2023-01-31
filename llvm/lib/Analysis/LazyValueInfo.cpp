@@ -990,10 +990,11 @@ LazyValueInfoImpl::solveBlockValueOverflowIntrinsic(WithOverflowInst *WO,
 
 std::optional<ValueLatticeElement>
 LazyValueInfoImpl::solveBlockValueIntrinsic(IntrinsicInst *II, BasicBlock *BB) {
+  ValueLatticeElement MetadataVal = getFromRangeMetadata(II);
   if (!ConstantRange::isIntrinsicSupported(II->getIntrinsicID())) {
     LLVM_DEBUG(dbgs() << " compute BB '" << BB->getName()
                       << "' - unknown intrinsic.\n");
-    return getFromRangeMetadata(II);
+    return MetadataVal;
   }
 
   SmallVector<ConstantRange, 2> OpRanges;
@@ -1004,8 +1005,9 @@ LazyValueInfoImpl::solveBlockValueIntrinsic(IntrinsicInst *II, BasicBlock *BB) {
     OpRanges.push_back(*Range);
   }
 
-  return ValueLatticeElement::getRange(
-      ConstantRange::intrinsic(II->getIntrinsicID(), OpRanges));
+  return intersect(ValueLatticeElement::getRange(ConstantRange::intrinsic(
+                       II->getIntrinsicID(), OpRanges)),
+                   MetadataVal);
 }
 
 std::optional<ValueLatticeElement>
@@ -1660,7 +1662,7 @@ ConstantRange LazyValueInfo::getConstantRangeAtUse(const Use &U,
   // position where V can be constrained by a select or branch condition.
   const Use *CurrU = &U;
   // TODO: Increase limit?
-  const unsigned MaxUsesToInspect = 2;
+  const unsigned MaxUsesToInspect = 3;
   for (unsigned I = 0; I < MaxUsesToInspect; ++I) {
     std::optional<ValueLatticeElement> CondVal;
     auto *CurrI = cast<Instruction>(CurrU->getUser());
@@ -1673,6 +1675,11 @@ ConstantRange LazyValueInfo::getConstantRangeAtUse(const Use &U,
       // TODO: Use non-local query?
       CondVal =
           getEdgeValueLocal(V, PHI->getIncomingBlock(*CurrU), PHI->getParent());
+    } else if (!isSafeToSpeculativelyExecute(CurrI)) {
+      // Stop walking if we hit a non-speculatable instruction. Even if the
+      // result is only used under a specific condition, executing the
+      // instruction itself may cause side effects or UB already.
+      break;
     }
     if (CondVal && CondVal->isConstantRange())
       CR = CR.intersectWith(CondVal->getConstantRange());

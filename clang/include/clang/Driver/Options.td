@@ -940,10 +940,10 @@ def cuda_include_ptx_EQ : Joined<["--"], "cuda-include-ptx=">, Flags<[NoXarchOpt
 def no_cuda_include_ptx_EQ : Joined<["--"], "no-cuda-include-ptx=">, Flags<[NoXarchOption]>,
   HelpText<"Do not include PTX for the following GPU architecture (e.g. sm_35) or 'all'. May be specified more than once.">;
 def offload_arch_EQ : Joined<["--"], "offload-arch=">, Flags<[NoXarchOption]>,
-  HelpText<"CUDA offloading device architecture (e.g. sm_35), or HIP offloading target ID in the form of a "
-           "device architecture followed by target ID features delimited by a colon. Each target ID feature "
-           "is a pre-defined string followed by a plus or minus sign (e.g. gfx908:xnack+:sramecc-).  May be "
-           "specified more than once.">;
+  HelpText<"Specify an offloading device architecture for CUDA, HIP, or OpenMP. (e.g. sm_35). "
+           "If 'native' is used the compiler will detect locally installed architectures. "
+           "For HIP offloading, the device architecture can be followed by target ID features "
+           "delimited by a colon (e.g. gfx908:xnack+:sramecc-). May be specified more than once.">;
 def cuda_gpu_arch_EQ : Joined<["--"], "cuda-gpu-arch=">, Flags<[NoXarchOption]>,
   Alias<offload_arch_EQ>;
 def cuda_feature_EQ : Joined<["--"], "cuda-feature=">, HelpText<"Manually specify the CUDA feature to use">;
@@ -1579,6 +1579,7 @@ def fignore_exceptions : Flag<["-"], "fignore-exceptions">, Group<f_Group>, Flag
   HelpText<"Enable support for ignoring exception handling constructs">,
   MarshallingInfoFlag<LangOpts<"IgnoreExceptions">>;
 def fexcess_precision_EQ : Joined<["-"], "fexcess-precision=">, Group<f_Group>,
+  Flags<[CoreOption]>,
   HelpText<"Allows control over excess precision on targets where native "
   "support for the precision types is not available. By default, excess "
   "precision is used to calculate intermediate results following the "
@@ -1954,7 +1955,7 @@ def ffp_contract : Joined<["-"], "ffp-contract=">, Group<f_Group>,
   " fast (fuses across statements disregarding pragmas)"
   " | on (only fuses in the same statement unless dictated by pragmas)"
   " | off (never fuses)"
-  " | fast-honor-pragmas (fuses across statements unless diectated by pragmas)."
+  " | fast-honor-pragmas (fuses across statements unless dictated by pragmas)."
   " Default is 'fast' for CUDA, 'fast-honor-pragmas' for HIP, and 'on' otherwise.">,
   HelpText<"Form fused FP ops (e.g. FMAs)">,
   Values<"fast,on,off,fast-honor-pragmas">;
@@ -2306,6 +2307,11 @@ defm prebuilt_implicit_modules : BoolFOption<"prebuilt-implicit-modules",
   PosFlag<SetTrue, [], "Look up implicit modules in the prebuilt module path">,
   NegFlag<SetFalse>, BothFlags<[NoXarchOption, CC1Option]>>;
 
+def fmodule_output_EQ : Joined<["-"], "fmodule-output=">, Flags<[NoXarchOption, CC1Option]>,
+  HelpText<"Save intermediate module file results when compiling a standard C++ module unit.">;
+def fmodule_output : Flag<["-"], "fmodule-output">, Flags<[NoXarchOption, CC1Option]>,
+  HelpText<"Save intermediate module file results when compiling a standard C++ module unit.">;
+
 def fmodules_prune_interval : Joined<["-"], "fmodules-prune-interval=">, Group<i_Group>,
   Flags<[CC1Option]>, MetaVarName<"<seconds>">,
   HelpText<"Specify the interval (in seconds) between attempts to prune the module cache">,
@@ -2467,9 +2473,9 @@ def fno_experimental_isel : Flag<["-"], "fno-experimental-isel">, Group<f_clang_
   Alias<fno_global_isel>;
 def fveclib : Joined<["-"], "fveclib=">, Group<f_Group>, Flags<[CC1Option]>,
     HelpText<"Use the given vector functions library">,
-    Values<"Accelerate,libmvec,MASSV,SVML,Darwin_libsystem_m,none">,
+    Values<"Accelerate,libmvec,MASSV,SVML,SLEEF,Darwin_libsystem_m,none">,
     NormalizedValuesScope<"CodeGenOptions">,
-    NormalizedValues<["Accelerate", "LIBMVEC", "MASSV", "SVML",
+    NormalizedValues<["Accelerate", "LIBMVEC", "MASSV", "SVML", "SLEEF",
                       "Darwin_libsystem_m", "NoLibrary"]>,
     MarshallingInfoEnum<CodeGenOpts<"VecLib">, "NoLibrary">;
 def fno_lax_vector_conversions : Flag<["-"], "fno-lax-vector-conversions">, Group<f_Group>,
@@ -3291,6 +3297,7 @@ def gdwarf_aranges : Flag<["-"], "gdwarf-aranges">, Group<g_flags_Group>;
 def gmodules : Flag <["-"], "gmodules">, Group<gN_Group>,
   HelpText<"Generate debug info with external references to clang modules"
            " or precompiled headers">;
+def gno_modules : Flag <["-"], "gno-modules">, Group<g_flags_Group>;
 def gz_EQ : Joined<["-"], "gz=">, Group<g_flags_Group>,
     HelpText<"DWARF debug sections compression type">;
 def gz : Flag<["-"], "gz">, Alias<gz_EQ>, AliasArgs<["zlib"]>, Group<g_flags_Group>;
@@ -5702,10 +5709,11 @@ def fctor_dtor_return_this : Flag<["-"], "fctor-dtor-return-this">,
            "and non-deleting destructors. (No effect on Microsoft ABI)">,
   MarshallingInfoFlag<CodeGenOpts<"CtorDtorReturnThis">>;
 
-def fexperimental_assignment_tracking :
-  Flag<["-"], "fexperimental-assignment-tracking">, Group<f_Group>,
-  HelpText<"Enable assignment tracking debug info">,
-  MarshallingInfoFlag<CodeGenOpts<"EnableAssignmentTracking">>;
+defm experimental_assignment_tracking :
+  BoolOption<"f", "experimental-assignment-tracking",
+  CodeGenOpts<"EnableAssignmentTracking">, DefaultFalse,
+  PosFlag<SetTrue, [CC1Option]>, NegFlag<SetFalse>, BothFlags<[CoreOption]>>,
+  Group<f_Group>;
 
 } // let Flags = [CC1Option, NoDriverOption]
 

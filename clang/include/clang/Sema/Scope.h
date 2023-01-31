@@ -20,6 +20,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/iterator_range.h"
 #include <cassert>
+#include <optional>
 
 namespace llvm {
 
@@ -145,11 +146,17 @@ public:
     /// order clause which specifies concurrent
     OpenMPOrderClauseScope = 0x4000000,
 
+    /// This is the scope for a lambda, after the lambda introducer.
+    /// Lambdas need two FunctionPrototypeScope scopes (because there is a
+    /// template scope in between), the outer scope does not increase the
+    /// depth of recursion.
+    LambdaScope = 0x8000000,
+
     /// This is the scope of OmpSs executable directive.
-    OmpSsDirectiveScope = 0x8000000,
+    OmpSsDirectiveScope = 0x10000000,
 
     /// This is the scope of some OmpSs loop directive.
-    OmpSsLoopDirectiveScope = 0x10000000,
+    OmpSsLoopDirectiveScope = 0x20000000,
   };
 
 private:
@@ -227,7 +234,7 @@ private:
   ///     (e.g. return a function parameter).
   ///  3) std::nullopt value means that there is no NRVO candidate in this scope
   ///     (i.e. there are no return statements in this scope).
-  Optional<VarDecl *> NRVO;
+  std::optional<VarDecl *> NRVO;
 
   /// Represents return slots for NRVO candidates in the current scope.
   /// If a variable is present in this set, it means that a return slot is

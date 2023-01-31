@@ -1199,7 +1199,7 @@ static bool UpdateOperandRegClass(MachineInstr &Instr) {
            "Operand has register constraints without being a register!");
 
     Register Reg = MO.getReg();
-    if (Register::isPhysicalRegister(Reg)) {
+    if (Reg.isPhysical()) {
       if (!OpRegCstraints->contains(Reg))
         return false;
     } else if (!OpRegCstraints->hasSubClassEq(MRI->getRegClass(Reg)) &&
@@ -3803,7 +3803,7 @@ static void storeRegPairToStackSlot(const TargetRegisterInfo &TRI,
                                     MachineMemOperand *MMO) {
   Register SrcReg0 = SrcReg;
   Register SrcReg1 = SrcReg;
-  if (Register::isPhysicalRegister(SrcReg)) {
+  if (SrcReg.isPhysical()) {
     SrcReg0 = TRI.getSubReg(SrcReg, SubIdx0);
     SubIdx0 = 0;
     SrcReg1 = TRI.getSubReg(SrcReg, SubIdx1);
@@ -3850,7 +3850,7 @@ void AArch64InstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
   case 4:
     if (AArch64::GPR32allRegClass.hasSubClassEq(RC)) {
       Opc = AArch64::STRWui;
-      if (Register::isVirtualRegister(SrcReg))
+      if (SrcReg.isVirtual())
         MF.getRegInfo().constrainRegClass(SrcReg, &AArch64::GPR32RegClass);
       else
         assert(SrcReg != AArch64::WSP);
@@ -3860,7 +3860,7 @@ void AArch64InstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
   case 8:
     if (AArch64::GPR64allRegClass.hasSubClassEq(RC)) {
       Opc = AArch64::STRXui;
-      if (Register::isVirtualRegister(SrcReg))
+      if (SrcReg.isVirtual())
         MF.getRegInfo().constrainRegClass(SrcReg, &AArch64::GPR64RegClass);
       else
         assert(SrcReg != AArch64::SP);
@@ -3958,7 +3958,7 @@ static void loadRegPairFromStackSlot(const TargetRegisterInfo &TRI,
   Register DestReg0 = DestReg;
   Register DestReg1 = DestReg;
   bool IsUndef = true;
-  if (Register::isPhysicalRegister(DestReg)) {
+  if (DestReg.isPhysical()) {
     DestReg0 = TRI.getSubReg(DestReg, SubIdx0);
     SubIdx0 = 0;
     DestReg1 = TRI.getSubReg(DestReg, SubIdx1);
@@ -4006,7 +4006,7 @@ void AArch64InstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
   case 4:
     if (AArch64::GPR32allRegClass.hasSubClassEq(RC)) {
       Opc = AArch64::LDRWui;
-      if (Register::isVirtualRegister(DestReg))
+      if (DestReg.isVirtual())
         MF.getRegInfo().constrainRegClass(DestReg, &AArch64::GPR32RegClass);
       else
         assert(DestReg != AArch64::WSP);
@@ -4016,7 +4016,7 @@ void AArch64InstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
   case 8:
     if (AArch64::GPR64allRegClass.hasSubClassEq(RC)) {
       Opc = AArch64::LDRXui;
-      if (Register::isVirtualRegister(DestReg))
+      if (DestReg.isVirtual())
         MF.getRegInfo().constrainRegClass(DestReg, &AArch64::GPR64RegClass);
       else
         assert(DestReg != AArch64::SP);
@@ -4481,11 +4481,11 @@ MachineInstr *AArch64InstrInfo::foldMemoryOperandImpl(
   if (MI.isFullCopy()) {
     Register DstReg = MI.getOperand(0).getReg();
     Register SrcReg = MI.getOperand(1).getReg();
-    if (SrcReg == AArch64::SP && Register::isVirtualRegister(DstReg)) {
+    if (SrcReg == AArch64::SP && DstReg.isVirtual()) {
       MF.getRegInfo().constrainRegClass(DstReg, &AArch64::GPR64RegClass);
       return nullptr;
     }
-    if (DstReg == AArch64::SP && Register::isVirtualRegister(SrcReg)) {
+    if (DstReg == AArch64::SP && SrcReg.isVirtual()) {
       MF.getRegInfo().constrainRegClass(SrcReg, &AArch64::GPR64RegClass);
       return nullptr;
     }
@@ -4559,7 +4559,7 @@ MachineInstr *AArch64InstrInfo::foldMemoryOperandImpl(
     //
     //   STRXui %xzr, %stack.0
     //
-    if (IsSpill && DstMO.isUndef() && Register::isPhysicalRegister(SrcReg)) {
+    if (IsSpill && DstMO.isUndef() && SrcReg.isPhysical()) {
       assert(SrcMO.getSubReg() == 0 &&
              "Unexpected subreg on physical register");
       const TargetRegisterClass *SpillRC;
@@ -4901,7 +4901,7 @@ static bool canCombine(MachineBasicBlock &MBB, MachineOperand &MO,
   MachineRegisterInfo &MRI = MBB.getParent()->getRegInfo();
   MachineInstr *MI = nullptr;
 
-  if (MO.isReg() && Register::isVirtualRegister(MO.getReg()))
+  if (MO.isReg() && MO.getReg().isVirtual())
     MI = MRI.getUniqueVRegDef(MO.getReg());
   // And it needs to be in the trace (otherwise, it won't have a depth).
   if (!MI || MI->getParent() != &MBB || (unsigned)MI->getOpcode() != CombineOpc)
@@ -5343,7 +5343,7 @@ static bool getFMULPatterns(MachineInstr &Root,
     MachineRegisterInfo &MRI = MBB.getParent()->getRegInfo();
     MachineOperand &MO = Root.getOperand(Operand);
     MachineInstr *MI = nullptr;
-    if (MO.isReg() && Register::isVirtualRegister(MO.getReg()))
+    if (MO.isReg() && MO.getReg().isVirtual())
       MI = MRI.getUniqueVRegDef(MO.getReg());
     // Ignore No-op COPYs in FMUL(COPY(DUP(..)))
     if (MI && MI->getOpcode() == TargetOpcode::COPY &&
@@ -5601,7 +5601,7 @@ genFusedMultiply(MachineFunction &MF, MachineRegisterInfo &MRI,
   Register SrcReg1 = MUL->getOperand(2).getReg();
   bool Src1IsKill = MUL->getOperand(2).isKill();
 
-  unsigned SrcReg2;
+  Register SrcReg2;
   bool Src2IsKill;
   if (ReplacedAddend) {
     // If we just generated a new addend, we must be it's only use.
@@ -5612,13 +5612,13 @@ genFusedMultiply(MachineFunction &MF, MachineRegisterInfo &MRI,
     Src2IsKill = Root.getOperand(IdxOtherOpd).isKill();
   }
 
-  if (Register::isVirtualRegister(ResultReg))
+  if (ResultReg.isVirtual())
     MRI.constrainRegClass(ResultReg, RC);
-  if (Register::isVirtualRegister(SrcReg0))
+  if (SrcReg0.isVirtual())
     MRI.constrainRegClass(SrcReg0, RC);
-  if (Register::isVirtualRegister(SrcReg1))
+  if (SrcReg1.isVirtual())
     MRI.constrainRegClass(SrcReg1, RC);
-  if (Register::isVirtualRegister(SrcReg2))
+  if (SrcReg2.isVirtual())
     MRI.constrainRegClass(SrcReg2, RC);
 
   MachineInstrBuilder MIB;
@@ -5791,11 +5791,11 @@ static MachineInstr *genMaddR(MachineFunction &MF, MachineRegisterInfo &MRI,
   Register SrcReg1 = MUL->getOperand(2).getReg();
   bool Src1IsKill = MUL->getOperand(2).isKill();
 
-  if (Register::isVirtualRegister(ResultReg))
+  if (ResultReg.isVirtual())
     MRI.constrainRegClass(ResultReg, RC);
-  if (Register::isVirtualRegister(SrcReg0))
+  if (SrcReg0.isVirtual())
     MRI.constrainRegClass(SrcReg0, RC);
-  if (Register::isVirtualRegister(SrcReg1))
+  if (SrcReg1.isVirtual())
     MRI.constrainRegClass(SrcReg1, RC);
   if (Register::isVirtualRegister(VR))
     MRI.constrainRegClass(VR, RC);
@@ -6871,7 +6871,7 @@ bool AArch64InstrInfo::optimizeCondBranch(MachineInstr &MI) const {
   MachineFunction *MF = MBB->getParent();
   MachineRegisterInfo *MRI = &MF->getRegInfo();
   Register VReg = MI.getOperand(0).getReg();
-  if (!Register::isVirtualRegister(VReg))
+  if (!VReg.isVirtual())
     return false;
 
   MachineInstr *DefMI = MRI->getVRegDef(VReg);
@@ -6907,7 +6907,7 @@ bool AArch64InstrInfo::optimizeCondBranch(MachineInstr &MI) const {
 
     MachineOperand &MO = DefMI->getOperand(1);
     Register NewReg = MO.getReg();
-    if (!Register::isVirtualRegister(NewReg))
+    if (!NewReg.isVirtual())
       return false;
 
     assert(!MRI->def_empty(NewReg) && "Register must be defined.");
@@ -7867,7 +7867,7 @@ void AArch64InstrInfo::fixupPostOutline(MachineBasicBlock &MBB) const {
 
 static void signOutlinedFunction(MachineFunction &MF, MachineBasicBlock &MBB,
                                  bool ShouldSignReturnAddr,
-                                 bool ShouldSignReturnAddrWithAKey) {
+                                 bool ShouldSignReturnAddrWithBKey) {
   if (ShouldSignReturnAddr) {
     MachineBasicBlock::iterator MBBPAC = MBB.begin();
     MachineBasicBlock::iterator MBBAUT = MBB.getFirstTerminator();
@@ -7885,21 +7885,15 @@ static void signOutlinedFunction(MachineFunction &MF, MachineBasicBlock &MBB,
     //    PACIASP                   EMITBKEY
     //    CFI_INSTRUCTION           PACIBSP
     //                              CFI_INSTRUCTION
-    unsigned PACI;
-    if (ShouldSignReturnAddrWithAKey) {
-      PACI = Subtarget.hasPAuth() ? AArch64::PACIA : AArch64::PACIASP;
-    } else {
+    if (ShouldSignReturnAddrWithBKey) {
       BuildMI(MBB, MBBPAC, DebugLoc(), TII->get(AArch64::EMITBKEY))
           .setMIFlag(MachineInstr::FrameSetup);
-      PACI = Subtarget.hasPAuth() ? AArch64::PACIB : AArch64::PACIBSP;
     }
 
-    auto MI = BuildMI(MBB, MBBPAC, DebugLoc(), TII->get(PACI));
-    if (Subtarget.hasPAuth())
-      MI.addReg(AArch64::LR, RegState::Define)
-          .addReg(AArch64::LR)
-          .addReg(AArch64::SP, RegState::InternalRead);
-    MI.setMIFlag(MachineInstr::FrameSetup);
+    BuildMI(MBB, MBBPAC, DebugLoc(),
+            TII->get(ShouldSignReturnAddrWithBKey ? AArch64::PACIBSP
+                                                  : AArch64::PACIASP))
+        .setMIFlag(MachineInstr::FrameSetup);
 
     if (MF.getInfo<AArch64FunctionInfo>()->needsDwarfUnwindInfo(MF)) {
       unsigned CFIIndex =
@@ -7915,14 +7909,14 @@ static void signOutlinedFunction(MachineFunction &MF, MachineBasicBlock &MBB,
     if (Subtarget.hasPAuth() && MBBAUT != MBB.end() &&
         MBBAUT->getOpcode() == AArch64::RET) {
       BuildMI(MBB, MBBAUT, DL,
-              TII->get(ShouldSignReturnAddrWithAKey ? AArch64::RETAA
-                                                    : AArch64::RETAB))
+              TII->get(ShouldSignReturnAddrWithBKey ? AArch64::RETAB
+                                                    : AArch64::RETAA))
           .copyImplicitOps(*MBBAUT);
       MBB.erase(MBBAUT);
     } else {
       BuildMI(MBB, MBBAUT, DL,
-              TII->get(ShouldSignReturnAddrWithAKey ? AArch64::AUTIASP
-                                                    : AArch64::AUTIBSP))
+              TII->get(ShouldSignReturnAddrWithBKey ? AArch64::AUTIBSP
+                                                    : AArch64::AUTIASP))
           .setMIFlag(MachineInstr::FrameDestroy);
       unsigned CFIIndexAuth =
           MF.addFrameInst(MCCFIInstruction::createNegateRAState(nullptr));
@@ -8037,13 +8031,13 @@ void AArch64InstrInfo::buildOutlinedFrame(
   bool ShouldSignReturnAddr = MFI.shouldSignReturnAddress(!IsLeafFunction);
 
   // a_key is the default
-  bool ShouldSignReturnAddrWithAKey = !MFI.shouldSignWithBKey();
+  bool ShouldSignReturnAddrWithBKey = MFI.shouldSignWithBKey();
 
   // If this is a tail call outlined function, then there's already a return.
   if (OF.FrameConstructionID == MachineOutlinerTailCall ||
       OF.FrameConstructionID == MachineOutlinerThunk) {
     signOutlinedFunction(MF, MBB, ShouldSignReturnAddr,
-                         ShouldSignReturnAddrWithAKey);
+                         ShouldSignReturnAddrWithBKey);
     return;
   }
 
@@ -8058,7 +8052,7 @@ void AArch64InstrInfo::buildOutlinedFrame(
   MBB.insert(MBB.end(), ret);
 
   signOutlinedFunction(MF, MBB, ShouldSignReturnAddr,
-                       ShouldSignReturnAddrWithAKey);
+                       ShouldSignReturnAddrWithBKey);
 
   FI->setOutliningStyle("Function");
 

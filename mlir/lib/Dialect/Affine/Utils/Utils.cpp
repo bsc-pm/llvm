@@ -25,6 +25,7 @@
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/IntegerSet.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include <optional>
 
 #define DEBUG_TYPE "affine-utils"
 
@@ -216,10 +217,9 @@ mlir::Value mlir::expandAffineExpr(OpBuilder &builder, Location loc,
 
 /// Create a sequence of operations that implement the `affineMap` applied to
 /// the given `operands` (as it it were an AffineApplyOp).
-Optional<SmallVector<Value, 8>> mlir::expandAffineMap(OpBuilder &builder,
-                                                      Location loc,
-                                                      AffineMap affineMap,
-                                                      ValueRange operands) {
+std::optional<SmallVector<Value, 8>>
+mlir::expandAffineMap(OpBuilder &builder, Location loc, AffineMap affineMap,
+                      ValueRange operands) {
   auto numDims = affineMap.getNumDims();
   auto expanded = llvm::to_vector<8>(
       llvm::map_range(affineMap.getResults(),
@@ -413,9 +413,12 @@ LogicalResult mlir::hoistAffineIfOp(AffineIfOp ifOp, bool *folded) {
   // in which case we return with `folded` being set.
   RewritePatternSet patterns(ifOp.getContext());
   AffineIfOp::getCanonicalizationPatterns(patterns, ifOp.getContext());
-  bool erased;
   FrozenRewritePatternSet frozenPatterns(std::move(patterns));
-  (void)applyOpPatternsAndFold(ifOp, frozenPatterns, &erased);
+  GreedyRewriteConfig config;
+  config.strictMode = GreedyRewriteStrictness::ExistingOps;
+  bool erased;
+  (void)applyOpPatternsAndFold(ifOp.getOperation(), frozenPatterns, config,
+                               /*changed=*/nullptr, &erased);
   if (erased) {
     if (folded)
       *folded = true;
@@ -1816,7 +1819,7 @@ MemRefType mlir::normalizeMemRefType(MemRefType memrefType,
       newShape[d] = ShapedType::kDynamic;
     } else {
       // The lower bound for the shape is always zero.
-      Optional<int64_t> ubConst =
+      std::optional<int64_t> ubConst =
           fac.getConstantBound64(IntegerPolyhedron::UB, d);
       // For a static memref and an affine map with no symbols, this is
       // always bounded. However, when we have symbols, we may not be able to

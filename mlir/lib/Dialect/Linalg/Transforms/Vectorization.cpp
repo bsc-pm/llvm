@@ -9,6 +9,7 @@
 // This file implements the linalg dialect Vectorization transformations.
 //
 //===----------------------------------------------------------------------===//
+#include "mlir/Dialect/Affine/Utils.h"
 
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -31,6 +32,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <type_traits>
+#include <optional>
 
 using namespace mlir;
 using namespace mlir::linalg;
@@ -77,9 +79,9 @@ struct VectorizationState {
   /// masking. Returns the masked operation or the original operation if masking
   /// is not needed. If provided, the canonical mask for this operation is
   /// permuted using `maybeMaskingMap`.
-  Operation *maskOperation(RewriterBase &rewriter, Operation *opToMask,
-                           LinalgOp linalgOp,
-                           Optional<AffineMap> maybeMaskingMap = std::nullopt);
+  Operation *
+  maskOperation(RewriterBase &rewriter, Operation *opToMask, LinalgOp linalgOp,
+                std::optional<AffineMap> maybeMaskingMap = std::nullopt);
 
 private:
   /// Initializes the iteration space static sizes using the Linalg op
@@ -100,7 +102,7 @@ private:
   /// cached for future users.
   Value getOrCreateMaskFor(RewriterBase &rewriter, Operation *opToMask,
                            LinalgOp linalgOp,
-                           Optional<AffineMap> maybeMaskingMap);
+                           std::optional<AffineMap> maybeMaskingMap);
 
   // Holds the compile-time static sizes of the iteration space to vectorize.
   // Dynamic dimensions are represented using ShapedType::kDynamicSize.
@@ -199,7 +201,7 @@ VectorizationState::initState(RewriterBase &rewriter, LinalgOp linalgOp,
 /// future users.
 Value VectorizationState::getOrCreateMaskFor(
     RewriterBase &rewriter, Operation *opToMask, LinalgOp linalgOp,
-    Optional<AffineMap> maybeMaskingMap) {
+    std::optional<AffineMap> maybeMaskingMap) {
   // No mask is needed if the operation is not maskable.
   auto maskableOp = dyn_cast<vector::MaskableOpInterface>(opToMask);
   if (!maskableOp)
@@ -278,7 +280,7 @@ Value VectorizationState::getOrCreateMaskFor(
 Operation *
 VectorizationState::maskOperation(RewriterBase &rewriter, Operation *opToMask,
                                   LinalgOp linalgOp,
-                                  Optional<AffineMap> maybeMaskingMap) {
+                                  std::optional<AffineMap> maybeMaskingMap) {
   LDBG("Trying to mask: " << *opToMask << "\n");
 
   // Create or retrieve mask for this operation.
@@ -292,25 +294,8 @@ VectorizationState::maskOperation(RewriterBase &rewriter, Operation *opToMask,
 
   // Wrap the operation with a new `vector.mask` and update D-U chain.
   assert(opToMask && "Expected a valid operation to mask");
-  auto opResults = opToMask->getResultTypes();
-  auto createRegionMask = [opToMask](OpBuilder &builder, Location loc) {
-    Block *insBlock = builder.getInsertionBlock();
-    // Create a block, put an op in that block. Look for a utility.
-    // Maybe in conversion pattern rewriter. Way to avoid splice.
-    // Set insertion point.
-    insBlock->getOperations().splice(
-        insBlock->begin(), opToMask->getBlock()->getOperations(), opToMask);
-    builder.create<vector::YieldOp>(loc, opToMask->getResults());
-  };
-  // TODO: Allow multiple results in vector.mask.
-  auto maskOp =
-      opResults.empty()
-          ? rewriter.create<vector::MaskOp>(opToMask->getLoc(), mask,
-                                            createRegionMask)
-          : rewriter.create<vector::MaskOp>(opToMask->getLoc(),
-                                            opToMask->getResultTypes().front(),
-                                            mask, createRegionMask);
-
+  auto maskOp = cast<vector::MaskOp>(
+      mlir::vector::maskOperation(rewriter, opToMask, mask));
   Operation *maskOpTerminator = &maskOp.getMaskRegion().front().back();
 
   for (auto [resIdx, resVal] : llvm::enumerate(opToMask->getResults()))
@@ -440,17 +425,16 @@ static Value broadcastIfNeeded(OpBuilder &b, Value value,
 /// initial value.buildMultiDimReduce
 // Note: this is a true builder that notifies the OpBuilder listener.
 // TODO: Consider moving as a static helper on the ReduceOp.
-static Operation *buildMultiDimReduce(OpBuilder &b,
-                                      Operation *reduceOp, Value valueToReduce,
-                                      Value acc,
-                                      const SmallVector<bool> &reductionMask) {
+static Operation *buildMultiDimReduce(OpBuilder &b, Operation *reduceOp,
+                                      Value valueToReduce, Value acc,
+                                      ArrayRef<bool> dimsToMask) {
   auto maybeKind = getCombinerOpKind(reduceOp);
   assert(maybeKind && "Failed precondition: could not get reduction kind");
   return b.create<vector::MultiDimReductionOp>(
-      reduceOp->getLoc(), valueToReduce, acc, reductionMask, *maybeKind);
+      reduceOp->getLoc(), valueToReduce, acc, dimsToMask, *maybeKind);
 }
 
-static SmallVector<bool> getReductionMask(LinalgOp linalgOp) {
+static SmallVector<bool> getDimsToReduce(LinalgOp linalgOp) {
   return llvm::to_vector(
       llvm::map_range(linalgOp.getIteratorTypesArray(), isReductionIterator));
 }
@@ -473,7 +457,7 @@ static Value buildVectorWrite(RewriterBase &rewriter, Value value,
 
   Operation *write;
   if (vectorType.getRank() > 0) {
-    AffineMap writeMap = reindexIndexingMap(opOperandMap);
+    AffineMap writeMap = inversePermutation(reindexIndexingMap(opOperandMap));
     SmallVector<Value> indices(linalgOp.getRank(outputOperand),
                                rewriter.create<arith::ConstantIndexOp>(loc, 0));
     value = broadcastIfNeeded(rewriter, value, vectorType.getShape());
@@ -701,8 +685,8 @@ static Operation *reduceIfNeeded(OpBuilder &b, LinalgOp linalgOp, Operation *op,
   if (!reduceType ||
       (outputType && reduceType.getShape() == outputType.getShape()))
     return nullptr;
-  SmallVector<bool> reductionMask = getReductionMask(linalgOp);
-  return buildMultiDimReduce(b, op, reduceVec, outputVec, reductionMask);
+  SmallVector<bool> dimsToMask = getDimsToReduce(linalgOp);
+  return buildMultiDimReduce(b, op, reduceVec, outputVec, dimsToMask);
 }
 
 /// Generic vectorization for a single operation `op`, given already vectorized
@@ -972,11 +956,8 @@ static LogicalResult reductionPreconditions(LinalgOp op) {
 }
 
 static LogicalResult vectorizeDynamicLinalgOpPrecondition(linalg::LinalgOp op) {
-  // TODO: Masking only supports dynamic generic ops without reductions for now.
-  if (!isElementwise(op) &&
-      llvm::any_of(op.getIteratorTypesArray(), [](utils::IteratorType itType) {
-        return itType != utils::IteratorType::parallel;
-      }))
+  // TODO: Masking only supports dynamic generic ops for now.
+  if (!isa<linalg::GenericOp>(op))
     return failure();
 
   // TODO: 0-d vectors are not supported yet.
@@ -999,16 +980,17 @@ mlir::linalg::vectorizeLinalgOpPrecondition(LinalgOp linalgOp,
            "Input vector sizes don't match the number of loops");
     assert(!ShapedType::isDynamicShape(inputVectorSizes) &&
            "Input vector sizes can't have dynamic dimensions");
-    assert(llvm::all_of(
-               llvm::zip(linalgOp.getStaticLoopRanges(), inputVectorSizes),
-               [](std::tuple<int64_t, int64_t> sizePair) {
-                 int64_t staticSize = std::get<0>(sizePair);
-                 int64_t inputSize = std::get<1>(sizePair);
-                 return ShapedType::isDynamic(staticSize) ||
-                        staticSize <= inputSize;
-               }) &&
-           "Input vector sizes must be smaller or equal than iteration space "
-           "static sizes");
+    assert(
+        llvm::all_of(
+            llvm::zip(linalgOp.getStaticLoopRanges(), inputVectorSizes),
+            [](std::tuple<int64_t, int64_t> sizePair) {
+              int64_t staticSize = std::get<0>(sizePair);
+              int64_t inputSize = std::get<1>(sizePair);
+              return ShapedType::isDynamic(staticSize) ||
+                     staticSize <= inputSize;
+            }) &&
+        "Input vector sizes must be greater than or equal to iteration space "
+        "static sizes");
   }
 
   // TODO: Masking is only supported for dynamic shapes so input vector sizes
@@ -1068,10 +1050,25 @@ mlir::linalg::vectorizeLinalgOpPrecondition(LinalgOp linalgOp,
   return success();
 }
 
+/// Converts affine.apply Ops to arithmetic operations.
+static void convertAffineApply(RewriterBase &rewriter, LinalgOp linalgOp) {
+  auto &newIP = linalgOp.getBlock()->front();
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPointAfter(&newIP);
+  auto toReplace = linalgOp.getBlock()->getOps<AffineApplyOp>();
+
+  for (auto op : make_early_inc_range(toReplace)) {
+    auto expanded =
+        expandAffineExpr(rewriter, op->getLoc(), op.getAffineMap().getResult(0),
+                         op.getOperands(), ValueRange{});
+    rewriter.replaceOp(op, expanded);
+  }
+}
+
 /// Emit a suitable vector form for a Linalg op. If provided, `inputVectorSizes`
 /// are used to vectorize this operation. `inputVectorSizes` must match the rank
-/// of the iteration space of the operation and the sizes must be smaller or
-/// equal than their counterpart interation space sizes, if static.
+/// of the iteration space of the operation and the input vector sizes must be
+/// greater than or equal to their counterpart iteration space sizes, if static.
 /// `inputVectorShapes` also allows the vectorization of operations with dynamic
 /// shapes.
 LogicalResult mlir::linalg::vectorize(RewriterBase &rewriter, LinalgOp linalgOp,
@@ -1104,6 +1101,10 @@ LogicalResult mlir::linalg::vectorize(RewriterBase &rewriter, LinalgOp linalgOp,
                                              vectorizeNDExtract)))
       return failure();
     LDBG("Vectorize generic by broadcasting to the canonical vector shape\n");
+
+    // Pre-process before proceeding.
+    convertAffineApply(rewriter, linalgOp);
+
     // TODO: 'vectorize' takes in a 'RewriterBase' which is up-casted to
     // 'OpBuilder' when it is passed over to some methods like
     // 'vectorizeAsLinalgGeneric'. This is highly problematic: if we erase an op
@@ -1129,10 +1130,14 @@ LogicalResult mlir::linalg::vectorizeCopy(RewriterBase &rewriter,
   if (!srcType.hasStaticShape() || !dstType.hasStaticShape())
     return failure();
 
-  auto readType =
-      VectorType::get(srcType.getShape(), getElementTypeOrSelf(srcType));
-  auto writeType =
-      VectorType::get(dstType.getShape(), getElementTypeOrSelf(dstType));
+  auto srcElementType = getElementTypeOrSelf(srcType);
+  auto dstElementType = getElementTypeOrSelf(dstType);
+  if (!VectorType::isValidElementType(srcElementType) ||
+      !VectorType::isValidElementType(dstElementType))
+    return failure();
+
+  auto readType = VectorType::get(srcType.getShape(), srcElementType);
+  auto writeType = VectorType::get(dstType.getShape(), dstElementType);
 
   Location loc = copyOp->getLoc();
   Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
@@ -1193,6 +1198,8 @@ struct GenericPadOpVectorizationPattern : public GeneralizePadOpPattern {
                                         tensor::PadOp padOp, Value dest) {
     auto sourceType = padOp.getSourceType();
     auto resultType = padOp.getResultType();
+    if (!VectorType::isValidElementType(sourceType.getElementType()))
+      return failure();
 
     // Copy cannot be vectorized if pad value is non-constant and source shape
     // is dynamic. In case of a dynamic source shape, padding must be appended

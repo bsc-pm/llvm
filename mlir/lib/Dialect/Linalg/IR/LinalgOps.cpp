@@ -39,6 +39,7 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
+#include <optional>
 
 using namespace mlir;
 using namespace mlir::linalg;
@@ -94,7 +95,7 @@ static void fillStructuredOpRegion(OpBuilder &opBuilder, Region &region,
 /// The body of the operation is filled using `regionBuilder`. All ods-gen
 /// created structured operations use the method to implement their builders.
 static void buildStructuredOp(OpBuilder &b, OperationState &state,
-                              llvm::Optional<TypeRange> resultTensorTypes,
+                              std::optional<TypeRange> resultTensorTypes,
                               ValueRange inputs, ValueRange outputs,
                               ArrayRef<NamedAttribute> attributes,
                               RegionBuilderFn regionBuilder) {
@@ -1766,7 +1767,7 @@ LogicalResult IndexOp::verify() {
 #define GET_OP_CLASSES
 #include "mlir/Dialect/Linalg/IR/LinalgStructuredOps.cpp.inc"
 
-AffineMap mlir::linalg::extractOrIdentityMap(Optional<AffineMap> maybeMap,
+AffineMap mlir::linalg::extractOrIdentityMap(std::optional<AffineMap> maybeMap,
                                              unsigned rank,
                                              MLIRContext *context) {
   if (maybeMap)
@@ -1794,7 +1795,7 @@ SmallVector<AffineExpr, 4> mlir::linalg::concat(ArrayRef<AffineExpr> a,
   return llvm::to_vector<4>(concatRanges);
 }
 
-static void appendMangledType(llvm::raw_string_ostream &ss, Type t) {
+static LogicalResult appendMangledType(llvm::raw_string_ostream &ss, Type t) {
   if (auto memref = t.dyn_cast<MemRefType>()) {
     ss << "view";
     for (auto size : memref.getShape())
@@ -1802,17 +1803,22 @@ static void appendMangledType(llvm::raw_string_ostream &ss, Type t) {
         ss << "sx";
       else
         ss << size << "x";
-    appendMangledType(ss, memref.getElementType());
-  } else if (auto vec = t.dyn_cast<VectorType>()) {
+    if (failed(appendMangledType(ss, memref.getElementType())))
+      return failure();
+    return success();
+  }
+  if (auto vec = t.dyn_cast<VectorType>()) {
     ss << "vector";
     llvm::interleave(
         vec.getShape(), [&](int64_t i) { ss << i; }, [&]() { ss << "x"; });
-    appendMangledType(ss, vec.getElementType());
+    if (failed(appendMangledType(ss, vec.getElementType())))
+      return failure();
+    return success();
   } else if (t.isSignlessIntOrIndexOrFloat()) {
     ss << t;
-  } else {
-    llvm_unreachable("Invalid type for linalg library name mangling");
+    return success();
   }
+  return failure();
 }
 
 std::string mlir::linalg::generateLibraryCallName(Operation *op) {
@@ -1822,11 +1828,14 @@ std::string mlir::linalg::generateLibraryCallName(Operation *op) {
   std::replace(name.begin(), name.end(), '.', '_');
   llvm::raw_string_ostream ss(name);
   ss << "_";
-  auto types = op->getOperandTypes();
-  llvm::interleave(
-      types.begin(), types.end(), [&](Type t) { appendMangledType(ss, t); },
-      [&]() { ss << "_"; });
-  return ss.str();
+  for (Type t : op->getOperandTypes()) {
+    if (failed(appendMangledType(ss, t)))
+      return std::string();
+    ss << "_";
+  }
+  std::string res = ss.str();
+  res.pop_back();
+  return res;
 }
 
 //===----------------------------------------------------------------------===//

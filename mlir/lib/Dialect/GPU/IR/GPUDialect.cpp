@@ -793,15 +793,13 @@ static ParseResult parseLaunchFuncOperands(
   if (parser.parseOptionalKeyword("args"))
     return success();
 
-  SmallVector<OpAsmParser::Argument> args;
-  if (parser.parseArgumentList(args, OpAsmParser::Delimiter::Paren,
-                               /*allowType=*/true))
-    return failure();
-  for (auto &arg : args) {
-    argNames.push_back(arg.ssaName);
-    argTypes.push_back(arg.type);
-  }
-  return success();
+  auto parseElement = [&]() -> ParseResult {
+    return failure(parser.parseOperand(argNames.emplace_back()) ||
+                   parser.parseColonType(argTypes.emplace_back()));
+  };
+
+  return parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Paren,
+                                        parseElement, " in argument list");
 }
 
 static void printLaunchFuncOperands(OpAsmPrinter &printer, Operation *,
@@ -1015,16 +1013,22 @@ LogicalResult GPUFuncOp::verifyType() {
 
 static LogicalResult verifyAttributions(Operation *op,
                                         ArrayRef<BlockArgument> attributions,
-                                        unsigned memorySpace) {
+                                        gpu::AddressSpace memorySpace) {
   for (Value v : attributions) {
     auto type = v.getType().dyn_cast<MemRefType>();
     if (!type)
       return op->emitOpError() << "expected memref type in attribution";
 
-    if (type.getMemorySpaceAsInt() != memorySpace) {
+    // We can only verify the address space if it hasn't already been lowered
+    // from the AddressSpaceAttr to a target-specific numeric value.
+    auto addressSpace =
+        type.getMemorySpace().dyn_cast_or_null<gpu::AddressSpaceAttr>();
+    if (!addressSpace)
+      continue;
+    if (addressSpace.getValue() != memorySpace)
       return op->emitOpError()
-             << "expected memory space " << memorySpace << " in attribution";
-    }
+             << "expected memory space " << stringifyAddressSpace(memorySpace)
+             << " in attribution";
   }
   return success();
 }

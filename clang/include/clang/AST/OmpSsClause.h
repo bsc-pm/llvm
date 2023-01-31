@@ -236,7 +236,7 @@ public:
 
   /// Get the clauses storage.
   MutableArrayRef<OSSClause *> getClauses() {
-    return llvm::makeMutableArrayRef(getTrailingObjects<OSSClause *>(),
+    return llvm::MutableArrayRef(getTrailingObjects<OSSClause *>(),
                                      NumClauses);
   }
   ArrayRef<OSSClause *> getClauses() const {

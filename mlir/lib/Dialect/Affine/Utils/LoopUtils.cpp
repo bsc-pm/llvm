@@ -25,11 +25,11 @@
 #include "mlir/IR/IntegerSet.h"
 #include "mlir/Support/MathExtras.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Transforms/RegionUtils.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
+#include <optional>
 
 #define DEBUG_TYPE "loop-utils"
 
@@ -129,7 +129,7 @@ static void replaceIterArgsAndYieldResults(AffineForOp forOp) {
 /// was known to have a single iteration.
 // TODO: extend this for arbitrary affine bounds.
 LogicalResult mlir::promoteIfSingleIteration(AffineForOp forOp) {
-  Optional<uint64_t> tripCount = getConstantTripCount(forOp);
+  std::optional<uint64_t> tripCount = getConstantTripCount(forOp);
   if (!tripCount || *tripCount != 1)
     return failure();
 
@@ -321,9 +321,11 @@ LogicalResult mlir::affineForOpBodySkew(AffineForOp forOp,
         // Simplify/canonicalize the affine.for.
         RewritePatternSet patterns(res.getContext());
         AffineForOp::getCanonicalizationPatterns(patterns, res.getContext());
+        GreedyRewriteConfig config;
+        config.strictMode = GreedyRewriteStrictness::ExistingOps;
         bool erased;
-        (void)applyOpPatternsAndFold(res, std::move(patterns), &erased);
-
+        (void)applyOpPatternsAndFold(res.getOperation(), std::move(patterns),
+                                     config, /*changed=*/nullptr, &erased);
         if (!erased && !prologue)
           prologue = res;
         if (!erased)
@@ -790,7 +792,8 @@ constructTiledIndexSetHyperRect(MutableArrayRef<AffineForOp> origLoops,
   // Bounds for intra-tile loops.
   for (unsigned i = 0; i < width; i++) {
     int64_t largestDiv = getLargestDivisorOfTripCount(origLoops[i]);
-    Optional<uint64_t> mayBeConstantCount = getConstantTripCount(origLoops[i]);
+    std::optional<uint64_t> mayBeConstantCount =
+        getConstantTripCount(origLoops[i]);
     // The lower bound is just the tile-space loop.
     AffineMap lbMap = b.getDimIdentityMap();
     newLoops[width + i].setLowerBound(
@@ -970,7 +973,7 @@ void mlir::getTileableBands(func::FuncOp f,
 
 /// Unrolls this loop completely.
 LogicalResult mlir::loopUnrollFull(AffineForOp forOp) {
-  Optional<uint64_t> mayBeConstantTripCount = getConstantTripCount(forOp);
+  std::optional<uint64_t> mayBeConstantTripCount = getConstantTripCount(forOp);
   if (mayBeConstantTripCount.has_value()) {
     uint64_t tripCount = *mayBeConstantTripCount;
     if (tripCount == 0)
@@ -986,7 +989,7 @@ LogicalResult mlir::loopUnrollFull(AffineForOp forOp) {
 /// whichever is lower.
 LogicalResult mlir::loopUnrollUpToFactor(AffineForOp forOp,
                                          uint64_t unrollFactor) {
-  Optional<uint64_t> mayBeConstantTripCount = getConstantTripCount(forOp);
+  std::optional<uint64_t> mayBeConstantTripCount = getConstantTripCount(forOp);
   if (mayBeConstantTripCount.has_value() &&
       *mayBeConstantTripCount < unrollFactor)
     return loopUnrollByFactor(forOp, *mayBeConstantTripCount);
@@ -1092,7 +1095,7 @@ LogicalResult mlir::loopUnrollByFactor(
     bool cleanUpUnroll) {
   assert(unrollFactor > 0 && "unroll factor should be positive");
 
-  Optional<uint64_t> mayBeConstantTripCount = getConstantTripCount(forOp);
+  std::optional<uint64_t> mayBeConstantTripCount = getConstantTripCount(forOp);
   if (unrollFactor == 1) {
     if (mayBeConstantTripCount && *mayBeConstantTripCount == 1 &&
         failed(promoteIfSingleIteration(forOp)))
@@ -1155,7 +1158,7 @@ LogicalResult mlir::loopUnrollByFactor(
 
 LogicalResult mlir::loopUnrollJamUpToFactor(AffineForOp forOp,
                                             uint64_t unrollJamFactor) {
-  Optional<uint64_t> mayBeConstantTripCount = getConstantTripCount(forOp);
+  std::optional<uint64_t> mayBeConstantTripCount = getConstantTripCount(forOp);
   if (mayBeConstantTripCount.has_value() &&
       *mayBeConstantTripCount < unrollJamFactor)
     return loopUnrollJamByFactor(forOp, *mayBeConstantTripCount);
@@ -1208,7 +1211,7 @@ LogicalResult mlir::loopUnrollJamByFactor(AffineForOp forOp,
                                           uint64_t unrollJamFactor) {
   assert(unrollJamFactor > 0 && "unroll jam factor should be positive");
 
-  Optional<uint64_t> mayBeConstantTripCount = getConstantTripCount(forOp);
+  std::optional<uint64_t> mayBeConstantTripCount = getConstantTripCount(forOp);
   if (unrollJamFactor == 1) {
     if (mayBeConstantTripCount && *mayBeConstantTripCount == 1 &&
         failed(promoteIfSingleIteration(forOp)))
@@ -2094,7 +2097,7 @@ static LogicalResult generateCopy(
   std::vector<SmallVector<int64_t, 4>> lbs;
   SmallVector<int64_t, 8> lbDivisors;
   lbs.reserve(rank);
-  Optional<int64_t> numElements = region.getConstantBoundingSizeAndShape(
+  std::optional<int64_t> numElements = region.getConstantBoundingSizeAndShape(
       &fastBufferShape, &lbs, &lbDivisors);
   if (!numElements) {
     LLVM_DEBUG(llvm::dbgs() << "Non-constant region size not supported\n");
@@ -2375,7 +2378,7 @@ static bool getFullMemRefAsRegion(Operation *op, unsigned numParamLoopIVs,
 LogicalResult mlir::affineDataCopyGenerate(Block::iterator begin,
                                            Block::iterator end,
                                            const AffineCopyOptions &copyOptions,
-                                           Optional<Value> filterMemRef,
+                                           std::optional<Value> filterMemRef,
                                            DenseSet<Operation *> &copyNests) {
   if (begin == end)
     return success();
@@ -2564,7 +2567,7 @@ LogicalResult mlir::affineDataCopyGenerate(Block::iterator begin,
 // an AffineForOp.
 LogicalResult mlir::affineDataCopyGenerate(AffineForOp forOp,
                                            const AffineCopyOptions &copyOptions,
-                                           Optional<Value> filterMemRef,
+                                           std::optional<Value> filterMemRef,
                                            DenseSet<Operation *> &copyNests) {
   return affineDataCopyGenerate(forOp.getBody()->begin(),
                                 std::prev(forOp.getBody()->end()), copyOptions,

@@ -1,17 +1,17 @@
 add_entrypoint_library(
-  ${LIBC_TARGET}
+  libc
   DEPENDS
   ${TARGET_LLVMLIBC_ENTRYPOINTS}
 )
 set_target_properties(
-  ${LIBC_TARGET}
+  libc
   PROPERTIES
     ARCHIVE_OUTPUT_NAME ${LIBC_ARCHIVE_NAME}
 )
 
 if(LIBC_TARGET_TRIPLE)
   set(LIBC_INSTALL_LIBRARY_DIR lib${LLVM_LIBDIR_SUFFIX}/${LIBC_TARGET_TRIPLE})
-elseif(LLVM_ENABLE_PER_TARGET_RUNTIME_DIR)
+elseif(LLVM_ENABLE_PER_TARGET_RUNTIME_DIR AND NOT LIBC_GPU_BUILD)
   set(LIBC_INSTALL_LIBRARY_DIR
       lib${LLVM_LIBDIR_SUFFIX}/${LLVM_DEFAULT_TARGET_TRIPLE})
 else()
@@ -19,13 +19,13 @@ else()
 endif()
 
 install(
-  TARGETS ${LIBC_TARGET}
+  TARGETS libc
   ARCHIVE DESTINATION ${LIBC_INSTALL_LIBRARY_DIR}
   COMPONENT libc-static-archives
 )
 
 add_llvm_install_targets(
   install-libc-static-archives
-  DEPENDS ${LIBC_TARGET}
+  DEPENDS libc
   COMPONENT libc-static-archives
 )

@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include <type_traits>
+#include <optional>
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -37,7 +38,7 @@
 using namespace mlir;
 using namespace mlir::vector;
 
-static Optional<int64_t> extractConstantIndex(Value v) {
+static std::optional<int64_t> extractConstantIndex(Value v) {
   if (auto cstOp = v.getDefiningOp<arith::ConstantIndexOp>())
     return cstOp.value();
   if (auto affineApplyOp = v.getDefiningOp<AffineApplyOp>())
@@ -251,7 +252,7 @@ createFullPartialLinalgCopy(RewriterBase &b, vector::TransferReadOp xferOp,
   Value zero = b.create<arith::ConstantIndexOp>(loc, 0);
   Value memref = xferOp.getSource();
   return b.create<scf::IfOp>(
-      loc, returnTypes, inBoundsCond,
+      loc, inBoundsCond,
       [&](OpBuilder &b, Location loc) {
         Value res = memref;
         if (compatibleMemRefType != xferOp.getShapedType())
@@ -306,7 +307,7 @@ static scf::IfOp createFullPartialVectorTransferRead(
   Value zero = b.create<arith::ConstantIndexOp>(loc, 0);
   Value memref = xferOp.getSource();
   return b.create<scf::IfOp>(
-      loc, returnTypes, inBoundsCond,
+      loc, inBoundsCond,
       [&](OpBuilder &b, Location loc) {
         Value res = memref;
         if (compatibleMemRefType != xferOp.getShapedType())
@@ -357,7 +358,7 @@ getLocationToWriteFullVec(RewriterBase &b, vector::TransferWriteOp xferOp,
   Value memref = xferOp.getSource();
   return b
       .create<scf::IfOp>(
-          loc, returnTypes, inBoundsCond,
+          loc, inBoundsCond,
           [&](OpBuilder &b, Location loc) {
             Value res = memref;
             if (compatibleMemRefType != xferOp.getShapedType())

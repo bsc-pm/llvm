@@ -20,6 +20,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/SourceMgr.h"
+#include <optional>
 #include <system_error>
 
 namespace llvm {
@@ -2006,10 +2007,10 @@ struct FormatStyle {
   /// \version 3.4
   bool Cpp11BracedListStyle;
 
-  /// \brief Analyze the formatted file for the most used line ending (``\r\n``
-  /// or ``\n``). ``UseCRLF`` is only used as a fallback if none can be derived.
+  /// This option is **deprecated**. See ``DeriveLF`` and ``DeriveCRLF`` of
+  /// ``LineEnding``.
   /// \version 10
-  bool DeriveLineEnding;
+  // bool DeriveLineEnding;
 
   /// If ``true``, analyze the formatted file for the most common
   /// alignment of ``&`` and ``*``.
@@ -2694,6 +2695,22 @@ struct FormatStyle {
   /// Language, this format style is targeted at.
   /// \version 3.5
   LanguageKind Language;
+
+  /// Line ending style.
+  enum LineEndingStyle : int8_t {
+    /// Use ``\n``.
+    LE_LF,
+    /// Use ``\r\n``.
+    LE_CRLF,
+    /// Use ``\n`` unless the input has more lines ending in ``\r\n``.
+    LE_DeriveLF,
+    /// Use ``\r\n`` unless the input has more lines ending in ``\n``.
+    LE_DeriveCRLF,
+  };
+
+  /// Line ending style (``\n`` or ``\r\n``) to use.
+  /// \version 16
+  LineEndingStyle LineEnding;
 
   /// A regular expression matching macros that start a block.
   /// \code
@@ -3493,22 +3510,49 @@ struct FormatStyle {
   /// \version 12
   SortJavaStaticImportOptions SortJavaStaticImport;
 
-  /// If ``true``, clang-format will sort using declarations.
-  ///
-  /// The order of using declarations is defined as follows:
-  /// Split the strings by "::" and discard any initial empty strings. The last
-  /// element of each list is a non-namespace name; all others are namespace
-  /// names. Sort the lists of names lexicographically, where the sort order of
-  /// individual names is that all non-namespace names come before all namespace
-  /// names, and within those groups, names are in case-insensitive
-  /// lexicographic order.
-  /// \code
-  ///    false:                                 true:
-  ///    using std::cout;               vs.     using std::cin;
-  ///    using std::cin;                        using std::cout;
-  /// \endcode
+  /// Using declaration sorting options.
+  enum SortUsingDeclarationsOptions : int8_t {
+    /// Using declarations are never sorted.
+    /// \code
+    ///    using std::chrono::duration_cast;
+    ///    using std::move;
+    ///    using boost::regex;
+    ///    using boost::regex_constants::icase;
+    ///    using std::string;
+    /// \endcode
+    SUD_Never,
+    /// Using declarations are sorted in the order defined as follows:
+    /// Split the strings by "::" and discard any initial empty strings. Sort
+    /// the lists of names lexicographically, and within those groups, names are
+    /// in case-insensitive lexicographic order.
+    /// \code
+    ///    using boost::regex;
+    ///    using boost::regex_constants::icase;
+    ///    using std::chrono::duration_cast;
+    ///    using std::move;
+    ///    using std::string;
+    /// \endcode
+    SUD_Lexicographic,
+    /// Using declarations are sorted in the order defined as follows:
+    /// Split the strings by "::" and discard any initial empty strings. The
+    /// last element of each list is a non-namespace name; all others are
+    /// namespace names. Sort the lists of names lexicographically, where the
+    /// sort order of individual names is that all non-namespace names come
+    /// before all namespace names, and within those groups, names are in
+    /// case-insensitive lexicographic order.
+    /// \code
+    ///    using boost::regex;
+    ///    using boost::regex_constants::icase;
+    ///    using std::move;
+    ///    using std::string;
+    ///    using std::chrono::duration_cast;
+    /// \endcode
+    SUD_LexicographicNumeric,
+  };
+
+  /// Controls if and how clang-format will sort using declarations.
   /// \version 5
-  bool SortUsingDeclarations;
+  SortUsingDeclarationsOptions SortUsingDeclarations;
 
   /// If ``true``, a space is inserted after C style casts.
   /// \code
@@ -4051,10 +4095,9 @@ struct FormatStyle {
   /// \version 9
   std::vector<std::string> TypenameMacros;
 
-  /// \brief Use ``\r\n`` instead of ``\n`` for line breaks.
-  /// Also used as fallback if ``DeriveLineEnding`` is true.
+  /// This option is **deprecated**. See ``LF`` and ``CRLF`` of ``LineEnding``.
   /// \version 10
-  bool UseCRLF;
+  // bool UseCRLF;
 
   /// Different ways to use tab in formatting.
   enum UseTabStyle : int8_t {
@@ -4144,7 +4187,6 @@ struct FormatStyle {
                R.ConstructorInitializerIndentWidth &&
            ContinuationIndentWidth == R.ContinuationIndentWidth &&
            Cpp11BracedListStyle == R.Cpp11BracedListStyle &&
-           DeriveLineEnding == R.DeriveLineEnding &&
            DerivePointerAlignment == R.DerivePointerAlignment &&
            DisableFormat == R.DisableFormat &&
            EmptyLineAfterAccessModifier == R.EmptyLineAfterAccessModifier &&
@@ -4181,7 +4223,7 @@ struct FormatStyle {
                R.KeepEmptyLinesAtTheStartOfBlocks &&
            Language == R.Language &&
            LambdaBodyIndentation == R.LambdaBodyIndentation &&
-           MacroBlockBegin == R.MacroBlockBegin &&
+           LineEnding == R.LineEnding && MacroBlockBegin == R.MacroBlockBegin &&
            MacroBlockEnd == R.MacroBlockEnd &&
            MaxEmptyLinesToKeep == R.MaxEmptyLinesToKeep &&
            NamespaceIndentation == R.NamespaceIndentation &&
@@ -4248,12 +4290,11 @@ struct FormatStyle {
            Standard == R.Standard &&
            StatementAttributeLikeMacros == R.StatementAttributeLikeMacros &&
            StatementMacros == R.StatementMacros && TabWidth == R.TabWidth &&
-           TypenameMacros == R.TypenameMacros && UseCRLF == R.UseCRLF &&
-           UseTab == R.UseTab &&
+           TypenameMacros == R.TypenameMacros && UseTab == R.UseTab &&
            WhitespaceSensitiveMacros == R.WhitespaceSensitiveMacros;
   }
 
-  llvm::Optional<FormatStyle> GetLanguageStyle(LanguageKind Language) const;
+  std::optional<FormatStyle> GetLanguageStyle(LanguageKind Language) const;
 
   // Stores per-language styles. A FormatStyle instance inside has an empty
   // StyleSet. A FormatStyle instance returned by the Get method has its
@@ -4265,7 +4306,7 @@ struct FormatStyle {
   struct FormatStyleSet {
     typedef std::map<FormatStyle::LanguageKind, FormatStyle> MapType;
 
-    llvm::Optional<FormatStyle> Get(FormatStyle::LanguageKind Language) const;
+    std::optional<FormatStyle> Get(FormatStyle::LanguageKind Language) const;
 
     // Adds \p Style to this FormatStyleSet. Style must not have an associated
     // FormatStyleSet.

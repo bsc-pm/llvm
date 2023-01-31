@@ -28,6 +28,7 @@
 #include "llvm/IR/Type.h"
 #include "llvm/Support/Alignment.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -505,7 +506,7 @@ public:
   /// returns 12 or 16 for x86_fp80, depending on alignment.
   TypeSize getTypeAllocSize(Type *Ty) const {
     // Round up to the next alignment boundary.
-    return alignTo(getTypeStoreSize(Ty), getABITypeAlignment(Ty));
+    return alignTo(getTypeStoreSize(Ty), getABITypeAlign(Ty).value());
   }
 
   /// Returns the offset in bits between successive objects of the
@@ -522,6 +523,7 @@ public:
 
   /// Returns the minimum ABI-required alignment for the specified type.
   /// FIXME: Deprecate this function once migration to Align is over.
+  LLVM_DEPRECATED("use getABITypeAlign instead", "getABITypeAlign")
   uint64_t getABITypeAlignment(Type *Ty) const;
 
   /// Returns the minimum ABI-required alignment for the specified type.
@@ -545,6 +547,7 @@ public:
   ///
   /// This is always at least as good as the ABI alignment.
   /// FIXME: Deprecate this function once migration to Align is over.
+  LLVM_DEPRECATED("use getPrefTypeAlign instead", "getPrefTypeAlign")
   uint64_t getPrefTypeAlignment(Type *Ty) const;
 
   /// Returns the preferred stack/global alignment for the specified
@@ -641,7 +644,7 @@ public:
   unsigned getElementContainingOffset(uint64_t Offset) const;
 
   MutableArrayRef<uint64_t> getMemberOffsets() {
-    return llvm::makeMutableArrayRef(getTrailingObjects<uint64_t>(),
+    return llvm::MutableArrayRef(getTrailingObjects<uint64_t>(),
                                      NumElements);
   }
 

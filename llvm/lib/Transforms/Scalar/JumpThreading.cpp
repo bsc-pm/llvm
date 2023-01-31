@@ -2522,18 +2522,7 @@ BasicBlock *JumpThreadingPass::splitBlockPreds(BasicBlock *BB,
 bool JumpThreadingPass::doesBlockHaveProfileData(BasicBlock *BB) {
   const Instruction *TI = BB->getTerminator();
   assert(TI->getNumSuccessors() > 1 && "not a split");
-
-  MDNode *WeightsNode = TI->getMetadata(LLVMContext::MD_prof);
-  if (!WeightsNode)
-    return false;
-
-  MDString *MDName = cast<MDString>(WeightsNode->getOperand(0));
-  if (MDName->getString() != "branch_weights")
-    return false;
-
-  // Ensure there are weights for all of the successors. Note that the first
-  // operand to the metadata node is a name, not a weight.
-  return WeightsNode->getNumOperands() == TI->getNumSuccessors() + 1;
+  return hasValidBranchWeightMD(*TI);
 }
 
 /// Update the block frequency of BB and branch weight and the metadata on the
@@ -2785,8 +2774,26 @@ void JumpThreadingPass::unfoldSelectInstr(BasicBlock *Pred, BasicBlock *BB,
   // Create a conditional branch and update PHI nodes.
   auto *BI = BranchInst::Create(NewBB, BB, SI->getCondition(), Pred);
   BI->applyMergedLocation(PredTerm->getDebugLoc(), SI->getDebugLoc());
+  BI->copyMetadata(*SI, {LLVMContext::MD_prof});
   SIUse->setIncomingValue(Idx, SI->getFalseValue());
   SIUse->addIncoming(SI->getTrueValue(), NewBB);
+  // Set the block frequency of NewBB.
+  if (HasProfileData) {
+    uint64_t TrueWeight, FalseWeight;
+    if (extractBranchWeights(*SI, TrueWeight, FalseWeight) &&
+        (TrueWeight + FalseWeight) != 0) {
+      SmallVector<BranchProbability, 2> BP;
+      BP.emplace_back(BranchProbability::getBranchProbability(
+          TrueWeight, TrueWeight + FalseWeight));
+      BP.emplace_back(BranchProbability::getBranchProbability(
+          FalseWeight, TrueWeight + FalseWeight));
+      BPI->setEdgeProbability(Pred, BP);
+    }
+
+    auto NewBBFreq =
+        BFI->getBlockFreq(Pred) * BPI->getEdgeProbability(Pred, NewBB);
+    BFI->setBlockFreq(NewBB, NewBBFreq.getFrequency());
+  }
 
   // The select is now dead.
   SI->eraseFromParent();

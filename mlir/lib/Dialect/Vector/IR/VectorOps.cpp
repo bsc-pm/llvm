@@ -342,6 +342,13 @@ LogicalResult MultiDimReductionOp::verify() {
   return success();
 }
 
+/// Returns the mask type expected by this operation.
+Type MultiDimReductionOp::getExpectedMaskType() {
+  auto vecType = getSourceVectorType();
+  return VectorType::get(vecType.getShape(),
+                         IntegerType::get(vecType.getContext(), /*width=*/1));
+}
+
 namespace {
 // Only unit dimensions that are being reduced are folded. If the dimension is
 // unit, but not reduced, it is not folded, thereby keeping the output type the
@@ -354,6 +361,12 @@ struct ElideUnitDimsInMultiDimReduction
 
   LogicalResult matchAndRewrite(MultiDimReductionOp reductionOp,
                                 PatternRewriter &rewriter) const override {
+    // Masked reductions can't be folded until we can propagate the mask to the
+    // resulting operation.
+    auto maskableOp = cast<MaskableOpInterface>(reductionOp.getOperation());
+    if (maskableOp.isMasked())
+      return failure();
+
     ArrayRef<int64_t> shape = reductionOp.getSourceVectorType().getShape();
     for (const auto &dim : enumerate(shape)) {
       if (reductionOp.isReducedDim(dim.index()) && dim.value() != 1)
@@ -511,6 +524,12 @@ struct ElideSingleElementReduction : public OpRewritePattern<ReductionOp> {
 
   LogicalResult matchAndRewrite(ReductionOp reductionOp,
                                 PatternRewriter &rewriter) const override {
+    // Masked reductions can't be folded until we can propagate the mask to the
+    // resulting operation.
+    auto maskableOp = cast<MaskableOpInterface>(reductionOp.getOperation());
+    if (maskableOp.isMasked())
+      return failure();
+
     if (reductionOp.getVectorType().getDimSize(0) != 1)
       return failure();
 
@@ -784,10 +803,15 @@ static LogicalResult verifyOutputShape(
 }
 
 LogicalResult ContractionOp::verify() {
-  auto lhsType = getLhsType();
-  auto rhsType = getRhsType();
-  auto accType = getAccType();
-  auto resType = getResultType();
+  VectorType lhsType = getLhsType();
+  VectorType rhsType = getRhsType();
+  Type accType = getAccType();
+  Type resType = getResultType();
+
+  if (lhsType.getElementType().isa<IntegerType>()) {
+    if (!lhsType.getElementType().isSignlessInteger())
+      return emitOpError("only supports signless integer types");
+  }
 
   // Verify that an indexing map was specified for each vector operand.
   if (getIndexingMapsArray().size() != 3)
@@ -1625,6 +1649,13 @@ public:
     // folding patterns.
     if (extractResultRank < broadcastSrcRank)
       return failure();
+
+    // Special case if broadcast src is a 0D vector.
+    if (extractResultRank == 0) {
+      assert(broadcastSrcRank == 0 && source.getType().isa<VectorType>());
+      rewriter.replaceOpWithNewOp<vector::ExtractElementOp>(extractOp, source);
+      return success();
+    }
     rewriter.replaceOpWithNewOp<vector::BroadcastOp>(
         extractOp, extractOp.getType(), source);
     return success();
@@ -2657,10 +2688,18 @@ ParseResult OuterProductOp::parse(OpAsmParser &parser, OperationState &result) {
   if (!vLHS)
     return parser.emitError(parser.getNameLoc(),
                             "expected vector type for operand #1");
-  VectorType resType =
-      vRHS ? VectorType::get({vLHS.getDimSize(0), vRHS.getDimSize(0)},
-                             vLHS.getElementType())
-           : VectorType::get({vLHS.getDimSize(0)}, vLHS.getElementType());
+
+  unsigned numScalableDims = vLHS.getNumScalableDims();
+  VectorType resType;
+  if (vRHS) {
+    numScalableDims += vRHS.getNumScalableDims();
+    resType = VectorType::get({vLHS.getDimSize(0), vRHS.getDimSize(0)},
+                              vLHS.getElementType(), numScalableDims);
+  } else {
+    // Scalar RHS operand
+    resType = VectorType::get({vLHS.getDimSize(0)}, vLHS.getElementType(),
+                              numScalableDims);
+  }
 
   if (!result.attributes.get(OuterProductOp::getKindAttrStrName())) {
     result.attributes.append(
@@ -2696,6 +2735,9 @@ LogicalResult OuterProductOp::verify() {
       return emitOpError("expected #1 operand dim to match result dim #1");
     if (vRHS.getDimSize(0) != vRES.getDimSize(1))
       return emitOpError("expected #2 operand dim to match result dim #2");
+    if (vRHS.isScalable() != vLHS.isScalable())
+      return emitOpError("expected either all or none of vector operands #1 "
+                         "and #2 to be scalable");
   } else {
     // An AXPY operation.
     if (vRES.getRank() != 1)
@@ -3355,12 +3397,12 @@ void TransferReadOp::print(OpAsmPrinter &p) {
   p << " : " << getShapedType() << ", " << getVectorType();
 }
 
-/// Infers the mask type for a transfer read given its vector type and
-/// permutation map. The mask in a transfer read operation applies to the
-/// tensor/buffer reading part of it and its type should match the shape read
+/// Infers the mask type for a transfer op given its vector type and
+/// permutation map. The mask in a transfer op operation applies to the
+/// tensor/buffer part of it and its type should match the vector shape
 /// *before* any permutation or broadcasting.
-static VectorType inferTransferReadMaskType(VectorType vecType,
-                                            AffineMap permMap) {
+static VectorType inferTransferOpMaskType(VectorType vecType,
+                                          AffineMap permMap) {
   auto i1Type = IntegerType::get(permMap.getContext(), 1);
   AffineMap invPermMap = inversePermutation(compressUnusedDims(permMap));
   assert(invPermMap && "Inversed permutation map couldn't be computed");
@@ -3418,7 +3460,7 @@ ParseResult TransferReadOp::parse(OpAsmParser &parser, OperationState &result) {
           maskInfo.location, "does not support masks with vector element type");
     // Instead of adding the mask type as an op type, compute it based on the
     // vector type and the permutation map (to keep the type signature small).
-    auto maskType = inferTransferReadMaskType(vectorType, permMap);
+    auto maskType = inferTransferOpMaskType(vectorType, permMap);
     if (parser.resolveOperand(maskInfo, maskType, result.operands))
       return failure();
   }
@@ -3437,7 +3479,7 @@ LogicalResult TransferReadOp::verify() {
   auto paddingType = getPadding().getType();
   auto permutationMap = getPermutationMap();
   VectorType inferredMaskType =
-      maskType ? inferTransferReadMaskType(vectorType, permutationMap)
+      maskType ? inferTransferOpMaskType(vectorType, permutationMap)
                : VectorType();
   auto sourceElementType = shapedType.getElementType();
 
@@ -3477,7 +3519,7 @@ LogicalResult TransferReadOp::verify() {
 /// Returns the mask type expected by this operation. Mostly used for
 /// verification purposes. It requires the operation to be vectorized."
 Type TransferReadOp::getExpectedMaskType() {
-  return inferTransferReadMaskType(getVectorType(), getPermutationMap());
+  return inferTransferOpMaskType(getVectorType(), getPermutationMap());
 }
 
 template <typename TransferOp>
@@ -3818,18 +3860,6 @@ void TransferWriteOp::build(OpBuilder &builder, OperationState &result,
   build(builder, result, vector, dest, indices, permutationMap, inBounds);
 }
 
-/// Infers the mask type for a transfer write given its vector type and
-/// permutation map. The mask in a transfer read operation applies to the
-/// tensor/buffer writing part of it and its type should match the shape written
-/// *after* any permutation.
-static VectorType inferTransferWriteMaskType(VectorType vecType,
-                                             AffineMap permMap) {
-  auto i1Type = IntegerType::get(permMap.getContext(), 1);
-  SmallVector<int64_t, 8> maskShape =
-      compressUnusedDims(permMap).compose(vecType.getShape());
-  return VectorType::get(maskShape, i1Type);
-}
-
 ParseResult TransferWriteOp::parse(OpAsmParser &parser,
                                    OperationState &result) {
   auto &builder = parser.getBuilder();
@@ -3874,7 +3904,7 @@ ParseResult TransferWriteOp::parse(OpAsmParser &parser,
     if (shapedType.getElementType().dyn_cast<VectorType>())
       return parser.emitError(
           maskInfo.location, "does not support masks with vector element type");
-    auto maskType = inferTransferWriteMaskType(vectorType, permMap);
+    auto maskType = inferTransferOpMaskType(vectorType, permMap);
     if (parser.resolveOperand(maskInfo, maskType, result.operands))
       return failure();
   }
@@ -3901,7 +3931,7 @@ LogicalResult TransferWriteOp::verify() {
   VectorType maskType = getMaskType();
   auto permutationMap = getPermutationMap();
   VectorType inferredMaskType =
-      maskType ? inferTransferWriteMaskType(vectorType, permutationMap)
+      maskType ? inferTransferOpMaskType(vectorType, permutationMap)
                : VectorType();
 
   if (llvm::size(getIndices()) != shapedType.getRank())
@@ -3927,7 +3957,7 @@ LogicalResult TransferWriteOp::verify() {
 /// Returns the mask type expected by this operation. Mostly used for
 /// verification purposes.
 Type TransferWriteOp::getExpectedMaskType() {
-  return inferTransferWriteMaskType(getVectorType(), getPermutationMap());
+  return inferTransferOpMaskType(getVectorType(), getPermutationMap());
 }
 
 /// Fold:
@@ -4920,6 +4950,27 @@ OpFoldResult BitCastOp::fold(FoldAdaptor adaptor) {
     }
   }
 
+  if (auto intPack = sourceConstant.dyn_cast<DenseIntElementsAttr>()) {
+    if (intPack.isSplat()) {
+      auto splat = intPack.getSplatValue<IntegerAttr>();
+
+      if (dstElemType.isa<IntegerType>()) {
+        uint64_t srcBitWidth = srcElemType.getIntOrFloatBitWidth();
+        uint64_t dstBitWidth = dstElemType.getIntOrFloatBitWidth();
+
+        // Casting to a larger integer bit width.
+        if (dstBitWidth > srcBitWidth && dstBitWidth % srcBitWidth == 0) {
+          APInt intBits = splat.getValue().zext(dstBitWidth);
+
+          // Duplicate the lower width element.
+          for (uint64_t i = 0; i < dstBitWidth / srcBitWidth - 1; i++)
+            intBits = (intBits << srcBitWidth) | intBits;
+          return DenseElementsAttr::get(getResultVectorType(), intBits);
+        }
+      }
+    }
+  }
+
   return {};
 }
 
@@ -5265,7 +5316,8 @@ void CreateMaskOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 void MaskOp::build(
     OpBuilder &builder, OperationState &result, Value mask,
-    function_ref<void(OpBuilder &, Location)> maskRegionBuilder) {
+    Operation *maskableOp,
+    function_ref<void(OpBuilder &, Operation *)> maskRegionBuilder) {
   assert(maskRegionBuilder &&
          "builder callback for 'maskRegion' must be present");
 
@@ -5273,24 +5325,25 @@ void MaskOp::build(
   OpBuilder::InsertionGuard guard(builder);
   Region *maskRegion = result.addRegion();
   builder.createBlock(maskRegion);
-  maskRegionBuilder(builder, result.location);
+  maskRegionBuilder(builder, maskableOp);
 }
 
 void MaskOp::build(
-    OpBuilder &builder, OperationState &result, Type resultType, Value mask,
-    function_ref<void(OpBuilder &, Location)> maskRegionBuilder) {
-  build(builder, result, resultType, mask, /*passthru=*/Value(),
+    OpBuilder &builder, OperationState &result, TypeRange resultTypes,
+    Value mask, Operation *maskableOp,
+    function_ref<void(OpBuilder &, Operation *)> maskRegionBuilder) {
+  build(builder, result, resultTypes, mask, /*passthru=*/Value(), maskableOp,
         maskRegionBuilder);
 }
 
 void MaskOp::build(
-    OpBuilder &builder, OperationState &result, Type resultType, Value mask,
-    Value passthru,
-    function_ref<void(OpBuilder &, Location)> maskRegionBuilder) {
-  build(builder, result, mask, maskRegionBuilder);
+    OpBuilder &builder, OperationState &result, TypeRange resultTypes, Value mask,
+    Value passthru, Operation *maskableOp,
+    function_ref<void(OpBuilder &, Operation *)> maskRegionBuilder) {
+  build(builder, result, mask, maskableOp, maskRegionBuilder);
   if (passthru)
     result.addOperands(passthru);
-  result.addTypes(resultType);
+  result.addTypes(resultTypes);
 }
 
 ParseResult MaskOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -5402,6 +5455,10 @@ LogicalResult MaskOp::verify() {
   if (!llvm::equal(maskableOp->getResultTypes(), getResultTypes()))
     return emitOpError(
         "expects result type to match maskable operation result type");
+
+  if (llvm::count_if(maskableOp->getResultTypes(),
+                     [](Type t) { return t.isa<VectorType>(); }) > 1)
+    return emitOpError("multiple vector results not supported");
 
   // Mask checks.
   Type expectedMaskType = maskableOp.getExpectedMaskType();
@@ -5725,6 +5782,34 @@ Value mlir::vector::makeArithReduction(OpBuilder &b, Location loc,
     return b.createOrFold<arith::XOrIOp>(loc, v1, v2);
   };
   llvm_unreachable("unknown CombiningKind");
+}
+
+//===----------------------------------------------------------------------===//
+// Vector Masking Utilities
+//===----------------------------------------------------------------------===//
+
+/// Create the vector.yield-ended region of a vector.mask op with `maskableOp`
+/// as masked operation.
+void mlir::vector::createMaskOpRegion(OpBuilder &builder,
+                                      Operation *maskableOp) {
+  assert(maskableOp->getBlock() && "MaskableOp must be inserted into a block");
+  Block *insBlock = builder.getInsertionBlock();
+  // Create a block and move the op to that block.
+  insBlock->getOperations().splice(
+      insBlock->begin(), maskableOp->getBlock()->getOperations(), maskableOp);
+  builder.create<YieldOp>(maskableOp->getLoc(), maskableOp->getResults());
+}
+
+/// Creates a vector.mask operation around a maskable operation. Returns the
+/// vector.mask operation if the mask provided is valid. Otherwise, returns
+/// the maskable operation itself.
+Operation *mlir::vector::maskOperation(RewriterBase &rewriter,
+                                       Operation *maskableOp, Value mask) {
+  if (!mask)
+    return maskableOp;
+  return rewriter.create<MaskOp>(maskableOp->getLoc(),
+                                 maskableOp->getResultTypes(), mask, maskableOp,
+                                 createMaskOpRegion);
 }
 
 //===----------------------------------------------------------------------===//

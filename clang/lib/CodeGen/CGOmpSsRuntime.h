@@ -137,7 +137,7 @@ struct OSSLoopDataTy final {
   const Expr *Unroll = nullptr;
   bool Update = false;
   unsigned NumCollapses;
-  llvm::Optional<bool> *TestIsLessOp;
+  std::optional<bool> *TestIsLessOp;
   bool *TestIsStrictOp;
   bool empty() const {
     return !IndVar &&
@@ -193,7 +193,7 @@ private:
   void BuildWrapperCallBundleList(
     std::string FuncName,
     CodeGenFunction &CGF, const Expr *E, QualType Q,
-    llvm::function_ref<void(CodeGenFunction &, const Expr *E, Optional<llvm::Value *>)> Body,
+    llvm::function_ref<void(CodeGenFunction &, const Expr *E, std::optional<llvm::Value *>)> Body,
     SmallVectorImpl<llvm::Value *> &List);
 
   // Builds a bundle of the with the form
@@ -201,7 +201,7 @@ private:
   void EmitWrapperCallBundle(
     std::string Name, std::string FuncName,
     CodeGenFunction &CGF, const Expr *E, QualType Q,
-    llvm::function_ref<void(CodeGenFunction &, const Expr *E, Optional<llvm::Value *>)> Body,
+    llvm::function_ref<void(CodeGenFunction &, const Expr *E, std::optional<llvm::Value *>)> Body,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
 
   // This is used by cost/priority/onready clauses to build a bundle with the form
@@ -328,7 +328,7 @@ public:
       const llvm::DenseMap<const VarDecl *, Address> &CaptureInvolvedMap,
       ArrayRef<QualType> RetTypes,
       bool HasThis, bool HasSwitch, std::string FuncName, std::string RetName,
-      llvm::function_ref<void(CodeGenFunction &, const Expr *E, Optional<llvm::Value *>)> Body);
+      llvm::function_ref<void(CodeGenFunction &, const Expr *E, std::optional<llvm::Value *>)> Body);
 
   RValue emitTaskFunction(CodeGenFunction &CGF,
                           const FunctionDecl *FD,

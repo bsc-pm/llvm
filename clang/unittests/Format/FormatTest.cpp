@@ -3444,6 +3444,13 @@ TEST_F(FormatTest, UnderstandsAccessSpecifiers) {
                "\n"
                "private:\n"
                "  int c;\n"
+               "};\n"
+               "class B {\n"
+               "public:\n"
+               "  std::unique_ptr<int *[] /* okay */> b() { return nullptr; }\n"
+               "\n"
+               "private:\n"
+               "  int c;\n"
                "};");
 }
 
@@ -9637,6 +9644,19 @@ TEST_F(FormatTest, ReturnTypeBreakingStyle) {
                "  return a;\n"
                "}",
                Style);
+  verifyFormat("byte *\n"
+               "f(a)\n"
+               "byte /* K&R C */ a[];\n"
+               "{\n"
+               "  return a;\n"
+               "}\n"
+               "byte *\n"
+               "g(p)\n"
+               "byte /* K&R C */ *p;\n"
+               "{\n"
+               "  return p;\n"
+               "}",
+               Style);
   verifyFormat("bool f(int a, int) override;\n"
                "Bar g(int a, Bar) final;\n"
                "Bar h(a, Bar) final;",
@@ -10345,6 +10365,7 @@ TEST_F(FormatTest, UnderstandsTemplateParameters) {
 
   // Not template parameters.
   verifyFormat("return a < b && c > d;");
+  verifyFormat("a < 0 ? b : a > 0 ? c : d;");
   verifyFormat("void f() {\n"
                "  while (a < b && c > d) {\n"
                "  }\n"
@@ -10779,6 +10800,33 @@ TEST_F(FormatTest, UnderstandsFunctionRefQualification) {
            "void b() const &;\n";
   EXPECT_EQ(Prefix + "int *x;",
             format(Prefix + "int* x;", DerivePointerAlignment));
+}
+
+TEST_F(FormatTest, PointerAlignmentFallback) {
+  FormatStyle Style = getLLVMStyle();
+  Style.DerivePointerAlignment = true;
+
+  const StringRef Code("int* p;\n"
+                       "int *q;\n"
+                       "int * r;");
+
+  EXPECT_EQ(Style.PointerAlignment, FormatStyle::PAS_Right);
+  verifyFormat("int *p;\n"
+               "int *q;\n"
+               "int *r;",
+               Code, Style);
+
+  Style.PointerAlignment = FormatStyle::PAS_Left;
+  verifyFormat("int* p;\n"
+               "int* q;\n"
+               "int* r;",
+               Code, Style);
+
+  Style.PointerAlignment = FormatStyle::PAS_Middle;
+  verifyFormat("int * p;\n"
+               "int * q;\n"
+               "int * r;",
+               Code, Style);
 }
 
 TEST_F(FormatTest, UnderstandsNewAndDelete) {
@@ -12783,6 +12831,7 @@ TEST_F(FormatTest, HandlesIncludeDirectives) {
   // But 'import' might also be a regular C++ namespace.
   verifyFormat("import::SomeFunction(aaaaaaaaaaaaaaaaaaaaaaaaaaa,\n"
                "                     aaaaaaaaaaaaaaaaaaaaaaaaaaaaa);");
+  verifyFormat("import::Bar foo(val ? 2 : 1);");
 }
 
 //===----------------------------------------------------------------------===//
@@ -22191,8 +22240,7 @@ TEST_F(FormatTest, SupportsCRLF) {
 
   FormatStyle style = getLLVMStyle();
 
-  style.DeriveLineEnding = true;
-  style.UseCRLF = false;
+  EXPECT_EQ(style.LineEnding, FormatStyle::LE_DeriveLF);
   EXPECT_EQ("union FooBarBazQux {\n"
             "  int foo;\n"
             "  int bar;\n"
@@ -22204,7 +22252,7 @@ TEST_F(FormatTest, SupportsCRLF) {
                    "  int baz;\n"
                    "};",
                    style));
-  style.UseCRLF = true;
+  style.LineEnding = FormatStyle::LE_DeriveCRLF;
   EXPECT_EQ("union FooBarBazQux {\r\n"
             "  int foo;\r\n"
             "  int bar;\r\n"
@@ -22217,8 +22265,7 @@ TEST_F(FormatTest, SupportsCRLF) {
                    "};",
                    style));
 
-  style.DeriveLineEnding = false;
-  style.UseCRLF = false;
+  style.LineEnding = FormatStyle::LE_LF;
   EXPECT_EQ("union FooBarBazQux {\n"
             "  int foo;\n"
             "  int bar;\n"
@@ -22232,7 +22279,7 @@ TEST_F(FormatTest, SupportsCRLF) {
                    "  int qux;\r\n"
                    "};",
                    style));
-  style.UseCRLF = true;
+  style.LineEnding = FormatStyle::LE_CRLF;
   EXPECT_EQ("union FooBarBazQux {\r\n"
             "  int foo;\r\n"
             "  int bar;\r\n"
@@ -22247,8 +22294,7 @@ TEST_F(FormatTest, SupportsCRLF) {
                    "};",
                    style));
 
-  style.DeriveLineEnding = true;
-  style.UseCRLF = false;
+  style.LineEnding = FormatStyle::LE_DeriveLF;
   EXPECT_EQ("union FooBarBazQux {\r\n"
             "  int foo;\r\n"
             "  int bar;\r\n"
@@ -22262,7 +22308,7 @@ TEST_F(FormatTest, SupportsCRLF) {
                    "  int qux;\r\n"
                    "};",
                    style));
-  style.UseCRLF = true;
+  style.LineEnding = FormatStyle::LE_DeriveCRLF;
   EXPECT_EQ("union FooBarBazQux {\n"
             "  int foo;\n"
             "  int bar;\n"
@@ -24604,6 +24650,7 @@ TEST_F(FormatTest, Cpp20ModulesSupport) {
   verifyFormat("import foo.bar;", Style);
   verifyFormat("import foo:bar;", Style);
   verifyFormat("import :bar;", Style);
+  verifyFormat("import /* module partition */ :bar;", Style);
   verifyFormat("import <ctime>;", Style);
   verifyFormat("import \"header\";", Style);
 
@@ -24630,6 +24677,8 @@ TEST_F(FormatTest, Cpp20ModulesSupport) {
   verifyFormat("import", Style);
   verifyFormat("module", Style);
   verifyFormat("export", Style);
+
+  verifyFormat("import /* not keyword */ = val ? 2 : 1;");
 }
 
 TEST_F(FormatTest, CoroutineForCoawait) {

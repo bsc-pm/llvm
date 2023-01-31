@@ -70,7 +70,7 @@ static unsigned countOperands(SDNode *Node, unsigned NumExpUses,
     if (isa<RegisterMaskSDNode>(Node->getOperand(I - 1)))
       continue;
     if (RegisterSDNode *RN = dyn_cast<RegisterSDNode>(Node->getOperand(I - 1)))
-      if (Register::isPhysicalRegister(RN->getReg()))
+      if (RN->getReg().isPhysical())
         continue;
     NumImpUses = N - I;
     break;
@@ -218,7 +218,7 @@ void InstrEmitter::CreateVirtualRegisters(SDNode *Node,
         RC = VTRC;
     }
 
-    if (II.OpInfo != nullptr && II.OpInfo[i].isOptionalDef()) {
+    if (!II.operands().empty() && II.operands()[i].isOptionalDef()) {
       // Optional def must be a physical register.
       VRBase = cast<RegisterSDNode>(Node->getOperand(i-NumResults))->getReg();
       assert(VRBase.isPhysical());
@@ -230,8 +230,8 @@ void InstrEmitter::CreateVirtualRegisters(SDNode *Node,
         if (User->getOpcode() == ISD::CopyToReg &&
             User->getOperand(2).getNode() == Node &&
             User->getOperand(2).getResNo() == i) {
-          unsigned Reg = cast<RegisterSDNode>(User->getOperand(1))->getReg();
-          if (Register::isVirtualRegister(Reg)) {
+          Register Reg = cast<RegisterSDNode>(User->getOperand(1))->getReg();
+          if (Reg.isVirtual()) {
             const TargetRegisterClass *RegRC = MRI->getRegClass(Reg);
             if (RegRC == RC) {
               VRBase = Reg;
@@ -304,7 +304,7 @@ InstrEmitter::AddRegisterOperand(MachineInstrBuilder &MIB,
 
   const MCInstrDesc &MCID = MIB->getDesc();
   bool isOptDef = IIOpNum < MCID.getNumOperands() &&
-    MCID.OpInfo[IIOpNum].isOptionalDef();
+                  MCID.operands()[IIOpNum].isOptionalDef();
 
   // If the instruction requires a register in a different class, create
   // a new virtual register and copy the value into it, but first attempt to
@@ -394,7 +394,7 @@ void InstrEmitter::AddOperand(MachineInstrBuilder &MIB,
                                       (IIRC && TRI->isDivergentRegClass(IIRC)))
             : nullptr;
 
-    if (OpRC && IIRC && OpRC != IIRC && Register::isVirtualRegister(VReg)) {
+    if (OpRC && IIRC && OpRC != IIRC && VReg.isVirtual()) {
       Register NewVReg = MRI->createVirtualRegister(IIRC);
       BuildMI(*MBB, InsertPos, Op.getNode()->getDebugLoc(),
                TII->get(TargetOpcode::COPY), NewVReg).addReg(VReg);
@@ -502,7 +502,7 @@ void InstrEmitter::EmitSubregNode(SDNode *Node,
     Register Reg;
     MachineInstr *DefMI;
     RegisterSDNode *R = dyn_cast<RegisterSDNode>(Node->getOperand(0));
-    if (R && Register::isPhysicalRegister(R->getReg())) {
+    if (R && R->getReg().isPhysical()) {
       Reg = R->getReg();
       DefMI = nullptr;
     } else {
@@ -649,7 +649,7 @@ void InstrEmitter::EmitRegSequence(SDNode *Node,
       RegisterSDNode *R = dyn_cast<RegisterSDNode>(Node->getOperand(i-1));
       // Skip physical registers as they don't have a vreg to get and we'll
       // insert copies for them in TwoAddressInstructionPass anyway.
-      if (!R || !Register::isPhysicalRegister(R->getReg())) {
+      if (!R || !R->getReg().isPhysical()) {
         unsigned SubIdx = cast<ConstantSDNode>(Op)->getZExtValue();
         unsigned SubReg = getVR(Node->getOperand(i-1), VRBaseMap);
         const TargetRegisterClass *TRC = MRI->getRegClass(SubReg);
@@ -1021,8 +1021,8 @@ EmitMachineNode(SDNode *Node, bool IsClone, bool IsCloned,
     countOperands(Node, II.getNumOperands() - NumDefs, NumImpUses);
   bool HasVRegVariadicDefs = !MF->getTarget().usesPhysRegsForValues() &&
                              II.isVariadic() && II.variadicOpsAreDefs();
-  bool HasPhysRegOuts = NumResults > NumDefs &&
-                        II.getImplicitDefs() != nullptr && !HasVRegVariadicDefs;
+  bool HasPhysRegOuts = NumResults > NumDefs && !II.implicit_defs().empty() &&
+                        !HasVRegVariadicDefs;
 #ifndef NDEBUG
   unsigned NumMIOperands = NodeOperands + NumResults;
   if (II.isVariadic())
@@ -1030,8 +1030,8 @@ EmitMachineNode(SDNode *Node, bool IsClone, bool IsCloned,
            "Too few operands for a variadic node!");
   else
     assert(NumMIOperands >= II.getNumOperands() &&
-           NumMIOperands <= II.getNumOperands() + II.getNumImplicitDefs() +
-                            NumImpUses &&
+           NumMIOperands <=
+               II.getNumOperands() + II.implicit_defs().size() + NumImpUses &&
            "#operands for dag node doesn't match .td file!");
 #endif
 
@@ -1128,7 +1128,7 @@ EmitMachineNode(SDNode *Node, bool IsClone, bool IsCloned,
   // Additional results must be physical register defs.
   if (HasPhysRegOuts) {
     for (unsigned i = NumDefs; i < NumResults; ++i) {
-      Register Reg = II.getImplicitDefs()[i - NumDefs];
+      Register Reg = II.implicit_defs()[i - NumDefs];
       if (!Node->hasAnyUseOfValue(i))
         continue;
       // This implicitly defined physreg has a use.
@@ -1149,8 +1149,7 @@ EmitMachineNode(SDNode *Node, bool IsClone, bool IsCloned,
       }
       // Collect declared implicit uses.
       const MCInstrDesc &MCID = TII->get(F->getMachineOpcode());
-      UsedRegs.append(MCID.getImplicitUses(),
-                      MCID.getImplicitUses() + MCID.getNumImplicitUses());
+      append_range(UsedRegs, MCID.implicit_uses());
       // In addition to declared implicit uses, we must also check for
       // direct RegisterSDNode operands.
       for (unsigned i = 0, e = F->getNumOperands(); i != e; ++i)
@@ -1162,8 +1161,16 @@ EmitMachineNode(SDNode *Node, bool IsClone, bool IsCloned,
     }
   }
 
+  // Add rounding control registers as implicit def for function call.
+  if (II.isCall() && MF->getFunction().hasFnAttribute(Attribute::StrictFP)) {
+    const MCPhysReg *RCRegs = TLI->getRoundingControlRegisters();
+    if (RCRegs)
+      for (; *RCRegs; ++RCRegs)
+        UsedRegs.push_back(*RCRegs);
+  }
+
   // Finally mark unused registers as dead.
-  if (!UsedRegs.empty() || II.getImplicitDefs() || II.hasOptionalDef())
+  if (!UsedRegs.empty() || !II.implicit_defs().empty() || II.hasOptionalDef())
     MIB->setPhysRegsDeadExcept(UsedRegs, *TRI);
 
   // STATEPOINT is too 'dynamic' to have meaningful machine description.
@@ -1205,7 +1212,7 @@ EmitSpecialNode(SDNode *Node, bool IsClone, bool IsCloned,
   case ISD::CopyToReg: {
     Register DestReg = cast<RegisterSDNode>(Node->getOperand(1))->getReg();
     SDValue SrcVal = Node->getOperand(2);
-    if (Register::isVirtualRegister(DestReg) && SrcVal.isMachineOpcode() &&
+    if (DestReg.isVirtual() && SrcVal.isMachineOpcode() &&
         SrcVal.getMachineOpcode() == TargetOpcode::IMPLICIT_DEF) {
       // Instead building a COPY to that vreg destination, build an
       // IMPLICIT_DEF instruction instead.
@@ -1312,22 +1319,19 @@ EmitSpecialNode(SDNode *Node, bool IsClone, bool IsCloned,
       default: llvm_unreachable("Bad flags!");
         case InlineAsm::Kind_RegDef:
         for (unsigned j = 0; j != NumVals; ++j, ++i) {
-          unsigned Reg = cast<RegisterSDNode>(Node->getOperand(i))->getReg();
+          Register Reg = cast<RegisterSDNode>(Node->getOperand(i))->getReg();
           // FIXME: Add dead flags for physical and virtual registers defined.
           // For now, mark physical register defs as implicit to help fast
           // regalloc. This makes inline asm look a lot like calls.
-          MIB.addReg(Reg,
-                     RegState::Define |
-                         getImplRegState(Register::isPhysicalRegister(Reg)));
+          MIB.addReg(Reg, RegState::Define | getImplRegState(Reg.isPhysical()));
         }
         break;
       case InlineAsm::Kind_RegDefEarlyClobber:
       case InlineAsm::Kind_Clobber:
         for (unsigned j = 0; j != NumVals; ++j, ++i) {
-          unsigned Reg = cast<RegisterSDNode>(Node->getOperand(i))->getReg();
-          MIB.addReg(Reg,
-                     RegState::Define | RegState::EarlyClobber |
-                         getImplRegState(Register::isPhysicalRegister(Reg)));
+          Register Reg = cast<RegisterSDNode>(Node->getOperand(i))->getReg();
+          MIB.addReg(Reg, RegState::Define | RegState::EarlyClobber |
+                              getImplRegState(Reg.isPhysical()));
           ECRegs.push_back(Reg);
         }
         break;
@@ -1398,12 +1402,11 @@ EmitSpecialNode(SDNode *Node, bool IsClone, bool IsCloned,
 /// InstrEmitter - Construct an InstrEmitter and set it to start inserting
 /// at the given position in the given block.
 InstrEmitter::InstrEmitter(const TargetMachine &TM, MachineBasicBlock *mbb,
-                           MachineBasicBlock::iterator insertpos,
-                           bool UseInstrRefDebugInfo)
+                           MachineBasicBlock::iterator insertpos)
     : MF(mbb->getParent()), MRI(&MF->getRegInfo()),
       TII(MF->getSubtarget().getInstrInfo()),
       TRI(MF->getSubtarget().getRegisterInfo()),
       TLI(MF->getSubtarget().getTargetLowering()), MBB(mbb),
       InsertPos(insertpos) {
-  EmitDebugInstrRefs = UseInstrRefDebugInfo;
+  EmitDebugInstrRefs = mbb->getParent()->useDebugInstrRef();
 }

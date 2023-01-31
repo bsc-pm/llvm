@@ -45,6 +45,7 @@
 #include <algorithm>
 #include <iterator>
 #include <list>
+#include <optional>
 #include <set>
 #include <utility>
 #include <vector>
@@ -530,7 +531,7 @@ void LookupResult::resolveKind() {
       continue;
     }
 
-    llvm::Optional<unsigned> ExistingI;
+    std::optional<unsigned> ExistingI;
 
     // Redeclarations of types via typedef can occur both within a scope
     // and, through using declarations and directives, across scopes. There is

@@ -11,6 +11,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "gtest/gtest.h"
+#include <optional>
 
 using namespace mlir;
 using namespace mlir::detail;
@@ -271,7 +272,7 @@ static void checkNativeAccess(MLIRContext *ctx, ArrayRef<T> data,
                          UnmanagedAsmResourceBlob::allocateInferAlign(data));
 
   // Check that we can access and iterate the data properly.
-  Optional<ArrayRef<T>> attrData = attr.tryGetAsArrayRef();
+  std::optional<ArrayRef<T>> attrData = attr.tryGetAsArrayRef();
   EXPECT_TRUE(attrData.has_value());
   EXPECT_EQ(*attrData, data);
 
@@ -421,4 +422,27 @@ TEST(SparseElementsAttrTest, GetZero) {
   EXPECT_TRUE(zeroStringValue.getType() == stringTy);
 }
 
+//===----------------------------------------------------------------------===//
+// SubElements
+//===----------------------------------------------------------------------===//
+
+TEST(SubElementTest, Nested) {
+  MLIRContext context;
+  Builder builder(&context);
+
+  BoolAttr trueAttr = builder.getBoolAttr(true);
+  BoolAttr falseAttr = builder.getBoolAttr(false);
+  ArrayAttr boolArrayAttr =
+      builder.getArrayAttr({trueAttr, falseAttr, trueAttr});
+  StringAttr strAttr = builder.getStringAttr("array");
+  DictionaryAttr dictAttr =
+      builder.getDictionaryAttr(builder.getNamedAttr(strAttr, boolArrayAttr));
+
+  SmallVector<Attribute> subAttrs;
+  dictAttr.walk([&](Attribute attr) { subAttrs.push_back(attr); });
+  // Note that trueAttr appears only once, identical subattributes are skipped.
+  EXPECT_EQ(llvm::ArrayRef(subAttrs),
+            ArrayRef<Attribute>(
+                {strAttr, trueAttr, falseAttr, boolArrayAttr, dictAttr}));
+}
 } // namespace

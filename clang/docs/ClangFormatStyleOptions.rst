@@ -2685,8 +2685,8 @@ the configuration (without a prefix: ``Auto``).
 .. _DeriveLineEnding:
 
 **DeriveLineEnding** (``Boolean``) :versionbadge:`clang-format 10` :ref:`¶ <DeriveLineEnding>`
-  Analyze the formatted file for the most used line ending (``\r\n``
-  or ``\n``). ``UseCRLF`` is only used as a fallback if none can be derived.
+  This option is **deprecated**. See ``DeriveLF`` and ``DeriveCRLF`` of
+  ``LineEnding``.
 
 .. _DerivePointerAlignment:
 
@@ -3580,6 +3580,27 @@ the configuration (without a prefix: ``Auto``).
     Should be used for Verilog and SystemVerilog.
     https://standards.ieee.org/ieee/1800/6700/
     https://sci-hub.st/10.1109/IEEESTD.2018.8299595
+
+
+
+.. _LineEnding:
+
+**LineEnding** (``LineEndingStyle``) :versionbadge:`clang-format 16` :ref:`¶ <LineEnding>`
+  Line ending style (``\n`` or ``\r\n``) to use.
+
+  Possible values:
+
+  * ``LE_LF`` (in configuration: ``LF``)
+    Use ``\n``.
+
+  * ``LE_CRLF`` (in configuration: ``CRLF``)
+    Use ``\r\n``.
+
+  * ``LE_DeriveLF`` (in configuration: ``DeriveLF``)
+    Use ``\n`` unless the input has more lines ending in ``\r\n``.
+
+  * ``LE_DeriveCRLF`` (in configuration: ``DeriveCRLF``)
+    Use ``\r\n`` unless the input has more lines ending in ``\n``.
 
 
 
@@ -4484,22 +4505,54 @@ the configuration (without a prefix: ``Auto``).
 
 .. _SortUsingDeclarations:
 
-**SortUsingDeclarations** (``Boolean``) :versionbadge:`clang-format 5` :ref:`¶ <SortUsingDeclarations>`
-  If ``true``, clang-format will sort using declarations.
+**SortUsingDeclarations** (``SortUsingDeclarationsOptions``) :versionbadge:`clang-format 5` :ref:`¶ <SortUsingDeclarations>`
+  Controls if and how clang-format will sort using declarations.
 
-  The order of using declarations is defined as follows:
-  Split the strings by "::" and discard any initial empty strings. The last
-  element of each list is a non-namespace name; all others are namespace
-  names. Sort the lists of names lexicographically, where the sort order of
-  individual names is that all non-namespace names come before all namespace
-  names, and within those groups, names are in case-insensitive
-  lexicographic order.
+  Possible values:
 
-  .. code-block:: c++
+  * ``SUD_Never`` (in configuration: ``Never``)
+    Using declarations are never sorted.
 
-     false:                                 true:
-     using std::cout;               vs.     using std::cin;
-     using std::cin;                        using std::cout;
+    .. code-block:: c++
+
+       using std::chrono::duration_cast;
+       using std::move;
+       using boost::regex;
+       using boost::regex_constants::icase;
+       using std::string;
+
+  * ``SUD_Lexicographic`` (in configuration: ``Lexicographic``)
+    Using declarations are sorted in the order defined as follows:
+    Split the strings by "::" and discard any initial empty strings. Sort
+    the lists of names lexicographically, and within those groups, names are
+    in case-insensitive lexicographic order.
+
+    .. code-block:: c++
+
+       using boost::regex;
+       using boost::regex_constants::icase;
+       using std::chrono::duration_cast;
+       using std::move;
+       using std::string;
+
+  * ``SUD_LexicographicNumeric`` (in configuration: ``LexicographicNumeric``)
+    Using declarations are sorted in the order defined as follows:
+    Split the strings by "::" and discard any initial empty strings. The
+    last element of each list is a non-namespace name; all others are
+    namespace names. Sort the lists of names lexicographically, where the
+    sort order of individual names is that all non-namespace names come
+    before all namespace names, and within those groups, names are in
+    case-insensitive lexicographic order.
+
+    .. code-block:: c++
+
+       using boost::regex;
+       using boost::regex_constants::icase;
+       using std::move;
+       using std::string;
+       using std::chrono::duration_cast;
+
+
 
 .. _SpaceAfterCStyleCast:
 
@@ -5114,8 +5167,7 @@ the configuration (without a prefix: ``Auto``).
 .. _UseCRLF:
 
 **UseCRLF** (``Boolean``) :versionbadge:`clang-format 10` :ref:`¶ <UseCRLF>`
-  Use ``\r\n`` instead of ``\n`` for line breaks.
-  Also used as fallback if ``DeriveLineEnding`` is true.
+  This option is **deprecated**. See ``LF`` and ``CRLF`` of ``LineEnding``.
 
 .. _UseTab:
 

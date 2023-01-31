@@ -192,6 +192,10 @@ unsigned getWavefrontSize(const MCSubtargetInfo *STI);
 /// \returns Local memory size in bytes for given subtarget \p STI.
 unsigned getLocalMemorySize(const MCSubtargetInfo *STI);
 
+/// \returns Maximum addressable local memory size in bytes for given subtarget
+/// \p STI.
+unsigned getAddressableLocalMemorySize(const MCSubtargetInfo *STI);
+
 /// \returns Number of execution units per compute unit for given subtarget \p
 /// STI.
 unsigned getEUsPerCU(const MCSubtargetInfo *STI);
@@ -1209,7 +1213,7 @@ inline unsigned getOperandSize(const MCOperandInfo &OpInfo) {
 
 LLVM_READNONE
 inline unsigned getOperandSize(const MCInstrDesc &Desc, unsigned OpNo) {
-  return getOperandSize(Desc.OpInfo[OpNo]);
+  return getOperandSize(Desc.operands()[OpNo]);
 }
 
 /// Is this literal inlinable, and not one of the values intended for floating
@@ -1289,6 +1293,9 @@ inline bool isLegal64BitDPPControl(unsigned DC) {
 
 /// \returns true if the intrinsic is divergent
 bool isIntrinsicSourceOfDivergence(unsigned IntrID);
+
+/// \returns true if the intrinsic is uniform
+bool isIntrinsicAlwaysUniform(unsigned IntrID);
 
 // Track defaults for fields in the MODE register.
 struct SIModeRegisterDefaults {

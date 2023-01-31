@@ -1577,7 +1577,7 @@ class OmpSsIterationSpaceChecker {
   ///   UB  >  Var
   ///   UB  >= Var
   /// This will have no value when the condition is !=
-  llvm::Optional<bool> TestIsLessOp;
+  std::optional<bool> TestIsLessOp;
   /// This flag is true when condition is strict ( < or > ).
   bool TestIsStrictOp = false;
   /// Checks if the provide statement depends on the loop counter.
@@ -1607,7 +1607,7 @@ public:
   /// Return the Step expression
   Expr *getLoopStepExpr() const { return Step; }
   /// Return true if < or <=, false if >= or >. No value means !=
-  llvm::Optional<bool> getLoopIsLessOp() const { return TestIsLessOp; }
+  std::optional<bool> getLoopIsLessOp() const { return TestIsLessOp; }
   /// Return true is strict comparison
   bool getLoopIsStrictOp() const { return TestIsStrictOp; }
   /// Source range of the loop init.
@@ -1629,7 +1629,7 @@ private:
   bool setLCDeclAndLB(ValueDecl *NewLCDecl, Expr *NewDeclRefExpr, Expr *NewLB,
                       bool EmitDiags);
   /// Helper to set upper bound.
-  bool setUB(Expr *NewUB, llvm::Optional<bool> LessOp, bool StrictOp,
+  bool setUB(Expr *NewUB, std::optional<bool> LessOp, bool StrictOp,
              SourceRange SR, SourceLocation SL);
   /// Helper to set loop increment.
   bool setStep(Expr *NewStep, bool Subtract);
@@ -1668,7 +1668,7 @@ bool OmpSsIterationSpaceChecker::setLCDeclAndLB(ValueDecl *NewLCDecl,
 }
 
 bool OmpSsIterationSpaceChecker::setUB(Expr *NewUB,
-                                        llvm::Optional<bool> LessOp,
+                                        std::optional<bool> LessOp,
                                         bool StrictOp, SourceRange SR,
                                         SourceLocation SL) {
   // State consistency checking to ensure correct usage.
@@ -1710,7 +1710,7 @@ bool OmpSsIterationSpaceChecker::setStep(Expr *NewStep, bool Subtract) {
     //  loop. If test-expr is of form b relational-op var and relational-op is
     //  > or >= then incr-expr must cause var to increase on each iteration of
     //  the loop.
-    Optional<llvm::APSInt> Result =
+    std::optional<llvm::APSInt> Result =
         NewStep->getIntegerConstantExpr(SemaRef.Context);
     bool IsUnsigned = !NewStep->getType()->hasSignedIntegerRepresentation();
     bool IsConstNeg =
@@ -5984,7 +5984,7 @@ ExprResult Sema::CheckNonNegativeIntegerValue(Expr *ValExpr,
     return Res.get();
 
   // The expression must evaluate to a non-negative integer value.
-  if (Optional<llvm::APSInt> Result =
+  if (std::optional<llvm::APSInt> Result =
           ValExpr->getIntegerConstantExpr(Context)) {
     if (Result->isSigned() &&
         !((!StrictlyPositive && Result->isNonNegative()) ||

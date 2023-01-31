@@ -191,6 +191,7 @@ public:
         getFlags()->GWP_ASAN_MaxSimultaneousAllocations;
     Opt.SampleRate = getFlags()->GWP_ASAN_SampleRate;
     Opt.InstallSignalHandlers = getFlags()->GWP_ASAN_InstallSignalHandlers;
+    Opt.Recoverable = getFlags()->GWP_ASAN_Recoverable;
     // Embedded GWP-ASan is locked through the Scudo atfork handler (via
     // Allocator::disable calling GWPASan.disable). Disable GWP-ASan's atfork
     // handler.
@@ -202,7 +203,8 @@ public:
       gwp_asan::segv_handler::installSignalHandlers(
           &GuardedAlloc, Printf,
           gwp_asan::backtrace::getPrintBacktraceFunction(),
-          gwp_asan::backtrace::getSegvBacktraceFunction());
+          gwp_asan::backtrace::getSegvBacktraceFunction(),
+          Opt.Recoverable);
 
     GuardedAllocSlotSize =
         GuardedAlloc.getAllocatorState()->maximumAllocationSize();
@@ -901,6 +903,10 @@ public:
 
   void setTrackAllocationStacks(bool Track) {
     initThreadMaybe();
+    if (getFlags()->allocation_ring_buffer_size == 0) {
+      DCHECK(!Primary.Options.load().get(OptionBit::TrackAllocationStacks));
+      return;
+    }
     if (Track)
       Primary.Options.set(OptionBit::TrackAllocationStacks);
     else
@@ -939,7 +945,8 @@ public:
 
   uptr getRingBufferSize() {
     initThreadMaybe();
-    return ringBufferSizeInBytes(getRingBuffer()->Size);
+    auto *RingBuffer = getRingBuffer();
+    return RingBuffer ? ringBufferSizeInBytes(RingBuffer->Size) : 0;
   }
 
   static bool setRingBufferSizeForBuffer(char *Buffer, size_t Size) {
@@ -1406,8 +1413,8 @@ private:
                                      const char *RingBufferPtr) {
     auto *RingBuffer =
         reinterpret_cast<const AllocationRingBuffer *>(RingBufferPtr);
-    if (!RingBuffer)
-      return; //  just in case; called before init
+    if (!RingBuffer || RingBuffer->Size == 0)
+      return;
     uptr Pos = atomic_load_relaxed(&RingBuffer->Pos);
 
     for (uptr I = Pos - 1;
@@ -1493,9 +1500,8 @@ private:
   void initRingBuffer() {
     u32 AllocationRingBufferSize =
         static_cast<u32>(getFlags()->allocation_ring_buffer_size);
-    // Have at least one entry so we don't need to special case.
     if (AllocationRingBufferSize < 1)
-      AllocationRingBufferSize = 1;
+      return;
     MapPlatformData Data = {};
     RawRingBuffer = static_cast<char *>(
         map(/*Addr=*/nullptr,
