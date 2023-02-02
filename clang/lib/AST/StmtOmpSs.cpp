@@ -30,7 +30,7 @@ void OSSChildren::setClauses(ArrayRef<OSSClause *> Clauses) {
 }
 
 MutableArrayRef<Stmt *> OSSChildren::getChildren() {
-  return llvm::makeMutableArrayRef(getTrailingObjects<Stmt *>(), NumChildren);
+  return llvm::MutableArrayRef(getTrailingObjects<Stmt *>(), NumChildren);
 }
 
 OSSChildren *OSSChildren::Create(void *Mem, ArrayRef<OSSClause *> Clauses) {
