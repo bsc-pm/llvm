@@ -54,10 +54,12 @@ void RTNAME(PointerSetDerivedLength)(
   addendum->SetLenParameterValue(which, x);
 }
 
-void RTNAME(PointerApplyMold)(Descriptor &pointer, const Descriptor &mold) {
+void RTNAME(PointerApplyMold)(
+    Descriptor &pointer, const Descriptor &mold, int rank) {
   pointer = mold;
   pointer.set_base_addr(nullptr);
   pointer.raw().attribute = CFI_attribute_pointer;
+  pointer.raw().rank = rank;
 }
 
 void RTNAME(PointerAssociateScalar)(Descriptor &pointer, void *target) {
@@ -142,8 +144,7 @@ int RTNAME(PointerAllocateSource)(Descriptor &pointer, const Descriptor &source,
       pointer, hasStat, errMsg, sourceFile, sourceLine)};
   if (stat == StatOk) {
     Terminator terminator{sourceFile, sourceLine};
-    // 9.7.1.2(7)
-    Assign(pointer, source, terminator, /*skipRealloc=*/true);
+    DoFromSourceAssign(pointer, source, terminator);
   }
   return stat;
 }

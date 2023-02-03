@@ -2184,6 +2184,9 @@ public:
         MsgParam = 1;
       }
     } else {
+      if (isa<CallExpr>(Operation)) {
+        MsgParam = 3;
+      }
       Loc = Operation->getBeginLoc();
       Range = Operation->getSourceRange();
     }

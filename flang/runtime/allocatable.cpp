@@ -85,7 +85,7 @@ void RTNAME(AllocatableSetDerivedLength)(
 }
 
 void RTNAME(AllocatableApplyMold)(
-    Descriptor &descriptor, const Descriptor &mold) {
+    Descriptor &descriptor, const Descriptor &mold, int rank) {
   if (descriptor.IsAllocated()) {
     // 9.7.1.3 Return so the error can be emitted by AllocatableAllocate.
     return;
@@ -93,6 +93,7 @@ void RTNAME(AllocatableApplyMold)(
   descriptor = mold;
   descriptor.set_base_addr(nullptr);
   descriptor.raw().attribute = CFI_attribute_allocatable;
+  descriptor.raw().rank = rank;
 }
 
 int RTNAME(AllocatableAllocate)(Descriptor &descriptor, bool hasStat,
@@ -127,8 +128,7 @@ int RTNAME(AllocatableAllocateSource)(Descriptor &alloc,
       alloc, hasStat, errMsg, sourceFile, sourceLine)};
   if (stat == StatOk) {
     Terminator terminator{sourceFile, sourceLine};
-    // 9.7.1.2(7)
-    Assign(alloc, source, terminator, /*skipRealloc=*/true);
+    DoFromSourceAssign(alloc, source, terminator);
   }
   return stat;
 }

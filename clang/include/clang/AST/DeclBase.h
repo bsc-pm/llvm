@@ -1393,6 +1393,8 @@ public:
 class DeclContext {
   /// For makeDeclVisibleInContextImpl
   friend class ASTDeclReader;
+  /// For checking the new bits in the Serialization part.
+  friend class ASTDeclWriter;
   /// For reconcileExternalVisibleStorage, CreateStoredDeclsMap,
   /// hasNeedToReconcileExternalVisibleStorage
   friend class ExternalASTSource;
