@@ -759,7 +759,7 @@ void Parser::PreParseCollapse() {
 }
 
 StmtResult Parser::ParseHlsPragma(ParsedStmtContext Allowed) {
-  assert(Tok.is(tok::annot_pragma_ompss) && "Not an OmpSs directive!");
+  assert(Tok.is(tok::annot_pragma_hls) && "Not an HLS directive!");
   SourceLocation StartLoc = ConsumeAnnotationToken(), EndLoc;
   clang::CachedTokens tokens;
   ConsumeAndStoreUntil(tok::annot_pragma_hls_end, tokens, false, false);

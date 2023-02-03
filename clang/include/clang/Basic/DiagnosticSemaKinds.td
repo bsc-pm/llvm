@@ -11637,6 +11637,10 @@ def err_oss_function_with_body_expected : Error<
   "'#pragma oss task device(fpga)' can only be applied to functions with bodies for now">;
 def err_oss_fpga_transform_broken : Error<
   "'#pragma oss task device(fpga)' we failed while making transformations on the code. Please, file a bug report!">;
+def err_oss_fpga_dependency_analisis : Error<
+  "'#pragma oss task device(fpga)' failed to resolve the dependencies of this function. This may be an internal bug. Error details: %0">;
+def err_oss_fpga_missing_body_for_function_depended_by_kernel : Error<"This function is depended by an fpga kernel, but we couldn't locate its body. Make sure it is visible in this translation unit.">;
+def note_oss_fpga_kernel : Note<"The fpga kernel">;
 def err_oss_non_void_task : Error<
   "non-void tasks are not supported">;
 def err_oss_rvalue_param_task : Error<

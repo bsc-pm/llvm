@@ -36,6 +36,7 @@
 #include "clang/AST/OperationKinds.h"
 #include "clang/AST/Stmt.h"
 #include "clang/AST/StmtCXX.h"
+#include "clang/AST/StmtHlsStub.h"
 #include "clang/AST/StmtObjC.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/AST/TemplateBase.h"
@@ -59,9 +60,11 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
@@ -573,6 +576,7 @@ namespace clang {
 
     // Importing statements
     ExpectedStmt VisitStmt(Stmt *S);
+    ExpectedStmt VisitHlsDirective(HlsDirective *S);
     ExpectedStmt VisitGCCAsmStmt(GCCAsmStmt *S);
     ExpectedStmt VisitDeclStmt(DeclStmt *S);
     ExpectedStmt VisitNullStmt(NullStmt *S);
@@ -6424,6 +6428,10 @@ ExpectedStmt ASTNodeImporter::VisitStmt(Stmt *S) {
   return make_error<ASTImportError>(ASTImportError::UnsupportedConstruct);
 }
 
+ExpectedStmt ASTNodeImporter::VisitHlsDirective(HlsDirective *S) {
+  return HlsDirective::Create(Importer.getToContext(), S->getBeginLoc(),
+                              S->getEndLoc(), llvm::StringRef(S->getContent()));
+}
 
 ExpectedStmt ASTNodeImporter::VisitGCCAsmStmt(GCCAsmStmt *S) {
   if (Importer.returnWithErrorInTest())
