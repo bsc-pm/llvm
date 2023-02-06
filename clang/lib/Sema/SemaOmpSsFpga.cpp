@@ -45,11 +45,13 @@
 #include "clang/Sema/ScopeInfo.h"
 #include "clang/Sema/SemaConsumer.h"
 #include "clang/Sema/SemaInternal.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_os_ostream.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <utility>
@@ -166,12 +168,32 @@ bool GenerateFunctionBody(Callable &&Diag, llvm::raw_ostream &outputFile,
 } // namespace
 
 bool Sema::ActOnOmpSsFpgaGenerateAitFiles() {
+  if (ompssFpgaDecls.empty())
+    return true;
+
+  auto &vfs = SourceMgr.getFileManager().getVirtualFileSystem();
+  std::string path = getLangOpts().OmpSsFpgaExtractHlsTasksDir;
+  if (path.empty()) {
+    Diag(ompssFpgaDecls[0]->getLocation(),
+         diag::err_oss_ompss_fpga_extract_hls_tasks_dir_missing_dir);
+    return false;
+  }
+  llvm::SmallVector<char, 128> realPathStr;
+  if (vfs.getRealPath(path, realPathStr)) {
+    Diag(ompssFpgaDecls[0]->getLocation(),
+         diag::err_oss_ompss_fpga_extract_hls_tasks_dir_missing_dir);
+    return false;
+  }
+  std::filesystem::path realPath =
+      std::filesystem::u8path(realPathStr.begin(), realPathStr.end());
+
+  auto diag = [&](auto... arg) { return Diag(arg...); };
   for (auto *decl : ompssFpgaDecls) {
-    auto diag = [&](auto... arg) { return Diag(arg...); };
     auto *FD = dyn_cast<FunctionDecl>(decl);
 
     auto funcName = FD->getName();
-    std::ofstream stream{funcName.str() + "_hls_automatic_clang.cpp"};
+    std::ofstream stream{realPath /
+                         (funcName.str() + "_hls_automatic_clang.cpp")};
     llvm::raw_os_ostream outputFile(stream);
 
     auto range = decl->getSourceRange();

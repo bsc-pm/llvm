@@ -2647,6 +2647,9 @@ def fompss_EQ : Joined<["-"], "fompss-2=">, Group<f_Group>;
 def fno_ompss : Flag<["-"], "fno-ompss-2">, Group<f_Group>, Flags<[NoArgumentUnused]>;
 def fdo_not_use_ompss_runtime : Flag<["-"], "fdo-not-use-ompss-2-runtime">, Group<f_Group>, Flags<[CC1Option, NoArgumentUnused]>,
   HelpText<"When compiling with -fompss-2 do not include or link with the runtime.">;
+def fompss_fpga_extract_hls_tasks_dir : Separate<["-"], "fompss-fpga-extract-hls-tasks-dir">, Flags<[CC1Option]>, Group<f_Group>,
+  MetaVarName<"<path>">,
+  MarshallingInfoString<LangOpts<"OmpSsFpgaExtractHlsTasksDir">>, HelpText<"Specify which directory should be used when extracting hls functions">;
 def fopenmp : Flag<["-"], "fopenmp">, Group<f_Group>, Flags<[CC1Option, NoArgumentUnused, FlangOption, FC1Option]>,
   HelpText<"Parse OpenMP pragmas and generate parallel code.">;
 def fno_openmp : Flag<["-"], "fno-openmp">, Group<f_Group>, Flags<[NoArgumentUnused]>;
