@@ -24,6 +24,7 @@
 #include "clang/AST/ExprObjC.h"
 #include "clang/AST/ExprOmpSs.h"
 #include "clang/AST/ExprOpenMP.h"
+#include "clang/AST/OmpSsClause.h"
 #include "clang/AST/OpenMPClause.h"
 #include "clang/AST/Stmt.h"
 #include "clang/AST/StmtCXX.h"
@@ -1782,6 +1783,24 @@ public:
                                       SourceLocation EndLoc) {
     return getSema().ActOnOmpSsLocalmemClause(VarList, StartLoc, LParenLoc,
                                               EndLoc);
+  }
+
+  /// Build a new OmpSs 'localmem_copies' clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSLocalmemCopiesClause(SourceLocation StartLoc,
+                                            SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsLocalmemCopiesClause(StartLoc, EndLoc);
+  }
+
+  /// Build a new OmpSs 'no_localmem_copies' clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSNoLocalmemCopiesClause(SourceLocation StartLoc,
+                                              SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsNoLocalmemCopiesClause(StartLoc, EndLoc);
   }
 
   /// Build a new OmpSs 'label' clause.
@@ -11297,6 +11316,20 @@ TreeTransform<Derived>::TransformOSSLocalmemClause(OSSLocalmemClause *C) {
 
   return getDerived().RebuildOSSLocalmemClause(
       Vars, C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSLocalmemCopiesClause(
+    OSSLocalmemCopiesClause *C) {
+  return getDerived().RebuildOSSLocalmemCopiesClause(C->getBeginLoc(),
+                                                     C->getEndLoc());
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSNoLocalmemCopiesClause(
+    OSSNoLocalmemCopiesClause *C) {
+  return getDerived().RebuildOSSNoLocalmemCopiesClause(C->getBeginLoc(),
+                                                       C->getEndLoc());
 }
 
 template <typename Derived>

@@ -4308,19 +4308,20 @@ static bool actOnOSSReductionKindClause(
 Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     DeclGroupPtrTy DG, Expr *If, Expr *Final, Expr *Cost, Expr *Priority,
     Expr *Onready, Expr *NumInstances, Expr *Onto, Expr *NumRepetitions,
-    Expr *Period, bool Wait, unsigned Device, SourceLocation DeviceLoc,
-    ArrayRef<Expr *> Localmem, ArrayRef<Expr *> Labels, ArrayRef<Expr *> Ins,
-    ArrayRef<Expr *> Outs, ArrayRef<Expr *> Inouts,
-    ArrayRef<Expr *> Concurrents, ArrayRef<Expr *> Commutatives,
-    ArrayRef<Expr *> WeakIns, ArrayRef<Expr *> WeakOuts,
-    ArrayRef<Expr *> WeakInouts, ArrayRef<Expr *> WeakConcurrents,
-    ArrayRef<Expr *> WeakCommutatives, ArrayRef<Expr *> DepIns,
-    ArrayRef<Expr *> DepOuts, ArrayRef<Expr *> DepInouts,
-    ArrayRef<Expr *> DepConcurrents, ArrayRef<Expr *> DepCommutatives,
-    ArrayRef<Expr *> DepWeakIns, ArrayRef<Expr *> DepWeakOuts,
-    ArrayRef<Expr *> DepWeakInouts, ArrayRef<Expr *> DepWeakConcurrents,
-    ArrayRef<Expr *> DepWeakCommutatives, ArrayRef<unsigned> ReductionListSizes,
-    ArrayRef<Expr *> Reductions, ArrayRef<unsigned> ReductionClauseType,
+    Expr *Period, bool LocalmemCopies, bool NoLocalmemCopies, bool Wait,
+    unsigned Device, SourceLocation DeviceLoc, ArrayRef<Expr *> Localmem,
+    ArrayRef<Expr *> Labels, ArrayRef<Expr *> Ins, ArrayRef<Expr *> Outs,
+    ArrayRef<Expr *> Inouts, ArrayRef<Expr *> Concurrents,
+    ArrayRef<Expr *> Commutatives, ArrayRef<Expr *> WeakIns,
+    ArrayRef<Expr *> WeakOuts, ArrayRef<Expr *> WeakInouts,
+    ArrayRef<Expr *> WeakConcurrents, ArrayRef<Expr *> WeakCommutatives,
+    ArrayRef<Expr *> DepIns, ArrayRef<Expr *> DepOuts,
+    ArrayRef<Expr *> DepInouts, ArrayRef<Expr *> DepConcurrents,
+    ArrayRef<Expr *> DepCommutatives, ArrayRef<Expr *> DepWeakIns,
+    ArrayRef<Expr *> DepWeakOuts, ArrayRef<Expr *> DepWeakInouts,
+    ArrayRef<Expr *> DepWeakConcurrents, ArrayRef<Expr *> DepWeakCommutatives,
+    ArrayRef<unsigned> ReductionListSizes, ArrayRef<Expr *> Reductions,
+    ArrayRef<unsigned> ReductionClauseType,
     ArrayRef<CXXScopeSpec> ReductionCXXScopeSpecs,
     ArrayRef<DeclarationNameInfo> ReductionIds, ArrayRef<Expr *> Ndranges,
     SourceLocation NdrangeLoc, SourceRange SR,
@@ -4596,9 +4597,9 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
 
   auto *NewAttr = OSSTaskDeclAttr::CreateImplicit(
       Context, IfRes.get(), FinalRes.get(), CostRes.get(), PriorityRes.get(),
-      Wait, DevType, OnreadyRes.get(), NumInstancesRes.get(), OntoRes.get(),
-      NumRepetitionsRes.get(), PeriodRes.get(),
-      const_cast<Expr **>(Localmem.data()), Localmem.size(),
+      LocalmemCopies, NoLocalmemCopies, Wait, DevType, OnreadyRes.get(),
+      NumInstancesRes.get(), OntoRes.get(), NumRepetitionsRes.get(),
+      PeriodRes.get(), const_cast<Expr **>(Localmem.data()), Localmem.size(),
       const_cast<Expr **>(LabelsRes.data()), LabelsRes.size(),
       const_cast<Expr **>(Ins.data()), Ins.size(),
       const_cast<Expr **>(Outs.data()), Outs.size(),
@@ -6279,6 +6280,16 @@ OSSClause *Sema::ActOnOmpSsPeriodClause(Expr *E, SourceLocation StartLoc,
   return new (Context) OSSPeriodClause(Res.get(), StartLoc, LParenLoc, EndLoc);
 }
 
+OSSClause *Sema::ActOnOmpSsLocalmemCopiesClause(SourceLocation StartLoc,
+                                                SourceLocation EndLoc) {
+  return new (Context) OSSLocalmemCopiesClause(StartLoc, EndLoc);
+}
+
+OSSClause *Sema::ActOnOmpSsNoLocalmemCopiesClause(SourceLocation StartLoc,
+                                                  SourceLocation EndLoc) {
+  return new (Context) OSSNoLocalmemCopiesClause(StartLoc, EndLoc);
+}
+
 OSSClause *Sema::ActOnOmpSsLabelClause(ArrayRef<Expr *> VarList,
                                        SourceLocation StartLoc,
                                        SourceLocation LParenLoc,
@@ -6409,6 +6420,12 @@ OSSClause *Sema::ActOnOmpSsClause(OmpSsClauseKind Kind,
                                   SourceLocation EndLoc) {
   OSSClause *Res = nullptr;
   switch (Kind) {
+  case OSSC_localmem_copies:
+    Res = ActOnOmpSsLocalmemCopiesClause(StartLoc, EndLoc);
+    break;
+  case OSSC_no_localmem_copies:
+    Res = ActOnOmpSsNoLocalmemCopiesClause(StartLoc, EndLoc);
+    break;
   case OSSC_wait:
     Res = ActOnOmpSsWaitClause(StartLoc, EndLoc);
     break;

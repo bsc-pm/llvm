@@ -1895,6 +1895,48 @@ public:
   }
 };
 
+template <OmpSsClauseKind KindT> class OSSFlagClause : public OSSClause {
+  friend class OSSClauseReader;
+
+public:
+  OSSFlagClause() : OSSClause(KindT, SourceLocation(), SourceLocation()) {}
+  OSSFlagClause(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSClause(KindT, StartLoc, EndLoc) {}
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == KindT;
+  }
+};
+
+/// This represents 'localmem_copies' clause in the '#pragma oss ...' directive.
+///
+/// \code
+/// #pragma oss task device(fpga) localmem_copies
+/// \endcode
+/// In this example directive '#pragma oss task device(fpga)' has
+/// localmem_copies
+class OSSLocalmemCopiesClause : public OSSFlagClause<OSSC_localmem_copies> {
+  friend class OSSClauseReader;
+
+public:
+  using OSSFlagClause<OSSC_localmem_copies>::OSSFlagClause;
+};
+
+/// This represents 'no_localmem_copies' clause in the '#pragma oss ...'
+/// directive.
+///
+/// \code
+/// #pragma oss task device(fpga) no_localmem_copies
+/// \endcode
+/// In this example directive '#pragma oss task device(fpga)' has
+/// no_localmem_copies
+class OSSNoLocalmemCopiesClause
+    : public OSSFlagClause<OSSC_no_localmem_copies> {
+  friend class OSSClauseReader;
+
+public:
+  using OSSFlagClause<OSSC_no_localmem_copies>::OSSFlagClause;
+};
+
 /// This represents 'ndrange' clause in the
 /// '#pragma oss task' directive.
 ///

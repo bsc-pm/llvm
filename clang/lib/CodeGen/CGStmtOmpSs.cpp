@@ -209,6 +209,16 @@ static void AddPeriodData(const OSSExecutableDirective &S, const Expr *&Expr) {
   }
 }
 
+static void AddLocalmemCopiesData(const OSSExecutableDirective &S,
+                                  bool &Found) {
+  Found = !S.getClausesOfKind<OSSLocalmemCopiesClause>().empty();
+}
+
+static void AddNoLocalmemCopiesData(const OSSExecutableDirective &S,
+                                    bool &Found) {
+  Found = !S.getClausesOfKind<OSSNoLocalmemCopiesClause>().empty();
+}
+
 static void AddLabelData(
     const OSSExecutableDirective &S, SmallVectorImpl<const Expr *> &Labels) {
   [[maybe_unused]] bool Found = false;
@@ -286,6 +296,8 @@ static void AddTaskData(const OSSExecutableDirective &S, OSSTaskDataTy &TaskData
   AddOntoData(S, TaskData.Onto);
   AddNumRepetitionsData(S, TaskData.NumRepetitions);
   AddPeriodData(S, TaskData.Period);
+  AddLocalmemCopiesData(S, TaskData.LocalmemCopies);
+  AddNoLocalmemCopiesData(S, TaskData.NoLocalmemCopies);
 }
 
 static void AddChunksizeLoopData(const OSSLoopDirective &S, const Expr * &ChunksizeExpr) {

@@ -226,6 +226,12 @@ void OSSTaskDeclAttr::printPrettyPragma(
   }
   l("localmem", "(", localmem_size(), localmem_begin(), localmem_end(), OS,
     Policy);
+  if (getLocalmemCopies()) {
+    OS << " localmem_copies";
+  }
+  if (getNoLocalmemCopies()) {
+    OS << " no_localmem_copies";
+  }
 }
 
 void OMPDeclareTargetDeclAttr::printPrettyPragma(

@@ -120,14 +120,14 @@ struct OSSTaskDataTy final {
   const Expr *NumRepetitions = nullptr;
   const Expr *Period = nullptr;
   SmallVector<const Expr *, 2> Labels;
+  bool LocalmemCopies = false;
+  bool NoLocalmemCopies = false;
   bool Wait = false;
   const Expr *Onready = nullptr;
 
   bool empty() const {
-    return DSAs.empty() && Deps.empty() &&
-      Reductions.empty() &&
-      !If && !Final && !Cost && !Priority &&
-      Labels.empty() && !Onready;
+    return DSAs.empty() && Deps.empty() && Reductions.empty() && !If &&
+           !Final && !Cost && !Priority && Labels.empty() && !Onready;
   }
 };
 

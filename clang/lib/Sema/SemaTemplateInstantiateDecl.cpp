@@ -321,6 +321,9 @@ void Sema::InstantiateOSSDeclareTaskAttr(
   ExprResult IfRes, FinalRes, CostRes, PriorityRes, OnreadyRes, NumInstancesRes,
       OntoRes, NumRepetitionsRes, PeriodRes;
   bool Wait = Attr.getWait();
+  bool LocalmemCopies = Attr.getLocalmemCopies();
+  bool NoLocalmemCopies = Attr.getNoLocalmemCopies();
+
   // This value means no clause seen
   unsigned Device = OSSC_DEVICE_unknown + 1;
 
@@ -483,11 +486,12 @@ void Sema::InstantiateOSSDeclareTaskAttr(
   (void)ActOnOmpSsDeclareTaskDirective(
       ConvertDeclToDeclGroup(New), IfRes.get(), FinalRes.get(), CostRes.get(),
       PriorityRes.get(), OnreadyRes.get(), NumInstancesRes.get(), OntoRes.get(),
-      NumRepetitionsRes.get(), PeriodRes.get(), Wait, Device, SourceLocation(),
-      Localmem, Labels, Ins, Outs, Inouts, Concurrents, Commutatives, WeakIns,
-      WeakOuts, WeakInouts, WeakConcurrents, WeakCommutatives, DepIns, DepOuts,
-      DepInouts, DepConcurrents, DepCommutatives, DepWeakIns, DepWeakOuts,
-      DepWeakInouts, DepWeakConcurrents, DepWeakCommutatives,
+      NumRepetitionsRes.get(), PeriodRes.get(), LocalmemCopies,
+      NoLocalmemCopies, Wait, Device, SourceLocation(), Localmem, Labels, Ins,
+      Outs, Inouts, Concurrents, Commutatives, WeakIns, WeakOuts, WeakInouts,
+      WeakConcurrents, WeakCommutatives, DepIns, DepOuts, DepInouts,
+      DepConcurrents, DepCommutatives, DepWeakIns, DepWeakOuts, DepWeakInouts,
+      DepWeakConcurrents, DepWeakCommutatives,
       ArrayRef<unsigned>(Attr.reductionListSizes_begin(),
                          Attr.reductionListSizes_end()),
       Reductions,

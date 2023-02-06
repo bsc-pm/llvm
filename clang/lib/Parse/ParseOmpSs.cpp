@@ -224,7 +224,8 @@ bool Parser::ParseDeclareTaskClauses(
     ExprResult &PriorityRes, ExprResult &OnreadyRes,
     ExprResult &NumInstancesRes, ExprResult &OntoRes,
     ExprResult &NumRepetitionsRes, ExprResult &PeriodRes,
-    SmallVectorImpl<Expr *> &Localmem, bool &Wait, unsigned &Device,
+    SmallVectorImpl<Expr *> &Localmem, bool &LocalmemCopies,
+    bool &NoLocalmemCopies, bool &Wait, unsigned &Device,
     SourceLocation &DeviceLoc, SmallVectorImpl<Expr *> &Labels,
     SmallVectorImpl<Expr *> &Ins, SmallVectorImpl<Expr *> &Outs,
     SmallVectorImpl<Expr *> &Inouts, SmallVectorImpl<Expr *> &Concurrents,
@@ -277,6 +278,32 @@ bool Parser::ParseDeclareTaskClauses(
     }
 
     switch (CKind) {
+    case OSSC_no_localmem_copies: {
+      SourceLocation Loc = Tok.getLocation();
+      ConsumeToken();
+      if (FirstClauses[CKind]) {
+        Diag(Loc, diag::err_oss_more_one_clause)
+            << getOmpSsDirectiveName(OSSD_declare_task)
+            << getOmpSsClauseName(CKind) << 0;
+        IsError = true;
+      }
+      NoLocalmemCopies = true;
+      FirstClauses[CKind] = true;
+      break;
+    }
+    case OSSC_localmem_copies: {
+      SourceLocation Loc = Tok.getLocation();
+      ConsumeToken();
+      if (FirstClauses[CKind]) {
+        Diag(Loc, diag::err_oss_more_one_clause)
+            << getOmpSsDirectiveName(OSSD_declare_task)
+            << getOmpSsClauseName(CKind) << 0;
+        IsError = true;
+      }
+      LocalmemCopies = true;
+      FirstClauses[CKind] = true;
+      break;
+    }
     case OSSC_if:
     case OSSC_final:
     case OSSC_cost:
@@ -481,6 +508,8 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
   ExprResult NumRepetitionsRes;
   ExprResult PeriodRes;
   bool Wait = false;
+  bool LocalmemCopies = false;
+  bool NoLocalmemCopies = false;
   // This value means no clause seen
   unsigned Device = OSSC_DEVICE_unknown + 1;
   SourceLocation DeviceLoc;
@@ -517,10 +546,11 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
 
   bool IsError = ParseDeclareTaskClauses(
       IfRes, FinalRes, CostRes, PriorityRes, OnreadyRes, NumInstancesRes,
-      OntoRes, NumRepetitionsRes, PeriodRes, Localmem, Wait, Device, DeviceLoc,
-      Labels, Ins, Outs, Inouts, Concurrents, Commutatives, WeakIns, WeakOuts,
-      WeakInouts, WeakConcurrents, WeakCommutatives, DepIns, DepOuts, DepInouts,
-      DepConcurrents, DepCommutatives, DepWeakIns, DepWeakOuts, DepWeakInouts,
+      OntoRes, NumRepetitionsRes, PeriodRes, Localmem, LocalmemCopies,
+      NoLocalmemCopies, Wait, Device, DeviceLoc, Labels, Ins, Outs, Inouts,
+      Concurrents, Commutatives, WeakIns, WeakOuts, WeakInouts, WeakConcurrents,
+      WeakCommutatives, DepIns, DepOuts, DepInouts, DepConcurrents,
+      DepCommutatives, DepWeakIns, DepWeakOuts, DepWeakInouts,
       DepWeakConcurrents, DepWeakCommutatives, ReductionListSizes, Reductions,
       ReductionClauseType, ReductionCXXScopeSpecs, ReductionIds, Ndranges,
       NdrangeLoc);
@@ -538,14 +568,14 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
   return Actions.ActOnOmpSsDeclareTaskDirective(
       Ptr, IfRes.get(), FinalRes.get(), CostRes.get(), PriorityRes.get(),
       OnreadyRes.get(), NumInstancesRes.get(), OntoRes.get(),
-      NumRepetitionsRes.get(), PeriodRes.get(), Wait, Device, DeviceLoc,
-      Localmem, Labels, Ins, Outs, Inouts, Concurrents, Commutatives, WeakIns,
-      WeakOuts, WeakInouts, WeakConcurrents, WeakCommutatives, DepIns, DepOuts,
-      DepInouts, DepConcurrents, DepCommutatives, DepWeakIns, DepWeakOuts,
-      DepWeakInouts, DepWeakConcurrents, DepWeakCommutatives,
-      ReductionListSizes, Reductions, ReductionClauseType,
-      ReductionCXXScopeSpecs, ReductionIds, Ndranges, NdrangeLoc,
-      SourceRange(Loc, EndLoc));
+      NumRepetitionsRes.get(), PeriodRes.get(), LocalmemCopies,
+      NoLocalmemCopies, Wait, Device, DeviceLoc, Localmem, Labels, Ins, Outs,
+      Inouts, Concurrents, Commutatives, WeakIns, WeakOuts, WeakInouts,
+      WeakConcurrents, WeakCommutatives, DepIns, DepOuts, DepInouts,
+      DepConcurrents, DepCommutatives, DepWeakIns, DepWeakOuts, DepWeakInouts,
+      DepWeakConcurrents, DepWeakCommutatives, ReductionListSizes, Reductions,
+      ReductionClauseType, ReductionCXXScopeSpecs, ReductionIds, Ndranges,
+      NdrangeLoc, SourceRange(Loc, EndLoc));
   return Ptr;
 }
 
@@ -1019,6 +1049,8 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
     }
     Clause = ParseOmpSsSingleExprClause(CKind, WrongDirective);
     break;
+  case OSSC_localmem_copies:
+  case OSSC_no_localmem_copies:
   case OSSC_wait:
   case OSSC_update:
   case OSSC_read:
