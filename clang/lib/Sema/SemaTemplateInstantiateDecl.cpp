@@ -347,6 +347,7 @@ void Sema::InstantiateOSSDeclareTaskAttr(
   SmallVector<Expr *, 4> Reductions;
   SmallVector<Expr *, 4> Labels;
   SmallVector<Expr *, 4> Ndranges;
+  SmallVector<Expr *, 4> Localmem;
 
   // Substitute a single OmpSs clause, which is a potentially-evaluated
   // full-expression.
@@ -400,6 +401,8 @@ void Sema::InstantiateOSSDeclareTaskAttr(
     l(Attr.depWeakConcurrents_size(), Attr.depWeakConcurrents_begin(), Attr.depWeakConcurrents_end(), DepWeakConcurrents);
     l(Attr.depWeakCommutatives_size(), Attr.depWeakCommutatives_begin(), Attr.depWeakCommutatives_end(), DepWeakCommutatives);
     l(Attr.reductions_size(), Attr.reductions_begin(), Attr.reductions_end(), Reductions);
+    l(Attr.localmem_size(), Attr.localmem_begin(), Attr.localmem_end(),
+      Localmem);
   }
 
   l(Attr.labelExprs_size(), Attr.labelExprs_begin(), Attr.labelExprs_end(), Labels);
@@ -481,10 +484,10 @@ void Sema::InstantiateOSSDeclareTaskAttr(
       ConvertDeclToDeclGroup(New), IfRes.get(), FinalRes.get(), CostRes.get(),
       PriorityRes.get(), OnreadyRes.get(), NumInstancesRes.get(), OntoRes.get(),
       NumRepetitionsRes.get(), PeriodRes.get(), Wait, Device, SourceLocation(),
-      Labels, Ins, Outs, Inouts, Concurrents, Commutatives, WeakIns, WeakOuts,
-      WeakInouts, WeakConcurrents, WeakCommutatives, DepIns, DepOuts, DepInouts,
-      DepConcurrents, DepCommutatives, DepWeakIns, DepWeakOuts, DepWeakInouts,
-      DepWeakConcurrents, DepWeakCommutatives,
+      Localmem, Labels, Ins, Outs, Inouts, Concurrents, Commutatives, WeakIns,
+      WeakOuts, WeakInouts, WeakConcurrents, WeakCommutatives, DepIns, DepOuts,
+      DepInouts, DepConcurrents, DepCommutatives, DepWeakIns, DepWeakOuts,
+      DepWeakInouts, DepWeakConcurrents, DepWeakCommutatives,
       ArrayRef<unsigned>(Attr.reductionListSizes_begin(),
                          Attr.reductionListSizes_end()),
       Reductions,

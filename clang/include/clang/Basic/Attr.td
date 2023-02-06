@@ -3767,6 +3767,7 @@ def OSSTaskDecl : Attr {
     ExprArgument<"Onto">,
     ExprArgument<"NumRepetitions">,
     ExprArgument<"Period">,
+    VariadicExprArgument<"Localmem">,
     VariadicExprArgument<"LabelExprs">,
     // in()
     VariadicExprArgument<"Ins">, VariadicExprArgument<"Outs">,

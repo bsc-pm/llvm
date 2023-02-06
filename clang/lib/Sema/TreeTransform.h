@@ -1772,6 +1772,18 @@ public:
                                             EndLoc);
   }
 
+  /// Build a new OmpSs 'localmem' pseudo clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSLocalmemClause(ArrayRef<Expr *> VarList,
+                                      SourceLocation StartLoc,
+                                      SourceLocation LParenLoc,
+                                      SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsLocalmemClause(VarList, StartLoc, LParenLoc,
+                                              EndLoc);
+  }
+
   /// Build a new OmpSs 'label' clause.
   ///
   /// By default, performs semantic analysis to build the new OmpSs clause.
@@ -11268,6 +11280,23 @@ TreeTransform<Derived>::TransformOSSPeriodClause(OSSPeriodClause *C) {
     return nullptr;
   return getDerived().RebuildOSSPeriodClause(E.get(), C->getBeginLoc(),
                                              C->getLParenLoc(), C->getEndLoc());
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSLocalmemClause(OSSLocalmemClause *C) {
+  llvm::SmallVector<Expr *, 16> Vars;
+  Vars.reserve(C->varlist_size());
+
+  for (auto *VE : C->varlists()) {
+    ExprResult EVar = getDerived().TransformExpr(cast<Expr>(VE));
+    if (EVar.isInvalid())
+      return nullptr;
+    Vars.push_back(EVar.get());
+  }
+
+  return getDerived().RebuildOSSLocalmemClause(
+      Vars, C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
 }
 
 template <typename Derived>

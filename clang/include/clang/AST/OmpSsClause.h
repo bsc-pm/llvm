@@ -1832,6 +1832,69 @@ public:
   }
 };
 
+/// This represents 'localmem' clause in the '#pragma oss ...' directive.
+///
+/// \code
+/// #pragma oss task device(fpga) localmem(a,b)
+/// \endcode
+/// In this example directive '#pragma oss task device(fpga)' has a localmem
+/// region This is used to designate explicitly these variables to be copied to
+/// the local memory of the fpga.
+class OSSLocalmemClause final
+    : public OSSVarListClause<OSSLocalmemClause>,
+      private llvm::TrailingObjects<OSSLocalmemClause, Expr *> {
+  friend class OSSClauseReader;
+  friend OSSVarListClause;
+  friend TrailingObjects;
+
+  /// Build clause with number of variables \a N.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param EndLoc Ending location of the clause.
+  /// \param N Number of the variables in the clause.
+  OSSLocalmemClause(SourceLocation StartLoc, SourceLocation LParenLoc,
+                    SourceLocation EndLoc, unsigned N)
+      : OSSVarListClause<OSSLocalmemClause>(OSSC_depend, StartLoc, LParenLoc,
+                                            EndLoc, N) {}
+
+  /// Build an empty clause.
+  ///
+  /// \param N Number of variables.
+  explicit OSSLocalmemClause(unsigned N)
+      : OSSVarListClause<OSSLocalmemClause>(OSSC_depend, SourceLocation(),
+                                            SourceLocation(), SourceLocation(),
+                                            N) {}
+
+public:
+  /// Creates clause with a list of variables \a VL.
+  ///
+  /// \param C AST context.
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param EndLoc Ending location of the clause.
+  /// \param VL List of references to the variables.
+  /// clause.
+  static OSSLocalmemClause *Create(const ASTContext &C, SourceLocation StartLoc,
+                                   SourceLocation LParenLoc,
+                                   SourceLocation EndLoc, ArrayRef<Expr *> VL);
+
+  /// Creates an empty clause with \a N variables.
+  ///
+  /// \param C AST context.
+  /// \param N The number of variables.
+  static OSSLocalmemClause *CreateEmpty(const ASTContext &C, unsigned N);
+
+  child_range children() {
+    return child_range(reinterpret_cast<Stmt **>(varlist_begin()),
+                       reinterpret_cast<Stmt **>(varlist_end()));
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == OSSC_localmem;
+  }
+};
+
 /// This represents 'ndrange' clause in the
 /// '#pragma oss task' directive.
 ///

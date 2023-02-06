@@ -426,3 +426,21 @@ void OSSClausePrinter::VisitOSSReleaseClause(OSSReleaseClause *Node) {
 void OSSClausePrinter::VisitOSSRelaxedClause(OSSRelaxedClause *Node) {
   OS << "relaxed";
 }
+
+OSSLocalmemClause *OSSLocalmemClause::Create(const ASTContext &C,
+                                             SourceLocation StartLoc,
+                                             SourceLocation LParenLoc,
+                                             SourceLocation EndLoc,
+                                             ArrayRef<Expr *> VL) {
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(VL.size()));
+  OSSLocalmemClause *Clause =
+      new (Mem) OSSLocalmemClause(StartLoc, LParenLoc, EndLoc, VL.size());
+  Clause->setVarRefs(VL);
+  return Clause;
+}
+
+OSSLocalmemClause *OSSLocalmemClause::CreateEmpty(const ASTContext &C,
+                                                  unsigned N) {
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(N));
+  return new (Mem) OSSLocalmemClause(N);
+}

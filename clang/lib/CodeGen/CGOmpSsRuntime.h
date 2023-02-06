@@ -47,10 +47,11 @@ struct OSSTaskDSADataTy final {
   SmallVector<const Expr *, 4> Shareds;
   SmallVector<OSSDSAPrivateDataTy, 4> Privates;
   SmallVector<OSSDSAFirstprivateDataTy, 4> Firstprivates;
+  SmallVector<const Expr *, 4> Localmems;
 
   bool empty() const {
-    return Shareds.empty() && Privates.empty()
-      && Firstprivates.empty();
+    return Shareds.empty() && Privates.empty() && Firstprivates.empty() &&
+           Localmems.empty();
   }
 };
 

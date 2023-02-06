@@ -4309,18 +4309,18 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     DeclGroupPtrTy DG, Expr *If, Expr *Final, Expr *Cost, Expr *Priority,
     Expr *Onready, Expr *NumInstances, Expr *Onto, Expr *NumRepetitions,
     Expr *Period, bool Wait, unsigned Device, SourceLocation DeviceLoc,
-    ArrayRef<Expr *> Labels, ArrayRef<Expr *> Ins, ArrayRef<Expr *> Outs,
-    ArrayRef<Expr *> Inouts, ArrayRef<Expr *> Concurrents,
-    ArrayRef<Expr *> Commutatives, ArrayRef<Expr *> WeakIns,
-    ArrayRef<Expr *> WeakOuts, ArrayRef<Expr *> WeakInouts,
-    ArrayRef<Expr *> WeakConcurrents, ArrayRef<Expr *> WeakCommutatives,
-    ArrayRef<Expr *> DepIns, ArrayRef<Expr *> DepOuts,
-    ArrayRef<Expr *> DepInouts, ArrayRef<Expr *> DepConcurrents,
-    ArrayRef<Expr *> DepCommutatives, ArrayRef<Expr *> DepWeakIns,
-    ArrayRef<Expr *> DepWeakOuts, ArrayRef<Expr *> DepWeakInouts,
-    ArrayRef<Expr *> DepWeakConcurrents, ArrayRef<Expr *> DepWeakCommutatives,
-    ArrayRef<unsigned> ReductionListSizes, ArrayRef<Expr *> Reductions,
-    ArrayRef<unsigned> ReductionClauseType,
+    ArrayRef<Expr *> Localmem, ArrayRef<Expr *> Labels, ArrayRef<Expr *> Ins,
+    ArrayRef<Expr *> Outs, ArrayRef<Expr *> Inouts,
+    ArrayRef<Expr *> Concurrents, ArrayRef<Expr *> Commutatives,
+    ArrayRef<Expr *> WeakIns, ArrayRef<Expr *> WeakOuts,
+    ArrayRef<Expr *> WeakInouts, ArrayRef<Expr *> WeakConcurrents,
+    ArrayRef<Expr *> WeakCommutatives, ArrayRef<Expr *> DepIns,
+    ArrayRef<Expr *> DepOuts, ArrayRef<Expr *> DepInouts,
+    ArrayRef<Expr *> DepConcurrents, ArrayRef<Expr *> DepCommutatives,
+    ArrayRef<Expr *> DepWeakIns, ArrayRef<Expr *> DepWeakOuts,
+    ArrayRef<Expr *> DepWeakInouts, ArrayRef<Expr *> DepWeakConcurrents,
+    ArrayRef<Expr *> DepWeakCommutatives, ArrayRef<unsigned> ReductionListSizes,
+    ArrayRef<Expr *> Reductions, ArrayRef<unsigned> ReductionClauseType,
     ArrayRef<CXXScopeSpec> ReductionCXXScopeSpecs,
     ArrayRef<DeclarationNameInfo> ReductionIds, ArrayRef<Expr *> Ndranges,
     SourceLocation NdrangeLoc, SourceRange SR,
@@ -4544,6 +4544,10 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
     OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_weakcommutative);
   }
+  for (Expr *RefExpr : Localmem) {
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
+    OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_localmem);
+  }
   ReductionData RD(Reductions.size());
   SmallVector<NestedNameSpecifierLoc, 4> ReductionNSLoc;
   auto UnresolvedReductions_it = UnresolvedReductions.begin();
@@ -4594,6 +4598,7 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
       Context, IfRes.get(), FinalRes.get(), CostRes.get(), PriorityRes.get(),
       Wait, DevType, OnreadyRes.get(), NumInstancesRes.get(), OntoRes.get(),
       NumRepetitionsRes.get(), PeriodRes.get(),
+      const_cast<Expr **>(Localmem.data()), Localmem.size(),
       const_cast<Expr **>(LabelsRes.data()), LabelsRes.size(),
       const_cast<Expr **>(Ins.data()), Ins.size(),
       const_cast<Expr **>(Outs.data()), Outs.size(),
@@ -5654,6 +5659,9 @@ Sema::ActOnOmpSsVarListClause(
     Res = ActOnOmpSsDependClause({ OSSC_DEPEND_mutexinoutset, OSSC_DEPEND_weak }, DepLoc, ColonLoc, Vars,
                                  StartLoc, LParenLoc, EndLoc, /*OSSSyntax=*/true);
     break;
+  case OSSC_localmem:
+    Res = ActOnOmpSsLocalmemClause(Vars, StartLoc, LParenLoc, EndLoc);
+    break;
   default:
     llvm_unreachable("Clause is not allowed.");
   }
@@ -5923,6 +5931,45 @@ Sema::ActOnOmpSsPrivateClause(ArrayRef<Expr *> Vars,
     return nullptr;
 
   return OSSPrivateClause::Create(Context, StartLoc, LParenLoc, EndLoc, ClauseVars, PrivateCopies);
+}
+
+OSSClause *Sema::ActOnOmpSsLocalmemClause(ArrayRef<Expr *> Vars,
+                                          SourceLocation StartLoc,
+                                          SourceLocation LParenLoc,
+                                          SourceLocation EndLoc) {
+  SmallVector<Expr *, 8> ClauseVars;
+  for (Expr *RefExpr : Vars) {
+
+    SourceLocation ELoc;
+    SourceRange ERange;
+
+    auto Res = getPrivateItem(*this, RefExpr, ELoc, ERange);
+    ValueDecl *D = Res.first;
+    if (!D) {
+      continue;
+    }
+
+    if (RequireCompleteType(ELoc, D->getType(), diag::err_oss_incomplete_type))
+      continue;
+
+    DSAStackTy::DSAVarData DVar = DSAStack->getCurrentDSA(D);
+    if (DVar.CKind != OSSC_unknown && DVar.CKind != OSSC_localmem &&
+        DVar.RefExpr) {
+      Diag(ELoc, diag::err_oss_wrong_dsa) << getOmpSsClauseName(DVar.CKind)
+                                          << getOmpSsClauseName(OSSC_localmem);
+      continue;
+    }
+
+    DSAStack->addDSA(D, RefExpr, OSSC_localmem, /*Ignore=*/false,
+                     /*IsBase=*/true, /*Implicit=*/false);
+    ClauseVars.push_back(RefExpr);
+  }
+
+  if (Vars.empty())
+    return nullptr;
+
+  return OSSLocalmemClause::Create(Context, StartLoc, LParenLoc, EndLoc,
+                                   ClauseVars);
 }
 
 OSSClause *
