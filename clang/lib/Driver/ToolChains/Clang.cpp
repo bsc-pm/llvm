@@ -6168,9 +6168,12 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
       break;
     }
   }
+  if (Args.getLastArg(options::OPT_fompss_fpga_extract) && !IsCuda) {
+    CmdArgs.push_back("-fompss-fpga-extract");
+  }
   if (Arg *A =
-          Args.getLastArg(options::OPT_fompss_fpga_extract_hls_tasks_dir)) {
-    CmdArgs.push_back("-fompss-fpga-extract-hls-tasks-dir");
+          Args.getLastArg(options::OPT_fompss_fpga_hls_tasks_dir); A && !IsCuda) {
+    CmdArgs.push_back("-fompss-fpga-hls-tasks-dir");
     CmdArgs.push_back(A->getValue());
   }
 

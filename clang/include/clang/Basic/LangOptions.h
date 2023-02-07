@@ -488,7 +488,7 @@ public:
   bool UseTargetPathSeparator = false;
 
   /// Path to the directory where the HLS tasks will get dumped.
-  std::string OmpSsFpgaExtractHlsTasksDir;
+  std::string OmpSsFpgaHlsTasksDir;
   LangOptions();
 
   /// Set language defaults for the given input language and

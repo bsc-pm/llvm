@@ -1431,8 +1431,8 @@ void Sema::ActOnEndOfTranslationUnit() {
     }
   }
 
-  if (!ompssFpgaDecls.empty()) {
-    ActOnOmpSsFpgaGenerateAitFiles();
+  if (LangOpts.OmpSsFpgaExtract) {
+    ActOnOmpSsFpgaExtractFiles();
   }
   // Check we've noticed that we're no longer parsing the initializer for every
   // variable. If we miss cases, then at best we have a performance issue and

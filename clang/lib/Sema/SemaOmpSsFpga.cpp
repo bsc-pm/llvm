@@ -131,11 +131,13 @@ bool GenerateFunctionBody(Callable &&Diag, llvm::raw_ostream &outputFile,
   }
 
   // Extra Headers needed. No need to bother checking for repeated includes.
-  outputFile << R"(#include <systemc.h>
-#include <ap_int.h>
-#include <cstring>
-#include <hls_stream.h>
-)";
+  // Commented out, as we don't need them while doing a raw export, but I'll
+  // need these in the future.
+  /*outputFile << R"(#include <systemc.h>
+  #include <ap_int.h>
+  #include <cstring>
+  #include <hls_stream.h>
+  )";*/
 
   // Body functions
   std::string out;
@@ -167,21 +169,21 @@ bool GenerateFunctionBody(Callable &&Diag, llvm::raw_ostream &outputFile,
 }
 } // namespace
 
-bool Sema::ActOnOmpSsFpgaGenerateAitFiles() {
+bool Sema::ActOnOmpSsFpgaExtractFiles() {
   if (ompssFpgaDecls.empty())
     return true;
 
   auto &vfs = SourceMgr.getFileManager().getVirtualFileSystem();
-  std::string path = getLangOpts().OmpSsFpgaExtractHlsTasksDir;
+  std::string path = getLangOpts().OmpSsFpgaHlsTasksDir;
   if (path.empty()) {
     Diag(ompssFpgaDecls[0]->getLocation(),
-         diag::err_oss_ompss_fpga_extract_hls_tasks_dir_missing_dir);
+         diag::err_oss_ompss_fpga_hls_tasks_dir_missing_dir);
     return false;
   }
   llvm::SmallVector<char, 128> realPathStr;
   if (vfs.getRealPath(path, realPathStr)) {
     Diag(ompssFpgaDecls[0]->getLocation(),
-         diag::err_oss_ompss_fpga_extract_hls_tasks_dir_missing_dir);
+         diag::err_oss_ompss_fpga_hls_tasks_dir_missing_dir);
     return false;
   }
   std::filesystem::path realPath =
