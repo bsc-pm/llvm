@@ -160,7 +160,7 @@ TYPE_PARSER(construct<OmpSsLoopConstruct>(
 
 // Task outline directives
 TYPE_PARSER(sourced(construct<OSSSimpleOutlineTaskDirective>(
-    "TASK" >> pure(llvm::oss::Directive::OSSD_outline_task))))
+    "TASK" >> pure(llvm::oss::Directive::OSSD_declare_task))))
 
 TYPE_PARSER(sourced(construct<OmpSsSimpleOutlineTaskConstruct>(
     Parser<OSSSimpleOutlineTaskDirective>{}, Parser<OSSClauseList>{})))

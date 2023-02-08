@@ -2756,7 +2756,7 @@ public:
 
   void Unparse(const OSSSimpleOutlineTaskDirective &x) {
     switch (x.v) {
-    case llvm::oss::Directive::OSSD_outline_task:
+    case llvm::oss::Directive::OSSD_declare_task:
       Word("TASK ");
       break;
     default:

@@ -2348,7 +2348,7 @@ bool OSSAttributeVisitor::Pre(const parser::OmpSsOutlineTask &x) {
   const auto &name{std::get<parser::Name>(stmt_subroutine.statement.t)};
 
   switch (dir.v) {
-  case llvm::oss::Directive::OSSD_outline_task:
+  case llvm::oss::Directive::OSSD_declare_task:
     PushContext(name.source, dir.v);
     break;
   default:
@@ -2374,7 +2374,7 @@ bool OSSAttributeVisitor::Pre(const parser::InterfaceBody::OmpSsIfaceOutlineTask
   const auto &name{std::get<parser::Name>(stmt_subroutine.statement.t)};
 
   switch (dir.v) {
-  case llvm::oss::Directive::OSSD_outline_task:
+  case llvm::oss::Directive::OSSD_declare_task:
     PushContext(name.source, dir.v);
     break;
   default:
