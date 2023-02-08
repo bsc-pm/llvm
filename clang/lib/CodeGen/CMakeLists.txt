@@ -8,6 +8,7 @@ set(LLVM_LINK_COMPONENTS
   Demangle
   Extensions
   FrontendHLSL
+  FrontendOmpSs
   FrontendOpenMP
   IPO
   IRPrinter
@@ -26,6 +27,7 @@ set(LLVM_LINK_COMPONENTS
   ScalarOpts
   Support
   Target
+  TargetParser
   TransformUtils
   )
 

@@ -137,7 +137,7 @@ struct OSSLoopDataTy final {
   const Expr *Unroll = nullptr;
   bool Update = false;
   unsigned NumCollapses;
-  llvm::Optional<bool> *TestIsLessOp;
+  std::optional<bool> *TestIsLessOp;
   bool *TestIsStrictOp;
   bool empty() const {
     return !IndVar &&
@@ -185,12 +185,15 @@ private:
   // List of OmpSs-2 specific metadata to be added to llvm.module.flags
   SmallVector<llvm::Metadata *, 4> MetadataList;
 
+  /// Atomic ordering from the omp requires directive.
+  llvm::AtomicOrdering RequiresAtomicOrdering = llvm::AtomicOrdering::Monotonic;
+
   // List of the with the form
   // (func_ptr, arg0, arg1... argN)
   void BuildWrapperCallBundleList(
     std::string FuncName,
     CodeGenFunction &CGF, const Expr *E, QualType Q,
-    llvm::function_ref<void(CodeGenFunction &, const Expr *E, Optional<llvm::Value *>)> Body,
+    llvm::function_ref<void(CodeGenFunction &, const Expr *E, std::optional<llvm::Value *>)> Body,
     SmallVectorImpl<llvm::Value *> &List);
 
   // Builds a bundle of the with the form
@@ -198,7 +201,7 @@ private:
   void EmitWrapperCallBundle(
     std::string Name, std::string FuncName,
     CodeGenFunction &CGF, const Expr *E, QualType Q,
-    llvm::function_ref<void(CodeGenFunction &, const Expr *E, Optional<llvm::Value *>)> Body,
+    llvm::function_ref<void(CodeGenFunction &, const Expr *E, std::optional<llvm::Value *>)> Body,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
 
   // This is used by cost/priority/onready clauses to build a bundle with the form
@@ -325,7 +328,7 @@ public:
       const llvm::DenseMap<const VarDecl *, Address> &CaptureInvolvedMap,
       ArrayRef<QualType> RetTypes,
       bool HasThis, bool HasSwitch, std::string FuncName, std::string RetName,
-      llvm::function_ref<void(CodeGenFunction &, const Expr *E, Optional<llvm::Value *>)> Body);
+      llvm::function_ref<void(CodeGenFunction &, const Expr *E, std::optional<llvm::Value *>)> Body);
 
   RValue emitTaskFunction(CodeGenFunction &CGF,
                           const FunctionDecl *FD,
@@ -344,7 +347,11 @@ public:
                             const OSSExecutableDirective &D,
                             SourceLocation Loc,
                             const OSSTaskDataTy &Data);
-
+  /// Emit code for 'critical' directive.
+  virtual void emitCriticalCall(CodeGenFunction &CGF,
+                                const OSSExecutableDirective &D,
+                                SourceLocation Loc,
+                                const DeclarationNameInfo &DirName);
   /// Emit code for 'task' directive.
   virtual void emitLoopCall(CodeGenFunction &CGF,
                             const OSSLoopDirective &D,
@@ -352,10 +359,15 @@ public:
                             const OSSTaskDataTy &Data,
                             const OSSLoopDataTy &LoopData);
 
+  /// Emit code for 'flush' "directive".
+  virtual void emitFlush(CodeGenFunction &CGF, llvm::AtomicOrdering);
+
   // Add all the metadata to OmpSs-2 metadata list.
   void addMetadata(ArrayRef<llvm::Metadata *> List);
   // Get OmpSs-2 metadata list as a single metadata node.
   llvm::MDNode *getMetadataNode();
+
+  llvm::AtomicOrdering getDefaultMemoryOrdering() const;
 
 };
 

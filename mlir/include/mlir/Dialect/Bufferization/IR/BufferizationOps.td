@@ -89,7 +89,8 @@ def Bufferization_AllocTensorOp : Bufferization_Op<"alloc_tensor",
     LogicalResult bufferize(RewriterBase &rewriter,
                             const BufferizationOptions &options);
 
-    bool isMemoryWrite(OpResult opResult, const AnalysisState &state);
+    bool resultBufferizesToMemoryWrite(OpResult opResult,
+                                       const AnalysisState &state);
 
     bool bufferizesToAllocation(OpResult opResult) { return true; }
 
@@ -293,12 +294,6 @@ def Bufferization_ToTensorOp : Bufferization_Op<"to_tensor", [
   let arguments = (ins Arg<AnyRankedOrUnrankedMemRef,
                        "the reference to load from", [MemRead]>:$memref);
   let results = (outs AnyTensor:$result);
-
-  let builders = [
-    OpBuilder<(ins "Value":$memref), [{
-      $_state.addOperands(memref);
-      $_state.addTypes(memref::getTensorTypeFromMemRefType(memref.getType()));
-    }]>];
 
   let extraClassDeclaration = [{
     /// The result of a to_tensor is always a tensor.

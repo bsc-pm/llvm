@@ -368,6 +368,21 @@ FunctionCallee taskInfoRegisterFuncCallee(Module &M) {
   );
 }
 
+FunctionCallee userLockFuncCallee(Module &M) {
+  return M.getOrInsertFunction("nanos6_user_lock",
+    Type::getVoidTy(M.getContext()),
+    PointerType::getUnqual(M.getContext()),
+    PointerType::getUnqual(M.getContext())
+  );
+}
+
+FunctionCallee userUnlockFuncCallee(Module &M) {
+  return M.getOrInsertFunction("nanos6_user_unlock",
+    Type::getVoidTy(M.getContext()),
+    PointerType::getUnqual(M.getContext())
+  );
+}
+
 FunctionCallee taskInfoRegisterCtorFuncCallee(Module &M) {
   return M.getOrInsertFunction("nanos6_constructor_register_task_info",
     Type::getVoidTy(M.getContext())

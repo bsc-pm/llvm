@@ -11,6 +11,7 @@
 
 include "mlir/Dialect/SparseTensor/IR/SparseTensorAttrDefs.td"
 include "mlir/Dialect/SparseTensor/IR/SparseTensorBase.td"
+include "mlir/Dialect/SparseTensor/IR/SparseTensorTypes.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
@@ -118,6 +119,8 @@ def SparseTensor_ToPointersOp : SparseTensor_Op<"pointers", [Pure]>,
     lowers into code that extracts the pointers array from the sparse storage
     scheme (either by calling a support library or through direct code).
 
+    Writing into the result of this operation is undefined behavior.
+
     Example:
 
     ```mlir
@@ -142,11 +145,43 @@ def SparseTensor_ToIndicesOp : SparseTensor_Op<"indices", [Pure]>,
     lowers into code that extracts the indices array from the sparse storage
     scheme (either by calling a support library or through direct code).
 
+    Writing into the result of this operation is undefined behavior.
+
     Example:
 
     ```mlir
     %1 = sparse_tensor.indices %0 { dimension = 1 : index }
        : tensor<64x64xf64, #CSR> to memref<?xindex>
+    ```
+  }];
+  let assemblyFormat = "$tensor attr-dict `:` type($tensor) `to` type($result)";
+  let hasVerifier = 1;
+}
+
+def SparseTensor_ToIndicesBufferOp : SparseTensor_Op<"indices_buffer", [Pure]>,
+    Arguments<(ins AnySparseTensor:$tensor)>,
+    Results<(outs AnyStridedMemRefOfRank<1>:$result)> {
+  let summary = "Extracts the linear indices array from a tensor";
+  let description = [{
+    Returns the linear indices array for a sparse tensor with a trailing COO
+    region with at least two dimensions. It is an error if the tensor doesn't
+    contain such a COO region. This is similar to the `bufferization.to_memref`
+    operation in the sense that it provides a bridge between a tensor world view
+    and a bufferized world view. Unlike the `bufferization.to_memref` operation,
+    however, this sparse operation actually lowers into code that extracts the
+    linear indices array from the sparse storage scheme that stores the indices
+    for the COO region as an array of structures. For example, a 2D COO sparse
+    tensor with two non-zero elements at coordinates (1, 3) and (4, 6) are
+    stored in a linear buffer as (1, 4, 3, 6) instead of two buffer as (1, 4)
+    and (3, 6).
+
+    Writing into the result of this operation is undefined behavior.
+
+    Example:
+
+    ```mlir
+    %1 = sparse_tensor.indices_buffer %0
+    : tensor<64x64xf64, #COO> to memref<?xindex>
     ```
   }];
   let assemblyFormat = "$tensor attr-dict `:` type($tensor) `to` type($result)";
@@ -166,6 +201,8 @@ def SparseTensor_ToValuesOp : SparseTensor_Op<"values", [Pure]>,
     lowers into code that extracts the values array from the sparse storage
     scheme (either by calling a support library or through direct code).
 
+    Writing into the result of this operation is undefined behavior.
+
     Example:
 
     ```mlir
@@ -173,6 +210,71 @@ def SparseTensor_ToValuesOp : SparseTensor_Op<"values", [Pure]>,
     ```
   }];
   let assemblyFormat = "$tensor attr-dict `:` type($tensor) `to` type($result)";
+  let hasVerifier = 1;
+}
+
+def SparseTensor_StorageSpecifierInitOp : SparseTensor_Op<"storage_specifier.init", [Pure]>,
+    Results<(outs SparseTensorStorageSpecifier:$result)> {
+  let summary = "";
+  let description = [{
+    Returns an initial storage specifier value. A storage specifier value holds
+    the sizes for tensor dimensions, pointer arrays, index arrays, and the value array.
+
+    Example:
+
+    ```mlir
+    %0 = sparse_tensor.storage_specifier.init :  !sparse_tensor.storage_specifier<#CSR>
+    ```
+  }];
+
+  let assemblyFormat = "attr-dict `:` qualified(type($result))";
+}
+
+def SparseTensor_GetStorageSpecifierOp : SparseTensor_Op<"storage_specifier.get", [Pure]>,
+    Arguments<(ins SparseTensorStorageSpecifier:$specifier,
+                   SparseTensorStorageSpecifierKindAttr:$specifierKind,
+                   OptionalAttr<IndexAttr>:$dim)>,
+    Results<(outs AnyType:$result)> {
+  let summary = "";
+  let description = [{
+    Returns the requested field of the given storage_specifier.
+
+    Example of querying the size of the index array for level 0:
+
+    ```mlir
+    %0 = sparse_tensor.storage_specifier.get %arg0 idx_mem_sz at 0
+         : !sparse_tensor.storage_specifier<#COO> to i64
+    ```
+  }];
+
+  let assemblyFormat = "$specifier $specifierKind (`at` $dim^)? attr-dict `:` "
+                       "qualified(type($specifier)) `to` type($result)";
+  let hasVerifier = 1;
+  let hasFolder = 1;
+}
+
+def SparseTensor_SetStorageSpecifierOp : SparseTensor_Op<"storage_specifier.set",
+    [Pure, AllTypesMatch<["result", "specifier"]>]>,
+    Arguments<(ins SparseTensorStorageSpecifier:$specifier,
+                   SparseTensorStorageSpecifierKindAttr:$specifierKind,
+                   OptionalAttr<IndexAttr>:$dim,
+                   AnyType:$value)>,
+    Results<(outs SparseTensorStorageSpecifier:$result)> {
+  let summary = "";
+  let description = [{
+    Set the field of the storage specifier to the given input value. Returns
+    the updated storage_specifier as a new SSA value.
+
+    Example of updating the sizes of the index array for level 0:
+
+    ```mlir
+    %0 = sparse_tensor.storage_specifier.set %arg0 idx_mem_sz at 0 with %new_sz
+       : i32, !sparse_tensor.storage_specifier<#COO>
+
+    ```
+  }];
+  let assemblyFormat = "$specifier $specifierKind (`at` $dim^)? `with` $value attr-dict `:` "
+                       "type($value) `,` qualified(type($result))";
   let hasVerifier = 1;
 }
 
@@ -277,18 +379,20 @@ def SparseTensor_PushBackOp : SparseTensor_Op<"push_back",
                     "inBuffer", "value",
                     "$_self.cast<ShapedType>().getElementType()">,
      AllTypesMatch<["inBuffer", "outBuffer"]>]>,
-    Arguments<(ins StridedMemRefRankOf<[Index], [1]>:$bufferSizes,
+    Arguments<(ins Index:$curSize,
                StridedMemRefRankOf<[AnyType], [1]>:$inBuffer,
-               AnyType:$value, IndexAttr:$idx, Optional<Index>:$n,
+               AnyType:$value, Optional<Index>:$n,
                UnitAttr:$inbounds)>,
-    Results<(outs StridedMemRefRankOf<[AnyType], [1]>:$outBuffer)>  {
+    Results<(outs StridedMemRefRankOf<[AnyType], [1]>:$outBuffer,
+             Index:$newSize)>  {
   string summary = "Pushes a value to the back of a given buffer";
   string description = [{
-    Push `value` to the end of the given sparse tensor storage buffer
-    `inBuffer` and update the size of the buffer in `bufferSizes[idx]`. The
-    capacity of the buffer is recorded in the memref type of `inBuffer `. If the
-    current buffer is full, then `inBuffer.realloc` is called before pushing the
-    data to the buffer. This is similar to std::vector push_back.
+    Pushes `value` to the end of the given sparse tensor storage buffer
+    `inBuffer` as indicated by the value of `curSize` and returns the
+    new size of the buffer in `newSize` (`newSize = curSize + n`).
+    The capacity of the buffer is recorded in the memref type of `inBuffer`.
+    If the current buffer is full, then `inBuffer.realloc` is called before
+    pushing the data to the buffer. This is similar to std::vector push_back.
 
     The optional input `n` specifies the number of times to repeately push
     the value to the back of the tensor. When `n` is a compile-time constant,
@@ -310,29 +414,28 @@ def SparseTensor_PushBackOp : SparseTensor_Op<"push_back",
     Example:
 
     ```mlir
-    %r = sparse_tensor.push_back %bufferSizes, %buffer, %val
-      {idx = 0 : index} : memref<?xindex>, memref<?xf64>, f64
+    %buf, %newSize = sparse_tensor.push_back %curSize, %buffer, %val
+       : index, memref<?xf64>, f64
     ```
 
     ```mlir
-    %r = sparse_tensor.push_back inbounds %bufferSizes, %buffer, %val
-      {idx = 0 : index} : memref<?xindex>, memref<?xf64>, f64
+    %buf, %newSize = sparse_tensor.push_back inbounds %curSize, %buffer, %val
+       : xindex, memref<?xf64>, f64
     ```
 
     ```mlir
-    %r = sparse_tensor.push_back inbounds %bufferSizes, %buffer, %val, %n
-      {idx = 0 : index} : memref<?xindex>, memref<?xf64>, f64
+    %buf, %newSize = sparse_tensor.push_back inbounds %curSize, %buffer, %val, %n
+       : xindex, memref<?xf64>, f64
     ```
   }];
-  let assemblyFormat = "(`inbounds` $inbounds^)? $bufferSizes `,` $inBuffer"
+  let assemblyFormat = "(`inbounds` $inbounds^)? $curSize `,` $inBuffer"
                        " `,` $value (`,` $n^ )?  attr-dict `:`"
-                       " type($bufferSizes) `,` type($inBuffer) `,`"
-                       " type($value)  (`,` type($n)^ )?";
+                       " type($curSize) `,` type($inBuffer) `,`"
+                       " type($value) (`,` type($n)^ )?";
 
   let builders = [
-    //Build an op without input `n`.
-    OpBuilder<(ins "Type":$outBuffer, "Value":$bufferSizes, "Value":$inBuffer,
-                   "Value":$value, "APInt":$idx)>
+    // Build an op (reusing type from curSize and inBuffer) without input `n`
+    OpBuilder<(ins "Value":$curSize, "Value":$inBuffer, "Value":$value)>
   ];
 
   let hasVerifier = 1;
@@ -386,7 +489,7 @@ def SparseTensor_CompressOp : SparseTensor_Op<"compress",
                    StridedMemRefRankOf<[Index],[1]>:$added,
                    Index:$count,
                    AnySparseTensor:$tensor,
-		   Variadic<Index>:$indices)>,
+                   Variadic<Index>:$indices)>,
     Results<(outs AnySparseTensor:$result)> {
   string summary = "Compressed an access pattern for insertion";
   string description = [{
@@ -412,8 +515,8 @@ def SparseTensor_CompressOp : SparseTensor_Op<"compress",
   }];
   let assemblyFormat = "$values `,` $filled `,` $added `,` $count"
                        " `into` $tensor `[` $indices `]` attr-dict"
-		       " `:` type($values) `,` type($filled) `,` type($added)"
-		       " `,` type($tensor)";
+                       " `:` type($values) `,` type($filled) `,` type($added)"
+                       " `,` type($tensor)";
   let hasVerifier = 1;
 }
 
@@ -478,10 +581,15 @@ def SparseTensor_SortOp : SparseTensor_Op<"sort", [AttrSizedOperandSegments]>,
     // TODO: May want to extend tablegen with
     // class NonemptyVariadic<Type type> : Variadic<type> { let minSize = 1; }
     // and then use NonemptyVariadic<...>:$xs here.
+    //
+    // TODO: Currently tablegen doesn't support the assembly syntax when
+    // `algorithm` is an optional enum attribute. We may want to use an optional
+    // enum attribute when this is fixed in tablegen.
+    //
     Arguments<(ins Index:$n,
                Variadic<StridedMemRefRankOf<[AnyInteger, Index], [1]>>:$xs,
                Variadic<StridedMemRefRankOf<[AnyType], [1]>>:$ys,
-               UnitAttr:$stable)>  {
+               SparseTensorSortKindAttr:$algorithm)>  {
   string summary = "Sorts the arrays in xs and ys lexicographically on the "
                    "integral values found in the xs list";
   string description = [{
@@ -503,8 +611,9 @@ def SparseTensor_SortOp : SparseTensor_Op<"sort", [AttrSizedOperandSegments]>,
     is undefined if this condition is not met. The operator requires at least
     one buffer in `xs` while `ys` can be empty.
 
-    The `stable` attribute indicates whether a stable sorting algorithm should
-    be used to implement the operator.
+    The enum attribute `algorithm` indicates the sorting algorithm used to
+    implement the operator: hybrid_quick_sort, insertion_sort_stable,
+    quick_sort, or heap_sort.
 
     Note that this operation is "impure" in the sense that its behavior is
     solely defined by side-effects and not SSA values.
@@ -512,17 +621,17 @@ def SparseTensor_SortOp : SparseTensor_Op<"sort", [AttrSizedOperandSegments]>,
     Example:
 
     ```mlir
-    sparse_tensor.sort %n, %x1, %x2 jointly y1, %y2
+    sparse_tensor.sort insertion_sort_stable %n, %x1, %x2 jointly y1, %y2
       : memref<?xindex>, memref<?xindex> jointly memref<?xindex>, memref<?xf32>
     ```
 
     ```mlir
-    sparse_tensor.sort stable %n, %x1, %x2 jointly y1, %y2
+    sparse_tensor.sort hybrid_quick_sort %n, %x1, %x2 jointly y1, %y2
+      { alg=1 : index}
       : memref<?xindex>, memref<?xindex> jointly memref<?xindex>, memref<?xf32>
     ```
   }];
-  let assemblyFormat = "(`stable` $stable^)? $n"
-                       "`,`$xs (`jointly` $ys^)? attr-dict"
+  let assemblyFormat = "$algorithm $n `,` $xs (`jointly` $ys^)? attr-dict"
                        "`:` type($xs) (`jointly` type($ys)^)?";
   let hasVerifier = 1;
 }
@@ -531,7 +640,7 @@ def SparseTensor_SortCooOp : SparseTensor_Op<"sort_coo">,
     Arguments<(ins Index:$n, StridedMemRefRankOf<[AnyInteger, Index], [1]>:$xy,
                Variadic<StridedMemRefRankOf<[AnyType], [1]>>:$ys,
                OptionalAttr<IndexAttr>:$nx, OptionalAttr<IndexAttr>:$ny,
-               UnitAttr:$stable)>  {
+               SparseTensorSortKindAttr:$algorithm)>  {
   let summary = "Sorts the arrays in xs and ys lexicographically on the "
                 "integral values found in the xs list";
   let description = [{
@@ -550,17 +659,18 @@ def SparseTensor_SortCooOp : SparseTensor_Op<"sort_coo">,
     Example:
 
     ```mlir
-    sparse_tensor.sort_coo %n, %x { nx = 2 : index}
+    sparse_tensor.sort_coo insertion_sort_stable %n, %x { nx = 2 : index}
       : memref<?xindex>
     ```
 
     ```mlir
-    sparse_tensor.sort %n, %xy jointly %y1 { nx = 2 : index, ny = 2 : index}
+    sparse_tensor.sort hybrid_quick_sort %n, %xy jointly %y1
+      { nx = 2 : index, ny = 2 : index}
       : memref<?xi64> jointly memref<?xf32>
     ```
   }];
 
-  let assemblyFormat = "(`stable` $stable^)? $n"
+  let assemblyFormat = "$algorithm $n"
                        "`,`$xy (`jointly` $ys^)? attr-dict"
                        "`:` type($xy) (`jointly` type($ys)^)?";
   let hasVerifier = 1;

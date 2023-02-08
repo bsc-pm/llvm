@@ -158,7 +158,7 @@ func.func @scf_while_non_equiv_yield(%arg0: tensor<5xi1>,
 
 // -----
 
-func.func private @fun_with_side_effects(%A: tensor<?xf32> {bufferization.writable = true})
+func.func private @fun_with_side_effects(%A: tensor<?xf32>)
 
 func.func @foo(%A: tensor<?xf32> {bufferization.writable = true}) -> (tensor<?xf32>) {
   call @fun_with_side_effects(%A) : (tensor<?xf32>) -> ()
@@ -315,3 +315,16 @@ func.func @yield_alloc_dominance_test_2(%cst : f32, %idx : index,
   %r = tensor.extract %2[%idx2] : tensor<?xf32>
   return %r : f32
 }
+
+// -----
+
+func.func @copy_of_unranked_tensor(%t: tensor<*xf32>) -> tensor<*xf32> {
+  // Unranked tensor OpOperands always bufferize in-place. With this limitation,
+  // there is no way to bufferize this IR correctly.
+  // expected-error @+1 {{input IR has RaW conflict}}
+  func.call @maybe_writing_func(%t) : (tensor<*xf32>) -> ()
+  return %t : tensor<*xf32>
+}
+
+// This function may write to buffer(%ptr).
+func.func private @maybe_writing_func(%ptr : tensor<*xf32>)

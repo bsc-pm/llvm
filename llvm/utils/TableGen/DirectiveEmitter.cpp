@@ -832,6 +832,7 @@ void GenerateClauseClassMacro(const DirectiveLanguage &DirLang,
   OS << "\n";
   OS << "#undef __IMPLICIT_CLAUSE_NO_CLASS\n";
   OS << "#undef __IMPLICIT_CLAUSE_CLASS\n";
+  OS << "#undef __CLAUSE_NO_CLASS\n";
   OS << "#undef __CLAUSE\n";
   OS << "#undef CLAUSE_NO_CLASS\n";
   OS << "#undef CLAUSE_CLASS\n";

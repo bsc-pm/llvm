@@ -15,6 +15,7 @@ add_header_library(
     utils.h
   DEPS
     libc.src.__support.common
+    libc.src.__support.compiler_features
     libc.src.__support.CPP.bit
     libc.src.__support.CPP.cstddef
     libc.src.__support.CPP.type_traits
@@ -58,4 +59,16 @@ add_header_library(
     bzero_implementations.h
   DEPS
     .memset_implementation
+)
+
+add_header_library(
+  strcmp_implementation
+  HDRS
+    strcmp_implementations.h
+)
+
+add_header_library(
+  strstr_implementation
+  HDRS
+    strstr_implementations.h
 )

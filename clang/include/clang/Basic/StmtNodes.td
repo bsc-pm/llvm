@@ -164,6 +164,7 @@ def FunctionParmPackExpr : StmtNode<Expr>;
 def MaterializeTemporaryExpr : StmtNode<Expr>;
 def LambdaExpr : StmtNode<Expr>;
 def CXXFoldExpr : StmtNode<Expr>;
+def CXXParenListInitExpr: StmtNode<Expr>;
 
 // C++ Coroutines TS expressions
 def CoroutineSuspendExpr : StmtNode<Expr, 1>;
@@ -303,7 +304,9 @@ def OSSLoopDirective : StmtNode<OSSExecutableDirective, 1>;
 def OSSTaskwaitDirective : StmtNode<OSSExecutableDirective>;
 def OSSReleaseDirective : StmtNode<OSSExecutableDirective>;
 def OSSTaskDirective : StmtNode<OSSExecutableDirective>;
+def OSSCriticalDirective : StmtNode<OSSExecutableDirective>;
 def OSSTaskForDirective : StmtNode<OSSLoopDirective>;
 def OSSTaskIterDirective : StmtNode<OSSLoopDirective>;
 def OSSTaskLoopDirective : StmtNode<OSSLoopDirective>;
 def OSSTaskLoopForDirective : StmtNode<OSSLoopDirective>;
+def OSSAtomicDirective : StmtNode<OSSExecutableDirective>;

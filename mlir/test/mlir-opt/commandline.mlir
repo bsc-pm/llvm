@@ -25,6 +25,7 @@
 // CHECK-NEXT: nvgpu
 // CHECK-NEXT: nvvm
 // CHECK-NEXT: omp
+// CHECK-NEXT: oss
 // CHECK-NEXT: pdl
 // CHECK-NEXT: pdl_interp
 // CHECK-NEXT: quant

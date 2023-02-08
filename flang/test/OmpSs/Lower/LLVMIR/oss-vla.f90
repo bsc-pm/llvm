@@ -51,22 +51,22 @@ subroutine task(X)
 
 end subroutine
 
-!LLVMIR-LABEL: define void @_QPtask(ptr %0) !dbg !3 {
+!LLVMIR-LABEL: define void @_QPtask(ptr %0)
 
 
 !LLVMIR: %{{.*}} = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00")
 !LLVM-SAME: "QUAL.OSS.VLA.DIMS"(ptr %10, i64 %8, i64 3)
-!LLVM-SAME: "QUAL.OSS.CAPTURED"(i32 1, i32 3, i32 1, i64 %8, i64 3) ]
+!LLVM-SAME: "QUAL.OSS.CAPTURED"(i64 %8, i64 3, i32 1, i32 3, i32 1) ]
 
 !LLVMIR: %{{.*}} = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00")
 !LLVM-SAME: "QUAL.OSS.VLA.DIMS"(ptr %12, i64 %8, i64 2)
-!LLVM-SAME: "QUAL.OSS.CAPTURED"(i32 2, i32 3, i32 1, i64 %8, i64 2, i64 1, i64 2) ]
+!LLVM-SAME: "QUAL.OSS.CAPTURED"(i64 %8, i64 2, i64 1, i64 2, i32 2, i32 3, i32 1) ]
 
 !LLVMIR: %{{.*}} = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00")
 !LLVM-SAME: "QUAL.OSS.VLA.DIMS"(ptr %17, i64 %15, i64 3)
-!LLVM-SAME: "QUAL.OSS.CAPTURED"(i32 1, i32 3, i32 1, i64 %15, i64 3, i64 4, i64 1) ]
+!LLVM-SAME: "QUAL.OSS.CAPTURED"(i64 %15, i64 3, i64 4, i64 1, i32 1, i32 3, i32 1) ]
 
 !LLVMIR: %{{.*}} = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00")
 !LLVM-SAME: "QUAL.OSS.VLA.DIMS"(ptr %19, i64 %15, i64 2)
-!LLVM-SAME: "QUAL.OSS.CAPTURED"(i32 2, i32 3, i32 1, i64 %15, i64 2, i64 4, i64 2) ]
+!LLVM-SAME: "QUAL.OSS.CAPTURED"(i64 %15, i64 2, i64 4, i64 2, i32 2, i32 3, i32 1) ]
 

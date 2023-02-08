@@ -4,6 +4,8 @@ add_header_library(
   blockstore
   HDRS
     blockstore.h
+  DEPENDS
+    libc.src.__support.CPP.new
 )
 
 add_header_library(
@@ -13,12 +15,17 @@ add_header_library(
 )
 
 add_header_library(
-  builtin_wrappers
+  compiler_features
   HDRS
-    builtin_wrappers.h
+    compiler_features.h
+)
+
+add_header_library(
+  sanitizer
+  HDRS
+    sanitizer.h
   DEPENDS
-    .named_pair
-    libc.src.__support.CPP.type_traits
+    libc.src.__support.compiler_features
 )
 
 add_header_library(
@@ -26,8 +33,27 @@ add_header_library(
   HDRS
     architectures.h
     common.h
+    cpu_features.h
     endian.h
-    sanitizer.h
+)
+
+add_header_library(
+  builtin_wrappers
+  HDRS
+    builtin_wrappers.h
+  DEPENDS
+    .named_pair
+    libc.src.__support.common
+    libc.src.__support.compiler_features
+    libc.src.__support.CPP.type_traits
+)
+
+add_header_library(
+  error_or
+  HDRS
+    error_or.h
+  DEPENDS
+    libc.src.__support.CPP.expected
 )
 
 add_header_library(
@@ -37,14 +63,22 @@ add_header_library(
 )
 
 add_header_library(
+  str_to_num_result
+  HDRS
+    str_to_num_result.h
+)
+
+add_header_library(
   str_to_integer
   HDRS
     str_to_integer.h
   DEPENDS
     .ctype_utils
+    .str_to_num_result
     libc.include.errno
     libc.src.errno.errno
     libc.src.__support.CPP.limits
+    libc.src.__support.common
 )
 
 add_header_library(
@@ -55,6 +89,7 @@ add_header_library(
     libc.src.__support.CPP.span
     libc.src.__support.CPP.string_view
     libc.src.__support.CPP.type_traits
+    libc.src.__support.common
 )
 
 
@@ -66,6 +101,7 @@ add_header_library(
   DEPENDS
     libc.src.__support.CPP.type_traits
     libc.src.__support.FPUtil.fp_bits
+    libc.src.__support.common
 )
 
 add_header_library(
@@ -80,6 +116,7 @@ add_header_library(
   str_to_float
   HDRS
     str_to_float.h
+    detailed_powers_of_ten.h
   DEPENDS
     .ctype_utils
     .high_precision_decimal
@@ -89,6 +126,7 @@ add_header_library(
     libc.src.__support.CPP.limits
     libc.src.__support.FPUtil.fp_bits
     libc.src.__support.builtin_wrappers
+    libc.src.__support.common
     libc.src.errno.errno
 )
 
@@ -103,6 +141,8 @@ add_header_library(
   arg_list
   HDRS
     arg_list.h
+  DEPENDS
+    libc.src.__support.common
 )
 
 add_header_library(
@@ -111,6 +151,14 @@ add_header_library(
     fixedvector.h
   DEPENDS
     libc.src.__support.CPP.array
+)
+
+add_header_library(
+  char_vector
+  HDRS
+    char_vector.h
+  DEPENDS
+    libc.src.__support.common
 )
 
 add_header_library(
@@ -130,6 +178,7 @@ add_header_library(
     .builtin_wrappers
     .number_pair
     libc.src.__support.CPP.type_traits
+    libc.src.__support.common
 )
 
 add_header_library(

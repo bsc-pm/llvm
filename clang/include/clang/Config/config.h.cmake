@@ -32,9 +32,6 @@
 /* Nanos6 home directory. */
 #define CLANG_DEFAULT_NANOS6_HOME "${CLANG_DEFAULT_NANOS6_HOME}"
 
-/* Default architecture for OpenMP offloading to Nvidia GPUs. */
-#define CLANG_OPENMP_NVPTX_DEFAULT_ARCH "${CLANG_OPENMP_NVPTX_DEFAULT_ARCH}"
-
 /* Default architecture for SystemZ. */
 #define CLANG_SYSTEMZ_DEFAULT_ARCH "${CLANG_SYSTEMZ_DEFAULT_ARCH}"
 

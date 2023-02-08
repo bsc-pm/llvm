@@ -15,7 +15,6 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/ExecutionEngine/JITLink/JITLinkMemoryManager.h"
@@ -29,6 +28,7 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include <optional>
 
 #include <map>
 #include <string>
@@ -163,7 +163,7 @@ private:
     assert(AlignmentOffset <= MaxAlignmentOffset &&
            "Alignment offset exceeds maximum");
     ContentMutable = false;
-    P2Align = Alignment ? countTrailingZeros(Alignment) : 0;
+    P2Align = Alignment ? llvm::countr_zero(Alignment) : 0;
     this->AlignmentOffset = AlignmentOffset;
   }
 
@@ -180,7 +180,7 @@ private:
     assert(AlignmentOffset <= MaxAlignmentOffset &&
            "Alignment offset exceeds maximum");
     ContentMutable = false;
-    P2Align = Alignment ? countTrailingZeros(Alignment) : 0;
+    P2Align = Alignment ? llvm::countr_zero(Alignment) : 0;
     this->AlignmentOffset = AlignmentOffset;
   }
 
@@ -199,7 +199,7 @@ private:
     assert(AlignmentOffset <= MaxAlignmentOffset &&
            "Alignment offset exceeds maximum");
     ContentMutable = true;
-    P2Align = Alignment ? countTrailingZeros(Alignment) : 0;
+    P2Align = Alignment ? llvm::countr_zero(Alignment) : 0;
     this->AlignmentOffset = AlignmentOffset;
   }
 
@@ -289,7 +289,7 @@ public:
   /// Set the alignment for this content.
   void setAlignment(uint64_t Alignment) {
     assert(isPowerOf2_64(Alignment) && "Alignment must be a power of two");
-    P2Align = Alignment ? countTrailingZeros(Alignment) : 0;
+    P2Align = Alignment ? llvm::countr_zero(Alignment) : 0;
   }
 
   /// Get the alignment offset for this content.
@@ -1071,7 +1071,7 @@ public:
   }
 
   /// Cache type for the splitBlock function.
-  using SplitBlockCache = Optional<SmallVector<Symbol *, 8>>;
+  using SplitBlockCache = std::optional<SmallVector<Symbol *, 8>>;
 
   /// Splits block B at the given index which must be greater than zero.
   /// If SplitIndex == B.getSize() then this function is a no-op and returns B.
@@ -1302,9 +1302,10 @@ public:
   /// given offset) of the size of the new block.
   ///
   /// All other symbol attributes are unchanged.
-  void transferDefinedSymbol(Symbol &Sym, Block &DestBlock,
-                             orc::ExecutorAddrDiff NewOffset,
-                             Optional<orc::ExecutorAddrDiff> ExplicitNewSize) {
+  void
+  transferDefinedSymbol(Symbol &Sym, Block &DestBlock,
+                        orc::ExecutorAddrDiff NewOffset,
+                        std::optional<orc::ExecutorAddrDiff> ExplicitNewSize) {
     auto &OldSection = Sym.getBlock().getSection();
     Sym.setBlock(DestBlock);
     Sym.setOffset(NewOffset);

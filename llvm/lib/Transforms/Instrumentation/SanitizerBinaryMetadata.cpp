@@ -85,6 +85,11 @@ using MetadataInfoSet = SetVector<const MetadataInfo *>;
 
 //===--- Command-line options ---------------------------------------------===//
 
+cl::opt<bool> ClWeakCallbacks(
+    "sanitizer-metadata-weak-callbacks",
+    cl::desc("Declare callbacks extern weak, and only call if non-null."),
+    cl::Hidden, cl::init(true));
+
 cl::opt<bool> ClEmitCovered("sanitizer-metadata-covered",
                             cl::desc("Emit PCs for covered functions."),
                             cl::Hidden, cl::init(false));
@@ -197,15 +202,21 @@ bool SanitizerBinaryMetadata::run() {
         getSectionMarker(getSectionStart(MI->SectionSuffix), Int8PtrTy),
         getSectionMarker(getSectionEnd(MI->SectionSuffix), Int8PtrTy),
     };
+    // We declare the _add and _del functions as weak, and only call them if
+    // there is a valid symbol linked. This allows building binaries with
+    // semantic metadata, but without having callbacks. When a tool that wants
+    // the metadata is linked which provides the callbacks, they will be called.
     Function *Ctor =
         createSanitizerCtorAndInitFunctions(
             Mod, (MI->FunctionPrefix + ".module_ctor").str(),
-            (MI->FunctionPrefix + "_add").str(), InitTypes, InitArgs)
+            (MI->FunctionPrefix + "_add").str(), InitTypes, InitArgs,
+            /*VersionCheckName=*/StringRef(), /*Weak=*/ClWeakCallbacks)
             .first;
     Function *Dtor =
         createSanitizerCtorAndInitFunctions(
             Mod, (MI->FunctionPrefix + ".module_dtor").str(),
-            (MI->FunctionPrefix + "_del").str(), InitTypes, InitArgs)
+            (MI->FunctionPrefix + "_del").str(), InitTypes, InitArgs,
+            /*VersionCheckName=*/StringRef(), /*Weak=*/ClWeakCallbacks)
             .first;
     Constant *CtorData = nullptr;
     Constant *DtorData = nullptr;
@@ -250,8 +261,10 @@ void SanitizerBinaryMetadata::runOn(Function &F, MetadataInfoSet &MIS) {
 
   if (F.isVarArg())
     FeatureMask &= ~kSanitizerBinaryMetadataUAR;
-  if (FeatureMask & kSanitizerBinaryMetadataUAR)
+  if (FeatureMask & kSanitizerBinaryMetadataUAR) {
+    RequiresCovered = true;
     NumMetadataUAR++;
+  }
 
   // Covered metadata is always emitted if explicitly requested, otherwise only
   // if some other metadata requires it to unambiguously interpret it for
@@ -269,28 +282,75 @@ void SanitizerBinaryMetadata::runOn(Function &F, MetadataInfoSet &MIS) {
   }
 }
 
+bool isUARSafeCall(CallInst *CI) {
+  auto *F = CI->getCalledFunction();
+  // There are no intrinsic functions that leak arguments.
+  // If the called function does not return, the current function
+  // does not return as well, so no possibility of use-after-return.
+  // Sanitizer function also don't leak or don't return.
+  // It's safe to both pass pointers to local variables to them
+  // and to tail-call them.
+  return F && (F->isIntrinsic() || F->doesNotReturn() ||
+               F->getName().startswith("__asan_") ||
+               F->getName().startswith("__hwsan_") ||
+               F->getName().startswith("__ubsan_") ||
+               F->getName().startswith("__msan_") ||
+               F->getName().startswith("__tsan_"));
+}
+
+bool hasUseAfterReturnUnsafeUses(Value &V) {
+  for (User *U : V.users()) {
+    if (auto *I = dyn_cast<Instruction>(U)) {
+      if (I->isLifetimeStartOrEnd() || I->isDroppable())
+        continue;
+      if (auto *CI = dyn_cast<CallInst>(U)) {
+        if (isUARSafeCall(CI))
+          continue;
+      }
+      if (isa<LoadInst>(U))
+        continue;
+      if (auto *SI = dyn_cast<StoreInst>(U)) {
+        // If storing TO the alloca, then the address isn't taken.
+        if (SI->getOperand(1) == &V)
+          continue;
+      }
+      if (auto *GEPI = dyn_cast<GetElementPtrInst>(U)) {
+        if (!hasUseAfterReturnUnsafeUses(*GEPI))
+          continue;
+      } else if (auto *BCI = dyn_cast<BitCastInst>(U)) {
+        if (!hasUseAfterReturnUnsafeUses(*BCI))
+          continue;
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
+bool useAfterReturnUnsafe(Instruction &I) {
+  if (isa<AllocaInst>(I))
+    return hasUseAfterReturnUnsafeUses(I);
+  // Tail-called functions are not necessary intercepted
+  // at runtime because there is no call instruction.
+  // So conservatively mark the caller as requiring checking.
+  else if (auto *CI = dyn_cast<CallInst>(&I))
+    return CI->isTailCall() && !isUARSafeCall(CI);
+  return false;
+}
+
 bool SanitizerBinaryMetadata::runOn(Instruction &I, MetadataInfoSet &MIS,
                                     MDBuilder &MDB, uint32_t &FeatureMask) {
   SmallVector<const MetadataInfo *, 1> InstMetadata;
   bool RequiresCovered = false;
 
-  if (Options.UAR) {
-    for (unsigned i = 0; i < I.getNumOperands(); ++i) {
-      const Value *V = I.getOperand(i);
-      // TODO(dvyukov): check if V is an address of alloca/function arg.
-      // See isSafeAndProfitableToSinkLoad for addr-taken allocas
-      // and DeadArgumentEliminationPass::removeDeadStuffFromFunction
-      // for iteration over function args.
-      if (V) {
-        RequiresCovered = true;
-        FeatureMask |= kSanitizerBinaryMetadataUAR;
-      }
-    }
+  if (Options.UAR && !(FeatureMask & kSanitizerBinaryMetadataUAR)) {
+    if (useAfterReturnUnsafe(I))
+      FeatureMask |= kSanitizerBinaryMetadataUAR;
   }
 
   if (Options.Atomics && I.mayReadOrWriteMemory()) {
     auto SSID = getAtomicSyncScopeID(&I);
-    if (SSID.has_value() && SSID.value() != SyncScope::SingleThread) {
+    if (SSID.has_value() && *SSID != SyncScope::SingleThread) {
       NumMetadataAtomics++;
       InstMetadata.push_back(&MetadataInfo::Atomics);
     }

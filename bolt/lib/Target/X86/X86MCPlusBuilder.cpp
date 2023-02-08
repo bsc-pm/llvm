@@ -1681,7 +1681,7 @@ public:
   bool requiresAlignedAddress(const MCInst &Inst) const override {
     const MCInstrDesc &Desc = Info->get(Inst.getOpcode());
     for (unsigned int I = 0; I < Desc.getNumOperands(); ++I) {
-      const MCOperandInfo &Op = Desc.OpInfo[I];
+      const MCOperandInfo &Op = Desc.operands()[I];
       if (Op.OperandType != MCOI::OPERAND_REGISTER)
         continue;
       if (Op.RegClass == X86::VR128RegClassID)
@@ -2588,7 +2588,7 @@ public:
     return Code;
   }
 
-  Optional<Relocation>
+  std::optional<Relocation>
   createRelocation(const MCFixup &Fixup,
                    const MCAsmBackend &MAB) const override {
     const MCFixupKindInfo &FKI = MAB.getFixupKindInfo(Fixup.getKind());
@@ -3594,7 +3594,7 @@ public:
 
         if (CallOrJmp.getOpcode() == X86::CALL64r ||
             CallOrJmp.getOpcode() == X86::CALL64pcrel32) {
-          if (Optional<uint32_t> Offset = getOffset(CallInst))
+          if (std::optional<uint32_t> Offset = getOffset(CallInst))
             // Annotated as duplicated call
             setOffset(CallOrJmp, *Offset);
         }
@@ -3602,7 +3602,7 @@ public:
         if (isInvoke(CallInst) && !isInvoke(CallOrJmp)) {
           // Copy over any EH or GNU args size information from the original
           // call.
-          Optional<MCPlus::MCLandingPad> EHInfo = getEHInfo(CallInst);
+          std::optional<MCPlus::MCLandingPad> EHInfo = getEHInfo(CallInst);
           if (EHInfo)
             addEHInfo(CallOrJmp, *EHInfo);
           int64_t GnuArgsSize = getGnuArgsSize(CallInst);

@@ -16,6 +16,7 @@
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/StmtCXX.h"
 #include "clang/AST/StmtObjC.h"
+#include "clang/AST/StmtOmpSs.h"
 #include "clang/AST/StmtOpenMP.h"
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Sema/SemaInternal.h"
@@ -615,6 +616,17 @@ void JumpScopeChecker::BuildScopeInformation(Stmt *S,
         return;
       }
     }
+    if (auto *ED = dyn_cast<OSSExecutableDirective>(S)) {
+      if (ED->hasAssociatedStmt()) {
+        unsigned NewParentScope = Scopes.size();
+        Scopes.emplace_back(ParentScope,
+                            diag::note_oss_protected_structured_block,
+                            diag::note_oss_exits_structured_block,
+                            ED->getAssociatedStmt()->getBeginLoc());
+        BuildScopeInformation(ED->getAssociatedStmt(), NewParentScope);
+        return;
+      }
+    }
     break;
   }
 
@@ -942,6 +954,11 @@ void JumpScopeChecker::CheckJump(Stmt *From, Stmt *To, SourceLocation DiagLoc,
       if (Scopes[I].InDiag == diag::note_omp_protected_structured_block) {
         S.Diag(From->getBeginLoc(), diag::err_goto_into_protected_scope);
         S.Diag(To->getBeginLoc(), diag::note_omp_exits_structured_block);
+        break;
+      }
+      if (Scopes[I].InDiag == diag::note_oss_protected_structured_block) {
+        S.Diag(From->getBeginLoc(), diag::err_goto_into_protected_scope);
+        S.Diag(To->getBeginLoc(), diag::note_oss_exits_structured_block);
         break;
       }
     }

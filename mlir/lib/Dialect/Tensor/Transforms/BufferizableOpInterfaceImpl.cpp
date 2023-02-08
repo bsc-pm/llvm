@@ -205,7 +205,8 @@ struct DimOpInterface
                                                     tensor::DimOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
-    return true;
+    // The op reads the tensor's metadata but not its contents.
+    return false;
   }
 
   bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
@@ -227,6 +228,24 @@ struct DimOpInterface
     replaceOpWithNewBufferizedOp<memref::DimOp>(rewriter, op, *v,
                                                 dimOp.getIndex());
     return success();
+  }
+};
+
+/// Bufferization of tensor.empty. This op does not bufferize, but we need an
+/// interface implementation, so that the result of this op is considered
+/// "writable" (default impl. of `isWritable`). Results of ops that do not
+/// implement `BufferizableOpInterface` are not writable.
+struct EmptyOpInterface
+    : public BufferizableOpInterface::ExternalModel<EmptyOpInterface,
+                                                    tensor::EmptyOp> {
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const BufferizationOptions &options) const {
+    // tensor.empty ops are used to indicate the shape of a tensor. They have
+    // no defined contents and cannot be bufferized. However, they can be
+    // converted to bufferization.alloc_tensor ops, which then bufferize to an
+    // allocation (--empty-tensor-to-alloc-tensor).
+    return op->emitOpError("cannot be bufferized, but can be converted to "
+                           "bufferization.alloc_tensor");
   }
 };
 
@@ -314,7 +333,7 @@ struct ExtractSliceOpInterface
 
   BufferRelation bufferRelation(Operation *op, OpResult opResult,
                                 const AnalysisState &state) const {
-    return BufferRelation::None;
+    return BufferRelation::Unknown;
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
@@ -627,10 +646,8 @@ static bool matchesInsertDestination(const AnalysisState &state, Value value,
         return true;
     return false;
   };
-  if (llvm::all_of(state.findValueInReverseUseDefChain(value, matchesSlice),
-                   matchesSlice))
-    return true;
-  return false;
+  return static_cast<bool>(llvm::all_of(
+      state.findValueInReverseUseDefChain(value, matchesSlice), matchesSlice));
 }
 
 template <typename OpTy>
@@ -695,7 +712,7 @@ static bool isNotConflictingInsertSliceLikeOp(Operation *op, OpOperand *uRead,
     // In the above example:
     // uRead             = OpOperand 0 (%1) of vector.transfer_read
     // uConflictingWrite = OpOperand 1 (%t) of tensor.insert_slice
-    // lastWrite         = %1
+    // definition        = %1
     //
     // This is not a conflict because the InsertSliceOp overwrites the
     // memory segment of %1 with the exact same data. (Effectively, there
@@ -909,7 +926,8 @@ struct RankOpInterface
                                                     tensor::RankOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
-    return true;
+    // The op reads the tensor's metadata but not its contents.
+    return false;
   }
 
   bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
@@ -1060,6 +1078,7 @@ void mlir::tensor::registerBufferizableOpInterfaceExternalModels(
     CastOp::attachInterface<CastOpInterface>(*ctx);
     CollapseShapeOp::attachInterface<CollapseShapeOpInterface>(*ctx);
     DimOp::attachInterface<DimOpInterface>(*ctx);
+    EmptyOp::attachInterface<EmptyOpInterface>(*ctx);
     ExpandShapeOp::attachInterface<ExpandShapeOpInterface>(*ctx);
     ExtractSliceOp::attachInterface<ExtractSliceOpInterface>(*ctx);
     ExtractOp::attachInterface<ExtractOpInterface>(*ctx);

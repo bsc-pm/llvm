@@ -904,6 +904,12 @@ void OMPClauseProfiler::VisitOMPAffinityClause(const OMPAffinityClause *C) {
 }
 void OMPClauseProfiler::VisitOMPOrderClause(const OMPOrderClause *C) {}
 void OMPClauseProfiler::VisitOMPBindClause(const OMPBindClause *C) {}
+void OMPClauseProfiler::VisitOMPXDynCGroupMemClause(
+    const OMPXDynCGroupMemClause *C) {
+  VistOMPClauseWithPreInit(C);
+  if (Expr *Size = C->getSize())
+    Profiler->VisitStmt(Size);
+}
 } // namespace
 
 void
@@ -1292,6 +1298,10 @@ void StmtProfiler::VisitOSSTaskDirective(const OSSTaskDirective *S) {
   VisitOSSExecutableDirective(S);
 }
 
+void StmtProfiler::VisitOSSCriticalDirective(const OSSCriticalDirective *S) {
+  VisitOSSExecutableDirective(S);
+}
+
 void StmtProfiler::VisitOSSTaskForDirective(const OSSTaskForDirective *S) {
   VisitOSSLoopDirective(S);
 }
@@ -1306,6 +1316,10 @@ void StmtProfiler::VisitOSSTaskLoopDirective(const OSSTaskLoopDirective *S) {
 
 void StmtProfiler::VisitOSSTaskLoopForDirective(const OSSTaskLoopForDirective *S) {
   VisitOSSLoopDirective(S);
+}
+
+void StmtProfiler::VisitOSSAtomicDirective(const OSSAtomicDirective *S) {
+  VisitOSSExecutableDirective(S);
 }
 
 void StmtProfiler::VisitExpr(const Expr *S) {
@@ -1675,8 +1689,8 @@ void StmtProfiler::VisitRequiresExpr(const RequiresExpr *S) {
     } else {
       ID.AddInteger(concepts::Requirement::RK_Nested);
       auto *NestedReq = cast<concepts::NestedRequirement>(Req);
-      ID.AddBoolean(NestedReq->isSubstitutionFailure());
-      if (!NestedReq->isSubstitutionFailure())
+      ID.AddBoolean(NestedReq->hasInvalidConstraint());
+      if (!NestedReq->hasInvalidConstraint())
         Visit(NestedReq->getConstraintExpr());
     }
   }
@@ -2244,6 +2258,10 @@ void StmtProfiler::VisitMaterializeTemporaryExpr(
 void StmtProfiler::VisitCXXFoldExpr(const CXXFoldExpr *S) {
   VisitExpr(S);
   ID.AddInteger(S->getOperator());
+}
+
+void StmtProfiler::VisitCXXParenListInitExpr(const CXXParenListInitExpr *S) {
+  VisitExpr(S);
 }
 
 void StmtProfiler::VisitCoroutineBodyStmt(const CoroutineBodyStmt *S) {

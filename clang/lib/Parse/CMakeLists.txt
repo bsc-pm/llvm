@@ -1,8 +1,10 @@
 set(LLVM_LINK_COMPONENTS
+  FrontendOmpSs
   FrontendOpenMP
   MC
   MCParser
   Support
+  TargetParser
   )
 
 add_clang_library(clangParse

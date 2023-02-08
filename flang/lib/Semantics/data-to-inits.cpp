@@ -30,6 +30,11 @@ static constexpr bool makeDefaultInitializationExplicit{false};
 // objects and pointers.
 static constexpr bool removeOriginalInits{false};
 
+// Impose a hard limit that's more than large enough for real applications but
+// small enough to cause artificial stress tests to fail reasonably instead of
+// crashing the compiler with a memory allocation failure.
+static constexpr auto maxDataInitBytes{std::size_t{1000000000}}; // 1GiB
+
 namespace Fortran::semantics {
 
 // Steps through a list of values in a DATA statement set; implements
@@ -155,7 +160,14 @@ bool DataInitializationCompiler<DSV>::Scan(const parser::Variable &var) {
 template <typename DSV>
 bool DataInitializationCompiler<DSV>::Scan(
     const parser::Designator &designator) {
-  if (auto expr{exprAnalyzer_.Analyze(designator)}) {
+  MaybeExpr expr;
+  { // The out-of-range subscript errors from the designator folder are a
+    // more specific than the default ones from expression semantics, so
+    // disable those to avoid piling on.
+    auto restorer{exprAnalyzer_.GetContextualMessages().DiscardMessages()};
+    expr = exprAnalyzer_.Analyze(designator);
+  }
+  if (expr) {
     parser::CharBlock at{parser::FindSourceLocation(designator)};
     exprAnalyzer_.GetFoldingContext().messages().SetLocation(at);
     scope_ = &exprAnalyzer_.context().FindScope(at);
@@ -356,6 +368,13 @@ bool DataInitializationCompiler<DSV>::InitElement(
   const SomeExpr *expr{*values_};
   if (!expr) {
     CHECK(exprAnalyzer_.context().AnyFatalError());
+  } else if (symbol.size() > maxDataInitBytes) {
+    evaluate::AttachDeclaration(
+        exprAnalyzer_.context().Say(
+            "'%s' is too large to initialize with a DATA statement"_todo_en_US,
+            symbol.name()),
+        symbol);
+    return false;
   } else if (isPointer) {
     if (static_cast<std::size_t>(offsetSymbol.offset() + offsetSymbol.size()) >
         symbol.size()) {

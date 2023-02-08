@@ -78,12 +78,11 @@ end program
 !LLVMIRDialect-LABEL: llvm.func @_QQmain()
 !LLVMIRDialect:  %[[CONSTANT_10:.*]] = llvm.mlir.constant(10 : i32) : i32
 !LLVMIRDialect:  %[[VAR_ARRAY:.*]] = llvm.mlir.addressof @_QFEarray : !llvm.ptr<array<10 x i32>>
-!LLVMIRDialect-NEXT:  %[[VAR_ARRAY1:.*]] = llvm.mlir.addressof @_QFEarray1 : !llvm.ptr<array<6 x i32>>
+!LLVMIRDialect-NEXT:  %[[CONSTANT_1_2:.*]] = llvm.mlir.constant(1 : i64) : i64
+!LLVMIRDialect-NEXT:  %[[VAR_ARRAY1:.*]] = llvm.alloca %[[CONSTANT_1_2]]
 !LLVMIRDialect-NEXT:  %[[CONSTANT_1_0:.*]] = llvm.mlir.constant(1 : i64) : i64
 !LLVMIRDialect-NEXT:  %[[VAR_I:.*]] = llvm.alloca %[[CONSTANT_1_0]]
-!LLVMIRDialect-NEXT:  %[[CONSTANT_1_1:.*]] = llvm.mlir.constant(1 : i64) : i64
-!LLVMIRDialect:  %[[CONSTANT_1_2:.*]] = llvm.mlir.constant(1 : i64) : i64
-!LLVMIRDialect-NEXT:  %[[VAR_T:.*]] = llvm.alloca %[[CONSTANT_1_2]]
+!LLVMIRDialect:  %[[VAR_T:.*]] = llvm.mlir.addressof @_QFEt : !llvm.ptr<struct<"_QFTty", (i32, array<10 x i32>)>>
 
 !LLVMIRDialect-NEXT:  %[[DEP_0:.*]] = oss.dependency base(%[[VAR_I]] : !llvm.ptr<i32>) function(@compute.dep0) arguments(%[[VAR_I]] : !llvm.ptr<i32>) -> i32
 !LLVMIRDialect-NEXT:  oss.task_for

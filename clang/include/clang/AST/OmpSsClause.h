@@ -31,6 +31,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/iterator.h"
 #include "llvm/ADT/iterator_range.h"
+#include "llvm/Frontend/OmpSs/OSSConstants.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -161,9 +162,97 @@ public:
 
   /// Fetches list of all variables in the clause.
   ArrayRef<const Expr *> getVarRefs() const {
-    return llvm::makeArrayRef(
+    return llvm::ArrayRef(
         static_cast<const T *>(this)->template getTrailingObjects<Expr *>(),
         NumVars);
+  }
+};
+
+/// Contains data for OmpSs-2 directives: clauses, children
+/// expressions/statements (helpers for codegen) and associated statement, if
+/// any.
+class OSSChildren final
+    : private llvm::TrailingObjects<OSSChildren, OSSClause *, Stmt *> {
+  friend TrailingObjects;
+  friend class OSSClauseReader;
+  friend class OSSExecutableDirective;
+
+  /// Numbers of clauses.
+  unsigned NumClauses = 0;
+  /// Number of child expressions/stmts.
+  unsigned NumChildren = 0;
+  /// true if the directive has associated statement.
+  bool HasAssociatedStmt = false;
+
+  /// Define the sizes of each trailing object array except the last one. This
+  /// is required for TrailingObjects to work properly.
+  size_t numTrailingObjects(OverloadToken<OSSClause *>) const {
+    return NumClauses;
+  }
+
+  OSSChildren() = delete;
+
+  OSSChildren(unsigned NumClauses, unsigned NumChildren, bool HasAssociatedStmt)
+      : NumClauses(NumClauses), NumChildren(NumChildren),
+        HasAssociatedStmt(HasAssociatedStmt) {}
+
+  static size_t size(unsigned NumClauses, bool HasAssociatedStmt,
+                     unsigned NumChildren);
+
+  static OSSChildren *Create(void *Mem, ArrayRef<OSSClause *> Clauses);
+  static OSSChildren *Create(void *Mem, ArrayRef<OSSClause *> Clauses, Stmt *S,
+                             unsigned NumChildren = 0);
+  static OSSChildren *CreateEmpty(void *Mem, unsigned NumClauses,
+                                  bool HasAssociatedStmt = false,
+                                  unsigned NumChildren = 0);
+
+public:
+  unsigned getNumClauses() const { return NumClauses; }
+  unsigned getNumChildren() const { return NumChildren; }
+  bool hasAssociatedStmt() const { return HasAssociatedStmt; }
+
+  /// Set associated statement.
+  void setAssociatedStmt(Stmt *S) {
+    getTrailingObjects<Stmt *>()[NumChildren] = S;
+  }
+
+  void setChildren(ArrayRef<Stmt *> Children);
+
+  /// Sets the list of variables for this clause.
+  ///
+  /// \param Clauses The list of clauses for the directive.
+  ///
+  void setClauses(ArrayRef<OSSClause *> Clauses);
+
+  /// Returns statement associated with the directive.
+  const Stmt *getAssociatedStmt() const {
+    return const_cast<OSSChildren *>(this)->getAssociatedStmt();
+  }
+  Stmt *getAssociatedStmt() {
+    assert(HasAssociatedStmt &&
+           "Expected directive with the associated statement.");
+    return getTrailingObjects<Stmt *>()[NumChildren];
+  }
+
+  /// Get the clauses storage.
+  MutableArrayRef<OSSClause *> getClauses() {
+    return llvm::MutableArrayRef(getTrailingObjects<OSSClause *>(),
+                                     NumClauses);
+  }
+  ArrayRef<OSSClause *> getClauses() const {
+    return const_cast<OSSChildren *>(this)->getClauses();
+  }
+
+  MutableArrayRef<Stmt *> getChildren();
+  ArrayRef<Stmt *> getChildren() const {
+    return const_cast<OSSChildren *>(this)->getChildren();
+  }
+
+  Stmt::child_range getAssociatedStmtAsRange() {
+    if (!HasAssociatedStmt)
+      return Stmt::child_range(Stmt::child_iterator(), Stmt::child_iterator());
+    return Stmt::child_range(&getTrailingObjects<Stmt *>()[NumChildren],
+                             &getTrailingObjects<Stmt *>()[NumChildren + 1]);
   }
 };
 
@@ -195,12 +284,12 @@ public:
   /// \param EndLoc Ending location of the clause.
   OSSIfClause(Expr *Cond, SourceLocation StartLoc, SourceLocation LParenLoc,
                  SourceLocation EndLoc)
-      : OSSClause(OSSC_if, StartLoc, EndLoc), LParenLoc(LParenLoc),
+      : OSSClause(llvm::oss::OSSC_if, StartLoc, EndLoc), LParenLoc(LParenLoc),
         Condition(Cond) {}
 
   /// Build an empty clause.
   OSSIfClause()
-      : OSSClause(OSSC_if, SourceLocation(), SourceLocation()) {}
+      : OSSClause(llvm::oss::OSSC_if, SourceLocation(), SourceLocation()) {}
 
   /// Sets the location of '('.
   void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
@@ -214,7 +303,7 @@ public:
   child_range children() { return child_range(&Condition, &Condition + 1); }
 
   static bool classof(const OSSClause *T) {
-    return T->getClauseKind() == OSSC_if;
+    return T->getClauseKind() == llvm::oss::OSSC_if;
   }
 };
 
@@ -246,12 +335,12 @@ public:
   /// \param EndLoc Ending location of the clause.
   OSSFinalClause(Expr *Cond, SourceLocation StartLoc, SourceLocation LParenLoc,
                  SourceLocation EndLoc)
-      : OSSClause(OSSC_final, StartLoc, EndLoc), LParenLoc(LParenLoc),
+      : OSSClause(llvm::oss::OSSC_final, StartLoc, EndLoc), LParenLoc(LParenLoc),
         Condition(Cond) {}
 
   /// Build an empty clause.
   OSSFinalClause()
-      : OSSClause(OSSC_final, SourceLocation(), SourceLocation()) {}
+      : OSSClause(llvm::oss::OSSC_final, SourceLocation(), SourceLocation()) {}
 
   /// Sets the location of '('.
   void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
@@ -265,7 +354,7 @@ public:
   child_range children() { return child_range(&Condition, &Condition + 1); }
 
   static bool classof(const OSSClause *T) {
-    return T->getClauseKind() == OSSC_final;
+    return T->getClauseKind() == llvm::oss::OSSC_final;
   }
 };
 
@@ -297,12 +386,12 @@ public:
   /// \param EndLoc Ending location of the clause.
   OSSCostClause(Expr *E, SourceLocation StartLoc, SourceLocation LParenLoc,
                 SourceLocation EndLoc)
-      : OSSClause(OSSC_cost, StartLoc, EndLoc), LParenLoc(LParenLoc),
+      : OSSClause(llvm::oss::OSSC_cost, StartLoc, EndLoc), LParenLoc(LParenLoc),
         Expression(E) {}
 
   /// Build an empty clause.
   OSSCostClause()
-      : OSSClause(OSSC_cost, SourceLocation(), SourceLocation()) {}
+      : OSSClause(llvm::oss::OSSC_cost, SourceLocation(), SourceLocation()) {}
 
   /// Sets the location of '('.
   void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
@@ -316,7 +405,7 @@ public:
   child_range children() { return child_range(&Expression, &Expression + 1); }
 
   static bool classof(const OSSClause *T) {
-    return T->getClauseKind() == OSSC_cost;
+    return T->getClauseKind() == llvm::oss::OSSC_cost;
   }
 };
 
@@ -348,12 +437,12 @@ public:
   /// \param EndLoc Ending location of the clause.
   OSSPriorityClause(Expr *E, SourceLocation StartLoc, SourceLocation LParenLoc,
                 SourceLocation EndLoc)
-      : OSSClause(OSSC_priority, StartLoc, EndLoc), LParenLoc(LParenLoc),
+      : OSSClause(llvm::oss::OSSC_priority, StartLoc, EndLoc), LParenLoc(LParenLoc),
         Expression(E) {}
 
   /// Build an empty clause.
   OSSPriorityClause()
-      : OSSClause(OSSC_priority, SourceLocation(), SourceLocation()) {}
+      : OSSClause(llvm::oss::OSSC_priority, SourceLocation(), SourceLocation()) {}
 
   /// Sets the location of '('.
   void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
@@ -367,7 +456,7 @@ public:
   child_range children() { return child_range(&Expression, &Expression + 1); }
 
   static bool classof(const OSSClause *T) {
-    return T->getClauseKind() == OSSC_priority;
+    return T->getClauseKind() == llvm::oss::OSSC_priority;
   }
 };
 
@@ -393,14 +482,14 @@ class OSSLabelClause final
   /// \param N Number of the variables in the clause.
   OSSLabelClause(SourceLocation StartLoc, SourceLocation LParenLoc,
                   SourceLocation EndLoc, unsigned N)
-      : OSSVarListClause<OSSLabelClause>(OSSC_label, StartLoc, LParenLoc,
+      : OSSVarListClause<OSSLabelClause>(llvm::oss::OSSC_label, StartLoc, LParenLoc,
                                           EndLoc, N) {}
 
   /// Build an empty clause.
   ///
   /// \param N Number of variables.
   explicit OSSLabelClause(unsigned N)
-      : OSSVarListClause<OSSLabelClause>(OSSC_label, SourceLocation(),
+      : OSSVarListClause<OSSLabelClause>(llvm::oss::OSSC_label, SourceLocation(),
                                           SourceLocation(), SourceLocation(),
                                           N) {}
 
@@ -428,7 +517,7 @@ public:
   }
 
   static bool classof(const OSSClause *T) {
-    return T->getClauseKind() == OSSC_label;
+    return T->getClauseKind() == llvm::oss::OSSC_label;
   }
 };
 
@@ -444,11 +533,11 @@ public:
   /// \param StartLoc Starting location of the clause.
   /// \param EndLoc Ending location of the clause.
   OSSWaitClause(SourceLocation StartLoc, SourceLocation EndLoc)
-      : OSSClause(OSSC_wait, StartLoc, EndLoc) {}
+      : OSSClause(llvm::oss::OSSC_wait, StartLoc, EndLoc) {}
 
   /// Build an empty clause.
   OSSWaitClause()
-      : OSSClause(OSSC_wait, SourceLocation(), SourceLocation()) {}
+      : OSSClause(llvm::oss::OSSC_wait, SourceLocation(), SourceLocation()) {}
 
   child_range children() {
     return child_range(child_iterator(), child_iterator());
@@ -466,11 +555,11 @@ public:
   }
 
   static bool classof(const OSSClause *T) {
-    return T->getClauseKind() == OSSC_wait;
+    return T->getClauseKind() == llvm::oss::OSSC_wait;
   }
 };
 
-/// This represents 'update' clause in the '#pragma oss taskiter' directive.
+/// This represents 'update' clause in the '#pragma oss taskiter|atomic' directive.
 ///
 /// \code
 /// #pragma oss taskiter update
@@ -482,11 +571,11 @@ public:
   /// \param StartLoc Starting location of the clause.
   /// \param EndLoc Ending location of the clause.
   OSSUpdateClause(SourceLocation StartLoc, SourceLocation EndLoc)
-      : OSSClause(OSSC_update, StartLoc, EndLoc) {}
+      : OSSClause(llvm::oss::OSSC_update, StartLoc, EndLoc) {}
 
   /// Build an empty clause.
   OSSUpdateClause()
-      : OSSClause(OSSC_update, SourceLocation(), SourceLocation()) {}
+      : OSSClause(llvm::oss::OSSC_update, SourceLocation(), SourceLocation()) {}
 
   child_range children() {
     return child_range(child_iterator(), child_iterator());
@@ -504,7 +593,7 @@ public:
   }
 
   static bool classof(const OSSClause *T) {
-    return T->getClauseKind() == OSSC_update;
+    return T->getClauseKind() == llvm::oss::OSSC_update;
   }
 };
 
@@ -536,12 +625,12 @@ public:
   /// \param EndLoc Ending location of the clause.
   OSSOnreadyClause(Expr *E, SourceLocation StartLoc, SourceLocation LParenLoc,
                 SourceLocation EndLoc)
-      : OSSClause(OSSC_onready, StartLoc, EndLoc), LParenLoc(LParenLoc),
+      : OSSClause(llvm::oss::OSSC_onready, StartLoc, EndLoc), LParenLoc(LParenLoc),
         Expression(E) {}
 
   /// Build an empty clause.
   OSSOnreadyClause()
-      : OSSClause(OSSC_onready, SourceLocation(), SourceLocation()) {}
+      : OSSClause(llvm::oss::OSSC_onready, SourceLocation(), SourceLocation()) {}
 
   /// Sets the location of '('.
   void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
@@ -555,7 +644,7 @@ public:
   child_range children() { return child_range(&Expression, &Expression + 1); }
 
   static bool classof(const OSSClause *T) {
-    return T->getClauseKind() == OSSC_onready;
+    return T->getClauseKind() == llvm::oss::OSSC_onready;
   }
 };
 
@@ -588,12 +677,12 @@ public:
   /// \param EndLoc Ending location of the clause.
   OSSChunksizeClause(Expr *E, SourceLocation StartLoc, SourceLocation LParenLoc,
                 SourceLocation EndLoc)
-      : OSSClause(OSSC_chunksize, StartLoc, EndLoc), LParenLoc(LParenLoc),
+      : OSSClause(llvm::oss::OSSC_chunksize, StartLoc, EndLoc), LParenLoc(LParenLoc),
         Expression(E) {}
 
   /// Build an empty clause.
   OSSChunksizeClause()
-      : OSSClause(OSSC_chunksize, SourceLocation(), SourceLocation()) {}
+      : OSSClause(llvm::oss::OSSC_chunksize, SourceLocation(), SourceLocation()) {}
 
   /// Sets the location of '('.
   void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
@@ -607,7 +696,7 @@ public:
   child_range children() { return child_range(&Expression, &Expression + 1); }
 
   static bool classof(const OSSClause *T) {
-    return T->getClauseKind() == OSSC_chunksize;
+    return T->getClauseKind() == llvm::oss::OSSC_chunksize;
   }
 };
 
@@ -640,12 +729,12 @@ public:
   /// \param EndLoc Ending location of the clause.
   OSSGrainsizeClause(Expr *E, SourceLocation StartLoc, SourceLocation LParenLoc,
                 SourceLocation EndLoc)
-      : OSSClause(OSSC_grainsize, StartLoc, EndLoc), LParenLoc(LParenLoc),
+      : OSSClause(llvm::oss::OSSC_grainsize, StartLoc, EndLoc), LParenLoc(LParenLoc),
         Expression(E) {}
 
   /// Build an empty clause.
   OSSGrainsizeClause()
-      : OSSClause(OSSC_grainsize, SourceLocation(), SourceLocation()) {}
+      : OSSClause(llvm::oss::OSSC_grainsize, SourceLocation(), SourceLocation()) {}
 
   /// Sets the location of '('.
   void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
@@ -659,7 +748,7 @@ public:
   child_range children() { return child_range(&Expression, &Expression + 1); }
 
   static bool classof(const OSSClause *T) {
-    return T->getClauseKind() == OSSC_grainsize;
+    return T->getClauseKind() == llvm::oss::OSSC_grainsize;
   }
 };
 
@@ -692,12 +781,12 @@ public:
   /// \param EndLoc Ending location of the clause.
   OSSUnrollClause(Expr *E, SourceLocation StartLoc, SourceLocation LParenLoc,
                 SourceLocation EndLoc)
-      : OSSClause(OSSC_unroll, StartLoc, EndLoc), LParenLoc(LParenLoc),
+      : OSSClause(llvm::oss::OSSC_unroll, StartLoc, EndLoc), LParenLoc(LParenLoc),
         Expression(E) {}
 
   /// Build an empty clause.
   OSSUnrollClause()
-      : OSSClause(OSSC_unroll, SourceLocation(), SourceLocation()) {}
+      : OSSClause(llvm::oss::OSSC_unroll, SourceLocation(), SourceLocation()) {}
 
   /// Sets the location of '('.
   void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
@@ -711,7 +800,7 @@ public:
   child_range children() { return child_range(&Expression, &Expression + 1); }
 
   static bool classof(const OSSClause *T) {
-    return T->getClauseKind() == OSSC_unroll;
+    return T->getClauseKind() == llvm::oss::OSSC_unroll;
   }
 };
 
@@ -748,12 +837,12 @@ public:
   /// \param EndLoc Ending location of the clause.
   OSSCollapseClause(Expr *Num, SourceLocation StartLoc,
                     SourceLocation LParenLoc, SourceLocation EndLoc)
-      : OSSClause(OSSC_collapse, StartLoc, EndLoc),
+      : OSSClause(llvm::oss::OSSC_collapse, StartLoc, EndLoc),
         LParenLoc(LParenLoc), NumForLoops(Num) {}
 
   /// Build an empty clause.
   explicit OSSCollapseClause()
-      : OSSClause(OSSC_collapse, SourceLocation(),
+      : OSSClause(llvm::oss::OSSC_collapse, SourceLocation(),
                   SourceLocation()) {}
 
   /// Sets the location of '('.
@@ -779,7 +868,7 @@ public:
   }
 
   static bool classof(const OSSClause *T) {
-    return T->getClauseKind() == OSSC_collapse;
+    return T->getClauseKind() == llvm::oss::OSSC_collapse;
   }
 };
 
@@ -797,7 +886,7 @@ class OSSDefaultClause : public OSSClause {
   SourceLocation LParenLoc;
 
   /// A kind of the 'default' clause.
-  OmpSsDefaultClauseKind Kind = OSSC_DEFAULT_unknown;
+  llvm::oss::DefaultKind Kind = llvm::oss::OSS_DEFAULT_unknown;
 
   /// Start location of the kind in source code.
   SourceLocation KindKwLoc;
@@ -805,7 +894,7 @@ class OSSDefaultClause : public OSSClause {
   /// Set kind of the clauses.
   ///
   /// \param K Argument of clause.
-  void setDefaultKind(OmpSsDefaultClauseKind K) { Kind = K; }
+  void setDefaultKind(llvm::oss::DefaultKind K) { Kind = K; }
 
   /// Set argument location.
   ///
@@ -820,15 +909,15 @@ public:
   /// \param StartLoc Starting location of the clause.
   /// \param LParenLoc Location of '('.
   /// \param EndLoc Ending location of the clause.
-  OSSDefaultClause(OmpSsDefaultClauseKind A, SourceLocation ALoc,
+  OSSDefaultClause(llvm::oss::DefaultKind A, SourceLocation ALoc,
                    SourceLocation StartLoc, SourceLocation LParenLoc,
                    SourceLocation EndLoc)
-      : OSSClause(OSSC_default, StartLoc, EndLoc), LParenLoc(LParenLoc),
+      : OSSClause(llvm::oss::OSSC_default, StartLoc, EndLoc), LParenLoc(LParenLoc),
         Kind(A), KindKwLoc(ALoc) {}
 
   /// Build an empty clause.
   OSSDefaultClause()
-      : OSSClause(OSSC_default, SourceLocation(), SourceLocation()) {}
+      : OSSClause(llvm::oss::OSSC_default, SourceLocation(), SourceLocation()) {}
 
   /// Sets the location of '('.
   void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
@@ -837,7 +926,7 @@ public:
   SourceLocation getLParenLoc() const { return LParenLoc; }
 
   /// Returns kind of the clause.
-  OmpSsDefaultClauseKind getDefaultKind() const { return Kind; }
+  llvm::oss::DefaultKind getDefaultKind() const { return Kind; }
 
   /// Returns location of clause kind.
   SourceLocation getDefaultKindKwLoc() const { return KindKwLoc; }
@@ -847,7 +936,7 @@ public:
   }
 
   static bool classof(const OSSClause *T) {
-    return T->getClauseKind() == OSSC_default;
+    return T->getClauseKind() == llvm::oss::OSSC_default;
   }
 };
 
@@ -872,14 +961,14 @@ class OSSPrivateClause final
   /// \param N Number of the variables in the clause.
   OSSPrivateClause(SourceLocation StartLoc, SourceLocation LParenLoc,
                   SourceLocation EndLoc, unsigned N)
-      : OSSVarListClause<OSSPrivateClause>(OSSC_private, StartLoc, LParenLoc,
+      : OSSVarListClause<OSSPrivateClause>(llvm::oss::OSSC_private, StartLoc, LParenLoc,
                                           EndLoc, N) {}
 
   /// Build an empty clause.
   ///
   /// \param N Number of variables.
   explicit OSSPrivateClause(unsigned N)
-      : OSSVarListClause<OSSPrivateClause>(OSSC_private, SourceLocation(),
+      : OSSVarListClause<OSSPrivateClause>(llvm::oss::OSSC_private, SourceLocation(),
                                           SourceLocation(), SourceLocation(),
                                           N) {}
 
@@ -894,7 +983,7 @@ class OSSPrivateClause final
     return MutableArrayRef<Expr *>(varlist_end(), varlist_size());
   }
   ArrayRef<const Expr *> getPrivateCopies() const {
-    return llvm::makeArrayRef(varlist_end(), varlist_size());
+    return llvm::ArrayRef(varlist_end(), varlist_size());
   }
 
 public:
@@ -938,7 +1027,7 @@ public:
   }
 
   static bool classof(const OSSClause *T) {
-    return T->getClauseKind() == OSSC_private;
+    return T->getClauseKind() == llvm::oss::OSSC_private;
   }
 };
 
@@ -964,14 +1053,14 @@ class OSSFirstprivateClause final
   /// \param N Number of the variables in the clause.
   OSSFirstprivateClause(SourceLocation StartLoc, SourceLocation LParenLoc,
                   SourceLocation EndLoc, unsigned N)
-      : OSSVarListClause<OSSFirstprivateClause>(OSSC_firstprivate, StartLoc, LParenLoc,
+      : OSSVarListClause<OSSFirstprivateClause>(llvm::oss::OSSC_firstprivate, StartLoc, LParenLoc,
                                           EndLoc, N) {}
 
   /// Build an empty clause.
   ///
   /// \param N Number of variables.
   explicit OSSFirstprivateClause(unsigned N)
-      : OSSVarListClause<OSSFirstprivateClause>(OSSC_firstprivate, SourceLocation(),
+      : OSSVarListClause<OSSFirstprivateClause>(llvm::oss::OSSC_firstprivate, SourceLocation(),
                                           SourceLocation(), SourceLocation(),
                                           N) {}
 
@@ -986,7 +1075,7 @@ class OSSFirstprivateClause final
     return MutableArrayRef<Expr *>(varlist_end(), varlist_size());
   }
   ArrayRef<const Expr *> getPrivateCopies() const {
-    return llvm::makeArrayRef(varlist_end(), varlist_size());
+    return llvm::ArrayRef(varlist_end(), varlist_size());
   }
 
   /// Sets the list of references to initializer variables for new
@@ -1000,7 +1089,7 @@ class OSSFirstprivateClause final
     return MutableArrayRef<Expr *>(getPrivateCopies().end(), varlist_size());
   }
   ArrayRef<const Expr *> getInits() const {
-    return llvm::makeArrayRef(getPrivateCopies().end(), varlist_size());
+    return llvm::ArrayRef(getPrivateCopies().end(), varlist_size());
   }
 
 public:
@@ -1058,7 +1147,7 @@ public:
   }
 
   static bool classof(const OSSClause *T) {
-    return T->getClauseKind() == OSSC_firstprivate;
+    return T->getClauseKind() == llvm::oss::OSSC_firstprivate;
   }
 };
 
@@ -1083,14 +1172,14 @@ class OSSSharedClause final
   /// \param N Number of the variables in the clause.
   OSSSharedClause(SourceLocation StartLoc, SourceLocation LParenLoc,
                   SourceLocation EndLoc, unsigned N)
-      : OSSVarListClause<OSSSharedClause>(OSSC_shared, StartLoc, LParenLoc,
+      : OSSVarListClause<OSSSharedClause>(llvm::oss::OSSC_shared, StartLoc, LParenLoc,
                                           EndLoc, N) {}
 
   /// Build an empty clause.
   ///
   /// \param N Number of variables.
   explicit OSSSharedClause(unsigned N)
-      : OSSVarListClause<OSSSharedClause>(OSSC_shared, SourceLocation(),
+      : OSSVarListClause<OSSSharedClause>(llvm::oss::OSSC_shared, SourceLocation(),
                                           SourceLocation(), SourceLocation(),
                                           N) {}
 
@@ -1118,7 +1207,7 @@ public:
   }
 
   static bool classof(const OSSClause *T) {
-    return T->getClauseKind() == OSSC_shared;
+    return T->getClauseKind() == llvm::oss::OSSC_shared;
   }
 };
 
@@ -1161,7 +1250,7 @@ class OSSDependClause final
   /// \param N Number of the variables in the clause.
   OSSDependClause(SourceLocation StartLoc, SourceLocation LParenLoc,
                   SourceLocation EndLoc, unsigned N, bool OSSSyntax)
-      : OSSVarListClause<OSSDependClause>(OSSC_depend, StartLoc, LParenLoc,
+      : OSSVarListClause<OSSDependClause>(llvm::oss::OSSC_depend, StartLoc, LParenLoc,
                                           EndLoc, N), OSSSyntax(OSSSyntax)
                                           {}
 
@@ -1169,7 +1258,7 @@ class OSSDependClause final
   ///
   /// \param N Number of variables.
   explicit OSSDependClause(unsigned N)
-      : OSSVarListClause<OSSDependClause>(OSSC_depend, SourceLocation(),
+      : OSSVarListClause<OSSDependClause>(llvm::oss::OSSC_depend, SourceLocation(),
                                           SourceLocation(), SourceLocation(),
                                           N), DepKinds(1, OSSC_DEPEND_unknown),
                                           DepKindsOrdered(1, OSSC_DEPEND_unknown),
@@ -1245,7 +1334,7 @@ public:
   }
 
   static bool classof(const OSSClause *T) {
-    return T->getClauseKind() == OSSC_depend;
+    return T->getClauseKind() == llvm::oss::OSSC_depend;
   }
 };
 
@@ -1297,7 +1386,7 @@ class OSSReductionClause final
                      NestedNameSpecifierLoc QualifierLoc,
                      const DeclarationNameInfo &NameInfo,
                      bool IsWeak)
-      : OSSVarListClause<OSSReductionClause>(OSSC_reduction, StartLoc,
+      : OSSVarListClause<OSSReductionClause>(llvm::oss::OSSC_reduction, StartLoc,
                                              LParenLoc, EndLoc, N),
         ColonLoc(ColonLoc),
         QualifierLoc(QualifierLoc), NameInfo(NameInfo),
@@ -1307,7 +1396,7 @@ class OSSReductionClause final
   ///
   /// \param N Number of variables.
   explicit OSSReductionClause(unsigned N)
-      : OSSVarListClause<OSSReductionClause>(OSSC_reduction, SourceLocation(),
+      : OSSVarListClause<OSSReductionClause>(llvm::oss::OSSC_reduction, SourceLocation(),
                                              SourceLocation(), SourceLocation(),
                                              N)
         {}
@@ -1336,7 +1425,7 @@ class OSSReductionClause final
     return MutableArrayRef<Expr *>(varlist_end(), varlist_size());
   }
   ArrayRef<const Expr *> getLHSExprs() const {
-    return llvm::makeArrayRef(varlist_end(), varlist_size());
+    return llvm::ArrayRef(varlist_end(), varlist_size());
   }
 
   /// Set list of helper expressions, required for proper codegen of the
@@ -1351,7 +1440,7 @@ class OSSReductionClause final
     return MutableArrayRef<Expr *>(getLHSExprs().end(), varlist_size());
   }
   ArrayRef<const Expr *> getRHSExprs() const {
-    return llvm::makeArrayRef(getLHSExprs().end(), varlist_size());
+    return llvm::ArrayRef(getLHSExprs().end(), varlist_size());
   }
 
   /// Set list of helper reduction expressions, required for proper
@@ -1365,7 +1454,7 @@ class OSSReductionClause final
     return MutableArrayRef<Expr *>(getRHSExprs().end(), varlist_size());
   }
   ArrayRef<const Expr *> getReductionOps() const {
-    return llvm::makeArrayRef(getRHSExprs().end(), varlist_size());
+    return llvm::ArrayRef(getRHSExprs().end(), varlist_size());
   }
 
 public:
@@ -1471,7 +1560,7 @@ public:
   }
 
   static bool classof(const OSSClause *T) {
-    return T->getClauseKind() == OSSC_reduction;
+    return T->getClauseKind() == llvm::oss::OSSC_reduction;
   }
 };
 
@@ -1515,12 +1604,12 @@ public:
   OSSDeviceClause(OmpSsDeviceClauseKind A, SourceLocation ALoc,
                    SourceLocation StartLoc, SourceLocation LParenLoc,
                    SourceLocation EndLoc)
-      : OSSClause(OSSC_device, StartLoc, EndLoc), LParenLoc(LParenLoc),
+      : OSSClause(llvm::oss::OSSC_device, StartLoc, EndLoc), LParenLoc(LParenLoc),
         Kind(A), KindKwLoc(ALoc) {}
 
   /// Build an empty clause.
   OSSDeviceClause()
-      : OSSClause(OSSC_device, SourceLocation(), SourceLocation()) {}
+      : OSSClause(llvm::oss::OSSC_device, SourceLocation(), SourceLocation()) {}
 
   /// Sets the location of '('.
   void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
@@ -1539,7 +1628,7 @@ public:
   }
 
   static bool classof(const OSSClause *T) {
-    return T->getClauseKind() == OSSC_device;
+    return T->getClauseKind() == llvm::oss::OSSC_device;
   }
 };
 
@@ -1572,14 +1661,14 @@ class OSSNdrangeClause final
   /// \param N Number of the variables in the clause.
   OSSNdrangeClause(SourceLocation StartLoc, SourceLocation LParenLoc,
                   SourceLocation EndLoc, unsigned N)
-      : OSSVarListClause<OSSNdrangeClause>(OSSC_ndrange, StartLoc, LParenLoc,
+      : OSSVarListClause<OSSNdrangeClause>(llvm::oss::OSSC_ndrange, StartLoc, LParenLoc,
                                           EndLoc, N) {}
 
   /// Build an empty clause.
   ///
   /// \param N Number of variables.
   explicit OSSNdrangeClause(unsigned N)
-      : OSSVarListClause<OSSNdrangeClause>(OSSC_ndrange, SourceLocation(),
+      : OSSVarListClause<OSSNdrangeClause>(llvm::oss::OSSC_ndrange, SourceLocation(),
                                           SourceLocation(), SourceLocation(),
                                           N) {}
 
@@ -1607,7 +1696,372 @@ public:
   }
 
   static bool classof(const OSSClause *T) {
-    return T->getClauseKind() == OSSC_ndrange;
+    return T->getClauseKind() == llvm::oss::OSSC_ndrange;
+  }
+};
+
+/// This represents 'read' clause in the '#pragma oss atomic' directive.
+///
+/// \code
+/// #pragma oss atomic read
+/// \endcode
+/// In this example directive '#pragma oss atomic' has 'read' clause.
+class OSSReadClause : public OSSClause {
+public:
+  /// Build 'read' clause.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSReadClause(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSClause(llvm::oss::OSSC_read, StartLoc, EndLoc) {}
+
+  /// Build an empty clause.
+  OSSReadClause()
+      : OSSClause(llvm::oss::OSSC_read, SourceLocation(), SourceLocation()) {}
+
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+
+  const_child_range children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  child_range used_children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+  const_child_range used_children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == llvm::oss::OSSC_read;
+  }
+};
+
+/// This represents 'write' clause in the '#pragma oss atomic' directive.
+///
+/// \code
+/// #pragma oss atomic write
+/// \endcode
+/// In this example directive '#pragma oss atomic' has 'write' clause.
+class OSSWriteClause : public OSSClause {
+public:
+  /// Build 'write' clause.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSWriteClause(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSClause(llvm::oss::OSSC_write, StartLoc, EndLoc) {}
+
+  /// Build an empty clause.
+  OSSWriteClause()
+      : OSSClause(llvm::oss::OSSC_write, SourceLocation(), SourceLocation()) {}
+
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+
+  const_child_range children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  child_range used_children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+  const_child_range used_children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == llvm::oss::OSSC_write;
+  }
+};
+
+/// This represents 'capture' clause in the '#pragma oss atomic'
+/// directive.
+///
+/// \code
+/// #pragma oss atomic capture
+/// \endcode
+/// In this example directive '#pragma oss atomic' has 'capture' clause.
+class OSSCaptureClause : public OSSClause {
+public:
+  /// Build 'capture' clause.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSCaptureClause(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSClause(llvm::oss::OSSC_capture, StartLoc, EndLoc) {}
+
+  /// Build an empty clause.
+  OSSCaptureClause()
+      : OSSClause(llvm::oss::OSSC_capture, SourceLocation(), SourceLocation()) {
+  }
+
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+
+  const_child_range children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  child_range used_children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+  const_child_range used_children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == llvm::oss::OSSC_capture;
+  }
+};
+
+/// This represents 'compare' clause in the '#pragma oss atomic'
+/// directive.
+///
+/// \code
+/// #pragma oss atomic compare
+/// \endcode
+/// In this example directive '#pragma oss atomic' has 'compare' clause.
+class OSSCompareClause final : public OSSClause {
+public:
+  /// Build 'compare' clause.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSCompareClause(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSClause(llvm::oss::OSSC_compare, StartLoc, EndLoc) {}
+
+  /// Build an empty clause.
+  OSSCompareClause()
+      : OSSClause(llvm::oss::OSSC_compare, SourceLocation(), SourceLocation()) {
+  }
+
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+
+  const_child_range children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  child_range used_children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+  const_child_range used_children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == llvm::oss::OSSC_compare;
+  }
+};
+
+/// This represents 'seq_cst' clause in the '#pragma oss atomic'
+/// directive.
+///
+/// \code
+/// #pragma oss atomic seq_cst
+/// \endcode
+/// In this example directive '#pragma oss atomic' has 'seq_cst' clause.
+class OSSSeqCstClause : public OSSClause {
+public:
+  /// Build 'seq_cst' clause.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSSeqCstClause(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSClause(llvm::oss::OSSC_seq_cst, StartLoc, EndLoc) {}
+
+  /// Build an empty clause.
+  OSSSeqCstClause()
+      : OSSClause(llvm::oss::OSSC_seq_cst, SourceLocation(), SourceLocation()) {
+  }
+
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+
+  const_child_range children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  child_range used_children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+  const_child_range used_children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == llvm::oss::OSSC_seq_cst;
+  }
+};
+
+/// This represents 'acq_rel' clause in the '#pragma oss atomic'
+/// directives.
+///
+/// \code
+/// #pragma oss atomic acq_rel
+/// \endcode
+/// In this example directive '#pragma oss atomic' has 'acq_rel' clause.
+class OSSAcqRelClause final : public OSSClause {
+public:
+  /// Build 'ack_rel' clause.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSAcqRelClause(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSClause(llvm::oss::OSSC_acq_rel, StartLoc, EndLoc) {}
+
+  /// Build an empty clause.
+  OSSAcqRelClause()
+      : OSSClause(llvm::oss::OSSC_acq_rel, SourceLocation(), SourceLocation()) {
+  }
+
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+
+  const_child_range children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  child_range used_children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+  const_child_range used_children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == llvm::oss::OSSC_acq_rel;
+  }
+};
+
+/// This represents 'acquire' clause in the '#pragma oss atomic'
+/// directives.
+///
+/// \code
+/// #pragma oss atomic acquire
+/// \endcode
+/// In this example directive '#pragma oss atomic' has 'acquire' clause.
+class OSSAcquireClause final : public OSSClause {
+public:
+  /// Build 'acquire' clause.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSAcquireClause(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSClause(llvm::oss::OSSC_acquire, StartLoc, EndLoc) {}
+
+  /// Build an empty clause.
+  OSSAcquireClause()
+      : OSSClause(llvm::oss::OSSC_acquire, SourceLocation(), SourceLocation()) {
+  }
+
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+
+  const_child_range children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  child_range used_children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+  const_child_range used_children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == llvm::oss::OSSC_acquire;
+  }
+};
+
+/// This represents 'release' clause in the '#pragma oss atomic'
+/// directives.
+///
+/// \code
+/// #pragma oss atomic release
+/// \endcode
+/// In this example directive '#pragma oss atomic' has 'release' clause.
+class OSSReleaseClause final : public OSSClause {
+public:
+  /// Build 'release' clause.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSReleaseClause(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSClause(llvm::oss::OSSC_release, StartLoc, EndLoc) {}
+
+  /// Build an empty clause.
+  OSSReleaseClause()
+      : OSSClause(llvm::oss::OSSC_release, SourceLocation(), SourceLocation()) {
+  }
+
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+
+  const_child_range children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  child_range used_children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+  const_child_range used_children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == llvm::oss::OSSC_release;
+  }
+};
+
+/// This represents 'relaxed' clause in the '#pragma oss atomic'
+/// directives.
+///
+/// \code
+/// #pragma oss atomic relaxed
+/// \endcode
+/// In this example directive '#pragma oss atomic' has 'relaxed' clause.
+class OSSRelaxedClause final : public OSSClause {
+public:
+  /// Build 'relaxed' clause.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSRelaxedClause(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSClause(llvm::oss::OSSC_relaxed, StartLoc, EndLoc) {}
+
+  /// Build an empty clause.
+  OSSRelaxedClause()
+      : OSSClause(llvm::oss::OSSC_relaxed, SourceLocation(), SourceLocation()) {
+  }
+
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+
+  const_child_range children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  child_range used_children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+  const_child_range used_children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == llvm::oss::OSSC_relaxed;
   }
 };
 
@@ -1616,21 +2070,26 @@ public:
 template<class ImplClass, template <typename> class Ptr, typename RetTy>
 class OSSClauseVisitorBase {
 public:
-#define PTR(CLASS) typename Ptr<CLASS>::type
+#define PTR(CLASS) Ptr<CLASS>
 #define DISPATCH(CLASS) \
   return static_cast<ImplClass*>(this)->Visit##CLASS(static_cast<PTR(CLASS)>(S))
 
-#define OMPSS_CLAUSE(Name, Class)                              \
-  RetTy Visit ## Class (PTR(Class) S) { DISPATCH(Class); }
-#include "clang/Basic/OmpSsKinds.def"
+#define GEN_CLANG_CLAUSE_CLASS
+#define CLAUSE_CLASS(Enum, Str, Class)                                         \
+  RetTy Visit##Class(PTR(Class) S) { DISPATCH(Class); }
+#include "llvm/Frontend/OmpSs/OSS.inc"
 
   RetTy Visit(PTR(OSSClause) S) {
-    // Top switch clause: visit each OSSClause.
+    // Top switch clause: visit each OMPClause.
     switch (S->getClauseKind()) {
-    default: llvm_unreachable("Unknown clause kind!");
-#define OMPSS_CLAUSE(Name, Class)                              \
-    case OSSC_ ## Name : return Visit ## Class(static_cast<PTR(Class)>(S));
-#include "clang/Basic/OmpSsKinds.def"
+#define GEN_CLANG_CLAUSE_CLASS
+#define CLAUSE_CLASS(Enum, Str, Class)                                         \
+  case llvm::oss::Clause::Enum:                                                \
+    return Visit##Class(static_cast<PTR(Class)>(S));
+#define CLAUSE_NO_CLASS(Enum, Str)                                             \
+  case llvm::oss::Clause::Enum:                                                \
+    break;
+#include "llvm/Frontend/OmpSs/OSS.inc"
     }
   }
   // Base case, ignore it. :)
@@ -1644,10 +2103,30 @@ using const_ptr = std::add_pointer_t<std::add_const_t<T>>;
 
 template<class ImplClass, typename RetTy = void>
 class OSSClauseVisitor :
-      public OSSClauseVisitorBase <ImplClass, std::add_pointer, RetTy> {};
+      public OSSClauseVisitorBase <ImplClass, std::add_pointer_t, RetTy> {};
 template<class ImplClass, typename RetTy = void>
 class ConstOSSClauseVisitor :
       public OSSClauseVisitorBase <ImplClass, const_ptr, RetTy> {};
+
+class OSSClausePrinter final : public OSSClauseVisitor<OSSClausePrinter> {
+  raw_ostream &OS;
+  const PrintingPolicy &Policy;
+
+  /// Process clauses with list of variables.
+  template <typename T> void VisitOSSClauseList(T *Node, char StartSym);
+  /// Process motion clauses.
+  template <typename T> void VisitOSSMotionClause(T *Node);
+
+public:
+  OSSClausePrinter(raw_ostream &OS, const PrintingPolicy &Policy)
+      : OS(OS), Policy(Policy) {}
+
+#define GEN_CLANG_CLAUSE_CLASS
+#define CLAUSE_CLASS(Enum, Str, Class) void Visit##Class(Class *S);
+#include "llvm/Frontend/OmpSs/OSS.inc"
+};
+
+
 } // namespace clang
 
 #endif // LLVM_CLANG_AST_OMPSSCLAUSE_H

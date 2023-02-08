@@ -19,6 +19,7 @@
 #include "ConstantEmitter.h"
 #include "clang/CodeGen/ConstantInitBuilder.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/OmpSsClause.h"
 #include "clang/AST/StmtOmpSs.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/Basic/BitmaskEnum.h"
@@ -37,12 +38,15 @@
 
 using namespace clang;
 using namespace CodeGen;
+using namespace llvm::oss;
 
 namespace {
 
 enum OmpSsBundleKind {
   OSSB_directive,
   OSSB_task,
+  OSSB_critical_start,
+  OSSB_critical_end,
   OSSB_task_for,
   OSSB_taskiter_for,
   OSSB_taskiter_while,
@@ -112,6 +116,10 @@ const char *getBundleStr(OmpSsBundleKind Kind) {
     return "DIR.OSS";
   case OSSB_task:
     return "TASK";
+  case OSSB_critical_start:
+    return "CRITICAL.START";
+  case OSSB_critical_end:
+    return "CRITICAL.END";
   case OSSB_task_for:
     return "TASK.FOR";
   case OSSB_taskiter_for:
@@ -338,7 +346,7 @@ public:
 
   // Walk down into the type and look for VLA expressions.
   void FillTypeVLASizes(const Expr *E) {
-    QualType type = E->getType();
+    QualType type = E->getType().getCanonicalType();
     while (type->isVariablyModifiedType()) {
       if (type->isPointerType()) {
         type = type->getPointeeType();
@@ -1332,7 +1340,7 @@ llvm::Function *CGOmpSsRuntime::createCallWrapperFunc(
     const llvm::DenseMap<const VarDecl *, Address> &CaptureInvolvedMap,
     ArrayRef<QualType> RetTypes,
     bool HasThis, bool HasSwitch, std::string FuncName, std::string RetName,
-    llvm::function_ref<void(CodeGenFunction &, const Expr *E, Optional<llvm::Value *>)> Body) {
+    llvm::function_ref<void(CodeGenFunction &, const Expr *E, std::optional<llvm::Value *>)> Body) {
 
   InDirectiveEmission = false;
 
@@ -1477,7 +1485,7 @@ llvm::Function *CGOmpSsRuntime::createCallWrapperFunc(
     (void)InitScope.Privatize();
 
     // Function body generation
-    Optional<llvm::Value *> SwitchValue;
+    std::optional<llvm::Value *> SwitchValue;
     if (HasSwitch)
       SwitchValue = &*(FuncVar->arg_end() - 1);
     Body(NewCGF, E, SwitchValue);
@@ -1532,7 +1540,7 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
   // For each iterator we have {init, remap, ub, step}
   SmallVector<QualType, 3 + 1> MultiDepRetTypes(
     MDExpr->getDepInits().size()*(3 + 1), CGF.getContext().IntTy);
-  auto Body = [](CodeGenFunction &NewCGF, const Expr *E, Optional<llvm::Value *> Switch) {
+  auto Body = [](CodeGenFunction &NewCGF, const Expr *E, std::optional<llvm::Value *> Switch) {
     auto *MDExpr = cast<OSSMultiDepExpr>(E);
     uint64_t SwitchTyBits =
       NewCGF.CGM.getDataLayout().getTypeSizeInBits(Switch.value()->getType());
@@ -1647,7 +1655,7 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
 void CGOmpSsRuntime::BuildWrapperCallBundleList(
     std::string FuncName,
     CodeGenFunction &CGF, const Expr *E, QualType Q,
-    llvm::function_ref<void(CodeGenFunction &, const Expr *E, Optional<llvm::Value *>)> Body,
+    llvm::function_ref<void(CodeGenFunction &, const Expr *E, std::optional<llvm::Value *>)> Body,
     SmallVectorImpl<llvm::Value *> &List) {
 
   OSSExprInfoGathering CallVisitor(CGF);
@@ -1692,7 +1700,7 @@ void CGOmpSsRuntime::BuildWrapperCallBundleList(
 void CGOmpSsRuntime::EmitWrapperCallBundle(
     std::string Name, std::string FuncName,
     CodeGenFunction &CGF, const Expr *E, QualType Q,
-    llvm::function_ref<void(CodeGenFunction &, const Expr *E, Optional<llvm::Value *>)> Body,
+    llvm::function_ref<void(CodeGenFunction &, const Expr *E, std::optional<llvm::Value *>)> Body,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
 
   SmallVector<llvm::Value *, 4> List;
@@ -1705,7 +1713,7 @@ void CGOmpSsRuntime::EmitScalarWrapperCallBundle(
     CodeGenFunction &CGF, const Expr *E,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
 
-  auto Body = [](CodeGenFunction &NewCGF, const Expr *E, Optional<llvm::Value *>) {
+  auto Body = [](CodeGenFunction &NewCGF, const Expr *E, std::optional<llvm::Value *>) {
     llvm::Value *V = NewCGF.EmitScalarExpr(E);
 
     Address RetAddr = NewCGF.ReturnValue;
@@ -1720,7 +1728,7 @@ void CGOmpSsRuntime::EmitBoolWrapperCallBundle(
     CodeGenFunction &CGF, const Expr *E,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
 
-  auto Body = [](CodeGenFunction &NewCGF, const Expr *E, Optional<llvm::Value *>) {
+  auto Body = [](CodeGenFunction &NewCGF, const Expr *E, std::optional<llvm::Value *>) {
     llvm::Value *V = NewCGF.EvaluateExprAsBool(E);
 
     Address RetAddr = NewCGF.ReturnValue;
@@ -1735,7 +1743,7 @@ void CGOmpSsRuntime::EmitIgnoredWrapperCallBundle(
     CodeGenFunction &CGF, const Expr *E,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
 
-  auto Body = [](CodeGenFunction &NewCGF, const Expr *E, Optional<llvm::Value *>) {
+  auto Body = [](CodeGenFunction &NewCGF, const Expr *E, std::optional<llvm::Value *>) {
     if (const auto *DRE = dyn_cast<DeclRefExpr>(E)) {
       if (DRE->isNonOdrUse() == NOUR_Unevaluated)
         return;
@@ -1762,7 +1770,7 @@ void CGOmpSsRuntime::EmitDependencyList(
 
   CodeGenFunction NewCGF(CGF.CGM);
 
-  auto Body = [&Dep](CodeGenFunction &NewCGF, const Expr *E, Optional<llvm::Value *>) {
+  auto Body = [&Dep](CodeGenFunction &NewCGF, const Expr *E, std::optional<llvm::Value *>) {
     SmallVector<llvm::Value *, 4> List;
     // C long -> LLVM long
     llvm::Type *OSSArgTy = NewCGF.ConvertType(NewCGF.getContext().LongTy);
@@ -1943,7 +1951,7 @@ void CGOmpSsRuntime::EmitDependency(
   MultiAndDepData.append(MultiDepData.begin(), MultiDepData.end());
   MultiAndDepData.append(DepData.begin(), DepData.end());
 
-  TaskInfo.emplace_back(Name, llvm::makeArrayRef(MultiAndDepData));
+  TaskInfo.emplace_back(Name, llvm::ArrayRef(MultiAndDepData));
 }
 
 /// Check if the combiner is a call to UDR and if it is so return the
@@ -2353,7 +2361,7 @@ void CGOmpSsRuntime::EmitReduction(
 
   List.insert(List.begin(), RedKind);
 
-  TaskInfo.emplace_back(RedName, makeArrayRef(List));
+  TaskInfo.emplace_back(RedName, ArrayRef(List));
   TaskInfo.emplace_back(RedInitName, ArrayRef<llvm::Value *>{DepBaseDSA, RedInit});
   TaskInfo.emplace_back(RedCombName, ArrayRef<llvm::Value *>{DepBaseDSA, RedComb});
 }
@@ -2394,7 +2402,7 @@ void CGOmpSsRuntime::emitTaskwaitCall(CodeGenFunction &CGF,
     InDirectiveEmission = false;
 
     llvm::Instruction *Result =
-      CGF.Builder.CreateCall(EntryCallee, {}, llvm::makeArrayRef(TaskInfo));
+      CGF.Builder.CreateCall(EntryCallee, {}, llvm::ArrayRef(TaskInfo));
     CGF.Builder.CreateCall(ExitCallee, Result);
 
     // Pop Task Stack
@@ -2421,7 +2429,7 @@ void CGOmpSsRuntime::emitReleaseCall(
   InDirectiveEmission = false;
 
   llvm::Function *Callee = CGM.getIntrinsic(llvm::Intrinsic::directive_marker);
-  CGF.Builder.CreateCall(Callee, {}, llvm::makeArrayRef(ReleaseInfo));
+  CGF.Builder.CreateCall(Callee, {}, llvm::ArrayRef(ReleaseInfo));
 
   // Pop Task Stack
   TaskStack.pop_back();
@@ -2503,8 +2511,10 @@ void CGOmpSsRuntime::setTaskNormalCleanupDestSlot(Address Addr) {
 // Borrowed brom CodeGenFunction.cpp
 static void EmitIfUsed(CodeGenFunction &CGF, llvm::BasicBlock *BB) {
   if (!BB) return;
-  if (!BB->use_empty())
-    return CGF.CurFn->getBasicBlockList().push_back(BB);
+  if (!BB->use_empty()) {
+    CGF.CurFn->insert(CGF.CurFn->end(), BB);
+    return;
+  }
   delete BB;
 }
 
@@ -2545,7 +2555,7 @@ static VarDecl *createImplicitVarDecl(
 
 static DeclRefExpr *emitTaskCallArg(
     CodeGenFunction &CGF, StringRef Name, QualType Q, SourceLocation Loc,
-    llvm::Optional<const Expr *> InitE = llvm::None) {
+    std::optional<const Expr *> InitE = std::nullopt) {
 
   ASTContext &Ctx = CGF.getContext();
 
@@ -2721,7 +2731,7 @@ void CGOmpSsRuntime::EmitDirectiveData(
     SmallVector<llvm::Value *> LTypeList;
     for (unsigned i = 0; i < LoopData.NumCollapses; ++i) {
       IndVarList.push_back(CGF.EmitLValue(LoopData.IndVar[i]).getPointer(CGF));
-      auto Body = [](CodeGenFunction &NewCGF, const Expr *E, Optional<llvm::Value *>) {
+      auto Body = [](CodeGenFunction &NewCGF, const Expr *E, std::optional<llvm::Value *>) {
         llvm::Value *V = NewCGF.EmitScalarExpr(E);
 
         Address RetAddr = NewCGF.ReturnValue;
@@ -2898,10 +2908,23 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
     Expr *ParmRef = emitTaskCallArg(CGF, "call_arg", ParQ, Loc, *ArgI);
 
     if (!ParQ->isReferenceType()) {
-      ParmRef =
-        ImplicitCastExpr::Create(Ctx, ParmRef->getType(), CK_LValueToRValue,
-                                 ParmRef, /*BasePath=*/nullptr,
-                                 VK_PRValue, FPOptionsOverride());
+      switch (CGF.getEvaluationKind(ParQ)) {
+      case TEK_Complex:
+      case TEK_Scalar: {
+        ParmRef =
+          ImplicitCastExpr::Create(Ctx, ParmRef->getType(), CK_LValueToRValue,
+                                   ParmRef, /*BasePath=*/nullptr,
+                                   VK_PRValue, FPOptionsOverride());
+        break;
+      }
+      case TEK_Aggregate: {
+        ParmRef =
+          ImplicitCastExpr::Create(Ctx, ParmRef->getType(), CK_NoOp,
+                                   ParmRef, /*BasePath=*/nullptr,
+                                   VK_PRValue, FPOptionsOverride());
+        break;
+      }
+      }
       FirstprivateCopies.push_back(ParmRef);
 
       LValue ParmLV = CGF.EmitLValue(ParmRef);
@@ -3361,7 +3384,7 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   InDirectiveEmission = false;
 
   llvm::Instruction *Result =
-    CGF.Builder.CreateCall(EntryCallee, {}, llvm::makeArrayRef(TaskInfo));
+    CGF.Builder.CreateCall(EntryCallee, {}, llvm::ArrayRef(TaskInfo));
 
   llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
   llvm::Instruction *TaskAllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "taskallocapt", Result->getParent());
@@ -3438,7 +3461,7 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   InDirectiveEmission = false;
 
   llvm::Instruction *Result =
-    CGF.Builder.CreateCall(EntryCallee, {}, llvm::makeArrayRef(TaskInfo));
+    CGF.Builder.CreateCall(EntryCallee, {}, llvm::ArrayRef(TaskInfo));
 
   llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
   llvm::Instruction *TaskAllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "taskallocapt", Result->getParent());
@@ -3466,6 +3489,45 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   CaptureMapStack.pop_back();
   TaskAllocaInsertPt->eraseFromParent();
 
+}
+
+void CGOmpSsRuntime::emitCriticalCall(CodeGenFunction &CGF,
+                                      const OSSExecutableDirective &D,
+                                      SourceLocation Loc,
+                                      const DeclarationNameInfo &DirName) {
+  llvm::Function *Callee = CGM.getIntrinsic(llvm::Intrinsic::directive_marker);
+
+  std::string CriticalName = "default";
+  if (!DirName.getAsString().empty())
+    CriticalName = DirName.getAsString();
+
+  llvm::Value *CriticalNameValue =
+    llvm::ConstantDataArray::getString(
+      CGM.getLLVMContext(), (Twine("nanos6_critical_") + CriticalName).str());
+
+  CGF.Builder.CreateCall(
+      Callee, {},
+      {
+        llvm::OperandBundleDef(
+          std::string(getBundleStr(OSSB_directive)),
+          ArrayRef<llvm::Value *>{
+            llvm::ConstantDataArray::getString(
+              CGM.getLLVMContext(), getBundleStr(OSSB_critical_start)),
+            CriticalNameValue
+          })
+      });
+  CGF.EmitStmt(D.getAssociatedStmt());
+  CGF.Builder.CreateCall(
+      Callee, {},
+      {
+        llvm::OperandBundleDef(
+          std::string(getBundleStr(OSSB_directive)),
+          ArrayRef<llvm::Value *>{
+            llvm::ConstantDataArray::getString(
+              CGM.getLLVMContext(), getBundleStr(OSSB_critical_end)),
+            CriticalNameValue
+          })
+      });
 }
 
 void CGOmpSsRuntime::emitLoopCall(CodeGenFunction &CGF,
@@ -3512,7 +3574,7 @@ void CGOmpSsRuntime::emitLoopCall(CodeGenFunction &CGF,
     InDirectiveEmission = false;
 
     llvm::Instruction *Result =
-      CGF.Builder.CreateCall(EntryCallee, {}, llvm::makeArrayRef(TaskInfo));
+      CGF.Builder.CreateCall(EntryCallee, {}, llvm::ArrayRef(TaskInfo));
 
     llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
     llvm::Instruction *TaskAllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "taskallocapt", Result->getParent());
@@ -3562,7 +3624,7 @@ void CGOmpSsRuntime::emitLoopCall(CodeGenFunction &CGF,
     InDirectiveEmission = false;
 
     llvm::Instruction *Result =
-      CGF.Builder.CreateCall(EntryCallee, {}, llvm::makeArrayRef(TaskInfo));
+      CGF.Builder.CreateCall(EntryCallee, {}, llvm::ArrayRef(TaskInfo));
 
     llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
     llvm::Instruction *TaskAllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "taskallocapt", Result->getParent());
@@ -3592,6 +3654,14 @@ void CGOmpSsRuntime::emitLoopCall(CodeGenFunction &CGF,
   }
 }
 
+/// Emit code for 'flush' "directive".
+void CGOmpSsRuntime::emitFlush(CodeGenFunction &CGF, llvm::AtomicOrdering AO) {
+  llvm::Function *Callee = CGM.getIntrinsic(llvm::Intrinsic::directive_marker);
+  llvm::Instruction *Call = CGF.Builder.CreateCall(Callee);
+  new llvm::FenceInst(CGF.CGM.getLLVMContext(), AO, llvm::SyncScope::System, Call);
+  Call->eraseFromParent();
+}
+
 void CGOmpSsRuntime::addMetadata(ArrayRef<llvm::Metadata *> List) {
   MetadataList.append(List.begin(), List.end());
 }
@@ -3600,4 +3670,8 @@ llvm::MDNode *CGOmpSsRuntime::getMetadataNode() {
   if (MetadataList.empty())
     return nullptr;
   return llvm::MDTuple::get(CGM.getLLVMContext(), MetadataList);
+}
+
+llvm::AtomicOrdering CGOmpSsRuntime::getDefaultMemoryOrdering() const {
+  return RequiresAtomicOrdering;
 }

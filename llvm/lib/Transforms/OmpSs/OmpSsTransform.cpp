@@ -596,14 +596,15 @@ struct OmpSsDirective {
     if (Func->empty()) {
       Func->setLinkage(GlobalValue::InternalLinkage);
       BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", Func);
-      EntryBB->getInstList().push_back(ReturnInst::Create(Ctx));
+      Instruction *RetInst = ReturnInst::Create(Ctx);
+      RetInst->insertInto(EntryBB, EntryBB->end());
 
       appendToGlobalCtors(M, Func, 65535);
     }
 
     BasicBlock &Entry = Func->getEntryBlock();
 
-    IRBuilder<> BBBuilder(&Entry.getInstList().back());
+    IRBuilder<> BBBuilder(&Entry.back());
     BBBuilder.CreateCall(nanos6Api::taskInfoRegisterFuncCallee(M), TaskInfoVar);
   }
 
@@ -809,7 +810,8 @@ struct OmpSsDirective {
     BasicBlock &Entry = UnpackFunc->getEntryBlock();
 
     // add the terminator so IRBuilder inserts just before it
-    UnpackFunc->getEntryBlock().getInstList().push_back(ReturnInst::Create(Ctx));
+    Instruction *RetInst = ReturnInst::Create(Ctx);
+    RetInst->insertInto(&Entry, Entry.end());
 
     SmallVector<Value *, 2> NewIndVarLBounds;
     SmallVector<Value *, 2> NewIndVarUBounds;
@@ -877,7 +879,8 @@ struct OmpSsDirective {
       Function *UnpackFunc, const MapVector<Value *, size_t> &StructToIdxMap) {
     BasicBlock::Create(Ctx, "entry", UnpackFunc);
     BasicBlock &Entry = UnpackFunc->getEntryBlock();
-    UnpackFunc->getEntryBlock().getInstList().push_back(ReturnInst::Create(Ctx));
+    Instruction *RetInst = ReturnInst::Create(Ctx);
+    RetInst->insertInto(&Entry, Entry.end());
     IRBuilder<> BBBuilder(&UnpackFunc->getEntryBlock().back());
     Value *Constraints = &*(UnpackFunc->arg_end() - 1);
     Value *Idx[2];
@@ -904,7 +907,8 @@ struct OmpSsDirective {
       Function *UnpackFunc, const MapVector<Value *, size_t> &StructToIdxMap) {
     BasicBlock::Create(Ctx, "entry", UnpackFunc);
     BasicBlock &Entry = UnpackFunc->getEntryBlock();
-    UnpackFunc->getEntryBlock().getInstList().push_back(ReturnInst::Create(Ctx));
+    Instruction *RetInst = ReturnInst::Create(Ctx);
+    RetInst->insertInto(&Entry, Entry.end());
     IRBuilder<> BBBuilder(&UnpackFunc->getEntryBlock().back());
     Value *PriorityArg = &*(UnpackFunc->arg_end() - 1);
 
@@ -925,7 +929,8 @@ struct OmpSsDirective {
       Function *UnpackFunc, const MapVector<Value *, size_t> &StructToIdxMap) {
     BasicBlock::Create(Ctx, "entry", UnpackFunc);
     BasicBlock &Entry = UnpackFunc->getEntryBlock();
-    UnpackFunc->getEntryBlock().getInstList().push_back(ReturnInst::Create(Ctx));
+    Instruction *RetInst = ReturnInst::Create(Ctx);
+    RetInst->insertInto(&Entry, Entry.end());
     IRBuilder<> BBBuilder(&UnpackFunc->getEntryBlock().back());
 
     BBBuilder.CreateCall(OnreadyInfo.Fun, OnreadyInfo.Args);
@@ -943,7 +948,8 @@ struct OmpSsDirective {
       Function *UnpackFunc, const MapVector<Value *, size_t> &StructToIdxMap) {
     BasicBlock::Create(Ctx, "entry", UnpackFunc);
     BasicBlock &Entry = UnpackFunc->getEntryBlock();
-    UnpackFunc->getEntryBlock().getInstList().push_back(ReturnInst::Create(Ctx));
+    Instruction *RetInst = ReturnInst::Create(Ctx);
+    RetInst->insertInto(&Entry, Entry.end());
     IRBuilder<> BBBuilder(&UnpackFunc->getEntryBlock().back());
     Value *ResArg = &*(UnpackFunc->arg_end() - 1);
 
@@ -1033,7 +1039,7 @@ struct OmpSsDirective {
         File = OldSP->getFile();
       }
       DIBuilder DIB(M, /*AllowUnresolved=*/false, CU);
-      auto SPType = DIB.createSubroutineType(DIB.getOrCreateTypeArray(None));
+      auto SPType = DIB.createSubroutineType(DIB.getOrCreateTypeArray(std::nullopt));
       DISubprogram::DISPFlags SPFlags = DISubprogram::SPFlagDefinition |
                                         DISubprogram::SPFlagOptimized |
                                         DISubprogram::SPFlagLocalToUnit;
@@ -1314,7 +1320,7 @@ struct OmpSsDirective {
     for (const VLAAlign& VAlign : VLAAlignsInfo) {
       auto *V = VAlign.V;
       Type *Ty = DirEnv.getDSAType(V);
-      unsigned TyAlign = VAlign.Align;
+      Align TyAlign = VAlign.TyAlign;
 
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Int32Ty);
@@ -1324,7 +1330,7 @@ struct OmpSsDirective {
                         TaskArgsDstL, Idx, "gep_dst_" + V->getName());
 
       // Point VLA in task args to an aligned position of the extra space allocated
-      IRB.CreateAlignedStore(TaskArgsDstLi8IdxGEP, GEP, Align(TyAlign));
+      IRB.CreateAlignedStore(TaskArgsDstLi8IdxGEP, GEP, TyAlign);
       // Skip current VLA size
       unsigned SizeB = DL.getTypeAllocSize(Ty);
       Value *VLASize = ConstantInt::get(Int64Ty, SizeB);
@@ -1404,7 +1410,7 @@ struct OmpSsDirective {
     for (size_t i = 0; i < DSAInfo.Firstprivate.size(); ++i) {
       Value *V = DSAInfo.Firstprivate[i];
       Type *Ty = DSAInfo.FirstprivateTy[i];
-      unsigned TyAlign = DL.getPrefTypeAlignment(Ty);
+      Align TyAlign = DL.getPrefTypeAlign(Ty);
 
       // Compute num elements
       Value *NSize = ConstantInt::get(Int64Ty, 1);
@@ -1457,7 +1463,7 @@ struct OmpSsDirective {
       } else {
         unsigned SizeB = DL.getTypeAllocSize(Ty);
         Value *NSizeB = IRB.CreateNUWMul(NSize, ConstantInt::get(Int64Ty, SizeB));
-        IRB.CreateMemCpy(GEPDst, Align(TyAlign), GEPSrc, Align(TyAlign), NSizeB);
+        IRB.CreateMemCpy(GEPDst, TyAlign, GEPSrc, TyAlign, NSizeB);
       }
     }
     for (Value *V : CapturedInfo) {
@@ -1581,7 +1587,7 @@ struct OmpSsDirective {
       TaskSizeofList.push_back(
         ConstantInt::get(
           Int32Ty,
-          DL.getTypeStoreSize(Ty).getFixedSize()));
+          DL.getTypeStoreSize(Ty).getFixedValue()));
     }
     SizeofTableVar =
       new GlobalVariable(M, ArrayType::get(Int32Ty, TaskTypeList.size()),
@@ -1631,7 +1637,7 @@ struct OmpSsDirective {
 
   struct VLAAlign {
     Value *V;
-    unsigned Align;
+    Align TyAlign;
   };
 
   // Greater alignemt go first
@@ -1640,13 +1646,13 @@ struct OmpSsDirective {
       auto *V = VLAWithDimsMap.first;
       Type *Ty = DirEnv.getDSAType(V);
 
-      unsigned Align = DL.getPrefTypeAlignment(Ty);
+      Align TyAlign = DL.getPrefTypeAlign(Ty);
 
       auto It = VLAAlignsInfo.begin();
-      while (It != VLAAlignsInfo.end() && It->Align >= Align)
+      while (It != VLAAlignsInfo.end() && It->TyAlign >= TyAlign)
         ++It;
 
-      VLAAlignsInfo.insert(It, {V, Align});
+      VLAAlignsInfo.insert(It, {V, TyAlign});
     }
   }
 
@@ -2169,7 +2175,7 @@ struct OmpSsDirective {
     // Placeholders
     BasicBlock *header, BasicBlock *newRootNode, BasicBlock *newHeader,
     Function *oldFunction, const SetVector<BasicBlock *> &Blocks) {
-    UnpackTaskFuncVar->getBasicBlockList().push_back(newRootNode);
+    UnpackTaskFuncVar->insert(UnpackTaskFuncVar->end(), newRootNode);
 
     if (DirEnv.isOmpSsLoopDirective()) {
       Type *OrigIndVarTy = DirEnv.getDSAType(LoopInfo.IndVar[0]);
@@ -2504,7 +2510,7 @@ struct OmpSsDirective {
     for (const auto& VAlign : VLAAlignsInfo) {
       auto *V = VAlign.V;
       Type *Ty = DirEnv.getDSAType(V);
-      unsigned TyAlign = VAlign.Align;
+      Align TyAlign = VAlign.TyAlign;
 
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Int32Ty);
@@ -2514,7 +2520,7 @@ struct OmpSsDirective {
                         TaskArgsVarL, Idx, "gep_" + V->getName());
 
       // Point VLA in task args to an aligned position of the extra space allocated
-      IRB.CreateAlignedStore(TaskArgsVarLi8IdxGEP, GEP, Align(TyAlign));
+      IRB.CreateAlignedStore(TaskArgsVarLi8IdxGEP, GEP, TyAlign);
       // Skip current VLA size
       unsigned SizeB = DL.getTypeAllocSize(Ty);
       Value *VLASize = ConstantInt::get(Int64Ty, SizeB);
@@ -2570,7 +2576,7 @@ struct OmpSsDirective {
     for (size_t i = 0; i < DSAInfo.Firstprivate.size(); ++i) {
       Value *V = DSAInfo.Firstprivate[i];
       Type *Ty = DSAInfo.FirstprivateTy[i];
-      unsigned TyAlign = DL.getPrefTypeAlignment(Ty);
+      Align TyAlign = DL.getPrefTypeAlign(Ty);
 
       // Compute num elements
       Value *NSize = ConstantInt::get(Int64Ty, 1);
@@ -2607,7 +2613,7 @@ struct OmpSsDirective {
       } else {
         unsigned SizeB = DL.getTypeAllocSize(Ty);
         Value *NSizeB = IRB.CreateNUWMul(NSize, ConstantInt::get(Int64Ty, SizeB));
-        IRB.CreateMemCpy(GEP, Align(TyAlign), V, Align(TyAlign), NSizeB);
+        IRB.CreateMemCpy(GEP, TyAlign, V, TyAlign, NSizeB);
       }
     }
     for (Value *V : CapturedInfo) {
@@ -2840,6 +2846,30 @@ struct OmpSsDirective {
     DirInfo.Entry->eraseFromParent();
   }
 
+  void lowerCritical() {
+    IRBuilder<> IRB(DirInfo.Entry);
+    unsigned Line = DirInfo.Entry->getDebugLoc().getLine();
+    unsigned Col = DirInfo.Entry->getDebugLoc().getCol();
+
+    std::string FileNamePlusLoc = (M.getSourceFileName()
+                                   + ":" + Twine(Line)
+                                   + ":" + Twine(Col)).str();
+    Constant *Nanos6CriticalLocStr = IRB.CreateGlobalStringPtr(FileNamePlusLoc);
+
+    GlobalVariable *GLock = cast<GlobalVariable>(
+      M.getOrInsertGlobal(DirEnv.CriticalNameStringRef, PtrTy));
+    GLock->setLinkage(GlobalValue::WeakAnyLinkage);
+    GLock->setInitializer(Constant::getNullValue(PtrTy));
+
+    if (DirEnv.isOmpSsCriticalStartDirective()) {
+      IRB.CreateCall(nanos6Api::userLockFuncCallee(M), {GLock, Nanos6CriticalLocStr});
+    } else {
+      IRB.CreateCall(nanos6Api::userUnlockFuncCallee(M), {GLock});
+    }
+
+    DirInfo.Entry->eraseFromParent();
+  }
+
   void lowerFinalCode() {
     // Skip non task directives
     if (!DirEnv.isOmpSsTaskDirective())
@@ -2976,6 +3006,8 @@ struct OmpSsDirective {
       lowerRelease();
     else if (DirEnv.isOmpSsTaskDirective())
       lowerTask();
+    else if (DirEnv.isOmpSsCriticalDirective())
+      lowerCritical();
 
     return true;
   }
@@ -3121,16 +3153,16 @@ struct OmpSsModule {
     Function *Func = cast<Function>(nanos6Api::registerCtorAssertFuncCallee(M).getCallee());
     if (Func->empty()) {
       Func->setLinkage(GlobalValue::InternalLinkage);
-      BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry",
-        Func);
-      EntryBB->getInstList().push_back(ReturnInst::Create(Ctx));
+      BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", Func);
+      Instruction *RetInst = ReturnInst::Create(Ctx);
+      RetInst->insertInto(EntryBB, EntryBB->end());
 
       appendToGlobalCtors(M, Func, 65535);
 
     }
     BasicBlock &Entry = Func->getEntryBlock();
 
-    IRBuilder<> BBBuilder(&Entry.getInstList().back());
+    IRBuilder<> BBBuilder(&Entry.back());
     Constant *StringPtr = BBBuilder.CreateGlobalStringPtr(Str);
     BBBuilder.CreateCall(nanos6Api::registerAssertFuncCallee(M), StringPtr);
   }

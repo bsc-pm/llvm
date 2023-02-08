@@ -26,6 +26,7 @@ def OmpSs_Dialect : Dialect {
   let cppNamespace = "::mlir::oss";
 
   let useDefaultAttributePrinterParser = 1;
+  let useFoldAPI = kEmitFoldAdaptorFolder;
 }
 
 // Type which can be constraint accepting standard integers, indices and

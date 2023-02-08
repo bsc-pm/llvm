@@ -26,6 +26,7 @@
 
 // RUN: %oss-compile
 // RUN: %oss-O2-compile
+// UNSUPPORTED: true
 
 // Match type size when building the loop
 

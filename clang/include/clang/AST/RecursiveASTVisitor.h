@@ -608,7 +608,7 @@ bool RecursiveASTVisitor<Derived>::TraverseConceptExprRequirement(
 template <typename Derived>
 bool RecursiveASTVisitor<Derived>::TraverseConceptNestedRequirement(
     concepts::NestedRequirement *R) {
-  if (!R->isSubstitutionFailure())
+  if (!R->hasInvalidConstraint())
     return getDerived().TraverseStmt(R->getConstraintExpr());
   return true;
 }
@@ -2879,6 +2879,7 @@ DEF_TRAVERSE_STMT(SubstNonTypeTemplateParmExpr, {})
 DEF_TRAVERSE_STMT(FunctionParmPackExpr, {})
 DEF_TRAVERSE_STMT(CXXFoldExpr, {})
 DEF_TRAVERSE_STMT(AtomicExpr, {})
+DEF_TRAVERSE_STMT(CXXParenListInitExpr, {})
 
 DEF_TRAVERSE_STMT(MaterializeTemporaryExpr, {
   if (S->getLifetimeExtendedTemporaryDecl()) {
@@ -3878,6 +3879,14 @@ bool RecursiveASTVisitor<Derived>::VisitOMPBindClause(OMPBindClause *C) {
   return true;
 }
 
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOMPXDynCGroupMemClause(
+    OMPXDynCGroupMemClause *C) {
+  TRY_TO(VisitOMPClauseWithPreInit(C));
+  TRY_TO(TraverseStmt(C->getSize()));
+  return true;
+}
+
 // FIXME: look at the following tricky-seeming exprs to see if we
 // need to recurse on anything.  These are ones that have methods
 // returning decls or qualtypes or nestednamespecifier -- though I'm
@@ -3918,6 +3927,9 @@ DEF_TRAVERSE_STMT(OSSReleaseDirective,
 DEF_TRAVERSE_STMT(OSSTaskDirective,
                   { TRY_TO(TraverseOSSExecutableDirective(S)); })
 
+DEF_TRAVERSE_STMT(OSSCriticalDirective,
+                  { TRY_TO(TraverseOSSExecutableDirective(S)); })
+
 DEF_TRAVERSE_STMT(OSSTaskForDirective,
                   { TRY_TO(TraverseOSSLoopDirective(S)); })
 
@@ -3929,6 +3941,9 @@ DEF_TRAVERSE_STMT(OSSTaskLoopDirective,
 
 DEF_TRAVERSE_STMT(OSSTaskLoopForDirective,
                   { TRY_TO(TraverseOSSLoopDirective(S)); })
+
+DEF_TRAVERSE_STMT(OSSAtomicDirective,
+                  { TRY_TO(TraverseOSSExecutableDirective(S)); })
 
 #undef DEF_TRAVERSE_STMT
 #undef TRAVERSE_STMT

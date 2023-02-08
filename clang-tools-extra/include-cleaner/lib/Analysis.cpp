@@ -8,16 +8,20 @@
 
 #include "clang-include-cleaner/Analysis.h"
 #include "AnalysisInternal.h"
+#include "clang-include-cleaner/Record.h"
 #include "clang-include-cleaner/Types.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
+#include "clang/AST/DeclBase.h"
 #include "clang/Basic/SourceManager.h"
 #include "clang/Format/Format.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Tooling/Core/Replacement.h"
-#include "clang/Tooling/Inclusions/HeaderIncludes.h"
 #include "clang/Tooling/Inclusions/StandardLibrary.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace clang::include_cleaner {
 
@@ -28,21 +32,20 @@ void walkUsed(llvm::ArrayRef<Decl *> ASTRoots,
   // This is duplicated in writeHTMLReport, changes should be mirrored there.
   tooling::stdlib::Recognizer Recognizer;
   for (auto *Root : ASTRoots) {
-    auto &SM = Root->getASTContext().getSourceManager();
     walkAST(*Root, [&](SourceLocation Loc, NamedDecl &ND, RefType RT) {
+      if (!SM.isWrittenInMainFile(SM.getSpellingLoc(Loc)))
+        return;
+      // FIXME: Most of the work done here is repetative. It might be useful to
+      // have a cache/batching.
       SymbolReference SymRef{Loc, ND, RT};
-      if (auto SS = Recognizer(&ND)) {
-        // FIXME: Also report forward decls from main-file, so that the caller
-        // can decide to insert/ignore a header.
-        return CB(SymRef, findHeaders(*SS, SM, PI));
-      }
-      // FIXME: Extract locations from redecls.
-      return CB(SymRef, findHeaders(ND.getLocation(), SM, PI));
+      return CB(SymRef, headersForSymbol(ND, SM, PI));
     });
   }
   for (const SymbolReference &MacroRef : MacroRefs) {
     assert(MacroRef.Target.kind() == Symbol::Macro);
-    CB(MacroRef, findHeaders(MacroRef.Target.macro().Definition, SM, PI));
+    if (!SM.isWrittenInMainFile(SM.getSpellingLoc(MacroRef.RefLocation)))
+      continue;
+    CB(MacroRef, headersForSymbol(MacroRef.Target, SM, PI));
   }
 }
 
@@ -88,7 +91,7 @@ AnalysisResults analyze(llvm::ArrayRef<Decl *> ASTRoots,
 
   AnalysisResults Results;
   for (const Include &I : Inc.all())
-    if (!Used.contains(&I))
+    if (!Used.contains(&I) && PI && !PI->shouldKeep(I.Line))
       Results.Unused.push_back(&I);
   for (llvm::StringRef S : Missing.keys())
     Results.Missing.push_back(S.str());

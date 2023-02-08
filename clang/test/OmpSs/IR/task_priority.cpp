@@ -73,51 +73,51 @@ void bar(int n) {
 // LIN64-LABEL: define {{[^@]+}}@compute_priority
 // LIN64-SAME: () #[[ATTR3:[0-9]+]] !dbg [[DBG25:![0-9]+]] {
 // LIN64-NEXT:  entry:
-// LIN64-NEXT:    [[CALL:%.*]] = call noundef i32 @_Z3fooIiET_v(), !dbg [[DBG26:![0-9]+]]
-// LIN64-NEXT:    ret i32 [[CALL]], !dbg [[DBG26]]
+// LIN64-NEXT:    [[CALL:%.*]] = call noundef i32 @_Z3fooIiET_v(), !dbg [[DBG27:![0-9]+]]
+// LIN64-NEXT:    ret i32 [[CALL]], !dbg [[DBG27]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@_Z3fooIiET_v
-// LIN64-SAME: () #[[ATTR0]] comdat !dbg [[DBG28:![0-9]+]] {
+// LIN64-SAME: () #[[ATTR0]] comdat !dbg [[DBG29:![0-9]+]] {
 // LIN64-NEXT:  entry:
-// LIN64-NEXT:    ret i32 0, !dbg [[DBG29:![0-9]+]]
+// LIN64-NEXT:    ret i32 0, !dbg [[DBG30:![0-9]+]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@compute_priority.1
-// LIN64-SAME: (ptr [[N:%.*]]) #[[ATTR3]] !dbg [[DBG30:![0-9]+]] {
+// LIN64-SAME: (ptr [[N:%.*]]) #[[ATTR3]] !dbg [[DBG31:![0-9]+]] {
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    [[N_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    store ptr [[N]], ptr [[N_ADDR]], align 8
-// LIN64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG31:![0-9]+]]
-// LIN64-NEXT:    ret i32 [[TMP0]], !dbg [[DBG31]]
+// LIN64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG32:![0-9]+]]
+// LIN64-NEXT:    ret i32 [[TMP0]], !dbg [[DBG32]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@compute_priority.2
-// LIN64-SAME: (ptr [[VLA:%.*]], i64 [[TMP0:%.*]]) #[[ATTR3]] !dbg [[DBG33:![0-9]+]] {
+// LIN64-SAME: (ptr [[VLA:%.*]], i64 [[TMP0:%.*]]) #[[ATTR3]] !dbg [[DBG34:![0-9]+]] {
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    [[VLA_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    [[DOTADDR:%.*]] = alloca i64, align 8
 // LIN64-NEXT:    store ptr [[VLA]], ptr [[VLA_ADDR]], align 8
 // LIN64-NEXT:    store i64 [[TMP0]], ptr [[DOTADDR]], align 8
-// LIN64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i32, ptr [[VLA]], i64 1, !dbg [[DBG34:![0-9]+]]
-// LIN64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[ARRAYIDX]], align 4, !dbg [[DBG34]]
-// LIN64-NEXT:    ret i32 [[TMP1]], !dbg [[DBG36:![0-9]+]]
+// LIN64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i32, ptr [[VLA]], i64 1, !dbg [[DBG35:![0-9]+]]
+// LIN64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[ARRAYIDX]], align 4, !dbg [[DBG35]]
+// LIN64-NEXT:    ret i32 [[TMP1]], !dbg [[DBG37:![0-9]+]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@compute_priority.3
-// LIN64-SAME: () #[[ATTR3]] !dbg [[DBG37:![0-9]+]] {
+// LIN64-SAME: () #[[ATTR3]] !dbg [[DBG38:![0-9]+]] {
 // LIN64-NEXT:  entry:
-// LIN64-NEXT:    [[CALL:%.*]] = call noundef i32 @_Z3fooIiET_v(), !dbg [[DBG38:![0-9]+]]
-// LIN64-NEXT:    ret i32 [[CALL]], !dbg [[DBG38]]
+// LIN64-NEXT:    [[CALL:%.*]] = call noundef i32 @_Z3fooIiET_v(), !dbg [[DBG39:![0-9]+]]
+// LIN64-NEXT:    ret i32 [[CALL]], !dbg [[DBG39]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@compute_priority.4
-// LIN64-SAME: (ptr [[N:%.*]]) #[[ATTR3]] !dbg [[DBG40:![0-9]+]] {
+// LIN64-SAME: (ptr [[N:%.*]]) #[[ATTR3]] !dbg [[DBG41:![0-9]+]] {
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    [[N_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    store ptr [[N]], ptr [[N_ADDR]], align 8
-// LIN64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG41:![0-9]+]]
-// LIN64-NEXT:    ret i32 [[TMP0]], !dbg [[DBG41]]
+// LIN64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG42:![0-9]+]]
+// LIN64-NEXT:    ret i32 [[TMP0]], !dbg [[DBG42]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@_Z4foo1v
@@ -169,149 +169,149 @@ void bar(int n) {
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@compute_priority
-// PPC64-SAME: () #[[ATTR3:[0-9]+]] !dbg [[DBG25:![0-9]+]] {
+// PPC64-SAME: () !dbg [[DBG25:![0-9]+]] {
 // PPC64-NEXT:  entry:
-// PPC64-NEXT:    [[CALL:%.*]] = call noundef signext i32 @_Z3fooIiET_v(), !dbg [[DBG26:![0-9]+]]
-// PPC64-NEXT:    ret i32 [[CALL]], !dbg [[DBG26]]
+// PPC64-NEXT:    [[CALL:%.*]] = call noundef signext i32 @_Z3fooIiET_v(), !dbg [[DBG27:![0-9]+]]
+// PPC64-NEXT:    ret i32 [[CALL]], !dbg [[DBG27]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@_Z3fooIiET_v
-// PPC64-SAME: () #[[ATTR0]] comdat !dbg [[DBG28:![0-9]+]] {
+// PPC64-SAME: () #[[ATTR0]] comdat !dbg [[DBG29:![0-9]+]] {
 // PPC64-NEXT:  entry:
-// PPC64-NEXT:    ret i32 0, !dbg [[DBG29:![0-9]+]]
+// PPC64-NEXT:    ret i32 0, !dbg [[DBG30:![0-9]+]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@compute_priority.1
-// PPC64-SAME: (ptr [[N:%.*]]) #[[ATTR3]] !dbg [[DBG30:![0-9]+]] {
+// PPC64-SAME: (ptr [[N:%.*]]) !dbg [[DBG31:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[N_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store ptr [[N]], ptr [[N_ADDR]], align 8
-// PPC64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG31:![0-9]+]]
-// PPC64-NEXT:    ret i32 [[TMP0]], !dbg [[DBG31]]
+// PPC64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG32:![0-9]+]]
+// PPC64-NEXT:    ret i32 [[TMP0]], !dbg [[DBG32]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@compute_priority.2
-// PPC64-SAME: (ptr [[VLA:%.*]], i64 [[TMP0:%.*]]) #[[ATTR3]] !dbg [[DBG33:![0-9]+]] {
+// PPC64-SAME: (ptr [[VLA:%.*]], i64 [[TMP0:%.*]]) !dbg [[DBG34:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[VLA_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    [[DOTADDR:%.*]] = alloca i64, align 8
 // PPC64-NEXT:    store ptr [[VLA]], ptr [[VLA_ADDR]], align 8
 // PPC64-NEXT:    store i64 [[TMP0]], ptr [[DOTADDR]], align 8
-// PPC64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i32, ptr [[VLA]], i64 1, !dbg [[DBG34:![0-9]+]]
-// PPC64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[ARRAYIDX]], align 4, !dbg [[DBG34]]
-// PPC64-NEXT:    ret i32 [[TMP1]], !dbg [[DBG36:![0-9]+]]
+// PPC64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i32, ptr [[VLA]], i64 1, !dbg [[DBG35:![0-9]+]]
+// PPC64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[ARRAYIDX]], align 4, !dbg [[DBG35]]
+// PPC64-NEXT:    ret i32 [[TMP1]], !dbg [[DBG37:![0-9]+]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@compute_priority.3
-// PPC64-SAME: () #[[ATTR3]] !dbg [[DBG37:![0-9]+]] {
+// PPC64-SAME: () !dbg [[DBG38:![0-9]+]] {
 // PPC64-NEXT:  entry:
-// PPC64-NEXT:    [[CALL:%.*]] = call noundef signext i32 @_Z3fooIiET_v(), !dbg [[DBG38:![0-9]+]]
-// PPC64-NEXT:    ret i32 [[CALL]], !dbg [[DBG38]]
+// PPC64-NEXT:    [[CALL:%.*]] = call noundef signext i32 @_Z3fooIiET_v(), !dbg [[DBG39:![0-9]+]]
+// PPC64-NEXT:    ret i32 [[CALL]], !dbg [[DBG39]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@compute_priority.4
-// PPC64-SAME: (ptr [[N:%.*]]) #[[ATTR3]] !dbg [[DBG40:![0-9]+]] {
+// PPC64-SAME: (ptr [[N:%.*]]) !dbg [[DBG41:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[N_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store ptr [[N]], ptr [[N_ADDR]], align 8
-// PPC64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG41:![0-9]+]]
-// PPC64-NEXT:    ret i32 [[TMP0]], !dbg [[DBG41]]
+// PPC64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG42:![0-9]+]]
+// PPC64-NEXT:    ret i32 [[TMP0]], !dbg [[DBG42]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@_Z4foo1v
-// AARCH64-SAME: () #[[ATTR0:[0-9]+]] !dbg [[DBG9:![0-9]+]] {
+// AARCH64-SAME: () #[[ATTR0:[0-9]+]] !dbg [[DBG5:![0-9]+]] {
 // AARCH64-NEXT:  entry:
-// AARCH64-NEXT:    ret void, !dbg [[DBG13:![0-9]+]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG9:![0-9]+]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@_Z4foo2i
-// AARCH64-SAME: (i32 noundef [[N:%.*]]) #[[ATTR0]] !dbg [[DBG14:![0-9]+]] {
+// AARCH64-SAME: (i32 noundef [[N:%.*]]) #[[ATTR0]] !dbg [[DBG10:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[N_ADDR:%.*]] = alloca i32, align 4
 // AARCH64-NEXT:    store i32 [[N]], ptr [[N_ADDR]], align 4
-// AARCH64-NEXT:    ret void, !dbg [[DBG15:![0-9]+]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG11:![0-9]+]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@_Z3bari
-// AARCH64-SAME: (i32 noundef [[N:%.*]]) #[[ATTR0]] !dbg [[DBG16:![0-9]+]] {
+// AARCH64-SAME: (i32 noundef [[N:%.*]]) #[[ATTR0]] !dbg [[DBG12:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[N_ADDR:%.*]] = alloca i32, align 4
 // AARCH64-NEXT:    [[SAVED_STACK:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    [[__VLA_EXPR0:%.*]] = alloca i64, align 8
 // AARCH64-NEXT:    [[CALL_ARG:%.*]] = alloca i32, align 4
 // AARCH64-NEXT:    store i32 [[N]], ptr [[N_ADDR]], align 4
-// AARCH64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N_ADDR]], align 4, !dbg [[DBG17:![0-9]+]]
-// AARCH64-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64, !dbg [[DBG18:![0-9]+]]
-// AARCH64-NEXT:    [[TMP2:%.*]] = call ptr @llvm.stacksave(), !dbg [[DBG18]]
-// AARCH64-NEXT:    store ptr [[TMP2]], ptr [[SAVED_STACK]], align 8, !dbg [[DBG18]]
-// AARCH64-NEXT:    [[VLA:%.*]] = alloca i32, i64 [[TMP1]], align 4, !dbg [[DBG18]]
-// AARCH64-NEXT:    store i64 [[TMP1]], ptr [[__VLA_EXPR0]], align 8, !dbg [[DBG18]]
-// AARCH64-NEXT:    [[TMP3:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.PRIORITY"(ptr @compute_priority) ], !dbg [[DBG19:![0-9]+]]
-// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP3]]), !dbg [[DBG20:![0-9]+]]
-// AARCH64-NEXT:    [[TMP4:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[N_ADDR]], i32 undef), "QUAL.OSS.PRIORITY"(ptr @compute_priority.1, ptr [[N_ADDR]]) ], !dbg [[DBG21:![0-9]+]]
-// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP4]]), !dbg [[DBG22:![0-9]+]]
-// AARCH64-NEXT:    [[TMP5:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[VLA]], i32 undef), "QUAL.OSS.VLA.DIMS"(ptr [[VLA]], i64 [[TMP1]]), "QUAL.OSS.PRIORITY"(ptr @compute_priority.2, ptr [[VLA]], i64 [[TMP1]]), "QUAL.OSS.CAPTURED"(i64 [[TMP1]]) ], !dbg [[DBG23:![0-9]+]]
-// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP5]]), !dbg [[DBG24:![0-9]+]]
-// AARCH64-NEXT:    [[TMP6:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.PRIORITY"(ptr @compute_priority.3), "QUAL.OSS.DECL.SOURCE"([9 x i8] c"foo1:8:9\00") ], !dbg [[DBG25:![0-9]+]]
-// AARCH64-NEXT:    call void @_Z4foo1v(), !dbg [[DBG25]]
-// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP6]]), !dbg [[DBG25]]
-// AARCH64-NEXT:    [[TMP7:%.*]] = load i32, ptr [[N_ADDR]], align 4, !dbg [[DBG26:![0-9]+]]
-// AARCH64-NEXT:    store i32 [[TMP7]], ptr [[CALL_ARG]], align 4, !dbg [[DBG26]]
-// AARCH64-NEXT:    [[TMP8:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], i32 undef), "QUAL.OSS.PRIORITY"(ptr @compute_priority.4, ptr [[CALL_ARG]]), "QUAL.OSS.DECL.SOURCE"([10 x i8] c"foo2:10:9\00") ], !dbg [[DBG27:![0-9]+]]
-// AARCH64-NEXT:    [[TMP9:%.*]] = load i32, ptr [[CALL_ARG]], align 4, !dbg [[DBG26]]
-// AARCH64-NEXT:    call void @_Z4foo2i(i32 noundef [[TMP9]]), !dbg [[DBG27]]
-// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP8]]), !dbg [[DBG27]]
-// AARCH64-NEXT:    [[TMP10:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG28:![0-9]+]]
-// AARCH64-NEXT:    call void @llvm.stackrestore(ptr [[TMP10]]), !dbg [[DBG28]]
-// AARCH64-NEXT:    ret void, !dbg [[DBG28]]
+// AARCH64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N_ADDR]], align 4, !dbg [[DBG13:![0-9]+]]
+// AARCH64-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64, !dbg [[DBG14:![0-9]+]]
+// AARCH64-NEXT:    [[TMP2:%.*]] = call ptr @llvm.stacksave(), !dbg [[DBG14]]
+// AARCH64-NEXT:    store ptr [[TMP2]], ptr [[SAVED_STACK]], align 8, !dbg [[DBG14]]
+// AARCH64-NEXT:    [[VLA:%.*]] = alloca i32, i64 [[TMP1]], align 4, !dbg [[DBG14]]
+// AARCH64-NEXT:    store i64 [[TMP1]], ptr [[__VLA_EXPR0]], align 8, !dbg [[DBG14]]
+// AARCH64-NEXT:    [[TMP3:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.PRIORITY"(ptr @compute_priority) ], !dbg [[DBG15:![0-9]+]]
+// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP3]]), !dbg [[DBG16:![0-9]+]]
+// AARCH64-NEXT:    [[TMP4:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[N_ADDR]], i32 undef), "QUAL.OSS.PRIORITY"(ptr @compute_priority.1, ptr [[N_ADDR]]) ], !dbg [[DBG17:![0-9]+]]
+// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP4]]), !dbg [[DBG18:![0-9]+]]
+// AARCH64-NEXT:    [[TMP5:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[VLA]], i32 undef), "QUAL.OSS.VLA.DIMS"(ptr [[VLA]], i64 [[TMP1]]), "QUAL.OSS.PRIORITY"(ptr @compute_priority.2, ptr [[VLA]], i64 [[TMP1]]), "QUAL.OSS.CAPTURED"(i64 [[TMP1]]) ], !dbg [[DBG19:![0-9]+]]
+// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP5]]), !dbg [[DBG20:![0-9]+]]
+// AARCH64-NEXT:    [[TMP6:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.PRIORITY"(ptr @compute_priority.3), "QUAL.OSS.DECL.SOURCE"([9 x i8] c"foo1:8:9\00") ], !dbg [[DBG21:![0-9]+]]
+// AARCH64-NEXT:    call void @_Z4foo1v(), !dbg [[DBG21]]
+// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP6]]), !dbg [[DBG21]]
+// AARCH64-NEXT:    [[TMP7:%.*]] = load i32, ptr [[N_ADDR]], align 4, !dbg [[DBG22:![0-9]+]]
+// AARCH64-NEXT:    store i32 [[TMP7]], ptr [[CALL_ARG]], align 4, !dbg [[DBG22]]
+// AARCH64-NEXT:    [[TMP8:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], i32 undef), "QUAL.OSS.PRIORITY"(ptr @compute_priority.4, ptr [[CALL_ARG]]), "QUAL.OSS.DECL.SOURCE"([10 x i8] c"foo2:10:9\00") ], !dbg [[DBG23:![0-9]+]]
+// AARCH64-NEXT:    [[TMP9:%.*]] = load i32, ptr [[CALL_ARG]], align 4, !dbg [[DBG22]]
+// AARCH64-NEXT:    call void @_Z4foo2i(i32 noundef [[TMP9]]), !dbg [[DBG23]]
+// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP8]]), !dbg [[DBG23]]
+// AARCH64-NEXT:    [[TMP10:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG24:![0-9]+]]
+// AARCH64-NEXT:    call void @llvm.stackrestore(ptr [[TMP10]]), !dbg [[DBG24]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG24]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@compute_priority
-// AARCH64-SAME: () #[[ATTR3:[0-9]+]] !dbg [[DBG29:![0-9]+]] {
+// AARCH64-SAME: () !dbg [[DBG25:![0-9]+]] {
 // AARCH64-NEXT:  entry:
-// AARCH64-NEXT:    [[CALL:%.*]] = call noundef i32 @_Z3fooIiET_v(), !dbg [[DBG30:![0-9]+]]
-// AARCH64-NEXT:    ret i32 [[CALL]], !dbg [[DBG30]]
+// AARCH64-NEXT:    [[CALL:%.*]] = call noundef i32 @_Z3fooIiET_v(), !dbg [[DBG27:![0-9]+]]
+// AARCH64-NEXT:    ret i32 [[CALL]], !dbg [[DBG27]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@_Z3fooIiET_v
-// AARCH64-SAME: () #[[ATTR0]] comdat !dbg [[DBG32:![0-9]+]] {
+// AARCH64-SAME: () #[[ATTR0]] comdat !dbg [[DBG29:![0-9]+]] {
 // AARCH64-NEXT:  entry:
-// AARCH64-NEXT:    ret i32 0, !dbg [[DBG33:![0-9]+]]
+// AARCH64-NEXT:    ret i32 0, !dbg [[DBG30:![0-9]+]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@compute_priority.1
-// AARCH64-SAME: (ptr [[N:%.*]]) #[[ATTR3]] !dbg [[DBG34:![0-9]+]] {
+// AARCH64-SAME: (ptr [[N:%.*]]) !dbg [[DBG31:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[N_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    store ptr [[N]], ptr [[N_ADDR]], align 8
-// AARCH64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG35:![0-9]+]]
-// AARCH64-NEXT:    ret i32 [[TMP0]], !dbg [[DBG35]]
+// AARCH64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG32:![0-9]+]]
+// AARCH64-NEXT:    ret i32 [[TMP0]], !dbg [[DBG32]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@compute_priority.2
-// AARCH64-SAME: (ptr [[VLA:%.*]], i64 [[TMP0:%.*]]) #[[ATTR3]] !dbg [[DBG37:![0-9]+]] {
+// AARCH64-SAME: (ptr [[VLA:%.*]], i64 [[TMP0:%.*]]) !dbg [[DBG34:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[VLA_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    [[DOTADDR:%.*]] = alloca i64, align 8
 // AARCH64-NEXT:    store ptr [[VLA]], ptr [[VLA_ADDR]], align 8
 // AARCH64-NEXT:    store i64 [[TMP0]], ptr [[DOTADDR]], align 8
-// AARCH64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i32, ptr [[VLA]], i64 1, !dbg [[DBG38:![0-9]+]]
-// AARCH64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[ARRAYIDX]], align 4, !dbg [[DBG38]]
-// AARCH64-NEXT:    ret i32 [[TMP1]], !dbg [[DBG40:![0-9]+]]
+// AARCH64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i32, ptr [[VLA]], i64 1, !dbg [[DBG35:![0-9]+]]
+// AARCH64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[ARRAYIDX]], align 4, !dbg [[DBG35]]
+// AARCH64-NEXT:    ret i32 [[TMP1]], !dbg [[DBG37:![0-9]+]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@compute_priority.3
-// AARCH64-SAME: () #[[ATTR3]] !dbg [[DBG41:![0-9]+]] {
+// AARCH64-SAME: () !dbg [[DBG38:![0-9]+]] {
 // AARCH64-NEXT:  entry:
-// AARCH64-NEXT:    [[CALL:%.*]] = call noundef i32 @_Z3fooIiET_v(), !dbg [[DBG42:![0-9]+]]
-// AARCH64-NEXT:    ret i32 [[CALL]], !dbg [[DBG42]]
+// AARCH64-NEXT:    [[CALL:%.*]] = call noundef i32 @_Z3fooIiET_v(), !dbg [[DBG39:![0-9]+]]
+// AARCH64-NEXT:    ret i32 [[CALL]], !dbg [[DBG39]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@compute_priority.4
-// AARCH64-SAME: (ptr [[N:%.*]]) #[[ATTR3]] !dbg [[DBG44:![0-9]+]] {
+// AARCH64-SAME: (ptr [[N:%.*]]) !dbg [[DBG41:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[N_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    store ptr [[N]], ptr [[N_ADDR]], align 8
-// AARCH64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG45:![0-9]+]]
-// AARCH64-NEXT:    ret i32 [[TMP0]], !dbg [[DBG45]]
+// AARCH64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG42:![0-9]+]]
+// AARCH64-NEXT:    ret i32 [[TMP0]], !dbg [[DBG42]]
 //

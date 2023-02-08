@@ -1940,7 +1940,7 @@ HexagonTargetLowering::validateConstPtrAlignment(SDValue Ptr, Align NeedAlign,
     return true;
   unsigned Addr = CA->getZExtValue();
   Align HaveAlign =
-      Addr != 0 ? Align(1ull << countTrailingZeros(Addr)) : NeedAlign;
+      Addr != 0 ? Align(1ull << llvm::countr_zero(Addr)) : NeedAlign;
   if (HaveAlign >= NeedAlign)
     return true;
 
@@ -2160,6 +2160,11 @@ bool HexagonTargetLowering::isExtractSubvectorCheap(EVT ResVT, EVT SrcVT,
 
   // Non-HVX bool vectors are relatively cheap.
   return SrcTy.getVectorNumElements() <= 8;
+}
+
+bool HexagonTargetLowering::isTargetCanonicalConstantNode(SDValue Op) const {
+  return Op.getOpcode() == ISD::CONCAT_VECTORS ||
+         TargetLowering::isTargetCanonicalConstantNode(Op);
 }
 
 bool HexagonTargetLowering::isShuffleMaskLegal(ArrayRef<int> Mask,

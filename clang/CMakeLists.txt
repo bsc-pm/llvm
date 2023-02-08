@@ -11,6 +11,13 @@ include(${LLVM_COMMON_CMAKE_UTILS}/Modules/CMakePolicy.cmake
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   project(Clang)
   set(CLANG_BUILT_STANDALONE TRUE)
+  if ("${CMAKE_VERSION}" VERSION_LESS "3.20.0")
+    message(WARNING
+      "Your CMake version is ${CMAKE_VERSION}. Starting with LLVM 17.0.0, the "
+      "minimum version of CMake required to build LLVM will become 3.20.0, and "
+      "using an older CMake will become an error. Please upgrade your CMake to "
+      "at least 3.20.0 now to avoid issues in the future!")
+  endif()
 endif()
 
 # Must go below project(..)
@@ -240,31 +247,6 @@ set(CLANG_DEFAULT_OPENMP_RUNTIME "libomp" CACHE STRING
 
 set(CLANG_DEFAULT_NANOS6_HOME "" CACHE STRING
   "Nanos6 home directory.")
-
-# OpenMP offloading requires at least sm_35 because we use shuffle instructions
-# to generate efficient code for reductions and the atomicMax instruction on
-# 64-bit integers in the implementation of conditional lastprivate.
-set(CUDA_ARCH_FLAGS "sm_35")
-
-# Try to find the highest Nvidia GPU architecture the system supports
-if (NOT DEFINED CLANG_OPENMP_NVPTX_DEFAULT_ARCH)
-  find_package(CUDA QUIET)
-  if (CUDA_FOUND)
-    cuda_select_nvcc_arch_flags(CUDA_ARCH_FLAGS)
-  endif()
-else()
-  set(CUDA_ARCH_FLAGS ${CLANG_OPENMP_NVPTX_DEFAULT_ARCH})
-endif()
-
-string(REGEX MATCH "sm_([0-9]+)" CUDA_ARCH_MATCH ${CUDA_ARCH_FLAGS})
-if (NOT DEFINED CUDA_ARCH_MATCH OR "${CMAKE_MATCH_1}" LESS 35)
-  set(CLANG_OPENMP_NVPTX_DEFAULT_ARCH "sm_35" CACHE STRING
-    "Default architecture for OpenMP offloading to Nvidia GPUs." FORCE)
-  message(WARNING "Resetting default architecture for OpenMP offloading to Nvidia GPUs to sm_35")
-else()
-  set(CLANG_OPENMP_NVPTX_DEFAULT_ARCH ${CUDA_ARCH_MATCH} CACHE STRING
-    "Default architecture for OpenMP offloading to Nvidia GPUs.")
-endif()
 
 set(CLANG_SYSTEMZ_DEFAULT_ARCH "z10" CACHE STRING "SystemZ Default Arch")
 
@@ -877,8 +859,6 @@ if (CLANG_BOLT_INSTRUMENT AND NOT LLVM_BUILD_INSTRUMENTED)
   set(CLANGXX_PATH ${CLANG_PATH}++)
   set(CLANG_INSTRUMENTED ${CLANG_PATH}-bolt.inst)
   set(CLANGXX_INSTRUMENTED ${CLANGXX_PATH}-bolt.inst)
-  set(CLANG_OPTIMIZED ${CLANG_PATH}-bolt)
-  set(CLANGXX_OPTIMIZED ${CLANGXX_PATH}-bolt)
 
   # Instrument clang with BOLT
   add_custom_target(clang-instrumented
@@ -956,6 +936,7 @@ if (CLANG_BOLT_INSTRUMENT AND NOT LLVM_BUILD_INSTRUMENTED)
   )
 
   # Optimize original (pre-bolt) Clang using the collected profile
+  set(CLANG_OPTIMIZED ${CMAKE_CURRENT_BINARY_DIR}/clang.bolt)
   add_custom_target(clang-bolt
     DEPENDS ${CLANG_OPTIMIZED}
   )
@@ -966,20 +947,8 @@ if (CLANG_BOLT_INSTRUMENT AND NOT LLVM_BUILD_INSTRUMENTED)
       -data ${CMAKE_CURRENT_BINARY_DIR}/prof.fdata
       -reorder-blocks=ext-tsp -reorder-functions=hfsort+ -split-functions
       -split-all-cold -split-eh -dyno-stats -icf=1 -use-gnu-stack
+    COMMAND ${CMAKE_COMMAND} -E rename ${CLANG_OPTIMIZED} $<TARGET_FILE:clang>
     COMMENT "Optimizing Clang with BOLT"
-    VERBATIM
-  )
-
-  # Make a symlink from clang-bolt to clang++-bolt
-  add_custom_target(clang++-bolt
-    DEPENDS ${CLANGXX_OPTIMIZED}
-  )
-  add_custom_command(OUTPUT ${CLANGXX_OPTIMIZED}
-    DEPENDS clang-bolt
-    COMMAND ${CMAKE_COMMAND} -E create_symlink
-      ${CLANG_OPTIMIZED}
-      ${CLANGXX_OPTIMIZED}
-    COMMENT "Creating symlink from BOLT optimized clang to clang++"
     VERBATIM
   )
 endif()

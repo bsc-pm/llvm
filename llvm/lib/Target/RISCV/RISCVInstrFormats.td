@@ -47,7 +47,8 @@ def InstFormatCS     : InstFormat<13>;
 def InstFormatCA     : InstFormat<14>;
 def InstFormatCB     : InstFormat<15>;
 def InstFormatCJ     : InstFormat<16>;
-def InstFormatOther  : InstFormat<17>;
+def InstFormatCSZN   : InstFormat<17>;
+def InstFormatOther  : InstFormat<18>;
 
 class RISCVVConstraint<bits<3> val> {
   bits<3> Value = val;
@@ -204,6 +205,13 @@ class RVInst<dag outs, dag ins, string opcodestr, string argstr,
 
   bit UsesMaskPolicy = 0;
   let TSFlags{18} = UsesMaskPolicy;
+
+  // Indicates that the result can be considered sign extended from bit 31. Some
+  // instructions with this flag aren't W instructions, but are either sign
+  // extended from a smaller size, always outputs a small integer, or put zeros
+  // in bits 63:31. Used by the SExtWRemoval pass.
+  bit IsSignExtendingOpW = 0;
+  let TSFlags{19} = IsSignExtendingOpW;
 }
 
 // Pseudo instructions

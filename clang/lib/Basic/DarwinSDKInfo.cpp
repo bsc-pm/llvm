@@ -11,6 +11,7 @@
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include <optional>
 
 using namespace clang;
 
@@ -33,7 +34,7 @@ std::optional<VersionTuple> DarwinSDKInfo::RelatedTargetVersionMapping::map(
   return std::nullopt;
 }
 
-Optional<DarwinSDKInfo::RelatedTargetVersionMapping>
+std::optional<DarwinSDKInfo::RelatedTargetVersionMapping>
 DarwinSDKInfo::RelatedTargetVersionMapping::parseJSON(
     const llvm::json::Object &Obj, VersionTuple MaximumDeploymentTarget) {
   VersionTuple Min = VersionTuple(std::numeric_limits<unsigned>::max());
@@ -61,8 +62,8 @@ DarwinSDKInfo::RelatedTargetVersionMapping::parseJSON(
       Min, Max, MinValue, MaximumDeploymentTarget, std::move(Mapping));
 }
 
-static Optional<VersionTuple> getVersionKey(const llvm::json::Object &Obj,
-                                            StringRef Key) {
+static std::optional<VersionTuple> getVersionKey(const llvm::json::Object &Obj,
+                                                 StringRef Key) {
   auto Value = Obj.getString(Key);
   if (!Value)
     return std::nullopt;
@@ -81,7 +82,8 @@ DarwinSDKInfo::parseDarwinSDKSettingsJSON(const llvm::json::Object *Obj) {
       getVersionKey(*Obj, "MaximumDeploymentTarget");
   if (!MaximumDeploymentVersion)
     return std::nullopt;
-  llvm::DenseMap<OSEnvPair::StorageType, Optional<RelatedTargetVersionMapping>>
+  llvm::DenseMap<OSEnvPair::StorageType,
+                 std::optional<RelatedTargetVersionMapping>>
       VersionMappings;
   if (const auto *VM = Obj->getObject("VersionMap")) {
     // FIXME: Generalize this out beyond iOS-deriving targets.

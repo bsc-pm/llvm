@@ -141,11 +141,21 @@ CHECK_SIMPLE_CLAUSE(Label, OSSC_label)
 
 CHECK_SIMPLE_CLAUSE(Wait, OSSC_wait)
 
+CHECK_SIMPLE_CLAUSE(Update, OSSC_update)
+
+CHECK_SIMPLE_CLAUSE(Onready, OSSC_onready)
+
+CHECK_SIMPLE_CLAUSE(Default, OSSC_default)
+
+CHECK_SIMPLE_CLAUSE(Device, OSSC_device)
+
 CHECK_SIMPLE_CLAUSE(Private, OSSC_private)
 
 CHECK_SIMPLE_CLAUSE(Firstprivate, OSSC_firstprivate)
 
 CHECK_SIMPLE_CLAUSE(Shared, OSSC_shared)
+
+CHECK_SIMPLE_CLAUSE(On, OSSC_on)
 
 CHECK_SIMPLE_CLAUSE(In, OSSC_in)
 
@@ -167,12 +177,34 @@ CHECK_SIMPLE_CLAUSE(Weakconcurrent, OSSC_weakconcurrent)
 
 CHECK_SIMPLE_CLAUSE(Weakcommutative, OSSC_weakcommutative)
 
-CHECK_SIMPLE_CLAUSE(Unknown, OSSC_unknown)
-
 CHECK_REQ_SCALAR_INT_CLAUSE(Grainsize, OSSC_grainsize)
 CHECK_REQ_SCALAR_INT_CLAUSE(Chunksize, OSSC_chunksize)
 
-CHECK_SIMPLE_CLAUSE(Default, OSSC_default)
+CHECK_SIMPLE_CLAUSE(Unroll, OSSC_unroll)
+
+CHECK_SIMPLE_CLAUSE(Collapse, OSSC_collapse)
+
+CHECK_SIMPLE_CLAUSE(Ndrange, OSSC_ndrange)
+
+CHECK_SIMPLE_CLAUSE(Read, OSSC_read)
+
+CHECK_SIMPLE_CLAUSE(Write, OSSC_write)
+
+CHECK_SIMPLE_CLAUSE(Capture, OSSC_capture)
+
+CHECK_SIMPLE_CLAUSE(Compare, OSSC_compare)
+
+CHECK_SIMPLE_CLAUSE(SeqCst, OSSC_seq_cst)
+
+CHECK_SIMPLE_CLAUSE(AcqRel, OSSC_acq_rel)
+
+CHECK_SIMPLE_CLAUSE(Acquire, OSSC_acquire)
+
+CHECK_SIMPLE_CLAUSE(Release, OSSC_release)
+
+CHECK_SIMPLE_CLAUSE(Relaxed, OSSC_relaxed)
+
+CHECK_SIMPLE_CLAUSE(Unknown, OSSC_unknown)
 
 void OSSStructureChecker::Enter(const parser::OSSClause::Depend &) {
   CheckAllowed(llvm::oss::Clause::OSSC_depend);
@@ -182,6 +214,9 @@ void OSSStructureChecker::Enter(const parser::OSSClause::Reduction &) {
   CheckAllowed(llvm::oss::Clause::OSSC_reduction);
 }
 
+void OSSStructureChecker::Enter(const parser::OSSClause::Weakreduction &) {
+  CheckAllowed(llvm::oss::Clause::OSSC_weakreduction);
+}
 
 llvm::StringRef OSSStructureChecker::getClauseName(llvm::oss::Clause clause) {
   return llvm::oss::getOmpSsClauseName(clause);

@@ -12,7 +12,7 @@ end
 
 !FIRDialect-LABEL: func @_QQmain()
 !FIRDialect:  %[[VAR_ARRAY:.*]] = fir.address_of(@_QFEarray) : !fir.ref<!fir.array<10x10xi32>>
-!FIRDialect-NEXT:  %[[DEP_0:.*]] = oss.dependency base(%[[VAR_ARRAY]] : !fir.ref<!fir.array<10x10xi32>>) function(@compute.dep0) arguments(%[[VAR_ARRAY]] : !fir.ref<!fir.array<10x10xi32>>) -> i32
+!FIRDialect:  %[[DEP_0:.*]] = oss.dependency base(%[[VAR_ARRAY]] : !fir.ref<!fir.array<10x10xi32>>) function(@compute.dep0) arguments(%[[VAR_ARRAY]] : !fir.ref<!fir.array<10x10xi32>>) -> i32
 !FIRDialect-NEXT:  oss.task
 !FIRDialect-SAME:  shared(%[[VAR_ARRAY]] : !fir.ref<!fir.array<10x10xi32>>)
 !FIRDialect-SAME:  captures(%{{.*}}, %{{.*}} : index, index)

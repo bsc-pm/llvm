@@ -15,7 +15,6 @@
 #define LLVM_IR_OPERATOR_H
 
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/None.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/FMF.h"
 #include "llvm/IR/Instruction.h"
@@ -64,6 +63,10 @@ public:
   /// Return true if this operator has flags which may cause this operator
   /// to evaluate to poison despite having non-poison inputs.
   bool hasPoisonGeneratingFlags() const;
+
+  /// Return true if this operator has poison-generating flags or metadata.
+  /// The latter is only possible for instructions.
+  bool hasPoisonGeneratingFlagsOrMetadata() const;
 };
 
 /// Utility class for integer operators which may exhibit overflow - Add, Sub,

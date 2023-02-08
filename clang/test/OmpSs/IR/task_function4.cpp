@@ -176,7 +176,7 @@ int main() {
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@compute_dep
-// PPC64-SAME: (ptr [[P:%.*]]) #[[ATTR3:[0-9]+]] !dbg [[DBG21:![0-9]+]] {
+// PPC64-SAME: (ptr [[P:%.*]]) !dbg [[DBG21:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T:%.*]], align 8
 // PPC64-NEXT:    [[P_ADDR:%.*]] = alloca ptr, align 8
@@ -265,7 +265,7 @@ int main() {
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@compute_dep
-// AARCH64-SAME: (ptr [[P:%.*]]) #[[ATTR3:[0-9]+]] !dbg [[DBG21:![0-9]+]] {
+// AARCH64-SAME: (ptr [[P:%.*]]) !dbg [[DBG21:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T:%.*]], align 8
 // AARCH64-NEXT:    [[P_ADDR:%.*]] = alloca ptr, align 8

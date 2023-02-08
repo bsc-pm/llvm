@@ -63,6 +63,7 @@
 #include "llvm/Support/Threading.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/YAMLParser.h"
+#include <optional>
 
 using namespace clang::driver;
 using namespace clang::driver::tools;
@@ -408,25 +409,9 @@ std::string tools::getCPUName(const Driver &D, const ArgList &Args,
   case llvm::Triple::ppc:
   case llvm::Triple::ppcle:
   case llvm::Triple::ppc64:
-  case llvm::Triple::ppc64le: {
-    std::string TargetCPUName = ppc::getPPCTargetCPU(Args);
-    // LLVM may default to generating code for the native CPU,
-    // but, like gcc, we default to a more generic option for
-    // each architecture. (except on AIX)
-    if (!TargetCPUName.empty())
-      return TargetCPUName;
+  case llvm::Triple::ppc64le:
+    return ppc::getPPCTargetCPU(Args, T);
 
-    if (T.isOSAIX())
-      TargetCPUName = "pwr7";
-    else if (T.getArch() == llvm::Triple::ppc64le)
-      TargetCPUName = "ppc64le";
-    else if (T.getArch() == llvm::Triple::ppc64)
-      TargetCPUName = "ppc64";
-    else
-      TargetCPUName = "ppc";
-
-    return TargetCPUName;
-  }
   case llvm::Triple::csky:
     if (const Arg *A = Args.getLastArg(options::OPT_mcpu_EQ))
       return A->getValue();
@@ -772,6 +757,11 @@ void tools::addLTOOptions(const ToolChain &ToolChain, const ArgList &Args,
       D.Diag(clang::diag::warn_drv_fjmc_for_elf_only);
   }
 
+  if (Args.hasFlag(options::OPT_fstack_size_section,
+                   options::OPT_fno_stack_size_section, false))
+    CmdArgs.push_back(
+        Args.MakeArgString(Twine(PluginOptPrefix) + "-stack-size-section"));
+
   // Setup statistics file output.
   SmallString<128> StatsFile = getStatsFileName(Args, Output, Input, D);
   if (!StatsFile.empty())
@@ -883,8 +873,7 @@ bool tools::addOpenMPRuntime(ArgStringList &CmdArgs, const ToolChain &TC,
   if (IsOffloadingHost)
     CmdArgs.push_back("-lomptarget");
 
-  if (IsOffloadingHost && TC.getDriver().isUsingLTO(/* IsOffload */ true) &&
-      !Args.hasArg(options::OPT_nogpulib))
+  if (IsOffloadingHost && !Args.hasArg(options::OPT_nogpulib))
     CmdArgs.push_back("-lomptarget.devicertl");
 
   addArchSpecificRPath(TC, Args, CmdArgs);
@@ -939,7 +928,7 @@ void tools::addOmpSsRuntimeLibs(
     return;
 
   std::string RuntimeDefaultHome(CLANG_DEFAULT_NANOS6_HOME);
-  Optional<std::string> RuntimeHome =
+  std::optional<std::string> RuntimeHome =
     llvm::sys::Process::GetEnv("NANOS6_HOME");
 
   // First look at environment NANOS6_HOME,
@@ -981,7 +970,7 @@ void tools::addOmpSsRuntimeInclude(
     return;
 
   std::string RuntimeDefaultHome(CLANG_DEFAULT_NANOS6_HOME);
-  Optional<std::string> RuntimeHome =
+  std::optional<std::string> RuntimeHome =
     llvm::sys::Process::GetEnv("NANOS6_HOME");
 
   // First look at environment NANOS6_HOME,
@@ -2045,8 +2034,7 @@ bool tools::SDLSearch(const Driver &D, const llvm::opt::ArgList &DriverArgs,
 /// Search if a user provided archive file lib<libname>.a exists in any of
 /// the library paths. If so, add a new command to clang-offload-bundler to
 /// unbundle this archive and create a temporary device specific archive. Name
-/// of this SDL is passed to the llvm-link (for amdgcn) or to the
-/// clang-nvlink-wrapper (for nvptx) commands by the driver.
+/// of this SDL is passed to the llvm-link tool.
 bool tools::GetSDLFromOffloadArchive(
     Compilation &C, const Driver &D, const Tool &T, const JobAction &JA,
     const InputInfoList &Inputs, const llvm::opt::ArgList &DriverArgs,
@@ -2170,17 +2158,6 @@ void tools::AddStaticDeviceLibsLinking(Compilation &C, const Tool &T,
                       Arch, Target, isBitCodeSDL, postClangLink);
 }
 
-// Wrapper function used for post clang linking of bitcode SDLS for nvptx by
-// the CUDA toolchain.
-void tools::AddStaticDeviceLibsPostLinking(const Driver &D,
-                                const llvm::opt::ArgList &DriverArgs,
-                                llvm::opt::ArgStringList &CC1Args,
-                                StringRef Arch, StringRef Target,
-                                bool isBitCodeSDL, bool postClangLink) {
-  AddStaticDeviceLibs(nullptr, nullptr, nullptr, nullptr, D, DriverArgs,
-                      CC1Args, Arch, Target, isBitCodeSDL, postClangLink);
-}
-
 // User defined Static Device Libraries(SDLs) can be passed to clang for
 // offloading GPU compilers. Like static host libraries, the use of a SDL is
 // specified with the -l command line option. The primary difference between
@@ -2193,11 +2170,9 @@ void tools::AddStaticDeviceLibsPostLinking(const Driver &D,
 //           compilation. For AMDGPU, these libraries are linked one time
 //           during the application link phase.
 //
-// * Machine-code SDLs: They are archive files. For NVPTX, the archive members
-//           contain cubin for Nvidia GPUs and are linked one time during the
-//           link phase by the CUDA SDK linker called nvlink.	For AMDGPU, the
-//           process for machine code SDLs is still in development. But they
-//           will be linked by the LLVM tool lld.
+// * Machine-code SDLs: They are archive files. For AMDGPU, the process for
+//           machine code SDLs is still in development. But they will be linked
+//           by the LLVM tool lld.
 //
 // * Bundled objects that contain both host and device codes: Bundled objects
 //           may also contain library code compiled from source. For NVPTX, the
@@ -2216,7 +2191,7 @@ void tools::AddStaticDeviceLibs(Compilation *C, const Tool *T,
 
   SmallVector<std::string, 8> LibraryPaths;
   // Add search directories from LIBRARY_PATH env variable
-  llvm::Optional<std::string> LibPath =
+  std::optional<std::string> LibPath =
       llvm::sys::Process::GetEnv("LIBRARY_PATH");
   if (LibPath) {
     SmallVector<StringRef, 8> Frags;
@@ -2262,10 +2237,9 @@ void tools::AddStaticDeviceLibs(Compilation *C, const Tool *T,
   }
 
   // The search stops as soon as an SDL file is found. The driver then provides
-  // the full filename of the SDL to the llvm-link or clang-nvlink-wrapper
-  // command. If no SDL is found after searching each LINKPATH with
-  // SEARCH-ORDER, it is possible that an archive file lib<libname>.a exists
-  // and may contain bundled object files.
+  // the full filename of the SDL to the llvm-link command. If no SDL is found
+  // after searching each LINKPATH with SEARCH-ORDER, it is possible that an
+  // archive file lib<libname>.a exists and may contain bundled object files.
   for (auto SDLName : SDLNames) {
     // This is the only call to SDLSearch
     if (!SDLSearch(D, DriverArgs, CC1Args, LibraryPaths, SDLName, Arch, Target,
@@ -2383,7 +2357,7 @@ void tools::addOpenMPDeviceRTL(const Driver &D,
   LibraryPaths.emplace_back(DefaultLibPath.c_str());
 
   // Add user defined library paths from LIBRARY_PATH.
-  llvm::Optional<std::string> LibPath =
+  std::optional<std::string> LibPath =
       llvm::sys::Process::GetEnv("LIBRARY_PATH");
   if (LibPath) {
     SmallVector<StringRef, 8> Frags;

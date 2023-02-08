@@ -119,13 +119,17 @@ static DependInfo::DependType getDependTypeFromId(uint64_t Id) {
 
 void DirectiveEnvironment::gatherDirInfo(OperandBundleDef &OB) {
   assert(DirectiveKind == OSSD_unknown && "Only allowed one OperandBundle with this Id");
-  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  assert(OB.input_size() >= 1 && "Needed at least one Value per OperandBundle");
   ConstantDataArray *DirectiveKindDataArray = cast<ConstantDataArray>(OB.inputs()[0]);
   assert(DirectiveKindDataArray->isCString() && "Directive kind must be a C string");
   DirectiveKindStringRef = DirectiveKindDataArray->getAsCString();
 
   if (DirectiveKindStringRef == "TASK")
     DirectiveKind = OSSD_task;
+  else if (DirectiveKindStringRef == "CRITICAL.START")
+    DirectiveKind = OSSD_critical_start;
+  else if (DirectiveKindStringRef == "CRITICAL.END")
+    DirectiveKind = OSSD_critical_end;
   else if (DirectiveKindStringRef == "TASK.FOR")
     DirectiveKind = OSSD_task_for;
   else if (DirectiveKindStringRef == "TASKITER.FOR")
@@ -142,6 +146,12 @@ void DirectiveEnvironment::gatherDirInfo(OperandBundleDef &OB) {
     DirectiveKind = OSSD_release;
   else
     llvm_unreachable("Unhandled DirectiveKind string");
+
+  if (isOmpSsCriticalDirective()) {
+    ConstantDataArray *CriticalNameDataArray = cast<ConstantDataArray>(OB.inputs()[1]);
+    assert(CriticalNameDataArray->isCString() && "Critical name must be a C string");
+    CriticalNameStringRef = CriticalNameDataArray->getAsCString();
+  }
 }
 
 void DirectiveEnvironment::gatherSharedInfo(OperandBundleDef &OB) {

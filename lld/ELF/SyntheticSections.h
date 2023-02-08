@@ -970,7 +970,7 @@ private:
   // hash collisions.
   size_t getShardId(uint32_t hash) {
     assert((hash >> 31) == 0);
-    return hash >> (31 - llvm::countTrailingZeros(numShards));
+    return hash >> (31 - llvm::countr_zero(numShards));
   }
 
   // Section size
@@ -1273,6 +1273,7 @@ inline Partition &SectionBase::getPartition() const {
 // a partition.
 struct InStruct {
   std::unique_ptr<InputSection> attributes;
+  std::unique_ptr<SyntheticSection> riscvAttributes;
   std::unique_ptr<BssSection> bss;
   std::unique_ptr<BssSection> bssRelRo;
   std::unique_ptr<GotSection> got;

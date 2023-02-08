@@ -660,7 +660,8 @@ static mlir::Value getComputeDep(
   for (size_t i = 0; i < paramSymbols.size(); ++i)
     localSymbols.addSymbol(paramSymbols[i], func.front().getArguments()[i]);
 
-  for (const auto &var : funit->getOrderedSymbolTable()) {
+  const Fortran::semantics::Scope &scope = funit->getScope();
+  for (const auto &var : Fortran::lower::pft::getScopeVariableList(scope)) {
     const Fortran::semantics::Symbol &sym = var.getSymbol();
     for (size_t i = 0; i < paramSymbols.size(); ++i) {
       if (paramSymbols[i] == sym) {
@@ -855,7 +856,7 @@ namespace {
         fir::factory::getMutableIRBox(firOpBuilder, loc, newBoxDst);
       } else {
         fir::ExtendedValue newBoxSrcLoad = fir::factory::genMutableBoxRead(firOpBuilder, loc, newBoxSrc);
-        fir::factory::associateMutableBox(firOpBuilder, loc, newBoxDst, newBoxSrcLoad, llvm::None);
+        fir::factory::associateMutableBox(firOpBuilder, loc, newBoxDst, newBoxSrcLoad, std::nullopt);
       }
 
       llvm::SmallVector<mlir::Value, 4> returnList;

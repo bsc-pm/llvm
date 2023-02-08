@@ -217,6 +217,12 @@ FunctionCallee taskInFinalFuncCallee(Module &M);
 // void nanos6_register_task_info(nanos6_task_info_t *task_info);
 FunctionCallee taskInfoRegisterFuncCallee(Module &M);
 
+// void nanos6_user_lock(void **handlerPointer, const char *invocation_source);
+FunctionCallee userLockFuncCallee(Module &M);
+
+// void nanos6_user_unlock(void **handlerPointer);
+FunctionCallee userUnlockFuncCallee(Module &M);
+
 // void nanos6_constructor_register_task_info(void);
 // NOTE: This does not belong to nanos6 API
 FunctionCallee taskInfoRegisterCtorFuncCallee(Module &M);

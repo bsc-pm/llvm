@@ -31,7 +31,7 @@ program p1
  array(i) = i+1
 !$oss end task
 !$oss task  depend(in:p)
- !DEF: /p1/OtherConstruct4/p (OSSFirstPrivate) HostAssoc INTEGER(4)
+ !DEF: /p1/OtherConstruct4/p POINTER (OSSFirstPrivate) HostAssoc INTEGER(4)
  p = 2
 !$oss end task
 !$oss task  depend(in:t%array(i))

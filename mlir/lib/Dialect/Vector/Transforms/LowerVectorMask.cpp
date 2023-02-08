@@ -109,15 +109,6 @@ public:
   }
 };
 
-/// Populates instances of `MaskOpRewritePattern` to lower masked operations
-/// with `vector.mask`. Patterns should rewrite the `vector.mask` operation and
-/// not its nested `MaskableOpInterface`.
-void populateVectorMaskLoweringPatternsForSideEffectingOps(
-    RewritePatternSet &patterns) {
-  patterns.add<MaskedTransferReadOpPattern, MaskedTransferWriteOpPattern>(
-      patterns.getContext());
-}
-
 struct LowerVectorMaskPass
     : public vector::impl::LowerVectorMaskPassBase<LowerVectorMaskPass> {
   using Base::Base;
@@ -129,8 +120,7 @@ struct LowerVectorMaskPass
     RewritePatternSet loweringPatterns(context);
     populateVectorMaskLoweringPatternsForSideEffectingOps(loweringPatterns);
 
-    if (failed(applyPatternsAndFoldGreedily(op->getRegions(),
-                                            std::move(loweringPatterns))))
+    if (failed(applyPatternsAndFoldGreedily(op, std::move(loweringPatterns))))
       signalPassFailure();
   }
 
@@ -140,6 +130,15 @@ struct LowerVectorMaskPass
 };
 
 } // namespace
+
+/// Populates instances of `MaskOpRewritePattern` to lower masked operations
+/// with `vector.mask`. Patterns should rewrite the `vector.mask` operation and
+/// not its nested `MaskableOpInterface`.
+void vector::populateVectorMaskLoweringPatternsForSideEffectingOps(
+    RewritePatternSet &patterns) {
+  patterns.add<MaskedTransferReadOpPattern, MaskedTransferWriteOpPattern>(
+      patterns.getContext());
+}
 
 std::unique_ptr<Pass> mlir::vector::createLowerVectorMaskPass() {
   return std::make_unique<LowerVectorMaskPass>();
