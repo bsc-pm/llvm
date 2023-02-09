@@ -393,6 +393,14 @@ define void @atomic_rmw(ptr %ptr1, i32 %val1, ptr %ptr2, float %val2) {
   %12 = atomicrmw fadd ptr %ptr2, float %val2 acquire
   ; CHECK:  llvm.atomicrmw fsub %[[PTR2]], %[[VAL2]] acquire
   %13 = atomicrmw fsub ptr %ptr2, float %val2 acquire
+  ; CHECK:  llvm.atomicrmw fmax %[[PTR2]], %[[VAL2]] acquire
+  %14 = atomicrmw fmax ptr %ptr2, float %val2 acquire
+  ; CHECK:  llvm.atomicrmw fmin %[[PTR2]], %[[VAL2]] acquire
+  %15 = atomicrmw fmin ptr %ptr2, float %val2 acquire
+  ; CHECK:  llvm.atomicrmw uinc_wrap %[[PTR1]], %[[VAL1]] acquire
+  %16 = atomicrmw uinc_wrap ptr %ptr1, i32 %val1 acquire
+  ; CHECK:  llvm.atomicrmw udec_wrap %[[PTR1]], %[[VAL1]] acquire
+  %17 = atomicrmw udec_wrap ptr %ptr1, i32 %val1 acquire
   ret void
 }
 
@@ -440,7 +448,7 @@ define void @indirect_call(ptr addrspace(42) %fn) {
 ; CHECK-SAME:  %[[PTR:[a-zA-Z0-9]+]]
 define void @gep_static_idx(ptr %ptr) {
   ; CHECK: %[[IDX:.+]] = llvm.mlir.constant(7 : i32)
-  ; CHECK: llvm.getelementptr inbounds %[[PTR]][%[[IDX]]] : (!llvm.ptr, i32) -> !llvm.ptr
+  ; CHECK: llvm.getelementptr inbounds %[[PTR]][%[[IDX]]] : (!llvm.ptr, i32) -> !llvm.ptr, f32
   %1 = getelementptr inbounds float, ptr %ptr, i32 7
   ret void
 }
@@ -468,7 +476,7 @@ define void @varargs_call(i32 %0) {
 ; CHECK-SAME:  %[[IDX:[a-zA-Z0-9]+]]
 define void @gep_dynamic_idx(ptr %ptr, i32 %idx) {
   ; CHECK: %[[C0:.+]] = llvm.mlir.constant(0 : i32)
-  ; CHECK: llvm.getelementptr %[[PTR]][%[[C0]], 1, %[[IDX]]]
+  ; CHECK: llvm.getelementptr %[[PTR]][%[[C0]], 1, %[[IDX]]]{{.*}}"my_struct"
   %1 = getelementptr %my_struct, ptr %ptr, i32 0, i32 1, i32 %idx
   ret void
 }

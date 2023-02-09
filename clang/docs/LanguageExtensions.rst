@@ -636,6 +636,8 @@ Unless specified otherwise operation(±0) = ±0 and operation(±infinity) = ±in
  T __builtin_elementwise_cos(T x)            return the cosine of x interpreted as an angle in radians        floating point types
  T __builtin_elementwise_floor(T x)          return the largest integral value less than or equal to x        floating point types
  T __builtin_elementwise_log(T x)            return the natural logarithm of x                                floating point types
+ T __builtin_elementwise_log2(T x)           return the base 2 logarithm of x                                 floating point types
+ T __builtin_elementwise_log10(T x)          return the base 10 logarithm of x                                floating point types
  T __builtin_elementwise_roundeven(T x)      round x to the nearest integer value in floating point format,   floating point types
                                              rounding halfway cases to even (that is, to the nearest value
                                              that is an even integer), regardless of the current rounding
@@ -3081,6 +3083,32 @@ Query for this feature with ``__has_builtin(__builtin_debugtrap)``.
 
 Query for this feature with ``__has_builtin(__builtin_trap)``.
 
+``__builtin_nondeterministic_value``
+------------------------------------
+
+``__builtin_nondeterministic_value`` returns a valid nondeterministic value of the same type as the provided argument.
+
+**Syntax**:
+
+.. code-block:: c++
+
+    type __builtin_nondeterministic_value(type x)
+
+**Examples**:
+
+.. code-block:: c++
+
+    int x = __builtin_nondeterministic_value(x);
+    float y = __builtin_nondeterministic_value(y);
+    __m256i a = __builtin_nondeterministic_value(a);
+
+**Description**
+
+Each call to ``__builtin_nondeterministic_value`` returns a valid value of the type given by the argument.
+
+The types currently supported are: integer types, floating-point types, vector types.
+
+Query for this feature with ``__has_builtin(__builtin_nondeterministic_value)``.
 
 ``__builtin_sycl_unique_stable_name``
 -------------------------------------

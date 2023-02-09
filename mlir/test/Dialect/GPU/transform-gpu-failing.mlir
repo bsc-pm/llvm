@@ -276,28 +276,30 @@ transform.sequence failures(propagate) {
 
 // -----
 
-!type = memref<32x32xf32>
-func.func @saxpy2d_wrong_mapping(%x: !type, %y: !type, %stream : !gpu.async.token) -> !type {
-  %c32 = arith.constant 32 : index
+func.func @tiling_buffer_semantic_op(%x: memref<32x32xf32>, %y: memref<32x32xf32>, %stream : !gpu.async.token) {
   %one = arith.constant 1 : index
   %name = gpu.launch async[%stream] blocks(%arg3, %arg4, %arg5) in (%arg9 = %one, %arg10 = %one, %arg11 = %one)
             threads(%arg6, %arg7, %arg8) in (%arg12 = %one, %arg13 = %one, %arg14 = %one)
   {
-    scf.foreach_thread (%i, %j) in (%c32, %c32) {
-        %4 = memref.load %x[%i, %j] : !type
-        %5 = memref.load %y[%i, %j] : !type
-        %6 = arith.mulf %4, %5 : f32
-        memref.store %6, %y[%i, %j] : !type
-     }  { mapping = [#gpu.block<x>, #gpu.block<x>] }
+    // expected-error @below {{'linalg.generic' op must have "tensor semantic" for tiling}}
+    // expected-note @below {{when applied to this op}}
+    linalg.generic
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       iterator_types = ["parallel", "parallel"]}
+      ins(%x : memref<32x32xf32>)
+      outs(%y : memref<32x32xf32>) {
+        ^bb0(%in: f32, %out: f32):
+          linalg.yield %in : f32
+    }
     gpu.terminator
   }
-  return %y : !type
+  return
 }
 
 transform.sequence failures(propagate) {
 ^bb1(%arg0: !pdl.operation):
-  %funcop = transform.structured.match ops{["gpu.launch"]} in %arg0 : (!pdl.operation) -> !pdl.operation
-  // expected-error @below {{mapping must be one of #gpu.thread<x>, #gpu.thread<y>, #gpu.thread<z>}}
-  transform.gpu.map_nested_foreach_to_threads %funcop { blockDim = [32, 32]}
+  %matmul = transform.structured.match ops{["linalg.generic"]} in %arg0 : (!pdl.operation) -> !pdl.operation
+  // expected-error @below {{transform.structured.tile_to_foreach_thread_op failed to apply}}
+  %foreach, %tiled = transform.structured.tile_to_foreach_thread_op %matmul num_threads [10, 20, 30] (mapping = [ #gpu.thread<y>, #gpu.thread<x>, #gpu.thread<z> ] )
 }
-

@@ -18,9 +18,10 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/DeclTemplate.h"
+#include "clang/AST/Designator.h"
 #include "clang/AST/Expr.h"
-#include "clang/AST/ExprConcepts.h"
 #include "clang/AST/ExprCXX.h"
+#include "clang/AST/ExprConcepts.h"
 #include "clang/AST/ExprObjC.h"
 #include "clang/AST/ExprOpenMP.h"
 #include "clang/AST/OpenMPClause.h"
@@ -28,11 +29,10 @@
 #include "clang/AST/Stmt.h"
 #include "clang/AST/StmtCXX.h"
 #include "clang/AST/StmtObjC.h"
+#include "clang/AST/StmtOmpSs.h"
 #include "clang/AST/StmtOpenMP.h"
 #include "clang/Basic/DiagnosticParse.h"
 #include "clang/Basic/OpenMPKinds.h"
-#include "clang/AST/StmtOmpSs.h"
-#include "clang/Sema/Designator.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Ownership.h"
 #include "clang/Sema/ParsedTemplate.h"
@@ -12506,11 +12506,10 @@ TreeTransform<Derived>::TransformDesignatedInitExpr(DesignatedInitExpr *E) {
   // transform the designators.
   SmallVector<Expr*, 4> ArrayExprs;
   bool ExprChanged = false;
-  for (const DesignatedInitExpr::Designator &D : E->designators()) {
+  for (const Designator &D : E->designators()) {
     if (D.isFieldDesignator()) {
-      Desig.AddDesignator(Designator::getField(D.getFieldName(),
-                                               D.getDotLoc(),
-                                               D.getFieldLoc()));
+      Desig.AddDesignator(Designator::CreateFieldDesignator(
+          D.getFieldName(), D.getDotLoc(), D.getFieldLoc()));
       if (D.getField()) {
         FieldDecl *Field = cast_or_null<FieldDecl>(
             getDerived().TransformDecl(D.getFieldLoc(), D.getField()));
@@ -12533,7 +12532,7 @@ TreeTransform<Derived>::TransformDesignatedInitExpr(DesignatedInitExpr *E) {
         return ExprError();
 
       Desig.AddDesignator(
-          Designator::getArray(Index.get(), D.getLBracketLoc()));
+          Designator::CreateArrayDesignator(Index.get(), D.getLBracketLoc()));
 
       ExprChanged = ExprChanged || Init.get() != E->getArrayIndex(D);
       ArrayExprs.push_back(Index.get());
@@ -12550,10 +12549,8 @@ TreeTransform<Derived>::TransformDesignatedInitExpr(DesignatedInitExpr *E) {
     if (End.isInvalid())
       return ExprError();
 
-    Desig.AddDesignator(Designator::getArrayRange(Start.get(),
-                                                  End.get(),
-                                                  D.getLBracketLoc(),
-                                                  D.getEllipsisLoc()));
+    Desig.AddDesignator(Designator::CreateArrayRangeDesignator(
+        Start.get(), End.get(), D.getLBracketLoc(), D.getEllipsisLoc()));
 
     ExprChanged = ExprChanged || Start.get() != E->getArrayRangeStart(D) ||
                   End.get() != E->getArrayRangeEnd(D);
@@ -14139,6 +14136,37 @@ TreeTransform<Derived>::TransformLambdaExpr(LambdaExpr *E) {
   LambdaScopeInfo *LSI = getSema().PushLambdaScope();
   Sema::FunctionScopeRAII FuncScopeCleanup(getSema());
 
+  // Transform the template parameters, and add them to the current
+  // instantiation scope. The null case is handled correctly.
+  auto TPL = getDerived().TransformTemplateParameterList(
+      E->getTemplateParameterList());
+  LSI->GLTemplateParameterList = TPL;
+
+  // Transform the type of the original lambda's call operator.
+  // The transformation MUST be done in the CurrentInstantiationScope since
+  // it introduces a mapping of the original to the newly created
+  // transformed parameters.
+  TypeSourceInfo *NewCallOpTSI = nullptr;
+  {
+    TypeSourceInfo *OldCallOpTSI = E->getCallOperator()->getTypeSourceInfo();
+    FunctionProtoTypeLoc OldCallOpFPTL =
+        OldCallOpTSI->getTypeLoc().getAs<FunctionProtoTypeLoc>();
+
+    TypeLocBuilder NewCallOpTLBuilder;
+    SmallVector<QualType, 4> ExceptionStorage;
+    TreeTransform *This = this; // Work around gcc.gnu.org/PR56135.
+    QualType NewCallOpType = TransformFunctionProtoType(
+        NewCallOpTLBuilder, OldCallOpFPTL, nullptr, Qualifiers(),
+        [&](FunctionProtoType::ExceptionSpecInfo &ESI, bool &Changed) {
+          return This->TransformExceptionSpec(OldCallOpFPTL.getBeginLoc(), ESI,
+                                              ExceptionStorage, Changed);
+        });
+    if (NewCallOpType.isNull())
+      return ExprError();
+    NewCallOpTSI = NewCallOpTLBuilder.getTypeSourceInfo(getSema().Context,
+                                                        NewCallOpType);
+  }
+
   // Create the local class that will describe the lambda.
 
   // FIXME: DependencyKind below is wrong when substituting inside a templated
@@ -14155,8 +14183,10 @@ TreeTransform<Derived>::TransformLambdaExpr(LambdaExpr *E) {
     DependencyKind = CXXRecordDecl::LDK_NeverDependent;
 
   CXXRecordDecl *OldClass = E->getLambdaClass();
-  CXXRecordDecl *Class = getSema().createLambdaClosureType(
-      E->getIntroducerRange(), nullptr, DependencyKind, E->getCaptureDefault());
+  CXXRecordDecl *Class =
+      getSema().createLambdaClosureType(E->getIntroducerRange(), NewCallOpTSI,
+                                        DependencyKind, E->getCaptureDefault());
+
   getDerived().transformedLocalDecl(OldClass, {Class});
 
   std::optional<std::tuple<bool, unsigned, unsigned, Decl *>> Mangling;
@@ -14166,18 +14196,35 @@ TreeTransform<Derived>::TransformLambdaExpr(LambdaExpr *E) {
                                OldClass->getDeviceLambdaManglingNumber(),
                                OldClass->getLambdaContextDecl());
 
-  CXXMethodDecl *NewCallOperator =
-      getSema().CreateLambdaCallOperator(E->getIntroducerRange(), Class);
-  NewCallOperator->setLexicalDeclContext(getSema().CurContext);
+  // Build the call operator.
+  CXXMethodDecl *NewCallOperator = getSema().startLambdaDefinition(
+      Class, E->getIntroducerRange(), NewCallOpTSI,
+      E->getCallOperator()->getEndLoc(),
+      NewCallOpTSI->getTypeLoc().castAs<FunctionProtoTypeLoc>().getParams(),
+      E->getCallOperator()->getConstexprKind(),
+      E->getCallOperator()->getStorageClass(),
+      E->getCallOperator()->getTrailingRequiresClause());
 
-  // Enter the scope of the lambda.
-  getSema().buildLambdaScope(LSI, NewCallOperator, E->getIntroducerRange(),
-                             E->getCaptureDefault(), E->getCaptureDefaultLoc(),
-                             E->hasExplicitParameters(), E->isMutable());
+  LSI->CallOperator = NewCallOperator;
+
+  getDerived().transformAttrs(E->getCallOperator(), NewCallOperator);
+  getDerived().transformedLocalDecl(E->getCallOperator(), {NewCallOperator});
+
+  // Number the lambda for linkage purposes if necessary.
+  getSema().handleLambdaNumbering(Class, NewCallOperator, Mangling);
 
   // Introduce the context of the call operator.
   Sema::ContextRAII SavedContext(getSema(), NewCallOperator,
                                  /*NewThisContext*/false);
+
+  // Enter the scope of the lambda.
+  getSema().buildLambdaScope(LSI, NewCallOperator,
+                             E->getIntroducerRange(),
+                             E->getCaptureDefault(),
+                             E->getCaptureDefaultLoc(),
+                             E->hasExplicitParameters(),
+                             E->hasExplicitResultType(),
+                             E->isMutable());
 
   bool Invalid = false;
 
@@ -14218,8 +14265,7 @@ TreeTransform<Derived>::TransformLambdaExpr(LambdaExpr *E) {
         }
         VarDecl *NewVD = getSema().createLambdaInitCaptureVarDecl(
             OldVD->getLocation(), InitQualType, NewC.EllipsisLoc,
-            OldVD->getIdentifier(), OldVD->getInitStyle(), Init.get(),
-            getSema().CurContext);
+            OldVD->getIdentifier(), OldVD->getInitStyle(), Init.get());
         if (!NewVD) {
           Invalid = true;
           break;
@@ -14298,55 +14344,6 @@ TreeTransform<Derived>::TransformLambdaExpr(LambdaExpr *E) {
                                  EllipsisLoc);
   }
   getSema().finishLambdaExplicitCaptures(LSI);
-
-  // Transform the template parameters, and add them to the current
-  // instantiation scope. The null case is handled correctly.
-  auto TPL = getDerived().TransformTemplateParameterList(
-      E->getTemplateParameterList());
-  LSI->GLTemplateParameterList = TPL;
-
-  // Transform the type of the original lambda's call operator.
-  // The transformation MUST be done in the CurrentInstantiationScope since
-  // it introduces a mapping of the original to the newly created
-  // transformed parameters.
-  TypeSourceInfo *NewCallOpTSI = nullptr;
-  {
-    TypeSourceInfo *OldCallOpTSI = E->getCallOperator()->getTypeSourceInfo();
-    auto OldCallOpFPTL =
-        OldCallOpTSI->getTypeLoc().getAs<FunctionProtoTypeLoc>();
-
-    TypeLocBuilder NewCallOpTLBuilder;
-    SmallVector<QualType, 4> ExceptionStorage;
-    TreeTransform *This = this; // Work around gcc.gnu.org/PR56135.
-    QualType NewCallOpType = TransformFunctionProtoType(
-        NewCallOpTLBuilder, OldCallOpFPTL, nullptr, Qualifiers(),
-        [&](FunctionProtoType::ExceptionSpecInfo &ESI, bool &Changed) {
-          return This->TransformExceptionSpec(OldCallOpFPTL.getBeginLoc(), ESI,
-                                              ExceptionStorage, Changed);
-        });
-    if (NewCallOpType.isNull())
-      return ExprError();
-    NewCallOpTSI =
-        NewCallOpTLBuilder.getTypeSourceInfo(getSema().Context, NewCallOpType);
-  }
-
-  getSema().CompleteLambdaCallOperator(
-      NewCallOperator, E->getCallOperator()->getLocation(),
-      E->getCallOperator()->getInnerLocStart(),
-      E->getCallOperator()->getTrailingRequiresClause(), NewCallOpTSI,
-      E->getCallOperator()->getConstexprKind(),
-      E->getCallOperator()->getStorageClass(),
-      NewCallOpTSI->getTypeLoc().castAs<FunctionProtoTypeLoc>().getParams(),
-      E->hasExplicitResultType());
-
-  getDerived().transformAttrs(E->getCallOperator(), NewCallOperator);
-  getDerived().transformedLocalDecl(E->getCallOperator(), {NewCallOperator});
-
-  {
-    // Number the lambda for linkage purposes if necessary.
-    Sema::ContextRAII ManglingContext(getSema(), Class->getDeclContext());
-    getSema().handleLambdaNumbering(Class, NewCallOperator, Mangling);
-  }
 
   // FIXME: Sema's lambda-building mechanism expects us to push an expression
   // evaluation context even if we're not transforming the function body.

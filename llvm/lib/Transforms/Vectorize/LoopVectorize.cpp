@@ -1538,14 +1538,23 @@ public:
     return ScalarEpilogueStatus == CM_ScalarEpilogueAllowed;
   }
 
+  /// Returns the TailFoldingStyle that is best for the current loop.
+  TailFoldingStyle getTailFoldingStyle() const {
+    if (!CanFoldTailByMasking)
+      return TailFoldingStyle::None;
+
+    return TTI.getPreferredTailFoldingStyle();
+  }
+
   /// Returns true if all loop blocks should be masked to fold tail loop.
-  bool foldTailByMasking() const { return FoldTailByMasking; }
+  bool foldTailByMasking() const {
+    return getTailFoldingStyle() != TailFoldingStyle::None;
+  }
 
   /// Returns true if were tail-folding and want to use the active lane mask
   /// for vector loop control flow.
   bool useActiveLaneMaskForControlFlow() const {
-    return FoldTailByMasking &&
-           TTI.emitGetActiveLaneMask() == PredicationStyle::DataAndControlFlow;
+    return getTailFoldingStyle() == TailFoldingStyle::DataAndControlFlow;
   }
 
   /// Returns true if the instructions in this block requires predication
@@ -1715,7 +1724,7 @@ private:
   ScalarEpilogueLowering ScalarEpilogueStatus = CM_ScalarEpilogueAllowed;
 
   /// All blocks of loop are to be masked to fold tail of scalar iterations.
-  bool FoldTailByMasking = false;
+  bool CanFoldTailByMasking = false;
 
   /// A map holding scalar costs for different vectorization factors. The
   /// presence of a cost for an instruction in the mapping indicates that the
@@ -5134,7 +5143,7 @@ LoopVectorizationCostModel::computeMaxVF(ElementCount UserVF, unsigned UserIC) {
   // by masking.
   // FIXME: look for a smaller MaxVF that does divide TC rather than masking.
   if (Legal->prepareToFoldTailByMasking()) {
-    FoldTailByMasking = true;
+    CanFoldTailByMasking = true;
     return MaxFactors;
   }
 
@@ -5292,7 +5301,7 @@ bool LoopVectorizationCostModel::isMoreProfitable(
 
   unsigned MaxTripCount = PSE.getSE()->getSmallConstantMaxTripCount(TheLoop);
 
-  if (!A.Width.isScalable() && !B.Width.isScalable() && FoldTailByMasking &&
+  if (!A.Width.isScalable() && !B.Width.isScalable() && foldTailByMasking() &&
       MaxTripCount) {
     // If we are folding the tail and the trip count is a known (possibly small)
     // constant, the trip count will be rounded up to an integer number of
@@ -8098,8 +8107,8 @@ VPValue *VPRecipeBuilder::createBlockInMask(BasicBlock *BB, VPlanPtr &Plan) {
 
     // If we're using the active lane mask for control flow, then we get the
     // mask from the active lane mask PHI that is cached in the VPlan.
-    PredicationStyle EmitGetActiveLaneMask = CM.TTI.emitGetActiveLaneMask();
-    if (EmitGetActiveLaneMask == PredicationStyle::DataAndControlFlow)
+    TailFoldingStyle Style = CM.getTailFoldingStyle();
+    if (Style == TailFoldingStyle::DataAndControlFlow)
       return BlockMaskCache[BB] = Plan->getActiveLaneMaskPhi();
 
     // Introduce the early-exit compare IV <= BTC to form header block mask.
@@ -8115,7 +8124,8 @@ VPValue *VPRecipeBuilder::createBlockInMask(BasicBlock *BB, VPlanPtr &Plan) {
 
     VPBuilder::InsertPointGuard Guard(Builder);
     Builder.setInsertPoint(HeaderVPBB, NewInsertionPoint);
-    if (EmitGetActiveLaneMask != PredicationStyle::None) {
+    if (Style != TailFoldingStyle::None &&
+        Style != TailFoldingStyle::DataWithoutLaneMask) {
       VPValue *TC = Plan->getOrCreateTripCount();
       BlockMask = Builder.createNaryOp(VPInstruction::ActiveLaneMask, {IV, TC},
                                        nullptr, "active.lane.mask");
@@ -8677,34 +8687,10 @@ void LoopVectorizationPlanner::buildVPlansWithVPRecipes(ElementCount MinVF,
   auto &ConditionalAssumes = Legal->getConditionalAssumes();
   DeadInstructions.insert(ConditionalAssumes.begin(), ConditionalAssumes.end());
 
-  MapVector<Instruction *, Instruction *> &SinkAfter = Legal->getSinkAfter();
-  // Dead instructions do not need sinking. Remove them from SinkAfter.
-  for (Instruction *I : DeadInstructions)
-    SinkAfter.erase(I);
-
-  // Cannot sink instructions after dead instructions (there won't be any
-  // recipes for them). Instead, find the first non-dead previous instruction.
-  for (auto &P : Legal->getSinkAfter()) {
-    Instruction *SinkTarget = P.second;
-    Instruction *FirstInst = &*SinkTarget->getParent()->begin();
-    (void)FirstInst;
-    while (DeadInstructions.contains(SinkTarget)) {
-      assert(
-          SinkTarget != FirstInst &&
-          "Must find a live instruction (at least the one feeding the "
-          "fixed-order recurrence PHI) before reaching beginning of the block");
-      SinkTarget = SinkTarget->getPrevNode();
-      assert(SinkTarget != P.first &&
-             "sink source equals target, no sinking required");
-    }
-    P.second = SinkTarget;
-  }
-
   auto MaxVFPlusOne = MaxVF.getWithIncrement(1);
   for (ElementCount VF = MinVF; ElementCount::isKnownLT(VF, MaxVFPlusOne);) {
     VFRange SubRange = {VF, MaxVFPlusOne};
-    VPlans.push_back(
-        buildVPlanWithVPRecipes(SubRange, DeadInstructions, SinkAfter));
+    VPlans.push_back(buildVPlanWithVPRecipes(SubRange, DeadInstructions));
     VF = SubRange.End;
   }
 }
@@ -8712,8 +8698,7 @@ void LoopVectorizationPlanner::buildVPlansWithVPRecipes(ElementCount MinVF,
 // Add the necessary canonical IV and branch recipes required to control the
 // loop.
 static void addCanonicalIVRecipes(VPlan &Plan, Type *IdxTy, DebugLoc DL,
-                                  bool HasNUW,
-                                  bool UseLaneMaskForLoopControlFlow) {
+                                  TailFoldingStyle Style) {
   Value *StartIdx = ConstantInt::get(IdxTy, 0);
   auto *StartV = Plan.getOrAddVPValue(StartIdx);
 
@@ -8725,6 +8710,7 @@ static void addCanonicalIVRecipes(VPlan &Plan, Type *IdxTy, DebugLoc DL,
 
   // Add a CanonicalIVIncrement{NUW} VPInstruction to increment the scalar
   // IV by VF * UF.
+  bool HasNUW = Style == TailFoldingStyle::None;
   auto *CanonicalIVIncrement =
       new VPInstruction(HasNUW ? VPInstruction::CanonicalIVIncrementNUW
                                : VPInstruction::CanonicalIVIncrement,
@@ -8734,7 +8720,7 @@ static void addCanonicalIVRecipes(VPlan &Plan, Type *IdxTy, DebugLoc DL,
   VPBasicBlock *EB = TopRegion->getExitingBasicBlock();
   EB->appendRecipe(CanonicalIVIncrement);
 
-  if (UseLaneMaskForLoopControlFlow) {
+  if (Style == TailFoldingStyle::DataAndControlFlow) {
     // Create the active lane mask instruction in the vplan preheader.
     VPBasicBlock *Preheader = Plan.getEntry()->getEntryBasicBlock();
 
@@ -8810,8 +8796,7 @@ static void addUsersInExitBlock(VPBasicBlock *HeaderVPBB,
 }
 
 VPlanPtr LoopVectorizationPlanner::buildVPlanWithVPRecipes(
-    VFRange &Range, SmallPtrSetImpl<Instruction *> &DeadInstructions,
-    const MapVector<Instruction *, Instruction *> &SinkAfter) {
+    VFRange &Range, SmallPtrSetImpl<Instruction *> &DeadInstructions) {
 
   SmallPtrSet<const InterleaveGroup<Instruction> *, 1> InterleaveGroups;
 
@@ -8822,12 +8807,6 @@ VPlanPtr LoopVectorizationPlanner::buildVPlanWithVPRecipes(
   // process after constructing the initial VPlan.
   // ---------------------------------------------------------------------------
 
-  // Mark instructions we'll need to sink later and their targets as
-  // ingredients whose recipe we'll need to record.
-  for (const auto &Entry : SinkAfter) {
-    RecipeBuilder.recordRecipeOf(Entry.first);
-    RecipeBuilder.recordRecipeOf(Entry.second);
-  }
   for (const auto &Reduction : CM.getInLoopReductionChains()) {
     PHINode *Phi = Reduction.first;
     RecurKind Kind =
@@ -8887,8 +8866,7 @@ VPlanPtr LoopVectorizationPlanner::buildVPlanWithVPRecipes(
       getDebugLocFromInstOrOperands(Legal->getPrimaryInduction());
   addCanonicalIVRecipes(*Plan, Legal->getWidestInductionType(),
                         DLInst ? DLInst->getDebugLoc() : DebugLoc(),
-                        !CM.foldTailByMasking(),
-                        CM.useActiveLaneMaskForControlFlow());
+                        CM.getTailFoldingStyle());
 
   // Scan the body of the loop in a topological order to visit each basic block
   // after having visited its predecessor basic blocks.
@@ -8896,7 +8874,6 @@ VPlanPtr LoopVectorizationPlanner::buildVPlanWithVPRecipes(
   DFS.perform(LI);
 
   VPBasicBlock *VPBB = HeaderVPBB;
-  SmallVector<VPWidenIntOrFpInductionRecipe *> InductionsToMove;
   for (BasicBlock *BB : make_range(DFS.beginRPO(), DFS.endRPO())) {
     // Relevant instructions from basic block BB will be grouped into VPRecipe
     // ingredients and fill a new VPBasicBlock.
@@ -8951,19 +8928,15 @@ VPlanPtr LoopVectorizationPlanner::buildVPlanWithVPRecipes(
           Plan->addVPValue(UV, Def);
         }
 
+        RecipeBuilder.setRecipe(Instr, Recipe);
         if (isa<VPWidenIntOrFpInductionRecipe>(Recipe) &&
             HeaderVPBB->getFirstNonPhi() != VPBB->end()) {
-          // Keep track of VPWidenIntOrFpInductionRecipes not in the phi section
-          // of the header block. That can happen for truncates of induction
-          // variables. Those recipes are moved to the phi section of the header
-          // block after applying SinkAfter, which relies on the original
-          // position of the trunc.
+          // Move VPWidenIntOrFpInductionRecipes for optimized truncates to the
+          // phi section of HeaderVPBB.
           assert(isa<TruncInst>(Instr));
-          InductionsToMove.push_back(
-              cast<VPWidenIntOrFpInductionRecipe>(Recipe));
-        }
-        RecipeBuilder.setRecipe(Instr, Recipe);
-        VPBB->appendRecipe(Recipe);
+          Recipe->insertBefore(*HeaderVPBB, HeaderVPBB->getFirstNonPhi());
+        } else
+          VPBB->appendRecipe(Recipe);
         continue;
       }
 
@@ -8998,115 +8971,16 @@ VPlanPtr LoopVectorizationPlanner::buildVPlanWithVPRecipes(
   // bring the VPlan to its final state.
   // ---------------------------------------------------------------------------
 
-  // Apply Sink-After legal constraints.
-  auto GetReplicateRegion = [](VPRecipeBase *R) -> VPRegionBlock * {
-    auto *Region = dyn_cast_or_null<VPRegionBlock>(R->getParent()->getParent());
-    if (Region && Region->isReplicator()) {
-      assert(Region->getNumSuccessors() == 1 &&
-             Region->getNumPredecessors() == 1 && "Expected SESE region!");
-      assert(R->getParent()->size() == 1 &&
-             "A recipe in an original replicator region must be the only "
-             "recipe in its block");
-      return Region;
-    }
-    return nullptr;
-  };
-  for (const auto &Entry : SinkAfter) {
-    VPRecipeBase *Sink = RecipeBuilder.getRecipe(Entry.first);
-    VPRecipeBase *Target = RecipeBuilder.getRecipe(Entry.second);
-
-    auto *TargetRegion = GetReplicateRegion(Target);
-    auto *SinkRegion = GetReplicateRegion(Sink);
-    if (!SinkRegion) {
-      // If the sink source is not a replicate region, sink the recipe directly.
-      if (TargetRegion) {
-        // The target is in a replication region, make sure to move Sink to
-        // the block after it, not into the replication region itself.
-        VPBasicBlock *NextBlock =
-            cast<VPBasicBlock>(TargetRegion->getSuccessors().front());
-        Sink->moveBefore(*NextBlock, NextBlock->getFirstNonPhi());
-      } else
-        Sink->moveAfter(Target);
-      continue;
-    }
-
-    // The sink source is in a replicate region. Unhook the region from the CFG.
-    auto *SinkPred = SinkRegion->getSinglePredecessor();
-    auto *SinkSucc = SinkRegion->getSingleSuccessor();
-    VPBlockUtils::disconnectBlocks(SinkPred, SinkRegion);
-    VPBlockUtils::disconnectBlocks(SinkRegion, SinkSucc);
-    VPBlockUtils::connectBlocks(SinkPred, SinkSucc);
-
-    if (TargetRegion) {
-      // The target recipe is also in a replicate region, move the sink region
-      // after the target region.
-      auto *TargetSucc = TargetRegion->getSingleSuccessor();
-      VPBlockUtils::disconnectBlocks(TargetRegion, TargetSucc);
-      VPBlockUtils::connectBlocks(TargetRegion, SinkRegion);
-      VPBlockUtils::connectBlocks(SinkRegion, TargetSucc);
-    } else {
-      // The sink source is in a replicate region, we need to move the whole
-      // replicate region, which should only contain a single recipe in the
-      // main block.
-      auto *SplitBlock =
-          Target->getParent()->splitAt(std::next(Target->getIterator()));
-
-      auto *SplitPred = SplitBlock->getSinglePredecessor();
-
-      VPBlockUtils::disconnectBlocks(SplitPred, SplitBlock);
-      VPBlockUtils::connectBlocks(SplitPred, SinkRegion);
-      VPBlockUtils::connectBlocks(SinkRegion, SplitBlock);
-    }
-  }
-
   VPlanTransforms::removeRedundantCanonicalIVs(*Plan);
   VPlanTransforms::removeRedundantInductionCasts(*Plan);
-
-  // Now that sink-after is done, move induction recipes for optimized truncates
-  // to the phi section of the header block.
-  for (VPWidenIntOrFpInductionRecipe *Ind : InductionsToMove)
-    Ind->moveBefore(*HeaderVPBB, HeaderVPBB->getFirstNonPhi());
 
   // Adjust the recipes for any inloop reductions.
   adjustRecipesForReductions(cast<VPBasicBlock>(TopRegion->getExiting()), Plan,
                              RecipeBuilder, Range.Start);
 
-  // Introduce a recipe to combine the incoming and previous values of a
-  // fixed-order recurrence.
-  for (VPRecipeBase &R :
-       Plan->getVectorLoopRegion()->getEntryBasicBlock()->phis()) {
-    auto *RecurPhi = dyn_cast<VPFirstOrderRecurrencePHIRecipe>(&R);
-    if (!RecurPhi)
-      continue;
-
-    VPRecipeBase *PrevRecipe = &RecurPhi->getBackedgeRecipe();
-    // Fixed-order recurrences do not contain cycles, so this loop is guaranteed
-    // to terminate.
-    while (auto *PrevPhi =
-               dyn_cast<VPFirstOrderRecurrencePHIRecipe>(PrevRecipe))
-      PrevRecipe = &PrevPhi->getBackedgeRecipe();
-    VPBasicBlock *InsertBlock = PrevRecipe->getParent();
-    auto *Region = GetReplicateRegion(PrevRecipe);
-    if (Region)
-      InsertBlock = dyn_cast<VPBasicBlock>(Region->getSingleSuccessor());
-    if (!InsertBlock) {
-      InsertBlock = new VPBasicBlock(Region->getName() + ".succ");
-      VPBlockUtils::insertBlockAfter(InsertBlock, Region);
-    }
-    if (Region || PrevRecipe->isPhi())
-      Builder.setInsertPoint(InsertBlock, InsertBlock->getFirstNonPhi());
-    else
-      Builder.setInsertPoint(InsertBlock, std::next(PrevRecipe->getIterator()));
-
-    auto *RecurSplice = cast<VPInstruction>(
-        Builder.createNaryOp(VPInstruction::FirstOrderRecurrenceSplice,
-                             {RecurPhi, RecurPhi->getBackedgeValue()}));
-
-    RecurPhi->replaceAllUsesWith(RecurSplice);
-    // Set the first operand of RecurSplice to RecurPhi again, after replacing
-    // all users.
-    RecurSplice->setOperand(0, RecurPhi);
-  }
+  // Sink users of fixed-order recurrence past the recipe defining the previous
+  // value and introduce FirstOrderRecurrenceSplice VPInstructions.
+  VPlanTransforms::adjustFixedOrderRecurrences(*Plan, Builder);
 
   // Interleave memory: for each Interleave Group we marked earlier as relevant
   // for this VPlan, replace the Recipes widening its memory instructions with a
@@ -9198,7 +9072,7 @@ VPlanPtr LoopVectorizationPlanner::buildVPlan(VFRange &Range) {
   Term->eraseFromParent();
 
   addCanonicalIVRecipes(*Plan, Legal->getWidestInductionType(), DebugLoc(),
-                        true, CM.useActiveLaneMaskForControlFlow());
+                        CM.getTailFoldingStyle());
   return Plan;
 }
 

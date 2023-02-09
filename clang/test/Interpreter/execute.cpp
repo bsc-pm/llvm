@@ -6,9 +6,6 @@
 // CHECK-DRIVER: i = 10
 // RUN: cat %s | clang-repl | FileCheck %s
 // RUN: cat %s | clang-repl -Xcc -O2 | FileCheck %s
-
-// We mark it as XFAIL because in upstream the test is failing
-// XFAIL: *
 extern "C" int printf(const char *, ...);
 int i = 42;
 auto r1 = printf("i = %d\n", i);

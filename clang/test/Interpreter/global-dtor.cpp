@@ -4,9 +4,6 @@
 // Tests that a global destructor is ran on platforms with gnu exception support.
 //
 // RUN: cat %s | clang-repl | FileCheck %s
-
-// We mark it as XFAIL because in upstream the test is failing
-// XFAIL: *
 extern "C" int printf(const char *, ...);
 
 struct D { float f = 1.0; D *m = nullptr; D(){} ~D() { printf("D[f=%f, m=0x%llx]\n", f, reinterpret_cast<unsigned long long>(m)); }} d;

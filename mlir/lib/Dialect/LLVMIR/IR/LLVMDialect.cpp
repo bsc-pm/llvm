@@ -2267,7 +2267,8 @@ LogicalResult AtomicRMWOp::verify() {
   if (!ptrType.isOpaque() && valType != ptrType.getElementType())
     return emitOpError("expected LLVM IR element type for operand #0 to "
                        "match type for operand #1");
-  if (getBinOp() == AtomicBinOp::fadd || getBinOp() == AtomicBinOp::fsub) {
+  if (getBinOp() == AtomicBinOp::fadd || getBinOp() == AtomicBinOp::fsub ||
+      getBinOp() == AtomicBinOp::fmin || getBinOp() == AtomicBinOp::fmax) {
     if (!mlir::LLVM::isCompatibleFloatingPointType(valType))
       return emitOpError("expected LLVM IR floating point type");
   } else if (getBinOp() == AtomicBinOp::xchg) {
@@ -2713,7 +2714,10 @@ struct LLVMOpAsmDialectInterface : public OpAsmDialectInterface {
         .Case<DIVoidResultTypeAttr, DIBasicTypeAttr, DICompileUnitAttr,
               DICompositeTypeAttr, DIDerivedTypeAttr, DIFileAttr,
               DILexicalBlockAttr, DILexicalBlockFileAttr, DILocalVariableAttr,
-              DISubprogramAttr, DISubroutineTypeAttr>([&](auto attr) {
+              DISubprogramAttr, DISubroutineTypeAttr, LoopAnnotationAttr,
+              LoopVectorizeAttr, LoopInterleaveAttr, LoopUnrollAttr,
+              LoopUnrollAndJamAttr, LoopLICMAttr, LoopDistributeAttr,
+              LoopPipelineAttr>([&](auto attr) {
           os << decltype(attr)::getMnemonic();
           return AliasResult::OverridableAlias;
         })
@@ -2991,51 +2995,27 @@ LogicalResult LLVMDialect::verifyOperationAttribute(Operation *op,
   // If the `llvm.loop` attribute is present, enforce the following structure,
   // which the module translation can assume.
   if (attr.getName() == LLVMDialect::getLoopAttrName()) {
-    auto loopAttr = attr.getValue().dyn_cast<DictionaryAttr>();
+    auto loopAttr = attr.getValue().dyn_cast<LoopAnnotationAttr>();
     if (!loopAttr)
       return op->emitOpError() << "expected '" << LLVMDialect::getLoopAttrName()
-                               << "' to be a dictionary attribute";
-    std::optional<NamedAttribute> parallelAccessGroup =
-        loopAttr.getNamed(LLVMDialect::getParallelAccessAttrName());
-    if (parallelAccessGroup) {
-      auto accessGroups = parallelAccessGroup->getValue().dyn_cast<ArrayAttr>();
-      if (!accessGroups)
-        return op->emitOpError()
-               << "expected '" << LLVMDialect::getParallelAccessAttrName()
-               << "' to be an array attribute";
-      for (Attribute attr : accessGroups) {
-        auto accessGroupRef = attr.dyn_cast<SymbolRefAttr>();
-        if (!accessGroupRef)
-          return op->emitOpError()
-                 << "expected '" << attr << "' to be a symbol reference";
-        StringAttr metadataName = accessGroupRef.getRootReference();
-        auto metadataOp =
-            SymbolTable::lookupNearestSymbolFrom<LLVM::MetadataOp>(
-                op->getParentOp(), metadataName);
-        if (!metadataOp)
-          return op->emitOpError()
-                 << "expected '" << attr << "' to reference a metadata op";
-        StringAttr accessGroupName = accessGroupRef.getLeafReference();
-        Operation *accessGroupOp =
-            SymbolTable::lookupNearestSymbolFrom(metadataOp, accessGroupName);
-        if (!accessGroupOp)
-          return op->emitOpError()
-                 << "expected '" << attr << "' to reference an access_group op";
-      }
+                               << "' to be a loop annotation attribute";
+    ArrayRef<SymbolRefAttr> parallelAccesses = loopAttr.getParallelAccesses();
+    if (parallelAccesses.empty())
+      return success();
+    for (SymbolRefAttr accessGroupRef : parallelAccesses) {
+      StringAttr metadataName = accessGroupRef.getRootReference();
+      auto metadataOp = SymbolTable::lookupNearestSymbolFrom<LLVM::MetadataOp>(
+          op->getParentOp(), metadataName);
+      if (!metadataOp)
+        return op->emitOpError() << "expected '" << accessGroupRef
+                                 << "' to reference a metadata op";
+      StringAttr accessGroupName = accessGroupRef.getLeafReference();
+      Operation *accessGroupOp =
+          SymbolTable::lookupNearestSymbolFrom(metadataOp, accessGroupName);
+      if (!accessGroupOp)
+        return op->emitOpError() << "expected '" << accessGroupRef
+                                 << "' to reference an access_group op";
     }
-
-    std::optional<NamedAttribute> loopOptions =
-        loopAttr.getNamed(LLVMDialect::getLoopOptionsAttrName());
-    if (loopOptions && !loopOptions->getValue().isa<LoopOptionsAttr>())
-      return op->emitOpError()
-             << "expected '" << LLVMDialect::getLoopOptionsAttrName()
-             << "' to be a `loopopts` attribute";
-  }
-
-  if (attr.getName() == LLVMDialect::getStructAttrsAttrName()) {
-    return op->emitOpError()
-           << "'" << LLVM::LLVMDialect::getStructAttrsAttrName()
-           << "' is permitted only in argument or result attributes";
   }
 
   // If the data layout attribute is present, it must use the LLVM data layout
@@ -3052,46 +3032,6 @@ LogicalResult LLVMDialect::verifyOperationAttribute(Operation *op,
   return op->emitOpError() << "expected '"
                            << LLVM::LLVMDialect::getDataLayoutAttrName()
                            << "' to be a string attributes";
-}
-
-LogicalResult LLVMDialect::verifyStructAttr(Operation *op, Attribute attr,
-                                            Type annotatedType) {
-  auto structType = annotatedType.dyn_cast<LLVMStructType>();
-  if (!structType) {
-    const auto emitIncorrectAnnotatedType = [&op]() {
-      return op->emitError()
-             << "expected '" << LLVMDialect::getStructAttrsAttrName()
-             << "' to annotate '!llvm.struct' or '!llvm.ptr<struct<...>>'";
-    };
-    const auto ptrType = annotatedType.dyn_cast<LLVMPointerType>();
-    if (!ptrType)
-      return emitIncorrectAnnotatedType();
-    structType = ptrType.getElementType().dyn_cast<LLVMStructType>();
-    if (!structType)
-      return emitIncorrectAnnotatedType();
-  }
-
-  const auto arrAttrs = attr.dyn_cast<ArrayAttr>();
-  if (!arrAttrs)
-    return op->emitError() << "expected '"
-                           << LLVMDialect::getStructAttrsAttrName()
-                           << "' to be an array attribute";
-
-  if (structType.getBody().size() != arrAttrs.size())
-    return op->emitError()
-           << "size of '" << LLVMDialect::getStructAttrsAttrName()
-           << "' must match the size of the annotated '!llvm.struct'";
-  return success();
-}
-
-static LogicalResult verifyFuncOpInterfaceStructAttr(Operation *op,
-                                                     Attribute attr,
-                                                     Type annotatedType) {
-  if (isa<FunctionOpInterface>(op))
-    return LLVMDialect::verifyStructAttr(op, attr, annotatedType);
-  return op->emitError() << "expected '"
-                         << LLVMDialect::getStructAttrsAttrName()
-                         << "' to be used on function-like operations";
 }
 
 LogicalResult LLVMDialect::verifyParameterAttribute(Operation *op,
@@ -3144,10 +3084,6 @@ LogicalResult LLVMDialect::verifyParameterAttribute(Operation *op,
                 "different type";
     return success();
   };
-
-  // Note: The struct parameter attributes are not lowered to LLVM IR.
-  if (name == LLVMDialect::getStructAttrsAttrName())
-    return verifyFuncOpInterfaceStructAttr(op, paramAttr.getValue(), paramType);
 
   // Check a unit attribute that is attached to a pointer value.
   if (name == LLVMDialect::getNoAliasAttrName() ||
