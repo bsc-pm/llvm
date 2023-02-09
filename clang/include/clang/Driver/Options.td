@@ -2654,6 +2654,12 @@ def fompss_fpga_hls_tasks_dir : Separate<["-"], "fompss-fpga-hls-tasks-dir">, Fl
 def fompss_fpga_extract : Flag<["-"], "fompss-fpga-extract">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"Export all OmpSs2 fpga code in the directory defined in -fompss-fpga-hls-tasks-dir">,
   MarshallingInfoFlag<LangOpts<"OmpSsFpgaExtract">>;
+def fompss_fpga_wrapper_code : Flag<["-"], "fompss-fpga-wrapper-code">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Generates all OmpSs2 fpga wrapper code to be sent to ait in the directory defined in -fompss-fpga-hls-tasks-dir">,
+  MarshallingInfoFlag<LangOpts<"OmpSsFpgaWrapperCode">>;
+def fompss_fpga_memory_port_width : Separate<["-"], "fompss-fpga-memory-port-width">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Defines the width (in bits) of memory ports (only for wrapper localmem data) for fpga accelerators">,
+  MarshallingInfoFlag<LangOpts<"OmpSsFpgaMemoryPortWidth">>;
 def fopenmp : Flag<["-"], "fopenmp">, Group<f_Group>, Flags<[CC1Option, NoArgumentUnused, FlangOption, FC1Option]>,
   HelpText<"Parse OpenMP pragmas and generate parallel code.">;
 def fno_openmp : Flag<["-"], "fno-openmp">, Group<f_Group>, Flags<[NoArgumentUnused]>;

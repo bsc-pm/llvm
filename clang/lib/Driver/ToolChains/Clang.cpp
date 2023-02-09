@@ -6171,9 +6171,17 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   if (Args.getLastArg(options::OPT_fompss_fpga_extract) && !IsCuda) {
     CmdArgs.push_back("-fompss-fpga-extract");
   }
-  if (Arg *A =
-          Args.getLastArg(options::OPT_fompss_fpga_hls_tasks_dir); A && !IsCuda) {
+  if (Args.getLastArg(options::OPT_fompss_fpga_wrapper_code) && !IsCuda) {
+    CmdArgs.push_back("-fompss-fpga-wrapper-code");
+  }
+  if (Arg *A = Args.getLastArg(options::OPT_fompss_fpga_hls_tasks_dir);
+      A && !IsCuda) {
     CmdArgs.push_back("-fompss-fpga-hls-tasks-dir");
+    CmdArgs.push_back(A->getValue());
+  }
+  if (Arg *A =
+          Args.getLastArg(options::OPT_fompss_fpga_memory_port_width); A && !IsCuda) {
+    CmdArgs.push_back("-fompss-fpga-memory-port-width");
     CmdArgs.push_back(A->getValue());
   }
 

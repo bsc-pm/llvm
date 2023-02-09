@@ -1430,10 +1430,15 @@ void Sema::ActOnEndOfTranslationUnit() {
       }
     }
   }
-
-  if (LangOpts.OmpSsFpgaExtract) {
-    ActOnOmpSsFpgaExtractFiles();
+  if (!Diags.hasErrorOccurred()) {
+    if (LangOpts.OmpSsFpgaExtract) {
+      ActOnOmpSsFpgaExtractFiles();
+    }
+    if (LangOpts.OmpSsFpgaWrapperCode) {
+      ActOnOmpSsFpgaGenerateWrapperCodeFiles();
+    }
   }
+
   // Check we've noticed that we're no longer parsing the initializer for every
   // variable. If we miss cases, then at best we have a performance issue and
   // at worst a rejects-valid bug.

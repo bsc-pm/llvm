@@ -11642,6 +11642,18 @@ def err_oss_fpga_dependency_analisis : Error<
   "'#pragma oss task device(fpga)' failed to resolve the dependencies of this function. This may be an internal bug. Error details: %0">;
 def err_oss_fpga_missing_body_for_function_depended_by_kernel : Error<"This function is depended by an fpga kernel, but we couldn't locate its body. Make sure it is visible in this translation unit.">;
 def note_oss_fpga_kernel : Note<"The fpga kernel">;
+def err_oss_fpga_expected_array_to_place_in_localmem: Error<
+  "Expected this to be an array if it is intended to be placed in the local memory of the FPGA. You might want to use the localmem, localmem_copies and/or no_localmem_copies parameters in the oss task">;
+def err_oss_fpga_param_used_in_localmem_marked_as_out_const_qualified: Error<
+  "Out/inout localmem with const qualifier. This parameter can't be sent to the FPGA local memory if it is marked as const and as an out/inout. Consider removing const">;
+def err_oss_fpga_onto_clause_missing_bits: Error<
+  "Architecture bits not set in the onto clause: 33 -> SMP arch, 32 -> FPGA arch">;
+def err_oss_fpga_onto_clause_task_type_too_wide: Error<
+  "Task type too wide: 2bits arch + 32bits hash">;
+def err_expected_constant_integer: Error<
+  "Expected this to evaulate to a constant integer">;
+def err_expected_constant_unsigned_integer: Error<
+  "Expected this to evaulate to a constant unsigned integer">;
 def err_oss_non_void_task : Error<
   "non-void tasks are not supported">;
 def err_oss_rvalue_param_task : Error<
