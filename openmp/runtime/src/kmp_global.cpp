@@ -577,4 +577,7 @@ int __kmp_free_agent_clause_dflt = FALSE;
 int __kmp_free_agent_allowed_teams_capacity = 0;
 int __kmp_free_agent_allowed_teams_length = 0;
 
+// Task scheduling order
+int __kmp_sched_own_tasks_in_order = FALSE;
+
 // end of file //

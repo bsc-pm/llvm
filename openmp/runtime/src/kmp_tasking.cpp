@@ -3043,6 +3043,7 @@ static kmp_task_t *__kmp_remove_my_task(kmp_info_t *thread, kmp_int32 gtid,
   kmp_taskdata_t *taskdata;
   kmp_thread_data_t *thread_data;
   kmp_uint32 tail;
+  kmp_uint32 head;
 
   KMP_DEBUG_ASSERT(__kmp_tasking_mode != tskm_immediate_exec);
   KMP_DEBUG_ASSERT(task_team->tt.tt_threads_data !=
@@ -3075,9 +3076,17 @@ static kmp_task_t *__kmp_remove_my_task(kmp_info_t *thread, kmp_int32 gtid,
     return NULL;
   }
 
-  tail = (thread_data->td.td_deque_tail - 1) &
-         TASK_DEQUE_MASK(thread_data->td); // Wrap index.
-  taskdata = thread_data->td.td_deque[tail];
+  if (__kmp_sched_own_tasks_in_order) {
+      head = (thread_data->td.td_deque_head) &
+             TASK_DEQUE_MASK(thread_data->td); // Wrap index.
+      taskdata = thread_data->td.td_deque[head];
+  }
+  else {
+      tail = (thread_data->td.td_deque_tail - 1) &
+             TASK_DEQUE_MASK(thread_data->td); // Wrap index.
+      taskdata = thread_data->td.td_deque[tail];
+  }
+ 
 
   if (!__kmp_task_is_allowed(gtid, is_constrained, taskdata,
                              thread->th.th_current_task)) {
@@ -3091,7 +3100,9 @@ static kmp_task_t *__kmp_remove_my_task(kmp_info_t *thread, kmp_int32 gtid,
     return NULL;
   }
 
-  thread_data->td.td_deque_tail = tail;
+  if (__kmp_sched_own_tasks_in_order) thread_data->td.td_deque_head = head + 1;
+  else thread_data->td.td_deque_tail = tail;
+
   TCW_4(thread_data->td.td_deque_ntasks, thread_data->td.td_deque_ntasks - 1);
 
   __kmp_release_bootstrap_lock(&thread_data->td.td_deque_lock);

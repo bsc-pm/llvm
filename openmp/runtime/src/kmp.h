@@ -3369,6 +3369,7 @@ extern int __kmp_free_agent_num_threads; /*Max number of free agents allowed. In
 env variable KMP_FREE_AGENT_NUM_THREADS */
 extern std::atomic<int> __kmp_free_agent_active_nth; //Actual number of free agents active
 extern int __kmp_free_agent_clause_dflt; //Value obtained from env variable KMP_FREE_AGENT_DEFAULT_CLAUSE
+extern int __kmp_sched_own_tasks_in_order; //Value obtained from env variable KMP_SCHED_OWN_TASKS_IN_ORDER
 /* -------------------------------------------------------------------------- */
 /* Global list of allowed teams for the free agent threads. All elements are  */
 /* read/write protected. Active free agents have a copy of this list in       */

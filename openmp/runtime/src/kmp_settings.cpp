@@ -5371,6 +5371,20 @@ static void __kmp_stg_print_free_agent_clause_default(kmp_str_buf_t *buffer,
 }
 
 // -----------------------------------------------------------------------------
+// KMP_SCHED_OWN_TASKS_IN_ORDER
+static void __kmp_stg_parse_sched_own_tasks_in_order(char const *name,
+                                                      char const *value,
+                                                      void *data){
+  __kmp_stg_parse_bool(name, value, &__kmp_sched_own_tasks_in_order);
+}
+
+static void __kmp_stg_print_sched_own_tasks_in_order(kmp_str_buf_t *buffer,
+                                                      char const *name,
+                                                      void *data){
+  __kmp_stg_print_bool(buffer, name, __kmp_sched_own_tasks_in_order);
+}
+
+// -----------------------------------------------------------------------------
 // Table.
 
 static kmp_setting_t __kmp_stg_table[] = {
@@ -5645,6 +5659,11 @@ static kmp_setting_t __kmp_stg_table[] = {
       __kmp_stg_print_num_free_agent_threads, NULL, 0, 0},
     {"KMP_FREE_AGENT_CLAUSE_DEFAULT", __kmp_stg_parse_free_agent_clause_default,
       __kmp_stg_print_free_agent_clause_default, NULL, 0, 0},
+
+
+    // Tasks scheduling order
+    {"KMP_SCHED_OWN_TASKS_IN_ORDER", __kmp_stg_parse_sched_own_tasks_in_order,
+      __kmp_stg_print_sched_own_tasks_in_order, NULL, 0, 0},
 
 #if KMP_HAVE_UMWAIT
     {"KMP_TPAUSE", __kmp_stg_parse_tpause, __kmp_stg_print_tpause, NULL, 0, 0},
