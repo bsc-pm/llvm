@@ -64,7 +64,6 @@
 #include "llvm/Support/raw_ostream.h"
 #include <cassert>
 #include <cstdint>
-#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <utility>
@@ -123,7 +122,7 @@ struct LocalmemInfo {
 };
 
 template <typename Callable>
-Optional<std::filesystem::path>
+Optional<std::string>
 getAbsoluteDirExport(const SourceManager &SourceMgr, const std::string &path,
                      const SourceLocation &Location, Callable &&Diag) {
   auto &vfs = SourceMgr.getFileManager().getVirtualFileSystem();
@@ -136,7 +135,7 @@ getAbsoluteDirExport(const SourceManager &SourceMgr, const std::string &path,
     Diag(Location, diag::err_oss_ompss_fpga_hls_tasks_dir_missing_dir);
     return llvm::NoneType{};
   }
-  return std::filesystem::u8path(realPathStr.begin(), realPathStr.end());
+  return std::string(realPathStr.begin(), realPathStr.end());
 }
 template <class Callable>
 bool GenerateExtractedOriginalFunction(
@@ -890,7 +889,7 @@ bool Sema::ActOnOmpSsFpgaExtractFiles() {
     auto *FD = dyn_cast<FunctionDecl>(decl);
 
     auto funcName = FD->getName();
-    std::ofstream stream{*realPathOrNone /
+    std::ofstream stream{*realPathOrNone + "/" +
                          (funcName.str() + "_hls_automatic_clang.cpp")};
     llvm::raw_os_ostream outputFile(stream);
 
@@ -918,7 +917,7 @@ bool Sema::ActOnOmpSsFpgaGenerateWrapperCodeFiles() {
     auto *FD = dyn_cast<FunctionDecl>(decl);
 
     auto funcName = FD->getName();
-    std::ofstream stream{*realPathOrNone /
+    std::ofstream stream{*realPathOrNone + "/" +
                          (funcName.str() + "_hls_automatic_clang.cpp")};
     llvm::raw_os_ostream outputFile(stream);
 
