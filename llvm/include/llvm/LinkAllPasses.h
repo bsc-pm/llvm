@@ -93,7 +93,6 @@ namespace {
       (void) llvm::createDomPrinterWrapperPassPass();
       (void) llvm::createDomOnlyViewerWrapperPassPass();
       (void) llvm::createDomViewerWrapperPassPass();
-      (void) llvm::createFunctionInliningPass();
       (void) llvm::createAlwaysInlinerLegacyPass();
       (void) llvm::createGlobalDCEPass();
       (void) llvm::createGlobalOptimizerPass();
