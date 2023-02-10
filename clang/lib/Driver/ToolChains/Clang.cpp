@@ -6174,6 +6174,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   if (Args.getLastArg(options::OPT_fompss_fpga_wrapper_code) && !IsCuda) {
     CmdArgs.push_back("-fompss-fpga-wrapper-code");
   }
+  if (Args.getLastArg(options::OPT_fompss_fpga_check_limits_memory_port) && !IsCuda) {
+    CmdArgs.push_back("-fompss-fpga-check-limits-memory-port");
+  }
   if (Arg *A = Args.getLastArg(options::OPT_fompss_fpga_hls_tasks_dir);
       A && !IsCuda) {
     CmdArgs.push_back("-fompss-fpga-hls-tasks-dir");

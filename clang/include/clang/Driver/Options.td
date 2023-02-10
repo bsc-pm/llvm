@@ -2660,6 +2660,9 @@ def fompss_fpga_wrapper_code : Flag<["-"], "fompss-fpga-wrapper-code">, Group<f_
 def fompss_fpga_memory_port_width : Separate<["-"], "fompss-fpga-memory-port-width">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"Defines the width (in bits) of memory ports (only for wrapper localmem data) for fpga accelerators">,
   MarshallingInfoFlag<LangOpts<"OmpSsFpgaMemoryPortWidth">>;
+def fompss_fpga_check_limits_memory_port : Flag<["-"], "fompss-fpga-check-limits-memory-port">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Enables the logic to ensure not overflowing local variables handled by the memory port">,
+  MarshallingInfoFlag<LangOpts<"OmpSsFpgaCheckLimitsMemoryPort">>;
 def fopenmp : Flag<["-"], "fopenmp">, Group<f_Group>, Flags<[CC1Option, NoArgumentUnused, FlangOption, FC1Option]>,
   HelpText<"Parse OpenMP pragmas and generate parallel code.">;
 def fno_openmp : Flag<["-"], "fno-openmp">, Group<f_Group>, Flags<[NoArgumentUnused]>;

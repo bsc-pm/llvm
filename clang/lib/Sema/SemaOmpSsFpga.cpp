@@ -545,64 +545,57 @@ template <typename Callable> class WrapperGenerator {
   }
 
   void generateMemcpyWideportFunction(bool in) {
-    /*
+
     const std::string mem_ptr_type =
-        "ap_uint<" + fpga_options.memory_port_width + ">";
+        "ap_uint<" +
+        std::to_string(SemaRef.getLangOpts().OmpSsFpgaMemoryPortWidth) + ">";
     const std::string sizeof_mem_ptr_type = "sizeof(" + mem_ptr_type + ")";
     const std::string n_elems_read = "(sizeof(" + mem_ptr_type + ")/sizeof(T))";
 
-    os() << "template<class T>";
-    os()
+    Output << "template<class T>\n";
+    Output
         << "void nanos6_fpga_memcpy_wideport_" << (in ? "in" : "out") << "(T * "
         << (in ? "dst" : "src")
         << ", const unsigned long long int addr, const unsigned int num_elems, "
-        << mem_ptr_type << "* mcxx_memport) {";
-    os() << "#pragma HLS inline";
-    push_indent();
-    os() << "for (int i = 0; i < (num_elems-1)/" << n_elems_read
-         << "+1; ++i) {";
-    os() << "#pragma HLS pipeline II=1";
-    push_indent();
-    os() << mem_ptr_type << " tmpBuffer;";
+        << mem_ptr_type << "* mcxx_memport) {\n";
+    Output << "#pragma HLS inline";
+    Output << "  for (int i = 0; i < (num_elems-1)/" << n_elems_read
+           << "+1; ++i) {\n";
+    Output << "  #pragma HLS pipeline II=1\n";
+    Output << "    " << mem_ptr_type << " tmpBuffer;\n";
     if (in)
-      os() << "tmpBuffer = *(mcxx_memport + addr/" << sizeof_mem_ptr_type
-           << " + i);";
-    os() << "for (int j = 0; j < " << n_elems_read << "; ++j) {";
-    push_indent();
-    if (fpga_options.check_limits_memory_port) {
-      os() << "if (i*" << n_elems_read << "+j >= num_elems)";
-      push_indent();
-      os() << "break;";
-      pop_indent();
+      Output << "    tmpBuffer = *(mcxx_memport + addr/" << sizeof_mem_ptr_type
+             << " + i);\n";
+    Output << "    for (int j = 0; j < " << n_elems_read << "; ++j) {\n";
+    if (SemaRef.getLangOpts().OmpSsFpgaCheckLimitsMemoryPort) {
+      Output << "      if (i*" << n_elems_read << "+j >= num_elems) break;\n";
     }
-    os() << "__mcxx_cast<T> cast_tmp;";
+    Output << "      __mcxx_cast<T> cast_tmp;\n";
     if (in) {
-      os() << "cast_tmp.raw = tmpBuffer((j+1)*sizeof(T)*8-1, j*sizeof(T)*8);";
-      os() << "dst[i*" << n_elems_read << "+j] = cast_tmp.typed;";
+      Output << "      cast_tmp.raw = tmpBuffer((j+1)*sizeof(T)*8-1, "
+                "j*sizeof(T)*8);\n";
+      Output << "      dst[i*" << n_elems_read << "+j] = cast_tmp.typed;\n";
     } else {
-      os() << "cast_tmp.typed = src[i*" << n_elems_read << "+j];";
-      os() << "tmpBuffer((j+1)*sizeof(T)*8-1, j*sizeof(T)*8) = cast_tmp.raw;";
+      Output << "      cast_tmp.typed = src[i*" << n_elems_read << "+j];\n";
+      Output << "      tmpBuffer((j+1)*sizeof(T)*8-1, j*sizeof(T)*8) = "
+                "cast_tmp.raw;\n";
     }
-    pop_indent();
-    os() << "}";
+    Output << "    }\n";
     if (!in) {
-      if (fpga_options.check_limits_memory_port) {
-        os() << "const int rem = num_elems-(i*" << n_elems_read << ");";
-        os() << "const unsigned int bit_l = 0;";
-        os() << "const unsigned int bit_h = rem >= " << n_elems_read << " ? ("
-             << sizeof_mem_ptr_type << "*8-1) : ((rem*sizeof(T))*8-1);";
-        os() << "mcxx_memport[addr/sizeof(" << mem_ptr_type << ") + i]"
-             << "(bit_h, bit_l) = tmpBuffer(bit_h, bit_l);";
+      if (SemaRef.getLangOpts().OmpSsFpgaCheckLimitsMemoryPort) {
+        Output << "    const int rem = num_elems-(i*" << n_elems_read << ");\n";
+        Output << "    const unsigned int bit_l = 0;\n";
+        Output << "    const unsigned int bit_h = rem >= " << n_elems_read
+               << " ? (" << sizeof_mem_ptr_type
+               << "*8-1) : ((rem*sizeof(T))*8-1);\n";
+        Output << "    mcxx_memport[addr/sizeof(" << mem_ptr_type << ") + i]"
+               << "(bit_h, bit_l) = tmpBuffer(bit_h, bit_l);\n";
       } else {
-        os() << "*(mcxx_memport + addr/" << sizeof_mem_ptr_type
-             << " + i) = tmpBuffer;";
+        Output << "    *(mcxx_memport + addr/" << sizeof_mem_ptr_type
+               << " + i) = tmpBuffer;\n";
       }
     }
-    pop_indent();
-    os() << "}";
-    pop_indent();
-    os() << "}";
-    */
+    Output << "  }\n}\n";
   }
 
   void GenerateWrapperHeader() {
@@ -778,6 +771,90 @@ OMPIF_COMM_WORLD
     return true;
   }
 
+  static const Type *GetElementTypePointerTo(const Type *type) {
+    const Type *pointsTo = type;
+
+    while (pointsTo->isPointerType() || pointsTo->isArrayType()) {
+      pointsTo = pointsTo->getPointeeOrArrayElementType();
+    }
+
+    return pointsTo;
+  }
+
+  void GenerateWrapperFunctionParams() {
+    Output << "void " << OrigFuncName << "_wrapper(" STR_INOUTPORT_DECL;
+
+    if (CreatesTasks) {
+      Output << ", " STR_SPWNINPORT_DECL;
+    }
+
+    bool forceMemport = [&] {
+      auto *it = WrapperPortMap.find(FD);
+      return it != WrapperPortMap.end() &&
+             it->second[(int)WrapperPort::MEMORY_PORT];
+    }();
+
+    if (!CreatesTasks) {
+      if ((SemaRef.getLangOpts().OmpSsFpgaMemoryPortWidth > 0 &&
+           Localmems.size() > 0) ||
+          forceMemport) {
+        Output << ", ap_uint<" << SemaRef.getLangOpts().OmpSsFpgaMemoryPortWidth
+               << ">* mcxx_memport";
+      }
+
+      for (auto *param : FD->parameters()) {
+        auto it = Localmems.find(param);
+        if (SemaRef.getLangOpts().OmpSsFpgaMemoryPortWidth > 0 &&
+            it != Localmems.end())
+          continue;
+
+        QualType paramType = param->getType();
+        if (paramType->isPointerType() || paramType->isArrayType()) {
+          auto *type = GetElementTypePointerTo(paramType.getTypePtr());
+          PrintingPolicy pp(SemaRef.getLangOpts());
+          Output << ", ";
+          QualType(type, 0).print(Output, pp);
+          Output << "*mcxx_" << param->getName();
+        }
+      }
+    }
+    if (UsesOmpif) {
+      Output << ", unsigned char ompif_rank, unsigned char ompif_size";
+    }
+    Output << ") {\n";
+
+    Output << "#pragma HLS interface ap_ctrl_none port=return\n";
+    Output << "#pragma HLS interface axis port=" STR_INPORT "\n";
+    Output << "#pragma HLS interface axis port=" STR_OUTPORT "\n";
+    if (CreatesTasks) {
+      Output << "#pragma HLS interface axis port=" STR_SPWNINPORT "\n";
+    }
+    if (UsesOmpif) {
+      Output << "#pragma HLS interface ap_stable port=ompif_rank\n";
+      Output << "#pragma HLS interface ap_stable port=ompif_size\n";
+    }
+
+    if (!CreatesTasks) {
+      if ((SemaRef.getLangOpts().OmpSsFpgaMemoryPortWidth > 0 &&
+           Localmems.size() > 0) ||
+          forceMemport) {
+        Output << "#pragma HLS interface m_axi port=mcxx_memport\n";
+      }
+      for (auto *param : FD->parameters()) {
+        auto it = Localmems.find(param);
+        if (SemaRef.getLangOpts().OmpSsFpgaMemoryPortWidth > 0 &&
+            it != Localmems.end())
+          continue;
+
+        QualType paramType = param->getType();
+        if (paramType->isPointerType() || paramType->isArrayType()) {
+          Output << "#pragma HLS interface m_axi port=mcxx_" << param->getName()
+                 << "\n";
+        }
+      }
+    }
+  }
+
   void GenerateWrapperFunction() {
     if (SemaRef.getLangOpts().OmpSsFpgaMemoryPortWidth == 0 &&
         !Localmems.empty()) {
@@ -795,8 +872,9 @@ OMPIF_COMM_WORLD
 )";
     Output << "  " STR_OUTPORT_WRITE("axis_word") ";\n";
     Output << "}\n";
+
+    GenerateWrapperFunctionParams();
     /*
-    generate_wrapper_function_params();
     push_indent();
     generate_wrapper_function_localmems();
     os() << STR_INPORT_READ_NODATA "; //command word";
@@ -866,6 +944,7 @@ public:
     if (!GenOriginalFunctionMoved()) {
       return false;
     }
+    GenerateWrapperFunction();
 
     OutputFinalFile << OutputStr;
     return true;
