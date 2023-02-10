@@ -224,13 +224,18 @@ void OSSTaskDeclAttr::printPrettyPragma(
     E->printPretty(OS, nullptr, Policy);
     OS << ")";
   }
-  l("localmem", "(", localmem_size(), localmem_begin(), localmem_end(), OS,
-    Policy);
-  if (getLocalmemCopies()) {
-    OS << " localmem_copies";
+  if (auto *E = getAffinity()) {
+    OS << " affinity(";
+    E->printPretty(OS, nullptr, Policy);
+    OS << ")";
   }
-  if (getNoLocalmemCopies()) {
-    OS << " no_localmem_copies";
+  l("copy_in", "(", copyIn_size(), copyIn_begin(), copyIn_end(), OS, Policy);
+  l("copy_out", "(", copyOut_size(), copyOut_begin(), copyOut_end(), OS,
+    Policy);
+  l("copy_inout", "(", copyInOut_size(), copyInOut_begin(), copyInOut_end(), OS,
+    Policy);
+  if (getCopyDeps()) {
+    OS << " copy_deps";
   }
 }
 

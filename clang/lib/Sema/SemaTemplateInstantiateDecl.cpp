@@ -319,10 +319,9 @@ void Sema::InstantiateOSSDeclareTaskAttr(
   addInstantiatedParametersToScope(FD, Pattern, Local, TemplateArgs);
 
   ExprResult IfRes, FinalRes, CostRes, PriorityRes, OnreadyRes, NumInstancesRes,
-      OntoRes, NumRepetitionsRes, PeriodRes;
+      OntoRes, NumRepetitionsRes, PeriodRes, AffinityRes;
   bool Wait = Attr.getWait();
-  bool LocalmemCopies = Attr.getLocalmemCopies();
-  bool NoLocalmemCopies = Attr.getNoLocalmemCopies();
+  bool CopyDeps = Attr.getCopyDeps();
 
   // This value means no clause seen
   unsigned Device = OSSC_DEVICE_unknown + 1;
@@ -350,7 +349,9 @@ void Sema::InstantiateOSSDeclareTaskAttr(
   SmallVector<Expr *, 4> Reductions;
   SmallVector<Expr *, 4> Labels;
   SmallVector<Expr *, 4> Ndranges;
-  SmallVector<Expr *, 4> Localmem;
+  SmallVector<Expr *, 4> CopyIn;
+  SmallVector<Expr *, 4> CopyOut;
+  SmallVector<Expr *, 4> CopyInOut;
 
   // Substitute a single OmpSs clause, which is a potentially-evaluated
   // full-expression.
@@ -404,8 +405,10 @@ void Sema::InstantiateOSSDeclareTaskAttr(
     l(Attr.depWeakConcurrents_size(), Attr.depWeakConcurrents_begin(), Attr.depWeakConcurrents_end(), DepWeakConcurrents);
     l(Attr.depWeakCommutatives_size(), Attr.depWeakCommutatives_begin(), Attr.depWeakCommutatives_end(), DepWeakCommutatives);
     l(Attr.reductions_size(), Attr.reductions_begin(), Attr.reductions_end(), Reductions);
-    l(Attr.localmem_size(), Attr.localmem_begin(), Attr.localmem_end(),
-      Localmem);
+    l(Attr.copyIn_size(), Attr.copyIn_begin(), Attr.copyIn_end(), CopyIn);
+    l(Attr.copyOut_size(), Attr.copyOut_begin(), Attr.copyOut_end(), CopyOut);
+    l(Attr.copyInOut_size(), Attr.copyInOut_begin(), Attr.copyInOut_end(),
+      CopyInOut);
   }
 
   l(Attr.labelExprs_size(), Attr.labelExprs_begin(), Attr.labelExprs_end(), Labels);
@@ -434,6 +437,8 @@ void Sema::InstantiateOSSDeclareTaskAttr(
     NumRepetitionsRes = Subst(E);
   if (auto *E = Attr.getPeriod())
     PeriodRes = Subst(E);
+  if (auto *E = Attr.getAffinity())
+    AffinityRes = Subst(E);
 
   if (Attr.getDevice() != OSSTaskDeclAttr::DeviceType::Unknown)
     Device = Attr.getDevice();
@@ -486,8 +491,8 @@ void Sema::InstantiateOSSDeclareTaskAttr(
   (void)ActOnOmpSsDeclareTaskDirective(
       ConvertDeclToDeclGroup(New), IfRes.get(), FinalRes.get(), CostRes.get(),
       PriorityRes.get(), OnreadyRes.get(), NumInstancesRes.get(), OntoRes.get(),
-      NumRepetitionsRes.get(), PeriodRes.get(), LocalmemCopies,
-      NoLocalmemCopies, Wait, Device, SourceLocation(), Localmem, Labels, Ins,
+      NumRepetitionsRes.get(), PeriodRes.get(), AffinityRes.get(), CopyDeps,
+      Wait, Device, SourceLocation(), CopyIn, CopyOut, CopyInOut, Labels, Ins,
       Outs, Inouts, Concurrents, Commutatives, WeakIns, WeakOuts, WeakInouts,
       WeakConcurrents, WeakCommutatives, DepIns, DepOuts, DepInouts,
       DepConcurrents, DepCommutatives, DepWeakIns, DepWeakOuts, DepWeakInouts,

@@ -216,6 +216,59 @@ OSSNdrangeClause *OSSNdrangeClause::CreateEmpty(const ASTContext &C, unsigned N)
   return new (Mem) OSSNdrangeClause(N);
 }
 
+OSSCopyInClause *OSSCopyInClause::Create(const ASTContext &C,
+                                         SourceLocation StartLoc,
+                                         SourceLocation LParenLoc,
+                                         SourceLocation EndLoc,
+                                         ArrayRef<Expr *> VL) {
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(VL.size()));
+  OSSCopyInClause *Clause =
+      new (Mem) OSSCopyInClause(StartLoc, LParenLoc, EndLoc, VL.size());
+  Clause->setVarRefs(VL);
+  return Clause;
+}
+
+OSSCopyInClause *OSSCopyInClause::CreateEmpty(const ASTContext &C, unsigned N) {
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(N));
+  return new (Mem) OSSCopyInClause(N);
+}
+
+OSSCopyOutClause *OSSCopyOutClause::Create(const ASTContext &C,
+                                           SourceLocation StartLoc,
+                                           SourceLocation LParenLoc,
+                                           SourceLocation EndLoc,
+                                           ArrayRef<Expr *> VL) {
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(VL.size()));
+  OSSCopyOutClause *Clause =
+      new (Mem) OSSCopyOutClause(StartLoc, LParenLoc, EndLoc, VL.size());
+  Clause->setVarRefs(VL);
+  return Clause;
+}
+
+OSSCopyOutClause *OSSCopyOutClause::CreateEmpty(const ASTContext &C,
+                                                unsigned N) {
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(N));
+  return new (Mem) OSSCopyOutClause(N);
+}
+
+OSSCopyInOutClause *OSSCopyInOutClause::Create(const ASTContext &C,
+                                               SourceLocation StartLoc,
+                                               SourceLocation LParenLoc,
+                                               SourceLocation EndLoc,
+                                               ArrayRef<Expr *> VL) {
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(VL.size()));
+  OSSCopyInOutClause *Clause =
+      new (Mem) OSSCopyInOutClause(StartLoc, LParenLoc, EndLoc, VL.size());
+  Clause->setVarRefs(VL);
+  return Clause;
+}
+
+OSSCopyInOutClause *OSSCopyInOutClause::CreateEmpty(const ASTContext &C,
+                                                    unsigned N) {
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(N));
+  return new (Mem) OSSCopyInOutClause(N);
+}
+
 //===----------------------------------------------------------------------===//
 //  OmpSs clauses printing methods
 //===----------------------------------------------------------------------===//
@@ -427,20 +480,61 @@ void OSSClausePrinter::VisitOSSRelaxedClause(OSSRelaxedClause *Node) {
   OS << "relaxed";
 }
 
-OSSLocalmemClause *OSSLocalmemClause::Create(const ASTContext &C,
-                                             SourceLocation StartLoc,
-                                             SourceLocation LParenLoc,
-                                             SourceLocation EndLoc,
-                                             ArrayRef<Expr *> VL) {
-  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(VL.size()));
-  OSSLocalmemClause *Clause =
-      new (Mem) OSSLocalmemClause(StartLoc, LParenLoc, EndLoc, VL.size());
-  Clause->setVarRefs(VL);
-  return Clause;
+void OSSClausePrinter::VisitOSSNumInstancesClause(OSSNumInstancesClause *Node) {
+  OS << "num_instances(";
+  Node->getExpression()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
 }
 
-OSSLocalmemClause *OSSLocalmemClause::CreateEmpty(const ASTContext &C,
-                                                  unsigned N) {
-  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(N));
-  return new (Mem) OSSLocalmemClause(N);
+void OSSClausePrinter::VisitOSSOntoClause(OSSOntoClause *Node) {
+  OS << "onto(";
+  Node->getExpression()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
+void OSSClausePrinter::VisitOSSNumRepetitionsClause(
+    OSSNumRepetitionsClause *Node) {
+  OS << "num_repetitions(";
+  Node->getExpression()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
+void OSSClausePrinter::VisitOSSAffinityClause(OSSAffinityClause *Node) {
+  OS << "affinity(";
+  Node->getExpression()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
+void OSSClausePrinter::VisitOSSPeriodClause(OSSPeriodClause *Node) {
+  OS << "period(";
+  Node->getExpression()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
+void OSSClausePrinter::VisitOSSCopyInClause(OSSCopyInClause *Node) {
+  if (!Node->varlist_empty()) {
+    OS << "copy_in";
+    VisitOSSClauseList(Node, '(');
+    OS << ")";
+  }
+}
+
+void OSSClausePrinter::VisitOSSCopyOutClause(OSSCopyOutClause *Node) {
+  if (!Node->varlist_empty()) {
+    OS << "copy_out";
+    VisitOSSClauseList(Node, '(');
+    OS << ")";
+  }
+}
+
+void OSSClausePrinter::VisitOSSCopyInOutClause(OSSCopyInOutClause *Node) {
+  if (!Node->varlist_empty()) {
+    OS << "copy_inout";
+    VisitOSSClauseList(Node, '(');
+    OS << ")";
+  }
+}
+
+void OSSClausePrinter::VisitOSSCopyDepsClause(OSSCopyDepsClause *_) {
+  OS << "copy_deps";
 }

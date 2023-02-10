@@ -117,6 +117,15 @@ unsigned clang::getOmpSsSimpleClauseType(OmpSsClauseKind Kind,
   case OSSC_unroll:
   case OSSC_collapse:
   case OSSC_ndrange:
+  case OSSC_num_instances:
+  case OSSC_onto:
+  case OSSC_num_repetitions:
+  case OSSC_period:
+  case OSSC_affinity:
+  case OSSC_copy_in:
+  case OSSC_copy_out:
+  case OSSC_copy_inout:
+  case OSSC_copy_deps:
   case OSSC_read:
   case OSSC_write:
   case OSSC_capture:
@@ -126,13 +135,6 @@ unsigned clang::getOmpSsSimpleClauseType(OmpSsClauseKind Kind,
   case OSSC_acquire:
   case OSSC_release:
   case OSSC_relaxed:
-  case OSSC_num_instances:
-  case OSSC_onto:
-  case OSSC_num_repetitions:
-  case OSSC_period:
-  case OSSC_localmem:
-  case OSSC_localmem_copies:
-  case OSSC_no_localmem_copies:
     break;
   }
   llvm_unreachable("Invalid OmpSs simple clause kind");
@@ -199,6 +201,15 @@ const char *clang::getOmpSsSimpleClauseTypeName(OmpSsClauseKind Kind,
   case OSSC_unroll:
   case OSSC_collapse:
   case OSSC_ndrange:
+  case OSSC_num_instances:
+  case OSSC_onto:
+  case OSSC_num_repetitions:
+  case OSSC_period:
+  case OSSC_affinity:
+  case OSSC_copy_in:
+  case OSSC_copy_out:
+  case OSSC_copy_inout:
+  case OSSC_copy_deps:
   case OSSC_read:
   case OSSC_write:
   case OSSC_capture:
@@ -208,13 +219,6 @@ const char *clang::getOmpSsSimpleClauseTypeName(OmpSsClauseKind Kind,
   case OSSC_acquire:
   case OSSC_release:
   case OSSC_relaxed:
-  case OSSC_num_instances:
-  case OSSC_onto:
-  case OSSC_num_repetitions:
-  case OSSC_period:
-  case OSSC_localmem:
-  case OSSC_localmem_copies:
-  case OSSC_no_localmem_copies:
     break;
   }
   llvm_unreachable("Invalid OmpSs simple clause kind");

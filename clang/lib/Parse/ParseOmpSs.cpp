@@ -117,7 +117,7 @@ getSingleClause(OmpSsClauseKind CKind, ExprResult &IfRes, ExprResult &FinalRes,
                 ExprResult &CostRes, ExprResult &PriorityRes,
                 ExprResult &OnreadyRes, ExprResult &NumInstancesRes,
                 ExprResult &OntoRes, ExprResult &NumRepetitionsRes,
-                ExprResult &PeriodRes) {
+                ExprResult &PeriodRes, ExprResult &Affinity) {
   switch (CKind) {
   case OSSC_if:
     return &IfRes;
@@ -137,6 +137,8 @@ getSingleClause(OmpSsClauseKind CKind, ExprResult &IfRes, ExprResult &FinalRes,
     return &NumRepetitionsRes;
   case OSSC_period:
     return &PeriodRes;
+  case OSSC_affinity:
+    return &Affinity;
   default:
     return nullptr;
   };
@@ -149,8 +151,8 @@ static SmallVectorImpl<Expr *> *getClauseList(
     SmallVectorImpl<Expr *> &WeakIns, SmallVectorImpl<Expr *> &WeakOuts,
     SmallVectorImpl<Expr *> &WeakInouts,
     SmallVectorImpl<Expr *> &WeakConcurrents,
-    SmallVectorImpl<Expr *> &WeakCommutatives,
-    SmallVectorImpl<Expr *> &Localmem) {
+    SmallVectorImpl<Expr *> &WeakCommutatives, SmallVectorImpl<Expr *> &CopyIn,
+    SmallVectorImpl<Expr *> &CopyOut, SmallVectorImpl<Expr *> &CopyInOut) {
   switch (CKind) {
   case OSSC_in:
     return &Ins;
@@ -172,8 +174,12 @@ static SmallVectorImpl<Expr *> *getClauseList(
     return &WeakConcurrents;
   case OSSC_weakcommutative:
     return &WeakCommutatives;
-  case OSSC_localmem:
-    return &Localmem;
+  case OSSC_copy_in:
+    return &CopyIn;
+  case OSSC_copy_out:
+    return &CopyOut;
+  case OSSC_copy_inout:
+    return &CopyInOut;
   default:
     return nullptr;
   }
@@ -224,13 +230,14 @@ bool Parser::ParseDeclareTaskClauses(
     ExprResult &PriorityRes, ExprResult &OnreadyRes,
     ExprResult &NumInstancesRes, ExprResult &OntoRes,
     ExprResult &NumRepetitionsRes, ExprResult &PeriodRes,
-    SmallVectorImpl<Expr *> &Localmem, bool &LocalmemCopies,
-    bool &NoLocalmemCopies, bool &Wait, unsigned &Device,
-    SourceLocation &DeviceLoc, SmallVectorImpl<Expr *> &Labels,
-    SmallVectorImpl<Expr *> &Ins, SmallVectorImpl<Expr *> &Outs,
-    SmallVectorImpl<Expr *> &Inouts, SmallVectorImpl<Expr *> &Concurrents,
-    SmallVectorImpl<Expr *> &Commutatives, SmallVectorImpl<Expr *> &WeakIns,
-    SmallVectorImpl<Expr *> &WeakOuts, SmallVectorImpl<Expr *> &WeakInouts,
+    ExprResult &AffinityRes, SmallVectorImpl<Expr *> &CopyIn,
+    SmallVectorImpl<Expr *> &CopyOut, SmallVectorImpl<Expr *> &CopyInOut,
+    bool &CopyDeps, bool &Wait, unsigned &Device, SourceLocation &DeviceLoc,
+    SmallVectorImpl<Expr *> &Labels, SmallVectorImpl<Expr *> &Ins,
+    SmallVectorImpl<Expr *> &Outs, SmallVectorImpl<Expr *> &Inouts,
+    SmallVectorImpl<Expr *> &Concurrents, SmallVectorImpl<Expr *> &Commutatives,
+    SmallVectorImpl<Expr *> &WeakIns, SmallVectorImpl<Expr *> &WeakOuts,
+    SmallVectorImpl<Expr *> &WeakInouts,
     SmallVectorImpl<Expr *> &WeakConcurrents,
     SmallVectorImpl<Expr *> &WeakCommutatives, SmallVectorImpl<Expr *> &DepIns,
     SmallVectorImpl<Expr *> &DepOuts, SmallVectorImpl<Expr *> &DepInouts,
@@ -268,7 +275,7 @@ bool Parser::ParseDeclareTaskClauses(
 
     Vars = getClauseList(CKind, Ins, Outs, Inouts, Concurrents, Commutatives,
                          WeakIns, WeakOuts, WeakInouts, WeakConcurrents,
-                         WeakCommutatives, Localmem);
+                         WeakCommutatives, CopyIn, CopyOut, CopyInOut);
 
     // Check if clause is allowed for the given directive.
     if (CKind != OSSC_unknown && !isAllowedClauseForDirective(OSSD_declare_task, CKind, /*Version=*/1)) {
@@ -278,30 +285,17 @@ bool Parser::ParseDeclareTaskClauses(
     }
 
     switch (CKind) {
-    case OSSC_no_localmem_copies: {
+    case OSSC_copy_deps: {
       SourceLocation Loc = Tok.getLocation();
       ConsumeToken();
-      if (FirstClauses[CKind]) {
+      if (FirstClauses[unsigned(CKind)]) {
         Diag(Loc, diag::err_oss_more_one_clause)
             << getOmpSsDirectiveName(OSSD_declare_task)
             << getOmpSsClauseName(CKind) << 0;
         IsError = true;
       }
-      NoLocalmemCopies = true;
-      FirstClauses[CKind] = true;
-      break;
-    }
-    case OSSC_localmem_copies: {
-      SourceLocation Loc = Tok.getLocation();
-      ConsumeToken();
-      if (FirstClauses[CKind]) {
-        Diag(Loc, diag::err_oss_more_one_clause)
-            << getOmpSsDirectiveName(OSSD_declare_task)
-            << getOmpSsClauseName(CKind) << 0;
-        IsError = true;
-      }
-      LocalmemCopies = true;
-      FirstClauses[CKind] = true;
+      CopyDeps = true;
+      FirstClauses[unsigned(CKind)] = true;
       break;
     }
     case OSSC_if:
@@ -312,7 +306,8 @@ bool Parser::ParseDeclareTaskClauses(
     case OSSC_num_instances:
     case OSSC_onto:
     case OSSC_num_repetitions:
-    case OSSC_period: {
+    case OSSC_period:
+    case OSSC_affinity: {
       ConsumeToken();
       if (FirstClauses[unsigned(CKind)]) {
         Diag(Tok, diag::err_oss_more_one_clause)
@@ -320,9 +315,9 @@ bool Parser::ParseDeclareTaskClauses(
         IsError = true;
       }
       SourceLocation RLoc;
-      SingleClause = getSingleClause(CKind, IfRes, FinalRes, CostRes,
-                                     PriorityRes, OnreadyRes, NumInstancesRes,
-                                     OntoRes, NumRepetitionsRes, PeriodRes);
+      SingleClause = getSingleClause(
+          CKind, IfRes, FinalRes, CostRes, PriorityRes, OnreadyRes,
+          NumInstancesRes, OntoRes, NumRepetitionsRes, PeriodRes, AffinityRes);
       *SingleClause = ParseOmpSsParensExpr(getOmpSsClauseName(CKind), RLoc);
 
       if (SingleClause->isInvalid())
@@ -372,7 +367,8 @@ bool Parser::ParseDeclareTaskClauses(
         SmallVectorImpl<Expr *> *DepList = getClauseList(
             getOmpSsClauseFromDependKinds(DepKindsOrdered), DepIns, DepOuts,
             DepInouts, DepConcurrents, DepCommutatives, DepWeakIns, DepWeakOuts,
-            WeakInouts, DepWeakConcurrents, DepWeakCommutatives, Localmem);
+            WeakInouts, DepWeakConcurrents, DepWeakCommutatives, CopyIn,
+            CopyOut, CopyInOut);
         DepList->append(TmpList.begin(), TmpList.end());
       }
       break;
@@ -407,7 +403,9 @@ bool Parser::ParseDeclareTaskClauses(
         IsError = true;
       FirstClauses[unsigned(CKind)] = true;
       break;
-    case OSSC_localmem:
+    case OSSC_copy_in:
+    case OSSC_copy_out:
+    case OSSC_copy_inout:
     case OSSC_in:
     case OSSC_out:
     case OSSC_inout:
@@ -507,9 +505,10 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
   ExprResult OntoRes;
   ExprResult NumRepetitionsRes;
   ExprResult PeriodRes;
+  ExprResult AffinityRes;
+
   bool Wait = false;
-  bool LocalmemCopies = false;
-  bool NoLocalmemCopies = false;
+  bool CopyDeps = false;
   // This value means no clause seen
   unsigned Device = OSSC_DEVICE_unknown + 1;
   SourceLocation DeviceLoc;
@@ -542,12 +541,14 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
   SmallVector<CXXScopeSpec, 4> ReductionCXXScopeSpecs;
   SmallVector<DeclarationNameInfo, 4> ReductionIds;
   SmallVector<Expr *, 4> Ndranges;
-  SmallVector<Expr *, 4> Localmem;
+  SmallVector<Expr *, 4> CopyIn;
+  SmallVector<Expr *, 4> CopyOut;
+  SmallVector<Expr *, 4> CopyInOut;
 
   bool IsError = ParseDeclareTaskClauses(
       IfRes, FinalRes, CostRes, PriorityRes, OnreadyRes, NumInstancesRes,
-      OntoRes, NumRepetitionsRes, PeriodRes, Localmem, LocalmemCopies,
-      NoLocalmemCopies, Wait, Device, DeviceLoc, Labels, Ins, Outs, Inouts,
+      OntoRes, NumRepetitionsRes, PeriodRes, AffinityRes, CopyIn, CopyOut,
+      CopyInOut, CopyDeps, Wait, Device, DeviceLoc, Labels, Ins, Outs, Inouts,
       Concurrents, Commutatives, WeakIns, WeakOuts, WeakInouts, WeakConcurrents,
       WeakCommutatives, DepIns, DepOuts, DepInouts, DepConcurrents,
       DepCommutatives, DepWeakIns, DepWeakOuts, DepWeakInouts,
@@ -568,8 +569,8 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
   return Actions.ActOnOmpSsDeclareTaskDirective(
       Ptr, IfRes.get(), FinalRes.get(), CostRes.get(), PriorityRes.get(),
       OnreadyRes.get(), NumInstancesRes.get(), OntoRes.get(),
-      NumRepetitionsRes.get(), PeriodRes.get(), LocalmemCopies,
-      NoLocalmemCopies, Wait, Device, DeviceLoc, Localmem, Labels, Ins, Outs,
+      NumRepetitionsRes.get(), PeriodRes.get(), AffinityRes.get(), CopyDeps,
+      Wait, Device, DeviceLoc, CopyIn, CopyOut, CopyInOut, Labels, Ins, Outs,
       Inouts, Concurrents, Commutatives, WeakIns, WeakOuts, WeakInouts,
       WeakConcurrents, WeakCommutatives, DepIns, DepOuts, DepInouts,
       DepConcurrents, DepCommutatives, DepWeakIns, DepWeakOuts, DepWeakInouts,
@@ -1042,6 +1043,7 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
   case OSSC_onto:
   case OSSC_num_repetitions:
   case OSSC_period:
+  case OSSC_affinity:
     if (!FirstClause) {
       Diag(Tok, diag::err_oss_more_one_clause)
           << getOmpSsDirectiveName(DKind) << getOmpSsClauseName(CKind) << 0;
@@ -1049,8 +1051,7 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
     }
     Clause = ParseOmpSsSingleExprClause(CKind, WrongDirective);
     break;
-  case OSSC_localmem_copies:
-  case OSSC_no_localmem_copies:
+  case OSSC_copy_deps:
   case OSSC_wait:
   case OSSC_update:
   case OSSC_read:
@@ -1087,7 +1088,9 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
     }
     Clause = ParseOmpSsFixedListClause<2>(DKind, CKind, WrongDirective);
     break;
-  case OSSC_localmem:
+  case OSSC_copy_in:
+  case OSSC_copy_out:
+  case OSSC_copy_inout:
   case OSSC_shared:
   case OSSC_private:
   case OSSC_firstprivate:

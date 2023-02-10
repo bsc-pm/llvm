@@ -1926,7 +1926,7 @@ private:
   ExprResult ParseFoldExpression(ExprResult LHS, BalancedDelimiterTracker &T);
 
   ExprResult ParseOSSMultiDepExpression();
-  // Used to handle assignment exprs. and multideps 
+  // Used to handle assignment exprs. and multideps
   ExprResult ParseOSSAssignmentExpression(
     OmpSsDirectiveKind DKind, OmpSsClauseKind CKind);
 
@@ -3393,11 +3393,12 @@ private:
       ExprResult &PriorityRes, ExprResult &OnreadyRes,
       ExprResult &NumInstancesRes, ExprResult &OntoRes,
       ExprResult &NumRepetitionsRes, ExprResult &PeriodRes,
-      SmallVectorImpl<Expr *> &Localmem, bool &LocalmemCopies,
-      bool &NoLocalmemCopies, bool &Wait, unsigned &Device,
-      SourceLocation &DeviceLoc, SmallVectorImpl<Expr *> &Labels,
-      SmallVectorImpl<Expr *> &Ins, SmallVectorImpl<Expr *> &Outs,
-      SmallVectorImpl<Expr *> &Inouts, SmallVectorImpl<Expr *> &Concurrents,
+      ExprResult &AffinityRes, SmallVectorImpl<Expr *> &CopyIn,
+      SmallVectorImpl<Expr *> &CopyOut, SmallVectorImpl<Expr *> &CopyInOut,
+      bool &CopyDeps, bool &Wait, unsigned &Device, SourceLocation &DeviceLoc,
+      SmallVectorImpl<Expr *> &Labels, SmallVectorImpl<Expr *> &Ins,
+      SmallVectorImpl<Expr *> &Outs, SmallVectorImpl<Expr *> &Inouts,
+      SmallVectorImpl<Expr *> &Concurrents,
       SmallVectorImpl<Expr *> &Commutatives, SmallVectorImpl<Expr *> &WeakIns,
       SmallVectorImpl<Expr *> &WeakOuts, SmallVectorImpl<Expr *> &WeakInouts,
       SmallVectorImpl<Expr *> &WeakConcurrents,

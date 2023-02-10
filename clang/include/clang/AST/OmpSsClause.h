@@ -1832,17 +1832,69 @@ public:
   }
 };
 
-/// This represents 'localmem' clause in the '#pragma oss ...' directive.
+/// This represents 'affinity' clause in the '#pragma oss ...' directive.
 ///
 /// \code
-/// #pragma oss task device(fpga) localmem(a,b)
+/// #pragma oss task device(fpga) affinity(3)
 /// \endcode
-/// In this example directive '#pragma oss task device(fpga)' has a localmem
-/// region This is used to designate explicitly these variables to be copied to
+/// In this example directive '#pragma oss task device(fpga)' has
+/// affinity
+class OSSAffinityClause : public OSSClause {
+  friend class OSSClauseReader;
+
+  /// Location of '('.
+  SourceLocation LParenLoc;
+
+  /// Expression of the 'affinity' clause.
+  Stmt *Expression = nullptr;
+
+  /// Set expression.
+  void setExpression(Expr *E) { Expression = E; }
+
+public:
+  /// Build 'affinity' clause with argument \a A.
+  ///
+  /// \param A Argument of the clause (a number).
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param EndLoc Ending location of the clause.
+  OSSAffinityClause(Stmt *A, SourceLocation StartLoc, SourceLocation LParenLoc,
+                    SourceLocation EndLoc)
+      : OSSClause(llvm::oss::OSSC_affinity, StartLoc, EndLoc),
+        LParenLoc(LParenLoc), Expression(A) {}
+
+  /// Build an empty clause.
+  OSSAffinityClause()
+      : OSSClause(llvm::oss::OSSC_affinity, SourceLocation(),
+                  SourceLocation()) {}
+
+  /// Sets the location of '('.
+  void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
+
+  /// Returns the location of '('.
+  SourceLocation getLParenLoc() const { return LParenLoc; }
+
+  /// Returns expression.
+  Expr *getExpression() const { return cast_or_null<Expr>(Expression); }
+
+  child_range children() { return child_range(&Expression, &Expression + 1); }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == llvm::oss::OSSC_affinity;
+  }
+};
+
+/// This represents 'copy_in' clause in the '#pragma oss ...' directive.
+///
+/// \code
+/// #pragma oss task device(fpga) copy_in(a,b)
+/// \endcode
+/// In this example directive '#pragma oss task device(fpga)' has a copy_in
+/// region this is used to designate explicitly these variables to be copied to
 /// the local memory of the fpga.
-class OSSLocalmemClause final
-    : public OSSVarListClause<OSSLocalmemClause>,
-      private llvm::TrailingObjects<OSSLocalmemClause, Expr *> {
+class OSSCopyInClause final
+    : public OSSVarListClause<OSSCopyInClause>,
+      private llvm::TrailingObjects<OSSCopyInClause, Expr *> {
   friend class OSSClauseReader;
   friend OSSVarListClause;
   friend TrailingObjects;
@@ -1853,18 +1905,18 @@ class OSSLocalmemClause final
   /// \param LParenLoc Location of '('.
   /// \param EndLoc Ending location of the clause.
   /// \param N Number of the variables in the clause.
-  OSSLocalmemClause(SourceLocation StartLoc, SourceLocation LParenLoc,
-                    SourceLocation EndLoc, unsigned N)
-      : OSSVarListClause<OSSLocalmemClause>(OSSC_depend, StartLoc, LParenLoc,
-                                            EndLoc, N) {}
+  OSSCopyInClause(SourceLocation StartLoc, SourceLocation LParenLoc,
+                  SourceLocation EndLoc, unsigned N)
+      : OSSVarListClause<OSSCopyInClause>(llvm::oss::OSSC_copy_in, StartLoc,
+                                          LParenLoc, EndLoc, N) {}
 
   /// Build an empty clause.
   ///
   /// \param N Number of variables.
-  explicit OSSLocalmemClause(unsigned N)
-      : OSSVarListClause<OSSLocalmemClause>(OSSC_depend, SourceLocation(),
-                                            SourceLocation(), SourceLocation(),
-                                            N) {}
+  explicit OSSCopyInClause(unsigned N)
+      : OSSVarListClause<OSSCopyInClause>(llvm::oss::OSSC_copy_in,
+                                          SourceLocation(), SourceLocation(),
+                                          SourceLocation(), N) {}
 
 public:
   /// Creates clause with a list of variables \a VL.
@@ -1875,15 +1927,15 @@ public:
   /// \param EndLoc Ending location of the clause.
   /// \param VL List of references to the variables.
   /// clause.
-  static OSSLocalmemClause *Create(const ASTContext &C, SourceLocation StartLoc,
-                                   SourceLocation LParenLoc,
-                                   SourceLocation EndLoc, ArrayRef<Expr *> VL);
+  static OSSCopyInClause *Create(const ASTContext &C, SourceLocation StartLoc,
+                                 SourceLocation LParenLoc,
+                                 SourceLocation EndLoc, ArrayRef<Expr *> VL);
 
   /// Creates an empty clause with \a N variables.
   ///
   /// \param C AST context.
   /// \param N The number of variables.
-  static OSSLocalmemClause *CreateEmpty(const ASTContext &C, unsigned N);
+  static OSSCopyInClause *CreateEmpty(const ASTContext &C, unsigned N);
 
   child_range children() {
     return child_range(reinterpret_cast<Stmt **>(varlist_begin()),
@@ -1891,7 +1943,134 @@ public:
   }
 
   static bool classof(const OSSClause *T) {
-    return T->getClauseKind() == OSSC_localmem;
+    return T->getClauseKind() == llvm::oss::OSSC_copy_in;
+  }
+};
+
+/// This represents 'copy_out' clause in the '#pragma oss ...' directive.
+///
+/// \code
+/// #pragma oss task device(fpga) copy_out(a,b)
+/// \endcode
+/// In this example directive '#pragma oss task device(fpga)' has a copy_out
+/// region This is used to designate explicitly these variables to be copied to
+/// the local memory of the fpga.
+class OSSCopyOutClause final
+    : public OSSVarListClause<OSSCopyOutClause>,
+      private llvm::TrailingObjects<OSSCopyOutClause, Expr *> {
+  friend class OSSClauseReader;
+  friend OSSVarListClause;
+  friend TrailingObjects;
+
+  /// Build clause with number of variables \a N.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param EndLoc Ending location of the clause.
+  /// \param N Number of the variables in the clause.
+  OSSCopyOutClause(SourceLocation StartLoc, SourceLocation LParenLoc,
+                   SourceLocation EndLoc, unsigned N)
+      : OSSVarListClause<OSSCopyOutClause>(llvm::oss::OSSC_copy_out, StartLoc,
+                                           LParenLoc, EndLoc, N) {}
+
+  /// Build an empty clause.
+  ///
+  /// \param N Number of variables.
+  explicit OSSCopyOutClause(unsigned N)
+      : OSSVarListClause<OSSCopyOutClause>(llvm::oss::OSSC_copy_out,
+                                           SourceLocation(), SourceLocation(),
+                                           SourceLocation(), N) {}
+
+public:
+  /// Creates clause with a list of variables \a VL.
+  ///
+  /// \param C AST context.
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param EndLoc Ending location of the clause.
+  /// \param VL List of references to the variables.
+  /// clause.
+  static OSSCopyOutClause *Create(const ASTContext &C, SourceLocation StartLoc,
+                                  SourceLocation LParenLoc,
+                                  SourceLocation EndLoc, ArrayRef<Expr *> VL);
+
+  /// Creates an empty clause with \a N variables.
+  ///
+  /// \param C AST context.
+  /// \param N The number of variables.
+  static OSSCopyOutClause *CreateEmpty(const ASTContext &C, unsigned N);
+
+  child_range children() {
+    return child_range(reinterpret_cast<Stmt **>(varlist_begin()),
+                       reinterpret_cast<Stmt **>(varlist_end()));
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == llvm::oss::OSSC_copy_out;
+  }
+};
+
+/// This represents 'copy_inout' clause in the '#pragma oss ...' directive.
+///
+/// \code
+/// #pragma oss task device(fpga) copy_inout(a,b)
+/// \endcode
+/// In this example directive '#pragma oss task device(fpga)' has a copy_inout
+/// region This is used to designate explicitly these variables to be copied to
+/// the local memory of the fpga.
+class OSSCopyInOutClause final
+    : public OSSVarListClause<OSSCopyInOutClause>,
+      private llvm::TrailingObjects<OSSCopyInOutClause, Expr *> {
+  friend class OSSClauseReader;
+  friend OSSVarListClause;
+  friend TrailingObjects;
+
+  /// Build clause with number of variables \a N.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param EndLoc Ending location of the clause.
+  /// \param N Number of the variables in the clause.
+  OSSCopyInOutClause(SourceLocation StartLoc, SourceLocation LParenLoc,
+                     SourceLocation EndLoc, unsigned N)
+      : OSSVarListClause<OSSCopyInOutClause>(llvm::oss::OSSC_copy_inout,
+                                             StartLoc, LParenLoc, EndLoc, N) {}
+
+  /// Build an empty clause.
+  ///
+  /// \param N Number of variables.
+  explicit OSSCopyInOutClause(unsigned N)
+      : OSSVarListClause<OSSCopyInOutClause>(llvm::oss::OSSC_copy_inout,
+                                             SourceLocation(), SourceLocation(),
+                                             SourceLocation(), N) {}
+
+public:
+  /// Creates clause with a list of variables \a VL.
+  ///
+  /// \param C AST context.
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param EndLoc Ending location of the clause.
+  /// \param VL List of references to the variables.
+  /// clause.
+  static OSSCopyInOutClause *Create(const ASTContext &C,
+                                    SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc, ArrayRef<Expr *> VL);
+
+  /// Creates an empty clause with \a N variables.
+  ///
+  /// \param C AST context.
+  /// \param N The number of variables.
+  static OSSCopyInOutClause *CreateEmpty(const ASTContext &C, unsigned N);
+
+  child_range children() {
+    return child_range(reinterpret_cast<Stmt **>(varlist_begin()),
+                       reinterpret_cast<Stmt **>(varlist_end()));
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == llvm::oss::OSSC_copy_inout;
   }
 };
 
@@ -1907,34 +2086,18 @@ public:
   }
 };
 
-/// This represents 'localmem_copies' clause in the '#pragma oss ...' directive.
+/// This represents 'copy_deps' clause in the '#pragma oss ...' directive.
 ///
 /// \code
-/// #pragma oss task device(fpga) localmem_copies
+/// #pragma oss task device(fpga) copy_deps
 /// \endcode
 /// In this example directive '#pragma oss task device(fpga)' has
-/// localmem_copies
-class OSSLocalmemCopiesClause : public OSSFlagClause<OSSC_localmem_copies> {
+/// copy_deps
+class OSSCopyDepsClause : public OSSFlagClause<llvm::oss::OSSC_copy_deps> {
   friend class OSSClauseReader;
 
 public:
-  using OSSFlagClause<OSSC_localmem_copies>::OSSFlagClause;
-};
-
-/// This represents 'no_localmem_copies' clause in the '#pragma oss ...'
-/// directive.
-///
-/// \code
-/// #pragma oss task device(fpga) no_localmem_copies
-/// \endcode
-/// In this example directive '#pragma oss task device(fpga)' has
-/// no_localmem_copies
-class OSSNoLocalmemCopiesClause
-    : public OSSFlagClause<OSSC_no_localmem_copies> {
-  friend class OSSClauseReader;
-
-public:
-  using OSSFlagClause<OSSC_no_localmem_copies>::OSSFlagClause;
+  using OSSFlagClause<llvm::oss::OSSC_copy_deps>::OSSFlagClause;
 };
 
 /// This represents 'ndrange' clause in the

@@ -1773,34 +1773,61 @@ public:
                                             EndLoc);
   }
 
-  /// Build a new OmpSs 'localmem' pseudo clause.
+  /// Build a new OmpSs 'affinity' clause.
   ///
   /// By default, performs semantic analysis to build the new OmpSs clause.
   /// Subclasses may override this routine to provide different behavior.
-  OSSClause *RebuildOSSLocalmemClause(ArrayRef<Expr *> VarList,
+  OSSClause *RebuildOSSAffinityClause(Expr *Condition,
+                                            SourceLocation StartLoc,
+                                            SourceLocation LParenLoc,
+                                            SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsAffinityClause(Condition, StartLoc,
+                                                    LParenLoc, EndLoc);
+  }
+
+  /// Build a new OmpSs 'copy_in' pseudo clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSCopyInClause(ArrayRef<Expr *> VarList,
                                       SourceLocation StartLoc,
                                       SourceLocation LParenLoc,
                                       SourceLocation EndLoc) {
-    return getSema().ActOnOmpSsLocalmemClause(VarList, StartLoc, LParenLoc,
+    return getSema().ActOnOmpSsCopyInClause(VarList, StartLoc, LParenLoc,
                                               EndLoc);
   }
 
-  /// Build a new OmpSs 'localmem_copies' clause.
+  /// Build a new OmpSs 'copy_out' pseudo clause.
   ///
   /// By default, performs semantic analysis to build the new OmpSs clause.
   /// Subclasses may override this routine to provide different behavior.
-  OSSClause *RebuildOSSLocalmemCopiesClause(SourceLocation StartLoc,
-                                            SourceLocation EndLoc) {
-    return getSema().ActOnOmpSsLocalmemCopiesClause(StartLoc, EndLoc);
+  OSSClause *RebuildOSSCopyOutClause(ArrayRef<Expr *> VarList,
+                                      SourceLocation StartLoc,
+                                      SourceLocation LParenLoc,
+                                      SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsCopyOutClause(VarList, StartLoc, LParenLoc,
+                                              EndLoc);
   }
 
-  /// Build a new OmpSs 'no_localmem_copies' clause.
+    /// Build a new OmpSs 'copy_inout' pseudo clause.
   ///
   /// By default, performs semantic analysis to build the new OmpSs clause.
   /// Subclasses may override this routine to provide different behavior.
-  OSSClause *RebuildOSSNoLocalmemCopiesClause(SourceLocation StartLoc,
-                                              SourceLocation EndLoc) {
-    return getSema().ActOnOmpSsNoLocalmemCopiesClause(StartLoc, EndLoc);
+  OSSClause *RebuildOSSCopyInOutClause(ArrayRef<Expr *> VarList,
+                                      SourceLocation StartLoc,
+                                      SourceLocation LParenLoc,
+                                      SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsCopyInOutClause(VarList, StartLoc, LParenLoc,
+                                              EndLoc);
+  }
+
+  /// Build a new OmpSs 'copy_deps' clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSCopyDepsClause(SourceLocation StartLoc,
+                                      SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsCopyDepsClause(StartLoc, EndLoc);
   }
 
   /// Build a new OmpSs 'label' clause.
@@ -11302,8 +11329,18 @@ TreeTransform<Derived>::TransformOSSPeriodClause(OSSPeriodClause *C) {
 }
 
 template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSAffinityClause(
+    OSSAffinityClause *C) {
+  ExprResult E = getDerived().TransformExpr(C->getExpression());
+  if (E.isInvalid())
+    return nullptr;
+  return getDerived().RebuildOSSAffinityClause(
+      E.get(), C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
+}
+
+template <typename Derived>
 OSSClause *
-TreeTransform<Derived>::TransformOSSLocalmemClause(OSSLocalmemClause *C) {
+TreeTransform<Derived>::TransformOSSCopyInClause(OSSCopyInClause *C) {
   llvm::SmallVector<Expr *, 16> Vars;
   Vars.reserve(C->varlist_size());
 
@@ -11314,22 +11351,49 @@ TreeTransform<Derived>::TransformOSSLocalmemClause(OSSLocalmemClause *C) {
     Vars.push_back(EVar.get());
   }
 
-  return getDerived().RebuildOSSLocalmemClause(
+  return getDerived().RebuildOSSCopyInClause(
       Vars, C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
 }
 
 template <typename Derived>
-OSSClause *TreeTransform<Derived>::TransformOSSLocalmemCopiesClause(
-    OSSLocalmemCopiesClause *C) {
-  return getDerived().RebuildOSSLocalmemCopiesClause(C->getBeginLoc(),
-                                                     C->getEndLoc());
+OSSClause *
+TreeTransform<Derived>::TransformOSSCopyOutClause(OSSCopyOutClause *C) {
+  llvm::SmallVector<Expr *, 16> Vars;
+  Vars.reserve(C->varlist_size());
+
+  for (auto *VE : C->varlists()) {
+    ExprResult EVar = getDerived().TransformExpr(cast<Expr>(VE));
+    if (EVar.isInvalid())
+      return nullptr;
+    Vars.push_back(EVar.get());
+  }
+
+  return getDerived().RebuildOSSCopyOutClause(
+      Vars, C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
 }
 
 template <typename Derived>
-OSSClause *TreeTransform<Derived>::TransformOSSNoLocalmemCopiesClause(
-    OSSNoLocalmemCopiesClause *C) {
-  return getDerived().RebuildOSSNoLocalmemCopiesClause(C->getBeginLoc(),
-                                                       C->getEndLoc());
+OSSClause *
+TreeTransform<Derived>::TransformOSSCopyInOutClause(OSSCopyInOutClause *C) {
+  llvm::SmallVector<Expr *, 16> Vars;
+  Vars.reserve(C->varlist_size());
+
+  for (auto *VE : C->varlists()) {
+    ExprResult EVar = getDerived().TransformExpr(cast<Expr>(VE));
+    if (EVar.isInvalid())
+      return nullptr;
+    Vars.push_back(EVar.get());
+  }
+
+  return getDerived().RebuildOSSCopyInOutClause(
+      Vars, C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSCopyDepsClause(OSSCopyDepsClause *C) {
+  return getDerived().RebuildOSSCopyDepsClause(C->getBeginLoc(),
+                                               C->getEndLoc());
 }
 
 template <typename Derived>

@@ -416,10 +416,8 @@ template <typename Callable> class WrapperGenerator {
     // Then compute the list of localmem parameters
     llvm::SmallDenseSet<const ParmVarDecl *> parametersToLocalmem;
 
-    // If explicit localmem_copies or no localmem() attr and no
-    // no_localmem_copies, We copy all the arrays to localmem
-    if (taskAttr->getLocalmemCopies() ||
-        (taskAttr->localmem_size() == 0 && !taskAttr->getNoLocalmemCopies())) {
+    // If copy_deps
+    if (taskAttr->getCopyDeps()) {
       for (auto *param : parametersToLocalmem) {
         if (currentAssignationsOfArrays.find(param) !=
             currentAssignationsOfArrays.end()) {
@@ -427,9 +425,10 @@ template <typename Callable> class WrapperGenerator {
         }
       }
     }
-    // If we have an explicit list of localmem, use that
-    else if (taskAttr->localmem_size() > 0) {
-      for (auto *localmem : taskAttr->localmem()) {
+    // If we have an explicit list of localmem (copy_in, copy_out, copy_inout),
+    // use that
+    auto explicitCopy = [&](auto &&list, LocalmemInfo::Dir dir) {
+      for (auto *localmem : list) {
         auto *arrShapingExpr = dyn_cast<OSSArrayShapingExpr>(localmem);
         if (!arrShapingExpr) {
           Diag(localmem->getExprLoc(),
@@ -444,20 +443,14 @@ template <typename Callable> class WrapperGenerator {
         auto *decl = dyn_cast<ParmVarDecl>(arrExprBase->getDecl());
         assert(decl);
         parametersToLocalmem.insert(decl);
-        // Could not find the direction of the array? Assume In/Out if not
-        // const, otherwise, In
-        if (currentAssignationsOfArrays.find(decl) ==
-            currentAssignationsOfArrays.end()) {
-          if (decl->getType()->getPointeeType().isConstQualified()) {
-            currentAssignationsOfArrays.insert(
-                {decl, {arrShapingExpr, LocalmemInfo::IN}});
-          } else {
-            currentAssignationsOfArrays.insert(
-                {decl, {arrShapingExpr, LocalmemInfo::INOUT}});
-          }
-        }
+        auto &def = currentAssignationsOfArrays[decl];
+        def.first = arrShapingExpr;
+        def.second = LocalmemInfo::Dir(def.second | dir);
       }
-    }
+    };
+    explicitCopy(taskAttr->copyIn(), LocalmemInfo::IN);
+    explicitCopy(taskAttr->copyOut(), LocalmemInfo::OUT);
+    explicitCopy(taskAttr->copyInOut(), LocalmemInfo::INOUT);
 
     // Now check that none of the decl are const qualified while out, and that
     // we know the sizes

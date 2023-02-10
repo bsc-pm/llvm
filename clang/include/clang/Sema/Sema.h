@@ -12433,8 +12433,9 @@ public:
   DeclGroupPtrTy ActOnOmpSsDeclareTaskDirective(
       DeclGroupPtrTy DG, Expr *If, Expr *Final, Expr *Cost, Expr *Priority,
       Expr *Onready, Expr *NumInstances, Expr *Onto, Expr *NumRepetitions,
-      Expr *Period, bool LocalmemCopies, bool NoLocalmemCopies, bool Wait,
-      unsigned Device, SourceLocation DeviceLoc, ArrayRef<Expr *> Localmem,
+      Expr *Period, Expr *Affinity, bool CopyDeps, bool Wait, unsigned Device,
+      SourceLocation DeviceLoc, ArrayRef<Expr *> CopyIn,
+      ArrayRef<Expr *> CopyOut, ArrayRef<Expr *> CopyInOut,
       ArrayRef<Expr *> Labels, ArrayRef<Expr *> Ins, ArrayRef<Expr *> Outs,
       ArrayRef<Expr *> Inouts, ArrayRef<Expr *> Concurrents,
       ArrayRef<Expr *> Commutatives, ArrayRef<Expr *> WeakIns,
@@ -12448,9 +12449,8 @@ public:
       ArrayRef<unsigned> ReductionListSizes, ArrayRef<Expr *> Reductions,
       ArrayRef<unsigned> ReductionClauseType,
       ArrayRef<CXXScopeSpec> ReductionCXXScopeSpecs,
-      ArrayRef<DeclarationNameInfo> ReductionIds,
-      ArrayRef<Expr *> Ndranges, SourceLocation NdrangeLoc,
-      SourceRange SR,
+      ArrayRef<DeclarationNameInfo> ReductionIds, ArrayRef<Expr *> Ndranges,
+      SourceLocation NdrangeLoc, SourceRange SR,
       ArrayRef<Expr *> UnresolvedReductions = std::nullopt);
 
   bool ActOnOmpSsDeclareTaskDirectiveWithFpga(Decl *ADecl);
@@ -12583,19 +12583,32 @@ public:
                                     SourceLocation LParenLoc,
                                     SourceLocation EndLoc);
 
-  /// Called on well-formed 'localmem' clause.
-  OSSClause *ActOnOmpSsLocalmemClause(ArrayRef<Expr *> Vars,
-                                      SourceLocation StartLoc,
+  /// Called on well-formed 'affinity' clause.
+  OSSClause *ActOnOmpSsAffinityClause(Expr *E, SourceLocation StartLoc,
                                       SourceLocation LParenLoc,
                                       SourceLocation EndLoc);
 
-  /// Called on well-formed 'localmem_copies' clause.
-  OSSClause *ActOnOmpSsLocalmemCopiesClause(SourceLocation StartLoc,
-                                            SourceLocation EndLoc);
+  /// Called on well-formed 'copy_in' clause.
+  OSSClause *ActOnOmpSsCopyInClause(ArrayRef<Expr *> Vars,
+                                    SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc);
 
-  /// Called on well-formed 'no_localmem_copies' clause.
-  OSSClause *ActOnOmpSsNoLocalmemCopiesClause(SourceLocation StartLoc,
-                                              SourceLocation EndLoc);
+  /// Called on well-formed 'copy_out' clause.
+  OSSClause *ActOnOmpSsCopyOutClause(ArrayRef<Expr *> Vars,
+                                     SourceLocation StartLoc,
+                                     SourceLocation LParenLoc,
+                                     SourceLocation EndLoc);
+
+  /// Called on well-formed 'copy_inout' clause.
+  OSSClause *ActOnOmpSsCopyInOutClause(ArrayRef<Expr *> Vars,
+                                       SourceLocation StartLoc,
+                                       SourceLocation LParenLoc,
+                                       SourceLocation EndLoc);
+
+  /// Called on well-formed 'copy_deps' clause.
+  OSSClause *ActOnOmpSsCopyDepsClause(SourceLocation StartLoc,
+                                      SourceLocation EndLoc);
 
   /// Called on well-formed 'label' clause.
   OSSClause *ActOnOmpSsLabelClause(ArrayRef<Expr *> VarList, SourceLocation StartLoc,

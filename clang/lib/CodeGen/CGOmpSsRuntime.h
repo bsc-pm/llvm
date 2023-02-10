@@ -47,11 +47,13 @@ struct OSSTaskDSADataTy final {
   SmallVector<const Expr *, 4> Shareds;
   SmallVector<OSSDSAPrivateDataTy, 4> Privates;
   SmallVector<OSSDSAFirstprivateDataTy, 4> Firstprivates;
-  SmallVector<const Expr *, 4> Localmems;
+  SmallVector<const Expr *, 4> CopyIn;
+  SmallVector<const Expr *, 4> CopyOut;
+  SmallVector<const Expr *, 4> CopyInOut;
 
   bool empty() const {
     return Shareds.empty() && Privates.empty() && Firstprivates.empty() &&
-           Localmems.empty();
+           CopyIn.empty() && CopyOut.empty() && CopyInOut.empty();
   }
 };
 
@@ -119,9 +121,9 @@ struct OSSTaskDataTy final {
   const Expr *Onto = nullptr;
   const Expr *NumRepetitions = nullptr;
   const Expr *Period = nullptr;
+  const Expr *Affinity = nullptr;
   SmallVector<const Expr *, 2> Labels;
-  bool LocalmemCopies = false;
-  bool NoLocalmemCopies = false;
+  bool CopyDeps = false;
   bool Wait = false;
   const Expr *Onready = nullptr;
 

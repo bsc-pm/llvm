@@ -76,11 +76,12 @@ static void AddDSAFirstprivateData(const OSSExecutableDirective &S,
   }
 }
 
-static void AddDSALocalmemData(const OSSExecutableDirective &S,
-                               SmallVectorImpl<const Expr *> &Data) {
+template <class T>
+static void AddDSACopyInOutData(const OSSExecutableDirective &S,
+                                SmallVectorImpl<const Expr *> &Data) {
   // All DSAs are DeclRefExpr or CXXThisExpr
   llvm::SmallSet<const ValueDecl *, 8> DeclExpr;
-  for (const auto *C : S.getClausesOfKind<OSSLocalmemClause>()) {
+  for (const auto *C : S.getClausesOfKind<T>()) {
     for (const Expr *Ref : C->varlists()) {
       if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(Ref)) {
         const ValueDecl *VD = DRE->getDecl();
@@ -98,7 +99,9 @@ static void AddDSAData(const OSSExecutableDirective &S, OSSTaskDSADataTy &DSAs) 
   AddDSASharedData(S, DSAs.Shareds);
   AddDSAPrivateData(S, DSAs.Privates);
   AddDSAFirstprivateData(S, DSAs.Firstprivates);
-  AddDSALocalmemData(S, DSAs.Localmems);
+  AddDSACopyInOutData<OSSCopyInClause>(S, DSAs.CopyIn);
+  AddDSACopyInOutData<OSSCopyOutClause>(S, DSAs.CopyOut);
+  AddDSACopyInOutData<OSSCopyInOutClause>(S, DSAs.CopyInOut);
 }
 
 static void AddDepData(const OSSExecutableDirective &S, OSSTaskDepDataTy &Deps) {
@@ -209,14 +212,18 @@ static void AddPeriodData(const OSSExecutableDirective &S, const Expr *&Expr) {
   }
 }
 
-static void AddLocalmemCopiesData(const OSSExecutableDirective &S,
-                                  bool &Found) {
-  Found = !S.getClausesOfKind<OSSLocalmemCopiesClause>().empty();
+static void AddAffinityData(const OSSExecutableDirective &S,
+                            const Expr *&Expr) {
+  [[maybe_unused]] bool Found = false;
+  for (const auto *C : S.getClausesOfKind<OSSAffinityClause>()) {
+    assert(!Found);
+    Found = true;
+    Expr = C->getExpression();
+  }
 }
 
-static void AddNoLocalmemCopiesData(const OSSExecutableDirective &S,
-                                    bool &Found) {
-  Found = !S.getClausesOfKind<OSSNoLocalmemCopiesClause>().empty();
+static void AddCopyDepsData(const OSSExecutableDirective &S, bool &Found) {
+  Found = !S.getClausesOfKind<OSSCopyDepsClause>().empty();
 }
 
 static void AddLabelData(
@@ -296,8 +303,8 @@ static void AddTaskData(const OSSExecutableDirective &S, OSSTaskDataTy &TaskData
   AddOntoData(S, TaskData.Onto);
   AddNumRepetitionsData(S, TaskData.NumRepetitions);
   AddPeriodData(S, TaskData.Period);
-  AddLocalmemCopiesData(S, TaskData.LocalmemCopies);
-  AddNoLocalmemCopiesData(S, TaskData.NoLocalmemCopies);
+  AddAffinityData(S, TaskData.Affinity);
+  AddCopyDepsData(S, TaskData.CopyDeps);
 }
 
 static void AddChunksizeLoopData(const OSSLoopDirective &S, const Expr * &ChunksizeExpr) {

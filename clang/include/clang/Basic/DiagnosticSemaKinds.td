@@ -11557,6 +11557,8 @@ def err_oss_num_repetitions_incompatible_device : Error<
   "num_repetitions cannot be used with other devices than fpga">;
 def err_oss_period_incompatible_device : Error<
   "period cannot be used with other devices than fpga">;
+def err_oss_affinity_incompatible_device : Error<
+  "affinity cannot be used with other devices than fpga">;
 def err_oss_ompss_fpga_hls_tasks_dir_missing_dir: Error<
   "-fompss-fpga-hls-tasks-dir needs a valid directory">;
 def err_oss_inline_device_not_supported : Error<

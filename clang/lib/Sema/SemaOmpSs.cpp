@@ -4308,20 +4308,20 @@ static bool actOnOSSReductionKindClause(
 Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     DeclGroupPtrTy DG, Expr *If, Expr *Final, Expr *Cost, Expr *Priority,
     Expr *Onready, Expr *NumInstances, Expr *Onto, Expr *NumRepetitions,
-    Expr *Period, bool LocalmemCopies, bool NoLocalmemCopies, bool Wait,
-    unsigned Device, SourceLocation DeviceLoc, ArrayRef<Expr *> Localmem,
-    ArrayRef<Expr *> Labels, ArrayRef<Expr *> Ins, ArrayRef<Expr *> Outs,
-    ArrayRef<Expr *> Inouts, ArrayRef<Expr *> Concurrents,
-    ArrayRef<Expr *> Commutatives, ArrayRef<Expr *> WeakIns,
-    ArrayRef<Expr *> WeakOuts, ArrayRef<Expr *> WeakInouts,
-    ArrayRef<Expr *> WeakConcurrents, ArrayRef<Expr *> WeakCommutatives,
-    ArrayRef<Expr *> DepIns, ArrayRef<Expr *> DepOuts,
-    ArrayRef<Expr *> DepInouts, ArrayRef<Expr *> DepConcurrents,
-    ArrayRef<Expr *> DepCommutatives, ArrayRef<Expr *> DepWeakIns,
-    ArrayRef<Expr *> DepWeakOuts, ArrayRef<Expr *> DepWeakInouts,
-    ArrayRef<Expr *> DepWeakConcurrents, ArrayRef<Expr *> DepWeakCommutatives,
-    ArrayRef<unsigned> ReductionListSizes, ArrayRef<Expr *> Reductions,
-    ArrayRef<unsigned> ReductionClauseType,
+    Expr *Period, Expr *Affinity, bool CopyDeps, bool Wait, unsigned Device,
+    SourceLocation DeviceLoc, ArrayRef<Expr *> CopyIn, ArrayRef<Expr *> CopyOut,
+    ArrayRef<Expr *> CopyInOut, ArrayRef<Expr *> Labels, ArrayRef<Expr *> Ins,
+    ArrayRef<Expr *> Outs, ArrayRef<Expr *> Inouts,
+    ArrayRef<Expr *> Concurrents, ArrayRef<Expr *> Commutatives,
+    ArrayRef<Expr *> WeakIns, ArrayRef<Expr *> WeakOuts,
+    ArrayRef<Expr *> WeakInouts, ArrayRef<Expr *> WeakConcurrents,
+    ArrayRef<Expr *> WeakCommutatives, ArrayRef<Expr *> DepIns,
+    ArrayRef<Expr *> DepOuts, ArrayRef<Expr *> DepInouts,
+    ArrayRef<Expr *> DepConcurrents, ArrayRef<Expr *> DepCommutatives,
+    ArrayRef<Expr *> DepWeakIns, ArrayRef<Expr *> DepWeakOuts,
+    ArrayRef<Expr *> DepWeakInouts, ArrayRef<Expr *> DepWeakConcurrents,
+    ArrayRef<Expr *> DepWeakCommutatives, ArrayRef<unsigned> ReductionListSizes,
+    ArrayRef<Expr *> Reductions, ArrayRef<unsigned> ReductionClauseType,
     ArrayRef<CXXScopeSpec> ReductionCXXScopeSpecs,
     ArrayRef<DeclarationNameInfo> ReductionIds, ArrayRef<Expr *> Ndranges,
     SourceLocation NdrangeLoc, SourceRange SR,
@@ -4390,7 +4390,7 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   ADecl->addAttr(OSSTaskDeclSentinelAttr::CreateImplicit(Context, SR));
 
   ExprResult IfRes, FinalRes, CostRes, PriorityRes, OnreadyRes, NumInstancesRes,
-      OntoRes, NumRepetitionsRes, PeriodRes;
+      OntoRes, NumRepetitionsRes, PeriodRes, AffinityRes;
   SmallVector<Expr *, 2> LabelsRes;
   SmallVector<Expr *, 4> NdrangesRes;
   OSSTaskDeclAttr::DeviceType DevType = OSSTaskDeclAttr::DeviceType::Unknown;
@@ -4463,6 +4463,13 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
                                              /*Outline=*/true);
     if (DevType != OSSTaskDeclAttr::Fpga)
       Diag(DeviceLoc, diag::err_oss_period_incompatible_device);
+  }
+  if (Affinity) {
+    AffinityRes = CheckNonNegativeIntegerValue(Affinity, OSSC_affinity,
+                                               /*StrictlyPositive=*/true,
+                                               /*Outline=*/true);
+    if (DevType != OSSTaskDeclAttr::Fpga)
+      Diag(DeviceLoc, diag::err_oss_affinity_incompatible_device);
   }
   OSSClauseDSAChecker OSSClauseChecker(/*Stack=*/nullptr, *this);
   for (Expr *RefExpr : Ins) {
@@ -4545,9 +4552,17 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     checkDependency(*this, RefExpr, /*OSSSyntax=*/false, /*Outline=*/true);
     OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_weakcommutative);
   }
-  for (Expr *RefExpr : Localmem) {
+  for (Expr *RefExpr : CopyIn) {
     checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
-    OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_localmem);
+    OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_copy_in);
+  }
+  for (Expr *RefExpr : CopyOut) {
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
+    OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_copy_out);
+  }
+  for (Expr *RefExpr : CopyInOut) {
+    checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
+    OSSClauseChecker.VisitClauseExpr(RefExpr, OSSC_copy_inout);
   }
   ReductionData RD(Reductions.size());
   SmallVector<NestedNameSpecifierLoc, 4> ReductionNSLoc;
@@ -4597,9 +4612,11 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
 
   auto *NewAttr = OSSTaskDeclAttr::CreateImplicit(
       Context, IfRes.get(), FinalRes.get(), CostRes.get(), PriorityRes.get(),
-      LocalmemCopies, NoLocalmemCopies, Wait, DevType, OnreadyRes.get(),
-      NumInstancesRes.get(), OntoRes.get(), NumRepetitionsRes.get(),
-      PeriodRes.get(), const_cast<Expr **>(Localmem.data()), Localmem.size(),
+      CopyDeps, Wait, DevType, OnreadyRes.get(), NumInstancesRes.get(),
+      OntoRes.get(), NumRepetitionsRes.get(), PeriodRes.get(),
+      AffinityRes.get(), const_cast<Expr **>(CopyIn.data()), CopyIn.size(),
+      const_cast<Expr **>(CopyOut.data()), CopyOut.size(),
+      const_cast<Expr **>(CopyInOut.data()), CopyInOut.size(),
       const_cast<Expr **>(LabelsRes.data()), LabelsRes.size(),
       const_cast<Expr **>(Ins.data()), Ins.size(),
       const_cast<Expr **>(Outs.data()), Outs.size(),
@@ -5660,8 +5677,14 @@ Sema::ActOnOmpSsVarListClause(
     Res = ActOnOmpSsDependClause({ OSSC_DEPEND_mutexinoutset, OSSC_DEPEND_weak }, DepLoc, ColonLoc, Vars,
                                  StartLoc, LParenLoc, EndLoc, /*OSSSyntax=*/true);
     break;
-  case OSSC_localmem:
-    Res = ActOnOmpSsLocalmemClause(Vars, StartLoc, LParenLoc, EndLoc);
+  case OSSC_copy_in:
+    Res = ActOnOmpSsCopyInClause(Vars, StartLoc, LParenLoc, EndLoc);
+    break;
+  case OSSC_copy_out:
+    Res = ActOnOmpSsCopyOutClause(Vars, StartLoc, LParenLoc, EndLoc);
+    break;
+  case OSSC_copy_inout:
+    Res = ActOnOmpSsCopyInOutClause(Vars, StartLoc, LParenLoc, EndLoc);
     break;
   default:
     llvm_unreachable("Clause is not allowed.");
@@ -5934,10 +5957,10 @@ Sema::ActOnOmpSsPrivateClause(ArrayRef<Expr *> Vars,
   return OSSPrivateClause::Create(Context, StartLoc, LParenLoc, EndLoc, ClauseVars, PrivateCopies);
 }
 
-OSSClause *Sema::ActOnOmpSsLocalmemClause(ArrayRef<Expr *> Vars,
-                                          SourceLocation StartLoc,
-                                          SourceLocation LParenLoc,
-                                          SourceLocation EndLoc) {
+OSSClause *Sema::ActOnOmpSsCopyInClause(ArrayRef<Expr *> Vars,
+                                        SourceLocation StartLoc,
+                                        SourceLocation LParenLoc,
+                                        SourceLocation EndLoc) {
   SmallVector<Expr *, 8> ClauseVars;
   for (Expr *RefExpr : Vars) {
 
@@ -5954,14 +5977,14 @@ OSSClause *Sema::ActOnOmpSsLocalmemClause(ArrayRef<Expr *> Vars,
       continue;
 
     DSAStackTy::DSAVarData DVar = DSAStack->getCurrentDSA(D);
-    if (DVar.CKind != OSSC_unknown && DVar.CKind != OSSC_localmem &&
+    if (DVar.CKind != OSSC_unknown && DVar.CKind != OSSC_copy_in &&
         DVar.RefExpr) {
-      Diag(ELoc, diag::err_oss_wrong_dsa) << getOmpSsClauseName(DVar.CKind)
-                                          << getOmpSsClauseName(OSSC_localmem);
+      Diag(ELoc, diag::err_oss_wrong_dsa)
+          << getOmpSsClauseName(DVar.CKind) << getOmpSsClauseName(OSSC_copy_in);
       continue;
     }
 
-    DSAStack->addDSA(D, RefExpr, OSSC_localmem, /*Ignore=*/false,
+    DSAStack->addDSA(D, RefExpr, OSSC_copy_in, /*Ignore=*/false,
                      /*IsBase=*/true, /*Implicit=*/false);
     ClauseVars.push_back(RefExpr);
   }
@@ -5969,8 +5992,87 @@ OSSClause *Sema::ActOnOmpSsLocalmemClause(ArrayRef<Expr *> Vars,
   if (Vars.empty())
     return nullptr;
 
-  return OSSLocalmemClause::Create(Context, StartLoc, LParenLoc, EndLoc,
-                                   ClauseVars);
+  return OSSCopyInClause::Create(Context, StartLoc, LParenLoc, EndLoc,
+                                 ClauseVars);
+}
+
+OSSClause *Sema::ActOnOmpSsCopyOutClause(ArrayRef<Expr *> Vars,
+                                         SourceLocation StartLoc,
+                                         SourceLocation LParenLoc,
+                                         SourceLocation EndLoc) {
+  SmallVector<Expr *, 8> ClauseVars;
+  for (Expr *RefExpr : Vars) {
+
+    SourceLocation ELoc;
+    SourceRange ERange;
+
+    auto Res = getPrivateItem(*this, RefExpr, ELoc, ERange);
+    ValueDecl *D = Res.first;
+    if (!D) {
+      continue;
+    }
+
+    if (RequireCompleteType(ELoc, D->getType(), diag::err_oss_incomplete_type))
+      continue;
+
+    DSAStackTy::DSAVarData DVar = DSAStack->getCurrentDSA(D);
+    if (DVar.CKind != OSSC_unknown && DVar.CKind != OSSC_copy_out &&
+        DVar.RefExpr) {
+      Diag(ELoc, diag::err_oss_wrong_dsa) << getOmpSsClauseName(DVar.CKind)
+                                          << getOmpSsClauseName(OSSC_copy_out);
+      continue;
+    }
+
+    DSAStack->addDSA(D, RefExpr, OSSC_copy_out, /*Ignore=*/false,
+                     /*IsBase=*/true, /*Implicit=*/false);
+    ClauseVars.push_back(RefExpr);
+  }
+
+  if (Vars.empty())
+    return nullptr;
+
+  return OSSCopyOutClause::Create(Context, StartLoc, LParenLoc, EndLoc,
+                                  ClauseVars);
+}
+
+OSSClause *Sema::ActOnOmpSsCopyInOutClause(ArrayRef<Expr *> Vars,
+                                           SourceLocation StartLoc,
+                                           SourceLocation LParenLoc,
+                                           SourceLocation EndLoc) {
+  SmallVector<Expr *, 8> ClauseVars;
+  for (Expr *RefExpr : Vars) {
+
+    SourceLocation ELoc;
+    SourceRange ERange;
+
+    auto Res = getPrivateItem(*this, RefExpr, ELoc, ERange);
+    ValueDecl *D = Res.first;
+    if (!D) {
+      continue;
+    }
+
+    if (RequireCompleteType(ELoc, D->getType(), diag::err_oss_incomplete_type))
+      continue;
+
+    DSAStackTy::DSAVarData DVar = DSAStack->getCurrentDSA(D);
+    if (DVar.CKind != OSSC_unknown && DVar.CKind != OSSC_copy_inout &&
+        DVar.RefExpr) {
+      Diag(ELoc, diag::err_oss_wrong_dsa)
+          << getOmpSsClauseName(DVar.CKind)
+          << getOmpSsClauseName(OSSC_copy_inout);
+      continue;
+    }
+
+    DSAStack->addDSA(D, RefExpr, OSSC_copy_inout, /*Ignore=*/false,
+                     /*IsBase=*/true, /*Implicit=*/false);
+    ClauseVars.push_back(RefExpr);
+  }
+
+  if (Vars.empty())
+    return nullptr;
+
+  return OSSCopyInOutClause::Create(Context, StartLoc, LParenLoc, EndLoc,
+                                    ClauseVars);
 }
 
 OSSClause *
@@ -6280,14 +6382,20 @@ OSSClause *Sema::ActOnOmpSsPeriodClause(Expr *E, SourceLocation StartLoc,
   return new (Context) OSSPeriodClause(Res.get(), StartLoc, LParenLoc, EndLoc);
 }
 
-OSSClause *Sema::ActOnOmpSsLocalmemCopiesClause(SourceLocation StartLoc,
-                                                SourceLocation EndLoc) {
-  return new (Context) OSSLocalmemCopiesClause(StartLoc, EndLoc);
+OSSClause *Sema::ActOnOmpSsAffinityClause(Expr *E, SourceLocation StartLoc,
+                                          SourceLocation LParenLoc,
+                                          SourceLocation EndLoc) {
+  ExprResult Res = CheckSignedIntegerValue(E, /*Outline=*/false);
+  if (Res.isInvalid())
+    return nullptr;
+
+  return new (Context)
+      OSSAffinityClause(Res.get(), StartLoc, LParenLoc, EndLoc);
 }
 
-OSSClause *Sema::ActOnOmpSsNoLocalmemCopiesClause(SourceLocation StartLoc,
-                                                  SourceLocation EndLoc) {
-  return new (Context) OSSNoLocalmemCopiesClause(StartLoc, EndLoc);
+OSSClause *Sema::ActOnOmpSsCopyDepsClause(SourceLocation StartLoc,
+                                          SourceLocation EndLoc) {
+  return new (Context) OSSCopyDepsClause(StartLoc, EndLoc);
 }
 
 OSSClause *Sema::ActOnOmpSsLabelClause(ArrayRef<Expr *> VarList,
@@ -6420,11 +6528,8 @@ OSSClause *Sema::ActOnOmpSsClause(OmpSsClauseKind Kind,
                                   SourceLocation EndLoc) {
   OSSClause *Res = nullptr;
   switch (Kind) {
-  case OSSC_localmem_copies:
-    Res = ActOnOmpSsLocalmemCopiesClause(StartLoc, EndLoc);
-    break;
-  case OSSC_no_localmem_copies:
-    Res = ActOnOmpSsNoLocalmemCopiesClause(StartLoc, EndLoc);
+  case OSSC_copy_deps:
+    Res = ActOnOmpSsCopyDepsClause(StartLoc, EndLoc);
     break;
   case OSSC_wait:
     Res = ActOnOmpSsWaitClause(StartLoc, EndLoc);
