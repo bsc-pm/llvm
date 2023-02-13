@@ -2737,7 +2737,7 @@ struct OmpSsDirective {
         Nanos6TaskDeclSourceStr ? Nanos6TaskDeclSourceStr : Nanos6TaskLocStr,
         // Set device_function_name only in case of task pure device
         // in order to let nanos6 identify them
-        (Nanos6TaskDevFuncStr && !DirEnv.DeviceInfo.Ndrange.empty())
+        Nanos6TaskDevFuncStr
           ? Nanos6TaskDevFuncStr
           : ConstantPointerNull::get(PtrTy))),
         ("implementations_var_" + F.getName()).str());

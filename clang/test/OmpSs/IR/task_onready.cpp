@@ -93,12 +93,12 @@ void bar(int n) {
 // LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP8]]), !dbg [[DBG30:![0-9]+]]
 // LIN64-NEXT:    store i32 10, ptr [[CALL_ARG]], align 4, !dbg [[DBG31:![0-9]+]]
 // LIN64-NEXT:    store ptr [[VLA]], ptr [[CALL_ARG1]], align 8, !dbg [[DBG32:![0-9]+]]
-// LIN64-NEXT:    [[TMP9:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG1]], ptr undef), "QUAL.OSS.ONREADY"(ptr @compute_onready.6, ptr [[CALL_ARG1]]), "QUAL.OSS.DECL.SOURCE"([10 x i8] c"foo1:17:9\00") ], !dbg [[DBG33:![0-9]+]]
+// LIN64-NEXT:    [[TMP9:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG1]], ptr undef), "QUAL.OSS.DEVICE.DEVFUNC"([12 x i8] c"_Z4foo1iPPi\00"), "QUAL.OSS.ONREADY"(ptr @compute_onready.6, ptr [[CALL_ARG1]]), "QUAL.OSS.DECL.SOURCE"([22 x i8] c"task_onready.cpp:17:9\00") ], !dbg [[DBG33:![0-9]+]]
 // LIN64-NEXT:    [[TMP10:%.*]] = load i32, ptr [[CALL_ARG]], align 4, !dbg [[DBG31]]
 // LIN64-NEXT:    [[TMP11:%.*]] = load ptr, ptr [[CALL_ARG1]], align 8, !dbg [[DBG32]]
 // LIN64-NEXT:    call void @_Z4foo1iPPi(i32 noundef [[TMP10]], ptr noundef [[TMP11]]), !dbg [[DBG33]]
 // LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP9]]), !dbg [[DBG33]]
-// LIN64-NEXT:    [[TMP12:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.ONREADY"(ptr @compute_onready.7), "QUAL.OSS.DECL.SOURCE"([10 x i8] c"foo2:20:9\00") ], !dbg [[DBG34:![0-9]+]]
+// LIN64-NEXT:    [[TMP12:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE.DEVFUNC"([9 x i8] c"_Z4foo2v\00"), "QUAL.OSS.ONREADY"(ptr @compute_onready.7), "QUAL.OSS.DECL.SOURCE"([22 x i8] c"task_onready.cpp:20:9\00") ], !dbg [[DBG34:![0-9]+]]
 // LIN64-NEXT:    call void @_Z4foo2v(), !dbg [[DBG34]]
 // LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP12]]), !dbg [[DBG34]]
 // LIN64-NEXT:    [[TMP13:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG35:![0-9]+]]
@@ -124,85 +124,85 @@ void bar(int n) {
 // LIN64-NEXT:    [[DOTADDR:%.*]] = alloca i64, align 8
 // LIN64-NEXT:    store ptr [[VLA]], ptr [[VLA_ADDR]], align 8
 // LIN64-NEXT:    store i64 [[TMP0]], ptr [[DOTADDR]], align 8
-// LIN64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds ptr, ptr [[VLA]], i64 3, !dbg [[DBG42:![0-9]+]]
-// LIN64-NEXT:    ret void, !dbg [[DBG44:![0-9]+]]
+// LIN64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds ptr, ptr [[VLA]], i64 3, !dbg [[DBG41:![0-9]+]]
+// LIN64-NEXT:    ret void, !dbg [[DBG43:![0-9]+]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@compute_onready.1
-// LIN64-SAME: () #[[ATTR3]] !dbg [[DBG45:![0-9]+]] {
+// LIN64-SAME: () #[[ATTR3]] !dbg [[DBG44:![0-9]+]] {
 // LIN64-NEXT:  entry:
-// LIN64-NEXT:    [[CALL:%.*]] = call noundef i32 @_Z3fooIiET_v(), !dbg [[DBG46:![0-9]+]]
-// LIN64-NEXT:    ret void, !dbg [[DBG46]]
+// LIN64-NEXT:    [[CALL:%.*]] = call noundef i32 @_Z3fooIiET_v(), !dbg [[DBG45:![0-9]+]]
+// LIN64-NEXT:    ret void, !dbg [[DBG45]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@_Z3fooIiET_v
-// LIN64-SAME: () #[[ATTR0]] comdat !dbg [[DBG48:![0-9]+]] {
+// LIN64-SAME: () #[[ATTR0]] comdat !dbg [[DBG47:![0-9]+]] {
 // LIN64-NEXT:  entry:
-// LIN64-NEXT:    ret i32 0, !dbg [[DBG49:![0-9]+]]
+// LIN64-NEXT:    ret i32 0, !dbg [[DBG48:![0-9]+]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@compute_onready.2
-// LIN64-SAME: (ptr [[N:%.*]]) #[[ATTR3]] !dbg [[DBG50:![0-9]+]] {
+// LIN64-SAME: (ptr [[N:%.*]]) #[[ATTR3]] !dbg [[DBG49:![0-9]+]] {
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    [[N_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    store ptr [[N]], ptr [[N_ADDR]], align 8
-// LIN64-NEXT:    ret void, !dbg [[DBG51:![0-9]+]]
+// LIN64-NEXT:    ret void, !dbg [[DBG50:![0-9]+]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@compute_onready.3
-// LIN64-SAME: () #[[ATTR3]] !dbg [[DBG53:![0-9]+]] {
+// LIN64-SAME: () #[[ATTR3]] !dbg [[DBG52:![0-9]+]] {
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    ret void
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@compute_onready.4
-// LIN64-SAME: () #[[ATTR3]] !dbg [[DBG54:![0-9]+]] {
+// LIN64-SAME: () #[[ATTR3]] !dbg [[DBG53:![0-9]+]] {
 // LIN64-NEXT:  entry:
-// LIN64-NEXT:    ret void, !dbg [[DBG55:![0-9]+]]
+// LIN64-NEXT:    ret void, !dbg [[DBG54:![0-9]+]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@compute_onready.5
-// LIN64-SAME: (ptr [[N:%.*]]) #[[ATTR3]] !dbg [[DBG57:![0-9]+]] {
+// LIN64-SAME: (ptr [[N:%.*]]) #[[ATTR3]] !dbg [[DBG56:![0-9]+]] {
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    [[N_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    [[AGG_TMP_ENSURED:%.*]] = alloca [[CLASS_ANON:%.*]], align 8
 // LIN64-NEXT:    store ptr [[N]], ptr [[N_ADDR]], align 8
-// LIN64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[CLASS_ANON]], ptr [[AGG_TMP_ENSURED]], i32 0, i32 0, !dbg [[DBG58:![0-9]+]]
-// LIN64-NEXT:    store ptr [[N]], ptr [[TMP0]], align 8, !dbg [[DBG58]]
-// LIN64-NEXT:    ret void, !dbg [[DBG60:![0-9]+]]
+// LIN64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[CLASS_ANON]], ptr [[AGG_TMP_ENSURED]], i32 0, i32 0, !dbg [[DBG57:![0-9]+]]
+// LIN64-NEXT:    store ptr [[N]], ptr [[TMP0]], align 8, !dbg [[DBG57]]
+// LIN64-NEXT:    ret void, !dbg [[DBG59:![0-9]+]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@compute_onready.6
-// LIN64-SAME: (ptr [[VLA:%.*]]) #[[ATTR3]] !dbg [[DBG61:![0-9]+]] {
+// LIN64-SAME: (ptr [[VLA:%.*]]) #[[ATTR3]] !dbg [[DBG60:![0-9]+]] {
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    [[VLA_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    store ptr [[VLA]], ptr [[VLA_ADDR]], align 8
-// LIN64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[VLA]], align 8, !dbg [[DBG62:![0-9]+]]
-// LIN64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds ptr, ptr [[TMP0]], i64 3, !dbg [[DBG62]]
-// LIN64-NEXT:    ret void, !dbg [[DBG64:![0-9]+]]
+// LIN64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[VLA]], align 8, !dbg [[DBG61:![0-9]+]]
+// LIN64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds ptr, ptr [[TMP0]], i64 3, !dbg [[DBG61]]
+// LIN64-NEXT:    ret void, !dbg [[DBG63:![0-9]+]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@compute_onready.7
-// LIN64-SAME: () #[[ATTR3]] !dbg [[DBG65:![0-9]+]] {
+// LIN64-SAME: () #[[ATTR3]] !dbg [[DBG64:![0-9]+]] {
 // LIN64-NEXT:  entry:
-// LIN64-NEXT:    [[CALL:%.*]] = call noundef ptr @_Z3fooIPiET_v(), !dbg [[DBG66:![0-9]+]]
-// LIN64-NEXT:    ret void, !dbg [[DBG66]]
+// LIN64-NEXT:    [[CALL:%.*]] = call noundef ptr @_Z3fooIPiET_v(), !dbg [[DBG65:![0-9]+]]
+// LIN64-NEXT:    ret void, !dbg [[DBG65]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@_Z3fooIPiET_v
-// LIN64-SAME: () #[[ATTR0]] comdat !dbg [[DBG68:![0-9]+]] {
+// LIN64-SAME: () #[[ATTR0]] comdat !dbg [[DBG67:![0-9]+]] {
 // LIN64-NEXT:  entry:
-// LIN64-NEXT:    ret ptr null, !dbg [[DBG69:![0-9]+]]
+// LIN64-NEXT:    ret ptr null, !dbg [[DBG68:![0-9]+]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@compute_onready.8
-// LIN64-SAME: (ptr [[THIS:%.*]]) #[[ATTR3]] !dbg [[DBG70:![0-9]+]] {
+// LIN64-SAME: (ptr [[THIS:%.*]]) #[[ATTR3]] !dbg [[DBG69:![0-9]+]] {
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
 // LIN64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// LIN64-NEXT:    [[X:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG71:![0-9]+]]
-// LIN64-NEXT:    ret void, !dbg [[DBG71]]
+// LIN64-NEXT:    [[X:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG70:![0-9]+]]
+// LIN64-NEXT:    ret void, !dbg [[DBG70]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@_Z4foo1iPPi
@@ -257,12 +257,12 @@ void bar(int n) {
 // PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP8]]), !dbg [[DBG30:![0-9]+]]
 // PPC64-NEXT:    store i32 10, ptr [[CALL_ARG]], align 4, !dbg [[DBG31:![0-9]+]]
 // PPC64-NEXT:    store ptr [[VLA]], ptr [[CALL_ARG1]], align 8, !dbg [[DBG32:![0-9]+]]
-// PPC64-NEXT:    [[TMP9:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG1]], ptr undef), "QUAL.OSS.ONREADY"(ptr @compute_onready.6, ptr [[CALL_ARG1]]), "QUAL.OSS.DECL.SOURCE"([10 x i8] c"foo1:17:9\00") ], !dbg [[DBG33:![0-9]+]]
+// PPC64-NEXT:    [[TMP9:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG1]], ptr undef), "QUAL.OSS.DEVICE.DEVFUNC"([12 x i8] c"_Z4foo1iPPi\00"), "QUAL.OSS.ONREADY"(ptr @compute_onready.6, ptr [[CALL_ARG1]]), "QUAL.OSS.DECL.SOURCE"([22 x i8] c"task_onready.cpp:17:9\00") ], !dbg [[DBG33:![0-9]+]]
 // PPC64-NEXT:    [[TMP10:%.*]] = load i32, ptr [[CALL_ARG]], align 4, !dbg [[DBG31]]
 // PPC64-NEXT:    [[TMP11:%.*]] = load ptr, ptr [[CALL_ARG1]], align 8, !dbg [[DBG32]]
 // PPC64-NEXT:    call void @_Z4foo1iPPi(i32 noundef signext [[TMP10]], ptr noundef [[TMP11]]), !dbg [[DBG33]]
 // PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP9]]), !dbg [[DBG33]]
-// PPC64-NEXT:    [[TMP12:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.ONREADY"(ptr @compute_onready.7), "QUAL.OSS.DECL.SOURCE"([10 x i8] c"foo2:20:9\00") ], !dbg [[DBG34:![0-9]+]]
+// PPC64-NEXT:    [[TMP12:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE.DEVFUNC"([9 x i8] c"_Z4foo2v\00"), "QUAL.OSS.ONREADY"(ptr @compute_onready.7), "QUAL.OSS.DECL.SOURCE"([22 x i8] c"task_onready.cpp:20:9\00") ], !dbg [[DBG34:![0-9]+]]
 // PPC64-NEXT:    call void @_Z4foo2v(), !dbg [[DBG34]]
 // PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP12]]), !dbg [[DBG34]]
 // PPC64-NEXT:    [[TMP13:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG35:![0-9]+]]
@@ -288,85 +288,85 @@ void bar(int n) {
 // PPC64-NEXT:    [[DOTADDR:%.*]] = alloca i64, align 8
 // PPC64-NEXT:    store ptr [[VLA]], ptr [[VLA_ADDR]], align 8
 // PPC64-NEXT:    store i64 [[TMP0]], ptr [[DOTADDR]], align 8
-// PPC64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds ptr, ptr [[VLA]], i64 3, !dbg [[DBG42:![0-9]+]]
-// PPC64-NEXT:    ret void, !dbg [[DBG44:![0-9]+]]
+// PPC64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds ptr, ptr [[VLA]], i64 3, !dbg [[DBG41:![0-9]+]]
+// PPC64-NEXT:    ret void, !dbg [[DBG43:![0-9]+]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@compute_onready.1
-// PPC64-SAME: () !dbg [[DBG45:![0-9]+]] {
+// PPC64-SAME: () !dbg [[DBG44:![0-9]+]] {
 // PPC64-NEXT:  entry:
-// PPC64-NEXT:    [[CALL:%.*]] = call noundef signext i32 @_Z3fooIiET_v(), !dbg [[DBG46:![0-9]+]]
-// PPC64-NEXT:    ret void, !dbg [[DBG46]]
+// PPC64-NEXT:    [[CALL:%.*]] = call noundef signext i32 @_Z3fooIiET_v(), !dbg [[DBG45:![0-9]+]]
+// PPC64-NEXT:    ret void, !dbg [[DBG45]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@_Z3fooIiET_v
-// PPC64-SAME: () #[[ATTR0]] comdat !dbg [[DBG48:![0-9]+]] {
+// PPC64-SAME: () #[[ATTR0]] comdat !dbg [[DBG47:![0-9]+]] {
 // PPC64-NEXT:  entry:
-// PPC64-NEXT:    ret i32 0, !dbg [[DBG49:![0-9]+]]
+// PPC64-NEXT:    ret i32 0, !dbg [[DBG48:![0-9]+]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@compute_onready.2
-// PPC64-SAME: (ptr [[N:%.*]]) !dbg [[DBG50:![0-9]+]] {
+// PPC64-SAME: (ptr [[N:%.*]]) !dbg [[DBG49:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[N_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store ptr [[N]], ptr [[N_ADDR]], align 8
-// PPC64-NEXT:    ret void, !dbg [[DBG51:![0-9]+]]
+// PPC64-NEXT:    ret void, !dbg [[DBG50:![0-9]+]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@compute_onready.3
-// PPC64-SAME: () !dbg [[DBG53:![0-9]+]] {
+// PPC64-SAME: () !dbg [[DBG52:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    ret void
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@compute_onready.4
-// PPC64-SAME: () !dbg [[DBG54:![0-9]+]] {
+// PPC64-SAME: () !dbg [[DBG53:![0-9]+]] {
 // PPC64-NEXT:  entry:
-// PPC64-NEXT:    ret void, !dbg [[DBG55:![0-9]+]]
+// PPC64-NEXT:    ret void, !dbg [[DBG54:![0-9]+]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@compute_onready.5
-// PPC64-SAME: (ptr [[N:%.*]]) !dbg [[DBG57:![0-9]+]] {
+// PPC64-SAME: (ptr [[N:%.*]]) !dbg [[DBG56:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[N_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    [[AGG_TMP_ENSURED:%.*]] = alloca [[CLASS_ANON:%.*]], align 8
 // PPC64-NEXT:    store ptr [[N]], ptr [[N_ADDR]], align 8
-// PPC64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[CLASS_ANON]], ptr [[AGG_TMP_ENSURED]], i32 0, i32 0, !dbg [[DBG58:![0-9]+]]
-// PPC64-NEXT:    store ptr [[N]], ptr [[TMP0]], align 8, !dbg [[DBG58]]
-// PPC64-NEXT:    ret void, !dbg [[DBG60:![0-9]+]]
+// PPC64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[CLASS_ANON]], ptr [[AGG_TMP_ENSURED]], i32 0, i32 0, !dbg [[DBG57:![0-9]+]]
+// PPC64-NEXT:    store ptr [[N]], ptr [[TMP0]], align 8, !dbg [[DBG57]]
+// PPC64-NEXT:    ret void, !dbg [[DBG59:![0-9]+]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@compute_onready.6
-// PPC64-SAME: (ptr [[VLA:%.*]]) !dbg [[DBG61:![0-9]+]] {
+// PPC64-SAME: (ptr [[VLA:%.*]]) !dbg [[DBG60:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[VLA_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store ptr [[VLA]], ptr [[VLA_ADDR]], align 8
-// PPC64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[VLA]], align 8, !dbg [[DBG62:![0-9]+]]
-// PPC64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds ptr, ptr [[TMP0]], i64 3, !dbg [[DBG62]]
-// PPC64-NEXT:    ret void, !dbg [[DBG64:![0-9]+]]
+// PPC64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[VLA]], align 8, !dbg [[DBG61:![0-9]+]]
+// PPC64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds ptr, ptr [[TMP0]], i64 3, !dbg [[DBG61]]
+// PPC64-NEXT:    ret void, !dbg [[DBG63:![0-9]+]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@compute_onready.7
-// PPC64-SAME: () !dbg [[DBG65:![0-9]+]] {
+// PPC64-SAME: () !dbg [[DBG64:![0-9]+]] {
 // PPC64-NEXT:  entry:
-// PPC64-NEXT:    [[CALL:%.*]] = call noundef ptr @_Z3fooIPiET_v(), !dbg [[DBG66:![0-9]+]]
-// PPC64-NEXT:    ret void, !dbg [[DBG66]]
+// PPC64-NEXT:    [[CALL:%.*]] = call noundef ptr @_Z3fooIPiET_v(), !dbg [[DBG65:![0-9]+]]
+// PPC64-NEXT:    ret void, !dbg [[DBG65]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@_Z3fooIPiET_v
-// PPC64-SAME: () #[[ATTR0]] comdat !dbg [[DBG68:![0-9]+]] {
+// PPC64-SAME: () #[[ATTR0]] comdat !dbg [[DBG67:![0-9]+]] {
 // PPC64-NEXT:  entry:
-// PPC64-NEXT:    ret ptr null, !dbg [[DBG69:![0-9]+]]
+// PPC64-NEXT:    ret ptr null, !dbg [[DBG68:![0-9]+]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@compute_onready.8
-// PPC64-SAME: (ptr [[THIS:%.*]]) !dbg [[DBG70:![0-9]+]] {
+// PPC64-SAME: (ptr [[THIS:%.*]]) !dbg [[DBG69:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
 // PPC64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// PPC64-NEXT:    [[X:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG71:![0-9]+]]
-// PPC64-NEXT:    ret void, !dbg [[DBG71]]
+// PPC64-NEXT:    [[X:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG70:![0-9]+]]
+// PPC64-NEXT:    ret void, !dbg [[DBG70]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@_Z4foo1iPPi
@@ -421,12 +421,12 @@ void bar(int n) {
 // AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP8]]), !dbg [[DBG30:![0-9]+]]
 // AARCH64-NEXT:    store i32 10, ptr [[CALL_ARG]], align 4, !dbg [[DBG31:![0-9]+]]
 // AARCH64-NEXT:    store ptr [[VLA]], ptr [[CALL_ARG1]], align 8, !dbg [[DBG32:![0-9]+]]
-// AARCH64-NEXT:    [[TMP9:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG1]], ptr undef), "QUAL.OSS.ONREADY"(ptr @compute_onready.6, ptr [[CALL_ARG1]]), "QUAL.OSS.DECL.SOURCE"([10 x i8] c"foo1:17:9\00") ], !dbg [[DBG33:![0-9]+]]
+// AARCH64-NEXT:    [[TMP9:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG1]], ptr undef), "QUAL.OSS.DEVICE.DEVFUNC"([12 x i8] c"_Z4foo1iPPi\00"), "QUAL.OSS.ONREADY"(ptr @compute_onready.6, ptr [[CALL_ARG1]]), "QUAL.OSS.DECL.SOURCE"([22 x i8] c"task_onready.cpp:17:9\00") ], !dbg [[DBG33:![0-9]+]]
 // AARCH64-NEXT:    [[TMP10:%.*]] = load i32, ptr [[CALL_ARG]], align 4, !dbg [[DBG31]]
 // AARCH64-NEXT:    [[TMP11:%.*]] = load ptr, ptr [[CALL_ARG1]], align 8, !dbg [[DBG32]]
 // AARCH64-NEXT:    call void @_Z4foo1iPPi(i32 noundef [[TMP10]], ptr noundef [[TMP11]]), !dbg [[DBG33]]
 // AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP9]]), !dbg [[DBG33]]
-// AARCH64-NEXT:    [[TMP12:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.ONREADY"(ptr @compute_onready.7), "QUAL.OSS.DECL.SOURCE"([10 x i8] c"foo2:20:9\00") ], !dbg [[DBG34:![0-9]+]]
+// AARCH64-NEXT:    [[TMP12:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE.DEVFUNC"([9 x i8] c"_Z4foo2v\00"), "QUAL.OSS.ONREADY"(ptr @compute_onready.7), "QUAL.OSS.DECL.SOURCE"([22 x i8] c"task_onready.cpp:20:9\00") ], !dbg [[DBG34:![0-9]+]]
 // AARCH64-NEXT:    call void @_Z4foo2v(), !dbg [[DBG34]]
 // AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP12]]), !dbg [[DBG34]]
 // AARCH64-NEXT:    [[TMP13:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG35:![0-9]+]]
@@ -452,83 +452,83 @@ void bar(int n) {
 // AARCH64-NEXT:    [[DOTADDR:%.*]] = alloca i64, align 8
 // AARCH64-NEXT:    store ptr [[VLA]], ptr [[VLA_ADDR]], align 8
 // AARCH64-NEXT:    store i64 [[TMP0]], ptr [[DOTADDR]], align 8
-// AARCH64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds ptr, ptr [[VLA]], i64 3, !dbg [[DBG42:![0-9]+]]
-// AARCH64-NEXT:    ret void, !dbg [[DBG44:![0-9]+]]
+// AARCH64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds ptr, ptr [[VLA]], i64 3, !dbg [[DBG41:![0-9]+]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG43:![0-9]+]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@compute_onready.1
-// AARCH64-SAME: () !dbg [[DBG45:![0-9]+]] {
+// AARCH64-SAME: () !dbg [[DBG44:![0-9]+]] {
 // AARCH64-NEXT:  entry:
-// AARCH64-NEXT:    [[CALL:%.*]] = call noundef i32 @_Z3fooIiET_v(), !dbg [[DBG46:![0-9]+]]
-// AARCH64-NEXT:    ret void, !dbg [[DBG46]]
+// AARCH64-NEXT:    [[CALL:%.*]] = call noundef i32 @_Z3fooIiET_v(), !dbg [[DBG45:![0-9]+]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG45]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@_Z3fooIiET_v
-// AARCH64-SAME: () #[[ATTR0]] comdat !dbg [[DBG48:![0-9]+]] {
+// AARCH64-SAME: () #[[ATTR0]] comdat !dbg [[DBG47:![0-9]+]] {
 // AARCH64-NEXT:  entry:
-// AARCH64-NEXT:    ret i32 0, !dbg [[DBG49:![0-9]+]]
+// AARCH64-NEXT:    ret i32 0, !dbg [[DBG48:![0-9]+]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@compute_onready.2
-// AARCH64-SAME: (ptr [[N:%.*]]) !dbg [[DBG50:![0-9]+]] {
+// AARCH64-SAME: (ptr [[N:%.*]]) !dbg [[DBG49:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[N_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    store ptr [[N]], ptr [[N_ADDR]], align 8
-// AARCH64-NEXT:    ret void, !dbg [[DBG51:![0-9]+]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG50:![0-9]+]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@compute_onready.3
-// AARCH64-SAME: () !dbg [[DBG53:![0-9]+]] {
+// AARCH64-SAME: () !dbg [[DBG52:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    ret void
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@compute_onready.4
-// AARCH64-SAME: () !dbg [[DBG54:![0-9]+]] {
+// AARCH64-SAME: () !dbg [[DBG53:![0-9]+]] {
 // AARCH64-NEXT:  entry:
-// AARCH64-NEXT:    ret void, !dbg [[DBG55:![0-9]+]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG54:![0-9]+]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@compute_onready.5
-// AARCH64-SAME: (ptr [[N:%.*]]) !dbg [[DBG57:![0-9]+]] {
+// AARCH64-SAME: (ptr [[N:%.*]]) !dbg [[DBG56:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[N_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    [[AGG_TMP_ENSURED:%.*]] = alloca [[CLASS_ANON:%.*]], align 8
 // AARCH64-NEXT:    store ptr [[N]], ptr [[N_ADDR]], align 8
-// AARCH64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[CLASS_ANON]], ptr [[AGG_TMP_ENSURED]], i32 0, i32 0, !dbg [[DBG58:![0-9]+]]
-// AARCH64-NEXT:    store ptr [[N]], ptr [[TMP0]], align 8, !dbg [[DBG58]]
-// AARCH64-NEXT:    ret void, !dbg [[DBG60:![0-9]+]]
+// AARCH64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[CLASS_ANON]], ptr [[AGG_TMP_ENSURED]], i32 0, i32 0, !dbg [[DBG57:![0-9]+]]
+// AARCH64-NEXT:    store ptr [[N]], ptr [[TMP0]], align 8, !dbg [[DBG57]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG59:![0-9]+]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@compute_onready.6
-// AARCH64-SAME: (ptr [[VLA:%.*]]) !dbg [[DBG61:![0-9]+]] {
+// AARCH64-SAME: (ptr [[VLA:%.*]]) !dbg [[DBG60:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[VLA_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    store ptr [[VLA]], ptr [[VLA_ADDR]], align 8
-// AARCH64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[VLA]], align 8, !dbg [[DBG62:![0-9]+]]
-// AARCH64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds ptr, ptr [[TMP0]], i64 3, !dbg [[DBG62]]
-// AARCH64-NEXT:    ret void, !dbg [[DBG64:![0-9]+]]
+// AARCH64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[VLA]], align 8, !dbg [[DBG61:![0-9]+]]
+// AARCH64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds ptr, ptr [[TMP0]], i64 3, !dbg [[DBG61]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG63:![0-9]+]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@compute_onready.7
-// AARCH64-SAME: () !dbg [[DBG65:![0-9]+]] {
+// AARCH64-SAME: () !dbg [[DBG64:![0-9]+]] {
 // AARCH64-NEXT:  entry:
-// AARCH64-NEXT:    [[CALL:%.*]] = call noundef ptr @_Z3fooIPiET_v(), !dbg [[DBG66:![0-9]+]]
-// AARCH64-NEXT:    ret void, !dbg [[DBG66]]
+// AARCH64-NEXT:    [[CALL:%.*]] = call noundef ptr @_Z3fooIPiET_v(), !dbg [[DBG65:![0-9]+]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG65]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@_Z3fooIPiET_v
-// AARCH64-SAME: () #[[ATTR0]] comdat !dbg [[DBG68:![0-9]+]] {
+// AARCH64-SAME: () #[[ATTR0]] comdat !dbg [[DBG67:![0-9]+]] {
 // AARCH64-NEXT:  entry:
-// AARCH64-NEXT:    ret ptr null, !dbg [[DBG69:![0-9]+]]
+// AARCH64-NEXT:    ret ptr null, !dbg [[DBG68:![0-9]+]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@compute_onready.8
-// AARCH64-SAME: (ptr [[THIS:%.*]]) !dbg [[DBG70:![0-9]+]] {
+// AARCH64-SAME: (ptr [[THIS:%.*]]) !dbg [[DBG69:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
 // AARCH64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// AARCH64-NEXT:    [[X:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG71:![0-9]+]]
-// AARCH64-NEXT:    ret void, !dbg [[DBG71]]
+// AARCH64-NEXT:    [[X:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG70:![0-9]+]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG70]]
 //

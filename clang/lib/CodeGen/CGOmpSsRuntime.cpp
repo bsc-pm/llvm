@@ -3145,12 +3145,11 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
           llvm::ConstantInt::getSigned(
             CGF.ConvertType(CGF.getContext().IntTy),
             convertDeviceTypeToInt(Attr->getDevice())));
-
-      TaskInfo.emplace_back(
-        getBundleStr(OSSB_device_dev_func),
-        llvm::ConstantDataArray::getString(
-          CGM.getLLVMContext(), CGF.CGM.getMangledName(GlobalDecl(FD))));
     }
+    TaskInfo.emplace_back(
+      getBundleStr(OSSB_device_dev_func),
+      llvm::ConstantDataArray::getString(
+        CGM.getLLVMContext(), CGF.CGM.getMangledName(GlobalDecl(FD))));
     if (Attr->ndranges_size() > 0) {
       HasNdrange = true;
       SmallVector<llvm::Value *, 4> Result;
@@ -3374,7 +3373,8 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
     // Get location information.
     llvm::DebugLoc DbgLoc = DI->SourceLocToDebugLoc(Attr->getLocation());
 
-    StringRef Name = FD->getName();
+    StringRef Name = CGM.getModule().getSourceFileName();
+    Name = llvm::sys::path::filename(Name);
     TaskInfo.emplace_back(
       getBundleStr(OSSB_decl_source),
       llvm::ConstantDataArray::getString(
