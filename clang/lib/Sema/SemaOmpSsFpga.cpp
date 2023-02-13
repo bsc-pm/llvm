@@ -31,6 +31,7 @@
 #include "clang/AST/StmtOmpSs.h"
 #include "clang/AST/StmtOpenMP.h"
 #include "clang/AST/StmtVisitor.h"
+#include "clang/AST/Type.h"
 #include "clang/Basic/Builtins.h"
 #include "clang/Basic/DiagnosticIDs.h"
 #include "clang/Basic/DiagnosticOptions.h"
@@ -52,6 +53,7 @@
 #include "clang/Sema/ScopeInfo.h"
 #include "clang/Sema/SemaConsumer.h"
 #include "clang/Sema/SemaInternal.h"
+#include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/ImmutableMap.h"
 #include "llvm/ADT/MapVector.h"
@@ -59,6 +61,7 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_os_ostream.h"
 #include "llvm/Support/raw_ostream.h"
@@ -66,6 +69,7 @@
 #include <cstdint>
 #include <fstream>
 #include <memory>
+#include <string>
 #include <utility>
 
 #define STR_COMPONENTS_COUNT "__mcxx_taskComponents"
@@ -115,8 +119,8 @@ using WrapperPortMap =
                          std::array<bool, size_t(WrapperPort::NUM_PORTS)>, 16>;
 
 struct LocalmemInfo {
-  int param_idx = -1;
-  const OSSArrayShapingExpr *fixed_array_ref;
+  int ParamIdx = -1;
+  const OSSArrayShapingExpr *FixedArrayRef;
   enum Dir { IN = 0b01, OUT = 0b10, INOUT = 0b11 };
   Dir dir;
 };
@@ -339,6 +343,7 @@ template <typename Callable> class WrapperGenerator {
   ASTContext &SourceContext;
   SourceManager &SourceMgr;
   Preprocessor &PP;
+  PrintingPolicy printPol;
 
   uint64_t NumInstances;
   uint64_t HashNum;
@@ -539,52 +544,52 @@ template <typename Callable> class WrapperGenerator {
 
   void generateMemcpyWideportFunction(bool in) {
 
-    const std::string mem_ptr_type =
+    const std::string memPtrType =
         "ap_uint<" +
         std::to_string(SemaRef.getLangOpts().OmpSsFpgaMemoryPortWidth) + ">";
-    const std::string sizeof_mem_ptr_type = "sizeof(" + mem_ptr_type + ")";
-    const std::string n_elems_read = "(sizeof(" + mem_ptr_type + ")/sizeof(T))";
+    const std::string sizeofMemPtrType = "sizeof(" + memPtrType + ")";
+    const std::string nElemsRead = "(sizeof(" + memPtrType + ")/sizeof(T))";
 
     Output << "template<class T>\n";
     Output
         << "void nanos6_fpga_memcpy_wideport_" << (in ? "in" : "out") << "(T * "
         << (in ? "dst" : "src")
         << ", const unsigned long long int addr, const unsigned int num_elems, "
-        << mem_ptr_type << "* mcxx_memport) {\n";
-    Output << "#pragma HLS inline";
-    Output << "  for (int i = 0; i < (num_elems-1)/" << n_elems_read
+        << memPtrType << "* mcxx_memport) {\n";
+    Output << "#pragma HLS inline\n";
+    Output << "  for (int i = 0; i < (num_elems-1)/" << nElemsRead
            << "+1; ++i) {\n";
     Output << "  #pragma HLS pipeline II=1\n";
-    Output << "    " << mem_ptr_type << " tmpBuffer;\n";
+    Output << "    " << memPtrType << " tmpBuffer;\n";
     if (in)
-      Output << "    tmpBuffer = *(mcxx_memport + addr/" << sizeof_mem_ptr_type
+      Output << "    tmpBuffer = *(mcxx_memport + addr/" << sizeofMemPtrType
              << " + i);\n";
-    Output << "    for (int j = 0; j < " << n_elems_read << "; ++j) {\n";
+    Output << "    for (int j = 0; j < " << nElemsRead << "; ++j) {\n";
     if (SemaRef.getLangOpts().OmpSsFpgaCheckLimitsMemoryPort) {
-      Output << "      if (i*" << n_elems_read << "+j >= num_elems) break;\n";
+      Output << "      if (i*" << nElemsRead << "+j >= num_elems) break;\n";
     }
     Output << "      __mcxx_cast<T> cast_tmp;\n";
     if (in) {
       Output << "      cast_tmp.raw = tmpBuffer((j+1)*sizeof(T)*8-1, "
                 "j*sizeof(T)*8);\n";
-      Output << "      dst[i*" << n_elems_read << "+j] = cast_tmp.typed;\n";
+      Output << "      dst[i*" << nElemsRead << "+j] = cast_tmp.typed;\n";
     } else {
-      Output << "      cast_tmp.typed = src[i*" << n_elems_read << "+j];\n";
+      Output << "      cast_tmp.typed = src[i*" << nElemsRead << "+j];\n";
       Output << "      tmpBuffer((j+1)*sizeof(T)*8-1, j*sizeof(T)*8) = "
                 "cast_tmp.raw;\n";
     }
     Output << "    }\n";
     if (!in) {
       if (SemaRef.getLangOpts().OmpSsFpgaCheckLimitsMemoryPort) {
-        Output << "    const int rem = num_elems-(i*" << n_elems_read << ");\n";
+        Output << "    const int rem = num_elems-(i*" << nElemsRead << ");\n";
         Output << "    const unsigned int bit_l = 0;\n";
-        Output << "    const unsigned int bit_h = rem >= " << n_elems_read
-               << " ? (" << sizeof_mem_ptr_type
+        Output << "    const unsigned int bit_h = rem >= " << nElemsRead
+               << " ? (" << sizeofMemPtrType
                << "*8-1) : ((rem*sizeof(T))*8-1);\n";
-        Output << "    mcxx_memport[addr/sizeof(" << mem_ptr_type << ") + i]"
+        Output << "    mcxx_memport[addr/sizeof(" << memPtrType << ") + i]"
                << "(bit_h, bit_l) = tmpBuffer(bit_h, bit_l);\n";
       } else {
-        Output << "    *(mcxx_memport + addr/" << sizeof_mem_ptr_type
+        Output << "    *(mcxx_memport + addr/" << sizeofMemPtrType
                << " + i) = tmpBuffer;\n";
       }
     }
@@ -649,10 +654,10 @@ struct __fpga_copyinfo_t {
              "const ap_uint<8> numArgs, const unsigned long long int args[], "
              "const ap_uint<8> numDeps, const unsigned long long int deps[], "
              "const ap_uint<8> numCopies, const __fpga_copyinfo_t "
-             "copies[], " STR_OUTPORT_DECL ");";
+             "copies[], " STR_OUTPORT_DECL ");\n";
 
       Output << "void mcxx_taskwait(" STR_SPWNINPORT_DECL ", " STR_OUTPORT_DECL
-                ");";
+                ");\n";
       Output << R"(
 template <typename T>
 struct __mcxx_ptr_t {
@@ -764,14 +769,47 @@ OMPIF_COMM_WORLD
     return true;
   }
 
-  static const Type *GetElementTypePointerTo(const Type *type) {
-    const Type *pointsTo = type;
+  QualType GetElementTypePointerTo(QualType type) {
+    QualType pointsTo = type;
 
-    while (pointsTo->isPointerType() || pointsTo->isArrayType()) {
-      pointsTo = pointsTo->getPointeeOrArrayElementType();
+    for (auto isPointer = pointsTo->isPointerType(),
+              isArray = pointsTo->isArrayType();
+         isPointer || isArray; isPointer = pointsTo->isPointerType(),
+              isArray = pointsTo->isArrayType()) {
+      if (isPointer) {
+        pointsTo = pointsTo->getPointeeType();
+      } else if (isArray) {
+        pointsTo = pointsTo->getAsArrayTypeUnsafe()->getElementType();
+      }
     }
 
     return pointsTo;
+  }
+
+  uint64_t ComputeArrayRefSize(const OSSArrayShapingExpr *arrayType,
+                               uint64_t baseType = 1) {
+    uint64_t totalSize = baseType;
+    for (auto *shape : arrayType->getShapes()) {
+      auto computedSize = shape->getIntegerConstantExpr(SourceContext);
+      if (!computedSize) {
+        llvm_unreachable(
+            "We have already checked that the shape expressions evaluate to "
+            "positive integers, we should be able to use them here safely");
+      }
+      totalSize *= computedSize->getZExtValue();
+    }
+    return totalSize;
+  }
+
+  void GenerateWrapperFunctionLocalmems() {
+    for (auto &&p : Localmems) {
+      auto *arrayType = p.second.FixedArrayRef;
+      uint64_t totalSize = ComputeArrayRefSize(arrayType);
+
+      Output << "  static ";
+      GetElementTypePointerTo(p.first->getType()).print(Output, printPol);
+      Output << " " << p.first->getName() << "[" << totalSize << "];\n";
+    }
   }
 
   void GenerateWrapperFunctionParams() {
@@ -803,11 +841,10 @@ OMPIF_COMM_WORLD
 
         QualType paramType = param->getType();
         if (paramType->isPointerType() || paramType->isArrayType()) {
-          auto *type = GetElementTypePointerTo(paramType.getTypePtr());
-          PrintingPolicy pp(SemaRef.getLangOpts());
           Output << ", ";
-          QualType(type, 0).print(Output, pp);
-          Output << "*mcxx_" << param->getName();
+          SourceContext.getPointerType(GetElementTypePointerTo(paramType))
+              .print(Output, printPol);
+          Output << " mcxx_" << param->getName();
         }
       }
     }
@@ -848,6 +885,252 @@ OMPIF_COMM_WORLD
     }
   }
 
+  void GenerateWrapperFunctionParamReads() {
+
+    auto getType = [&](ParmVarDecl *param) -> std::pair<QualType, bool> {
+      auto paramType = param->getType();
+      bool usesMemoryPort = false;
+      if (paramType->isPointerType() || paramType->isArrayType()) {
+        usesMemoryPort = true;
+      }
+      if (paramType->isArrayType()) {
+        paramType =
+            SourceContext.getPointerType(GetElementTypePointerTo(paramType));
+      }
+      if (!usesMemoryPort && paramType.isConstQualified()) {
+        paramType.removeLocalConst();
+      }
+      return std::pair{paramType, usesMemoryPort};
+    };
+    auto paramId = 0;
+    for (auto *param : FD->parameters()) {
+      auto [paramType, _] = getType(param);
+      StringRef symbolName = param->getName();
+      if (CreatesTasks && paramType->isPointerType()) {
+        Output << "  __mcxx_ptr_t<";
+        paramType->getPointeeType().print(Output, printPol);
+        Output << "> " << symbolName << ";\n";
+      } else {
+        auto it = Localmems.find(param);
+        if (it == Localmems.end()) {
+          if (paramType->isArrayType()) {
+            paramType = SourceContext.getPointerType(
+                GetElementTypePointerTo(paramType));
+          }
+          Output << "  ";
+          paramType.print(Output, printPol);
+          Output << " " << symbolName << ";\n";
+        } else {
+          Output << "  ap_uint<8> mcxx_flags_" << paramId << ";\n";
+          Output << "  ap_uint<64> mcxx_offset_" << paramId << ";\n";
+        }
+      }
+      ++paramId;
+    }
+    Output << "  {\n";
+    Output << "  #pragma HLS protocol fixed\n";
+    paramId = 0;
+    for (auto *param : FD->parameters()) {
+      auto [paramType, usesMemoryPort] = getType(param);
+
+      auto symbolName = param->getName();
+      auto it = Localmems.find(param);
+      Output << "    {\n";
+      if (!usesMemoryPort || (CreatesTasks && paramType->isPointerType()) ||
+          it == Localmems.end()) {
+        Output << "      ap_uint<8> mcxx_flags_" << paramId << ";\n";
+        Output << "      ap_uint<64> mcxx_offset_" << paramId << ";\n";
+      }
+      Output << "      mcxx_flags_" << paramId << " = "
+             << STR_INPORT_READ "(7,0);\n";
+      Output << "      ap_wait();\n";
+      if (usesMemoryPort) {
+        Output << "      mcxx_offset_" << paramId
+               << " = " STR_INPORT_READ ";\n";
+        if (CreatesTasks && paramType->isPointerType()) {
+          Output << "      " << symbolName << ".val = mcxx_offset_" << paramId
+                 << ";\n";
+        } else if (it == Localmems.end()) {
+          QualType pointedType = paramType->getPointeeType();
+          Output << "      " << symbolName << " = mcxx_" << symbolName
+                 << " + mcxx_offset_" << paramId << "/sizeof(";
+          pointedType.print(Output, printPol);
+          Output << ");\n";
+        } else {
+          it->second.ParamIdx = paramId;
+        }
+      } else {
+        Output << "      __mcxx_cast<";
+        paramType.print(Output, printPol);
+        Output << "> mcxx_arg_" << paramId << ";\n";
+
+        Output << "      mcxx_arg_" << paramId
+               << ".raw = " STR_INPORT_READ ";\n";
+        Output << "      " << symbolName << " = mcxx_arg_" << paramId
+               << ".typed;\n";
+      }
+      Output << "    }\n";
+      Output << "    ap_wait();\n";
+      ++paramId;
+    }
+    Output << "  }\n";
+  }
+
+  void GenerateWrapperFunctionLocalmemCopies(LocalmemInfo::Dir dir) {
+    for (auto &&[param, localmemInfo] : Localmems) {
+      if ((localmemInfo.dir & dir) == 0) {
+        continue;
+      }
+
+      const auto &fixedArrayRef = localmemInfo.FixedArrayRef;
+      int paramId = localmemInfo.ParamIdx;
+      QualType baseType = GetElementTypePointerTo(param->getType());
+      uint64_t baseTypeSize = SourceContext.getTypeSize(baseType);
+
+      const auto paramName = param->getName();
+      const auto baseTypeSizeStr = std::to_string(baseTypeSize);
+      const std::string memPtrType =
+          "ap_uint<" +
+          (SemaRef.getLangOpts().OmpSsFpgaMemoryPortWidth > 0
+               ? std::to_string(SemaRef.getLangOpts().OmpSsFpgaMemoryPortWidth)
+               : std::to_string(baseTypeSize * 8)) +
+          ">";
+      const std::string sizeofMemPtrType = "sizeof(" + memPtrType + ")";
+
+      const std::string dataReferenceSize =
+          "(" +
+          std::to_string(ComputeArrayRefSize(fixedArrayRef, baseTypeSize)) +
+          ")";
+      const std::string nElementsSrc =
+          "(" + dataReferenceSize + "/" + baseTypeSizeStr + ")";
+      const std::string nElemsRead =
+          "(sizeof(" + memPtrType + ")/" + baseTypeSizeStr + ")";
+
+      Output << "  if (mcxx_flags_" << paramId << "["
+             << (dir == LocalmemInfo::IN ? STR_ARG_FLAG_IN_BIT
+                                         : STR_ARG_FLAG_OUT_BIT)
+             << "]) {\n";
+      if (SemaRef.getLangOpts().OmpSsFpgaMemoryPortWidth == 0) {
+        QualType pointedType = GetElementTypePointerTo(param->getType());
+        if (dir == LocalmemInfo::IN) {
+          Output << "    memcpy(" << paramName << ", mcxx_" << paramName
+                 << " + mcxx_offset_" << paramId << "/sizeof(";
+          pointedType.print(Output, printPol);
+          Output << "), " << dataReferenceSize << ");\n";
+        } else {
+          Output << "    memcpy(mcxx_" << paramName << " + mcxx_offset_"
+                 << paramId << "/sizeof(";
+          pointedType.print(Output, printPol);
+          Output << "), " << paramName << ", " << dataReferenceSize << ");\n";
+        }
+      } else {
+        Output << "    for (int __i = 0; "
+               << "__i < (" << dataReferenceSize << " - 1)/" << sizeofMemPtrType
+               << "+1; "
+               << "++__i) {\n";
+        Output << "    #pragma HLS pipeline II=1\n";
+        Output << "      " << memPtrType << " __tmpBuffer;\n";
+        if (dir == LocalmemInfo::IN) {
+          Output << "      __tmpBuffer = *(mcxx_memport + mcxx_offset_"
+                 << paramId << '/' << sizeofMemPtrType << " + __i);\n";
+        }
+        Output << "      for (int __j=0; "
+               << "__j <" << nElemsRead << "; "
+               << "__j++) {\n";
+        if (SemaRef.getLangOpts().OmpSsFpgaCheckLimitsMemoryPort) {
+          Output << "        if (__i*" << nElemsRead
+                 << "+__j >= " << nElementsSrc << ") continue;\n";
+        }
+        Output << "        __mcxx_cast<";
+        baseType.print(Output, printPol);
+        Output << "> cast_tmp;\n";
+        if (dir == LocalmemInfo::IN) {
+          Output << "        cast_tmp.raw = __tmpBuffer("
+                 << "(__j+1)*" << baseTypeSizeStr << "*8-1,"
+                 << "__j*" << baseTypeSizeStr << "*8);\n";
+          Output << "        " << paramName << "[__i*" << nElemsRead
+                 << "+__j] = cast_tmp.typed;\n";
+        } else {
+          Output << "        "
+                 << "cast_tmp.typed = " << paramName << "[__i*" << nElemsRead
+                 << "+__j];\n";
+          Output << "        "
+                 << "__tmpBuffer((__j+1)*" << baseTypeSizeStr << "*8-1,"
+                 << "__j*" << baseTypeSizeStr << "*8) = cast_tmp.raw;\n";
+        }
+        Output << "      }\n";
+        if (dir == LocalmemInfo::OUT) {
+          if (SemaRef.getLangOpts().OmpSsFpgaCheckLimitsMemoryPort) {
+            Output << "      "
+                   << "const int rem = " << nElementsSrc << "-(__i*"
+                   << nElemsRead << ");\n";
+            Output << "      "
+                   << "const unsigned int bit_l = 0;\n";
+            Output << "      "
+                   << "const unsigned int bit_h = rem >= " << nElemsRead
+                   << " ? (" << sizeofMemPtrType << "*8-1) : ((rem*"
+                   << baseTypeSizeStr << ")*8-1);\n";
+            Output << "      "
+                   << "mcxx_memport[mcxx_offset_" << paramId << '/'
+                   << sizeofMemPtrType << "+ __i]"
+                   << "(bit_h, bit_l) = __tmpBuffer(bit_h, bit_l);\n";
+          } else {
+            Output << "      "
+                   << "*(mcxx_memport + mcxx_offset_" << paramId << '/'
+                   << sizeofMemPtrType << "+ __i) = __tmpBuffer;\n";
+          }
+        }
+        Output << "    }\n";
+      }
+      Output << "  }\n";
+    }
+  }
+
+  void GenerateWrapperFunctionUserTaskCall() {
+    auto &outs = Output << "  " << TaskFuncName << "(";
+    bool first = true;
+    auto printSeparator = [&]() {
+      if (first) {
+        first = false;
+      } else {
+        outs << ", ";
+      }
+    };
+
+    for (auto *param : FD->parameters()) {
+      printSeparator();
+      outs << param->getName();
+    }
+    auto *it = WrapperPortMap.find(FD);
+    if (it != WrapperPortMap.end()) {
+      if (it->second[(int)WrapperPort::OMPIF_RANK]) {
+        printSeparator();
+        outs << "ompif_rank";
+      }
+      if (it->second[(int)WrapperPort::OMPIF_SIZE]) {
+        printSeparator();
+        outs << "ompif_size";
+      }
+      if (it->second[(int)WrapperPort::SPAWN_INPORT]) {
+        printSeparator();
+        outs << STR_SPWNINPORT;
+      }
+      if (it->second[(int)WrapperPort::INPORT]) {
+        printSeparator();
+        outs << STR_INPORT;
+      }
+      if (it->second[(int)WrapperPort::OUTPORT]) {
+        printSeparator();
+        outs << STR_OUTPORT;
+      }
+      if (it->second[(int)WrapperPort::MEMORY_PORT]) {
+        printSeparator();
+        outs << "mcxx_memport";
+      }
+    }
+    outs << ");\n";
+  }
+
   void GenerateWrapperFunction() {
     if (SemaRef.getLangOpts().OmpSsFpgaMemoryPortWidth == 0 &&
         !Localmems.empty()) {
@@ -867,33 +1150,173 @@ OMPIF_COMM_WORLD
     Output << "}\n";
 
     GenerateWrapperFunctionParams();
-    /*
-    push_indent();
-    generate_wrapper_function_localmems();
-    os() << STR_INPORT_READ_NODATA "; //command word";
-    os() << STR_TASKID " = " STR_INPORT_READ ";";
-    os() << "ap_uint<64> " << STR_PARENT_TASKID " = " STR_INPORT_READ ";";
-    generate_wrapper_function_param_reads();
-    generate_wrapper_function_localmem_copies(LocalmemInfo::IN);
-    generate_wrapper_function_user_task_call();
-    generate_wrapper_function_localmem_copies(LocalmemInfo::OUT);
-    os() << "{"; // send finish task
-    push_indent();
-    os() << "#pragma HLS protocol fixed";
-    os() << "ap_uint<64> header = 0x03;";
-    os() << "ap_wait();";
-    os() << STR_OUTPORT_WRITE_FUN("header, " STR_FINISH_TASK_CODE ", 0");
-    os() << "ap_wait();";
-    os() << STR_OUTPORT_WRITE_FUN(STR_TASKID ", " STR_FINISH_TASK_CODE ", 0");
-    os() << "ap_wait();";
-    os() << STR_OUTPORT_WRITE_FUN(STR_PARENT_TASKID ", " STR_FINISH_TASK_CODE
-                                                    ", 1");
-    os() << "ap_wait();";
-    pop_indent();
-    os() << "}";
-    pop_indent();
-    os() << "}";
-    */
+    GenerateWrapperFunctionLocalmems();
+
+    Output << "  " STR_INPORT_READ_NODATA "; //command word\n";
+    Output << "  " STR_TASKID " = " STR_INPORT_READ ";\n";
+    Output << "  ap_uint<64> " STR_PARENT_TASKID " = " STR_INPORT_READ ";\n";
+
+    GenerateWrapperFunctionParamReads();
+    GenerateWrapperFunctionLocalmemCopies(LocalmemInfo::IN);
+    GenerateWrapperFunctionUserTaskCall();
+    GenerateWrapperFunctionLocalmemCopies(LocalmemInfo::OUT);
+    Output << "  {\n"; // send finish task
+    Output << "  #pragma HLS protocol fixed\n";
+    Output << "    ap_uint<64> header = 0x03;\n";
+    Output << "    ap_wait();\n";
+    Output << "    " STR_OUTPORT_WRITE_FUN("header, " STR_FINISH_TASK_CODE
+                                           ", 0")
+           << "\n";
+    Output << "    "
+              "ap_wait();\n";
+    Output << "    " STR_OUTPORT_WRITE_FUN(STR_TASKID ", " STR_FINISH_TASK_CODE
+                                                      ", 0")
+           << "\n";
+
+    Output << "    "
+              "ap_wait();\n";
+    Output << "    " STR_OUTPORT_WRITE_FUN(STR_PARENT_TASKID
+                                           ", " STR_FINISH_TASK_CODE ", 1")
+           << "\n";
+    Output << "    "
+              "ap_wait();\n";
+    Output << "  }\n";
+    Output << "}\n";
+  }
+
+  void GenerateWrapperBottom() {
+    if (CreatesTasks) {
+      Output
+          << "void mcxx_task_create(const ap_uint<64> type, const ap_uint<8> "
+             "instanceNum, "
+             "const ap_uint<8> numArgs, const unsigned long long int args[], "
+             "const ap_uint<8> numDeps, const unsigned long long int deps[], "
+             "const ap_uint<8> numCopies, const __fpga_copyinfo_t "
+             "copies[], " STR_OUTPORT_DECL ") {\n";
+      Output << "#pragma HLS inline\n";
+      Output << "  const ap_uint<2> destId = " STR_NEW_TASK_CODE ";\n";
+      Output << "  ap_uint<64> tmp;\n";
+      Output << "  tmp(15,8)  = numArgs;\n";
+      Output << "  tmp(23,16) = numDeps;\n";
+      Output << "  tmp(31,24) = numCopies;\n";
+      Output << "  " STR_OUTPORT_WRITE_FUN("tmp, destId, 0") "\n";
+      Output << "  " STR_OUTPORT_WRITE_FUN(STR_TASKID ", destId, 0") "\n";
+      Output << "  tmp(47,40) = instanceNum;\n";
+      Output << "  tmp(33,0)  = type(33,0);\n";
+      Output << "  " STR_OUTPORT_WRITE_FUN("tmp, destId, 0") "\n";
+      Output << "  for (ap_uint<4> i = 0; i < numDeps(3,0); ++i) {\n";
+      Output << "    " STR_OUTPORT_WRITE_FUN(
+          "deps[i], destId, numArgs == 0 && numCopies == 0 && i == "
+          "numDeps-1") "\n";
+      Output << "  }\n";
+      Output << "  for (ap_uint<4> i = 0; i < numCopies(3,0); ++i) {\n";
+      Output << "    " STR_OUTPORT_WRITE_FUN(
+          "copies[i].copy_address, destId, 0") "\n";
+      Output << "    tmp(7,0) = copies[i].flags;\n";
+      Output << "    tmp(15,8) = copies[i].arg_idx;\n";
+      Output << "    tmp(63,32) = copies[i].size;\n";
+      Output << "    " STR_OUTPORT_WRITE_FUN(
+          "tmp, destId, numArgs == 0 && i == numCopies-1") "\n";
+      Output << "  }\n";
+      Output << "  for (ap_uint<4> i = 0; i < numArgs(3,0); ++i) {\n";
+      Output << "    " STR_OUTPORT_WRITE_FUN(
+          "args[i], destId, i == numArgs-1") "\n";
+      Output << "  }\n";
+      Output << "}\n";
+      Output << "\n"; // blank line
+      Output << "void mcxx_taskwait(" STR_SPWNINPORT_DECL ", " STR_OUTPORT_DECL
+                ") {\n";
+      Output << "#pragma HLS inline\n";
+      Output << "  ap_wait();\n";
+      Output << "  " STR_OUTPORT_WRITE_FUN(STR_TASKID ", " STR_TASKWAIT_CODE
+                                                      ", 1") "\n";
+      Output << "  ap_wait();\n";
+      Output << "  " STR_SPWNINPORT_READ ";\n";
+      Output << "  ap_wait();\n";
+      Output << "}\n";
+    }
+    if (UsesLock) {
+      Output << "void mcxx_set_lock(" STR_INOUTPORT_DECL ") {\n";
+      Output << "#pragma HLS inline\n";
+      Output << "  ap_uint<64> tmp = 0x4;\n";
+      Output << "  ap_uint<8> ack;\n";
+      Output << "  do {\n";
+      Output << "    ap_wait();\n";
+      Output << "    " STR_OUTPORT_WRITE_FUN("tmp, 1, 1") "\n";
+      Output << "    ap_wait();\n";
+      Output << "    ack = " STR_INPORT_READ ";\n";
+      Output << "    ap_wait();\n";
+      Output << "  } while (ack == 0);\n";
+      Output << "}\n";
+      Output << "\n"; // blank line
+      Output << "void mcxx_unset_lock(" STR_OUTPORT_DECL ") {\n";
+      Output << "#pragma HLS inline\n";
+      Output << "  ap_uint<64> tmp = 0x6;\n";
+      Output << "  " STR_OUTPORT_WRITE_FUN("tmp, 1, 1") "\n";
+      Output << "}\n";
+    }
+    if (UsesOmpif) {
+      Output << "const int ompif_type_sizes[3] = {sizeof(int), sizeof(double), "
+                "sizeof(float)};\n";
+      Output << "void OMPIF_Send(const void *data, int count, OMPIF_Datatype "
+                "datatype, int destination, unsigned char tag, OMPIF_Comm "
+                "communicator, const ap_uint<8> numDeps, const unsigned long "
+                "long int deps[], " STR_OUTPORT_DECL ") {\n";
+      Output << "#pragma HLS inline\n";
+      Output << "  ap_uint<64> command;\n";
+      Output << "  command(7,0) = 0;\n";
+      Output << "  command(15,8) = tag;\n";
+      Output << "  command(23,16) = destination+1;\n";
+      Output << "  command(63, 32) = (unsigned long long int)data;\n";
+      Output
+          << "  unsigned long long int args[2] = {command, (unsigned long long "
+             "int)count*ompif_type_sizes[(int)datatype]};\n";
+      Output << "  " STR_TASK_CREATE_FUN(
+          "4294967299LU, 0xFF, 2, args, numDeps, deps, 0, 0") "\n";
+      Output << "}\n";
+      Output
+          << "void OMPIF_Recv(void *data, int count, OMPIF_Datatype datatype, "
+             "int source, unsigned char tag, OMPIF_Comm communicator, const "
+             "ap_uint<8> numDeps, const unsigned long long int "
+             "deps[], " STR_OUTPORT_DECL ") {\n";
+      Output << "#pragma HLS inline\n";
+      Output << "  ap_uint<64> command;\n";
+      Output << "  command(7,0) = 0;\n";
+      Output << "  command(15,8) = tag;\n";
+      Output << "  command(23,16) = source+1;\n";
+      Output << "  command(63, 32) = (unsigned long long int)data;\n";
+      Output
+          << "unsigned long long int args[2] = {command, (unsigned long long "
+             "int)count*ompif_type_sizes[(int)datatype]};\n";
+      Output << "  " STR_TASK_CREATE_FUN(
+          "4294967300LU, 0xFF, 2, args, numDeps, deps, 0, 0") "\n";
+      Output << "}\n";
+      Output
+          << "void OMPIF_Allgather(void *data, int count, OMPIF_Datatype "
+             "datatype, unsigned char tag, OMPIF_Comm communicator, unsigned "
+             "char ompif_rank, " STR_SPWNINOUTPORT_DECL ") {\n";
+      Output << "#pragma HLS inline\n";
+      Output << "  ap_uint<64> command_sender, command_receiver;\n";
+      Output << "  const unsigned long long int size = (unsigned long long "
+                "int)count*ompif_type_sizes[(int)datatype];\n";
+      Output << "  command_sender(7,0) = 1; //SENDALL\n";
+      Output << "  command_receiver(7, 0) = 1; //RECVALL\n";
+      Output << "  command_sender(15, 8) = tag; //TAG\n";
+      Output << "  command_receiver(15, 8) = tag;\n";
+      Output << "  command_sender(63, 32) = (unsigned long long int)data + "
+                "(ompif_rank-1)*size;\n";
+      Output << "  command_receiver(63, 32) = (unsigned long long int)data;\n";
+      Output << "  const unsigned long long int mcxx_args_sender[2] = "
+                "{command_sender, size};\n";
+      Output << "  const unsigned long long int mcxx_args_receiver[2] = "
+                "{command_receiver, size};\n";
+      Output << "  " STR_TASK_CREATE_FUN(
+          "4294967300LU, 255, 2, mcxx_args_receiver, 0, NULL, 0, NULL") "\n";
+      Output << "  " STR_TASK_CREATE_FUN(
+          "4294967299LU, 255, 2, mcxx_args_sender, 0, NULL, 0, NULL") "\n";
+      Output << "  " STR_TASKWAIT_FUN "\n";
+      Output << "}\n";
+    }
   }
 
 public:
@@ -904,7 +1327,8 @@ public:
       : SemaRef(SemaRef), Diag(std::forward<Callable>(Diag)), Output(OutputStr),
         OutputFinalFile(OutputFile), FD(FD), OrigFuncName(FuncName),
         TaskFuncName(std::string(FuncName) + "_moved"),
-        SourceContext(SourceContext), SourceMgr(SourceMgr), PP(PP) {}
+        SourceContext(SourceContext), SourceMgr(SourceMgr), PP(PP),
+        printPol(SemaRef.getLangOpts()) {}
 
   bool GenerateWrapperFile() {
     auto numInstances = getNumInstances();
@@ -938,7 +1362,7 @@ public:
       return false;
     }
     GenerateWrapperFunction();
-
+    GenerateWrapperBottom();
     OutputFinalFile << OutputStr;
     return true;
   }
