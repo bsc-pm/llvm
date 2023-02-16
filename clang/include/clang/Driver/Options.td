@@ -2659,7 +2659,8 @@ def fompss_fpga_wrapper_code : Flag<["-"], "fompss-fpga-wrapper-code">, Group<f_
   MarshallingInfoFlag<LangOpts<"OmpSsFpgaWrapperCode">>;
 def fompss_fpga_memory_port_width : Separate<["-"], "fompss-fpga-memory-port-width">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"Defines the width (in bits) of memory ports (only for wrapper localmem data) for fpga accelerators">,
-  MarshallingInfoFlag<LangOpts<"OmpSsFpgaMemoryPortWidth">>;
+  MetaVarName<"<bits>">,
+  MarshallingInfoInt<LangOpts<"OmpSsFpgaMemoryPortWidth">>;
 def fompss_fpga_check_limits_memory_port : Flag<["-"], "fompss-fpga-check-limits-memory-port">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"Enables the logic to ensure not overflowing local variables handled by the memory port">,
   MarshallingInfoFlag<LangOpts<"OmpSsFpgaCheckLimitsMemoryPort">>;

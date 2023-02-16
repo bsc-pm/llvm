@@ -880,6 +880,7 @@ OMPIF_COMM_WORLD
     auto paramType = arrayType->getBase()->getType();
     for (size_t i = 0; i < arrayType->getShapes().size(); ++i)
       paramType = DerefOnceTypePointerTo(paramType);
+    paramType.removeLocalCVRQualifiers(Qualifiers::CVRMask);
     for (auto *shape : arrayType->getShapes()) {
       auto computedSize = shape->getIntegerConstantExpr(SourceContext);
       if (!computedSize) {
