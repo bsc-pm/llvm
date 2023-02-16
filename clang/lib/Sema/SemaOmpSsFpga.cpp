@@ -42,6 +42,7 @@
 #include "clang/Basic/OmpSsKinds.h"
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Basic/SourceManager.h"
+#include "clang/Basic/Specifiers.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/MultiplexConsumer.h"
 #include "clang/Lex/Preprocessor.h"
@@ -425,7 +426,7 @@ template <typename Callable> class WrapperGenerator {
 
     // If copy_deps
     if (taskAttr->getCopyDeps()) {
-      for (auto *param : parametersToLocalmem) {
+      for (auto *param : FD->parameters()) {
         if (currentAssignationsOfArrays.find(param) !=
             currentAssignationsOfArrays.end()) {
           parametersToLocalmem.insert(param);
@@ -479,6 +480,24 @@ template <typename Callable> class WrapperGenerator {
                diag::err_expected_constant_unsigned_integer);
           foundError = true;
         }
+      }
+      auto paramType = param->getType();
+      auto numShapes = currentAssignationsOfArrays.find(param)
+                           ->second.first->getShapes()
+                           .size();
+      for (size_t i = 0; i < numShapes; ++i) {
+        paramType = DerefOnceTypePointerTo(paramType);
+      }
+      while (paramType->isArrayType()) {
+        if (!paramType->isConstantArrayType()) {
+          Diag(param->getLocation(),
+               diag::err_expected_constant_unsigned_integer);
+        }
+        paramType = DerefOnceTypePointerTo(paramType);
+      }
+      if (paramType->isPointerType()) {
+        Diag(param->getLocation(),
+             diag::err_expected_constant_unsigned_integer);
       }
     }
     if (foundError) {
@@ -815,6 +834,30 @@ OMPIF_COMM_WORLD
     return true;
   }
 
+  std::string GetDeclVariableString(StorageClass storageClass, QualType type,
+                                    StringRef name) {
+    auto &id = PP.getIdentifierTable().get(name);
+    auto *varDecl = VarDecl::Create(
+        SourceContext, SemaRef.getCurLexicalContext(), SourceLocation(),
+        SourceLocation(), &id, type, nullptr, storageClass);
+
+    std::string res;
+    llvm::raw_string_ostream stream(res);
+    varDecl->print(stream);
+    return res;
+  }
+
+  QualType DerefOnceTypePointerTo(QualType type) {
+
+    if (type->isPointerType()) {
+      return type->getPointeeType().IgnoreParens();
+    }
+    if (type->isArrayType()) {
+      return type->getAsArrayTypeUnsafe()->getElementType().IgnoreParens();
+    }
+    return type;
+  }
+
   QualType GetElementTypePointerTo(QualType type) {
     QualType pointsTo = type;
 
@@ -823,18 +866,20 @@ OMPIF_COMM_WORLD
          isPointer || isArray; isPointer = pointsTo->isPointerType(),
               isArray = pointsTo->isArrayType()) {
       if (isPointer) {
-        pointsTo = pointsTo->getPointeeType();
+        pointsTo = pointsTo->getPointeeType().IgnoreParens();
       } else if (isArray) {
-        pointsTo = pointsTo->getAsArrayTypeUnsafe()->getElementType();
+        pointsTo =
+            pointsTo->getAsArrayTypeUnsafe()->getElementType().IgnoreParens();
       }
     }
 
     return pointsTo;
   }
 
-  uint64_t ComputeArrayRefSize(const OSSArrayShapingExpr *arrayType,
-                               uint64_t baseType = 1) {
-    uint64_t totalSize = baseType;
+  QualType LocalmemArrayType(const OSSArrayShapingExpr *arrayType) {
+    auto paramType = arrayType->getBase()->getType();
+    for (size_t i = 0; i < arrayType->getShapes().size(); ++i)
+      paramType = DerefOnceTypePointerTo(paramType);
     for (auto *shape : arrayType->getShapes()) {
       auto computedSize = shape->getIntegerConstantExpr(SourceContext);
       if (!computedSize) {
@@ -842,19 +887,36 @@ OMPIF_COMM_WORLD
             "We have already checked that the shape expressions evaluate to "
             "positive integers, we should be able to use them here safely");
       }
-      totalSize *= computedSize->getZExtValue();
+      paramType = SourceContext.getConstantArrayType(
+          paramType, *computedSize, shape, ArrayType::ArraySizeModifier{}, 0);
     }
+    return paramType;
+  }
+
+  uint64_t ComputeArrayRefSize(const OSSArrayShapingExpr *arrayType,
+                               uint64_t baseType = 1) {
+    uint64_t totalSize = baseType;
+    auto paramType = LocalmemArrayType(arrayType);
+    while (paramType->isArrayType()) {
+      if (!paramType->isConstantArrayType()) {
+        llvm_unreachable("We have already checked that the parameter type is a "
+                         "constant array");
+      }
+      auto *arrType = dyn_cast<ConstantArrayType>(paramType);
+      paramType = DerefOnceTypePointerTo(paramType);
+      totalSize *= arrType->getSize().getZExtValue();
+    }
+
     return totalSize;
   }
 
   void GenerateWrapperFunctionLocalmems() {
     for (auto &&p : Localmems) {
-      auto *arrayType = p.second.FixedArrayRef;
-      uint64_t totalSize = ComputeArrayRefSize(arrayType);
-
-      Output << "  static ";
-      GetElementTypePointerTo(p.first->getType()).print(Output, printPol);
-      Output << " " << p.first->getName() << "[" << totalSize << "];\n";
+      Output << "  "
+             << GetDeclVariableString(StorageClass::SC_Static,
+                                      LocalmemArrayType(p.second.FixedArrayRef),
+                                      p.first->getName())
+             << ";\n";
     }
   }
 
@@ -887,10 +949,12 @@ OMPIF_COMM_WORLD
 
         QualType paramType = param->getType();
         if (paramType->isPointerType() || paramType->isArrayType()) {
-          Output << ", ";
-          SourceContext.getPointerType(GetElementTypePointerTo(paramType))
-              .print(Output, printPol);
-          Output << " mcxx_" << param->getName();
+          Output << ", "
+                 << GetDeclVariableString(
+                        StorageClass::SC_None,
+                        SourceContext.getPointerType(
+                            GetElementTypePointerTo(paramType)),
+                        " mcxx_" + param->getNameAsString());
         }
       }
     }
@@ -963,9 +1027,10 @@ OMPIF_COMM_WORLD
             paramType = SourceContext.getPointerType(
                 GetElementTypePointerTo(paramType));
           }
-          Output << "  ";
-          paramType.print(Output, printPol);
-          Output << " " << symbolName << ";\n";
+          Output << "  "
+                 << GetDeclVariableString(StorageClass::SC_None, paramType,
+                                          symbolName)
+                 << ";\n";
         } else {
           Output << "  ap_uint<8> mcxx_flags_" << paramId << ";\n";
           Output << "  ap_uint<64> mcxx_offset_" << paramId << ";\n";
@@ -1031,7 +1096,8 @@ OMPIF_COMM_WORLD
       const auto &fixedArrayRef = localmemInfo.FixedArrayRef;
       int paramId = localmemInfo.ParamIdx;
       QualType baseType = GetElementTypePointerTo(param->getType());
-      uint64_t baseTypeSize = SourceContext.getTypeSize(baseType);
+      uint64_t baseTypeSize =
+          SourceContext.getTypeSize(baseType) / SourceContext.getCharWidth();
 
       const auto paramName = param->getName();
       const auto baseTypeSizeStr = std::to_string(baseTypeSize);
