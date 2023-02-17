@@ -1104,7 +1104,7 @@ private:
     valarray& __assign_range(const value_type* __f, const value_type* __l);
 };
 
-#if _LIBCPP_STD_VER > 14
+#if _LIBCPP_STD_VER >= 17
 template<class _Tp, size_t _Size>
 valarray(const _Tp(&)[_Size], size_t) -> valarray<_Tp>;
 #endif
@@ -4935,6 +4935,7 @@ _LIBCPP_POP_MACROS
 #  include <concepts>
 #  include <cstring>
 #  include <functional>
+#  include <type_traits>
 #endif
 
 #endif // _LIBCPP_VALARRAY

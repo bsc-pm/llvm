@@ -189,11 +189,10 @@ class MemoryOpBase {
   }];
   code setNonTemporalMetadataCode = [{
     if ($nontemporal) {
-      llvm::Module *module = builder.GetInsertBlock()->getModule();
       llvm::MDNode *metadata = llvm::MDNode::get(
           inst->getContext(), llvm::ConstantAsMetadata::get(
               builder.getInt32(1)));
-      inst->setMetadata(module->getMDKindID("nontemporal"), metadata);
+      inst->setMetadata(llvm::LLVMContext::MD_nontemporal, metadata);
     }
   }];
   code setAccessGroupsMetadataCode = [{
@@ -350,10 +349,15 @@ def LLVM_LoadOp : LLVM_Op<"load">, MemoryOpBase {
                    OptionalAttr<SymbolRefArrayAttr>:$access_groups,
                    OptionalAttr<SymbolRefArrayAttr>:$alias_scopes,
                    OptionalAttr<SymbolRefArrayAttr>:$noalias_scopes,
+                   OptionalAttr<SymbolRefArrayAttr>:$tbaa,
                    OptionalAttr<I64Attr>:$alignment, UnitAttr:$volatile_,
                    UnitAttr:$nontemporal);
   let results = (outs LLVM_LoadableType:$res);
   string llvmInstName = "Load";
+  let assemblyFormat = [{
+    (`volatile` $volatile_^)? $addr attr-dict `:`
+    custom<LoadType>(type($addr), type($res))
+  }];
   string llvmBuilder = [{
     auto *inst = builder.CreateLoad($_resultType, $addr, $volatile_);
   }] # setAlignmentCode
@@ -364,9 +368,12 @@ def LLVM_LoadOp : LLVM_Op<"load">, MemoryOpBase {
      # [{
     $res = inst;
   }];
-  // FIXME: Import attributes.
   string mlirBuilder = [{
-    $res = $_builder.create<LLVM::LoadOp>($_location, $_resultType, $addr);
+    auto *loadInst = cast<llvm::LoadInst>(inst);
+    unsigned alignment = loadInst->getAlign().value();
+    $res = $_builder.create<LLVM::LoadOp>($_location, $_resultType, $addr,
+        alignment, loadInst->isVolatile(),
+        loadInst->hasMetadata(llvm::LLVMContext::MD_nontemporal));
   }];
   let builders = [
     OpBuilder<(ins "Value":$addr, CArg<"unsigned", "0">:$alignment,
@@ -377,9 +384,10 @@ def LLVM_LoadOp : LLVM_Op<"load">, MemoryOpBase {
                      "when the pointer type is opaque");
       build($_builder, $_state, type, addr, alignment, isVolatile, isNonTemporal);
     }]>,
-    OpBuilder<(ins "Type":$t, "Value":$addr,
+    OpBuilder<(ins "Type":$type, "Value":$addr,
       CArg<"unsigned", "0">:$alignment, CArg<"bool", "false">:$isVolatile,
-      CArg<"bool", "false">:$isNonTemporal)>,];
+      CArg<"bool", "false">:$isNonTemporal)>
+  ];
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
 }
@@ -390,9 +398,14 @@ def LLVM_StoreOp : LLVM_Op<"store">, MemoryOpBase {
                    OptionalAttr<SymbolRefArrayAttr>:$access_groups,
                    OptionalAttr<SymbolRefArrayAttr>:$alias_scopes,
                    OptionalAttr<SymbolRefArrayAttr>:$noalias_scopes,
+                   OptionalAttr<SymbolRefArrayAttr>:$tbaa,
                    OptionalAttr<I64Attr>:$alignment, UnitAttr:$volatile_,
                    UnitAttr:$nontemporal);
   string llvmInstName = "Store";
+  let assemblyFormat = [{
+    (`volatile` $volatile_^)? $value `,` $addr attr-dict `:`
+    custom<StoreType>(type($value), type($addr))
+  }];
   string llvmBuilder = [{
     auto *inst = builder.CreateStore($value, $addr, $volatile_);
   }] # setAlignmentCode
@@ -400,16 +413,18 @@ def LLVM_StoreOp : LLVM_Op<"store">, MemoryOpBase {
      # setAccessGroupsMetadataCode
      # setAliasScopeMetadataCode
      # setTBAAMetadataCode;
-  // FIXME: Import attributes.
   string mlirBuilder = [{
-    $_op = $_builder.create<LLVM::StoreOp>($_location, $value, $addr);
+    auto *storeInst = cast<llvm::StoreInst>(inst);
+    unsigned alignment = storeInst->getAlign().value();
+    $_op = $_builder.create<LLVM::StoreOp>($_location, $value, $addr,
+        alignment, storeInst->isVolatile(),
+        storeInst->hasMetadata(llvm::LLVMContext::MD_nontemporal));
   }];
   let builders = [
     OpBuilder<(ins "Value":$value, "Value":$addr,
       CArg<"unsigned", "0">:$alignment, CArg<"bool", "false">:$isVolatile,
       CArg<"bool", "false">:$isNonTemporal)>
-    ];
-  let hasCustomAssemblyFormat = 1;
+  ];
   let hasVerifier = 1;
 }
 
@@ -431,6 +446,7 @@ class LLVM_CastOp<string mnemonic, string instName, Type type,
 def LLVM_BitcastOp : LLVM_CastOp<"bitcast", "BitCast",
                                  LLVM_AnyNonAggregate, LLVM_AnyNonAggregate> {
   let hasFolder = 1;
+  let hasVerifier = 1;
 }
 def LLVM_AddrSpaceCastOp : LLVM_CastOp<"addrspacecast", "AddrSpaceCast",
                                        LLVM_ScalarOrVectorOf<LLVM_AnyPointer>,
@@ -762,7 +778,10 @@ def LLVM_FreezeOp : LLVM_Op<"freeze", [SameOperandsAndResultType]> {
 // Terminators.
 def LLVM_BrOp : LLVM_TerminatorOp<"br",
     [DeclareOpInterfaceMethods<BranchOpInterface>, Pure]> {
-  let arguments = (ins Variadic<LLVM_Type>:$destOperands);
+  let arguments = (ins
+    Variadic<LLVM_Type>:$destOperands,
+    OptionalAttr<LoopAnnotationAttr>:$loop_annotation
+  );
   let successors = (successor AnySuccessor:$dest);
   let assemblyFormat = [{
     $dest (`(` $destOperands^ `:` type($destOperands) `)`)? attr-dict
@@ -771,8 +790,12 @@ def LLVM_BrOp : LLVM_TerminatorOp<"br",
     OpBuilder<(ins "Block *":$dest), [{
       build($_builder, $_state, ValueRange(), dest);
     }]>,
+    OpBuilder<(ins "ValueRange":$operands, "Block *":$dest), [{
+      build($_builder, $_state, operands, /*loop_annotation=*/{}, dest);
+    }]>,
     LLVM_TerminatorPassthroughOpBuilder
   ];
+  let hasVerifier = 1;
 }
 def LLVM_CondBrOp : LLVM_TerminatorOp<"cond_br",
     [AttrSizedOperandSegments, DeclareOpInterfaceMethods<BranchOpInterface>,
@@ -780,7 +803,8 @@ def LLVM_CondBrOp : LLVM_TerminatorOp<"cond_br",
   let arguments = (ins I1:$condition,
                    Variadic<LLVM_Type>:$trueDestOperands,
                    Variadic<LLVM_Type>:$falseDestOperands,
-                   OptionalAttr<ElementsAttr>:$branch_weights);
+                   OptionalAttr<ElementsAttr>:$branch_weights,
+                   OptionalAttr<LoopAnnotationAttr>:$loop_annotation);
   let successors = (successor AnySuccessor:$trueDest, AnySuccessor:$falseDest);
   let assemblyFormat = [{
     $condition ( `weights` `(` $branch_weights^ `)` )? `,`
@@ -793,23 +817,20 @@ def LLVM_CondBrOp : LLVM_TerminatorOp<"cond_br",
     OpBuilder<(ins "Value":$condition, "Block *":$trueDest,
       "ValueRange":$trueOperands, "Block *":$falseDest,
       "ValueRange":$falseOperands,
-      CArg<"std::optional<std::pair<uint32_t, uint32_t>>", "{}">:$weights),
-    [{
-        ElementsAttr weightsAttr;
-        if (weights) {
-          weightsAttr =
-              $_builder.getI32VectorAttr({static_cast<int32_t>(weights->first),
-                                       static_cast<int32_t>(weights->second)});
-        }
-        build($_builder, $_state, condition, trueOperands, falseOperands, weightsAttr,
-              trueDest, falseDest);
-  }]>,
+      CArg<"std::optional<std::pair<uint32_t, uint32_t>>", "{}">:$weights)>,
   OpBuilder<(ins "Value":$condition, "Block *":$trueDest,
     "Block *":$falseDest, CArg<"ValueRange", "{}">:$falseOperands),
   [{
       build($_builder, $_state, condition, trueDest, ValueRange(), falseDest,
             falseOperands);
+  }]>,
+  OpBuilder<(ins "Value":$condition, "ValueRange":$trueOperands, "ValueRange":$falseOperands,
+    "ElementsAttr":$branchWeights, "Block *":$trueDest, "Block *":$falseDest),
+  [{
+      build($_builder, $_state, condition, trueOperands, falseOperands, branchWeights,
+      {}, trueDest, falseDest);
   }]>, LLVM_TerminatorPassthroughOpBuilder];
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -994,10 +1015,12 @@ def LLVM_MetadataOp : LLVM_Op<"metadata", [
     llvm.metadata op defines one or more metadata nodes.
 
     Example:
-      llvm.metadata @metadata {
-        llvm.access_group @group1
-        llvm.access_group @group2
-      }
+    ```mlir
+    llvm.metadata @metadata {
+      llvm.access_group @group1
+      llvm.access_group @group2
+    }
+    ```
   }];
   let regions = (region SizedRegion<1>:$body);
 
@@ -1046,30 +1069,33 @@ def LLVM_AliasScopeMetadataOp : LLVM_Op<"alias_scope", [
     memory-affecting operations in another scope.
 
     Example:
-      module {
-        llvm.func @foo(%ptr1 : !llvm.ptr<i32>) {
-            %c0 = llvm.mlir.constant(0 : i32) : i32
-            %c4 = llvm.mlir.constant(4 : i32) : i32
-            %1 = llvm.ptrtoint %ptr1 : !llvm.ptr<i32> to i32
-            %2 = llvm.add %1, %c1 : i32
-            %ptr2 = llvm.inttoptr %2 : i32 to !llvm.ptr<i32>
-            llvm.store %c0, %ptr1 { alias_scopes = [@metadata::@scope1], llvm.noalias = [@metadata::@scope2] } : !llvm.ptr<i32>
-            llvm.store %c4, %ptr2 { alias_scopes = [@metadata::@scope2], llvm.noalias = [@metadata::@scope1] } : !llvm.ptr<i32>
-            llvm.return
-        }
-
-        llvm.metadata @metadata {
-          llvm.alias_scope_domain @unused_domain
-          llvm.alias_scope_domain @domain { description = "Optional domain description"}
-          llvm.alias_scope @scope1 { domain = @domain }
-          llvm.alias_scope @scope2 { domain = @domain, description = "Optional scope description" }
-        }
+    ```mlir
+    module {
+      llvm.func @foo(%ptr1 : !llvm.ptr<i32>) {
+          %c0 = llvm.mlir.constant(0 : i32) : i32
+          %c4 = llvm.mlir.constant(4 : i32) : i32
+          %1 = llvm.ptrtoint %ptr1 : !llvm.ptr<i32> to i32
+          %2 = llvm.add %1, %c1 : i32
+          %ptr2 = llvm.inttoptr %2 : i32 to !llvm.ptr<i32>
+          llvm.store %c0, %ptr1 { alias_scopes = [@metadata::@scope1], llvm.noalias = [@metadata::@scope2] } : !llvm.ptr<i32>
+          llvm.store %c4, %ptr2 { alias_scopes = [@metadata::@scope2], llvm.noalias = [@metadata::@scope1] } : !llvm.ptr<i32>
+          llvm.return
       }
+
+      llvm.metadata @metadata {
+        llvm.alias_scope_domain @unused_domain
+        llvm.alias_scope_domain @domain { description = "Optional domain description"}
+        llvm.alias_scope @scope1 { domain = @domain }
+        llvm.alias_scope @scope2 { domain = @domain, description = "Optional scope description" }
+      }
+    }
+    ```
 
     See the following link for more details:
     https://llvm.org/docs/LangRef.html#noalias-and-alias-scope-metadata
   }];
   let assemblyFormat = "$sym_name attr-dict";
+  let hasVerifier = 1;
 }
 
 def LLVM_AccessGroupMetadataOp : LLVM_Op<"access_group", [
@@ -1104,9 +1130,11 @@ def LLVM_TBAARootMetadataOp : LLVM_Op<"tbaa_root", [
     Defines a TBAA root node.
 
     Example:
-      llvm.metadata @tbaa {
-        llvm.tbaa_root @tbaa_root_0 {identity = "Simple C/C++ TBAA"}
-      }
+    ```mlir
+    llvm.metadata @tbaa {
+      llvm.tbaa_root @tbaa_root_0 {identity = "Simple C/C++ TBAA"}
+    }
+    ```
 
     See the following link for more details:
     https://llvm.org/docs/LangRef.html#tbaa-metadata
@@ -1131,34 +1159,36 @@ def LLVM_TBAATypeDescriptorOp : LLVM_Op<"tbaa_type_desc", [
     Defines a TBAA node describing a type.
 
     Example:
-      llvm.metadata @tbaa {
-        llvm.tbaa_root @tbaa_root_0 {identity = "Simple C/C++ TBAA"}
-        llvm.tbaa_type_desc @tbaa_type_desc_1 {
-            identity = "omnipotent char",
-            members = [@tbaa_root_0],
-            offsets = array<i64: 0>
-        }
-        llvm.tbaa_type_desc @tbaa_type_desc_2 {
-            identity = "long long",
-            members = [@tbaa_type_desc_1],
-            offsets = array<i64: 0>
-        }
-        llvm.tbaa_type_desc @tbaa_type_desc_3 {
-            identity = "agg2_t",
-            members = [@tbaa_type_desc_2, @tbaa_type_desc_2],
-            offsets = array<i64: 0, 8>
-        }
-        llvm.tbaa_type_desc @tbaa_type_desc_5 {
-            identity = "int",
-            members = [@tbaa_type_desc_1],
-            offsets = array<i64: 0>
-        }
-        llvm.tbaa_type_desc @tbaa_type_desc_6 {
-            identity = "agg1_t",
-            members = [@tbaa_type_desc_5, @tbaa_type_desc_5],
-            offsets = array<i64: 0, 4>
-        }
+    ```mlir
+    llvm.metadata @tbaa {
+      llvm.tbaa_root @tbaa_root_0 {identity = "Simple C/C++ TBAA"}
+      llvm.tbaa_type_desc @tbaa_type_desc_1 {
+          identity = "omnipotent char",
+          members = [@tbaa_root_0],
+          offsets = array<i64: 0>
       }
+      llvm.tbaa_type_desc @tbaa_type_desc_2 {
+          identity = "long long",
+          members = [@tbaa_type_desc_1],
+          offsets = array<i64: 0>
+      }
+      llvm.tbaa_type_desc @tbaa_type_desc_3 {
+          identity = "agg2_t",
+          members = [@tbaa_type_desc_2, @tbaa_type_desc_2],
+          offsets = array<i64: 0, 8>
+      }
+      llvm.tbaa_type_desc @tbaa_type_desc_5 {
+          identity = "int",
+          members = [@tbaa_type_desc_1],
+          offsets = array<i64: 0>
+      }
+      llvm.tbaa_type_desc @tbaa_type_desc_6 {
+          identity = "agg1_t",
+          members = [@tbaa_type_desc_5, @tbaa_type_desc_5],
+          offsets = array<i64: 0, 4>
+      }
+    }
+    ```
 
     See the following link for more details:
     https://llvm.org/docs/LangRef.html#tbaa-metadata
@@ -1190,44 +1220,46 @@ def LLVM_TBAATagOp : LLVM_Op<"tbaa_tag", [
     Defines a TBAA node describing a memory access.
 
     Example:
-      llvm.metadata @tbaa {
-        llvm.tbaa_root @tbaa_root_0 {identity = "Simple C/C++ TBAA"}
-        llvm.tbaa_type_desc @tbaa_type_desc_1 {
-            identity = "omnipotent char",
-            members = [@tbaa_root_0],
-            offsets = array<i64: 0>
-        }
-        llvm.tbaa_type_desc @tbaa_type_desc_2 {
-            identity = "long long",
-            members = [@tbaa_type_desc_1],
-            offsets = array<i64: 0>
-        }
-        llvm.tbaa_type_desc @tbaa_type_desc_3 {
-            identity = "agg2_t",
-            members = [@tbaa_type_desc_2, @tbaa_type_desc_2],
-            offsets = array<i64: 0, 8>
-        }
-        llvm.tbaa_tag @tbaa_tag_4 {
-            access_type = @tbaa_type_desc_2,
-            base_type = @tbaa_type_desc_3,
-            offset = 8 : i64
-        }
-        llvm.tbaa_type_desc @tbaa_type_desc_5 {
-            identity = "int",
-            members = [@tbaa_type_desc_1],
-            offsets = array<i64: 0>
-        }
-        llvm.tbaa_type_desc @tbaa_type_desc_6 {
-            identity = "agg1_t",
-            members = [@tbaa_type_desc_5, @tbaa_type_desc_5],
-            offsets = array<i64: 0, 4>
-        }
-        llvm.tbaa_tag @tbaa_tag_7 {
-            access_type = @tbaa_type_desc_5,
-            base_type = @tbaa_type_desc_6,
-            offset = 0 : i64
-        }
+    ```mlir
+    llvm.metadata @tbaa {
+      llvm.tbaa_root @tbaa_root_0 {identity = "Simple C/C++ TBAA"}
+      llvm.tbaa_type_desc @tbaa_type_desc_1 {
+          identity = "omnipotent char",
+          members = [@tbaa_root_0],
+          offsets = array<i64: 0>
       }
+      llvm.tbaa_type_desc @tbaa_type_desc_2 {
+          identity = "long long",
+          members = [@tbaa_type_desc_1],
+          offsets = array<i64: 0>
+      }
+      llvm.tbaa_type_desc @tbaa_type_desc_3 {
+          identity = "agg2_t",
+          members = [@tbaa_type_desc_2, @tbaa_type_desc_2],
+          offsets = array<i64: 0, 8>
+      }
+      llvm.tbaa_tag @tbaa_tag_4 {
+          access_type = @tbaa_type_desc_2,
+          base_type = @tbaa_type_desc_3,
+          offset = 8 : i64
+      }
+      llvm.tbaa_type_desc @tbaa_type_desc_5 {
+          identity = "int",
+          members = [@tbaa_type_desc_1],
+          offsets = array<i64: 0>
+      }
+      llvm.tbaa_type_desc @tbaa_type_desc_6 {
+          identity = "agg1_t",
+          members = [@tbaa_type_desc_5, @tbaa_type_desc_5],
+          offsets = array<i64: 0, 4>
+      }
+      llvm.tbaa_tag @tbaa_tag_7 {
+          access_type = @tbaa_type_desc_5,
+          base_type = @tbaa_type_desc_6,
+          offset = 0 : i64
+      }
+    }
+    ```
 
     See the following link for more details:
     https://llvm.org/docs/LangRef.html#tbaa-metadata

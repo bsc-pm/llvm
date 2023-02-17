@@ -44,12 +44,6 @@ ModulePass *createAnnotation2MetadataLegacyPass();
 ModulePass *createConstantMergePass();
 
 //===----------------------------------------------------------------------===//
-/// createGlobalOptimizerPass - This function returns a new pass that optimizes
-/// non-address taken internal globals.
-///
-ModulePass *createGlobalOptimizerPass();
-
-//===----------------------------------------------------------------------===//
 /// createGlobalDCEPass - This transform is designed to eliminate unreachable
 /// internal globals (functions or global variables)
 ///
@@ -83,13 +77,6 @@ ModulePass *createDeadArgEliminationPass();
 ModulePass *createDeadArgHackingPass();
 
 //===----------------------------------------------------------------------===//
-/// createIPSCCPPass - This pass propagates constants from call sites into the
-/// bodies of functions, and keeps track of whether basic blocks are executable
-/// in the process.
-///
-ModulePass *createIPSCCPPass();
-
-//===----------------------------------------------------------------------===//
 //
 /// createLoopExtractorPass - This pass extracts all natural loops from the
 /// program into a function if it can.
@@ -112,13 +99,6 @@ enum class PassSummaryAction {
   Import, ///< Import information from summary.
   Export, ///< Export information to summary.
 };
-
-/// This pass export CFI checks for use by external modules.
-ModulePass *createCrossDSOCFIPass();
-
-/// This pass splits globals into pieces for the benefit of whole-program
-/// devirtualization and control-flow integrity.
-ModulePass *createGlobalSplitPass();
 
 } // End llvm namespace
 

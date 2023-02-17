@@ -104,10 +104,9 @@ public:
   /// \returns A \c StringError with the diagnostic output if clang errors
   /// occurred, P1689 dependency format rules otherwise.
   llvm::Expected<P1689Rule>
-  getP1689ModuleDependencyFile(
-      const clang::tooling::CompileCommand &Command, StringRef CWD,
-      std::string &MakeformatOutput, std::string &MakeformatOutputPath,
-      std::optional<StringRef> ModuleName = std::nullopt);
+  getP1689ModuleDependencyFile(const clang::tooling::CompileCommand &Command,
+                               StringRef CWD, std::string &MakeformatOutput,
+                               std::string &MakeformatOutputPath);
 
   /// Given a Clang driver command-line for a translation unit, gather the
   /// modular dependencies and return the information needed for explicit build.

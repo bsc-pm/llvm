@@ -71,6 +71,20 @@ def HasStdExtZihintntl : Predicate<"Subtarget->hasStdExtZihintntl()">,
                                     AssemblerPredicate<(all_of FeatureStdExtZihintntl),
                                     "'Zihintntl' (Non-Temporal Locality Hints)">;
 
+def FeatureStdExtZicsr
+    : SubtargetFeature<"zicsr", "HasStdExtZicsr", "true",
+                       "'zicsr' (CSRs)">;
+def HasStdExtZicsr : Predicate<"Subtarget->hasStdExtZicsr()">,
+                                AssemblerPredicate<(all_of FeatureStdExtZicsr),
+                                "'Zicsr' (CSRs)">;
+
+def FeatureStdExtZifencei
+    : SubtargetFeature<"zifencei", "HasStdExtZifencei", "true",
+                       "'zifencei' (fence.i)">;
+def HasStdExtZifencei : Predicate<"Subtarget->hasStdExtZifencei()">,
+                                   AssemblerPredicate<(all_of FeatureStdExtZifencei),
+                                   "'Zifencei' (fence.i)">;
+
 def FeatureStdExtZfhmin
     : SubtargetFeature<"zfhmin", "HasStdExtZfhmin", "true",
                        "'Zfhmin' (Half-Precision Floating-Point Minimal)",
@@ -469,6 +483,27 @@ def FeatureVendorXTHeadBa
 def HasVendorXTHeadBa : Predicate<"Subtarget->hasVendorXTHeadBa()">,
                                   AssemblerPredicate<(all_of FeatureVendorXTHeadBa),
                                   "'xtheadba' (T-Head address calculation instructions)">;
+
+def FeatureVendorXTHeadBb
+    : SubtargetFeature<"xtheadbb", "HasVendorXTHeadBb", "true",
+                       "'xtheadbb' (T-Head basic bit-manipulation instructions)">;
+def HasVendorXTHeadBb : Predicate<"Subtarget->hasVendorXTHeadBb()">,
+                                  AssemblerPredicate<(all_of FeatureVendorXTHeadBb),
+                                  "'xtheadbb' (T-Head basic bit-manipulation instructions)">;
+
+def FeatureVendorXTHeadBs
+    : SubtargetFeature<"xtheadbs", "HasVendorXTHeadBs", "true",
+                       "'xtheadbs' (T-Head single-bit instructions)">;
+def HasVendorXTHeadBs : Predicate<"Subtarget->hasVendorXTHeadBs()">,
+                                  AssemblerPredicate<(all_of FeatureVendorXTHeadBs),
+                                  "'xtheadbs' (T-Head single-bit instructions)">;
+
+def FeatureVendorXTHeadMac
+    : SubtargetFeature<"xtheadmac", "HasVendorXTHeadMac", "true",
+                       "'xtheadmac' (T-Head Multiply-Accumulate Instructions)">;
+def HasVendorXTHeadMac : Predicate<"Subtarget->hasVendorXTHeadMac()">,
+                                   AssemblerPredicate<(all_of FeatureVendorXTHeadMac),
+                                   "'xtheadmac' (T-Head Multiply-Accumulate Instructions)">;
 
 def FeatureVendorXTHeadVdot
     : SubtargetFeature<"xtheadvdot", "HasVendorXTHeadVdot", "true",

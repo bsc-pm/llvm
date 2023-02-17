@@ -286,6 +286,9 @@ module std [system] {
         export *
       }
       module lexicographical_compare         { private header "__algorithm/lexicographical_compare.h" }
+      module lexicographical_compare_three_way {
+        private header "__algorithm/lexicographical_compare_three_way.h"
+      }
       module lower_bound                     { private header "__algorithm/lower_bound.h" }
       module make_heap                       { private header "__algorithm/make_heap.h" }
       module make_projected                  { private header "__algorithm/make_projected.h" }
@@ -596,6 +599,7 @@ module std [system] {
       module stable_partition                { private header "__algorithm/stable_partition.h" }
       module stable_sort                     { private header "__algorithm/stable_sort.h" }
       module swap_ranges                     { private header "__algorithm/swap_ranges.h" }
+      module three_way_comp_ref_type         { private header "__algorithm/three_way_comp_ref_type.h" }
       module transform                       { private header "__algorithm/transform.h" }
       module unique                          { private header "__algorithm/unique.h" }
       module unique_copy                     { private header "__algorithm/unique_copy.h" }
@@ -670,6 +674,7 @@ module std [system] {
 
     module __chrono {
       module calendar               { private header "__chrono/calendar.h" }
+      module concepts               { private header "__chrono/concepts.h" }
       module convert_to_timespec    { private header "__chrono/convert_to_timespec.h" }
       module convert_to_tm          { private header "__chrono/convert_to_tm.h" }
       module day                    { private header "__chrono/day.h" }
@@ -857,7 +862,10 @@ module std [system] {
         export locale
       }
       module format_error                    { private header "__format/format_error.h" }
-      module format_functions                { private header "__format/format_functions.h" }
+      module format_functions                {
+        private header "__format/format_functions.h"
+        export string
+      }
       module format_fwd                      { private header "__format/format_fwd.h" }
       module format_parse_context            { private header "__format/format_parse_context.h" }
       module format_string                   { private header "__format/format_string.h" }

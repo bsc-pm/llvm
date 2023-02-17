@@ -81,6 +81,7 @@ END-SCRIPT
 #include <__algorithm/iter_swap.h> // expected-error@*:* {{use of private header from outside its module: '__algorithm/iter_swap.h'}}
 #include <__algorithm/iterator_operations.h> // expected-error@*:* {{use of private header from outside its module: '__algorithm/iterator_operations.h'}}
 #include <__algorithm/lexicographical_compare.h> // expected-error@*:* {{use of private header from outside its module: '__algorithm/lexicographical_compare.h'}}
+#include <__algorithm/lexicographical_compare_three_way.h> // expected-error@*:* {{use of private header from outside its module: '__algorithm/lexicographical_compare_three_way.h'}}
 #include <__algorithm/lower_bound.h> // expected-error@*:* {{use of private header from outside its module: '__algorithm/lower_bound.h'}}
 #include <__algorithm/make_heap.h> // expected-error@*:* {{use of private header from outside its module: '__algorithm/make_heap.h'}}
 #include <__algorithm/make_projected.h> // expected-error@*:* {{use of private header from outside its module: '__algorithm/make_projected.h'}}
@@ -220,6 +221,7 @@ END-SCRIPT
 #include <__algorithm/stable_partition.h> // expected-error@*:* {{use of private header from outside its module: '__algorithm/stable_partition.h'}}
 #include <__algorithm/stable_sort.h> // expected-error@*:* {{use of private header from outside its module: '__algorithm/stable_sort.h'}}
 #include <__algorithm/swap_ranges.h> // expected-error@*:* {{use of private header from outside its module: '__algorithm/swap_ranges.h'}}
+#include <__algorithm/three_way_comp_ref_type.h> // expected-error@*:* {{use of private header from outside its module: '__algorithm/three_way_comp_ref_type.h'}}
 #include <__algorithm/transform.h> // expected-error@*:* {{use of private header from outside its module: '__algorithm/transform.h'}}
 #include <__algorithm/uniform_random_bit_generator_adaptor.h> // expected-error@*:* {{use of private header from outside its module: '__algorithm/uniform_random_bit_generator_adaptor.h'}}
 #include <__algorithm/unique.h> // expected-error@*:* {{use of private header from outside its module: '__algorithm/unique.h'}}
@@ -248,6 +250,7 @@ END-SCRIPT
 #include <__charconv/to_chars_base_10.h> // expected-error@*:* {{use of private header from outside its module: '__charconv/to_chars_base_10.h'}}
 #include <__charconv/to_chars_result.h> // expected-error@*:* {{use of private header from outside its module: '__charconv/to_chars_result.h'}}
 #include <__chrono/calendar.h> // expected-error@*:* {{use of private header from outside its module: '__chrono/calendar.h'}}
+#include <__chrono/concepts.h> // expected-error@*:* {{use of private header from outside its module: '__chrono/concepts.h'}}
 #include <__chrono/convert_to_timespec.h> // expected-error@*:* {{use of private header from outside its module: '__chrono/convert_to_timespec.h'}}
 #include <__chrono/convert_to_tm.h> // expected-error@*:* {{use of private header from outside its module: '__chrono/convert_to_tm.h'}}
 #include <__chrono/day.h> // expected-error@*:* {{use of private header from outside its module: '__chrono/day.h'}}

@@ -44,8 +44,6 @@ using mlir::LLVM::linkage::getMaxEnumValForLinkage;
 
 #include "mlir/Dialect/LLVMIR/LLVMOpsDialect.cpp.inc"
 
-static constexpr const char kVolatileAttrName[] = "volatile_";
-static constexpr const char kNonTemporalAttrName[] = "nontemporal";
 static constexpr const char kElemTypeAttrName[] = "elem_type";
 
 #include "mlir/Dialect/LLVMIR/LLVMOpsInterfaces.cpp.inc"
@@ -266,9 +264,40 @@ LogicalResult AllocaOp::verify() {
 // LLVM::BrOp
 //===----------------------------------------------------------------------===//
 
+/// Check if the `loopAttr` references correct symbols.
+static LogicalResult verifyLoopAnnotationAttr(LoopAnnotationAttr loopAttr,
+                                              Operation *op) {
+  if (!loopAttr)
+    return success();
+  // If the `llvm.loop` attribute is present, enforce the following structure,
+  // which the module translation can assume.
+  ArrayRef<SymbolRefAttr> parallelAccesses = loopAttr.getParallelAccesses();
+  if (parallelAccesses.empty())
+    return success();
+  for (SymbolRefAttr accessGroupRef : parallelAccesses) {
+    StringAttr metadataName = accessGroupRef.getRootReference();
+    auto metadataOp = SymbolTable::lookupNearestSymbolFrom<LLVM::MetadataOp>(
+        op->getParentOp(), metadataName);
+    if (!metadataOp)
+      return op->emitOpError() << "expected '" << accessGroupRef
+                               << "' to reference a metadata op";
+    StringAttr accessGroupName = accessGroupRef.getLeafReference();
+    Operation *accessGroupOp =
+        SymbolTable::lookupNearestSymbolFrom(metadataOp, accessGroupName);
+    if (!accessGroupOp)
+      return op->emitOpError() << "expected '" << accessGroupRef
+                               << "' to reference an access_group op";
+  }
+  return success();
+}
+
 SuccessorOperands BrOp::getSuccessorOperands(unsigned index) {
   assert(index == 0 && "invalid successor index");
   return SuccessorOperands(getDestOperandsMutable());
+}
+
+LogicalResult BrOp::verify() {
+  return verifyLoopAnnotationAttr(getLoopAnnotationAttr(), *this);
 }
 
 //===----------------------------------------------------------------------===//
@@ -279,6 +308,24 @@ SuccessorOperands CondBrOp::getSuccessorOperands(unsigned index) {
   assert(index < getNumSuccessors() && "invalid successor index");
   return SuccessorOperands(index == 0 ? getTrueDestOperandsMutable()
                                       : getFalseDestOperandsMutable());
+}
+
+LogicalResult CondBrOp::verify() {
+  return verifyLoopAnnotationAttr(getLoopAnnotationAttr(), *this);
+}
+
+void CondBrOp::build(OpBuilder &builder, OperationState &result,
+                     Value condition, Block *trueDest, ValueRange trueOperands,
+                     Block *falseDest, ValueRange falseOperands,
+                     std::optional<std::pair<uint32_t, uint32_t>> weights) {
+  ElementsAttr weightsAttr;
+  if (weights)
+    weightsAttr =
+        builder.getI32VectorAttr({static_cast<int32_t>(weights->first),
+                                  static_cast<int32_t>(weights->second)});
+
+  build(builder, result, condition, trueOperands, falseOperands, weightsAttr,
+        /*loop_annotation=*/{}, trueDest, falseDest);
 }
 
 //===----------------------------------------------------------------------===//
@@ -665,56 +712,63 @@ Type LLVM::GEPOp::getSourceElementType() {
 }
 
 //===----------------------------------------------------------------------===//
-// Builder, printer and parser for for LLVM::LoadOp.
+// LoadOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult verifySymbolAttribute(
-    Operation *op, StringRef attributeName,
+/// Verifies the given array attribute contains symbol references and checks the
+/// referenced symbol types using the provided verification function.
+LogicalResult verifyMemOpSymbolRefs(
+    Operation *op, StringRef name, ArrayAttr symbolRefs,
     llvm::function_ref<LogicalResult(Operation *, SymbolRefAttr)>
         verifySymbolType) {
-  if (Attribute attribute = op->getAttr(attributeName)) {
-    // Verify that the attribute is a symbol ref array attribute,
-    // because this constraint is not verified for all attribute
-    // names processed here (e.g. 'tbaa'). This verification
-    // is redundant in some cases.
-    if (!(attribute.isa<ArrayAttr>() &&
-          llvm::all_of(attribute.cast<ArrayAttr>(), [&](Attribute attr) {
-            return attr && attr.isa<SymbolRefAttr>();
-          })))
-      return op->emitOpError("attribute '")
-             << attributeName
-             << "' failed to satisfy constraint: symbol ref array attribute";
+  assert(symbolRefs && "expected a non-null attribute");
 
-    for (SymbolRefAttr symbolRef :
-         attribute.cast<ArrayAttr>().getAsRange<SymbolRefAttr>()) {
-      StringAttr metadataName = symbolRef.getRootReference();
-      StringAttr symbolName = symbolRef.getLeafReference();
-      // We want @metadata::@symbol, not just @symbol
-      if (metadataName == symbolName) {
-        return op->emitOpError() << "expected '" << symbolRef
-                                 << "' to specify a fully qualified reference";
-      }
-      auto metadataOp = SymbolTable::lookupNearestSymbolFrom<LLVM::MetadataOp>(
-          op->getParentOp(), metadataName);
-      if (!metadataOp)
-        return op->emitOpError()
-               << "expected '" << symbolRef << "' to reference a metadata op";
-      Operation *symbolOp =
-          SymbolTable::lookupNearestSymbolFrom(metadataOp, symbolName);
-      if (!symbolOp)
-        return op->emitOpError()
-               << "expected '" << symbolRef << "' to be a valid reference";
-      if (failed(verifySymbolType(symbolOp, symbolRef))) {
-        return failure();
-      }
+  // Verify that the attribute is a symbol ref array attribute,
+  // because this constraint is not verified for all attribute
+  // names processed here (e.g. 'tbaa'). This verification
+  // is redundant in some cases.
+  if (!llvm::all_of(symbolRefs, [](Attribute attr) {
+        return attr && attr.isa<SymbolRefAttr>();
+      }))
+    return op->emitOpError("attribute '")
+           << name
+           << "' failed to satisfy constraint: symbol ref array attribute";
+
+  for (SymbolRefAttr symbolRef : symbolRefs.getAsRange<SymbolRefAttr>()) {
+    StringAttr metadataName = symbolRef.getRootReference();
+    StringAttr symbolName = symbolRef.getLeafReference();
+    // We want @metadata::@symbol, not just @symbol
+    if (metadataName == symbolName) {
+      return op->emitOpError() << "expected '" << symbolRef
+                               << "' to specify a fully qualified reference";
+    }
+    auto metadataOp = SymbolTable::lookupNearestSymbolFrom<LLVM::MetadataOp>(
+        op->getParentOp(), metadataName);
+    if (!metadataOp)
+      return op->emitOpError()
+             << "expected '" << symbolRef << "' to reference a metadata op";
+    Operation *symbolOp =
+        SymbolTable::lookupNearestSymbolFrom(metadataOp, symbolName);
+    if (!symbolOp)
+      return op->emitOpError()
+             << "expected '" << symbolRef << "' to be a valid reference";
+    if (failed(verifySymbolType(symbolOp, symbolRef))) {
+      return failure();
     }
   }
+
   return success();
 }
 
-// Verifies that metadata ops are wired up properly.
+/// Verifies the given array attribute contains symbol references that point to
+/// metadata operations of the given type.
 template <typename OpTy>
-static LogicalResult verifyOpMetadata(Operation *op, StringRef attributeName) {
+static LogicalResult
+verifyMemOpSymbolRefsPointTo(Operation *op, StringRef name,
+                             std::optional<ArrayAttr> symbolRefs) {
+  if (!symbolRefs)
+    return success();
+
   auto verifySymbolType = [op](Operation *symbolOp,
                                SymbolRefAttr symbolRef) -> LogicalResult {
     if (!isa<OpTy>(symbolOp)) {
@@ -724,59 +778,41 @@ static LogicalResult verifyOpMetadata(Operation *op, StringRef attributeName) {
     }
     return success();
   };
-
-  return verifySymbolAttribute(op, attributeName, verifySymbolType);
+  return verifyMemOpSymbolRefs(op, name, *symbolRefs, verifySymbolType);
 }
 
-static LogicalResult verifyMemoryOpMetadata(Operation *op) {
-  // access_groups
-  if (failed(verifyOpMetadata<LLVM::AccessGroupMetadataOp>(
-          op, LLVMDialect::getAccessGroupsAttrName())))
+/// Verifies the types of the metadata operations referenced by aliasing and
+/// access group metadata.
+template <typename OpTy>
+LogicalResult verifyMemOpMetadata(OpTy memOp) {
+  if (failed(verifyMemOpSymbolRefsPointTo<LLVM::AccessGroupMetadataOp>(
+          memOp, memOp.getAccessGroupsAttrName(), memOp.getAccessGroups())))
     return failure();
 
-  // alias_scopes
-  if (failed(verifyOpMetadata<LLVM::AliasScopeMetadataOp>(
-          op, LLVMDialect::getAliasScopesAttrName())))
+  if (failed(verifyMemOpSymbolRefsPointTo<LLVM::AliasScopeMetadataOp>(
+          memOp, memOp.getAliasScopesAttrName(), memOp.getAliasScopes())))
     return failure();
 
-  // noalias_scopes
-  if (failed(verifyOpMetadata<LLVM::AliasScopeMetadataOp>(
-          op, LLVMDialect::getNoAliasScopesAttrName())))
+  if (failed(verifyMemOpSymbolRefsPointTo<LLVM::AliasScopeMetadataOp>(
+          memOp, memOp.getNoaliasScopesAttrName(), memOp.getNoaliasScopes())))
     return failure();
 
-  // tbaa
-  if (failed(verifyOpMetadata<LLVM::TBAATagOp>(op,
-                                               LLVMDialect::getTBAAAttrName())))
+  if (failed(verifyMemOpSymbolRefsPointTo<LLVM::TBAATagOp>(
+          memOp, memOp.getTbaaAttrName(), memOp.getTbaa())))
     return failure();
 
   return success();
 }
 
-LogicalResult LoadOp::verify() { return verifyMemoryOpMetadata(*this); }
+LogicalResult LoadOp::verify() { return verifyMemOpMetadata(*this); }
 
-void LoadOp::build(OpBuilder &builder, OperationState &result, Type t,
+void LoadOp::build(OpBuilder &builder, OperationState &state, Type type,
                    Value addr, unsigned alignment, bool isVolatile,
                    bool isNonTemporal) {
-  result.addOperands(addr);
-  result.addTypes(t);
-  if (isVolatile)
-    result.addAttribute(kVolatileAttrName, builder.getUnitAttr());
-  if (isNonTemporal)
-    result.addAttribute(kNonTemporalAttrName, builder.getUnitAttr());
-  if (alignment != 0)
-    result.addAttribute("alignment", builder.getI64IntegerAttr(alignment));
-}
-
-void LoadOp::print(OpAsmPrinter &p) {
-  p << ' ';
-  if (getVolatile_())
-    p << "volatile ";
-  p << getAddr();
-  p.printOptionalAttrDict((*this)->getAttrs(),
-                          {kVolatileAttrName, kElemTypeAttrName});
-  p << " : " << getAddr().getType();
-  if (getAddr().getType().cast<LLVMPointerType>().isOpaque())
-    p << " -> " << getType();
+  build(builder, state, type, addr, /*access_groups=*/nullptr,
+        /*alias_scopes=*/nullptr, /*noalias_scopes=*/nullptr, /*tbaa=*/nullptr,
+        alignment ? builder.getI64IntegerAttr(alignment) : nullptr, isVolatile,
+        isNonTemporal);
 }
 
 // Extract the pointee type from the LLVM pointer type wrapped in MLIR. Return
@@ -792,103 +828,83 @@ getLoadStoreElementType(OpAsmParser &parser, Type type, SMLoc trailingTypeLoc) {
   return llvmTy.getElementType();
 }
 
-// <operation> ::= `llvm.load` `volatile` ssa-use attribute-dict? `:` type
-//                 (`->` type)?
-ParseResult LoadOp::parse(OpAsmParser &parser, OperationState &result) {
-  OpAsmParser::UnresolvedOperand addr;
-  Type type;
+/// Parses the LoadOp type either using the typed or opaque pointer format.
+// TODO: Drop once the typed pointer assembly format is not needed anymore.
+static ParseResult parseLoadType(OpAsmParser &parser, Type &type,
+                                 Type &elementType) {
   SMLoc trailingTypeLoc;
-
-  if (succeeded(parser.parseOptionalKeyword("volatile")))
-    result.addAttribute(kVolatileAttrName, parser.getBuilder().getUnitAttr());
-
-  if (parser.parseOperand(addr) ||
-      parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
-      parser.getCurrentLocation(&trailingTypeLoc) || parser.parseType(type) ||
-      parser.resolveOperand(addr, type, result.operands))
+  if (parser.getCurrentLocation(&trailingTypeLoc) || parser.parseType(type))
     return failure();
 
-  std::optional<Type> elemTy =
+  std::optional<Type> pointerElementType =
       getLoadStoreElementType(parser, type, trailingTypeLoc);
-  if (!elemTy)
+  if (!pointerElementType)
     return failure();
-  if (*elemTy) {
-    result.addTypes(*elemTy);
+  if (*pointerElementType) {
+    elementType = *pointerElementType;
     return success();
   }
 
-  Type trailingType;
-  if (parser.parseArrow() || parser.parseType(trailingType))
+  if (parser.parseArrow() || parser.parseType(elementType))
     return failure();
-  result.addTypes(trailingType);
   return success();
 }
 
+/// Prints the LoadOp type either using the typed or opaque pointer format.
+// TODO: Drop once the typed pointer assembly format is not needed anymore.
+static void printLoadType(OpAsmPrinter &printer, Operation *op, Type type,
+                          Type elementType) {
+  printer << type;
+  auto pointerType = cast<LLVMPointerType>(type);
+  if (pointerType.isOpaque())
+    printer << " -> " << elementType;
+}
+
 //===----------------------------------------------------------------------===//
-// Builder, printer and parser for LLVM::StoreOp.
+// StoreOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult StoreOp::verify() { return verifyMemoryOpMetadata(*this); }
+LogicalResult StoreOp::verify() { return verifyMemOpMetadata(*this); }
 
-void StoreOp::build(OpBuilder &builder, OperationState &result, Value value,
+void StoreOp::build(OpBuilder &builder, OperationState &state, Value value,
                     Value addr, unsigned alignment, bool isVolatile,
                     bool isNonTemporal) {
-  result.addOperands({value, addr});
-  result.addTypes({});
-  if (isVolatile)
-    result.addAttribute(kVolatileAttrName, builder.getUnitAttr());
-  if (isNonTemporal)
-    result.addAttribute(kNonTemporalAttrName, builder.getUnitAttr());
-  if (alignment != 0)
-    result.addAttribute("alignment", builder.getI64IntegerAttr(alignment));
+  build(builder, state, value, addr, /*access_groups=*/nullptr,
+        /*alias_scopes=*/nullptr, /*noalias_scopes=*/nullptr, /*tbaa=*/nullptr,
+        alignment ? builder.getI64IntegerAttr(alignment) : nullptr, isVolatile,
+        isNonTemporal);
 }
 
-void StoreOp::print(OpAsmPrinter &p) {
-  p << ' ';
-  if (getVolatile_())
-    p << "volatile ";
-  p << getValue() << ", " << getAddr();
-  p.printOptionalAttrDict((*this)->getAttrs(), {kVolatileAttrName});
-  p << " : ";
-  if (getAddr().getType().cast<LLVMPointerType>().isOpaque())
-    p << getValue().getType() << ", ";
-  p << getAddr().getType();
-}
-
-// <operation> ::= `llvm.store` `volatile` ssa-use `,` ssa-use
-//                 attribute-dict? `:` type (`,` type)?
-ParseResult StoreOp::parse(OpAsmParser &parser, OperationState &result) {
-  OpAsmParser::UnresolvedOperand addr, value;
-  Type type;
+/// Parses the StoreOp type either using the typed or opaque pointer format.
+// TODO: Drop once the typed pointer assembly format is not needed anymore.
+static ParseResult parseStoreType(OpAsmParser &parser, Type &elementType,
+                                  Type &type) {
   SMLoc trailingTypeLoc;
-
-  if (succeeded(parser.parseOptionalKeyword("volatile")))
-    result.addAttribute(kVolatileAttrName, parser.getBuilder().getUnitAttr());
-
-  if (parser.parseOperand(value) || parser.parseComma() ||
-      parser.parseOperand(addr) ||
-      parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
-      parser.getCurrentLocation(&trailingTypeLoc) || parser.parseType(type))
+  if (parser.getCurrentLocation(&trailingTypeLoc) ||
+      parser.parseType(elementType))
     return failure();
 
-  Type operandType;
-  if (succeeded(parser.parseOptionalComma())) {
-    operandType = type;
-    if (parser.parseType(type))
-      return failure();
-  } else {
-    std::optional<Type> maybeOperandType =
-        getLoadStoreElementType(parser, type, trailingTypeLoc);
-    if (!maybeOperandType)
-      return failure();
-    operandType = *maybeOperandType;
-  }
+  if (succeeded(parser.parseOptionalComma()))
+    return parser.parseType(type);
 
-  if (parser.resolveOperand(value, operandType, result.operands) ||
-      parser.resolveOperand(addr, type, result.operands))
+  // Extract the element type from the pointer type.
+  type = elementType;
+  std::optional<Type> pointerElementType =
+      getLoadStoreElementType(parser, type, trailingTypeLoc);
+  if (!pointerElementType)
     return failure();
-
+  elementType = *pointerElementType;
   return success();
+}
+
+/// Prints the StoreOp type either using the typed or opaque pointer format.
+// TODO: Drop once the typed pointer assembly format is not needed anymore.
+static void printStoreType(OpAsmPrinter &printer, Operation *op,
+                           Type elementType, Type type) {
+  auto pointerType = cast<LLVMPointerType>(type);
+  if (pointerType.isOpaque())
+    printer << elementType << ", ";
+  printer << type;
 }
 
 //===----------------------------------------------------------------------===//
@@ -2340,7 +2356,7 @@ LogicalResult FenceOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// Folder for LLVM::BitcastOp
+// Folder and verifier for LLVM::BitcastOp
 //===----------------------------------------------------------------------===//
 
 OpFoldResult LLVM::BitcastOp::fold(FoldAdaptor adaptor) {
@@ -2352,6 +2368,41 @@ OpFoldResult LLVM::BitcastOp::fold(FoldAdaptor adaptor) {
     if (prev.getArg().getType() == getType())
       return prev.getArg();
   return {};
+}
+
+LogicalResult LLVM::BitcastOp::verify() {
+  auto resultType = extractVectorElementType(getResult().getType())
+                        .dyn_cast<LLVMPointerType>();
+  auto sourceType =
+      extractVectorElementType(getArg().getType()).dyn_cast<LLVMPointerType>();
+
+  // If one of the types is a pointer (or vector of pointers), then
+  // both source and result type have to be pointers.
+  if (static_cast<bool>(resultType) != static_cast<bool>(sourceType))
+    return emitOpError("can only cast pointers from and to pointers");
+
+  if (!resultType)
+    return success();
+
+  auto isVector = [](Type type) {
+    return type.isa<VectorType, LLVMScalableVectorType, LLVMFixedVectorType>();
+  };
+
+  // Due to bitcast requiring both operands to be of the same size, it is not
+  // possible for only one of the two to be a pointer of vectors.
+  if (isVector(getResult().getType()) && !isVector(getArg().getType()))
+    return emitOpError("cannot cast pointer to vector of pointers");
+
+  if (!isVector(getResult().getType()) && isVector(getArg().getType()))
+    return emitOpError("cannot cast vector of pointers to pointer");
+
+  // Bitcast cannot cast between pointers of different address spaces.
+  // 'llvm.addrspacecast' must be used for this purpose instead.
+  if (resultType.getAddressSpace() != sourceType.getAddressSpace())
+    return emitOpError("cannot cast pointers of different address spaces, "
+                       "use 'llvm.addrspacecast' instead");
+
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -2473,28 +2524,27 @@ struct TBAAGraphNode {
 
 // TBAA graph.
 class TBAAGraph {
-  // Mapping between symbol names defined by TBAA
-  // operations and corresponding TBAAGraphNode's.
-  DenseMap<StringAttr, TBAAGraphNode> nodeMap;
-  // Synthetic root node that has all graph nodes
-  // in its operands list.
-  TBAAGraphNode root;
-
 public:
   using iterator = SmallVectorImpl<TBAAGraphNode *>::iterator;
+
+  // Creates a new graph with nodes corresponding to `symbolNames` defined by a
+  // set of TBAA operations.
+  TBAAGraph(ArrayRef<StringAttr> symbolNames) {
+    for (auto symbol : symbolNames) {
+      TBAAGraphNode &node = nodeMap[symbol];
+      assert(node.symbol.empty() && "node is already in the graph");
+      node.symbol = symbol;
+    }
+
+    // Fill the graph operands once all nodes were added. Otherwise,
+    // reallocation can lead to pointer invalidation.
+    for (auto symbol : symbolNames)
+      root.operands.push_back(&nodeMap[symbol]);
+  }
 
   iterator begin() { return root.operands.begin(); }
   iterator end() { return root.operands.end(); }
   TBAAGraphNode *getEntryNode() { return &root; }
-
-  // Add new graph node corresponding to `symbol`
-  // defined by a TBAA operation.
-  void addNodeDefinition(StringAttr symbol) {
-    TBAAGraphNode &node = nodeMap[symbol];
-    assert(node.symbol.empty() && "node is already in the graph");
-    node.symbol = symbol;
-    root.operands.push_back(&node);
-  }
 
   // Get a pointer to TBAAGraphNode corresponding
   // to `symbol`. The node must be already in the graph.
@@ -2503,8 +2553,17 @@ public:
     assert(it != nodeMap.end() && "node must be in the graph");
     return &it->second;
   }
+
+private:
+  // Mapping between symbol names defined by TBAA
+  // operations and corresponding TBAAGraphNode's.
+  DenseMap<StringAttr, TBAAGraphNode> nodeMap;
+  // Synthetic root node that has all graph nodes
+  // in its operands list.
+  TBAAGraphNode root;
 };
 } // end anonymous namespace
+
 namespace llvm {
 // GraphTraits definitions for using TBAAGraph with
 // scc_iterator.
@@ -2536,20 +2595,26 @@ LogicalResult MetadataOp::verifyRegions() {
   Region &body = getBody();
   // Symbol names defined by TBAARootMetadataOp and TBAATypeDescriptorOp.
   llvm::SmallDenseSet<StringAttr> definedGraphSymbols;
-  // Complete TBAA graph consisting of TBAARootMetadataOp,
-  // TBAATypeDescriptorOp, and TBAATagOp symbols. It is used
-  // for detecting cycles in the TBAA graph, which is illegal.
-  TBAAGraph tbaaGraph;
 
-  for (Operation &op : body.getOps())
+  // Collection of symbol names to ensure a stable ordering of the pointers.
+  // Otherwise, error messages might not be deterministic.
+  SmallVector<StringAttr> symbolNames;
+
+  for (Operation &op : body.getOps()) {
     if (isa<LLVM::TBAARootMetadataOp>(op) ||
         isa<LLVM::TBAATypeDescriptorOp>(op)) {
       StringAttr symbolDef = cast<SymbolOpInterface>(op).getNameAttr();
       definedGraphSymbols.insert(symbolDef);
-      tbaaGraph.addNodeDefinition(symbolDef);
+      symbolNames.push_back(symbolDef);
     } else if (auto tagOp = dyn_cast<LLVM::TBAATagOp>(op)) {
-      tbaaGraph.addNodeDefinition(tagOp.getSymNameAttr());
+      symbolNames.push_back(tagOp.getSymNameAttr());
     }
+  }
+
+  // Complete TBAA graph consisting of TBAARootMetadataOp,
+  // TBAATypeDescriptorOp, and TBAATagOp symbols. It is used
+  // for detecting cycles in the TBAA graph, which is illegal.
+  TBAAGraph tbaaGraph(symbolNames);
 
   // Verify that TBAA metadata operations refer symbols
   // from definedGraphSymbols only. Note that TBAATagOp
@@ -2670,6 +2735,21 @@ LogicalResult TBAATypeDescriptorOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// AliasScopeMetadataOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult AliasScopeMetadataOp::verify() {
+  Operation *domainOp = SymbolTable::lookupNearestSymbolFrom(
+      this->getOperation(), getDomainAttr());
+  if (!isa_and_nonnull<AliasScopeDomainMetadataOp>(domainOp)) {
+    return this->emitOpError()
+           << "expected '" << getDomain()
+           << "' to reference a domain operation in the same region";
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // OpAsmDialectInterface
 //===----------------------------------------------------------------------===//
 
@@ -2679,16 +2759,17 @@ struct LLVMOpAsmDialectInterface : public OpAsmDialectInterface {
 
   AliasResult getAlias(Attribute attr, raw_ostream &os) const override {
     return TypeSwitch<Attribute, AliasResult>(attr)
-        .Case<DIVoidResultTypeAttr, DIBasicTypeAttr, DICompileUnitAttr,
+        .Case<DINullTypeAttr, DIBasicTypeAttr, DICompileUnitAttr,
               DICompositeTypeAttr, DIDerivedTypeAttr, DIFileAttr,
               DILexicalBlockAttr, DILexicalBlockFileAttr, DILocalVariableAttr,
               DISubprogramAttr, DISubroutineTypeAttr, LoopAnnotationAttr,
               LoopVectorizeAttr, LoopInterleaveAttr, LoopUnrollAttr,
               LoopUnrollAndJamAttr, LoopLICMAttr, LoopDistributeAttr,
-              LoopPipelineAttr>([&](auto attr) {
-          os << decltype(attr)::getMnemonic();
-          return AliasResult::OverridableAlias;
-        })
+              LoopPipelineAttr, LoopPeeledAttr, LoopUnswitchAttr>(
+            [&](auto attr) {
+              os << decltype(attr)::getMnemonic();
+              return AliasResult::OverridableAlias;
+            })
         .Default([](Attribute) { return AliasResult::NoAlias; });
   }
 };
@@ -2960,32 +3041,6 @@ LogicalResult LLVMDialect::verifyDataLayoutString(
 /// Verify LLVM dialect attributes.
 LogicalResult LLVMDialect::verifyOperationAttribute(Operation *op,
                                                     NamedAttribute attr) {
-  // If the `llvm.loop` attribute is present, enforce the following structure,
-  // which the module translation can assume.
-  if (attr.getName() == LLVMDialect::getLoopAttrName()) {
-    auto loopAttr = attr.getValue().dyn_cast<LoopAnnotationAttr>();
-    if (!loopAttr)
-      return op->emitOpError() << "expected '" << LLVMDialect::getLoopAttrName()
-                               << "' to be a loop annotation attribute";
-    ArrayRef<SymbolRefAttr> parallelAccesses = loopAttr.getParallelAccesses();
-    if (parallelAccesses.empty())
-      return success();
-    for (SymbolRefAttr accessGroupRef : parallelAccesses) {
-      StringAttr metadataName = accessGroupRef.getRootReference();
-      auto metadataOp = SymbolTable::lookupNearestSymbolFrom<LLVM::MetadataOp>(
-          op->getParentOp(), metadataName);
-      if (!metadataOp)
-        return op->emitOpError() << "expected '" << accessGroupRef
-                                 << "' to reference a metadata op";
-      StringAttr accessGroupName = accessGroupRef.getLeafReference();
-      Operation *accessGroupOp =
-          SymbolTable::lookupNearestSymbolFrom(metadataOp, accessGroupName);
-      if (!accessGroupOp)
-        return op->emitOpError() << "expected '" << accessGroupRef
-                                 << "' to reference an access_group op";
-    }
-  }
-
   // If the data layout attribute is present, it must use the LLVM data layout
   // syntax. Try parsing it and report errors in case of failure. Users of this
   // attribute may assume it is well-formed and can pass it to the (asserting)

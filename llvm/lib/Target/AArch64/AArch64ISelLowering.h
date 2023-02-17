@@ -713,6 +713,7 @@ public:
   void emitAtomicCmpXchgNoStoreLLBalance(IRBuilderBase &Builder) const override;
 
   bool isOpSuitableForLDPSTP(const Instruction *I) const;
+  bool isOpSuitableForLSE128(const Instruction *I) const;
   bool isOpSuitableForRCPC3(const Instruction *I) const;
   bool shouldInsertFencesForAtomic(const Instruction *I) const override;
   bool
@@ -838,11 +839,6 @@ public:
       Instruction *I, ComplexDeinterleavingOperation OperationType,
       ComplexDeinterleavingRotation Rotation, Value *InputA, Value *InputB,
       Value *Accumulator = nullptr) const override;
-
-  bool hasBitPreservingFPLogic(EVT VT) const override {
-    // FIXME: Is this always true? It should be true for vectors at least.
-    return VT == MVT::f32 || VT == MVT::f64;
-  }
 
   bool supportSplitCSR(MachineFunction *MF) const override {
     return MF->getFunction().getCallingConv() == CallingConv::CXX_FAST_TLS &&
@@ -1171,8 +1167,7 @@ private:
   bool isUsedByReturnOnly(SDNode *N, SDValue &Chain) const override;
   bool mayBeEmittedAsTailCall(const CallInst *CI) const override;
   bool getIndexedAddressParts(SDNode *N, SDNode *Op, SDValue &Base,
-                              SDValue &Offset, ISD::MemIndexedMode &AM,
-                              bool &IsInc, SelectionDAG &DAG) const;
+                              SDValue &Offset, SelectionDAG &DAG) const;
   bool getPreIndexedAddressParts(SDNode *N, SDValue &Base, SDValue &Offset,
                                  ISD::MemIndexedMode &AM,
                                  SelectionDAG &DAG) const override;

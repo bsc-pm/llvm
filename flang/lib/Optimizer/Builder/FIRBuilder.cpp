@@ -511,8 +511,11 @@ mlir::Value fir::FirOpBuilder::createBox(mlir::Location loc,
   }
   mlir::Type boxTy = fir::BoxType::get(elementType);
   mlir::Value tdesc;
-  if (isPolymorphic)
+  if (isPolymorphic) {
+    elementType = fir::updateTypeForUnlimitedPolymorphic(elementType);
     boxTy = fir::ClassType::get(elementType);
+  }
+
   return exv.match(
       [&](const fir::ArrayBoxValue &box) -> mlir::Value {
         mlir::Value empty;

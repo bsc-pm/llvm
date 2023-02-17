@@ -103,6 +103,8 @@ static const RISCVSupportedExtension SupportedExtensions[] = {
     {"zicbom", RISCVExtensionVersion{1, 0}},
     {"zicboz", RISCVExtensionVersion{1, 0}},
     {"zicbop", RISCVExtensionVersion{1, 0}},
+    {"zicsr", RISCVExtensionVersion{2, 0}},
+    {"zifencei", RISCVExtensionVersion{2, 0}},
 
     {"svnapot", RISCVExtensionVersion{1, 0}},
     {"svpbmt", RISCVExtensionVersion{1, 0}},
@@ -110,6 +112,9 @@ static const RISCVSupportedExtension SupportedExtensions[] = {
 
     // vendor-defined ('X') extensions
     {"xtheadba", RISCVExtensionVersion{1, 0}},
+    {"xtheadbb", RISCVExtensionVersion{1, 0}},
+    {"xtheadbs", RISCVExtensionVersion{1, 0}},
+    {"xtheadmac", RISCVExtensionVersion{1, 0}},
     {"xtheadvdot", RISCVExtensionVersion{1, 0}},
     {"xventanacondops", RISCVExtensionVersion{1, 0}},
 };

@@ -91,9 +91,8 @@ llvm::Expected<std::string> DependencyScanningTool::getDependencyFile(
 }
 
 llvm::Expected<P1689Rule> DependencyScanningTool::getP1689ModuleDependencyFile(
-    const CompileCommand &Command, StringRef CWD,
-    std::string &MakeformatOutput, std::string &MakeformatOutputPath,
-    std::optional<StringRef> ModuleName) {
+    const CompileCommand &Command, StringRef CWD, std::string &MakeformatOutput,
+    std::string &MakeformatOutputPath) {
   class P1689ModuleDependencyPrinterConsumer
       : public MakeDependencyPrinterConsumer {
   public:
@@ -116,6 +115,12 @@ llvm::Expected<P1689Rule> DependencyScanningTool::getP1689ModuleDependencyFile(
       if (Opts->OutputFormat != DependencyOutputFormat::Make)
         return {};
       return Opts->OutputFile;
+    }
+
+    // The lookupModuleOutput is for clang modules. P1689 format don't need it.
+    std::string lookupModuleOutput(const ModuleID &ID,
+                                 ModuleOutputKind Kind) override {
+      return "";
     }
 
   private:

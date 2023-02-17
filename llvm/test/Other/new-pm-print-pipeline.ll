@@ -62,7 +62,7 @@
 ; CHECK-20: cgscc(inline<only-mandatory>,inline),cgscc(inline)
 
 ; RUN: opt -disable-output -disable-verify -print-pipeline-passes -passes='scc-oz-module-inliner' < %s | FileCheck %s --match-full-lines --check-prefixes=CHECK-21
-; CHECK-21: require<globals-aa>,function(invalidate<aa>),require<profile-summary>,cgscc(devirt<4>(inline,{{.*}},instcombine{{.*}}))
+; CHECK-21: require<globals-aa>,function(invalidate<aa>),require<profile-summary>,cgscc(devirt<4>(inline<only-mandatory>,inline,{{.*}},instcombine{{.*}}))
 
 ; RUN: opt -disable-output -disable-verify -print-pipeline-passes -passes='cgscc(function<eager-inv>(no-op-function)),function<eager-inv>(no-op-function)' < %s | FileCheck %s --match-full-lines --check-prefixes=CHECK-22
 ; CHECK-22: cgscc(function<eager-inv>(no-op-function)),function<eager-inv>(no-op-function)
@@ -89,3 +89,7 @@
 ; RUN: opt -disable-output -passes='default<O1>' < %s
 ; RUN: opt -disable-output -passes='default<O2>' < %s
 ; RUN: opt -disable-output -passes='default<O3>' < %s
+
+;; Test SeparateConstOffsetFromGEPPass option.
+; RUN: opt -disable-output -disable-verify -print-pipeline-passes -passes='separate-const-offset-from-gep<lower-gep>' < %s | FileCheck %s --match-full-lines --check-prefixes=CHECK-27
+; CHECK-27: function(separate-const-offset-from-gep<lower-gep>)

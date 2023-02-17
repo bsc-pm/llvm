@@ -19,13 +19,13 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileUtilities.h"
-#include "llvm/Support/Host.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/ThreadPool.h"
 #include "llvm/Support/Threading.h"
+#include "llvm/TargetParser/Host.h"
 #include <mutex>
 #include <optional>
 #include <thread>
@@ -515,7 +515,10 @@ public:
     OS << llvm::formatv("{0:2}\n", Value(std::move(Output)));
   }
 
-  void addRules(P1689Rule &Rule) { Rules.push_back(Rule); }
+  void addRules(P1689Rule &Rule) {
+    std::unique_lock<std::mutex> LockGuard(Lock);
+    Rules.push_back(Rule);
+  }
 
 private:
   void addSourcePathsToRequires() {
@@ -533,6 +536,7 @@ private:
     }
   }
 
+  std::mutex Lock;
   std::vector<P1689Rule> Rules;
 };
 
@@ -833,10 +837,10 @@ int main(int argc, const char **argv) {
           std::string MakeformatOutput;
 
           auto MaybeRule = WorkerTools[I]->getP1689ModuleDependencyFile(
-              *Input, CWD, MakeformatOutput, MakeformatOutputPath,
-              MaybeModuleName);
-          HadErrors =
-              handleP1689DependencyToolResult(Filename, MaybeRule, PD, Errs);
+              *Input, CWD, MakeformatOutput, MakeformatOutputPath);
+
+          if (handleP1689DependencyToolResult(Filename, MaybeRule, PD, Errs))
+            HadErrors = true;
 
           if (!MakeformatOutputPath.empty() && !MakeformatOutput.empty() &&
               !HadErrors) {
@@ -863,8 +867,9 @@ int main(int argc, const char **argv) {
 
             SharedStream MakeformatOS(OSIter->second);
             llvm::Expected<std::string> MaybeOutput(MakeformatOutput);
-            HadErrors = handleMakeDependencyToolResult(Filename, MaybeOutput,
-                                                       MakeformatOS, Errs);
+            if (handleMakeDependencyToolResult(Filename, MaybeOutput,
+                                               MakeformatOS, Errs))
+              HadErrors = true;
           }
         } else if (MaybeModuleName) {
           auto MaybeModuleDepsGraph = WorkerTools[I]->getModuleDependencies(
