@@ -3912,10 +3912,10 @@ bool RecursiveASTVisitor<Derived>::TraverseHlsDirective(
 //    Every class that has getQualifier.
 
 // OmpSs directives.
+
 template <typename Derived>
 bool RecursiveASTVisitor<Derived>::TraverseOSSExecutableDirective(
     OSSExecutableDirective *S) {
-  llvm_unreachable("");
   return true;
 }
 
@@ -3925,32 +3925,51 @@ RecursiveASTVisitor<Derived>::TraverseOSSLoopDirective(OSSLoopDirective *S) {
   return TraverseOSSExecutableDirective(S);
 }
 
-DEF_TRAVERSE_STMT(OSSTaskwaitDirective,
-                  { TRY_TO(TraverseOSSExecutableDirective(S)); })
+DEF_TRAVERSE_STMT(OSSTaskwaitDirective, {
+  TRY_TO(VisitOSSTaskwaitDirective(S));
+  TRY_TO(TraverseOSSExecutableDirective(S));
+})
 
-DEF_TRAVERSE_STMT(OSSReleaseDirective,
-                  { TRY_TO(TraverseOSSExecutableDirective(S)); })
+DEF_TRAVERSE_STMT(OSSReleaseDirective, {
+  TRY_TO(VisitOSSReleaseDirective(S));
+  TRY_TO(TraverseOSSExecutableDirective(S));
+})
 
-DEF_TRAVERSE_STMT(OSSTaskDirective,
-                  { TRY_TO(TraverseOSSExecutableDirective(S)); })
+DEF_TRAVERSE_STMT(OSSTaskDirective, {
+  TRY_TO(VisitOSSTaskDirective(S));
+  TRY_TO(TraverseOSSExecutableDirective(S));
+})
 
-DEF_TRAVERSE_STMT(OSSCriticalDirective,
-                  { TRY_TO(TraverseOSSExecutableDirective(S)); })
+DEF_TRAVERSE_STMT(OSSCriticalDirective, {
+  TRY_TO(VisitOSSCriticalDirective(S));
+  TRY_TO(TraverseOSSExecutableDirective(S));
+})
 
-DEF_TRAVERSE_STMT(OSSTaskForDirective,
-                  { TRY_TO(TraverseOSSLoopDirective(S)); })
 
-DEF_TRAVERSE_STMT(OSSTaskIterDirective,
-                  { TRY_TO(TraverseOSSLoopDirective(S)); })
+DEF_TRAVERSE_STMT(OSSTaskForDirective, {
+  TRY_TO(VisitOSSTaskForDirective(S));
+  TRY_TO(TraverseOSSLoopDirective(S));
+})
 
-DEF_TRAVERSE_STMT(OSSTaskLoopDirective,
-                  { TRY_TO(TraverseOSSLoopDirective(S)); })
+DEF_TRAVERSE_STMT(OSSTaskIterDirective, {
+  TRY_TO(VisitOSSTaskIterDirective(S));
+  TRY_TO(TraverseOSSLoopDirective(S));
+})
 
-DEF_TRAVERSE_STMT(OSSTaskLoopForDirective,
-                  { TRY_TO(TraverseOSSLoopDirective(S)); })
+DEF_TRAVERSE_STMT(OSSTaskLoopDirective, {
+  TRY_TO(VisitOSSTaskLoopDirective(S));
+  TRY_TO(TraverseOSSLoopDirective(S));
+})
 
-DEF_TRAVERSE_STMT(OSSAtomicDirective,
-                  { TRY_TO(TraverseOSSExecutableDirective(S)); })
+DEF_TRAVERSE_STMT(OSSTaskLoopForDirective, {
+  TRY_TO(VisitOSSTaskLoopForDirective(S));
+  TRY_TO(TraverseOSSLoopDirective(S));
+})
+
+DEF_TRAVERSE_STMT(OSSAtomicDirective, {
+  TRY_TO(VisitOSSAtomicDirective(S));
+  TRY_TO(TraverseOSSExecutableDirective(S));
+})
 
 #undef DEF_TRAVERSE_STMT
 #undef TRAVERSE_STMT

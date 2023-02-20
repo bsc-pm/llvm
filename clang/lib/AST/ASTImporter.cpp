@@ -33,11 +33,13 @@
 #include "clang/AST/ExternalASTSource.h"
 #include "clang/AST/LambdaCapture.h"
 #include "clang/AST/NestedNameSpecifier.h"
+#include "clang/AST/OmpSsClause.h"
 #include "clang/AST/OperationKinds.h"
 #include "clang/AST/Stmt.h"
 #include "clang/AST/StmtCXX.h"
 #include "clang/AST/StmtHlsStub.h"
 #include "clang/AST/StmtObjC.h"
+#include "clang/AST/StmtOmpSs.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/AST/TemplateBase.h"
 #include "clang/AST/TemplateName.h"
@@ -62,6 +64,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
@@ -595,6 +598,62 @@ namespace clang {
     ExpectedStmt VisitContinueStmt(ContinueStmt *S);
     ExpectedStmt VisitBreakStmt(BreakStmt *S);
     ExpectedStmt VisitReturnStmt(ReturnStmt *S);
+    //===----------------------------------------------------------------------===//
+    // OmpSs Stmt importing
+    //===----------------------------------------------------------------------===//
+    ExpectedStmt VisitOSSLoopDirective(OSSLoopDirective *S);
+    ExpectedStmt VisitOSSTaskwaitDirective(OSSTaskwaitDirective *S);
+    ExpectedStmt VisitOSSReleaseDirective(OSSReleaseDirective *S);
+    ExpectedStmt VisitOSSTaskDirective(OSSTaskDirective *S);
+    ExpectedStmt VisitOSSCriticalDirective(OSSCriticalDirective *S);
+    ExpectedStmt VisitOSSTaskForDirective(OSSTaskForDirective *S);
+    ExpectedStmt VisitOSSTaskIterDirective(OSSTaskIterDirective *S);
+    ExpectedStmt VisitOSSTaskLoopDirective(OSSTaskLoopDirective *S);
+    ExpectedStmt VisitOSSTaskLoopForDirective(OSSTaskLoopForDirective *S);
+    ExpectedStmt VisitOSSAtomicDirective(OSSAtomicDirective *S);
+    //===----------------------------------------------------------------------===//
+    // OmpSs clause importing
+    //===----------------------------------------------------------------------===//
+    Expected<OSSClause *> VisitOSSClause(OSSClause *S);
+    Expected<OSSClause *> VisitOSSIfClause(OSSIfClause *C);
+    Expected<OSSClause *> VisitOSSFinalClause(OSSFinalClause *C);
+    Expected<OSSClause *> VisitOSSCostClause(OSSCostClause *C);
+    Expected<OSSClause *> VisitOSSPriorityClause(OSSPriorityClause *C);
+    Expected<OSSClause *> VisitOSSNumInstancesClause(OSSNumInstancesClause *C);
+    Expected<OSSClause *> VisitOSSOntoClause(OSSOntoClause *C);
+    Expected<OSSClause *>
+    VisitOSSNumRepetitionsClause(OSSNumRepetitionsClause *C);
+    Expected<OSSClause *> VisitOSSPeriodClause(OSSPeriodClause *C);
+    Expected<OSSClause *> VisitOSSAffinityClause(OSSAffinityClause *C);
+    Expected<OSSClause *> VisitOSSCopyInClause(OSSCopyInClause *C);
+    Expected<OSSClause *> VisitOSSCopyOutClause(OSSCopyOutClause *C);
+    Expected<OSSClause *> VisitOSSCopyInOutClause(OSSCopyInOutClause *C);
+    Expected<OSSClause *> VisitOSSCopyDepsClause(OSSCopyDepsClause *C);
+    Expected<OSSClause *> VisitOSSLabelClause(OSSLabelClause *C);
+    Expected<OSSClause *> VisitOSSOnreadyClause(OSSOnreadyClause *C);
+    Expected<OSSClause *> VisitOSSChunksizeClause(OSSChunksizeClause *C);
+    Expected<OSSClause *> VisitOSSGrainsizeClause(OSSGrainsizeClause *C);
+    Expected<OSSClause *> VisitOSSUnrollClause(OSSUnrollClause *C);
+    Expected<OSSClause *> VisitOSSCollapseClause(OSSCollapseClause *C);
+    Expected<OSSClause *> VisitOSSWaitClause(OSSWaitClause *C);
+    Expected<OSSClause *> VisitOSSUpdateClause(OSSUpdateClause *C);
+    Expected<OSSClause *> VisitOSSDefaultClause(OSSDefaultClause *C);
+    Expected<OSSClause *> VisitOSSDependClause(OSSDependClause *C);
+    Expected<OSSClause *> VisitOSSReductionClause(OSSReductionClause *C);
+    Expected<OSSClause *> VisitOSSDeviceClause(OSSDeviceClause *C);
+    Expected<OSSClause *> VisitOSSSharedClause(OSSSharedClause *C);
+    Expected<OSSClause *> VisitOSSPrivateClause(OSSPrivateClause *C);
+    Expected<OSSClause *> VisitOSSFirstprivateClause(OSSFirstprivateClause *C);
+    Expected<OSSClause *> VisitOSSNdrangeClause(OSSNdrangeClause *C);
+    Expected<OSSClause *> VisitOSSReadClause(OSSReadClause *C);
+    Expected<OSSClause *> VisitOSSWriteClause(OSSWriteClause *C);
+    Expected<OSSClause *> VisitOSSCaptureClause(OSSCaptureClause *C);
+    Expected<OSSClause *> VisitOSSCompareClause(OSSCompareClause *C);
+    Expected<OSSClause *> VisitOSSSeqCstClause(OSSSeqCstClause *C);
+    Expected<OSSClause *> VisitOSSAcqRelClause(OSSAcqRelClause *C);
+    Expected<OSSClause *> VisitOSSAcquireClause(OSSAcquireClause *C);
+    Expected<OSSClause *> VisitOSSReleaseClause(OSSReleaseClause *C);
+    Expected<OSSClause *> VisitOSSRelaxedClause(OSSRelaxedClause *C);
     // FIXME: MSAsmStmt
     // FIXME: SEHExceptStmt
     // FIXME: SEHFinallyStmt
@@ -688,7 +747,12 @@ namespace clang {
     ExpectedStmt VisitTypeTraitExpr(TypeTraitExpr *E);
     ExpectedStmt VisitCXXTypeidExpr(CXXTypeidExpr *E);
     ExpectedStmt VisitCXXFoldExpr(CXXFoldExpr *E);
-
+    //===----------------------------------------------------------------------===//
+    // OmpSs Expr importing
+    //===----------------------------------------------------------------------===//
+    ExpectedStmt VisitOSSArraySectionExpr(OSSArraySectionExpr *E);
+    ExpectedStmt VisitOSSArrayShapingExpr(OSSArrayShapingExpr *E);
+    ExpectedStmt VisitOSSMultiDepExpr(OSSMultiDepExpr *E);
     // Helper for chaining together multiple imports. If an error is detected,
     // subsequent imports will return default constructed nodes, so that failure
     // can be detected with a single conditional branch after a sequence of
@@ -6775,12 +6839,759 @@ ExpectedStmt ASTNodeImporter::VisitReturnStmt(ReturnStmt *S) {
                             ToNRVOCandidate);
 }
 
+ExpectedStmt
+ASTNodeImporter::VisitOSSTaskwaitDirective(OSSTaskwaitDirective *S) {
+  SmallVector<OSSClause *, 8> clauses;
+  for (auto *clause : S->clauses()) {
+    auto newClause = VisitOSSClause(clause);
+    if (!newClause) {
+      return newClause.takeError();
+    }
+    clauses.push_back(*newClause);
+  }
+  Error Err = Error::success();
+  auto begin = importChecked(Err, S->getBeginLoc());
+  auto end = importChecked(Err, S->getEndLoc());
+  if (Err)
+    return std::move(Err);
+  return OSSTaskwaitDirective::Create(Importer.getToContext(), begin, end,
+                                      clauses);
+}
+
+ExpectedStmt ASTNodeImporter::VisitOSSReleaseDirective(OSSReleaseDirective *S) {
+  SmallVector<OSSClause *, 8> clauses;
+  for (auto *clause : S->clauses()) {
+    auto newClause = VisitOSSClause(clause);
+    if (!newClause) {
+      return newClause.takeError();
+    }
+    clauses.push_back(*newClause);
+  }
+  Error Err = Error::success();
+  auto begin = importChecked(Err, S->getBeginLoc());
+  auto end = importChecked(Err, S->getEndLoc());
+  if (Err)
+    return std::move(Err);
+  return OSSReleaseDirective::Create(Importer.getToContext(), begin, end,
+                                     clauses);
+}
+ExpectedStmt ASTNodeImporter::VisitOSSTaskDirective(OSSTaskDirective *S) {
+  SmallVector<OSSClause *, 8> clauses;
+  for (auto *clause : S->clauses()) {
+    auto newClause = VisitOSSClause(clause);
+    if (!newClause) {
+      return newClause.takeError();
+    }
+    clauses.push_back(*newClause);
+  }
+  Error Err = Error::success();
+  auto *assocStmt = importChecked(Err, S->getAssociatedStmt());
+  auto begin = importChecked(Err, S->getBeginLoc());
+  auto end = importChecked(Err, S->getEndLoc());
+  if (Err)
+    return std::move(Err);
+  return OSSTaskDirective::Create(Importer.getToContext(), begin, end, clauses,
+                                  assocStmt);
+}
+ExpectedStmt
+ASTNodeImporter::VisitOSSCriticalDirective(OSSCriticalDirective *S) {
+  SmallVector<OSSClause *, 8> clauses;
+  for (auto *clause : S->clauses()) {
+    auto newClause = VisitOSSClause(clause);
+    if (!newClause) {
+      return newClause.takeError();
+    }
+    clauses.push_back(*newClause);
+  }
+  Error Err = Error::success();
+  auto *assocStmt = importChecked(Err, S->getAssociatedStmt());
+  auto begin = importChecked(Err, S->getBeginLoc());
+  auto end = importChecked(Err, S->getEndLoc());
+  auto ToMember = importChecked(Err, S->getDirectiveName().getName());
+  auto ToMemberLoc = importChecked(Err, S->getDirectiveName().getLoc());
+  if (Err)
+    return std::move(Err);
+  DeclarationNameInfo ToMemberNameInfo(ToMember, ToMemberLoc);
+  // Import additional name location/type info.
+  if (Error Err =
+          ImportDeclarationNameLoc(S->getDirectiveName(), ToMemberNameInfo))
+    return std::move(Err);
+  return OSSCriticalDirective::Create(Importer.getToContext(), ToMemberNameInfo,
+                                      begin, end, clauses, assocStmt);
+}
+ExpectedStmt ASTNodeImporter::VisitOSSTaskForDirective(OSSTaskForDirective *S) {
+  SmallVector<OSSClause *, 8> clauses;
+  for (auto *clause : S->clauses()) {
+    auto newClause = VisitOSSClause(clause);
+    if (!newClause) {
+      return newClause.takeError();
+    }
+    clauses.push_back(*newClause);
+  }
+  Error Err = Error::success();
+  auto *assocStmt = importChecked(Err, S->getAssociatedStmt());
+  auto begin = importChecked(Err, S->getBeginLoc());
+  auto end = importChecked(Err, S->getEndLoc());
+  if (Err)
+    return std::move(Err);
+  SmallVector<OSSLoopDirective::HelperExprs, 2> helperExprs(
+      S->getNumCollapses());
+  for (size_t i = 0; i < S->getNumCollapses(); ++i) {
+    helperExprs[i].IndVar = importChecked(Err, S->getIterationVariable()[i]);
+    helperExprs[i].Step = importChecked(Err, S->getStep()[i]);
+    helperExprs[i].LB = importChecked(Err, S->getLowerBound()[i]);
+    helperExprs[i].UB = importChecked(Err, S->getUpperBound()[i]);
+    helperExprs[i].TestIsLessOp = S->getIsLessOp()[i];
+    helperExprs[i].TestIsStrictOp = S->getIsStrictOp()[i];
+  }
+  if (Err)
+    return std::move(Err);
+  return OSSTaskForDirective::Create(Importer.getToContext(), begin, end,
+                                     clauses, assocStmt, helperExprs);
+}
+ExpectedStmt
+ASTNodeImporter::VisitOSSTaskIterDirective(OSSTaskIterDirective *S) {
+  SmallVector<OSSClause *, 8> clauses;
+  for (auto *clause : S->clauses()) {
+    auto newClause = VisitOSSClause(clause);
+    if (!newClause) {
+      return newClause.takeError();
+    }
+    clauses.push_back(*newClause);
+  }
+  Error Err = Error::success();
+  auto *assocStmt = importChecked(Err, S->getAssociatedStmt());
+  auto begin = importChecked(Err, S->getBeginLoc());
+  auto end = importChecked(Err, S->getEndLoc());
+  if (Err)
+    return std::move(Err);
+  SmallVector<OSSLoopDirective::HelperExprs, 2> helperExprs(
+      S->getNumCollapses());
+  for (size_t i = 0; i < S->getNumCollapses(); ++i) {
+    helperExprs[i].IndVar = importChecked(Err, S->getIterationVariable()[i]);
+    helperExprs[i].Step = importChecked(Err, S->getStep()[i]);
+    helperExprs[i].LB = importChecked(Err, S->getLowerBound()[i]);
+    helperExprs[i].UB = importChecked(Err, S->getUpperBound()[i]);
+    helperExprs[i].TestIsLessOp = S->getIsLessOp()[i];
+    helperExprs[i].TestIsStrictOp = S->getIsStrictOp()[i];
+  }
+  if (Err)
+    return std::move(Err);
+  return OSSTaskIterDirective::Create(Importer.getToContext(), begin, end,
+                                      clauses, assocStmt, helperExprs);
+}
+ExpectedStmt
+ASTNodeImporter::VisitOSSTaskLoopDirective(OSSTaskLoopDirective *S) {
+  SmallVector<OSSClause *, 8> clauses;
+  for (auto *clause : S->clauses()) {
+    auto newClause = VisitOSSClause(clause);
+    if (!newClause) {
+      return newClause.takeError();
+    }
+    clauses.push_back(*newClause);
+  }
+  Error Err = Error::success();
+  auto *assocStmt = importChecked(Err, S->getAssociatedStmt());
+  auto begin = importChecked(Err, S->getBeginLoc());
+  auto end = importChecked(Err, S->getEndLoc());
+  if (Err)
+    return std::move(Err);
+  SmallVector<OSSLoopDirective::HelperExprs, 2> helperExprs(
+      S->getNumCollapses());
+  for (size_t i = 0; i < S->getNumCollapses(); ++i) {
+    helperExprs[i].IndVar = importChecked(Err, S->getIterationVariable()[i]);
+    helperExprs[i].Step = importChecked(Err, S->getStep()[i]);
+    helperExprs[i].LB = importChecked(Err, S->getLowerBound()[i]);
+    helperExprs[i].UB = importChecked(Err, S->getUpperBound()[i]);
+    helperExprs[i].TestIsLessOp = S->getIsLessOp()[i];
+    helperExprs[i].TestIsStrictOp = S->getIsStrictOp()[i];
+  }
+  if (Err)
+    return std::move(Err);
+  return OSSTaskLoopDirective::Create(Importer.getToContext(), begin, end,
+                                      clauses, assocStmt, helperExprs);
+}
+ExpectedStmt
+ASTNodeImporter::VisitOSSTaskLoopForDirective(OSSTaskLoopForDirective *S) {
+  SmallVector<OSSClause *, 8> clauses;
+  for (auto *clause : S->clauses()) {
+    auto newClause = VisitOSSClause(clause);
+    if (!newClause) {
+      return newClause.takeError();
+    }
+    clauses.push_back(*newClause);
+  }
+  Error Err = Error::success();
+  auto *assocStmt = importChecked(Err, S->getAssociatedStmt());
+  auto begin = importChecked(Err, S->getBeginLoc());
+  auto end = importChecked(Err, S->getEndLoc());
+  if (Err)
+    return std::move(Err);
+  SmallVector<OSSLoopDirective::HelperExprs, 2> helperExprs(
+      S->getNumCollapses());
+  for (size_t i = 0; i < S->getNumCollapses(); ++i) {
+    helperExprs[i].IndVar = importChecked(Err, S->getIterationVariable()[i]);
+    helperExprs[i].Step = importChecked(Err, S->getStep()[i]);
+    helperExprs[i].LB = importChecked(Err, S->getLowerBound()[i]);
+    helperExprs[i].UB = importChecked(Err, S->getUpperBound()[i]);
+    helperExprs[i].TestIsLessOp = S->getIsLessOp()[i];
+    helperExprs[i].TestIsStrictOp = S->getIsStrictOp()[i];
+  }
+  if (Err)
+    return std::move(Err);
+  return OSSTaskLoopForDirective::Create(Importer.getToContext(), begin, end,
+                                         clauses, assocStmt, helperExprs);
+}
+ExpectedStmt ASTNodeImporter::VisitOSSAtomicDirective(OSSAtomicDirective *S) {
+  SmallVector<OSSClause *, 8> clauses;
+  for (auto *clause : S->clauses()) {
+    auto newClause = VisitOSSClause(clause);
+    if (!newClause) {
+      return newClause.takeError();
+    }
+    clauses.push_back(*newClause);
+  }
+  Error Err = Error::success();
+  auto *assocStmt = importChecked(Err, S->getAssociatedStmt());
+  auto begin = importChecked(Err, S->getBeginLoc());
+  auto end = importChecked(Err, S->getEndLoc());
+  OSSAtomicDirective::Expressions helperExprs{};
+  helperExprs.Cond = importChecked(Err, S->getCondExpr());
+  helperExprs.D = importChecked(Err, S->getD());
+  helperExprs.E = importChecked(Err, S->getExpr());
+  helperExprs.R = importChecked(Err, S->getR());
+  helperExprs.UE = importChecked(Err, S->getUpdateExpr());
+  helperExprs.V = importChecked(Err, S->getV());
+  helperExprs.X = importChecked(Err, S->getX());
+  helperExprs.IsFailOnly = S->isFailOnly();
+  helperExprs.IsPostfixUpdate = S->isPostfixUpdate();
+  helperExprs.IsXLHSInRHSPart = S->isXLHSInRHSPart();
+  if (Err)
+    return std::move(Err);
+  return OSSAtomicDirective::Create(Importer.getToContext(), begin, end,
+                                    clauses, assocStmt, helperExprs);
+}
+
+Expected<OSSClause *> ASTNodeImporter::VisitOSSClause(OSSClause *S) {
+  if (!S)
+    return Expected<OSSClause *>(S);
+
+  switch (S->getClauseKind()) {
+  default:
+    break;
+    // Transform individual clause nodes
+#define GEN_CLANG_CLAUSE_CLASS
+#define CLAUSE_CLASS(Enum, Str, Class)                                         \
+  case llvm::oss::Enum:                                                        \
+    return Visit##Class(cast<Class>(S));
+#include "llvm/Frontend/OmpSs/OSS.inc"
+  }
+
+  return S;
+}
+
+Expected<OSSClause *> ASTNodeImporter::VisitOSSIfClause(OSSIfClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  auto *condition = importChecked(Err, C->getCondition());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext())
+      OSSIfClause(condition, beginLoc, lParenLoc, endLoc);
+}
+
+Expected<OSSClause *> ASTNodeImporter::VisitOSSFinalClause(OSSFinalClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  auto *condition = importChecked(Err, C->getCondition());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext())
+      OSSFinalClause(condition, beginLoc, lParenLoc, endLoc);
+}
+
+Expected<OSSClause *> ASTNodeImporter::VisitOSSCostClause(OSSCostClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  auto *expr = importChecked(Err, C->getExpression());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext())
+      OSSCostClause(expr, beginLoc, lParenLoc, endLoc);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSPriorityClause(OSSPriorityClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  auto *expr = importChecked(Err, C->getExpression());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext())
+      OSSPriorityClause(expr, beginLoc, lParenLoc, endLoc);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSNumInstancesClause(OSSNumInstancesClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  auto *expr = importChecked(Err, C->getExpression());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext())
+      OSSNumInstancesClause(expr, beginLoc, lParenLoc, endLoc);
+}
+
+Expected<OSSClause *> ASTNodeImporter::VisitOSSOntoClause(OSSOntoClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  auto *expr = importChecked(Err, C->getExpression());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext())
+      OSSOntoClause(expr, beginLoc, lParenLoc, endLoc);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSNumRepetitionsClause(OSSNumRepetitionsClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  auto *expr = importChecked(Err, C->getExpression());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext())
+      OSSNumRepetitionsClause(expr, beginLoc, lParenLoc, endLoc);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSPeriodClause(OSSPeriodClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  auto *expr = importChecked(Err, C->getExpression());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext())
+      OSSPeriodClause(expr, beginLoc, lParenLoc, endLoc);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSAffinityClause(OSSAffinityClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  auto *expr = importChecked(Err, C->getExpression());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext())
+      OSSAffinityClause(expr, beginLoc, lParenLoc, endLoc);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSCopyInClause(OSSCopyInClause *C) {
+  llvm::SmallVector<Expr *, 16> Vars(C->varlist_size());
+  Error Err = ImportContainerChecked(C->varlists(), Vars);
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  if (Err)
+    return std::move(Err);
+  return OSSCopyInClause::Create(Importer.getToContext(), beginLoc, lParenLoc,
+                                 endLoc, Vars);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSCopyOutClause(OSSCopyOutClause *C) {
+  llvm::SmallVector<Expr *, 16> Vars(C->varlist_size());
+  Error Err = ImportContainerChecked(C->varlists(), Vars);
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  if (Err)
+    return std::move(Err);
+  return OSSCopyOutClause::Create(Importer.getToContext(), beginLoc, lParenLoc,
+                                  endLoc, Vars);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSCopyInOutClause(OSSCopyInOutClause *C) {
+  llvm::SmallVector<Expr *, 16> Vars(C->varlist_size());
+  Error Err = ImportContainerChecked(C->varlists(), Vars);
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  if (Err)
+    return std::move(Err);
+  return OSSCopyInOutClause::Create(Importer.getToContext(), beginLoc,
+                                    lParenLoc, endLoc, Vars);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSCopyDepsClause(OSSCopyDepsClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext()) OSSCopyDepsClause(beginLoc, endLoc);
+}
+
+Expected<OSSClause *> ASTNodeImporter::VisitOSSLabelClause(OSSLabelClause *C) {
+  llvm::SmallVector<Expr *, 16> Vars(C->varlist_size());
+  Error Err = ImportContainerChecked(C->varlists(), Vars);
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  if (Err)
+    return std::move(Err);
+  return OSSLabelClause::Create(Importer.getToContext(), beginLoc, lParenLoc,
+                                endLoc, Vars);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSOnreadyClause(OSSOnreadyClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  auto *expr = importChecked(Err, C->getExpression());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext())
+      OSSOnreadyClause(expr, beginLoc, lParenLoc, endLoc);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSChunksizeClause(OSSChunksizeClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  auto *expr = importChecked(Err, C->getExpression());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext())
+      OSSChunksizeClause(expr, beginLoc, lParenLoc, endLoc);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSGrainsizeClause(OSSGrainsizeClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  auto *expr = importChecked(Err, C->getExpression());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext())
+      OSSGrainsizeClause(expr, beginLoc, lParenLoc, endLoc);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSUnrollClause(OSSUnrollClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  auto *expr = importChecked(Err, C->getExpression());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext())
+      OSSUnrollClause(expr, beginLoc, lParenLoc, endLoc);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSCollapseClause(OSSCollapseClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  auto *expr = importChecked(Err, C->getNumForLoops());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext())
+      OSSCollapseClause(expr, beginLoc, lParenLoc, endLoc);
+}
+
+Expected<OSSClause *> ASTNodeImporter::VisitOSSWaitClause(OSSWaitClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext()) OSSWaitClause(beginLoc, endLoc);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSUpdateClause(OSSUpdateClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext()) OSSUpdateClause(beginLoc, endLoc);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSDefaultClause(OSSDefaultClause *C) {
+  Error Err = Error::success();
+  auto ALoc = importChecked(Err, C->getDefaultKindKwLoc());
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext())
+      OSSDefaultClause(C->getDefaultKind(), ALoc, beginLoc, lParenLoc, endLoc);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSDependClause(OSSDependClause *C) {
+  llvm::SmallVector<Expr *, 16> Vars(C->varlist_size());
+  Error Err = ImportContainerChecked(C->varlists(), Vars);
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  auto colonLoc = importChecked(Err, C->getColonLoc());
+  auto depLoc = importChecked(Err, C->getDependencyLoc());
+  if (Err)
+    return std::move(Err);
+  return OSSDependClause::Create(Importer.getToContext(), beginLoc, lParenLoc,
+                                 endLoc, C->getDependencyKinds(),
+                                 C->getDependencyKindsOrdered(), depLoc,
+                                 colonLoc, Vars, C->isOSSSyntax());
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSReductionClause(OSSReductionClause *C) {
+  auto rhsUnimported = C->rhs_exprs();
+  llvm::SmallVector<Expr *, 16> Rhs(rhsUnimported.end() -
+                                    rhsUnimported.begin());
+  Error Err = ImportContainerChecked(rhsUnimported, Rhs);
+  if (Err)
+    return std::move(Err);
+  auto lhsUnimported = C->lhs_exprs();
+  llvm::SmallVector<Expr *, 16> Lhs(lhsUnimported.end() -
+                                    lhsUnimported.begin());
+  Err = ImportContainerChecked(lhsUnimported, Lhs);
+  if (Err)
+    return std::move(Err);
+  auto redOpsUnimported = C->reduction_ops();
+  llvm::SmallVector<Expr *, 16> RedOps(redOpsUnimported.end() -
+                                       redOpsUnimported.begin());
+  Err = ImportContainerChecked(redOpsUnimported, RedOps);
+  if (Err)
+    return std::move(Err);
+  llvm::SmallVector<Expr *, 16> VarRefs(C->varlist_size());
+  Err = ImportContainerChecked(C->varlists(), VarRefs);
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  auto colonLoc = importChecked(Err, C->getColonLoc());
+  auto qualLoc = importChecked(Err, C->getQualifierLoc());
+  auto ToMember = importChecked(Err, C->getNameInfo().getName());
+  auto ToMemberLoc = importChecked(Err, C->getNameInfo().getLoc());
+  if (Err)
+    return std::move(Err);
+  DeclarationNameInfo ToMemberNameInfo(ToMember, ToMemberLoc);
+  // Import additional name location/type info.
+  if (Error Err = ImportDeclarationNameLoc(C->getNameInfo(), ToMemberNameInfo))
+    return std::move(Err);
+  return OSSReductionClause::Create(Importer.getToContext(), beginLoc,
+                                    lParenLoc, colonLoc, endLoc, VarRefs,
+                                    qualLoc, ToMemberNameInfo, Lhs, Rhs, RedOps,
+                                    C->getReductionKinds(), C->isWeak());
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSDeviceClause(OSSDeviceClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  auto deviceLoc = importChecked(Err, C->getDeviceKindKwLoc());
+  auto device = C->getDeviceKind();
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext())
+      OSSDeviceClause(device, deviceLoc, beginLoc, lParenLoc, endLoc);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSSharedClause(OSSSharedClause *C) {
+  llvm::SmallVector<Expr *, 16> Vars(C->varlist_size());
+  Error Err = ImportContainerChecked(C->varlists(), Vars);
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  if (Err)
+    return std::move(Err);
+  return OSSSharedClause::Create(Importer.getToContext(), beginLoc, lParenLoc,
+                                 endLoc, Vars);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSPrivateClause(OSSPrivateClause *C) {
+  llvm::SmallVector<Expr *, 16> Vars(C->varlist_size());
+  Error Err = ImportContainerChecked(C->varlists(), Vars);
+  if (Err)
+    return std::move(Err);
+  llvm::SmallVector<Expr *, 16> PrivateVars(C->private_copies());
+  Err = ImportContainerChecked(C->private_copies(), PrivateVars);
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  if (Err)
+    return std::move(Err);
+  return OSSPrivateClause::Create(Importer.getToContext(), beginLoc, lParenLoc,
+                                  endLoc, Vars, PrivateVars);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSFirstprivateClause(OSSFirstprivateClause *C) {
+  llvm::SmallVector<Expr *, 16> Vars(C->varlist_size());
+  Error Err = ImportContainerChecked(C->varlists(), Vars);
+  if (Err)
+    return std::move(Err);
+  llvm::SmallVector<Expr *, 16> PrivateVars(C->private_copies());
+  Err = ImportContainerChecked(C->private_copies(), PrivateVars);
+  if (Err)
+    return std::move(Err);
+  llvm::SmallVector<Expr *, 16> InitVL(C->inits());
+  Err = ImportContainerChecked(C->inits(), InitVL);
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  if (Err)
+    return std::move(Err);
+  return OSSFirstprivateClause::Create(Importer.getToContext(), beginLoc,
+                                       lParenLoc, endLoc, Vars, PrivateVars,
+                                       InitVL);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSNdrangeClause(OSSNdrangeClause *C) {
+  llvm::SmallVector<Expr *, 16> Vars(C->varlist_size());
+  Error Err = ImportContainerChecked(C->varlists(), Vars);
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  auto lParenLoc = importChecked(Err, C->getLParenLoc());
+  if (Err)
+    return std::move(Err);
+  return OSSNdrangeClause::Create(Importer.getToContext(), beginLoc, lParenLoc,
+                                  endLoc, Vars);
+}
+
+Expected<OSSClause *> ASTNodeImporter::VisitOSSReadClause(OSSReadClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext()) OSSReadClause(beginLoc, endLoc);
+}
+
+Expected<OSSClause *> ASTNodeImporter::VisitOSSWriteClause(OSSWriteClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext()) OSSWriteClause(beginLoc, endLoc);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSCaptureClause(OSSCaptureClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext()) OSSCaptureClause(beginLoc, endLoc);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSCompareClause(OSSCompareClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext()) OSSCompareClause(beginLoc, endLoc);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSSeqCstClause(OSSSeqCstClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext()) OSSSeqCstClause(beginLoc, endLoc);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSAcqRelClause(OSSAcqRelClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext()) OSSAcqRelClause(beginLoc, endLoc);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSAcquireClause(OSSAcquireClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext()) OSSAcquireClause(beginLoc, endLoc);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSReleaseClause(OSSReleaseClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext()) OSSReleaseClause(beginLoc, endLoc);
+}
+
+Expected<OSSClause *>
+ASTNodeImporter::VisitOSSRelaxedClause(OSSRelaxedClause *C) {
+  Error Err = Error::success();
+  auto beginLoc = importChecked(Err, C->getBeginLoc());
+  auto endLoc = importChecked(Err, C->getEndLoc());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext()) OSSRelaxedClause(beginLoc, endLoc);
+}
+
 ExpectedStmt ASTNodeImporter::VisitCXXCatchStmt(CXXCatchStmt *S) {
 
   Error Err = Error::success();
   auto ToCatchLoc = importChecked(Err, S->getCatchLoc());
-  auto ToExceptionDecl = importChecked(Err, S->getExceptionDecl());
-  auto ToHandlerBlock = importChecked(Err, S->getHandlerBlock());
+  auto *ToExceptionDecl = importChecked(Err, S->getExceptionDecl());
+  auto *ToHandlerBlock = importChecked(Err, S->getHandlerBlock());
   if (Err)
     return std::move(Err);
 
@@ -8562,6 +9373,89 @@ ExpectedStmt ASTNodeImporter::VisitCXXFoldExpr(CXXFoldExpr *E) {
   return new (Importer.getToContext())
       CXXFoldExpr(ToType, ToCallee, ToLParenLoc, ToLHS, E->getOperator(),
                   ToEllipsisLoc, ToRHS, ToRParenLoc, E->getNumExpansions());
+}
+
+ExpectedStmt ASTNodeImporter::VisitOSSArraySectionExpr(OSSArraySectionExpr *E) {
+  Error Err = Error::success();
+
+  auto *base = importChecked(Err, E->getBase());
+  auto *lowerBound = importChecked(Err, E->getLowerBound());
+  auto *lengthUpper = importChecked(Err, E->getLengthUpper());
+  auto type = importChecked(Err, E->getType());
+  auto VK = E->getValueKind();
+  auto OK = E->getObjectKind();
+  auto colonLoc = importChecked(Err, E->getColonLoc());
+  auto rBracketLoc = importChecked(Err, E->getRBracketLoc());
+  auto colonForm = E->isColonForm();
+
+  if (Err)
+    return std::move(Err);
+
+  return new (Importer.getToContext())
+      OSSArraySectionExpr(base, lowerBound, lengthUpper, type, VK, OK, colonLoc,
+                          rBracketLoc, colonForm);
+}
+
+ExpectedStmt ASTNodeImporter::VisitOSSArrayShapingExpr(OSSArrayShapingExpr *E) {
+  Error Err = Error::success();
+
+  auto type = importChecked(Err, E->getType());
+  auto VK = E->getValueKind();
+  auto OK = E->getObjectKind();
+  auto *base = importChecked(Err, E->getBase());
+
+  auto beginLoc = importChecked(Err, E->getBeginLoc());
+  auto endLoc = importChecked(Err, E->getEndLoc());
+  if (Err)
+    return std::move(Err);
+  auto fromShapes = E->getShapes();
+  SmallVector<Expr *, 8> toShapes(fromShapes.size());
+  if (auto Err = ImportContainerChecked(fromShapes, toShapes)) {
+    return Err;
+  }
+  return OSSArrayShapingExpr::Create(Importer.getToContext(), type, VK, OK,
+                                     base, toShapes, beginLoc, endLoc);
+}
+
+ExpectedStmt ASTNodeImporter::VisitOSSMultiDepExpr(OSSMultiDepExpr *E) {
+  Error Err = Error::success();
+
+  auto type = importChecked(Err, E->getType());
+  auto VK = E->getValueKind();
+  auto OK = E->getObjectKind();
+
+  auto beginLoc = importChecked(Err, E->getBeginLoc());
+  auto endLoc = importChecked(Err, E->getEndLoc());
+  auto *depExpr = importChecked(Err, E->getDepExpr());
+  if (Err)
+    return std::move(Err);
+  auto importContainer =
+      [&](auto fromExprs) -> Expected<SmallVector<Expr *, 8>> {
+    SmallVector<Expr *, 8> toExprs(fromExprs.size());
+    if (auto Err = ImportContainerChecked(fromExprs, toExprs)) {
+      return Err;
+    }
+    return toExprs;
+  };
+#define CHECK_EXPECTED(thing)                                                  \
+  if (!thing) {                                                                \
+    return thing.takeError();                                                  \
+  }
+  auto depIterators = importContainer(E->getDepIterators());
+  CHECK_EXPECTED(depIterators);
+  auto depInits = importContainer(E->getDepInits());
+  CHECK_EXPECTED(depInits);
+  auto depSizes = importContainer(E->getDepSizes());
+  CHECK_EXPECTED(depSizes);
+  auto depSteps = importContainer(E->getDepSteps());
+  CHECK_EXPECTED(depSteps);
+  auto discreteArrays = importContainer(E->getDiscreteArrays());
+  CHECK_EXPECTED(discreteArrays);
+#undef CHECK_EXPECTED
+  return OSSMultiDepExpr::Create(Importer.getToContext(), type, VK, OK, depExpr,
+                                 *depIterators, *depInits, *depSizes, *depSteps,
+                                 *discreteArrays, E->getDepSizeOrSection(),
+                                 beginLoc, endLoc);
 }
 
 Error ASTNodeImporter::ImportOverriddenMethods(CXXMethodDecl *ToMethod,
