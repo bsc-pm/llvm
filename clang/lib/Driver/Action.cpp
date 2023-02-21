@@ -50,6 +50,8 @@ const char *Action::getClassName(ActionClass AC) {
     return "static-lib-linker";
   case BinaryAnalyzeJobClass:
     return "binary-analyzer";
+  case FPGAWrapperGenJobClass:
+    return "fpga-wrapper-generator";
   }
 
   llvm_unreachable("invalid class");
@@ -458,3 +460,8 @@ void BinaryAnalyzeJobAction::anchor() {}
 
 BinaryAnalyzeJobAction::BinaryAnalyzeJobAction(Action *Input, types::ID Type)
     : JobAction(BinaryAnalyzeJobClass, Input, Type) {}
+
+void FPGAWrapperGenJobAction::anchor() {}
+
+FPGAWrapperGenJobAction::FPGAWrapperGenJobAction(Action *Input, types::ID Type)
+    : JobAction(FPGAWrapperGenJobClass, Input, Type) {}

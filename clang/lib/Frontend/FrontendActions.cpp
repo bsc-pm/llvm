@@ -1143,3 +1143,14 @@ void GetDependenciesByModuleNameAction::ExecuteAction() {
   PPCallbacks *CB = PP.getPPCallbacks();
   CB->moduleImport(SourceLocation(), Path, ModResult);
 }
+
+// FPGAWrapperGen
+std::unique_ptr<ASTConsumer>
+FPGAWrapperGenAction::CreateASTConsumer(CompilerInstance &CI,
+                                        StringRef InFile) {
+  return CreateFPGAWrapperGen(CI.getPreprocessor());
+}
+
+void FPGAWrapperGenAction::ExecuteAction() {
+  ASTFrontendAction::ExecuteAction();
+}

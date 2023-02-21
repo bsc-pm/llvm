@@ -76,9 +76,10 @@ public:
     LinkerWrapperJobClass,
     StaticLibJobClass,
     BinaryAnalyzeJobClass,
+    FPGAWrapperGenJobClass,
 
     JobClassFirst = PreprocessJobClass,
-    JobClassLast = BinaryAnalyzeJobClass
+    JobClassLast = FPGAWrapperGenJobClass
   };
 
   // The offloading kind determines if this action is binded to a particular
@@ -683,6 +684,17 @@ public:
 
   static bool classof(const Action *A) {
     return A->getKind() == BinaryAnalyzeJobClass;
+  }
+};
+
+class FPGAWrapperGenJobAction : public JobAction {
+  void anchor() override;
+
+public:
+  FPGAWrapperGenJobAction(Action *Input, types::ID Type);
+
+  static bool classof(const Action *A) {
+    return A->getKind() == FPGAWrapperGenJobClass;
   }
 };
 

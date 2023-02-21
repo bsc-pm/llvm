@@ -636,6 +636,9 @@ public:
   IntrusiveRefCntPtr<ExternalASTSource> ExternalSource;
   ASTMutationListener *Listener = nullptr;
 
+  /// declared functions with the #pragma task device(fpga) attribute
+  SmallVector<Decl *, 2> ompssFpgaDecls;
+
   /// Returns the clang bytecode interpreter context.
   interp::Context &getInterpContext();
 

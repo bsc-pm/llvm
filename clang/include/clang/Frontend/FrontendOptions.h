@@ -140,7 +140,10 @@ enum ActionKind {
   RunPreprocessorOnly,
 
   /// Print the output of the dependency directives source minimizer.
-  PrintDependencyDirectivesSourceMinimizerOutput
+  PrintDependencyDirectivesSourceMinimizerOutput,
+
+  /// Ompss2@FPGA Wrapper generator
+  FPGAWrapperGen,
 };
 
 } // namespace frontend

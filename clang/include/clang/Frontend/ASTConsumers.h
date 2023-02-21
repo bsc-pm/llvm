@@ -15,11 +15,13 @@
 
 #include "clang/AST/ASTDumperUtils.h"
 #include "clang/Basic/LLVM.h"
+#include "clang/Lex/Preprocessor.h"
 #include <memory>
 
 namespace clang {
 
 class ASTConsumer;
+class Sema;
 
 // AST pretty-printer: prints out the AST in a format that is close to the
 // original C code.  The output is intended to be in a format such that
@@ -43,6 +45,10 @@ std::unique_ptr<ASTConsumer> CreateASTDeclNodeLister();
 // the AST and displays it with the graph viewer "dotty".  Also outputs
 // function declarations to stderr.
 std::unique_ptr<ASTConsumer> CreateASTViewer();
+
+// Performs various FPGA source to source code generation operations related to
+// Ompss2@FPGA
+std::unique_ptr<ASTConsumer> CreateFPGAWrapperGen(Preprocessor &PP);
 
 } // end clang namespace
 

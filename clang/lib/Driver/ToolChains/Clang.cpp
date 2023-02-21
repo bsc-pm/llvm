@@ -4778,6 +4778,8 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     if (Arg *ExtractAPIIgnoresFileArg =
             Args.getLastArg(options::OPT_extract_api_ignores_EQ))
       ExtractAPIIgnoresFileArg->render(Args, CmdArgs);
+  } else if (isa<FPGAWrapperGenJobAction>(JA)) {
+    CmdArgs.push_back("-fompss-fpga");
   } else {
     assert((isa<CompileJobAction>(JA) || isa<BackendJobAction>(JA)) &&
            "Invalid action for clang tool.");

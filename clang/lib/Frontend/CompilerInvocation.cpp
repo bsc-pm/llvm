@@ -2459,6 +2459,8 @@ static const auto &getFrontendActionTable() {
       {frontend::RunPreprocessorOnly, OPT_Eonly},
       {frontend::PrintDependencyDirectivesSourceMinimizerOutput,
        OPT_print_dependency_directives_minimized_source},
+      {frontend::FPGAWrapperGen, OPT_fompss_fpga},
+
   };
 
   return Table;
@@ -4078,6 +4080,7 @@ static bool isStrictlyPreprocessorAction(frontend::ActionKind Action) {
   case frontend::RunAnalysis:
   case frontend::TemplightDump:
   case frontend::MigrateSource:
+  case frontend::FPGAWrapperGen:
     return false;
 
   case frontend::DumpCompilerOptions:

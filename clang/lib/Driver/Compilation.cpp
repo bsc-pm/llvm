@@ -223,6 +223,9 @@ static bool ActionFailed(const Action *A,
   if (A->isOffloading(Action::OFK_Cuda) || A->isOffloading(Action::OFK_HIP))
     return true;
 
+  if (isa<FPGAWrapperGenJobAction>(A))
+    return true;
+
   for (const auto &CI : FailingCommands)
     if (A == &(CI.second->getSource()))
       return true;

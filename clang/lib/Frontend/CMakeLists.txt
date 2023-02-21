@@ -30,6 +30,7 @@ add_clang_library(clangFrontend
   LogDiagnosticPrinter.cpp
   ModuleDependencyCollector.cpp
   MultiplexConsumer.cpp
+  OmpSsFpgaWrapperGen.cpp
   PrecompiledPreamble.cpp
   PrintPreprocessedOutput.cpp
   SARIFDiagnostic.cpp

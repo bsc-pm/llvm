@@ -4047,6 +4047,7 @@ void Driver::BuildActions(Compilation &C, DerivedArgList &Args,
   ExtractAPIJobAction *ExtractAPIAction = nullptr;
   ActionList LinkerInputs;
   ActionList MergerInputs;
+  FPGAWrapperGenJobAction *FPGAWrapperGen = nullptr;
 
   for (auto &I : Inputs) {
     types::ID InputType = I.first;
@@ -4114,6 +4115,18 @@ void Driver::BuildActions(Compilation &C, DerivedArgList &Args,
       if (NewCurrent == Current)
         continue;
 
+      if ((Args.hasArg(options::OPT_fompss_fpga) ||
+           Args.hasArg(options::OPT_fompss_fpga_extract) ||
+           Args.hasArg(options::OPT_fompss_fpga_wrapper_code)) &&
+          Phase == phases::Compile &&
+          (Current->getType() == types::TY_PP_C ||
+           Current->getType() == types::TY_PP_CXX)) {
+        FPGAWrapperGen = C.MakeAction<FPGAWrapperGenJobAction>(
+            Current, Current->getType() == types::TY_PP_C
+                         ? types::TY_PP_FPGA_WRAPPERGEN_C
+                         : types::TY_PP_FPGA_WRAPPERGEN_CXX);
+      }
+
       if (auto *EAA = dyn_cast<ExtractAPIJobAction>(NewCurrent))
         ExtractAPIAction = EAA;
 
@@ -4136,6 +4149,9 @@ void Driver::BuildActions(Compilation &C, DerivedArgList &Args,
     // If we ended with something, add to the output list.
     if (Current)
       Actions.push_back(Current);
+
+    if (FPGAWrapperGen)
+      Actions.push_back(FPGAWrapperGen);
 
     // Add any top level actions generated for offloading.
     if (!UseNewOffloadingDriver)
@@ -4723,12 +4739,16 @@ void Driver::BuildJobs(Compilation &C) const {
   // into a single offloading action. We should count all inputs to the action
   // as outputs. Also ignore device-only outputs if we're compiling with
   // -fsyntax-only.
+  //
+  // FPGAWrapperGen of type TY_PP_FPGA_WRAPPERGEN_C or
+  // TY_PP_FPGA_WRAPPERGEN_CXX.
   if (FinalOutput) {
     unsigned NumOutputs = 0;
     unsigned NumIfsOutputs = 0;
     for (const Action *A : C.getActions()) {
       if (A->getType() != types::TY_Nothing &&
           A->getType() != types::TY_DX_CONTAINER &&
+          A->getKind() != Action::FPGAWrapperGenJobClass &&
           !(A->getKind() == Action::IfsMergeJobClass ||
             (A->getType() == clang::driver::types::TY_IFS_CPP &&
              A->getKind() == clang::driver::Action::CompileJobClass &&
@@ -5663,7 +5683,8 @@ const char *Driver::GetNamedOutputPath(Compilation &C, const JobAction &JA,
 
   llvm::PrettyStackTraceString CrashInfo("Computing output path");
   // Output to a user requested destination?
-  if (AtTopLevel && !isa<DsymutilJobAction>(JA) && !isa<VerifyJobAction>(JA)) {
+  if (AtTopLevel && !isa<DsymutilJobAction>(JA) && !isa<VerifyJobAction>(JA) &&
+      !isa<FPGAWrapperGenJobAction>(JA)) {
     if (Arg *FinalOutput = C.getArgs().getLastArg(options::OPT_o))
       return C.addResultFile(FinalOutput->getValue(), &JA);
   }

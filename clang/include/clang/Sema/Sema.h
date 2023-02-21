@@ -12454,9 +12454,6 @@ public:
       ArrayRef<Expr *> UnresolvedReductions = std::nullopt);
 
   bool ActOnOmpSsDeclareTaskDirectiveWithFpga(Decl *ADecl);
-  SmallVector<Decl *, 2> ompssFpgaDecls;
-  bool ActOnOmpSsFpgaExtractFiles();
-  bool ActOnOmpSsFpgaGenerateWrapperCodeFiles();
 
   OSSClause *ActOnOmpSsVarListClause(
       OmpSsClauseKind Kind, ArrayRef<Expr *> Vars, SourceLocation StartLoc,

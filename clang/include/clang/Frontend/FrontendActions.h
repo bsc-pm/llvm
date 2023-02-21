@@ -215,6 +215,14 @@ protected:
   void ExecuteAction() override;
 };
 
+class FPGAWrapperGenAction : public ASTFrontendAction {
+public:
+  std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI,
+                                                 StringRef InFile) override;
+
+  void ExecuteAction() override;
+};
+
 /**
  * Frontend action adaptor that merges ASTs together.
  *

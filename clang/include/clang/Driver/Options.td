@@ -2648,6 +2648,8 @@ def fno_ompss : Flag<["-"], "fno-ompss-2">, Group<f_Group>, Flags<[NoArgumentUnu
 def fdo_not_use_ompss_runtime : Flag<["-"], "fdo-not-use-ompss-2-runtime">, Group<f_Group>, Flags<[CC1Option, NoArgumentUnused]>,
   HelpText<"When compiling with -fompss-2 do not include or link with the runtime.">;
 def fompss_fpga_extract_hls_tasks_dir : Separate<["-"], "fompss-fpga-extract-hls-tasks-dir">, Flags<[CC1Option]>, Group<f_Group>,
+def fompss_fpga : Flag<["-"], "fompss-fpga">, Flags<[CC1Option]>, Group<Action_Group>,
+  HelpText<"Ompss2@FPGA wrapper generation">;
 def fompss_fpga_hls_tasks_dir : Separate<["-"], "fompss-fpga-hls-tasks-dir">, Flags<[CC1Option]>, Group<f_Group>,
   MetaVarName<"<path>">,
   MarshallingInfoString<LangOpts<"OmpSsFpgaHlsTasksDir">>, HelpText<"Specify which directory should be used when extracting hls functions">;

@@ -431,6 +431,7 @@ Tool *ToolChain::getTool(Action::ActionClass AC) const {
   case Action::MigrateJobClass:
   case Action::VerifyPCHJobClass:
   case Action::BackendJobClass:
+  case Action::FPGAWrapperGenJobClass:
     return getClang();
 
   case Action::OffloadBundlingJobClass:

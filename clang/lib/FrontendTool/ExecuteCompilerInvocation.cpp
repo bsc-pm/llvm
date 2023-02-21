@@ -20,6 +20,7 @@
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Frontend/FrontendActions.h"
 #include "clang/Frontend/FrontendDiagnostic.h"
+#include "clang/Frontend/FrontendOptions.h"
 #include "clang/Frontend/FrontendPluginRegistry.h"
 #include "clang/Frontend/Utils.h"
 #include "clang/FrontendTool/Utils.h"
@@ -125,6 +126,8 @@ CreateFrontendBaseAction(CompilerInstance &CI) {
   case RunPreprocessorOnly:    return std::make_unique<PreprocessOnlyAction>();
   case PrintDependencyDirectivesSourceMinimizerOutput:
     return std::make_unique<PrintDependencyDirectivesSourceMinimizerAction>();
+  case FPGAWrapperGen:
+    return std::make_unique<FPGAWrapperGenAction>();
   }
 
 #if !CLANG_ENABLE_ARCMT || !CLANG_ENABLE_STATIC_ANALYZER \
