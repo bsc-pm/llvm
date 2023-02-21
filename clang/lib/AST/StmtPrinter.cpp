@@ -716,49 +716,6 @@ void StmtPrinter::VisitSEHLeaveStmt(SEHLeaveStmt *Node) {
   if (Policy.IncludeNewlines) OS << NL;
 }
 
-void OSSClausePrinter::VisitOSSNumInstancesClause(OSSNumInstancesClause *Node) {
-  OS << "num_instances(";
-  Node->getExpression()->printPretty(OS, nullptr, Policy, 0);
-  OS << ")";
-}
-
-void OSSClausePrinter::VisitOSSOntoClause(OSSOntoClause *Node) {
-  OS << "onto(";
-  Node->getExpression()->printPretty(OS, nullptr, Policy, 0);
-  OS << ")";
-}
-
-void OSSClausePrinter::VisitOSSNumRepetitionsClause(
-    OSSNumRepetitionsClause *Node) {
-  OS << "num_repetitions(";
-  Node->getExpression()->printPretty(OS, nullptr, Policy, 0);
-  OS << ")";
-}
-
-void OSSClausePrinter::VisitOSSPeriodClause(OSSPeriodClause *Node) {
-  OS << "period(";
-  Node->getExpression()->printPretty(OS, nullptr, Policy, 0);
-  OS << ")";
-}
-
-void OSSClausePrinter::VisitOSSLocalmemClause(OSSLocalmemClause *Node) {
-  if (!Node->varlist_empty()) {
-    OS << "localmem";
-    VisitOSSClauseList(Node, '(');
-    OS << ")";
-  }
-}
-
-void OSSClausePrinter::VisitOSSLocalmemCopiesClause(
-    OSSLocalmemCopiesClause *_) {
-  OS << "localmem_copies";
-}
-
-void OSSClausePrinter::VisitOSSNoLocalmemCopiesClause(
-    OSSNoLocalmemCopiesClause *_) {
-  OS << "no_localmem_copies";
-}
-
 //===----------------------------------------------------------------------===//
 //  OpenMP directives printing methods
 //===----------------------------------------------------------------------===//

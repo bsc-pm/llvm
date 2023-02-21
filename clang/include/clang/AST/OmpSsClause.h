@@ -1657,14 +1657,14 @@ public:
   /// \param StartLoc Starting location of the clause.
   /// \param LParenLoc Location of '('.
   /// \param EndLoc Ending location of the clause.
-  OSSNumInstancesClause(Stmt *A, SourceLocation StartLoc,
+  OSSNumInstancesClause(Expr *A, SourceLocation StartLoc,
                         SourceLocation LParenLoc, SourceLocation EndLoc)
-      : OSSClause(OSSC_num_instances, StartLoc, EndLoc), LParenLoc(LParenLoc),
+      : OSSClause(llvm::oss::OSSC_num_instances, StartLoc, EndLoc), LParenLoc(LParenLoc),
         Expression(A) {}
 
   /// Build an empty clause.
   OSSNumInstancesClause()
-      : OSSClause(OSSC_num_instances, SourceLocation(), SourceLocation()) {}
+      : OSSClause(llvm::oss::OSSC_num_instances, SourceLocation(), SourceLocation()) {}
 
   /// Sets the location of '('.
   void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
@@ -1678,7 +1678,7 @@ public:
   child_range children() { return child_range(&Expression, &Expression + 1); }
 
   static bool classof(const OSSClause *T) {
-    return T->getClauseKind() == OSSC_num_instances;
+    return T->getClauseKind() == llvm::oss::OSSC_num_instances;
   }
 };
 
@@ -1709,11 +1709,11 @@ public:
   /// \param EndLoc Ending location of the clause.
   OSSOntoClause(Stmt *A, SourceLocation StartLoc, SourceLocation LParenLoc,
                 SourceLocation EndLoc)
-      : OSSClause(OSSC_onto, StartLoc, EndLoc), LParenLoc(LParenLoc),
+      : OSSClause(llvm::oss::OSSC_onto, StartLoc, EndLoc), LParenLoc(LParenLoc),
         Expression(A) {}
 
   /// Build an empty clause.
-  OSSOntoClause() : OSSClause(OSSC_onto, SourceLocation(), SourceLocation()) {}
+  OSSOntoClause() : OSSClause(llvm::oss::OSSC_onto, SourceLocation(), SourceLocation()) {}
 
   /// Sets the location of '('.
   void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
@@ -1727,7 +1727,7 @@ public:
   child_range children() { return child_range(&Expression, &Expression + 1); }
 
   static bool classof(const OSSClause *T) {
-    return T->getClauseKind() == OSSC_onto;
+    return T->getClauseKind() == llvm::oss::OSSC_onto;
   }
 };
 
@@ -1759,12 +1759,12 @@ public:
   /// \param EndLoc Ending location of the clause.
   OSSNumRepetitionsClause(Stmt *A, SourceLocation StartLoc,
                           SourceLocation LParenLoc, SourceLocation EndLoc)
-      : OSSClause(OSSC_num_repetitions, StartLoc, EndLoc), LParenLoc(LParenLoc),
+      : OSSClause(llvm::oss::OSSC_num_repetitions, StartLoc, EndLoc), LParenLoc(LParenLoc),
         Expression(A) {}
 
   /// Build an empty clause.
   OSSNumRepetitionsClause()
-      : OSSClause(OSSC_num_repetitions, SourceLocation(), SourceLocation()) {}
+      : OSSClause(llvm::oss::OSSC_num_repetitions, SourceLocation(), SourceLocation()) {}
 
   /// Sets the location of '('.
   void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
@@ -1778,7 +1778,7 @@ public:
   child_range children() { return child_range(&Expression, &Expression + 1); }
 
   static bool classof(const OSSClause *T) {
-    return T->getClauseKind() == OSSC_num_repetitions;
+    return T->getClauseKind() == llvm::oss::OSSC_num_repetitions;
   }
 };
 
@@ -1809,12 +1809,12 @@ public:
   /// \param EndLoc Ending location of the clause.
   OSSPeriodClause(Stmt *A, SourceLocation StartLoc, SourceLocation LParenLoc,
                   SourceLocation EndLoc)
-      : OSSClause(OSSC_period, StartLoc, EndLoc), LParenLoc(LParenLoc),
+      : OSSClause(llvm::oss::OSSC_period, StartLoc, EndLoc), LParenLoc(LParenLoc),
         Expression(A) {}
 
   /// Build an empty clause.
   OSSPeriodClause()
-      : OSSClause(OSSC_period, SourceLocation(), SourceLocation()) {}
+      : OSSClause(llvm::oss::OSSC_period, SourceLocation(), SourceLocation()) {}
 
   /// Sets the location of '('.
   void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
@@ -1828,7 +1828,7 @@ public:
   child_range children() { return child_range(&Expression, &Expression + 1); }
 
   static bool classof(const OSSClause *T) {
-    return T->getClauseKind() == OSSC_period;
+    return T->getClauseKind() == llvm::oss::OSSC_period;
   }
 };
 

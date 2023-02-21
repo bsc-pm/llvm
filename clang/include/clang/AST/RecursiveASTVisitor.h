@@ -3885,6 +3885,7 @@ bool RecursiveASTVisitor<Derived>::VisitOMPXDynCGroupMemClause(
     OMPXDynCGroupMemClause *C) {
   TRY_TO(VisitOMPClauseWithPreInit(C));
   TRY_TO(TraverseStmt(C->getSize()));
+  return true;
 }
 
 template <typename Derived>

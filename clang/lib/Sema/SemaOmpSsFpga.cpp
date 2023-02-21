@@ -70,6 +70,7 @@
 #include <cstdint>
 #include <fstream>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -127,18 +128,18 @@ struct LocalmemInfo {
 };
 
 template <typename Callable>
-Optional<std::string>
+std::optional<std::string>
 getAbsoluteDirExport(const SourceManager &SourceMgr, const std::string &path,
                      const SourceLocation &Location, Callable &&Diag) {
   auto &vfs = SourceMgr.getFileManager().getVirtualFileSystem();
   if (path.empty()) {
     Diag(Location, diag::err_oss_ompss_fpga_hls_tasks_dir_missing_dir);
-    return llvm::NoneType{};
+    return std::nullopt;
   }
   llvm::SmallVector<char, 128> realPathStr;
   if (vfs.getRealPath(path, realPathStr)) {
     Diag(Location, diag::err_oss_ompss_fpga_hls_tasks_dir_missing_dir);
-    return llvm::NoneType{};
+    return std::nullopt;
   }
   return std::string(realPathStr.begin(), realPathStr.end());
 }
@@ -358,7 +359,7 @@ template <typename Callable> class WrapperGenerator {
 
   llvm::SmallDenseMap<const ParmVarDecl *, LocalmemInfo> Localmems;
 
-  Optional<uint64_t> getNumInstances() {
+  std::optional<uint64_t> getNumInstances() {
     uint64_t value = 1; // Default is 1 instance
     if (auto *numInstances =
             FD->getAttr<OSSTaskDeclAttr>()->getNumInstances()) {
@@ -368,14 +369,14 @@ template <typename Callable> class WrapperGenerator {
       } else {
         Diag(numInstances->getExprLoc(),
              diag::err_expected_constant_unsigned_integer);
-        return llvm::NoneType{};
+        return std::nullopt;
       }
     }
 
     return value;
   }
 
-  Optional<llvm::SmallDenseMap<const ParmVarDecl *, LocalmemInfo>>
+  std::optional<llvm::SmallDenseMap<const ParmVarDecl *, LocalmemInfo>>
   ComputeLocalmems() {
     auto *taskAttr = FD->getAttr<OSSTaskDeclAttr>();
     bool foundError = false;
@@ -501,7 +502,7 @@ template <typename Callable> class WrapperGenerator {
       }
     }
     if (foundError) {
-      return llvm::NoneType{};
+      return std::nullopt;
     }
     // Compute the localmem list
     llvm::SmallDenseMap<const ParmVarDecl *, LocalmemInfo> localmemList;
@@ -513,7 +514,7 @@ template <typename Callable> class WrapperGenerator {
     return localmemList;
   }
 
-  Optional<uint64_t> GenOnto() {
+  std::optional<uint64_t> GenOnto() {
     auto *taskAttr = FD->getAttr<OSSTaskDeclAttr>();
     auto *ontoExpr = taskAttr->getOnto();
     // Check onto information
@@ -522,7 +523,7 @@ template <typename Callable> class WrapperGenerator {
       if (!ontoRes || *ontoRes < 0) {
         Diag(ontoExpr->getExprLoc(),
              diag::err_expected_constant_unsigned_integer);
-        return llvm::NoneType{};
+        return std::nullopt;
       }
       uint64_t onto = ontoRes->getZExtValue();
       // Check that arch bits are set
