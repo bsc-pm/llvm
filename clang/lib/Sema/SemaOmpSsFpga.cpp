@@ -76,6 +76,143 @@
 
 using namespace clang;
 
+namespace {
+QualType DerefOnceTypePointerTo(QualType type) {
+  if (type->isPointerType()) {
+    return type->getPointeeType().IgnoreParens();
+  }
+  if (type->isArrayType()) {
+    return type->getAsArrayTypeUnsafe()->getElementType().IgnoreParens();
+  }
+  return type;
+}
+} // namespace
+
+bool Sema::CheckFpgaLocalmems(FunctionDecl *FD) {
+  enum Dir { IN = 0b01, OUT = 0b10, INOUT = 0b11 };
+  auto *taskAttr = FD->getAttr<OSSTaskDeclAttr>();
+  bool foundError = false;
+  // First, compute the direction tags of the parameters. Do note that not
+  // all parameters are guaranteed to be present
+  llvm::SmallDenseMap<const ParmVarDecl *,
+                      std::pair<const OSSArrayShapingExpr *, Dir>>
+      currentAssignationsOfArrays;
+  auto EmitDepListIterDecls = [&](auto &&DepExprsIter, Dir dir) {
+    for (const Expr *DepExpr : DepExprsIter) {
+      auto *arrShapingExpr = dyn_cast<OSSArrayShapingExpr>(DepExpr);
+      if (!arrShapingExpr)
+        return;
+      auto *arrExprBase = dyn_cast<DeclRefExpr>(
+          arrShapingExpr->getBase()->IgnoreParenImpCasts());
+      assert(arrExprBase);
+      auto *decl = dyn_cast<ParmVarDecl>(arrExprBase->getDecl());
+      assert(decl);
+      auto res = currentAssignationsOfArrays.find(decl);
+      if (res != currentAssignationsOfArrays.end()) {
+        res->second.second = Dir(res->second.second | dir);
+      } else {
+        currentAssignationsOfArrays.insert({decl, {arrShapingExpr, dir}});
+      };
+    }
+  };
+  EmitDepListIterDecls(taskAttr->ins(), IN);
+  EmitDepListIterDecls(taskAttr->outs(), OUT);
+  EmitDepListIterDecls(taskAttr->inouts(), INOUT);
+  EmitDepListIterDecls(taskAttr->concurrents(), INOUT);
+  EmitDepListIterDecls(taskAttr->weakIns(), IN);
+  EmitDepListIterDecls(taskAttr->weakOuts(), OUT);
+  EmitDepListIterDecls(taskAttr->weakInouts(), INOUT);
+  EmitDepListIterDecls(taskAttr->weakConcurrents(), INOUT);
+  EmitDepListIterDecls(taskAttr->depIns(), IN);
+  EmitDepListIterDecls(taskAttr->depOuts(), OUT);
+  EmitDepListIterDecls(taskAttr->depInouts(), INOUT);
+  EmitDepListIterDecls(taskAttr->depConcurrents(), INOUT);
+  EmitDepListIterDecls(taskAttr->depWeakIns(), IN);
+  EmitDepListIterDecls(taskAttr->depWeakOuts(), OUT);
+  EmitDepListIterDecls(taskAttr->depWeakInouts(), INOUT);
+  EmitDepListIterDecls(taskAttr->depWeakConcurrents(), INOUT);
+
+  // Then compute the list of localmem parameters
+  llvm::SmallDenseSet<const ParmVarDecl *> parametersToLocalmem;
+
+  // If copy_deps
+  if (taskAttr->getCopyDeps()) {
+    for (auto *param : FD->parameters()) {
+      if (currentAssignationsOfArrays.find(param) !=
+          currentAssignationsOfArrays.end()) {
+        parametersToLocalmem.insert(param);
+      }
+    }
+  }
+  // If we have an explicit list of localmem (copy_in, copy_out, copy_inout),
+  // use that
+  auto explicitCopy = [&](auto &&list, Dir dir) {
+    for (auto *localmem : list) {
+      auto *arrShapingExpr = dyn_cast<OSSArrayShapingExpr>(localmem);
+      if (!arrShapingExpr) {
+        Diag(localmem->getExprLoc(),
+             diag::err_oss_fpga_expected_array_to_place_in_localmem);
+        foundError = true;
+        continue;
+      }
+
+      auto *arrExprBase = dyn_cast<DeclRefExpr>(
+          arrShapingExpr->getBase()->IgnoreParenImpCasts());
+      assert(arrExprBase);
+      auto *decl = dyn_cast<ParmVarDecl>(arrExprBase->getDecl());
+      assert(decl);
+      parametersToLocalmem.insert(decl);
+      auto &def = currentAssignationsOfArrays[decl];
+      def.first = arrShapingExpr;
+      def.second = Dir(def.second | dir);
+    }
+  };
+  explicitCopy(taskAttr->copyIn(), IN);
+  explicitCopy(taskAttr->copyOut(), OUT);
+  explicitCopy(taskAttr->copyInOut(), INOUT);
+
+  // Now check that none of the decl are const qualified while out, and that
+  // we know the sizes
+  for (auto *param : parametersToLocalmem) {
+    if (currentAssignationsOfArrays.find(param)->second.second & OUT &&
+        param->getType()->getPointeeType().isConstQualified()) {
+      Diag(
+          param->getLocation(),
+          diag::
+              err_oss_fpga_param_used_in_localmem_marked_as_out_const_qualified);
+      foundError = true;
+    }
+    for (auto *shape :
+         currentAssignationsOfArrays.find(param)->second.first->getShapes()) {
+      if (auto valInteger = shape->getIntegerConstantExpr(Context);
+          !valInteger || *valInteger < 0) {
+        Diag(shape->getExprLoc(), diag::err_expected_constant_unsigned_integer);
+        foundError = true;
+      }
+    }
+    auto paramType = param->getType();
+    auto numShapes = currentAssignationsOfArrays.find(param)
+                         ->second.first->getShapes()
+                         .size();
+    for (size_t i = 0; i < numShapes; ++i) {
+      paramType = DerefOnceTypePointerTo(paramType);
+    }
+    while (paramType->isArrayType()) {
+      if (!paramType->isConstantArrayType()) {
+        Diag(param->getLocation(),
+             diag::err_expected_constant_unsigned_integer);
+        foundError = true;
+      }
+      paramType = DerefOnceTypePointerTo(paramType);
+    }
+    if (paramType->isPointerType()) {
+      Diag(param->getLocation(), diag::err_expected_constant_unsigned_integer);
+      foundError = true;
+    }
+  }
+  return foundError;
+}
+
 bool Sema::ActOnOmpSsDeclareTaskDirectiveWithFpga(Decl *ADecl) {
   auto *FD = dyn_cast<FunctionDecl>(ADecl);
   if (!FD) {
@@ -85,6 +222,10 @@ bool Sema::ActOnOmpSsDeclareTaskDirectiveWithFpga(Decl *ADecl) {
 
   if (!FD->doesThisDeclarationHaveABody()) {
     Diag(ADecl->getLocation(), diag::err_oss_function_with_body_expected);
+    return false;
+  }
+
+  if (CheckFpgaLocalmems(FD)) {
     return false;
   }
 

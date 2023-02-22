@@ -11559,6 +11559,14 @@ def err_oss_period_incompatible_device : Error<
   "period cannot be used with other devices than fpga">;
 def err_oss_affinity_incompatible_device : Error<
   "affinity cannot be used with other devices than fpga">;
+def err_oss_copy_deps_incompatible_device : Error<
+  "copy_deps cannot be used with other devices than fpga">;
+def err_oss_copy_in_incompatible_device : Error<
+  "copy_in cannot be used with other devices than fpga">;
+def err_oss_copy_out_incompatible_device : Error<
+  "copy_out cannot be used with other devices than fpga">;
+def err_oss_copy_inout_incompatible_device : Error<
+  "copy_inout cannot be used with other devices than fpga">;
 def err_oss_ompss_fpga_hls_tasks_dir_missing_dir: Error<
   "-fompss-fpga-hls-tasks-dir needs a valid directory">;
 def err_oss_inline_device_not_supported : Error<
@@ -11645,7 +11653,7 @@ def err_oss_fpga_dependency_analisis : Error<
 def err_oss_fpga_missing_body_for_function_depended_by_kernel : Error<"This function is depended by an fpga kernel, but we couldn't locate its body. Make sure it is visible in this translation unit.">;
 def note_oss_fpga_kernel : Note<"The fpga kernel">;
 def err_oss_fpga_expected_array_to_place_in_localmem: Error<
-  "Expected this to be an array if it is intended to be placed in the local memory of the FPGA. You might want to use the localmem, localmem_copies and/or no_localmem_copies parameters in the oss task">;
+  "Expected this to be an array if it is intended to be placed in the local memory of the FPGA. You might want to use the copy_deps, copy_in, copy_out and/or copy_inout parameters in the oss task">;
 def err_oss_fpga_param_used_in_localmem_marked_as_out_const_qualified: Error<
   "Out/inout localmem with const qualifier. This parameter can't be sent to the FPGA local memory if it is marked as const and as an out/inout. Consider removing const">;
 def err_oss_fpga_onto_clause_missing_bits: Error<

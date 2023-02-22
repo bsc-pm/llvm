@@ -12454,6 +12454,7 @@ public:
       ArrayRef<Expr *> UnresolvedReductions = std::nullopt);
 
   bool ActOnOmpSsDeclareTaskDirectiveWithFpga(Decl *ADecl);
+  bool CheckFpgaLocalmems(FunctionDecl *FD);
 
   OSSClause *ActOnOmpSsVarListClause(
       OmpSsClauseKind Kind, ArrayRef<Expr *> Vars, SourceLocation StartLoc,

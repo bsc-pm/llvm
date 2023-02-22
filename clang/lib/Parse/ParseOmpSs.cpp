@@ -290,8 +290,8 @@ bool Parser::ParseDeclareTaskClauses(
       ConsumeToken();
       if (FirstClauses[unsigned(CKind)]) {
         Diag(Loc, diag::err_oss_more_one_clause)
-            << getOmpSsDirectiveName(OSSD_declare_task)
-            << getOmpSsClauseName(CKind) << 0;
+            << getOmpSsDirectiveName(OSSD_task) << getOmpSsClauseName(CKind)
+            << 0;
         IsError = true;
       }
       CopyDeps = true;

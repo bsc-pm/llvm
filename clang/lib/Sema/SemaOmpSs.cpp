@@ -4471,6 +4471,18 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     if (DevType != OSSTaskDeclAttr::Fpga)
       Diag(DeviceLoc, diag::err_oss_affinity_incompatible_device);
   }
+  if (CopyDeps && DevType != OSSTaskDeclAttr::Fpga) {
+    Diag(DeviceLoc, diag::err_oss_copy_deps_incompatible_device);
+  }
+  if (!CopyIn.empty() && DevType != OSSTaskDeclAttr::Fpga) {
+    Diag(DeviceLoc, diag::err_oss_copy_in_incompatible_device);
+  }
+  if (!CopyOut.empty() && DevType != OSSTaskDeclAttr::Fpga) {
+    Diag(DeviceLoc, diag::err_oss_copy_out_incompatible_device);
+  }
+  if (!CopyInOut.empty() && DevType != OSSTaskDeclAttr::Fpga) {
+    Diag(DeviceLoc, diag::err_oss_copy_inout_incompatible_device);
+  }
   OSSClauseDSAChecker OSSClauseChecker(/*Stack=*/nullptr, *this);
   for (Expr *RefExpr : Ins) {
     checkDependency(*this, RefExpr, /*OSSSyntax=*/true, /*Outline=*/true);
@@ -4592,7 +4604,8 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
 
     ReductionNSLoc.push_back(ReductionCXXScopeSpecs[i].getWithLocInContext(Context));
     Reductions_it += ReductionListSizes[i];
-    UnresolvedReductions_it += ReductionListSizes[i];
+    if (!UnresolvedReductions.empty())
+      UnresolvedReductions_it += ReductionListSizes[i];
   }
   if (!Ndranges.empty()) {
     if (!(DevType == OSSTaskDeclAttr::DeviceType::Cuda

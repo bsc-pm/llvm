@@ -16,6 +16,16 @@ void task_label();
 void task_label();
 #pragma oss task ndrange(1,1,1) ndrange(1,1,1) // expected-error {{directive '#pragma oss task' cannot contain more than one 'ndrange' clause}}
 void task_label();
+#pragma oss task num_instances(1) num_instances(1) // expected-error {{directive '#pragma oss task' cannot contain more than one 'num_instances' clause}}
+void task_label0();
+#pragma oss task onto(1) onto(1) // expected-error {{directive '#pragma oss task' cannot contain more than one 'onto' clause}}
+void task_label1();
+#pragma oss task period(1) period(1) // expected-error {{directive '#pragma oss task' cannot contain more than one 'period' clause}}
+void task_label2();
+#pragma oss task affinity(1) affinity(1) // expected-error {{directive '#pragma oss task' cannot contain more than one 'affinity' clause}}
+void task_label3();
+#pragma oss task copy_deps copy_deps // expected-error {{directive '#pragma oss task' cannot contain more than one 'copy_deps' clause}}
+void task_label7();
 
 void bar() {
   #pragma oss task if(1) if(0) // expected-error {{directive '#pragma oss task' cannot contain more than one 'if' clause}}

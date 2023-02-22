@@ -570,6 +570,9 @@ void Parser::resetPragmaHandlers() {
 
   PP.RemovePragmaHandler(OmpSsHandler.get());
   OmpSsHandler.reset();
+  if (getLangOpts().OmpSs) {
+    PP.RemovePragmaHandler(HlsHandlerStub.get());
+  }
 
   if (getLangOpts().MicrosoftExt ||
       getTargetInfo().getTriple().isOSBinFormatELF()) {

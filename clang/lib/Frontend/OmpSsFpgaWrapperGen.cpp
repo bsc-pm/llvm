@@ -375,10 +375,8 @@ template <typename Callable> class WrapperGenerator {
     return value;
   }
 
-  std::optional<llvm::SmallDenseMap<const ParmVarDecl *, LocalmemInfo>>
-  ComputeLocalmems() {
+  llvm::SmallDenseMap<const ParmVarDecl *, LocalmemInfo> ComputeLocalmems() {
     auto *taskAttr = FD->getAttr<OSSTaskDeclAttr>();
-    bool foundError = false;
     // First, compute the direction tags of the parameters. Do note that not
     // all parameters are guaranteed to be present
     llvm::SmallDenseMap<
@@ -439,9 +437,7 @@ template <typename Callable> class WrapperGenerator {
       for (auto *localmem : list) {
         auto *arrShapingExpr = dyn_cast<OSSArrayShapingExpr>(localmem);
         if (!arrShapingExpr) {
-          Diag(localmem->getExprLoc(),
-               diag::err_oss_fpga_expected_array_to_place_in_localmem);
-          foundError = true;
+          llvm_unreachable("We have checked this in a sema pass");
           continue;
         }
 
@@ -460,49 +456,6 @@ template <typename Callable> class WrapperGenerator {
     explicitCopy(taskAttr->copyOut(), LocalmemInfo::OUT);
     explicitCopy(taskAttr->copyInOut(), LocalmemInfo::INOUT);
 
-    // Now check that none of the decl are const qualified while out, and that
-    // we know the sizes
-    for (auto *param : parametersToLocalmem) {
-      if (currentAssignationsOfArrays.find(param)->second.second &
-              LocalmemInfo::OUT &&
-          param->getType()->getPointeeType().isConstQualified()) {
-        Diag(
-            param->getLocation(),
-            diag::
-                err_oss_fpga_param_used_in_localmem_marked_as_out_const_qualified);
-        foundError = true;
-      }
-      for (auto *shape :
-           currentAssignationsOfArrays.find(param)->second.first->getShapes()) {
-        if (auto valInteger = shape->getIntegerConstantExpr(SourceContext);
-            !valInteger || *valInteger < 0) {
-          Diag(shape->getExprLoc(),
-               diag::err_expected_constant_unsigned_integer);
-          foundError = true;
-        }
-      }
-      auto paramType = param->getType();
-      auto numShapes = currentAssignationsOfArrays.find(param)
-                           ->second.first->getShapes()
-                           .size();
-      for (size_t i = 0; i < numShapes; ++i) {
-        paramType = DerefOnceTypePointerTo(paramType);
-      }
-      while (paramType->isArrayType()) {
-        if (!paramType->isConstantArrayType()) {
-          Diag(param->getLocation(),
-               diag::err_expected_constant_unsigned_integer);
-        }
-        paramType = DerefOnceTypePointerTo(paramType);
-      }
-      if (paramType->isPointerType()) {
-        Diag(param->getLocation(),
-             diag::err_expected_constant_unsigned_integer);
-      }
-    }
-    if (foundError) {
-      return std::nullopt;
-    }
     // Compute the localmem list
     llvm::SmallDenseMap<const ParmVarDecl *, LocalmemInfo> localmemList;
     for (auto *param : parametersToLocalmem) {
@@ -850,7 +803,6 @@ OMPIF_COMM_WORLD
   }
 
   QualType DerefOnceTypePointerTo(QualType type) {
-
     if (type->isPointerType()) {
       return type->getPointeeType().IgnoreParens();
     }
@@ -1454,11 +1406,7 @@ public:
     }
     NumInstances = std::move(*numInstances);
 
-    auto localmems = ComputeLocalmems();
-    if (!localmems) {
-      return false;
-    }
-    Localmems = std::move(*localmems);
+    Localmems = ComputeLocalmems();
 
     auto hashNum = GenOnto();
     if (!hashNum) {

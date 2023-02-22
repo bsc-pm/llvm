@@ -8,7 +8,7 @@ void foo1();
 #pragma oss task device(opencl)
 void foo2();
 #pragma oss task device(fpga)
-void foo3();
+void foo3() {}
 
 void bar() {
     #pragma oss task device(smp)
@@ -26,7 +26,7 @@ void bar() {
 // CHECK: #pragma oss task device(opencl)
 // CHECK-NEXT: void foo2();
 // CHECK: #pragma oss task device(fpga)
-// CHECK-NEXT: void foo3();
+// CHECK-NEXT: void foo3()
 // CHECK: void bar() {
 // CHECK:     #pragma oss task device(smp)
 // CHECK:     #pragma oss task device(cuda)
