@@ -1931,31 +1931,44 @@ def int_aarch64_sve_whilehi : AdvSIMD_SVE_WHILE_Intrinsic;
 //
 
 def int_aarch64_sve_fabd       : AdvSIMD_Pred2VectorArg_Intrinsic;
+def int_aarch64_sve_fabd_u     : AdvSIMD_Pred2VectorArg_Intrinsic;
 def int_aarch64_sve_fabs       : AdvSIMD_Merged1VectorArg_Intrinsic;
 def int_aarch64_sve_fadd       : AdvSIMD_Pred2VectorArg_Intrinsic;
+def int_aarch64_sve_fadd_u     : AdvSIMD_Pred2VectorArg_Intrinsic;
 def int_aarch64_sve_fcadd      : AdvSIMD_SVE_CADD_Intrinsic;
 def int_aarch64_sve_fcmla      : AdvSIMD_SVE_CMLA_Intrinsic;
 def int_aarch64_sve_fcmla_lane : AdvSIMD_SVE_CMLA_LANE_Intrinsic;
 def int_aarch64_sve_fdiv       : AdvSIMD_Pred2VectorArg_Intrinsic;
+def int_aarch64_sve_fdiv_u     : AdvSIMD_Pred2VectorArg_Intrinsic;
 def int_aarch64_sve_fdivr      : AdvSIMD_Pred2VectorArg_Intrinsic;
 def int_aarch64_sve_fexpa_x    : AdvSIMD_SVE_EXPA_Intrinsic;
 def int_aarch64_sve_fmad       : AdvSIMD_Pred3VectorArg_Intrinsic;
 def int_aarch64_sve_fmax       : AdvSIMD_Pred2VectorArg_Intrinsic;
+def int_aarch64_sve_fmax_u     : AdvSIMD_Pred2VectorArg_Intrinsic;
 def int_aarch64_sve_fmaxnm     : AdvSIMD_Pred2VectorArg_Intrinsic;
+def int_aarch64_sve_fmaxnm_u   : AdvSIMD_Pred2VectorArg_Intrinsic;
 def int_aarch64_sve_fmin       : AdvSIMD_Pred2VectorArg_Intrinsic;
+def int_aarch64_sve_fmin_u     : AdvSIMD_Pred2VectorArg_Intrinsic;
 def int_aarch64_sve_fminnm     : AdvSIMD_Pred2VectorArg_Intrinsic;
+def int_aarch64_sve_fminnm_u   : AdvSIMD_Pred2VectorArg_Intrinsic;
 def int_aarch64_sve_fmla       : AdvSIMD_Pred3VectorArg_Intrinsic;
 def int_aarch64_sve_fmla_lane  : AdvSIMD_3VectorArgIndexed_Intrinsic;
+def int_aarch64_sve_fmla_u     : AdvSIMD_Pred3VectorArg_Intrinsic;
 def int_aarch64_sve_fmls       : AdvSIMD_Pred3VectorArg_Intrinsic;
 def int_aarch64_sve_fmls_lane  : AdvSIMD_3VectorArgIndexed_Intrinsic;
+def int_aarch64_sve_fmls_u     : AdvSIMD_Pred3VectorArg_Intrinsic;
 def int_aarch64_sve_fmsb       : AdvSIMD_Pred3VectorArg_Intrinsic;
 def int_aarch64_sve_fmul       : AdvSIMD_Pred2VectorArg_Intrinsic;
-def int_aarch64_sve_fmulx      : AdvSIMD_Pred2VectorArg_Intrinsic;
-def int_aarch64_sve_fneg       : AdvSIMD_Merged1VectorArg_Intrinsic;
 def int_aarch64_sve_fmul_lane  : AdvSIMD_2VectorArgIndexed_Intrinsic;
+def int_aarch64_sve_fmul_u     : AdvSIMD_Pred2VectorArg_Intrinsic;
+def int_aarch64_sve_fmulx      : AdvSIMD_Pred2VectorArg_Intrinsic;
+def int_aarch64_sve_fmulx_u    : AdvSIMD_Pred2VectorArg_Intrinsic;
+def int_aarch64_sve_fneg       : AdvSIMD_Merged1VectorArg_Intrinsic;
 def int_aarch64_sve_fnmad      : AdvSIMD_Pred3VectorArg_Intrinsic;
 def int_aarch64_sve_fnmla      : AdvSIMD_Pred3VectorArg_Intrinsic;
+def int_aarch64_sve_fnmla_u    : AdvSIMD_Pred3VectorArg_Intrinsic;
 def int_aarch64_sve_fnmls      : AdvSIMD_Pred3VectorArg_Intrinsic;
+def int_aarch64_sve_fnmls_u    : AdvSIMD_Pred3VectorArg_Intrinsic;
 def int_aarch64_sve_fnmsb      : AdvSIMD_Pred3VectorArg_Intrinsic;
 def int_aarch64_sve_frecpe_x   : AdvSIMD_1VectorArg_Intrinsic;
 def int_aarch64_sve_frecps_x   : AdvSIMD_2VectorArg_Intrinsic;
@@ -1972,6 +1985,7 @@ def int_aarch64_sve_frsqrts_x  : AdvSIMD_2VectorArg_Intrinsic;
 def int_aarch64_sve_fscale     : AdvSIMD_SVE_SCALE_Intrinsic;
 def int_aarch64_sve_fsqrt      : AdvSIMD_Merged1VectorArg_Intrinsic;
 def int_aarch64_sve_fsub       : AdvSIMD_Pred2VectorArg_Intrinsic;
+def int_aarch64_sve_fsub_u     : AdvSIMD_Pred2VectorArg_Intrinsic;
 def int_aarch64_sve_fsubr      : AdvSIMD_Pred2VectorArg_Intrinsic;
 def int_aarch64_sve_ftmad_x    : AdvSIMD_2VectorArgIndexed_Intrinsic;
 def int_aarch64_sve_ftsmul_x   : AdvSIMD_SVE_TSMUL_Intrinsic;
@@ -3003,6 +3017,20 @@ let TargetPrefix = "aarch64" in {
   def int_aarch64_sme_bmopa_za32 : SME_OuterProduct_Intrinsic;
   def int_aarch64_sme_bmops_za32 : SME_OuterProduct_Intrinsic;
 
+  //
+  // Multi-vector rounding shift left intrinsics
+  //
+
+  def int_aarch64_sve_srshl_single_x2 : SME2_VG2_Multi_Single_Intrinsic;
+  def int_aarch64_sve_urshl_single_x2 : SME2_VG2_Multi_Single_Intrinsic;
+  def int_aarch64_sve_srshl_single_x4 : SME2_VG4_Multi_Single_Intrinsic;
+  def int_aarch64_sve_urshl_single_x4 : SME2_VG4_Multi_Single_Intrinsic;
+
+  def int_aarch64_sve_srshl_x2 : SME2_VG2_Multi_Multi_Intrinsic;
+  def int_aarch64_sve_urshl_x2 : SME2_VG2_Multi_Multi_Intrinsic;
+  def int_aarch64_sve_srshl_x4 : SME2_VG4_Multi_Multi_Intrinsic;
+  def int_aarch64_sve_urshl_x4 : SME2_VG4_Multi_Multi_Intrinsic;
+
   // Multi-vector saturating rounding shift right intrinsics
 
   def int_aarch64_sve_sqrshr_x2 : SME2_VG2_Multi_Imm_Intrinsic;
@@ -3050,6 +3078,9 @@ let TargetPrefix = "aarch64" in {
         def int_aarch64_sme_ # ty # instr # _ # za # _single_vg4x1 : SME2_Matrix_ArrayVector_Single_Single_Intrinsic;
         def int_aarch64_sme_ # ty # instr # _ # za # _single_vg4x2 : SME2_Matrix_ArrayVector_VG2_Multi_Single_Intrinsic;
         def int_aarch64_sme_ # ty # instr # _ # za # _single_vg4x4 : SME2_Matrix_ArrayVector_VG4_Multi_Single_Intrinsic;
+
+        def int_aarch64_sme_ # ty # instr # _ # za # _vg4x2 : SME2_Matrix_ArrayVector_VG2_Multi_Multi_Intrinsic;
+        def int_aarch64_sme_ # ty # instr # _ # za # _vg4x4 : SME2_Matrix_ArrayVector_VG4_Multi_Multi_Intrinsic;
       }
     }
   }
@@ -3060,6 +3091,9 @@ let TargetPrefix = "aarch64" in {
   def int_aarch64_sme_usmla_za32_single_vg4x1 : SME2_Matrix_ArrayVector_Single_Single_Intrinsic;
   def int_aarch64_sme_usmla_za32_single_vg4x2 : SME2_Matrix_ArrayVector_VG2_Multi_Single_Intrinsic;
   def int_aarch64_sme_usmla_za32_single_vg4x4 : SME2_Matrix_ArrayVector_VG4_Multi_Single_Intrinsic;
+
+  def int_aarch64_sme_usmla_za32_vg4x2 : SME2_Matrix_ArrayVector_VG2_Multi_Multi_Intrinsic;
+  def int_aarch64_sme_usmla_za32_vg4x4 : SME2_Matrix_ArrayVector_VG4_Multi_Multi_Intrinsic;
 
   // Multi-vector signed saturating doubling multiply high
 

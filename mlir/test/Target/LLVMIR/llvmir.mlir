@@ -1261,7 +1261,7 @@ llvm.func @indexconstantsplat() -> vector<3xi32> {
 // CHECK-LABEL: @indexconstantarray
 llvm.func @indexconstantarray() -> vector<3xi32> {
   %1 = llvm.mlir.constant(dense<[0, 1, 2]> : vector<3xindex>) : vector<3xi32>
-  // CHECK: ret <3 x i32> <i32 0, i32 1, i32 2> 
+  // CHECK: ret <3 x i32> <i32 0, i32 1, i32 2>
   llvm.return %1 : vector<3xi32>
 }
 
@@ -1780,6 +1780,25 @@ llvm.func @nontemporal_store_and_load() {
 
 // -----
 
+llvm.func @atomic_store_and_load(%ptr : !llvm.ptr) {
+  // CHECK: load atomic
+  // CHECK-SAME:  acquire, align 4
+  %1 = llvm.load %ptr atomic acquire {alignment = 4 : i64} : !llvm.ptr -> f32
+  // CHECK: load atomic
+  // CHECK-SAME:  syncscope("singlethread") acquire, align 4
+  %2 = llvm.load %ptr atomic syncscope("singlethread") acquire {alignment = 4 : i64} : !llvm.ptr -> f32
+
+  // CHECK: store atomic
+  // CHECK-SAME:  release, align 4
+  llvm.store %1, %ptr atomic release {alignment = 4 : i64} : f32, !llvm.ptr
+  // CHECK: store atomic
+  // CHECK-SAME:  syncscope("singlethread") release, align 4
+  llvm.store %2, %ptr atomic syncscope("singlethread") release {alignment = 4 : i64} : f32, !llvm.ptr
+  llvm.return
+}
+
+// -----
+
 // Check that the translation does not crash in absence of a data layout.
 module {
   // CHECK: declare void @module_default_layout
@@ -2101,16 +2120,16 @@ llvm.func @vararg_function(%arg0: i32, ...) {
   %2 = llvm.alloca %1 x !llvm.struct<"struct.va_list", (ptr<i8>)> {alignment = 8 : i64} : (i32) -> !llvm.ptr<struct<"struct.va_list", (ptr<i8>)>>
   %3 = llvm.bitcast %2 : !llvm.ptr<struct<"struct.va_list", (ptr<i8>)>> to !llvm.ptr<i8>
   // CHECK: call void @llvm.va_start(ptr %[[ALLOCA0]])
-  llvm.intr.vastart %3
+  llvm.intr.vastart %3 : !llvm.ptr<i8>
   // CHECK: %[[ALLOCA1:.+]] = alloca ptr, align 8
   %4 = llvm.alloca %0 x !llvm.ptr<i8> {alignment = 8 : i64} : (i32) -> !llvm.ptr<ptr<i8>>
   %5 = llvm.bitcast %4 : !llvm.ptr<ptr<i8>> to !llvm.ptr<i8>
   // CHECK: call void @llvm.va_copy(ptr %[[ALLOCA1]], ptr %[[ALLOCA0]])
-  llvm.intr.vacopy %3 to %5
+  llvm.intr.vacopy %3 to %5 : !llvm.ptr<i8>, !llvm.ptr<i8>
   // CHECK: call void @llvm.va_end(ptr %[[ALLOCA1]])
   // CHECK: call void @llvm.va_end(ptr %[[ALLOCA0]])
-  llvm.intr.vaend %5
-  llvm.intr.vaend %3
+  llvm.intr.vaend %5 : !llvm.ptr<i8>
+  llvm.intr.vaend %3 : !llvm.ptr<i8>
   // CHECK: ret void
   llvm.return
 }

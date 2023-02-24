@@ -193,6 +193,20 @@ set(files
   __algorithm/unwrap_range.h
   __algorithm/upper_bound.h
   __assert
+  __atomic/aliases.h
+  __atomic/atomic.h
+  __atomic/atomic_base.h
+  __atomic/atomic_flag.h
+  __atomic/atomic_init.h
+  __atomic/atomic_lock_free.h
+  __atomic/atomic_sync.h
+  __atomic/check_memory_order.h
+  __atomic/contention_t.h
+  __atomic/cxx_atomic_impl.h
+  __atomic/fence.h
+  __atomic/is_always_lock_free.h
+  __atomic/kill_dependency.h
+  __atomic/memory_order.h
   __availability
   __bit/bit_cast.h
   __bit/bit_ceil.h
@@ -543,6 +557,7 @@ set(files
   __split_buffer
   __std_stream
   __string/char_traits.h
+  __string/constexpr_c_functions.h
   __string/extern_template_lists.h
   __support/android/locale_bionic.h
   __support/fuchsia/xlocale.h
@@ -623,6 +638,7 @@ set(files
   __type_traits/is_destructible.h
   __type_traits/is_empty.h
   __type_traits/is_enum.h
+  __type_traits/is_equality_comparable.h
   __type_traits/is_final.h
   __type_traits/is_floating_point.h
   __type_traits/is_function.h
@@ -687,6 +703,7 @@ set(files
   __type_traits/nat.h
   __type_traits/negation.h
   __type_traits/noexcept_move_assign_container.h
+  __type_traits/predicate_traits.h
   __type_traits/promote.h
   __type_traits/rank.h
   __type_traits/remove_all_extents.h

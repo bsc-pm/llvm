@@ -773,7 +773,6 @@ typedef regex_token_iterator<wstring::const_iterator> wsregex_token_iterator;
 #include <__utility/move.h>
 #include <__utility/pair.h>
 #include <__utility/swap.h>
-#include <cstring>
 #include <deque>
 #include <stdexcept>
 #include <string>
@@ -1012,7 +1011,7 @@ template <regex_constants::error_type _Ev>
 _LIBCPP_NORETURN inline _LIBCPP_INLINE_VISIBILITY
 void __throw_regex_error()
 {
-#ifndef _LIBCPP_NO_EXCEPTIONS
+#ifndef _LIBCPP_HAS_NO_EXCEPTIONS
     throw regex_error(_Ev);
 #else
     _VSTD::abort();

@@ -4851,7 +4851,7 @@ bool TreeTransform<Derived>::TransformTemplateArgument(
         getSema(),
         Uneval ? Sema::ExpressionEvaluationContext::Unevaluated
                : Sema::ExpressionEvaluationContext::ConstantEvaluated,
-        /*LambdaContextDecl=*/nullptr, /*ExprContext=*/
+        Sema::ReuseLambdaContextDecl, /*ExprContext=*/
         Sema::ExpressionEvaluationContextRecord::EK_TemplateArgument);
 
     Expr *InputExpr = Input.getSourceExpression();
@@ -8231,8 +8231,7 @@ TreeTransform<Derived>::TransformMSAsmStmt(MSAsmStmt *S) {
                                        TransformedExprs, S->getEndLoc());
 }
 
-// C++ Coroutines TS
-
+// C++ Coroutines
 template<typename Derived>
 StmtResult
 TreeTransform<Derived>::TransformCoroutineBodyStmt(CoroutineBodyStmt *S) {

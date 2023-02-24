@@ -161,11 +161,13 @@ struct PackOpTiling
       }
 
       // Limit the size of the input operand for incomplete tiles.
-      OpFoldResult dimSize = srcDimValues[dim];
-      auto avDimSize = AV(dim0).bind(dimSize);
-      auto avInputIdx = AV(dim1).bind(inputIndices.back());
-      inputSizes.back() =
-          ab.min({inputSizes.back(), ab.sub(avDimSize, avInputIdx)});
+      if (packOp.getPaddingValue()) {
+        OpFoldResult dimSize = srcDimValues[dim];
+        auto avDimSize = AV(dim0).bind(dimSize);
+        auto avInputIdx = AV(dim1).bind(inputIndices.back());
+        inputSizes.back() =
+            ab.min({inputSizes.back(), ab.sub(avDimSize, avInputIdx)});
+      }
     }
 
     auto oneAttr = b.getI64IntegerAttr(1);
@@ -318,8 +320,11 @@ static UnpackTileDimInfo getUnpackTileDimInfo(OpBuilder &b, UnPackOp unpackOp,
       ab.add(AV(dim0).bind(lengthMinusOne), AV(dim1).bind(oneAttr));
   info.sourceOffset = firstCoord.quotient;
   info.resultOffset = firstCoord.remainder;
-  info.destExpandedSize =
-      ab.mul(AV(dim0).bind(info.sourceSize), AV(sym0).bind(innerTileSize));
+  // Do not create an Affine ops for expanded size because the affine op is too
+  // complicated which would trigger an issue in affine ops simplification.
+  info.destExpandedSize = b.createOrFold<arith::MulIOp>(
+      loc, getValueOrCreateConstantIndexOp(b, loc, info.sourceSize),
+      getValueOrCreateConstantIndexOp(b, loc, innerTileSize));
   return info;
 }
 

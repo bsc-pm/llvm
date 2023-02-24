@@ -9,6 +9,7 @@
 #ifndef LLVM_LIBC_SRC_STDIO_PRINTF_CORE_PARSER_H
 #define LLVM_LIBC_SRC_STDIO_PRINTF_CORE_PARSER_H
 
+#include "src/__support/CPP/optional.h"
 #include "src/__support/CPP/type_traits.h"
 #include "src/__support/arg_list.h"
 #include "src/__support/common.h"
@@ -20,28 +21,34 @@
 namespace __llvm_libc {
 namespace printf_core {
 
+#ifndef LIBC_COPT_MOCK_ARG_LIST
+using ArgProvider = internal::ArgList;
+#else  // not defined LIBC_COPT_MOCK_ARG_LIST
+using ArgProvider = internal::MockArgList;
+#endif // LIBC_COPT_MOCK_ARG_LIST
+
 class Parser {
   const char *__restrict str;
 
   size_t cur_pos = 0;
-  internal::ArgList args_cur;
+  ArgProvider args_cur;
 
 #ifndef LIBC_COPT_PRINTF_DISABLE_INDEX_MODE
   // args_start stores the start of the va_args, which is allows getting the
   // value of arguments that have already been passed. args_index is tracked so
   // that we know which argument args_cur is on.
-  internal::ArgList args_start;
+  ArgProvider args_start;
   size_t args_index = 1;
 
   // Defined in printf_config.h
   static constexpr size_t DESC_ARR_LEN = LIBC_COPT_PRINTF_INDEX_ARR_LEN;
 
-  // desc_arr stores the sizes of the variables in the ArgList. This is used in
-  // index mode to reduce repeated string parsing. The sizes are stored as
+  // desc_arr stores the sizes of the variables in the ArgProvider. This is used
+  // in index mode to reduce repeated string parsing. The sizes are stored as
   // TypeDesc objects, which store the size as well as minimal type information.
   // This is necessary because some systems separate the floating point and
   // integer values in va_args.
-  TypeDesc desc_arr[DESC_ARR_LEN] = {{0, Integer}};
+  TypeDesc desc_arr[DESC_ARR_LEN] = {type_desc_from_type<void>()};
 
   // TODO: Look into object stores for optimization.
 
@@ -49,10 +56,10 @@ class Parser {
 
 public:
 #ifndef LIBC_COPT_PRINTF_DISABLE_INDEX_MODE
-  LIBC_INLINE Parser(const char *__restrict new_str, internal::ArgList &args)
+  LIBC_INLINE Parser(const char *__restrict new_str, ArgProvider &args)
       : str(new_str), args_cur(args), args_start(args) {}
 #else
-  LIBC_INLINE Parser(const char *__restrict new_str, internal::ArgList &args)
+  LIBC_INLINE Parser(const char *__restrict new_str, ArgProvider &args)
       : str(new_str), args_cur(args) {}
 #endif // LIBC_COPT_PRINTF_DISABLE_INDEX_MODE
 
@@ -100,10 +107,18 @@ private:
 
   // get_arg_value gets the value from the arg list at index (starting at 1).
   // This may require parsing the format string. An index of 0 is interpreted as
-  // the next value.
-  template <class T> LIBC_INLINE T get_arg_value(size_t index) {
-    if (!(index == 0 || index == args_index))
-      args_to_index(index);
+  // the next value. If the format string is not valid, it may have gaps in its
+  // indexes. Requesting the value for any index after a gap will fail, since
+  // the arg list must be read in order and with the correct types.
+  template <class T> LIBC_INLINE cpp::optional<T> get_arg_value(size_t index) {
+    if (!(index == 0 || index == args_index)) {
+      bool success = args_to_index(index);
+      if (!success) {
+        // If we can't get to this index, then the value of the arg can't be
+        // found.
+        return cpp::optional<T>();
+      }
+    }
 
     set_type_desc(index, type_desc_from_type<T>());
 
@@ -111,12 +126,12 @@ private:
     return get_next_arg_value<T>();
   }
 
-  // the ArgList can only return the next item in the list. This function is
+  // the ArgProvider can only return the next item in the list. This function is
   // used in index mode when the item that needs to be read is not the next one.
   // It moves cur_args to the index requested so the the appropriate value may
   // be read. This may involve parsing the format string, and is in the worst
   // case an O(n^2) operation.
-  void args_to_index(size_t index);
+  bool args_to_index(size_t index);
 
   // get_type_desc assumes that this format string uses index mode. It iterates
   // through the format string until it finds a format specifier that defines

@@ -1163,9 +1163,9 @@ static Value *simplifyDiv(Instruction::BinaryOps Opcode, Value *Op0, Value *Op1,
   // at least as many trailing zeros as the divisor to divide evenly. If it has
   // less trailing zeros, then the result must be poison.
   const APInt *DivC;
-  if (IsExact && match(Op1, m_APInt(DivC)) && DivC->countTrailingZeros()) {
+  if (IsExact && match(Op1, m_APInt(DivC)) && DivC->countr_zero()) {
     KnownBits KnownOp0 = computeKnownBits(Op0, Q.DL, 0, Q.AC, Q.CxtI, Q.DT);
-    if (KnownOp0.countMaxTrailingZeros() < DivC->countTrailingZeros())
+    if (KnownOp0.countMaxTrailingZeros() < DivC->countr_zero())
       return PoisonValue::get(Op0->getType());
   }
 
@@ -2850,11 +2850,35 @@ static Constant *computePointerICmp(CmpInst::Predicate Pred, Value *LHS,
     else if (isAllocLikeFn(RHS, TLI) &&
              llvm::isKnownNonZero(LHS, DL, 0, nullptr, CxtI, DT))
       MI = RHS;
-    // FIXME: We should also fold the compare when the pointer escapes, but the
-    // compare dominates the pointer escape
-    if (MI && !PointerMayBeCaptured(MI, true, true))
-      return ConstantInt::get(getCompareTy(LHS),
-                              CmpInst::isFalseWhenEqual(Pred));
+    if (MI) {
+      // FIXME: This is incorrect, see PR54002. While we can assume that the
+      // allocation is at an address that makes the comparison false, this
+      // requires that *all* comparisons to that address be false, which
+      // InstSimplify cannot guarantee.
+      struct CustomCaptureTracker : public CaptureTracker {
+        bool Captured = false;
+        void tooManyUses() override { Captured = true; }
+        bool captured(const Use *U) override {
+          if (auto *ICmp = dyn_cast<ICmpInst>(U->getUser())) {
+            // Comparison against value stored in global variable. Given the
+            // pointer does not escape, its value cannot be guessed and stored
+            // separately in a global variable.
+            unsigned OtherIdx = 1 - U->getOperandNo();
+            auto *LI = dyn_cast<LoadInst>(ICmp->getOperand(OtherIdx));
+            if (LI && isa<GlobalVariable>(LI->getPointerOperand()))
+              return false;
+          }
+
+          Captured = true;
+          return true;
+        }
+      };
+      CustomCaptureTracker Tracker;
+      PointerMayBeCaptured(MI, &Tracker);
+      if (!Tracker.Captured)
+        return ConstantInt::get(getCompareTy(LHS),
+                                CmpInst::isFalseWhenEqual(Pred));
+    }
   }
 
   // Otherwise, fail.
@@ -3394,8 +3418,26 @@ static Value *simplifyICmpWithBinOp(CmpInst::Predicate Pred, Value *LHS,
       return ConstantInt::getTrue(getCompareTy(RHS));
   }
 
-  if (MaxRecurse && LBO && RBO && LBO->getOpcode() == RBO->getOpcode() &&
-      LBO->getOperand(1) == RBO->getOperand(1)) {
+  if (!MaxRecurse || !LBO || !RBO || LBO->getOpcode() != RBO->getOpcode())
+    return nullptr;
+
+  if (LBO->getOperand(0) == RBO->getOperand(0)) {
+    switch (LBO->getOpcode()) {
+    default:
+      break;
+    case Instruction::Shl:
+      bool NUW = Q.IIQ.hasNoUnsignedWrap(LBO) && Q.IIQ.hasNoUnsignedWrap(RBO);
+      bool NSW = Q.IIQ.hasNoSignedWrap(LBO) && Q.IIQ.hasNoSignedWrap(RBO);
+      if (!NUW || (ICmpInst::isSigned(Pred) && !NSW) ||
+          !isKnownNonZero(LBO->getOperand(0), Q.DL))
+        break;
+      if (Value *V = simplifyICmpInst(Pred, LBO->getOperand(1),
+                                      RBO->getOperand(1), Q, MaxRecurse - 1))
+        return V;
+    }
+  }
+
+  if (LBO->getOperand(1) == RBO->getOperand(1)) {
     switch (LBO->getOpcode()) {
     default:
       break;
@@ -4211,6 +4253,17 @@ static Value *simplifyWithOpReplaced(Value *V, Value *Op, Value *RepOp,
       if ((Opcode == Instruction::And || Opcode == Instruction::Or) &&
           NewOps[0] == NewOps[1])
         return NewOps[0];
+
+      // If we are substituting an absorber constant into a binop and extra
+      // poison can't leak if we remove the select -- because both operands of
+      // the binop are based on the same value -- then it may be safe to replace
+      // the value with the absorber constant. Examples:
+      // (Op == 0) ? 0 : (Op & -Op)            --> Op & -Op
+      // (Op == 0) ? 0 : (Op * (binop Op, C))  --> Op * (binop Op, C)
+      // (Op == -1) ? -1 : (Op | (binop C, Op) --> Op | (binop C, Op)
+      if (RepOp == ConstantExpr::getBinOpAbsorber(Opcode, I->getType()) &&
+          impliesPoison(BO, Op))
+        return RepOp;
     }
 
     if (auto *GEP = dyn_cast<GetElementPtrInst>(I)) {
@@ -6572,8 +6625,8 @@ Value *llvm::simplifyFreezeInst(Value *Op0, const SimplifyQuery &Q) {
   return ::simplifyFreezeInst(Op0, Q);
 }
 
-static Value *simplifyLoadInst(LoadInst *LI, Value *PtrOp,
-                               const SimplifyQuery &Q) {
+Value *llvm::simplifyLoadInst(LoadInst *LI, Value *PtrOp,
+                              const SimplifyQuery &Q) {
   if (LI->isVolatile())
     return nullptr;
 
@@ -6585,6 +6638,12 @@ static Value *simplifyLoadInst(LoadInst *LI, Value *PtrOp,
   auto *GV = dyn_cast<GlobalVariable>(getUnderlyingObject(PtrOp));
   if (!GV || !GV->isConstant() || !GV->hasDefinitiveInitializer())
     return nullptr;
+
+  // If GlobalVariable's initializer is uniform, then return the constant
+  // regardless of its offset.
+  if (Constant *C =
+          ConstantFoldLoadFromUniformValue(GV->getInitializer(), LI->getType()))
+    return C;
 
   // Try to convert operand into a constant by stripping offsets while looking
   // through invariant.group intrinsics.

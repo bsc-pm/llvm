@@ -178,7 +178,7 @@ public:
     llvm_unreachable("Unsupported register kind");
   }
 
-  unsigned getMaxInterleaveFactor(unsigned VF) {
+  unsigned getMaxInterleaveFactor(ElementCount VF) {
     return ST->getMaxInterleaveFactor();
   }
 
@@ -325,6 +325,9 @@ public:
 
     return true;
   }
+
+  bool hasArmWideBranch(bool Thumb) const;
+
   /// @}
 };
 
