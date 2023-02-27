@@ -1061,15 +1061,24 @@ struct OmpSsDirective {
   // Rewrites task_args using address_translation
   void translateDep(
       IRBuilder<> &IRBTranslate, IRBuilder<> &IRBReload, Value *DSA,
-      bool IsShared, Value *&UnpackedDSA, Value *AddrTranslationTable, int SymbolIndex) {
+      bool IsShared, Value *&UnpackedDSA, Type *UnpackedDSATy,
+      Value *AddrTranslationTable, int SymbolIndex) {
 
     // nanos6_address_translation_entry_t *address_translation_table
     Type *TaskAddrTranslationEntryTy = nanos6Api::Nanos6TaskAddrTranslationEntry::getInstance(M).getType();
 
     llvm::Value *DepBase = UnpackedDSA;
+    llvm::Value *AddrToTranslate = DepBase;
     if (!IsShared) {
       assert(!isa<LoadInst>(UnpackedDSA));
-      DepBase = IRBTranslate.CreateLoad(PtrTy, DepBase);
+      DepBase = IRBTranslate.CreateLoad(UnpackedDSATy, DepBase);
+      // HUGE FIXME! (1)
+      // flang POINTER used in dependencies are firstprivate
+      // fir.box. We want to translate the buffer, so here
+      // we are assuming the first field is the buffer
+      // In the future we way do this in a generic way
+      if (UnpackedDSATy->isStructTy())
+        AddrToTranslate = IRBTranslate.CreateExtractValue(DepBase, 0, "agg.ptr");
     }
 
     Value *Idx[2];
@@ -1088,7 +1097,7 @@ struct OmpSsDirective {
 
     // Res = device_addr + (DSA_addr - local_addr)
     Value *Translation =
-        IRBTranslate.CreateGEP(Int8Ty, DepBase, IRBTranslate.CreateNeg(LocalAddr));
+        IRBTranslate.CreateGEP(Int8Ty, AddrToTranslate, IRBTranslate.CreateNeg(LocalAddr));
     Translation = IRBTranslate.CreateGEP(Int8Ty, Translation, DeviceAddr);
 
     // Store the translation
@@ -1098,16 +1107,20 @@ struct OmpSsDirective {
       // Reload what we have translated
       UnpackedDSA = IRBReload.CreateLoad(PtrTy, LUnpackedDSA->getPointerOperand());
     } else {
+      // HUGE FIXME!
+      // Same note as (1)
+      if (UnpackedDSATy->isStructTy())
+        Translation = IRBTranslate.CreateInsertValue(DepBase, Translation, 0);
       IRBTranslate.CreateStore(Translation, UnpackedDSA);
     }
   }
 
   // Given a Outline Function assuming that task args are the first parameter, and
   // DSAInfo and VLADimsInfo, it unpacks task args in Outline and fills UnpackedList
-  // with those Values, used to call Unpack Functions
+  // and UnpackedToTypeMap with those Values and Types, used to call Unpack Functions
   void unpackDSAsWithVLADims(
       Type *TaskArgsTy, Function *OlFunc, const MapVector<Value *, size_t> &StructToIdxMap,
-      SmallVectorImpl<Value *> &UnpackedList) {
+      SmallVectorImpl<Value *> &UnpackedList, MapVector<Value *, Type *> &UnpackedToTypeMap) {
     UnpackedList.clear();
 
     IRBuilder<> BBBuilder(&OlFunc->getEntryBlock());
@@ -1126,7 +1139,9 @@ struct OmpSsDirective {
 
       UnpackedList.push_back(LGEP);
     }
-    for (Value *V : DSAInfo.Private) {
+    for (size_t i = 0; i < DSAInfo.Private.size(); ++i) {
+      Value *V = DSAInfo.Private[i];
+      Type *Ty = DSAInfo.PrivateTy[i];
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Int32Ty);
       Idx[1] = ConstantInt::get(Int32Ty, StructToIdxMap.lookup(V));
@@ -1139,8 +1154,11 @@ struct OmpSsDirective {
         GEP = BBBuilder.CreateLoad(PtrTy, GEP, "load_" + GEP->getName());
 
       UnpackedList.push_back(GEP);
+      UnpackedToTypeMap[GEP] = Ty;
     }
-    for (Value *V : DSAInfo.Firstprivate) {
+    for (size_t i = 0; i < DSAInfo.Firstprivate.size(); ++i) {
+      Value *V = DSAInfo.Firstprivate[i];
+      Type *Ty = DSAInfo.FirstprivateTy[i];
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Int32Ty);
       Idx[1] = ConstantInt::get(Int32Ty, StructToIdxMap.lookup(V));
@@ -1153,6 +1171,7 @@ struct OmpSsDirective {
         GEP = BBBuilder.CreateLoad(PtrTy, GEP, "load_" + GEP->getName());
 
       UnpackedList.push_back(GEP);
+      UnpackedToTypeMap[GEP] = Ty;
     }
     for (Value *V : CapturedInfo) {
       Value *Idx[2];
@@ -1174,6 +1193,7 @@ struct OmpSsDirective {
       const std::map<Value *, int> &DepSymToIdx,
       const MapVector<Value *, size_t> &StructToIdxMap,
       SmallVector<Value *, 4> &UnpackParams,
+      const MapVector<Value *, Type *> &UnpackParamsToTypesMap,
       bool HasDevice) {
 
     for (const auto &p : DepSymToIdx) {
@@ -1192,10 +1212,10 @@ struct OmpSsDirective {
       } else {
         Value *NewDepBaseDSA =
           IRBEntry.CreateAlloca(
-            PtrTy, nullptr, "tlate." + UnpackedDSA->getName());
+            UnpackParamsToTypesMap.lookup(UnpackedDSA), nullptr, "tlate." + UnpackedDSA->getName());
         IRBEntry.CreateStore(
           IRBEntry.CreateLoad(
-            PtrTy, UnpackedDSA),
+            UnpackParamsToTypesMap.lookup(UnpackedDSA), UnpackedDSA),
           NewDepBaseDSA);
 
         UnpackParams[Idx] = NewDepBaseDSA;
@@ -1214,7 +1234,8 @@ struct OmpSsDirective {
     Function::arg_iterator AI = OlFunc->arg_begin();
     AI++;
     SmallVector<Value *, 4> UnpackParams;
-    unpackDSAsWithVLADims(TaskArgsTy, OlFunc, StructToIdxMap, UnpackParams);
+    MapVector<Value *, Type *> UnpackParamsToTypesMap;
+    unpackDSAsWithVLADims(TaskArgsTy, OlFunc, StructToIdxMap, UnpackParams, UnpackParamsToTypesMap);
     while (AI != OlFunc->arg_end()) {
       UnpackParams.push_back(&*AI++);
     }
@@ -1244,13 +1265,12 @@ struct OmpSsDirective {
 
       bool HasDevice = !DirInfo.DirEnv.DeviceInfo.empty();
 
-      dupTranlationNeededArgs(
-          IRBEntry, DirInfo.DirEnv.DepSymToIdx, StructToIdxMap, UnpackParams, HasDevice);
-
-      // Preserve the params before translation. And replace used after build all
-      // compute_dep calls
+      // Preserve the params to still take profit of UnpackParamsToTypesMap
       // NOTE: this assumes UnpackParams can be indexed with StructToIdxMap
       SmallVector<Value *, 4> UnpackParamsCopy(UnpackParams);
+
+      dupTranlationNeededArgs(
+          IRBEntry, DirInfo.DirEnv.DepSymToIdx, StructToIdxMap, UnpackParams, UnpackParamsToTypesMap, HasDevice);
 
       for (const auto &p : DirInfo.DirEnv.DepSymToIdx) {
         Value *DepBaseDSA = p.first;
@@ -1264,16 +1284,8 @@ struct OmpSsDirective {
 
         translateDep(
           IRBIfThen, IRBIfEnd, DepBaseDSA,
-          IsShared, UnpackParams[Idx], AddrTranslationTable, SymbolIndex);
-      }
-      // Replaces dsa uses by unpacked values
-      for (Instruction &I : *IfThenBB) {
-        auto UnpackedIt = UnpackParamsCopy.begin();
-        for (auto It = StructToIdxMap.begin();
-               It != StructToIdxMap.end(); ++It, ++UnpackedIt) {
-          if (isReplaceableValue(It->first))
-            I.replaceUsesOfWith(It->first, *UnpackedIt);
-        }
+          IsShared, UnpackParams[Idx], UnpackParamsToTypesMap.lookup(UnpackParamsCopy[Idx]),
+          AddrTranslationTable, SymbolIndex);
       }
       // Build TaskUnpackCall with the translated values
       IRBIfEnd.CreateCall(UnpackFunc, UnpackParams);
