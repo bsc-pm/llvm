@@ -2240,10 +2240,11 @@ bool OSSOutlineVisitor::Pre(const parser::InterfaceBlock &x){
   if (const auto &generic{std::get<std::optional<parser::GenericSpec>>(stmt.statement.u)}){
     const auto &spec_list{std::get<std::list<parser::InterfaceSpecification>>(x.t)};
     for (const parser::InterfaceSpecification &spec : spec_list) {
-      const auto &body{std::get<parser::InterfaceBody>(spec.u)};
-      if (const auto *task{std::get_if<parser::InterfaceBody::OmpSsIfaceOutlineTask>(&body.u)}){
-        context_.Say(parser::FindSourceLocation(*task),
-              "A task outline does not allow Generic Specifier Interfaces"_err_en_US);
+      if (const auto *body{std::get_if<parser::InterfaceBody>(&spec.u)}) {
+        if (const auto *task{std::get_if<parser::InterfaceBody::OmpSsIfaceOutlineTask>(&body->u)}){
+          context_.Say(parser::FindSourceLocation(*task),
+                "A task outline does not allow Generic Specifier Interfaces"_err_en_US);
+        }
       }
     }
   }
