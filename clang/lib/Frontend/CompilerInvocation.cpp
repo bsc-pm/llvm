@@ -2460,7 +2460,6 @@ static const auto &getFrontendActionTable() {
       {frontend::PrintDependencyDirectivesSourceMinimizerOutput,
        OPT_print_dependency_directives_minimized_source},
       {frontend::FPGAWrapperGen, OPT_fompss_fpga},
-
   };
 
   return Table;

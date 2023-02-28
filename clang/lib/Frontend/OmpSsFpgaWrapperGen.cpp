@@ -1460,7 +1460,6 @@ void FPGAWrapperGen::ActOnOmpSsFpgaExtractFiles(clang::ASTContext &Ctx) {
       return;
     }
   }
-  return;
 }
 
 void FPGAWrapperGen::ActOnOmpSsFpgaGenerateWrapperCodeFiles(
@@ -1490,7 +1489,6 @@ void FPGAWrapperGen::ActOnOmpSsFpgaGenerateWrapperCodeFiles(
       return;
     }
   }
-  return;
 }
 
 void FPGAWrapperGen::HandleTranslationUnit(clang::ASTContext &Ctx) {
