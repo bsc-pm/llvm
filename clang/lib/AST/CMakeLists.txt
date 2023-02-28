@@ -111,6 +111,7 @@ add_clang_library(clangAST
   SelectorLocationsKind.cpp
   Stmt.cpp
   StmtCXX.cpp
+  StmtHlsStub.cpp
   StmtIterator.cpp
   StmtObjC.cpp
   StmtOpenMP.cpp

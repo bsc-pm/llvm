@@ -6483,8 +6483,13 @@ ExpectedStmt ASTNodeImporter::VisitStmt(Stmt *S) {
 }
 
 ExpectedStmt ASTNodeImporter::VisitHlsDirective(HlsDirective *S) {
+  auto OrigExprs = S->getVarRefs();
+  SmallVector<Expr *, 4> Exprs(OrigExprs.size());
+  if (Error Err = ImportContainerChecked(OrigExprs, Exprs))
+    return std::move(Err);
   return HlsDirective::Create(Importer.getToContext(), S->getBeginLoc(),
-                              S->getEndLoc(), llvm::StringRef(S->getContent()));
+                              S->getEndLoc(), llvm::StringRef(S->getContent()),
+                              std::move(OrigExprs));
 }
 
 ExpectedStmt ASTNodeImporter::VisitGCCAsmStmt(GCCAsmStmt *S) {

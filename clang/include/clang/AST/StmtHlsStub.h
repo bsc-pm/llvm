@@ -15,18 +15,23 @@
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Stmt.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/TrailingObjects.h"
 #include <algorithm>
 
 namespace clang {
-class HlsDirective : public Stmt {
+class HlsDirective final
+    : public Stmt,
+      public llvm::TrailingObjects<HlsDirective, char, const Expr *> {
   friend class ASTStmtReader;
   /// Starting location of the directive (directive keyword).
   SourceLocation StartLoc;
   /// Ending location of the directive.
   SourceLocation EndLoc;
-  size_t length;
+  size_t numChars;
+  size_t numExprs;
   /// Build a stub directive with the given start and end location.
   ///
   /// \param StartLoc Starting location of the directive kind.
@@ -34,29 +39,31 @@ class HlsDirective : public Stmt {
   /// \param conent raw source content to print back.
   ///
   HlsDirective(SourceLocation StartLoc, SourceLocation EndLoc,
-               StringRef &&content)
-      : Stmt(StmtClass::HlsDirectiveClass), StartLoc(StartLoc), EndLoc(EndLoc) {
-    std::copy(content.begin(), content.end(),
-              reinterpret_cast<char *>(this) +
-                  llvm::alignTo(sizeof(HlsDirective), alignof(void *)));
-    length = content.size();
-  }
+               StringRef &&content, llvm::ArrayRef<const Expr *> &&arrayExpr);
 
 public:
+  size_t numTrailingObjects(OverloadToken<char>) const { return numChars; }
+  size_t numTrailingObjects(OverloadToken<const Expr *>) const {
+    return numExprs;
+  }
+
   const StringRef getContent() const {
-    return StringRef(reinterpret_cast<const char *>(this) +
-                         llvm::alignTo(sizeof(HlsDirective), alignof(void *)),
-                     length);
+    return StringRef(getTrailingObjects<char>(), numChars);
+  }
+
+  ArrayRef<const Expr *> getVarRefs() const {
+    return llvm::ArrayRef(getTrailingObjects<const Expr *>(), numExprs);
   }
 
   template <class Alloc>
   static HlsDirective *Create(Alloc &C, SourceLocation StartLoc,
-                              SourceLocation EndLoc,
-                              llvm::StringRef &&content) {
-    unsigned Size = llvm::alignTo(sizeof(HlsDirective), alignof(void *));
-    void *Mem = C.Allocate(Size + content.size(), sizeof(void *));
-    HlsDirective *Dir =
-        new (Mem) HlsDirective(StartLoc, EndLoc, std::move(content));
+                              SourceLocation EndLoc, llvm::StringRef &&content,
+                              ArrayRef<const Expr *> Deps) {
+    void *Mem = C.Allocate(
+        totalSizeToAlloc<char, const Expr *>(content.size(), Deps.size()),
+        sizeof(void *));
+    HlsDirective *Dir = new (Mem)
+        HlsDirective(StartLoc, EndLoc, std::move(content), std::move(Deps));
     return Dir;
   }
 

@@ -11,17 +11,23 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/PrettyPrinter.h"
 #include "clang/AST/StmtHlsStub.h"
 #include "clang/AST/StmtOmpSs.h"
 #include "clang/Basic/OmpSsKinds.h"
+#include "clang/Basic/TokenKinds.h"
+#include "clang/Lex/Token.h"
 #include "clang/Parse/ParseDiagnostic.h"
 #include "clang/Parse/Parser.h"
 #include "clang/Parse/RAIIObjectsForParser.h"
 #include "clang/Sema/DeclSpec.h"
+#include "clang/Sema/Ownership.h"
 #include "clang/Sema/Scope.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace clang;
 using namespace llvm::oss;
@@ -807,16 +813,31 @@ void Parser::PreParseCollapse() {
 StmtResult Parser::ParseHlsPragma(ParsedStmtContext Allowed) {
   assert(Tok.is(tok::annot_pragma_hls) && "Not an HLS directive!");
   SourceLocation StartLoc = ConsumeAnnotationToken(), EndLoc;
-  clang::CachedTokens tokens;
-  ConsumeAndStoreUntil(tok::annot_pragma_hls_end, tokens, false, false);
+  llvm::SmallVector<Expr *, 4> exprRefs;
+  while (Tok.isNot(tok::annot_pragma_hls_end)) {
+    if (Tok.isAnyIdentifier() && PP.LookAhead(0).is(tok::equal)) {
+      ConsumeToken();
+      ConsumeToken();
+
+      bool NotPrimaryExpression = false;
+      bool NotCastExpression = true;
+      auto result =
+          ParseCastExpression(PrimaryExprOnly, false, NotCastExpression,
+                              NotTypeCast, false, &NotPrimaryExpression);
+      if (!result.isInvalid()) {
+        exprRefs.push_back(result.get());
+      }
+    } else {
+      ConsumeToken();
+    }
+  }
   EndLoc = ConsumeAnnotationToken();
   auto &SourceMgr = PP.getSourceManager();
   StringRef content(SourceMgr.getCharacterData(StartLoc),
                     SourceMgr.getFileOffset(EndLoc) -
                         SourceMgr.getFileOffset(StartLoc));
-
   return HlsDirective::Create(Actions.BumpAlloc, StartLoc, EndLoc,
-                              std::move(content));
+                              std::move(content), llvm::ArrayRef(exprRefs));
 }
 
 /// Parsing of declarative or executable OmpSs directives.
