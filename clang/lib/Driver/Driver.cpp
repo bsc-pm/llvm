@@ -4121,8 +4121,24 @@ void Driver::BuildActions(Compilation &C, DerivedArgList &Args,
           Phase == phases::Compile &&
           (Current->getType() == types::TY_PP_C ||
            Current->getType() == types::TY_PP_CXX)) {
-        FPGAWrapperGen =
-            C.MakeAction<FPGAWrapperGenJobAction>(Current, Current->getType());
+        auto *argDir = Args.getLastArg(options::OPT_fompss_fpga_hls_tasks_dir);
+        std::string pathOutput;
+        if (argDir) {
+          pathOutput = argDir->getValue();
+        } else {
+          pathOutput = GetTemporaryDirectory("fpga");
+        }
+        FPGAWrapperGen = C.MakeAction<FPGAWrapperGenJobAction>(
+            Current,
+            Current->getType(),
+            pathOutput);
+        if (Args.hasArg(options::OPT_fompss_fpga_extract) &&
+            Args.hasArg(options::OPT_fompss_fpga_mercurium_flags)) {
+          FPGAMercuriumGen = C.MakeAction<FPGAMercuriumJobAction>(
+              Current,
+              Current->getType(),
+              pathOutput);
+        }
       }
 
       if (auto *EAA = dyn_cast<ExtractAPIJobAction>(NewCurrent))

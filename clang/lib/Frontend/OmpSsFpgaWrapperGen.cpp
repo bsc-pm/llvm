@@ -750,7 +750,6 @@ OMPIF_COMM_WORLD
 
         headerInclude = StringRef(data, dataEndInclude - data);
       }
-
       OutputHeaders << "#include " << headerInclude << '\n';
     }
 
@@ -1438,8 +1437,7 @@ public:
     return true;
   }
 };
-} // namespace
-
+}
 void FPGAWrapperGen::ActOnOmpSsFpgaExtractFiles(clang::ASTContext &Ctx) {
   if (Ctx.ompssFpgaDecls.empty())
     return;
