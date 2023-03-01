@@ -1148,7 +1148,7 @@ void GetDependenciesByModuleNameAction::ExecuteAction() {
 std::unique_ptr<ASTConsumer>
 FPGAWrapperGenAction::CreateASTConsumer(CompilerInstance &CI,
                                         StringRef InFile) {
-  return CreateFPGAWrapperGen(CI.getPreprocessor());
+  return CreateFPGAWrapperGen(CI.getPreprocessor(), CI);
 }
 
 void FPGAWrapperGenAction::ExecuteAction() {

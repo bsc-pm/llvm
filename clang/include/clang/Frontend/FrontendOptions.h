@@ -513,6 +513,22 @@ public:
   /// Path which stores the output files for -ftime-trace
   std::string TimeTracePath;
 
+  /// Defines the width (in bits) of memory ports (only for wrapper localmem
+  /// data) for fpga accelerators
+  unsigned OmpSsFpgaMemoryPortWidth;
+  /// Export all OmpSs2 fpga code in the directory defined in
+  /// -fompss-fpga-hls-tasks-dir
+  unsigned OmpSsFpgaExtract : 1;
+  /// Generates all OmpSs2 fpga wrapper code to be sent to ait in the directory
+  /// defined in -fompss-fpga-hls-tasks-dir
+  unsigned OmpSsFpgaWrapperCode : 1;
+  /// Enables the logic to ensure not overflowing local variables handled by the
+  /// memory port
+  unsigned OmpSsFpgaCheckLimitsMemoryPort : 1;
+
+  /// Path to the directory where the HLS tasks will get dumped.
+  std::string OmpSsFpgaHlsTasksDir;
+
 public:
   FrontendOptions()
       : DisableFree(false), RelocatablePCH(false), ShowHelp(false),

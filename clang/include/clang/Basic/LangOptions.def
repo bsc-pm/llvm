@@ -240,16 +240,6 @@ LANGOPT(CUDA              , 1, 0, "CUDA")
 LANGOPT(HIP               , 1, 0, "HIP")
 LANGOPT(OmpSs             , 32, 0, "OpenSs support")
 LANGOPT(OpenMP            , 32, 0, "OpenMP support and version of OpenMP (31, 40 or 45)")
-LANGOPT(OmpSsFpgaMemoryPortWidth, 32, 0,
-        "Defines the width (in bits) of memory ports (only for wrapper "
-        "localmem data) for fpga accelerators")
-LANGOPT(OmpSsFpgaExtract   , 1, 0, "Export all OmpSs2 fpga code in the directory defined in -fompss-fpga-hls-tasks-dir")
-LANGOPT(OmpSsFpgaWrapperCode, 1, 0,
-        "Generates all OmpSs2 fpga wrapper code to be sent to ait in the "
-        "directory defined in -fompss-fpga-hls-tasks-dir")
-LANGOPT(OmpSsFpgaCheckLimitsMemoryPort, 1, 0,
-        "Enables the logic to ensure not overflowing local variables handled "
-        "by the memory port")
 LANGOPT(OpenMPExtensions  , 1, 1, "Enable all Clang extensions for OpenMP directives and clauses")
 LANGOPT(OpenMPSimd        , 1, 0, "Use SIMD only OpenMP support.")
 LANGOPT(OpenMPUseTLS      , 1, 0, "Use TLS for threadprivates or runtime calls")

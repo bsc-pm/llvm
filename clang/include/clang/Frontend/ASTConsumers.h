@@ -15,6 +15,7 @@
 
 #include "clang/AST/ASTDumperUtils.h"
 #include "clang/Basic/LLVM.h"
+#include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/Preprocessor.h"
 #include <memory>
 
@@ -48,7 +49,8 @@ std::unique_ptr<ASTConsumer> CreateASTViewer();
 
 // Performs various FPGA source to source code generation operations related to
 // Ompss2@FPGA
-std::unique_ptr<ASTConsumer> CreateFPGAWrapperGen(Preprocessor &PP);
+std::unique_ptr<ASTConsumer> CreateFPGAWrapperGen(Preprocessor &PP,
+                                                  clang::CompilerInstance &CI);
 
 } // end clang namespace
 

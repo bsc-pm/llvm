@@ -346,6 +346,7 @@ template <typename Callable> class WrapperGenerator {
   ASTContext &SourceContext;
   SourceManager &SourceMgr;
   Preprocessor &PP;
+  CompilerInstance &CI;
   PrintingPolicy printPol;
 
   uint64_t NumInstances;
@@ -520,8 +521,7 @@ template <typename Callable> class WrapperGenerator {
 
     const std::string memPtrType =
         "ap_uint<" +
-        std::to_string(SourceContext.getLangOpts().OmpSsFpgaMemoryPortWidth) +
-        ">";
+        std::to_string(CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth) + ">";
     const std::string sizeofMemPtrType = "sizeof(" + memPtrType + ")";
     const std::string nElemsRead = "(sizeof(" + memPtrType + ")/sizeof(T))";
 
@@ -540,7 +540,7 @@ template <typename Callable> class WrapperGenerator {
       Output << "    tmpBuffer = *(mcxx_memport + addr/" << sizeofMemPtrType
              << " + i);\n";
     Output << "    for (int j = 0; j < " << nElemsRead << "; ++j) {\n";
-    if (SourceContext.getLangOpts().OmpSsFpgaCheckLimitsMemoryPort) {
+    if (CI.getFrontendOpts().OmpSsFpgaCheckLimitsMemoryPort) {
       Output << "      if (i*" << nElemsRead << "+j >= num_elems) break;\n";
     }
     Output << "      __mcxx_cast<T> cast_tmp;\n";
@@ -555,7 +555,7 @@ template <typename Callable> class WrapperGenerator {
     }
     Output << "    }\n";
     if (!in) {
-      if (SourceContext.getLangOpts().OmpSsFpgaCheckLimitsMemoryPort) {
+      if (CI.getFrontendOpts().OmpSsFpgaCheckLimitsMemoryPort) {
         Output << "    const int rem = num_elems-(i*" << nElemsRead << ");\n";
         Output << "    const unsigned int bit_l = 0;\n";
         Output << "    const unsigned int bit_h = rem >= " << nElemsRead
@@ -889,17 +889,16 @@ OMPIF_COMM_WORLD
     }();
 
     if (!CreatesTasks) {
-      if ((SourceContext.getLangOpts().OmpSsFpgaMemoryPortWidth > 0 &&
+      if ((CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth > 0 &&
            Localmems.size() > 0) ||
           forceMemport) {
-        Output << ", ap_uint<"
-               << SourceContext.getLangOpts().OmpSsFpgaMemoryPortWidth
+        Output << ", ap_uint<" << CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth
                << ">* mcxx_memport";
       }
 
       for (auto *param : FD->parameters()) {
         auto it = Localmems.find(param);
-        if (SourceContext.getLangOpts().OmpSsFpgaMemoryPortWidth > 0 &&
+        if (CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth > 0 &&
             it != Localmems.end())
           continue;
 
@@ -931,14 +930,14 @@ OMPIF_COMM_WORLD
     }
 
     if (!CreatesTasks) {
-      if ((SourceContext.getLangOpts().OmpSsFpgaMemoryPortWidth > 0 &&
+      if ((CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth > 0 &&
            Localmems.size() > 0) ||
           forceMemport) {
         Output << "#pragma HLS interface m_axi port=mcxx_memport\n";
       }
       for (auto *param : FD->parameters()) {
         auto it = Localmems.find(param);
-        if (SourceContext.getLangOpts().OmpSsFpgaMemoryPortWidth > 0 &&
+        if (CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth > 0 &&
             it != Localmems.end())
           continue;
 
@@ -1059,9 +1058,8 @@ OMPIF_COMM_WORLD
       const auto baseTypeSizeStr = std::to_string(baseTypeSize);
       const std::string memPtrType =
           "ap_uint<" +
-          (SourceContext.getLangOpts().OmpSsFpgaMemoryPortWidth > 0
-               ? std::to_string(
-                     SourceContext.getLangOpts().OmpSsFpgaMemoryPortWidth)
+          (CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth > 0
+               ? std::to_string(CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth)
                : std::to_string(baseTypeSize * 8)) +
           ">";
       const std::string sizeofMemPtrType = "sizeof(" + memPtrType + ")";
@@ -1079,7 +1077,7 @@ OMPIF_COMM_WORLD
              << (dir == LocalmemInfo::IN ? STR_ARG_FLAG_IN_BIT
                                          : STR_ARG_FLAG_OUT_BIT)
              << "]) {\n";
-      if (SourceContext.getLangOpts().OmpSsFpgaMemoryPortWidth == 0) {
+      if (CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth == 0) {
         QualType pointedType = GetElementTypePointerTo(param->getType());
         if (dir == LocalmemInfo::IN) {
           Output << "    memcpy(" << paramName << ", mcxx_" << paramName
@@ -1106,7 +1104,7 @@ OMPIF_COMM_WORLD
         Output << "      for (int __j=0; "
                << "__j <" << nElemsRead << "; "
                << "__j++) {\n";
-        if (SourceContext.getLangOpts().OmpSsFpgaCheckLimitsMemoryPort) {
+        if (CI.getFrontendOpts().OmpSsFpgaCheckLimitsMemoryPort) {
           Output << "        if (__i*" << nElemsRead
                  << "+__j >= " << nElementsSrc << ") continue;\n";
         }
@@ -1129,7 +1127,7 @@ OMPIF_COMM_WORLD
         }
         Output << "      }\n";
         if (dir == LocalmemInfo::OUT) {
-          if (SourceContext.getLangOpts().OmpSsFpgaCheckLimitsMemoryPort) {
+          if (CI.getFrontendOpts().OmpSsFpgaCheckLimitsMemoryPort) {
             Output << "      "
                    << "const int rem = " << nElementsSrc << "-(__i*"
                    << nElemsRead << ");\n";
@@ -1201,7 +1199,7 @@ OMPIF_COMM_WORLD
   }
 
   void GenerateWrapperFunction() {
-    if (SourceContext.getLangOpts().OmpSsFpgaMemoryPortWidth == 0 &&
+    if (CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth == 0 &&
         !Localmems.empty()) {
       OutputHeaders << "#include <string.h> //needed for memcpy\n";
     }
@@ -1392,11 +1390,11 @@ public:
   WrapperGenerator(Callable Diag, llvm::raw_ostream &OutputFile,
                    FunctionDecl *FD, llvm::StringRef FuncName,
                    ASTContext &SourceContext, SourceManager &SourceMgr,
-                   Preprocessor &PP)
+                   Preprocessor &PP, CompilerInstance &CI)
       : Diag(std::forward<Callable>(Diag)), OutputHeaders(OutputStrHeaders),
         Output(OutputStr), OutputFinalFile(OutputFile), FD(FD),
         OrigFuncName(FuncName), TaskFuncName(std::string(FuncName) + "_moved"),
-        SourceContext(SourceContext), SourceMgr(SourceMgr), PP(PP),
+        SourceContext(SourceContext), SourceMgr(SourceMgr), PP(PP), CI(CI),
         printPol(SourceContext.getLangOpts()) {}
 
   bool GenerateWrapperFile() {
@@ -1441,7 +1439,7 @@ void FPGAWrapperGen::ActOnOmpSsFpgaExtractFiles(clang::ASTContext &Ctx) {
 
   auto diag = [&](auto... arg) { return PP.Diag(arg...); };
   auto realPathOrNone = getAbsoluteDirExport(
-      Ctx.getSourceManager(), Ctx.getLangOpts().OmpSsFpgaHlsTasksDir,
+      Ctx.getSourceManager(), CI.getFrontendOpts().OmpSsFpgaHlsTasksDir,
       Ctx.ompssFpgaDecls[0]->getLocation(), diag);
   if (!realPathOrNone) {
     return;
@@ -1469,7 +1467,7 @@ void FPGAWrapperGen::ActOnOmpSsFpgaGenerateWrapperCodeFiles(
 
   auto diag = [&](auto... arg) { return PP.Diag(arg...); };
   auto realPathOrNone = getAbsoluteDirExport(
-      Ctx.getSourceManager(), Ctx.getLangOpts().OmpSsFpgaHlsTasksDir,
+      Ctx.getSourceManager(), CI.getFrontendOpts().OmpSsFpgaHlsTasksDir,
       Ctx.ompssFpgaDecls[0]->getLocation(), diag);
   if (!realPathOrNone) {
     return;
@@ -1484,7 +1482,7 @@ void FPGAWrapperGen::ActOnOmpSsFpgaGenerateWrapperCodeFiles(
     llvm::raw_os_ostream outputFile(stream);
 
     if (!WrapperGenerator<decltype(diag)>(diag, outputFile, FD, funcName, Ctx,
-                                          Ctx.getSourceManager(), PP)
+                                          Ctx.getSourceManager(), PP, CI)
              .GenerateWrapperFile()) {
       return;
     }
@@ -1492,13 +1490,14 @@ void FPGAWrapperGen::ActOnOmpSsFpgaGenerateWrapperCodeFiles(
 }
 
 void FPGAWrapperGen::HandleTranslationUnit(clang::ASTContext &Ctx) {
-  if (Ctx.getLangOpts().OmpSsFpgaExtract) {
+  if (CI.getFrontendOpts().OmpSsFpgaExtract) {
     ActOnOmpSsFpgaExtractFiles(Ctx);
   }
-  if (Ctx.getLangOpts().OmpSsFpgaWrapperCode) {
+  if (CI.getFrontendOpts().OmpSsFpgaWrapperCode) {
     ActOnOmpSsFpgaGenerateWrapperCodeFiles(Ctx);
   }
 }
 
-FPGAWrapperGen::FPGAWrapperGen(Preprocessor &PP) : PP(PP) {}
+FPGAWrapperGen::FPGAWrapperGen(Preprocessor &PP, CompilerInstance &CI)
+    : PP(PP), CI(CI) {}
 FPGAWrapperGen::~FPGAWrapperGen() = default;

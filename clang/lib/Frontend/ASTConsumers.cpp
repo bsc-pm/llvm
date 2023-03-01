@@ -19,6 +19,7 @@
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/SourceManager.h"
+#include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/OmpSsFgpaWrapperGen.h"
 #include "clang/Lex/Preprocessor.h"
 #include "llvm/Support/Path.h"
@@ -221,6 +222,7 @@ std::unique_ptr<ASTConsumer> clang::CreateASTViewer() {
 //===----------------------------------------------------------------------===//
 /// FPGAExtractor consumer
 //===----------------------------------------------------------------------===//
-std::unique_ptr<ASTConsumer> clang::CreateFPGAWrapperGen(Preprocessor &PP) {
-  return std::make_unique<FPGAWrapperGen>(PP);
+std::unique_ptr<ASTConsumer> clang::CreateFPGAWrapperGen(Preprocessor &PP,
+                                                         CompilerInstance &CI) {
+  return std::make_unique<FPGAWrapperGen>(PP, CI);
 }

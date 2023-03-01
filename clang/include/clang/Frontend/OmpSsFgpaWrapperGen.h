@@ -17,17 +17,19 @@
 #define LLVM_CLANG_FRONTEND_OMPSSFPGAWRAPPERGEN_H
 
 #include "clang/AST/ASTConsumer.h"
+#include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Sema/Sema.h"
 
 class FPGAWrapperGen : public clang::ASTConsumer {
 private:
   clang::Preprocessor &PP;
+  clang::CompilerInstance &CI;
   void ActOnOmpSsFpgaExtractFiles(clang::ASTContext &Ctx);
   void ActOnOmpSsFpgaGenerateWrapperCodeFiles(clang::ASTContext &Ctx);
 
 public:
-  FPGAWrapperGen(clang::Preprocessor &PP);
+  FPGAWrapperGen(clang::Preprocessor &PP, clang::CompilerInstance &CI);
   ~FPGAWrapperGen() override;
   void HandleTranslationUnit(clang::ASTContext &Ctx) override;
 };

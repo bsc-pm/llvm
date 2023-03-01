@@ -2652,20 +2652,26 @@ def fompss_fpga : Flag<["-"], "fompss-fpga">, Flags<[CC1Option]>, Group<Action_G
   HelpText<"Ompss2@FPGA wrapper generation">;
 def fompss_fpga_hls_tasks_dir : Separate<["-"], "fompss-fpga-hls-tasks-dir">, Flags<[CC1Option]>, Group<f_Group>,
   MetaVarName<"<path>">,
-  MarshallingInfoString<LangOpts<"OmpSsFpgaHlsTasksDir">>, HelpText<"Specify which directory should be used when extracting hls functions">;
+  MarshallingInfoString<FrontendOpts<"OmpSsFpgaHlsTasksDir">>, HelpText<"Specify which directory should be used when extracting hls functions">;
+def fompss_fpga_mercurium : Separate<["-"], "fompss-fpga-mercurium">, Flags<[CC1Option]>, Group<f_Group>,
+  MetaVarName<"<path>">,
+  HelpText<"Specify which executable should be used when extracting and compiling through mercurium">;
+def fompss_fpga_mercurium_flags : Separate<["-"], "fompss-fpga-mercurium-flags">, Flags<[CC1Option]>, Group<f_Group>,
+  MetaVarName<"<flags>">,
+  HelpText<"Specify the flags to pass to mercurium. Do not specify the file or output.">;
 def fompss_fpga_extract : Flag<["-"], "fompss-fpga-extract">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"Export all OmpSs2 fpga code in the directory defined in -fompss-fpga-hls-tasks-dir">,
-  MarshallingInfoFlag<LangOpts<"OmpSsFpgaExtract">>;
+  MarshallingInfoFlag<FrontendOpts<"OmpSsFpgaExtract">>;
 def fompss_fpga_wrapper_code : Flag<["-"], "fompss-fpga-wrapper-code">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"Generates all OmpSs2 fpga wrapper code to be sent to ait in the directory defined in -fompss-fpga-hls-tasks-dir">,
-  MarshallingInfoFlag<LangOpts<"OmpSsFpgaWrapperCode">>;
+  MarshallingInfoFlag<FrontendOpts<"OmpSsFpgaWrapperCode">>;
 def fompss_fpga_memory_port_width : Separate<["-"], "fompss-fpga-memory-port-width">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"Defines the width (in bits) of memory ports (only for wrapper localmem data) for fpga accelerators">,
   MetaVarName<"<bits>">,
-  MarshallingInfoInt<LangOpts<"OmpSsFpgaMemoryPortWidth">>;
+  MarshallingInfoInt<FrontendOpts<"OmpSsFpgaMemoryPortWidth">>;
 def fompss_fpga_check_limits_memory_port : Flag<["-"], "fompss-fpga-check-limits-memory-port">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"Enables the logic to ensure not overflowing local variables handled by the memory port">,
-  MarshallingInfoFlag<LangOpts<"OmpSsFpgaCheckLimitsMemoryPort">>;
+  MarshallingInfoFlag<FrontendOpts<"OmpSsFpgaCheckLimitsMemoryPort">>;
 def fopenmp : Flag<["-"], "fopenmp">, Group<f_Group>, Flags<[CC1Option, NoArgumentUnused, FlangOption, FC1Option]>,
   HelpText<"Parse OpenMP pragmas and generate parallel code.">;
 def fno_openmp : Flag<["-"], "fno-openmp">, Group<f_Group>, Flags<[NoArgumentUnused]>;
