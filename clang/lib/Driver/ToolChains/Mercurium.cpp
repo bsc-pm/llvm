@@ -93,9 +93,17 @@ void tools::mercurium::Mercurium::ConstructJob(
       CmdArgs.push_back(Args.MakeArgString(part));
     }
   }
-  auto InFile = Args.MakeArgString(std::string(MJA.getOutputDirPath()) +
-                                   "/extracted.cpp");
-  CmdArgs.push_back(InFile);
+  for (auto InputJob : MJA.getInputs()) {
+    auto *WrappeGenInput = dyn_cast<FPGAWrapperGenJobAction>(InputJob);
+    assert(WrappeGenInput && "The inputs to the Mercurium Job must be "
+                             "FPGAWrapperWrapperGenJobAction");
+
+    const auto *InFile = Args.MakeArgString(
+        std::string(WrappeGenInput->getOutputDirPath()) + "/extracted." +
+        (WrappeGenInput->getType() == types::TY_PP_C ? "c" : "cpp"));
+    CmdArgs.push_back(InFile);
+  }
+
   CmdArgs.push_back("-o");
   auto *mercuriumOutFile = D.CreateTempFile(C, "mercuriumFile", "");
   CmdArgs.push_back(mercuriumOutFile);

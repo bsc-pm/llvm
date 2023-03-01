@@ -4047,7 +4047,7 @@ void Driver::BuildActions(Compilation &C, DerivedArgList &Args,
   ExtractAPIJobAction *ExtractAPIAction = nullptr;
   ActionList LinkerInputs;
   ActionList MergerInputs;
-  FPGAWrapperGenJobAction *FPGAWrapperGen = nullptr;
+  ActionList FPGAWrapperGens;
 
   for (auto &I : Inputs) {
     types::ID InputType = I.first;
@@ -4068,6 +4068,7 @@ void Driver::BuildActions(Compilation &C, DerivedArgList &Args,
       if (OffloadBuilder->addHostDependenceToDeviceActions(Current, InputArg))
         break;
 
+    Action *FPGAWrapperGen = nullptr;
     for (phases::ID Phase : PL) {
 
       // Add any offload action the host action depends on.
@@ -4123,7 +4124,7 @@ void Driver::BuildActions(Compilation &C, DerivedArgList &Args,
            Current->getType() == types::TY_PP_CXX)) {
         auto *argDir = Args.getLastArg(options::OPT_fompss_fpga_hls_tasks_dir);
         std::string pathOutput;
-        if (argDir) {
+        if (argDir && (&Inputs.front() == &I)) {
           pathOutput = argDir->getValue();
         } else {
           pathOutput = GetTemporaryDirectory("fpga");
@@ -4132,13 +4133,6 @@ void Driver::BuildActions(Compilation &C, DerivedArgList &Args,
             Current,
             Current->getType(),
             pathOutput);
-        if (Args.hasArg(options::OPT_fompss_fpga_extract) &&
-            Args.hasArg(options::OPT_fompss_fpga_mercurium_flags)) {
-          FPGAMercuriumGen = C.MakeAction<FPGAMercuriumJobAction>(
-              Current,
-              Current->getType(),
-              pathOutput);
-        }
       }
 
       if (auto *EAA = dyn_cast<ExtractAPIJobAction>(NewCurrent))
@@ -4164,15 +4158,26 @@ void Driver::BuildActions(Compilation &C, DerivedArgList &Args,
     if (Current)
       Actions.push_back(Current);
 
-    if (FPGAWrapperGen)
+    if (FPGAWrapperGen) {
       Actions.push_back(FPGAWrapperGen);
-
+      FPGAWrapperGens.push_back(FPGAWrapperGen);
+    }
     // Add any top level actions generated for offloading.
     if (!UseNewOffloadingDriver)
       OffloadBuilder->appendTopLevelActions(Actions, Current, InputArg);
     else if (Current)
       Current->propagateHostOffloadInfo(C.getActiveOffloadKinds(),
                                         /*BoundArch=*/nullptr);
+  }
+
+  // Mercurium & AIT link passes
+  if (!FPGAWrapperGens.empty()) {
+    if (Args.hasArg(options::OPT_fompss_fpga_extract) &&
+        Args.hasArg(options::OPT_fompss_fpga_mercurium_flags)) {
+      auto *FPGAMercuriumGen = C.MakeAction<FPGAMercuriumJobAction>(
+          FPGAWrapperGens, types::TY_PP_FPGA_MERCURIUM_CXX);
+      Actions.push_back(FPGAMercuriumGen);
+    }
   }
 
   // Add a link action if necessary.
