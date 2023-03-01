@@ -1449,13 +1449,21 @@ void FPGAWrapperGen::ActOnOmpSsFpgaExtractFiles(clang::ASTContext &Ctx) {
     auto *FD = dyn_cast<FunctionDecl>(decl);
 
     auto funcName = FD->getName();
-    std::ofstream stream{*realPathOrNone + "/" +
-                         (funcName.str() + "_hls_automatic_clang.cpp")};
-    llvm::raw_os_ostream outputFile(stream);
+    if (CI.getFrontendOpts().OmpSsFpgaDump) {
+      llvm::outs() << funcName << '\n';
+      if (!GenerateExtractedOriginalFunction(diag, llvm::outs(), FD, funcName,
+                                             Ctx, Ctx.getSourceManager(), PP)) {
+        return;
+      }
+    } else {
+      std::ofstream stream{*realPathOrNone + "/" +
+                           (funcName.str() + "_hls_automatic_clang.cpp")};
+      llvm::raw_os_ostream outputFile(stream);
 
-    if (!GenerateExtractedOriginalFunction(diag, outputFile, FD, funcName, Ctx,
-                                           Ctx.getSourceManager(), PP)) {
-      return;
+      if (!GenerateExtractedOriginalFunction(diag, outputFile, FD, funcName,
+                                             Ctx, Ctx.getSourceManager(), PP)) {
+        return;
+      }
     }
   }
 }
@@ -1477,14 +1485,23 @@ void FPGAWrapperGen::ActOnOmpSsFpgaGenerateWrapperCodeFiles(
     auto *FD = dyn_cast<FunctionDecl>(decl);
 
     auto funcName = FD->getName();
-    std::ofstream stream{*realPathOrNone + "/" +
-                         (funcName.str() + "_hls_automatic_clang.cpp")};
-    llvm::raw_os_ostream outputFile(stream);
+    if (CI.getFrontendOpts().OmpSsFpgaDump) {
+      llvm::outs() << funcName << '\n';
+      if (!WrapperGenerator<decltype(diag)>(diag, llvm::outs(), FD, funcName,
+                                            Ctx, Ctx.getSourceManager(), PP, CI)
+               .GenerateWrapperFile()) {
+        return;
+      }
+    } else {
+      std::ofstream stream{*realPathOrNone + "/" +
+                           (funcName.str() + "_hls_automatic_clang.cpp")};
+      llvm::raw_os_ostream outputFile(stream);
 
-    if (!WrapperGenerator<decltype(diag)>(diag, outputFile, FD, funcName, Ctx,
-                                          Ctx.getSourceManager(), PP, CI)
-             .GenerateWrapperFile()) {
-      return;
+      if (!WrapperGenerator<decltype(diag)>(diag, outputFile, FD, funcName, Ctx,
+                                            Ctx.getSourceManager(), PP, CI)
+               .GenerateWrapperFile()) {
+        return;
+      }
     }
   }
 }

@@ -525,6 +525,8 @@ public:
   /// Enables the logic to ensure not overflowing local variables handled by the
   /// memory port
   unsigned OmpSsFpgaCheckLimitsMemoryPort : 1;
+  /// Dump the generated FPGA Wrapper to stdout.
+  unsigned OmpSsFpgaDump : 1;
 
   /// Path to the directory where the HLS tasks will get dumped.
   std::string OmpSsFpgaHlsTasksDir;
