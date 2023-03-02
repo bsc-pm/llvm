@@ -226,6 +226,12 @@ static bool ActionFailed(const Action *A,
   if (isa<FPGAWrapperGenJobAction>(A))
     return true;
 
+  if (isa<FPGAMercuriumJobAction>(A))
+    return true;
+
+  if (isa<FPGAAitJobAction>(A))
+    return true;
+
   for (const auto &CI : FailingCommands)
     if (A == &(CI.second->getSource()))
       return true;

@@ -109,3 +109,6 @@ TYPE("hip-fatbin",               HIP_FATBIN,   INVALID,         "hipfb",  phases
 TYPE("api-information",          API_INFO,     INVALID,         "json",   phases::Precompile)
 TYPE("dx-container",             DX_CONTAINER, INVALID,         "dxo",    phases::Compile, phases::Backend)
 TYPE("none",                     Nothing,      INVALID,         nullptr,  phases::Compile, phases::Backend, phases::Assemble, phases::Link)
+
+TYPE("fpga-mercurium-cpp", PP_FPGA_MERCURIUM, INVALID, "mercurium", phases::Link)
+TYPE("fpga-ait-cpp", PP_FPGA_AIT, INVALID, "ait", phases::Link)

@@ -721,4 +721,10 @@ def err_drv_loongarch_invalid_mfpu_EQ : Error<
 
 def err_drv_expand_response_file : Error<
   "failed to expand response file: %0">;
+
+def err_drv_fpga_mercurium_could_not_locate : Error<
+  "Couldn't resolve location of mercurium at '%0'. Try specifying the location with the -fompss-fpga-mercurium option, and make sure that the path is correct">;
+
+def err_drv_fpga_ait_could_not_locate : Error<
+  "Couldn't resolve location of ait. Make sure the tool is present in the path">;
 }

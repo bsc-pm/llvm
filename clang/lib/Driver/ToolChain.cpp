@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/Driver/ToolChain.h"
+#include "ToolChains/Ait.h"
 #include "ToolChains/Arch/ARM.h"
 #include "ToolChains/Clang.h"
 #include "ToolChains/Flang.h"
@@ -328,6 +329,12 @@ ToolChain::getDefaultUnwindTableLevel(const ArgList &Args) const {
   return UnwindTableLevel::None;
 }
 
+Tool *ToolChain::getAit() const {
+  if (!Ait)
+    Ait.reset(new tools::ait::Ait(*this));
+  return Ait.get();
+}
+
 Tool *ToolChain::getClang() const {
   if (!Clang)
     Clang.reset(new tools::Clang(*this, useIntegratedBackend()));
@@ -433,6 +440,11 @@ Tool *ToolChain::getTool(Action::ActionClass AC) const {
   case Action::BackendJobClass:
   case Action::FPGAWrapperGenJobClass:
     return getClang();
+
+  case Action::FPGAMercuriumJobClass:
+    return getMercurium();
+  case Action::FPGAAitJobClass:
+    return getAit();
 
   case Action::OffloadBundlingJobClass:
   case Action::OffloadUnbundlingJobClass:

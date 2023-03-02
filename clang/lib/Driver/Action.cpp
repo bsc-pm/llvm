@@ -52,6 +52,10 @@ const char *Action::getClassName(ActionClass AC) {
     return "binary-analyzer";
   case FPGAWrapperGenJobClass:
     return "fpga-wrapper-generator";
+  case FPGAMercuriumJobClass:
+    return "fpga-mercurium";
+  case FPGAAitJobClass:
+    return "fpga-ait";
   }
 
   llvm_unreachable("invalid class");
@@ -463,5 +467,17 @@ BinaryAnalyzeJobAction::BinaryAnalyzeJobAction(Action *Input, types::ID Type)
 
 void FPGAWrapperGenJobAction::anchor() {}
 
-FPGAWrapperGenJobAction::FPGAWrapperGenJobAction(Action *Input, types::ID Type)
-    : JobAction(FPGAWrapperGenJobClass, Input, Type) {}
+FPGAWrapperGenJobAction::FPGAWrapperGenJobAction(Action *Input, types::ID Type,
+                                                 std::string Path)
+    : JobAction(FPGAWrapperGenJobClass, Input, Type), Path(Path) {}
+
+void FPGAMercuriumJobAction::anchor() {}
+
+FPGAMercuriumJobAction::FPGAMercuriumJobAction(ActionList Inputs,
+                                               types::ID Type)
+    : JobAction(FPGAMercuriumJobClass, Inputs, Type) {}
+
+void FPGAAitJobAction::anchor() {}
+
+FPGAAitJobAction::FPGAAitJobAction(ActionList Inputs, types::ID Type)
+    : JobAction(FPGAAitJobClass, Inputs, Type) {}

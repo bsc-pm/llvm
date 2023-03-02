@@ -1,4 +1,4 @@
-//===--- HLSL.cpp - HLSL ToolChain Implementations --------------*- C++ -*-===//
+//===--- Mercurium.cpp - Mercurium ToolChain Implementations ----*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -81,9 +81,12 @@ void tools::mercurium::Mercurium::ConstructJob(
   if (Arg *A = Args.getLastArg(options::OPT_fompss_fpga_mercurium); A) {
     mercuriumTryPath = A->getValue();
   }
-  auto mercuriumExe = getToolChain().GetProgramPath(mercuriumTryPath.c_str());
-  if (!llvm::sys::fs::can_execute(mercuriumExe)) {
-    D.Diag(diag::err_drv_fpga_mercurium_could_not_locate) << mercuriumTryPath;
+  if (!llvm::sys::fs::can_execute(mercuriumTryPath)) {
+    auto mercuriumExe = getToolChain().GetProgramPath(mercuriumTryPath.c_str());
+    if (!llvm::sys::fs::can_execute(mercuriumExe)) {
+      D.Diag(diag::err_drv_fpga_mercurium_could_not_locate) << mercuriumTryPath;
+    }
+    mercuriumTryPath = mercuriumExe;
   }
 
   ArgStringList CmdArgs;
@@ -108,7 +111,7 @@ void tools::mercurium::Mercurium::ConstructJob(
   auto *mercuriumOutFile = D.CreateTempFile(C, "mercuriumFile", "");
   CmdArgs.push_back(mercuriumOutFile);
   CmdArgs.push_back("--fpga-link");
-  const char *Exec = Args.MakeArgString(mercuriumExe);
+  const char *Exec = Args.MakeArgString(mercuriumTryPath);
   C.addCommand(std::make_unique<Command>(JA, *this, ResponseFileSupport::None(),
                                          Exec, CmdArgs, Inputs, Inputs));
 }

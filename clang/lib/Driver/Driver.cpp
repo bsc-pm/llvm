@@ -4175,8 +4175,14 @@ void Driver::BuildActions(Compilation &C, DerivedArgList &Args,
     if (Args.hasArg(options::OPT_fompss_fpga_extract) &&
         Args.hasArg(options::OPT_fompss_fpga_mercurium_flags)) {
       auto *FPGAMercuriumGen = C.MakeAction<FPGAMercuriumJobAction>(
-          FPGAWrapperGens, types::TY_PP_FPGA_MERCURIUM_CXX);
+          FPGAWrapperGens, types::TY_PP_FPGA_MERCURIUM);
       Actions.push_back(FPGAMercuriumGen);
+    }
+    if (Args.hasArg(options::OPT_fompss_fpga_wrapper_code) &&
+        Args.hasArg(options::OPT_fompss_fpga_ait_flags)) {
+      auto *FPGAAitGen = C.MakeAction<FPGAAitJobAction>(FPGAWrapperGens,
+                                                        types::TY_PP_FPGA_AIT);
+      Actions.push_back(FPGAAitGen);
     }
   }
 

@@ -77,9 +77,11 @@ public:
     StaticLibJobClass,
     BinaryAnalyzeJobClass,
     FPGAWrapperGenJobClass,
+    FPGAMercuriumJobClass,
+    FPGAAitJobClass,
 
     JobClassFirst = PreprocessJobClass,
-    JobClassLast = FPGAWrapperGenJobClass
+    JobClassLast = FPGAAitJobClass
   };
 
   // The offloading kind determines if this action is binded to a particular
@@ -689,12 +691,37 @@ public:
 
 class FPGAWrapperGenJobAction : public JobAction {
   void anchor() override;
+  std::string Path;
 
 public:
-  FPGAWrapperGenJobAction(Action *Input, types::ID Type);
+  FPGAWrapperGenJobAction(Action *Input, types::ID Type, std::string Path);
 
   static bool classof(const Action *A) {
     return A->getKind() == FPGAWrapperGenJobClass;
+  }
+
+  StringRef getOutputDirPath() const { return Path; }
+};
+
+class FPGAMercuriumJobAction : public JobAction {
+  void anchor() override;
+
+public:
+  FPGAMercuriumJobAction(ActionList Inputs, types::ID Type);
+
+  static bool classof(const Action *A) {
+    return A->getKind() == FPGAMercuriumJobClass;
+  }
+};
+
+class FPGAAitJobAction : public JobAction {
+  void anchor() override;
+
+public:
+  FPGAAitJobAction(ActionList Inputs, types::ID Type);
+
+  static bool classof(const Action *A) {
+    return A->getKind() == FPGAAitJobClass;
   }
 };
 

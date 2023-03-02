@@ -2660,6 +2660,12 @@ def fompss_fpga_mercurium : Separate<["-"], "fompss-fpga-mercurium">, Flags<[CC1
 def fompss_fpga_mercurium_flags : Separate<["-"], "fompss-fpga-mercurium-flags">, Flags<[CC1Option]>, Group<f_Group>,
   MetaVarName<"<flags>">,
   HelpText<"Specify the flags to pass to mercurium. Do not specify the file or output.">;
+def fompss_fpga_ait : Separate<["-"], "fompss-fpga-ait">, Flags<[CC1Option]>, Group<f_Group>,
+  MetaVarName<"<path>">,
+  HelpText<"Specify which executable should be used when generating the wrapper and compiling through AIT">;
+def fompss_fpga_ait_flags : Separate<["-"], "fompss-fpga-ait-flags">, Flags<[CC1Option]>, Group<f_Group>,
+  MetaVarName<"<flags>">,
+  HelpText<"Specify the flags to pass to AIT. Do not specify the file or output.">;
 def fompss_fpga_extract : Flag<["-"], "fompss-fpga-extract">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"Export all OmpSs2 fpga code in the directory defined in -fompss-fpga-hls-tasks-dir">,
   MarshallingInfoFlag<FrontendOpts<"OmpSsFpgaExtract">>;

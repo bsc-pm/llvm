@@ -158,8 +158,12 @@ private:
   mutable std::unique_ptr<Tool> OffloadBundler;
   mutable std::unique_ptr<Tool> OffloadPackager;
   mutable std::unique_ptr<Tool> LinkerWrapper;
+  mutable std::unique_ptr<Tool> Mercurium;
+  mutable std::unique_ptr<Tool> Ait;
 
   Tool *getClang() const;
+  Tool *getMercurium() const;
+  Tool *getAit() const;
   Tool *getFlang() const;
   Tool *getAssemble() const;
   Tool *getLink() const;

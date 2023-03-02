@@ -319,11 +319,13 @@ public:
         UsesOmpif = true;
         propagatePort(WrapperPort::OMPIF_RANK);
         return true;
-      } else if (symName == "OMPIF_Comm_size") {
+      }
+      if (symName == "OMPIF_Comm_size") {
         UsesOmpif = true;
         propagatePort(WrapperPort::OMPIF_SIZE);
         return true;
-      } else if (symName.startswith("OMPIF_")) {
+      }
+      if (symName.startswith("OMPIF_")) {
         UsesOmpif = CreatesTasks = true;
         propagatePort(WrapperPort::OUTPORT);
         if (symName == "OMPIF_Allgather") {
@@ -1431,6 +1433,28 @@ public:
     OutputFinalFile << OutputStr;
     return true;
   }
+
+  void AddPartJson(llvm::raw_ostream &OutputJson, StringRef generatedPathFile,
+                   StringRef generatedFile) {
+    OutputJson << "{\n";
+    OutputJson << "    \"full_path\" : \"" << generatedPathFile << "\",\n";
+    OutputJson << "    \"filename\" : \"" << generatedFile << "\",\n";
+    OutputJson << "    \"name\" : \"" << OrigFuncName << "\",\n";
+    OutputJson << "    \"type\" : " << HashNum << ",\n";
+    OutputJson << "    \"num_instances\" : " << NumInstances << ",\n";
+    OutputJson << "    \"task_creation\" : "
+               << (CreatesTasks ? "true" : "false") << ",\n";
+    OutputJson << "    \"instrumentation\" : false,\n";
+    OutputJson << "    \"periodic\" : false,\n";
+    OutputJson << "    \"lock\" : " << (UsesLock ? "true" : "false") << ",\n";
+
+    OutputJson
+        << "    \"deps\" : false,\n"; /*TODO: Once we have AST transformations,
+                                         we can know if we need deps*/
+
+    OutputJson << "    \"ompif\" : " << (UsesOmpif ? "true" : "false") << "\n";
+    OutputJson << "},\n";
+  }
 };
 }
 void FPGAWrapperGen::ActOnOmpSsFpgaExtractFiles(clang::ASTContext &Ctx) {
@@ -1480,27 +1504,33 @@ void FPGAWrapperGen::ActOnOmpSsFpgaGenerateWrapperCodeFiles(
     return;
   }
 
+  std::ofstream outputJson{*realPathOrNone + "/extracted.json.part"};
+  llvm::raw_os_ostream outputJsonFile(outputJson);
   for (auto *decl : Ctx.ompssFpgaDecls) {
     auto *FD = dyn_cast<FunctionDecl>(decl);
 
     auto funcName = FD->getName();
+    auto fileName = (funcName.str() + "_hls_automatic_clang.cpp");
+    auto filePath = *realPathOrNone + "/" + fileName;
     if (CI.getFrontendOpts().OmpSsFpgaDump) {
       llvm::outs() << funcName << '\n';
-      if (!WrapperGenerator<decltype(diag)>(diag, llvm::outs(), FD, funcName,
-                                            Ctx, Ctx.getSourceManager(), PP, CI)
-               .GenerateWrapperFile()) {
+      WrapperGenerator<decltype(diag)> wrapperGen(
+          diag, llvm::outs(), FD, funcName, Ctx, Ctx.getSourceManager(), PP,
+          CI);
+      if (!wrapperGen.GenerateWrapperFile()) {
         return;
       }
+      wrapperGen.AddPartJson(llvm::outs(), filePath, fileName);
     } else {
-      std::ofstream stream{*realPathOrNone + "/" +
-                           (funcName.str() + "_hls_automatic_clang.cpp")};
+      std::ofstream stream{filePath};
       llvm::raw_os_ostream outputFile(stream);
 
-      if (!WrapperGenerator<decltype(diag)>(diag, outputFile, FD, funcName, Ctx,
-                                            Ctx.getSourceManager(), PP, CI)
-               .GenerateWrapperFile()) {
+      WrapperGenerator<decltype(diag)> wrapperGen(
+          diag, outputFile, FD, funcName, Ctx, Ctx.getSourceManager(), PP, CI);
+      if (!wrapperGen.GenerateWrapperFile()) {
         return;
       }
+      wrapperGen.AddPartJson(outputJsonFile, filePath, fileName);
     }
   }
 }
