@@ -1,8 +1,8 @@
-// RUN: %clang_cc1 -fompss-2 -fompss-fpga-hls-tasks-dir /tmp -fompss-fpga -fompss-fpga-extract -fompss-fpga-dump -ferror-limit 100 %s | FileCheck %s
+// RUN: %clang_cc1 -fompss-2 -fompss-fpga-hls-tasks-dir %{fs-tmp-root} -fompss-fpga -fompss-fpga-extract -fompss-fpga-dump -ferror-limit 100 %s | FileCheck %s
 // expected-no-diagnostics
 
-#include "header.h"
-#include "header.fpga.h"
+#include "Inputs/header.h"
+#include "Inputs/header.fpga.h"
 const int VAL = 0;
 void depend();
 #pragma oss task device(fpga)

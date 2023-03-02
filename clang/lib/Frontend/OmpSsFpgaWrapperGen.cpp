@@ -1,10 +1,8 @@
-//===--- OmpssFpgaWrapperGen.cpp - Semantic Analysis for OmpSs Fpga target
-//------===//
+//===- OmpssFpgaWrapperGen.cpp - Wrapper generation for OmpSs Fpga target -===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 /// \file
@@ -105,6 +103,18 @@ using namespace clang;
 
 namespace {
 static constexpr auto WrapperVersion = 14;
+
+uint32_t MercuriumHashStr(const char *str) {
+  const int MULTIPLIER = 33;
+  uint32_t h = 0;
+
+  for (unsigned const char *p = (unsigned const char *)str; *p != '\0'; p++)
+    h = MULTIPLIER * h + *p;
+
+  h += (h >> 5);
+
+  return h; // or, h % ARRAY_SIZE;
+}
 
 enum class WrapperPort {
   OMPIF_RANK = 0,
@@ -489,19 +499,6 @@ template <typename Callable> class WrapperGenerator {
       }
       return onto;
     }
-    auto simpleHashStr = [](const char *str) {
-      const int MULTIPLIER = 33;
-      unsigned int h;
-      unsigned const char *p;
-
-      h = 0;
-      for (p = (unsigned const char *)str; *p != '\0'; p++)
-        h = MULTIPLIER * h + *p;
-
-      h += (h >> 5);
-
-      return h; // or, h % ARRAY_SIZE;
-    };
 
     // Not using the line number to allow future modifications of source code
     // without afecting the accelerator hash
@@ -510,7 +507,7 @@ template <typename Callable> class WrapperGenerator {
 
     typeStream << SourceMgr.getFilename(FD->getSourceRange().getBegin()) << " "
                << OrigFuncName;
-    unsigned long long int type = simpleHashStr(typeStr.c_str()) &
+    unsigned long long int type = MercuriumHashStr(typeStr.c_str()) &
                                   0xFFFFFFFF; //< Ensure that it its upto 32b
     // FPGA flag
     type |= 0x100000000;
