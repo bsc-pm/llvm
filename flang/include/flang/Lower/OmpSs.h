@@ -15,6 +15,10 @@
 
 #include "flang/Semantics/symbol.h"
 
+namespace mlir {
+class Value;
+} // namespace mlir
+
 namespace Fortran {
 namespace parser {
 struct OmpSsConstruct;
@@ -42,13 +46,13 @@ void genOmpSsConstruct(
   const parser::OmpSsConstruct &, const Fortran::lower::ImplicitDSAs &,
   Fortran::semantics::SemanticsContext &);
 
-void genOmpSsTaskSubroutine(
+mlir::Value genOmpSsTaskSubroutine(
   AbstractConverter &,
+  Fortran::lower::pft::Evaluation &,
+  const Fortran::parser::OmpSsOutlineTaskConstruct &,
   Fortran::semantics::SemanticsContext &,
   const Fortran::evaluate::ProcedureRef &,
-  SymMap &, StatementContext &,
-  Fortran::lower::pft::Evaluation &,
-  const Fortran::parser::OmpSsOutlineTaskConstruct &);
+  StatementContext &);
 
 } // namespace lower
 } // namespace Fortran

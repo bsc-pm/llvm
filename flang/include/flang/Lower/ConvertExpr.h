@@ -218,23 +218,25 @@ mlir::Value createSubroutineCall(AbstractConverter &converter,
                                  SymMap &symMap, StatementContext &stmtCtx,
                                  bool isUserDefAssignment);
 
-// TODO: place this in other place
 void emitOSSCopyExpr(
   AbstractConverter &, const Fortran::semantics::Symbol &, Fortran::lower::StatementContext &stmtCtx, bool);
 
-// TODO: place this in other place
-void fill_mapping(
+void createOSSAllocasForArgs(
                       Fortran::lower::SymMap &,
-                      const Fortran::evaluate::ProcedureRef &,
                       Fortran::lower::AbstractConverter &,
+                      Fortran::lower::CallerInterface &,
+                      Fortran::lower::StatementContext &);
+
+fir::ExtendedValue createOSSCallOpWithAllocas(
                       Fortran::lower::SymMap &,
+                      Fortran::lower::AbstractConverter &,
+                      Fortran::lower::CallerInterface &,
                       Fortran::lower::StatementContext &);
 
 // TODO: place this in other place
 llvm::SmallVector<mlir::Value> fillDSAs(
                       Fortran::lower::CallerInterface &caller,
                       Fortran::lower::AbstractConverter &converter,
-                      Fortran::lower::SymMap &symMap,
                       Fortran::lower::StatementContext &stmtCtx);
 
 // Attribute for an alloca that is a trivial adaptor for converting a value to

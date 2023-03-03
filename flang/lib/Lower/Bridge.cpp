@@ -1074,19 +1074,13 @@ private:
         const auto *outlineTask{details->getOutlineTask()};
 
         auto insertPt = builder->saveInsertionPoint();
-        localSymbols.pushScope();
 
-        genOmpSsTaskSubroutine(*this,
+        mlir::Value res = genOmpSsTaskSubroutine(*this, eval, *outlineTask,
             const_cast<Fortran::semantics::SemanticsContext&>(bridge.getSemanticsContext()),
-            *stmt.typedCall, localSymbols, stmtCtx, eval, *outlineTask);
-        // Call statement lowering shares code with function call lowering.
-        mlir::Value res = Fortran::lower::createSubroutineCall(
-            *this, *stmt.typedCall, explicitIterSpace, implicitIterSpace,
-            localSymbols, stmtCtx, /*isUserDefAssignment=*/false);
+            *stmt.typedCall, stmtCtx);
         if (res)
           llvm_unreachable("Unexpected call");
 
-        localSymbols.popScope();
         builder->restoreInsertionPoint(insertPt);
         return;
       }

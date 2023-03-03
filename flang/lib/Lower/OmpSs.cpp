@@ -1963,13 +1963,13 @@ void Fortran::lower::genOmpSsConstruct(
       ossConstruct.u);
 }
 
-void Fortran::lower::genOmpSsTaskSubroutine(
+mlir::Value Fortran::lower::genOmpSsTaskSubroutine(
     Fortran::lower::AbstractConverter &converter,
+    Fortran::lower::pft::Evaluation &eval,
+    const Fortran::parser::OmpSsOutlineTaskConstruct &outlineTask,
     Fortran::semantics::SemanticsContext &context,
     const Fortran::evaluate::ProcedureRef &procRef,
-    SymMap &symMap, StatementContext &stmtCtx,
-    Fortran::lower::pft::Evaluation &eval,
-    const Fortran::parser::OmpSsOutlineTaskConstruct &outlineTask) {
+    StatementContext &stmtCtx) {
 
   const auto &simpleConstruct{std::get<parser::OmpSsSimpleOutlineTaskConstruct>(outlineTask.t)};
   const auto &clauseList{std::get<parser::OSSClauseList>(simpleConstruct.t)};
@@ -1978,14 +1978,14 @@ void Fortran::lower::genOmpSsTaskSubroutine(
 
   Fortran::lower::SymMap localSymbols;
 
-  Fortran::lower::fill_mapping(localSymbols, procRef, converter, symMap, stmtCtx);
+  // Create allocas to store argument expressions
+  Fortran::lower::createOSSAllocasForArgs(
+    localSymbols, converter, caller, stmtCtx);
 
   converter.getLocalSymbols().symbolMapStack.emplace_back(localSymbols.symbolMapStack.back());
 
   OSSClausesVisitor clausesVisitor(converter, context, eval, stmtCtx);
   clausesVisitor.gatherClauseList(clauseList);
-
-  converter.getLocalSymbols().popScope();
   
   auto loc = converter.getCurrentLocation();
   auto &firOpBuilder = converter.getFirOpBuilder();
@@ -1997,8 +1997,9 @@ void Fortran::lower::genOmpSsTaskSubroutine(
   llvm::SmallVector<mlir::Value> val_init; /*No needed*/
   llvm::SmallVector<mlir::Value> val_deinit; /*No needed*/
   llvm::SmallVector<mlir::Value> val_shared = 
-        Fortran::lower::fillDSAs(caller, converter, 
-                                          symMap, stmtCtx);
+        Fortran::lower::fillDSAs(caller, converter, stmtCtx);
+
+  converter.getLocalSymbols().popScope();
 
   auto taskOp = firOpBuilder.create<mlir::oss::TaskOp>(
     loc, argTy,
@@ -2033,5 +2034,7 @@ void Fortran::lower::genOmpSsTaskSubroutine(
   firOpBuilder.create<mlir::oss::TerminatorOp>(loc);
   // Reset the insertion point to the start of the first block.
   firOpBuilder.setInsertionPointToStart(&block);
+
+  return fir::getBase(Fortran::lower::createOSSCallOpWithAllocas(localSymbols, converter, caller, stmtCtx));
 }
 
