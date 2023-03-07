@@ -222,17 +222,8 @@ namespace {
 
         auto baseExpr = Fortran::semantics::AnalyzeExpr(context, x);
         fir::ExtendedValue variable = converter.genExprAddr(*baseExpr, stmtCtx, &loc);
-        auto type = fir::getBase(variable).getType();
-        if (type.isa<fir::BaseBoxType>()) {
-          if (fir::isAllocatableType(type))
-            retOperands_.push_back(fir::HeapType::get(fir::dyn_cast_ptrOrBoxEleTy(type)));
-          else if (fir::isPointerType(type))
-            retOperands_.push_back(fir::PointerType::get(fir::dyn_cast_ptrOrBoxEleTy(type)));
-          else
-            retOperands_.push_back(fir::ReferenceType::get(fir::dyn_cast_ptrOrBoxEleTy(type)));
-        } else {
-          retOperands_.push_back(type);
-        }
+        auto type = unwrapBoxAndBoxRefType(fir::getBase(variable).getType());
+        retOperands_.push_back(type);
 
         for (size_t i = 0; i < getNumDims(type); ++i)
           AddDimStartEnd();
@@ -257,17 +248,8 @@ namespace {
         auto baseExpr = Fortran::semantics::AnalyzeExpr(context, name);
         fir::ExtendedValue variable = converter.genExprAddr(*baseExpr, stmtCtx, &loc);
         if (retOperands_.empty()) {
-          auto type = fir::getBase(variable).getType();
-          if (type.isa<fir::BaseBoxType>()) {
-            if (fir::isAllocatableType(type))
-              retOperands_.push_back(fir::HeapType::get(fir::dyn_cast_ptrOrBoxEleTy(type)));
-            else if (fir::isPointerType(type))
-              retOperands_.push_back(fir::PointerType::get(fir::dyn_cast_ptrOrBoxEleTy(type)));
-            else
-              retOperands_.push_back(fir::ReferenceType::get(fir::dyn_cast_ptrOrBoxEleTy(type)));
-          } else {
-            retOperands_.push_back(type);
-          }
+          auto type = unwrapBoxAndBoxRefType(fir::getBase(variable).getType());
+          retOperands_.push_back(type);
 
           for (size_t i = 0; i < getNumDims(type); ++i)
             AddDimStartEnd();
@@ -282,6 +264,22 @@ namespace {
     llvm::ArrayRef<mlir::Type> retOperands() const { return retOperands_; }
 
     private:
+      mlir::Type unwrapBoxAndBoxRefType(mlir::Type type) {
+        // Dummy parameters in a task outline
+        if (auto refType = type.dyn_cast<fir::ReferenceType>()) {
+          if (auto boxTy = refType.getEleTy().dyn_cast<fir::BaseBoxType>()) {
+            return boxTy.getEleTy();
+          }
+        } else if (auto boxTy = type.dyn_cast<fir::BaseBoxType>()) {
+          // Assumed-shape case fir.box<fir.array<>> -> fir.ref<fir.array<>>
+          if (!(fir::isAllocatableType(boxTy) || fir::isPointerType(boxTy)))
+            return fir::ReferenceType::get(fir::dyn_cast_ptrOrBoxEleTy(boxTy));
+          // fir.box<fir.ptr<>> case. There is no case for heap since the type
+          // given has not box already.
+          return boxTy.getEleTy();
+        }
+        return type;
+      }
       void FillTypeVLASizes(Fortran::semantics::SymbolRef sym) {
         if (const auto *details{sym->detailsIf<Fortran::semantics::ObjectEntityDetails>()}) {
           for (const auto &shapeSpec : details->shape()) {
@@ -2001,14 +1999,15 @@ mlir::Value Fortran::lower::genOmpSsTaskSubroutine(
   auto loc = converter.getCurrentLocation();
   auto &firOpBuilder = converter.getFirOpBuilder();
   llvm::ArrayRef<mlir::Type> argTy;
+  llvm::SmallVector<mlir::Value> val_shared;
   llvm::SmallVector<mlir::Value> val_private; /*No needed*/
-  llvm::SmallVector<mlir::Value> val_firstprivate; /*No needed*/
-  // TODO: is this needed?
+  llvm::SmallVector<mlir::Value> val_firstprivate;
   llvm::SmallVector<mlir::Value> val_copy; /*No needed*/
   llvm::SmallVector<mlir::Value> val_init; /*No needed*/
   llvm::SmallVector<mlir::Value> val_deinit; /*No needed*/
-  llvm::SmallVector<mlir::Value> val_shared = 
-        Fortran::lower::fillDSAs(caller, converter, stmtCtx);
+  llvm::SmallVector<mlir::Value> val_capture{clausesVisitor.captureOperands().begin(), clausesVisitor.captureOperands().end()};
+
+  Fortran::lower::fillDSAs(caller, converter, stmtCtx, val_shared, val_firstprivate, val_capture);
 
   converter.getLocalSymbols().popScope();
 
@@ -2026,7 +2025,7 @@ mlir::Value Fortran::lower::genOmpSsTaskSubroutine(
     val_deinit,
     val_shared,
     clausesVisitor.vlaDimsOperands(),
-    clausesVisitor.captureOperands(),
+    val_capture,
     clausesVisitor.inClauseOperands(),
     clausesVisitor.outClauseOperands(),
     clausesVisitor.inoutClauseOperands(),

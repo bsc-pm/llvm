@@ -2832,7 +2832,9 @@ public:
       mlir::Type argTy = callSiteType.getInput(arg.firArgument);
       if (!actual) {
         // Optional dummy argument for which there is no actual argument.
-        caller.placeInput(arg, builder.create<fir::AbsentOp>(loc, argTy));
+        mlir::Value absent = builder.create<fir::AbsentOp>(loc, argTy);
+        localSymbols.addSymbol(*sym, absent);
+        caller.placeInput(arg, absent);
         continue;
       }
       const auto *expr = actual->UnwrapExpr();
@@ -2844,6 +2846,7 @@ public:
         if (!fir::isUnboxedValue(argVal))
           fir::emitFatalError(
               loc, "internal error: passing non trivial value by value");
+        localSymbols.addSymbol(*sym, argVal);
         caller.placeInput(arg, fir::getBase(argVal));
         continue;
       }
@@ -2865,6 +2868,7 @@ public:
           mlir::Value nullBox = fir::factory::createUnallocatedBox(
               builder, loc, boxTy, /*nonDeferredParams=*/{});
           builder.create<fir::StoreOp>(loc, nullBox, boxStorage);
+          localSymbols.addSymbol(*sym, boxStorage);
           caller.placeInput(arg, boxStorage);
           continue;
         }
@@ -2883,6 +2887,7 @@ public:
           Fortran::lower::associateMutableBox(converter, loc, pointer, *expr,
                                               /*lbounds=*/std::nullopt,
                                               stmtCtx);
+          localSymbols.addSymbol(*sym, irBox);
           caller.placeInput(arg, irBox);
           continue;
         }
@@ -2890,6 +2895,7 @@ public:
         fir::MutableBoxValue mutableBox = genMutableBoxValue(*expr);
         mlir::Value irBox =
             fir::factory::getMutableIRBox(builder, loc, mutableBox);
+        localSymbols.addSymbol(*sym, irBox);
         caller.placeInput(arg, irBox);
         if (arg.mayBeModifiedByCall())
           mutableModifiedByCall.emplace_back(std::move(mutableBox));
@@ -2945,6 +2951,7 @@ public:
                     loc, argTy, dataPtr,
                     /*allowCharacterConversion=*/true);
               });
+          localSymbols.addSymbol(*sym, boxChar);
           caller.placeInput(arg, boxChar);
         }
       } else if (arg.passBy == PassBy::Box) {
@@ -2975,11 +2982,14 @@ public:
           if (isPresentValue) {
             mlir::Value convertedBox = builder.createConvert(loc, argTy, box);
             auto absent = builder.create<fir::AbsentOp>(loc, argTy);
-            caller.placeInput(arg,
-                              builder.create<mlir::arith::SelectOp>(
-                                  loc, *isPresentValue, convertedBox, absent));
+            mlir::Value select = builder.create<mlir::arith::SelectOp>(
+                                  loc, *isPresentValue, convertedBox, absent);
+            localSymbols.addSymbol(*sym, select);
+            caller.placeInput(arg, select);
           } else {
-            caller.placeInput(arg, builder.createBox(loc, argAddr));
+            mlir::Value box = builder.createBox(loc, argAddr);
+            localSymbols.addSymbol(*sym, box);
+            caller.placeInput(arg, box);
           }
 
         } else if (arg.isOptional() &&
@@ -3024,8 +3034,10 @@ public:
 
           // Need the box types to be exactly similar for the selectOp.
           mlir::Value convertedBox = builder.createConvert(loc, argTy, box);
-          caller.placeInput(arg, builder.create<mlir::arith::SelectOp>(
-                                     loc, isAllocated, convertedBox, absent));
+          mlir::Value select = builder.create<mlir::arith::SelectOp>(
+                                     loc, isAllocated, convertedBox, absent);
+          localSymbols.addSymbol(*sym, select);
+          caller.placeInput(arg, select);
         } else {
           // Make sure a variable address is only passed if the expression is
           // actually a variable.
@@ -3063,9 +3075,7 @@ public:
                                                  /*slice=*/mlir::Value{});
             }
           }
-          // Should we fill the lbounds and other info here?
-          // if not I think the lbound offset fix does not work
-          localSymbols.addBoxSymbol(*sym, box, {}, {}, {});
+          localSymbols.addSymbol(*sym, box);
           caller.placeInput(arg, box);
         }
       } else if (arg.passBy == PassBy::AddressAndLength) {
@@ -7756,20 +7766,38 @@ fir::ExtendedValue Fortran::lower::createOSSCallOpWithAllocas(
 }
 
 // TODO: place this in other place
-llvm::SmallVector<mlir::Value> Fortran::lower::fillDSAs(
-                      Fortran::lower::CallerInterface &caller,
-                      Fortran::lower::AbstractConverter &converter,
-                      Fortran::lower::StatementContext &stmtCtx){
-  llvm::SmallVector<mlir::Value> val_firstprivate;
+void Fortran::lower::fillDSAs(
+    Fortran::lower::CallerInterface &caller,
+    Fortran::lower::AbstractConverter &converter,
+    Fortran::lower::StatementContext &stmtCtx,
+    llvm::SmallVectorImpl<mlir::Value>& val_shared,
+    llvm::SmallVectorImpl<mlir::Value>& val_firstprivate,
+    llvm::SmallVectorImpl<mlir::Value>& val_capture) {
 
   Fortran::lower::SymMap &symMap = converter.getLocalSymbols();
   const auto &dummies = caller.getInterfaceDetails()->dummyArgs();
+  for (const Fortran::lower::CallInterface<
+           Fortran::lower::CallerInterface>::PassedEntity &arg :
+       caller.getPassedArguments()) {
+    // TODO: location
+    auto loc = converter.genUnknownLocation();
+    const auto *actual = arg.entity;
+    const auto *expr = actual->UnwrapExpr();
+    const Fortran::semantics::Symbol *sym = dummies[arg.firArgument];
 
-  for (size_t i = 0; i < dummies.size(); ++i){
-    auto argAddr = symMap.lookupSymbol(*dummies[i]).toExtendedValue();
-    val_firstprivate.push_back(fir::getBase(argAddr));
+    auto ossArgValue = symMap.lookupSymbol(*sym).getAddr();
+    auto origArgValue = fir::getBase(converter.genExprAddr(*expr, stmtCtx, &loc));
+    if (ossArgValue == origArgValue) {
+      val_shared.push_back(ossArgValue);
+    } else if (fir::isa_box_type(ossArgValue.getType())) {
+      // Copying the box should be enough
+      val_firstprivate.push_back(ossArgValue);
+    } else if (!fir::isa_ref_type(ossArgValue.getType())) {
+      val_capture.push_back(ossArgValue);
+    } else {
+      val_firstprivate.push_back(ossArgValue);
+    }
   }
-  return val_firstprivate;
 }
 
 template <typename A>

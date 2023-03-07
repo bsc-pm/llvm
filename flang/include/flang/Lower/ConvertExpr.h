@@ -234,10 +234,12 @@ fir::ExtendedValue createOSSCallOpWithAllocas(
                       Fortran::lower::StatementContext &);
 
 // TODO: place this in other place
-llvm::SmallVector<mlir::Value> fillDSAs(
-                      Fortran::lower::CallerInterface &caller,
-                      Fortran::lower::AbstractConverter &converter,
-                      Fortran::lower::StatementContext &stmtCtx);
+void fillDSAs(Fortran::lower::CallerInterface &caller,
+              Fortran::lower::AbstractConverter &converter,
+              Fortran::lower::StatementContext &stmtCtx,
+              llvm::SmallVectorImpl<mlir::Value>& val_shared,
+              llvm::SmallVectorImpl<mlir::Value>& val_firstprivate,
+              llvm::SmallVectorImpl<mlir::Value>& val_capture);
 
 // Attribute for an alloca that is a trivial adaptor for converting a value to
 // pass-by-ref semantics for a VALUE parameter. The optimizer may be able to

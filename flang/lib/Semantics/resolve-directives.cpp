@@ -713,8 +713,10 @@ private:
     template <typename A> bool Pre(const A &) { return true; }
     template <typename A> void Post(const A &) {}
     bool Pre(const parser::StructureComponent &x) {
-      if (!elemSize)
-        elemSize = ComputeElemTypeSize(x.component.symbol);
+      if (!elemSize) {
+        Symbol *sym = Fortran::evaluate::GetLastSymbol(x);
+        elemSize = ComputeElemTypeSize(sym);
+      }
       Walk(x.base);
       return false;
     }
