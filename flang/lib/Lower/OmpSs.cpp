@@ -686,6 +686,7 @@ static mlir::Value getComputeDep(
     Fortran::lower::AbstractConverter &converter,
     Fortran::semantics::SemanticsContext &context,
     Fortran::lower::pft::Evaluation &eval,
+    const Fortran::semantics::Scope &scope,
     Fortran::lower::StatementContext &stmtCtx,
     const Fortran::parser::OSSObject &ossObject) {
   OSSDependInfoGathering dependInfoGathering(converter, context, stmtCtx);
@@ -721,8 +722,6 @@ static mlir::Value getComputeDep(
 
   firOpBuilder.setInsertionPointToStart(&block);
 
-  /// Return the FunctionLikeUnit containing this evaluation (or nullptr).
-  Fortran::lower::pft::FunctionLikeUnit *funit = eval.getOwningProcedure();
   Fortran::lower::SymMap localSymbols;
 
   // Map symbols to function arguments
@@ -765,15 +764,14 @@ static mlir::Value getComputeDep(
     }
   }
 
-  const Fortran::semantics::Scope &scope = funit->getScope();
   for (const auto &var : Fortran::lower::pft::getScopeVariableList(scope)) {
     const Fortran::semantics::Symbol &sym = var.getSymbol();
     for (size_t i = 0; i < paramSymbols.size(); ++i) {
-      // if (paramSymbols[i] == sym) {
-      //   Fortran::lower::mapSymbolAttributes(
-      //     converter, var, localSymbols, stmtCtx, func.front().getArguments()[i]);
-      //   break;
-      // }
+      if (paramSymbols[i] == sym) {
+        Fortran::lower::mapSymbolAttributes(
+          converter, var, localSymbols, stmtCtx, func.front().getArguments()[i]);
+        break;
+      }
     }
   }
 
@@ -806,16 +804,18 @@ namespace {
         Fortran::lower::AbstractConverter &converter,
         Fortran::semantics::SemanticsContext &context,
         Fortran::lower::pft::Evaluation &eval,
+        const Fortran::semantics::Scope &scope,
         Fortran::lower::StatementContext &stmtCtx)
-      : converter(converter), context(context), eval(eval), stmtCtx(stmtCtx) {}
+      : converter(converter), context(context), eval(eval), scope(scope), stmtCtx(stmtCtx) {}
 
     explicit OSSClausesVisitor(
         Fortran::lower::AbstractConverter &converter,
         Fortran::semantics::SemanticsContext &context,
         Fortran::lower::pft::Evaluation &eval,
+        const Fortran::semantics::Scope &scope,
         Fortran::lower::StatementContext &stmtCtx,
         const Fortran::lower::ImplicitDSAs &implicitDSAs)
-      : converter(converter), context(context), eval(eval), stmtCtx(stmtCtx) {
+      : converter(converter), context(context), eval(eval), scope(scope), stmtCtx(stmtCtx) {
 
       for (const auto &sym : implicitDSAs.sharedList) {
         addOperandsBoxAware(sym, sharedClauseOperands_);
@@ -1471,7 +1471,7 @@ namespace {
           const auto &dependType{std::get<Fortran::parser::OSSDependenceType>(inOut.t)};
           const Fortran::parser::OSSObjectList &ossObjectList{std::get<Fortran::parser::OSSObjectList>(inOut.t)};
           for (const auto &ossObject : ossObjectList.v) {
-            mlir::Value op = getComputeDep(converter, context, eval, stmtCtx, ossObject);
+            mlir::Value op = getComputeDep(converter, context, eval, scope, stmtCtx, ossObject);
             switch (dependType.v) {
             case Fortran::parser::OSSDependenceType::Type::In:
               inClauseOperands_.push_back(op);
@@ -1509,70 +1509,70 @@ namespace {
                        std::get_if<Fortran::parser::OSSClause::In>(
                            &clause.u)) {
           for (const auto &ossObject : inClause->v.v) {
-            mlir::Value op = getComputeDep(converter, context, eval, stmtCtx, ossObject);
+            mlir::Value op = getComputeDep(converter, context, eval, scope, stmtCtx, ossObject);
             inClauseOperands_.push_back(op);
           }
         } else if (const auto &outClause =
                        std::get_if<Fortran::parser::OSSClause::Out>(
                            &clause.u)) {
           for (const auto &ossObject : outClause->v.v) {
-            mlir::Value op = getComputeDep(converter, context, eval, stmtCtx, ossObject);
+            mlir::Value op = getComputeDep(converter, context, eval, scope, stmtCtx, ossObject);
             outClauseOperands_.push_back(op);
           }
         } else if (const auto &inoutClause =
                        std::get_if<Fortran::parser::OSSClause::Inout>(
                            &clause.u)) {
           for (const auto &ossObject : inoutClause->v.v) {
-            mlir::Value op = getComputeDep(converter, context, eval, stmtCtx, ossObject);
+            mlir::Value op = getComputeDep(converter, context, eval, scope, stmtCtx, ossObject);
             inoutClauseOperands_.push_back(op);
           }
         } else if (const auto &concurrentClause =
                        std::get_if<Fortran::parser::OSSClause::Concurrent>(
                            &clause.u)) {
           for (const auto &ossObject : concurrentClause->v.v) {
-            mlir::Value op = getComputeDep(converter, context, eval, stmtCtx, ossObject);
+            mlir::Value op = getComputeDep(converter, context, eval, scope, stmtCtx, ossObject);
             concurrentClauseOperands_.push_back(op);
           }
         } else if (const auto &commutativeClause =
                        std::get_if<Fortran::parser::OSSClause::Commutative>(
                            &clause.u)) {
           for (const auto &ossObject : commutativeClause->v.v) {
-            mlir::Value op = getComputeDep(converter, context, eval, stmtCtx, ossObject);
+            mlir::Value op = getComputeDep(converter, context, eval, scope, stmtCtx, ossObject);
             commutativeClauseOperands_.push_back(op);
           }
         } else if (const auto &weakinClause =
                        std::get_if<Fortran::parser::OSSClause::Weakin>(
                            &clause.u)) {
           for (const auto &ossObject : weakinClause->v.v) {
-            mlir::Value op = getComputeDep(converter, context, eval, stmtCtx, ossObject);
+            mlir::Value op = getComputeDep(converter, context, eval, scope, stmtCtx, ossObject);
             weakinClauseOperands_.push_back(op);
           }
         } else if (const auto &weakoutClause =
                        std::get_if<Fortran::parser::OSSClause::Weakout>(
                            &clause.u)) {
           for (const auto &ossObject : weakoutClause->v.v) {
-            mlir::Value op = getComputeDep(converter, context, eval, stmtCtx, ossObject);
+            mlir::Value op = getComputeDep(converter, context, eval, scope, stmtCtx, ossObject);
             weakoutClauseOperands_.push_back(op);
           }
         } else if (const auto &weakinoutClause =
                        std::get_if<Fortran::parser::OSSClause::Weakinout>(
                            &clause.u)) {
           for (const auto &ossObject : weakinoutClause->v.v) {
-            mlir::Value op = getComputeDep(converter, context, eval, stmtCtx, ossObject);
+            mlir::Value op = getComputeDep(converter, context, eval, scope, stmtCtx, ossObject);
             weakinoutClauseOperands_.push_back(op);
           }
         } else if (const auto &weakconcurrentClause =
                        std::get_if<Fortran::parser::OSSClause::Weakconcurrent>(
                            &clause.u)) {
           for (const auto &ossObject : weakconcurrentClause->v.v) {
-            mlir::Value op = getComputeDep(converter, context, eval, stmtCtx, ossObject);
+            mlir::Value op = getComputeDep(converter, context, eval, scope, stmtCtx, ossObject);
             weakconcurrentClauseOperands_.push_back(op);
           }
         } else if (const auto &weakcommutativeClause =
                        std::get_if<Fortran::parser::OSSClause::Weakcommutative>(
                            &clause.u)) {
           for (const auto &ossObject : weakcommutativeClause->v.v) {
-            mlir::Value op = getComputeDep(converter, context, eval, stmtCtx, ossObject);
+            mlir::Value op = getComputeDep(converter, context, eval, scope, stmtCtx, ossObject);
             weakcommutativeClauseOperands_.push_back(op);
           }
         }
@@ -1636,6 +1636,7 @@ namespace {
     Fortran::lower::AbstractConverter &converter;
     Fortran::semantics::SemanticsContext &context;
     Fortran::lower::pft::Evaluation &eval;
+    const Fortran::semantics::Scope &scope;
     Fortran::lower::StatementContext &stmtCtx;
     mlir::Value ifClauseOperand_;
     mlir::Value finalClauseOperand_;
@@ -1679,9 +1680,12 @@ static void genOSS(Fortran::lower::AbstractConverter &converter,
 
   Fortran::lower::StatementContext stmtCtx;
 
+  Fortran::lower::pft::FunctionLikeUnit *funit = eval.getOwningProcedure();
+  const Fortran::semantics::Scope &scope = funit->getScope();
+
   const auto &clauseList =
       std::get<Fortran::parser::OSSClauseList>(simpleStandaloneConstruct.t);
-  OSSClausesVisitor clausesVisitor(converter, context, eval, stmtCtx, implicitDSAs);
+  OSSClausesVisitor clausesVisitor(converter, context, eval, scope, stmtCtx, implicitDSAs);
   clausesVisitor.gatherClauseList(clauseList);
 
   auto &firOpBuilder = converter.getFirOpBuilder();
@@ -1769,11 +1773,14 @@ genOSS(Fortran::lower::AbstractConverter &converter,
   const auto &blockDirective =
       std::get<Fortran::parser::OSSBlockDirective>(beginBlockDirective.t);
 
+  Fortran::lower::pft::FunctionLikeUnit *funit = eval.getOwningProcedure();
+  const Fortran::semantics::Scope &scope = funit->getScope();
+
   Fortran::lower::StatementContext stmtCtx;
 
   const auto &clauseList =
       std::get<Fortran::parser::OSSClauseList>(beginBlockDirective.t);
-  OSSClausesVisitor clausesVisitor(converter, context, eval, stmtCtx, implicitDSAs);
+  OSSClausesVisitor clausesVisitor(converter, context, eval, scope, stmtCtx, implicitDSAs);
   clausesVisitor.gatherClauseList(clauseList);
 
   auto &firOpBuilder = converter.getFirOpBuilder();
@@ -1819,11 +1826,14 @@ genOSS(Fortran::lower::AbstractConverter &converter,
   const auto &beginLoopDir{std::get<Fortran::parser::OSSBeginLoopDirective>(loopConstruct.t)};
   const auto &loopDir{std::get<Fortran::parser::OSSLoopDirective>(beginLoopDir.t)};
 
+  Fortran::lower::pft::FunctionLikeUnit *funit = eval.getOwningProcedure();
+  const Fortran::semantics::Scope &scope = funit->getScope();
+
   Fortran::lower::StatementContext stmtCtx;
 
   const auto &clauseList =
       std::get<Fortran::parser::OSSClauseList>(beginLoopDir.t);
-  OSSClausesVisitor clausesVisitor(converter, context, eval, stmtCtx, implicitDSAs);
+  OSSClausesVisitor clausesVisitor(converter, context, eval, scope, stmtCtx, implicitDSAs);
   clausesVisitor.gatherClauseList(clauseList);
 
   // NOTE: do this after visiting clauses to bind symbols
@@ -1966,6 +1976,7 @@ void Fortran::lower::genOmpSsConstruct(
 mlir::Value Fortran::lower::genOmpSsTaskSubroutine(
     Fortran::lower::AbstractConverter &converter,
     Fortran::lower::pft::Evaluation &eval,
+    const Fortran::semantics::Scope &scope,
     const Fortran::parser::OmpSsOutlineTaskConstruct &outlineTask,
     Fortran::semantics::SemanticsContext &context,
     const Fortran::evaluate::ProcedureRef &procRef,
@@ -1984,7 +1995,7 @@ mlir::Value Fortran::lower::genOmpSsTaskSubroutine(
 
   converter.getLocalSymbols().symbolMapStack.emplace_back(localSymbols.symbolMapStack.back());
 
-  OSSClausesVisitor clausesVisitor(converter, context, eval, stmtCtx);
+  OSSClausesVisitor clausesVisitor(converter, context, eval, scope, stmtCtx);
   clausesVisitor.gatherClauseList(clauseList);
   
   auto loc = converter.getCurrentLocation();

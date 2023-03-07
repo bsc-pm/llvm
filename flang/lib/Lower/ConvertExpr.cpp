@@ -3063,6 +3063,9 @@ public:
                                                  /*slice=*/mlir::Value{});
             }
           }
+          // Should we fill the lbounds and other info here?
+          // if not I think the lbound offset fix does not work
+          localSymbols.addBoxSymbol(*sym, box, {}, {}, {});
           caller.placeInput(arg, box);
         }
       } else if (arg.passBy == PassBy::AddressAndLength) {

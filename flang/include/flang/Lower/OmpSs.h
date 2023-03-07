@@ -25,6 +25,10 @@ struct OmpSsConstruct;
 struct OmpSsOutlineTaskConstruct;
 } // namespace parser
 
+namespace semantics {
+class Scope;
+} // namespace semantics
+
 namespace lower {
 
 class AbstractConverter;
@@ -49,6 +53,7 @@ void genOmpSsConstruct(
 mlir::Value genOmpSsTaskSubroutine(
   AbstractConverter &,
   Fortran::lower::pft::Evaluation &,
+  const Fortran::semantics::Scope &,
   const Fortran::parser::OmpSsOutlineTaskConstruct &,
   Fortran::semantics::SemanticsContext &,
   const Fortran::evaluate::ProcedureRef &,

@@ -1071,11 +1071,11 @@ private:
       auto &ultimate{name->symbol->GetUltimate()};
       if (ultimate.test(Fortran::semantics::Symbol::Flag::OSSOutlineTask)) {
         auto *details{ultimate.detailsIf<Fortran::semantics::SubprogramDetails>()};
-        const auto *outlineTask{details->getOutlineTask()};
+        const Fortran::parser::OmpSsOutlineTaskConstruct *outlineTask{details->getOutlineTask()};
 
         auto insertPt = builder->saveInsertionPoint();
 
-        mlir::Value res = genOmpSsTaskSubroutine(*this, eval, *outlineTask,
+        mlir::Value res = genOmpSsTaskSubroutine(*this, eval, *ultimate.scope(), *outlineTask,
             const_cast<Fortran::semantics::SemanticsContext&>(bridge.getSemanticsContext()),
             *stmt.typedCall, stmtCtx);
         if (res)
