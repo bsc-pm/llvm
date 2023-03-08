@@ -44,9 +44,9 @@ public:
         Ctx.getPrintableASTType("hls::stream<ap_uint<8> >"));
     auto &II = IdentifierTable.get("mcxx_spawnInPort");
 
-    NewParamInfo.push_back(ParmVarDecl::Create(
+    /*NewParamInfo.push_back(ParmVarDecl::Create(
         Ctx, funcDecl->getDeclContext(), SourceLocation{}, SourceLocation{},
-        &II, spawnInPortType, nullptr, SC_None, nullptr));
+        &II, spawnInPortType, nullptr, SC_None, nullptr));*/
 
     const auto *origType = funcDecl->getType()->getAs<FunctionProtoType>();
     llvm::SmallVector<QualType, 4> typesParam;
