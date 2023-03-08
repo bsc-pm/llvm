@@ -241,14 +241,26 @@ template <typename Callable> class WrapperGenerator {
   std::string OutputStr;
   llvm::raw_string_ostream Output;
   llvm::raw_ostream &OutputFinalFile;
-  FunctionDecl *FD;
+
   llvm::StringRef OrigFuncName;
   std::string TaskFuncName;
-  ASTContext &SourceContext;
-  SourceManager &SourceMgr;
+
   Preprocessor &PP;
   CompilerInstance &CI;
   PrintingPolicy printPol;
+
+  FunctionDecl *OriginalFD;
+  ASTContext &OriginalContext;
+  SourceManager &OriginalSourceMgr;
+
+  DiagnosticsEngine ToDiagnosticsEngine;
+  FileManager ToFileManager;
+  SourceManager ToSourceManager;
+  LangOptions ToLangOpts;
+  IdentifierTable ToIdentifierTable;
+  SelectorTable ToSelectorTable;
+  ASTContext ToContext;
+  FunctionDecl *ToFD;
 
   uint64_t NumInstances;
   uint64_t HashNum;
@@ -263,8 +275,8 @@ template <typename Callable> class WrapperGenerator {
   std::optional<uint64_t> getNumInstances() {
     uint64_t value = 1; // Default is 1 instance
     if (auto *numInstances =
-            FD->getAttr<OSSTaskDeclAttr>()->getNumInstances()) {
-      if (auto number = numInstances->getIntegerConstantExpr(SourceContext);
+            OriginalFD->getAttr<OSSTaskDeclAttr>()->getNumInstances()) {
+      if (auto number = numInstances->getIntegerConstantExpr(OriginalContext);
           number && *number > 0) {
         value = number->getZExtValue();
       } else {
@@ -278,7 +290,7 @@ template <typename Callable> class WrapperGenerator {
   }
 
   llvm::SmallDenseMap<const ParmVarDecl *, LocalmemInfo> ComputeLocalmems() {
-    auto *taskAttr = FD->getAttr<OSSTaskDeclAttr>();
+    auto *taskAttr = OriginalFD->getAttr<OSSTaskDeclAttr>();
     // First, compute the direction tags of the parameters. Do note that not
     // all parameters are guaranteed to be present
     llvm::SmallDenseMap<
@@ -326,7 +338,7 @@ template <typename Callable> class WrapperGenerator {
 
     // If copy_deps
     if (taskAttr->getCopyDeps()) {
-      for (auto *param : FD->parameters()) {
+      for (auto *param : OriginalFD->parameters()) {
         if (currentAssignationsOfArrays.find(param) !=
             currentAssignationsOfArrays.end()) {
           parametersToLocalmem.insert(param);
@@ -369,11 +381,11 @@ template <typename Callable> class WrapperGenerator {
   }
 
   std::optional<uint64_t> GenOnto() {
-    auto *taskAttr = FD->getAttr<OSSTaskDeclAttr>();
+    auto *taskAttr = OriginalFD->getAttr<OSSTaskDeclAttr>();
     auto *ontoExpr = taskAttr->getOnto();
     // Check onto information
     if (ontoExpr) {
-      auto ontoRes = ontoExpr->getIntegerConstantExpr(SourceContext);
+      auto ontoRes = ontoExpr->getIntegerConstantExpr(OriginalContext);
       if (!ontoRes || *ontoRes < 0) {
         Diag(ontoExpr->getExprLoc(),
              diag::err_expected_constant_unsigned_integer);
@@ -388,8 +400,9 @@ template <typename Callable> class WrapperGenerator {
     std::string typeStr;
     llvm::raw_string_ostream typeStream(typeStr);
 
-    typeStream << SourceMgr.getFilename(FD->getSourceRange().getBegin()) << " "
-               << OrigFuncName;
+    typeStream << OriginalSourceMgr.getFilename(
+                      OriginalFD->getSourceRange().getBegin())
+               << " " << OrigFuncName;
     unsigned long long int type = MercuriumHashStr(typeStr.c_str()) &
                                   0xFFFFFFFF; //< Ensure that it its upto 32b
     // FPGA flag
@@ -535,7 +548,7 @@ struct __mcxx_ptr_t {
       Output << "void mcxx_unset_lock(" STR_OUTPORT_DECL ");\n";
     }
 
-    if (WrapperPortMap[FD][size_t(WrapperPort::MEMORY_PORT)]) {
+    if (WrapperPortMap[ToFD][size_t(WrapperPort::MEMORY_PORT)]) {
       generateMemcpyWideportFunction(true);
       generateMemcpyWideportFunction(false);
     }
@@ -571,33 +584,6 @@ OMPIF_COMM_WORLD
   }
 
   bool GenOriginalFunctionMoved() {
-    // Dependency resolution. We use the ASTImporter utility, which is able to
-    // manage any sort of C++ construct during resolution.
-    DiagnosticsEngine toDiagnostics(new DiagnosticIDs(),
-                                    new DiagnosticOptions());
-    FileManager fileManager(SourceMgr.getFileManager().getFileSystemOpts());
-    SourceManager toMgr(toDiagnostics, fileManager);
-    LangOptions toLangOpts(SourceContext.getLangOpts());
-    IdentifierTable toIdentifierTable;
-    SelectorTable toSelectorTable;
-    ASTContext toContext(toLangOpts, toMgr, toIdentifierTable, toSelectorTable,
-                         PP.getBuiltinInfo(), TU_Incremental);
-    toContext.InitBuiltinTypes(SourceContext.getTargetInfo());
-
-    ASTImporter importer(toContext, toMgr.getFileManager(), SourceContext,
-                         SourceMgr.getFileManager(), true);
-
-    auto importedOrErr = importer.Import(FD);
-    if (!importedOrErr) {
-      auto err = importedOrErr.takeError();
-      std::string out;
-      llvm::raw_string_ostream stream(out);
-      stream << err;
-      Diag(FD->getLocation(), diag::err_oss_fpga_dependency_analisis) << out;
-      return false;
-    }
-    (*importedOrErr)->dropAttr<OSSTaskDeclAttr>();
-
     // Headers
     // We are only going to preserve the headers ending with .fpga.h or .fpga,
     // this was a restriction in the original ompss@fpga and it simplifies some
@@ -614,10 +600,12 @@ OMPIF_COMM_WORLD
       headerInclude = headerIncludeStorage;
       if (headerInclude.size() == 2) /*Missing path*/ {
         // This extracts the path from the source file
-        auto loc = SourceMgr.getIncludeLoc(SourceMgr.translateFile(file));
-        auto *data = SourceMgr.getCharacterData(loc);
+        auto loc = OriginalSourceMgr.getIncludeLoc(
+            OriginalSourceMgr.translateFile(file));
+        auto *data = OriginalSourceMgr.getCharacterData(loc);
         // Just to make sure I don't overrun a buffer later
-        auto bufferData = SourceMgr.getBufferData(SourceMgr.getFileID(loc));
+        auto bufferData =
+            OriginalSourceMgr.getBufferData(OriginalSourceMgr.getFileID(loc));
         const auto *endChar = bufferData.data() + bufferData.size();
         auto *dataEndInclude = data;
         for (; dataEndInclude < endChar && *dataEndInclude != '\n' &&
@@ -631,9 +619,10 @@ OMPIF_COMM_WORLD
     }
 
     // Body functions
-    for (Decl *otherDecl : toContext.getTranslationUnitDecl()->decls()) {
-      if (SourceMgr.getFileID(otherDecl->getSourceRange().getBegin()) !=
-          SourceMgr.getFileID(FD->getSourceRange().getBegin())) {
+    ToFD->dropAttr<OSSTaskDeclAttr>();
+    for (Decl *otherDecl : ToContext.getTranslationUnitDecl()->decls()) {
+      if (ToSourceManager.getFileID(otherDecl->getSourceRange().getBegin()) !=
+          ToSourceManager.getFileID(ToFD->getSourceRange().getBegin())) {
         // Skip dependency not originating in the file.
         continue;
       }
@@ -642,7 +631,7 @@ OMPIF_COMM_WORLD
           funcDecl && !funcDecl->hasBody()) {
         Diag(otherDecl->getLocation(),
              diag::err_oss_fpga_missing_body_for_function_depended_by_kernel);
-        Diag(FD->getLocation(), diag::note_oss_fpga_kernel);
+        Diag(ToFD->getLocation(), diag::note_oss_fpga_kernel);
         return false;
       } else if (funcDecl) {
         auto origName = funcDecl->getDeclName();
@@ -653,11 +642,10 @@ OMPIF_COMM_WORLD
         funcDecl->setDeclName(name);
       }
     }
-    OmpssFpgaTreeTransform(toContext, toIdentifierTable,
-                           dyn_cast<FunctionDecl>(*importedOrErr));
-    for (Decl *otherDecl : toContext.getTranslationUnitDecl()->decls()) {
-      if (SourceMgr.getFileID(otherDecl->getSourceRange().getBegin()) !=
-          SourceMgr.getFileID(FD->getSourceRange().getBegin())) {
+    OmpssFpgaTreeTransform(ToContext, ToIdentifierTable, WrapperPortMap);
+    for (Decl *otherDecl : ToContext.getTranslationUnitDecl()->decls()) {
+      if (ToSourceManager.getFileID(otherDecl->getSourceRange().getBegin()) !=
+          ToSourceManager.getFileID(ToFD->getSourceRange().getBegin())) {
         // Skip dependency not originating in the file.
         continue;
       }
@@ -676,7 +664,7 @@ OMPIF_COMM_WORLD
                                     StringRef name) {
     auto &id = PP.getIdentifierTable().get(name);
 
-    auto *varDecl = VarDecl::Create(SourceContext, FD->getLexicalDeclContext(),
+    auto *varDecl = VarDecl::Create(ToContext, ToFD->getLexicalDeclContext(),
                                     SourceLocation(), SourceLocation(), &id,
                                     type, nullptr, storageClass);
 
@@ -720,13 +708,13 @@ OMPIF_COMM_WORLD
       paramType = DerefOnceTypePointerTo(paramType);
     paramType.removeLocalCVRQualifiers(Qualifiers::CVRMask);
     for (auto *shape : arrayType->getShapes()) {
-      auto computedSize = shape->getIntegerConstantExpr(SourceContext);
+      auto computedSize = shape->getIntegerConstantExpr(OriginalContext);
       if (!computedSize) {
         llvm_unreachable(
             "We have already checked that the shape expressions evaluate to "
             "positive integers, we should be able to use them here safely");
       }
-      paramType = SourceContext.getConstantArrayType(
+      paramType = OriginalContext.getConstantArrayType(
           paramType, *computedSize, shape, ArrayType::ArraySizeModifier{}, 0);
     }
     return paramType;
@@ -767,7 +755,7 @@ OMPIF_COMM_WORLD
     }
 
     bool forceMemport = [&] {
-      auto *it = WrapperPortMap.find(FD);
+      auto *it = WrapperPortMap.find(ToFD);
       return it != WrapperPortMap.end() &&
              it->second[(int)WrapperPort::MEMORY_PORT];
     }();
@@ -780,7 +768,7 @@ OMPIF_COMM_WORLD
                << ">* mcxx_memport";
       }
 
-      for (auto *param : FD->parameters()) {
+      for (auto *param : OriginalFD->parameters()) {
         auto it = Localmems.find(param);
         if (CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth > 0 &&
             it != Localmems.end())
@@ -791,7 +779,7 @@ OMPIF_COMM_WORLD
           Output << ", "
                  << GetDeclVariableString(
                         StorageClass::SC_None,
-                        SourceContext.getPointerType(
+                        OriginalContext.getPointerType(
                             GetElementTypePointerTo(paramType)),
                         " mcxx_" + param->getNameAsString());
         }
@@ -819,7 +807,7 @@ OMPIF_COMM_WORLD
           forceMemport) {
         Output << "#pragma HLS interface m_axi port=mcxx_memport\n";
       }
-      for (auto *param : FD->parameters()) {
+      for (auto *param : OriginalFD->parameters()) {
         auto it = Localmems.find(param);
         if (CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth > 0 &&
             it != Localmems.end())
@@ -844,7 +832,7 @@ OMPIF_COMM_WORLD
       }
       if (paramType->isArrayType()) {
         paramType =
-            SourceContext.getPointerType(GetElementTypePointerTo(paramType));
+            OriginalContext.getPointerType(GetElementTypePointerTo(paramType));
       }
       if (!usesMemoryPort && paramType.isConstQualified()) {
         paramType.removeLocalConst();
@@ -852,7 +840,7 @@ OMPIF_COMM_WORLD
       return std::pair{paramType, usesMemoryPort};
     };
     auto paramId = 0;
-    for (auto *param : FD->parameters()) {
+    for (auto *param : OriginalFD->parameters()) {
       auto [paramType, _] = getType(param);
       StringRef symbolName = param->getName();
       if (CreatesTasks && paramType->isPointerType()) {
@@ -863,7 +851,7 @@ OMPIF_COMM_WORLD
         auto it = Localmems.find(param);
         if (it == Localmems.end()) {
           if (paramType->isArrayType()) {
-            paramType = SourceContext.getPointerType(
+            paramType = OriginalContext.getPointerType(
                 GetElementTypePointerTo(paramType));
           }
           Output << "  "
@@ -880,7 +868,7 @@ OMPIF_COMM_WORLD
     Output << "  {\n";
     Output << "  #pragma HLS protocol fixed\n";
     paramId = 0;
-    for (auto *param : FD->parameters()) {
+    for (auto *param : OriginalFD->parameters()) {
       auto [paramType, usesMemoryPort] = getType(param);
 
       auto symbolName = param->getName();
@@ -935,8 +923,8 @@ OMPIF_COMM_WORLD
       const auto &fixedArrayRef = localmemInfo.FixedArrayRef;
       int paramId = localmemInfo.ParamIdx;
       QualType baseType = GetElementTypePointerTo(param->getType());
-      uint64_t baseTypeSize =
-          SourceContext.getTypeSize(baseType) / SourceContext.getCharWidth();
+      uint64_t baseTypeSize = OriginalContext.getTypeSize(baseType) /
+                              OriginalContext.getCharWidth();
 
       const auto paramName = param->getName();
       const auto baseTypeSizeStr = std::to_string(baseTypeSize);
@@ -1048,11 +1036,11 @@ OMPIF_COMM_WORLD
       }
     };
 
-    for (auto *param : FD->parameters()) {
+    for (auto *param : OriginalFD->parameters()) {
       printSeparator();
       outs << param->getName();
     }
-    auto *it = WrapperPortMap.find(FD);
+    auto *it = WrapperPortMap.find(ToFD);
     if (it != WrapperPortMap.end()) {
       if (it->second[(int)WrapperPort::OMPIF_RANK]) {
         printSeparator();
@@ -1270,16 +1258,45 @@ OMPIF_COMM_WORLD
     }
   }
 
+  bool generateMovedContext() {
+    // Dependency resolution. We use the ASTImporter utility, which is able to
+    // manage any sort of C++ construct during resolution.
+    ASTImporter importer(ToContext, ToFileManager, OriginalContext,
+                         OriginalSourceMgr.getFileManager(), true);
+
+    auto importedOrErr = importer.Import(OriginalFD);
+    if (!importedOrErr) {
+      auto err = importedOrErr.takeError();
+      std::string out;
+      llvm::raw_string_ostream stream(out);
+      stream << err;
+      Diag(OriginalFD->getLocation(), diag::err_oss_fpga_dependency_analisis)
+          << out;
+      return false;
+    }
+    ToFD = dyn_cast<FunctionDecl>(*importedOrErr);
+    return true;
+  }
+
 public:
   WrapperGenerator(Callable Diag, llvm::raw_ostream &OutputFile,
                    FunctionDecl *FD, llvm::StringRef FuncName,
                    ASTContext &SourceContext, SourceManager &SourceMgr,
                    Preprocessor &PP, CompilerInstance &CI)
       : Diag(std::forward<Callable>(Diag)), OutputHeaders(OutputStrHeaders),
-        Output(OutputStr), OutputFinalFile(OutputFile), FD(FD),
-        OrigFuncName(FuncName), TaskFuncName(std::string(FuncName) + "_moved"),
-        SourceContext(SourceContext), SourceMgr(SourceMgr), PP(PP), CI(CI),
-        printPol(SourceContext.getLangOpts()) {}
+        Output(OutputStr), OutputFinalFile(OutputFile), OrigFuncName(FuncName),
+        TaskFuncName(std::string(FuncName) + "_moved"), PP(PP), CI(CI),
+        printPol(SourceContext.getLangOpts()), OriginalFD(FD),
+        OriginalContext(SourceContext), OriginalSourceMgr(SourceMgr),
+        ToDiagnosticsEngine(new DiagnosticIDs(), new DiagnosticOptions()),
+        ToFileManager(SourceMgr.getFileManager().getFileSystemOpts()),
+        ToSourceManager(ToDiagnosticsEngine, ToFileManager),
+        ToLangOpts(SourceContext.getLangOpts()), ToIdentifierTable(),
+        ToSelectorTable(),
+        ToContext(ToLangOpts, ToSourceManager, ToIdentifierTable,
+                  ToSelectorTable, PP.getBuiltinInfo(), TU_Incremental) {
+    ToContext.InitBuiltinTypes(OriginalContext.getTargetInfo());
+  }
 
   bool GenerateWrapperFile() {
     auto numInstances = getNumInstances();
@@ -1296,8 +1313,13 @@ public:
     }
     HashNum = std::move(*hashNum);
 
-    FPGAFunctionTreeVisitor visitor(FD, WrapperPortMap);
-    visitor.TraverseStmt(FD->getBody());
+    if (!generateMovedContext()) {
+      return false;
+    }
+
+    FPGAFunctionTreeVisitor visitor(ToFD, WrapperPortMap);
+    visitor.TraverseStmt(ToFD->getBody());
+
     MemcpyWideport = visitor.MemcpyWideport;
     CreatesTasks = visitor.CreatesTasks;
     UsesLock = visitor.UsesLock;

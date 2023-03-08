@@ -68,7 +68,7 @@ public:
 
 void OmpssFpgaTreeTransform(clang::ASTContext &Ctx,
                             clang::IdentifierTable &identifierTable,
-                            FunctionDecl *FD);
+                            WrapperPortMap &WrapperPortMap);
 } // namespace clang
 
 #endif

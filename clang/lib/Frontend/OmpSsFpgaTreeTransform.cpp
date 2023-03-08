@@ -30,14 +30,14 @@ class OmpSsFpgaTreeTransformVisitor
   using Inherited = RecursiveASTVisitor<OmpSsFpgaTreeTransformVisitor>;
   ASTContext &Ctx;
   IdentifierTable &IdentifierTable;
-  WrapperPortMap WrapperPortMap;
+  WrapperPortMap &WrapperPortMap;
 
 public:
   OmpSsFpgaTreeTransformVisitor(ASTContext &Ctx,
                                 clang::IdentifierTable &IdentifierTable,
-                                ::WrapperPortMap &&WrapperPortMap)
+                                ::WrapperPortMap &WrapperPortMap)
       : Inherited(), Ctx(Ctx), IdentifierTable(IdentifierTable),
-        WrapperPortMap(std::move(WrapperPortMap)) {}
+        WrapperPortMap(WrapperPortMap) {}
   bool VisitFunctionDecl(FunctionDecl *funcDecl) {
     llvm::SmallVector<ParmVarDecl *, 4> NewParamInfo(funcDecl->parameters());
     auto spawnInPortType = Ctx.getLValueReferenceType(
@@ -65,12 +65,8 @@ public:
 namespace clang {
 void OmpssFpgaTreeTransform(clang::ASTContext &Ctx,
                             clang::IdentifierTable &identifierTable,
-                            FunctionDecl *FD) {
-  WrapperPortMap wrapperPortMap;
-  FPGAFunctionTreeVisitor visitor(FD, wrapperPortMap);
-  visitor.TraverseStmt(FD->getBody());
-  OmpSsFpgaTreeTransformVisitor t(Ctx, identifierTable,
-                                  std::move(wrapperPortMap));
+                            WrapperPortMap &WrapperPortMap) {
+  OmpSsFpgaTreeTransformVisitor t(Ctx, identifierTable, WrapperPortMap);
   t.TraverseAST(Ctx);
 }
 } // namespace clang
