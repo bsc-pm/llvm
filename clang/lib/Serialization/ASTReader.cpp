@@ -6942,6 +6942,8 @@ void TypeLocReader::VisitDependentBitIntTypeLoc(
   TL.setNameLoc(readSourceLocation());
 }
 
+void TypeLocReader::VisitPrintableASTTypeLoc(PrintableASTTypeLoc TL) {}
+
 void ASTRecordReader::readTypeLoc(TypeLoc TL, LocSeq *ParentSeq) {
   LocSeq::State Seq(ParentSeq);
   TypeLocReader TLR(*this, Seq);

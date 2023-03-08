@@ -117,6 +117,7 @@ def ExtParameterInfo : PropertyType<"FunctionProtoType::ExtParameterInfo">;
 def FixedPointSemantics : PropertyType<"llvm::FixedPointSemantics"> {
   let PassByReference = 1;
 }
+def StringRef : PropertyType<"StringRef">;
 def Identifier : RefPropertyType<"IdentifierInfo"> { let ConstWhenWriting = 1; }
 def LValuePathEntry : PropertyType<"APValue::LValuePathEntry">;
 def LValuePathSerializationHelper :

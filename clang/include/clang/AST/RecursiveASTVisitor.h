@@ -1180,6 +1180,7 @@ DEF_TRAVERSE_TYPE(PipeType, { TRY_TO(TraverseType(T->getElementType())); })
 DEF_TRAVERSE_TYPE(BitIntType, {})
 DEF_TRAVERSE_TYPE(DependentBitIntType,
                   { TRY_TO(TraverseStmt(T->getNumBitsExpr())); })
+DEF_TRAVERSE_TYPE(PrintableASTType, {})
 
 #undef DEF_TRAVERSE_TYPE
 
@@ -1480,6 +1481,7 @@ DEF_TRAVERSE_TYPELOC(BitIntType, {})
 DEF_TRAVERSE_TYPELOC(DependentBitIntType, {
   TRY_TO(TraverseStmt(TL.getTypePtr()->getNumBitsExpr()));
 })
+DEF_TRAVERSE_TYPELOC(PrintableASTType, {})
 
 #undef DEF_TRAVERSE_TYPELOC
 

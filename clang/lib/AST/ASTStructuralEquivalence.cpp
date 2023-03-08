@@ -1289,6 +1289,14 @@ static bool IsStructurallyEquivalent(StructuralEquivalenceContext &Context,
       return false;
     break;
   }
+  case Type::PrintableAST: {
+    const auto *P1 = cast<PrintableASTType>(T1);
+    const auto *P2 = cast<PrintableASTType>(T2);
+
+    if (P1->getPrintName() != P2->getPrintName())
+      return false;
+    break;
+  }
   } // end switch
 
   return true;

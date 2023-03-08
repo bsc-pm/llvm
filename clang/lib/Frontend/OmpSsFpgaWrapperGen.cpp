@@ -44,6 +44,7 @@
 #include "clang/Basic/Specifiers.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/MultiplexConsumer.h"
+#include "clang/Frontend/OmpSsFpgaTreeTransform.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Rewrite/Core/Rewriter.h"
 #include "clang/Sema/DeclSpec.h"
@@ -61,6 +62,7 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_os_ostream.h"
@@ -116,20 +118,6 @@ uint32_t MercuriumHashStr(const char *str) {
 
   return h; // or, h % ARRAY_SIZE;
 }
-
-enum class WrapperPort {
-  OMPIF_RANK = 0,
-  OMPIF_SIZE = 1,
-  MEMORY_PORT = 2,
-  INPORT = 3,
-  OUTPORT = 4,
-  SPAWN_INPORT = 5,
-  NUM_PORTS = 6
-};
-
-using WrapperPortMap =
-    llvm::SmallMapVector<const Decl *,
-                         std::array<bool, size_t(WrapperPort::NUM_PORTS)>, 16>;
 
 struct LocalmemInfo {
   int ParamIdx = -1;
@@ -244,114 +232,6 @@ bool GenerateExtractedOriginalFunction(
 
   return true;
 }
-
-class FPGAFunctionTreeVisitor
-    : public RecursiveASTVisitor<FPGAFunctionTreeVisitor> {
-  struct FunctionCallTree {
-    const Decl *symbol;
-    FunctionCallTree *parent;
-
-    FunctionCallTree(const Decl *symbol, FunctionCallTree *parent)
-        : symbol(symbol), parent(parent) {}
-  };
-
-  FunctionCallTree Top;
-  FunctionCallTree *Current;
-  WrapperPortMap &WrapperPortMap;
-
-  void propagatePort(WrapperPort port) {
-    const FunctionCallTree *node = Current;
-    do {
-      WrapperPortMap[node->symbol][(int)port] = true;
-      node = node->parent;
-    } while (node != nullptr);
-  }
-
-public:
-  bool CreatesTasks = false;
-  bool UsesOmpif = false;
-  bool MemcpyWideport = false;
-  bool UsesLock = false;
-
-  FPGAFunctionTreeVisitor(FunctionDecl *startSymbol,
-                          ::WrapperPortMap &wrapperPortMap)
-      : Top(startSymbol, nullptr), Current(&Top),
-        WrapperPortMap(wrapperPortMap) {}
-
-  bool VisitOSSTaskDirective(OSSTaskDirective *) {
-    CreatesTasks = true;
-    propagatePort(WrapperPort::OUTPORT);
-    return true;
-  }
-
-  bool VisitOSSTaskwaitDirective(OSSTaskwaitDirective *) {
-    CreatesTasks = true;
-    propagatePort(WrapperPort::OUTPORT);
-    propagatePort(WrapperPort::SPAWN_INPORT);
-    return true;
-  }
-
-  bool VisitCXXConstructExpr(CXXConstructExpr *n) {
-    auto *body = n->getConstructor()->getBody();
-    getDerived().VisitStmt(body);
-    return true;
-  }
-
-  bool VisitOMPCriticalDirective(OMPCriticalDirective *n) {
-    for (auto *c : n->children())
-      getDerived().VisitStmt(c);
-
-    UsesLock = true;
-    propagatePort(WrapperPort::INPORT);
-    propagatePort(WrapperPort::OUTPORT);
-    return true;
-  }
-
-  bool VisitCallExpr(CallExpr *n) {
-    for (auto *arg : n->children()) {
-      getDerived().VisitStmt(arg);
-    }
-    auto *sym = n->getCalleeDecl();
-    if (const NamedDecl *symNamed = dyn_cast<NamedDecl>(sym); symNamed) {
-      auto symName = symNamed->getName();
-
-      if (symName == "OMPIF_Comm_rank") {
-        UsesOmpif = true;
-        propagatePort(WrapperPort::OMPIF_RANK);
-        return true;
-      }
-      if (symName == "OMPIF_Comm_size") {
-        UsesOmpif = true;
-        propagatePort(WrapperPort::OMPIF_SIZE);
-        return true;
-      }
-      if (symName.startswith("OMPIF_")) {
-        UsesOmpif = CreatesTasks = true;
-        propagatePort(WrapperPort::OUTPORT);
-        if (symName == "OMPIF_Allgather") {
-          propagatePort(WrapperPort::OMPIF_RANK);
-          propagatePort(WrapperPort::SPAWN_INPORT);
-        }
-      } else if (symName == "nanos6_fpga_memcpy_wideport_in" ||
-                 symName == "nanos6_fpga_memcpy_wideport_out") {
-        MemcpyWideport = true;
-        propagatePort(WrapperPort::MEMORY_PORT);
-        return true;
-      }
-    }
-    auto *body = sym->getBody();
-    if (!body) {
-      return true;
-    }
-
-    FunctionCallTree newNode(sym, Current);
-    FunctionCallTree *prev = Current;
-    Current = &newNode;
-    getDerived().VisitStmt(body);
-    Current = prev;
-    return true;
-  }
-};
 
 template <typename Callable> class WrapperGenerator {
   // Construction
@@ -773,7 +653,8 @@ OMPIF_COMM_WORLD
         funcDecl->setDeclName(name);
       }
     }
-
+    OmpssFpgaTreeTransform(toContext, toIdentifierTable,
+                           dyn_cast<FunctionDecl>(*importedOrErr));
     for (Decl *otherDecl : toContext.getTranslationUnitDecl()->decls()) {
       if (SourceMgr.getFileID(otherDecl->getSourceRange().getBegin()) !=
           SourceMgr.getFileID(FD->getSourceRange().getBegin())) {

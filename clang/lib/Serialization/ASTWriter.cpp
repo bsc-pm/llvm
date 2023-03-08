@@ -33,6 +33,7 @@
 #include "clang/AST/RawCommentList.h"
 #include "clang/AST/TemplateName.h"
 #include "clang/AST/Type.h"
+#include "clang/AST/TypeLoc.h"
 #include "clang/AST/TypeLocVisitor.h"
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/DiagnosticOptions.h"
@@ -154,6 +155,7 @@ static TypeCode getTypeCodeForTypeClass(Type::TypeClass id) {
   case Type::CLASS_ID: return TYPE_##CODE_ID;
 #include "clang/Serialization/TypeBitCodes.def"
   case Type::Builtin:
+  case Type::PrintableAST:
     llvm_unreachable("shouldn't be serializing a builtin type this way");
   }
   llvm_unreachable("bad type kind");
@@ -605,6 +607,8 @@ void TypeLocWriter::VisitDependentBitIntTypeLoc(
     clang::DependentBitIntTypeLoc TL) {
   addSourceLocation(TL.getNameLoc());
 }
+
+void TypeLocWriter::VisitPrintableASTTypeLoc(PrintableASTTypeLoc TL) {}
 
 void ASTWriter::WriteTypeAbbrevs() {
   using namespace llvm;

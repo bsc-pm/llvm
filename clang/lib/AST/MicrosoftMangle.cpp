@@ -17,8 +17,8 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
-#include "clang/AST/DeclOpenMP.h"
 #include "clang/AST/DeclOmpSs.h"
+#include "clang/AST/DeclOpenMP.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/Expr.h"
 #include "clang/AST/ExprCXX.h"
@@ -32,6 +32,7 @@
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CRC.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MD5.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/StringSaver.h"
@@ -3370,6 +3371,12 @@ void MicrosoftCXXNameMangler::mangleType(const PipeType *T, Qualifiers,
   Extra.mangleIntegerLiteral(llvm::APSInt::get(T->isReadOnly()));
 
   mangleArtificialTagType(TTK_Struct, TemplateMangling, {"__clang"});
+}
+
+void MicrosoftCXXNameMangler::mangleType(const PrintableASTType *T, Qualifiers,
+                                         SourceRange Range) {
+  llvm_unreachable("The printable AST type can't be mangled");
+  Out << T->getPrintName();
 }
 
 void MicrosoftMangleContextImpl::mangleCXXName(GlobalDecl GD,

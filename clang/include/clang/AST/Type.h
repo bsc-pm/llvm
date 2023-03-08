@@ -6588,6 +6588,34 @@ public:
   }
 };
 
+class PrintableASTType : public Type, public llvm::FoldingSetNode {
+  friend class ASTContext; // ASTContext creates these.
+  StringRef Name;
+
+  PrintableASTType(StringRef Name)
+      : Type(PrintableAST, QualType(), TypeDependence::None), Name(Name) {}
+
+public:
+  QualType getElementType() const { return QualType(); }
+
+  bool isSugared() const { return false; }
+
+  QualType desugar() const { return QualType(this, 0); }
+
+  bool isReadOnly() const { return true; }
+  static bool classof(const Type *T) {
+    return T->getTypeClass() == PrintableAST;
+  }
+
+  StringRef getPrintName() const { return Name; }
+
+  void Profile(llvm::FoldingSetNodeID &ID) { Profile(ID, getPrintName()); }
+
+  static void Profile(llvm::FoldingSetNodeID &ID, StringRef name) {
+    ID.AddString(name);
+  }
+};
+
 /// A qualifier set is used to build a set of qualifiers.
 class QualifierCollector : public Qualifiers {
 public:

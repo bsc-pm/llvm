@@ -4078,6 +4078,7 @@ static CachedProperties computeCachedProperties(const Type *T) {
 
   case Type::Auto:
   case Type::DeducedTemplateSpecialization:
+  case Type::PrintableAST:
     // Give non-deduced 'auto' types external linkage. We should only see them
     // here in error recovery.
     return CachedProperties(ExternalLinkage, false);
@@ -4188,6 +4189,7 @@ LinkageInfo LinkageComputer::computeTypeLinkageInfo(const Type *T) {
 
   case Type::Auto:
   case Type::DeducedTemplateSpecialization:
+  case Type::PrintableAST:
     return LinkageInfo::external();
 
   case Type::Record:
@@ -4407,6 +4409,7 @@ bool Type::canHaveNullability(bool ResultIfUnknown) const {
   case Type::Pipe:
   case Type::BitInt:
   case Type::DependentBitInt:
+  case Type::PrintableAST:
     return false;
   }
   llvm_unreachable("bad type kind!");
