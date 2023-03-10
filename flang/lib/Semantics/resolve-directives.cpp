@@ -572,10 +572,12 @@ private:
   std::int64_t ordCollapseLevel{0};
 };
 
-class OSSOutlineVisitor {
+// This visitor diagnoses abound improper use of variables
+// in a task outline
+class OSSOutlineVisitor : DirectiveAttributeVisitor<llvm::oss::Directive> {
 public:
   explicit OSSOutlineVisitor(SemanticsContext &context)
-      : context_{context} {}
+      : DirectiveAttributeVisitor(context) {}
 
   template <typename A> void Walk(const A &x) { parser::Walk(x, *this); }
   template <typename A> bool Pre(const A &) { return true; }
@@ -585,10 +587,6 @@ public:
   bool Pre(const parser::OmpSsOutlineTask &);
   bool Pre(const parser::InterfaceBody::OmpSsIfaceOutlineTask &);
   void Post(const parser::Name &);
-
-private:
-  SemanticsContext &context_;
-  Scope *scope_{nullptr};
 };
 
 // Data-sharing and Data-mapping attributes for data-refs in OmpSs-2 construct
@@ -713,10 +711,10 @@ private:
     template <typename A> bool Pre(const A &) { return true; }
     template <typename A> void Post(const A &) {}
     bool Pre(const parser::StructureComponent &x) {
-      if (!elemSize) {
-        Symbol *sym = Fortran::evaluate::GetLastSymbol(x);
-        elemSize = ComputeElemTypeSize(sym);
-      }
+      if (!x.component.symbol)
+        elemSize = -1;
+      if (!elemSize)
+        elemSize = ComputeElemTypeSize(x.component.symbol);
       Walk(x.base);
       return false;
     }
@@ -733,7 +731,8 @@ private:
     void Post(const parser::Name &name) {
       names.push_back({&name, isBase});
       isBase = false;
-      if (!name.symbol){ elemSize = -1; return; }
+      if (!name.symbol)
+        elemSize = -1;
       if (!elemSize)
         elemSize = ComputeElemTypeSize(name.symbol);
     }
@@ -2256,61 +2255,66 @@ bool OSSOutlineVisitor::Pre(const parser::InterfaceBlock &x){
 bool OSSOutlineVisitor::Pre(const parser::OmpSsOutlineTask &x){
   const auto &stmt{std::get<parser::Statement<parser::OmpSsOutlineTaskConstruct>>(x.t)};
   const auto &simpleConstruct{std::get<parser::OmpSsSimpleOutlineTaskConstruct>(stmt.statement.t)};
+  const auto &dir{std::get<parser::OSSSimpleOutlineTaskDirective>(simpleConstruct.t)};
 
-  const auto &func{std::get<common::Indirection<parser::SubroutineSubprogram>>(x.t)};
-  const auto &subroutine{func.value()};
-  const auto &stmt_subroutine{std::get<parser::Statement<parser::SubroutineStmt>>(subroutine.t)};
-  const auto &name{std::get<parser::Name>(stmt_subroutine.statement.t)};
+  switch (dir.v) {
+  case llvm::oss::Directive::OSSD_declare_task:
+    PushContext(simpleConstruct.source, dir.v);
+    break;
+  default:
+    // TODO others
+    break;
+  }
 
-  auto symbol = name.symbol;
-  symbol->set(Symbol::Flag::OSSOutlineTask);
-  auto *details{symbol->detailsIf<semantics::SubprogramDetails>()};
-  details->setOutlineTask(stmt.statement);
-  scope_ = symbol->scope();
-
+  // Walk over clauses manually
+  GetContext().withinConstruct = true;
   Walk(simpleConstruct.t);
-  scope_ = nullptr;
+
+  PopContext();
   return false;
 }
 
 bool OSSOutlineVisitor::Pre(const parser::InterfaceBody::OmpSsIfaceOutlineTask &x){
   const auto &stmt{std::get<parser::Statement<common::Indirection<parser::OmpSsOutlineTaskConstruct>>>(x.t)};
   const auto &simpleConstruct{std::get<parser::OmpSsSimpleOutlineTaskConstruct>(stmt.statement.value().t)};
+  const auto &dir{std::get<parser::OSSSimpleOutlineTaskDirective>(simpleConstruct.t)};
 
-  const auto &stmt_subroutine{std::get<parser::Statement<parser::SubroutineStmt>>(x.t)};
-  const auto &name{std::get<parser::Name>(stmt_subroutine.statement.t)};
+  switch (dir.v) {
+  case llvm::oss::Directive::OSSD_declare_task:
+    PushContext(simpleConstruct.source, dir.v);
+    break;
+  default:
+    // TODO others
+    break;
+  }
 
-  auto symbol = name.symbol;
-  symbol->set(Symbol::Flag::OSSOutlineTask);
-  auto *details{symbol->detailsIf<semantics::SubprogramDetails>()};
-  details->setOutlineTask(stmt.statement.value());
-  scope_ = symbol->scope();
-
+  // Walk over clauses manually
+  GetContext().withinConstruct = true;
   Walk(simpleConstruct.t);
-  scope_ = nullptr;
+
+  PopContext();
   return false;
 }
 
 void OSSOutlineVisitor::Post(const parser::Name &name) {
-  if (scope_){
-    if (Symbol *found{scope_->FindSymbol(name.source)}) {
-      name.symbol = found;
-      if (!IsDummy(*found)){
-        context_.Say(name.source,
-              "In a task outline '%s' must be a dummyArgument"_err_en_US,
-              found->name());
-      }
-      else if (found->attrs().test(Attr::VALUE)){
-        context_.Say(name.source,
-              "In a task outline '%s' cannot be a Value"_err_en_US,
-              found->name());
-      }
-    }
-    else{
-      context_.Say(name.source,
-              "In a task outline '%s' is undefined"_err_en_US,
-              name.ToString());
-    }
+  auto *symbol{name.symbol};
+  if (!symbol) return;
+  // Look up only variables in pragmas
+  if (dirContext_.empty() || !GetContext().withinConstruct) return;
+  // Skip I in T%I
+  // Skip calls
+  if (symbol->owner().IsDerivedType()
+      || symbol->has<ProcEntityDetails>()
+      || symbol->has<SubprogramDetails>()) return;
+  if (!IsDummy(*symbol)){
+    context_.Say(name.source,
+          "In a task outline '%s' must be a dummyArgument"_err_en_US,
+          symbol->name());
+  }
+  else if (symbol->attrs().test(Attr::VALUE)){
+    context_.Say(name.source,
+          "In a task outline '%s' cannot be a Value"_err_en_US,
+          symbol->name());
   }
 }
 

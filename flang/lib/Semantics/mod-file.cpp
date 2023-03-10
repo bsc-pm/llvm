@@ -456,6 +456,9 @@ void ModFileWriter::PutSubprogram(const Symbol &symbol) {
     os << (isAbstract ? "abstract " : "") << "interface\n";
   }
   PutAttrs(os, prefixAttrs, nullptr, ""s, " "s);
+  if (symbol.test(Fortran::semantics::Symbol::Flag::OSSOutlineTask))
+    parser::Unparse(
+        os, std::get<parser::OmpSsSimpleOutlineTaskConstruct>(details.getOutlineTask()->t));
   os << (details.isFunction() ? "function " : "subroutine ");
   os << symbol.name() << '(';
   int n = 0;
@@ -957,6 +960,7 @@ Scope *ModFileReader::Read(const SourceName &name,
   options.isModuleFile = true;
   options.features.Enable(common::LanguageFeature::BackslashEscapes);
   options.features.Enable(common::LanguageFeature::OpenMP);
+  options.features.Enable(common::LanguageFeature::OmpSs);
   if (!isIntrinsic.value_or(false) && !notAModule) {
     // The search for this module file will scan non-intrinsic module
     // directories.  If a directory is in both the intrinsic and non-intrinsic

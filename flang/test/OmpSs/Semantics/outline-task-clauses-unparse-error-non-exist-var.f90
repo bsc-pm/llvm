@@ -1,6 +1,6 @@
 ! RUN: %python %S/../../Semantics/test_errors.py %s %flang_fc1 -fompss-2
 
-!ERROR: In a task outline 'z' is undefined
+!ERROR: No explicit type declared for 'z'
 !$OSS TASK INOUT(Z)
 SUBROUTINE S1(X)
   IMPLICIT NONE

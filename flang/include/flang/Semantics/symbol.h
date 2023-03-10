@@ -111,7 +111,7 @@ public:
     result_ = &result;
   }
   void setOutlineTask(const parser::OmpSsOutlineTaskConstruct &x) { outlineTask_ = &x; }
-  const parser::OmpSsOutlineTaskConstruct *getOutlineTask() { return outlineTask_; }
+  const parser::OmpSsOutlineTaskConstruct *getOutlineTask() const { return outlineTask_; }
 
 private:
   bool isInterface_{false}; // true if this represents an interface-body

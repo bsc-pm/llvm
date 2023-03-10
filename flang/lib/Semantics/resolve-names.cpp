@@ -1503,6 +1503,33 @@ public:
     messageHandler().set_currStmtSource(std::nullopt);
   }
 
+  // At this point, name resolution is already done in the ProgramUnit
+  // Simulate we're in the same scope to resolve our pragma names
+  bool Pre(const parser::OmpSsOutlineTask &x) {
+    const auto &stmt{std::get<parser::Statement<parser::OmpSsOutlineTaskConstruct>>(x.t)};
+    const auto &simpleConstruct{std::get<parser::OmpSsSimpleOutlineTaskConstruct>(stmt.statement.t)};
+
+    const auto &func{std::get<common::Indirection<parser::SubroutineSubprogram>>(x.t)};
+    const auto &subroutine{func.value()};
+    const auto &stmt_subroutine{std::get<parser::Statement<parser::SubroutineStmt>>(subroutine.t)};
+    const auto &name{std::get<parser::Name>(stmt_subroutine.statement.t)};
+
+    auto symbol = name.symbol;
+    symbol->set(Symbol::Flag::OSSOutlineTask);
+    auto *details{symbol->detailsIf<semantics::SubprogramDetails>()};
+    details->setOutlineTask(stmt.statement);
+
+    Scope *scope = symbol->scope();
+    assert(scope);
+    Scope *tmp = &currScope();
+
+    // Simulate we are in subroutine scope, where the pragma symbols are.
+    SetScope(*scope);
+    Walk(simpleConstruct.t);
+    SetScope(*tmp);
+    return false;
+  }
+
   bool Pre(const parser::OmpSsSimpleOutlineTaskConstruct &) {
     PushScope(Scope::Kind::OtherConstruct, nullptr);
     return true;
@@ -1619,9 +1646,6 @@ public:
     llvm_unreachable("This node is handled in ProgramUnit");
   }
   bool Pre(const parser::SubroutineSubprogram &) {
-    llvm_unreachable("This node is handled in ProgramUnit");
-  }
-  bool Pre(const parser::OmpSsOutlineTask &) {
     llvm_unreachable("This node is handled in ProgramUnit");
   }
   bool Pre(const parser::SeparateModuleSubprogram &) {
@@ -3553,8 +3577,26 @@ bool SubprogramVisitor::Pre(const parser::InterfaceBody::OmpSsIfaceOutlineTask &
       std::get<parser::Statement<parser::SubroutineStmt>>(x.t).statement.t)};
   return BeginSubprogram(name, Symbol::Flag::Subroutine);
 }
-void SubprogramVisitor::Post(const parser::InterfaceBody::OmpSsIfaceOutlineTask &) {
+void SubprogramVisitor::Post(const parser::InterfaceBody::OmpSsIfaceOutlineTask &x) {
   EndSubprogram();
+  const auto &name{std::get<parser::Name>(
+      std::get<parser::Statement<parser::SubroutineStmt>>(x.t).statement.t)};
+  const auto &stmt{std::get<parser::Statement<common::Indirection<parser::OmpSsOutlineTaskConstruct>>>(x.t)};
+  const auto &simpleConstruct{std::get<parser::OmpSsSimpleOutlineTaskConstruct>(stmt.statement.value().t)};
+
+  auto symbol = name.symbol;
+  symbol->set(Symbol::Flag::OSSOutlineTask);
+  auto *details{symbol->detailsIf<semantics::SubprogramDetails>()};
+  details->setOutlineTask(stmt.statement.value());
+
+  Scope *scope = symbol->scope();
+  assert(scope);
+  Scope *tmp = &currScope();
+
+  // Simulate we are in subroutine scope, where the pragma symbols are.
+  SetScope(*scope);
+  Walk(simpleConstruct.t);
+  SetScope(*tmp);
 }
 
 bool SubprogramVisitor::Pre(const parser::SubroutineStmt &stmt) {
@@ -7800,6 +7842,20 @@ bool ResolveNamesVisitor::Pre(const parser::ProgramUnit &x) {
   ResolveExecutionParts(root);
   ResolveAccParts(context(), x);
   ResolveOmpParts(context(), x);
+  // Walk over OmpSsOutlineTask since ProgramUnit does not do it
+  if (const auto *outline{std::get_if<common::Indirection<parser::OmpSsOutlineTask>>(&x.u)}) {
+    Walk(*outline);
+  } else if (const auto *module{std::get_if<common::Indirection<parser::Module>>(&x.u)}) {
+    if (const auto &subps{std::get<std::optional<parser::ModuleSubprogramPart>>(module->value().t)}) {
+      if (subps) {
+        for (const auto &subp :
+            std::get<std::list<parser::ModuleSubprogram>>(subps->t)) {
+          if (const auto *outline{std::get_if<common::Indirection<parser::OmpSsOutlineTask>>(&subp.u)})
+            Walk(*outline);
+        }
+      }
+    }
+  }
   ResolveOSSParts(context(), x);
   return false;
 }

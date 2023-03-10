@@ -2981,4 +2981,6 @@ template void Unparse<Program>(llvm::raw_ostream &, const Program &, Encoding,
     bool, bool, preStatementType *, AnalyzedObjectsAsFortran *);
 template void Unparse<Expr>(llvm::raw_ostream &, const Expr &, Encoding, bool,
     bool, preStatementType *, AnalyzedObjectsAsFortran *);
+template void Unparse<OmpSsSimpleOutlineTaskConstruct>(llvm::raw_ostream &, const OmpSsSimpleOutlineTaskConstruct &, Encoding, bool,
+    bool, preStatementType *, AnalyzedObjectsAsFortran *);
 } // namespace Fortran::parser
