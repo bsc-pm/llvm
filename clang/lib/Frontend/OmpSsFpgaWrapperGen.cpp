@@ -627,13 +627,21 @@ OMPIF_COMM_WORLD
         continue;
       }
 
+      auto isProtected = [&](StringRef name) {
+        return name == "OMPIF_Comm_rank" || name == "OMPIF_Comm_size" ||
+               name == "OMPIF_Send" || name == "OMPIF_Recv" ||
+               name == "OMPIF_Allgather" ||
+               name.starts_with("nanos6_fpga_memcpy_wideport_");
+      };
       if (auto *funcDecl = dyn_cast<FunctionDecl>(otherDecl);
-          funcDecl && !funcDecl->hasBody()) {
+          funcDecl && !funcDecl->hasBody() &&
+          !isProtected(funcDecl->getName())) {
         Diag(otherDecl->getLocation(),
              diag::err_oss_fpga_missing_body_for_function_depended_by_kernel);
         Diag(ToFD->getLocation(), diag::note_oss_fpga_kernel);
         return false;
-      } else if (funcDecl) {
+      } else if (funcDecl && !isProtected(funcDecl->getName())) {
+
         auto origName = funcDecl->getDeclName();
         auto &id =
             PP.getIdentifierTable().get(origName.getAsString() + "_moved");
@@ -642,7 +650,10 @@ OMPIF_COMM_WORLD
         funcDecl->setDeclName(name);
       }
     }
-    OmpssFpgaTreeTransform(ToContext, ToIdentifierTable, WrapperPortMap);
+
+    OmpssFpgaTreeTransform(ToContext, ToIdentifierTable, WrapperPortMap,
+                           CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth,
+                           CreatesTasks);
     for (Decl *otherDecl : ToContext.getTranslationUnitDecl()->decls()) {
       if (ToSourceManager.getFileID(otherDecl->getSourceRange().getBegin()) !=
           ToSourceManager.getFileID(ToFD->getSourceRange().getBegin())) {
@@ -650,6 +661,14 @@ OMPIF_COMM_WORLD
         continue;
       }
 
+      if (llvm::isa<FunctionDecl>(otherDecl)) {
+        auto *FuncDecl = cast<FunctionDecl>(otherDecl);
+        if (FuncDecl->hasAttr<OSSTaskDeclAttr>()) { // Don't print tasks, as now
+                                                    // they are not needed in
+                                                    // the wrapper
+          continue;
+        }
+      }
       otherDecl->print(Output, 0, true);
       if (!OutputStr.empty() && OutputStr[OutputStr.size() - 1] != '\n') {
         Output << ";\n"; // This may lead to superfluous ';', but I'm not
@@ -1076,7 +1095,7 @@ OMPIF_COMM_WORLD
       OutputHeaders << "#include <string.h> //needed for memcpy\n";
     }
     Output << "void mcxx_write_out_port(const ap_uint<64> data, const "
-              "ap_uint<2> dest, const ap_uint<1> last, " STR_OUTPORT_DECL
+              "ap_uint<3> dest, const ap_uint<1> last, " STR_OUTPORT_DECL
               ") {\n";
     Output << R"(
   #pragma HLS inline

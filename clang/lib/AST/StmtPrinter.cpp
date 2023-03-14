@@ -1213,6 +1213,14 @@ void StmtPrinter::VisitOSSAtomicDirective(OSSAtomicDirective *Node) {
   PrintOSSExecutableDirective(Node);
 }
 
+void StmtPrinter::VisitOSSRedirectStmt(OSSRedirectStmt *Node) {
+  PrintStmt(Node->getRedirect());
+}
+
+void StmtPrinter::VisitOSSRedirectExpr(OSSRedirectExpr *Node) {
+  Visit(Node->getRedirect());
+}
+
 //===----------------------------------------------------------------------===//
 //  Expr printing methods.
 //===----------------------------------------------------------------------===//

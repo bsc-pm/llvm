@@ -460,6 +460,8 @@ void CodeGenFunction::EmitStmt(const Stmt *S, ArrayRef<const Attr *> Attrs) {
   case Stmt::OSSAtomicDirectiveClass:
     EmitOSSAtomicDirective(cast<OSSAtomicDirective>(*S));
     break;
+  case Stmt::OSSRedirectStmtClass:
+    break;
   }
 }
 

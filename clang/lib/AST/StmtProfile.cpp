@@ -1334,6 +1334,14 @@ void StmtProfiler::VisitOSSAtomicDirective(const OSSAtomicDirective *S) {
   VisitOSSExecutableDirective(S);
 }
 
+void StmtProfiler::VisitOSSRedirectStmt(const OSSRedirectStmt *S) {
+  VisitStmt(S->getRedirect());
+}
+
+void StmtProfiler::VisitOSSRedirectExpr(const OSSRedirectExpr *S) {
+  VisitExpr(S->getRedirect());
+}
+
 void StmtProfiler::VisitExpr(const Expr *S) {
   VisitStmt(S);
 }

@@ -12,8 +12,8 @@ void foo() {
 }
 void depend() {}
 
-// CHECK:#include "
-// CHECK-NEXT:#include "{{.*}}Inputs/header.fpga.h"
+// CHECK:#include "{{.*}}Inputs/header.fpga.h"
+// CHECK-NEXT:const int VAL = 0;
 // CHECK-NEXT:void depend();
 // CHECK-NEXT:void depend() {
 // CHECK-NEXT:}

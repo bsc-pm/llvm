@@ -2762,6 +2762,14 @@ void ASTStmtWriter::VisitOSSAtomicDirective(OSSAtomicDirective *D) {
   llvm_unreachable("Not supported yet");
 }
 
+void ASTStmtWriter::VisitOSSRedirectStmt(OSSRedirectStmt *D) {
+  llvm_unreachable("Not supported yet");
+}
+
+void ASTStmtWriter::VisitOSSRedirectExpr(OSSRedirectExpr *D) {
+  llvm_unreachable("Not supported yet");
+}
+
 //===----------------------------------------------------------------------===//
 // ASTWriter Implementation
 //===----------------------------------------------------------------------===//

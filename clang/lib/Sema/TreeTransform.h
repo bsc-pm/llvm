@@ -11155,6 +11155,26 @@ TreeTransform<Derived>::TransformOSSAtomicDirective(OSSAtomicDirective *D) {
   return Res;
 }
 
+template <typename Derived>
+StmtResult
+TreeTransform<Derived>::TransformOSSRedirectStmt(OSSRedirectStmt *D) {
+  StmtResult Redirect = getDerived().TransformStmt(D->getRedirect());
+  if (!Redirect.isUsable()) {
+    return Redirect;
+  }
+  return new (getSema().Context) OSSRedirectStmt(Redirect.get());
+}
+
+template <typename Derived>
+ExprResult
+TreeTransform<Derived>::TransformOSSRedirectExpr(OSSRedirectExpr *D) {
+  ExprResult Redirect = getDerived().TransformExpr(D->getRedirect());
+  if (!Redirect.isUsable()) {
+    return Redirect;
+  }
+  return new (getSema().Context) OSSRedirectExpr(Redirect.get());
+}
+
 //===----------------------------------------------------------------------===//
 // OmpSs clause transformation
 //===----------------------------------------------------------------------===//

@@ -611,6 +611,9 @@ namespace clang {
     ExpectedStmt VisitOSSTaskLoopDirective(OSSTaskLoopDirective *S);
     ExpectedStmt VisitOSSTaskLoopForDirective(OSSTaskLoopForDirective *S);
     ExpectedStmt VisitOSSAtomicDirective(OSSAtomicDirective *S);
+    ExpectedStmt VisitOSSRedirectStmt(OSSRedirectStmt *S);
+    ExpectedExpr VisitOSSRedirectExpr(OSSRedirectExpr *S);
+
     //===----------------------------------------------------------------------===//
     // OmpSs clause importing
     //===----------------------------------------------------------------------===//
@@ -7065,6 +7068,22 @@ ExpectedStmt ASTNodeImporter::VisitOSSAtomicDirective(OSSAtomicDirective *S) {
     return std::move(Err);
   return OSSAtomicDirective::Create(Importer.getToContext(), begin, end,
                                     clauses, assocStmt, helperExprs);
+}
+
+ExpectedStmt ASTNodeImporter::VisitOSSRedirectStmt(OSSRedirectStmt *S) {
+  Error Err = Error::success();
+  auto *stmt = importChecked(Err, S->getRedirect());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext()) OSSRedirectStmt(stmt);
+}
+
+ExpectedExpr ASTNodeImporter::VisitOSSRedirectExpr(OSSRedirectExpr *S) {
+  Error Err = Error::success();
+  auto *stmt = importChecked(Err, S->getRedirect());
+  if (Err)
+    return std::move(Err);
+  return new (Importer.getToContext()) OSSRedirectExpr(stmt);
 }
 
 Expected<OSSClause *> ASTNodeImporter::VisitOSSClause(OSSClause *S) {

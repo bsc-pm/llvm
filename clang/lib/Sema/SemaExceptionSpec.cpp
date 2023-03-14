@@ -15,6 +15,7 @@
 #include "clang/AST/Expr.h"
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/StmtObjC.h"
+#include "clang/AST/StmtOmpSs.h"
 #include "clang/AST/TypeLoc.h"
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/ExceptionSpecificationType.h"
@@ -1534,6 +1535,11 @@ CanThrowResult Sema::canThrow(const Stmt *S) {
   case Stmt::SwitchStmtClass:
   case Stmt::WhileStmtClass:
     return canSubStmtsThrow(*this, S);
+
+  case Stmt::OSSRedirectStmtClass:
+    return canThrow(cast<OSSRedirectStmt>(S)->getRedirect());
+  case Stmt::OSSRedirectExprClass:
+    return canThrow(cast<OSSRedirectExpr>(S)->getRedirect());
 
   case Stmt::DeclStmtClass: {
     CanThrowResult CT = CT_Cannot;

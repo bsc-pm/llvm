@@ -62,13 +62,14 @@ public:
   bool VisitOSSTaskDirective(OSSTaskDirective *);
   bool VisitOSSTaskwaitDirective(OSSTaskwaitDirective *);
   bool VisitCXXConstructExpr(CXXConstructExpr *n);
-  bool VisitOMPCriticalDirective(OMPCriticalDirective *n);
+  bool VisitOSSCriticalDirective(OSSCriticalDirective *n);
   bool VisitCallExpr(CallExpr *n);
 };
 
 void OmpssFpgaTreeTransform(clang::ASTContext &Ctx,
                             clang::IdentifierTable &identifierTable,
-                            WrapperPortMap &WrapperPortMap);
+                            WrapperPortMap &WrapperPortMap,
+                            uint64_t FpgaPortWidth, bool CreatesTasks);
 } // namespace clang
 
 #endif
