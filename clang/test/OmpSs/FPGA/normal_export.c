@@ -12,9 +12,8 @@ void foo() {
 }
 void depend() {}
 
-// CHECK:foo
-// CHECK-NEXT:#include "
-// CHECK-SAME:header.fpga.h"
+// CHECK:#include "
+// CHECK-NEXT:#include "{{.*}}Inputs/header.fpga.h"
 // CHECK-NEXT:void depend();
 // CHECK-NEXT:void depend() {
 // CHECK-NEXT:}

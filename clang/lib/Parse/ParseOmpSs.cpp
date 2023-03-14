@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/DeclarationName.h"
 #include "clang/AST/PrettyPrinter.h"
 #include "clang/AST/StmtHlsStub.h"
 #include "clang/AST/StmtOmpSs.h"
@@ -21,6 +22,7 @@
 #include "clang/Parse/Parser.h"
 #include "clang/Parse/RAIIObjectsForParser.h"
 #include "clang/Sema/DeclSpec.h"
+#include "clang/Sema/Lookup.h"
 #include "clang/Sema/Ownership.h"
 #include "clang/Sema/Scope.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -815,17 +817,27 @@ StmtResult Parser::ParseHlsPragma(ParsedStmtContext Allowed) {
   SourceLocation StartLoc = ConsumeAnnotationToken(), EndLoc;
   llvm::SmallVector<Expr *, 4> exprRefs;
   while (Tok.isNot(tok::annot_pragma_hls_end)) {
-    if (Tok.isAnyIdentifier() && PP.LookAhead(0).is(tok::equal)) {
+    if (Tok.isAnyIdentifier() && PP.LookAhead(0).is(tok::equal) &&
+        PP.LookAhead(1).isAnyIdentifier()) {
       ConsumeToken();
       ConsumeToken();
 
       bool NotPrimaryExpression = false;
       bool NotCastExpression = true;
-      auto result =
-          ParseCastExpression(PrimaryExprOnly, false, NotCastExpression,
-                              NotTypeCast, false, &NotPrimaryExpression);
-      if (!result.isInvalid()) {
-        exprRefs.push_back(result.get());
+
+      DeclarationNameInfo decInfo(DeclarationName(Tok.getIdentifierInfo()),
+                                  Tok.getLocation());
+      LookupResult result(Actions, decInfo,
+                          Sema::LookupNameKind::LookupAnyName);
+      if (Actions.LookupName(result, getCurScope())) {
+        auto result =
+            ParseCastExpression(PrimaryExprOnly, false, NotCastExpression,
+                                NotTypeCast, false, &NotPrimaryExpression);
+        if (!result.isInvalid()) {
+          exprRefs.push_back(result.get());
+        }
+      } else {
+        ConsumeToken();
       }
     } else {
       ConsumeToken();
