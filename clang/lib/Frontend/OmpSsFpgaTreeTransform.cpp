@@ -129,7 +129,7 @@ class OmpSsFpgaTreeTransformVisitor
         Ctx.Allocate(original.size() + 1, sizeof(void *)));
     memcpy(mem, original.data(), original.size());
     mem[original.size()] = '\0';
-    return StringRef(mem);
+    return StringRef(mem, original.size());
   }
 
   // WARNING: If the function decl is going to be
@@ -189,7 +189,7 @@ public:
     OutPortIdentifier = &IdentifierTable.get("mcxx_outPort");
 
     MemPortType = Ctx.getPointerType(Ctx.getPrintableASTType(
-        "ap_uint<" + std::to_string(FpgaPortWidth) + ">"));
+        AllocatedStringRef("ap_uint<" + std::to_string(FpgaPortWidth) + ">")));
     MemPortIdentifier = &IdentifierTable.get("mcxx_memport");
 
     McxxSetLockType = Ctx.getFunctionType(Ctx.VoidTy, {InPortType, OutPortType},
@@ -227,7 +227,7 @@ public:
 
   bool VisitVarDecl(VarDecl *decl) {
     QualType type = decl->getType();
-    if (type->isPointerType()) {
+    if (CreatesTasks && type->isPointerType()) {
       type = type->getPointeeType().IgnoreParens();
       std::string outType;
       llvm::raw_string_ostream out(outType);
@@ -252,16 +252,17 @@ public:
         dyn_cast<FunctionDecl>(callExpr->getCalleeDecl())->getName();
 
     if (funcName == "OMPIF_Comm_rank") {
-      addReplacementOpExpr(
-          callExpr,
-          BinaryOperator::Create(
-              Ctx, makeDeclRefExpr(OmpIfRank),
-              UnaryOperator::Create(
-                  Ctx, makeIntegerLiteral(1), UnaryOperatorKind::UO_Minus,
-                  Ctx.IntTy, ExprValueKind::VK_PRValue,
-                  ExprObjectKind::OK_Ordinary, SourceLocation{}, false, {}),
-              BinaryOperatorKind::BO_Add, Ctx.IntTy, callExpr->getValueKind(),
-              callExpr->getObjectKind(), SourceLocation{}, {}));
+      auto *operation = BinaryOperator::Create(
+          Ctx, makeDeclRefExpr(OmpIfRank),
+          UnaryOperator::Create(
+              Ctx, makeIntegerLiteral(1), UnaryOperatorKind::UO_Minus,
+              Ctx.IntTy, ExprValueKind::VK_PRValue, ExprObjectKind::OK_Ordinary,
+              SourceLocation{}, false, {}),
+          BinaryOperatorKind::BO_Add, Ctx.IntTy, callExpr->getValueKind(),
+          callExpr->getObjectKind(), SourceLocation{}, {});
+      auto *paren =
+          new (Ctx) ParenExpr(SourceLocation{}, SourceLocation{}, operation);
+      addReplacementOpExpr(callExpr, paren);
       return true;
     }
     if (funcName == "OMPIF_Comm_size") {
@@ -290,7 +291,8 @@ public:
                            makeCallToWithDifferentParams(callExpr, arguments));
       return true;
     }
-    if (funcName.find("nanos6_fpga_memcpy_wideport_") == 0) {
+    if (funcName == "nanos6_fpga_memcpy_wideport_in" ||
+        funcName == "nanos6_fpga_memcpy_wideport_out") {
       llvm::SmallVector<Expr *, 4> arguments(callExpr->arguments());
       arguments.push_back(makeDeclRefExpr(MemPort));
       addReplacementOpExpr(callExpr,
@@ -341,22 +343,24 @@ public:
       return param;
     };
 
-    OmpIfRank = (WrapperPortMap[funcDecl][(int)WrapperPort::OMPIF_RANK])
+    auto &wrapperMap = WrapperPortMap[funcDecl->getCanonicalDecl()];
+
+    OmpIfRank = (wrapperMap[(int)WrapperPort::OMPIF_RANK])
                     ? addNewParamInfo(OmpIfRankIdentifier, OmpIfRankType)
                     : nullptr;
-    OmpIfSize = (WrapperPortMap[funcDecl][(int)WrapperPort::OMPIF_SIZE])
+    OmpIfSize = (wrapperMap[(int)WrapperPort::OMPIF_SIZE])
                     ? addNewParamInfo(OmpIfSizeIdentifier, OmpIfSizeType)
                     : nullptr;
-    SpawnInPort = (WrapperPortMap[funcDecl][(int)WrapperPort::SPAWN_INPORT])
+    SpawnInPort = (wrapperMap[(int)WrapperPort::SPAWN_INPORT])
                       ? addNewParamInfo(SpawnInPortIdentifier, SpawnInPortType)
                       : nullptr;
-    InPort = (WrapperPortMap[funcDecl][(int)WrapperPort::INPORT])
+    InPort = (wrapperMap[(int)WrapperPort::INPORT])
                  ? addNewParamInfo(InPortIdentifier, InPortType)
                  : nullptr;
-    OutPort = (WrapperPortMap[funcDecl][(int)WrapperPort::OUTPORT])
+    OutPort = (wrapperMap[(int)WrapperPort::OUTPORT])
                   ? addNewParamInfo(OutPortIdentifier, OutPortType)
                   : nullptr;
-    MemPort = (WrapperPortMap[funcDecl][(int)WrapperPort::MEMORY_PORT])
+    MemPort = (wrapperMap[(int)WrapperPort::MEMORY_PORT])
                   ? addNewParamInfo(MemPortIdentifier, MemPortType)
                   : nullptr;
 
@@ -366,10 +370,24 @@ public:
     for (auto *param : NewParamInfo) {
       typesParam.push_back(param->getType());
     }
-    funcDecl->setType(Ctx.getFunctionType(origType->getReturnType(), typesParam,
-                                          FunctionProtoType::ExtProtoInfo()));
+
+    if (origType->isFunctionProtoType()) {
+      auto *funcType = origType->getAs<FunctionProtoType>();
+      funcDecl->setType(Ctx.getFunctionType(
+          funcType->getReturnType(), typesParam, funcType->getExtProtoInfo()));
+      funcDecl->resetParams();
+      funcDecl->setParams(NewParamInfo);
+    } else if (origType->isFunctionNoProtoType()) {
+      auto *funcType = origType->getAs<FunctionNoProtoType>();
+      funcDecl->setType(
+          Ctx.getFunctionType(funcType->getReturnType(), typesParam, {}));
+    } else {
+      llvm_unreachable("Other types of function are not implemented (if any?)");
+    }
     funcDecl->resetParams();
     funcDecl->setParams(NewParamInfo);
+    funcDecl->setHasWrittenPrototype();
+
     return true;
   }
 

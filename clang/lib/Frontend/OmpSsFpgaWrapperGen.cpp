@@ -669,7 +669,7 @@ OMPIF_COMM_WORLD
           continue;
         }
       }
-      otherDecl->print(Output, 0, true);
+      otherDecl->print(Output, printPol, 0, true);
       if (!OutputStr.empty() && OutputStr[OutputStr.size() - 1] != '\n') {
         Output << ";\n"; // This may lead to superfluous ';', but I'm not
                          // quite sure how to prevent them easily.
@@ -689,7 +689,7 @@ OMPIF_COMM_WORLD
 
     std::string res;
     llvm::raw_string_ostream stream(res);
-    varDecl->print(stream);
+    varDecl->print(stream, printPol);
     return res;
   }
 
@@ -1095,8 +1095,7 @@ OMPIF_COMM_WORLD
       OutputHeaders << "#include <string.h> //needed for memcpy\n";
     }
     Output << "void mcxx_write_out_port(const ap_uint<64> data, const "
-              "ap_uint<3> dest, const ap_uint<1> last, " STR_OUTPORT_DECL
-              ") {\n";
+              "ap_uint<3> dest, const ap_uint<1> last, " STR_OUTPORT_DECL ") {";
     Output << R"(
   #pragma HLS inline
   mcxx_outaxis axis_word;
@@ -1314,6 +1313,7 @@ public:
         ToSelectorTable(),
         ToContext(ToLangOpts, ToSourceManager, ToIdentifierTable,
                   ToSelectorTable, PP.getBuiltinInfo(), TU_Incremental) {
+    printPol.adjustForCPlusPlus();
     ToContext.InitBuiltinTypes(OriginalContext.getTargetInfo());
   }
 

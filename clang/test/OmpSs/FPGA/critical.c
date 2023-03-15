@@ -7,11 +7,12 @@ const int VAL = 0;
 void depend();
 #pragma oss task device(fpga)
 void foo() {
-    #pragma HLS var=VAL
     depend();
 }
-void depend() {}
-
+void depend() {
+    #pragma oss critical
+    ;
+}
 
 // CHECK:foo
 // CHECK-NEXT:///////////////////
@@ -22,7 +23,7 @@ void depend() {}
 // CHECK-NEXT://  2) OmpSs@FPGA toolchain code which is licensed under LGPLv3 terms and conditions
 // CHECK-NEXT:///////////////////
 // CHECK-NEXT:// Top IP Function: foo_moved
-// CHECK-NEXT:// Accel. type hash: 8570810011
+// CHECK-NEXT:// Accel. type hash: 4854598551
 // CHECK-NEXT:// Num. instances: 1
 // CHECK-NEXT:// Wrapper version: 14
 // CHECK-NEXT:///////////////////
@@ -32,24 +33,29 @@ void depend() {}
 // CHECK-NEXT:#include <ap_axi_sdata.h>
 // CHECK-NEXT:#include "{{.*}}Inputs/header.fpga.h"
 // CHECK-NEXT:static ap_uint<64> __mcxx_taskId;
-// CHECK-EMPTY:
-// CHECK-NEXT:template<class T>
+
+// CHECK:template<class T>
 // CHECK-NEXT:union __mcxx_cast {
 // CHECK-NEXT:  unsigned long long int raw;
 // CHECK-NEXT:  T typed;
 // CHECK-NEXT:};
-// CHECK-EMPTY:
-// CHECK-NEXT:struct mcxx_inaxis {
+
+// CHECK:struct mcxx_inaxis {
 // CHECK-NEXT:  ap_uint<64> data;
 // CHECK-NEXT:};
 // CHECK-NEXT:typedef ap_axiu<64, 1, 1, 2> mcxx_outaxis;
-// CHECK-NEXT:const int VAL = 0;
-// CHECK-NEXT:void depend_moved(void);
-// CHECK-NEXT:void depend_moved(void) {
+// CHECK-NEXT:void mcxx_set_lock(hls::stream<ap_uint<64> >& mcxx_inPort, hls::stream<mcxx_outaxis>& mcxx_outPort);
+// CHECK-NEXT:void mcxx_unset_lock(hls::stream<mcxx_outaxis>& mcxx_outPort);
+// CHECK-NEXT:void depend_moved(hls::stream<ap_uint<64> > &mcxx_inPort, hls::stream<mcxx_outaxis> &mcxx_outPort);
+// CHECK-NEXT:void depend_moved(hls::stream<ap_uint<64> > &mcxx_inPort, hls::stream<mcxx_outaxis> &mcxx_outPort) {
+// CHECK-NEXT:        {
+// CHECK-NEXT:            mcxx_set_lock(mcxx_inPort, mcxx_outPort);
+// CHECK-NEXT:            ;
+// CHECK-NEXT:            mcxx_unset_lock(mcxx_outPort);
+// CHECK-NEXT:        }
 // CHECK-NEXT:}
-// CHECK-NEXT:void foo_moved(void) {
-// CHECK-NEXT:    #pragma HLS var=VAL
-// CHECK-NEXT:    depend_moved();
+// CHECK-NEXT:void foo_moved(hls::stream<ap_uint<64> > &mcxx_inPort, hls::stream<mcxx_outaxis> &mcxx_outPort) {
+// CHECK-NEXT:    depend_moved(mcxx_inPort, mcxx_outPort);
 // CHECK-NEXT:}
 // CHECK-NEXT:void mcxx_write_out_port(const ap_uint<64> data, const ap_uint<3> dest, const ap_uint<1> last, hls::stream<mcxx_outaxis>& mcxx_outPort) {
 // CHECK-NEXT:  #pragma HLS inline
@@ -69,7 +75,7 @@ void depend() {}
 // CHECK-NEXT:  {
 // CHECK-NEXT:  #pragma HLS protocol fixed
 // CHECK-NEXT:  }
-// CHECK-NEXT:  foo_moved();
+// CHECK-NEXT:  foo_moved(mcxx_inPort, mcxx_outPort);
 // CHECK-NEXT:  {
 // CHECK-NEXT:  #pragma HLS protocol fixed
 // CHECK-NEXT:    ap_uint<64> header = {{.*}};
@@ -82,16 +88,33 @@ void depend() {}
 // CHECK-NEXT:    ap_wait();
 // CHECK-NEXT:  }
 // CHECK-NEXT:}
+// CHECK-NEXT:void mcxx_set_lock(hls::stream<ap_uint<64> >& mcxx_inPort, hls::stream<mcxx_outaxis>& mcxx_outPort) {
+// CHECK-NEXT:#pragma HLS inline
+// CHECK-NEXT:  ap_uint<64> tmp = {{.*}};
+// CHECK-NEXT:  ap_uint<8> ack;
+// CHECK-NEXT:  do {
+// CHECK-NEXT:    ap_wait();
+// CHECK-NEXT:    mcxx_write_out_port(tmp, 1, 1, mcxx_outPort);
+// CHECK-NEXT:    ap_wait();
+// CHECK-NEXT:    ack = mcxx_inPort.read();
+// CHECK-NEXT:    ap_wait();
+// CHECK-NEXT:  } while (ack == 0);
+// CHECK-NEXT:}
+// CHECK:void mcxx_unset_lock(hls::stream<mcxx_outaxis>& mcxx_outPort) {
+// CHECK-NEXT:#pragma HLS inline
+// CHECK-NEXT:  ap_uint<64> tmp = {{.*}};
+// CHECK-NEXT:  mcxx_write_out_port(tmp, 1, 1, mcxx_outPort);
+// CHECK-NEXT:}
 // CHECK-NEXT:{
 // CHECK-NEXT:    "full_path" : "//foo_hls_automatic_clang.cpp",
 // CHECK-NEXT:    "filename" : "foo_hls_automatic_clang.cpp",
 // CHECK-NEXT:    "name" : "foo",
-// CHECK-NEXT:    "type" : 8570810011,
+// CHECK-NEXT:    "type" : 4854598551,
 // CHECK-NEXT:    "num_instances" : 1,
 // CHECK-NEXT:    "task_creation" : false,
 // CHECK-NEXT:    "instrumentation" : false,
 // CHECK-NEXT:    "periodic" : false,
-// CHECK-NEXT:    "lock" : false,
+// CHECK-NEXT:    "lock" : true,
 // CHECK-NEXT:    "deps" : false,
 // CHECK-NEXT:    "ompif" : false
 // CHECK-NEXT:},

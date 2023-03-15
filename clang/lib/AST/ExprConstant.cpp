@@ -15613,6 +15613,7 @@ static ICEDiag CheckICE(const Expr* E, const ASTContext &Ctx) {
   case Expr::OSSArraySectionExprClass:
   case Expr::OSSArrayShapingExprClass:
   case Expr::OSSMultiDepExprClass:
+  case Expr::OSSRedirectExprClass:
   case Expr::MemberExprClass:
   case Expr::CompoundAssignOperatorClass:
   case Expr::CompoundLiteralExprClass:
