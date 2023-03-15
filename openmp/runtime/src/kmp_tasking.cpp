@@ -3077,9 +3077,9 @@ static kmp_task_t *__kmp_remove_my_task(kmp_info_t *thread, kmp_int32 gtid,
   }
 
   if (__kmp_sched_own_tasks_in_order) {
-      head = (thread_data->td.td_deque_head) &
+      head = (thread_data->td.td_deque_head + 1) &
              TASK_DEQUE_MASK(thread_data->td); // Wrap index.
-      taskdata = thread_data->td.td_deque[head];
+      taskdata = thread_data->td.td_deque[thread_data->td.td_deque_head];
   }
   else {
       tail = (thread_data->td.td_deque_tail - 1) &
@@ -3100,7 +3100,7 @@ static kmp_task_t *__kmp_remove_my_task(kmp_info_t *thread, kmp_int32 gtid,
     return NULL;
   }
 
-  if (__kmp_sched_own_tasks_in_order) thread_data->td.td_deque_head = head + 1;
+  if (__kmp_sched_own_tasks_in_order) thread_data->td.td_deque_head = head;
   else thread_data->td.td_deque_tail = tail;
 
   TCW_4(thread_data->td.td_deque_ntasks, thread_data->td.td_deque_ntasks - 1);
