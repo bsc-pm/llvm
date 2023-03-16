@@ -15,9 +15,14 @@
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/ASTFwd.h"
+#include "clang/AST/Attrs.inc"
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclAccessPair.h"
+#include "clang/AST/DeclBase.h"
+#include "clang/AST/DeclGroup.h"
 #include "clang/AST/DeclarationName.h"
 #include "clang/AST/Expr.h"
+#include "clang/AST/ExprOmpSs.h"
 #include "clang/AST/NestedNameSpecifier.h"
 #include "clang/AST/OperationKinds.h"
 #include "clang/AST/PrettyPrinter.h"
@@ -25,12 +30,16 @@
 #include "clang/AST/Stmt.h"
 #include "clang/AST/StmtOmpSs.h"
 #include "clang/AST/Type.h"
+#include "clang/ASTMatchers/ASTMatchers.h"
 #include "clang/Basic/Diagnostic.h"
+#include "clang/Basic/DiagnosticSema.h"
 #include "clang/Basic/LangOptions.h"
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Basic/Specifiers.h"
+#include "clang/Frontend/CompilerInvocation.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -86,6 +95,12 @@ class OmpSsFpgaTreeTransformVisitor
   IdentifierInfo *McxxTaskwaitIdentifier;
   FunctionDecl *McxxTaskwait;
 
+  QualType McxxTaskCreateType;
+  IdentifierInfo *McxxTaskCreateIdentifier;
+  FunctionDecl *McxxTaskCreate;
+
+  bool needsDeps = false;
+
   template <class T> struct ReplacementBlock {
     T *original;
     T *replaced;
@@ -109,10 +124,11 @@ class OmpSsFpgaTreeTransformVisitor
     replacementExpr.push_back(ReplacementBlock<Expr>{OriginalPos, Replacement});
   }
 
-  DeclRefExpr *makeDeclRefExpr(ValueDecl *Decl) const {
+  DeclRefExpr *makeDeclRefExpr(const ValueDecl *Decl) const {
     assert(Decl && "Decl must not be null");
     return DeclRefExpr::Create(Ctx, NestedNameSpecifierLoc{}, SourceLocation{},
-                               Decl, false, SourceLocation{},
+                               const_cast<ValueDecl *>(Decl), false,
+                               SourceLocation{},
                                Decl->getType().getNonReferenceType(), {});
   }
 
@@ -152,13 +168,65 @@ class OmpSsFpgaTreeTransformVisitor
         llvm::dyn_cast<FunctionDecl>(original->getCalleeDecl())
             ->getIdentifier();
     auto *FunctionDecl = FunctionDecl::Create(
-        Ctx, Ctx.getTranslationUnitDecl()->getDeclContext(), {}, {},
+        Ctx, Ctx.getTranslationUnitDecl(), {}, {},
         DeclarationName(FunctionIdentifier), FunctionType, nullptr, SC_None);
 
-    makeDeclRefExpr(McxxSetLock);
     return CallExpr::Create(Ctx, makeDeclRefExpr(FunctionDecl), parameters,
                             original->getType(), original->getValueKind(),
                             SourceLocation{}, original->getFPFeatures());
+  }
+
+  CallExpr *makeCallToFunc(FunctionDecl *FunctionDecl,
+                           llvm::ArrayRef<Expr *> parameters) {
+    llvm::SmallVector<QualType, 4> paramTypes(parameters.size());
+    int i = 0;
+    for (auto &&param : parameters) {
+      paramTypes[i] = param->getType();
+      ++i;
+    }
+
+    return CallExpr::Create(Ctx, makeDeclRefExpr(FunctionDecl), parameters,
+                            FunctionDecl->getReturnType(), clang::VK_LValue,
+                            SourceLocation{}, {});
+  }
+
+  MemberExpr *makeAccessExpr(Expr *Base, StringRef AccessMemberName) {
+    auto *identifier = &IdentifierTable.get(AccessMemberName);
+
+    auto declName = DeclarationName(identifier);
+    FieldDecl *member =
+        FieldDecl::Create(Ctx, Ctx.getTranslationUnitDecl(), {}, {}, identifier,
+                          Ctx.getIntPtrType(), nullptr, nullptr, true,
+                          InClassInitStyle::ICIS_NoInit);
+    return MemberExpr::Create(
+        Ctx, Base, false, {}, {}, {}, member,
+        DeclAccessPair::make(member, AccessSpecifier::AS_public),
+        DeclarationNameInfo(declName, {}), nullptr, Ctx.getIntPtrType(),
+        ExprValueKind::VK_LValue, ExprObjectKind::OK_Ordinary, NOUR_None);
+  }
+
+  DeclStmt *makeDeclStmt(VarDecl *declVar) {
+    Decl *decl = static_cast<Decl *>(declVar);
+    return new (Ctx) DeclStmt(DeclGroupRef::Create(Ctx, &decl, 1), {}, {});
+  }
+
+  VarDecl *makeVarDecl(QualType type, StringRef name) {
+    auto *varDecl = VarDecl::Create(Ctx, Ctx.getTranslationUnitDecl(), {}, {},
+                                    &IdentifierTable.get(name), type, nullptr,
+                                    StorageClass::SC_None);
+    assert(
+        varDecl
+            ->getTranslationUnitDecl()); // Make sure we have a good declaration
+                                         // context. Otherwise, things will
+                                         // break in obscure ways.
+    return varDecl;
+  }
+
+  std::string typeToString(QualType type) {
+    std::string outType;
+    llvm::raw_string_ostream out(outType);
+    type.print(out, PrintPol);
+    return outType;
   }
 
 public:
@@ -195,28 +263,42 @@ public:
     McxxSetLockType = Ctx.getFunctionType(Ctx.VoidTy, {InPortType, OutPortType},
                                           FunctionProtoType::ExtProtoInfo());
     McxxSetLockIdentifier = &IdentifierTable.get("mcxx_set_lock");
-    McxxSetLock = FunctionDecl::Create(
-        Ctx, Ctx.getTranslationUnitDecl()->getDeclContext(), {}, {},
-        DeclarationName(McxxSetLockIdentifier), McxxSetLockType, nullptr,
-        SC_None);
+    McxxSetLock =
+        FunctionDecl::Create(Ctx, Ctx.getTranslationUnitDecl(), {}, {},
+                             DeclarationName(McxxSetLockIdentifier),
+                             McxxSetLockType, nullptr, SC_None);
 
     McxxUnsetLockType = Ctx.getFunctionType(Ctx.VoidTy, {OutPortType},
                                             FunctionProtoType::ExtProtoInfo());
     McxxUnsetLockIdentifier = &IdentifierTable.get("mcxx_unset_lock");
-    McxxUnsetLock = FunctionDecl::Create(
-        Ctx, Ctx.getTranslationUnitDecl()->getDeclContext(), {}, {},
-        DeclarationName(McxxUnsetLockIdentifier), McxxUnsetLockType, nullptr,
-        SC_None);
+    McxxUnsetLock =
+        FunctionDecl::Create(Ctx, Ctx.getTranslationUnitDecl(), {}, {},
+                             DeclarationName(McxxUnsetLockIdentifier),
+                             McxxUnsetLockType, nullptr, SC_None);
 
     McxxTaskwaitType =
         Ctx.getFunctionType(Ctx.VoidTy, {SpawnInPortType, OutPortType},
                             FunctionProtoType::ExtProtoInfo());
     McxxTaskwaitIdentifier = &IdentifierTable.get("mcxx_taskwait");
-    McxxTaskwait = FunctionDecl::Create(
-        Ctx, Ctx.getTranslationUnitDecl()->getDeclContext(), {}, {},
-        DeclarationName(McxxTaskwaitIdentifier), McxxTaskwaitType, nullptr,
-        SC_None);
+    McxxTaskwait =
+        FunctionDecl::Create(Ctx, Ctx.getTranslationUnitDecl(), {}, {},
+                             DeclarationName(McxxTaskwaitIdentifier),
+                             McxxTaskwaitType, nullptr, SC_None);
+
+    McxxTaskCreateType = Ctx.getFunctionType(
+        Ctx.VoidTy,
+        {Ctx.UnsignedLongLongTy, Ctx.UnsignedLongLongTy, Ctx.UnsignedLongLongTy,
+         Ctx.VoidPtrTy, Ctx.UnsignedLongLongTy, Ctx.VoidPtrTy,
+         Ctx.UnsignedLongLongTy, Ctx.VoidPtrTy, OutPortType},
+        {});
+    McxxTaskCreateIdentifier = &IdentifierTable.get("mcxx_taskwait");
+    McxxTaskCreate =
+        FunctionDecl::Create(Ctx, Ctx.getTranslationUnitDecl(), {}, {},
+                             DeclarationName(McxxTaskCreateIdentifier),
+                             McxxTaskCreateType, nullptr, SC_None);
   }
+
+  bool getNeedsDeps() { return needsDeps; }
 
   void performReplacements() {
     for (auto &&[original, replaced] : replacementStmt)
@@ -229,25 +311,302 @@ public:
     QualType type = decl->getType();
     if (CreatesTasks && type->isPointerType()) {
       type = type->getPointeeType().IgnoreParens();
-      std::string outType;
-      llvm::raw_string_ostream out(outType);
-      type.print(out, PrintPol);
       type = Ctx.getPrintableASTType(
-          AllocatedStringRef("__mcxx_ptr_t<" + outType + " >"));
+          AllocatedStringRef("__mcxx_ptr_t<" + typeToString(type) + " >"));
       decl->setType(type);
       decl->setTypeSourceInfo(nullptr);
     }
     return true;
   }
 
-  bool VisitCallExpr(CallExpr *callExpr) {
-    if (callExpr->getCalleeDecl()
-            ->getAttr<OSSTaskDeclAttr>()) { // TODO: Transform Task calls as
-                                            // well
-      return true;
+  llvm::SmallVector<Stmt *, 1> copyParamTaskCall(
+      llvm::SmallDenseMap<const ParmVarDecl *, LocalmemInfo> &copies,
+      VarDecl *copiesDecl, ParmVarDecl *param, int &copId, int paramId,
+      Expr *accessedMember, QualType typeMember) {
+
+    llvm::SmallVector<Stmt *, 1> stmts;
+
+    auto copIt = copies.find(param);
+    if (copIt != copies.end()) {
+      auto copy = *copIt;
+      Expr *copyIdExpr = makeIntegerLiteral(copId);
+
+      auto *copiesSubscript = new (Ctx) ArraySubscriptExpr(
+          makeDeclRefExpr(copiesDecl), copyIdExpr,
+          QualType(copiesDecl->getType()->getPointeeOrArrayElementType(), 0),
+          ExprValueKind::VK_LValue, ExprObjectKind::OK_Ordinary, {});
+
+      stmts.push_back(BinaryOperator::Create(
+          Ctx, makeAccessExpr(copiesSubscript, "copy_address"), accessedMember,
+          BinaryOperator::Opcode::BO_Assign, typeMember,
+          ExprValueKind::VK_LValue, ExprObjectKind::OK_Ordinary, {}, {}));
+
+      stmts.push_back(BinaryOperator::Create(
+          Ctx, makeAccessExpr(copiesSubscript, "arg_idx"),
+          makeIntegerLiteral(paramId), BinaryOperator::Opcode::BO_Assign,
+          typeMember, ExprValueKind::VK_LValue, ExprObjectKind::OK_Ordinary, {},
+          {}));
+
+      stmts.push_back(BinaryOperator::Create(
+          Ctx, makeAccessExpr(copiesSubscript, "flags"),
+          makeIntegerLiteral(unsigned(copy.second.dir)),
+          BinaryOperator::Opcode::BO_Assign, typeMember,
+          ExprValueKind::VK_LValue, ExprObjectKind::OK_Ordinary, {}, {}));
+
+      auto *sizeArray = [&] {
+        if (copy.second.FixedArrayRef) {
+          return makeIntegerLiteral(ComputeArrayRefSize(
+              Ctx, copy.second.FixedArrayRef,
+              Ctx.getTypeSize(GetElementTypePointerTo(copy.first->getType())) /
+                  Ctx.getCharWidth()));
+        }
+        // UnaryExprOrTypeTraitExpr e(UnaryExprOrTypeTrait::UETT_SizeOf, );
+        return makeIntegerLiteral(
+            Ctx.getTypeSize(GetElementTypePointerTo(copy.first->getType())) /
+            Ctx.getCharWidth());
+      }();
+
+      stmts.push_back(BinaryOperator::Create(
+          Ctx, makeAccessExpr(copiesSubscript, "size"), sizeArray,
+          BinaryOperator::Opcode::BO_Assign, typeMember,
+          ExprValueKind::VK_LValue, ExprObjectKind::OK_Ordinary, {}, {}));
+
+      ++copId;
     }
-    // ExhaustiveVisitor<void>::visit(n);
-    // Symbol sym = n.get_called().get_symbol();
+    return stmts;
+  }
+
+  bool TaskCall(CallExpr *callExpr, OSSTaskDeclAttr *attr) {
+    auto dependencyMap = computeDependencyMap(attr, true);
+
+    llvm::SmallVector<Stmt *, 1> stmts;
+
+    VarDecl *argsDecl = nullptr;
+    {
+      auto typeArgs = Ctx.getConstantArrayType(
+          Ctx.UnsignedLongLongTy, llvm::APInt(64, callExpr->getNumArgs()),
+          makeIntegerLiteral(callExpr->getNumArgs()),
+          ArrayType::ArraySizeModifier::Normal, 0);
+      argsDecl = makeVarDecl(typeArgs, "__mcxx_args");
+      stmts.push_back(makeDeclStmt(argsDecl));
+    }
+
+    llvm::SmallDenseMap<const ParmVarDecl *, LocalmemInfo> copies;
+    if (attr->getDevice() == OSSTaskDeclAttr::Fpga)
+      copies =
+          ComputeLocalmems(dyn_cast<FunctionDecl>(callExpr->getCalleeDecl()));
+    else {
+      for (auto &&[param, dependency] : dependencyMap) {
+        if (auto *arrExpr = dyn_cast<OSSArrayShapingExpr>(dependency.first)) {
+          copies.insert(std::pair<const ParmVarDecl *, LocalmemInfo>(
+              param, LocalmemInfo{-1, arrExpr, dependency.second}));
+        } else {
+          copies.insert(std::pair<const ParmVarDecl *, LocalmemInfo>(
+              param, LocalmemInfo{-1, nullptr, dependency.second}));
+        }
+      }
+    }
+
+    VarDecl *depsDecl = nullptr;
+    if (!dependencyMap.empty()) {
+      auto typeArgs = Ctx.getConstantArrayType(
+          Ctx.UnsignedLongLongTy, llvm::APInt(64, dependencyMap.size()),
+          makeIntegerLiteral(dependencyMap.size()),
+          ArrayType::ArraySizeModifier::Normal, 0);
+
+      depsDecl = makeVarDecl(typeArgs, "__mcxx_deps");
+
+      stmts.push_back(makeDeclStmt(depsDecl));
+    }
+
+    VarDecl *copiesDecl = nullptr;
+    if (!copies.empty()) {
+      auto typeArgs = Ctx.getConstantArrayType(
+          Ctx.getPrintableASTType("__fpga_copyinfo_t"),
+          llvm::APInt(64, copies.size()), makeIntegerLiteral(copies.size()),
+          ArrayType::ArraySizeModifier::Normal, 0);
+
+      copiesDecl = makeVarDecl(typeArgs, "__mcxx_copies");
+      stmts.push_back(makeDeclStmt(copiesDecl));
+    }
+
+    int paramId = 0;
+    int copId = 0;
+    int depId = 0;
+    for (auto [argIt, paramIt, argEnd, paramEnd] =
+             std::tuple{callExpr->arg_begin(),
+                        dyn_cast<FunctionDecl>(callExpr->getCalleeDecl())
+                            ->param_begin(),
+                        callExpr->arg_end(),
+                        dyn_cast<FunctionDecl>(callExpr->getCalleeDecl())
+                            ->param_end()};
+         argIt != argEnd && paramIt != paramEnd; ++argIt, ++paramIt) {
+      Expr *arg = *argIt;
+      ParmVarDecl *param = *paramIt;
+
+      QualType paramType = param->getType();
+
+      VarDecl *classInstance;
+      Expr *accessedMember;
+      if (paramType->isPointerType()) {
+        QualType ptrType = Ctx.getPrintableASTType(AllocatedStringRef(
+            "__mcxx_ptr_t<" + typeToString(paramType->getPointeeType()) +
+            " >"));
+
+        classInstance =
+            makeVarDecl(ptrType, AllocatedStringRef("__mcxx_arg_" +
+                                                    std::to_string(paramId)));
+        stmts.push_back(makeDeclStmt(classInstance));
+
+        stmts.push_back(BinaryOperator::Create(
+            Ctx, makeDeclRefExpr(classInstance), arg,
+            BinaryOperator::Opcode::BO_Assign, ptrType,
+            ExprValueKind::VK_LValue, ExprObjectKind::OK_Ordinary, {}, {}));
+
+        accessedMember = makeAccessExpr(makeDeclRefExpr(classInstance), "val");
+      } else {
+        paramType.removeLocalCVRQualifiers(Qualifiers::CVRMask);
+        QualType castUnionType = Ctx.getPrintableASTType(AllocatedStringRef(
+            "__mcxx_cast<" + typeToString(paramType) + " >"));
+
+        classInstance = makeVarDecl(
+            castUnionType,
+            AllocatedStringRef("cast_param_" + std::to_string(paramId)));
+        stmts.push_back(makeDeclStmt(classInstance));
+
+        stmts.push_back(BinaryOperator::Create(
+            Ctx, makeAccessExpr(makeDeclRefExpr(classInstance), "typed"), arg,
+            BinaryOperator::Opcode::BO_Assign, castUnionType,
+            ExprValueKind::VK_LValue, ExprObjectKind::OK_Ordinary, {}, {}));
+
+        accessedMember = makeAccessExpr(makeDeclRefExpr(classInstance), "raw");
+      }
+
+      auto typeMember =
+          QualType(argsDecl->getType()->getPointeeOrArrayElementType(), 0);
+      stmts.push_back(BinaryOperator::Create(
+          Ctx,
+          new (Ctx) ArraySubscriptExpr(makeDeclRefExpr(argsDecl),
+                                       makeIntegerLiteral(paramId), typeMember,
+                                       ExprValueKind::VK_LValue,
+                                       ExprObjectKind::OK_Ordinary, {}),
+          accessedMember, BinaryOperator::Opcode::BO_Assign, typeMember,
+          ExprValueKind::VK_LValue, ExprObjectKind::OK_Ordinary, {}, {}));
+
+      stmts.append(copyParamTaskCall(copies, copiesDecl, param, copId, paramId,
+                                     accessedMember, typeMember));
+
+      if (auto dependIt = dependencyMap.find(param);
+          dependIt != dependencyMap.end()) {
+        needsDeps = true;
+
+        auto *flagExpression = BinaryOperator::Create(
+            Ctx, makeIntegerLiteral(unsigned(dependIt->second.second)),
+            makeIntegerLiteral(58), BO_Shl, Ctx.UnsignedIntTy,
+            ExprValueKind::VK_LValue, ExprObjectKind::OK_Ordinary, {}, {});
+
+        auto paramType = param->getType();
+        auto dataType = paramType;
+        if (dataType->isPointerType()) {
+          dataType = dataType->getPointeeType();
+        }
+        auto type = Ctx.getPrintableASTType(AllocatedStringRef(
+            "__mcxx_ptr_t<" + typeToString(dataType) + " >"));
+
+        auto *ptrVar = makeVarDecl(
+            type, AllocatedStringRef("__mcxx_dep_" + std::to_string(depId)));
+
+        stmts.push_back(makeDeclStmt(ptrVar));
+
+        /* Figure out what this was doing
+
+        stmts.append(BinaryOperator::Create(
+            Ctx, makeDeclRefExpr(ptrVar),
+            BinaryOperator::Create(
+                Ctx, Expr * lhs, Expr * rhs, BinaryOperatorKind::BO_Add, type,
+                ExprValueKind::VK_LValue, ExprObjectKind::OK_Ordinary, {}, {}),
+            BinaryOperatorKind::BO_Assign, type, ExprValueKind::VK_LValue,
+            ExprObjectKind::OK_Ordinary, {}, {}));
+
+        spawn_nodes.append(
+            Nodecl::ExpressionStatement::make(Nodecl::Assignment::make(
+                mcxx_ptr_var.make_nodecl(),
+                Nodecl::Add::make(
+                    base_address,
+                    Nodecl::Div::make(
+                        dep.ref.get_offsetof_dependence(),
+                        const_value_to_nodecl(
+                            const_value_get_unsigned_int(data_type.get_size())),
+                        Type::get_unsigned_long_long_int_type()),
+                    Type::get_unsigned_long_long_int_type()),
+                mcxx_ptr_var.get_type())));*/
+
+        // This is a stub until I figure out what the code above was doing.
+        stmts.push_back(BinaryOperator::Create(
+            Ctx, makeDeclRefExpr(ptrVar), arg, BinaryOperatorKind::BO_Assign,
+            type, ExprValueKind::VK_LValue, ExprObjectKind::OK_Ordinary, {},
+            {}));
+        stmts.push_back(BinaryOperator::Create(
+            Ctx,
+            new (Ctx) ArraySubscriptExpr(
+                makeDeclRefExpr(depsDecl), makeIntegerLiteral(depId),
+                QualType(depsDecl->getType()->getPointeeOrArrayElementType(),
+                         0),
+                ExprValueKind::VK_LValue, ExprObjectKind::OK_Ordinary, {}),
+            BinaryOperator::Create(
+                Ctx, flagExpression,
+                makeAccessExpr(makeDeclRefExpr(ptrVar), "val"),
+                BinaryOperatorKind::BO_Or, type, ExprValueKind::VK_LValue,
+                ExprObjectKind::OK_Ordinary, {}, {}),
+            BinaryOperatorKind::BO_Assign, type, ExprValueKind::VK_LValue,
+            ExprObjectKind::OK_Ordinary, {}, {}));
+        ++depId;
+      }
+      ++paramId;
+    }
+
+    llvm::SmallVector<Expr *, 10> arguments;
+
+    arguments.push_back(makeIntegerLiteral(
+        GenOnto(Ctx, dyn_cast<FunctionDecl>(callExpr->getCalleeDecl()))));
+    if (auto affinity = attr->getAffinity()) {
+      arguments.push_back(affinity);
+    } else {
+      arguments.push_back(makeIntegerLiteral(0xFF));
+    }
+
+    arguments.push_back(makeIntegerLiteral(paramId));
+    arguments.push_back(makeDeclRefExpr(argsDecl));
+
+    arguments.push_back(makeIntegerLiteral(depId));
+    if (depId > 0) {
+      arguments.push_back(makeDeclRefExpr(depsDecl));
+    } else {
+      arguments.push_back(makeIntegerLiteral(0));
+    }
+
+    arguments.push_back(makeIntegerLiteral(copId));
+    if (copId > 0) {
+      arguments.push_back(makeDeclRefExpr(copiesDecl));
+    } else {
+      arguments.push_back(makeIntegerLiteral(0));
+    }
+
+    arguments.push_back(makeDeclRefExpr(OutPort));
+
+    stmts.push_back(makeCallToFunc(McxxTaskCreate, arguments));
+
+    addReplacementOpStmt(callExpr,
+                         CompoundStmt::Create(Ctx, stmts, {}, {}, {}));
+
+    return true;
+  }
+
+  bool VisitCallExpr(CallExpr *callExpr) {
+    if (auto *attr = callExpr->getCalleeDecl()->getAttr<OSSTaskDeclAttr>()) {
+      return TaskCall(callExpr, attr);
+    }
+
     const StringRef funcName =
         dyn_cast<FunctionDecl>(callExpr->getCalleeDecl())->getName();
 
@@ -395,18 +754,12 @@ public:
     llvm::SmallVector<Stmt *, 4> stmts;
 
     DeclRefExpr *in = makeDeclRefExpr(InPort), *out = makeDeclRefExpr(OutPort);
-    stmts.push_back(CallExpr::Create(
-        Ctx, makeDeclRefExpr(McxxSetLock), {in, out},
-        dyn_cast<FunctionType>(McxxSetLockType.getTypePtr())->getReturnType(),
-        {}, {}, {}));
+    stmts.push_back(makeCallToFunc(McxxSetLock, {in, out}));
 
     if (n->hasAssociatedStmt())
       stmts.push_back(n->getAssociatedStmt());
 
-    stmts.push_back(CallExpr::Create(
-        Ctx, makeDeclRefExpr(McxxUnsetLock), {out},
-        dyn_cast<FunctionType>(McxxUnsetLockType.getTypePtr())->getReturnType(),
-        {}, {}, {}));
+    stmts.push_back(makeCallToFunc(McxxUnsetLock, {out}));
 
     auto *stmt = CompoundStmt::Create(Ctx, stmts, FPOptionsOverride(),
                                       SourceLocation{}, SourceLocation{});
@@ -418,18 +771,26 @@ public:
     DeclRefExpr *SapawnIn = makeDeclRefExpr(SpawnInPort),
                 *out = makeDeclRefExpr(OutPort);
 
-    addReplacementOpStmt(
-        n,
-        CallExpr::Create(Ctx, makeDeclRefExpr(McxxTaskwait), {SapawnIn, out},
-                         dyn_cast<FunctionType>(McxxUnsetLockType.getTypePtr())
-                             ->getReturnType(),
-                         {}, {}, {}));
+    addReplacementOpStmt(n, makeCallToFunc(McxxTaskwait, {SapawnIn, out}));
     return true;
   }
 };
+
+uint32_t MercuriumHashStr(const char *str) {
+  const int MULTIPLIER = 33;
+  uint32_t h = 0;
+
+  for (unsigned const char *p = (unsigned const char *)str; *p != '\0'; p++)
+    h = MULTIPLIER * h + *p;
+
+  h += (h >> 5);
+
+  return h; // or, h % ARRAY_SIZE;
+}
+
 } // namespace
 namespace clang {
-void OmpssFpgaTreeTransform(clang::ASTContext &Ctx,
+bool OmpssFpgaTreeTransform(clang::ASTContext &Ctx,
                             clang::IdentifierTable &identifierTable,
                             WrapperPortMap &WrapperPortMap,
                             uint64_t FpgaPortWidth, bool CreatesTasks) {
@@ -437,7 +798,239 @@ void OmpssFpgaTreeTransform(clang::ASTContext &Ctx,
                                   FpgaPortWidth, CreatesTasks);
   t.TraverseAST(Ctx);
   t.performReplacements();
+  return t.getNeedsDeps();
 }
+
+ParamDependencyMap computeDependencyMap(OSSTaskDeclAttr *taskAttr,
+                                        bool includeNonArrays) {
+  ParamDependencyMap currentAssignationsOfArrays;
+
+  auto GetTheArgument = [&](const Expr *OSSExpr) -> const ParmVarDecl * {
+    if (auto *arrShapingExpr = dyn_cast<OSSArrayShapingExpr>(OSSExpr)) {
+      auto *arrExprBase = dyn_cast<DeclRefExpr>(
+          arrShapingExpr->getBase()->IgnoreParenImpCasts());
+      assert(arrExprBase);
+      if (!arrExprBase)
+        return nullptr;
+      auto *decl = dyn_cast<ParmVarDecl>(arrExprBase->getDecl());
+      assert(decl);
+      return decl;
+    }
+    if (auto *arrSectionExpr = dyn_cast<OSSArraySectionExpr>(OSSExpr);
+        includeNonArrays && arrSectionExpr) {
+      auto *arrExprBase = dyn_cast<DeclRefExpr>(
+          arrSectionExpr->getBase()->IgnoreParenImpCasts());
+      assert(arrExprBase);
+      if (!arrExprBase)
+        return nullptr;
+      auto *decl = dyn_cast<ParmVarDecl>(arrExprBase->getDecl());
+      assert(decl);
+      return decl;
+    }
+    if (auto *MultiDepExpr = dyn_cast<OSSMultiDepExpr>(OSSExpr);
+        includeNonArrays && MultiDepExpr) {
+      auto *arrExprBase = dyn_cast<DeclRefExpr>(
+          MultiDepExpr->getDepExpr()->IgnoreParenImpCasts());
+      if (!arrExprBase)
+        return nullptr;
+      auto *decl = dyn_cast<ParmVarDecl>(arrExprBase->getDecl());
+      return decl;
+    }
+    if (auto *exprDecl = dyn_cast<DeclRefExpr>(OSSExpr->IgnoreParenImpCasts());
+        includeNonArrays && exprDecl) {
+      return dyn_cast<ParmVarDecl>(exprDecl->getDecl());
+    }
+    return nullptr;
+  };
+
+  auto EmitDepListIterDecls = [&](auto &&DepExprsIter, LocalmemInfo::Dir dir) {
+    for (const Expr *DepExpr : DepExprsIter) {
+      auto *decl = GetTheArgument(DepExpr);
+      if (!decl)
+        continue;
+      auto res = currentAssignationsOfArrays.find(decl);
+      if (res != currentAssignationsOfArrays.end()) {
+        res->second.second = LocalmemInfo::Dir(res->second.second | dir);
+      } else {
+        currentAssignationsOfArrays.insert({decl, {DepExpr, dir}});
+      };
+    }
+  };
+  EmitDepListIterDecls(taskAttr->ins(), LocalmemInfo::IN);
+  EmitDepListIterDecls(taskAttr->outs(), LocalmemInfo::OUT);
+  EmitDepListIterDecls(taskAttr->inouts(), LocalmemInfo::INOUT);
+  EmitDepListIterDecls(taskAttr->concurrents(), LocalmemInfo::INOUT);
+  EmitDepListIterDecls(taskAttr->weakIns(), LocalmemInfo::IN);
+  EmitDepListIterDecls(taskAttr->weakOuts(), LocalmemInfo::OUT);
+  EmitDepListIterDecls(taskAttr->weakInouts(), LocalmemInfo::INOUT);
+  EmitDepListIterDecls(taskAttr->weakConcurrents(), LocalmemInfo::INOUT);
+  EmitDepListIterDecls(taskAttr->depIns(), LocalmemInfo::IN);
+  EmitDepListIterDecls(taskAttr->depOuts(), LocalmemInfo::OUT);
+  EmitDepListIterDecls(taskAttr->depInouts(), LocalmemInfo::INOUT);
+  EmitDepListIterDecls(taskAttr->depConcurrents(), LocalmemInfo::INOUT);
+  EmitDepListIterDecls(taskAttr->depWeakIns(), LocalmemInfo::IN);
+  EmitDepListIterDecls(taskAttr->depWeakOuts(), LocalmemInfo::OUT);
+  EmitDepListIterDecls(taskAttr->depWeakInouts(), LocalmemInfo::INOUT);
+  EmitDepListIterDecls(taskAttr->depWeakConcurrents(), LocalmemInfo::INOUT);
+  return currentAssignationsOfArrays;
+}
+
+llvm::SmallDenseMap<const clang::ParmVarDecl *, LocalmemInfo>
+ComputeLocalmems(FunctionDecl *FD) {
+  auto *taskAttr = FD->getAttr<OSSTaskDeclAttr>();
+  // First, compute the direction tags of the parameters. Do note that not
+  // all parameters are guaranteed to be present
+  ParamDependencyMap currentAssignationsOfArrays =
+      computeDependencyMap(taskAttr);
+
+  // Then compute the list of localmem parameters
+  llvm::SmallDenseSet<const ParmVarDecl *> parametersToLocalmem;
+
+  // If copy_deps
+  if (taskAttr->getCopyDeps()) {
+    for (auto *param : FD->parameters()) {
+      if (currentAssignationsOfArrays.find(param) !=
+          currentAssignationsOfArrays.end()) {
+        parametersToLocalmem.insert(param);
+      }
+    }
+  }
+  // If we have an explicit list of localmem (copy_in, copy_out, copy_inout),
+  // use that
+  auto explicitCopy = [&](auto &&list, LocalmemInfo::Dir dir) {
+    for (auto *localmem : list) {
+      auto *arrShapingExpr = dyn_cast<OSSArrayShapingExpr>(localmem);
+      if (!arrShapingExpr) {
+        llvm_unreachable("We have checked this in a sema pass");
+        continue;
+      }
+
+      auto *arrExprBase = dyn_cast<DeclRefExpr>(
+          arrShapingExpr->getBase()->IgnoreParenImpCasts());
+      assert(arrExprBase);
+      auto *decl = dyn_cast<ParmVarDecl>(arrExprBase->getDecl());
+      assert(decl);
+      parametersToLocalmem.insert(decl);
+      auto &def = currentAssignationsOfArrays[decl];
+      def.first = arrShapingExpr;
+      def.second = LocalmemInfo::Dir(def.second | dir);
+    }
+  };
+  explicitCopy(taskAttr->copyIn(), LocalmemInfo::IN);
+  explicitCopy(taskAttr->copyOut(), LocalmemInfo::OUT);
+  explicitCopy(taskAttr->copyInOut(), LocalmemInfo::INOUT);
+
+  // Compute the localmem list
+  llvm::SmallDenseMap<const ParmVarDecl *, LocalmemInfo> localmemList;
+  for (auto *param : parametersToLocalmem) {
+    auto data = currentAssignationsOfArrays.find(param);
+    localmemList.insert(
+        {param,
+         LocalmemInfo{-1, dyn_cast<OSSArrayShapingExpr>(data->second.first),
+                      data->second.second}});
+  }
+  return localmemList;
+}
+
+QualType DerefOnceTypePointerTo(QualType type) {
+  if (type->isPointerType()) {
+    return type->getPointeeType().IgnoreParens();
+  }
+  if (type->isArrayType()) {
+    return type->getAsArrayTypeUnsafe()->getElementType().IgnoreParens();
+  }
+  return type;
+}
+
+QualType GetElementTypePointerTo(QualType type) {
+  QualType pointsTo = type;
+
+  for (auto isPointer = pointsTo->isPointerType(),
+            isArray = pointsTo->isArrayType();
+       isPointer || isArray; isPointer = pointsTo->isPointerType(),
+            isArray = pointsTo->isArrayType()) {
+    if (isPointer) {
+      pointsTo = pointsTo->getPointeeType().IgnoreParens();
+    } else if (isArray) {
+      pointsTo =
+          pointsTo->getAsArrayTypeUnsafe()->getElementType().IgnoreParens();
+    }
+  }
+
+  return pointsTo;
+}
+
+QualType LocalmemArrayType(ASTContext &Ctx,
+                           const OSSArrayShapingExpr *arrayType) {
+  auto paramType = arrayType->getBase()->getType();
+  for (size_t i = 0; i < arrayType->getShapes().size(); ++i)
+    paramType = DerefOnceTypePointerTo(paramType);
+  paramType.removeLocalCVRQualifiers(Qualifiers::CVRMask);
+  for (auto *shape : arrayType->getShapes()) {
+    auto computedSize = shape->getIntegerConstantExpr(Ctx);
+    if (!computedSize) {
+      llvm_unreachable(
+          "We have already checked that the shape expressions evaluate to "
+          "positive integers, we should be able to use them here safely");
+    }
+    paramType = Ctx.getConstantArrayType(paramType, *computedSize, shape,
+                                         ArrayType::ArraySizeModifier{}, 0);
+  }
+  return paramType;
+}
+
+uint64_t ComputeArrayRefSize(ASTContext &Ctx,
+                             const OSSArrayShapingExpr *arrayType,
+                             uint64_t baseType) {
+  uint64_t totalSize = baseType;
+  auto paramType = LocalmemArrayType(Ctx, arrayType);
+  while (paramType->isArrayType()) {
+    if (!paramType->isConstantArrayType()) {
+      llvm_unreachable("We have already checked that the parameter type is a "
+                       "constant array");
+    }
+    auto *arrType = dyn_cast<ConstantArrayType>(paramType);
+    paramType = DerefOnceTypePointerTo(paramType);
+    totalSize *= arrType->getSize().getZExtValue();
+  }
+
+  return totalSize;
+}
+
+uint64_t GenOnto(ASTContext &Ctx, FunctionDecl *FD) {
+  auto *taskAttr = FD->getAttr<OSSTaskDeclAttr>();
+  auto *ontoExpr = taskAttr->getOnto();
+  // Check onto information
+  if (ontoExpr) {
+    auto ontoRes = ontoExpr->getIntegerConstantExpr(Ctx);
+    if (ontoRes && *ontoRes >= 0) {
+      uint64_t onto = ontoRes->getZExtValue();
+      // Check that arch bits are set
+      if ((onto & 0x300000000) != 0 && onto <= 0x3FFFFFFFF) {
+        return onto;
+      }
+    }
+  }
+  // Not using the line number to allow future modifications of source code
+  // without afecting the accelerator hash
+  std::string typeStr;
+  llvm::raw_string_ostream typeStream(typeStr);
+
+  typeStream << Ctx.getSourceManager().getFilename(
+                    FD->getSourceRange().getBegin())
+             << " " << FD->getNameAsString();
+  unsigned long long int type = MercuriumHashStr(typeStr.c_str()) &
+                                0xFFFFFFFF; //< Ensure that it its upto 32b
+  if (taskAttr->getDevice() == OSSTaskDeclAttr::Fpga) {
+    // FPGA flag
+    type |= 0x100000000;
+  } else {
+    // SMP flag
+    type |= 0x200000000;
+  }
+  return type;
+}
+
 } // namespace clang
 
 void FPGAFunctionTreeVisitor::propagatePort(WrapperPort port) {

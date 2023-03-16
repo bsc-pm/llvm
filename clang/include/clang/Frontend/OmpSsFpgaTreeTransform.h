@@ -15,8 +15,10 @@
 #define LLVM_CLANG_FRONTEND_OMPSSFPGATREETRANSFORM_H
 
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Basic/IdentifierTable.h"
+#include "clang/Frontend/CompilerInstance.h"
 namespace clang {
 
 enum class WrapperPort {
@@ -32,6 +34,13 @@ enum class WrapperPort {
 using WrapperPortMap =
     llvm::SmallMapVector<const Decl *,
                          std::array<bool, size_t(WrapperPort::NUM_PORTS)>, 16>;
+
+struct LocalmemInfo {
+  int ParamIdx = -1;
+  const OSSArrayShapingExpr *FixedArrayRef;
+  enum Dir { IN = 0b01, OUT = 0b10, INOUT = 0b11 };
+  Dir dir;
+};
 
 class FPGAFunctionTreeVisitor
     : public RecursiveASTVisitor<FPGAFunctionTreeVisitor> {
@@ -66,10 +75,31 @@ public:
   bool VisitCallExpr(CallExpr *n);
 };
 
-void OmpssFpgaTreeTransform(clang::ASTContext &Ctx,
+bool OmpssFpgaTreeTransform(clang::ASTContext &Ctx,
                             clang::IdentifierTable &identifierTable,
                             WrapperPortMap &WrapperPortMap,
                             uint64_t FpgaPortWidth, bool CreatesTasks);
+
+using ParamDependencyMap =
+    llvm::SmallDenseMap<const ParmVarDecl *,
+                        std::pair<const Expr *, LocalmemInfo::Dir>>;
+// Compute the direction tags of the parameters. Do note that not
+// all parameters are guaranteed to be present
+ParamDependencyMap computeDependencyMap(OSSTaskDeclAttr *taskAttr,
+                                        bool includeNonArrays = false);
+
+llvm::SmallDenseMap<const clang::ParmVarDecl *, LocalmemInfo>
+ComputeLocalmems(FunctionDecl *FD);
+
+QualType DerefOnceTypePointerTo(QualType type);
+QualType GetElementTypePointerTo(QualType type);
+QualType LocalmemArrayType(ASTContext &Ctx,
+                           const OSSArrayShapingExpr *arrayType);
+uint64_t ComputeArrayRefSize(ASTContext &Ctx,
+                             const OSSArrayShapingExpr *arrayType,
+                             uint64_t baseType = 1);
+
+uint64_t GenOnto(ASTContext &Ctx, FunctionDecl *FD);
 } // namespace clang
 
 #endif

@@ -107,25 +107,6 @@ using namespace clang;
 namespace {
 static constexpr auto WrapperVersion = 14;
 
-uint32_t MercuriumHashStr(const char *str) {
-  const int MULTIPLIER = 33;
-  uint32_t h = 0;
-
-  for (unsigned const char *p = (unsigned const char *)str; *p != '\0'; p++)
-    h = MULTIPLIER * h + *p;
-
-  h += (h >> 5);
-
-  return h; // or, h % ARRAY_SIZE;
-}
-
-struct LocalmemInfo {
-  int ParamIdx = -1;
-  const OSSArrayShapingExpr *FixedArrayRef;
-  enum Dir { IN = 0b01, OUT = 0b10, INOUT = 0b11 };
-  Dir dir;
-};
-
 template <typename Callable>
 std::optional<std::string>
 getAbsoluteDirExport(const SourceManager &SourceMgr, const std::string &path,
@@ -268,6 +249,7 @@ template <typename Callable> class WrapperGenerator {
   bool UsesOmpif = false;
   bool MemcpyWideport = false;
   bool UsesLock = false;
+  bool NeedsDeps = false;
   WrapperPortMap WrapperPortMap;
 
   llvm::SmallDenseMap<const ParmVarDecl *, LocalmemInfo> Localmems;
@@ -289,97 +271,6 @@ template <typename Callable> class WrapperGenerator {
     return value;
   }
 
-  llvm::SmallDenseMap<const ParmVarDecl *, LocalmemInfo> ComputeLocalmems() {
-    auto *taskAttr = OriginalFD->getAttr<OSSTaskDeclAttr>();
-    // First, compute the direction tags of the parameters. Do note that not
-    // all parameters are guaranteed to be present
-    llvm::SmallDenseMap<
-        const ParmVarDecl *,
-        std::pair<const OSSArrayShapingExpr *, LocalmemInfo::Dir>>
-        currentAssignationsOfArrays;
-    auto EmitDepListIterDecls = [&](auto &&DepExprsIter,
-                                    LocalmemInfo::Dir dir) {
-      for (const Expr *DepExpr : DepExprsIter) {
-        auto *arrShapingExpr = dyn_cast<OSSArrayShapingExpr>(DepExpr);
-        if (!arrShapingExpr)
-          return;
-        auto *arrExprBase = dyn_cast<DeclRefExpr>(
-            arrShapingExpr->getBase()->IgnoreParenImpCasts());
-        assert(arrExprBase);
-        auto *decl = dyn_cast<ParmVarDecl>(arrExprBase->getDecl());
-        assert(decl);
-        auto res = currentAssignationsOfArrays.find(decl);
-        if (res != currentAssignationsOfArrays.end()) {
-          res->second.second = LocalmemInfo::Dir(res->second.second | dir);
-        } else {
-          currentAssignationsOfArrays.insert({decl, {arrShapingExpr, dir}});
-        };
-      }
-    };
-    EmitDepListIterDecls(taskAttr->ins(), LocalmemInfo::IN);
-    EmitDepListIterDecls(taskAttr->outs(), LocalmemInfo::OUT);
-    EmitDepListIterDecls(taskAttr->inouts(), LocalmemInfo::INOUT);
-    EmitDepListIterDecls(taskAttr->concurrents(), LocalmemInfo::INOUT);
-    EmitDepListIterDecls(taskAttr->weakIns(), LocalmemInfo::IN);
-    EmitDepListIterDecls(taskAttr->weakOuts(), LocalmemInfo::OUT);
-    EmitDepListIterDecls(taskAttr->weakInouts(), LocalmemInfo::INOUT);
-    EmitDepListIterDecls(taskAttr->weakConcurrents(), LocalmemInfo::INOUT);
-    EmitDepListIterDecls(taskAttr->depIns(), LocalmemInfo::IN);
-    EmitDepListIterDecls(taskAttr->depOuts(), LocalmemInfo::OUT);
-    EmitDepListIterDecls(taskAttr->depInouts(), LocalmemInfo::INOUT);
-    EmitDepListIterDecls(taskAttr->depConcurrents(), LocalmemInfo::INOUT);
-    EmitDepListIterDecls(taskAttr->depWeakIns(), LocalmemInfo::IN);
-    EmitDepListIterDecls(taskAttr->depWeakOuts(), LocalmemInfo::OUT);
-    EmitDepListIterDecls(taskAttr->depWeakInouts(), LocalmemInfo::INOUT);
-    EmitDepListIterDecls(taskAttr->depWeakConcurrents(), LocalmemInfo::INOUT);
-
-    // Then compute the list of localmem parameters
-    llvm::SmallDenseSet<const ParmVarDecl *> parametersToLocalmem;
-
-    // If copy_deps
-    if (taskAttr->getCopyDeps()) {
-      for (auto *param : OriginalFD->parameters()) {
-        if (currentAssignationsOfArrays.find(param) !=
-            currentAssignationsOfArrays.end()) {
-          parametersToLocalmem.insert(param);
-        }
-      }
-    }
-    // If we have an explicit list of localmem (copy_in, copy_out, copy_inout),
-    // use that
-    auto explicitCopy = [&](auto &&list, LocalmemInfo::Dir dir) {
-      for (auto *localmem : list) {
-        auto *arrShapingExpr = dyn_cast<OSSArrayShapingExpr>(localmem);
-        if (!arrShapingExpr) {
-          llvm_unreachable("We have checked this in a sema pass");
-          continue;
-        }
-
-        auto *arrExprBase = dyn_cast<DeclRefExpr>(
-            arrShapingExpr->getBase()->IgnoreParenImpCasts());
-        assert(arrExprBase);
-        auto *decl = dyn_cast<ParmVarDecl>(arrExprBase->getDecl());
-        assert(decl);
-        parametersToLocalmem.insert(decl);
-        auto &def = currentAssignationsOfArrays[decl];
-        def.first = arrShapingExpr;
-        def.second = LocalmemInfo::Dir(def.second | dir);
-      }
-    };
-    explicitCopy(taskAttr->copyIn(), LocalmemInfo::IN);
-    explicitCopy(taskAttr->copyOut(), LocalmemInfo::OUT);
-    explicitCopy(taskAttr->copyInOut(), LocalmemInfo::INOUT);
-
-    // Compute the localmem list
-    llvm::SmallDenseMap<const ParmVarDecl *, LocalmemInfo> localmemList;
-    for (auto *param : parametersToLocalmem) {
-      auto data = currentAssignationsOfArrays.find(param);
-      localmemList.insert(
-          {param, LocalmemInfo{-1, data->second.first, data->second.second}});
-    }
-    return localmemList;
-  }
-
   std::optional<uint64_t> GenOnto() {
     auto *taskAttr = OriginalFD->getAttr<OSSTaskDeclAttr>();
     auto *ontoExpr = taskAttr->getOnto();
@@ -395,19 +286,7 @@ template <typename Callable> class WrapperGenerator {
       return onto;
     }
 
-    // Not using the line number to allow future modifications of source code
-    // without afecting the accelerator hash
-    std::string typeStr;
-    llvm::raw_string_ostream typeStream(typeStr);
-
-    typeStream << OriginalSourceMgr.getFilename(
-                      OriginalFD->getSourceRange().getBegin())
-               << " " << OrigFuncName;
-    unsigned long long int type = MercuriumHashStr(typeStr.c_str()) &
-                                  0xFFFFFFFF; //< Ensure that it its upto 32b
-    // FPGA flag
-    type |= 0x100000000;
-    return type;
+    return clang::GenOnto(OriginalContext, OriginalFD);
   }
 
   void generateMemcpyWideportFunction(bool in) {
@@ -620,19 +499,18 @@ OMPIF_COMM_WORLD
 
     // Body functions
     ToFD->dropAttr<OSSTaskDeclAttr>();
+    auto isProtected = [&](StringRef name) {
+      return name == "OMPIF_Comm_rank" || name == "OMPIF_Comm_size" ||
+             name == "OMPIF_Send" || name == "OMPIF_Recv" ||
+             name == "OMPIF_Allgather" ||
+             name.starts_with("nanos6_fpga_memcpy_wideport_");
+    };
     for (Decl *otherDecl : ToContext.getTranslationUnitDecl()->decls()) {
       if (ToSourceManager.getFileID(otherDecl->getSourceRange().getBegin()) !=
           ToSourceManager.getFileID(ToFD->getSourceRange().getBegin())) {
         // Skip dependency not originating in the file.
         continue;
       }
-
-      auto isProtected = [&](StringRef name) {
-        return name == "OMPIF_Comm_rank" || name == "OMPIF_Comm_size" ||
-               name == "OMPIF_Send" || name == "OMPIF_Recv" ||
-               name == "OMPIF_Allgather" ||
-               name.starts_with("nanos6_fpga_memcpy_wideport_");
-      };
       if (auto *funcDecl = dyn_cast<FunctionDecl>(otherDecl);
           funcDecl && !funcDecl->hasBody() &&
           !isProtected(funcDecl->getName())) {
@@ -640,7 +518,22 @@ OMPIF_COMM_WORLD
              diag::err_oss_fpga_missing_body_for_function_depended_by_kernel);
         Diag(ToFD->getLocation(), diag::note_oss_fpga_kernel);
         return false;
-      } else if (funcDecl && !isProtected(funcDecl->getName())) {
+      }
+    }
+
+    NeedsDeps = OmpssFpgaTreeTransform(
+        ToContext, ToIdentifierTable, WrapperPortMap,
+        CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth, CreatesTasks);
+
+    for (Decl *otherDecl : ToContext.getTranslationUnitDecl()->decls()) {
+      if (ToSourceManager.getFileID(otherDecl->getSourceRange().getBegin()) !=
+          ToSourceManager.getFileID(ToFD->getSourceRange().getBegin())) {
+        // Skip dependency not originating in the file.
+        continue;
+      }
+
+      if (auto *funcDecl = dyn_cast<FunctionDecl>(otherDecl);
+          funcDecl && !isProtected(funcDecl->getName())) {
 
         auto origName = funcDecl->getDeclName();
         auto &id =
@@ -651,9 +544,6 @@ OMPIF_COMM_WORLD
       }
     }
 
-    OmpssFpgaTreeTransform(ToContext, ToIdentifierTable, WrapperPortMap,
-                           CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth,
-                           CreatesTasks);
     for (Decl *otherDecl : ToContext.getTranslationUnitDecl()->decls()) {
       if (ToSourceManager.getFileID(otherDecl->getSourceRange().getBegin()) !=
           ToSourceManager.getFileID(ToFD->getSourceRange().getBegin())) {
@@ -693,75 +583,13 @@ OMPIF_COMM_WORLD
     return res;
   }
 
-  QualType DerefOnceTypePointerTo(QualType type) {
-    if (type->isPointerType()) {
-      return type->getPointeeType().IgnoreParens();
-    }
-    if (type->isArrayType()) {
-      return type->getAsArrayTypeUnsafe()->getElementType().IgnoreParens();
-    }
-    return type;
-  }
-
-  QualType GetElementTypePointerTo(QualType type) {
-    QualType pointsTo = type;
-
-    for (auto isPointer = pointsTo->isPointerType(),
-              isArray = pointsTo->isArrayType();
-         isPointer || isArray; isPointer = pointsTo->isPointerType(),
-              isArray = pointsTo->isArrayType()) {
-      if (isPointer) {
-        pointsTo = pointsTo->getPointeeType().IgnoreParens();
-      } else if (isArray) {
-        pointsTo =
-            pointsTo->getAsArrayTypeUnsafe()->getElementType().IgnoreParens();
-      }
-    }
-
-    return pointsTo;
-  }
-
-  QualType LocalmemArrayType(const OSSArrayShapingExpr *arrayType) {
-    auto paramType = arrayType->getBase()->getType();
-    for (size_t i = 0; i < arrayType->getShapes().size(); ++i)
-      paramType = DerefOnceTypePointerTo(paramType);
-    paramType.removeLocalCVRQualifiers(Qualifiers::CVRMask);
-    for (auto *shape : arrayType->getShapes()) {
-      auto computedSize = shape->getIntegerConstantExpr(OriginalContext);
-      if (!computedSize) {
-        llvm_unreachable(
-            "We have already checked that the shape expressions evaluate to "
-            "positive integers, we should be able to use them here safely");
-      }
-      paramType = OriginalContext.getConstantArrayType(
-          paramType, *computedSize, shape, ArrayType::ArraySizeModifier{}, 0);
-    }
-    return paramType;
-  }
-
-  uint64_t ComputeArrayRefSize(const OSSArrayShapingExpr *arrayType,
-                               uint64_t baseType = 1) {
-    uint64_t totalSize = baseType;
-    auto paramType = LocalmemArrayType(arrayType);
-    while (paramType->isArrayType()) {
-      if (!paramType->isConstantArrayType()) {
-        llvm_unreachable("We have already checked that the parameter type is a "
-                         "constant array");
-      }
-      auto *arrType = dyn_cast<ConstantArrayType>(paramType);
-      paramType = DerefOnceTypePointerTo(paramType);
-      totalSize *= arrType->getSize().getZExtValue();
-    }
-
-    return totalSize;
-  }
-
   void GenerateWrapperFunctionLocalmems() {
     for (auto &&p : Localmems) {
       Output << "  "
-             << GetDeclVariableString(StorageClass::SC_Static,
-                                      LocalmemArrayType(p.second.FixedArrayRef),
-                                      p.first->getName())
+             << GetDeclVariableString(
+                    StorageClass::SC_Static,
+                    LocalmemArrayType(OriginalContext, p.second.FixedArrayRef),
+                    p.first->getName())
              << ";\n";
     }
   }
@@ -957,7 +785,8 @@ OMPIF_COMM_WORLD
 
       const std::string dataReferenceSize =
           "(" +
-          std::to_string(ComputeArrayRefSize(fixedArrayRef, baseTypeSize)) +
+          std::to_string(ComputeArrayRefSize(OriginalContext, fixedArrayRef,
+                                             baseTypeSize)) +
           ")";
       const std::string nElementsSrc =
           "(" + dataReferenceSize + "/" + baseTypeSizeStr + ")";
@@ -1324,7 +1153,7 @@ public:
     }
     NumInstances = std::move(*numInstances);
 
-    Localmems = ComputeLocalmems();
+    Localmems = ComputeLocalmems(OriginalFD);
 
     auto hashNum = GenOnto();
     if (!hashNum) {
@@ -1369,11 +1198,7 @@ public:
     OutputJson << "    \"instrumentation\" : false,\n";
     OutputJson << "    \"periodic\" : false,\n";
     OutputJson << "    \"lock\" : " << (UsesLock ? "true" : "false") << ",\n";
-
-    OutputJson
-        << "    \"deps\" : false,\n"; /*TODO: Once we have AST transformations,
-                                         we can know if we need deps*/
-
+    OutputJson << "    \"deps\" : " << (NeedsDeps ? "true" : "false") << ",\n";
     OutputJson << "    \"ompif\" : " << (UsesOmpif ? "true" : "false") << "\n";
     OutputJson << "},\n";
   }
