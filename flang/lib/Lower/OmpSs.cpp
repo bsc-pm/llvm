@@ -209,8 +209,10 @@ namespace {
     explicit OSSDependInfoGathering(
         Fortran::lower::AbstractConverter &converter,
         Fortran::semantics::SemanticsContext &context,
-        Fortran::lower::StatementContext &stmtCtx)
-      : converter(converter), context(context), stmtCtx(stmtCtx) {}
+        Fortran::semantics::Scope &newScope,
+        Fortran::lower::StatementContext &stmtCtx,
+        llvm::SetVector<mlir::Value> &captureOperands)
+      : converter(converter), context(context), newScope(newScope), stmtCtx(stmtCtx), captureOperands(captureOperands) {}
 
     template <typename A> void Walk(const A &x) { Fortran::parser::Walk(x, *this); }
     template <typename A> bool Pre(const A &) { return true; }
@@ -238,10 +240,11 @@ namespace {
       return false;
     }
     void Post(const Fortran::parser::Name &name) {
+      fir::ExtendedValue exv = converter.getSymbolExtendedValue(*name.symbol);
       // We visit the base of all the expressions, so the first
       // decl value is the dep base.
       if (!baseOperand_) {
-        baseOperand_ = fir::getBase(converter.getSymbolExtendedValue(*name.symbol));
+        baseOperand_ = fir::getBase(exv);
 
         // TODO: location
         auto loc = converter.genUnknownLocation();
@@ -255,12 +258,18 @@ namespace {
             AddDimStartEnd();
         }
       }
+      if (!paramSymbolsSet_.insert(*name.symbol))
+        return;
       FillTypeVLASizes(*name.symbol);
-      paramSymbols_.insert(*name.symbol);
+      // paramSymbols_.insert(*name.symbol);
+      paramValues_.push_back(fir::getBase(exv));
+      paramTypes_.push_back(fir::getBase(exv).getType());
     }
 
     mlir::Value baseOperand() const { return baseOperand_; }
-    llvm::ArrayRef<Fortran::semantics::SymbolRef> paramSymbols() const { return paramSymbols_.getArrayRef(); }
+    llvm::ArrayRef<std::pair<const Fortran::semantics::Symbol *, const Fortran::semantics::Symbol *>> paramSymbols() const { return paramSymbols_; }
+    llvm::ArrayRef<mlir::Value> paramValues() const { return paramValues_; }
+    llvm::ArrayRef<mlir::Type> paramTypes() const { return paramTypes_; }
     llvm::ArrayRef<mlir::Type> retOperands() const { return retOperands_; }
 
     private:
@@ -281,33 +290,80 @@ namespace {
         return type;
       }
       void FillTypeVLASizes(Fortran::semantics::SymbolRef sym) {
-        if (const auto *details{sym->detailsIf<Fortran::semantics::ObjectEntityDetails>()}) {
-          for (const auto &shapeSpec : details->shape()) {
-            struct ExprSymbolGathering : public Fortran::evaluate::AnyTraverse<ExprSymbolGathering> {
-              using Base = AnyTraverse<ExprSymbolGathering>;
-              ExprSymbolGathering(llvm::SetVector<Fortran::semantics::SymbolRef> &paramSymbols)
-                : Base{*this}, paramSymbols_(paramSymbols) {}
-              using Base::operator();
-              bool operator()(const Fortran::semantics::Symbol &x) {
-                paramSymbols_.insert(x);
-                return true;
-              }
-              llvm::SetVector<Fortran::semantics::SymbolRef> &paramSymbols_;
-            };
-            if (const auto &lb{shapeSpec.lbound().GetExplicit()}) {
-              if (!IsConstantExpr(*lb)) {
-                auto expr = Fortran::semantics::SomeExpr{*lb};
-                ExprSymbolGathering{paramSymbols_}(expr);
-              }
-            }
-            if (const auto &ub{shapeSpec.ubound().GetExplicit()}) {
-              if (!IsConstantExpr(*ub)) {
-                auto expr = Fortran::semantics::SomeExpr{*ub};
-                ExprSymbolGathering{paramSymbols_}(expr);
-              }
+        bool skip = Fortran::semantics::IsAllocatableOrPointer(sym);
+        skip |= !sym->has<Fortran::semantics::ObjectEntityDetails>();
+        // Skip anything but assumed-shape and explicit-shape
+        if (skip) {
+          // We have to introduce a copy of the symbol in the newScope
+          // otherwise we will not find it. Therefore the initialization
+          // will not be performed
+          Fortran::semantics::Symbol *newSymbol = newScope.CopySymbol(sym);
+          if (auto *details{newSymbol->detailsIf<Fortran::semantics::ObjectEntityDetails>()})
+            details->set_isDummy(true);
+          paramSymbols_.emplace_back(newSymbol, &*sym);
+          return;
+        }
+        auto *details{sym->detailsIf<Fortran::semantics::ObjectEntityDetails>()};
+        Fortran::semantics::ArraySpec newBounds;
+        fir::ExtendedValue exv = converter.getSymbolExtendedValue(sym);
+        for (const Fortran::semantics::ShapeSpec &subs : details->shape()) {
+          Fortran::semantics::Bound newLb = subs.lbound();
+          if (const auto &lb{subs.lbound().GetExplicit()}) {
+            if (!Fortran::evaluate::IsConstantExpr(*lb)) {
+              fir::ExtendedValue exv = converter.genExprValue(Fortran::semantics::SomeExpr{*lb}, stmtCtx);
+              // ubounds are necessary to be captured always since the exv has extents instead...
+              paramValues_.push_back(fir::getBase(exv));
+              captureOperands.insert(fir::getBase(exv));
+              paramTypes_.push_back(fir::getBase(exv).getType());
+
+              newLb = duplicateBoundUsingTempSym(Fortran::semantics::SomeExpr{*lb});
             }
           }
+          Fortran::semantics::Bound newUb = subs.ubound();
+          if (const auto &ub{subs.ubound().GetExplicit()}) {
+            if (!Fortran::evaluate::IsConstantExpr(*ub)) {
+              fir::ExtendedValue exv = converter.genExprValue(Fortran::semantics::SomeExpr{*ub}, stmtCtx);
+              // ubounds are necessary to be captured always since the exv has extents instead...
+              paramValues_.push_back(fir::getBase(exv));
+              captureOperands.insert(fir::getBase(exv));
+              paramTypes_.push_back(fir::getBase(exv).getType());
+
+              newUb = duplicateBoundUsingTempSym(Fortran::semantics::SomeExpr{*ub});
+            }
+          }
+          newBounds.push_back(Fortran::semantics::ShapeSpec::MakeExplicit(std::move(newLb), std::move(newUb)));
         }
+        Fortran::semantics::ObjectEntityDetails newDetails{/*isDummy=*/true};
+        newDetails.set_shape(newBounds);
+        Fortran::semantics::Symbol &newSymbol = createTempSym(newScope, *sym->GetType(), std::move(newDetails));
+        paramSymbols_.emplace_back(&newSymbol, &*sym);
+      }
+
+      Fortran::semantics::Bound duplicateBoundUsingTempSym(Fortran::semantics::SomeExpr expr) {
+        Fortran::semantics::Symbol &tmpSym = createTempSym(newScope, *expr.GetType());
+        paramSymbols_.emplace_back(&tmpSym, nullptr);
+
+        Fortran::semantics::MaybeExpr maybeExpr{Fortran::evaluate::AsGenericExpr(tmpSym)};
+        Fortran::semantics::MaybeSubscriptIntExpr maybeSubscript =
+          Fortran::evaluate::Fold(converter.getFoldingContext(),
+            Fortran::evaluate::ConvertToType<Fortran::evaluate::SubscriptInteger>(
+              std::move(*Fortran::evaluate::UnwrapExpr<Fortran::semantics::SomeIntExpr>(*maybeExpr))));
+        return Fortran::semantics::Bound{std::move(maybeSubscript)};
+      }
+
+      Fortran::semantics::Symbol &createTempSym(Fortran::semantics::Scope &scope, const Fortran::evaluate::DynamicType &type) {
+        Fortran::semantics::Symbol &sym = *scope.try_emplace(
+          context.GetTempName(scope), Fortran::semantics::Attrs{}, Fortran::semantics::ObjectEntityDetails{/*isDummy=*/true}).first->second;
+        const Fortran::semantics::DeclTypeSpec &typeSpec{scope.MakeNumericType(type.category(), Fortran::semantics::KindExpr{type.kind()})};
+        sym.SetType(typeSpec);
+        return sym;
+      }
+
+      Fortran::semantics::Symbol &createTempSym(Fortran::semantics::Scope &scope, const Fortran::semantics::DeclTypeSpec &type, Fortran::semantics::ObjectEntityDetails &&details) {
+        Fortran::semantics::Symbol &sym = *scope.try_emplace(
+          context.GetTempName(scope), Fortran::semantics::Attrs{}, std::move(details)).first->second;
+        sym.SetType(type);
+        return sym;
       }
 
       size_t getNumDims(mlir::Type type) {
@@ -329,11 +385,16 @@ namespace {
 
       Fortran::lower::AbstractConverter &converter;
       Fortran::semantics::SemanticsContext &context;
+      Fortran::semantics::Scope &newScope;
       Fortran::lower::StatementContext &stmtCtx;
+      llvm::SetVector<mlir::Value> &captureOperands;
 
       mlir::Value baseOperand_;
       // Used by regular variables involved in the expression
-      llvm::SetVector<Fortran::semantics::SymbolRef> paramSymbols_;
+      llvm::SetVector<Fortran::semantics::SymbolRef> paramSymbolsSet_;
+      llvm::SmallVector<std::pair<const Fortran::semantics::Symbol *, const Fortran::semantics::Symbol *>> paramSymbols_;
+      llvm::SmallVector<mlir::Value> paramValues_;
+      llvm::SmallVector<mlir::Type> paramTypes_;
       // TODO: is this the correct type?
       llvm::SmallVector<mlir::Type, 3> retOperands_;
   };
@@ -345,8 +406,9 @@ namespace {
     explicit OSSDependVisitor(
         Fortran::lower::AbstractConverter &converter,
         Fortran::semantics::SemanticsContext &context,
+        llvm::ArrayRef<std::pair<const Fortran::semantics::Symbol *, const Fortran::semantics::Symbol *>> paramSymbols,
         Fortran::lower::StatementContext &stmtCtx)
-      : converter(converter), context(context), stmtCtx(stmtCtx),
+      : converter(converter), context(context), paramSymbols(paramSymbols), stmtCtx(stmtCtx),
         ossType(converter.getFirOpBuilder().getI64Type()) {}
 
     template <typename A> void Walk(const A &x) { Fortran::parser::Walk(x, *this); }
@@ -403,6 +465,9 @@ namespace {
       returnList_.push_back(baseValue);
 
       const Fortran::semantics::Symbol *sym = Fortran::evaluate::GetLastSymbol(baseExpr);
+
+      sym = replaceOrigByMod(&*sym);
+
       Fortran::lower::BoxAnalyzer sba;
       sba.analyze(*sym);
 
@@ -516,6 +581,23 @@ namespace {
     llvm::ArrayRef<mlir::Value> returnList() const { return returnList_; }
 
     private:
+
+      // Dealing with arrays composed by non constant dimensions like
+      // INTEGER A(N+M)
+      // INTEGER A(N+M : )
+      // We need to process the modified symbol instead of the original of the dependence
+      // In OSSDependVisitor we use two ways to reach the original symbol:
+      // 1. By running GetLastSymbol(expr) so we can get the symbol and analyze it
+      // 2. By running genExprAddr(expr) so we can get the ExtendedValue
+      // This function solves 1., but in order to be consistent we need to map the original
+      // symbol to the compute.dep function parameter too. Refer to REF:1
+      const Fortran::semantics::Symbol *replaceOrigByMod(const Fortran::semantics::Symbol *sym) {
+        for (const auto &tmpSym : paramSymbols)
+          if (tmpSym.second == sym)
+            return tmpSym.first;
+        return sym;
+      }
+
       mlir::Value convertToOSSType(mlir::Value val) {
         // TODO: location
         auto loc = converter.genUnknownLocation();
@@ -528,6 +610,8 @@ namespace {
       void ProcessSymbol(Fortran::semantics::SymbolRef sym, fir::ExtendedValue exv) {
         auto &firOpBuilder = converter.getFirOpBuilder();
 
+        const Fortran::semantics::Symbol *pSym = replaceOrigByMod(&*sym);
+
         // TODO: location
         auto loc = converter.genUnknownLocation();
 
@@ -536,7 +620,7 @@ namespace {
         llvm::SmallVector<std::pair<mlir::Value, mlir::Value>, 2> subscripts;
 
         Fortran::lower::BoxAnalyzer sba;
-        sba.analyze(sym);
+        sba.analyze(*pSym);
         if (sba.isArray()) {
           if (sba.isStaticArray()) {
             llvm::ArrayRef<int64_t> staticShape = sba.staticShape();
@@ -634,6 +718,7 @@ namespace {
 
       Fortran::lower::AbstractConverter &converter;
       Fortran::semantics::SemanticsContext &context;
+      llvm::ArrayRef<std::pair<const Fortran::semantics::Symbol *, const Fortran::semantics::Symbol *>> paramSymbols;
       Fortran::lower::StatementContext &stmtCtx;
       llvm::SmallVector<mlir::Value, 4> returnList_;
       const mlir::Type ossType;
@@ -697,121 +782,6 @@ namespace {
   };
 } // namespace
 
-static mlir::Value getComputeDep(
-    Fortran::lower::AbstractConverter &converter,
-    Fortran::semantics::SemanticsContext &context,
-    Fortran::lower::pft::Evaluation &eval,
-    const Fortran::semantics::Scope &scope,
-    Fortran::lower::StatementContext &stmtCtx,
-    const Fortran::parser::OSSObject &ossObject) {
-  OSSDependInfoGathering dependInfoGathering(converter, context, stmtCtx);
-  dependInfoGathering.Walk(ossObject);
-
-  mlir::Value baseOperand = dependInfoGathering.baseOperand();
-  const auto &paramSymbols = dependInfoGathering.paramSymbols();
-  llvm::ArrayRef<mlir::Type> retOperands = dependInfoGathering.retOperands();
-  llvm::SmallVector<mlir::Type, 4> paramTypes;
-  llvm::SmallVector<mlir::Value, 4> paramValues;
-  for (const auto &sym : paramSymbols) {
-    mlir::Value val = addOperands(converter, sym);
-    paramTypes.push_back(val.getType());
-    paramValues.push_back(val);
-  }
-
-  auto &firOpBuilder = converter.getFirOpBuilder();
-  auto currentLocation = converter.getCurrentLocation();
-
-  auto ty = mlir::FunctionType::get(
-    firOpBuilder.getContext(), paramTypes, retOperands);
-
-  std::string funcName = "compute.dep";
-  static size_t instance = 0;
-  funcName += std::to_string(instance++);
-
-  auto func = firOpBuilder.createFunction(currentLocation, funcName.c_str(), ty);
-  func.setVisibility(mlir::SymbolTable::Visibility::Public);
-  func.addEntryBlock();
-  auto &block = func.getRegion().back();
-
-  auto insertPt = firOpBuilder.saveInsertionPoint();
-
-  firOpBuilder.setInsertionPointToStart(&block);
-
-  Fortran::lower::SymMap localSymbols;
-
-  // Map symbols to function arguments
-  for (size_t i = 0; i < paramSymbols.size(); ++i) {
-    fir::ExtendedValue exv = converter.getSymbolExtendedValue(paramSymbols[i]);
-    if (auto *box = exv.getBoxOf<fir::MutableBoxValue>()) {
-      auto loc = converter.genUnknownLocation();
-
-      auto rank = box->rank();
-      const auto &mutableProperties = box->getMutableProperties();
-
-      fir::MutableProperties newMutablePropertiesDst;
-
-      if (box->isDescribedByVariables()) {
-        newMutablePropertiesDst.addr = firOpBuilder.createTemporary(loc, box->getMemTy(), "addr.dst");
-        for (decltype(rank) dim = 0; dim < rank; ++dim) {
-          if (mutableProperties.lbounds[dim]) {
-            newMutablePropertiesDst.lbounds.push_back(
-              firOpBuilder.createTemporary(loc, firOpBuilder.getIndexType(), "lb.dst"));
-          }
-          if (mutableProperties.extents[dim]) {
-            newMutablePropertiesDst.extents.push_back(
-              firOpBuilder.createTemporary(loc, firOpBuilder.getIndexType(), "extent.dst"));
-          }
-        }
-      }
-
-      auto newBoxDst = fir::MutableBoxValue(
-        func.front().getArguments()[i], box->nonDeferredLenParams(), newMutablePropertiesDst);
-
-      // 2899b42f075fe8c016efb111b023ec6e8742642e dice que pushear un scope va a hacer
-      // que no se encuentre el iterador del bucle al emitir la op de oss.taskloop
-      localSymbols.addAllocatableOrPointer(paramSymbols[i], newBoxDst);
-      fir::factory::syncMutableBoxFromIRBox(firOpBuilder, loc, newBoxDst);
-    } else if (auto *box = exv.getBoxOf<fir::BoxValue>()) {
-      localSymbols.addBoxSymbol(
-        paramSymbols[i], func.front().getArguments()[i], box->getLBounds(), box->getExplicitExtents(), box->getExplicitParameters());
-    } else {
-      localSymbols.addSymbol(paramSymbols[i], func.front().getArguments()[i]);
-    }
-  }
-
-  for (const auto &var : Fortran::lower::pft::getScopeVariableList(scope)) {
-    const Fortran::semantics::Symbol &sym = var.getSymbol();
-    for (size_t i = 0; i < paramSymbols.size(); ++i) {
-      if (paramSymbols[i] == sym) {
-        Fortran::lower::mapSymbolAttributes(
-          converter, var, localSymbols, stmtCtx, func.front().getArguments()[i]);
-        break;
-      }
-    }
-  }
-
-  // llvm::dbgs() << "stack size: " << localSymbols.symbolMapStack.size() << "\n";
-
-  converter.getLocalSymbols().symbolMapStack.emplace_back(localSymbols.symbolMapStack.back());
-
-  OSSDependVisitor dependVisitor(converter, context, stmtCtx);
-  dependVisitor.Walk(ossObject);
-
-  llvm::ArrayRef<mlir::Value> returnList = dependVisitor.returnList();
-
-  // Ensure the block is well-formed.
-  firOpBuilder.create<mlir::func::ReturnOp>(currentLocation, returnList);
-
-  converter.getLocalSymbols().popScope();
-
-  firOpBuilder.restoreInsertionPoint(insertPt);
-
-  auto op = firOpBuilder.create<mlir::oss::DepOp>(
-    currentLocation, firOpBuilder.getI32Type(), baseOperand,
-    func.getSymName(), paramValues).getResult();
-  return op;
-}
-
 namespace {
   class OSSClausesVisitor {
   public:
@@ -835,6 +805,8 @@ namespace {
       for (const auto &sym : implicitDSAs.sharedList) {
         addOperandsBoxAware(sym, sharedClauseOperands_);
         addAdditionalInfo(sym);
+        // addOperandsBoxAware(*sym->getOssAdditionalSym(), sharedClauseOperands_);
+        // addAdditionalInfo(*sym->getOssAdditionalSym());
       }
       for (const auto &sym : implicitDSAs.privateList) {
         addOperandsBoxAware(sym, privateClauseOperands_);
@@ -891,6 +863,85 @@ namespace {
         }
       }
       llvm_unreachable("addOperands");
+    }
+
+    mlir::Value getComputeDep(const Fortran::parser::OSSObject &ossObject) {
+      Fortran::semantics::Scope &newScope = const_cast<Fortran::semantics::Scope&>(scope).MakeScope(scope.kind());
+      OSSDependInfoGathering dependInfoGathering(converter, context, newScope, stmtCtx, capturesOperands_);
+      dependInfoGathering.Walk(ossObject);
+
+      mlir::Value baseOperand = dependInfoGathering.baseOperand();
+      const auto &paramSymbols = dependInfoGathering.paramSymbols();
+      llvm::ArrayRef<mlir::Type> retOperands = dependInfoGathering.retOperands();
+      const auto &paramTypes = dependInfoGathering.paramTypes();
+      const auto &paramValues = dependInfoGathering.paramValues();
+
+      auto &firOpBuilder = converter.getFirOpBuilder();
+      auto currentLocation = converter.getCurrentLocation();
+
+      auto ty = mlir::FunctionType::get(
+        firOpBuilder.getContext(), paramTypes, retOperands);
+
+      std::string funcName = "compute.dep";
+      static size_t instance = 0;
+      funcName += std::to_string(instance++);
+
+      auto func = firOpBuilder.createFunction(currentLocation, funcName.c_str(), ty);
+      func.setVisibility(mlir::SymbolTable::Visibility::Public);
+      func.addEntryBlock();
+      auto &block = func.getRegion().back();
+
+      auto insertPt = firOpBuilder.saveInsertionPoint();
+
+      firOpBuilder.setInsertionPointToStart(&block);
+
+      Fortran::lower::SymMap localSymbols;
+
+      // Dummy symbols need to be mapped before mapSymbolAttributes
+      for (size_t i = 0; i < paramSymbols.size(); ++i) {
+        const Fortran::semantics::Symbol &modSym = *paramSymbols[i].first;
+        if (Fortran::semantics::IsDummy(modSym))
+          localSymbols.addSymbol(modSym, func.front().getArguments()[i]);
+      }
+
+      // Walk over paramSymbols first since we want to match the function parameter
+      // list.
+      for (size_t i = 0; i < paramSymbols.size(); ++i) {
+        const Fortran::semantics::Symbol &modSym = *paramSymbols[i].first;
+        const Fortran::semantics::Symbol *origSym = paramSymbols[i].second;
+        for (const auto &var : Fortran::lower::pft::getScopeVariableList(newScope)) {
+          if (var.getSymbol() == modSym) {
+            Fortran::lower::mapSymbolAttributes(
+              converter, var, localSymbols, stmtCtx, func.front().getArguments()[i]);
+            fir::ExtendedValue exv = localSymbols.lookupSymbol(modSym).toExtendedValue();
+            // REF:1 Map the original symbol to the modifies symbol value
+            if (origSym)
+              localSymbols.addSymbol(*origSym, exv);
+            break;
+          }
+        }
+      }
+
+      // llvm::dbgs() << "stack size: " << localSymbols.symbolMapStack.size() << "\n";
+
+      converter.getLocalSymbols().symbolMapStack.emplace_back(localSymbols.symbolMapStack.back());
+
+      OSSDependVisitor dependVisitor(converter, context, paramSymbols, stmtCtx);
+      dependVisitor.Walk(ossObject);
+
+      llvm::ArrayRef<mlir::Value> returnList = dependVisitor.returnList();
+
+      // Ensure the block is well-formed.
+      firOpBuilder.create<mlir::func::ReturnOp>(currentLocation, returnList);
+
+      converter.getLocalSymbols().popScope();
+
+      firOpBuilder.restoreInsertionPoint(insertPt);
+
+      auto op = firOpBuilder.create<mlir::oss::DepOp>(
+        currentLocation, firOpBuilder.getI32Type(), baseOperand,
+        func.getSymName(), paramValues).getResult();
+      return op;
     }
 
     void getCopyMutableBoxValueGen(
@@ -1486,7 +1537,7 @@ namespace {
           const auto &dependType{std::get<Fortran::parser::OSSDependenceType>(inOut.t)};
           const Fortran::parser::OSSObjectList &ossObjectList{std::get<Fortran::parser::OSSObjectList>(inOut.t)};
           for (const auto &ossObject : ossObjectList.v) {
-            mlir::Value op = getComputeDep(converter, context, eval, scope, stmtCtx, ossObject);
+            mlir::Value op = getComputeDep(ossObject);
             switch (dependType.v) {
             case Fortran::parser::OSSDependenceType::Type::In:
               inClauseOperands_.push_back(op);
@@ -1524,70 +1575,70 @@ namespace {
                        std::get_if<Fortran::parser::OSSClause::In>(
                            &clause.u)) {
           for (const auto &ossObject : inClause->v.v) {
-            mlir::Value op = getComputeDep(converter, context, eval, scope, stmtCtx, ossObject);
+            mlir::Value op = getComputeDep(ossObject);
             inClauseOperands_.push_back(op);
           }
         } else if (const auto &outClause =
                        std::get_if<Fortran::parser::OSSClause::Out>(
                            &clause.u)) {
           for (const auto &ossObject : outClause->v.v) {
-            mlir::Value op = getComputeDep(converter, context, eval, scope, stmtCtx, ossObject);
+            mlir::Value op = getComputeDep(ossObject);
             outClauseOperands_.push_back(op);
           }
         } else if (const auto &inoutClause =
                        std::get_if<Fortran::parser::OSSClause::Inout>(
                            &clause.u)) {
           for (const auto &ossObject : inoutClause->v.v) {
-            mlir::Value op = getComputeDep(converter, context, eval, scope, stmtCtx, ossObject);
+            mlir::Value op = getComputeDep(ossObject);
             inoutClauseOperands_.push_back(op);
           }
         } else if (const auto &concurrentClause =
                        std::get_if<Fortran::parser::OSSClause::Concurrent>(
                            &clause.u)) {
           for (const auto &ossObject : concurrentClause->v.v) {
-            mlir::Value op = getComputeDep(converter, context, eval, scope, stmtCtx, ossObject);
+            mlir::Value op = getComputeDep(ossObject);
             concurrentClauseOperands_.push_back(op);
           }
         } else if (const auto &commutativeClause =
                        std::get_if<Fortran::parser::OSSClause::Commutative>(
                            &clause.u)) {
           for (const auto &ossObject : commutativeClause->v.v) {
-            mlir::Value op = getComputeDep(converter, context, eval, scope, stmtCtx, ossObject);
+            mlir::Value op = getComputeDep(ossObject);
             commutativeClauseOperands_.push_back(op);
           }
         } else if (const auto &weakinClause =
                        std::get_if<Fortran::parser::OSSClause::Weakin>(
                            &clause.u)) {
           for (const auto &ossObject : weakinClause->v.v) {
-            mlir::Value op = getComputeDep(converter, context, eval, scope, stmtCtx, ossObject);
+            mlir::Value op = getComputeDep(ossObject);
             weakinClauseOperands_.push_back(op);
           }
         } else if (const auto &weakoutClause =
                        std::get_if<Fortran::parser::OSSClause::Weakout>(
                            &clause.u)) {
           for (const auto &ossObject : weakoutClause->v.v) {
-            mlir::Value op = getComputeDep(converter, context, eval, scope, stmtCtx, ossObject);
+            mlir::Value op = getComputeDep(ossObject);
             weakoutClauseOperands_.push_back(op);
           }
         } else if (const auto &weakinoutClause =
                        std::get_if<Fortran::parser::OSSClause::Weakinout>(
                            &clause.u)) {
           for (const auto &ossObject : weakinoutClause->v.v) {
-            mlir::Value op = getComputeDep(converter, context, eval, scope, stmtCtx, ossObject);
+            mlir::Value op = getComputeDep(ossObject);
             weakinoutClauseOperands_.push_back(op);
           }
         } else if (const auto &weakconcurrentClause =
                        std::get_if<Fortran::parser::OSSClause::Weakconcurrent>(
                            &clause.u)) {
           for (const auto &ossObject : weakconcurrentClause->v.v) {
-            mlir::Value op = getComputeDep(converter, context, eval, scope, stmtCtx, ossObject);
+            mlir::Value op = getComputeDep(ossObject);
             weakconcurrentClauseOperands_.push_back(op);
           }
         } else if (const auto &weakcommutativeClause =
                        std::get_if<Fortran::parser::OSSClause::Weakcommutative>(
                            &clause.u)) {
           for (const auto &ossObject : weakcommutativeClause->v.v) {
-            mlir::Value op = getComputeDep(converter, context, eval, scope, stmtCtx, ossObject);
+            mlir::Value op = getComputeDep(ossObject);
             weakcommutativeClauseOperands_.push_back(op);
           }
         }
