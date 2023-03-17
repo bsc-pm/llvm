@@ -291,7 +291,7 @@ public:
          Ctx.VoidPtrTy, Ctx.UnsignedLongLongTy, Ctx.VoidPtrTy,
          Ctx.UnsignedLongLongTy, Ctx.VoidPtrTy, OutPortType},
         {});
-    McxxTaskCreateIdentifier = &IdentifierTable.get("mcxx_taskwait");
+    McxxTaskCreateIdentifier = &IdentifierTable.get("mcxx_task_create");
     McxxTaskCreate =
         FunctionDecl::Create(Ctx, Ctx.getTranslationUnitDecl(), {}, {},
                              DeclarationName(McxxTaskCreateIdentifier),
@@ -501,8 +501,8 @@ public:
         needsDeps = true;
 
         auto *flagExpression = BinaryOperator::Create(
-            Ctx, makeIntegerLiteral(unsigned(dependIt->second.second)),
-            makeIntegerLiteral(58), BO_Shl, Ctx.UnsignedIntTy,
+            Ctx, makeIntegerLiteral(uint64_t(dependIt->second.second)),
+            makeIntegerLiteral(58ULL), BO_Shl, Ctx.UnsignedIntTy,
             ExprValueKind::VK_LValue, ExprObjectKind::OK_Ordinary, {}, {});
 
         auto paramType = param->getType();

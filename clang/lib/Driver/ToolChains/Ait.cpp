@@ -156,6 +156,8 @@ void tools::ait::Ait::ConstructJob(Compilation &C, const JobAction &JA,
       CmdArgs.push_back(Args.MakeArgString(part));
     }
   }
+  CmdArgs.push_back(Args.MakeArgString("--wrapper_version"));
+  CmdArgs.push_back(Args.MakeArgString("14"));
 
   auto *JsonFilePath = C.addTempFile("ait_extracted.json");
   auto command = [JsonFilePath, AitJA]() -> void {
