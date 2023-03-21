@@ -1,10 +1,18 @@
-#pragma once
-/// This represents '#pragma oss taskwait' directive.
-///
-/// \code
-/// #pragma oss taskwait
-/// \endcode
-///
+//===- StmtHlsStub.h - Hls pragma directive stub ----------------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines the nodes for the stub HLS pragma directive
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef LLVM_CLANG_AST_STMTHLSSTUB_H
+#define LLVM_CLANG_AST_STMTHLSSTUB_H
+
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Stmt.h"
 #include "llvm/ADT/SmallString.h"
@@ -77,3 +85,4 @@ public:
   }
 };
 } // namespace clang
+#endif

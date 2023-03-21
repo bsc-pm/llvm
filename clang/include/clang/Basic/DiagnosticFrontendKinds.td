@@ -343,4 +343,8 @@ def warn_profile_data_misexpect : Warning<
 def err_extract_api_ignores_file_not_found :
   Error<"file '%0' specified by '--extract-api-ignores=' not found">, DefaultFatal;
 
+def err_oss_fpga_wrapper_code_and_extract : Error<
+  "found flags -fompss-fpga-wrapper-code and -fompss-fpga-extract. You should use one or the other.">;
+def err_oss_fpga_missing_body_for_function_depended_by_kernel : Error<"This function is depended by an fpga kernel, but we couldn't locate its body. Make sure it is visible in this translation unit.">;
+def note_oss_fpga_kernel : Note<"The fpga kernel">;
 }

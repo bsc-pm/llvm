@@ -4121,10 +4121,8 @@ void Driver::BuildActions(Compilation &C, DerivedArgList &Args,
           Phase == phases::Compile &&
           (Current->getType() == types::TY_PP_C ||
            Current->getType() == types::TY_PP_CXX)) {
-        FPGAWrapperGen = C.MakeAction<FPGAWrapperGenJobAction>(
-            Current, Current->getType() == types::TY_PP_C
-                         ? types::TY_PP_FPGA_WRAPPERGEN_C
-                         : types::TY_PP_FPGA_WRAPPERGEN_CXX);
+        FPGAWrapperGen =
+            C.MakeAction<FPGAWrapperGenJobAction>(Current, Current->getType());
       }
 
       if (auto *EAA = dyn_cast<ExtractAPIJobAction>(NewCurrent))

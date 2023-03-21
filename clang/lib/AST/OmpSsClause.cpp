@@ -535,6 +535,6 @@ void OSSClausePrinter::VisitOSSCopyInOutClause(OSSCopyInOutClause *Node) {
   }
 }
 
-void OSSClausePrinter::VisitOSSCopyDepsClause(OSSCopyDepsClause *_) {
+void OSSClausePrinter::VisitOSSCopyDepsClause(OSSCopyDepsClause *) {
   OS << "copy_deps";
 }

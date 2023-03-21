@@ -10,6 +10,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "clang/Basic/DiagnosticFrontend.h"
 #include "clang/Frontend/OmpSsFgpaWrapperGen.h"
 
 #include "clang/AST/ASTConsumer.h"
@@ -489,14 +490,6 @@ template <typename Callable> class WrapperGenerator {
         return std::nullopt;
       }
       uint64_t onto = ontoRes->getZExtValue();
-      // Check that arch bits are set
-      if ((onto & 0x300000000) == 0) {
-        Diag(ontoExpr->getExprLoc(),
-             diag::err_oss_fpga_onto_clause_missing_bits);
-      } else if (onto > 0x3FFFFFFFF) {
-        Diag(ontoExpr->getExprLoc(),
-             diag::err_oss_fpga_onto_clause_task_type_too_wide);
-      }
       return onto;
     }
 
@@ -1454,7 +1447,8 @@ void FPGAWrapperGen::ActOnOmpSsFpgaExtractFiles(clang::ASTContext &Ctx) {
       }
     } else {
       std::ofstream stream{*realPathOrNone + "/" +
-                           (funcName.str() + "_hls_automatic_clang.cpp")};
+                           (funcName.str() + "_hls_automatic_clang." +
+                            (Ctx.getLangOpts().CPlusPlus ? "cpp" : "c"))};
       llvm::raw_os_ostream outputFile(stream);
 
       if (!GenerateExtractedOriginalFunction(diag, outputFile, FD, funcName,
@@ -1504,6 +1498,11 @@ void FPGAWrapperGen::ActOnOmpSsFpgaGenerateWrapperCodeFiles(
 }
 
 void FPGAWrapperGen::HandleTranslationUnit(clang::ASTContext &Ctx) {
+  if (CI.getFrontendOpts().OmpSsFpgaExtract &&
+      CI.getFrontendOpts().OmpSsFpgaWrapperCode) {
+    CI.getDiagnostics().Report(diag::err_oss_fpga_wrapper_code_and_extract);
+    return;
+  }
   if (CI.getFrontendOpts().OmpSsFpgaExtract) {
     ActOnOmpSsFpgaExtractFiles(Ctx);
   }

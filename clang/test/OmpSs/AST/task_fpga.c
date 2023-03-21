@@ -1,7 +1,7 @@
 // RUN: %clang_cc1 -verify -fompss-2 -ast-dump -ferror-limit 100 %s | FileCheck %s
 // expected-no-diagnostics
 
-#pragma oss task device(fpga) num_instances(2) onto(123) copy_deps
+#pragma oss task device(fpga) num_instances(2) onto(0x300000000) copy_deps
 void foo0() {
     #pragma HLS
 }
@@ -19,14 +19,14 @@ void foo2(int *i, int *o, int *io) {
 // CHECK:|-FunctionDecl {{.*}} <{{.*}}task_fpga.c:5:1, line:7:1> line:5:6 foo0 'void ()'
 // CHECK-NEXT:| |-CompoundStmt {{.*}} <col:13, line:7:1>
 // CHECK-NEXT:| | `-HlsDirective {{.*}} <line:6:13, col:16>HLS
-// CHECK-NEXT:| `-OSSTaskDeclAttr {{.*}} <line:4:9, col:67> Implicit CopyDeps Fpga
+// CHECK-NEXT:| `-OSSTaskDeclAttr {{.*}} <line:4:9, col:75> Implicit CopyDeps Fpga
 // CHECK-NEXT:|   |-<<<NULL>>>
 // CHECK-NEXT:|   |-<<<NULL>>>
 // CHECK-NEXT:|   |-<<<NULL>>>
 // CHECK-NEXT:|   |-<<<NULL>>>
 // CHECK-NEXT:|   |-<<<NULL>>>
 // CHECK-NEXT:|   |-IntegerLiteral {{.*}} <col:45> 'int' 2
-// CHECK-NEXT:|   |-IntegerLiteral {{.*}} <col:53> 'int' 123
+// CHECK-NEXT:|   |-IntegerLiteral {{.*}} <col:53> 'long' 12884901888
 // CHECK-NEXT:|   |-<<<NULL>>>
 // CHECK-NEXT:|   |-<<<NULL>>>
 // CHECK-NEXT:|   `-<<<NULL>>>

@@ -11650,8 +11650,6 @@ def err_oss_fpga_transform_broken : Error<
   "'#pragma oss task device(fpga)' we failed while making transformations on the code. Please, file a bug report!">;
 def err_oss_fpga_dependency_analisis : Error<
   "'#pragma oss task device(fpga)' failed to resolve the dependencies of this function. This may be an internal bug. Error details: %0">;
-def err_oss_fpga_missing_body_for_function_depended_by_kernel : Error<"This function is depended by an fpga kernel, but we couldn't locate its body. Make sure it is visible in this translation unit.">;
-def note_oss_fpga_kernel : Note<"The fpga kernel">;
 def err_oss_fpga_expected_array_to_place_in_localmem: Error<
   "Expected this to be an array if it is intended to be placed in the local memory of the FPGA. You might want to use the copy_deps, copy_in, copy_out and/or copy_inout parameters in the oss task">;
 def err_oss_fpga_param_used_in_localmem_marked_as_out_const_qualified: Error<

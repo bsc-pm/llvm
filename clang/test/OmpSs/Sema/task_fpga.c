@@ -1,8 +1,8 @@
-// RUN: %clang_cc1 -verify -fompss-2 -ferror-limit 100 -o - %s
+// RUN: %clang_cc1 -verify -fompss-2 -fompss-fpga-hls-tasks-dir %{fs-tmp-root} -fompss-fpga -fompss-fpga-wrapper-code -fompss-fpga-dump -ferror-limit 100 -o - %s
 
 #pragma oss task device(cuda) num_instances(1)  // expected-error {{num_instances cannot be used with other devices than fpga}}
 void foo1();
-#pragma oss task device(cuda) onto(1)  // expected-error {{onto cannot be used with other devices than fpga}}
+#pragma oss task device(cuda) onto(0x300000000)  // expected-error {{onto cannot be used with other devices than fpga}}
 void foo2();
 #pragma oss task device(cuda) num_repetitions(1)  // expected-error {{num_repetitions cannot be used with other devices than fpga}}
 void foo3();
@@ -36,4 +36,18 @@ void array2(int b, int (*a)[b]) {  // expected-error {{Expected this to evaulate
 void bar() {
     #pragma oss task device(fpga) // expected-error {{device(fpga) is not supported in inline directives}}
     {}
+}
+
+#pragma oss task device(fpga) onto(1) // expected-error {{Architecture bits not set in the onto clause: 33 -> SMP arch, 32 -> FPGA arch}}
+void ontoerr1() {}
+
+
+#pragma oss task device(fpga) onto(0x600000000) // expected-error {{Task type too wide: 2bits arch + 32bits hash}}
+void ontoerr2() {}
+
+void dependencyNormalFunc();  // expected-error {{This function is depended by an fpga kernel, but we couldn't locate its body. Make sure it is visible in this translation unit.}}
+
+#pragma oss task device(fpga)
+void missingDependBody() { // expected-note {{The fpga kernel}}
+    dependencyNormalFunc();
 }

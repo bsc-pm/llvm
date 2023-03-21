@@ -4449,6 +4449,15 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
                                            /*Outline=*/true);
     if (DevType != OSSTaskDeclAttr::Fpga)
       Diag(DeviceLoc, diag::err_oss_onto_incompatible_device);
+    uint64_t onto =
+        OntoRes.get()->getIntegerConstantExpr(Context)->getZExtValue();
+    // Check that arch bits are set
+    if ((onto & 0x300000000) == 0) {
+      Diag(Onto->getExprLoc(), diag::err_oss_fpga_onto_clause_missing_bits);
+    } else if (onto > 0x3FFFFFFFF) {
+      Diag(Onto->getExprLoc(),
+           diag::err_oss_fpga_onto_clause_task_type_too_wide);
+    }
   }
   if (NumRepetitions) {
     NumRepetitionsRes = CheckNonNegativeIntegerValue(

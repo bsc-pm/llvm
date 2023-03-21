@@ -109,5 +109,3 @@ TYPE("hip-fatbin",               HIP_FATBIN,   INVALID,         "hipfb",  phases
 TYPE("api-information",          API_INFO,     INVALID,         "json",   phases::Precompile)
 TYPE("dx-container",             DX_CONTAINER, INVALID,         "dxo",    phases::Compile, phases::Backend)
 TYPE("none",                     Nothing,      INVALID,         nullptr,  phases::Compile, phases::Backend, phases::Assemble, phases::Link)
-TYPE("fpga-wrappergen-c",           PP_FPGA_WRAPPERGEN_C,   INVALID,    "fpga-wrappergen.i",   phases::Compile)
-TYPE("fpga-wrappergen-cpp",       PP_FPGA_WRAPPERGEN_CXX, INVALID,      "fpga-wrappergen.ii",  phases::Compile)
