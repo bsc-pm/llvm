@@ -78,7 +78,7 @@ void depend() {
 // CHECK-NEXT:void foo_moved(__mcxx_ptr_t<int > ptr, hls::stream<ap_uint<8> > &mcxx_spawnInPort, hls::stream<mcxx_outaxis> &mcxx_outPort) {
 // CHECK-NEXT:    depend_moved(mcxx_spawnInPort, mcxx_outPort);
 // CHECK-NEXT:}
-// CHECK-NEXT:void mcxx_write_out_port(const ap_uint<64> data, const ap_uint<3> dest, const ap_uint<1> last, hls::stream<mcxx_outaxis>& mcxx_outPort) {
+// CHECK-NEXT:void mcxx_write_out_port(const ap_uint<64> data, const ap_uint<2> dest, const ap_uint<1> last, hls::stream<mcxx_outaxis>& mcxx_outPort) {
 // CHECK-NEXT:  #pragma HLS inline
 // CHECK-NEXT:  mcxx_outaxis axis_word;
 // CHECK-NEXT:  axis_word.data = data;

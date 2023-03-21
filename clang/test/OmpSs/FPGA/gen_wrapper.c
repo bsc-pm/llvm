@@ -51,7 +51,7 @@ void depend() {}
 // CHECK-NEXT:    #pragma HLS var=VAL
 // CHECK-NEXT:    depend_moved();
 // CHECK-NEXT:}
-// CHECK-NEXT:void mcxx_write_out_port(const ap_uint<64> data, const ap_uint<3> dest, const ap_uint<1> last, hls::stream<mcxx_outaxis>& mcxx_outPort) {
+// CHECK-NEXT:void mcxx_write_out_port(const ap_uint<64> data, const ap_uint<2> dest, const ap_uint<1> last, hls::stream<mcxx_outaxis>& mcxx_outPort) {
 // CHECK-NEXT:  #pragma HLS inline
 // CHECK-NEXT:  mcxx_outaxis axis_word;
 // CHECK-NEXT:  axis_word.data = data;

@@ -518,23 +518,8 @@ OMPIF_COMM_WORLD
              diag::err_oss_fpga_missing_body_for_function_depended_by_kernel);
         Diag(ToFD->getLocation(), diag::note_oss_fpga_kernel);
         return false;
-      }
-    }
-
-    NeedsDeps = OmpssFpgaTreeTransform(
-        ToContext, ToIdentifierTable, WrapperPortMap,
-        CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth, CreatesTasks);
-
-    for (Decl *otherDecl : ToContext.getTranslationUnitDecl()->decls()) {
-      if (ToSourceManager.getFileID(otherDecl->getSourceRange().getBegin()) !=
-          ToSourceManager.getFileID(ToFD->getSourceRange().getBegin())) {
-        // Skip dependency not originating in the file.
-        continue;
-      }
-
-      if (auto *funcDecl = dyn_cast<FunctionDecl>(otherDecl);
-          funcDecl && !isProtected(funcDecl->getName())) {
-
+      } else if (funcDecl && !isProtected(funcDecl->getName()) &&
+                 !funcDecl->hasAttr<OSSTaskDeclAttr>()) {
         auto origName = funcDecl->getDeclName();
         auto &id =
             PP.getIdentifierTable().get(origName.getAsString() + "_moved");
@@ -543,6 +528,10 @@ OMPIF_COMM_WORLD
         funcDecl->setDeclName(name);
       }
     }
+
+    NeedsDeps = OmpssFpgaTreeTransform(
+        ToContext, ToIdentifierTable, WrapperPortMap,
+        CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth, CreatesTasks);
 
     for (Decl *otherDecl : ToContext.getTranslationUnitDecl()->decls()) {
       if (ToSourceManager.getFileID(otherDecl->getSourceRange().getBegin()) !=
@@ -924,7 +913,7 @@ OMPIF_COMM_WORLD
       OutputHeaders << "#include <string.h> //needed for memcpy\n";
     }
     Output << "void mcxx_write_out_port(const ap_uint<64> data, const "
-              "ap_uint<3> dest, const ap_uint<1> last, " STR_OUTPORT_DECL ") {";
+              "ap_uint<2> dest, const ap_uint<1> last, " STR_OUTPORT_DECL ") {";
     Output << R"(
   #pragma HLS inline
   mcxx_outaxis axis_word;

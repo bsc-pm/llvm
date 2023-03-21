@@ -122,7 +122,7 @@ void depend(int *ptr) {
 // CHECK-NEXT:void foo_moved(__mcxx_ptr_t<int > ptr, unsigned char __ompif_rank, unsigned char __ompif_size, hls::stream<mcxx_outaxis> &mcxx_outPort, ap_uint<0> *mcxx_memport) {
 // CHECK-NEXT:    depend_moved(ptr, __ompif_rank, __ompif_size, mcxx_outPort, mcxx_memport);
 // CHECK-NEXT:}
-// CHECK-NEXT:void mcxx_write_out_port(const ap_uint<64> data, const ap_uint<3> dest, const ap_uint<1> last, hls::stream<mcxx_outaxis>& mcxx_outPort) {
+// CHECK-NEXT:void mcxx_write_out_port(const ap_uint<64> data, const ap_uint<2> dest, const ap_uint<1> last, hls::stream<mcxx_outaxis>& mcxx_outPort) {
 // CHECK-NEXT:  #pragma HLS inline
 // CHECK-NEXT:  mcxx_outaxis axis_word;
 // CHECK-NEXT:  axis_word.data = data;
