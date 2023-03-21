@@ -6493,7 +6493,7 @@ ExpectedStmt ASTNodeImporter::VisitHlsDirective(HlsDirective *S) {
     return std::move(Err);
   return HlsDirective::Create(Importer.getToContext(), S->getBeginLoc(),
                               S->getEndLoc(), llvm::StringRef(S->getContent()),
-                              std::move(OrigExprs));
+                              std::move(Exprs));
 }
 
 ExpectedStmt ASTNodeImporter::VisitGCCAsmStmt(GCCAsmStmt *S) {
