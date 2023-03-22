@@ -9411,7 +9411,7 @@ ExpectedStmt ASTNodeImporter::VisitOSSArrayShapingExpr(OSSArrayShapingExpr *E) {
   auto fromShapes = E->getShapes();
   SmallVector<Expr *, 8> toShapes(fromShapes.size());
   if (auto Err = ImportContainerChecked(fromShapes, toShapes)) {
-    return Err;
+    return std::move(Err);
   }
   return OSSArrayShapingExpr::Create(Importer.getToContext(), type, VK, OK,
                                      base, toShapes, beginLoc, endLoc);
@@ -9433,7 +9433,7 @@ ExpectedStmt ASTNodeImporter::VisitOSSMultiDepExpr(OSSMultiDepExpr *E) {
       [&](auto fromExprs) -> Expected<SmallVector<Expr *, 8>> {
     SmallVector<Expr *, 8> toExprs(fromExprs.size());
     if (auto Err = ImportContainerChecked(fromExprs, toExprs)) {
-      return Err;
+      return std::move(Err);
     }
     return toExprs;
   };
@@ -9879,6 +9879,111 @@ Expected<Attr *> ASTImporter::Import(const Attr *FromAttr) {
     AI.importAttr(From,
                   AI.importArrayArg(From->args(), From->args_size()).value(),
                   From->args_size());
+    break;
+  }
+  case attr::OSSTaskDecl: {
+    const auto *From = cast<OSSTaskDeclAttr>(FromAttr);
+
+    llvm::SmallVector<DeclarationNameInfo, 4> declNameInfo;
+    for (auto origDecl : From->declNameInfos()) {
+      declNameInfo.emplace_back(AI.importArg(origDecl.getName()).value(),
+                                AI.importArg(origDecl.getLoc()).value());
+    }
+
+    AI.importAttr(
+        From, AI.importArg(From->getIfExpr()).value(),
+        AI.importArg(From->getFinalExpr()).value(),
+        AI.importArg(From->getCostExpr()).value(),
+        AI.importArg(From->getPriorityExpr()).value(), From->getCopyDeps(),
+        From->getWait(), From->getDevice(),
+        AI.importArg(From->getOnreadyExpr()).value(),
+        AI.importArg(From->getNumInstances()).value(),
+        AI.importArg(From->getOnto()).value(),
+        AI.importArg(From->getNumRepetitions()).value(),
+        AI.importArg(From->getPeriod()).value(),
+        AI.importArg(From->getAffinity()).value(),
+        AI.importArrayArg(From->copyIn(), From->copyIn_size()).value(),
+        From->copyIn_size(),
+        AI.importArrayArg(From->copyOut(), From->copyOut_size()).value(),
+        From->copyOut_size(),
+        AI.importArrayArg(From->copyInOut(), From->copyInOut_size()).value(),
+        From->copyInOut_size(),
+        AI.importArrayArg(From->labelExprs(), From->labelExprs_size()).value(),
+        From->labelExprs_size(),
+        AI.importArrayArg(From->ins(), From->ins_size()).value(),
+        From->ins_size(),
+        AI.importArrayArg(From->outs(), From->outs_size()).value(),
+        From->outs_size(),
+        AI.importArrayArg(From->inouts(), From->inouts_size()).value(),
+        From->inouts_size(),
+        AI.importArrayArg(From->concurrents(), From->concurrents_size())
+            .value(),
+        From->concurrents_size(),
+        AI.importArrayArg(From->commutatives(), From->commutatives_size())
+            .value(),
+        From->commutatives_size(),
+        AI.importArrayArg(From->weakIns(), From->weakIns_size()).value(),
+        From->weakIns_size(),
+        AI.importArrayArg(From->weakOuts(), From->weakOuts_size()).value(),
+        From->weakOuts_size(),
+        AI.importArrayArg(From->weakInouts(), From->weakInouts_size()).value(),
+        From->weakInouts_size(),
+        AI.importArrayArg(From->weakConcurrents(), From->weakConcurrents_size())
+            .value(),
+        From->weakConcurrents_size(),
+        AI.importArrayArg(From->weakCommutatives(),
+                          From->weakCommutatives_size())
+            .value(),
+        From->weakCommutatives_size(),
+        AI.importArrayArg(From->depIns(), From->depIns_size()).value(),
+        From->depIns_size(),
+        AI.importArrayArg(From->depOuts(), From->depOuts_size()).value(),
+        From->depOuts_size(),
+        AI.importArrayArg(From->depInouts(), From->depInouts_size()).value(),
+        From->depInouts_size(),
+        AI.importArrayArg(From->depConcurrents(), From->depConcurrents_size())
+            .value(),
+        From->depConcurrents_size(),
+        AI.importArrayArg(From->depCommutatives(), From->depCommutatives_size())
+            .value(),
+        From->depCommutatives_size(),
+        AI.importArrayArg(From->depWeakIns(), From->depWeakIns_size()).value(),
+        From->depWeakIns_size(),
+        AI.importArrayArg(From->depWeakOuts(), From->depWeakOuts_size())
+            .value(),
+        From->depWeakOuts_size(),
+        AI.importArrayArg(From->depWeakInouts(), From->depWeakInouts_size())
+            .value(),
+        From->depWeakInouts_size(),
+        AI.importArrayArg(From->depWeakConcurrents(),
+                          From->depWeakConcurrents_size())
+            .value(),
+        From->depWeakConcurrents_size(),
+        AI.importArrayArg(From->depWeakCommutatives(),
+                          From->depWeakCommutatives_size())
+            .value(),
+        From->depWeakCommutatives_size(), From->reductionListSizes().begin(),
+        From->reductionListSizes_size(),
+        AI.importArrayArg(From->reductions(), From->reductions_size()).value(),
+        From->reductions_size(),
+        AI.importArrayArg(From->reductionLHSs(), From->reductionLHSs_size())
+            .value(),
+        From->reductionLHSs_size(),
+        AI.importArrayArg(From->reductionRHSs(), From->reductionRHSs_size())
+            .value(),
+        From->reductionRHSs_size(),
+        AI.importArrayArg(From->reductionOps(), From->reductionOps_size())
+            .value(),
+        From->reductionOps_size(), From->reductionKinds().begin(),
+        From->reductionKinds_size(), From->reductionClauseType().begin(),
+        From->reductionClauseType_size(),
+        AI.importArrayArg(From->nameSpecifierLocs(),
+                          From->nameSpecifierLocs_size())
+            .value(),
+        From->nameSpecifierLocs_size(), declNameInfo.data(),
+        declNameInfo.size(),
+        AI.importArrayArg(From->ndranges(), From->ndranges_size()).value(),
+        From->ndranges_size());
     break;
   }
 
