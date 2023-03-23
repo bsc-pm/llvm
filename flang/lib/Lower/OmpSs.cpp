@@ -421,22 +421,24 @@ namespace {
           auto lbExpr = sba.dynamicBound()[i]->lbound().GetExplicit();
           auto ubExpr = sba.dynamicBound()[i]->ubound().GetExplicit();
           lbDecl = fir::getBase(converter.genExprValue(Fortran::semantics::SomeExpr{*lbExpr}, stmtCtx));
+          lbDecl = convertToOSSType(lbDecl);
           ubDecl = fir::getBase(converter.genExprValue(Fortran::semantics::SomeExpr{*ubExpr}, stmtCtx));
+          ubDecl = convertToOSSType(ubDecl);
           sizes.push_back(computeExtent(firOpBuilder, loc, ossType, lbDecl, ubDecl));
         } else if (sba.dynamicBound()[i]->ubound().isStar()) {
           auto lbExpr = sba.dynamicBound()[i]->lbound().GetExplicit();
           lbDecl = fir::getBase(converter.genExprValue(Fortran::semantics::SomeExpr{*lbExpr}, stmtCtx));
+          lbDecl = convertToOSSType(lbDecl);
           assumedSizeSize = lbDecl;
         } else if (sba.dynamicBound()[i]->ubound().isColon()) {
-          mlir::IndexType idxTy = firOpBuilder.getIndexType();
-          mlir::Value one = firOpBuilder.createIntegerConstant(loc, idxTy, 1);
+          mlir::Value one = firOpBuilder.createIntegerConstant(loc, ossType, 1);
           mlir::Value lb = fir::factory::readLowerBound(firOpBuilder, loc, exv, i, one);
-          lbDecl = firOpBuilder.createConvert(loc, ossType, lb);
+          lbDecl = convertToOSSType(lb);
           mlir::Value extent = fir::factory::readExtent(firOpBuilder, loc, exv, i);
-          extent = firOpBuilder.createConvert(loc, ossType, extent);
+          extent = convertToOSSType(extent);
           ubDecl = firOpBuilder.create<mlir::arith::AddIOp>(loc, extent, lbDecl);
-          ubDecl = firOpBuilder.create<mlir::arith::SubIOp>(loc, ubDecl, firOpBuilder.createIntegerConstant(loc, ossType, 1));
-          sizes.push_back(computeExtent(firOpBuilder, loc, ossType, lbDecl, ubDecl));
+          ubDecl = firOpBuilder.create<mlir::arith::SubIOp>(loc, ubDecl, one);
+          sizes.push_back(extent);
         } else {
           llvm_unreachable("unexpected array type");
         }
@@ -445,7 +447,7 @@ namespace {
         if (auto *intExpr = std::get_if<Fortran::parser::IntExpr>(&subscriptIt->u)) {
           mlir::Value lb = fir::getBase(converter.genExprValue(
             *Fortran::semantics::AnalyzeExpr(context, intExpr->thing.value()), stmtCtx));
-          lb = firOpBuilder.createConvert(loc, ossType, lb);
+          lb = convertToOSSType(lb);
           subscripts.emplace_back(lb, lb);
         }
         if (auto *triplet{std::get_if<Fortran::parser::SubscriptTriplet>(&subscriptIt->u)}) {
@@ -455,7 +457,7 @@ namespace {
           } else {
             lb = fir::getBase(converter.genExprValue(
               *Fortran::semantics::GetExpr(std::get<0>(triplet->t)), stmtCtx));
-            lb = firOpBuilder.createConvert(loc, ossType, lb);
+            lb = convertToOSSType(lb);
           }
 
           mlir::Value ub;
@@ -472,7 +474,7 @@ namespace {
           } else {
             ub = fir::getBase(converter.genExprValue(
               *Fortran::semantics::GetExpr(std::get<1>(triplet->t)), stmtCtx));
-            ub = firOpBuilder.createConvert(loc, ossType, ub);
+            ub = convertToOSSType(ub);
             // If we're in an assumed-size and have a section
             // set the size as the extent computed from it
             if (!sba.isStaticArray() && sba.dynamicBound()[i]->ubound().isStar())
@@ -514,12 +516,20 @@ namespace {
     llvm::ArrayRef<mlir::Value> returnList() const { return returnList_; }
 
     private:
+      mlir::Value convertToOSSType(mlir::Value val) {
+        // TODO: location
+        auto loc = converter.genUnknownLocation();
+        auto &firOpBuilder = converter.getFirOpBuilder();
+        if (val.getType() != ossType)
+          return firOpBuilder.createConvert(loc, ossType, val);
+        return val;
+      }
+
       void ProcessSymbol(Fortran::semantics::SymbolRef sym, fir::ExtendedValue exv) {
         auto &firOpBuilder = converter.getFirOpBuilder();
 
         // TODO: location
         auto loc = converter.genUnknownLocation();
-        mlir::IndexType idxTy = firOpBuilder.getIndexType();
 
         llvm::SmallVector<mlir::Value, 2> sizes;
         llvm::SmallVector<mlir::Value, 2> lBounds;
@@ -545,26 +555,28 @@ namespace {
             for (size_t i = 0; i < dynamicBound.size(); ++i) {
               const Fortran::semantics::ShapeSpec *spec = dynamicBound[i];
 
+              mlir::Value one = firOpBuilder.createIntegerConstant(loc, ossType, 1);
+
               mlir::Value lbVal;
               if (auto lbExpr = spec->lbound().GetExplicit()) {
                 lbVal = fir::getBase(converter.genExprValue(Fortran::semantics::SomeExpr{*lbExpr}, stmtCtx));
               } else if (spec->lbound().isColon()) {
-                mlir::Value one = firOpBuilder.createIntegerConstant(loc, idxTy, 1);
-                mlir::Value lb = fir::factory::readLowerBound(firOpBuilder, loc, exv, i, one);
-                lbVal = firOpBuilder.createConvert(loc, ossType, lb);
+                lbVal = fir::factory::readLowerBound(firOpBuilder, loc, exv, i, one);
               }
+              lbVal = convertToOSSType(lbVal);
 
               mlir::Value ubVal;
               if (auto ubExpr = spec->ubound().GetExplicit()) {
                 ubVal = fir::getBase(converter.genExprValue(Fortran::semantics::SomeExpr{*ubExpr}, stmtCtx));
+                ubVal = convertToOSSType(ubVal);
               } else if (spec->ubound().isColon()) {
                 mlir::Value extent = fir::factory::readExtent(firOpBuilder, loc, exv, i);
-                extent = firOpBuilder.createConvert(loc, ossType, extent);
+                extent = convertToOSSType(extent);
                 ubVal = firOpBuilder.create<mlir::arith::AddIOp>(loc, extent, lbVal);
-                ubVal = firOpBuilder.create<mlir::arith::SubIOp>(loc, ubVal, firOpBuilder.createIntegerConstant(loc, ossType, 1));
+                ubVal = firOpBuilder.create<mlir::arith::SubIOp>(loc, ubVal, one);
               }
 
-              mlir::Value size = firOpBuilder.createIntegerConstant(loc, ossType, 1);
+              mlir::Value size = one;
               size = firOpBuilder.create<mlir::arith::AddIOp>(loc, size, ubVal);
               size = firOpBuilder.create<mlir::arith::SubIOp>(loc, size, lbVal);
               sizes.push_back(size);
@@ -598,6 +610,11 @@ namespace {
         mlir::Value c1 = firOpBuilder.createIntegerConstant(loc, ossType, 1);
         mlir::Value elemSizeBytes = firOpBuilder.createIntegerConstant(loc, ossType, elemSize);
         for (size_t i = 0; i < sizes.size(); ++i) {
+          assert(sizes[i].getType() == ossType);
+          assert(lBounds[i].getType() == ossType);
+          assert(subscripts[i].first.getType() == ossType);
+          assert(subscripts[i].second.getType() == ossType);
+
           returnList_.push_back(sizes[i]);
 
           mlir::Value depLB = subscripts[i].first;

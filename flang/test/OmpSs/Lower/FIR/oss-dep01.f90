@@ -108,12 +108,12 @@ end subroutine
 !FIRDialect-NEXT:   %c0 = arith.constant 0 : index
 !FIRDialect-NEXT:   %7 = arith.cmpi sgt, %6, %c0 : index
 !FIRDialect-NEXT:   %8 = arith.select %7, %6, %c0 : index
+!FIRDialect-NEXT:   %c1_i64 = arith.constant 1 : i64
 !FIRDialect-NEXT:   %c4_i64_0 = arith.constant 4 : i64
 !FIRDialect-NEXT:   %9 = fir.load %arg0 : !fir.ref<i32>
 !FIRDialect-NEXT:   %c6_i32_1 = arith.constant 6 : i32
 !FIRDialect-NEXT:   %10 = arith.addi %9, %c6_i32_1 : i32
 !FIRDialect-NEXT:   %11 = fir.convert %10 : (i32) -> i64
-!FIRDialect-NEXT:   %c1_i64 = arith.constant 1 : i64
 !FIRDialect-NEXT:   %12 = arith.addi %c1_i64, %11 : i64
 !FIRDialect-NEXT:   %13 = arith.subi %12, %c4_i64_0 : i64
 !FIRDialect-NEXT:   %c1_i64_2 = arith.constant 1 : i64
