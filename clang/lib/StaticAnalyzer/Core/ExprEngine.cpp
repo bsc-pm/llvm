@@ -1816,8 +1816,6 @@ void ExprEngine::Visit(const Stmt *S, ExplodedNode *Pred,
     case Stmt::OSSTaskLoopForDirectiveClass:
     case Stmt::OSSAtomicDirectiveClass:
     case Stmt::OSSMultiDepExprClass:
-    case Stmt::OSSRedirectStmtClass:
-    case Stmt::OSSRedirectExprClass:
     case Stmt::CapturedStmtClass:
     case Stmt::OMPUnrollDirectiveClass:
     case Stmt::OMPMetaDirectiveClass: {

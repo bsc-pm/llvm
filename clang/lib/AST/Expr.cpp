@@ -3795,10 +3795,6 @@ bool Expr::HasSideEffects(const ASTContext &Ctx,
     if (IncludePossibleEffects)
       return true;
     break;
-  case OSSRedirectExprClass:
-    // FIXME: Move this into the "return false;" block above.
-    return cast<OSSRedirectExpr>(this)->getRedirect()->HasSideEffects(
-        Ctx, IncludePossibleEffects);
   }
 
   // Recurse to children.

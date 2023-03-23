@@ -228,6 +228,7 @@ template <typename Callable> class WrapperGenerator {
 
   Preprocessor &PP;
   CompilerInstance &CI;
+  ReplacementMap ReplacementMap;
   PrintingPolicy printPol;
 
   FunctionDecl *OriginalFD;
@@ -529,10 +530,11 @@ OMPIF_COMM_WORLD
       }
     }
 
-    NeedsDeps = OmpssFpgaTreeTransform(
+    auto [needsDeps, replacementMap] = OmpssFpgaTreeTransform(
         ToContext, ToIdentifierTable, WrapperPortMap,
         CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth, CreatesTasks);
-
+    NeedsDeps = needsDeps;
+    ReplacementMap = std::move(replacementMap);
     for (Decl *otherDecl : ToContext.getTranslationUnitDecl()->decls()) {
       if (ToSourceManager.getFileID(otherDecl->getSourceRange().getBegin()) !=
           ToSourceManager.getFileID(ToFD->getSourceRange().getBegin())) {
@@ -1132,6 +1134,7 @@ public:
         ToContext(ToLangOpts, ToSourceManager, ToIdentifierTable,
                   ToSelectorTable, PP.getBuiltinInfo(), TU_Incremental) {
     printPol.adjustForCPlusPlus();
+    printPol.Replacements = &ReplacementMap;
     ToContext.InitBuiltinTypes(OriginalContext.getTargetInfo());
   }
 

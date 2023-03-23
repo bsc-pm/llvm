@@ -87,6 +87,12 @@ namespace {
     void PrintStmt(Stmt *S) { PrintStmt(S, Policy.Indentation); }
 
     void PrintStmt(Stmt *S, int SubIndent) {
+      if (Policy.Replacements) {
+        if (auto *repl = Policy.Replacements->lookupStmt(S)) {
+          PrintStmt(repl);
+          return;
+        }
+      }
       IndentLevel += SubIndent;
       if (S && isa<Expr>(S)) {
         // If this is an expr used in a stmt context, indent and newline it.
@@ -140,6 +146,16 @@ namespace {
     void PrintOSSLoopDirective(OSSLoopDirective *S);
 
     void PrintExpr(Expr *E) {
+      if (Policy.Replacements) {
+        if (auto *repl = Policy.Replacements->lookupStmt(E)) {
+          if (isa<Expr>(repl)) {
+            PrintExpr(cast<Expr>(repl));
+          } else {
+            PrintStmt(repl);
+          }
+          return;
+        }
+      }
       if (E)
         Visit(E);
       else
@@ -153,6 +169,13 @@ namespace {
     }
 
     void Visit(Stmt* S) {
+      if (Policy.Replacements) {
+        if (auto *repl = Policy.Replacements->lookupStmt(S)) {
+          Visit(repl);
+          return;
+        }
+      }
+
       if (Helper && Helper->handledStmt(S,OS))
           return;
       else StmtVisitor<StmtPrinter>::Visit(S);
@@ -1211,14 +1234,6 @@ void StmtPrinter::VisitOSSTaskLoopForDirective(OSSTaskLoopForDirective *Node) {
 void StmtPrinter::VisitOSSAtomicDirective(OSSAtomicDirective *Node) {
   Indent() << "#pragma oss atomic";
   PrintOSSExecutableDirective(Node);
-}
-
-void StmtPrinter::VisitOSSRedirectStmt(OSSRedirectStmt *Node) {
-  PrintStmt(Node->getRedirect());
-}
-
-void StmtPrinter::VisitOSSRedirectExpr(OSSRedirectExpr *Node) {
-  Visit(Node->getRedirect());
 }
 
 //===----------------------------------------------------------------------===//

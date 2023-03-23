@@ -15,12 +15,14 @@
 
 #include "clang/Basic/LLVM.h"
 #include "clang/Basic/LangOptions.h"
+#include "llvm/ADT/MapVector.h"
 
 namespace clang {
 
 class DeclContext;
 class LangOptions;
 class Stmt;
+class Expr;
 
 class PrinterHelper {
 public:
@@ -47,6 +49,15 @@ public:
   /// The printing stops at the first isScopeVisible() == true, so there will
   /// be no calls with outer scopes.
   virtual bool isScopeVisible(const DeclContext *DC) const { return false; }
+};
+
+struct ReplacementMap {
+  llvm::SmallMapVector<Stmt *, Stmt *, 16> replacementStmt;
+  void addReplacementOpStmt(Stmt *OriginalPos, Stmt *Replacement) {
+    replacementStmt.insert({OriginalPos, Replacement});
+  }
+
+  Stmt *lookupStmt(Stmt *stmt) const { return replacementStmt.lookup(stmt); }
 };
 
 /// Describes how types, statements, expressions, and declarations should be
@@ -301,6 +312,8 @@ struct PrintingPolicy {
 
   /// Callbacks to use to allow the behavior of printing to be customized.
   const PrintingCallbacks *Callbacks = nullptr;
+
+  const ReplacementMap *Replacements = nullptr;
 };
 
 } // end namespace clang

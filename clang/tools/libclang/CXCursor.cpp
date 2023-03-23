@@ -884,8 +884,6 @@ CXCursor cxcursor::MakeCXCursor(const Stmt *S, const Decl *Parent,
   case Stmt::OSSAtomicDirectiveClass:
   case Stmt::OSSTaskwaitDirectiveClass:
   case Stmt::OSSReleaseDirectiveClass:
-  case Stmt::OSSRedirectStmtClass:
-  case Stmt::OSSRedirectExprClass:
     llvm_unreachable("unsupported");
     break;
   case Stmt::BuiltinBitCastExprClass:

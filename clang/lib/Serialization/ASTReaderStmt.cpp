@@ -2791,14 +2791,6 @@ void ASTStmtReader::VisitOSSAtomicDirective(OSSAtomicDirective *D) {
   llvm_unreachable("Not supported yet");
 }
 
-void ASTStmtReader::VisitOSSRedirectStmt(OSSRedirectStmt *D) {
-  llvm_unreachable("Not supported yet");
-}
-
-void ASTStmtReader::VisitOSSRedirectExpr(OSSRedirectExpr *D) {
-  llvm_unreachable("Not supported yet");
-}
-
 //===----------------------------------------------------------------------===//
 // ASTReader Implementation
 //===----------------------------------------------------------------------===//

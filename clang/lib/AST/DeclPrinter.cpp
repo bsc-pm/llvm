@@ -1788,7 +1788,7 @@ void DeclPrinter::VisitOSSDeclareReductionDecl(OSSDeclareReductionDecl *D) {
     Out << " : ";
     D->getType().print(Out, Policy);
     Out << " : ";
-    D->getCombiner()->printPretty(Out, nullptr, Policy, 0);
+    D->getCombiner()->printPretty(Out, nullptr, Policy, 0, "\n", &Context);
     Out << ")";
     if (auto *Init = D->getInitializer()) {
       Out << " initializer(";
@@ -1802,7 +1802,7 @@ void DeclPrinter::VisitOSSDeclareReductionDecl(OSSDeclareReductionDecl *D) {
       case OSSDeclareReductionDecl::CallInit:
         break;
       }
-      Init->printPretty(Out, nullptr, Policy, 0);
+      Init->printPretty(Out, nullptr, Policy, 0, "\n", &Context);
       if (D->getInitializerKind() == OSSDeclareReductionDecl::DirectInit)
         Out << ")";
       Out << ")";
@@ -1818,7 +1818,7 @@ void DeclPrinter::VisitOSSAssertDecl(OSSAssertDecl *D) {
         I != E; ++I) {
       Out << (I == D->varlist_begin() ? '(' : ',');
       StringLiteral *SL = cast<StringLiteral>(*I);
-      SL->printPretty(Out, nullptr, Policy, Indentation);
+      SL->printPretty(Out, nullptr, Policy, Indentation, "\n", &Context);
     }
     Out << ")";
   }

@@ -978,64 +978,6 @@ public:
   }
 };
 
-class OSSRedirectStmt : public Stmt {
-  friend class ASTStmtReader;
-  Stmt *Redirect;
-
-public:
-  /// Build a redirect Stmt.
-  ///
-  /// \param Redirect Statement to redirect to.
-  ///
-  OSSRedirectStmt(Stmt *Redirect)
-      : Stmt(OSSRedirectStmtClass), Redirect(Redirect) {}
-
-  /// Returns starting location of directive kind.
-  SourceLocation getBeginLoc() const { return Redirect->getBeginLoc(); }
-  /// Returns ending location of directive.
-  SourceLocation getEndLoc() const { return Redirect->getEndLoc(); }
-
-  static bool classof(const Stmt *S) {
-    return S->getStmtClass() == OSSRedirectStmtClass;
-  }
-
-  child_range children() { return Redirect->children(); }
-
-  const_child_range children() const { return Redirect->children(); }
-
-  Stmt *getRedirect() const { return Redirect; }
-};
-
-class OSSRedirectExpr : public Expr {
-  friend class ASTStmtReader;
-  Expr *Redirect;
-
-public:
-  /// Build a redirect Stmt.
-  ///
-  /// \param Redirect Statement to redirect to.
-  ///
-  OSSRedirectExpr(Expr *Redirect)
-      : Expr(OSSRedirectExprClass, Redirect->getType(),
-             Redirect->getValueKind(), Redirect->getObjectKind()),
-        Redirect(Redirect) {}
-
-  /// Returns starting location of directive kind.
-  SourceLocation getBeginLoc() const { return Redirect->getBeginLoc(); }
-  /// Returns ending location of directive.
-  SourceLocation getEndLoc() const { return Redirect->getEndLoc(); }
-
-  static bool classof(const Stmt *S) {
-    return S->getStmtClass() == OSSRedirectExprClass;
-  }
-
-  child_range children() { return Redirect->children(); }
-
-  const_child_range children() const { return Redirect->children(); }
-
-  Expr *getRedirect() const { return Redirect; }
-};
-
 } // end namespace clang
 
 #endif

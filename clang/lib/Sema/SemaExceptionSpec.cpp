@@ -1536,11 +1536,6 @@ CanThrowResult Sema::canThrow(const Stmt *S) {
   case Stmt::WhileStmtClass:
     return canSubStmtsThrow(*this, S);
 
-  case Stmt::OSSRedirectStmtClass:
-    return canThrow(cast<OSSRedirectStmt>(S)->getRedirect());
-  case Stmt::OSSRedirectExprClass:
-    return canThrow(cast<OSSRedirectExpr>(S)->getRedirect());
-
   case Stmt::DeclStmtClass: {
     CanThrowResult CT = CT_Cannot;
     for (const Decl *D : cast<DeclStmt>(S)->decls()) {

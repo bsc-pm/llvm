@@ -75,10 +75,9 @@ public:
   bool VisitCallExpr(CallExpr *n);
 };
 
-bool OmpssFpgaTreeTransform(clang::ASTContext &Ctx,
-                            clang::IdentifierTable &identifierTable,
-                            WrapperPortMap &WrapperPortMap,
-                            uint64_t FpgaPortWidth, bool CreatesTasks);
+std::pair<bool, ReplacementMap> OmpssFpgaTreeTransform(
+    clang::ASTContext &Ctx, clang::IdentifierTable &identifierTable,
+    WrapperPortMap &WrapperPortMap, uint64_t FpgaPortWidth, bool CreatesTasks);
 
 using ParamDependencyMap =
     llvm::SmallDenseMap<const ParmVarDecl *,

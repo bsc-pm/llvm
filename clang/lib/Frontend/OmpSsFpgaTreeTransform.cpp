@@ -101,27 +101,10 @@ class OmpSsFpgaTreeTransformVisitor
 
   bool needsDeps = false;
 
-  template <class T> struct ReplacementBlock {
-    T *original;
-    T *replaced;
-  };
-  llvm::SmallVector<ReplacementBlock<Stmt>, 2> replacementStmt;
-  llvm::SmallVector<ReplacementBlock<Expr>, 2> replacementExpr;
+  ReplacementMap replMap;
 
-  template <class T>
-  void addReplacementOpStmt(T *OriginalPos, Stmt *Replacement) {
-    static_assert(sizeof(OSSRedirectStmt) <= sizeof(T),
-                  "expected replaced node to be smaller or equal than the "
-                  "redirection node");
-    replacementStmt.push_back(ReplacementBlock<Stmt>{OriginalPos, Replacement});
-  }
-
-  template <class T>
-  void addReplacementOpExpr(T *OriginalPos, Expr *Replacement) {
-    static_assert(sizeof(OSSRedirectExpr) <= sizeof(T),
-                  "expected replaced node to be smaller or equal than the "
-                  "redirection node");
-    replacementExpr.push_back(ReplacementBlock<Expr>{OriginalPos, Replacement});
+  void addReplacementOpStmt(Stmt *OriginalPos, Stmt *Replacement) {
+    replMap.addReplacementOpStmt(OriginalPos, Replacement);
   }
 
   DeclRefExpr *makeDeclRefExpr(const ValueDecl *Decl) const {
@@ -298,14 +281,9 @@ public:
                              McxxTaskCreateType, nullptr, SC_None);
   }
 
-  bool getNeedsDeps() { return needsDeps; }
+  ReplacementMap &&takeReplacementMap() { return std::move(replMap); }
 
-  void performReplacements() {
-    for (auto &&[original, replaced] : replacementStmt)
-      new (reinterpret_cast<void *>(original)) OSSRedirectStmt(replaced);
-    for (auto &&[original, replaced] : replacementExpr)
-      new (reinterpret_cast<void *>(original)) OSSRedirectExpr(replaced);
-  }
+  bool getNeedsDeps() { return needsDeps; }
 
   bool VisitVarDecl(VarDecl *decl) {
     QualType type = decl->getType();
@@ -621,11 +599,11 @@ public:
           callExpr->getObjectKind(), SourceLocation{}, {});
       auto *paren =
           new (Ctx) ParenExpr(SourceLocation{}, SourceLocation{}, operation);
-      addReplacementOpExpr(callExpr, paren);
+      addReplacementOpStmt(callExpr, paren);
       return true;
     }
     if (funcName == "OMPIF_Comm_size") {
-      addReplacementOpExpr(callExpr, makeDeclRefExpr(OmpIfRank));
+      addReplacementOpStmt(callExpr, makeDeclRefExpr(OmpIfRank));
       return true;
     }
     if (funcName == "OMPIF_Send" || funcName == "OMPIF_Recv") {
@@ -635,7 +613,7 @@ public:
       arguments.push_back(makeIntegerLiteral(0));
       arguments.push_back(makeDeclRefExpr(OutPort));
 
-      addReplacementOpExpr(callExpr,
+      addReplacementOpStmt(callExpr,
                            makeCallToWithDifferentParams(callExpr, arguments));
       return true;
     }
@@ -646,7 +624,7 @@ public:
       arguments.push_back(makeDeclRefExpr(SpawnInPort));
       arguments.push_back(makeDeclRefExpr(OutPort));
 
-      addReplacementOpExpr(callExpr,
+      addReplacementOpStmt(callExpr,
                            makeCallToWithDifferentParams(callExpr, arguments));
       return true;
     }
@@ -654,7 +632,7 @@ public:
         funcName == "nanos6_fpga_memcpy_wideport_out") {
       llvm::SmallVector<Expr *, 4> arguments(callExpr->arguments());
       arguments.push_back(makeDeclRefExpr(MemPort));
-      addReplacementOpExpr(callExpr,
+      addReplacementOpStmt(callExpr,
                            makeCallToWithDifferentParams(callExpr, arguments));
       return true;
     }
@@ -675,7 +653,7 @@ public:
     if (mapping[(int)WrapperPort::MEMORY_PORT])
       arguments.push_back(makeDeclRefExpr(MemPort));
 
-    addReplacementOpExpr(callExpr,
+    addReplacementOpStmt(callExpr,
                          makeCallToWithDifferentParams(callExpr, arguments));
 
     return true;
@@ -790,15 +768,13 @@ uint32_t MercuriumHashStr(const char *str) {
 
 } // namespace
 namespace clang {
-bool OmpssFpgaTreeTransform(clang::ASTContext &Ctx,
-                            clang::IdentifierTable &identifierTable,
-                            WrapperPortMap &WrapperPortMap,
-                            uint64_t FpgaPortWidth, bool CreatesTasks) {
+std::pair<bool, ReplacementMap> OmpssFpgaTreeTransform(
+    clang::ASTContext &Ctx, clang::IdentifierTable &identifierTable,
+    WrapperPortMap &WrapperPortMap, uint64_t FpgaPortWidth, bool CreatesTasks) {
   OmpSsFpgaTreeTransformVisitor t(Ctx, identifierTable, WrapperPortMap,
                                   FpgaPortWidth, CreatesTasks);
   t.TraverseAST(Ctx);
-  t.performReplacements();
-  return t.getNeedsDeps();
+  return {t.getNeedsDeps(), t.takeReplacementMap()};
 }
 
 ParamDependencyMap computeDependencyMap(OSSTaskDeclAttr *taskAttr,
