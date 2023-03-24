@@ -72,42 +72,48 @@ end subroutine
 !LLVMIR:  %[[VLA_EXTENT:.*]] = select i1 %{{.*}}, i64 %{{.*}}, i64 0
 !LLVMIR:  %[[VAR_ARRAY2:.*]] = alloca i32, i64 %{{.*}}, align 4
 
+!LLVMIR: %[[VAR_X_LOAD:.*]] = load i32, ptr %0, align 4
+!LLVMIR: %[[X_PLUS_6:.*]] = add i32 %[[VAR_X_LOAD]], 6
+!LLVMIR: %[[X_PLUS_6_64:.*]] = sext i32 %[[X_PLUS_6]] to i64
 !LLVMIR: %{{.*}} = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"),
 !LLVMIR-SAME: "QUAL.OSS.SHARED"(ptr %[[VAR_ARRAY2]], i32 undef),
 !LLVMIR-SAME: "QUAL.OSS.VLA.DIMS"(ptr %[[VAR_ARRAY2]], i64 %[[VLA_EXTENT]]),
-!LLVMIR-SAME: "QUAL.OSS.DEP.OUT"(ptr %[[VAR_ARRAY2]], [11 x i8] c"dep string\00", ptr @compute.dep0, ptr %0, ptr %[[VAR_ARRAY2]]), "QUAL.OSS.CAPTURED"(i64 %[[VLA_EXTENT]], i64 4, i32 1, i32 10, i32 1) ]
+!LLVMIR-SAME: "QUAL.OSS.DEP.OUT"(ptr %[[VAR_ARRAY2]], [11 x i8] c"dep string\00", ptr @compute.dep0, i64 %[[X_PLUS_6_64]], ptr %[[VAR_ARRAY2]]), "QUAL.OSS.CAPTURED"(i64 %[[VLA_EXTENT]], i64 4, i64 %[[X_PLUS_6_64]], i32 1, i32 10, i32 1) ]
 
 !LLVMIR: %{{.*}} = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00")
 !LLVMIR-SAME: "QUAL.OSS.SHARED"(ptr %1, i32 undef)
 !LLVMIR-SAME: "QUAL.OSS.FIRSTPRIVATE"(ptr %[[VAR_I]], i32 undef)
 !LLVMIR-SAME: "QUAL.OSS.DEP.OUT"(ptr %1, [11 x i8] c"dep string\00", ptr @compute.dep1, ptr %1, ptr %[[VAR_I]]), "QUAL.OSS.CAPTURED"(i64 undef, i32 1, i32 10, i32 1) ]
 
+!LLVMIR: %[[VAR_X_LOAD_0:.*]] = load i32, ptr %0, align 4
+!LLVMIR: %[[X_PLUS_6_0:.*]] = add i32 %[[VAR_X_LOAD_0]], 6
+!LLVMIR: %[[X_PLUS_6_64_0:.*]] = sext i32 %[[X_PLUS_6_0]] to i64
 !LLVMIR: %{{.*}} = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00")
 !LLVMIR-SAME: "QUAL.OSS.SHARED"(ptr %[[VAR_ARRAY2]], i32 undef)
 !LLVMIR-SAME: "QUAL.OSS.FIRSTPRIVATE"(ptr %[[VAR_I]], i32 undef),
-!LLVMIR-SAME: "QUAL.OSS.DEP.OUT"(ptr %[[VAR_ARRAY2]], [11 x i8] c"dep string\00", ptr @compute.dep2, ptr %0, ptr %[[VAR_ARRAY2]], ptr %[[VAR_I]]), "QUAL.OSS.CAPTURED"(i64 %[[VLA_EXTENT]], i64 4, i32 1, i32 10, i32 1) ]
+!LLVMIR-SAME: "QUAL.OSS.DEP.OUT"(ptr %[[VAR_ARRAY2]], [11 x i8] c"dep string\00", ptr @compute.dep2, i64 %[[X_PLUS_6_64_0]], ptr %[[VAR_ARRAY2]], ptr %[[VAR_I]]), "QUAL.OSS.CAPTURED"(i64 %[[VLA_EXTENT]], i64 4, i64 %[[X_PLUS_6_64_0]], i32 1, i32 10, i32 1) ]
 
 !LLVMIR: %{{.*}} = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00")
 !LLVMIR-SAME: "QUAL.OSS.SHARED"(ptr %1, i32 undef)
 !LLVMIR-SAME: "QUAL.OSS.FIRSTPRIVATE"(ptr %[[VAR_I]], i32 undef)
 !LLVMIR-SAME: "QUAL.OSS.DEP.OUT"(ptr %1, [11 x i8] c"dep string\00", ptr @compute.dep3, ptr %1, ptr %[[VAR_I]]), "QUAL.OSS.CAPTURED"(i64 undef, i32 1, i32 10, i32 1) ]
 
+!LLVMIR: %[[VAR_X_LOAD_1:.*]] = load i32, ptr %0, align 4
+!LLVMIR: %[[X_PLUS_6_1:.*]] = add i32 %[[VAR_X_LOAD_1]], 6
+!LLVMIR: %[[X_PLUS_6_64_1:.*]] = sext i32 %[[X_PLUS_6_1]] to i64
 !LLVMIR: %{{.*}} = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00")
 !LLVMIR-SAME: "QUAL.OSS.SHARED"(ptr %[[VAR_ARRAY2]], i32 undef)
 !LLVMIR-SAME: "QUAL.OSS.VLA.DIMS"(ptr %[[VAR_ARRAY2]], i64 %[[VLA_EXTENT]])
-!LLVMIR-SAME: "QUAL.OSS.DEP.OUT"(ptr %[[VAR_ARRAY2]], [11 x i8] c"dep string\00", ptr @compute.dep4, ptr %0, ptr %[[VAR_ARRAY2]]), "QUAL.OSS.CAPTURED"(i64 %[[VLA_EXTENT]], i64 4, i32 1, i32 10, i32 1) ]
+!LLVMIR-SAME: "QUAL.OSS.DEP.OUT"(ptr %[[VAR_ARRAY2]], [11 x i8] c"dep string\00", ptr @compute.dep4, i64 %[[X_PLUS_6_64_1]], ptr %[[VAR_ARRAY2]]), "QUAL.OSS.CAPTURED"(i64 %[[VLA_EXTENT]], i64 4, i64 %[[X_PLUS_6_64_1]], i32 1, i32 10, i32 1) ]
 
-!LLVMIR-LABEL: define { ptr, i64, i64, i64 } @compute.dep0(ptr %0, ptr %1)
-!LLVMIR-NEXT:   %3 = load i32, ptr %0, align 4
-!LLVMIR-NEXT:   %4 = add i32 %3, 6
-!LLVMIR-NEXT:   %5 = sext i32 %4 to i64
-!LLVMIR-NEXT:   %6 = add i64 %5, -3
-!LLVMIR-NEXT:   %7 = mul i64 %6, 4
-!LLVMIR-NEXT:   %8 = insertvalue { ptr, i64, i64, i64 } undef, ptr %1, 0
-!LLVMIR-NEXT:   %9 = insertvalue { ptr, i64, i64, i64 } %8, i64 %7, 1
-!LLVMIR-NEXT:   %10 = insertvalue { ptr, i64, i64, i64 } %9, i64 0, 2
-!LLVMIR-NEXT:   %11 = insertvalue { ptr, i64, i64, i64 } %10, i64 %7, 3
-!LLVMIR-NEXT:   ret { ptr, i64, i64, i64 } %11
+!LLVMIR-LABEL: define { ptr, i64, i64, i64 } @compute.dep0(i64 %0, ptr %1)
+!LLVMIR:   %3 = add i64 %0, -3
+!LLVMIR-NEXT:   %4 = mul i64 %3, 4
+!LLVMIR-NEXT:   %5 = insertvalue { ptr, i64, i64, i64 } undef, ptr %1, 0
+!LLVMIR-NEXT:   %6 = insertvalue { ptr, i64, i64, i64 } %5, i64 %4, 1
+!LLVMIR-NEXT:   %7 = insertvalue { ptr, i64, i64, i64 } %6, i64 0, 2
+!LLVMIR-NEXT:   %8 = insertvalue { ptr, i64, i64, i64 } %7, i64 %4, 3
+!LLVMIR-NEXT:   ret { ptr, i64, i64, i64 } %8
 
 !LLVMIR-LABEL: define { ptr, i64, i64, i64 } @compute.dep1(ptr %0, ptr %1)
 !LLVMIR:   %3 = load i32, ptr %1, align 4
@@ -121,25 +127,22 @@ end subroutine
 !LLVMIR-NEXT:   %11 = insertvalue { ptr, i64, i64, i64 } %10, i64 %7, 3
 !LLVMIR-NEXT:   ret { ptr, i64, i64, i64 } %11
 
-!LLVMIR-LABEL: define { ptr, i64, i64, i64 } @compute.dep2(ptr %0, ptr %1, ptr %2)
-!LLVMIR:   %4 = load i32, ptr %0, align 4
-!LLVMIR-NEXT:   %5 = add i32 %4, 6
-!LLVMIR-NEXT:   %6 = sext i32 %5 to i64
-!LLVMIR-NEXT:   %7 = add i64 %6, -3
-!LLVMIR-NEXT:   %8 = icmp sgt i64 %7, 0
-!LLVMIR-NEXT:   %9 = select i1 %8, i64 %7, i64 0
-!LLVMIR-NEXT:   %10 = load i32, ptr %2, align 4
-!LLVMIR-NEXT:   %11 = sext i32 %10 to i64
-!LLVMIR-NEXT:   %12 = sub i64 %11, 4
-!LLVMIR-NEXT:   %13 = add i64 %11, -3
-!LLVMIR-NEXT:   %14 = mul i64 %9, 4
-!LLVMIR-NEXT:   %15 = mul i64 %12, 4
-!LLVMIR-NEXT:   %16 = mul i64 %13, 4
-!LLVMIR-NEXT:   %17 = insertvalue { ptr, i64, i64, i64 } undef, ptr %1, 0
-!LLVMIR-NEXT:   %18 = insertvalue { ptr, i64, i64, i64 } %17, i64 %14, 1
-!LLVMIR-NEXT:   %19 = insertvalue { ptr, i64, i64, i64 } %18, i64 %15, 2
-!LLVMIR-NEXT:   %20 = insertvalue { ptr, i64, i64, i64 } %19, i64 %16, 3
-!LLVMIR-NEXT:   ret { ptr, i64, i64, i64 } %20
+!LLVMIR-LABEL: define { ptr, i64, i64, i64 } @compute.dep2(i64 %0, ptr %1, ptr %2)
+!LLVMIR:   %4 = add i64 %0, -3
+!LLVMIR-NEXT:   %5 = icmp sgt i64 %4, 0
+!LLVMIR-NEXT:   %6 = select i1 %5, i64 %4, i64 0
+!LLVMIR-NEXT:   %7 = load i32, ptr %2, align 4
+!LLVMIR-NEXT:   %8 = sext i32 %7 to i64
+!LLVMIR-NEXT:   %9 = sub i64 %8, 4
+!LLVMIR-NEXT:   %10 = add i64 %8, -3
+!LLVMIR-NEXT:   %11 = mul i64 %6, 4
+!LLVMIR-NEXT:   %12 = mul i64 %9, 4
+!LLVMIR-NEXT:   %13 = mul i64 %10, 4
+!LLVMIR-NEXT:   %14 = insertvalue { ptr, i64, i64, i64 } undef, ptr %1, 0
+!LLVMIR-NEXT:   %15 = insertvalue { ptr, i64, i64, i64 } %14, i64 %11, 1
+!LLVMIR-NEXT:   %16 = insertvalue { ptr, i64, i64, i64 } %15, i64 %12, 2
+!LLVMIR-NEXT:   %17 = insertvalue { ptr, i64, i64, i64 } %16, i64 %13, 3
+!LLVMIR-NEXT:   ret { ptr, i64, i64, i64 } %17
 
 !LLVMIR-LABEL: define { ptr, i64, i64, i64 } @compute.dep3(ptr %0, ptr %1)
 !LLVMIR:   %3 = load i32, ptr %1, align 4
@@ -160,17 +163,14 @@ end subroutine
 !LLVMIR-NEXT:   %18 = insertvalue { ptr, i64, i64, i64 } %17, i64 %14, 3
 !LLVMIR-NEXT:   ret { ptr, i64, i64, i64 } %18
 
-!LLVMIR-LABEL: define { ptr, i64, i64, i64 } @compute.dep4(ptr %0, ptr %1)
-!LLVMIR:   %3 = load i32, ptr %0, align 4
-!LLVMIR-NEXT:   %4 = add i32 %3, 6
-!LLVMIR-NEXT:   %5 = sext i32 %4 to i64
-!LLVMIR-NEXT:   %6 = add i64 %5, -3
-!LLVMIR-NEXT:   %7 = icmp sgt i64 %6, 0
-!LLVMIR-NEXT:   %8 = select i1 %7, i64 %6, i64 0
-!LLVMIR-NEXT:   %9 = mul i64 %8, 4
-!LLVMIR-NEXT:   %10 = mul i64 %6, 4
-!LLVMIR-NEXT:   %11 = insertvalue { ptr, i64, i64, i64 } undef, ptr %1, 0
-!LLVMIR-NEXT:   %12 = insertvalue { ptr, i64, i64, i64 } %11, i64 %9, 1
-!LLVMIR-NEXT:   %13 = insertvalue { ptr, i64, i64, i64 } %12, i64 0, 2
-!LLVMIR-NEXT:   %14 = insertvalue { ptr, i64, i64, i64 } %13, i64 %10, 3
-!LLVMIR-NEXT:   ret { ptr, i64, i64, i64 } %14
+!LLVMIR-LABEL: define { ptr, i64, i64, i64 } @compute.dep4(i64 %0, ptr %1)
+!LLVMIR:   %3 = add i64 %0, -3
+!LLVMIR-NEXT:   %4 = icmp sgt i64 %3, 0
+!LLVMIR-NEXT:   %5 = select i1 %4, i64 %3, i64 0
+!LLVMIR-NEXT:   %6 = mul i64 %5, 4
+!LLVMIR-NEXT:   %7 = mul i64 %3, 4
+!LLVMIR-NEXT:   %8 = insertvalue { ptr, i64, i64, i64 } undef, ptr %1, 0
+!LLVMIR-NEXT:   %9 = insertvalue { ptr, i64, i64, i64 } %8, i64 %6, 1
+!LLVMIR-NEXT:   %10 = insertvalue { ptr, i64, i64, i64 } %9, i64 0, 2
+!LLVMIR-NEXT:   %11 = insertvalue { ptr, i64, i64, i64 } %10, i64 %7, 3
+!LLVMIR-NEXT:   ret { ptr, i64, i64, i64 } %11
