@@ -27,8 +27,8 @@ SUBROUTINE FOO(N, M)
 
 END SUBROUTINE FOO
 
-!FIRDialect-LABEL: func @_QPfoo(%arg0: !fir.ref<i32>, %arg1: !fir.ref<i32>)
-!FIRDialect:  %[[RES:.*]] = fir.alloca i32 {name = "_QFfooEres"}
+!FIRDialect-LABEL: func @_QPfoo(%arg0: !fir.ref<i32> {fir.bindc_name = "n"}, %arg1: !fir.ref<i32> {fir.bindc_name = "m"})
+!FIRDialect:  %[[RES:.*]] = fir.alloca i32 {bindc_name = "res", uniq_name = "_QFfooEres"}
 !FIRDialect:  oss.task
 !FIRDialect-SAME:  firstprivate(%arg0, %arg1 : !fir.ref<i32>, !fir.ref<i32>)
 !FIRDialect-SAME:  shared(%[[RES]] : !fir.ref<i32>)
