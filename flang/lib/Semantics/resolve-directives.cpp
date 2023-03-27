@@ -48,6 +48,7 @@ protected:
     // data-sharing assigned before materialization
     struct DSAInfo {
       Symbol::Flag ossFlag;
+      parser::CharBlock source;
       // Indicates if the DSA is explicit or from a dep base
       bool isBase;
     };
@@ -798,7 +799,7 @@ private:
   };
 
   class OSSImplicitVisitor {
-    std::vector<std::pair<Symbol *, Symbol::Flag>> symbols;
+    std::vector<std::tuple<Symbol *, parser::CharBlock, Symbol::Flag>> symbols;
     SemanticsContext &context_;
     std::vector<DirContext> dirContext_; // used as a stack
 
@@ -828,6 +829,9 @@ private:
 
   // Materialize DSAs computed from clauses.
   void MaterializeDSAs(DirContext &context);
+
+  // Materialize DSAs computed from clauses.
+  bool DiagnoseUnsupportedDataTypes(DirContext &context, const Symbol &sym, parser::CharBlock);
 
   // Make loop index a private variable
   template <typename A> void PrivatizeLoopIndexes(const A &);
@@ -2521,6 +2525,9 @@ void OSSAttributeVisitor::OSSImplicitVisitor::Post(const parser::Name &name) {
         || symbol->has<MiscDetails>())
       continue;
 
+    // stmt-function symbols don't appear to have a source
+    parser::CharBlock source = symbol == sym ? name.source : nullptr;
+
     // If a parent task has a private dsa inherit it
     Symbol::Flag ossParentFlag = Symbol::Flag::AccShared;
     for (auto it = dirContext_.rbegin() + 1; it != dirContext_.rend(); ++it) {
@@ -2542,11 +2549,11 @@ void OSSAttributeVisitor::OSSImplicitVisitor::Post(const parser::Name &name) {
             symbol->name());
       } else if (GetContext().defaultDSA != Symbol::Flag::AccShared) {
         // TODO: Do not use AccShared, use an OSSUnspecified or similar
-        symbols.emplace_back(symbol, GetContext().defaultDSA);
+        symbols.emplace_back(symbol, source, GetContext().defaultDSA);
       } else if (ossParentFlag != Symbol::Flag::AccShared) {
         // TODO: Do not use AccShared, use an OSSUnspecified or similar
         // parent inheritance
-        symbols.push_back({symbol, ossParentFlag});
+        symbols.emplace_back(symbol, source, ossParentFlag);
       } else {
         // Implicit rules
         Symbol::Flag ossFlag = Symbol::Flag::OSSFirstPrivate;
@@ -2561,7 +2568,7 @@ void OSSAttributeVisitor::OSSImplicitVisitor::Post(const parser::Name &name) {
         if (symbol->attrs().test(Attr::PARAMETER))
           return;
 
-        symbols.push_back({symbol, ossFlag});
+        symbols.emplace_back(symbol, source, ossFlag);
       }
     }
   }
@@ -2569,10 +2576,34 @@ void OSSAttributeVisitor::OSSImplicitVisitor::Post(const parser::Name &name) {
 
 void OSSAttributeVisitor::MaterializeDSAs(DirContext &context) {
   for (const auto &[sym, info] : context.beforeDSAMat) {
+    if (DiagnoseUnsupportedDataTypes(context, *sym, info.source))
+      continue;
     if (auto *new_sym{ResolveOSS(*sym, info.ossFlag, currScope())}) {
       AddToContextObjectWithDSA(*new_sym, info.ossFlag);
     }
   }
+}
+
+// TODO: I've put this here because the data-sharing resolution
+// is a bit tricky. OpenMP does a lot of checks in check-omp-structure.
+// Should we move this to that stage of semantic? There we only check
+// trivial things like we get an integer in the clause
+bool OSSAttributeVisitor::DiagnoseUnsupportedDataTypes(DirContext &context, const Symbol &sym, parser::CharBlock source) {
+  if (const DeclTypeSpec *type{sym.GetType()}) {
+    if (type->category() == DeclTypeSpec::Character) {
+      context_.Say(source, "CHARACTER data type is not supported"_err_en_US);
+      return true;
+    }
+    if (const DerivedTypeSpec *derived{sym.GetType()->AsDerived()}) {
+      // 4.5.5.2 When finalization occurs
+      // NOTE: I'm not sure if it is easy to support this
+      if (Fortran::semantics::IsFinalizable(*derived)) {
+        context_.Say(source, "finalizable type is not supported"_err_en_US);
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 template <typename A>
@@ -2584,7 +2615,7 @@ void OSSAttributeVisitor::PrivatizeLoopIndexes(const A &x) {
 
     Symbol *sym = GetSymbolFromName(*name);
     if (!sym) return;
-    GetContext().beforeDSAMat[sym] = {ossFlag, /*isBase=*/true};
+    GetContext().beforeDSAMat[sym] = {ossFlag, name->source, /*isBase=*/true};
   }
 }
 
@@ -2592,8 +2623,8 @@ template <typename A>
 void OSSAttributeVisitor::DeduceBodyImplicitDsas(const A &x) {
   OSSImplicitVisitor implicitVisitor{context_, dirContext_};
   implicitVisitor.Walk(x);
-  for (const auto &[sym, ossFlag] : implicitVisitor.getSymbols()) {
-    GetContext().beforeDSAMat[sym] = {ossFlag, /*isBase=*/true};
+  for (const auto &[sym, source, ossFlag] : implicitVisitor.getSymbols()) {
+    GetContext().beforeDSAMat[sym] = {ossFlag, source, /*isBase=*/true};
   }
 }
 
@@ -2637,7 +2668,7 @@ void OSSAttributeVisitor::ResolveDsaOSSObject(
               }
 
               if (GetContext().beforeDSAMat.count(sym)) {
-                auto &[infoOssFlag, infoIsBase] = GetContext().beforeDSAMat[sym];
+                auto &[infoOssFlag, infoSource, infoIsBase] = GetContext().beforeDSAMat[sym];
                 if (infoIsBase && infoOssFlag != ossFlag) {
                   context_.Say(designator.source,
                       "data-sharing mismatch '%s' vs '%s'"_err_en_US,
@@ -2647,10 +2678,11 @@ void OSSAttributeVisitor::ResolveDsaOSSObject(
                            ossFlag == Symbol::Flag::OSSShared) {
                   // Promote
                   infoOssFlag = ossFlag;
+                  infoSource = designator.source;
                   infoIsBase = true;
                 }
               } else {
-                GetContext().beforeDSAMat[sym] = {ossFlag, /*isBase=*/true};
+                GetContext().beforeDSAMat[sym] = {ossFlag, designator.source, /*isBase=*/true};
               }
             } else {
               context_.Say(designator.source,
@@ -2701,7 +2733,7 @@ void OSSAttributeVisitor::ResolveDepOSSObject(
                   ossFlag = Symbol::Flag::OSSFirstPrivate;
 
                 if (GetContext().beforeDSAMat.count(sym)) {
-                  auto &[infoOssFlag, infoIsBase] = GetContext().beforeDSAMat[sym];
+                  auto &[infoOssFlag, infoSource, infoIsBase] = GetContext().beforeDSAMat[sym];
                   if (isBase && infoIsBase && infoOssFlag != ossFlag) {
                     context_.Say(designator.source,
                         "data-sharing mismatch '%s' vs '%s'"_err_en_US,
@@ -2711,10 +2743,11 @@ void OSSAttributeVisitor::ResolveDepOSSObject(
                              ossFlag == Symbol::Flag::OSSShared) {
                     // Promote
                     infoOssFlag = ossFlag;
+                    infoSource = name->source;
                     infoIsBase = isBase || infoIsBase;
                   }
                 } else {
-                    GetContext().beforeDSAMat[sym] = {ossFlag, isBase};
+                    GetContext().beforeDSAMat[sym] = {ossFlag, name->source, isBase};
                 }
               }
             }
