@@ -167,7 +167,8 @@ void createAllocatableArrayAssignment(AbstractConverter &converter,
                                       ExplicitIterSpace &explicitIterSpace,
                                       ImplicitIterSpace &implicitIterSpace,
                                       SymMap &symMap,
-                                      StatementContext &stmtCtx);
+                                      StatementContext &stmtCtx,
+                                      bool DoNotInitialize = false);
 
 /// Lower a pointer assignment in an explicit iteration space. The explicit
 /// space iterates over a data structure with a type of `!fir.array<...

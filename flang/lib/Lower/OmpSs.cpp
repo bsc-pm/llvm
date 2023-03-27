@@ -998,7 +998,11 @@ namespace {
         mlir::Value isAllocated = fir::factory::genIsAllocatedOrAssociatedTest(firOpBuilder, loc, newBoxSrc);
         firOpBuilder.genIfThen(loc, isAllocated)
             .genThen([&]() {
-              emitOSSCopyExpr(converter, sym, stmtCtx, DoNotInitialize);
+              Fortran::evaluate::Expr rhs{Fortran::evaluate::AsGenericExpr(*sym).value()};
+              Fortran::evaluate::Expr lhs{Fortran::evaluate::AsGenericExpr(*sym->getOssAdditionalSym()).value()};
+              const Fortran::evaluate::Assignment assign(std::move(lhs), std::move(rhs));
+              converter.genAssignment(assign, DoNotInitialize);
+              // emitOSSCopyExpr(converter, sym, stmtCtx, DoNotInitialize);
             })
             .end();
         // Pack again the modified described variables in the box if it is the case
@@ -1027,7 +1031,11 @@ namespace {
       // Assignment requires first an initialization
       mlir::Value TmpBox = firOpBuilder.createBox(loc, dst);
       fir::runtime::genDerivedTypeInitialize(firOpBuilder, loc, TmpBox);
-      fir::factory::genRecordAssignment(firOpBuilder, loc, dst, src);
+
+      Fortran::evaluate::Expr rhs{Fortran::evaluate::AsGenericExpr(*sym).value()};
+      Fortran::evaluate::Expr lhs{Fortran::evaluate::AsGenericExpr(*sym->getOssAdditionalSym()).value()};
+      const Fortran::evaluate::Assignment assign(std::move(lhs), std::move(rhs));
+      converter.genAssignment(assign);
     }
 
     mlir::Value getCopyMutableBoxValue(Fortran::lower::SymbolRef sym, bool DoNotInitialize) {

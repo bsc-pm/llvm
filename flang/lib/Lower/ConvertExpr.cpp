@@ -7493,14 +7493,15 @@ void Fortran::lower::createAllocatableArrayAssignment(
     const Fortran::lower::SomeExpr &lhs, const Fortran::lower::SomeExpr &rhs,
     Fortran::lower::ExplicitIterSpace &explicitSpace,
     Fortran::lower::ImplicitIterSpace &implicitSpace,
-    Fortran::lower::SymMap &symMap, Fortran::lower::StatementContext &stmtCtx) {
+    Fortran::lower::SymMap &symMap, Fortran::lower::StatementContext &stmtCtx,
+    bool DoNotInitialize) {
   LLVM_DEBUG(lhs.AsFortran(llvm::dbgs() << "defining array: ") << '\n';
              rhs.AsFortran(llvm::dbgs() << "assign expression: ")
              << " given the explicit iteration space:\n"
              << explicitSpace << "\n and implied mask conditions:\n"
              << implicitSpace << '\n';);
   ArrayExprLowering::lowerAllocatableArrayAssignment(
-      converter, symMap, stmtCtx, lhs, rhs, explicitSpace, implicitSpace);
+      converter, symMap, stmtCtx, lhs, rhs, explicitSpace, implicitSpace, DoNotInitialize);
 }
 
 void Fortran::lower::createArrayOfPointerAssignment(

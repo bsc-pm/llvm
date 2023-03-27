@@ -2627,7 +2627,8 @@ private:
       const Fortran::evaluate::Assignment &assign,
       Fortran::lower::StatementContext &localStmtCtx,
       std::optional<llvm::SmallVector<mlir::Value>> lbounds = std::nullopt,
-      std::optional<llvm::SmallVector<mlir::Value>> ubounds = std::nullopt) {
+      std::optional<llvm::SmallVector<mlir::Value>> ubounds = std::nullopt,
+      bool DoNotInitialize = false) {
 
     Fortran::lower::StatementContext &stmtCtx =
         explicitIterationSpace()
@@ -2639,7 +2640,7 @@ private:
       // deallocated/reallocated. See Fortran 2018 10.2.1.3 p3
       Fortran::lower::createAllocatableArrayAssignment(
           *this, assign.lhs, assign.rhs, explicitIterSpace, implicitIterSpace,
-          localSymbols, stmtCtx);
+          localSymbols, stmtCtx, DoNotInitialize);
       return;
     }
 
@@ -2822,7 +2823,7 @@ private:
   }
 
   /// Shared for both assignments and pointer assignments.
-  void genAssignment(const Fortran::evaluate::Assignment &assign) {
+  void genAssignment(const Fortran::evaluate::Assignment &assign, bool DoNotInitialize = false) {
     mlir::Location loc = toLocation();
     if (lowerToHighLevelFIR()) {
       if (explicitIterationSpace() || !implicitIterSpace.empty())
@@ -2902,7 +2903,7 @@ private:
                   TODO(loc, "derived-type finalization with array assignment");
                 // Array assignment
                 // See Fortran 2018 10.2.1.3 p5, p6, and p7
-                genArrayAssignment(assign, stmtCtx);
+                genArrayAssignment(assign, stmtCtx, std::nullopt, std::nullopt, DoNotInitialize);
                 return;
               }
 

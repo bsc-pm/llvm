@@ -213,6 +213,8 @@ public:
       mlir::Location loc,
       const Fortran::semantics::DerivedTypeSpec *typeSpec) = 0;
 
+  virtual void genAssignment(const Fortran::evaluate::Assignment &assign, bool DoNotInitialize = false) = 0;
+
   //===--------------------------------------------------------------------===//
   // Locations
   //===--------------------------------------------------------------------===//
