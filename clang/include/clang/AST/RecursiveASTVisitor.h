@@ -32,6 +32,7 @@
 #include "clang/AST/ExprOpenMP.h"
 #include "clang/AST/LambdaCapture.h"
 #include "clang/AST/NestedNameSpecifier.h"
+#include "clang/AST/OmpSsClause.h"
 #include "clang/AST/OpenMPClause.h"
 #include "clang/AST/Stmt.h"
 #include "clang/AST/StmtCXX.h"
@@ -508,6 +509,20 @@ private:
   // OmpSs
   bool TraverseOSSExecutableDirective(OSSExecutableDirective *S);
   bool TraverseOSSLoopDirective(OSSLoopDirective *S);
+  bool TraverseOSSClause(OSSClause *C);
+  bool VisitOSSClause(OSSClause *C) { return true; }
+
+#define GEN_CLANG_CLAUSE_CLASS
+#define CLAUSE_CLASS(Enum, Str, Class)                                         \
+  bool Visit##Class(Class *C) { return true; }                                 \
+  bool Traverse##Class(Class *C);                                              \
+  bool WalkUpFrom##Class(Class *C) {                                           \
+    TRY_TO(VisitOSSClause(C));                                                 \
+    TRY_TO(Visit##Class(C));                                                   \
+    return true;                                                               \
+  }
+#define CLAUSE_NO_CLASS(Enum, Str)
+#include "llvm/Frontend/OmpSs/OSS.inc"
 
   bool PostVisitStmt(Stmt *S);
 };
@@ -3912,10 +3927,57 @@ bool RecursiveASTVisitor<Derived>::TraverseHlsDirective(
 //    Every class that has getQualifier.
 
 // OmpSs directives.
+// OpenMP clauses.
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::TraverseOSSClause(OSSClause *C) {
+  if (!C)
+    return true;
+  switch (C->getClauseKind()) {
+#define GEN_CLANG_CLAUSE_CLASS
+#define CLAUSE_CLASS(Enum, Str, Class)                                         \
+  case llvm::oss::Clause::Enum:                                                \
+    TRY_TO(Traverse##Class(static_cast<Class *>(C)));                          \
+    break;
+#define CLAUSE_NO_CLASS(Enum, Str)                                             \
+  case llvm::oss::Clause::Enum:                                                \
+    break;
+#include "llvm/Frontend/OmpSs/OSS.inc"
+  }
+  return true;
+}
+
+#define TRAVERSE_OSS_CLAUSE(CLASS, CODE)                                       \
+  template <typename Derived>                                                  \
+  bool RecursiveASTVisitor<Derived>::Traverse##CLASS(CLASS *C) {               \
+    bool ShouldVisitChildren = true;                                           \
+    bool ReturnValue = true;                                                   \
+    if (!getDerived().shouldTraversePostOrder())                               \
+      TRY_TO(WalkUpFrom##CLASS(C));                                            \
+    { CODE; }                                                                  \
+    if (ReturnValue && ShouldVisitChildren) {                                  \
+      for (Stmt * SubStmt : C->children()) {                                   \
+        TRY_TO(TraverseStmt(SubStmt));                                         \
+      }                                                                        \
+    } /* Call WalkUpFrom if TRY_TO_TRAVERSE_OR_ENQUEUE_STMT has traversed the  \
+       * children already. If TRY_TO_TRAVERSE_OR_ENQUEUE_STMT only enqueued    \
+       * the children, PostVisitStmt will call WalkUpFrom after we are done    \
+       * visiting children. */                                                 \
+    if (ReturnValue && getDerived().shouldTraversePostOrder()) {               \
+      TRY_TO(WalkUpFrom##CLASS(C));                                            \
+    }                                                                          \
+    return ReturnValue;                                                        \
+  }
+#define GEN_CLANG_CLAUSE_CLASS
+#define CLAUSE_CLASS(Enum, Str, Class) TRAVERSE_OSS_CLAUSE(Class, {})
+#define CLAUSE_NO_CLASS(Enum, Str)
+#include "llvm/Frontend/OmpSs/OSS.inc"
 
 template <typename Derived>
 bool RecursiveASTVisitor<Derived>::TraverseOSSExecutableDirective(
     OSSExecutableDirective *S) {
+  for (auto *C : S->clauses()) {
+    TRY_TO(TraverseOSSClause(C));
+  }
   return true;
 }
 
