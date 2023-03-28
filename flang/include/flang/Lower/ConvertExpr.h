@@ -219,9 +219,6 @@ mlir::Value createSubroutineCall(AbstractConverter &converter,
                                  SymMap &symMap, StatementContext &stmtCtx,
                                  bool isUserDefAssignment);
 
-void emitOSSCopyExpr(
-  AbstractConverter &, const Fortran::semantics::Symbol &, Fortran::lower::StatementContext &stmtCtx, bool);
-
 void createOSSAllocasForArgs(
                       Fortran::lower::SymMap &,
                       Fortran::lower::AbstractConverter &,

@@ -157,50 +157,6 @@ static void createBodyOfOpWithPreface(Op &op, Fortran::lower::AbstractConverter 
   firOpBuilder.create<mlir::oss::TerminatorOp>(loc);
   // Reset the insertion point to the start of the first block.
   firOpBuilder.setInsertionPointToStart(&block);
-
-  // Build new unpacked values inside the task and sync
-  auto dupUnpackBoxes = [&converter, &firOpBuilder](const std::vector<Fortran::evaluate::SymbolRef> &list) {
-    for (const auto &sym : list) {
-      const auto variable = converter.getSymbolAddress(sym);
-      if (variable) {
-        fir::ExtendedValue exv = converter.getSymbolExtendedValue(sym);
-        if (auto *box = exv.getBoxOf<fir::MutableBoxValue>()) {
-          if (box->isDescribedByVariables()) {
-            auto loc = converter.genUnknownLocation();
-            auto rank = box->rank();
-            const auto &mutableProperties = box->getMutableProperties();
-
-            fir::MutableProperties newMutableProperties;
-            newMutableProperties.addr = firOpBuilder.createTemporary(loc, box->getMemTy(), "addr");
-
-            // TODO: Idk if we have to check if the values exists
-            for (decltype(rank) dim = 0; dim < rank; ++dim) {
-              if (mutableProperties.lbounds[dim]) {
-                newMutableProperties.lbounds.push_back(
-                  firOpBuilder.createTemporary(loc, firOpBuilder.getIndexType(), "lb"));
-              }
-              if (mutableProperties.extents[dim]) {
-                newMutableProperties.extents.push_back(
-                  firOpBuilder.createTemporary(loc, firOpBuilder.getIndexType(), "extent"));
-              }
-            }
-            auto newBox = fir::MutableBoxValue(
-              fir::getBase(exv), box->nonDeferredLenParams(), newMutableProperties);
-
-            // 2899b42f075fe8c016efb111b023ec6e8742642e dice que pushear un scope va a hacer
-            // que no se encuentre el iterador del bucle al emitir la op de oss.taskloop
-            converter.getLocalSymbols().addAllocatableOrPointer(sym, newBox);
-            fir::factory::syncMutableBoxFromIRBox(firOpBuilder, loc, newBox);
-          }
-        }
-      }
-    }
-  };
-  // We do not want to dup shareds because they will be
-  // directly captured. Both the box and the unpacked values
-  dupUnpackBoxes(implicitDSAs.sharedList);
-  dupUnpackBoxes(implicitDSAs.privateList);
-  dupUnpackBoxes(implicitDSAs.firstprivateList);
 }
 
 namespace {
@@ -803,66 +759,17 @@ namespace {
       : converter(converter), context(context), eval(eval), scope(scope), stmtCtx(stmtCtx) {
 
       for (const auto &sym : implicitDSAs.sharedList) {
-        addOperandsBoxAware(sym, sharedClauseOperands_);
+        sharedClauseOperands_.insert(addOperands(converter, sym));
         addAdditionalInfo(sym);
-        // addOperandsBoxAware(*sym->getOssAdditionalSym(), sharedClauseOperands_);
-        // addAdditionalInfo(*sym->getOssAdditionalSym());
       }
       for (const auto &sym : implicitDSAs.privateList) {
-        addOperandsBoxAware(sym, privateClauseOperands_);
+        privateClauseOperands_.insert(addOperands(converter, sym));
         addAdditionalInfo(sym, /*InitNeeded=*/true);
       }
       for (const auto &sym : implicitDSAs.firstprivateList) {
-        addOperandsBoxAware(sym, firstprivateClauseOperands_);
+        firstprivateClauseOperands_.insert(addOperands(converter, sym));
         addAdditionalInfo(sym, /*InitNeeded=*/false, /*CopyNeeded=*/true);
       }
-    }
-
-    // ShouldPack is needed in private variables. We pack the box there to
-    // have the updated values, do the copy and unpack the values again
-    // In shared variables we need to annotate both the box and the
-    // unpacked values
-    void addOperandsBoxAware(
-        Fortran::lower::SymbolRef sym, llvm::SetVector<mlir::Value> &list, bool ShouldPack = true) {
-      auto &firOpBuilder = converter.getFirOpBuilder();
-      const auto variable = converter.getSymbolAddress(sym);
-      if (variable) {
-        fir::ExtendedValue exv = converter.getSymbolExtendedValue(sym);
-        if (auto *box = exv.getBoxOf<fir::MutableBoxValue>()) {
-          if (ShouldPack) {
-            auto loc = converter.genUnknownLocation();
-            list.insert(fir::factory::getMutableIRBox(firOpBuilder, loc, *box));
-            return;
-          } else {
-            auto rank = box->rank();
-            const auto &mutableProperties = box->getMutableProperties();
-
-            list.insert(fir::getBase(exv));
-            if (box->isDescribedByVariables()) {
-              // TODO: Idk if we have to check if the values exists
-              list.insert(mutableProperties.addr);
-              for (decltype(rank) dim = 0; dim < rank; ++dim) {
-                if (mutableProperties.lbounds[dim])
-                  list.insert(mutableProperties.lbounds[dim]);
-                if (mutableProperties.extents[dim])
-                  list.insert(mutableProperties.extents[dim]);
-              }
-            }
-            return;
-          }
-        } else {
-          list.insert(variable);
-          return;
-        }
-      } else {
-        if (const auto *details =
-                sym->detailsIf<Fortran::semantics::HostAssocDetails>()) {
-          converter.copySymbolBinding(details->symbol(), sym);
-          list.insert(converter.getSymbolAddress(details->symbol()));
-          return;
-        }
-      }
-      llvm_unreachable("addOperands");
     }
 
     mlir::Value getComputeDep(const Fortran::parser::OSSObject &ossObject) {
@@ -953,36 +860,11 @@ namespace {
         mlir::Value dst, mlir::Value src, bool DoNotInitialize) {
 
       auto *box = exv.getBoxOf<fir::MutableBoxValue>();
-
-      auto rank = box->rank();
-      const auto &mutableProperties = box->getMutableProperties();
-
-      fir::MutableProperties newMutablePropertiesSrc;
-      fir::MutableProperties newMutablePropertiesDst;
-
-      if (box->isDescribedByVariables()) {
-        newMutablePropertiesSrc.addr = firOpBuilder.createTemporary(loc, box->getMemTy(), "addr.src");
-        newMutablePropertiesDst.addr = firOpBuilder.createTemporary(loc, box->getMemTy(), "addr.dst");
-        for (decltype(rank) dim = 0; dim < rank; ++dim) {
-          if (mutableProperties.lbounds[dim]) {
-            newMutablePropertiesSrc.lbounds.push_back(
-              firOpBuilder.createTemporary(loc, firOpBuilder.getIndexType(), "lb.src"));
-            newMutablePropertiesDst.lbounds.push_back(
-              firOpBuilder.createTemporary(loc, firOpBuilder.getIndexType(), "lb.dst"));
-          }
-          if (mutableProperties.extents[dim]) {
-            newMutablePropertiesSrc.extents.push_back(
-              firOpBuilder.createTemporary(loc, firOpBuilder.getIndexType(), "extent.src"));
-            newMutablePropertiesDst.extents.push_back(
-              firOpBuilder.createTemporary(loc, firOpBuilder.getIndexType(), "extent.dst"));
-          }
-        }
-      }
-
+      assert(!box->isDescribedByVariables() && "We're supposed to force using the box directly");
       auto newBoxSrc = fir::MutableBoxValue(
-        src, box->nonDeferredLenParams(), newMutablePropertiesSrc);
+        src, box->nonDeferredLenParams(), fir::MutableProperties{});
       auto newBoxDst = fir::MutableBoxValue(
-        dst, box->nonDeferredLenParams(), newMutablePropertiesDst);
+        dst, box->nonDeferredLenParams(), fir::MutableProperties{});
 
       // 2899b42f075fe8c016efb111b023ec6e8742642e dice que pushear un scope va a hacer
       // que no se encuentre el iterador del bucle al emitir la op de oss.taskloop
@@ -992,9 +874,6 @@ namespace {
       converter.getLocalSymbols().symbolMapStack.emplace_back(localSymbols.symbolMapStack.back());
 
       if (box->isAllocatable()) {
-        // Sync described variables if it is the case
-        fir::factory::syncMutableBoxFromIRBox(firOpBuilder, loc, newBoxSrc);
-        fir::factory::syncMutableBoxFromIRBox(firOpBuilder, loc, newBoxDst);
         mlir::Value isAllocated = fir::factory::genIsAllocatedOrAssociatedTest(firOpBuilder, loc, newBoxSrc);
         firOpBuilder.genIfThen(loc, isAllocated)
             .genThen([&]() {
@@ -1002,11 +881,8 @@ namespace {
               Fortran::evaluate::Expr lhs{Fortran::evaluate::AsGenericExpr(*sym->getOssAdditionalSym()).value()};
               const Fortran::evaluate::Assignment assign(std::move(lhs), std::move(rhs));
               converter.genAssignment(assign, DoNotInitialize);
-              // emitOSSCopyExpr(converter, sym, stmtCtx, DoNotInitialize);
             })
             .end();
-        // Pack again the modified described variables in the box if it is the case
-        fir::factory::getMutableIRBox(firOpBuilder, loc, newBoxDst);
       } else {
         fir::ExtendedValue newBoxSrcLoad = fir::factory::genMutableBoxRead(firOpBuilder, loc, newBoxSrc);
         fir::factory::associateMutableBox(firOpBuilder, loc, newBoxDst, newBoxSrcLoad, std::nullopt);
@@ -1116,27 +992,9 @@ namespace {
 
       auto *box = exv.getBoxOf<fir::MutableBoxValue>();
 
-      auto rank = box->rank();
-      const auto &mutableProperties = box->getMutableProperties();
-
-      fir::MutableProperties newMutablePropertiesDst;
-
-      if (box->isDescribedByVariables()) {
-        newMutablePropertiesDst.addr = firOpBuilder.createTemporary(loc, box->getMemTy(), "addr.dst");
-        for (decltype(rank) dim = 0; dim < rank; ++dim) {
-          if (mutableProperties.lbounds[dim]) {
-            newMutablePropertiesDst.lbounds.push_back(
-              firOpBuilder.createTemporary(loc, firOpBuilder.getIndexType(), "lb.dst"));
-          }
-          if (mutableProperties.extents[dim]) {
-            newMutablePropertiesDst.extents.push_back(
-              firOpBuilder.createTemporary(loc, firOpBuilder.getIndexType(), "extent.dst"));
-          }
-        }
-      }
-
+      assert(!box->isDescribedByVariables() && "We're supposed to force using the box directly");
       auto newBoxDst = fir::MutableBoxValue(
-        dst, box->nonDeferredLenParams(), newMutablePropertiesDst);
+        dst, box->nonDeferredLenParams(), fir::MutableProperties{});
 
       // 2899b42f075fe8c016efb111b023ec6e8742642e dice que pushear un scope va a hacer
       // que no se encuentre el iterador del bucle al emitir la op de oss.taskloop
@@ -1144,7 +1002,6 @@ namespace {
       converter.getLocalSymbols().symbolMapStack.emplace_back(localSymbols.symbolMapStack.back());
 
       fir::factory::disassociateMutableBox(firOpBuilder, loc, newBoxDst);
-      fir::factory::getMutableIRBox(firOpBuilder, loc, newBoxDst);
     }
 
     void getInitDerivedGen(
@@ -1237,28 +1094,10 @@ namespace {
         mlir::Value dst) {
 
       auto *box = exv.getBoxOf<fir::MutableBoxValue>();
-
-      auto rank = box->rank();
-      const auto &mutableProperties = box->getMutableProperties();
-
-      fir::MutableProperties newMutablePropertiesDst;
-
-      if (box->isDescribedByVariables()) {
-        newMutablePropertiesDst.addr = firOpBuilder.createTemporary(loc, box->getMemTy(), "addr.dst");
-        for (decltype(rank) dim = 0; dim < rank; ++dim) {
-          if (mutableProperties.lbounds[dim]) {
-            newMutablePropertiesDst.lbounds.push_back(
-              firOpBuilder.createTemporary(loc, firOpBuilder.getIndexType(), "lb.dst"));
-          }
-          if (mutableProperties.extents[dim]) {
-            newMutablePropertiesDst.extents.push_back(
-              firOpBuilder.createTemporary(loc, firOpBuilder.getIndexType(), "extent.dst"));
-          }
-        }
-      }
+      assert(!box->isDescribedByVariables() && "We're supposed to force using the box directly");
 
       auto newBoxDst = fir::MutableBoxValue(
-        dst, box->nonDeferredLenParams(), newMutablePropertiesDst);
+        dst, box->nonDeferredLenParams(), fir::MutableProperties{});
 
       // 2899b42f075fe8c016efb111b023ec6e8742642e dice que pushear un scope va a hacer
       // que no se encuentre el iterador del bucle al emitir la op de oss.taskloop
@@ -1266,9 +1105,7 @@ namespace {
       converter.getLocalSymbols().symbolMapStack.emplace_back(localSymbols.symbolMapStack.back());
 
       if (box->isAllocatable()) {
-        fir::factory::syncMutableBoxFromIRBox(firOpBuilder, loc, newBoxDst);
         emitOSSDeinitExpr(converter, newBoxDst, loc);
-        fir::factory::getMutableIRBox(firOpBuilder, loc, newBoxDst);
       } else {
         fir::factory::disassociateMutableBox(firOpBuilder, loc, newBoxDst);
       }
@@ -1446,24 +1283,47 @@ namespace {
         }
       } else if (sba.isTrivial()) {
         Fortran::evaluate::Expr expr{Fortran::evaluate::AsGenericExpr(sym).value()};
-        if (auto exprType = expr.GetType()) {
-          if (exprType->category() == Fortran::common::TypeCategory::Derived) {
-            auto baseTy = fir::dyn_cast_ptrOrBoxEleTy(fir::getBase(exv).getType());
-            assert(baseTy && "must be a memory type");
-            auto recTy = baseTy.dyn_cast<fir::RecordType>();
-            if (recordTypeCanBeMemCopied(recTy))
-              return;
-            if (InitNeeded) {
-              auto initOp = getInitDerived(sym);
-              auto deinitOp = getDeinitDerived(sym);
-              initClauseOperands_.insert(initOp);
-              deinitClauseOperands_.insert(deinitOp);
-            } else if (CopyNeeded) {
-              auto copyOp = getCopyDerived(sym);
-              auto deinitOp = getDeinitDerived(sym);
+        assert(expr.GetType() && "Expected type in expression");
+        if (expr.GetType()->category() == Fortran::common::TypeCategory::Derived) {
+          auto baseTy = fir::dyn_cast_ptrOrBoxEleTy(fir::getBase(exv).getType());
+          assert(baseTy && "must be a memory type");
+          auto recTy = baseTy.dyn_cast<fir::RecordType>();
+          if (recordTypeCanBeMemCopied(recTy))
+            return;
+          if (InitNeeded) {
+            auto initOp = getInitDerived(sym);
+            auto deinitOp = getDeinitDerived(sym);
+            initClauseOperands_.insert(initOp);
+            deinitClauseOperands_.insert(deinitOp);
+          } else if (CopyNeeded) {
+            auto copyOp = getCopyDerived(sym);
+            auto deinitOp = getDeinitDerived(sym);
+            copyClauseOperands_.insert(copyOp);
+            deinitClauseOperands_.insert(deinitOp);
+          }
+        } else if (auto *box = exv.getBoxOf<fir::MutableBoxValue>()) {
+          if (InitNeeded) {
+            if (box->isAllocatable()) {
+              auto copyOp = getCopyMutableBoxValue(sym, /*DoNotInitialize=*/true);
+              auto deinitOp = getDeinitMutableBoxValue(sym);
               copyClauseOperands_.insert(copyOp);
               deinitClauseOperands_.insert(deinitOp);
+              // FIXME: change the dsa since we will emit a "copy" function where
+              // only we will allocate an uninitialized buffer if the orig variable
+              // is allocated
+              privateClauseOperands_.remove(fir::getBase(exv));
+              firstprivateClauseOperands_.insert(fir::getBase(exv));
+            } else {
+              auto initOp = getInitMutableBoxValue(sym);
+              auto deinitOp = getDeinitMutableBoxValue(sym);
+              initClauseOperands_.insert(initOp);
+              deinitClauseOperands_.insert(deinitOp);
             }
+          } else if (CopyNeeded) {
+            auto copyOp = getCopyMutableBoxValue(sym, /*DoNotInitialize=*/false);
+            auto deinitOp = getDeinitMutableBoxValue(sym);
+            copyClauseOperands_.insert(copyOp);
+            deinitClauseOperands_.insert(deinitOp);
           }
         }
       }

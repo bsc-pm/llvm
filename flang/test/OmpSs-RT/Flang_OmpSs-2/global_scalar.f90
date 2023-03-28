@@ -1,0 +1,37 @@
+! RUN: %oss-compile-and-run
+
+! Test to check we support properly scalar allocatables
+! and pointers
+PROGRAM P
+  IMPLICIT NONE
+  INTEGER, ALLOCATABLE :: X
+  INTEGER, POINTER :: Y
+  INTEGER, TARGET :: TMP
+
+  ALLOCATE(X)
+  X = 7
+
+  Y => TMP
+  Y = 7
+
+  !$OSS TASK FIRSTPRIVATE(X, Y)
+  IF (X .NE. 7) STOP -1
+  IF (Y .NE. 7) STOP -2
+  DEALLOCATE(X)
+  NULLIFY(Y)
+  !$OSS END TASK
+  !$OSS TASKWAIT
+
+  IF (.NOT. ALLOCATED(X)) STOP -3
+  IF (.NOT. ASSOCIATED(Y)) STOP -4
+
+  !$OSS TASK PRIVATE(X, Y)
+  IF (.NOT. ALLOCATED(X)) STOP -5
+  DEALLOCATE(X)
+  NULLIFY(Y)
+  !$OSS END TASK
+  !$OSS TASKWAIT
+
+  IF (.NOT. ALLOCATED(X)) STOP -6
+  IF (.NOT. ASSOCIATED(Y)) STOP -7
+END

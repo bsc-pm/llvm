@@ -7732,18 +7732,6 @@ mlir::Value Fortran::lower::createSubroutineCall(
   return fir::getBase(res);
 }
 
-void Fortran::lower::emitOSSCopyExpr(
-    AbstractConverter &converter, const Fortran::semantics::Symbol &sym,
-    Fortran::lower::StatementContext &stmtCtx, bool DoNotInitialize) {
-  Fortran::evaluate::Expr rhs{Fortran::evaluate::AsGenericExpr(sym).value()};
-  Fortran::evaluate::Expr lhs{Fortran::evaluate::AsGenericExpr(*sym.getOssAdditionalSym()).value()};
-  Fortran::lower::SymMap &symMap = converter.getLocalSymbols();
-  Fortran::lower::ExplicitIterSpace explicitIterSpace;
-  Fortran::lower::ImplicitIterSpace implicitIterSpace;
-  ArrayExprLowering::lowerAllocatableArrayAssignment(
-    converter, symMap, stmtCtx, lhs, rhs, explicitIterSpace, implicitIterSpace, DoNotInitialize);
-}
-
 void Fortran::lower::createOSSAllocasForArgs(
                       Fortran::lower::SymMap &localSymbols,
                       Fortran::lower::AbstractConverter &converter,

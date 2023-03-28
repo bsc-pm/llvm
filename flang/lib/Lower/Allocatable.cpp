@@ -854,6 +854,7 @@ createMutableProperties(Fortran::lower::AbstractConverter &converter,
       Fortran::semantics::IsFunctionResult(sym) ||
       sym.attrs().test(Fortran::semantics::Attr::VOLATILE) ||
       isNonContiguousArrayPointer(sym) || useAllocateRuntime ||
+      sym.attrs().test(Fortran::semantics::Attr::OMPSS2_CAPTURE) ||
       useDescForMutableBox || mayBeCapturedInInternalProc(sym) ||
       isPolymorphicPointer(sym) || isPolymorphicAllocatable(sym))
     return {};

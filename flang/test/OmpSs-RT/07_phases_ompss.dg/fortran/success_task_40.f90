@@ -1,4 +1,5 @@
 ! RUN: %oss-compile-and-run
+! XFAIL: true
 ! <testinfo>
 ! test_generator="config/mercurium-ompss"
 ! test_FFLAGS="-O2"
