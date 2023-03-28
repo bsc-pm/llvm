@@ -126,8 +126,6 @@ public:
     AddStmt(const_cast<Stmt*>(S));
   }
 
-  void writeStringRef(const StringRef S) { Writer->AddString(S, *Record); }
-
   /// Write an BTFTypeTagAttr object.
   void writeBTFTypeTagAttr(const BTFTypeTagAttr *A) { AddAttr(A); }
 

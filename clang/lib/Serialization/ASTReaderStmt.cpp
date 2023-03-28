@@ -2791,6 +2791,7 @@ void ASTStmtReader::VisitOSSAtomicDirective(OSSAtomicDirective *D) {
   llvm_unreachable("Not supported yet");
 }
 
+
 //===----------------------------------------------------------------------===//
 // ASTReader Implementation
 //===----------------------------------------------------------------------===//

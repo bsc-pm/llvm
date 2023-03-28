@@ -3513,6 +3513,7 @@ void ItaniumRTTIBuilder::BuildVTablePointer(const Type *Ty) {
 
   case Type::Pipe:
     llvm_unreachable("Pipe types shouldn't get here");
+
   case Type::Builtin:
   case Type::BitInt:
   // GCC treats vector and complex types as fundamental types.

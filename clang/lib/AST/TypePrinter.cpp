@@ -247,8 +247,8 @@ bool TypePrinter::canPrefixQualifiers(const Type *T,
     case Type::BitInt:
     case Type::DependentBitInt:
     case Type::BTFTagAttributed:
-    CanPrefixQualifiers = true;
-    break;
+      CanPrefixQualifiers = true;
+      break;
 
     case Type::ObjCObjectPointer:
       CanPrefixQualifiers = T->isObjCIdType() || T->isObjCClassType() ||

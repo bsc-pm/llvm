@@ -73,16 +73,6 @@ public:
   /// next value.
   uint64_t readInt() { return Record[Idx++]; }
 
-  StringRef readStringRef() {
-    auto str = Reader->ReadString(Record, Idx);
-
-    char *data = reinterpret_cast<char *>(
-        getContext().Allocate(str.size() + 1, sizeof(void *)));
-    memcpy(data, str.data(), str.size());
-    data[str.size()] = '\0';
-    return data;
-  }
-
   ArrayRef<uint64_t> readIntArray(unsigned Len) {
     auto Array = llvm::ArrayRef(Record).slice(Idx, Len);
     Idx += Len;

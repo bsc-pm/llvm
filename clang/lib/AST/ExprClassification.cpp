@@ -10,14 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "clang/AST/Expr.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/DeclTemplate.h"
-#include "clang/AST/Expr.h"
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/ExprObjC.h"
-#include "clang/AST/StmtOmpSs.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace clang;
@@ -450,6 +449,7 @@ static Cl::Kinds ClassifyInternal(ASTContext &Ctx, const Expr *E) {
   case Expr::SYCLUniqueStableNameExprClass:
     return Cl::CL_PRValue;
     break;
+
   case Expr::CXXParenListInitExprClass:
     if (isa<ArrayType>(E->getType()))
       return Cl::CL_ArrayTemporary;
