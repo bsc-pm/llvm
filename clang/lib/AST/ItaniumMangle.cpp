@@ -2326,7 +2326,6 @@ bool CXXNameMangler::mangleUnresolvedTypeOrSimpleId(QualType Ty,
   case Type::MacroQualified:
   case Type::BitInt:
   case Type::DependentBitInt:
-  case Type::PrintableAST:
     llvm_unreachable("type is illegal as a nested name specifier");
 
   case Type::SubstTemplateTypeParmPack:
@@ -4157,11 +4156,6 @@ void CXXNameMangler::mangleType(const DependentBitIntType *T) {
   Out << "D" << (T->isUnsigned() ? "U" : "B");
   mangleExpression(T->getNumBitsExpr());
   Out << "_";
-}
-
-void CXXNameMangler::mangleType(const PrintableASTType *T) {
-  assert(false && "The printable AST type can't be mangled");
-  Out << T->getPrintName();
 }
 
 void CXXNameMangler::mangleIntegerLiteral(QualType T,

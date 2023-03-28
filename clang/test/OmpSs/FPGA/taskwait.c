@@ -24,7 +24,7 @@ void depend() {
 // CHECK-NEXT:// Top IP Function: foo_moved
 // CHECK-NEXT:// Accel. type hash: 4797224880
 // CHECK-NEXT:// Num. instances: 1
-// CHECK-NEXT:// Wrapper version: 14
+// CHECK-NEXT:// Wrapper version: 13
 // CHECK-NEXT:///////////////////
 
 // CHECK:#include <hls_stream.h>

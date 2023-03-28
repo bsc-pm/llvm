@@ -6421,11 +6421,6 @@ bool UnnamedLocalNoLinkageFinder::VisitDependentBitIntType(
   return false;
 }
 
-bool UnnamedLocalNoLinkageFinder::VisitPrintableASTType(
-    const PrintableASTType *T) {
-  return false;
-}
-
 bool UnnamedLocalNoLinkageFinder::VisitTagDecl(const TagDecl *Tag) {
   if (Tag->getDeclContext()->isFunctionOrMethod()) {
     S.Diag(SR.getBegin(),

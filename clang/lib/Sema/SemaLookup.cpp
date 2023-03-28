@@ -3224,8 +3224,6 @@ addAssociatedClassesAndNamespaces(AssociatedLookup &Result, QualType Ty) {
     case Type::Pipe:
       T = cast<PipeType>(T)->getElementType().getTypePtr();
       continue;
-    case Type::PrintableAST:
-      break;
     }
 
     if (Queue.empty())

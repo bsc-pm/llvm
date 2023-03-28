@@ -2443,12 +2443,6 @@ TypeInfo ASTContext::getTypeInfoImpl(const Type *T) const {
     Width = Target->getPointerWidth(LangAS::opencl_global);
     Align = Target->getPointerAlign(LangAS::opencl_global);
     break;
-  case Type::PrintableAST: {
-    Width = 0;
-    Align = 0;
-    llvm_unreachable("Can't get size from PrintableAST type");
-    break;
-  }
   }
 
   assert(llvm::isPowerOf2_32(Align) && "Alignment must be power of 2");
@@ -3674,7 +3668,6 @@ QualType ASTContext::getVariableArrayDecayedType(QualType type) const {
   case Type::PackExpansion:
   case Type::BitInt:
   case Type::DependentBitInt:
-  case Type::PrintableAST:
     llvm_unreachable("type should never be variably-modified");
 
   // These types can be variably-modified but should never need to
@@ -4603,24 +4596,6 @@ QualType ASTContext::getPipeType(QualType T, bool ReadOnly) const {
   auto *New = new (*this, TypeAlignment) PipeType(T, Canonical, ReadOnly);
   Types.push_back(New);
   PipeTypes.InsertNode(New, InsertPos);
-  return QualType(New, 0);
-}
-
-QualType ASTContext::getPrintableASTType(StringRef name) const {
-  llvm::FoldingSetNodeID ID;
-  PrintableASTType::Profile(ID, name);
-
-  void *InsertPos = nullptr;
-  if (PrintableASTType *PT =
-          PrintableASTTypes.FindNodeOrInsertPos(ID, InsertPos))
-    return QualType(PT, 0);
-
-  // If the pipe element type isn't canonical, this won't be a canonical type
-  // either, so fill in the canonical type field.
-  QualType Canonical;
-  auto *New = new (*this, TypeAlignment) PrintableASTType(name);
-  Types.push_back(New);
-  PrintableASTTypes.InsertNode(New, InsertPos);
   return QualType(New, 0);
 }
 
@@ -8587,7 +8562,6 @@ void ASTContext::getObjCEncodingForTypeImpl(QualType T, std::string &S,
 
   // We could see an undeduced auto type here during error recovery.
   // Just ignore it.
-  case Type::PrintableAST:
   case Type::Auto:
   case Type::DeducedTemplateSpecialization:
     return;
@@ -10859,13 +10833,6 @@ QualType ASTContext::mergeTypes(QualType LHS, QualType RHS, bool OfBlockPointer,
       return {};
     return LHS;
   }
-  case Type::PrintableAST: {
-    StringRef LHSName = LHS->castAs<PrintableASTType>()->getPrintName();
-    StringRef RHSName = RHS->castAs<PrintableASTType>()->getPrintName();
-    if (LHSName != RHSName)
-      return {};
-    return LHS;
-  }
   }
 
   llvm_unreachable("Invalid Type::Class!");
@@ -12653,7 +12620,6 @@ static QualType getCommonNonSugarTypeNode(ASTContext &Ctx, const Type *X,
     SUGAR_FREE_TYPE(Record)
     SUGAR_FREE_TYPE(SubstTemplateTypeParmPack)
     SUGAR_FREE_TYPE(UnresolvedUsing)
-    SUGAR_FREE_TYPE(PrintableAST)
 
 #undef SUGAR_FREE_TYPE
 #define NON_UNIQUE_TYPE(Class) UNEXPECTED_TYPE(Class, "non-unique")
@@ -12971,7 +12937,6 @@ static QualType getCommonSugarTypeNode(ASTContext &Ctx, const Type *X,
     CANONICAL_TYPE(RValueReference)
     CANONICAL_TYPE(VariableArray)
     CANONICAL_TYPE(Vector)
-    CANONICAL_TYPE(PrintableAST)
 #undef CANONICAL_TYPE
 
 #undef UNEXPECTED_TYPE

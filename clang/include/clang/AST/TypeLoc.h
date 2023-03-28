@@ -2627,21 +2627,6 @@ public:
   QualType getInnerType() const { return this->getTypePtr()->getElementType(); }
 };
 
-struct PrintableASTTypeLocInfo {};
-
-class PrintableASTTypeLoc
-    : public ConcreteTypeLoc<UnqualTypeLoc, PrintableASTTypeLoc,
-                             PrintableASTType, PrintableASTTypeLocInfo> {
-public:
-  TypeLoc getValueLoc() const { return this->getInnerTypeLoc(); }
-
-  SourceRange getLocalSourceRange() const { return SourceRange(); }
-
-  void initializeLocal(ASTContext &Context, SourceLocation Loc) {}
-
-  QualType getInnerType() const { return this->getTypePtr()->getElementType(); }
-};
-
 template <typename T>
 inline T TypeLoc::getAsAdjusted() const {
   TypeLoc Cur = *this;

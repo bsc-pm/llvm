@@ -3513,8 +3513,6 @@ void ItaniumRTTIBuilder::BuildVTablePointer(const Type *Ty) {
 
   case Type::Pipe:
     llvm_unreachable("Pipe types shouldn't get here");
-  case Type::PrintableAST:
-    llvm_unreachable("Printable AST types shouldn't get here");
   case Type::Builtin:
   case Type::BitInt:
   // GCC treats vector and complex types as fundamental types.
@@ -3786,9 +3784,6 @@ llvm::Constant *ItaniumRTTIBuilder::BuildTypeInfo(
   case Type::Auto:
   case Type::DeducedTemplateSpecialization:
     llvm_unreachable("Undeduced type shouldn't get here");
-
-  case Type::PrintableAST:
-    llvm_unreachable("Printable AST types shouldn't get here");
 
   case Type::Pipe:
     break;

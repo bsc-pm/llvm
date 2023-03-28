@@ -248,7 +248,6 @@ TypeEvaluationKind CodeGenFunction::getEvaluationKind(QualType type) {
     case Type::ObjCObjectPointer:
     case Type::Pipe:
     case Type::BitInt:
-    case Type::PrintableAST:
       return TEK_Scalar;
 
     // Complexes.
@@ -2356,7 +2355,6 @@ void CodeGenFunction::EmitVariablyModifiedType(QualType type) {
     case Type::Decltype:
     case Type::Auto:
     case Type::DeducedTemplateSpecialization:
-    case Type::PrintableAST:
       // Stop walking: nothing to do.
       return;
 

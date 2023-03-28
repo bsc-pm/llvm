@@ -15,6 +15,7 @@
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/ASTFwd.h"
+#include "clang/AST/ASTTypeTraits.h"
 #include "clang/AST/Attrs.inc"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclAccessPair.h"
@@ -61,7 +62,6 @@ class OmpSsFpgaTreeTransformVisitor
   WrapperPortMap &WrapperPortMap;
   PrintingPolicy PrintPol;
 
-  uint64_t FpgaPortWidth;
   bool CreatesTasks;
 
   QualType OmpIfRankType;
@@ -105,6 +105,13 @@ class OmpSsFpgaTreeTransformVisitor
 
   void addReplacementOpStmt(Stmt *OriginalPos, Stmt *Replacement) {
     replMap.addReplacementOpStmt(OriginalPos, Replacement);
+  }
+
+  QualType getTypeStr(StringRef str) {
+    auto *decl = RecordDecl::Create(Ctx, TagTypeKind::TTK_Struct,
+                                    Ctx.getTranslationUnitDecl(), {}, {},
+                                    &IdentifierTable.get(str));
+    return Ctx.getRecordType(decl);
   }
 
   DeclRefExpr *makeDeclRefExpr(const ValueDecl *Decl) const {
@@ -219,7 +226,7 @@ public:
                                 uint64_t FpgaPortWidth, bool CreatesTasks)
       : Inherited(), Ctx(Ctx), IdentifierTable(IdentifierTable),
         WrapperPortMap(WrapperPortMap), PrintPol(Ctx.getLangOpts()),
-        FpgaPortWidth(FpgaPortWidth), CreatesTasks(CreatesTasks) {
+        CreatesTasks(CreatesTasks) {
 
     OmpIfRankType = Ctx.UnsignedCharTy;
     OmpIfRankIdentifier = &IdentifierTable.get("__ompif_rank");
@@ -227,19 +234,19 @@ public:
     OmpIfSizeType = Ctx.UnsignedCharTy;
     OmpIfSizeIdentifier = &IdentifierTable.get("__ompif_size");
 
-    SpawnInPortType = Ctx.getLValueReferenceType(
-        Ctx.getPrintableASTType("hls::stream<ap_uint<8> >"));
+    SpawnInPortType =
+        Ctx.getLValueReferenceType(getTypeStr("hls::stream<ap_uint<8> >"));
     SpawnInPortIdentifier = &IdentifierTable.get("mcxx_spawnInPort");
 
-    InPortType = Ctx.getLValueReferenceType(
-        Ctx.getPrintableASTType("hls::stream<ap_uint<64> >"));
+    InPortType =
+        Ctx.getLValueReferenceType(getTypeStr("hls::stream<ap_uint<64> >"));
     InPortIdentifier = &IdentifierTable.get("mcxx_inPort");
 
-    OutPortType = Ctx.getLValueReferenceType(
-        Ctx.getPrintableASTType("hls::stream<mcxx_outaxis>"));
+    OutPortType =
+        Ctx.getLValueReferenceType(getTypeStr("hls::stream<mcxx_outaxis>"));
     OutPortIdentifier = &IdentifierTable.get("mcxx_outPort");
 
-    MemPortType = Ctx.getPointerType(Ctx.getPrintableASTType(
+    MemPortType = Ctx.getPointerType(getTypeStr(
         AllocatedStringRef("ap_uint<" + std::to_string(FpgaPortWidth) + ">")));
     MemPortIdentifier = &IdentifierTable.get("mcxx_memport");
 
@@ -289,7 +296,7 @@ public:
     QualType type = decl->getType();
     if (CreatesTasks && type->isPointerType()) {
       type = type->getPointeeType().IgnoreParens();
-      type = Ctx.getPrintableASTType(
+      type = getTypeStr(
           AllocatedStringRef("__mcxx_ptr_t<" + typeToString(type) + " >"));
       decl->setType(type);
       decl->setTypeSourceInfo(nullptr);
@@ -400,8 +407,8 @@ public:
     VarDecl *copiesDecl = nullptr;
     if (!copies.empty()) {
       auto typeArgs = Ctx.getConstantArrayType(
-          Ctx.getPrintableASTType("__fpga_copyinfo_t"),
-          llvm::APInt(64, copies.size()), makeIntegerLiteral(copies.size()),
+          getTypeStr("__fpga_copyinfo_t"), llvm::APInt(64, copies.size()),
+          makeIntegerLiteral(copies.size()),
           ArrayType::ArraySizeModifier::Normal, 0);
 
       copiesDecl = makeVarDecl(typeArgs, "__mcxx_copies");
@@ -427,7 +434,7 @@ public:
       VarDecl *classInstance;
       Expr *accessedMember;
       if (paramType->isPointerType()) {
-        QualType ptrType = Ctx.getPrintableASTType(AllocatedStringRef(
+        QualType ptrType = getTypeStr(AllocatedStringRef(
             "__mcxx_ptr_t<" + typeToString(paramType->getPointeeType()) +
             " >"));
 
@@ -444,7 +451,7 @@ public:
         accessedMember = makeAccessExpr(makeDeclRefExpr(classInstance), "val");
       } else {
         paramType.removeLocalCVRQualifiers(Qualifiers::CVRMask);
-        QualType castUnionType = Ctx.getPrintableASTType(AllocatedStringRef(
+        QualType castUnionType = getTypeStr(AllocatedStringRef(
             "__mcxx_cast<" + typeToString(paramType) + " >"));
 
         classInstance = makeVarDecl(
@@ -488,7 +495,7 @@ public:
         if (dataType->isPointerType()) {
           dataType = dataType->getPointeeType();
         }
-        auto type = Ctx.getPrintableASTType(AllocatedStringRef(
+        auto type = getTypeStr(AllocatedStringRef(
             "__mcxx_ptr_t<" + typeToString(dataType) + " >"));
 
         auto *ptrVar = makeVarDecl(
@@ -547,7 +554,7 @@ public:
 
     arguments.push_back(makeIntegerLiteral(
         GenOnto(Ctx, dyn_cast<FunctionDecl>(callExpr->getCalleeDecl()))));
-    if (auto affinity = attr->getAffinity()) {
+    if (auto *affinity = attr->getAffinity()) {
       arguments.push_back(affinity);
     } else {
       arguments.push_back(makeIntegerLiteral(0xFF));

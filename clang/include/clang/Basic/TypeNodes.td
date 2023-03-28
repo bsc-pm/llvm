@@ -111,4 +111,3 @@ def PipeType : TypeNode<Type>;
 def AtomicType : TypeNode<Type>;
 def BitIntType : TypeNode<Type>;
 def DependentBitIntType : TypeNode<Type>, AlwaysDependent;
-def PrintableASTType : TypeNode<Type>;

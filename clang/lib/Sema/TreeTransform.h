@@ -6981,17 +6981,6 @@ QualType TreeTransform<Derived>::TransformDependentBitIntType(
   return Result;
 }
 
-template <typename Derived>
-QualType
-TreeTransform<Derived>::TransformPrintableASTType(TypeLocBuilder &TLB,
-                                                  PrintableASTTypeLoc TL) {
-  QualType ValueType = getDerived().TransformType(TLB, TL.getValueLoc());
-  if (ValueType.isNull())
-    return QualType();
-
-  QualType Result = TL.getType();
-  return Result;
-}
   /// Simple iterator that traverses the template arguments in a
   /// container that provides a \c getArgLoc() member function.
   ///

@@ -454,10 +454,6 @@ llvm::Type *CodeGenTypes::ConvertType(QualType T) {
 #define NON_CANONICAL_UNLESS_DEPENDENT_TYPE(Class, Base) case Type::Class:
 #include "clang/AST/TypeNodes.inc"
     llvm_unreachable("Non-canonical or dependent types aren't possible.");
-  case Type::PrintableAST:
-    llvm_unreachable(
-        "The print AST node is not possible to transform to LLVM type.");
-    break;
 
   case Type::Builtin: {
     switch (cast<BuiltinType>(Ty)->getKind()) {

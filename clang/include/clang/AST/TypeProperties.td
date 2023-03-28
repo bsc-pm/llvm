@@ -950,12 +950,3 @@ let Class = DependentBitIntType in {
     return ctx.getDependentBitIntType(isUnsigned, numBitsExpr);
   }]>;
 }
-
-let Class = PrintableASTType in {
-  def : Property<"name", StringRef> {
-    let Read = [{ node->getPrintName() }];
-  }
-  def : Creator<[{
-    return ctx.getPrintableASTType(name);
-  }]>;
-}

@@ -247,7 +247,6 @@ bool TypePrinter::canPrefixQualifiers(const Type *T,
     case Type::BitInt:
     case Type::DependentBitInt:
     case Type::BTFTagAttributed:
-    case Type::PrintableAST:
     CanPrefixQualifiers = true;
     break;
 
@@ -1253,13 +1252,6 @@ void TypePrinter::printDependentBitIntBefore(const DependentBitIntType *T,
 void TypePrinter::printDependentBitIntAfter(const DependentBitIntType *T,
                                             raw_ostream &OS) {}
 
-void TypePrinter::printPrintableASTBefore(const PrintableASTType *T,
-                                          raw_ostream &OS) {
-  OS << T->getPrintName();
-  spaceBeforePlaceHolder(OS);
-}
-void TypePrinter::printPrintableASTAfter(const PrintableASTType *T,
-                                         raw_ostream &OS) {}
 /// Appends the given scope to the end of a string.
 void TypePrinter::AppendScope(DeclContext *DC, raw_ostream &OS,
                               DeclarationName NameInScope) {

@@ -1268,11 +1268,6 @@ public:
   void VisitExtVectorType(const ExtVectorType * T) {
     VisitVectorType(T);
   }
-
-  void VisitPrintableASTType(const PrintableASTType *T) {
-    ID.AddString(T->getPrintName());
-    VisitType(T);
-  }
 };
 } // namespace
 

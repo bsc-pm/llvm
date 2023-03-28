@@ -11415,7 +11415,6 @@ EvaluateBuiltinClassifyType(QualType T, const LangOptions &LangOpts) {
   case Type::ObjCObjectPointer:
   case Type::Pipe:
   case Type::BitInt:
-  case Type::PrintableAST:
     // GCC classifies vectors as None. We follow its lead and classify all
     // other types that don't fit into the regular classification the same way.
     return GCCTypeClass::None;

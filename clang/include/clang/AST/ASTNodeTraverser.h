@@ -418,7 +418,6 @@ public:
   void VisitAtomicType(const AtomicType *T) { Visit(T->getValueType()); }
   void VisitPipeType(const PipeType *T) { Visit(T->getElementType()); }
   void VisitAdjustedType(const AdjustedType *T) { Visit(T->getOriginalType()); }
-  void VisitPrintableASTType(const PrintableASTType *T) {}
   void VisitPackExpansionType(const PackExpansionType *T) {
     if (!T->isSugared())
       Visit(T->getPattern());

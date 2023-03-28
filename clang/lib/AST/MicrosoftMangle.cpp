@@ -3373,12 +3373,6 @@ void MicrosoftCXXNameMangler::mangleType(const PipeType *T, Qualifiers,
   mangleArtificialTagType(TTK_Struct, TemplateMangling, {"__clang"});
 }
 
-void MicrosoftCXXNameMangler::mangleType(const PrintableASTType *T, Qualifiers,
-                                         SourceRange Range) {
-  llvm_unreachable("The printable AST type can't be mangled");
-  Out << T->getPrintName();
-}
-
 void MicrosoftMangleContextImpl::mangleCXXName(GlobalDecl GD,
                                                raw_ostream &Out) {
   const NamedDecl *D = cast<NamedDecl>(GD.getDecl());
