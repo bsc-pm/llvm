@@ -63,25 +63,35 @@ class OmpSsFpgaTreeTransformVisitor
   PrintingPolicy PrintPol;
 
   bool CreatesTasks;
+  bool instrumented;
 
   QualType OmpIfRankType;
   IdentifierInfo *OmpIfRankIdentifier;
   ParmVarDecl *OmpIfRank;
+
   QualType OmpIfSizeType;
   IdentifierInfo *OmpIfSizeIdentifier;
   ParmVarDecl *OmpIfSize;
+
   QualType SpawnInPortType;
   IdentifierInfo *SpawnInPortIdentifier;
   ParmVarDecl *SpawnInPort;
+
   QualType InPortType;
   IdentifierInfo *InPortIdentifier;
   ParmVarDecl *InPort;
+
   QualType OutPortType;
   IdentifierInfo *OutPortIdentifier;
   ParmVarDecl *OutPort;
+
   QualType MemPortType;
   IdentifierInfo *MemPortIdentifier;
   ParmVarDecl *MemPort;
+
+  QualType InstrPortType;
+  IdentifierInfo *InstrPortIdentifier;
+  ParmVarDecl *InstrPort;
 
   QualType McxxSetLockType;
   IdentifierInfo *McxxSetLockIdentifier;
@@ -98,6 +108,10 @@ class OmpSsFpgaTreeTransformVisitor
   QualType McxxTaskCreateType;
   IdentifierInfo *McxxTaskCreateIdentifier;
   FunctionDecl *McxxTaskCreate;
+
+  QualType McxxInstrumentEventType;
+  IdentifierInfo *McxxInstrumentEventIdentifier;
+  FunctionDecl *McxxInstrumentEvent;
 
   bool needsDeps = false;
 
@@ -212,6 +226,32 @@ class OmpSsFpgaTreeTransformVisitor
     return varDecl;
   }
 
+  Stmt *maybeMakeInstrumentedApiCall(Stmt *stmtToInstr,
+                                     FPGAInstrumentationApiCalls call) {
+    if (!instrumented) {
+      return stmtToInstr;
+    }
+    llvm::SmallVector<Stmt *, 3> stmts;
+
+    auto *instr = makeDeclRefExpr(InstrPort);
+    stmts.push_back(makeCallToFunc(
+        McxxInstrumentEvent,
+        {makeIntegerLiteral(uint32_t(FPGAInstrumentationEvents::APICallBegin)),
+         makeIntegerLiteral(uint64_t(call)), instr}));
+
+    stmts.push_back(stmtToInstr);
+
+    stmts.push_back(makeCallToFunc(
+        McxxInstrumentEvent,
+        {makeIntegerLiteral(uint32_t(FPGAInstrumentationEvents::APICallEnd)),
+         makeIntegerLiteral(uint64_t(call)), instr}));
+
+    auto *stmt = CompoundStmt::Create(Ctx, stmts, FPOptionsOverride(),
+                                      SourceLocation{}, SourceLocation{});
+
+    return stmt;
+  }
+
   std::string typeToString(QualType type) {
     std::string outType;
     llvm::raw_string_ostream out(outType);
@@ -223,11 +263,11 @@ public:
   OmpSsFpgaTreeTransformVisitor(ASTContext &Ctx,
                                 clang::IdentifierTable &IdentifierTable,
                                 ::WrapperPortMap &WrapperPortMap,
-                                uint64_t FpgaPortWidth, bool CreatesTasks)
+                                uint64_t FpgaPortWidth, bool CreatesTasks,
+                                bool instrumented)
       : Inherited(), Ctx(Ctx), IdentifierTable(IdentifierTable),
         WrapperPortMap(WrapperPortMap), PrintPol(Ctx.getLangOpts()),
-        CreatesTasks(CreatesTasks) {
-
+        CreatesTasks(CreatesTasks), instrumented(instrumented) {
     OmpIfRankType = Ctx.UnsignedCharTy;
     OmpIfRankIdentifier = &IdentifierTable.get("__ompif_rank");
 
@@ -249,6 +289,10 @@ public:
     MemPortType = Ctx.getPointerType(getTypeStr(
         AllocatedStringRef("ap_uint<" + std::to_string(FpgaPortWidth) + ">")));
     MemPortIdentifier = &IdentifierTable.get("mcxx_memport");
+
+    InstrPortType = Ctx.getLValueReferenceType(
+        getTypeStr("hls::stream<__mcxx_instrData_t>"));
+    InstrPortIdentifier = &IdentifierTable.get("mcxx_instr");
 
     McxxSetLockType = Ctx.getFunctionType(Ctx.VoidTy, {InPortType, OutPortType},
                                           FunctionProtoType::ExtProtoInfo());
@@ -286,6 +330,16 @@ public:
         FunctionDecl::Create(Ctx, Ctx.getTranslationUnitDecl(), {}, {},
                              DeclarationName(McxxTaskCreateIdentifier),
                              McxxTaskCreateType, nullptr, SC_None);
+
+    McxxInstrumentEventType = Ctx.getFunctionType(
+        Ctx.VoidTy, {Ctx.UnsignedCharTy, Ctx.UnsignedLongLongTy, InstrPortType},
+        FunctionProtoType::ExtProtoInfo());
+    McxxInstrumentEventIdentifier =
+        &IdentifierTable.get("mcxx_instrument_event");
+    McxxInstrumentEvent =
+        FunctionDecl::Create(Ctx, Ctx.getTranslationUnitDecl(), {}, {},
+                             DeclarationName(McxxInstrumentEventIdentifier),
+                             McxxInstrumentEventType, nullptr, SC_None);
   }
 
   ReplacementMap &&takeReplacementMap() { return std::move(replMap); }
@@ -579,7 +633,9 @@ public:
 
     arguments.push_back(makeDeclRefExpr(OutPort));
 
-    stmts.push_back(makeCallToFunc(McxxTaskCreate, arguments));
+    stmts.push_back(
+        maybeMakeInstrumentedApiCall(makeCallToFunc(McxxTaskCreate, arguments),
+                                     FPGAInstrumentationApiCalls::CreateTask));
 
     addReplacementOpStmt(callExpr,
                          CompoundStmt::Create(Ctx, stmts, {}, {}, {}));
@@ -659,7 +715,8 @@ public:
       arguments.push_back(makeDeclRefExpr(OutPort));
     if (mapping[(int)WrapperPort::MEMORY_PORT])
       arguments.push_back(makeDeclRefExpr(MemPort));
-
+    if (instrumented)
+      arguments.push_back(makeDeclRefExpr(InstrPort));
     addReplacementOpStmt(callExpr,
                          makeCallToWithDifferentParams(callExpr, arguments));
 
@@ -708,6 +765,10 @@ public:
                   ? addNewParamInfo(MemPortIdentifier, MemPortType)
                   : nullptr;
 
+    InstrPort = (instrumented)
+                    ? addNewParamInfo(InstrPortIdentifier, InstrPortType)
+                    : nullptr;
+
     const auto *origType = funcDecl->getType()->getAs<FunctionType>();
     llvm::SmallVector<QualType, 4> typesParam;
     typesParam.reserve(NewParamInfo.size());
@@ -739,12 +800,16 @@ public:
     llvm::SmallVector<Stmt *, 4> stmts;
 
     DeclRefExpr *in = makeDeclRefExpr(InPort), *out = makeDeclRefExpr(OutPort);
-    stmts.push_back(makeCallToFunc(McxxSetLock, {in, out}));
+    stmts.push_back(
+        maybeMakeInstrumentedApiCall(makeCallToFunc(McxxSetLock, {in, out}),
+                                     FPGAInstrumentationApiCalls::SetLock));
 
     if (n->hasAssociatedStmt())
       stmts.push_back(n->getAssociatedStmt());
 
-    stmts.push_back(makeCallToFunc(McxxUnsetLock, {out}));
+    stmts.push_back(
+        maybeMakeInstrumentedApiCall(makeCallToFunc(McxxUnsetLock, {out}),
+                                     FPGAInstrumentationApiCalls::UnsetLock));
 
     auto *stmt = CompoundStmt::Create(Ctx, stmts, FPOptionsOverride(),
                                       SourceLocation{}, SourceLocation{});
@@ -756,7 +821,9 @@ public:
     DeclRefExpr *SapawnIn = makeDeclRefExpr(SpawnInPort),
                 *out = makeDeclRefExpr(OutPort);
 
-    addReplacementOpStmt(n, makeCallToFunc(McxxTaskwait, {SapawnIn, out}));
+    addReplacementOpStmt(n, maybeMakeInstrumentedApiCall(
+                                makeCallToFunc(McxxTaskwait, {SapawnIn, out}),
+                                FPGAInstrumentationApiCalls::WaitTasks));
     return true;
   }
 };
@@ -775,11 +842,13 @@ uint32_t MercuriumHashStr(const char *str) {
 
 } // namespace
 namespace clang {
-std::pair<bool, ReplacementMap> OmpssFpgaTreeTransform(
-    clang::ASTContext &Ctx, clang::IdentifierTable &identifierTable,
-    WrapperPortMap &WrapperPortMap, uint64_t FpgaPortWidth, bool CreatesTasks) {
+std::pair<bool, ReplacementMap>
+OmpssFpgaTreeTransform(clang::ASTContext &Ctx,
+                       clang::IdentifierTable &identifierTable,
+                       WrapperPortMap &WrapperPortMap, uint64_t FpgaPortWidth,
+                       bool CreatesTasks, bool instrumented) {
   OmpSsFpgaTreeTransformVisitor t(Ctx, identifierTable, WrapperPortMap,
-                                  FpgaPortWidth, CreatesTasks);
+                                  FpgaPortWidth, CreatesTasks, instrumented);
   t.TraverseAST(Ctx);
   return {t.getNeedsDeps(), t.takeReplacementMap()};
 }

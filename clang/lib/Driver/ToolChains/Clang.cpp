@@ -6173,6 +6173,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   if (Args.getLastArg(options::OPT_fompss_fpga_extract) && !IsCuda) {
     CmdArgs.push_back("-fompss-fpga-extract");
   }
+  if (Args.getLastArg(options::OPT_fompss_fpga_instrumentation) && !IsCuda) {
+    CmdArgs.push_back("-fompss-fpga-instrumentation");
+  }
   if (Args.getLastArg(options::OPT_fompss_fpga_wrapper_code) && !IsCuda) {
     CmdArgs.push_back("-fompss-fpga-wrapper-code");
   }

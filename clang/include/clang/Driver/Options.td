@@ -2651,6 +2651,8 @@ def fompss_fpga : Flag<["-"], "fompss-fpga">, Flags<[CC1Option]>, Group<Action_G
   HelpText<"Ompss2@FPGA wrapper generation">;
 def fompss_fpga_dump : Flag<["-"], "fompss-fpga-dump">, Flags<[CC1Option]>, Group<f_Group>,
   MarshallingInfoFlag<FrontendOpts<"OmpSsFpgaDump">>, HelpText<"Dump the generated FPGA contents to stdout">;
+def fompss_fpga_instrumentation : Flag<["-"], "fompss-fpga-instrumentation">, Flags<[CC1Option]>, Group<f_Group>,
+  MarshallingInfoFlag<FrontendOpts<"OmpSsFpgaInstrumentation">>, HelpText<"Generate instrumentation code for FPGAs">;
 def fompss_fpga_hls_tasks_dir : Separate<["-"], "fompss-fpga-hls-tasks-dir">, Flags<[CC1Option]>, Group<f_Group>,
   MetaVarName<"<path>">,
   MarshallingInfoString<FrontendOpts<"OmpSsFpgaHlsTasksDir">>, HelpText<"Specify which directory should be used when extracting hls functions">;

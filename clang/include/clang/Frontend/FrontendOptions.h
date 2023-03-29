@@ -527,6 +527,8 @@ public:
   unsigned OmpSsFpgaCheckLimitsMemoryPort : 1;
   /// Dump the generated FPGA Wrapper to stdout.
   unsigned OmpSsFpgaDump : 1;
+  /// Add instrumentation code to FPGA functions
+  unsigned OmpSsFpgaInstrumentation : 1;
 
   /// Path to the directory where the HLS tasks will get dumped.
   std::string OmpSsFpgaHlsTasksDir;

@@ -21,6 +21,37 @@
 #include "clang/Frontend/CompilerInstance.h"
 namespace clang {
 
+static constexpr uint8_t InstrumentationEventBurstBegin = 0b0000'0000;
+static constexpr uint8_t InstrumentationEventBurstEnd = 0b1000'0000;
+
+#define EV_DEVCOPYIN 78
+#define EV_DEVCOPYOUT 79
+#define EV_DEVEXEC 80
+#define EV_INSTEVLOST 82
+#define EV_VAL_WG_WAIT 1
+#define EV_VAL_SET_LOCK 2
+#define EV_VAL_UNSET_LOCK 3
+#define EV_VAL_TRY_LOCK 4
+
+#define BURST(name, val)                                                       \
+  name##Begin = InstrumentationEventBurstBegin | val,                          \
+  name##End = InstrumentationEventBurstEnd | val
+
+enum class FPGAInstrumentationEvents : uint8_t {
+  BURST(APICall, 85),
+  BURST(DevCopyIn, 78),
+  BURST(DevCopyOut, 79),
+  BURST(DevExec, 80),
+};
+#undef BURST
+
+enum class FPGAInstrumentationApiCalls : uint64_t {
+  WaitTasks = 1,
+  SetLock = 2,
+  UnsetLock = 3,
+  CreateTask = 5
+};
+
 enum class WrapperPort {
   OMPIF_RANK = 0,
   OMPIF_SIZE = 1,
@@ -75,9 +106,11 @@ public:
   bool VisitCallExpr(CallExpr *n);
 };
 
-std::pair<bool, ReplacementMap> OmpssFpgaTreeTransform(
-    clang::ASTContext &Ctx, clang::IdentifierTable &identifierTable,
-    WrapperPortMap &WrapperPortMap, uint64_t FpgaPortWidth, bool CreatesTasks);
+std::pair<bool, ReplacementMap>
+OmpssFpgaTreeTransform(clang::ASTContext &Ctx,
+                       clang::IdentifierTable &identifierTable,
+                       WrapperPortMap &WrapperPortMap, uint64_t FpgaPortWidth,
+                       bool CreatesTasks, bool instrumented);
 
 using ParamDependencyMap =
     llvm::SmallDenseMap<const ParmVarDecl *,

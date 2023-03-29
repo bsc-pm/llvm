@@ -79,6 +79,7 @@
 #define STR_OUTPORT "mcxx_outPort"
 #define STR_OUTPORT_WRITE(X) "mcxx_outPort.write(" X ")"
 #define STR_INPORT "mcxx_inPort"
+#define STR_INSTRPORT "mcxx_instr"
 #define STR_SPWNINPORT "mcxx_spawnInPort"
 #define STR_SPWNINPORT_READ "mcxx_spawnInPort.read()"
 #define STR_INPORT_READ "mcxx_inPort.read()"
@@ -86,11 +87,13 @@
 #define STR_INPORT_TYPE "hls::stream<ap_uint<64> >"
 #define STR_SPWNINPORT_TYPE "hls::stream<ap_uint<8> >"
 #define STR_OUTPORT_TYPE "hls::stream<mcxx_outaxis>"
+#define STR_INSTRPORT_TYPE "hls::stream<__mcxx_instrData_t>"
 #define STR_INPORT_DECL STR_INPORT_TYPE "& " STR_INPORT
 #define STR_SPWNINPORT_DECL STR_SPWNINPORT_TYPE "& " STR_SPWNINPORT
 #define STR_OUTPORT_DECL STR_OUTPORT_TYPE "& " STR_OUTPORT
 #define STR_INOUTPORT_DECL STR_INPORT_DECL ", " STR_OUTPORT_DECL
 #define STR_SPWNINOUTPORT_DECL STR_SPWNINPORT_DECL ", " STR_OUTPORT_DECL
+#define STR_INSTRPORT_DECL STR_INSTRPORT_TYPE "& " STR_INSTRPORT
 #define STR_OUTPORT_WRITE_FUN(X) "mcxx_write_out_port(" X ", " STR_OUTPORT ");"
 #define STR_TASKWAIT_FUN "mcxx_taskwait(" STR_SPWNINPORT ", " STR_OUTPORT ");"
 #define STR_TASK_CREATE_FUN(X) "mcxx_task_create(" X ", " STR_OUTPORT ");"
@@ -461,6 +464,12 @@ OMPIF_COMM_WORLD
                 "datatype, unsigned char tag, OMPIF_Comm communicator, unsigned"
                 "char ompif_rank, " STR_SPWNINOUTPORT_DECL ");\n";
     }
+    if (CI.getFrontendOpts().OmpSsFpgaInstrumentation) {
+      OutputHeaders << "#include <cstdint>\n";
+      Output << "typedef ap_uint<105> __mcxx_instrData_t;\n"
+             << "void mcxx_instrument_event(uint8_t event, uint64_t "
+                "payload, " STR_INSTRPORT_DECL ");\n";
+    }
   }
 
   bool GenOriginalFunctionMoved() {
@@ -532,7 +541,8 @@ OMPIF_COMM_WORLD
 
     auto [needsDeps, replacementMap] = OmpssFpgaTreeTransform(
         ToContext, ToIdentifierTable, WrapperPortMap,
-        CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth, CreatesTasks);
+        CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth, CreatesTasks,
+        CI.getFrontendOpts().OmpSsFpgaInstrumentation);
     NeedsDeps = needsDeps;
     ReplacementMap = std::move(replacementMap);
     for (Decl *otherDecl : ToContext.getTranslationUnitDecl()->decls()) {
@@ -626,6 +636,9 @@ OMPIF_COMM_WORLD
     if (UsesOmpif) {
       Output << ", unsigned char ompif_rank, unsigned char ompif_size";
     }
+    if (CI.getFrontendOpts().OmpSsFpgaInstrumentation) {
+      Output << ", " STR_INSTRPORT_DECL;
+    }
     Output << ") {\n";
 
     Output << "#pragma HLS interface ap_ctrl_none port=return\n";
@@ -657,6 +670,9 @@ OMPIF_COMM_WORLD
                  << "\n";
         }
       }
+    }
+    if (CI.getFrontendOpts().OmpSsFpgaInstrumentation) {
+      Output << "#pragma HLS interface ap_hs port=" STR_INSTRPORT "\n";
     }
   }
 
@@ -753,6 +769,18 @@ OMPIF_COMM_WORLD
   }
 
   void GenerateWrapperFunctionLocalmemCopies(LocalmemInfo::Dir dir) {
+    if (CI.getFrontendOpts().OmpSsFpgaInstrumentation) {
+      if (dir & LocalmemInfo::Dir::IN) {
+        Output << "mcxx_instrument_event("
+               << uint32_t(FPGAInstrumentationEvents::DevCopyInBegin)
+               << ", " STR_TASKID ", " STR_INSTRPORT ");\n";
+      } else {
+        Output << "mcxx_instrument_event("
+               << uint32_t(FPGAInstrumentationEvents::DevCopyOutBegin)
+               << ", " STR_TASKID ", " STR_INSTRPORT ");\n";
+      }
+    }
+
     for (auto &&[param, localmemInfo] : Localmems) {
       if ((localmemInfo.dir & dir) == 0) {
         continue;
@@ -862,9 +890,25 @@ OMPIF_COMM_WORLD
       }
       Output << "  }\n";
     }
+    if (CI.getFrontendOpts().OmpSsFpgaInstrumentation) {
+      if (dir & LocalmemInfo::Dir::IN) {
+        Output << "mcxx_instrument_event("
+               << uint32_t(FPGAInstrumentationEvents::DevCopyInEnd)
+               << ", " STR_TASKID ", " STR_INSTRPORT ");\n";
+      } else {
+        Output << "mcxx_instrument_event("
+               << uint32_t(FPGAInstrumentationEvents::DevCopyOutEnd)
+               << ", " STR_TASKID ", " STR_INSTRPORT ");\n";
+      }
+    }
   }
 
   void GenerateWrapperFunctionUserTaskCall() {
+    if (CI.getFrontendOpts().OmpSsFpgaInstrumentation) {
+      Output << "mcxx_instrument_event("
+             << uint32_t(FPGAInstrumentationEvents::DevExecBegin)
+             << ", " STR_TASKID ", " STR_INSTRPORT ");\n";
+    }
     auto &outs = Output << "  " << TaskFuncName << "(";
     bool first = true;
     auto printSeparator = [&]() {
@@ -906,7 +950,17 @@ OMPIF_COMM_WORLD
         outs << "mcxx_memport";
       }
     }
+    if (CI.getFrontendOpts().OmpSsFpgaInstrumentation) {
+      printSeparator();
+      outs << STR_INSTRPORT;
+    }
     outs << ");\n";
+
+    if (CI.getFrontendOpts().OmpSsFpgaInstrumentation) {
+      outs << "mcxx_instrument_event("
+           << uint32_t(FPGAInstrumentationEvents::DevExecEnd)
+           << ", " STR_TASKID ", " STR_INSTRPORT ");\n";
+    }
   }
 
   void GenerateWrapperFunction() {
@@ -1093,6 +1147,21 @@ OMPIF_COMM_WORLD
           "4294967299LU, 255, 2, mcxx_args_sender, 0, NULL, 0, NULL") "\n";
       Output << "  " STR_TASKWAIT_FUN "\n";
       Output << "}\n";
+    }
+
+    if (CI.getFrontendOpts().OmpSsFpgaInstrumentation) {
+      Output << "void mcxx_instrument_event(uint8_t event, uint64_t "
+                "payload, " STR_INSTRPORT_DECL ") {\n"
+                "#pragma HLS inline\n"
+                "  __mcxx_instrData_t tmp;\n"
+                "  tmp.range(63, 0) = payload;\n"
+                "  tmp.range(95, 64) = event & 0x7F;\n"
+                "  tmp.range(103, 96) = event >> 7;\n"
+                "  tmp.bit(104) = 1;\n"
+                "  wait();\n"
+                "  " STR_INSTRPORT ".write(tmp);\n"
+                "  wait();\n"
+                "}\n";
     }
   }
 
