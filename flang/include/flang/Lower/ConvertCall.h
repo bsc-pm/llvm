@@ -34,6 +34,16 @@ fir::ExtendedValue genCallOpAndResult(
     Fortran::lower::CallerInterface &caller, mlir::FunctionType callSiteType,
     std::optional<mlir::Type> resultType);
 
+/// Given a call site for which the arguments were already lowered, generate
+/// the call and return the result. This function deals with explicit result
+/// allocation and lowering if needed. It also deals with passing the host
+/// link to internal procedures.
+fir::ExtendedValue genOmpSsCallOpAndResult(
+    mlir::Location loc, Fortran::lower::AbstractConverter &converter,
+    Fortran::lower::SymMap &symMap, Fortran::lower::StatementContext &stmtCtx,
+    Fortran::lower::CallerInterface &caller, mlir::FunctionType callSiteType,
+    std::optional<mlir::Type> resultType);
+
 /// If \p arg is the address of a function with a denoted host-association tuple
 /// argument, then return the host-associations tuple value of the current
 /// procedure. Otherwise, return nullptr.

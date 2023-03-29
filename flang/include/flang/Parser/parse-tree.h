@@ -454,6 +454,7 @@ struct SpecificationPart {
 struct InternalSubprogram {
   UNION_CLASS_BOILERPLATE(InternalSubprogram);
   std::variant<common::Indirection<FunctionSubprogram>,
+      common::Indirection<OmpSsOutlineTask>,
       common::Indirection<SubroutineSubprogram>>
       u;
 };

@@ -437,6 +437,85 @@ fir::ExtendedValue Fortran::lower::genCallOpAndResult(
   return callResult;
 }
 
+fir::ExtendedValue Fortran::lower::genOmpSsCallOpAndResult(
+    mlir::Location loc, Fortran::lower::AbstractConverter &converter,
+    Fortran::lower::SymMap &symMap, Fortran::lower::StatementContext &stmtCtx,
+    Fortran::lower::CallerInterface &caller, mlir::FunctionType callSiteType,
+    std::optional<mlir::Type> resultType) {
+  assert(!caller.requireDispatchCall());
+  assert(!caller.mustMapInterfaceSymbols());
+  fir::FirOpBuilder &builder = converter.getFirOpBuilder();
+
+  mlir::SymbolRefAttr funcSymbolAttr;
+  bool addHostAssociations = false;
+  mlir::FunctionType funcOpType = caller.getFuncOp().getFunctionType();
+  mlir::SymbolRefAttr symbolAttr =
+      builder.getSymbolRefAttr(caller.getMangledName());
+  assert(callSiteType.getNumResults() == funcOpType.getNumResults());
+  assert(callSiteType.getNumInputs() == funcOpType.getNumInputs() ||
+         callSiteType.getNumInputs() + 1 == funcOpType.getNumInputs());
+  if (callSiteType.getNumInputs() + 1 == funcOpType.getNumInputs() &&
+      fir::anyFuncArgsHaveAttr(caller.getFuncOp(),
+                               fir::getHostAssocAttrName())) {
+    // The number of arguments is off by one, and we're lowering a function
+    // with host associations. Modify call to include host associations
+    // argument by appending the value at the end of the operands.
+    assert(funcOpType.getInput(findHostAssocTuplePos(caller.getFuncOp())) ==
+           converter.hostAssocTupleValue().getType());
+    addHostAssociations = true;
+  }
+  funcSymbolAttr = symbolAttr;
+
+  mlir::FunctionType funcType = caller.getFuncOp().getFunctionType();
+  llvm::SmallVector<mlir::Value> operands;
+
+  // Deal with potential mismatches in arguments types. Passing an array to a
+  // scalar argument should for instance be tolerated here.
+  bool callingImplicitInterface = caller.canBeCalledViaImplicitInterface();
+  for (auto [fst, snd] : llvm::zip(caller.getInputs(), funcType.getInputs())) {
+    // When passing arguments to a procedure that can be called by implicit
+    // interface, allow any character actual arguments to be passed to dummy
+    // arguments of any type and vice versa.
+    mlir::Value cast;
+    auto *context = builder.getContext();
+    if (snd.isa<fir::BoxProcType>() &&
+        fst.getType().isa<mlir::FunctionType>()) {
+      auto funcTy =
+          mlir::FunctionType::get(context, std::nullopt, std::nullopt);
+      auto boxProcTy = builder.getBoxProcType(funcTy);
+      if (mlir::Value host = argumentHostAssocs(converter, fst)) {
+        cast = builder.create<fir::EmboxProcOp>(
+            loc, boxProcTy, llvm::ArrayRef<mlir::Value>{fst, host});
+      } else {
+        cast = builder.create<fir::EmboxProcOp>(loc, boxProcTy, fst);
+      }
+    } else {
+      mlir::Type fromTy = fir::unwrapRefType(fst.getType());
+      if (fir::isa_builtin_cptr_type(fromTy) &&
+          Fortran::lower::isCPtrArgByValueType(snd)) {
+        cast = genRecordCPtrValueArg(converter, fst, fromTy);
+      } else if (fir::isa_derived(snd)) {
+        // FIXME: This seems like a serious bug elsewhere in lowering. Paper
+        // over the problem for now.
+        TODO(loc, "derived type argument passed by value");
+      } else {
+        cast = builder.convertWithSemantics(loc, snd, fst,
+                                            callingImplicitInterface);
+      }
+    }
+    operands.push_back(cast);
+  }
+
+  // Add host associations as necessary.
+  if (addHostAssociations)
+    operands.push_back(converter.hostAssocTupleValue());
+
+  // Standard procedure call with fir.call.
+  builder.create<fir::CallOp>(loc, funcType.getResults(),
+                                          funcSymbolAttr, operands);
+  return mlir::Value{}; // subroutine call
+}
+
 static hlfir::EntityWithAttributes genStmtFunctionRef(
     mlir::Location loc, Fortran::lower::AbstractConverter &converter,
     Fortran::lower::SymMap &symMap, Fortran::lower::StatementContext &stmtCtx,

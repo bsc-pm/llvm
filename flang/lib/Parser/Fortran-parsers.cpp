@@ -121,6 +121,7 @@ TYPE_PARSER(first(
 // can be followed by ';' and another statement on the same line.
 TYPE_CONTEXT_PARSER("internal subprogram"_en_US,
     (construct<InternalSubprogram>(indirect(functionSubprogram)) ||
+        construct<InternalSubprogram>(indirect(ompssOutlineTask)) ||
         construct<InternalSubprogram>(indirect(subroutineSubprogram))) /
         forceEndOfStmt)
 

@@ -7855,6 +7855,16 @@ bool ResolveNamesVisitor::Pre(const parser::ProgramUnit &x) {
         }
       }
     }
+  } else if (const auto *main{std::get_if<common::Indirection<parser::MainProgram>>(&x.u)}) {
+    if (const auto &subps{std::get<std::optional<parser::InternalSubprogramPart>>(main->value().t)}) {
+      if (subps) {
+        for (const auto &subp :
+            std::get<std::list<parser::InternalSubprogram>>(subps->t)) {
+          if (const auto *outline{std::get_if<common::Indirection<parser::OmpSsOutlineTask>>(&subp.u)})
+            Walk(*outline);
+        }
+      }
+    }
   }
   ResolveOSSParts(context(), x);
   return false;

@@ -2805,13 +2805,13 @@ public:
 
     if (const Fortran::evaluate::SpecificIntrinsic *intrinsic =
             procRef.proc().GetSpecificIntrinsic())
-      llvm_unreachable("");
+      fir::emitFatalError(loc, "OmpSs-2 task outline not supported");
 
     if (isIntrinsicModuleProcRef(procRef))
-      llvm_unreachable("");
+      fir::emitFatalError(loc, "OmpSs-2 task outline not supported");
 
     if (isStatementFunctionCall(procRef))
-      llvm_unreachable("");
+      fir::emitFatalError(loc, "OmpSs-2 task outline not supported");
 
     using PassBy = Fortran::lower::CallerInterface::PassEntityBy;
 
@@ -3091,6 +3091,10 @@ public:
         TODO(loc, "pass by value in non elemental function call");
       }
     }
+    if (!copyOutPairs.empty())
+      llvm_unreachable("copyOutPairs should be empty");
+    if (!mutableModifiedByCall.empty())
+      llvm_unreachable("mutableModifiedByCall should be empty");
   }
 
   ExtValue genOmpSsCallOpAndResult(
@@ -3100,19 +3104,8 @@ public:
     mlir::Location loc = getLoc();
     mlir::FunctionType callSiteType = caller.genFunctionType();
 
-    ExtValue result = Fortran::lower::genCallOpAndResult(
+    ExtValue result = Fortran::lower::genOmpSsCallOpAndResult(
         loc, converter, symMap, stmtCtx, caller, callSiteType, resultType);
-
-    // Sync pointers and allocatables that may have been modified during the
-    // call.
-    // for (const auto &mutableBox : mutableModifiedByCall)
-    //   fir::factory::syncMutableBoxFromIRBox(builder, loc, mutableBox);
-    // Handle case where result was passed as argument
-
-    // Copy-out temps that were created for non contiguous variable arguments if
-    // needed.
-    // for (const auto &copyOutPair : copyOutPairs)
-    //   genCopyOut(copyOutPair);
 
     return result;
   }
@@ -7786,6 +7779,15 @@ void Fortran::lower::fillDSAs(
     } else {
       val_firstprivate.push_back(ossArgValue);
     }
+  }
+  // Internal subprograms support
+  mlir::FunctionType funcOpType = caller.getFuncOp().getFunctionType();
+  mlir::FunctionType callSiteType = caller.genFunctionType();
+  if (callSiteType.getNumResults() == funcOpType.getNumResults() &&
+      callSiteType.getNumInputs() + 1 == funcOpType.getNumInputs() &&
+      fir::anyFuncArgsHaveAttr(caller.getFuncOp(),
+                               fir::getHostAssocAttrName())) {
+    val_firstprivate.push_back(converter.hostAssocTupleValue());
   }
 }
 
