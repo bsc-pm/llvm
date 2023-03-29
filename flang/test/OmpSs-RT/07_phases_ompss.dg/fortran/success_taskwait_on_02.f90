@@ -1,6 +1,4 @@
 ! RUN: %oss-compile-and-run
-! XFAIL: true
-! <testinfo>
 ! test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatibility")
 ! </testinfo>
 PROGRAM P

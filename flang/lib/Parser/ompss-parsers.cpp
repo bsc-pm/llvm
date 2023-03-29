@@ -88,6 +88,8 @@ TYPE_PARSER(
                           parenthesized(Parser<OSSObjectList>{}))) ||
     "LABEL" >> construct<OSSClause>(construct<OSSClause::Label>(
                       parenthesized(scalarDefaultCharExpr))) ||
+    "ON" >> construct<OSSClause>(construct<OSSClause::Inout>(
+                          parenthesized(Parser<OSSObjectList>{}))) ||
     "OUT" >> construct<OSSClause>(construct<OSSClause::Out>(
                           parenthesized(Parser<OSSObjectList>{}))) ||
     "PRIORITY" >> construct<OSSClause>(construct<OSSClause::Priority>(
