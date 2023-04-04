@@ -1256,7 +1256,10 @@ public:
     OutputJson << "    \"num_instances\" : " << NumInstances << ",\n";
     OutputJson << "    \"task_creation\" : "
                << (CreatesTasks ? "true" : "false") << ",\n";
-    OutputJson << "    \"instrumentation\" : false,\n";
+    OutputJson << "    \"instrumentation\" : "
+               << (CI.getFrontendOpts().OmpSsFpgaInstrumentation ? "true"
+                                                                 : "false")
+               << ",\n";
     OutputJson << "    \"periodic\" : false,\n";
     OutputJson << "    \"lock\" : " << (UsesLock ? "true" : "false") << ",\n";
     OutputJson << "    \"deps\" : " << (NeedsDeps ? "true" : "false") << ",\n";
