@@ -85,16 +85,7 @@ void freebsd::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
     else
       CmdArgs.push_back("-mfpu=softvfp");
 
-    switch (getToolChain().getTriple().getEnvironment()) {
-    case llvm::Triple::GNUEABIHF:
-    case llvm::Triple::GNUEABI:
-    case llvm::Triple::EABI:
-      CmdArgs.push_back("-meabi=5");
-      break;
-
-    default:
-      CmdArgs.push_back("-matpcs");
-    }
+    CmdArgs.push_back("-meabi=5");
     break;
   }
   case llvm::Triple::sparc:
@@ -441,30 +432,14 @@ void FreeBSD::addLibCxxIncludePaths(const llvm::opt::ArgList &DriverArgs,
                    concat(getDriver().SysRoot, "/usr/include/c++/v1"));
 }
 
-void FreeBSD::addLibStdCxxIncludePaths(
-    const llvm::opt::ArgList &DriverArgs,
-    llvm::opt::ArgStringList &CC1Args) const {
-  addLibStdCXXIncludePaths(concat(getDriver().SysRoot, "/usr/include/c++/4.2"),
-                           "", "", DriverArgs, CC1Args);
-}
-
 void FreeBSD::AddCXXStdlibLibArgs(const ArgList &Args,
                                   ArgStringList &CmdArgs) const {
-  CXXStdlibType Type = GetCXXStdlibType(Args);
   unsigned Major = getTriple().getOSMajorVersion();
   bool Profiling = Args.hasArg(options::OPT_pg) && Major != 0 && Major < 14;
 
-  switch (Type) {
-  case ToolChain::CST_Libcxx:
-    CmdArgs.push_back(Profiling ? "-lc++_p" : "-lc++");
-    if (Args.hasArg(options::OPT_fexperimental_library))
-      CmdArgs.push_back("-lc++experimental");
-    break;
-
-  case ToolChain::CST_Libstdcxx:
-    CmdArgs.push_back(Profiling ? "-lstdc++_p" : "-lstdc++");
-    break;
-  }
+  CmdArgs.push_back(Profiling ? "-lc++_p" : "-lc++");
+  if (Args.hasArg(options::OPT_fexperimental_library))
+    CmdArgs.push_back("-lc++experimental");
 }
 
 void FreeBSD::AddCudaIncludeArgs(const ArgList &DriverArgs,
@@ -482,21 +457,6 @@ Tool *FreeBSD::buildAssembler() const {
 }
 
 Tool *FreeBSD::buildLinker() const { return new tools::freebsd::Linker(*this); }
-
-llvm::ExceptionHandling FreeBSD::GetExceptionModel(const ArgList &Args) const {
-  // FreeBSD uses SjLj exceptions on ARM oabi.
-  switch (getTriple().getEnvironment()) {
-  case llvm::Triple::GNUEABIHF:
-  case llvm::Triple::GNUEABI:
-  case llvm::Triple::EABI:
-    return llvm::ExceptionHandling::None;
-  default:
-    if (getTriple().getArch() == llvm::Triple::arm ||
-        getTriple().getArch() == llvm::Triple::thumb)
-      return llvm::ExceptionHandling::SjLj;
-    return llvm::ExceptionHandling::None;
-  }
-}
 
 bool FreeBSD::HasNativeLLVMSupport() const { return true; }
 

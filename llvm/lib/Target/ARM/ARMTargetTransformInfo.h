@@ -303,16 +303,13 @@ public:
                                 AssumptionCache &AC,
                                 TargetLibraryInfo *LibInfo,
                                 HardwareLoopInfo &HWLoopInfo);
-  bool preferPredicateOverEpilogue(Loop *L, LoopInfo *LI, ScalarEvolution &SE,
-                                   AssumptionCache &AC, TargetLibraryInfo *TLI,
-                                   DominatorTree *DT,
-                                   LoopVectorizationLegality *LVL,
-                                   InterleavedAccessInfo *IAI);
+  bool preferPredicateOverEpilogue(TailFoldingInfo *TFI);
   void getUnrollingPreferences(Loop *L, ScalarEvolution &SE,
                                TTI::UnrollingPreferences &UP,
                                OptimizationRemarkEmitter *ORE);
 
-  TailFoldingStyle getPreferredTailFoldingStyle() const;
+  TailFoldingStyle
+  getPreferredTailFoldingStyle(bool IVUpdateMayOverflow = true) const;
 
   void getPeelingPreferences(Loop *L, ScalarEvolution &SE,
                              TTI::PeelingPreferences &PP);

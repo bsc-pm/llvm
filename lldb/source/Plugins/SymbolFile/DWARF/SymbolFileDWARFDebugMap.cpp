@@ -683,6 +683,17 @@ XcodeSDK SymbolFileDWARFDebugMap::ParseXcodeSDK(CompileUnit &comp_unit) {
   return {};
 }
 
+llvm::SmallSet<lldb::LanguageType, 4>
+SymbolFileDWARFDebugMap::ParseAllLanguages(
+    lldb_private::CompileUnit &comp_unit) {
+  llvm::SmallSet<lldb::LanguageType, 4> langs;
+  auto *info = GetCompUnitInfo(comp_unit);
+  for (auto &comp_unit : info->compile_units_sps) {
+    langs.insert(comp_unit->GetLanguage());
+  }
+  return langs;
+}
+
 size_t SymbolFileDWARFDebugMap::ParseFunctions(CompileUnit &comp_unit) {
   std::lock_guard<std::recursive_mutex> guard(GetModuleMutex());
   SymbolFileDWARF *oso_dwarf = GetSymbolFile(comp_unit);
@@ -1537,4 +1548,13 @@ Status SymbolFileDWARFDebugMap::CalculateFrameVariableError(StackFrame &frame) {
     }
   }
   return Status();
+}
+
+void SymbolFileDWARFDebugMap::GetCompileOptions(
+    std::unordered_map<lldb::CompUnitSP, lldb_private::Args> &args) {
+
+  ForEachSymbolFile([&](SymbolFileDWARF *oso_dwarf) -> bool {
+    oso_dwarf->GetCompileOptions(args);
+    return false;
+  });
 }

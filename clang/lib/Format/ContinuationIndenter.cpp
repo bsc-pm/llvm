@@ -18,6 +18,7 @@
 #include "WhitespaceManager.h"
 #include "clang/Basic/OperatorPrecedence.h"
 #include "clang/Basic/SourceManager.h"
+#include "clang/Basic/TokenKinds.h"
 #include "clang/Format/Format.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
@@ -739,9 +740,14 @@ void ContinuationIndenter::addTokenOnCurrentLine(LineState &State, bool DryRun,
   if (Previous.is(TT_TemplateString) && Previous.opensScope())
     CurrentState.NoLineBreak = true;
 
+  // Align following lines within parentheses / brackets if configured.
+  // Note: This doesn't apply to macro expansion lines, which are MACRO( , , )
+  // with args as children of the '(' and ',' tokens. It does not make sense to
+  // align the commas with the opening paren.
   if (Style.AlignAfterOpenBracket != FormatStyle::BAS_DontAlign &&
       !CurrentState.IsCSharpGenericTypeConstraint && Previous.opensScope() &&
       Previous.isNot(TT_ObjCMethodExpr) && Previous.isNot(TT_RequiresClause) &&
+      !(Current.MacroParent && Previous.MacroParent) &&
       (Current.isNot(TT_LineComment) || Previous.is(BK_BracedInit))) {
     CurrentState.Indent = State.Column + Spaces;
     CurrentState.IsAligned = true;
@@ -1119,8 +1125,14 @@ unsigned ContinuationIndenter::getNewLineColumn(const LineState &State) {
            Style.IndentWidth;
   }
 
-  if (NextNonComment->is(tok::l_brace) && NextNonComment->is(BK_Block))
-    return Current.NestingLevel == 0 ? State.FirstIndent : CurrentState.Indent;
+  if (NextNonComment->is(tok::l_brace) && NextNonComment->is(BK_Block)) {
+    if (Current.NestingLevel == 0 ||
+        (Style.LambdaBodyIndentation == FormatStyle::LBI_OuterScope &&
+         State.NextToken->is(TT_LambdaLBrace))) {
+      return State.FirstIndent;
+    }
+    return CurrentState.Indent;
+  }
   if ((Current.isOneOf(tok::r_brace, tok::r_square) ||
        (Current.is(tok::greater) &&
         (Style.Language == FormatStyle::LK_Proto ||
@@ -1267,8 +1279,13 @@ unsigned ContinuationIndenter::getNewLineColumn(const LineState &State) {
     return ContinuationIndent;
   }
 
-  if (State.Line->InPragmaDirective)
-    return CurrentState.Indent + Style.ContinuationIndentWidth;
+  // OpenMP clauses want to get additional indentation when they are pushed onto
+  // the next line.
+  if (State.Line->InPragmaDirective) {
+    FormatToken *PragmaType = State.Line->First->Next->Next;
+    if (PragmaType && PragmaType->TokenText.equals("omp"))
+      return CurrentState.Indent + Style.ContinuationIndentWidth;
+  }
 
   // This ensure that we correctly format ObjC methods calls without inputs,
   // i.e. where the last element isn't selector like: [callee method];
@@ -1819,6 +1836,10 @@ void ContinuationIndenter::moveStatePastScopeCloser(LineState &State) {
 }
 
 void ContinuationIndenter::moveStateToNewBlock(LineState &State) {
+  if (Style.LambdaBodyIndentation == FormatStyle::LBI_OuterScope &&
+      State.NextToken->is(TT_LambdaLBrace)) {
+    State.Stack.back().NestedBlockIndent = State.FirstIndent;
+  }
   unsigned NestedBlockIndent = State.Stack.back().NestedBlockIndent;
   // ObjC block sometimes follow special indentation rules.
   unsigned NewIndent =

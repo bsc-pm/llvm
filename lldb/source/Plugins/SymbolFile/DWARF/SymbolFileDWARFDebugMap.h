@@ -62,6 +62,8 @@ public:
   ParseLanguage(lldb_private::CompileUnit &comp_unit) override;
   lldb_private::XcodeSDK
   ParseXcodeSDK(lldb_private::CompileUnit &comp_unit) override;
+  llvm::SmallSet<lldb::LanguageType, 4>
+  ParseAllLanguages(lldb_private::CompileUnit &comp_unit) override;
   size_t ParseFunctions(lldb_private::CompileUnit &comp_unit) override;
   bool ParseLineTable(lldb_private::CompileUnit &comp_unit) override;
   bool ParseDebugMacros(lldb_private::CompileUnit &comp_unit) override;
@@ -150,6 +152,9 @@ public:
 
   // Statistics overrides.
   lldb_private::ModuleList GetDebugInfoModules() override;
+
+  void GetCompileOptions(
+      std::unordered_map<lldb::CompUnitSP, lldb_private::Args> &args) override;
 
 protected:
   enum { kHaveInitializedOSOs = (1 << 0), kNumFlags };

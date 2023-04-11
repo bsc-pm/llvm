@@ -1,4 +1,4 @@
-//===-- RISCVDisassembler.cpp - Disassembler for RISCV --------------------===//
+//===-- RISCVDisassembler.cpp - Disassembler for RISC-V -------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -61,9 +61,9 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeRISCVDisassembler() {
 static DecodeStatus DecodeGPRRegisterClass(MCInst &Inst, uint32_t RegNo,
                                            uint64_t Address,
                                            const MCDisassembler *Decoder) {
-  bool IsRV32E = Decoder->getSubtargetInfo().hasFeature(RISCV::FeatureRV32E);
+  bool IsRVE = Decoder->getSubtargetInfo().hasFeature(RISCV::FeatureRVE);
 
-  if (RegNo >= 32 || (IsRV32E && RegNo >= 16))
+  if (RegNo >= 32 || (IsRVE && RegNo >= 16))
     return MCDisassembler::Fail;
 
   MCRegister Reg = RISCV::X0 + RegNo;
@@ -520,6 +520,13 @@ DecodeStatus RISCVDisassembler::getInstruction(MCInst &MI, uint64_t &Size,
       if (Result != MCDisassembler::Fail)
         return Result;
     }
+    if (STI.hasFeature(RISCV::FeatureVendorXTHeadCondMov)) {
+      LLVM_DEBUG(dbgs() << "Trying XTHeadCondMov custom opcode table:\n");
+      Result = decodeInstruction(DecoderTableTHeadCondMov32, MI, Insn, Address,
+                                 this, STI);
+      if (Result != MCDisassembler::Fail)
+        return Result;
+    }
     if (STI.hasFeature(RISCV::FeatureVendorXTHeadCmo)) {
       LLVM_DEBUG(dbgs() << "Trying XTHeadCmo custom opcode table:\n");
       Result = decodeInstruction(DecoderTableTHeadCmo32, MI, Insn, Address,
@@ -566,6 +573,13 @@ DecodeStatus RISCVDisassembler::getInstruction(MCInst &MI, uint64_t &Size,
       LLVM_DEBUG(dbgs() << "Trying XTHeadVdot custom opcode table:\n");
       Result =
           decodeInstruction(DecoderTableTHeadV32, MI, Insn, Address, this, STI);
+      if (Result != MCDisassembler::Fail)
+        return Result;
+    }
+    if (STI.hasFeature(RISCV::FeatureVendorXSfvcp)) {
+      LLVM_DEBUG(dbgs() << "Trying SiFive VCIX custom opcode table:\n");
+      Result = decodeInstruction(DecoderTableXSfvcp32, MI, Insn, Address, this,
+                                 STI);
       if (Result != MCDisassembler::Fail)
         return Result;
     }

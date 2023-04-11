@@ -144,12 +144,17 @@ namespace format {
   TYPE(UnaryOperator)                                                          \
   TYPE(UnionLBrace)                                                            \
   TYPE(UntouchableMacroFunc)                                                   \
+  /* Like in 'assign x = 0, y = 1;' . */                                       \
+  TYPE(VerilogAssignComma)                                                     \
   /* like in begin : block */                                                  \
   TYPE(VerilogBlockLabelColon)                                                 \
   /* The square bracket for the dimension part of the type name.               \
    * In 'logic [1:0] x[1:0]', only the first '['. This way we can have space   \
    * before the first bracket but not the second. */                           \
   TYPE(VerilogDimensionedTypeName)                                             \
+  /* list of port connections or parameters in a module instantiation */       \
+  TYPE(VerilogInstancePortComma)                                               \
+  TYPE(VerilogInstancePortLParen)                                              \
   /* for the base in a number literal, not including the quote */              \
   TYPE(VerilogNumberBase)                                                      \
   /* like `(strong1, pull0)` */                                                \
@@ -377,6 +382,11 @@ public:
   /// binary operator.
   TokenType getType() const { return Type; }
   void setType(TokenType T) {
+    // If this token is a macro argument while formatting an unexpanded macro
+    // call, we do not change its type any more - the type was deduced from
+    // formatting the expanded macro stream already.
+    if (MacroCtx && MacroCtx->Role == MR_UnexpandedArg)
+      return;
     assert((!TypeIsFinalized || T == Type) &&
            "Please use overwriteFixedType to change a fixed type.");
     Type = T;
@@ -607,7 +617,7 @@ public:
     return isOneOf(tok::kw_const, tok::kw_restrict, tok::kw_volatile,
                    tok::kw___attribute, tok::kw__Nonnull, tok::kw__Nullable,
                    tok::kw__Null_unspecified, tok::kw___ptr32, tok::kw___ptr64,
-                   TT_AttributeMacro);
+                   tok::kw___funcref, TT_AttributeMacro);
   }
 
   /// Determine whether the token is a simple-type-specifier.
@@ -939,6 +949,7 @@ struct AdditionalKeywords {
     kw_CF_OPTIONS = &IdentTable.get("CF_OPTIONS");
     kw_NS_CLOSED_ENUM = &IdentTable.get("NS_CLOSED_ENUM");
     kw_NS_ENUM = &IdentTable.get("NS_ENUM");
+    kw_NS_ERROR_ENUM = &IdentTable.get("NS_ERROR_ENUM");
     kw_NS_OPTIONS = &IdentTable.get("NS_OPTIONS");
 
     kw_as = &IdentTable.get("as");
@@ -1324,6 +1335,7 @@ struct AdditionalKeywords {
   IdentifierInfo *kw_CF_OPTIONS;
   IdentifierInfo *kw_NS_CLOSED_ENUM;
   IdentifierInfo *kw_NS_ENUM;
+  IdentifierInfo *kw_NS_ERROR_ENUM;
   IdentifierInfo *kw_NS_OPTIONS;
   IdentifierInfo *kw___except;
   IdentifierInfo *kw___has_include;
@@ -1715,8 +1727,9 @@ struct AdditionalKeywords {
     case tok::kw_while:
       return false;
     case tok::identifier:
-      return VerilogExtraKeywords.find(Tok.Tok.getIdentifierInfo()) ==
-             VerilogExtraKeywords.end();
+      return isWordLike(Tok) &&
+             VerilogExtraKeywords.find(Tok.Tok.getIdentifierInfo()) ==
+                 VerilogExtraKeywords.end();
     default:
       // getIdentifierInfo returns non-null for both identifiers and keywords.
       return Tok.Tok.getIdentifierInfo();
@@ -1794,6 +1807,13 @@ struct AdditionalKeywords {
            (Tok.is(tok::kw_default) &&
             !(Next && Next->isOneOf(tok::colon, tok::semi, kw_clocking, kw_iff,
                                     kw_input, kw_output, kw_sequence)));
+  }
+
+  /// Returns whether \p Tok is a Verilog keyword that starts a
+  /// structured procedure like 'always'.
+  bool isVerilogStructuredProcedure(const FormatToken &Tok) const {
+    return Tok.isOneOf(kw_always, kw_always_comb, kw_always_ff, kw_always_latch,
+                       kw_final, kw_forever, kw_initial);
   }
 
   bool isVerilogQualifier(const FormatToken &Tok) const {

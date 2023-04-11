@@ -373,10 +373,22 @@ struct AMDGPUDeviceImageTy : public DeviceImageTy {
   Expected<hsa_executable_symbol_t>
   findDeviceSymbol(GenericDeviceTy &Device, StringRef SymbolName) const;
 
+  /// Get additional info for kernel, e.g., register spill counts
+  std::optional<utils::KernelMetaDataTy>
+  getKernelInfo(StringRef Identifier) const {
+    auto It = KernelInfoMap.find(Identifier);
+
+    if (It == KernelInfoMap.end())
+      return {};
+
+    return It->second;
+  }
+
 private:
   /// The exectuable loaded on the agent.
   hsa_executable_t Executable;
   hsa_code_object_t CodeObject;
+  StringMap<utils::KernelMetaDataTy> KernelInfoMap;
 };
 
 /// Class implementing the AMDGPU kernel functionalities which derives from the
@@ -426,6 +438,12 @@ struct AMDGPUKernelTy : public GenericKernelTy {
     // TODO: Read the kernel descriptor for the max threads per block. May be
     // read from the image.
 
+    // Get additional kernel info read from image
+    KernelInfo = AMDImage.getKernelInfo(getName());
+    if (!KernelInfo.has_value())
+      INFO(OMP_INFOTYPE_PLUGIN_KERNEL, Device.getDeviceId(),
+           "Could not read extra information for kernel %s.", getName());
+
     return Plugin::success();
   }
 
@@ -433,6 +451,11 @@ struct AMDGPUKernelTy : public GenericKernelTy {
   Error launchImpl(GenericDeviceTy &GenericDevice, uint32_t NumThreads,
                    uint64_t NumBlocks, KernelArgsTy &KernelArgs, void *Args,
                    AsyncInfoWrapperTy &AsyncInfoWrapper) const override;
+
+  /// Print more elaborate kernel launch info for AMDGPU
+  Error printLaunchInfoDetails(GenericDeviceTy &GenericDevice,
+                               KernelArgsTy &KernelArgs, uint32_t NumThreads,
+                               uint64_t NumBlocks) const override;
 
   /// The default number of blocks is common to the whole device.
   uint32_t getDefaultNumBlocks(GenericDeviceTy &GenericDevice) const override {
@@ -462,6 +485,9 @@ private:
 
   /// The size of implicit kernel arguments.
   const uint32_t ImplicitArgsSize;
+
+  /// Additional Info for the AMD GPU Kernel
+  std::optional<utils::KernelMetaDataTy> KernelInfo;
 };
 
 /// Class representing an HSA signal. Signals are used to define dependencies
@@ -1837,7 +1863,7 @@ struct AMDGPUDeviceTy : public GenericDeviceTy, AMDGenericDeviceTy {
     hsa_status_t Status =
         hsa_amd_memory_lock(HstPtr, Size, nullptr, 0, &PinnedPtr);
     if (auto Err = Plugin::check(Status, "Error in hsa_amd_memory_lock: %s\n"))
-      return Err;
+      return std::move(Err);
 
     return PinnedPtr;
   }
@@ -1860,7 +1886,7 @@ struct AMDGPUDeviceTy : public GenericDeviceTy, AMDGenericDeviceTy {
                              /* Number of accessible agents (out) */ nullptr,
                              /* Accessible agents */ nullptr);
     if (auto Err = Plugin::check(Status, "Error in hsa_amd_pointer_info: %s"))
-      return Err;
+      return std::move(Err);
 
     // The buffer may be locked or allocated through HSA allocators. Assume that
     // the buffer is host pinned if the runtime reports a HSA type.
@@ -2199,6 +2225,10 @@ Error AMDGPUDeviceImageTy::loadExecutable(const AMDGPUDeviceTy &Device) {
 
   if (Result)
     return Plugin::error("Loaded HSA executable does not validate");
+
+  if (auto Err =
+          utils::readAMDGPUMetaDataFromImage(getMemoryBuffer(), KernelInfoMap))
+    return Err;
 
   return Plugin::success();
 }
@@ -2569,6 +2599,56 @@ Error AMDGPUKernelTy::launchImpl(GenericDeviceTy &GenericDevice,
   // Push the kernel launch into the stream.
   return Stream.pushKernelLaunch(*this, AllArgs, NumThreads, NumBlocks,
                                  GroupSize, ArgsMemoryManager);
+}
+
+Error AMDGPUKernelTy::printLaunchInfoDetails(GenericDeviceTy &GenericDevice,
+                                             KernelArgsTy &KernelArgs,
+                                             uint32_t NumThreads,
+                                             uint64_t NumBlocks) const {
+  // Only do all this when the output is requested
+  if (!(getInfoLevel() & OMP_INFOTYPE_PLUGIN_KERNEL))
+    return Plugin::success();
+
+  // We don't have data to print additional info, but no hard error
+  if (!KernelInfo.has_value())
+    return Plugin::success();
+
+  // General Info
+  auto NumGroups = NumBlocks;
+  auto ThreadsPerGroup = NumThreads;
+
+  // Kernel Arguments Info
+  auto ArgNum = KernelArgs.NumArgs;
+  auto LoopTripCount = KernelArgs.Tripcount;
+
+  // Details for AMDGPU kernels (read from image)
+  // https://www.llvm.org/docs/AMDGPUUsage.html#code-object-v4-metadata
+  auto GroupSegmentSize = (*KernelInfo).GroupSegmentList;
+  auto SGPRCount = (*KernelInfo).SGPRCount;
+  auto VGPRCount = (*KernelInfo).VGPRCount;
+  auto SGPRSpillCount = (*KernelInfo).SGPRSpillCount;
+  auto VGPRSpillCount = (*KernelInfo).VGPRSpillCount;
+  auto MaxFlatWorkgroupSize = (*KernelInfo).MaxFlatWorkgroupSize;
+
+  // Prints additional launch info that contains the following.
+  // Num Args: The number of kernel arguments
+  // Teams x Thrds: The number of teams and the number of threads actually
+  // running.
+  // MaxFlatWorkgroupSize: Maximum flat work-group size supported by the
+  // kernel in work-items
+  // LDS Usage: Amount of bytes used in LDS storage
+  // S/VGPR Count: the number of S/V GPRs occupied by the kernel
+  // S/VGPR Spill Count: how many S/VGPRs are spilled by the kernel
+  // Tripcount: loop tripcount for the kernel
+  INFO(OMP_INFOTYPE_PLUGIN_KERNEL, GenericDevice.getDeviceId(),
+       "#Args: %d Teams x Thrds: %4lux%4u (MaxFlatWorkGroupSize: %u) LDS "
+       "Usage: %uB #SGPRs/VGPRs: %u/%u #SGPR/VGPR Spills: %u/%u Tripcount: "
+       "%lu\n",
+       ArgNum, NumGroups, ThreadsPerGroup, MaxFlatWorkgroupSize,
+       GroupSegmentSize, SGPRCount, VGPRCount, SGPRSpillCount, VGPRSpillCount,
+       LoopTripCount);
+
+  return Plugin::success();
 }
 
 GenericPluginTy *Plugin::createPlugin() { return new AMDGPUPluginTy(); }

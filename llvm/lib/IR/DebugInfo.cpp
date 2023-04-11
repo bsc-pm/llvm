@@ -43,10 +43,7 @@ using namespace llvm;
 using namespace llvm::at;
 using namespace llvm::dwarf;
 
-/// Finds all intrinsics declaring local variables as living in the memory that
-/// 'V' points to. This may include a mix of dbg.declare and
-/// dbg.addr intrinsics.
-TinyPtrVector<DbgVariableIntrinsic *> llvm::FindDbgAddrUses(Value *V) {
+TinyPtrVector<DbgDeclareInst *> llvm::FindDbgDeclareUses(Value *V) {
   // This function is hot. Check whether the value has any metadata to avoid a
   // DenseMap lookup.
   if (!V->isUsedByMetadata())
@@ -58,22 +55,13 @@ TinyPtrVector<DbgVariableIntrinsic *> llvm::FindDbgAddrUses(Value *V) {
   if (!MDV)
     return {};
 
-  TinyPtrVector<DbgVariableIntrinsic *> Declares;
+  TinyPtrVector<DbgDeclareInst *> Declares;
   for (User *U : MDV->users()) {
-    if (auto *DII = dyn_cast<DbgVariableIntrinsic>(U))
-      if (DII->isAddressOfVariable())
-        Declares.push_back(DII);
+    if (auto *DDI = dyn_cast<DbgDeclareInst>(U))
+      Declares.push_back(DDI);
   }
 
   return Declares;
-}
-
-TinyPtrVector<DbgDeclareInst *> llvm::FindDbgDeclareUses(Value *V) {
-  TinyPtrVector<DbgDeclareInst *> DDIs;
-  for (DbgVariableIntrinsic *DVI : FindDbgAddrUses(V))
-    if (auto *DDI = dyn_cast<DbgDeclareInst>(DVI))
-      DDIs.push_back(DDI);
-  return DDIs;
 }
 
 void llvm::findDbgValues(SmallVectorImpl<DbgValueInst *> &DbgValues, Value *V) {
@@ -801,7 +789,6 @@ bool llvm::stripNonLineTableDebugInfo(Module &M) {
       Changed = true;
     }
   };
-  RemoveUses("llvm.dbg.addr");
   RemoveUses("llvm.dbg.declare");
   RemoveUses("llvm.dbg.label");
   RemoveUses("llvm.dbg.value");
@@ -1848,6 +1835,7 @@ std::optional<AssignmentInfo> at::getAssignmentInfo(const DataLayout &DL,
   return getAssignmentInfoImpl(DL, AI, SizeInBits);
 }
 
+/// Returns nullptr if the assignment shouldn't be attributed to this variable.
 static CallInst *emitDbgAssign(AssignmentInfo Info, Value *Val, Value *Dest,
                                Instruction &StoreLikeInst,
                                const VarRecord &VarRec, DIBuilder &DIB) {
@@ -1855,9 +1843,24 @@ static CallInst *emitDbgAssign(AssignmentInfo Info, Value *Val, Value *Dest,
   assert(ID && "Store instruction must have DIAssignID metadata");
   (void)ID;
 
+  bool StoreToWholeVariable = Info.StoreToWholeAlloca;
+  if (auto Size = VarRec.Var->getSizeInBits()) {
+    // Discard stores to bits outside this variable. NOTE: trackAssignments
+    // doesn't understand base expressions yet, so all variables that reach
+    // here are guaranteed to start at offset 0 in the alloca.
+    // TODO: Could we truncate the fragment expression instead of discarding
+    // the assignment?
+    if (Info.OffsetInBits + Info.SizeInBits > *Size)
+      return nullptr;
+    // FIXME: As noted above - only variables at offset 0 are handled
+    // currently.
+    StoreToWholeVariable = Info.OffsetInBits == /*VarOffsetInAlloca*/ 0 &&
+                           Info.SizeInBits == *Size;
+  }
+
   DIExpression *Expr =
       DIExpression::get(StoreLikeInst.getContext(), std::nullopt);
-  if (!Info.StoreToWholeAlloca) {
+  if (!StoreToWholeVariable) {
     auto R = DIExpression::createFragmentExpression(Expr, Info.OffsetInBits,
                                                     Info.SizeInBits);
     assert(R.has_value() && "failed to create fragment expression");
@@ -1957,13 +1960,17 @@ void at::trackAssignments(Function::iterator Start, Function::iterator End,
         auto *Assign =
             emitDbgAssign(*Info, ValueComponent, DestComponent, I, R, DIB);
         (void)Assign;
-        LLVM_DEBUG(errs() << " > INSERT: " << *Assign << "\n");
+        LLVM_DEBUG(if (Assign) errs() << " > INSERT: " << *Assign << "\n");
       }
     }
   }
 }
 
 bool AssignmentTrackingPass::runOnFunction(Function &F) {
+  // No value in assignment tracking without optimisations.
+  if (F.hasFnAttribute(Attribute::OptimizeNone))
+    return /*Changed*/ false;
+
   bool Changed = false;
   // Collect a map of {backing storage : dbg.declares} (currently "backing
   // storage" is limited to Allocas). We'll use this to find dbg.declares to

@@ -277,14 +277,14 @@ Instruction *InstCombinerImpl::foldCmpLoadFromIndexedGlobal(
   // order the state machines in complexity of the generated code.
   Value *Idx = GEP->getOperand(2);
 
-  // If the index is larger than the pointer size of the target, truncate the
-  // index down like the GEP would do implicitly.  We don't have to do this for
-  // an inbounds GEP because the index can't be out of range.
+  // If the index is larger than the pointer offset size of the target, truncate
+  // the index down like the GEP would do implicitly.  We don't have to do this
+  // for an inbounds GEP because the index can't be out of range.
   if (!GEP->isInBounds()) {
-    Type *IntPtrTy = DL.getIntPtrType(GEP->getType());
-    unsigned PtrSize = IntPtrTy->getIntegerBitWidth();
-    if (Idx->getType()->getPrimitiveSizeInBits().getFixedValue() > PtrSize)
-      Idx = Builder.CreateTrunc(Idx, IntPtrTy);
+    Type *PtrIdxTy = DL.getIndexType(GEP->getType());
+    unsigned OffsetSize = PtrIdxTy->getIntegerBitWidth();
+    if (Idx->getType()->getPrimitiveSizeInBits().getFixedValue() > OffsetSize)
+      Idx = Builder.CreateTrunc(Idx, PtrIdxTy);
   }
 
   // If inbounds keyword is not present, Idx * ElementSize can overflow.
@@ -563,7 +563,7 @@ static Value *rewriteGEPAsOffset(Type *ElemTy, Value *Start, Value *Base,
   // Create all the other instructions.
   for (Value *Val : Explored) {
 
-    if (NewInsts.find(Val) != NewInsts.end())
+    if (NewInsts.contains(Val))
       continue;
 
     if (auto *CI = dyn_cast<CastInst>(Val)) {
@@ -611,7 +611,7 @@ static Value *rewriteGEPAsOffset(Type *ElemTy, Value *Start, Value *Base,
       for (unsigned I = 0, E = PHI->getNumIncomingValues(); I < E; ++I) {
         Value *NewIncoming = PHI->getIncomingValue(I);
 
-        if (NewInsts.find(NewIncoming) != NewInsts.end())
+        if (NewInsts.contains(NewIncoming))
           NewIncoming = NewInsts[NewIncoming];
 
         NewPhi->addIncoming(NewIncoming, PHI->getIncomingBlock(I));
@@ -741,7 +741,7 @@ Instruction *InstCombinerImpl::foldGEPICmp(GEPOperator *GEPLHS, Value *RHS,
     RHS = RHS->stripPointerCasts();
 
   Value *PtrBase = GEPLHS->getOperand(0);
-  if (PtrBase == RHS && GEPLHS->isInBounds()) {
+  if (PtrBase == RHS && (GEPLHS->isInBounds() || ICmpInst::isEquality(Cond))) {
     // ((gep Ptr, OFFSET) cmp Ptr)   ---> (OFFSET cmp 0).
     Value *Offset = EmitGEPOffset(GEPLHS);
     return new ICmpInst(ICmpInst::getSignedPredicate(Cond), Offset,
@@ -884,7 +884,8 @@ Instruction *InstCombinerImpl::foldGEPICmp(GEPOperator *GEPLHS, Value *RHS,
 
     // Only lower this if the icmp is the only user of the GEP or if we expect
     // the result to fold to a constant!
-    if (GEPsInBounds && (isa<ConstantExpr>(GEPLHS) || GEPLHS->hasOneUse()) &&
+    if ((GEPsInBounds || CmpInst::isEquality(Cond)) &&
+        (isa<ConstantExpr>(GEPLHS) || GEPLHS->hasOneUse()) &&
         (isa<ConstantExpr>(GEPRHS) || GEPRHS->hasOneUse())) {
       // ((gep Ptr, OFFSET1) cmp (gep Ptr, OFFSET2)  --->  (OFFSET1 cmp OFFSET2)
       Value *L = EmitGEPOffset(GEPLHS);
@@ -1382,11 +1383,8 @@ Instruction *InstCombinerImpl::foldICmpWithDominatingICmp(ICmpInst &Cmp) {
   if (TrueBB == FalseBB)
     return nullptr;
 
-  // Try to simplify this compare to T/F based on the dominating condition.
-  std::optional<bool> Imp =
-      isImpliedCondition(DomCond, &Cmp, DL, TrueBB == CmpBB);
-  if (Imp)
-    return replaceInstUsesWith(Cmp, ConstantInt::get(Cmp.getType(), *Imp));
+  // We already checked simple implication in InstSimplify, only handle complex
+  // cases here.
 
   CmpInst::Predicate Pred = Cmp.getPredicate();
   Value *X = Cmp.getOperand(0), *Y = Cmp.getOperand(1);
@@ -1831,6 +1829,15 @@ Instruction *InstCombinerImpl::foldICmpAndConstant(ICmpInst &Cmp,
         match(And->getOperand(1), m_Not(m_Specific(X)))) {
       auto NewPred = TrueIfNeg ? CmpInst::ICMP_EQ : CmpInst::ICMP_NE;
       return new ICmpInst(NewPred, X, ConstantInt::getNullValue(X->getType()));
+    }
+    // (X & X) <  0 --> X == MinSignedC
+    // (X & X) > -1 --> X != MinSignedC
+    if (match(And, m_c_And(m_Neg(m_Value(X)), m_Deferred(X)))) {
+      Constant *MinSignedC = ConstantInt::get(
+          X->getType(),
+          APInt::getSignedMinValue(X->getType()->getScalarSizeInBits()));
+      auto NewPred = TrueIfNeg ? CmpInst::ICMP_EQ : CmpInst::ICMP_NE;
+      return new ICmpInst(NewPred, X, MinSignedC);
     }
   }
 
@@ -3233,16 +3240,6 @@ Instruction *InstCombinerImpl::foldICmpBinOpEqualityWithConstant(
     }
     break;
   }
-  case Instruction::And: {
-    const APInt *BOC;
-    if (match(BOp1, m_APInt(BOC))) {
-      // If we have ((X & C) == C), turn it into ((X & C) != 0).
-      if (C == *BOC && C.isPowerOf2())
-        return new ICmpInst(isICMP_NE ? ICmpInst::ICMP_EQ : ICmpInst::ICMP_NE,
-                            BO, Constant::getNullValue(RHS->getType()));
-    }
-    break;
-  }
   case Instruction::UDiv:
     if (C.isZero()) {
       // (icmp eq/ne (udiv A, B), 0) -> (icmp ugt/ule i32 B, A)
@@ -3275,6 +3272,11 @@ Instruction *InstCombinerImpl::foldICmpEqIntrinsicWithConstant(
     // bswap(A) == C  ->  A == bswap(C)
     return new ICmpInst(Pred, II->getArgOperand(0),
                         ConstantInt::get(Ty, C.byteSwap()));
+
+  case Intrinsic::bitreverse:
+    // bitreverse(A) == C  ->  A == bitreverse(C)
+    return new ICmpInst(Pred, II->getArgOperand(0),
+                        ConstantInt::get(Ty, C.reverseBits()));
 
   case Intrinsic::ctlz:
   case Intrinsic::cttz: {
@@ -4063,20 +4065,36 @@ Value *InstCombinerImpl::foldMultiplicationOverflowCheck(ICmpInst &I) {
   return Res;
 }
 
-static Instruction *foldICmpXNegX(ICmpInst &I) {
+static Instruction *foldICmpXNegX(ICmpInst &I,
+                                  InstCombiner::BuilderTy &Builder) {
   CmpInst::Predicate Pred;
   Value *X;
-  if (!match(&I, m_c_ICmp(Pred, m_NSWNeg(m_Value(X)), m_Deferred(X))))
-    return nullptr;
+  if (match(&I, m_c_ICmp(Pred, m_NSWNeg(m_Value(X)), m_Deferred(X)))) {
 
-  if (ICmpInst::isSigned(Pred))
-    Pred = ICmpInst::getSwappedPredicate(Pred);
-  else if (ICmpInst::isUnsigned(Pred))
-    Pred = ICmpInst::getSignedPredicate(Pred);
-  // else for equality-comparisons just keep the predicate.
+    if (ICmpInst::isSigned(Pred))
+      Pred = ICmpInst::getSwappedPredicate(Pred);
+    else if (ICmpInst::isUnsigned(Pred))
+      Pred = ICmpInst::getSignedPredicate(Pred);
+    // else for equality-comparisons just keep the predicate.
 
-  return ICmpInst::Create(Instruction::ICmp, Pred, X,
-                          Constant::getNullValue(X->getType()), I.getName());
+    return ICmpInst::Create(Instruction::ICmp, Pred, X,
+                            Constant::getNullValue(X->getType()), I.getName());
+  }
+
+  // A value is not equal to its negation unless that value is 0 or
+  // MinSignedValue, ie: a != -a --> (a & MaxSignedVal) != 0
+  if (match(&I, m_c_ICmp(Pred, m_OneUse(m_Neg(m_Value(X))), m_Deferred(X))) &&
+      ICmpInst::isEquality(Pred)) {
+    Type *Ty = X->getType();
+    uint32_t BitWidth = Ty->getScalarSizeInBits();
+    Constant *MaxSignedVal =
+        ConstantInt::get(Ty, APInt::getSignedMaxValue(BitWidth));
+    Value *And = Builder.CreateAnd(X, MaxSignedVal);
+    Constant *Zero = Constant::getNullValue(Ty);
+    return CmpInst::Create(Instruction::ICmp, Pred, And, Zero);
+  }
+
+  return nullptr;
 }
 
 /// Try to fold icmp (binop), X or icmp X, (binop).
@@ -4094,7 +4112,7 @@ Instruction *InstCombinerImpl::foldICmpBinOp(ICmpInst &I,
   if (!BO0 && !BO1)
     return nullptr;
 
-  if (Instruction *NewICmp = foldICmpXNegX(I))
+  if (Instruction *NewICmp = foldICmpXNegX(I, Builder))
     return NewICmp;
 
   const CmpInst::Predicate Pred = I.getPredicate();
@@ -5455,17 +5473,22 @@ static APInt getDemandedBitsLHSMask(ICmpInst &I, unsigned BitWidth) {
 /// The rationale is that several architectures use the same instruction for
 /// both subtract and cmp. Thus, it is better if the order of those operands
 /// match.
+/// TODO: Shouldn't this be part of CGP instead?
 /// \return true if Op0 and Op1 should be swapped.
 static bool swapMayExposeCSEOpportunities(const Value *Op0, const Value *Op1) {
   // Filter out pointer values as those cannot appear directly in subtract.
   // FIXME: we may want to go through inttoptrs or bitcasts.
-  if (Op0->getType()->isPointerTy())
+  if (Op0->getType()->isPointerTy() || isa<Constant>(Op0))
     return false;
   // If a subtract already has the same operands as a compare, swapping would be
   // bad. If a subtract has the same operands as a compare but in reverse order,
   // then swapping is good.
   int GoodToSwap = 0;
+  unsigned NumInspected = 0;
   for (const User *U : Op0->users()) {
+    // Avoid walking many users.
+    if (++NumInspected > 128)
+      return false;
     if (match(U, m_Sub(m_Specific(Op1), m_Specific(Op0))))
       GoodToSwap++;
     else if (match(U, m_Sub(m_Specific(Op0), m_Specific(Op1))))
@@ -5755,6 +5778,12 @@ Instruction *InstCombinerImpl::foldICmpUsingKnownBits(ICmpInst &I) {
         }
       }
     }
+
+    // Op0 eq C_Pow2 -> Op0 ne 0 if Op0 is known to be C_Pow2 or zero.
+    if (Op1Known.isConstant() && Op1Known.getConstant().isPowerOf2() &&
+        (Op0Known & Op1Known) == Op0Known)
+      return new ICmpInst(CmpInst::getInversePredicate(Pred), Op0,
+                          ConstantInt::getNullValue(Op1->getType()));
     break;
   }
   case ICmpInst::ICMP_ULT: {
@@ -5852,8 +5881,7 @@ Instruction *InstCombinerImpl::foldICmpUsingBoolRange(ICmpInst &I) {
     return BinaryOperator::CreateOr(Builder.CreateIsNull(X), Y);
 
   const APInt *C;
-  if (match(I.getOperand(0),
-            m_OneUse(m_c_Add(m_ZExt(m_Value(X)), m_SExt(m_Value(Y))))) &&
+  if (match(I.getOperand(0), m_c_Add(m_ZExt(m_Value(X)), m_SExt(m_Value(Y)))) &&
       match(I.getOperand(1), m_APInt(C)) &&
       X->getType()->isIntOrIntVectorTy(1) &&
       Y->getType()->isIntOrIntVectorTy(1)) {
@@ -5869,38 +5897,40 @@ Instruction *InstCombinerImpl::foldICmpUsingBoolRange(ICmpInst &I) {
         (C->slt(MinusOne) && Pred == ICmpInst::ICMP_SGT))
       return replaceInstUsesWith(I, ConstantInt::getTrue(I.getType()));
 
-    APInt NewC = *C;
-    // canonicalize predicate to eq/ne
-    if ((*C == Zero && Pred == ICmpInst::ICMP_SLT) ||
-        (*C != Zero && *C != MinusOne && Pred == ICmpInst::ICMP_UGT)) {
-      // x s< 0 in [-1, 1] --> x == -1
-      // x u> 1(or any const !=0 !=-1) in [-1, 1] --> x == -1
-      NewC = MinusOne;
-      Pred = ICmpInst::ICMP_EQ;
-    } else if ((*C == MinusOne && Pred == ICmpInst::ICMP_SGT) ||
-               (*C != Zero && *C != One && Pred == ICmpInst::ICMP_ULT)) {
-      // x s> -1 in [-1, 1] --> x != -1
-      // x u< -1 in [-1, 1] --> x != -1
-      Pred = ICmpInst::ICMP_NE;
-    } else if (*C == Zero && Pred == ICmpInst::ICMP_SGT) {
-      // x s> 0 in [-1, 1] --> x == 1
-      NewC = One;
-      Pred = ICmpInst::ICMP_EQ;
-    } else if (*C == One && Pred == ICmpInst::ICMP_SLT) {
-      // x s< 1 in [-1, 1] --> x != 1
-      Pred = ICmpInst::ICMP_NE;
-    }
+    if (I.getOperand(0)->hasOneUse()) {
+      APInt NewC = *C;
+      // canonicalize predicate to eq/ne
+      if ((*C == Zero && Pred == ICmpInst::ICMP_SLT) ||
+          (*C != Zero && *C != MinusOne && Pred == ICmpInst::ICMP_UGT)) {
+        // x s< 0 in [-1, 1] --> x == -1
+        // x u> 1(or any const !=0 !=-1) in [-1, 1] --> x == -1
+        NewC = MinusOne;
+        Pred = ICmpInst::ICMP_EQ;
+      } else if ((*C == MinusOne && Pred == ICmpInst::ICMP_SGT) ||
+                 (*C != Zero && *C != One && Pred == ICmpInst::ICMP_ULT)) {
+        // x s> -1 in [-1, 1] --> x != -1
+        // x u< -1 in [-1, 1] --> x != -1
+        Pred = ICmpInst::ICMP_NE;
+      } else if (*C == Zero && Pred == ICmpInst::ICMP_SGT) {
+        // x s> 0 in [-1, 1] --> x == 1
+        NewC = One;
+        Pred = ICmpInst::ICMP_EQ;
+      } else if (*C == One && Pred == ICmpInst::ICMP_SLT) {
+        // x s< 1 in [-1, 1] --> x != 1
+        Pred = ICmpInst::ICMP_NE;
+      }
 
-    if (NewC == MinusOne) {
-      if (Pred == ICmpInst::ICMP_EQ)
-        return BinaryOperator::CreateAnd(Builder.CreateNot(X), Y);
-      if (Pred == ICmpInst::ICMP_NE)
-        return BinaryOperator::CreateOr(X, Builder.CreateNot(Y));
-    } else if (NewC == One) {
-      if (Pred == ICmpInst::ICMP_EQ)
-        return BinaryOperator::CreateAnd(X, Builder.CreateNot(Y));
-      if (Pred == ICmpInst::ICMP_NE)
-        return BinaryOperator::CreateOr(Builder.CreateNot(X), Y);
+      if (NewC == MinusOne) {
+        if (Pred == ICmpInst::ICMP_EQ)
+          return BinaryOperator::CreateAnd(Builder.CreateNot(X), Y);
+        if (Pred == ICmpInst::ICMP_NE)
+          return BinaryOperator::CreateOr(X, Builder.CreateNot(Y));
+      } else if (NewC == One) {
+        if (Pred == ICmpInst::ICMP_EQ)
+          return BinaryOperator::CreateAnd(X, Builder.CreateNot(Y));
+        if (Pred == ICmpInst::ICMP_NE)
+          return BinaryOperator::CreateOr(Builder.CreateNot(X), Y);
+      }
     }
   }
 
@@ -6871,7 +6901,7 @@ static Instruction *foldFabsWithFcmpZero(FCmpInst &I, InstCombinerImpl &IC) {
         Mode.Input == DenormalMode::PositiveZero) {
 
       auto replaceFCmp = [](FCmpInst *I, FCmpInst::Predicate P, Value *X) {
-        Constant *Zero = ConstantFP::getNullValue(X->getType());
+        Constant *Zero = ConstantFP::getZero(X->getType());
         return new FCmpInst(P, X, Zero, "", I);
       };
 
@@ -6967,7 +6997,7 @@ static Instruction *foldFCmpFNegCommonOp(FCmpInst &I) {
 
   // Replace the negated operand with 0.0:
   // fcmp Pred Op0, -Op0 --> fcmp Pred Op0, 0.0
-  Constant *Zero = ConstantFP::getNullValue(Op0->getType());
+  Constant *Zero = ConstantFP::getZero(Op0->getType());
   return new FCmpInst(Pred, Op0, Zero, "", &I);
 }
 
@@ -7018,10 +7048,10 @@ Instruction *InstCombinerImpl::visitFCmpInst(FCmpInst &I) {
   // then canonicalize the operand to 0.0.
   if (Pred == CmpInst::FCMP_ORD || Pred == CmpInst::FCMP_UNO) {
     if (!match(Op0, m_PosZeroFP()) && isKnownNeverNaN(Op0, &TLI))
-      return replaceOperand(I, 0, ConstantFP::getNullValue(OpType));
+      return replaceOperand(I, 0, ConstantFP::getZero(OpType));
 
     if (!match(Op1, m_PosZeroFP()) && isKnownNeverNaN(Op1, &TLI))
-      return replaceOperand(I, 1, ConstantFP::getNullValue(OpType));
+      return replaceOperand(I, 1, ConstantFP::getZero(OpType));
   }
 
   // fcmp pred (fneg X), (fneg Y) -> fcmp swap(pred) X, Y
@@ -7050,7 +7080,7 @@ Instruction *InstCombinerImpl::visitFCmpInst(FCmpInst &I) {
   // The sign of 0.0 is ignored by fcmp, so canonicalize to +0.0:
   // fcmp Pred X, -0.0 --> fcmp Pred X, 0.0
   if (match(Op1, m_AnyZeroFP()) && !match(Op1, m_PosZeroFP()))
-    return replaceOperand(I, 1, ConstantFP::getNullValue(OpType));
+    return replaceOperand(I, 1, ConstantFP::getZero(OpType));
 
   // Ignore signbit of bitcasted int when comparing equality to FP 0.0:
   // fcmp oeq/une (bitcast X), 0.0 --> (and X, SignMaskC) ==/!= 0
@@ -7139,11 +7169,11 @@ Instruction *InstCombinerImpl::visitFCmpInst(FCmpInst &I) {
         case FCmpInst::FCMP_ONE:
           // X is ordered and not equal to an impossible constant --> ordered
           return new FCmpInst(FCmpInst::FCMP_ORD, X,
-                              ConstantFP::getNullValue(X->getType()));
+                              ConstantFP::getZero(X->getType()));
         case FCmpInst::FCMP_UEQ:
           // X is unordered or equal to an impossible constant --> unordered
           return new FCmpInst(FCmpInst::FCMP_UNO, X,
-                              ConstantFP::getNullValue(X->getType()));
+                              ConstantFP::getZero(X->getType()));
         case FCmpInst::FCMP_UNE:
           // X is unordered or not equal to an impossible constant --> true
           return replaceInstUsesWith(I, ConstantInt::getTrue(I.getType()));

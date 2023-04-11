@@ -852,6 +852,22 @@ void Parser::ParseMicrosoftTypeAttributes(ParsedAttributes &attrs) {
   }
 }
 
+void Parser::ParseWebAssemblyFuncrefTypeAttribute(ParsedAttributes &attrs) {
+  assert(Tok.is(tok::kw___funcref));
+  SourceLocation StartLoc = Tok.getLocation();
+  if (!getTargetInfo().getTriple().isWasm()) {
+    ConsumeToken();
+    Diag(StartLoc, diag::err_wasm_funcref_not_wasm);
+    return;
+  }
+
+  IdentifierInfo *AttrName = Tok.getIdentifierInfo();
+  SourceLocation AttrNameLoc = ConsumeToken();
+  attrs.addNew(AttrName, AttrNameLoc, /*ScopeName=*/nullptr,
+               /*ScopeLoc=*/SourceLocation{}, /*Args=*/nullptr, /*numArgs=*/0,
+               ParsedAttr::AS_Keyword);
+}
+
 void Parser::DiagnoseAndSkipExtendedMicrosoftTypeAttributes() {
   SourceLocation StartLoc = Tok.getLocation();
   SourceLocation EndLoc = SkipExtendedMicrosoftTypeAttributes();
@@ -3380,6 +3396,8 @@ void Parser::ParseDeclarationSpecifiers(
         goto DoneWithDeclSpec;
 
       CXXScopeSpec SS;
+      if (TemplateInfo.TemplateParams)
+        SS.setTemplateParamLists(*TemplateInfo.TemplateParams);
       Actions.RestoreNestedNameSpecifierAnnotation(Tok.getAnnotationValue(),
                                                    Tok.getAnnotationRange(),
                                                    SS);
@@ -3430,12 +3448,12 @@ void Parser::ParseDeclarationSpecifiers(
         continue;
       }
 
-      if (TemplateId && TemplateId->Kind == TNK_Concept_template &&
-          GetLookAheadToken(2).isOneOf(tok::kw_auto, tok::kw_decltype)) {
+      if (TemplateId && TemplateId->Kind == TNK_Concept_template) {
         DS.getTypeSpecScope() = SS;
-        // This is a qualified placeholder-specifier, e.g., ::C<int> auto ...
-        // Consume the scope annotation and continue to consume the template-id
-        // as a placeholder-specifier.
+        // This is probably a qualified placeholder-specifier, e.g., ::C<int>
+        // auto ... Consume the scope annotation and continue to consume the
+        // template-id as a placeholder-specifier. Let the next iteration
+        // diagnose a missing auto.
         ConsumeAnnotationToken();
         continue;
       }
@@ -3475,7 +3493,8 @@ void Parser::ParseDeclarationSpecifiers(
                                      &SS) &&
           isConstructorDeclarator(/*Unqualified=*/false,
                                   /*DeductionGuide=*/false,
-                                  DS.isFriendSpecified()))
+                                  DS.isFriendSpecified(),
+                                  &TemplateInfo))
         goto DoneWithDeclSpec;
 
       // C++20 [temp.spec] 13.9/6.
@@ -3751,6 +3770,10 @@ void Parser::ParseDeclarationSpecifiers(
         }
         if (!NextToken().isOneOf(tok::kw_auto, tok::kw_decltype))
             goto DoneWithDeclSpec;
+
+        if (TemplateId && !isInvalid && Actions.CheckTypeConstraint(TemplateId))
+            TemplateId = nullptr;
+
         ConsumeAnnotationToken();
         SourceLocation AutoLoc = Tok.getLocation();
         if (TryConsumeToken(tok::kw_decltype)) {
@@ -3840,6 +3863,10 @@ void Parser::ParseDeclarationSpecifiers(
     case tok::kw___regcall:
     case tok::kw___vectorcall:
       ParseMicrosoftTypeAttributes(DS.getAttributes());
+      continue;
+
+    case tok::kw___funcref:
+      ParseWebAssemblyFuncrefTypeAttribute(DS.getAttributes());
       continue;
 
     // Borland single token adornments.
@@ -3934,6 +3961,8 @@ void Parser::ParseDeclarationSpecifiers(
       isStorageClass = true;
       break;
     case tok::kw_thread_local:
+      if (getLangOpts().C2x)
+        Diag(Tok, diag::warn_c2x_compat_keyword) << Tok.getName();
       isInvalid = DS.SetStorageClassSpecThread(DeclSpec::TSCS_thread_local, Loc,
                                                PrevSpec, DiagID);
       isStorageClass = true;
@@ -4169,6 +4198,9 @@ void Parser::ParseDeclarationSpecifiers(
                                      DiagID, Policy);
       break;
     case tok::kw_bool:
+      if (getLangOpts().C2x)
+        Diag(Tok, diag::warn_c2x_compat_keyword) << Tok.getName();
+      [[fallthrough]];
     case tok::kw__Bool:
       if (Tok.is(tok::kw__Bool) && !getLangOpts().C99)
         Diag(Tok, diag::ext_c99_feature) << Tok.getName();
@@ -4960,6 +4992,7 @@ void Parser::ParseEnumSpecifier(SourceLocation StartLoc, DeclSpec &DS,
     assert(TemplateInfo.TemplateParams && "no template parameters");
     TParams = MultiTemplateParamsArg(TemplateInfo.TemplateParams->data(),
                                      TemplateInfo.TemplateParams->size());
+    SS.setTemplateParamLists(TParams);
   }
 
   if (!Name && TUK != Sema::TUK_Definition) {
@@ -5408,7 +5441,7 @@ bool Parser::isTypeSpecifierQualifier() {
   case tok::kw___read_only:
   case tok::kw___read_write:
   case tok::kw___write_only:
-
+  case tok::kw___funcref:
   case tok::kw_groupshared:
     return true;
 
@@ -5673,6 +5706,7 @@ bool Parser::isDeclarationSpecifier(
 #define GENERIC_IMAGE_TYPE(ImgType, Id) case tok::kw_##ImgType##_t:
 #include "clang/Basic/OpenCLImageTypes.def"
 
+  case tok::kw___funcref:
   case tok::kw_groupshared:
     return true;
 
@@ -5682,11 +5716,15 @@ bool Parser::isDeclarationSpecifier(
 }
 
 bool Parser::isConstructorDeclarator(bool IsUnqualified, bool DeductionGuide,
-                                     DeclSpec::FriendSpecified IsFriend) {
+                                     DeclSpec::FriendSpecified IsFriend,
+                                     const ParsedTemplateInfo *TemplateInfo) {
   TentativeParsingAction TPA(*this);
 
   // Parse the C++ scope specifier.
   CXXScopeSpec SS;
+  if (TemplateInfo && TemplateInfo->TemplateParams)
+    SS.setTemplateParamLists(*TemplateInfo->TemplateParams);
+
   if (ParseOptionalCXXScopeSpecifier(SS, /*ObjectType=*/nullptr,
                                      /*ObjectHasErrors=*/false,
                                      /*EnteringContext=*/true)) {
@@ -5934,6 +5972,12 @@ void Parser::ParseTypeQualifierListOpt(
         continue;
       }
       goto DoneWithTypeQuals;
+
+    case tok::kw___funcref:
+      ParseWebAssemblyFuncrefTypeAttribute(DS.getAttributes());
+      continue;
+      goto DoneWithTypeQuals;
+
     case tok::kw___pascal:
       if (AttrReqs & AR_VendorAttributesParsed) {
         ParseBorlandTypeAttributes(DS.getAttributes());
@@ -6078,6 +6122,7 @@ void Parser::ParseDeclaratorInternal(Declarator &D,
     bool EnteringContext = D.getContext() == DeclaratorContext::File ||
                            D.getContext() == DeclaratorContext::Member;
     CXXScopeSpec SS;
+    SS.setTemplateParamLists(D.getTemplateParameterLists());
     ParseOptionalCXXScopeSpecifier(SS, /*ObjectType=*/nullptr,
                                    /*ObjectHasErrors=*/false, EnteringContext);
 
@@ -7665,8 +7710,7 @@ void Parser::ParseTypeofSpecifier(DeclSpec &DS) {
   bool IsUnqual = Tok.is(tok::kw_typeof_unqual);
   const IdentifierInfo *II = Tok.getIdentifierInfo();
   if (getLangOpts().C2x && !II->getName().startswith("__"))
-    Diag(Tok.getLocation(), diag::warn_c2x_compat_typeof_type_specifier)
-        << IsUnqual;
+    Diag(Tok.getLocation(), diag::warn_c2x_compat_keyword) << Tok.getName();
 
   Token OpTok = Tok;
   SourceLocation StartLoc = ConsumeToken();
@@ -7866,7 +7910,7 @@ void Parser::DiagnoseBitIntUse(const Token &Tok) {
     // In C2x mode, diagnose that the use is not compatible with pre-C2x modes.
     // Otherwise, diagnose that the use is a Clang extension.
     if (getLangOpts().C2x)
-      Diag(Loc, diag::warn_c17_compat_bit_int);
+      Diag(Loc, diag::warn_c2x_compat_keyword) << Tok.getName();
     else
       Diag(Loc, diag::ext_bit_int) << getLangOpts().CPlusPlus;
   }

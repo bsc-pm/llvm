@@ -1763,6 +1763,13 @@ PreservedAnalyses PostOrderFunctionAttrsPass::run(LazyCallGraph::SCC &C,
                                                   CGSCCAnalysisManager &AM,
                                                   LazyCallGraph &CG,
                                                   CGSCCUpdateResult &) {
+  // Skip non-recursive functions if requested.
+  if (C.size() == 1 && SkipNonRecursive) {
+    LazyCallGraph::Node &N = *C.begin();
+    if (!N->lookup(N))
+      return PreservedAnalyses::all();
+  }
+
   FunctionAnalysisManager &FAM =
       AM.getResult<FunctionAnalysisManagerCGSCCProxy>(C, CG).getManager();
 
@@ -1808,40 +1815,12 @@ PreservedAnalyses PostOrderFunctionAttrsPass::run(LazyCallGraph::SCC &C,
   return PA;
 }
 
-namespace {
-
-struct PostOrderFunctionAttrsLegacyPass : public CallGraphSCCPass {
-  // Pass identification, replacement for typeid
-  static char ID;
-
-  PostOrderFunctionAttrsLegacyPass() : CallGraphSCCPass(ID) {
-    initializePostOrderFunctionAttrsLegacyPassPass(
-        *PassRegistry::getPassRegistry());
-  }
-
-  bool runOnSCC(CallGraphSCC &SCC) override;
-
-  void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.setPreservesCFG();
-    AU.addRequired<AssumptionCacheTracker>();
-    getAAResultsAnalysisUsage(AU);
-    CallGraphSCCPass::getAnalysisUsage(AU);
-  }
-};
-
-} // end anonymous namespace
-
-char PostOrderFunctionAttrsLegacyPass::ID = 0;
-INITIALIZE_PASS_BEGIN(PostOrderFunctionAttrsLegacyPass, "function-attrs",
-                      "Deduce function attributes", false, false)
-INITIALIZE_PASS_DEPENDENCY(AAResultsWrapperPass)
-INITIALIZE_PASS_DEPENDENCY(AssumptionCacheTracker)
-INITIALIZE_PASS_DEPENDENCY(CallGraphWrapperPass)
-INITIALIZE_PASS_END(PostOrderFunctionAttrsLegacyPass, "function-attrs",
-                    "Deduce function attributes", false, false)
-
-Pass *llvm::createPostOrderFunctionAttrsLegacyPass() {
-  return new PostOrderFunctionAttrsLegacyPass();
+void PostOrderFunctionAttrsPass::printPipeline(
+    raw_ostream &OS, function_ref<StringRef(StringRef)> MapClassName2PassName) {
+  static_cast<PassInfoMixin<PostOrderFunctionAttrsPass> *>(this)->printPipeline(
+      OS, MapClassName2PassName);
+  if (SkipNonRecursive)
+    OS << "<skip-non-recursive>";
 }
 
 template <typename AARGetterT>
@@ -1852,12 +1831,6 @@ static bool runImpl(CallGraphSCC &SCC, AARGetterT AARGetter) {
   }
 
   return !deriveAttrsInPostOrder(Functions, AARGetter).empty();
-}
-
-bool PostOrderFunctionAttrsLegacyPass::runOnSCC(CallGraphSCC &SCC) {
-  if (skipSCC(SCC))
-    return false;
-  return runImpl(SCC, LegacyAARGetter(*this));
 }
 
 static bool addNoRecurseAttrsTopDown(Function &F) {

@@ -948,7 +948,7 @@ void LeakReport::PrintSummary() {
 
 uptr LeakReport::ApplySuppressions() {
   LeakSuppressionContext *suppressions = GetSuppressionContext();
-  uptr new_suppressions = false;
+  uptr new_suppressions = 0;
   for (uptr i = 0; i < leaks_.size(); i++) {
     if (suppressions->Suppress(leaks_[i].stack_trace_id, leaks_[i].hit_count,
                                leaks_[i].total_size)) {
@@ -997,7 +997,7 @@ void __lsan_ignore_object(const void *p) {
   // Cannot use PointsIntoChunk or LsanMetadata here, since the allocator is not
   // locked.
   Lock l(&global_mutex);
-  IgnoreObjectResult res = IgnoreObjectLocked(p);
+  IgnoreObjectResult res = IgnoreObject(p);
   if (res == kIgnoreObjectInvalid)
     VReport(1, "__lsan_ignore_object(): no heap object found at %p\n", p);
   if (res == kIgnoreObjectAlreadyIgnored)

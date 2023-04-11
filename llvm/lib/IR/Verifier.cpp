@@ -1964,6 +1964,14 @@ void Verifier::verifyParameterAttrs(AttributeSet Attrs, Type *Ty,
       }
     }
   }
+
+  if (Attrs.hasAttribute(Attribute::NoFPClass)) {
+    uint64_t Val = Attrs.getAttribute(Attribute::NoFPClass).getValueAsInt();
+    Check(Val != 0, "Attribute 'nofpclass' must have at least one test bit set",
+          V);
+    Check((Val & ~static_cast<unsigned>(fcAllFlags)) == 0,
+          "Invalid value for 'nofpclass' test mask", V);
+  }
 }
 
 void Verifier::checkUnsignedBaseTenFuncAttr(AttributeList Attrs, StringRef Attr,
@@ -3888,7 +3896,8 @@ void Verifier::visitRangeMetadata(Instruction &I, MDNode *Range, Type *Ty) {
     ConstantInt *High =
         mdconst::dyn_extract<ConstantInt>(Range->getOperand(2 * i + 1));
     Check(High, "The upper limit must be an integer!", High);
-    Check(High->getType() == Low->getType() && High->getType() == Ty,
+    Check(High->getType() == Low->getType() &&
+          High->getType() == Ty->getScalarType(),
           "Range types must match instruction type!", &I);
 
     APInt HighV = High->getValue();
@@ -5070,7 +5079,7 @@ void Verifier::visitIntrinsicCall(Intrinsic::ID ID, CallBase &Call) {
   }
   case Intrinsic::is_fpclass: {
     const ConstantInt *TestMask = cast<ConstantInt>(Call.getOperand(1));
-    Check((TestMask->getZExtValue() & ~fcAllFlags) == 0,
+    Check((TestMask->getZExtValue() & ~static_cast<unsigned>(fcAllFlags)) == 0,
           "unsupported bits for llvm.is.fpclass test mask");
     break;
   }
@@ -5107,9 +5116,6 @@ void Verifier::visitIntrinsicCall(Intrinsic::ID ID, CallBase &Call) {
     Check(isa<MetadataAsValue>(Call.getArgOperand(0)),
           "invalid llvm.dbg.declare intrinsic call 1", Call);
     visitDbgIntrinsic("declare", cast<DbgVariableIntrinsic>(Call));
-    break;
-  case Intrinsic::dbg_addr: // llvm.dbg.addr
-    visitDbgIntrinsic("addr", cast<DbgVariableIntrinsic>(Call));
     break;
   case Intrinsic::dbg_value: // llvm.dbg.value
     visitDbgIntrinsic("value", cast<DbgVariableIntrinsic>(Call));
@@ -5632,15 +5638,28 @@ void Verifier::visitIntrinsicCall(Intrinsic::ID ID, CallBase &Call) {
     Type *Op0ElemTy = nullptr;
     Type *Op1ElemTy = nullptr;
     switch (ID) {
-    case Intrinsic::matrix_multiply:
+    case Intrinsic::matrix_multiply: {
       NumRows = cast<ConstantInt>(Call.getArgOperand(2));
+      ConstantInt *N = cast<ConstantInt>(Call.getArgOperand(3));
       NumColumns = cast<ConstantInt>(Call.getArgOperand(4));
+      Check(cast<FixedVectorType>(Call.getArgOperand(0)->getType())
+                    ->getNumElements() ==
+                NumRows->getZExtValue() * N->getZExtValue(),
+            "First argument of a matrix operation does not match specified "
+            "shape!");
+      Check(cast<FixedVectorType>(Call.getArgOperand(1)->getType())
+                    ->getNumElements() ==
+                N->getZExtValue() * NumColumns->getZExtValue(),
+            "Second argument of a matrix operation does not match specified "
+            "shape!");
+
       ResultTy = cast<VectorType>(Call.getType());
       Op0ElemTy =
           cast<VectorType>(Call.getArgOperand(0)->getType())->getElementType();
       Op1ElemTy =
           cast<VectorType>(Call.getArgOperand(1)->getType())->getElementType();
       break;
+    }
     case Intrinsic::matrix_transpose:
       NumRows = cast<ConstantInt>(Call.getArgOperand(1));
       NumColumns = cast<ConstantInt>(Call.getArgOperand(2));
@@ -6053,20 +6072,20 @@ void Verifier::visitConstrainedFPIntrinsic(ConstrainedFPIntrinsic &FPI) {
   case Intrinsic::experimental_constrained_fptosi:
   case Intrinsic::experimental_constrained_fptoui: {
     Value *Operand = FPI.getArgOperand(0);
-    uint64_t NumSrcElem = 0;
+    ElementCount SrcEC;
     Check(Operand->getType()->isFPOrFPVectorTy(),
           "Intrinsic first argument must be floating point", &FPI);
     if (auto *OperandT = dyn_cast<VectorType>(Operand->getType())) {
-      NumSrcElem = cast<FixedVectorType>(OperandT)->getNumElements();
+      SrcEC = cast<VectorType>(OperandT)->getElementCount();
     }
 
     Operand = &FPI;
-    Check((NumSrcElem > 0) == Operand->getType()->isVectorTy(),
+    Check(SrcEC.isNonZero() == Operand->getType()->isVectorTy(),
           "Intrinsic first argument and result disagree on vector use", &FPI);
     Check(Operand->getType()->isIntOrIntVectorTy(),
           "Intrinsic result must be an integer", &FPI);
     if (auto *OperandT = dyn_cast<VectorType>(Operand->getType())) {
-      Check(NumSrcElem == cast<FixedVectorType>(OperandT)->getNumElements(),
+      Check(SrcEC == cast<VectorType>(OperandT)->getElementCount(),
             "Intrinsic first argument and result vector lengths must be equal",
             &FPI);
     }
@@ -6076,20 +6095,20 @@ void Verifier::visitConstrainedFPIntrinsic(ConstrainedFPIntrinsic &FPI) {
   case Intrinsic::experimental_constrained_sitofp:
   case Intrinsic::experimental_constrained_uitofp: {
     Value *Operand = FPI.getArgOperand(0);
-    uint64_t NumSrcElem = 0;
+    ElementCount SrcEC;
     Check(Operand->getType()->isIntOrIntVectorTy(),
           "Intrinsic first argument must be integer", &FPI);
     if (auto *OperandT = dyn_cast<VectorType>(Operand->getType())) {
-      NumSrcElem = cast<FixedVectorType>(OperandT)->getNumElements();
+      SrcEC = cast<VectorType>(OperandT)->getElementCount();
     }
 
     Operand = &FPI;
-    Check((NumSrcElem > 0) == Operand->getType()->isVectorTy(),
+    Check(SrcEC.isNonZero() == Operand->getType()->isVectorTy(),
           "Intrinsic first argument and result disagree on vector use", &FPI);
     Check(Operand->getType()->isFPOrFPVectorTy(),
           "Intrinsic result must be a floating point", &FPI);
     if (auto *OperandT = dyn_cast<VectorType>(Operand->getType())) {
-      Check(NumSrcElem == cast<FixedVectorType>(OperandT)->getNumElements(),
+      Check(SrcEC == cast<VectorType>(OperandT)->getElementCount(),
             "Intrinsic first argument and result vector lengths must be equal",
             &FPI);
     }
@@ -6108,8 +6127,8 @@ void Verifier::visitConstrainedFPIntrinsic(ConstrainedFPIntrinsic &FPI) {
     Check(OperandTy->isVectorTy() == ResultTy->isVectorTy(),
           "Intrinsic first argument and result disagree on vector use", &FPI);
     if (OperandTy->isVectorTy()) {
-      Check(cast<FixedVectorType>(OperandTy)->getNumElements() ==
-                cast<FixedVectorType>(ResultTy)->getNumElements(),
+      Check(cast<VectorType>(OperandTy)->getElementCount() ==
+                cast<VectorType>(ResultTy)->getElementCount(),
             "Intrinsic first argument and result vector lengths must be equal",
             &FPI);
     }

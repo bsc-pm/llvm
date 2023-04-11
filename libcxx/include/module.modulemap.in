@@ -71,6 +71,10 @@ module std [system] {
     module stdint_h {
       header "stdint.h"
       export *
+      // FIXME: This module only exists on OS X and for some reason the
+      // wildcard above doesn't export it. Removing this breaks the tests
+      // for C compatibility headers in C++17 mode with modules enabled.
+      export Darwin.C.stdint
     }
     module stdio_h {
       // <stdio.h>'s __need_* macros require textual inclusion.
@@ -627,7 +631,10 @@ module std [system] {
     export *
 
     module __atomic {
-      module aliases             { private header "__atomic/aliases.h" }
+      module aliases             {
+        private header "__atomic/aliases.h"
+        export atomic
+      }
       module atomic              { private header "__atomic/atomic.h" }
       module atomic_base         { private header "__atomic/atomic_base.h" }
       module atomic_flag         { private header "__atomic/atomic_flag.h" }
@@ -680,11 +687,16 @@ module std [system] {
     export *
 
     module __charconv {
-      module chars_format      { private header "__charconv/chars_format.h" }
-      module from_chars_result { private header "__charconv/from_chars_result.h" }
-      module tables            { private header "__charconv/tables.h" }
-      module to_chars_base_10  { private header "__charconv/to_chars_base_10.h" }
-      module to_chars_result   { private header "__charconv/to_chars_result.h" }
+      module chars_format            { private header "__charconv/chars_format.h" }
+      module from_chars_integral     { private header "__charconv/from_chars_integral.h" }
+      module from_chars_result       { private header "__charconv/from_chars_result.h" }
+      module tables                  { private header "__charconv/tables.h" }
+      module to_chars                { private header "__charconv/to_chars.h" }
+      module to_chars_base_10        { private header "__charconv/to_chars_base_10.h" }
+      module to_chars_floating_point { private header "__charconv/to_chars_floating_point.h" }
+      module to_chars_integral       { private header "__charconv/to_chars_integral.h" }
+      module to_chars_result         { private header "__charconv/to_chars_result.h" }
+      module traits                  { private header "__charconv/traits.h" }
     }
 
   }
@@ -801,6 +813,10 @@ module std [system] {
   module condition_variable {
     header "condition_variable"
     export *
+
+    module __condition_variable {
+      module condition_variable { private header "__condition_variable/condition_variable.h" }
+    }
   }
   module coroutine {
     header "coroutine"
@@ -822,6 +838,14 @@ module std [system] {
   module exception {
     header "exception"
     export *
+
+    module __exception {
+      module exception        { private header "__exception/exception.h" }
+      module exception_ptr    { private header "__exception/exception_ptr.h" }
+      module nested_exception { private header "__exception/nested_exception.h" }
+      module operations       { private header "__exception/operations.h" }
+      module terminate        { private header "__exception/terminate.h" }
+    }
   }
   module execution {
     header "execution"
@@ -880,6 +904,7 @@ module std [system] {
         private header "__format/format_context.h"
         export optional
         export locale
+        export __locale
       }
       module format_error                    { private header "__format/format_error.h" }
       module format_functions                {
@@ -1154,6 +1179,13 @@ module std [system] {
     @requires_LIBCXX_ENABLE_THREADS@
     header "mutex"
     export *
+
+    module __mutex {
+      module lock_guard  { private header "__mutex/lock_guard.h" }
+      module mutex       { private header "__mutex/mutex.h" }
+      module tag_types   { private header "__mutex/tag_types.h" }
+      module unique_lock { private header "__mutex/unique_lock.h" }
+    }
   }
   module new {
     header "new"
@@ -1402,7 +1434,24 @@ module std [system] {
   }
   module system_error {
     header "system_error"
+    export __errc
     export *
+    module __system_error {
+      module errc           { private header "__system_error/errc.h" }
+      module error_category { private header "__system_error/error_category.h" }
+      module error_code {
+        private header "__system_error/error_code.h"
+        export functional.__functional.hash
+        export functional.__functional.unary_function
+      }
+      module error_condition {
+        private header "__system_error/error_condition.h"
+        export functional.__functional.hash
+        export functional.__functional.unary_function
+      }
+      module system_error { private header "__system_error/system_error.h" }
+
+    }
   }
   module thread {
     @requires_LIBCXX_ENABLE_THREADS@
@@ -1616,7 +1665,10 @@ module std [system] {
 
     module __utility {
       module as_const            { private header "__utility/as_const.h" }
-      module auto_cast           { private header "__utility/auto_cast.h" }
+      module auto_cast           {
+        private header "__utility/auto_cast.h"
+        export type_traits.decay
+      }
       module cmp                 { private header "__utility/cmp.h" }
       module convert_to_integral { private header "__utility/convert_to_integral.h" }
       module declval             { private header "__utility/declval.h" }
@@ -1665,14 +1717,12 @@ module std [system] {
   module __availability      { private header "__availability"      export * }
   module __bit_reference     { private header "__bit_reference"     export * }
   module __debug             {         header "__debug"             export * }
-  module __errc              { private header "__errc"              export * }
   module __hash_table        {         header "__hash_table"        export * }
   module __locale            {
     @requires_LIBCXX_ENABLE_LOCALIZATION@
     private header "__locale" export *
   }
   module __mbstate_t         { private header "__mbstate_t.h"       export * }
-  module __mutex_base        { private header "__mutex_base"        export * }
   module __node_handle       { private header "__node_handle"       export * }
   module __split_buffer      { private header "__split_buffer"      export * }
   module __std_stream        {
@@ -1687,20 +1737,12 @@ module std [system] {
   module experimental {
     requires cplusplus11
 
-    module algorithm {
-      header "experimental/algorithm"
-      export *
-    }
     module deque {
       header "experimental/deque"
       export *
     }
     module forward_list {
       header "experimental/forward_list"
-      export *
-    }
-    module functional {
-      header "experimental/functional"
       export *
     }
     module iterator {

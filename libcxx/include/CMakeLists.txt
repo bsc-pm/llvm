@@ -225,10 +225,15 @@ set(files
   __bsd_locale_defaults.h
   __bsd_locale_fallbacks.h
   __charconv/chars_format.h
+  __charconv/from_chars_integral.h
   __charconv/from_chars_result.h
   __charconv/tables.h
+  __charconv/to_chars.h
   __charconv/to_chars_base_10.h
+  __charconv/to_chars_floating_point.h
+  __charconv/to_chars_integral.h
   __charconv/to_chars_result.h
+  __charconv/traits.h
   __chrono/calendar.h
   __chrono/concepts.h
   __chrono/convert_to_timespec.h
@@ -289,6 +294,7 @@ set(files
   __concepts/semiregular.h
   __concepts/swappable.h
   __concepts/totally_ordered.h
+  __condition_variable/condition_variable.h
   __config
   __coroutine/coroutine_handle.h
   __coroutine/coroutine_traits.h
@@ -296,7 +302,11 @@ set(files
   __coroutine/trivial_awaitables.h
   __debug
   __debug_utils/randomize_range.h
-  __errc
+  __exception/exception.h
+  __exception/exception_ptr.h
+  __exception/nested_exception.h
+  __exception/operations.h
+  __exception/terminate.h
   __expected/bad_expected_access.h
   __expected/expected.h
   __expected/unexpect.h
@@ -464,7 +474,10 @@ set(files
   __memory_resource/pool_options.h
   __memory_resource/synchronized_pool_resource.h
   __memory_resource/unsynchronized_pool_resource.h
-  __mutex_base
+  __mutex/lock_guard.h
+  __mutex/mutex.h
+  __mutex/tag_types.h
+  __mutex/unique_lock.h
   __node_handle
   __numeric/accumulate.h
   __numeric/adjacent_difference.h
@@ -575,6 +588,11 @@ set(files
   __support/xlocale/__nop_locale_mgmt.h
   __support/xlocale/__posix_l_fallback.h
   __support/xlocale/__strtonum_fallback.h
+  __system_error/errc.h
+  __system_error/error_category.h
+  __system_error/error_code.h
+  __system_error/error_condition.h
+  __system_error/system_error.h
   __thread/poll_with_backoff.h
   __thread/timed_backoff_policy.h
   __threading_support
@@ -792,10 +810,8 @@ set(files
   expected
   experimental/__config
   experimental/__memory
-  experimental/algorithm
   experimental/deque
   experimental/forward_list
-  experimental/functional
   experimental/iterator
   experimental/list
   experimental/map

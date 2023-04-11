@@ -388,6 +388,29 @@ public:
     return (Desc.TSFlags & X86II::OpPrefixMask) == X86II::PD;
   }
 
+  bool shouldRecordCodeRelocation(uint64_t RelType) const override {
+    switch (RelType) {
+    case ELF::R_X86_64_8:
+    case ELF::R_X86_64_16:
+    case ELF::R_X86_64_32:
+    case ELF::R_X86_64_32S:
+    case ELF::R_X86_64_64:
+    case ELF::R_X86_64_PC8:
+    case ELF::R_X86_64_PC32:
+    case ELF::R_X86_64_PC64:
+    case ELF::R_X86_64_GOTPCRELX:
+    case ELF::R_X86_64_REX_GOTPCRELX:
+      return true;
+    case ELF::R_X86_64_PLT32:
+    case ELF::R_X86_64_GOTPCREL:
+    case ELF::R_X86_64_TPOFF32:
+    case ELF::R_X86_64_GOTTPOFF:
+      return false;
+    default:
+      llvm_unreachable("Unexpected x86 relocation type in code");
+    }
+  }
+
   unsigned getTrapFillValue() const override { return 0xCC; }
 
   struct IndJmpMatcherFrag1 : MCInstMatcher {
@@ -3030,11 +3053,12 @@ public:
     Inst.clear();
   }
 
-  void createInstrIncMemory(InstructionListType &Instrs, const MCSymbol *Target,
-                            MCContext *Ctx, bool IsLeaf) const override {
+  InstructionListType createInstrIncMemory(const MCSymbol *Target,
+                                           MCContext *Ctx,
+                                           bool IsLeaf) const override {
+    InstructionListType Instrs(IsLeaf ? 13 : 11);
     unsigned int I = 0;
 
-    Instrs.resize(IsLeaf ? 13 : 11);
     // Don't clobber application red zone (ABI dependent)
     if (IsLeaf)
       createStackPointerIncrement(Instrs[I++], 128,
@@ -3061,6 +3085,7 @@ public:
     if (IsLeaf)
       createStackPointerDecrement(Instrs[I], 128,
                                   /*NoFlagsClobber=*/true);
+    return Instrs;
   }
 
   void createSwap(MCInst &Inst, MCPhysReg Source, MCPhysReg MemBaseReg,
@@ -3085,8 +3110,7 @@ public:
     Inst.addOperand(MCOperand::createReg(X86::NoRegister)); // AddrSegmentReg
   }
 
-  InstructionListType createInstrumentedIndirectCall(const MCInst &CallInst,
-                                                     bool TailCall,
+  InstructionListType createInstrumentedIndirectCall(MCInst &&CallInst,
                                                      MCSymbol *HandlerFuncAddr,
                                                      int CallSiteID,
                                                      MCContext *Ctx) override {
@@ -3137,14 +3161,13 @@ public:
     createLoadImmediate(Insts.back(), TempReg, CallSiteID);
     Insts.emplace_back();
     createPushRegister(Insts.back(), TempReg, 8);
-    Insts.emplace_back();
-    createDirectCall(Insts.back(), HandlerFuncAddr, Ctx,
-                     /*TailCall=*/TailCall);
-    // Carry over metadata
-    for (int I = MCPlus::getNumPrimeOperands(CallInst),
-             E = CallInst.getNumOperands();
-         I != E; ++I)
-      Insts.back().addOperand(CallInst.getOperand(I));
+
+    MCInst &NewCallInst = Insts.emplace_back();
+    createDirectCall(NewCallInst, HandlerFuncAddr, Ctx, isTailCall(CallInst));
+
+    // Carry over metadata including tail call marker if present.
+    stripAnnotations(NewCallInst);
+    moveAnnotations(std::move(CallInst), NewCallInst);
 
     return Insts;
   }

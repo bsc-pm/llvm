@@ -294,7 +294,7 @@ static bool isCommutative(Instruction *I) {
 /// \returns inserting index of InsertElement or InsertValue instruction,
 /// using Offset as base offset for index.
 static std::optional<unsigned> getInsertIndex(const Value *InsertInst,
-                                         unsigned Offset = 0) {
+                                              unsigned Offset = 0) {
   int Index = Offset;
   if (const auto *IE = dyn_cast<InsertElementInst>(InsertInst)) {
     const auto *VT = dyn_cast<FixedVectorType>(IE->getType());
@@ -349,16 +349,16 @@ enum class UseMask {
 static SmallBitVector buildUseMask(int VF, ArrayRef<int> Mask,
                                    UseMask MaskArg) {
   SmallBitVector UseMask(VF, true);
-  for (auto P : enumerate(Mask)) {
-    if (P.value() == UndefMaskElem) {
+  for (auto [Idx, Value] : enumerate(Mask)) {
+    if (Value == UndefMaskElem) {
       if (MaskArg == UseMask::UndefsAsMask)
-        UseMask.reset(P.index());
+        UseMask.reset(Idx);
       continue;
     }
-    if (MaskArg == UseMask::FirstArg && P.value() < VF)
-      UseMask.reset(P.value());
-    else if (MaskArg == UseMask::SecondArg && P.value() >= VF)
-      UseMask.reset(P.value() - VF);
+    if (MaskArg == UseMask::FirstArg && Value < VF)
+      UseMask.reset(Value);
+    else if (MaskArg == UseMask::SecondArg && Value >= VF)
+      UseMask.reset(Value - VF);
   }
   return UseMask;
 }
@@ -554,8 +554,11 @@ tryToGatherExtractElements(SmallVectorImpl<Value *> &VL,
   SmallVector<int> UndefVectorExtracts;
   for (int I = 0, E = VL.size(); I < E; ++I) {
     auto *EI = dyn_cast<ExtractElementInst>(VL[I]);
-    if (!EI)
+    if (!EI) {
+      if (isa<UndefValue>(VL[I]))
+        UndefVectorExtracts.push_back(I);
       continue;
+    }
     auto *VecTy = dyn_cast<FixedVectorType>(EI->getVectorOperandType());
     if (!VecTy || !isa<ConstantInt, UndefValue>(EI->getIndexOperand()))
       continue;
@@ -1121,8 +1124,12 @@ public:
   /// Vectorize the tree but with the list of externally used values \p
   /// ExternallyUsedValues. Values in this MapVector can be replaced but the
   /// generated extractvalue instructions.
-  Value *vectorizeTree(ExtraValueToDebugLocsMap &ExternallyUsedValues,
-                       Instruction *ReductionRoot = nullptr);
+  /// \param ReplacedExternals containd list of replaced external values
+  /// {scalar, replace} after emitting extractelement for external uses.
+  Value *
+  vectorizeTree(const ExtraValueToDebugLocsMap &ExternallyUsedValues,
+                SmallVectorImpl<std::pair<Value *, Value *>> &ReplacedExternals,
+                Instruction *ReductionRoot = nullptr);
 
   /// \returns the cost incurred by unwanted spills and fills, caused by
   /// holding live values over call sites.
@@ -1158,6 +1165,12 @@ public:
            !VectorizableTree.front()->UserTreeIndices.empty();
   }
 
+  /// Return the scalars of the root node.
+  ArrayRef<Value *> getRootNodeScalars() const {
+    assert(!VectorizableTree.empty() && "No graph to get the first node from");
+    return VectorizableTree.front()->Scalars;
+  }
+
   /// Builds external uses of the vectorized scalars, i.e. the list of
   /// vectorized scalars to be extracted, their lanes and their scalar users. \p
   /// ExternallyUsedValues contains additional list of external uses to handle
@@ -1179,6 +1192,8 @@ public:
     MinBWs.clear();
     InstrElementSize.clear();
     UserIgnoreList = nullptr;
+    PostponedGathers.clear();
+    ValueToGatherNodes.clear();
   }
 
   unsigned getTreeSize() const { return VectorizableTree.size(); }
@@ -1198,9 +1213,12 @@ public:
   /// Gets reordering data for the given tree entry. If the entry is vectorized
   /// - just return ReorderIndices, otherwise check if the scalars can be
   /// reordered and return the most optimal order.
+  /// \return std::nullopt if ordering is not important, empty order, if
+  /// identity order is important, or the actual order.
   /// \param TopToBottom If true, include the order of vectorized stores and
   /// insertelement nodes, otherwise skip them.
-  std::optional<OrdersType> getReorderingData(const TreeEntry &TE, bool TopToBottom);
+  std::optional<OrdersType> getReorderingData(const TreeEntry &TE,
+                                              bool TopToBottom);
 
   /// Reorders the current graph to the most profitable order starting from the
   /// root node to the leaf nodes. The best order is chosen only from the nodes
@@ -1443,8 +1461,14 @@ public:
       ConstantInt *Ex1Idx;
       if (match(V1, m_ExtractElt(m_Value(EV1), m_ConstantInt(Ex1Idx)))) {
         // Undefs are always profitable for extractelements.
+        // Compiler can easily combine poison and extractelement <non-poison> or
+        // undef and extractelement <poison>. But combining undef +
+        // extractelement <non-poison-but-may-produce-poison> requires some
+        // extra operations.
         if (isa<UndefValue>(V2))
-          return LookAheadHeuristics::ScoreConsecutiveExtracts;
+          return (isa<PoisonValue>(V2) || isUndefVector(EV1).all())
+                     ? LookAheadHeuristics::ScoreConsecutiveExtracts
+                     : LookAheadHeuristics::ScoreSameOpcode;
         Value *EV2 = nullptr;
         ConstantInt *Ex2Idx = nullptr;
         if (match(V2,
@@ -1798,9 +1822,10 @@ public:
     // Search all operands in Ops[*][Lane] for the one that matches best
     // Ops[OpIdx][LastLane] and return its opreand index.
     // If no good match can be found, return std::nullopt.
-    std::optional<unsigned> getBestOperand(unsigned OpIdx, int Lane, int LastLane,
-                                      ArrayRef<ReorderingMode> ReorderingModes,
-                                      ArrayRef<Value *> MainAltOps) {
+    std::optional<unsigned>
+    getBestOperand(unsigned OpIdx, int Lane, int LastLane,
+                   ArrayRef<ReorderingMode> ReorderingModes,
+                   ArrayRef<Value *> MainAltOps) {
       unsigned NumOperands = getNumOperands();
 
       // The operand of the previous lane at OpIdx.
@@ -2475,8 +2500,9 @@ private:
   /// the bundle
   void setInsertPointAfterBundle(const TreeEntry *E);
 
-  /// \returns a vector from a collection of scalars in \p VL.
-  Value *gather(ArrayRef<Value *> VL);
+  /// \returns a vector from a collection of scalars in \p VL. if \p Root is not
+  /// specified, the starting vector value is poison.
+  Value *gather(ArrayRef<Value *> VL, Value *Root = nullptr);
 
   /// \returns whether the VectorizableTree is fully vectorizable and will
   /// be beneficial even the tree height is tiny.
@@ -2799,20 +2825,22 @@ private:
 
 #ifndef NDEBUG
   void dumpTreeCosts(const TreeEntry *E, InstructionCost ReuseShuffleCost,
-                     InstructionCost VecCost,
-                     InstructionCost ScalarCost) const {
-    dbgs() << "SLP: Calculated costs for Tree:\n"; E->dump();
+                     InstructionCost VecCost, InstructionCost ScalarCost,
+                     StringRef Banner) const {
+    dbgs() << "SLP: " << Banner << ":\n";
+    E->dump();
     dbgs() << "SLP: Costs:\n";
     dbgs() << "SLP:     ReuseShuffleCost = " << ReuseShuffleCost << "\n";
     dbgs() << "SLP:     VectorCost = " << VecCost << "\n";
     dbgs() << "SLP:     ScalarCost = " << ScalarCost << "\n";
-    dbgs() << "SLP:     ReuseShuffleCost + VecCost - ScalarCost = " <<
-               ReuseShuffleCost + VecCost - ScalarCost << "\n";
+    dbgs() << "SLP:     ReuseShuffleCost + VecCost - ScalarCost = "
+           << ReuseShuffleCost + VecCost - ScalarCost << "\n";
   }
 #endif
 
   /// Create a new VectorizableTree entry.
-  TreeEntry *newTreeEntry(ArrayRef<Value *> VL, std::optional<ScheduleData *> Bundle,
+  TreeEntry *newTreeEntry(ArrayRef<Value *> VL,
+                          std::optional<ScheduleData *> Bundle,
                           const InstructionsState &S,
                           const EdgeInfo &UserTreeIdx,
                           ArrayRef<int> ReuseShuffleIndices = std::nullopt,
@@ -2922,6 +2950,15 @@ private:
   /// vectorization process since the basic blocks are affected, need to
   /// pre-gather them before.
   DenseMap<const TreeEntry *, Instruction *> EntryToLastInstruction;
+
+  /// List of gather nodes, depending on other gather/vector nodes, which should
+  /// be emitted after the vector instruction emission process to correctly
+  /// handle order of the vector instructions and shuffles.
+  SetVector<const TreeEntry *> PostponedGathers;
+
+  using ValueToGatherNodesMap =
+      DenseMap<Value *, SmallPtrSet<const TreeEntry *, 4>>;
+  ValueToGatherNodesMap ValueToGatherNodes;
 
   /// This POD struct describes one external user in the vectorized tree.
   struct ExternalUser {
@@ -3768,10 +3805,8 @@ BoUpSLP::findReusedOrderedScalars(const BoUpSLP::TreeEntry &TE) {
           return false;
       return true;
     };
-    if (IsIdentityOrder(CurrentOrder)) {
-      CurrentOrder.clear();
-      return CurrentOrder;
-    }
+    if (IsIdentityOrder(CurrentOrder))
+      return OrdersType();
     auto *It = CurrentOrder.begin();
     for (unsigned I = 0; I < NumScalars;) {
       if (UsedPositions.test(I)) {
@@ -3784,7 +3819,7 @@ BoUpSLP::findReusedOrderedScalars(const BoUpSLP::TreeEntry &TE) {
       }
       ++It;
     }
-    return CurrentOrder;
+    return std::move(CurrentOrder);
   }
   return std::nullopt;
 }
@@ -3894,9 +3929,9 @@ static LoadsState canVectorizeLoads(ArrayRef<Value *> VL, const Value *VL0,
   return LoadsState::Gather;
 }
 
-bool clusterSortPtrAccesses(ArrayRef<Value *> VL, Type *ElemTy,
-                            const DataLayout &DL, ScalarEvolution &SE,
-                            SmallVectorImpl<unsigned> &SortedIndices) {
+static bool clusterSortPtrAccesses(ArrayRef<Value *> VL, Type *ElemTy,
+                                   const DataLayout &DL, ScalarEvolution &SE,
+                                   SmallVectorImpl<unsigned> &SortedIndices) {
   assert(llvm::all_of(
              VL, [](const Value *V) { return V->getType()->isPointerTy(); }) &&
          "Expected list of pointer operands.");
@@ -3940,7 +3975,7 @@ bool clusterSortPtrAccesses(ArrayRef<Value *> VL, Type *ElemTy,
         return std::get<1>(X) < std::get<1>(Y);
       });
       int InitialOffset = std::get<1>(Vec[0]);
-      AnyConsecutive |= all_of(enumerate(Vec), [InitialOffset](auto &P) {
+      AnyConsecutive |= all_of(enumerate(Vec), [InitialOffset](const auto &P) {
         return std::get<1>(P.value()) == int(P.index()) + InitialOffset;
       });
     }
@@ -3977,7 +4012,7 @@ BoUpSLP::findPartiallyOrderedLoads(const BoUpSLP::TreeEntry &TE) {
 
   BoUpSLP::OrdersType Order;
   if (clusterSortPtrAccesses(Ptrs, ScalarTy, *DL, *SE, Order))
-    return Order;
+    return std::move(Order);
   return std::nullopt;
 }
 
@@ -4003,31 +4038,35 @@ static bool areTwoInsertFromSameBuildVector(
   // Go through the vector operand of insertelement instructions trying to find
   // either VU as the original vector for IE2 or V as the original vector for
   // IE1.
+  SmallSet<int, 8> ReusedIdx;
+  bool IsReusedIdx = false;
   do {
-    if (IE2 == VU)
+    if (IE2 == VU && !IE1)
       return VU->hasOneUse();
-    if (IE1 == V)
+    if (IE1 == V && !IE2)
       return V->hasOneUse();
-    if (IE1) {
-      if ((IE1 != VU && !IE1->hasOneUse()) ||
-          getInsertIndex(IE1).value_or(*Idx2) == *Idx2)
+    if (IE1 && IE1 != V) {
+      IsReusedIdx |=
+          !ReusedIdx.insert(getInsertIndex(IE1).value_or(*Idx2)).second;
+      if ((IE1 != VU && !IE1->hasOneUse()) || IsReusedIdx)
         IE1 = nullptr;
       else
         IE1 = dyn_cast_or_null<InsertElementInst>(GetBaseOperand(IE1));
     }
-    if (IE2) {
-      if ((IE2 != V && !IE2->hasOneUse()) ||
-          getInsertIndex(IE2).value_or(*Idx1) == *Idx1)
+    if (IE2 && IE2 != VU) {
+      IsReusedIdx |=
+          !ReusedIdx.insert(getInsertIndex(IE2).value_or(*Idx1)).second;
+      if ((IE2 != V && !IE2->hasOneUse()) || IsReusedIdx)
         IE2 = nullptr;
       else
         IE2 = dyn_cast_or_null<InsertElementInst>(GetBaseOperand(IE2));
     }
-  } while (IE1 || IE2);
+  } while (!IsReusedIdx && (IE1 || IE2));
   return false;
 }
 
-std::optional<BoUpSLP::OrdersType> BoUpSLP::getReorderingData(const TreeEntry &TE,
-                                                         bool TopToBottom) {
+std::optional<BoUpSLP::OrdersType>
+BoUpSLP::getReorderingData(const TreeEntry &TE, bool TopToBottom) {
   // No need to reorder if need to shuffle reuses, still need to shuffle the
   // node.
   if (!TE.ReuseShuffleIndices.empty()) {
@@ -4081,8 +4120,8 @@ std::optional<BoUpSLP::OrdersType> BoUpSLP::getReorderingData(const TreeEntry &T
     }
     if (all_of(enumerate(ResOrder),
                [](const auto &Data) { return Data.index() == Data.value(); }))
-      return {}; // Use identity order.
-    return ResOrder;
+      return std::nullopt; // No need to reorder.
+    return std::move(ResOrder);
   }
   if (TE.State == TreeEntry::Vectorize &&
       (isa<LoadInst, ExtractElementInst, ExtractValueInst>(TE.getMainOp()) ||
@@ -4138,8 +4177,8 @@ std::optional<BoUpSLP::OrdersType> BoUpSLP::getReorderingData(const TreeEntry &T
     for (unsigned Id = 0, Sz = Phis.size(); Id < Sz; ++Id)
       ResOrder[Id] = PhiToId[Phis[Id]];
     if (IsIdentityOrder(ResOrder))
-      return {};
-    return ResOrder;
+      return std::nullopt; // No need to reorder.
+    return std::move(ResOrder);
   }
   if (TE.State == TreeEntry::NeedToGather) {
     // TODO: add analysis of other gather nodes with extractelement
@@ -4165,7 +4204,42 @@ std::optional<BoUpSLP::OrdersType> BoUpSLP::getReorderingData(const TreeEntry &T
       if (Reuse || !CurrentOrder.empty()) {
         if (!CurrentOrder.empty())
           fixupOrderingIndices(CurrentOrder);
-        return CurrentOrder;
+        return std::move(CurrentOrder);
+      }
+    }
+    // If the gather node is <undef, v, .., poison> and
+    // insertelement poison, v, 0 [+ permute]
+    // is cheaper than
+    // insertelement poison, v, n - try to reorder.
+    // If rotating the whole graph, exclude the permute cost, the whole graph
+    // might be transformed.
+    int Sz = TE.Scalars.size();
+    if (isSplat(TE.Scalars) && !allConstant(TE.Scalars) &&
+        count_if(TE.Scalars, UndefValue::classof) == Sz - 1) {
+      const auto *It =
+          find_if(TE.Scalars, [](Value *V) { return !isConstant(V); });
+      if (It == TE.Scalars.begin())
+        return OrdersType();
+      auto *Ty = FixedVectorType::get(TE.Scalars.front()->getType(), Sz);
+      if (It != TE.Scalars.end()) {
+        OrdersType Order(Sz, Sz);
+        unsigned Idx = std::distance(TE.Scalars.begin(), It);
+        Order[Idx] = 0;
+        fixupOrderingIndices(Order);
+        SmallVector<int> Mask;
+        inversePermutation(Order, Mask);
+        InstructionCost PermuteCost =
+            TopToBottom
+                ? 0
+                : TTI->getShuffleCost(TTI::SK_PermuteSingleSrc, Ty, Mask);
+        InstructionCost InsertFirstCost = TTI->getVectorInstrCost(
+            Instruction::InsertElement, Ty, TTI::TCK_RecipThroughput, 0,
+            PoisonValue::get(Ty), *It);
+        InstructionCost InsertIdxCost = TTI->getVectorInstrCost(
+            Instruction::InsertElement, Ty, TTI::TCK_RecipThroughput, Idx,
+            PoisonValue::get(Ty), *It);
+        if (InsertFirstCost + PermuteCost < InsertIdxCost)
+          return std::move(Order);
       }
     }
     if (std::optional<OrdersType> CurrentOrder = findReusedOrderedScalars(TE))
@@ -5191,9 +5265,6 @@ void BoUpSLP::buildTree_rec(ArrayRef<Value *> VL, unsigned Depth,
                                           Depth](ArrayRef<Value *> VL) {
     if (!S.getOpcode() || !S.isAltShuffle() || VL.size() > 2)
       return false;
-    if (S.getOpcode() == Instruction::GetElementPtr &&
-        !TTI->prefersVectorizedAddressing())
-      return true;
     if (VectorizableTree.size() < MinTreeSize)
       return false;
     if (Depth >= RecursionMaxDepth - 1)
@@ -6538,9 +6609,10 @@ protected:
         LocalVF = SVOpTy->getNumElements();
       SmallVector<int> ExtMask(Mask.size(), UndefMaskElem);
       for (auto [Idx, I] : enumerate(Mask)) {
-         if (I == UndefMaskElem)
-           continue;
-         ExtMask[Idx] = SV->getMaskValue(I);
+        if (I == UndefMaskElem ||
+            static_cast<unsigned>(I) >= SV->getShuffleMask().size())
+          continue;
+        ExtMask[Idx] = SV->getMaskValue(I);
       }
       bool IsOp1Undef =
           isUndefVector(SV->getOperand(0),
@@ -6571,7 +6643,8 @@ protected:
         Op = SV->getOperand(1);
     }
     if (auto *OpTy = dyn_cast<FixedVectorType>(Op->getType());
-        !OpTy || !isIdentityMask(Mask, OpTy, SinglePermute)) {
+        !OpTy || !isIdentityMask(Mask, OpTy, SinglePermute) ||
+        ShuffleVectorInst::isZeroEltSplatMask(Mask)) {
       if (IdentityOp) {
         V = IdentityOp;
         assert(Mask.size() == IdentityMask.size() &&
@@ -6603,6 +6676,8 @@ protected:
   static Value *createShuffle(Value *V1, Value *V2, ArrayRef<int> Mask,
                               ShuffleBuilderTy &Builder) {
     assert(V1 && "Expected at least one vector value.");
+    if (V2)
+      Builder.resizeToMatch(V1, V2);
     int VF = Mask.size();
     if (auto *FTy = dyn_cast<FixedVectorType>(V1->getType()))
       VF = FTy->getNumElements();
@@ -6690,6 +6765,15 @@ protected:
           CombinedMask1[I] = CombinedMask2[I] + (Op1 == Op2 ? 0 : VF);
         }
       }
+      const int Limit = CombinedMask1.size() * 2;
+      if (Op1 == Op2 && Limit == 2 * VF &&
+          all_of(CombinedMask1, [=](int Idx) { return Idx < Limit; }) &&
+          (ShuffleVectorInst::isIdentityMask(CombinedMask1) ||
+           (ShuffleVectorInst::isZeroEltSplatMask(CombinedMask1) &&
+            isa<ShuffleVectorInst>(Op1) &&
+            cast<ShuffleVectorInst>(Op1)->getShuffleMask() ==
+                ArrayRef(CombinedMask1))))
+        return Op1;
       return Builder.createShuffleVector(
           Op1, Op1 == Op2 ? PoisonValue::get(Op1->getType()) : Op2,
           CombinedMask1);
@@ -6937,16 +7021,18 @@ InstructionCost BoUpSLP::getEntryCost(const TreeEntry *E,
         return TTI::TCC_Free;
       // Add broadcast for non-identity shuffle only.
       bool NeedShuffle =
-          VL.front() != *It || !all_of(VL.drop_front(), UndefValue::classof);
-      InstructionCost InsertCost =
-          TTI->getVectorInstrCost(Instruction::InsertElement, VecTy, CostKind,
-                                  /*Index=*/0, PoisonValue::get(VecTy), *It);
+          count(VL, *It) > 1 &&
+          (VL.front() != *It || !all_of(VL.drop_front(), UndefValue::classof));
+      InstructionCost InsertCost = TTI->getVectorInstrCost(
+          Instruction::InsertElement, VecTy, CostKind,
+          NeedShuffle ? 0 : std::distance(VL.begin(), It),
+          PoisonValue::get(VecTy), *It);
       return InsertCost + (NeedShuffle
                                ? TTI->getShuffleCost(
                                      TargetTransformInfo::SK_Broadcast, VecTy,
                                      /*Mask=*/std::nullopt, CostKind,
                                      /*Index=*/0,
-                                     /*SubTp=*/nullptr, /*Args=*/VL[0])
+                                     /*SubTp=*/nullptr, /*Args=*/*It)
                                : TTI::TCC_Free);
     }
     InstructionCost ReuseShuffleCost = 0;
@@ -7091,48 +7177,92 @@ InstructionCost BoUpSLP::getEntryCost(const TreeEntry *E,
         }
 
         InstructionCost VecCost = VectorCost(CommonCost);
-        LLVM_DEBUG(
-            dumpTreeCosts(E, CommonCost, VecCost - CommonCost, ScalarCost));
-        // Disable warnings for `this` and `E` are unused. Required for
-        // `dumpTreeCosts`.
-        (void)this;
-        (void)E;
+        LLVM_DEBUG(dumpTreeCosts(E, CommonCost, VecCost - CommonCost,
+                                 ScalarCost, "Calculated costs for Tree"));
         return VecCost - ScalarCost;
       };
   // Calculate cost difference from vectorizing set of GEPs.
   // Negative value means vectorizing is profitable.
   auto GetGEPCostDiff = [=](ArrayRef<Value *> Ptrs, Value *BasePtr) {
-    InstructionCost CostSavings = 0;
-    for (Value *V : Ptrs) {
-      if (V == BasePtr)
-        continue;
-      auto *Ptr = dyn_cast<GetElementPtrInst>(V);
-      // GEPs may contain just addresses without instructions, considered free.
-      // GEPs with all constant indices also considered to have zero cost.
-      if (!Ptr || Ptr->hasAllConstantIndices())
-        continue;
+    InstructionCost ScalarCost = 0;
+    InstructionCost VecCost = 0;
+    // Here we differentiate two cases: (1) when Ptrs represent a regular
+    // vectorization tree node (as they are pointer arguments of scattered
+    // loads) or (2) when Ptrs are the arguments of loads or stores being
+    // vectorized as plane wide unit-stride load/store since all the
+    // loads/stores are known to be from/to adjacent locations.
+    assert(E->State == TreeEntry::Vectorize &&
+           "Entry state expected to be Vectorize here.");
+    if (isa<LoadInst, StoreInst>(VL0)) {
+      // Case 2: estimate costs for pointer related costs when vectorizing to
+      // a wide load/store.
+      // Scalar cost is estimated as a set of pointers with known relationship
+      // between them.
+      // For vector code we will use BasePtr as argument for the wide load/store
+      // but we also need to account all the instructions which are going to
+      // stay in vectorized code due to uses outside of these scalar
+      // loads/stores.
+      ScalarCost = TTI->getPointersChainCost(
+          Ptrs, BasePtr, TTI::PointersChainInfo::getKnownUniformStrided(),
+          CostKind);
 
-      // Here we differentiate two cases: when GEPs represent a regular
-      // vectorization tree node (and hence vectorized) and when the set is
-      // arguments of a set of loads or stores being vectorized. In the former
-      // case all the scalar GEPs will be removed as a result of vectorization.
+      SmallVector<const Value *> PtrsRetainedInVecCode;
+      for (Value *V : Ptrs) {
+        if (V == BasePtr) {
+          PtrsRetainedInVecCode.push_back(V);
+          continue;
+        }
+        auto *Ptr = dyn_cast<GetElementPtrInst>(V);
+        // For simplicity assume Ptr to stay in vectorized code if it's not a
+        // GEP instruction. We don't care since it's cost considered free.
+        // TODO: We should check for any uses outside of vectorizable tree
+        // rather than just single use.
+        if (!Ptr || !Ptr->hasOneUse())
+          PtrsRetainedInVecCode.push_back(V);
+      }
+
+      if (PtrsRetainedInVecCode.size() == Ptrs.size()) {
+        // If all pointers stay in vectorized code then we don't have
+        // any savings on that.
+        LLVM_DEBUG(dumpTreeCosts(E, 0, ScalarCost, ScalarCost,
+                                 "Calculated GEPs cost for Tree"));
+        return InstructionCost{TTI::TCC_Free};
+      }
+      VecCost = TTI->getPointersChainCost(
+          PtrsRetainedInVecCode, BasePtr,
+          TTI::PointersChainInfo::getKnownNonUniformStrided(), CostKind);
+    } else {
+      // Case 1: Ptrs are the arguments of loads that we are going to transform
+      // into masked gather load intrinsic.
+      // All the scalar GEPs will be removed as a result of vectorization.
       // For any external uses of some lanes extract element instructions will
-      // be generated (which cost is estimated separately). For the latter case
-      // since the set of GEPs itself is not vectorized those used more than
-      // once will remain staying in vectorized code as well. So we should not
-      // count them as savings.
-      if (!Ptr->hasOneUse() && isa<LoadInst, StoreInst>(VL0))
-        continue;
+      // be generated (which cost is estimated separately).
+      TTI::PointersChainInfo PtrsInfo =
+          all_of(Ptrs,
+                 [](const Value *V) {
+                   auto *Ptr = dyn_cast<GetElementPtrInst>(V);
+                   return Ptr && !Ptr->hasAllConstantIndices();
+                 })
+              ? TTI::PointersChainInfo::getNonUniformStrided()
+              : TTI::PointersChainInfo::getKnownNonUniformStrided();
 
-      // TODO: it is target dependent, so need to implement and then use a TTI
-      // interface.
-      CostSavings += TTI->getArithmeticInstrCost(Instruction::Add,
-                                                 Ptr->getType(), CostKind);
+      ScalarCost = TTI->getPointersChainCost(Ptrs, BasePtr, PtrsInfo, CostKind);
+
+      // Remark: it not quite correct to use scalar GEP cost for a vector GEP,
+      // but it's not clear how to do that without having vector GEP arguments
+      // ready.
+      // Perhaps using just TTI::TCC_Free/TTI::TCC_Basic would be better option.
+      if (const auto *Base = dyn_cast<GetElementPtrInst>(BasePtr)) {
+        SmallVector<const Value *> Indices(Base->indices());
+        VecCost = TTI->getGEPCost(Base->getSourceElementType(),
+                                  Base->getPointerOperand(), Indices, CostKind);
+      }
     }
-    LLVM_DEBUG(dbgs() << "SLP: Calculated GEPs cost savings or Tree:\n";
-               E->dump());
-    LLVM_DEBUG(dbgs() << "SLP:     GEP cost saving = " << CostSavings << "\n");
-    return InstructionCost() - CostSavings;
+
+    LLVM_DEBUG(dumpTreeCosts(E, 0, VecCost, ScalarCost,
+                             "Calculated GEPs cost for Tree"));
+
+    return VecCost - ScalarCost;
   };
 
   switch (ShuffleOrOp) {
@@ -8023,6 +8153,16 @@ static T *performExtractsShuffleAction(
 }
 
 InstructionCost BoUpSLP::getTreeCost(ArrayRef<Value *> VectorizedVals) {
+  // Build a map for gathered scalars to the nodes where they are used.
+  ValueToGatherNodes.clear();
+  for (const std::unique_ptr<TreeEntry> &EntryPtr : VectorizableTree) {
+    if (EntryPtr->State != TreeEntry::NeedToGather)
+      continue;
+    for (Value *V : EntryPtr->Scalars)
+      if (!isConstant(V))
+        ValueToGatherNodes.try_emplace(V).first->getSecond().insert(
+            EntryPtr.get());
+  }
   InstructionCost Cost = 0;
   LLVM_DEBUG(dbgs() << "SLP: Calculating cost for tree of size "
                     << VectorizableTree.size() << ".\n");
@@ -8299,45 +8439,6 @@ BoUpSLP::isGatherShuffledEntry(const TreeEntry *TE, ArrayRef<Value *> VL,
       return false;
     return true;
   };
-  // Build a lists of values to tree entries.
-  DenseMap<Value *, SmallPtrSet<const TreeEntry *, 4>> ValueToTEs;
-  for (const std::unique_ptr<TreeEntry> &EntryPtr : VectorizableTree) {
-    if (EntryPtr.get() == TE)
-      continue;
-    if (EntryPtr->State != TreeEntry::NeedToGather)
-      continue;
-    if (!any_of(EntryPtr->Scalars, [&GatheredScalars](Value *V) {
-          return GatheredScalars.contains(V);
-        }))
-      continue;
-    assert(EntryPtr->UserTreeIndices.size() == 1 &&
-           "Expected only single user of the gather node.");
-    Instruction &EntryUserInst =
-        getLastInstructionInBundle(EntryPtr->UserTreeIndices.front().UserTE);
-    if (&UserInst == &EntryUserInst) {
-      // If 2 gathers are operands of the same entry, compare operands indices,
-      // use the earlier one as the base.
-      if (TE->UserTreeIndices.front().UserTE ==
-              EntryPtr->UserTreeIndices.front().UserTE &&
-          TE->UserTreeIndices.front().EdgeIdx <
-              EntryPtr->UserTreeIndices.front().EdgeIdx)
-        continue;
-    }
-    // Check if the user node of the TE comes after user node of EntryPtr,
-    // otherwise EntryPtr depends on TE.
-    auto *EntryPHI = dyn_cast<PHINode>(&EntryUserInst);
-    auto *EntryI =
-        EntryPHI
-            ? EntryPHI
-                  ->getIncomingBlock(EntryPtr->UserTreeIndices.front().EdgeIdx)
-                  ->getTerminator()
-            : &EntryUserInst;
-    if (!CheckOrdering(EntryI))
-      continue;
-    for (Value *V : EntryPtr->Scalars)
-      if (!isConstant(V))
-        ValueToTEs.try_emplace(V).first->getSecond().insert(EntryPtr.get());
-  }
   // Find all tree entries used by the gathered values. If no common entries
   // found - not a shuffle.
   // Here we build a set of tree nodes for each gathered value and trying to
@@ -8347,16 +8448,56 @@ BoUpSLP::isGatherShuffledEntry(const TreeEntry *TE, ArrayRef<Value *> VL,
   // have a permutation of 2 input vectors.
   SmallVector<SmallPtrSet<const TreeEntry *, 4>> UsedTEs;
   DenseMap<Value *, int> UsedValuesEntry;
-  for (Value *V : TE->Scalars) {
+  for (Value *V : VL) {
     if (isConstant(V))
       continue;
     // Build a list of tree entries where V is used.
     SmallPtrSet<const TreeEntry *, 4> VToTEs;
-    auto It = ValueToTEs.find(V);
-    if (It != ValueToTEs.end())
-      VToTEs = It->second;
-    if (const TreeEntry *VTE = getTreeEntry(V))
+    for (const TreeEntry *TEPtr : ValueToGatherNodes.find(V)->second) {
+      if (TEPtr == TE)
+        continue;
+      if (!any_of(TEPtr->Scalars, [&GatheredScalars](Value *V) {
+            return GatheredScalars.contains(V);
+          }))
+        continue;
+      assert(TEPtr->UserTreeIndices.size() == 1 &&
+             "Expected only single user of the gather node.");
+      Instruction &EntryUserInst =
+          getLastInstructionInBundle(TEPtr->UserTreeIndices.front().UserTE);
+      PHINode *EntryPHI =
+          dyn_cast<PHINode>(TEPtr->UserTreeIndices.front().UserTE->getMainOp());
+      if (&UserInst == &EntryUserInst && !EntryPHI) {
+        // If 2 gathers are operands of the same entry, compare operands
+        // indices, use the earlier one as the base.
+        if (TE->UserTreeIndices.front().UserTE ==
+                TEPtr->UserTreeIndices.front().UserTE &&
+            TE->UserTreeIndices.front().EdgeIdx <
+                TEPtr->UserTreeIndices.front().EdgeIdx)
+          continue;
+      }
+      // Check if the user node of the TE comes after user node of EntryPtr,
+      // otherwise EntryPtr depends on TE.
+      auto *EntryI = EntryPHI
+                         ? EntryPHI
+                               ->getIncomingBlock(
+                                   TEPtr->UserTreeIndices.front().EdgeIdx)
+                               ->getTerminator()
+                         : &EntryUserInst;
+      if (!CheckOrdering(EntryI) &&
+          (ParentBB != EntryI->getParent() ||
+           TE->UserTreeIndices.front().UserTE !=
+               TEPtr->UserTreeIndices.front().UserTE ||
+           TE->UserTreeIndices.front().EdgeIdx <
+               TEPtr->UserTreeIndices.front().EdgeIdx))
+        continue;
+      VToTEs.insert(TEPtr);
+    }
+    if (const TreeEntry *VTE = getTreeEntry(V)) {
+      Instruction &EntryUserInst = getLastInstructionInBundle(VTE);
+      if (&EntryUserInst == &UserInst || !CheckOrdering(&EntryUserInst))
+        continue;
       VToTEs.insert(VTE);
+    }
     if (VToTEs.empty())
       continue;
     if (UsedTEs.empty()) {
@@ -8412,12 +8553,12 @@ BoUpSLP::isGatherShuffledEntry(const TreeEntry *TE, ArrayRef<Value *> VL,
     auto *It = find_if(FirstEntries, [=](const TreeEntry *EntryPtr) {
       return EntryPtr->isSame(VL) || EntryPtr->isSame(TE->Scalars);
     });
-    if (It != FirstEntries.end()) {
+    if (It != FirstEntries.end() && (*It)->getVectorFactor() == VL.size()) {
       Entries.push_back(*It);
       std::iota(Mask.begin(), Mask.end(), 0);
       // Clear undef scalars.
       for (int I = 0, Sz = VL.size(); I < Sz; ++I)
-        if (isa<PoisonValue>(TE->Scalars[I]))
+        if (isa<PoisonValue>(VL[I]))
           Mask[I] = UndefMaskElem;
       return TargetTransformInfo::SK_PermuteSingleSrc;
     }
@@ -8454,10 +8595,18 @@ BoUpSLP::isGatherShuffledEntry(const TreeEntry *TE, ArrayRef<Value *> VL,
         break;
       }
     }
-    // No 2 source vectors with the same vector factor - give up and do regular
-    // gather.
-    if (Entries.empty())
-      return std::nullopt;
+    // No 2 source vectors with the same vector factor - just choose 2 with max
+    // index.
+    if (Entries.empty()) {
+      Entries.push_back(
+          *std::max_element(UsedTEs.front().begin(), UsedTEs.front().end(),
+                            [](const TreeEntry *TE1, const TreeEntry *TE2) {
+                              return TE1->Idx < TE2->Idx;
+                            }));
+      Entries.push_back(SecondEntries.front());
+      VF = std::max(Entries.front()->getVectorFactor(),
+                    Entries.back()->getVectorFactor());
+    }
   }
 
   bool IsSplatOrUndefs = isSplat(VL) || all_of(VL, UndefValue::classof);
@@ -8793,7 +8942,7 @@ void BoUpSLP::setInsertPointAfterBundle(const TreeEntry *E) {
   Builder.SetCurrentDebugLocation(Front->getDebugLoc());
 }
 
-Value *BoUpSLP::gather(ArrayRef<Value *> VL) {
+Value *BoUpSLP::gather(ArrayRef<Value *> VL, Value *Root) {
   // List of instructions/lanes from current block and/or the blocks which are
   // part of the current loop. These instructions will be inserted at the end to
   // make it possible to optimize loops and hoist invariant instructions out of
@@ -8810,7 +8959,8 @@ Value *BoUpSLP::gather(ArrayRef<Value *> VL) {
   for (int I = 0, E = VL.size(); I < E; ++I) {
     if (auto *Inst = dyn_cast<Instruction>(VL[I]))
       if ((CheckPredecessor(Inst->getParent(), Builder.GetInsertBlock()) ||
-           getTreeEntry(Inst) || (L && (L->contains(Inst)))) &&
+           getTreeEntry(Inst) ||
+           (L && (!Root || L->isLoopInvariant(Root)) && L->contains(Inst))) &&
           PostponedIndices.insert(I).second)
         PostponedInsts.emplace_back(Inst, I);
   }
@@ -8833,7 +8983,7 @@ Value *BoUpSLP::gather(ArrayRef<Value *> VL) {
   Value *Val0 =
       isa<StoreInst>(VL[0]) ? cast<StoreInst>(VL[0])->getValueOperand() : VL[0];
   FixedVectorType *VecTy = FixedVectorType::get(Val0->getType(), VL.size());
-  Value *Vec = PoisonValue::get(VecTy);
+  Value *Vec = Root ? Root : PoisonValue::get(VecTy);
   SmallVector<int> NonConsts;
   // Insert constant values at first.
   for (int I = 0, E = VL.size(); I < E; ++I) {
@@ -8842,6 +8992,18 @@ Value *BoUpSLP::gather(ArrayRef<Value *> VL) {
     if (!isConstant(VL[I])) {
       NonConsts.push_back(I);
       continue;
+    }
+    if (Root) {
+      if (!isa<UndefValue>(VL[I])) {
+        NonConsts.push_back(I);
+        continue;
+      }
+      if (isa<PoisonValue>(VL[I]))
+        continue;
+      if (auto *SV = dyn_cast<ShuffleVectorInst>(Root)) {
+        if (SV->getMaskValue(I) == UndefMaskElem)
+          continue;
+      }
     }
     Vec = CreateInsertElement(Vec, VL[I], I);
   }
@@ -8989,6 +9151,39 @@ public:
   ShuffleInstructionBuilder(IRBuilderBase &Builder, BoUpSLP &R)
       : Builder(Builder), R(R) {}
 
+  /// Adjusts extractelements after reusing them.
+  Value *adjustExtracts(const TreeEntry *E, ArrayRef<int> Mask) {
+    Value *VecBase = nullptr;
+    for (int I = 0, Sz = Mask.size(); I < Sz; ++I) {
+      int Idx = Mask[I];
+      if (Idx == UndefMaskElem)
+        continue;
+      auto *EI = cast<ExtractElementInst>(E->Scalars[I]);
+      VecBase = EI->getVectorOperand();
+      // If the only one use is vectorized - can delete the extractelement
+      // itself.
+      if (!EI->hasOneUse() || any_of(EI->users(), [&](User *U) {
+            return !R.ScalarToTreeEntry.count(U);
+          }))
+        continue;
+      R.eraseInstruction(EI);
+    }
+    return VecBase;
+  };
+  /// Checks if the specified entry \p E needs to be delayed because of its
+  /// dependency nodes.
+  Value *needToDelay(const TreeEntry *E, ArrayRef<const TreeEntry *> Deps) {
+    // No need to delay emission if all deps are ready.
+    if (all_of(Deps, [](const TreeEntry *TE) { return TE->VectorizedValue; }))
+      return nullptr;
+    // Postpone gather emission, will be emitted after the end of the
+    // process to keep correct order.
+    auto *VecTy = FixedVectorType::get(E->Scalars.front()->getType(),
+                                       E->getVectorFactor());
+    Value *Vec = Builder.CreateAlignedLoad(
+        VecTy, PoisonValue::get(VecTy->getPointerTo()), MaybeAlign());
+    return Vec;
+  };
   /// Adds 2 input vectors and the mask for their shuffling.
   void add(Value *V1, Value *V2, ArrayRef<int> Mask) {
     assert(V1 && V2 && !Mask.empty() && "Expected non-empty input vectors.");
@@ -9001,11 +9196,11 @@ public:
     Value *Vec = InVectors.front();
     if (InVectors.size() == 2) {
       Vec = createShuffle(Vec, InVectors.back(), CommonMask);
-      transformMaskAfterShuffle(CommonMask, Mask);
+      transformMaskAfterShuffle(CommonMask, CommonMask);
     } else if (cast<FixedVectorType>(Vec->getType())->getNumElements() !=
                Mask.size()) {
       Vec = createShuffle(Vec, nullptr, CommonMask);
-      transformMaskAfterShuffle(CommonMask, Mask);
+      transformMaskAfterShuffle(CommonMask, CommonMask);
     }
     V1 = createShuffle(V1, V2, Mask);
     for (unsigned Idx = 0, Sz = CommonMask.size(); Idx < Sz; ++Idx)
@@ -9081,9 +9276,34 @@ public:
     add(V1, NewMask);
   }
   /// Finalize emission of the shuffles.
+  /// \param Action the action (if any) to be performed before final applying of
+  /// the \p ExtMask mask.
   Value *
-  finalize(ArrayRef<int> ExtMask = std::nullopt) {
+  finalize(ArrayRef<int> ExtMask, unsigned VF = 0,
+           function_ref<void(Value *&, SmallVectorImpl<int> &)> Action = {}) {
     IsFinalized = true;
+    if (Action) {
+      Value *Vec = InVectors.front();
+      if (InVectors.size() == 2) {
+        Vec = createShuffle(Vec, InVectors.back(), CommonMask);
+        InVectors.pop_back();
+      } else {
+        Vec = createShuffle(Vec, nullptr, CommonMask);
+      }
+      for (unsigned Idx = 0, Sz = CommonMask.size(); Idx < Sz; ++Idx)
+        if (CommonMask[Idx] != UndefMaskElem)
+          CommonMask[Idx] = Idx;
+      assert(VF > 0 &&
+             "Expected vector length for the final value before action.");
+      unsigned VecVF = cast<FixedVectorType>(Vec->getType())->getNumElements();
+      if (VecVF < VF) {
+        SmallVector<int> ResizeMask(VF, UndefMaskElem);
+        std::iota(ResizeMask.begin(), std::next(ResizeMask.begin(), VecVF), 0);
+        Vec = createShuffle(Vec, nullptr, ResizeMask);
+      }
+      Action(Vec, CommonMask);
+      InVectors.front() = Vec;
+    }
     if (!ExtMask.empty()) {
       if (CommonMask.empty()) {
         CommonMask.assign(ExtMask.begin(), ExtMask.end());
@@ -9183,6 +9403,21 @@ Value *BoUpSLP::vectorizeOperand(TreeEntry *E, unsigned NodeIdx) {
           V = FinalShuffle(V, UniformMask);
         }
       }
+      // Need to update the operand gather node, if actually the operand is not a
+      // vectorized node, but the buildvector/gather node, which matches one of
+      // the vectorized nodes.
+      if (find_if(VE->UserTreeIndices, [&](const EdgeInfo &EI) {
+            return EI.UserTE == E && EI.EdgeIdx == NodeIdx;
+          }) == VE->UserTreeIndices.end()) {
+        auto *It = find_if(
+            VectorizableTree, [&](const std::unique_ptr<TreeEntry> &TE) {
+              return TE->State == TreeEntry::NeedToGather &&
+                     TE->UserTreeIndices.front().UserTE == E &&
+                     TE->UserTreeIndices.front().EdgeIdx == NodeIdx;
+            });
+        assert(It != VectorizableTree.end() && "Expected gather node operand.");
+        (*It)->VectorizedValue = V;
+      }
       return V;
     }
   }
@@ -9212,202 +9447,59 @@ Value *BoUpSLP::createBuildVector(const TreeEntry *E) {
   assert(E->State == TreeEntry::NeedToGather && "Expected gather node.");
   unsigned VF = E->getVectorFactor();
 
-  ShuffleInstructionBuilder ShuffleBuilder(Builder, *this);
-  SmallVector<Value *> Gathered(
-      VF, PoisonValue::get(E->Scalars.front()->getType()));
   bool NeedFreeze = false;
-  SmallVector<Value *> VL(E->Scalars.begin(), E->Scalars.end());
-  // Build a mask out of the redorder indices and reorder scalars per this mask.
+  SmallVector<int> ReuseShuffleIndicies(E->ReuseShuffleIndices.begin(),
+                                        E->ReuseShuffleIndices.end());
+  SmallVector<Value *> GatheredScalars(E->Scalars.begin(), E->Scalars.end());
+  // Build a mask out of the reorder indices and reorder scalars per this
+  // mask.
   SmallVector<int> ReorderMask;
   inversePermutation(E->ReorderIndices, ReorderMask);
   if (!ReorderMask.empty())
-    reorderScalars(VL, ReorderMask);
-  SmallVector<int> ReuseMask(VF, UndefMaskElem);
-  if (!allConstant(VL)) {
-    // For splats with can emit broadcasts instead of gathers, so try to find
-    // such sequences.
-    bool IsSplat = isSplat(VL) && (VL.size() > 2 || VL.front() == VL.back());
-    SmallVector<int> UndefPos;
-    DenseMap<Value *, unsigned> UniquePositions;
-    // Gather unique non-const values and all constant values.
-    // For repeated values, just shuffle them.
-    for (auto [I, V] : enumerate(VL)) {
-      if (isa<UndefValue>(V)) {
-        if (!isa<PoisonValue>(V)) {
-          Gathered[I] = V;
-          ReuseMask[I] = I;
-          UndefPos.push_back(I);
-        }
-        continue;
-      }
-      if (isConstant(V)) {
-        Gathered[I] = V;
-        ReuseMask[I] = I;
-        continue;
-      }
-      if (IsSplat) {
-        Gathered.front() = V;
-        ReuseMask[I] = 0;
-      } else {
-        const auto Res = UniquePositions.try_emplace(V, I);
-        Gathered[Res.first->second] = V;
-        ReuseMask[I] = Res.first->second;
-      }
-    }
-    if (!UndefPos.empty() && IsSplat) {
-      // For undef values, try to replace them with the simple broadcast.
-      // We can do it if the broadcasted value is guaranteed to be
-      // non-poisonous, or by freezing the incoming scalar value first.
-      auto *It = find_if(Gathered, [this, E](Value *V) {
-        return !isa<UndefValue>(V) &&
-               (getTreeEntry(V) || isGuaranteedNotToBePoison(V) ||
-                any_of(V->uses(), [E](const Use &U) {
-                  // Check if the value already used in the same operation in
-                  // one of the nodes already.
-                  return E->UserTreeIndices.size() == 1 &&
-                         is_contained(
-                             E->UserTreeIndices.front().UserTE->Scalars,
-                             U.getUser()) &&
-                         E->UserTreeIndices.front().EdgeIdx != U.getOperandNo();
-                }));
-      });
-      if (It != Gathered.end()) {
-        // Replace undefs by the non-poisoned scalars and emit broadcast.
-        int Pos = std::distance(Gathered.begin(), It);
-        for_each(UndefPos, [&](int I) {
-          // Set the undef position to the non-poisoned scalar.
-          ReuseMask[I] = Pos;
-          // Replace the undef by the poison, in the mask it is replaced by non-poisoned scalar already.
-          if (I != Pos)
-            Gathered[I] = PoisonValue::get(Gathered[I]->getType());
+    reorderScalars(GatheredScalars, ReorderMask);
+  auto FindReusedSplat = [&](SmallVectorImpl<int> &Mask) {
+    if (!isSplat(E->Scalars) || none_of(E->Scalars, [](Value *V) {
+          return isa<UndefValue>(V) && !isa<PoisonValue>(V);
+        }))
+      return false;
+    TreeEntry *UserTE = E->UserTreeIndices.back().UserTE;
+    unsigned EdgeIdx = E->UserTreeIndices.back().EdgeIdx;
+    if (UserTE->getNumOperands() != 2)
+      return false;
+    auto *It =
+        find_if(VectorizableTree, [=](const std::unique_ptr<TreeEntry> &TE) {
+          return find_if(TE->UserTreeIndices, [=](const EdgeInfo &EI) {
+                   return EI.UserTE == UserTE && EI.EdgeIdx != EdgeIdx;
+                 }) != TE->UserTreeIndices.end();
         });
-      } else {
-        // Replace undefs by the poisons, emit broadcast and then emit
-        // freeze.
-        for_each(UndefPos, [&](int I) {
-          ReuseMask[I] = UndefMaskElem;
-          if (isa<UndefValue>(Gathered[I]))
-            Gathered[I] = PoisonValue::get(Gathered[I]->getType());
-        });
-        NeedFreeze = true;
-      }
-    }
-  } else {
-    ReuseMask.clear();
-    copy(VL, Gathered.begin());
-  }
-  // Gather unique scalars and all constants.
-  Value *Vec = gather(Gathered);
-  ShuffleBuilder.add(Vec, ReuseMask);
-  Vec = ShuffleBuilder.finalize(E->ReuseShuffleIndices);
-  if (NeedFreeze)
-    Vec = Builder.CreateFreeze(Vec);
-  return Vec;
-}
-
-Value *BoUpSLP::vectorizeTree(TreeEntry *E) {
-  IRBuilder<>::InsertPointGuard Guard(Builder);
-
-  if (E->VectorizedValue) {
-    LLVM_DEBUG(dbgs() << "SLP: Diamond merged for " << *E->Scalars[0] << ".\n");
-    return E->VectorizedValue;
-  }
-
-  auto FinalShuffle = [&](Value *V, const TreeEntry *E) {
-    ShuffleInstructionBuilder ShuffleBuilder(Builder, *this);
-    if (E->State != TreeEntry::NeedToGather &&
-        E->getOpcode() == Instruction::Store) {
-      ArrayRef<int> Mask =
-          ArrayRef(reinterpret_cast<const int *>(E->ReorderIndices.begin()),
-                   E->ReorderIndices.size());
-      ShuffleBuilder.add(V, Mask);
-    } else {
-      ShuffleBuilder.addOrdered(V, E->ReorderIndices);
-    }
-    return ShuffleBuilder.finalize(E->ReuseShuffleIndices);
+    if (It == VectorizableTree.end())
+      return false;
+    unsigned I =
+        *find_if_not(Mask, [](int Idx) { return Idx == UndefMaskElem; });
+    int Sz = Mask.size();
+    if (all_of(Mask, [Sz](int Idx) { return Idx < 2 * Sz; }) &&
+        ShuffleVectorInst::isIdentityMask(Mask))
+      std::iota(Mask.begin(), Mask.end(), 0);
+    else
+      std::fill(Mask.begin(), Mask.end(), I);
+    return true;
   };
-
-  if (E->State == TreeEntry::NeedToGather) {
-    if (E->Idx > 0) {
-      // We are in the middle of a vectorizable chain. We need to gather the
-      // scalars from the users.
-      Value *Vec = createBuildVector(E);
-      E->VectorizedValue = Vec;
-      return Vec;
-    }
-    if (E->getMainOp())
-      setInsertPointAfterBundle(E);
-    unsigned VF = E->getVectorFactor();
-    auto AdjustExtracts = [&](const TreeEntry *E, ArrayRef<int> Mask) {
-      Value *VecBase = nullptr;
-      for (int I = 0, Sz = Mask.size(); I < Sz; ++I) {
-        int Idx = Mask[I];
-        if (Idx == UndefMaskElem)
-          continue;
-        auto *EI = cast<ExtractElementInst>(E->Scalars[I]);
-        VecBase = EI->getVectorOperand();
-        // If all users are vectorized - can delete the extractelement
-        // itself.
-        if (any_of(EI->users(),
-                   [&](User *U) { return !ScalarToTreeEntry.count(U); }))
-          continue;
-        eraseInstruction(EI);
-      }
-      return VecBase;
-    };
-    auto CreateShuffle = [&](Value *V1, Value *V2, ArrayRef<int> Mask) {
-      if (V1->getType() != V2->getType()) {
-        unsigned VF1 = cast<FixedVectorType>(V1->getType())->getNumElements();
-        unsigned VF2 = cast<FixedVectorType>(V2->getType())->getNumElements();
-        unsigned VF = std::max(VF1, VF2);
-        SmallVector<int> ExtMask(VF, UndefMaskElem);
-        std::iota(ExtMask.begin(),
-                  std::next(ExtMask.begin(), std::min(VF1, VF2)), 0);
-        if (VF1 < VF2) {
-          V1 = Builder.CreateShuffleVector(V1, ExtMask);
-          if (auto *I = dyn_cast<Instruction>(V1)) {
-            GatherShuffleExtractSeq.insert(I);
-            CSEBlocks.insert(I->getParent());
-          }
-        } else {
-          V2 = Builder.CreateShuffleVector(V2, ExtMask);
-          if (auto *I = dyn_cast<Instruction>(V2)) {
-            GatherShuffleExtractSeq.insert(I);
-            CSEBlocks.insert(I->getParent());
-          }
-        }
-      }
-      Value *Vec = Builder.CreateShuffleVector(V1, V2, Mask);
-      if (auto *I = dyn_cast<Instruction>(Vec)) {
-        GatherShuffleExtractSeq.insert(I);
-        CSEBlocks.insert(I->getParent());
-      }
-      return Vec;
-    };
-
-    SmallVector<int> ReuseShuffleIndicies(E->ReuseShuffleIndices.begin(),
-                                          E->ReuseShuffleIndices.end());
-    SmallVector<Value *> GatheredScalars(E->Scalars.begin(), E->Scalars.end());
-    // Build a mask out of the reorder indices and reorder scalars per this
-    // mask.
-    SmallVector<int> ReorderMask;
-    inversePermutation(E->ReorderIndices, ReorderMask);
-    if (!ReorderMask.empty())
-      reorderScalars(GatheredScalars, ReorderMask);
-    Value *Vec = nullptr;
-    SmallVector<int> Mask;
-    SmallVector<int> ExtractMask;
-    std::optional<TargetTransformInfo::ShuffleKind> ExtractShuffle;
-    std::optional<TargetTransformInfo::ShuffleKind> GatherShuffle;
-    SmallVector<const TreeEntry *> Entries;
-    Type *ScalarTy = GatheredScalars.front()->getType();
+  ShuffleInstructionBuilder ShuffleBuilder(Builder, *this);
+  Value *Vec = nullptr;
+  SmallVector<int> Mask;
+  SmallVector<int> ExtractMask;
+  std::optional<TargetTransformInfo::ShuffleKind> ExtractShuffle;
+  std::optional<TargetTransformInfo::ShuffleKind> GatherShuffle;
+  SmallVector<const TreeEntry *> Entries;
+  Type *ScalarTy = GatheredScalars.front()->getType();
+  if (!all_of(GatheredScalars, UndefValue::classof)) {
     // Check for gathered extracts.
     ExtractShuffle = tryToGatherExtractElements(GatheredScalars, ExtractMask);
     SmallVector<Value *> IgnoredVals;
     if (UserIgnoreList)
       IgnoredVals.assign(UserIgnoreList->begin(), UserIgnoreList->end());
     bool Resized = false;
-    if (Value *VecBase = AdjustExtracts(E, ExtractMask))
+    if (Value *VecBase = ShuffleBuilder.adjustExtracts(E, ExtractMask))
       if (auto *VecBaseTy = dyn_cast<FixedVectorType>(VecBase->getType()))
         if (VF == VecBaseTy->getNumElements() && GatheredScalars.size() != VF) {
           Resized = true;
@@ -9419,9 +9511,17 @@ Value *BoUpSLP::vectorizeTree(TreeEntry *E) {
         E->isAltShuffle() ||
         all_of(E->Scalars, [this](Value *V) { return getTreeEntry(V); }) ||
         isSplat(E->Scalars) ||
-        (E->Scalars != GatheredScalars && GatheredScalars.size() <= 2))
+        (E->Scalars != GatheredScalars && GatheredScalars.size() <= 2)) {
       GatherShuffle = isGatherShuffledEntry(E, GatheredScalars, Mask, Entries);
+    }
     if (GatherShuffle) {
+      if (Value *Delayed = ShuffleBuilder.needToDelay(E, Entries)) {
+        // Delay emission of gathers which are not ready yet.
+        PostponedGathers.insert(E);
+        // Postpone gather emission, will be emitted after the end of the
+        // process to keep correct order.
+        return Delayed;
+      }
       assert((Entries.size() == 1 || Entries.size() == 2) &&
              "Expected shuffle of 1 or 2 entries.");
       if (!Resized) {
@@ -9437,59 +9537,265 @@ Value *BoUpSLP::vectorizeTree(TreeEntry *E) {
           GatheredScalars[I] = PoisonValue::get(ScalarTy);
       }
     }
-    if ((ExtractShuffle || GatherShuffle) &&
-        all_of(GatheredScalars, PoisonValue::classof)) {
-      Value *Vec1 = nullptr;
-      if (ExtractShuffle) {
-        // Gather of extractelements can be represented as just a shuffle of
-        // a single/two vectors the scalars are extracted from.
-        // Find input vectors.
-        Value *Vec2 = nullptr;
-        for (unsigned I = 0, Sz = ExtractMask.size(); I < Sz; ++I) {
-          if (ExtractMask[I] == UndefMaskElem ||
-              (!Mask.empty() && Mask[I] != UndefMaskElem)) {
-            ExtractMask[I] = UndefMaskElem;
-            continue;
-          }
-          if (isa<UndefValue>(E->Scalars[I]))
-            continue;
-          auto *EI = cast<ExtractElementInst>(E->Scalars[I]);
-          if (!Vec1) {
-            Vec1 = EI->getVectorOperand();
-          } else if (Vec1 != EI->getVectorOperand()) {
-            assert((!Vec2 || Vec2 == EI->getVectorOperand()) &&
-                   "Expected only 1 or 2 vectors shuffle.");
-            Vec2 = EI->getVectorOperand();
-          }
+  }
+  auto TryPackScalars = [&](SmallVectorImpl<Value *> &Scalars,
+                            SmallVectorImpl<int> &ReuseMask,
+                            bool IsRootPoison) {
+    // For splats with can emit broadcasts instead of gathers, so try to find
+    // such sequences.
+    bool IsSplat = IsRootPoison && isSplat(Scalars) &&
+                   (Scalars.size() > 2 || Scalars.front() == Scalars.back());
+    Scalars.append(VF - Scalars.size(), PoisonValue::get(ScalarTy));
+    SmallVector<int> UndefPos;
+    DenseMap<Value *, unsigned> UniquePositions;
+    // Gather unique non-const values and all constant values.
+    // For repeated values, just shuffle them.
+    int NumNonConsts = 0;
+    int SinglePos = 0;
+    for (auto [I, V] : enumerate(Scalars)) {
+      if (isa<UndefValue>(V)) {
+        if (!isa<PoisonValue>(V)) {
+          ReuseMask[I] = I;
+          UndefPos.push_back(I);
         }
-        if (Vec2)
-          Vec1 = CreateShuffle(Vec1, Vec2, ExtractMask);
-        else if (Vec1)
-          Vec1 = CreateShuffle(Vec1, Vec1, ExtractMask);
+        continue;
       }
-      if (GatherShuffle) {
-        Vec = CreateShuffle(Entries.front()->VectorizedValue,
-                            Entries.back()->VectorizedValue, Mask);
-        if (Vec1) {
-          // Build final mask.
-          for (auto [I, Idx] : enumerate(Mask)) {
-            if (ExtractMask[I] != UndefMaskElem)
-              Idx = I;
-            else if (Idx != UndefMaskElem)
-              Idx = I + VF;
-          }
-          Vec = CreateShuffle(Vec1, Vec, Mask);
-        }
+      if (isConstant(V)) {
+        ReuseMask[I] = I;
+        continue;
+      }
+      ++NumNonConsts;
+      SinglePos = I;
+      Value *OrigV = V;
+      Scalars[I] = PoisonValue::get(ScalarTy);
+      if (IsSplat) {
+        Scalars.front() = OrigV;
+        ReuseMask[I] = 0;
       } else {
-        Vec = Vec1;
+        const auto Res = UniquePositions.try_emplace(OrigV, I);
+        Scalars[Res.first->second] = OrigV;
+        ReuseMask[I] = Res.first->second;
       }
-    } else {
-      Vec = gather(E->Scalars);
     }
-    Vec = FinalShuffle(Vec, E);
+    if (NumNonConsts == 1) {
+      // Restore single insert element.
+      if (IsSplat) {
+        ReuseMask.assign(VF, UndefMaskElem);
+        std::swap(Scalars.front(), Scalars[SinglePos]);
+        if (!UndefPos.empty() && UndefPos.front() == 0)
+          Scalars.front() = UndefValue::get(ScalarTy);
+      }
+      ReuseMask[SinglePos] = SinglePos;
+    } else if (!UndefPos.empty() && IsSplat) {
+      // For undef values, try to replace them with the simple broadcast.
+      // We can do it if the broadcasted value is guaranteed to be
+      // non-poisonous, or by freezing the incoming scalar value first.
+      auto *It = find_if(Scalars, [this, E](Value *V) {
+        return !isa<UndefValue>(V) &&
+               (getTreeEntry(V) || isGuaranteedNotToBePoison(V) ||
+                (E->UserTreeIndices.size() == 1 &&
+                 any_of(V->uses(), [E](const Use &U) {
+                   // Check if the value already used in the same operation in
+                   // one of the nodes already.
+                   return E->UserTreeIndices.front().EdgeIdx !=
+                              U.getOperandNo() &&
+                          is_contained(
+                              E->UserTreeIndices.front().UserTE->Scalars,
+                              U.getUser());
+                 })));
+      });
+      if (It != Scalars.end()) {
+        // Replace undefs by the non-poisoned scalars and emit broadcast.
+        int Pos = std::distance(Scalars.begin(), It);
+        for_each(UndefPos, [&](int I) {
+          // Set the undef position to the non-poisoned scalar.
+          ReuseMask[I] = Pos;
+          // Replace the undef by the poison, in the mask it is replaced by
+          // non-poisoned scalar already.
+          if (I != Pos)
+            Scalars[I] = PoisonValue::get(ScalarTy);
+        });
+      } else {
+        // Replace undefs by the poisons, emit broadcast and then emit
+        // freeze.
+        for_each(UndefPos, [&](int I) {
+          ReuseMask[I] = UndefMaskElem;
+          if (isa<UndefValue>(Scalars[I]))
+            Scalars[I] = PoisonValue::get(ScalarTy);
+        });
+        NeedFreeze = true;
+      }
+    }
+  };
+  if (ExtractShuffle || GatherShuffle) {
+    bool IsNonPoisoned = true;
+    bool IsUsedInExpr = false;
+    Value *Vec1 = nullptr;
+    if (ExtractShuffle) {
+      // Gather of extractelements can be represented as just a shuffle of
+      // a single/two vectors the scalars are extracted from.
+      // Find input vectors.
+      Value *Vec2 = nullptr;
+      for (unsigned I = 0, Sz = ExtractMask.size(); I < Sz; ++I) {
+        if (ExtractMask[I] == UndefMaskElem ||
+            (!Mask.empty() && Mask[I] != UndefMaskElem)) {
+          ExtractMask[I] = UndefMaskElem;
+          continue;
+        }
+        if (isa<UndefValue>(E->Scalars[I]))
+          continue;
+        auto *EI = cast<ExtractElementInst>(E->Scalars[I]);
+        if (!Vec1) {
+          Vec1 = EI->getVectorOperand();
+        } else if (Vec1 != EI->getVectorOperand()) {
+          assert((!Vec2 || Vec2 == EI->getVectorOperand()) &&
+                 "Expected only 1 or 2 vectors shuffle.");
+          Vec2 = EI->getVectorOperand();
+        }
+      }
+      if (Vec2) {
+        IsNonPoisoned &=
+            isGuaranteedNotToBePoison(Vec1) && isGuaranteedNotToBePoison(Vec2);
+        ShuffleBuilder.add(Vec1, Vec2, ExtractMask);
+      } else if (Vec1) {
+        IsUsedInExpr = FindReusedSplat(ExtractMask);
+        ShuffleBuilder.add(Vec1, ExtractMask);
+        IsNonPoisoned &= isGuaranteedNotToBePoison(Vec1);
+      } else {
+        ShuffleBuilder.add(PoisonValue::get(FixedVectorType::get(
+                               ScalarTy, GatheredScalars.size())),
+                           ExtractMask);
+      }
+    }
+    if (GatherShuffle) {
+      if (Entries.size() == 1) {
+        IsUsedInExpr = FindReusedSplat(Mask);
+        ShuffleBuilder.add(Entries.front()->VectorizedValue, Mask);
+        IsNonPoisoned &=
+            isGuaranteedNotToBePoison(Entries.front()->VectorizedValue);
+      } else {
+        ShuffleBuilder.add(Entries.front()->VectorizedValue,
+                           Entries.back()->VectorizedValue, Mask);
+        IsNonPoisoned &=
+            isGuaranteedNotToBePoison(Entries.front()->VectorizedValue) &&
+            isGuaranteedNotToBePoison(Entries.back()->VectorizedValue);
+      }
+    }
+    // Try to figure out best way to combine values: build a shuffle and insert
+    // elements or just build several shuffles.
+    // Insert non-constant scalars.
+    SmallVector<Value *> NonConstants(GatheredScalars);
+    int EMSz = ExtractMask.size();
+    int MSz = Mask.size();
+    // Try to build constant vector and shuffle with it only if currently we
+    // have a single permutation and more than 1 scalar constants.
+    bool IsSingleShuffle = !ExtractShuffle || !GatherShuffle;
+    bool IsIdentityShuffle =
+        (ExtractShuffle.value_or(TTI::SK_PermuteTwoSrc) ==
+             TTI::SK_PermuteSingleSrc &&
+         none_of(ExtractMask, [&](int I) { return I >= EMSz; }) &&
+         ShuffleVectorInst::isIdentityMask(ExtractMask)) ||
+        (GatherShuffle.value_or(TTI::SK_PermuteTwoSrc) ==
+             TTI::SK_PermuteSingleSrc &&
+         none_of(Mask, [&](int I) { return I >= MSz; }) &&
+         ShuffleVectorInst::isIdentityMask(Mask));
+    bool EnoughConstsForShuffle =
+        IsSingleShuffle &&
+        (none_of(GatheredScalars,
+                 [](Value *V) {
+                   return isa<UndefValue>(V) && !isa<PoisonValue>(V);
+                 }) ||
+         any_of(GatheredScalars,
+                [](Value *V) {
+                  return isa<Constant>(V) && !isa<UndefValue>(V);
+                })) &&
+        (!IsIdentityShuffle ||
+         (GatheredScalars.size() == 2 &&
+          any_of(GatheredScalars,
+                 [](Value *V) { return !isa<UndefValue>(V); })) ||
+         count_if(GatheredScalars, [](Value *V) {
+           return isa<Constant>(V) && !isa<PoisonValue>(V);
+         }) > 1);
+    // NonConstants array contains just non-constant values, GatheredScalars
+    // contains only constant to build final vector and then shuffle.
+    for (int I = 0, Sz = GatheredScalars.size(); I < Sz; ++I) {
+      if (EnoughConstsForShuffle && isa<Constant>(GatheredScalars[I]))
+        NonConstants[I] = PoisonValue::get(ScalarTy);
+      else
+        GatheredScalars[I] = PoisonValue::get(ScalarTy);
+    }
+    // Generate constants for final shuffle and build a mask for them.
+    if (!all_of(GatheredScalars, PoisonValue::classof)) {
+      SmallVector<int> BVMask(GatheredScalars.size(), UndefMaskElem);
+      TryPackScalars(GatheredScalars, BVMask, /*IsRootPoison=*/true);
+      Value *BV = gather(GatheredScalars);
+      ShuffleBuilder.add(BV, BVMask);
+    }
+    if (all_of(NonConstants, [=](Value *V) {
+          return isa<PoisonValue>(V) ||
+                 (IsSingleShuffle && ((IsIdentityShuffle &&
+                  IsNonPoisoned) || IsUsedInExpr) && isa<UndefValue>(V));
+        }))
+      Vec = ShuffleBuilder.finalize(E->ReuseShuffleIndices);
+    else
+      Vec = ShuffleBuilder.finalize(
+          E->ReuseShuffleIndices, E->Scalars.size(),
+          [&](Value *&Vec, SmallVectorImpl<int> &Mask) {
+            TryPackScalars(NonConstants, Mask, /*IsRootPoison=*/false);
+            Vec = gather(NonConstants, Vec);
+          });
+  } else if (!allConstant(GatheredScalars)) {
+    // Gather unique scalars and all constants.
+    SmallVector<int> ReuseMask(GatheredScalars.size(), UndefMaskElem);
+    TryPackScalars(GatheredScalars, ReuseMask, /*IsRootPoison=*/true);
+    Vec = gather(GatheredScalars);
+    ShuffleBuilder.add(Vec, ReuseMask);
+    Vec = ShuffleBuilder.finalize(E->ReuseShuffleIndices);
+  } else {
+    // Gather all constants.
+    SmallVector<int> Mask(E->Scalars.size(), UndefMaskElem);
+    for (auto [I, V] : enumerate(E->Scalars)) {
+      if (!isa<PoisonValue>(V))
+        Mask[I] = I;
+    }
+    Vec = gather(E->Scalars);
+    ShuffleBuilder.add(Vec, Mask);
+    Vec = ShuffleBuilder.finalize(E->ReuseShuffleIndices);
+  }
+
+  if (NeedFreeze)
+    Vec = Builder.CreateFreeze(Vec);
+  return Vec;
+}
+
+Value *BoUpSLP::vectorizeTree(TreeEntry *E) {
+  IRBuilder<>::InsertPointGuard Guard(Builder);
+
+  if (E->VectorizedValue) {
+    LLVM_DEBUG(dbgs() << "SLP: Diamond merged for " << *E->Scalars[0] << ".\n");
+    return E->VectorizedValue;
+  }
+
+  if (E->State == TreeEntry::NeedToGather) {
+    if (E->getMainOp() && E->Idx == 0)
+      setInsertPointAfterBundle(E);
+    Value *Vec = createBuildVector(E);
     E->VectorizedValue = Vec;
     return Vec;
   }
+
+  auto FinalShuffle = [&](Value *V, const TreeEntry *E) {
+    ShuffleInstructionBuilder ShuffleBuilder(Builder, *this);
+    if (E->getOpcode() == Instruction::Store) {
+      ArrayRef<int> Mask =
+          ArrayRef(reinterpret_cast<const int *>(E->ReorderIndices.begin()),
+                   E->ReorderIndices.size());
+      ShuffleBuilder.add(V, Mask);
+    } else {
+      ShuffleBuilder.addOrdered(V, E->ReorderIndices);
+    }
+    return ShuffleBuilder.finalize(E->ReuseShuffleIndices);
+  };
 
   assert((E->State == TreeEntry::Vectorize ||
           E->State == TreeEntry::ScatterVectorize) &&
@@ -10092,7 +10398,8 @@ Value *BoUpSLP::vectorizeTree(TreeEntry *E) {
 
 Value *BoUpSLP::vectorizeTree() {
   ExtraValueToDebugLocsMap ExternallyUsedValues;
-  return vectorizeTree(ExternallyUsedValues);
+  SmallVector<std::pair<Value *, Value *>> ReplacedExternals;
+  return vectorizeTree(ExternallyUsedValues, ReplacedExternals);
 }
 
 namespace {
@@ -10106,8 +10413,10 @@ struct ShuffledInsertData {
 };
 } // namespace
 
-Value *BoUpSLP::vectorizeTree(ExtraValueToDebugLocsMap &ExternallyUsedValues,
-                              Instruction *ReductionRoot) {
+Value *BoUpSLP::vectorizeTree(
+    const ExtraValueToDebugLocsMap &ExternallyUsedValues,
+    SmallVectorImpl<std::pair<Value *, Value *>> &ReplacedExternals,
+    Instruction *ReductionRoot) {
   // All blocks must be scheduled before any instructions are inserted.
   for (auto &BSIter : BlocksSchedules) {
     scheduleBlock(BSIter.second.get());
@@ -10128,6 +10437,36 @@ Value *BoUpSLP::vectorizeTree(ExtraValueToDebugLocsMap &ExternallyUsedValues,
   Builder.SetInsertPoint(ReductionRoot ? ReductionRoot
                                        : &F->getEntryBlock().front());
   auto *VectorRoot = vectorizeTree(VectorizableTree[0].get());
+  // Run through the list of postponed gathers and emit them, replacing the temp
+  // emitted allocas with actual vector instructions.
+  ArrayRef<const TreeEntry *> PostponedNodes = PostponedGathers.getArrayRef();
+  DenseMap<Value *, SmallVector<TreeEntry *>> PostponedValues;
+  for (const TreeEntry *E : PostponedNodes) {
+    auto *TE = const_cast<TreeEntry *>(E);
+    if (auto *VecTE = getTreeEntry(TE->Scalars.front()))
+      if (VecTE->isSame(TE->UserTreeIndices.front().UserTE->getOperand(
+              TE->UserTreeIndices.front().EdgeIdx)))
+        // Found gather node which is absolutely the same as one of the
+        // vectorized nodes. It may happen after reordering.
+        continue;
+    auto *PrevVec = cast<Instruction>(TE->VectorizedValue);
+    TE->VectorizedValue = nullptr;
+    auto *UserI =
+        cast<Instruction>(TE->UserTreeIndices.front().UserTE->VectorizedValue);
+    Builder.SetInsertPoint(PrevVec);
+    Builder.SetCurrentDebugLocation(UserI->getDebugLoc());
+    Value *Vec = vectorizeTree(TE);
+    PrevVec->replaceAllUsesWith(Vec);
+    PostponedValues.try_emplace(Vec).first->second.push_back(TE);
+    // Replace the stub vector node, if it was used before for one of the
+    // buildvector nodes already.
+    auto It = PostponedValues.find(PrevVec);
+    if (It != PostponedValues.end()) {
+      for (TreeEntry *VTE : It->getSecond())
+        VTE->VectorizedValue = Vec;
+    }
+    eraseInstruction(PrevVec);
+  }
 
   // If the vectorized tree can be rewritten in a smaller type, we truncate the
   // vectorized root. InstCombine will then rewrite the entire expression. We
@@ -10245,14 +10584,9 @@ Value *BoUpSLP::vectorizeTree(ExtraValueToDebugLocsMap &ExternallyUsedValues,
         Builder.SetInsertPoint(&F->getEntryBlock().front());
       }
       Value *NewInst = ExtractAndExtendIfNeeded(Vec);
-      auto &NewInstLocs = ExternallyUsedValues[NewInst];
-      auto It = ExternallyUsedValues.find(Scalar);
-      assert(It != ExternallyUsedValues.end() &&
-             "Externally used scalar is not found in ExternallyUsedValues");
-      NewInstLocs.append(It->second);
-      ExternallyUsedValues.erase(Scalar);
       // Required to update internally referenced instructions.
       Scalar->replaceAllUsesWith(NewInst);
+      ReplacedExternals.emplace_back(Scalar, NewInst);
       continue;
     }
 
@@ -11518,60 +11852,6 @@ void BoUpSLP::computeMinimumValueSizes() {
     MinBWs[Scalar] = std::make_pair(MaxBitWidth, !IsKnownPositive);
 }
 
-namespace {
-
-/// The SLPVectorizer Pass.
-struct SLPVectorizer : public FunctionPass {
-  SLPVectorizerPass Impl;
-
-  /// Pass identification, replacement for typeid
-  static char ID;
-
-  explicit SLPVectorizer() : FunctionPass(ID) {
-    initializeSLPVectorizerPass(*PassRegistry::getPassRegistry());
-  }
-
-  bool doInitialization(Module &M) override { return false; }
-
-  bool runOnFunction(Function &F) override {
-    if (skipFunction(F))
-      return false;
-
-    auto *SE = &getAnalysis<ScalarEvolutionWrapperPass>().getSE();
-    auto *TTI = &getAnalysis<TargetTransformInfoWrapperPass>().getTTI(F);
-    auto *TLIP = getAnalysisIfAvailable<TargetLibraryInfoWrapperPass>();
-    auto *TLI = TLIP ? &TLIP->getTLI(F) : nullptr;
-    auto *AA = &getAnalysis<AAResultsWrapperPass>().getAAResults();
-    auto *LI = &getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
-    auto *DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
-    auto *AC = &getAnalysis<AssumptionCacheTracker>().getAssumptionCache(F);
-    auto *DB = &getAnalysis<DemandedBitsWrapperPass>().getDemandedBits();
-    auto *ORE = &getAnalysis<OptimizationRemarkEmitterWrapperPass>().getORE();
-
-    return Impl.runImpl(F, SE, TTI, TLI, AA, LI, DT, AC, DB, ORE);
-  }
-
-  void getAnalysisUsage(AnalysisUsage &AU) const override {
-    FunctionPass::getAnalysisUsage(AU);
-    AU.addRequired<AssumptionCacheTracker>();
-    AU.addRequired<ScalarEvolutionWrapperPass>();
-    AU.addRequired<AAResultsWrapperPass>();
-    AU.addRequired<TargetTransformInfoWrapperPass>();
-    AU.addRequired<LoopInfoWrapperPass>();
-    AU.addRequired<DominatorTreeWrapperPass>();
-    AU.addRequired<DemandedBitsWrapperPass>();
-    AU.addRequired<OptimizationRemarkEmitterWrapperPass>();
-    AU.addRequired<InjectTLIMappingsLegacy>();
-    AU.addPreserved<LoopInfoWrapperPass>();
-    AU.addPreserved<DominatorTreeWrapperPass>();
-    AU.addPreserved<AAResultsWrapperPass>();
-    AU.addPreserved<GlobalsAAWrapperPass>();
-    AU.setPreservesCFG();
-  }
-};
-
-} // end anonymous namespace
-
 PreservedAnalyses SLPVectorizerPass::run(Function &F, FunctionAnalysisManager &AM) {
   auto *SE = &AM.getResult<ScalarEvolutionAnalysis>(F);
   auto *TTI = &AM.getResult<TargetIRAnalysis>(F);
@@ -11876,23 +12156,21 @@ void SLPVectorizerPass::collectSeedInstructions(BasicBlock *BB) {
       if (!isValidElementType(SI->getValueOperand()->getType()))
         continue;
       Stores[getUnderlyingObject(SI->getPointerOperand())].push_back(SI);
-      continue;
     }
 
     // Ignore getelementptr instructions that have more than one index, a
     // constant index, or a pointer operand that doesn't point to a scalar
     // type.
-    if (TTI->prefersVectorizedAddressing())
-      if (auto *GEP = dyn_cast<GetElementPtrInst>(&I)) {
-        auto Idx = GEP->idx_begin()->get();
-        if (GEP->getNumIndices() > 1 || isa<Constant>(Idx))
-          continue;
-        if (!isValidElementType(Idx->getType()))
-          continue;
-        if (GEP->getType()->isVectorTy())
-          continue;
-        GEPs[GEP->getPointerOperand()].push_back(GEP);
-      }
+    else if (auto *GEP = dyn_cast<GetElementPtrInst>(&I)) {
+      auto Idx = GEP->idx_begin()->get();
+      if (GEP->getNumIndices() > 1 || isa<Constant>(Idx))
+        continue;
+      if (!isValidElementType(Idx->getType()))
+        continue;
+      if (GEP->getType()->isVectorTy())
+        continue;
+      GEPs[GEP->getPointerOperand()].push_back(GEP);
+    }
   }
 }
 
@@ -12186,6 +12464,7 @@ class HorizontalReduction {
   static Value *createOp(IRBuilder<> &Builder, RecurKind Kind, Value *LHS,
                          Value *RHS, const Twine &Name, bool UseSelect) {
     unsigned RdxOpcode = RecurrenceDescriptor::getOpcode(Kind);
+    bool IsConstant = isConstant(LHS) && isConstant(RHS);
     switch (Kind) {
     case RecurKind::Or:
       if (UseSelect &&
@@ -12207,29 +12486,37 @@ class HorizontalReduction {
       return Builder.CreateBinOp((Instruction::BinaryOps)RdxOpcode, LHS, RHS,
                                  Name);
     case RecurKind::FMax:
+      if (IsConstant)
+        return ConstantFP::get(LHS->getType(),
+                               maxnum(cast<ConstantFP>(LHS)->getValueAPF(),
+                                      cast<ConstantFP>(RHS)->getValueAPF()));
       return Builder.CreateBinaryIntrinsic(Intrinsic::maxnum, LHS, RHS);
     case RecurKind::FMin:
+      if (IsConstant)
+        return ConstantFP::get(LHS->getType(),
+                               minnum(cast<ConstantFP>(LHS)->getValueAPF(),
+                                      cast<ConstantFP>(RHS)->getValueAPF()));
       return Builder.CreateBinaryIntrinsic(Intrinsic::minnum, LHS, RHS);
     case RecurKind::SMax:
-      if (UseSelect) {
+      if (IsConstant || UseSelect) {
         Value *Cmp = Builder.CreateICmpSGT(LHS, RHS, Name);
         return Builder.CreateSelect(Cmp, LHS, RHS, Name);
       }
       return Builder.CreateBinaryIntrinsic(Intrinsic::smax, LHS, RHS);
     case RecurKind::SMin:
-      if (UseSelect) {
+      if (IsConstant || UseSelect) {
         Value *Cmp = Builder.CreateICmpSLT(LHS, RHS, Name);
         return Builder.CreateSelect(Cmp, LHS, RHS, Name);
       }
       return Builder.CreateBinaryIntrinsic(Intrinsic::smin, LHS, RHS);
     case RecurKind::UMax:
-      if (UseSelect) {
+      if (IsConstant || UseSelect) {
         Value *Cmp = Builder.CreateICmpUGT(LHS, RHS, Name);
         return Builder.CreateSelect(Cmp, LHS, RHS, Name);
       }
       return Builder.CreateBinaryIntrinsic(Intrinsic::umax, LHS, RHS);
     case RecurKind::UMin:
-      if (UseSelect) {
+      if (IsConstant || UseSelect) {
         Value *Cmp = Builder.CreateICmpULT(LHS, RHS, Name);
         return Builder.CreateSelect(Cmp, LHS, RHS, Name);
       }
@@ -12713,6 +13000,7 @@ public:
     DenseMap<Value *, WeakTrackingVH> TrackedVals(
         ReducedVals.size() * ReducedVals.front().size() + ExtraArgs.size());
     BoUpSLP::ExtraValueToDebugLocsMap ExternallyUsedValues;
+    SmallVector<std::pair<Value *, Value *>> ReplacedExternals;
     ExternallyUsedValues.reserve(ExtraArgs.size() + 1);
     // The same extra argument may be used several times, so log each attempt
     // to use it.
@@ -12756,6 +13044,12 @@ public:
           continue;
         IgnoreList.insert(RdxOp);
       }
+    // Intersect the fast-math-flags from all reduction operations.
+    FastMathFlags RdxFMF;
+    RdxFMF.set();
+    for (Value *U : IgnoreList)
+      if (auto *FPMO = dyn_cast<FPMathOperator>(U))
+        RdxFMF &= FPMO->getFastMathFlags();
     bool IsCmpSelMinMax = isCmpSelMinMax(cast<Instruction>(ReductionRoot));
 
     // Need to track reduced vals, they may be changed during vectorization of
@@ -12995,7 +13289,7 @@ public:
           Value *OrigV = TrackedToOrig.find(RdxVal)->second;
           unsigned NumOps =
               VectorizedVals.lookup(RdxVal) + SameValuesCounter[OrigV];
-          if (NumOps != ReducedValsToOps.find(RdxVal)->second.size())
+          if (NumOps != ReducedValsToOps.find(OrigV)->second.size())
             LocalExternallyUsedValues[RdxVal];
         }
         // Do not need the list of reused scalars in regular mode anymore.
@@ -13004,16 +13298,18 @@ public:
         for (Value *RdxVal : VL)
           if (RequiredExtract.contains(RdxVal))
             LocalExternallyUsedValues[RdxVal];
+        // Update LocalExternallyUsedValues for the scalar, replaced by
+        // extractelement instructions.
+        for (const std::pair<Value *, Value *> &Pair : ReplacedExternals) {
+          auto It = ExternallyUsedValues.find(Pair.first);
+          if (It == ExternallyUsedValues.end())
+            continue;
+          LocalExternallyUsedValues[Pair.second].append(It->second);
+        }
         V.buildExternalUses(LocalExternallyUsedValues);
 
         V.computeMinimumValueSizes();
 
-        // Intersect the fast-math-flags from all reduction operations.
-        FastMathFlags RdxFMF;
-        RdxFMF.set();
-        for (Value *U : IgnoreList)
-          if (auto *FPMO = dyn_cast<FPMathOperator>(U))
-            RdxFMF &= FPMO->getFastMathFlags();
         // Estimate cost.
         InstructionCost TreeCost = V.getTreeCost(VL);
         InstructionCost ReductionCost =
@@ -13073,8 +13369,8 @@ public:
           InsertPt = GetCmpForMinMaxReduction(RdxRootInst);
 
         // Vectorize a tree.
-        Value *VectorizedRoot =
-            V.vectorizeTree(LocalExternallyUsedValues, InsertPt);
+        Value *VectorizedRoot = V.vectorizeTree(LocalExternallyUsedValues,
+                                                ReplacedExternals, InsertPt);
 
         Builder.SetInsertPoint(InsertPt);
 
@@ -13086,8 +13382,9 @@ public:
 
         // Emit code to correctly handle reused reduced values, if required.
         if (OptReusedScalars && !SameScaleFactor) {
-          VectorizedRoot = emitReusedOps(VectorizedRoot, Builder, VL,
-                                         SameValuesCounter, TrackedToOrig);
+          VectorizedRoot =
+              emitReusedOps(VectorizedRoot, Builder, V.getRootNodeScalars(),
+                            SameValuesCounter, TrackedToOrig);
         }
 
         Value *ReducedSubTree =
@@ -13105,7 +13402,7 @@ public:
         for (Value *RdxVal : VL) {
           Value *OrigV = TrackedToOrig.find(RdxVal)->second;
           if (IsSupportedHorRdxIdentityOp) {
-            VectorizedVals.try_emplace(OrigV, SameValuesCounter[OrigV]);
+            VectorizedVals.try_emplace(OrigV, SameValuesCounter[RdxVal]);
             continue;
           }
           ++VectorizedVals.try_emplace(OrigV, 0).first->getSecond();
@@ -14464,20 +14761,3 @@ bool SLPVectorizerPass::vectorizeStoreChains(BoUpSLP &R) {
   }
   return Changed;
 }
-
-char SLPVectorizer::ID = 0;
-
-static const char lv_name[] = "SLP Vectorizer";
-
-INITIALIZE_PASS_BEGIN(SLPVectorizer, SV_NAME, lv_name, false, false)
-INITIALIZE_PASS_DEPENDENCY(AAResultsWrapperPass)
-INITIALIZE_PASS_DEPENDENCY(TargetTransformInfoWrapperPass)
-INITIALIZE_PASS_DEPENDENCY(AssumptionCacheTracker)
-INITIALIZE_PASS_DEPENDENCY(ScalarEvolutionWrapperPass)
-INITIALIZE_PASS_DEPENDENCY(LoopSimplify)
-INITIALIZE_PASS_DEPENDENCY(DemandedBitsWrapperPass)
-INITIALIZE_PASS_DEPENDENCY(OptimizationRemarkEmitterWrapperPass)
-INITIALIZE_PASS_DEPENDENCY(InjectTLIMappingsLegacy)
-INITIALIZE_PASS_END(SLPVectorizer, SV_NAME, lv_name, false, false)
-
-Pass *llvm::createSLPVectorizerPass() { return new SLPVectorizer(); }

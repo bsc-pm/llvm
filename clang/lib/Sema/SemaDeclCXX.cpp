@@ -1721,6 +1721,7 @@ static bool CheckConstexprParameterTypes(Sema &SemaRef,
                                               e = FT->param_type_end();
        i != e; ++i, ++ArgIndex) {
     const ParmVarDecl *PD = FD->getParamDecl(ArgIndex);
+    assert(PD && "null in a parameter list");
     SourceLocation ParamLoc = PD->getLocation();
     if (CheckLiteralType(SemaRef, Kind, ParamLoc, *i,
                          diag::err_constexpr_non_literal_param, ArgIndex + 1,
@@ -2608,7 +2609,8 @@ Sema::CheckBaseSpecifier(CXXRecordDecl *Class,
   }
 
   // For the MS ABI, propagate DLL attributes to base class templates.
-  if (Context.getTargetInfo().getCXXABI().isMicrosoft()) {
+  if (Context.getTargetInfo().getCXXABI().isMicrosoft() ||
+      Context.getTargetInfo().getTriple().isPS()) {
     if (Attr *ClassAttr = getDLLAttr(Class)) {
       if (auto *BaseTemplate = dyn_cast_or_null<ClassTemplateSpecializationDecl>(
               BaseType->getAsCXXRecordDecl())) {
@@ -3230,16 +3232,6 @@ static bool InitializationHasSideEffects(const FieldDecl &FD) {
   return false;
 }
 
-static const ParsedAttr *getMSPropertyAttr(const ParsedAttributesView &list) {
-  ParsedAttributesView::const_iterator Itr =
-      llvm::find_if(list, [](const ParsedAttr &AL) {
-        return AL.isDeclspecPropertyAttribute();
-      });
-  if (Itr != list.end())
-    return &*Itr;
-  return nullptr;
-}
-
 // Check if there is a field shadowing.
 void Sema::CheckShadowInheritedFields(const SourceLocation &Loc,
                                       DeclarationName FieldName,
@@ -3317,7 +3309,7 @@ Sema::ActOnCXXMemberDeclarator(Scope *S, AccessSpecifier AS, Declarator &D,
 
   bool isFunc = D.isDeclarationOfFunction();
   const ParsedAttr *MSPropertyAttr =
-      getMSPropertyAttr(D.getDeclSpec().getAttributes());
+      D.getDeclSpec().getAttributes().getMSPropertyAttr();
 
   if (cast<CXXRecordDecl>(CurContext)->isInterface()) {
     // The Microsoft extension __interface only permits public member functions
@@ -6346,6 +6338,18 @@ void Sema::checkClassLevelDLLAttribute(CXXRecordDecl *Class) {
   if (!ClassAttr)
     return;
 
+  // MSVC allows imported or exported template classes that have UniqueExternal
+  // linkage. This occurs when the template class has been instantiated with
+  // a template parameter which itself has internal linkage.
+  // We drop the attribute to avoid exporting or importing any members.
+  if ((Context.getTargetInfo().getCXXABI().isMicrosoft() ||
+       Context.getTargetInfo().getTriple().isPS()) &&
+      (!Class->isExternallyVisible() && Class->hasExternalFormalLinkage())) {
+    Class->dropAttr<DLLExportAttr>();
+    Class->dropAttr<DLLImportAttr>();
+    return;
+  }
+
   if (!Class->isExternallyVisible()) {
     Diag(Class->getLocation(), diag::err_attribute_dll_not_extern)
         << Class << ClassAttr;
@@ -9157,7 +9161,18 @@ bool SpecialMemberDeletionInfo::shouldDeleteForSubobjectCall(
     // must be accessible and non-deleted, but need not be trivial. Such a
     // destructor is never actually called, but is semantically checked as
     // if it were.
-    DiagKind = 4;
+    if (CSM == Sema::CXXDefaultConstructor) {
+      // [class.default.ctor]p2:
+      //   A defaulted default constructor for class X is defined as deleted if
+      //   - X is a union that has a variant member with a non-trivial default
+      //     constructor and no variant member of X has a default member
+      //     initializer
+      const auto *RD = cast<CXXRecordDecl>(Field->getParent());
+      if (!RD->hasInClassInitializer())
+        DiagKind = 4;
+    } else {
+      DiagKind = 4;
+    }
   }
 
   if (DiagKind == -1)
@@ -16362,14 +16377,8 @@ Decl *Sema::ActOnStartLinkageSpecification(Scope *S, SourceLocation ExternLoc,
   /// If the declaration is already in global module fragment, we don't
   /// need to attach it again.
   if (getLangOpts().CPlusPlusModules && isCurrentModulePurview()) {
-    Module *GlobalModule =
-        PushGlobalModuleFragment(ExternLoc);
-    /// According to [module.reach]p3.2,
-    /// The declaration in global module fragment is reachable if it is not
-    /// discarded. And the discarded declaration should be deleted. So it
-    /// doesn't matter mark the declaration in global module fragment as
-    /// reachable here.
-    D->setModuleOwnershipKind(Decl::ModuleOwnershipKind::ReachableWhenImported);
+    Module *GlobalModule = PushImplicitGlobalModuleFragment(
+        ExternLoc, /*IsExported=*/D->isInExportDeclContext());
     D->setLocalOwningModule(GlobalModule);
   }
 
@@ -16394,8 +16403,9 @@ Decl *Sema::ActOnFinishLinkageSpecification(Scope *S,
   // LinkageSpec isn't in the module created by itself. So we don't
   // need to pop it.
   if (getLangOpts().CPlusPlusModules && getCurrentModule() &&
-      getCurrentModule()->isGlobalModule() && getCurrentModule()->Parent)
-    PopGlobalModuleFragment();
+      getCurrentModule()->isImplicitGlobalModule() &&
+      getCurrentModule()->Parent)
+    PopImplicitGlobalModuleFragment();
 
   PopDeclContext();
   return LinkageSpec;
@@ -16708,7 +16718,8 @@ static bool UsefulToPrintExpr(const Expr *E) {
 /// Try to print more useful information about a failed static_assert
 /// with expression \E
 void Sema::DiagnoseStaticAssertDetails(const Expr *E) {
-  if (const auto *Op = dyn_cast<BinaryOperator>(E)) {
+  if (const auto *Op = dyn_cast<BinaryOperator>(E);
+      Op && Op->getOpcode() != BO_LOr) {
     const Expr *LHS = Op->getLHS()->IgnoreParenImpCasts();
     const Expr *RHS = Op->getRHS()->IgnoreParenImpCasts();
 
@@ -16784,7 +16795,14 @@ Decl *Sema::BuildStaticAssertDeclaration(SourceLocation StaticAssertLoc,
                        FoldKind).isInvalid())
       Failed = true;
 
-    if (!Failed && !Cond) {
+    // CWG2518
+    // [dcl.pre]/p10  If [...] the expression is evaluated in the context of a
+    // template definition, the declaration has no effect.
+    bool InTemplateDefinition =
+        getLangOpts().CPlusPlus && CurContext->isDependentContext();
+
+    if (!Failed && !Cond && !InTemplateDefinition) {
+
       SmallString<256> MsgBuffer;
       llvm::raw_svector_ostream Msg(MsgBuffer);
       if (AssertMessage) {
@@ -16815,7 +16833,8 @@ Decl *Sema::BuildStaticAssertDeclaration(SourceLocation StaticAssertLoc,
         DiagnoseStaticAssertDetails(InnerCond);
       } else {
         Diag(StaticAssertLoc, diag::err_static_assert_failed)
-          << !AssertMessage << Msg.str() << AssertExpr->getSourceRange();
+            << !AssertMessage << Msg.str() << AssertExpr->getSourceRange();
+        PrintContextStack();
       }
       Failed = true;
     }
@@ -17967,7 +17986,7 @@ void Sema::MarkVTableUsed(SourceLocation Loc, CXXRecordDecl *Class,
   // immediately. For all other classes, we mark their virtual members
   // at the end of the translation unit.
   if (Class->isLocalClass())
-    MarkVirtualMembersReferenced(Loc, Class);
+    MarkVirtualMembersReferenced(Loc, Class->getDefinition());
   else
     VTableUses.push_back(std::make_pair(Class, Loc));
 }

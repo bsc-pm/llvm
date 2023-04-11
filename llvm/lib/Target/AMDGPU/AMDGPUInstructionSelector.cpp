@@ -1046,6 +1046,8 @@ bool AMDGPUInstructionSelector::selectG_INTRINSIC(MachineInstr &I) const {
     return selectIntrinsicCmp(I);
   case Intrinsic::amdgcn_ballot:
     return selectBallot(I);
+  case Intrinsic::amdgcn_inverse_ballot:
+    return selectInverseBallot(I);
   case Intrinsic::amdgcn_reloc_constant:
     return selectRelocConstant(I);
   case Intrinsic::amdgcn_groupstaticsize:
@@ -1347,6 +1349,17 @@ bool AMDGPUInstructionSelector::selectBallot(MachineInstr &I) const {
     BuildMI(*BB, &I, DL, TII.get(AMDGPU::COPY), DstReg).addReg(SrcReg);
   }
 
+  I.eraseFromParent();
+  return true;
+}
+
+bool AMDGPUInstructionSelector::selectInverseBallot(MachineInstr &I) const {
+  MachineBasicBlock *BB = I.getParent();
+  const DebugLoc &DL = I.getDebugLoc();
+  const Register DstReg = I.getOperand(0).getReg();
+  const Register MaskReg = I.getOperand(2).getReg();
+
+  BuildMI(*BB, &I, DL, TII.get(AMDGPU::COPY), DstReg).addReg(MaskReg);
   I.eraseFromParent();
   return true;
 }
@@ -3404,7 +3417,11 @@ bool AMDGPUInstructionSelector::select(MachineInstr &I) {
   case TargetOpcode::G_ZEXT:
   case TargetOpcode::G_ANYEXT:
   case TargetOpcode::G_SEXT_INREG:
-    if (selectImpl(I, *CoverageInfo))
+    // This is a workaround. For extension from type i1, `selectImpl()` uses
+    // patterns from TD file and generates an illegal VGPR to SGPR COPY as type
+    // i1 can only be hold in a SGPR class.
+    if (MRI->getType(I.getOperand(1).getReg()) != LLT::scalar(1) &&
+        selectImpl(I, *CoverageInfo))
       return true;
     return selectG_SZA_EXT(I);
   case TargetOpcode::G_BRCOND:
@@ -3847,7 +3864,7 @@ AMDGPUInstructionSelector::selectFlatOffsetImpl(MachineOperand &Root,
   int64_t ConstOffset;
   std::tie(PtrBase, ConstOffset) =
       getPtrBaseWithConstantOffset(Root.getReg(), *MRI);
-  if (ConstOffset == 0)
+  if (ConstOffset == 0 || !isFlatScratchBaseLegal(PtrBase, FlatVariant))
     return Default;
 
   unsigned AddrSpace = (*MI->memoperands_begin())->getAddrSpace();
@@ -4010,7 +4027,7 @@ AMDGPUInstructionSelector::selectScratchSAddr(MachineOperand &Root) const {
   // possible.
   std::tie(PtrBase, ConstOffset) = getPtrBaseWithConstantOffset(Addr, *MRI);
 
-  if (ConstOffset != 0 &&
+  if (ConstOffset != 0 && isFlatScratchBaseLegal(PtrBase) &&
       TII.isLegalFLATOffset(ConstOffset, AMDGPUAS::PRIVATE_ADDRESS,
                             SIInstrFlags::FlatScratch)) {
     Addr = PtrBase;
@@ -4102,6 +4119,9 @@ AMDGPUInstructionSelector::selectScratchSVAddr(MachineOperand &Root) const {
 
   Register LHS = AddrDef->MI->getOperand(1).getReg();
   auto LHSDef = getDefSrcRegIgnoringCopies(LHS, *MRI);
+
+  if (!isFlatScratchBaseLegal(LHS) || !isFlatScratchBaseLegal(RHS))
+    return std::nullopt;
 
   if (checkFlatScratchSVSSwizzleBug(RHS, LHS, ImmOffset))
     return std::nullopt;
@@ -4231,6 +4251,16 @@ bool AMDGPUInstructionSelector::isDSOffset2Legal(Register Base, int64_t Offset0,
 
   // On Southern Islands instruction with a negative base value and an offset
   // don't seem to work.
+  return KnownBits->signBitIsZero(Base);
+}
+
+bool AMDGPUInstructionSelector::isFlatScratchBaseLegal(
+    Register Base, uint64_t FlatVariant) const {
+  if (FlatVariant != SIInstrFlags::FlatScratch)
+    return true;
+
+  // When value in 32-bit Base can be negative calculate scratch offset using
+  // 32-bit add instruction, otherwise use Base(unsigned) + offset.
   return KnownBits->signBitIsZero(Base);
 }
 
@@ -4688,64 +4718,6 @@ AMDGPUInstructionSelector::selectMUBUFOffset(MachineOperand &Root) const {
       addZeroImm, //  cpol
       addZeroImm, //  tfe
       addZeroImm, //  swz
-    }};
-}
-
-InstructionSelector::ComplexRendererFns
-AMDGPUInstructionSelector::selectMUBUFAddr64Atomic(MachineOperand &Root) const {
-  Register VAddr;
-  Register RSrcReg;
-  Register SOffset;
-  int64_t Offset = 0;
-
-  if (!selectMUBUFAddr64Impl(Root, VAddr, RSrcReg, SOffset, Offset))
-    return {};
-
-  // FIXME: Use defaulted operands for trailing 0s and remove from the complex
-  // pattern.
-  return {{
-      [=](MachineInstrBuilder &MIB) {  // rsrc
-        MIB.addReg(RSrcReg);
-      },
-      [=](MachineInstrBuilder &MIB) { // vaddr
-        MIB.addReg(VAddr);
-      },
-      [=](MachineInstrBuilder &MIB) { // soffset
-        if (SOffset)
-          MIB.addReg(SOffset);
-        else
-          MIB.addImm(0);
-      },
-      [=](MachineInstrBuilder &MIB) { // offset
-        MIB.addImm(Offset);
-      },
-      [=](MachineInstrBuilder &MIB) {
-        MIB.addImm(AMDGPU::CPol::GLC); // cpol
-      }
-    }};
-}
-
-InstructionSelector::ComplexRendererFns
-AMDGPUInstructionSelector::selectMUBUFOffsetAtomic(MachineOperand &Root) const {
-  Register RSrcReg;
-  Register SOffset;
-  int64_t Offset = 0;
-
-  if (!selectMUBUFOffsetImpl(Root, RSrcReg, SOffset, Offset))
-    return {};
-
-  return {{
-      [=](MachineInstrBuilder &MIB) {  // rsrc
-        MIB.addReg(RSrcReg);
-      },
-      [=](MachineInstrBuilder &MIB) { // soffset
-        if (SOffset)
-          MIB.addReg(SOffset);
-        else
-          MIB.addImm(0);
-      },
-      [=](MachineInstrBuilder &MIB) { MIB.addImm(Offset); }, // offset
-      [=](MachineInstrBuilder &MIB) { MIB.addImm(AMDGPU::CPol::GLC); } // cpol
     }};
 }
 

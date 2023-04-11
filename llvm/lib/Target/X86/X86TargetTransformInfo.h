@@ -88,6 +88,11 @@ class X86TTIImpl : public BasicTTIImplBase<X86TTIImpl> {
       X86::TuningInsertVZEROUPPER,
       X86::TuningUseSLMArithCosts,
       X86::TuningUseGLMDivSqrtCosts,
+      X86::TuningNoDomainDelay,
+      X86::TuningNoDomainDelayMov,
+      X86::TuningNoDomainDelayShuffle,
+      X86::TuningNoDomainDelayBlend,
+      X86::TuningPreferShiftShuffle,
 
       // Perf-tuning flags.
       X86::TuningFastGather,
@@ -172,6 +177,10 @@ public:
                                          Align Alignment,
                                          TTI::TargetCostKind CostKind,
                                          const Instruction *I);
+  InstructionCost getPointersChainCost(ArrayRef<const Value *> Ptrs,
+                                       const Value *Base,
+                                       const TTI::PointersChainInfo &Info,
+                                       TTI::TargetCostKind CostKind);
   InstructionCost getAddressComputationCost(Type *PtrTy, ScalarEvolution *SE,
                                             const SCEV *Ptr);
 

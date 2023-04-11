@@ -335,6 +335,7 @@ public:
   // in this header.
   struct CGCoroInfo {
     std::unique_ptr<CGCoroData> Data;
+    bool InSuspendBlock = false;
     CGCoroInfo();
     ~CGCoroInfo();
   };
@@ -342,6 +343,10 @@ public:
 
   bool isCoroutine() const {
     return CurCoro.Data != nullptr;
+  }
+
+  bool inSuspendBlock() const {
+    return isCoroutine() && CurCoro.InSuspendBlock;
   }
 
   /// CurGD - The GlobalDecl for the current function being compiled.
@@ -3784,6 +3789,7 @@ public:
       const OMPTargetTeamsDistributeSimdDirective &S);
   void EmitOMPGenericLoopDirective(const OMPGenericLoopDirective &S);
   void EmitOMPInteropDirective(const OMPInteropDirective &S);
+  void EmitOMPParallelMaskedDirective(const OMPParallelMaskedDirective &S);
 
   /// Emit device code for the target directive.
   static void EmitOMPTargetDeviceFunction(CodeGenModule &CGM,

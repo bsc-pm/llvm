@@ -271,4 +271,27 @@ def AlgebraicSimplification : Pass<"flang-algebraic-simplification"> {
   let constructor = "::fir::createAlgebraicSimplificationPass()";
 }
 
+def PolymorphicOpConversion : Pass<"fir-polymorphic-op", "::mlir::func::FuncOp"> {
+  let summary =
+    "Simplify operations on polymorphic types";
+  let description = [{
+    This pass breaks up the lowering of operations on polymorphic types by 
+    introducing an intermediate FIR level that simplifies code geneation. 
+  }];
+  let constructor = "::fir::createPolymorphicOpConversionPass()";
+  let dependentDialects = [
+    "fir::FIROpsDialect", "mlir::func::FuncDialect"
+  ];
+}
+
+def OpenACCDataOperandConversion : Pass<"fir-openacc-data-operand-conversion", "::mlir::func::FuncOp"> {
+  let summary = "Convert the FIR operands in OpenACC ops to LLVM dialect";
+  let dependentDialects = ["mlir::LLVM::LLVMDialect"];
+  let options = [
+    Option<"useOpaquePointers", "use-opaque-pointers", "bool",
+           /*default=*/"true", "Generate LLVM IR using opaque pointers "
+           "instead of typed pointers">,
+  ];
+}
+
 #endif // FLANG_OPTIMIZER_TRANSFORMS_PASSES

@@ -603,6 +603,9 @@ Any variables in scope, including all arguments to the function and the
 return value must be trivially destructible. The calling convention of the
 caller and callee must match, and they must not be variadic functions or have
 old style K&R C function declarations.
+
+``clang::musttail`` provides assurances that the tail call can be optimized on
+all targets, not just one.
   }];
 }
 
@@ -2293,7 +2296,7 @@ as ``-mlong-calls`` and ``-mno-long-calls``.
 
 def RISCVInterruptDocs : Documentation {
   let Category = DocCatFunction;
-  let Heading = "interrupt (RISCV)";
+  let Heading = "interrupt (RISC-V)";
   let Content = [{
 Clang supports the GNU style ``__attribute__((interrupt))`` attribute on RISCV
 targets. This attribute may be attached to a function definition and instructs
@@ -5328,7 +5331,7 @@ takes precedence over the command line option ``-fpatchable-function-entry=N,M``
 ``M`` defaults to 0 if omitted.
 
 This attribute is only supported on
-aarch64/aarch64-be/riscv32/riscv64/i386/x86-64 targets.
+aarch64/aarch64-be/loongarch32/loongarch64/riscv32/riscv64/i386/x86-64 targets.
 }];
 }
 
@@ -6936,5 +6939,14 @@ def ReadOnlyPlacementDocs : Documentation {
      ``enforce_read_only_placement`` attribute.
   5. A type ``Q`` inherits from type ``T`` and it does not have the
      ``enforce_read_only_placement`` attribute.
+  }];
+}
+
+def WebAssemblyFuncrefDocs : Documentation {
+  let Category = DocCatType;
+  let Content = [{
+Clang supports the ``__funcref`` attribute for the WebAssembly target. 
+This attribute may be attached to a function pointer type, where it modifies 
+its underlying representation to be a WebAssembly ``funcref``.
   }];
 }

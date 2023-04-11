@@ -161,6 +161,12 @@ protected:
       {llvmIntPtrType /* intptr_t rank */,
        llvmPointerType /* void *memrefDesc */,
        llvmIntPtrType /* intptr_t elementSizeBytes */}};
+  FunctionCallBuilder hostUnregisterCallBuilder = {
+      "mgpuMemHostUnregisterMemRef",
+      llvmVoidType,
+      {llvmIntPtrType /* intptr_t rank */,
+       llvmPointerType /* void *memrefDesc */,
+       llvmIntPtrType /* intptr_t elementSizeBytes */}};
   FunctionCallBuilder allocCallBuilder = {
       "mgpuMemAlloc",
       llvmPointerType /* void * */,
@@ -199,6 +205,20 @@ public:
 private:
   LogicalResult
   matchAndRewrite(gpu::HostRegisterOp hostRegisterOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override;
+};
+
+class ConvertHostUnregisterOpToGpuRuntimeCallPattern
+    : public ConvertOpToGpuRuntimeCallPattern<gpu::HostUnregisterOp> {
+public:
+  ConvertHostUnregisterOpToGpuRuntimeCallPattern(
+      LLVMTypeConverter &typeConverter)
+      : ConvertOpToGpuRuntimeCallPattern<gpu::HostUnregisterOp>(typeConverter) {
+  }
+
+private:
+  LogicalResult
+  matchAndRewrite(gpu::HostUnregisterOp hostUnregisterOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override;
 };
 
@@ -446,6 +466,28 @@ LogicalResult ConvertHostRegisterOpToGpuRuntimeCallPattern::matchAndRewrite(
   return success();
 }
 
+LogicalResult ConvertHostUnregisterOpToGpuRuntimeCallPattern::matchAndRewrite(
+    gpu::HostUnregisterOp hostUnregisterOp, OpAdaptor adaptor,
+    ConversionPatternRewriter &rewriter) const {
+  Operation *op = hostUnregisterOp.getOperation();
+  if (failed(areAllLLVMTypes(op, adaptor.getOperands(), rewriter)))
+    return failure();
+
+  Location loc = op->getLoc();
+
+  auto memRefType = hostUnregisterOp.getValue().getType();
+  auto elementType = memRefType.cast<UnrankedMemRefType>().getElementType();
+  auto elementSize = getSizeInBytes(loc, elementType, rewriter);
+
+  auto arguments = getTypeConverter()->promoteOperands(
+      loc, op->getOperands(), adaptor.getOperands(), rewriter);
+  arguments.push_back(elementSize);
+  hostUnregisterCallBuilder.create(loc, rewriter, arguments);
+
+  rewriter.eraseOp(op);
+  return success();
+}
+
 LogicalResult ConvertAllocOpToGpuRuntimeCallPattern::matchAndRewrite(
     gpu::AllocOp allocOp, OpAdaptor adaptor,
     ConversionPatternRewriter &rewriter) const {
@@ -680,8 +722,7 @@ Value ConvertLaunchFuncOpToGpuRuntimeCallPattern::generateParamsArray(
   for (const auto &en : llvm::enumerate(arguments)) {
     Value fieldPtr = builder.create<LLVM::GEPOp>(
         loc, getTypeConverter()->getPointerType(argumentTypes[en.index()]),
-        argumentTypes[en.index()], structPtr,
-        ArrayRef<LLVM::GEPArg>{0, en.index()});
+        structType, structPtr, ArrayRef<LLVM::GEPArg>{0, en.index()});
     builder.create<LLVM::StoreOp>(loc, en.value(), fieldPtr);
     auto elementPtr = builder.create<LLVM::GEPOp>(
         loc, llvmPointerPointerType, llvmPointerType, arrayPtr,
@@ -929,6 +970,7 @@ void mlir::populateGpuToLLVMConversionPatterns(LLVMTypeConverter &converter,
   patterns.add<ConvertAllocOpToGpuRuntimeCallPattern,
                ConvertDeallocOpToGpuRuntimeCallPattern,
                ConvertHostRegisterOpToGpuRuntimeCallPattern,
+               ConvertHostUnregisterOpToGpuRuntimeCallPattern,
                ConvertMemcpyOpToGpuRuntimeCallPattern,
                ConvertMemsetOpToGpuRuntimeCallPattern,
                ConvertSetDefaultDeviceOpToGpuRuntimeCallPattern,

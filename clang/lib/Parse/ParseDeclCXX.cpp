@@ -958,14 +958,16 @@ Decl *Parser::ParseStaticAssertDeclaration(SourceLocation &DeclEnd) {
   assert(Tok.isOneOf(tok::kw_static_assert, tok::kw__Static_assert) &&
          "Not a static_assert declaration");
 
-  // Save the token used for static assertion.
-  Token SavedTok = Tok;
+  // Save the token name used for static assertion.
+  const char *TokName = Tok.getName();
 
   if (Tok.is(tok::kw__Static_assert) && !getLangOpts().C11)
     Diag(Tok, diag::ext_c11_feature) << Tok.getName();
   if (Tok.is(tok::kw_static_assert)) {
     if (!getLangOpts().CPlusPlus) {
-      if (!getLangOpts().C2x)
+      if (getLangOpts().C2x)
+        Diag(Tok, diag::warn_c2x_compat_keyword) << Tok.getName();
+      else
         Diag(Tok, diag::ext_ms_static_assert) << FixItHint::CreateReplacement(
             Tok.getLocation(), "_Static_assert");
     } else
@@ -1025,9 +1027,7 @@ Decl *Parser::ParseStaticAssertDeclaration(SourceLocation &DeclEnd) {
   T.consumeClose();
 
   DeclEnd = Tok.getLocation();
-  // Passing the token used to the error message.
-  ExpectAndConsumeSemi(diag::err_expected_semi_after_static_assert,
-                       SavedTok.getName());
+  ExpectAndConsumeSemi(diag::err_expected_semi_after_static_assert, TokName);
 
   return Actions.ActOnStaticAssertDeclaration(StaticAssertLoc, AssertExpr.get(),
                                               AssertMessage.get(),
@@ -1674,6 +1674,9 @@ void Parser::ParseClassSpecifier(tok::TokenKind TagTokKind,
     ColonProtectionRAIIObject X(*this);
 
     CXXScopeSpec Spec;
+    if (TemplateInfo.TemplateParams)
+      Spec.setTemplateParamLists(*TemplateInfo.TemplateParams);
+
     bool HasValidSpec = true;
     if (ParseOptionalCXXScopeSpecifier(Spec, /*ObjectType=*/nullptr,
                                        /*ObjectHasErrors=*/false,
@@ -4460,7 +4463,10 @@ void Parser::ParseCXX11AttributeSpecifierInternal(ParsedAttributes &Attrs,
                                                   CachedTokens &OpenMPTokens,
                                                   SourceLocation *EndLoc) {
   if (Tok.is(tok::kw_alignas)) {
-    Diag(Tok.getLocation(), diag::warn_cxx98_compat_alignas);
+    if (getLangOpts().C2x)
+      Diag(Tok, diag::warn_c2x_compat_keyword) << Tok.getName();
+    else
+      Diag(Tok.getLocation(), diag::warn_cxx98_compat_alignas);
     ParseAlignmentSpecifier(Attrs, EndLoc);
     return;
   }

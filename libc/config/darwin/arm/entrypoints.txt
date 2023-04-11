@@ -16,7 +16,10 @@ set(TARGET_LIBC_ENTRYPOINTS
     libc.src.ctype.toascii
     libc.src.ctype.tolower
     libc.src.ctype.toupper
-    
+
+    # errno.h entrypoints
+    libc.src.errno.errno
+
     # string.h entrypoints
     libc.src.string.bcmp
     libc.src.string.bcopy
@@ -35,6 +38,7 @@ set(TARGET_LIBC_ENTRYPOINTS
     libc.src.string.strcasestr
     libc.src.string.strcat
     libc.src.string.strchr
+    libc.src.string.strchrnul
     libc.src.string.strcmp
     libc.src.string.strcpy
     libc.src.string.strcspn

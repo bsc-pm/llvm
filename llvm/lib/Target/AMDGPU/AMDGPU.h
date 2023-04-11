@@ -56,7 +56,6 @@ FunctionPass *createAMDGPUMachineCFGStructurizerPass();
 FunctionPass *createAMDGPUPropagateAttributesEarlyPass(const TargetMachine *);
 ModulePass *createAMDGPUPropagateAttributesLatePass(const TargetMachine *);
 FunctionPass *createAMDGPURewriteOutArgumentsPass();
-ModulePass *createAMDGPUReplaceLDSUseWithPointerPass();
 ModulePass *createAMDGPULowerModuleLDSPass();
 FunctionPass *createSIModeRegisterPass();
 FunctionPass *createGCNPreRAOptimizationsPass();
@@ -142,14 +141,6 @@ struct AMDGPUPropagateAttributesLatePass
 
 private:
   TargetMachine &TM;
-};
-
-void initializeAMDGPUReplaceLDSUseWithPointerPass(PassRegistry &);
-extern char &AMDGPUReplaceLDSUseWithPointerID;
-
-struct AMDGPUReplaceLDSUseWithPointerPass
-    : PassInfoMixin<AMDGPUReplaceLDSUseWithPointerPass> {
-  PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
 };
 
 void initializeAMDGPULowerModuleLDSPass(PassRegistry &);
@@ -425,6 +416,12 @@ inline bool isFlatGlobalAddrSpace(unsigned AS) {
   return AS == AMDGPUAS::GLOBAL_ADDRESS ||
          AS == AMDGPUAS::FLAT_ADDRESS ||
          AS == AMDGPUAS::CONSTANT_ADDRESS ||
+         AS > AMDGPUAS::MAX_AMDGPU_ADDRESS;
+}
+
+inline bool isExtendedGlobalAddrSpace(unsigned AS) {
+  return AS == AMDGPUAS::GLOBAL_ADDRESS || AS == AMDGPUAS::CONSTANT_ADDRESS ||
+         AS == AMDGPUAS::CONSTANT_ADDRESS_32BIT ||
          AS > AMDGPUAS::MAX_AMDGPU_ADDRESS;
 }
 }

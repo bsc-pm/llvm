@@ -185,6 +185,9 @@ static Value *foldMulShl1(BinaryOperator &Mul, bool CommuteOperands,
   return nullptr;
 }
 
+static Value *takeLog2(IRBuilderBase &Builder, Value *Op, unsigned Depth,
+                       bool DoFold);
+
 Instruction *InstCombinerImpl::visitMul(BinaryOperator &I) {
   Value *Op0 = I.getOperand(0), *Op1 = I.getOperand(1);
   if (Value *V =
@@ -470,6 +473,33 @@ Instruction *InstCombinerImpl::visitMul(BinaryOperator &I) {
 
   if (Instruction *Ext = narrowMathIfNoOverflow(I))
     return Ext;
+
+  // min(X, Y) * max(X, Y) => X * Y.
+  if (match(&I, m_CombineOr(m_c_Mul(m_SMax(m_Value(X), m_Value(Y)),
+                                    m_c_SMin(m_Deferred(X), m_Deferred(Y))),
+                            m_c_Mul(m_UMax(m_Value(X), m_Value(Y)),
+                                    m_c_UMin(m_Deferred(X), m_Deferred(Y))))))
+    return BinaryOperator::CreateWithCopiedFlags(Instruction::Mul, X, Y, &I);
+
+  // (mul Op0 Op1):
+  //    if Log2(Op0) folds away ->
+  //        (shl Op1, Log2(Op0))
+  //    if Log2(Op1) folds away ->
+  //        (shl Op0, Log2(Op1))
+  if (takeLog2(Builder, Op0, /*Depth*/ 0, /*DoFold*/ false)) {
+    Value *Res = takeLog2(Builder, Op0, /*Depth*/ 0, /*DoFold*/ true);
+    BinaryOperator *Shl = BinaryOperator::CreateShl(Op1, Res);
+    // We can only propegate nuw flag.
+    Shl->setHasNoUnsignedWrap(HasNUW);
+    return Shl;
+  }
+  if (takeLog2(Builder, Op1, /*Depth*/ 0, /*DoFold*/ false)) {
+    Value *Res = takeLog2(Builder, Op1, /*Depth*/ 0, /*DoFold*/ true);
+    BinaryOperator *Shl = BinaryOperator::CreateShl(Op0, Res);
+    // We can only propegate nuw flag.
+    Shl->setHasNoUnsignedWrap(HasNUW);
+    return Shl;
+  }
 
   bool Changed = false;
   if (!HasNSW && willNotOverflowSignedMul(Op0, Op1, I)) {
@@ -764,6 +794,20 @@ Instruction *InstCombinerImpl::visitFMul(BinaryOperator &I) {
   if (matchSimpleRecurrence(&I, PN, Start, Step) && I.hasNoNaNs() &&
       I.hasNoSignedZeros() && match(Start, m_Zero()))
     return replaceInstUsesWith(I, Start);
+
+  // minimun(X, Y) * maximum(X, Y) => X * Y.
+  if (match(&I,
+            m_c_FMul(m_Intrinsic<Intrinsic::maximum>(m_Value(X), m_Value(Y)),
+                     m_c_Intrinsic<Intrinsic::minimum>(m_Deferred(X),
+                                                       m_Deferred(Y))))) {
+    BinaryOperator *Result = BinaryOperator::CreateFMulFMF(X, Y, &I);
+    // We cannot preserve ninf if nnan flag is not set.
+    // If X is NaN and Y is Inf then in original program we had NaN * NaN,
+    // while in optimized version NaN * Inf and this is a poison with ninf flag.
+    if (!Result->hasNoNaNs())
+      Result->setHasNoInfs(false);
+    return Result;
+  }
 
   return nullptr;
 }
@@ -1698,6 +1742,63 @@ Instruction *InstCombinerImpl::visitFDiv(BinaryOperator &I) {
   return nullptr;
 }
 
+// Variety of transform for (urem/srem (mul/shl X, Y), (mul/shl X, Z))
+static Instruction *simplifyIRemMulShl(BinaryOperator &I,
+                                       InstCombinerImpl &IC) {
+  Value *Op0 = I.getOperand(0), *Op1 = I.getOperand(1), *X;
+  const APInt *Y, *Z;
+  if (!(match(Op0, m_Mul(m_Value(X), m_APInt(Y))) &&
+        match(Op1, m_c_Mul(m_Specific(X), m_APInt(Z)))) &&
+      !(match(Op0, m_Mul(m_APInt(Y), m_Value(X))) &&
+        match(Op1, m_c_Mul(m_Specific(X), m_APInt(Z)))))
+    return nullptr;
+
+  bool IsSRem = I.getOpcode() == Instruction::SRem;
+
+  OverflowingBinaryOperator *BO0 = cast<OverflowingBinaryOperator>(Op0);
+  // TODO: We may be able to deduce more about nsw/nuw of BO0/BO1 based on Y >=
+  // Z or Z >= Y.
+  bool BO0HasNSW = BO0->hasNoSignedWrap();
+  bool BO0HasNUW = BO0->hasNoUnsignedWrap();
+  bool BO0NoWrap = IsSRem ? BO0HasNSW : BO0HasNUW;
+
+  APInt RemYZ = IsSRem ? Y->srem(*Z) : Y->urem(*Z);
+  // (rem (mul nuw/nsw X, Y), (mul X, Z))
+  //      if (rem Y, Z) == 0
+  //          -> 0
+  if (RemYZ.isZero() && BO0NoWrap)
+    return IC.replaceInstUsesWith(I, ConstantInt::getNullValue(I.getType()));
+
+  OverflowingBinaryOperator *BO1 = cast<OverflowingBinaryOperator>(Op1);
+  bool BO1HasNSW = BO1->hasNoSignedWrap();
+  bool BO1HasNUW = BO1->hasNoUnsignedWrap();
+  bool BO1NoWrap = IsSRem ? BO1HasNSW : BO1HasNUW;
+  // (rem (mul X, Y), (mul nuw/nsw X, Z))
+  //      if (rem Y, Z) == Y
+  //          -> (mul nuw/nsw X, Y)
+  if (RemYZ == *Y && BO1NoWrap) {
+    BinaryOperator *BO =
+        BinaryOperator::CreateMul(X, ConstantInt::get(I.getType(), *Y));
+    // Copy any overflow flags from Op0.
+    BO->setHasNoSignedWrap(IsSRem || BO0HasNSW);
+    BO->setHasNoUnsignedWrap(!IsSRem || BO0HasNUW);
+    return BO;
+  }
+
+  // (rem (mul nuw/nsw X, Y), (mul {nsw} X, Z))
+  //      if Y >= Z
+  //          -> (mul {nuw} nsw X, (rem Y, Z))
+  if (Y->uge(*Z) && (IsSRem ? (BO0HasNSW && BO1HasNSW) : BO0HasNUW)) {
+    BinaryOperator *BO =
+        BinaryOperator::CreateMul(X, ConstantInt::get(I.getType(), RemYZ));
+    BO->setHasNoSignedWrap();
+    BO->setHasNoUnsignedWrap(BO0HasNUW);
+    return BO;
+  }
+
+  return nullptr;
+}
+
 /// This function implements the transforms common to both integer remainder
 /// instructions (urem and srem). It is called by the visitors to those integer
 /// remainder instructions.
@@ -1749,6 +1850,9 @@ Instruction *InstCombinerImpl::commonIRemTransforms(BinaryOperator &I) {
         return &I;
     }
   }
+
+  if (Instruction *R = simplifyIRemMulShl(I, *this))
+    return R;
 
   return nullptr;
 }

@@ -65,7 +65,7 @@ def DeprecatedCoroutine :
 def AlwaysInlineCoroutine :
   DiagGroup<"always-inline-coroutine">;
 def CoroNonAlignedAllocationFunction :
-  DiagGroup<"coro-non-aligned-allocation-funciton">;
+  DiagGroup<"coro-non-aligned-allocation-function">;
 def Coroutine : DiagGroup<"coroutine", [CoroutineMissingUnhandledException, DeprecatedCoroutine,
                                         AlwaysInlineCoroutine, CoroNonAlignedAllocationFunction]>;
 def ObjCBoolConstantConversion : DiagGroup<"objc-bool-constant-conversion">;
@@ -256,7 +256,6 @@ def EmptyBody : DiagGroup<"empty-body">;
 def Exceptions : DiagGroup<"exceptions">;
 def DeclarationAfterStatement : DiagGroup<"declaration-after-statement">;
 
-def GNUEmptyInitializer : DiagGroup<"gnu-empty-initializer">;
 def GNUEmptyStruct : DiagGroup<"gnu-empty-struct">;
 def ExtraTokens : DiagGroup<"extra-tokens">;
 def CXX98CompatExtraSemi : DiagGroup<"c++98-compat-extra-semi">;
@@ -801,6 +800,7 @@ def AtomicAlignment : DiagGroup<"atomic-alignment">;
 def CustomAtomic : DiagGroup<"custom-atomic-properties">;
 def AtomicProperties : DiagGroup<"atomic-properties",
                                  [ImplicitAtomic, CustomAtomic]>;
+def SyncAlignment : DiagGroup<"sync-alignment">;
 def ARCUnsafeRetainedAssign : DiagGroup<"arc-unsafe-retained-assign">;
 def ARCRetainCycles : DiagGroup<"arc-retain-cycles">;
 def ARCNonPodMemAccess : DiagGroup<"arc-non-pod-memaccess">;
@@ -854,8 +854,9 @@ def LargeByValueCopy : DiagGroup<"large-by-value-copy">;
 def DuplicateArgDecl : DiagGroup<"duplicate-method-arg">;
 def SignedEnumBitfield : DiagGroup<"signed-enum-bitfield">;
 
+def ReservedModuleIdentifier : DiagGroup<"reserved-module-identifier">;
 def ReservedIdentifier : DiagGroup<"reserved-identifier",
-    [ReservedIdAsMacro]>;
+    [ReservedIdAsMacro, ReservedModuleIdentifier]>;
 
 // Unreachable code warning groups.
 //
@@ -1133,7 +1134,7 @@ def GNU : DiagGroup<"gnu", [GNUAlignofExpression, GNUAnonymousStruct,
                             GNUBinaryLiteral, GNUCaseRange,
                             GNUComplexInteger, GNUCompoundLiteralInitializer,
                             GNUConditionalOmittedOperand, GNUDesignator,
-                            GNUEmptyInitializer, GNUEmptyStruct,
+                            GNUEmptyStruct,
                             VLAExtension, GNUFlexibleArrayInitializer,
                             GNUFlexibleArrayUnionMember, GNUFoldingConstant,
                             GNUImaginaryConstant, GNUIncludeNext,
@@ -1326,6 +1327,9 @@ def CudaUnknownVersion: DiagGroup<"unknown-cuda-version">;
 // A warning group for warnings about features supported by HIP but
 // ignored by CUDA.
 def HIPOnly : DiagGroup<"hip-only">;
+
+// Warning about mixed HIP and OpenMP compilation / target offloading.
+def HIPOpenMPOffloading: DiagGroup<"hip-omp-target-directives">;
 
 // Warnings which cause linking of the runtime libraries like
 // libc and the CRT to be skipped.

@@ -1431,6 +1431,14 @@ Instruction *InstCombinerImpl::visitAdd(BinaryOperator &I) {
       Value *Sub = Builder.CreateSub(A, B);
       return BinaryOperator::CreateAdd(Sub, ConstantExpr::getAdd(C1, C2));
     }
+
+    // Canonicalize a constant sub operand as an add operand for better folding:
+    // (C1 - A) + B --> (B - A) + C1
+    if (match(&I, m_c_Add(m_OneUse(m_Sub(m_ImmConstant(C1), m_Value(A))),
+                          m_Value(B)))) {
+      Value *Sub = Builder.CreateSub(B, A, "reass.sub");
+      return BinaryOperator::CreateAdd(Sub, C1);
+    }
   }
 
   // X % C0 + (( X / C0 ) % C1) * C0 => X % (C0 * C1)
@@ -1545,6 +1553,13 @@ Instruction *InstCombinerImpl::visitAdd(BinaryOperator &I) {
 
   if (Instruction *Ashr = foldAddToAshr(I))
     return Ashr;
+
+  // min(A, B) + max(A, B) => A + B.
+  if (match(&I, m_CombineOr(m_c_Add(m_SMax(m_Value(A), m_Value(B)),
+                                    m_c_SMin(m_Deferred(A), m_Deferred(B))),
+                            m_c_Add(m_UMax(m_Value(A), m_Value(B)),
+                                    m_c_UMin(m_Deferred(A), m_Deferred(B))))))
+    return BinaryOperator::CreateWithCopiedFlags(Instruction::Add, A, B, &I);
 
   // TODO(jingyue): Consider willNotOverflowSignedAdd and
   // willNotOverflowUnsignedAdd to reduce the number of invocations of
@@ -1794,6 +1809,20 @@ Instruction *InstCombinerImpl::visitFAdd(BinaryOperator &I) {
 
     if (Value *V = FAddCombine(Builder).simplify(&I))
       return replaceInstUsesWith(I, V);
+  }
+
+  // minumum(X, Y) + maximum(X, Y) => X + Y.
+  if (match(&I,
+            m_c_FAdd(m_Intrinsic<Intrinsic::maximum>(m_Value(X), m_Value(Y)),
+                     m_c_Intrinsic<Intrinsic::minimum>(m_Deferred(X),
+                                                       m_Deferred(Y))))) {
+    BinaryOperator *Result = BinaryOperator::CreateFAddFMF(X, Y, &I);
+    // We cannot preserve ninf if nnan flag is not set.
+    // If X is NaN and Y is Inf then in original program we had NaN + NaN,
+    // while in optimized version NaN + Inf and this is a poison with ninf flag.
+    if (!Result->hasNoNaNs())
+      Result->setHasNoInfs(false);
+    return Result;
   }
 
   return nullptr;
@@ -2396,6 +2425,18 @@ Instruction *InstCombinerImpl::visitSub(BinaryOperator &I) {
     Value *Sub = Builder.CreateSub(X, Y, "sub", PropagateNUW, PropagateNSW);
     Value *Mul = Builder.CreateMul(Add, Sub, "", PropagateNUW, PropagateNSW);
     return replaceInstUsesWith(I, Mul);
+  }
+
+  // max(X,Y) nsw/nuw - min(X,Y) --> abs(X nsw - Y)
+  if (match(Op0, m_OneUse(m_c_SMax(m_Value(X), m_Value(Y)))) &&
+      match(Op1, m_OneUse(m_c_SMin(m_Specific(X), m_Specific(Y))))) {
+    if (I.hasNoUnsignedWrap() || I.hasNoSignedWrap()) {
+      Value *Sub =
+          Builder.CreateSub(X, Y, "sub", /*HasNUW=*/false, /*HasNSW=*/true);
+      Value *Call =
+          Builder.CreateBinaryIntrinsic(Intrinsic::abs, Sub, Builder.getTrue());
+      return replaceInstUsesWith(I, Call);
+    }
   }
 
   return TryToNarrowDeduceFlags();

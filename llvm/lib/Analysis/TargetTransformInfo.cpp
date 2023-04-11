@@ -108,6 +108,14 @@ IntrinsicCostAttributes::IntrinsicCostAttributes(Intrinsic::ID Id, Type *RTy,
   Arguments.insert(Arguments.begin(), Args.begin(), Args.end());
 }
 
+HardwareLoopInfo::HardwareLoopInfo(Loop *L) : L(L) {
+  // Match default options:
+  // - hardware-loop-counter-bitwidth = 32
+  // - hardware-loop-decrement = 1
+  CountType = Type::getInt32Ty(L->getHeader()->getContext());
+  LoopDecrement = ConstantInt::get(CountType, 1);
+}
+
 bool HardwareLoopInfo::isHardwareLoopCandidate(ScalarEvolution &SE,
                                                LoopInfo &LI, DominatorTree &DT,
                                                bool ForceNestedLoop,
@@ -220,6 +228,14 @@ TargetTransformInfo::getGEPCost(Type *PointeeType, const Value *Ptr,
   return TTIImpl->getGEPCost(PointeeType, Ptr, Operands, CostKind);
 }
 
+InstructionCost TargetTransformInfo::getPointersChainCost(
+    ArrayRef<const Value *> Ptrs, const Value *Base,
+    const TTI::PointersChainInfo &Info, TTI::TargetCostKind CostKind) const {
+  assert((Base || !Info.isSameBase()) &&
+         "If pointers have same base address it has to be provided.");
+  return TTIImpl->getPointersChainCost(Ptrs, Base, Info, CostKind);
+}
+
 unsigned TargetTransformInfo::getEstimatedNumberOfCaseClusters(
     const SwitchInst &SI, unsigned &JTSize, ProfileSummaryInfo *PSI,
     BlockFrequencyInfo *BFI) const {
@@ -306,14 +322,13 @@ bool TargetTransformInfo::isHardwareLoopProfitable(
 }
 
 bool TargetTransformInfo::preferPredicateOverEpilogue(
-    Loop *L, LoopInfo *LI, ScalarEvolution &SE, AssumptionCache &AC,
-    TargetLibraryInfo *TLI, DominatorTree *DT, LoopVectorizationLegality *LVL,
-    InterleavedAccessInfo *IAI) const {
-  return TTIImpl->preferPredicateOverEpilogue(L, LI, SE, AC, TLI, DT, LVL, IAI);
+    TailFoldingInfo *TFI) const {
+  return TTIImpl->preferPredicateOverEpilogue(TFI);
 }
 
-TailFoldingStyle TargetTransformInfo::getPreferredTailFoldingStyle() const {
-  return TTIImpl->getPreferredTailFoldingStyle();
+TailFoldingStyle TargetTransformInfo::getPreferredTailFoldingStyle(
+    bool IVUpdateMayOverflow) const {
+  return TTIImpl->getPreferredTailFoldingStyle(IVUpdateMayOverflow);
 }
 
 std::optional<Instruction *>
@@ -669,6 +684,10 @@ std::optional<unsigned> TargetTransformInfo::getMaxVScale() const {
 
 std::optional<unsigned> TargetTransformInfo::getVScaleForTuning() const {
   return TTIImpl->getVScaleForTuning();
+}
+
+bool TargetTransformInfo::isVScaleKnownToBeAPowerOfTwo() const {
+  return TTIImpl->isVScaleKnownToBeAPowerOfTwo();
 }
 
 bool TargetTransformInfo::shouldMaximizeVectorBandwidth(

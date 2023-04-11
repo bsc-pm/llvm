@@ -622,16 +622,13 @@ public:
     return BaseT::isHardwareLoopProfitable(L, SE, AC, LibInfo, HWLoopInfo);
   }
 
-  bool preferPredicateOverEpilogue(Loop *L, LoopInfo *LI, ScalarEvolution &SE,
-                                   AssumptionCache &AC, TargetLibraryInfo *TLI,
-                                   DominatorTree *DT,
-                                   LoopVectorizationLegality *LVL,
-                                   InterleavedAccessInfo *IAI) {
-    return BaseT::preferPredicateOverEpilogue(L, LI, SE, AC, TLI, DT, LVL, IAI);
+  bool preferPredicateOverEpilogue(TailFoldingInfo *TFI) {
+    return BaseT::preferPredicateOverEpilogue(TFI);
   }
 
-  TailFoldingStyle getPreferredTailFoldingStyle() {
-    return BaseT::getPreferredTailFoldingStyle();
+  TailFoldingStyle
+  getPreferredTailFoldingStyle(bool IVUpdateMayOverflow = true) {
+    return BaseT::getPreferredTailFoldingStyle(IVUpdateMayOverflow);
   }
 
   std::optional<Instruction *> instCombineIntrinsic(InstCombiner &IC,
@@ -713,6 +710,7 @@ public:
 
   std::optional<unsigned> getMaxVScale() const { return std::nullopt; }
   std::optional<unsigned> getVScaleForTuning() const { return std::nullopt; }
+  bool isVScaleKnownToBeAPowerOfTwo() const { return false; }
 
   /// Estimate the overhead of scalarizing an instruction. Insert and Extract
   /// are set if the demanded result elements need to be inserted and/or
@@ -2333,6 +2331,7 @@ public:
   InstructionCost getArithmeticReductionCost(unsigned Opcode, VectorType *Ty,
                                              std::optional<FastMathFlags> FMF,
                                              TTI::TargetCostKind CostKind) {
+    assert(Ty && "Unknown reduction vector type");
     if (TTI::requiresOrderedReduction(FMF))
       return getOrderedReductionCost(Opcode, Ty, CostKind);
     return getTreeReductionCost(Opcode, Ty, CostKind);

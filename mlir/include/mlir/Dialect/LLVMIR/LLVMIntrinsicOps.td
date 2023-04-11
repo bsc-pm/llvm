@@ -4,7 +4,6 @@
 include "mlir/IR/OpBase.td"
 include "mlir/Dialect/LLVMIR/LLVMAttrDefs.td"
 include "mlir/Dialect/LLVMIR/LLVMOpBase.td"
-include "mlir/Dialect/LLVMIR/LLVMAttrDefs.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 
 // Operations that correspond to LLVM intrinsics. With MLIR operation set being
@@ -58,17 +57,29 @@ class LLVM_BinarySameArgsIntrOpF<string func, list<Trait> traits = []> :
   let arguments = !con(commonArgs, fmfArg);
 }
 
-class LLVM_TernarySameArgsIntrOpF<string func, list<Trait> traits = []> :
+class LLVM_TernarySameArgsIntrOpBase<string func, Type element,
+              list<Trait> traits = [], bit requiresFastmath = 0> :
     LLVM_OneResultIntrOp<func, [], [0],
            !listconcat([Pure, SameOperandsAndResultType], traits),
-           /*requiresFastmath=*/1> {
-  let arguments = (ins LLVM_ScalarOrVectorOf<AnyFloat>:$a,
-                       LLVM_ScalarOrVectorOf<AnyFloat>:$b,
-                       LLVM_ScalarOrVectorOf<AnyFloat>:$c,
-                       DefaultValuedAttr<LLVM_FastmathFlagsAttr,
-                                         "{}">:$fastmathFlags);
+           requiresFastmath> {
+  dag commonArgs = (ins LLVM_ScalarOrVectorOf<element>:$a,
+                       LLVM_ScalarOrVectorOf<element>:$b,
+                       LLVM_ScalarOrVectorOf<element>:$c);
   let assemblyFormat = "`(` operands `)` custom<LLVMOpAttrs>(attr-dict) `:` "
       "functional-type(operands, results)";
+}
+
+class LLVM_TernarySameArgsIntrOpI<string func, list<Trait> traits = []> :
+    LLVM_TernarySameArgsIntrOpBase<func, AnySignlessInteger, traits> {
+  let arguments = commonArgs;
+}
+
+class LLVM_TernarySameArgsIntrOpF<string func, list<Trait> traits = []> :
+    LLVM_TernarySameArgsIntrOpBase<func, LLVM_AnyFloat, traits,
+                                  /*requiresFastmath=*/1> {
+  dag fmfArg = (
+    ins DefaultValuedAttr<LLVM_FastmathFlagsAttr, "{}">:$fastmathFlags);
+  let arguments = !con(commonArgs, fmfArg);
 }
 
 class LLVM_CountZerosIntrOp<string func, list<Trait> traits = []> :
@@ -109,8 +120,7 @@ def LLVM_FTruncOp : LLVM_UnaryIntrOpF<"trunc">;
 def LLVM_SqrtOp : LLVM_UnaryIntrOpF<"sqrt">;
 def LLVM_PowOp : LLVM_BinarySameArgsIntrOpF<"pow">;
 def LLVM_PowIOp : LLVM_OneResultIntrOp<"powi", [], [0,1],
-    [DeclareOpInterfaceMethods<FastmathFlagsInterface>, Pure],
-    /*requiresFastmath=*/1> {
+                                       [Pure], /*requiresFastmath=*/1> {
   let arguments =
       (ins LLVM_ScalarOrVectorOf<LLVM_AnyFloat>:$val,
            AnySignlessInteger:$power,
@@ -119,9 +129,12 @@ def LLVM_PowIOp : LLVM_OneResultIntrOp<"powi", [], [0,1],
       "functional-type(operands, results)";
 }
 def LLVM_BitReverseOp : LLVM_UnaryIntrOpI<"bitreverse">;
+def LLVM_ByteSwapOp : LLVM_UnaryIntrOpI<"bswap">;
 def LLVM_CountLeadingZerosOp : LLVM_CountZerosIntrOp<"ctlz">;
 def LLVM_CountTrailingZerosOp : LLVM_CountZerosIntrOp<"cttz">;
 def LLVM_CtPopOp : LLVM_UnaryIntrOpI<"ctpop">;
+def LLVM_FshlOp : LLVM_TernarySameArgsIntrOpI<"fshl">;
+def LLVM_FshrOp : LLVM_TernarySameArgsIntrOpI<"fshr">;
 def LLVM_MaxNumOp : LLVM_BinarySameArgsIntrOpF<"maxnum">;
 def LLVM_MinNumOp : LLVM_BinarySameArgsIntrOpF<"minnum">;
 def LLVM_MaximumOp : LLVM_BinarySameArgsIntrOpF<"maximum">;
@@ -131,25 +144,67 @@ def LLVM_SMinOp : LLVM_BinarySameArgsIntrOpI<"smin">;
 def LLVM_UMaxOp : LLVM_BinarySameArgsIntrOpI<"umax">;
 def LLVM_UMinOp : LLVM_BinarySameArgsIntrOpI<"umin">;
 
-def LLVM_MemcpyOp : LLVM_ZeroResultIntrOp<"memcpy", [0, 1, 2]> {
-  let arguments = (ins Arg<LLVM_AnyPointer,"",[MemWrite]>:$dst,
-                       Arg<LLVM_AnyPointer,"",[MemRead]>:$src,
-                       AnySignlessInteger:$len, I1:$isVolatile);
-}
-def LLVM_MemcpyInlineOp : LLVM_ZeroResultIntrOp<"memcpy.inline", [0, 1, 2]> {
-  let arguments = (ins Arg<LLVM_AnyPointer,"",[MemWrite]>:$dst,
-                       Arg<LLVM_AnyPointer,"",[MemRead]>:$src,
-                       AnySignlessInteger:$len, I1:$isVolatile);
-}
-def LLVM_MemmoveOp : LLVM_ZeroResultIntrOp<"memmove", [0, 1, 2]> {
-  let arguments = (ins Arg<LLVM_AnyPointer,"",[MemWrite]>:$dst,
-                       Arg<LLVM_AnyPointer,"",[MemRead]>:$src,
-                       AnySignlessInteger:$len, I1:$isVolatile);
+class LLVM_MemcpyIntrOpBase<string name> :
+    LLVM_ZeroResultIntrOp<name, [0, 1, 2], [], /*requiresAccessGroup=*/1,
+                                               /*requiresAliasAnalysis=*/1> {
+  dag args = (ins Arg<LLVM_AnyPointer,"",[MemWrite]>:$dst,
+                  Arg<LLVM_AnyPointer,"",[MemRead]>:$src,
+                  AnySignlessInteger:$len, I1:$isVolatile);
+  // Append the alias attributes defined by LLVM_IntrOpBase.
+  let arguments = !con(args, aliasAttrs);
+  let builders = [
+    OpBuilder<(ins "Value":$dst, "Value":$src, "Value":$len,
+                   "Value":$isVolatile), [{
+      build($_builder, $_state, dst, src, len, isVolatile,
+            /*access_groups=*/nullptr, /*alias_scopes=*/nullptr,
+            /*noalias_scopes=*/nullptr, /*tbaa=*/nullptr);
+    }]
+  >];
 }
 
-def LLVM_MemsetOp : LLVM_ZeroResultIntrOp<"memset", [0, 2]> {
-  let arguments = (ins Arg<LLVM_AnyPointer,"",[MemWrite]>:$dst,
-                       I8:$val, AnySignlessInteger:$len, I1:$isVolatile);
+def LLVM_MemcpyOp : LLVM_MemcpyIntrOpBase<"memcpy">;
+def LLVM_MemcpyInlineOp : LLVM_MemcpyIntrOpBase<"memcpy.inline">;
+def LLVM_MemmoveOp : LLVM_MemcpyIntrOpBase<"memmove">;
+
+def LLVM_MemsetOp : LLVM_ZeroResultIntrOp<"memset", [0, 2], [],
+                      /*requiresAccessGroup=*/1, /*requiresAliasAnalysis=*/1> {
+  dag args = (ins Arg<LLVM_AnyPointer,"",[MemWrite]>:$dst,
+                  I8:$val, AnySignlessInteger:$len, I1:$isVolatile);
+  // Append the alias attributes defined by LLVM_IntrOpBase.
+  let arguments = !con(args, aliasAttrs);
+  let builders = [
+    OpBuilder<(ins "Value":$dst, "Value":$val, "Value":$len,
+                    "Value":$isVolatile), [{
+      build($_builder, $_state, dst, val, len, isVolatile,
+            /*access_groups=*/nullptr, /*alias_scopes=*/nullptr,
+            /*noalias_scopes=*/nullptr, /*tbaa=*/nullptr);
+    }]
+  >];
+}
+
+def LLVM_NoAliasScopeDeclOp
+    : LLVM_ZeroResultIntrOp<"experimental.noalias.scope.decl"> {
+  let arguments = (ins SymbolRefAttr:$scope);
+  string llvmBuilder = [{
+    // Wrap the scope argument into a list since the LLVM IR intrinsic takes
+    // a list containing exactly one scope rather than a scope itself.
+    llvm::MDNode* node = moduleTranslation.getAliasScopes(op, {$scope});
+    builder.CreateNoAliasScopeDeclaration(node);
+  }];
+  string mlirBuilder = [{
+    FailureOr<SmallVector<SymbolRefAttr>> scopeAttrs =
+      moduleImport.matchAliasScopeAttrs(llvmOperands[0]);
+    // Drop the intrinsic if the alias scope translation fails since the scope
+    // is not used by an aliasing operation, such as a load or store, that is
+    // used to convert the alias scope metadata.
+    if (failed(scopeAttrs))
+      return success();
+    if (scopeAttrs->size() != 1)
+      return failure();
+    $_op = $_builder.create<LLVM::NoAliasScopeDeclOp>(
+      $_location, (*scopeAttrs)[0]);
+  }];
+  let assemblyFormat = "$scope attr-dict";
 }
 
 //===----------------------------------------------------------------------===//
@@ -307,11 +362,6 @@ class LLVM_DbgIntrOp<string name, string argName> : LLVM_IntrOp<name, [], [], []
   }];
 }
 
-def LLVM_DbgAddrOp : LLVM_DbgIntrOp<"dbg.addr", "addr"> {
-  let summary = "Describe the current address of a local debug info variable.";
-  let arguments = (ins LLVM_AnyPointer:$addr, LLVM_DILocalVariableAttr:$varInfo);
-}
-
 def LLVM_DbgDeclareOp : LLVM_DbgIntrOp<"dbg.declare", "addr"> {
   let summary = "Declare the address of a local debug info variable.";
   let arguments = (ins LLVM_AnyPointer:$addr, LLVM_DILocalVariableAttr:$varInfo);
@@ -371,16 +421,27 @@ def LLVM_StackRestoreOp : LLVM_ZeroResultIntrOp<"stackrestore"> {
 //
 
 // LLVM vector reduction over a single vector.
-class LLVM_VecReductionBase<string mnem, Type element>
+class LLVM_VecReductionBase<string mnem, Type element, bit requiresFastmath=0>
     : LLVM_OneResultIntrOp<"vector.reduce." # mnem, [], [0],
-                           [Pure, SameOperandsAndResultElementType]>,
-      Arguments<(ins LLVM_VectorOf<element>)>;
+                           [Pure, SameOperandsAndResultElementType],
+                           requiresFastmath> {
+      dag commonArgs = (ins LLVM_VectorOf<element>:$in);
+}
 
 class LLVM_VecReductionF<string mnem>
-    : LLVM_VecReductionBase<mnem, AnyFloat>;
+    : LLVM_VecReductionBase<mnem, AnyFloat, /*requiresFastmath=*/1> {
+  dag fmfArg = (
+    ins DefaultValuedAttr<LLVM_FastmathFlagsAttr, "{}">:$fastmathFlags);
+  let arguments = !con(commonArgs, fmfArg);
+
+  let assemblyFormat = "`(` operands `)` custom<LLVMOpAttrs>(attr-dict) `:` "
+      "functional-type(operands, results)";
+}
 
 class LLVM_VecReductionI<string mnem>
-    : LLVM_VecReductionBase<mnem, AnySignlessInteger>;
+    : LLVM_VecReductionBase<mnem, AnySignlessInteger> {
+      let arguments = commonArgs;
+}
 
 // LLVM vector reduction over a single vector, with an initial value,
 // and with permission to reassociate the reduction operations.

@@ -317,16 +317,17 @@ static void emitConstant(uint64_t Val, unsigned Size, raw_ostream &OS) {
 static bool isDispOrCDisp8(uint64_t TSFlags, int Value, int &ImmOffset) {
   bool HasEVEX = (TSFlags & X86II::EncodingMask) == X86II::EVEX;
 
-  int CD8_Scale =
+  unsigned CD8_Scale =
       (TSFlags & X86II::CD8_Scale_Mask) >> X86II::CD8_Scale_Shift;
-  if (!HasEVEX || CD8_Scale == 0)
+  CD8_Scale = CD8_Scale ? 1U << (CD8_Scale - 1) : 0U;
+  if (!HasEVEX || !CD8_Scale)
     return isInt<8>(Value);
 
   assert(isPowerOf2_32(CD8_Scale) && "Unexpected CD8 scale!");
   if (Value & (CD8_Scale - 1)) // Unaligned offset
     return false;
 
-  int CDisp8 = Value / CD8_Scale;
+  int CDisp8 = Value / static_cast<int>(CD8_Scale);
   if (!isInt<8>(CDisp8))
     return false;
 
@@ -878,7 +879,7 @@ PrefixKind X86MCCodeEmitter::emitVEXOpcodePrefix(int MemOperand,
     break;
   }
 
-  Prefix.setW(TSFlags & X86II::VEX_W);
+  Prefix.setW(TSFlags & X86II::REX_W);
 
   bool HasEVEX_K = TSFlags & X86II::EVEX_K;
   bool HasVEX_4V = TSFlags & X86II::VEX_4V;
@@ -1160,20 +1161,21 @@ PrefixKind X86MCCodeEmitter::emitREXPrefix(int MemOperand, const MCInst &MI,
   if (!STI.hasFeature(X86::Is64Bit))
     return None;
   X86OpcodePrefixHelper Prefix(*Ctx.getRegisterInfo());
-  bool UsesHighByteReg = false;
   const MCInstrDesc &Desc = MCII.get(MI.getOpcode());
   uint64_t TSFlags = Desc.TSFlags;
   Prefix.setW(TSFlags & X86II::REX_W);
   unsigned NumOps = MI.getNumOperands();
-  if (!NumOps) {
-    PrefixKind Kind = Prefix.determineOptimalKind();
-    Prefix.emit(OS);
-    return Kind;
-  }
-  unsigned CurOp = X86II::getOperandBias(Desc);
+  bool UsesHighByteReg = false;
+#ifndef NDEBUG
+  bool HasRegOp = false;
+#endif
+  unsigned CurOp = NumOps ? X86II::getOperandBias(Desc) : 0;
   for (unsigned i = CurOp; i != NumOps; ++i) {
     const MCOperand &MO = MI.getOperand(i);
     if (MO.isReg()) {
+#ifndef NDEBUG
+      HasRegOp = true;
+#endif
       unsigned Reg = MO.getReg();
       if (Reg == X86::AH || Reg == X86::BH || Reg == X86::CH || Reg == X86::DH)
         UsesHighByteReg = true;
@@ -1194,6 +1196,15 @@ PrefixKind X86MCCodeEmitter::emitREXPrefix(int MemOperand, const MCInst &MI,
     }
   }
   switch (TSFlags & X86II::FormMask) {
+  default:
+    assert(!HasRegOp && "Unexpected form in emitREXPrefix!");
+    break;
+  case X86II::RawFrm:
+  case X86II::RawFrmMemOffs:
+  case X86II::RawFrmSrc:
+  case X86II::RawFrmDst:
+  case X86II::RawFrmDstSrc:
+    break;
   case X86II::AddRegFrm:
     Prefix.setB(MI, CurOp++);
     break;
