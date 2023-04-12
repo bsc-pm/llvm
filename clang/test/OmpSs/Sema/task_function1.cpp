@@ -44,7 +44,7 @@ struct Q {
 // expected-error@+1 4 {{expected lvalue reference, global variable, dereference, array element, array section or array shape}}
 #pragma oss task in((*s).x, *(s->x), &*p, s->x, a, a++, p, *p, p[0 : 4], [10]p)
 void foo(Q *s, int a, int *p){}
-// expected-error@+1 2 {{expected variable name or array shaping}} expected-error@+1 {{expected lvalue reference, global variable or array shape}}
+// expected-error@+1 2 {{expected variable name or array shaping}} expected-error@+1 {{expected lvalue reference or array shape}}
 #pragma oss task reduction(+: (*s).x, &*p, a)
 void foo_1(Q *s, int a, int *p){}
 #pragma oss task in(a)

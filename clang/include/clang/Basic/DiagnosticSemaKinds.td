@@ -11557,7 +11557,7 @@ def err_oss_call_expr_support : Error<
 def err_oss_expected_addressable_lvalue_or_array_item : Error<
   "expected addressable lvalue expression, array element, array shape or array section">;
 def err_oss_expected_lvalue_reference_or_global_or_dereference_or_array_item : Error<
-  "expected lvalue reference, global variable%select{, dereference, array element, array section|}0 or array shape">;
+  "expected lvalue reference%select{, global variable, dereference, array element, array section|}0 or array shape">;
 def err_oss_expected_var_name_member_expr_or_array_shaping : Error<
   "expected variable name%select{|, static data member of current class}0 or array shaping">;
 def err_oss_expected_var_name_member_expr : Error<

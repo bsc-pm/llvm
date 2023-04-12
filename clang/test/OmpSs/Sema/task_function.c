@@ -19,7 +19,7 @@ void foo6(int *p) {}
 void foo7(int *p) {}
 #pragma oss task reduction(+: *p) weakreduction(+: *p) // expected-error {{expected variable name or array shaping}} expected-error {{expected variable name or array shaping}} expected-error {{conflicts between dependency and reduction clause}}
 void foo8(int *p) {}
-#pragma oss task reduction(+: a) weakreduction(+: a) // expected-error 2 {{expected lvalue reference, global variable or array shape}} expected-error {{variable 'a' conflicts between dependency and reduction clause}}
+#pragma oss task reduction(+: a) weakreduction(+: a) // expected-error 2 {{expected lvalue reference or array shape}} expected-error {{variable 'a' conflicts between dependency and reduction clause}}
 void foo8_1(int a) {}
 #pragma oss task on([1]p) // expected-error {{unexpected OmpSs-2 clause 'on' in directive '#pragma oss task'}}
 void foo9(int *p) {}

@@ -5,19 +5,14 @@ struct S {
   static int x;
   #pragma oss task in(x)
   void foo();
-  #pragma oss task reduction(+:x)
-  void foo1();
 };
 
 int main() {
   S s;
   s.foo();
-  s.foo1();
 }
 
 
-// CHECK: %{{.*}} = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00")
-// CHECK-SAME: "QUAL.OSS.SHARED"(ptr @_ZN1S1xE, i32 undef)
 // CHECK: %{{.*}} = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00")
 // CHECK-SAME: "QUAL.OSS.SHARED"(ptr @_ZN1S1xE, i32 undef)
 
