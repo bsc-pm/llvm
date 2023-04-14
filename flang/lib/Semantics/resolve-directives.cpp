@@ -2337,6 +2337,7 @@ bool OSSAttributeVisitor::Pre(const parser::OmpSsBlockConstruct &x) {
   }
   ClearDataSharingAttributeObjects();
 
+  PrivatizeLoopIndexes(block);
   // Walk over clauses manually
   Walk(beginBlockDir.t);
   GetContext().withinConstruct = true;
