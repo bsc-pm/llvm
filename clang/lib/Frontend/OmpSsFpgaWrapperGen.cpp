@@ -465,10 +465,9 @@ OMPIF_COMM_WORLD
                 "char ompif_rank, " STR_SPWNINOUTPORT_DECL ");\n";
     }
     if (CI.getFrontendOpts().OmpSsFpgaInstrumentation) {
-      OutputHeaders << "#include <cstdint>\n";
       Output << "typedef ap_uint<105> __mcxx_instrData_t;\n"
-             << "void mcxx_instrument_event(uint8_t event, uint64_t "
-                "payload, " STR_INSTRPORT_DECL ");\n";
+             << "void mcxx_instrument_event(unsigned char event, unsigned long "
+                "long payload, " STR_INSTRPORT_DECL ");\n";
     }
   }
 
@@ -1150,17 +1149,17 @@ OMPIF_COMM_WORLD
     }
 
     if (CI.getFrontendOpts().OmpSsFpgaInstrumentation) {
-      Output << "void mcxx_instrument_event(uint8_t event, uint64_t "
-                "payload, " STR_INSTRPORT_DECL ") {\n"
+      Output << "void mcxx_instrument_event(unsigned char event, unsigned long "
+                "long payload, " STR_INSTRPORT_DECL ") {\n"
                 "#pragma HLS inline\n"
                 "  __mcxx_instrData_t tmp;\n"
                 "  tmp.range(63, 0) = payload;\n"
                 "  tmp.range(95, 64) = event & 0x7F;\n"
                 "  tmp.range(103, 96) = event >> 7;\n"
                 "  tmp.bit(104) = 1;\n"
-                "  wait();\n"
+                "  ap_wait();\n"
                 "  " STR_INSTRPORT ".write(tmp);\n"
-                "  wait();\n"
+                "  ap_wait();\n"
                 "}\n";
     }
   }

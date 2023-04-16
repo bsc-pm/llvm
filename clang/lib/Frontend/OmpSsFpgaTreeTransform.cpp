@@ -1068,9 +1068,7 @@ uint64_t GenOnto(ASTContext &Ctx, FunctionDecl *FD) {
   std::string typeStr;
   llvm::raw_string_ostream typeStream(typeStr);
 
-  typeStream << Ctx.getSourceManager().getFilename(
-                    FD->getSourceRange().getBegin())
-             << " " << FD->getNameAsString();
+  typeStream << FD->getNameAsString();
   unsigned long long int type = MercuriumHashStr(typeStr.c_str()) &
                                 0xFFFFFFFF; //< Ensure that it its upto 32b
   if (taskAttr->getDevice() == OSSTaskDeclAttr::Fpga) {
