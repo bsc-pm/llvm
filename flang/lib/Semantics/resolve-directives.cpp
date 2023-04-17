@@ -2522,6 +2522,8 @@ void OSSAttributeVisitor::OSSImplicitVisitor::Post(const parser::Name &name) {
     if (symbol->owner().IsDerivedType()
         || symbol->has<ProcEntityDetails>()
         || symbol->has<SubprogramDetails>()
+        || symbol->has<UseDetails>()
+        || symbol->has<UseErrorDetails>()
         || symbol->has<MiscDetails>())
       continue;
 
