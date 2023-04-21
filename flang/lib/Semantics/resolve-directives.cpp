@@ -2524,6 +2524,7 @@ void OSSAttributeVisitor::OSSImplicitVisitor::Post(const parser::Name &name) {
         || symbol->has<SubprogramDetails>()
         || symbol->has<UseDetails>()
         || symbol->has<UseErrorDetails>()
+        || symbol->has<AssocEntityDetails>()
         || symbol->has<MiscDetails>())
       continue;
 
