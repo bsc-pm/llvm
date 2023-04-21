@@ -1907,7 +1907,65 @@ void Fortran::lower::genOmpSsConstruct(
       ossConstruct.u);
 }
 
-mlir::Value Fortran::lower::genOmpSsTaskSubroutine(
+static void resolveDSA(
+    mlir::Value value,
+    llvm::SetVector<mlir::Value>& val_shared,
+    llvm::SetVector<mlir::Value>& val_firstprivate,
+    llvm::SetVector<mlir::Value>& val_capture) {
+
+  if (fir::isa_box_type(value.getType())) {
+    // Copying the box should be enough
+    val_firstprivate.insert(value);
+  } else if (!fir::isa_ref_type(value.getType())) {
+    val_capture.insert(value);
+  } else {
+    val_shared.insert(value);
+  }
+}
+
+static void fillCallDSAs(
+    Fortran::lower::CallerInterface &caller,
+    Fortran::lower::AbstractConverter &converter,
+    Fortran::lower::StatementContext &stmtCtx,
+    llvm::SetVector<mlir::Value>& val_shared,
+    llvm::SetVector<mlir::Value>& val_firstprivate,
+    llvm::SetVector<mlir::Value>& val_capture) {
+
+  Fortran::lower::SymMap &symMap = converter.getLocalSymbols();
+  const auto &dummies = caller.getInterfaceDetails()->dummyArgs();
+  for (const Fortran::lower::CallInterface<
+           Fortran::lower::CallerInterface>::PassedEntity &arg :
+       caller.getPassedArguments()) {
+    // TODO: location
+    auto loc = converter.genUnknownLocation();
+    const auto *actual = arg.entity;
+    const auto *expr = actual->UnwrapExpr();
+    const Fortran::semantics::Symbol *sym = dummies[arg.firArgument];
+
+    auto value = symMap.lookupSymbol(*sym).getAddr();
+    resolveDSA(value, val_shared, val_firstprivate, val_capture);
+  }
+  // Internal subprograms support
+  mlir::FunctionType funcOpType = caller.getFuncOp().getFunctionType();
+  mlir::FunctionType callSiteType = caller.genFunctionType();
+  if (callSiteType.getNumResults() == funcOpType.getNumResults() &&
+      callSiteType.getNumInputs() + 1 == funcOpType.getNumInputs() &&
+      fir::anyFuncArgsHaveAttr(caller.getFuncOp(),
+                               fir::getHostAssocAttrName())) {
+    val_firstprivate.insert(converter.hostAssocTupleValue());
+  }
+}
+
+static void fillCallAdditionalCaptures(
+    const llvm::SmallVector<mlir::Value>& copyOutTmps,
+    llvm::SetVector<mlir::Value>& val_shared,
+    llvm::SetVector<mlir::Value>& val_firstprivate,
+    llvm::SetVector<mlir::Value>& val_capture) {
+  for (mlir::Value value : copyOutTmps)
+    resolveDSA(value, val_shared, val_firstprivate, val_capture);
+}
+
+void Fortran::lower::genOmpSsTaskSubroutine(
     Fortran::lower::AbstractConverter &converter,
     Fortran::lower::pft::Evaluation &eval,
     const Fortran::semantics::Scope &scope,
@@ -1921,66 +1979,72 @@ mlir::Value Fortran::lower::genOmpSsTaskSubroutine(
   
   Fortran::lower::CallerInterface caller(procRef, converter);
 
-  Fortran::lower::SymMap localSymbols;
+  auto BodyGen = [&](Fortran::lower::SymMap &localSymbols,
+                     const llvm::SmallVector<mlir::Value> &copyOutTmps) {
+    converter.getLocalSymbols().symbolMapStack.emplace_back(localSymbols.symbolMapStack.back());
 
-  // Create allocas to store argument expressions
-  Fortran::lower::createOSSAllocasForArgs(
-    localSymbols, converter, caller, stmtCtx);
+    Fortran::lower::ImplicitDSAs implicitDSAs;
+    const auto &dummies = caller.getInterfaceDetails()->dummyArgs();
+    for (const Fortran::lower::CallInterface<
+             Fortran::lower::CallerInterface>::PassedEntity &arg :
+         caller.getPassedArguments()) {
+      const Fortran::semantics::Symbol *sym = dummies[arg.firArgument];
+      // We don't care about the dsa processing in OSSClausesVisitor,
+      // we are manually handling this to fisrtprivate
+      implicitDSAs.firstprivateList.push_back(*sym);
+    }
 
-  converter.getLocalSymbols().symbolMapStack.emplace_back(localSymbols.symbolMapStack.back());
+    OSSClausesVisitor clausesVisitor(converter, context, eval, scope, stmtCtx, implicitDSAs);
+    clausesVisitor.gatherClauseList(clauseList);
+    
+    auto loc = converter.getCurrentLocation();
+    auto &firOpBuilder = converter.getFirOpBuilder();
+    llvm::ArrayRef<mlir::Type> argTy;
+    llvm::SetVector<mlir::Value> val_shared_set;
+    llvm::SetVector<mlir::Value> val_firstprivate_set;
+    llvm::SetVector<mlir::Value> val_capture_set;
+    val_capture_set.insert(clausesVisitor.captureOperands().begin(), clausesVisitor.captureOperands().end());
 
-  OSSClausesVisitor clausesVisitor(converter, context, eval, scope, stmtCtx);
-  clausesVisitor.gatherClauseList(clauseList);
-  
-  auto loc = converter.getCurrentLocation();
-  auto &firOpBuilder = converter.getFirOpBuilder();
-  llvm::ArrayRef<mlir::Type> argTy;
-  llvm::SmallVector<mlir::Value> val_shared;
-  llvm::SmallVector<mlir::Value> val_private; /*No needed*/
-  llvm::SmallVector<mlir::Value> val_firstprivate;
-  llvm::SmallVector<mlir::Value> val_copy; /*No needed*/
-  llvm::SmallVector<mlir::Value> val_init; /*No needed*/
-  llvm::SmallVector<mlir::Value> val_deinit; /*No needed*/
-  llvm::SmallVector<mlir::Value> val_capture{clausesVisitor.captureOperands().begin(), clausesVisitor.captureOperands().end()};
+    fillCallDSAs(caller, converter, stmtCtx, val_shared_set, val_firstprivate_set, val_capture_set);
+    fillCallAdditionalCaptures(copyOutTmps, val_shared_set, val_firstprivate_set, val_capture_set);
 
-  Fortran::lower::fillDSAs(caller, converter, stmtCtx, val_shared, val_firstprivate, val_capture);
+    converter.getLocalSymbols().popScope();
 
-  converter.getLocalSymbols().popScope();
+    auto taskOp = firOpBuilder.create<mlir::oss::TaskOp>(
+      loc, argTy,
+      clausesVisitor.ifClauseOperand(),
+      clausesVisitor.finalClauseOperand(),
+      clausesVisitor.costClauseOperand(),
+      clausesVisitor.priorityClauseOperand(),
+      clausesVisitor.defaultClauseOperand(),
+      clausesVisitor.privateClauseOperands(),
+      val_firstprivate_set.getArrayRef(),
+      clausesVisitor.copyClauseOperands(),
+      clausesVisitor.initClauseOperands(),
+      clausesVisitor.deinitClauseOperands(),
+      val_shared_set.getArrayRef(),
+      clausesVisitor.vlaDimsOperands(),
+      val_capture_set.getArrayRef(),
+      clausesVisitor.inClauseOperands(),
+      clausesVisitor.outClauseOperands(),
+      clausesVisitor.inoutClauseOperands(),
+      clausesVisitor.concurrentClauseOperands(),
+      clausesVisitor.commutativeClauseOperands(),
+      clausesVisitor.weakinClauseOperands(),
+      clausesVisitor.weakoutClauseOperands(),
+      clausesVisitor.weakinoutClauseOperands(),
+      clausesVisitor.weakconcurrentClauseOperands(),
+      clausesVisitor.weakcommutativeClauseOperands());
 
-  auto taskOp = firOpBuilder.create<mlir::oss::TaskOp>(
-    loc, argTy,
-    clausesVisitor.ifClauseOperand(),
-    clausesVisitor.finalClauseOperand(),
-    clausesVisitor.costClauseOperand(),
-    clausesVisitor.priorityClauseOperand(),
-    clausesVisitor.defaultClauseOperand(),
-    val_private,
-    val_firstprivate,
-    val_copy,
-    val_init,
-    val_deinit,
-    val_shared,
-    clausesVisitor.vlaDimsOperands(),
-    val_capture,
-    clausesVisitor.inClauseOperands(),
-    clausesVisitor.outClauseOperands(),
-    clausesVisitor.inoutClauseOperands(),
-    clausesVisitor.concurrentClauseOperands(),
-    clausesVisitor.commutativeClauseOperands(),
-    clausesVisitor.weakinClauseOperands(),
-    clausesVisitor.weakoutClauseOperands(),
-    clausesVisitor.weakinoutClauseOperands(),
-    clausesVisitor.weakconcurrentClauseOperands(),
-    clausesVisitor.weakcommutativeClauseOperands());
+    firOpBuilder.createBlock(&taskOp.getRegion());
+    auto &block = taskOp.getRegion().back();
+    firOpBuilder.setInsertionPointToStart(&block);
+    // Ensure the block is well-formed.
+    firOpBuilder.create<mlir::oss::TerminatorOp>(loc);
+    // Reset the insertion point to the start of the first block.
+    firOpBuilder.setInsertionPointToStart(&block);
+  };
 
-  firOpBuilder.createBlock(&taskOp.getRegion());
-  auto &block = taskOp.getRegion().back();
-  firOpBuilder.setInsertionPointToStart(&block);
-  // Ensure the block is well-formed.
-  firOpBuilder.create<mlir::oss::TerminatorOp>(loc);
-  // Reset the insertion point to the start of the first block.
-  firOpBuilder.setInsertionPointToStart(&block);
-
-  return fir::getBase(Fortran::lower::createOSSCallOpWithAllocas(localSymbols, converter, caller, stmtCtx));
+  OSSCreateCall{converter, caller, stmtCtx, BodyGen}.run();
 }
 

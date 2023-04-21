@@ -218,26 +218,22 @@ mlir::Value createSubroutineCall(AbstractConverter &converter,
                                  ImplicitIterSpace &implicitIterSpace,
                                  SymMap &symMap, StatementContext &stmtCtx,
                                  bool isUserDefAssignment);
+struct OSSCreateCall {
+  Fortran::lower::AbstractConverter &converter;
+  Fortran::lower::CallerInterface &caller;
+  Fortran::lower::StatementContext &stmtCtx;
+  std::function<void(Fortran::lower::SymMap &,
+                     const llvm::SmallVector<mlir::Value>&)> BodyGen;
 
-void createOSSAllocasForArgs(
-                      Fortran::lower::SymMap &,
-                      Fortran::lower::AbstractConverter &,
-                      Fortran::lower::CallerInterface &,
-                      Fortran::lower::StatementContext &);
-
-fir::ExtendedValue createOSSCallOpWithAllocas(
-                      Fortran::lower::SymMap &,
-                      Fortran::lower::AbstractConverter &,
-                      Fortran::lower::CallerInterface &,
-                      Fortran::lower::StatementContext &);
-
-// TODO: place this in other place
-void fillDSAs(Fortran::lower::CallerInterface &caller,
-              Fortran::lower::AbstractConverter &converter,
-              Fortran::lower::StatementContext &stmtCtx,
-              llvm::SmallVectorImpl<mlir::Value>& val_shared,
-              llvm::SmallVectorImpl<mlir::Value>& val_firstprivate,
-              llvm::SmallVectorImpl<mlir::Value>& val_capture);
+  OSSCreateCall(Fortran::lower::AbstractConverter &converter,
+                Fortran::lower::CallerInterface &caller,
+                Fortran::lower::StatementContext &stmtCtx,
+                std::function<void(Fortran::lower::SymMap &,
+                                   const llvm::SmallVector<mlir::Value>&)> BodyGen)
+  : converter(converter), caller(caller), stmtCtx(stmtCtx), BodyGen(BodyGen)
+  {}
+  void run();
+};
 
 // Attribute for an alloca that is a trivial adaptor for converting a value to
 // pass-by-ref semantics for a VALUE parameter. The optimizer may be able to

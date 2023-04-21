@@ -2794,8 +2794,7 @@ public:
     return result;
   }
 
-  void genOmpSsCall(std::optional<mlir::Type> resultType,
-                    Fortran::lower::SymMap &localSymbols,
+  CopyOutPairs genOmpSsCall(Fortran::lower::SymMap &localSymbols,
                     Fortran::lower::CallerInterface &caller) {
     mlir::Location loc = getLoc();
     const Fortran::evaluate::ProcedureRef &procRef{caller.getCallDescription()};
@@ -2815,7 +2814,6 @@ public:
 
     using PassBy = Fortran::lower::CallerInterface::PassEntityBy;
 
-    llvm::SmallVector<fir::MutableBoxValue> mutableModifiedByCall;
     // List of <var, temp> where temp must be copied into var after the call.
     CopyOutPairs copyOutPairs;
 
@@ -2897,8 +2895,6 @@ public:
             fir::factory::getMutableIRBox(builder, loc, mutableBox);
         localSymbols.addSymbol(*sym, irBox);
         caller.placeInput(arg, irBox);
-        if (arg.mayBeModifiedByCall())
-          mutableModifiedByCall.emplace_back(std::move(mutableBox));
         if (fir::isAllocatableType(argTy) && arg.isIntentOut() &&
             Fortran::semantics::IsBindCProcedure(*procRef.proc().GetSymbol())) {
           if (mutableBox.isDerived() || mutableBox.isPolymorphic() ||
@@ -3091,23 +3087,14 @@ public:
         TODO(loc, "pass by value in non elemental function call");
       }
     }
-    if (!copyOutPairs.empty())
-      llvm_unreachable("copyOutPairs should be empty");
-    if (!mutableModifiedByCall.empty())
-      llvm_unreachable("mutableModifiedByCall should be empty");
+    return copyOutPairs;
   }
 
-  ExtValue genOmpSsCallOpAndResult(
-      std::optional<mlir::Type> resultType,
-      Fortran::lower::SymMap &localSymbols,
-      Fortran::lower::CallerInterface &caller) {
-    mlir::Location loc = getLoc();
-    mlir::FunctionType callSiteType = caller.genFunctionType();
-
-    ExtValue result = Fortran::lower::genOmpSsCallOpAndResult(
-        loc, converter, symMap, stmtCtx, caller, callSiteType, resultType);
-
-    return result;
+  void genOmpSsCallCopyOuts(const CopyOutPairs &copyOutPairs) {
+    // Copy-out temps that were created for non contiguous variable arguments if
+    // needed.
+    for (const auto &copyOutPair : copyOutPairs)
+      genCopyOut(copyOutPair);
   }
 
   template <typename A>
@@ -7725,70 +7712,42 @@ mlir::Value Fortran::lower::createSubroutineCall(
   return fir::getBase(res);
 }
 
-void Fortran::lower::createOSSAllocasForArgs(
-                      Fortran::lower::SymMap &localSymbols,
-                      Fortran::lower::AbstractConverter &converter,
-                      Fortran::lower::CallerInterface &caller,
-                      Fortran::lower::StatementContext &stmtCtx){
+void Fortran::lower::OSSCreateCall::run() {
   // TODO: location
   auto loc = converter.getCurrentLocation();
+  auto &firOpBuilder = converter.getFirOpBuilder();
   Fortran::lower::SymMap &symMap = converter.getLocalSymbols();
-  ScalarExprLowering{loc, converter, symMap, stmtCtx}.genOmpSsCall(std::nullopt, localSymbols, caller);
-}
+  Fortran::lower::SymMap localSymbols;
+  ScalarExprLowering scalarExprLowering{loc, converter, symMap, stmtCtx};
 
-fir::ExtendedValue Fortran::lower::createOSSCallOpWithAllocas(
-                      Fortran::lower::SymMap &localSymbols,
-                      Fortran::lower::AbstractConverter &converter,
-                      Fortran::lower::CallerInterface &caller,
-                      Fortran::lower::StatementContext &stmtCtx){
-  // TODO: location
-  auto loc = converter.getCurrentLocation();
-  Fortran::lower::SymMap &symMap = converter.getLocalSymbols();
-  return ScalarExprLowering{loc, converter, symMap, stmtCtx}.genOmpSsCallOpAndResult(std::nullopt, localSymbols, caller);
-}
-
-// TODO: place this in other place
-void Fortran::lower::fillDSAs(
-    Fortran::lower::CallerInterface &caller,
-    Fortran::lower::AbstractConverter &converter,
-    Fortran::lower::StatementContext &stmtCtx,
-    llvm::SmallVectorImpl<mlir::Value>& val_shared,
-    llvm::SmallVectorImpl<mlir::Value>& val_firstprivate,
-    llvm::SmallVectorImpl<mlir::Value>& val_capture) {
-
-  Fortran::lower::SymMap &symMap = converter.getLocalSymbols();
-  const auto &dummies = caller.getInterfaceDetails()->dummyArgs();
-  for (const Fortran::lower::CallInterface<
-           Fortran::lower::CallerInterface>::PassedEntity &arg :
-       caller.getPassedArguments()) {
-    // TODO: location
-    auto loc = converter.genUnknownLocation();
-    const auto *actual = arg.entity;
-    const auto *expr = actual->UnwrapExpr();
-    const Fortran::semantics::Symbol *sym = dummies[arg.firArgument];
-
-    auto ossArgValue = symMap.lookupSymbol(*sym).getAddr();
-    auto origArgValue = fir::getBase(converter.genExprAddr(*expr, stmtCtx, &loc));
-    if (ossArgValue == origArgValue) {
-      val_shared.push_back(ossArgValue);
-    } else if (fir::isa_box_type(ossArgValue.getType())) {
-      // Copying the box should be enough
-      val_firstprivate.push_back(ossArgValue);
-    } else if (!fir::isa_ref_type(ossArgValue.getType())) {
-      val_capture.push_back(ossArgValue);
-    } else {
-      val_firstprivate.push_back(ossArgValue);
+  // Create allocas to store argument expressions
+  ScalarExprLowering::CopyOutPairs copyOutPairs =
+    scalarExprLowering.genOmpSsCall(localSymbols, caller);
+  llvm::SmallVector<mlir::Value> copyOutTmps;
+  for (const auto &copyOutPair : copyOutPairs) {
+    if (copyOutPair.argMayBeModifiedByCall) {
+      // Capture the original value
+      copyOutTmps.push_back(fir::getBase(copyOutPair.var));
+      copyOutTmps.push_back(fir::getBase(copyOutPair.temp));
+      for (mlir::Value val : fir::factory::getNonDefaultLowerBounds(firOpBuilder, loc, copyOutPair.temp)) {
+        copyOutTmps.push_back(val);
+      }
+      for (mlir::Value val : fir::factory::getExtents(loc, firOpBuilder, copyOutPair.temp)) {
+        copyOutTmps.push_back(val);
+      }
+    }
+    if (copyOutPair.restrictCopyAndFreeAtRuntime) {
+      copyOutTmps.push_back(*copyOutPair.restrictCopyAndFreeAtRuntime);
     }
   }
-  // Internal subprograms support
-  mlir::FunctionType funcOpType = caller.getFuncOp().getFunctionType();
+
+  BodyGen(localSymbols, copyOutTmps);
+
   mlir::FunctionType callSiteType = caller.genFunctionType();
-  if (callSiteType.getNumResults() == funcOpType.getNumResults() &&
-      callSiteType.getNumInputs() + 1 == funcOpType.getNumInputs() &&
-      fir::anyFuncArgsHaveAttr(caller.getFuncOp(),
-                               fir::getHostAssocAttrName())) {
-    val_firstprivate.push_back(converter.hostAssocTupleValue());
-  }
+  Fortran::lower::genOmpSsCallOpAndResult(
+    loc, converter, symMap, stmtCtx, caller, callSiteType);
+
+  scalarExprLowering.genOmpSsCallCopyOuts(copyOutPairs);
 }
 
 template <typename A>

@@ -440,8 +440,7 @@ fir::ExtendedValue Fortran::lower::genCallOpAndResult(
 fir::ExtendedValue Fortran::lower::genOmpSsCallOpAndResult(
     mlir::Location loc, Fortran::lower::AbstractConverter &converter,
     Fortran::lower::SymMap &symMap, Fortran::lower::StatementContext &stmtCtx,
-    Fortran::lower::CallerInterface &caller, mlir::FunctionType callSiteType,
-    std::optional<mlir::Type> resultType) {
+    Fortran::lower::CallerInterface &caller, mlir::FunctionType callSiteType) {
   assert(!caller.requireDispatchCall());
   assert(!caller.mustMapInterfaceSymbols());
   fir::FirOpBuilder &builder = converter.getFirOpBuilder();

@@ -53,12 +53,12 @@ if [ "${foundFileCheck}" != "-1" ]; then
   runline=("${runline[@]:0:${foundFileCheck}-1}")
 fi
 
-echo "${runline[*]}"
 tmpfile=/tmp/test.mlir
+echo "${runline[*]} > ${tmpfile}"
 $(${runline[*]} > ${tmpfile})
 
 echo "${update_mlir_test} ${tmpfile} --check-prefix ${prefix}"
-ret=$(${update_mlir_test} ${tmpfile} --check-prefix ${prefix})
+#ret=$(${update_mlir_test} ${tmpfile} --check-prefix ${prefix})
 
 tmpfile1=/tmp/test1.f90
 if [ "$update" = 1 ]; then

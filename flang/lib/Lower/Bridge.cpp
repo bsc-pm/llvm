@@ -1075,11 +1075,9 @@ private:
 
         auto insertPt = builder->saveInsertionPoint();
 
-        mlir::Value res = genOmpSsTaskSubroutine(*this, eval, *ultimate.scope(), *outlineTask,
+        genOmpSsTaskSubroutine(*this, eval, *ultimate.scope(), *outlineTask,
             const_cast<Fortran::semantics::SemanticsContext&>(bridge.getSemanticsContext()),
             *stmt.typedCall, stmtCtx);
-        if (res)
-          llvm_unreachable("Unexpected call");
 
         builder->restoreInsertionPoint(insertPt);
         return;

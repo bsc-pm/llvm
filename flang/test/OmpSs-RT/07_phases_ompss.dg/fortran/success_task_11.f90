@@ -2,6 +2,11 @@
 ! <testinfo>
 ! test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatibility")
 ! </testinfo>
+
+! FIXME: This test should work but it's not because
+! we're doing shared of an alloca with an valuebyref
+! In theory with this flag some kind of optimization
+! must happen...
 MODULE M
     CONTAINS
         SUBROUTINE S2(A)

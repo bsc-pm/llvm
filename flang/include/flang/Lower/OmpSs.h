@@ -50,7 +50,7 @@ void genOmpSsConstruct(
   const parser::OmpSsConstruct &, const Fortran::lower::ImplicitDSAs &,
   Fortran::semantics::SemanticsContext &);
 
-mlir::Value genOmpSsTaskSubroutine(
+void genOmpSsTaskSubroutine(
   AbstractConverter &,
   Fortran::lower::pft::Evaluation &,
   const Fortran::semantics::Scope &,
