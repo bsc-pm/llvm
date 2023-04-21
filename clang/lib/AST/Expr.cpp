@@ -3427,6 +3427,7 @@ bool Expr::isConstantInitializer(ASTContext &Ctx, bool IsForRef,
         CE->getCastKind() == CK_ConstructorConversion ||
         CE->getCastKind() == CK_NonAtomicToAtomic ||
         CE->getCastKind() == CK_AtomicToNonAtomic ||
+        CE->getCastKind() == CK_NullToPointer ||
         CE->getCastKind() == CK_IntToOCLSampler)
       return CE->getSubExpr()->isConstantInitializer(Ctx, false, Culprit);
 
@@ -4411,7 +4412,7 @@ const IdentifierInfo *DesignatedInitExpr::Designator::getFieldName() const {
   assert(isFieldDesignator() && "Only valid on a field designator");
   if (FieldInfo.NameOrField & 0x01)
     return reinterpret_cast<IdentifierInfo *>(FieldInfo.NameOrField & ~0x01);
-  return getField()->getIdentifier();
+  return getFieldDecl()->getIdentifier();
 }
 
 DesignatedInitExpr::DesignatedInitExpr(const ASTContext &C, QualType Ty,
