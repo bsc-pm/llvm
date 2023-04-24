@@ -982,7 +982,20 @@ OMPIF_COMM_WORLD
     GenerateWrapperFunctionParams();
     GenerateWrapperFunctionLocalmems();
 
-    Output << "  " STR_INPORT_READ_NODATA "; //command word\n";
+    if (CI.getFrontendOpts().OmpSsFpgaInstrumentation) {
+      Output << "  ap_uint<64> __command = " STR_INPORT_READ
+                "; //command word\n";
+      Output << "  if (__command(7,0) == 2) {\n";
+      Output << "    __mcxx_instrData_t tmpSetup;\n";
+      Output << "    tmpSetup(63,0) = " STR_INPORT_READ ";\n";
+      Output << "    tmpSetup(79,64) =  (__command>>8)&0xFFFFFF;\n";
+      Output << "    tmpSetup[104] = 0;\n";
+      Output << "    " STR_INSTRPORT ".write(tmpSetup);\n";
+      Output << "    return;\n";
+      Output << "  }\n";
+    } else {
+      Output << "  " STR_INPORT_READ_NODATA "; //command word\n";
+    }
     Output << "  " STR_TASKID " = " STR_INPORT_READ ";\n";
     Output << "  ap_uint<64> " STR_PARENT_TASKID " = " STR_INPORT_READ ";\n";
 
