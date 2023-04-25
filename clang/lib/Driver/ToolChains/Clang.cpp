@@ -6158,8 +6158,15 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   Args.AddLastArg(CmdArgs, options::OPT_fno_elide_type);
 
   // Forward flags for OmpSs
-  if (Args.getLastArg(options::OPT_fompss) && !IsCuda) {
-    CmdArgs.push_back("-fompss-2");
+  if (Args.hasFlag(options::OPT_fompss, options::OPT_fompss_EQ, options::OPT_fno_ompss, false) && !IsCuda) {
+    switch (D.getOmpSsRuntime(Args)) {
+    case Driver::OSSRT_NANOS6:
+    case Driver::OSSRT_NODES:
+      CmdArgs.push_back("-fompss-2");
+      break;
+    default:
+      break;
+    }
   }
 
   // Forward flags for OpenMP. We don't do this if the current action is an

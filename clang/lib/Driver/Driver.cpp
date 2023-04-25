@@ -773,6 +773,31 @@ Driver::OpenMPRuntimeKind Driver::getOpenMPRuntime(const ArgList &Args) const {
   return RT;
 }
 
+/// Compute the desired OmpSs-2 runtime from the flags provided.
+Driver::OmpSsRuntimeKind Driver::getOmpSsRuntime(const ArgList &Args) const {
+  StringRef RuntimeName(CLANG_DEFAULT_OMPSS2_RUNTIME);
+
+  const Arg *A = Args.getLastArg(options::OPT_fompss_EQ);
+  if (A)
+    RuntimeName = A->getValue();
+
+  auto RT = llvm::StringSwitch<OmpSsRuntimeKind>(RuntimeName)
+                .Case("libnanos6", OSSRT_NANOS6)
+                .Case("libnodes", OSSRT_NODES)
+                .Default(OSSRT_Unknown);
+
+  if (RT == OSSRT_Unknown) {
+    if (A)
+      Diag(diag::err_drv_unsupported_option_argument)
+          << A->getSpelling() << A->getValue();
+    else
+      // FIXME: We could use a nicer diagnostic here.
+      Diag(diag::err_drv_unsupported_opt) << "-fompss-2";
+  }
+
+  return RT;
+}
+
 void Driver::CreateOffloadingDeviceToolChains(Compilation &C,
                                               InputList &Inputs) {
 

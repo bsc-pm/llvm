@@ -925,15 +925,17 @@ void tools::addFortranRuntimeLibraryPath(const ToolChain &TC,
 void tools::addOmpSsRuntimeLibs(
     ArgStringList &CmdArgs, const ToolChain &TC, const ArgList &Args) {
 
-  // -fdo-not-use-nanos6 means ignoring nanos6
-  if (Args.getLastArg(options::OPT_fdo_not_use_nanos6))
+  // -fdo-not-use-ompss-2-rt means ignoring OmpSs-2 runtime
+  if (Args.getLastArg(options::OPT_fdo_not_use_ompss_runtime))
+    return;
+  if (!Args.hasFlag(options::OPT_fompss, options::OPT_fompss_EQ, options::OPT_fno_ompss, false))
     return;
 
-  std::string RuntimeDefaultHome(CLANG_DEFAULT_NANOS6_HOME);
+  std::string RuntimeDefaultHome(CLANG_DEFAULT_OMPSS2_RUNTIME_HOME);
   std::optional<std::string> RuntimeHome =
-    llvm::sys::Process::GetEnv("NANOS6_HOME");
+    llvm::sys::Process::GetEnv("OMPSS2_RUNTIME_HOME");
 
-  // First look at environment NANOS6_HOME,
+  // First look at environment OMPSS2_RUNTIME_HOME,
   // then CMAKE defined variable.
   //
   // Default to compiler lib dir. in case both are not defined.
@@ -944,8 +946,26 @@ void tools::addOmpSsRuntimeLibs(
     HomePath = RuntimeDefaultHome;
   }
 
+  Driver::OmpSsRuntimeKind RTKind = TC.getDriver().getOmpSsRuntime(Args);
+
+  if (RTKind == Driver::OSSRT_Unknown)
+    // Already diagnosed.
+    return;
+
+  std::string RuntimeLibPrefix;
+  switch (RTKind) {
+  case Driver::OSSRT_NANOS6:
+    RuntimeLibPrefix = "nanos6";
+    break;
+  case Driver::OSSRT_NODES:
+    RuntimeLibPrefix = "nodes";
+    break;
+  case Driver::OSSRT_Unknown:
+    break;
+  }
+
   if (!HomePath.empty()) {
-    CmdArgs.push_back(Args.MakeArgString(HomePath + "/lib/nanos6-main-wrapper.o"));
+    CmdArgs.push_back(Args.MakeArgString(HomePath + "/lib/" + RuntimeLibPrefix + "-main-wrapper.o"));
     CmdArgs.push_back("-z");
     CmdArgs.push_back("lazy");
     CmdArgs.push_back("-L");
@@ -954,28 +974,28 @@ void tools::addOmpSsRuntimeLibs(
     CmdArgs.push_back(Args.MakeArgString(HomePath + "/lib"));
   } else {
     // Fallback to compiler installed dir.
-    CmdArgs.push_back(Args.MakeArgString(std::string(TC.getDriver().getInstalledDir()) + "/../lib/nanos6-main-wrapper.o"));
+    CmdArgs.push_back(Args.MakeArgString(std::string(TC.getDriver().getInstalledDir()) + "/../lib/" + RuntimeLibPrefix + "-main-wrapper.o"));
     CmdArgs.push_back("-z");
     CmdArgs.push_back("lazy");
     CmdArgs.push_back("-rpath");
     CmdArgs.push_back(Args.MakeArgString(std::string(TC.getDriver().getInstalledDir()) + "/../lib"));
   }
-  CmdArgs.push_back("-lnanos6");
+  CmdArgs.push_back(Args.MakeArgString(std::string("-l") + RuntimeLibPrefix));
   CmdArgs.push_back("-ldl");
 }
 
 void tools::addOmpSsRuntimeInclude(
     ArgStringList &CmdArgs, const ToolChain &TC, const ArgList &Args) {
 
-  // -fdo-not-use-nanos6 means ignoring nanos6
-  if (Args.getLastArg(options::OPT_fdo_not_use_nanos6))
+  // -fdo-not-use-ompss-2-rt means ignoring OmpSs-2 runtime
+  if (Args.getLastArg(options::OPT_fdo_not_use_ompss_runtime))
     return;
 
-  std::string RuntimeDefaultHome(CLANG_DEFAULT_NANOS6_HOME);
+  std::string RuntimeDefaultHome(CLANG_DEFAULT_OMPSS2_RUNTIME_HOME);
   std::optional<std::string> RuntimeHome =
-    llvm::sys::Process::GetEnv("NANOS6_HOME");
+    llvm::sys::Process::GetEnv("OMPSS2_RUNTIME_HOME");
 
-  // First look at environment NANOS6_HOME,
+  // First look at environment OMPSS2_RUNTIME_HOME,
   // then CMAKE defined variable.
   //
   // Default to compiler lib dir. in case both are not defined.

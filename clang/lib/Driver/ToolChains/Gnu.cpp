@@ -638,8 +638,7 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
         // FIXME: Does this really make sense for all GNU toolchains?
         WantPthread = true;
 
-      if (Args.getLastArg(options::OPT_fompss))
-        addOmpSsRuntimeLibs(CmdArgs, ToolChain, Args);
+      addOmpSsRuntimeLibs(CmdArgs, ToolChain, Args);
 
       AddRunTimeLibs(ToolChain, D, CmdArgs, Args);
 
