@@ -4305,7 +4305,7 @@ void EmitClangAttrParsedAttrImpl(RecordKeeper &Records, raw_ostream &OS) {
 
   // Generate all of the custom appertainsTo functions that the attributes
   // will be using.
-  for (auto I : Attrs) {
+  for (const auto &I : Attrs) {
     const Record &Attr = *I.second;
     if (Attr.isValueUnset("Subjects"))
       continue;

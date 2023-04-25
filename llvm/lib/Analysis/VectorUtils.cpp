@@ -118,15 +118,17 @@ bool llvm::isVectorIntrinsicWithScalarOpAtArg(Intrinsic::ID ID,
 }
 
 bool llvm::isVectorIntrinsicWithOverloadTypeAtArg(Intrinsic::ID ID,
-                                                  unsigned OpdIdx) {
+                                                  int OpdIdx) {
   switch (ID) {
   case Intrinsic::fptosi_sat:
   case Intrinsic::fptoui_sat:
+    return OpdIdx == -1 || OpdIdx == 0;
+  case Intrinsic::is_fpclass:
     return OpdIdx == 0;
   case Intrinsic::powi:
-    return OpdIdx == 1;
+    return OpdIdx == -1 || OpdIdx == 1;
   default:
-    return false;
+    return OpdIdx == -1;
   }
 }
 
