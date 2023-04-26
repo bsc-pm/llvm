@@ -24,6 +24,8 @@
 #include "clang/AST/DeclarationName.h"
 #include "clang/AST/Expr.h"
 #include "clang/AST/ExprOmpSs.h"
+#include "clang/AST/GlobalDecl.h"
+#include "clang/AST/Mangle.h"
 #include "clang/AST/NestedNameSpecifier.h"
 #include "clang/AST/OperationKinds.h"
 #include "clang/AST/PrettyPrinter.h"
@@ -828,15 +830,17 @@ public:
   }
 };
 
-uint32_t MercuriumHashStr(const char *str) {
-  const int MULTIPLIER = 33;
-  uint32_t h = 0;
+unsigned int MercuriumHashStr(const char *str) {
 
-  for (unsigned const char *p = (unsigned const char *)str; *p != '\0'; p++)
+  const int MULTIPLIER = 33;
+  unsigned int h;
+  unsigned const char *p;
+
+  h = 0;
+  for (p = (unsigned const char *)str; *p != '\0'; p++)
     h = MULTIPLIER * h + *p;
 
   h += (h >> 5);
-
   return h; // or, h % ARRAY_SIZE;
 }
 
@@ -1067,8 +1071,13 @@ uint64_t GenOnto(ASTContext &Ctx, FunctionDecl *FD) {
   // without afecting the accelerator hash
   std::string typeStr;
   llvm::raw_string_ostream typeStream(typeStr);
-
-  typeStream << FD->getNameAsString();
+  std::unique_ptr<MangleContext> MC;
+  MC.reset(Ctx.createMangleContext());
+  if (MC->shouldMangleDeclName(FD)) {
+    MC->mangleName(GlobalDecl(FD), typeStream);
+  } else {
+    typeStr = FD->getNameAsString();
+  }
   unsigned long long int type = MercuriumHashStr(typeStr.c_str()) &
                                 0xFFFFFFFF; //< Ensure that it its upto 32b
   if (taskAttr->getDevice() == OSSTaskDeclAttr::Fpga) {
