@@ -49,6 +49,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <cstdint>
 #include <cstring>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -1023,7 +1024,7 @@ QualType LocalmemArrayType(ASTContext &Ctx,
     paramType = DerefOnceTypePointerTo(paramType);
   paramType.removeLocalCVRQualifiers(Qualifiers::CVRMask);
   for (auto *shape : arrayType->getShapes()) {
-    auto computedSize = shape->getIntegerConstantExpr(Ctx);
+    auto computedSize = extractIntegerConstantFromExpr(Ctx, shape);
     if (!computedSize) {
       llvm_unreachable(
           "We have already checked that the shape expressions evaluate to "
@@ -1053,12 +1054,31 @@ uint64_t ComputeArrayRefSize(ASTContext &Ctx,
   return totalSize;
 }
 
+std::optional<llvm::APSInt> extractIntegerConstantFromExpr(ASTContext &Ctx,
+                                                           const Expr *expr) {
+  if (const ConstantExpr *CE = dyn_cast<ConstantExpr>(expr)) {
+    switch (CE->getResultStorageKind()) {
+    case ConstantExpr::RSK_APValue: {
+      if (CE->getAPValueResult().isInt()) {
+        return std::make_optional(CE->getResultAsAPSInt());
+      }
+      return std::nullopt;
+    }
+    case ConstantExpr::RSK_Int64:
+      return std::make_optional(CE->getResultAsAPSInt());
+    default:
+      return std::nullopt;
+    }
+  }
+  return expr->getIntegerConstantExpr(Ctx);
+}
+
 uint64_t GenOnto(ASTContext &Ctx, FunctionDecl *FD) {
   auto *taskAttr = FD->getAttr<OSSTaskDeclAttr>();
   auto *ontoExpr = taskAttr->getOnto();
   // Check onto information
   if (ontoExpr) {
-    auto ontoRes = ontoExpr->getIntegerConstantExpr(Ctx);
+    auto ontoRes = extractIntegerConstantFromExpr(Ctx, ontoExpr);
     if (ontoRes && *ontoRes >= 0) {
       uint64_t onto = ontoRes->getZExtValue();
       // Check that arch bits are set

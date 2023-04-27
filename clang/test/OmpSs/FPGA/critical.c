@@ -23,7 +23,7 @@ void depend() {
 // CHECK-NEXT://  2) OmpSs@FPGA toolchain code which is licensed under LGPLv3 terms and conditions
 // CHECK-NEXT:///////////////////
 // CHECK-NEXT:// Top IP Function: foo_moved
-// CHECK-NEXT:// Accel. type hash: 4854598551
+// CHECK-NEXT:// Accel. type hash: 4295085737
 // CHECK-NEXT:// Num. instances: 1
 // CHECK-NEXT:// Wrapper version: 13
 // CHECK-NEXT:///////////////////
@@ -109,7 +109,7 @@ void depend() {
 // CHECK-NEXT:    "full_path" : "//foo_hls_automatic_clang.cpp",
 // CHECK-NEXT:    "filename" : "foo_hls_automatic_clang.cpp",
 // CHECK-NEXT:    "name" : "foo",
-// CHECK-NEXT:    "type" : 4854598551,
+// CHECK-NEXT:    "type" : 4295085737,
 // CHECK-NEXT:    "num_instances" : 1,
 // CHECK-NEXT:    "task_creation" : false,
 // CHECK-NEXT:    "instrumentation" : false,

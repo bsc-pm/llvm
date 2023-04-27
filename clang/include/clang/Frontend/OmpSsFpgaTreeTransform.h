@@ -19,6 +19,7 @@
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Frontend/CompilerInstance.h"
+#include "llvm/ADT/APSInt.h"
 namespace clang {
 
 static constexpr uint8_t InstrumentationEventBurstBegin = 0b0000'0000;
@@ -130,6 +131,9 @@ QualType LocalmemArrayType(ASTContext &Ctx,
 uint64_t ComputeArrayRefSize(ASTContext &Ctx,
                              const OSSArrayShapingExpr *arrayType,
                              uint64_t baseType = 1);
+
+std::optional<llvm::APSInt> extractIntegerConstantFromExpr(ASTContext &Ctx,
+                                                           const Expr *expr);
 
 uint64_t GenOnto(ASTContext &Ctx, FunctionDecl *FD);
 } // namespace clang

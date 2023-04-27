@@ -4441,6 +4441,15 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     NumInstancesRes = CheckNonNegativeIntegerValue(
         NumInstances, OSSC_num_instances, /*StrictlyPositive=*/true,
         /*Outline=*/false);
+    if (NumInstancesRes.isUsable()) {
+      llvm::APSInt Result;
+      NumInstancesRes = VerifyIntegerConstantExpression(NumInstancesRes.get(),
+                                                        &Result, AllowFold);
+      if (NumInstancesRes.isUsable() && Result < 0) {
+        Diag(NumInstances->getExprLoc(),
+             diag::err_expected_constant_unsigned_integer);
+      }
+    }
     if (DevType != OSSTaskDeclAttr::Fpga)
       Diag(DeviceLoc, diag::err_oss_clause_incompatible_device)
           << getOmpSsClauseName(OSSC_num_instances) << "fpga";
@@ -4452,20 +4461,35 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     if (DevType != OSSTaskDeclAttr::Fpga)
       Diag(DeviceLoc, diag::err_oss_clause_incompatible_device)
           << getOmpSsClauseName(OSSC_onto) << "fpga";
-    uint64_t onto =
-        OntoRes.get()->getIntegerConstantExpr(Context)->getZExtValue();
-    // Check that arch bits are set
-    if ((onto & 0x300000000) == 0) {
-      Diag(Onto->getExprLoc(), diag::err_oss_fpga_onto_clause_missing_bits);
-    } else if (onto > 0x3FFFFFFFF) {
-      Diag(Onto->getExprLoc(),
-           diag::err_oss_fpga_onto_clause_task_type_too_wide);
+    if (OntoRes.isUsable()) {
+      llvm::APSInt Result;
+      OntoRes =
+          VerifyIntegerConstantExpression(OntoRes.get(), &Result, AllowFold);
+      if (OntoRes.isUsable()) {
+        uint64_t onto = Result.getZExtValue();
+        // Check that arch bits are set
+        if ((onto & 0x300000000) == 0) {
+          Diag(Onto->getExprLoc(), diag::err_oss_fpga_onto_clause_missing_bits);
+        } else if (onto > 0x3FFFFFFFF) {
+          Diag(Onto->getExprLoc(),
+               diag::err_oss_fpga_onto_clause_task_type_too_wide);
+        }
+      }
     }
   }
   if (NumRepetitions) {
     NumRepetitionsRes = CheckNonNegativeIntegerValue(
         NumRepetitions, OSSC_num_repetitions, /*StrictlyPositive=*/true,
         /*Outline=*/false);
+    if (NumRepetitionsRes.isUsable()) {
+      llvm::APSInt Result;
+      NumRepetitionsRes = VerifyIntegerConstantExpression(
+          NumRepetitionsRes.get(), &Result, AllowFold);
+      if (NumRepetitionsRes.isUsable() && Result < 0) {
+        Diag(NumRepetitions->getExprLoc(),
+             diag::err_expected_constant_unsigned_integer);
+      }
+    }
     if (DevType != OSSTaskDeclAttr::Fpga)
       Diag(DeviceLoc, diag::err_oss_clause_incompatible_device)
           << getOmpSsClauseName(OSSC_num_repetitions) << "fpga";
@@ -4474,6 +4498,15 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     PeriodRes = CheckNonNegativeIntegerValue(Period, OSSC_period,
                                              /*StrictlyPositive=*/true,
                                              /*Outline=*/false);
+    if (PeriodRes.isUsable()) {
+      llvm::APSInt Result;
+      PeriodRes =
+          VerifyIntegerConstantExpression(PeriodRes.get(), &Result, AllowFold);
+      if (PeriodRes.isUsable() && Result < 0) {
+        Diag(Period->getExprLoc(),
+             diag::err_expected_constant_unsigned_integer);
+      }
+    }
     if (DevType != OSSTaskDeclAttr::Fpga)
       Diag(DeviceLoc, diag::err_oss_clause_incompatible_device)
           << getOmpSsClauseName(OSSC_period) << "fpga";
@@ -4482,6 +4515,15 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     AffinityRes = CheckNonNegativeIntegerValue(Affinity, OSSC_affinity,
                                                /*StrictlyPositive=*/true,
                                                /*Outline=*/false);
+    if (AffinityRes.isUsable()) {
+      llvm::APSInt Result;
+      AffinityRes =
+          VerifyIntegerConstantExpression(AffinityRes.get(), &Result, AllowFold);
+      if (AffinityRes.isUsable() && Result < 0) {
+        Diag(Period->getExprLoc(),
+             diag::err_expected_constant_unsigned_integer);
+      }
+    }
     if (DevType != OSSTaskDeclAttr::Fpga)
       Diag(DeviceLoc, diag::err_oss_clause_incompatible_device)
           << getOmpSsClauseName(OSSC_affinity) << "fpga";

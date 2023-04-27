@@ -262,7 +262,8 @@ template <typename Callable> class WrapperGenerator {
     uint64_t value = 1; // Default is 1 instance
     if (auto *numInstances =
             OriginalFD->getAttr<OSSTaskDeclAttr>()->getNumInstances()) {
-      if (auto number = numInstances->getIntegerConstantExpr(OriginalContext);
+      if (auto number =
+              extractIntegerConstantFromExpr(OriginalContext, numInstances);
           number && *number > 0) {
         value = number->getZExtValue();
       } else {
@@ -280,7 +281,7 @@ template <typename Callable> class WrapperGenerator {
     auto *ontoExpr = taskAttr->getOnto();
     // Check onto information
     if (ontoExpr) {
-      auto ontoRes = ontoExpr->getIntegerConstantExpr(OriginalContext);
+      auto ontoRes = extractIntegerConstantFromExpr(OriginalContext, ontoExpr);
       if (!ontoRes || *ontoRes < 0) {
         Diag(ontoExpr->getExprLoc(),
              diag::err_expected_constant_unsigned_integer);

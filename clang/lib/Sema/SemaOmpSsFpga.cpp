@@ -92,16 +92,39 @@ bool Sema::CheckFpgaLocalmems(FunctionDecl *FD) {
   enum Dir { IN = 0b01, OUT = 0b10, INOUT = 0b11 };
   auto *taskAttr = FD->getAttr<OSSTaskDeclAttr>();
   bool foundError = false;
+
+  // All of the array shapings must have their expressions be computed to
+  // constant integer expressions
+  auto transformOSSArrayShapingExpr = [&](OSSArrayShapingExpr *shaping) {
+    llvm::SmallVector<Expr *, 4> shapes;
+    for (auto *shape : shaping->getShapes()) {
+
+      llvm::APSInt valInteger;
+      if (auto constantResult = VerifyIntegerConstantExpression(
+              const_cast<Expr *>(shape), &valInteger, AllowFold);
+          constantResult.isUsable() && valInteger >= 0) {
+        shapes.push_back(constantResult.get());
+      } else {
+        Diag(shape->getExprLoc(), diag::err_expected_constant_unsigned_integer);
+        foundError = true;
+      }
+    }
+    if (!foundError) {
+      shaping->setShapes(shapes);
+    }
+  };
+
   // First, compute the direction tags of the parameters. Do note that not
   // all parameters are guaranteed to be present
   llvm::SmallDenseMap<const ParmVarDecl *,
-                      std::pair<const OSSArrayShapingExpr *, Dir>>
+                      std::pair<OSSArrayShapingExpr *, Dir>>
       currentAssignationsOfArrays;
   auto EmitDepListIterDecls = [&](auto &&DepExprsIter, Dir dir) {
-    for (const Expr *DepExpr : DepExprsIter) {
+    for (Expr *DepExpr : DepExprsIter) {
       auto *arrShapingExpr = dyn_cast<OSSArrayShapingExpr>(DepExpr);
       if (!arrShapingExpr)
         return;
+      transformOSSArrayShapingExpr(arrShapingExpr);
       auto *arrExprBase = dyn_cast<DeclRefExpr>(
           arrShapingExpr->getBase()->IgnoreParenImpCasts());
       assert(arrExprBase);
@@ -152,6 +175,7 @@ bool Sema::CheckFpgaLocalmems(FunctionDecl *FD) {
       if (!arrShapingExpr) {
         continue;
       }
+      transformOSSArrayShapingExpr(arrShapingExpr);
 
       auto *arrExprBase = dyn_cast<DeclRefExpr>(
           arrShapingExpr->getBase()->IgnoreParenImpCasts());
@@ -178,14 +202,6 @@ bool Sema::CheckFpgaLocalmems(FunctionDecl *FD) {
           diag::
               err_oss_fpga_param_used_in_localmem_marked_as_out_const_qualified);
       foundError = true;
-    }
-    for (auto *shape :
-         currentAssignationsOfArrays.find(param)->second.first->getShapes()) {
-      if (auto valInteger = shape->getIntegerConstantExpr(Context);
-          !valInteger || *valInteger < 0) {
-        Diag(shape->getExprLoc(), diag::err_expected_constant_unsigned_integer);
-        foundError = true;
-      }
     }
     auto paramType = param->getType();
     auto numShapes = currentAssignationsOfArrays.find(param)

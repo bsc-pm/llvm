@@ -25,8 +25,12 @@ void foo2(int *i, int *o, int *io) {
 // CHECK-NEXT:|   |-<<<NULL>>>
 // CHECK-NEXT:|   |-<<<NULL>>>
 // CHECK-NEXT:|   |-<<<NULL>>>
-// CHECK-NEXT:|   |-IntegerLiteral {{.*}} <col:45> 'int' 2
-// CHECK-NEXT:|   |-IntegerLiteral {{.*}} <col:53> 'long' 12884901888
+// CHECK-NEXT:|   |-ConstantExpr {{.*}} <col:45> 'int'
+// CHECK-NEXT:|   | |-value: Int 2
+// CHECK-NEXT:|   | `-IntegerLiteral {{.*}} <col:45> 'int' 2
+// CHECK-NEXT:|   |-ConstantExpr {{.*}} <col:53> 'long'
+// CHECK-NEXT:|   | |-value: Int 12884901888
+// CHECK-NEXT:|   | `-IntegerLiteral {{.*}} <col:53> 'long' 12884901888
 // CHECK-NEXT:|   |-<<<NULL>>>
 // CHECK-NEXT:|   |-<<<NULL>>>
 // CHECK-NEXT:|   `-<<<NULL>>>
@@ -42,8 +46,12 @@ void foo2(int *i, int *o, int *io) {
 // CHECK-NEXT:|   |-<<<NULL>>>
 // CHECK-NEXT:|   |-<<<NULL>>>
 // CHECK-NEXT:|   |-<<<NULL>>>
-// CHECK-NEXT:|   |-IntegerLiteral {{.*}} <col:38> 'int' 12
-// CHECK-NEXT:|   `-IntegerLiteral {{.*}} <col:51> 'int' 1234
+// CHECK-NEXT:|   |-ConstantExpr {{.*}} <col:38> 'int'
+// CHECK-NEXT:|   | |-value: Int 12
+// CHECK-NEXT:|   | `-IntegerLiteral {{.*}} <col:38> 'int' 12
+// CHECK-NEXT:|   `-ConstantExpr {{.*}} <col:51> 'int'
+// CHECK-NEXT:|     |-value: Int 1234
+// CHECK-NEXT:|     `-IntegerLiteral {{.*}} <col:51> 'int' 1234
 // CHECK-NEXT:`-FunctionDecl {{.*}} <line:14:1, line:16:1> line:14:6 foo2 'void (int *, int *, int *)'
 // CHECK-NEXT:  |-ParmVarDecl {{.*}} <col:11, col:16> col:16 used i 'int *'
 // CHECK-NEXT:  |-ParmVarDecl {{.*}} <col:19, col:24> col:24 used o 'int *'
@@ -64,12 +72,18 @@ void foo2(int *i, int *o, int *io) {
 // CHECK-NEXT:    |-OSSArrayShapingExpr {{.*}} <col:39, col:45> 'int[1000]' lvalue
 // CHECK-NEXT:    | |-ImplicitCastExpr {{.*}} <col:45> 'int *' <LValueToRValue>
 // CHECK-NEXT:    | | `-DeclRefExpr {{.*}} <col:45> 'int *' lvalue ParmVar {{.*}} 'i' 'int *'
-// CHECK-NEXT:    | `-IntegerLiteral {{.*}} <col:40> 'int' 1000
+// CHECK-NEXT:    | `-ConstantExpr {{.*}} <col:40> 'int'
+// CHECK-NEXT:    |   |-value: Int 1000
+// CHECK-NEXT:    |   `-IntegerLiteral {{.*}} <col:40> 'int' 1000
 // CHECK-NEXT:    |-OSSArrayShapingExpr {{.*}} <col:57, col:63> 'int[1000]' lvalue
 // CHECK-NEXT:    | |-ImplicitCastExpr {{.*}} <col:63> 'int *' <LValueToRValue>
 // CHECK-NEXT:    | | `-DeclRefExpr {{.*}} <col:63> 'int *' lvalue ParmVar {{.*}} 'o' 'int *'
-// CHECK-NEXT:    | `-IntegerLiteral {{.*}} <col:58> 'int' 1000
+// CHECK-NEXT:    | `-ConstantExpr {{.*}} <col:58> 'int'
+// CHECK-NEXT:    |   |-value: Int 1000
+// CHECK-NEXT:    |   `-IntegerLiteral {{.*}} <col:58> 'int' 1000
 // CHECK-NEXT:    `-OSSArrayShapingExpr {{.*}} <col:77, col:83> 'int[1000]' lvalue
 // CHECK-NEXT:      |-ImplicitCastExpr {{.*}} <col:83> 'int *' <LValueToRValue>
 // CHECK-NEXT:      | `-DeclRefExpr {{.*}} <col:83> 'int *' lvalue ParmVar {{.*}} 'io' 'int *'
-// CHECK-NEXT:      `-IntegerLiteral {{.*}} <col:78> 'int' 1000
+// CHECK-NEXT:      `-ConstantExpr {{.*}} <col:78> 'int'
+// CHECK-NEXT:        |-value: Int 1000
+// CHECK-NEXT:        `-IntegerLiteral {{.*}} <col:78> 'int' 1000
