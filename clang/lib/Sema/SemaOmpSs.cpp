@@ -4440,7 +4440,7 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   if (NumInstances) {
     NumInstancesRes = CheckNonNegativeIntegerValue(
         NumInstances, OSSC_num_instances, /*StrictlyPositive=*/true,
-        /*Outline=*/true);
+        /*Outline=*/false);
     if (DevType != OSSTaskDeclAttr::Fpga)
       Diag(DeviceLoc, diag::err_oss_clause_incompatible_device)
           << getOmpSsClauseName(OSSC_num_instances) << "fpga";
@@ -4448,7 +4448,7 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   if (Onto) {
     OntoRes = CheckNonNegativeIntegerValue(Onto, OSSC_onto,
                                            /*StrictlyPositive=*/false,
-                                           /*Outline=*/true);
+                                           /*Outline=*/false);
     if (DevType != OSSTaskDeclAttr::Fpga)
       Diag(DeviceLoc, diag::err_oss_clause_incompatible_device)
           << getOmpSsClauseName(OSSC_onto) << "fpga";
@@ -4465,7 +4465,7 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   if (NumRepetitions) {
     NumRepetitionsRes = CheckNonNegativeIntegerValue(
         NumRepetitions, OSSC_num_repetitions, /*StrictlyPositive=*/true,
-        /*Outline=*/true);
+        /*Outline=*/false);
     if (DevType != OSSTaskDeclAttr::Fpga)
       Diag(DeviceLoc, diag::err_oss_clause_incompatible_device)
           << getOmpSsClauseName(OSSC_num_repetitions) << "fpga";
@@ -4473,7 +4473,7 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   if (Period) {
     PeriodRes = CheckNonNegativeIntegerValue(Period, OSSC_period,
                                              /*StrictlyPositive=*/true,
-                                             /*Outline=*/true);
+                                             /*Outline=*/false);
     if (DevType != OSSTaskDeclAttr::Fpga)
       Diag(DeviceLoc, diag::err_oss_clause_incompatible_device)
           << getOmpSsClauseName(OSSC_period) << "fpga";
@@ -4481,7 +4481,7 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   if (Affinity) {
     AffinityRes = CheckNonNegativeIntegerValue(Affinity, OSSC_affinity,
                                                /*StrictlyPositive=*/true,
-                                               /*Outline=*/true);
+                                               /*Outline=*/false);
     if (DevType != OSSTaskDeclAttr::Fpga)
       Diag(DeviceLoc, diag::err_oss_clause_incompatible_device)
           << getOmpSsClauseName(OSSC_affinity) << "fpga";
