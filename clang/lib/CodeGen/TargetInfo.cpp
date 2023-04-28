@@ -11573,7 +11573,6 @@ public:
 
     const char *Kind;
     switch (Attr->getInterrupt()) {
-    case RISCVInterruptAttr::user: Kind = "user"; break;
     case RISCVInterruptAttr::supervisor: Kind = "supervisor"; break;
     case RISCVInterruptAttr::machine: Kind = "machine"; break;
     }

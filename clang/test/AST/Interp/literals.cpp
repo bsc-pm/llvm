@@ -80,6 +80,12 @@ static_assert(~255 == -256, "");
 static_assert(~INT_MIN == INT_MAX, "");
 static_assert(~INT_MAX == INT_MIN, "");
 
+static_assert(-(1 << 31), ""); // expected-error {{not an integral constant expression}} \
+                               // expected-note {{outside the range of representable values}} \
+                               // ref-error {{not an integral constant expression}} \
+                               // ref-note {{outside the range of representable values}} \
+
+
 enum E {};
 constexpr E e = static_cast<E>(0);
 static_assert(~e == -1, "");
@@ -719,6 +725,23 @@ namespace IncDec {
              // ref-note {{cannot refer to element -1 of array of 3 elements}}
     return *p;
   }
+
+  /// This used to leave a 0 on the stack instead of the previous
+  /// value of a.
+  constexpr int bug1Inc() {
+    int a = 3;
+    int b = a++;
+    return b;
+  }
+  static_assert(bug1Inc() == 3);
+
+  constexpr int bug1Dec() {
+    int a = 3;
+    int b = a--;
+    return b;
+  }
+  static_assert(bug1Dec() == 3);
+
 };
 #endif
 
