@@ -19,10 +19,12 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclOmpSs.h"
+#include "clang/AST/Expr.h"
 #include "clang/AST/OmpSsClause.h"
 #include "clang/AST/StmtCXX.h"
 #include "clang/AST/StmtOmpSs.h"
 #include "clang/AST/StmtVisitor.h"
+#include "clang/Basic/DiagnosticParse.h"
 #include "clang/Basic/OmpSsKinds.h"
 #include "clang/Sema/Initialization.h"
 #include "clang/Sema/Lookup.h"
@@ -4516,13 +4518,17 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
                                                /*StrictlyPositive=*/true,
                                                /*Outline=*/false);
     if (AffinityRes.isUsable()) {
-      llvm::APSInt Result;
-      AffinityRes =
-          VerifyIntegerConstantExpression(AffinityRes.get(), &Result, AllowFold);
-      if (AffinityRes.isUsable() && Result < 0) {
-        Diag(Period->getExprLoc(),
-             diag::err_expected_constant_unsigned_integer);
+      Expr *Affinity = AffinityRes.get()->IgnoreImpCasts();
+      if (auto *AffinityRefExpr = dyn_cast<DeclRefExpr>(Affinity);
+          AffinityRefExpr) {
+        if (auto *param = dyn_cast<ParmVarDecl>(AffinityRefExpr->getDecl());
+            !param) {
+          Diag(Affinity->getExprLoc(), diag::err_expected_parameter);
+        }
+      } else {
+        Diag(Affinity->getExprLoc(), diag::err_expected_parameter);
       }
+      AffinityRes = Affinity;
     }
     if (DevType != OSSTaskDeclAttr::Fpga)
       Diag(DeviceLoc, diag::err_oss_clause_incompatible_device)

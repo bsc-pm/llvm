@@ -295,7 +295,6 @@ template <typename Callable> class WrapperGenerator {
   }
 
   void generateMemcpyWideportFunction(bool in) {
-
     const std::string memPtrType =
         "ap_uint<" +
         std::to_string(CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth) + ">";

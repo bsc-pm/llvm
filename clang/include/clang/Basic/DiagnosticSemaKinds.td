@@ -11646,6 +11646,8 @@ def err_expected_constant_integer: Error<
   "Expected this to evaulate to a constant integer">;
 def err_expected_constant_unsigned_integer: Error<
   "Expected this to evaulate to a constant unsigned integer">;
+def err_expected_parameter: Error<
+  "Expected this to be a parameter of the function task">;
 def err_oss_non_void_task : Error<
   "non-void tasks are not supported">;
 def err_oss_rvalue_param_task : Error<

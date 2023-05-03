@@ -560,30 +560,8 @@ public:
 
         stmts.push_back(makeDeclStmt(ptrVar));
 
-        /* Figure out what this was doing
-
-        stmts.append(BinaryOperator::Create(
-            Ctx, makeDeclRefExpr(ptrVar),
-            BinaryOperator::Create(
-                Ctx, Expr * lhs, Expr * rhs, BinaryOperatorKind::BO_Add, type,
-                ExprValueKind::VK_LValue, ExprObjectKind::OK_Ordinary, {}, {}),
-            BinaryOperatorKind::BO_Assign, type, ExprValueKind::VK_LValue,
-            ExprObjectKind::OK_Ordinary, {}, {}));
-
-        spawn_nodes.append(
-            Nodecl::ExpressionStatement::make(Nodecl::Assignment::make(
-                mcxx_ptr_var.make_nodecl(),
-                Nodecl::Add::make(
-                    base_address,
-                    Nodecl::Div::make(
-                        dep.ref.get_offsetof_dependence(),
-                        const_value_to_nodecl(
-                            const_value_get_unsigned_int(data_type.get_size())),
-                        Type::get_unsigned_long_long_int_type()),
-                    Type::get_unsigned_long_long_int_type()),
-                mcxx_ptr_var.get_type())));*/
-
-        // This is a stub until I figure out what the code above was doing.
+        // previously, in mercurium we used to support passing slices of an
+        // array here. This is the resulting code with that feature removed.
         stmts.push_back(BinaryOperator::Create(
             Ctx, makeDeclRefExpr(ptrVar), arg, BinaryOperatorKind::BO_Assign,
             type, ExprValueKind::VK_LValue, ExprObjectKind::OK_Ordinary, {},
@@ -609,10 +587,16 @@ public:
 
     llvm::SmallVector<Expr *, 10> arguments;
 
-    arguments.push_back(makeIntegerLiteral(
-        GenOnto(Ctx, dyn_cast<FunctionDecl>(callExpr->getCalleeDecl()))));
-    if (auto *affinity = attr->getAffinity()) {
-      arguments.push_back(affinity);
+    auto *declFunctionTask = dyn_cast<FunctionDecl>(callExpr->getCalleeDecl());
+    arguments.push_back(makeIntegerLiteral(GenOnto(Ctx, declFunctionTask)));
+    if (auto *affinity =
+            llvm::dyn_cast_or_null<DeclRefExpr>(attr->getAffinity())) {
+      auto *param = dyn_cast<ParmVarDecl>(affinity->getDecl());
+      for (unsigned i = 0; i < declFunctionTask->param_size(); ++i) {
+        if (declFunctionTask->getParamDecl(i) == param) {
+          arguments.push_back(callExpr->getArg(i));
+        }
+      }
     } else {
       arguments.push_back(makeIntegerLiteral(0xFF));
     }
@@ -783,8 +767,6 @@ public:
       auto *funcType = origType->getAs<FunctionProtoType>();
       funcDecl->setType(Ctx.getFunctionType(
           funcType->getReturnType(), typesParam, funcType->getExtProtoInfo()));
-      funcDecl->resetParams();
-      funcDecl->setParams(NewParamInfo);
     } else if (origType->isFunctionNoProtoType()) {
       auto *funcType = origType->getAs<FunctionNoProtoType>();
       funcDecl->setType(
