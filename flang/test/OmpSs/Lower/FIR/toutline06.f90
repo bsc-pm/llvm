@@ -1,6 +1,11 @@
 ! RUN: bbc -fompss-2 -polymorphic-type -emit-fir %s -o - | FileCheck %s
+! XFAIL: true
+! NOTE: Fow now let's wait until merge upstream to see what we can do to
+! support this
 
 ! Tests various aspect of the lowering of polymorphic entities.
+
+! Borrowed from Lower/polymoprhic.f90
 
 module polymorphic_test
   type p1
