@@ -355,43 +355,36 @@ attributes #4 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG11]]
 ; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg [[DBG11]]
 ; CHECK:       codeRepl:
-; CHECK-NEXT:    [[TMP5:%.*]] = mul nuw i64 4, [[TMP1]], !dbg [[DBG11]]
-; CHECK-NEXT:    [[TMP6:%.*]] = add nuw i64 0, [[TMP5]], !dbg [[DBG11]]
-; CHECK-NEXT:    [[TMP7:%.*]] = add nuw i64 32, [[TMP6]], !dbg [[DBG11]]
 ; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS]], align 8, !dbg [[DBG11]]
-; CHECK-NEXT:    [[TMP8:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG11]]
-; CHECK-NEXT:    [[TMP9:%.*]] = add i64 [[TMP8]], 1, !dbg [[DBG11]]
-; CHECK-NEXT:    store i64 [[TMP9]], ptr [[NUM_DEPS]], align 8, !dbg [[DBG11]]
-; CHECK-NEXT:    [[TMP10:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG11]]
-; CHECK-NEXT:    [[TMP11:%.*]] = add i64 [[TMP10]], 1, !dbg [[DBG11]]
-; CHECK-NEXT:    store i64 [[TMP11]], ptr [[NUM_DEPS]], align 8, !dbg [[DBG11]]
-; CHECK-NEXT:    [[TMP12:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG11]]
-; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_foo, ptr @task_invocation_info_foo, ptr null, i64 [[TMP7]], ptr [[TMP3]], ptr [[TMP4]], i64 0, i64 [[TMP12]]), !dbg [[DBG11]]
-; CHECK-NEXT:    [[TMP13:%.*]] = load ptr, ptr [[TMP3]], align 8, !dbg [[DBG11]]
-; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP13]], i64 32, !dbg [[DBG11]]
-; CHECK-NEXT:    [[GEP_VLA:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO:%.*]], ptr [[TMP13]], i32 0, i32 1, !dbg [[DBG11]]
-; CHECK-NEXT:    store ptr [[ARGS_END]], ptr [[GEP_VLA]], align 4, !dbg [[DBG11]]
-; CHECK-NEXT:    [[TMP14:%.*]] = mul nuw i64 4, [[TMP1]], !dbg [[DBG11]]
-; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr i8, ptr [[ARGS_END]], i64 [[TMP14]], !dbg [[DBG11]]
-; CHECK-NEXT:    [[GEP_N_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO]], ptr [[TMP13]], i32 0, i32 0, !dbg [[DBG11]]
+; CHECK-NEXT:    [[TMP5:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG11]]
+; CHECK-NEXT:    [[TMP6:%.*]] = add i64 [[TMP5]], 1, !dbg [[DBG11]]
+; CHECK-NEXT:    store i64 [[TMP6]], ptr [[NUM_DEPS]], align 8, !dbg [[DBG11]]
+; CHECK-NEXT:    [[TMP7:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG11]]
+; CHECK-NEXT:    [[TMP8:%.*]] = add i64 [[TMP7]], 1, !dbg [[DBG11]]
+; CHECK-NEXT:    store i64 [[TMP8]], ptr [[NUM_DEPS]], align 8, !dbg [[DBG11]]
+; CHECK-NEXT:    [[TMP9:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG11]]
+; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_foo, ptr @task_invocation_info_foo, ptr null, i64 32, ptr [[TMP3]], ptr [[TMP4]], i64 0, i64 [[TMP9]]), !dbg [[DBG11]]
+; CHECK-NEXT:    [[TMP10:%.*]] = load ptr, ptr [[TMP3]], align 8, !dbg [[DBG11]]
+; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP10]], i64 32, !dbg [[DBG11]]
+; CHECK-NEXT:    [[GEP_N_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO:%.*]], ptr [[TMP10]], i32 0, i32 0, !dbg [[DBG11]]
 ; CHECK-NEXT:    store ptr [[N_ADDR]], ptr [[GEP_N_ADDR]], align 8, !dbg [[DBG11]]
-; CHECK-NEXT:    [[GEP_VLA1:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO]], ptr [[TMP13]], i32 0, i32 1, !dbg [[DBG11]]
-; CHECK-NEXT:    store ptr [[VLA]], ptr [[GEP_VLA1]], align 8, !dbg [[DBG11]]
-; CHECK-NEXT:    [[CAPT_GEP_:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO]], ptr [[TMP13]], i32 0, i32 2, !dbg [[DBG11]]
+; CHECK-NEXT:    [[GEP_VLA:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO]], ptr [[TMP10]], i32 0, i32 1, !dbg [[DBG11]]
+; CHECK-NEXT:    store ptr [[VLA]], ptr [[GEP_VLA]], align 8, !dbg [[DBG11]]
+; CHECK-NEXT:    [[CAPT_GEP_:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO]], ptr [[TMP10]], i32 0, i32 2, !dbg [[DBG11]]
 ; CHECK-NEXT:    store i64 [[TMP1]], ptr [[CAPT_GEP_]], align 8, !dbg [[DBG11]]
-; CHECK-NEXT:    [[TMP16:%.*]] = load ptr, ptr [[TMP4]], align 8, !dbg [[DBG11]]
-; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP16]]), !dbg [[DBG11]]
+; CHECK-NEXT:    [[TMP11:%.*]] = load ptr, ptr [[TMP4]], align 8, !dbg [[DBG11]]
+; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP11]]), !dbg [[DBG11]]
 ; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG11]]
 ; CHECK:       final.end:
-; CHECK-NEXT:    [[TMP17:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG12:![0-9]+]]
-; CHECK-NEXT:    call void @llvm.stackrestore(ptr [[TMP17]]), !dbg [[DBG12]]
+; CHECK-NEXT:    [[TMP12:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG12:![0-9]+]]
+; CHECK-NEXT:    call void @llvm.stackrestore(ptr [[TMP12]]), !dbg [[DBG12]]
 ; CHECK-NEXT:    ret void, !dbg [[DBG12]]
 ; CHECK:       final.then:
 ; CHECK-NEXT:    br label [[FINAL_END]], !dbg [[DBG12]]
 ; CHECK:       final.cond:
-; CHECK-NEXT:    [[TMP18:%.*]] = call i32 @nanos6_in_final(), !dbg [[DBG11]]
-; CHECK-NEXT:    [[TMP19:%.*]] = icmp ne i32 [[TMP18]], 0, !dbg [[DBG11]]
-; CHECK-NEXT:    br i1 [[TMP19]], label [[FINAL_THEN:%.*]], label [[CODEREPL:%.*]], !dbg [[DBG11]]
+; CHECK-NEXT:    [[TMP13:%.*]] = call i32 @nanos6_in_final(), !dbg [[DBG11]]
+; CHECK-NEXT:    [[TMP14:%.*]] = icmp ne i32 [[TMP13]], 0, !dbg [[DBG11]]
+; CHECK-NEXT:    br i1 [[TMP14]], label [[FINAL_THEN:%.*]], label [[CODEREPL:%.*]], !dbg [[DBG11]]
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@red_init
@@ -509,43 +502,36 @@ attributes #4 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG26]]
 ; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg [[DBG26]]
 ; CHECK:       codeRepl:
-; CHECK-NEXT:    [[TMP5:%.*]] = mul nuw i64 4, [[TMP1]], !dbg [[DBG26]]
-; CHECK-NEXT:    [[TMP6:%.*]] = add nuw i64 0, [[TMP5]], !dbg [[DBG26]]
-; CHECK-NEXT:    [[TMP7:%.*]] = add nuw i64 32, [[TMP6]], !dbg [[DBG26]]
 ; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS]], align 8, !dbg [[DBG26]]
-; CHECK-NEXT:    [[TMP8:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG26]]
-; CHECK-NEXT:    [[TMP9:%.*]] = add i64 [[TMP8]], 1, !dbg [[DBG26]]
-; CHECK-NEXT:    store i64 [[TMP9]], ptr [[NUM_DEPS]], align 8, !dbg [[DBG26]]
-; CHECK-NEXT:    [[TMP10:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG26]]
-; CHECK-NEXT:    [[TMP11:%.*]] = add i64 [[TMP10]], 1, !dbg [[DBG26]]
-; CHECK-NEXT:    store i64 [[TMP11]], ptr [[NUM_DEPS]], align 8, !dbg [[DBG26]]
-; CHECK-NEXT:    [[TMP12:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG26]]
-; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_foo1, ptr @task_invocation_info_foo1, ptr null, i64 [[TMP7]], ptr [[TMP3]], ptr [[TMP4]], i64 0, i64 [[TMP12]]), !dbg [[DBG26]]
-; CHECK-NEXT:    [[TMP13:%.*]] = load ptr, ptr [[TMP3]], align 8, !dbg [[DBG26]]
-; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP13]], i64 32, !dbg [[DBG26]]
-; CHECK-NEXT:    [[GEP_VLA:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO1:%.*]], ptr [[TMP13]], i32 0, i32 1, !dbg [[DBG26]]
-; CHECK-NEXT:    store ptr [[ARGS_END]], ptr [[GEP_VLA]], align 4, !dbg [[DBG26]]
-; CHECK-NEXT:    [[TMP14:%.*]] = mul nuw i64 4, [[TMP1]], !dbg [[DBG26]]
-; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr i8, ptr [[ARGS_END]], i64 [[TMP14]], !dbg [[DBG26]]
-; CHECK-NEXT:    [[GEP_N_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO1]], ptr [[TMP13]], i32 0, i32 0, !dbg [[DBG26]]
+; CHECK-NEXT:    [[TMP5:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG26]]
+; CHECK-NEXT:    [[TMP6:%.*]] = add i64 [[TMP5]], 1, !dbg [[DBG26]]
+; CHECK-NEXT:    store i64 [[TMP6]], ptr [[NUM_DEPS]], align 8, !dbg [[DBG26]]
+; CHECK-NEXT:    [[TMP7:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG26]]
+; CHECK-NEXT:    [[TMP8:%.*]] = add i64 [[TMP7]], 1, !dbg [[DBG26]]
+; CHECK-NEXT:    store i64 [[TMP8]], ptr [[NUM_DEPS]], align 8, !dbg [[DBG26]]
+; CHECK-NEXT:    [[TMP9:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG26]]
+; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_foo1, ptr @task_invocation_info_foo1, ptr null, i64 32, ptr [[TMP3]], ptr [[TMP4]], i64 0, i64 [[TMP9]]), !dbg [[DBG26]]
+; CHECK-NEXT:    [[TMP10:%.*]] = load ptr, ptr [[TMP3]], align 8, !dbg [[DBG26]]
+; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP10]], i64 32, !dbg [[DBG26]]
+; CHECK-NEXT:    [[GEP_N_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO1:%.*]], ptr [[TMP10]], i32 0, i32 0, !dbg [[DBG26]]
 ; CHECK-NEXT:    store ptr [[N_ADDR]], ptr [[GEP_N_ADDR]], align 8, !dbg [[DBG26]]
-; CHECK-NEXT:    [[GEP_VLA1:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO1]], ptr [[TMP13]], i32 0, i32 1, !dbg [[DBG26]]
-; CHECK-NEXT:    store ptr [[VLA]], ptr [[GEP_VLA1]], align 8, !dbg [[DBG26]]
-; CHECK-NEXT:    [[CAPT_GEP_:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO1]], ptr [[TMP13]], i32 0, i32 2, !dbg [[DBG26]]
+; CHECK-NEXT:    [[GEP_VLA:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO1]], ptr [[TMP10]], i32 0, i32 1, !dbg [[DBG26]]
+; CHECK-NEXT:    store ptr [[VLA]], ptr [[GEP_VLA]], align 8, !dbg [[DBG26]]
+; CHECK-NEXT:    [[CAPT_GEP_:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO1]], ptr [[TMP10]], i32 0, i32 2, !dbg [[DBG26]]
 ; CHECK-NEXT:    store i64 [[TMP1]], ptr [[CAPT_GEP_]], align 8, !dbg [[DBG26]]
-; CHECK-NEXT:    [[TMP16:%.*]] = load ptr, ptr [[TMP4]], align 8, !dbg [[DBG26]]
-; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP16]]), !dbg [[DBG26]]
+; CHECK-NEXT:    [[TMP11:%.*]] = load ptr, ptr [[TMP4]], align 8, !dbg [[DBG26]]
+; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP11]]), !dbg [[DBG26]]
 ; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG26]]
 ; CHECK:       final.end:
-; CHECK-NEXT:    [[TMP17:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG27:![0-9]+]]
-; CHECK-NEXT:    call void @llvm.stackrestore(ptr [[TMP17]]), !dbg [[DBG27]]
+; CHECK-NEXT:    [[TMP12:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG27:![0-9]+]]
+; CHECK-NEXT:    call void @llvm.stackrestore(ptr [[TMP12]]), !dbg [[DBG27]]
 ; CHECK-NEXT:    ret void, !dbg [[DBG27]]
 ; CHECK:       final.then:
 ; CHECK-NEXT:    br label [[FINAL_END]], !dbg [[DBG27]]
 ; CHECK:       final.cond:
-; CHECK-NEXT:    [[TMP18:%.*]] = call i32 @nanos6_in_final(), !dbg [[DBG26]]
-; CHECK-NEXT:    [[TMP19:%.*]] = icmp ne i32 [[TMP18]], 0, !dbg [[DBG26]]
-; CHECK-NEXT:    br i1 [[TMP19]], label [[FINAL_THEN:%.*]], label [[CODEREPL:%.*]], !dbg [[DBG26]]
+; CHECK-NEXT:    [[TMP13:%.*]] = call i32 @nanos6_in_final(), !dbg [[DBG26]]
+; CHECK-NEXT:    [[TMP14:%.*]] = icmp ne i32 [[TMP13]], 0, !dbg [[DBG26]]
+; CHECK-NEXT:    br i1 [[TMP14]], label [[FINAL_THEN:%.*]], label [[CODEREPL:%.*]], !dbg [[DBG26]]
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@red_init.2
@@ -658,24 +644,18 @@ attributes #4 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[TASK_ARGS_DST]], align 8
 ; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP0]], i64 32
-; CHECK-NEXT:    [[GEP_DST_VLA:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO:%.*]], ptr [[TMP0]], i32 0, i32 1
-; CHECK-NEXT:    store ptr [[ARGS_END]], ptr [[GEP_DST_VLA]], align 4
-; CHECK-NEXT:    [[GEP_DST_:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO]], ptr [[TMP0]], i32 0, i32 2
-; CHECK-NEXT:    [[TMP1:%.*]] = load i64, ptr [[GEP_DST_]], align 8
-; CHECK-NEXT:    [[TMP2:%.*]] = mul nuw i64 4, [[TMP1]]
-; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr [[ARGS_END]], i64 [[TMP2]]
-; CHECK-NEXT:    [[GEP_SRC_N_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO]], ptr [[TASK_ARGS_SRC]], i32 0, i32 0
+; CHECK-NEXT:    [[GEP_SRC_N_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO:%.*]], ptr [[TASK_ARGS_SRC]], i32 0, i32 0
 ; CHECK-NEXT:    [[GEP_DST_N_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO]], ptr [[TMP0]], i32 0, i32 0
-; CHECK-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[GEP_SRC_N_ADDR]], align 8
-; CHECK-NEXT:    store ptr [[TMP4]], ptr [[GEP_DST_N_ADDR]], align 8
+; CHECK-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[GEP_SRC_N_ADDR]], align 8
+; CHECK-NEXT:    store ptr [[TMP1]], ptr [[GEP_DST_N_ADDR]], align 8
 ; CHECK-NEXT:    [[GEP_SRC_VLA:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO]], ptr [[TASK_ARGS_SRC]], i32 0, i32 1
-; CHECK-NEXT:    [[GEP_DST_VLA1:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO]], ptr [[TMP0]], i32 0, i32 1
-; CHECK-NEXT:    [[TMP5:%.*]] = load ptr, ptr [[GEP_SRC_VLA]], align 8
-; CHECK-NEXT:    store ptr [[TMP5]], ptr [[GEP_DST_VLA1]], align 8
+; CHECK-NEXT:    [[GEP_DST_VLA:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO]], ptr [[TMP0]], i32 0, i32 1
+; CHECK-NEXT:    [[TMP2:%.*]] = load ptr, ptr [[GEP_SRC_VLA]], align 8
+; CHECK-NEXT:    store ptr [[TMP2]], ptr [[GEP_DST_VLA]], align 8
 ; CHECK-NEXT:    [[CAPT_GEP_SRC_:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO]], ptr [[TASK_ARGS_SRC]], i32 0, i32 2
 ; CHECK-NEXT:    [[CAPT_GEP_DST_:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO]], ptr [[TMP0]], i32 0, i32 2
-; CHECK-NEXT:    [[TMP6:%.*]] = load i64, ptr [[CAPT_GEP_SRC_]], align 8
-; CHECK-NEXT:    store i64 [[TMP6]], ptr [[CAPT_GEP_DST_]], align 8
+; CHECK-NEXT:    [[TMP3:%.*]] = load i64, ptr [[CAPT_GEP_SRC_]], align 8
+; CHECK-NEXT:    store i64 [[TMP3]], ptr [[CAPT_GEP_DST_]], align 8
 ; CHECK-NEXT:    ret void
 ;
 ;
@@ -776,24 +756,18 @@ attributes #4 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[TASK_ARGS_DST]], align 8
 ; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP0]], i64 32
-; CHECK-NEXT:    [[GEP_DST_VLA:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO1:%.*]], ptr [[TMP0]], i32 0, i32 1
-; CHECK-NEXT:    store ptr [[ARGS_END]], ptr [[GEP_DST_VLA]], align 4
-; CHECK-NEXT:    [[GEP_DST_:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO1]], ptr [[TMP0]], i32 0, i32 2
-; CHECK-NEXT:    [[TMP1:%.*]] = load i64, ptr [[GEP_DST_]], align 8
-; CHECK-NEXT:    [[TMP2:%.*]] = mul nuw i64 4, [[TMP1]]
-; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr [[ARGS_END]], i64 [[TMP2]]
-; CHECK-NEXT:    [[GEP_SRC_N_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO1]], ptr [[TASK_ARGS_SRC]], i32 0, i32 0
+; CHECK-NEXT:    [[GEP_SRC_N_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO1:%.*]], ptr [[TASK_ARGS_SRC]], i32 0, i32 0
 ; CHECK-NEXT:    [[GEP_DST_N_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO1]], ptr [[TMP0]], i32 0, i32 0
-; CHECK-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[GEP_SRC_N_ADDR]], align 8
-; CHECK-NEXT:    store ptr [[TMP4]], ptr [[GEP_DST_N_ADDR]], align 8
+; CHECK-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[GEP_SRC_N_ADDR]], align 8
+; CHECK-NEXT:    store ptr [[TMP1]], ptr [[GEP_DST_N_ADDR]], align 8
 ; CHECK-NEXT:    [[GEP_SRC_VLA:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO1]], ptr [[TASK_ARGS_SRC]], i32 0, i32 1
-; CHECK-NEXT:    [[GEP_DST_VLA1:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO1]], ptr [[TMP0]], i32 0, i32 1
-; CHECK-NEXT:    [[TMP5:%.*]] = load ptr, ptr [[GEP_SRC_VLA]], align 8
-; CHECK-NEXT:    store ptr [[TMP5]], ptr [[GEP_DST_VLA1]], align 8
+; CHECK-NEXT:    [[GEP_DST_VLA:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO1]], ptr [[TMP0]], i32 0, i32 1
+; CHECK-NEXT:    [[TMP2:%.*]] = load ptr, ptr [[GEP_SRC_VLA]], align 8
+; CHECK-NEXT:    store ptr [[TMP2]], ptr [[GEP_DST_VLA]], align 8
 ; CHECK-NEXT:    [[CAPT_GEP_SRC_:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO1]], ptr [[TASK_ARGS_SRC]], i32 0, i32 2
 ; CHECK-NEXT:    [[CAPT_GEP_DST_:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO1]], ptr [[TMP0]], i32 0, i32 2
-; CHECK-NEXT:    [[TMP6:%.*]] = load i64, ptr [[CAPT_GEP_SRC_]], align 8
-; CHECK-NEXT:    store i64 [[TMP6]], ptr [[CAPT_GEP_DST_]], align 8
+; CHECK-NEXT:    [[TMP3:%.*]] = load i64, ptr [[CAPT_GEP_SRC_]], align 8
+; CHECK-NEXT:    store i64 [[TMP3]], ptr [[CAPT_GEP_DST_]], align 8
 ; CHECK-NEXT:    ret void
 ;
 ;

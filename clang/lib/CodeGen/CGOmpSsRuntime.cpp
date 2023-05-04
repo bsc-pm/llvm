@@ -1188,13 +1188,9 @@ void CGOmpSsRuntime::EmitDSAShared(
       CaptureMapStack.back().try_emplace(VD, LV.getAddress(CGF));
       DSAValue = LV.getPointer(CGF);
       DSABundleList.push_back(DSAValue);
-      DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(DRE->getType())));
-      TaskInfo.emplace_back(getBundleStr(OSSB_shared), DSABundleList);
     } else {
       DSAValue = CGF.EmitDeclRefLValue(DRE).getPointer(CGF);
       DSABundleList.push_back(DSAValue);
-      DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(DRE->getType())));
-      TaskInfo.emplace_back(getBundleStr(OSSB_shared), DSABundleList);
     }
     QualType Q = VD->getType();
     // int (**p)[sizex][sizey] -> we need to capture sizex sizey only
@@ -1203,8 +1199,15 @@ void CGOmpSsRuntime::EmitDSAShared(
     while (Q->isPointerType()) {
       Q = Q->getPointeeType();
     }
-    if (Q->isVariableArrayType())
+    if (Q->isVariableArrayType()) {
       GatherVLADims(CGF, DSAValue, Q, DimsWithValue, CapturedList, IsPtr);
+      QualType BaseElementTy = CGF.getContext().getBaseElementType(DRE->getType());
+      DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(BaseElementTy)));
+    } else {
+      DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(DRE->getType())));
+    }
+
+    TaskInfo.emplace_back(getBundleStr(OSSB_shared), DSABundleList);
 
     if (!DimsWithValue.empty())
       TaskInfo.emplace_back(getBundleStr(OSSB_vladims), DimsWithValue);
@@ -1237,13 +1240,9 @@ void CGOmpSsRuntime::EmitDSAPrivate(
     CaptureMapStack.back().try_emplace(VD, LV.getAddress(CGF));
     DSAValue = LV.getPointer(CGF);
     DSABundleList.push_back(DSAValue);
-    DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(DRE->getType())));
-    TaskInfo.emplace_back(getBundleStr(OSSB_private), DSABundleList);
   } else {
     DSAValue = CGF.EmitDeclRefLValue(DRE).getPointer(CGF);
     DSABundleList.push_back(DSAValue);
-    DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(DRE->getType())));
-    TaskInfo.emplace_back(getBundleStr(OSSB_private), DSABundleList);
   }
   QualType Q = VD->getType();
   // int (**p)[sizex][sizey] -> we need to capture sizex sizey only
@@ -1252,8 +1251,15 @@ void CGOmpSsRuntime::EmitDSAPrivate(
   while (Q->isPointerType()) {
     Q = Q->getPointeeType();
   }
-  if (Q->isVariableArrayType())
+  if (Q->isVariableArrayType()) {
     GatherVLADims(CGF, DSAValue, Q, DimsWithValue, CapturedList, IsPtr);
+    QualType BaseElementTy = CGF.getContext().getBaseElementType(DRE->getType());
+    DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(BaseElementTy)));
+  } else {
+    DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(DRE->getType())));
+  }
+
+  TaskInfo.emplace_back(getBundleStr(OSSB_private), DSABundleList);
 
   if (!DimsWithValue.empty())
     TaskInfo.emplace_back(getBundleStr(OSSB_vladims), DimsWithValue);
@@ -1291,13 +1297,9 @@ void CGOmpSsRuntime::EmitDSAFirstprivate(
     CaptureMapStack.back().try_emplace(VD, LV.getAddress(CGF));
     DSAValue = LV.getPointer(CGF);
     DSABundleList.push_back(DSAValue);
-    DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(DRE->getType())));
-    TaskInfo.emplace_back(getBundleStr(OSSB_firstprivate), DSABundleList);
   } else {
     DSAValue = CGF.EmitDeclRefLValue(DRE).getPointer(CGF);
     DSABundleList.push_back(DSAValue);
-    DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(DRE->getType())));
-    TaskInfo.emplace_back(getBundleStr(OSSB_firstprivate), DSABundleList);
   }
   QualType Q = VD->getType();
   // int (**p)[sizex][sizey] -> we need to capture sizex sizey only
@@ -1306,8 +1308,15 @@ void CGOmpSsRuntime::EmitDSAFirstprivate(
   while (Q->isPointerType()) {
     Q = Q->getPointeeType();
   }
-  if (Q->isVariableArrayType())
+  if (Q->isVariableArrayType()) {
     GatherVLADims(CGF, DSAValue, Q, DimsWithValue, CapturedList, IsPtr);
+    QualType BaseElementTy = CGF.getContext().getBaseElementType(DRE->getType());
+    DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(BaseElementTy)));
+  } else {
+    DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(DRE->getType())));
+  }
+
+  TaskInfo.emplace_back(getBundleStr(OSSB_firstprivate), DSABundleList);
 
   if (!DimsWithValue.empty())
     TaskInfo.emplace_back(getBundleStr(OSSB_vladims), DimsWithValue);

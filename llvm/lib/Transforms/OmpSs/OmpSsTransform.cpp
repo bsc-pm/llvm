@@ -1480,6 +1480,9 @@ struct OmpSsDirective {
   Value *computeTaskArgsVLAsExtraSizeOf(IRBuilder<> &IRB) {
     Value *Sum = ConstantInt::get(Int64Ty, 0);
     for (const auto &VLAWithDimsMap : VLADimsInfo) {
+      // Skip shareds because they don't need space in task_args
+      if (DSAInfo.Shared.count(VLAWithDimsMap.first))
+        continue;
       Type *Ty = DirEnv.getDSAType(VLAWithDimsMap.first);
       unsigned SizeB = DL.getTypeAllocSize(Ty);
       Value *ArraySize = ConstantInt::get(Int64Ty, SizeB);
@@ -1636,6 +1639,9 @@ struct OmpSsDirective {
   // Greater alignemt go first
   void computeVLAsAlignOrder(SmallVectorImpl<VLAAlign> &VLAAlignsInfo) {
     for (const auto &VLAWithDimsMap : VLADimsInfo) {
+      // Skip shareds because they don't need space in task_args
+      if (DSAInfo.Shared.count(VLAWithDimsMap.first))
+        continue;
       auto *V = VLAWithDimsMap.first;
       Type *Ty = DirEnv.getDSAType(V);
 
