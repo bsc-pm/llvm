@@ -25,15 +25,6 @@ namespace clang {
 static constexpr uint8_t InstrumentationEventBurstBegin = 0b0000'0000;
 static constexpr uint8_t InstrumentationEventBurstEnd = 0b1000'0000;
 
-#define EV_DEVCOPYIN 78
-#define EV_DEVCOPYOUT 79
-#define EV_DEVEXEC 80
-#define EV_INSTEVLOST 82
-#define EV_VAL_WG_WAIT 1
-#define EV_VAL_SET_LOCK 2
-#define EV_VAL_UNSET_LOCK 3
-#define EV_VAL_TRY_LOCK 4
-
 #define BURST(name, val)                                                       \
   name##Begin = InstrumentationEventBurstBegin | val,                          \
   name##End = InstrumentationEventBurstEnd | val
