@@ -407,21 +407,21 @@ struct __fpga_copyinfo_t {
       Output << R"(
 template <typename T>
 struct __mcxx_ptr_t {
+  T *ptr;
   unsigned long long int val;
-  __mcxx_ptr_t(unsigned long long int val) : val(val) {}
+  __mcxx_ptr_t(T *ptr, unsigned long long int val) : ptr(ptr), val(val) {}
   __mcxx_ptr_t() {}
   inline operator __mcxx_ptr_t<const T>() const {
-    return __mcxx_ptr_t<const T>(val);
+    return __mcxx_ptr_t<const T>(ptr, val);
   }
   template <typename V> inline __mcxx_ptr_t<T> operator+(V const val) const {
-    return __mcxx_ptr_t<T>(this->val + val*sizeof(T));
+    return __mcxx_ptr_t<T>(this->ptr + val, this->val + val * sizeof(T));
   }
   template <typename V> inline __mcxx_ptr_t<T> operator-(V const val) const {
-    return __mcxx_ptr_t<T>(this->val - val*sizeof(T));
+    return __mcxx_ptr_t<T>(this->ptr - val, this->val - val * sizeof(T));
   }
-  template <typename V> inline operator V() const {
-    return (V)val;
-  }
+  template <typename V> inline operator V() const { return (V)val; }
+  T& operator[](long long int i) { return ptr[i]; }
 };
 )";
     }
@@ -607,29 +607,26 @@ OMPIF_COMM_WORLD
              it->second[(int)WrapperPort::MEMORY_PORT];
     }();
 
-    if (!CreatesTasks) {
-      if ((CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth > 0 &&
-           Localmems.size() > 0) ||
-          forceMemport) {
-        Output << ", ap_uint<" << CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth
-               << ">* mcxx_memport";
-      }
+    if ((CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth > 0 &&
+         Localmems.size() > 0) ||
+        forceMemport) {
+      Output << ", ap_uint<" << CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth
+             << ">* mcxx_memport";
+    }
 
-      for (auto *param : OriginalFD->parameters()) {
-        auto it = Localmems.find(param);
-        if (CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth > 0 &&
-            it != Localmems.end())
-          continue;
+    for (auto *param : OriginalFD->parameters()) {
+      auto it = Localmems.find(param);
+      if (CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth > 0 &&
+          it != Localmems.end())
+        continue;
 
-        QualType paramType = param->getType();
-        if (paramType->isPointerType() || paramType->isArrayType()) {
-          Output << ", "
-                 << GetDeclVariableString(
-                        StorageClass::SC_None,
-                        OriginalContext.getPointerType(
-                            GetElementTypePointerTo(paramType)),
-                        " mcxx_" + param->getNameAsString());
-        }
+      QualType paramType = param->getType();
+      if (paramType->isPointerType() || paramType->isArrayType()) {
+        Output << ", "
+               << GetDeclVariableString(StorageClass::SC_None,
+                                        OriginalContext.getPointerType(
+                                            GetElementTypePointerTo(paramType)),
+                                        " mcxx_" + param->getNameAsString());
       }
     }
     if (UsesOmpif) {
@@ -651,25 +648,24 @@ OMPIF_COMM_WORLD
       Output << "#pragma HLS interface ap_stable port=ompif_size\n";
     }
 
-    if (!CreatesTasks) {
-      if ((CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth > 0 &&
-           Localmems.size() > 0) ||
-          forceMemport) {
-        Output << "#pragma HLS interface m_axi port=mcxx_memport\n";
-      }
-      for (auto *param : OriginalFD->parameters()) {
-        auto it = Localmems.find(param);
-        if (CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth > 0 &&
-            it != Localmems.end())
-          continue;
+    if ((CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth > 0 &&
+         Localmems.size() > 0) ||
+        forceMemport) {
+      Output << "#pragma HLS interface m_axi port=mcxx_memport\n";
+    }
+    for (auto *param : OriginalFD->parameters()) {
+      auto it = Localmems.find(param);
+      if (CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth > 0 &&
+          it != Localmems.end())
+        continue;
 
-        QualType paramType = param->getType();
-        if (paramType->isPointerType() || paramType->isArrayType()) {
-          Output << "#pragma HLS interface m_axi port=mcxx_" << param->getName()
-                 << "\n";
-        }
+      QualType paramType = param->getType();
+      if (paramType->isPointerType() || paramType->isArrayType()) {
+        Output << "#pragma HLS interface m_axi port=mcxx_" << param->getName()
+               << "\n";
       }
     }
+
     if (CI.getFrontendOpts().OmpSsFpgaInstrumentation) {
       Output << "#pragma HLS interface ap_hs port=" STR_INSTRPORT "\n";
     }
@@ -739,8 +735,13 @@ OMPIF_COMM_WORLD
         Output << "      mcxx_offset_" << paramId
                << " = " STR_INPORT_READ ";\n";
         if (CreatesTasks && paramType->isPointerType()) {
+          QualType pointedType = paramType->getPointeeType();
           Output << "      " << symbolName << ".val = mcxx_offset_" << paramId
                  << ";\n";
+          Output << "      " << symbolName << ".ptr = mcxx_" << symbolName
+                 << " + mcxx_offset_" << paramId << "/sizeof(";
+          pointedType.print(Output, printPol);
+          Output << ");\n";
         } else if (it == Localmems.end()) {
           QualType pointedType = paramType->getPointeeType();
           Output << "      " << symbolName << " = mcxx_" << symbolName
