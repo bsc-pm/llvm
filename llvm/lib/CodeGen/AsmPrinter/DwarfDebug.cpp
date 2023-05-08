@@ -18,7 +18,6 @@
 #include "DwarfUnit.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/Triple.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/DIE.h"
@@ -53,6 +52,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/TargetParser/Triple.h"
 #include <algorithm>
 #include <cstddef>
 #include <iterator>
@@ -452,14 +452,8 @@ DwarfDebug::DwarfDebug(AsmPrinter *A)
 
   // Split DWARF would benefit object size significantly by trading reductions
   // in address pool usage for slightly increased range list encodings.
-  if (DwarfVersion >= 5) {
+  if (DwarfVersion >= 5)
     MinimizeAddr = MinimizeAddrInV5Option;
-    // FIXME: In the future, enable this by default for Split DWARF where the
-    // tradeoff is more pronounced due to being able to offload the range
-    // lists to the dwo file and shrink object files/reduce relocations there.
-    if (MinimizeAddr == MinimizeAddrInV5::Default)
-      MinimizeAddr = MinimizeAddrInV5::Disabled;
-  }
 
   Asm->OutStreamer->getContext().setDwarfVersion(DwarfVersion);
   Asm->OutStreamer->getContext().setDwarfFormat(Dwarf64 ? dwarf::DWARF64
@@ -1050,11 +1044,11 @@ void DwarfDebug::finishUnitAttributes(const DICompileUnit *DIUnit,
   if (!SDK.empty())
     NewCU.addString(Die, dwarf::DW_AT_APPLE_sdk, SDK);
 
-  // Add DW_str_offsets_base to the unit DIE, except for split units.
-  if (useSegmentedStringOffsetsTable() && !useSplitDwarf())
-    NewCU.addStringOffsetsStart();
-
   if (!useSplitDwarf()) {
+    // Add DW_str_offsets_base to the unit DIE, except for split units.
+    if (useSegmentedStringOffsetsTable())
+      NewCU.addStringOffsetsStart();
+
     NewCU.initStmtList();
 
     // If we're using split dwarf the compilation dir is going to be in the
@@ -1377,11 +1371,10 @@ void DwarfDebug::finalizeModuleInfo() {
       if (U.hasRangeLists())
         U.addRnglistsBase();
 
-      if (!DebugLocs.getLists().empty()) {
-        if (!useSplitDwarf())
-          U.addSectionLabel(U.getUnitDie(), dwarf::DW_AT_loclists_base,
-                            DebugLocs.getSym(),
-                            TLOF.getDwarfLoclistsSection()->getBeginSymbol());
+      if (!DebugLocs.getLists().empty() && !useSplitDwarf()) {
+        U.addSectionLabel(U.getUnitDie(), dwarf::DW_AT_loclists_base,
+                          DebugLocs.getSym(),
+                          TLOF.getDwarfLoclistsSection()->getBeginSymbol());
       }
     }
 
@@ -2260,6 +2253,9 @@ void DwarfDebug::endFunctionImpl(const MachineFunction *MF) {
   if (!TheCU.getCUNode()->getDebugInfoForProfiling() &&
       TheCU.getCUNode()->getEmissionKind() == DICompileUnit::LineTablesOnly &&
       LScopes.getAbstractScopesList().empty() && !IsDarwin) {
+    for (const auto &R : Asm->MBBSectionRanges)
+      addArangeLabel(SymbolCU(&TheCU, R.second.BeginLabel));
+
     assert(InfoHolder.getScopeVariables().empty());
     PrevLabel = nullptr;
     CurFn = nullptr;
@@ -3582,4 +3578,14 @@ DwarfDebug::getMD5AsBytes(const DIFile *File) const {
   MD5::MD5Result CKMem;
   std::copy(ChecksumString.begin(), ChecksumString.end(), CKMem.data());
   return CKMem;
+}
+
+bool DwarfDebug::alwaysUseRanges(const DwarfCompileUnit &CU) const {
+  if (MinimizeAddr == MinimizeAddrInV5::Ranges)
+    return true;
+  if (MinimizeAddr != MinimizeAddrInV5::Default)
+    return false;
+  if (useSplitDwarf())
+    return true;
+  return false;
 }

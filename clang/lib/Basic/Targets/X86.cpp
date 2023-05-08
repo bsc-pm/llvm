@@ -17,7 +17,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "llvm/Support/X86TargetParser.h"
+#include "llvm/TargetParser/X86TargetParser.h"
 #include <optional>
 
 namespace clang {
@@ -335,6 +335,8 @@ bool X86TargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
       HasAMXINT8 = true;
     } else if (Feature == "+amx-tile") {
       HasAMXTILE = true;
+    } else if (Feature == "+amx-complex") {
+      HasAMXCOMPLEX = true;
     } else if (Feature == "+cmpccxadd") {
       HasCMPCCXADD = true;
     } else if (Feature == "+raoint") {
@@ -792,13 +794,15 @@ void X86TargetInfo::getTargetDefines(const LangOptions &Opts,
   if (HasHRESET)
     Builder.defineMacro("__HRESET__");
   if (HasAMXTILE)
-    Builder.defineMacro("__AMXTILE__");
+    Builder.defineMacro("__AMX_TILE__");
   if (HasAMXINT8)
-    Builder.defineMacro("__AMXINT8__");
+    Builder.defineMacro("__AMX_INT8__");
   if (HasAMXBF16)
-    Builder.defineMacro("__AMXBF16__");
+    Builder.defineMacro("__AMX_BF16__");
   if (HasAMXFP16)
-    Builder.defineMacro("__AMXFP16__");
+    Builder.defineMacro("__AMX_FP16__");
+  if (HasAMXCOMPLEX)
+    Builder.defineMacro("__AMX_COMPLEX__");
   if (HasCMPCCXADD)
     Builder.defineMacro("__CMPCCXADD__");
   if (HasRAOINT)
@@ -912,6 +916,7 @@ bool X86TargetInfo::isValidFeatureName(StringRef Name) const {
       .Case("adx", true)
       .Case("aes", true)
       .Case("amx-bf16", true)
+      .Case("amx-complex", true)
       .Case("amx-fp16", true)
       .Case("amx-int8", true)
       .Case("amx-tile", true)
@@ -1013,6 +1018,7 @@ bool X86TargetInfo::hasFeature(StringRef Feature) const {
       .Case("adx", HasADX)
       .Case("aes", HasAES)
       .Case("amx-bf16", HasAMXBF16)
+      .Case("amx-complex", HasAMXCOMPLEX)
       .Case("amx-fp16", HasAMXFP16)
       .Case("amx-int8", HasAMXINT8)
       .Case("amx-tile", HasAMXTILE)

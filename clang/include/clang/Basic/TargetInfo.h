@@ -29,12 +29,12 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/Triple.h"
 #include "llvm/Frontend/OpenMP/OMPGridValues.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/Support/DataTypes.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/VersionTuple.h"
+#include "llvm/TargetParser/Triple.h"
 #include <cassert>
 #include <optional>
 #include <string>
@@ -202,7 +202,7 @@ enum OpenCLTypeKind : uint8_t {
 
 /// Exposes information about the current target.
 ///
-class TargetInfo : public virtual TransferrableTargetInfo,
+class TargetInfo : public TransferrableTargetInfo,
                    public RefCountedBase<TargetInfo> {
   std::shared_ptr<TargetOptions> TargetOpts;
   llvm::Triple Triple;
@@ -1178,7 +1178,7 @@ public:
   }
 
   /// Returns a string of target-specific clobbers, in LLVM format.
-  virtual const char *getClobbers() const = 0;
+  virtual std::string_view getClobbers() const = 0;
 
   /// Returns true if NaN encoding is IEEE 754-2008.
   /// Only MIPS allows a different encoding.
@@ -1333,10 +1333,14 @@ public:
   }
 
   /// Returns true if feature has an impact on target code
-  /// generation and get its dependent options in second argument.
-  virtual bool getFeatureDepOptions(StringRef Feature,
-                                    std::string &Options) const {
+  /// generation.
+  virtual bool doesFeatureAffectCodeGen(StringRef Feature) const {
     return true;
+  }
+
+  /// For given feature return dependent ones.
+  virtual StringRef getFeatureDependencies(StringRef Feature) const {
+    return StringRef();
   }
 
   struct BranchProtectionInfo {

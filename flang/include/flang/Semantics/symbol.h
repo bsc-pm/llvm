@@ -71,10 +71,13 @@ public:
   const std::string *bindName() const {
     return bindName_ ? &*bindName_ : nullptr;
   }
+  bool isExplicitBindName() const { return isExplicitBindName_; }
   void set_bindName(std::string &&name) { bindName_ = std::move(name); }
+  void set_isExplicitBindName(bool yes) { isExplicitBindName_ = yes; }
 
 private:
   std::optional<std::string> bindName_;
+  bool isExplicitBindName_{false};
 };
 
 // A subroutine or function definition, or a subprogram interface defined
@@ -112,6 +115,8 @@ public:
   }
   void setOutlineTask(const parser::OmpSsOutlineTaskConstruct &x) { outlineTask_ = &x; }
   const parser::OmpSsOutlineTaskConstruct *getOutlineTask() const { return outlineTask_; }
+  bool defaultIgnoreTKR() const { return defaultIgnoreTKR_; }
+  void set_defaultIgnoreTKR(bool yes) { defaultIgnoreTKR_ = yes; }
 
 private:
   bool isInterface_{false}; // true if this represents an interface-body
@@ -125,6 +130,7 @@ private:
   // appeared in an ancestor (sub)module.
   Symbol *moduleInterface_{nullptr};
   const parser::OmpSsOutlineTaskConstruct *outlineTask_{nullptr};
+  bool defaultIgnoreTKR_{false};
 
   friend llvm::raw_ostream &operator<<(
       llvm::raw_ostream &, const SubprogramDetails &);
@@ -217,6 +223,8 @@ public:
   void set_commonBlock(const Symbol &commonBlock) {
     commonBlock_ = &commonBlock;
   }
+  common::IgnoreTKRSet ignoreTKR() const { return ignoreTKR_; }
+  void set_ignoreTKR(common::IgnoreTKRSet set) { ignoreTKR_ = set; }
   bool IsArray() const { return !shape_.empty(); }
   bool IsCoarray() const { return !coshape_.empty(); }
   bool CanBeAssumedShape() const {
@@ -231,6 +239,7 @@ private:
   const parser::Expr *unanalyzedPDTComponentInit_{nullptr};
   ArraySpec shape_;
   ArraySpec coshape_;
+  common::IgnoreTKRSet ignoreTKR_;
   const Symbol *commonBlock_{nullptr}; // common block this object is in
   friend llvm::raw_ostream &operator<<(
       llvm::raw_ostream &, const ObjectEntityDetails &);
@@ -338,6 +347,7 @@ class ProcBindingDetails : public WithPassArg {
 public:
   explicit ProcBindingDetails(const Symbol &symbol) : symbol_{symbol} {}
   const Symbol &symbol() const { return symbol_; }
+  void ReplaceSymbol(const Symbol &symbol) { symbol_ = symbol; }
 
 private:
   SymbolRef symbol_; // procedure bound to; may be forward
@@ -445,8 +455,6 @@ private:
 // defined assignment, intrinsic operator, or defined I/O.
 struct GenericKind {
   ENUM_CLASS(OtherKind, Name, DefinedOp, Assignment, Concat)
-  ENUM_CLASS(DefinedIo, // defined io
-      ReadFormatted, ReadUnformatted, WriteFormatted, WriteUnformatted)
   GenericKind() : u{OtherKind::Name} {}
   template <typename T> GenericKind(const T &x) { u = x; }
   bool IsName() const { return Is(OtherKind::Name); }
@@ -455,9 +463,9 @@ struct GenericKind {
   bool IsIntrinsicOperator() const;
   bool IsOperator() const;
   std::string ToString() const;
-  static SourceName AsFortran(DefinedIo);
+  static SourceName AsFortran(common::DefinedIo);
   std::variant<OtherKind, common::NumericOperator, common::LogicalOperator,
-      common::RelationalOperator, DefinedIo>
+      common::RelationalOperator, common::DefinedIo>
       u;
 
 private:
@@ -635,6 +643,8 @@ public:
 
   const std::string *GetBindName() const;
   void SetBindName(std::string &&);
+  bool GetIsExplicitBindName() const;
+  void SetIsExplicitBindName(bool);
   bool IsFuncResult() const;
   bool IsObjectArray() const;
   bool IsSubprogram() const;

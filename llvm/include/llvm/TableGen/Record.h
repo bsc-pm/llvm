@@ -142,8 +142,6 @@ public:
   std::string getAsString() const override;
 
   bool typeIsConvertibleTo(const RecTy *RHS) const override;
-
-  bool typeIsA(const RecTy *RHS) const override;
 };
 
 /// 'int' - Represent an integer value of no particular size
@@ -785,7 +783,18 @@ public:
 ///
 class UnOpInit : public OpInit, public FoldingSetNode {
 public:
-  enum UnaryOp : uint8_t { CAST, NOT, HEAD, TAIL, SIZE, EMPTY, GETDAGOP, LOG2 };
+  enum UnaryOp : uint8_t {
+    TOLOWER,
+    TOUPPER,
+    CAST,
+    NOT,
+    HEAD,
+    TAIL,
+    SIZE,
+    EMPTY,
+    GETDAGOP,
+    LOG2
+  };
 
 private:
   Init *LHS;
@@ -848,6 +857,7 @@ public:
     LISTCONCAT,
     LISTSPLAT,
     LISTREMOVE,
+    RANGE,
     STRCONCAT,
     INTERLEAVE,
     CONCAT,
@@ -1828,7 +1838,7 @@ public:
 
   /// This method looks up the specified field and returns its value as a
   /// string, throwing an exception if the value is not a string and
-  /// llvm::Optional() if the field does not exist.
+  /// std::nullopt if the field does not exist.
   std::optional<StringRef> getValueAsOptionalString(StringRef FieldName) const;
 
   /// This method looks up the specified field and returns its value as a

@@ -15,7 +15,7 @@
 #include "lldb/lldb-forward.h"
 #include "lldb/lldb-private-enumerations.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -171,6 +171,8 @@ public:
     eCore_mips64r3el,
     eCore_mips64r5el,
     eCore_mips64r6el,
+
+    eCore_msp430,
 
     eCore_ppc_generic,
     eCore_ppc_ppc601,

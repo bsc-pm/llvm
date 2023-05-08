@@ -571,6 +571,19 @@ enum NodeType {
   /// vector, but not the other way around.
   EXTRACT_SUBVECTOR,
 
+  /// VECTOR_DEINTERLEAVE(VEC1, VEC2) - Returns two vectors with all input and
+  /// output vectors having the same type. The first output contains the even
+  /// indices from CONCAT_VECTORS(VEC1, VEC2), with the second output
+  /// containing the odd indices. The relative order of elements within an
+  /// output match that of the concatenated input.
+  VECTOR_DEINTERLEAVE,
+
+  /// VECTOR_INTERLEAVE(VEC1, VEC2) - Returns two vectors with all input and
+  /// output vectors having the same type. The first output contains the
+  /// result of interleaving the low half of CONCAT_VECTORS(VEC1, VEC2), with
+  /// the second output containing the result of interleaving the high half.
+  VECTOR_INTERLEAVE,
+
   /// VECTOR_REVERSE(VECTOR) - Returns a vector, of the same type as VECTOR,
   /// whose elements are shuffled using the following algorithm:
   ///   RESULT[i] = VECTOR[VECTOR.ElementCount - 1 - i]
@@ -1346,6 +1359,12 @@ std::optional<unsigned> getVPMaskIdx(unsigned Opcode);
 /// The operand position of the explicit vector length parameter.
 std::optional<unsigned> getVPExplicitVectorLengthIdx(unsigned Opcode);
 
+/// Translate this VP Opcode to its corresponding non-VP Opcode.
+std::optional<unsigned> getBaseOpcodeForVP(unsigned Opcode, bool hasFPExcept);
+
+/// Translate this non-VP Opcode to its corresponding VP Opcode.
+unsigned getVPForBaseOpcode(unsigned Opcode);
+
 //===--------------------------------------------------------------------===//
 /// MemIndexedMode enum - This enum defines the load / store indexed
 /// addressing modes.
@@ -1493,6 +1512,12 @@ CondCode getSetCCInverse(CondCode Operation, EVT Type);
 inline bool isExtOpcode(unsigned Opcode) {
   return Opcode == ISD::ANY_EXTEND || Opcode == ISD::ZERO_EXTEND ||
          Opcode == ISD::SIGN_EXTEND;
+}
+
+inline bool isExtVecInRegOpcode(unsigned Opcode) {
+  return Opcode == ISD::ANY_EXTEND_VECTOR_INREG ||
+         Opcode == ISD::ZERO_EXTEND_VECTOR_INREG ||
+         Opcode == ISD::SIGN_EXTEND_VECTOR_INREG;
 }
 
 namespace GlobalISel {

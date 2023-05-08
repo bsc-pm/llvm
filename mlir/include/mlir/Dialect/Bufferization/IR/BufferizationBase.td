@@ -26,7 +26,7 @@ def Bufferization_Dialect : Dialect {
     deallocation](/docs/BufferDeallocationInternals/).
   }];
   let dependentDialects = [
-    "AffineDialect", "memref::MemRefDialect", "tensor::TensorDialect"
+    "affine::AffineDialect", "memref::MemRefDialect", "tensor::TensorDialect"
   ];
 
   let extraClassDeclaration = [{
@@ -69,7 +69,6 @@ def Bufferization_Dialect : Dialect {
         kEscapeAttrName = "bufferization.escape";
   }];
   let hasOperationAttrVerify = 1;
-  let useFoldAPI = kEmitFoldAdaptorFolder;
 }
 
 #endif // BUFFERIZATION_BASE

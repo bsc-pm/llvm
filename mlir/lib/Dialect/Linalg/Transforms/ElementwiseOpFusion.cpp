@@ -23,8 +23,8 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include <utility>
 #include <optional>
+#include <utility>
 
 namespace mlir {
 #define GEN_PASS_DEF_LINALGFOLDUNITEXTENTDIMS
@@ -73,6 +73,9 @@ static AffineMap getIndexingMapOfProducerOperandsInCoordinatesOfFusedOp(
 
 /// Conditions for elementwise fusion of generic operations.
 bool mlir::linalg::areElementwiseOpsFusable(OpOperand *fusedOperand) {
+  if (!fusedOperand)
+    return false;
+
   auto producer = fusedOperand->get().getDefiningOp<GenericOp>();
   auto consumer = dyn_cast<GenericOp>(fusedOperand->getOwner());
 
@@ -176,7 +179,7 @@ static void generateFusedElementwiseOpRegion(
                     });
     for (IndexOp indexOp :
          llvm::make_early_inc_range(producerBlock.getOps<IndexOp>())) {
-      Value newIndex = rewriter.create<mlir::AffineApplyOp>(
+      Value newIndex = rewriter.create<affine::AffineApplyOp>(
           producer.getLoc(),
           consumerToProducerLoopsMap.getSubMap(indexOp.getDim()), fusedIndices);
       mapper.map(indexOp.getResult(), newIndex);
@@ -270,7 +273,7 @@ static void generateFusedElementwiseOpRegion(
          "Ill-formed GenericOp region");
 }
 
-FailureOr<Operation *>
+FailureOr<mlir::linalg::ElementwiseOpFusionResult>
 mlir::linalg::fuseElementwiseOps(RewriterBase &rewriter,
                                  OpOperand *fusedOperand) {
   assert(areElementwiseOpsFusable(fusedOperand) &&
@@ -390,7 +393,15 @@ mlir::linalg::fuseElementwiseOps(RewriterBase &rewriter,
   generateFusedElementwiseOpRegion(
       rewriter, fusedOp, consumerToProducerLoopsMap, fusedOperand,
       consumer.getNumLoops(), preservedProducerResults);
-  return fusedOp.getOperation();
+  ElementwiseOpFusionResult result;
+  result.fusedOp = fusedOp;
+  int resultNum = 0;
+  for (auto [index, producerResult] : llvm::enumerate(producer->getResults()))
+    if (preservedProducerResults.count(index))
+      result.replacements[producerResult] = fusedOp->getResult(resultNum++);
+  for (auto consumerResult : consumer->getResults())
+    result.replacements[consumerResult] = fusedOp->getResult(resultNum++);
+  return result;
 }
 
 namespace {
@@ -411,13 +422,19 @@ public:
       if (!controlFn(&opOperand))
         continue;
 
-      FailureOr<Operation *> fusedOp = fuseElementwiseOps(rewriter, &opOperand);
-      if (succeeded(fusedOp)) {
-        auto replacements =
-            (*fusedOp)->getResults().take_back(genericOp.getNumResults());
-        rewriter.replaceOp(genericOp, replacements);
-        return success();
+      FailureOr<ElementwiseOpFusionResult> fusionResult =
+          fuseElementwiseOps(rewriter, &opOperand);
+      if (failed(fusionResult))
+        return rewriter.notifyMatchFailure(genericOp, "fusion failed");
+      Operation *producer = opOperand.get().getDefiningOp();
+      for (auto [origVal, replacement] : fusionResult->replacements) {
+        rewriter.replaceUsesWithIf(origVal, replacement, [&](OpOperand &use) {
+          // Only replace consumer uses.
+          return use.get().getDefiningOp() != producer;
+        });
       }
+      rewriter.eraseOp(genericOp);
+      return success();
     }
     return failure();
   }
@@ -702,7 +719,7 @@ static void updateExpandedGenericOpRegion(PatternRewriter &rewriter,
       assert(!ShapedType::isDynamic(std::get<0>(it)));
       AffineExpr idx, acc;
       bindDims(rewriter.getContext(), idx, acc);
-      newIndex = rewriter.create<AffineApplyOp>(
+      newIndex = rewriter.create<affine::AffineApplyOp>(
           indexOp.getLoc(), idx + acc * std::get<0>(it),
           ValueRange{std::get<1>(it), newIndex});
     }
@@ -1377,7 +1394,7 @@ void generateCollapsedIndexingRegion(Location loc, Block *block,
   //   i1 = (i_{folded} / d2) % d1
   //   i0 = i_{folded} / (d1 * d2)
   llvm::DenseMap<unsigned, Value> indexReplacementVals;
-  for (auto &foldedDims :
+  for (auto foldedDims :
        enumerate(collapsingInfo.getCollapsedOpToOrigOpMapping())) {
     ReassociationIndicesRef foldedDimsRef(foldedDims.value());
     Value newIndexVal =
@@ -1671,8 +1688,8 @@ public:
       }
 
       // Create a constant scalar value from the splat constant.
-      Value scalarConstant = rewriter.create<arith::ConstantOp>(
-          def->getLoc(), constantAttr, constantAttr.getType());
+      Value scalarConstant =
+          rewriter.create<arith::ConstantOp>(def->getLoc(), constantAttr);
 
       SmallVector<Value> outputOperands = genericOp.getOutputs();
       auto fusedOp = rewriter.create<GenericOp>(
@@ -1781,8 +1798,8 @@ struct FoldFillWithGenericOp : public OpRewritePattern<GenericOp> {
       Value convertedVal =
           convertScalarToDtype(rewriter, fillOp.getLoc(), fillVal, resultType,
                                /*isUnsignedCast =*/false);
-      payload.getArgument(opOperand->getOperandNumber())
-          .replaceAllUsesWith(convertedVal);
+      rewriter.replaceAllUsesWith(
+          payload.getArgument(opOperand->getOperandNumber()), convertedVal);
     }
     return success(fillFound);
   }
@@ -1854,7 +1871,7 @@ struct LinalgElementwiseOpFusionPass
     populateFoldReshapeOpsByExpansionPatterns(patterns, defaultControlFn);
 
     // General canonicalization patterns.
-    AffineApplyOp::getCanonicalizationPatterns(patterns, context);
+    affine::AffineApplyOp::getCanonicalizationPatterns(patterns, context);
     GenericOp::getCanonicalizationPatterns(patterns, context);
     tensor::ExpandShapeOp::getCanonicalizationPatterns(patterns, context);
     tensor::CollapseShapeOp::getCanonicalizationPatterns(patterns, context);

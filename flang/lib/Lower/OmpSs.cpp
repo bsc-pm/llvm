@@ -820,7 +820,8 @@ namespace {
           if (var.getSymbol() == modSym) {
             Fortran::lower::mapSymbolAttributes(
               converter, var, localSymbols, stmtCtx, func.front().getArguments()[i]);
-            fir::ExtendedValue exv = localSymbols.lookupSymbol(modSym).toExtendedValue();
+            fir::ExtendedValue exv =
+                converter.getSymbolExtendedValue(modSym, &localSymbols);
             // REF:1 Map the original symbol to the modifies symbol value
             if (origSym)
               localSymbols.addSymbol(*origSym, exv);
@@ -1227,7 +1228,8 @@ namespace {
       sba.analyze(ultimate);
       llvm::SmallVector<mlir::Value> extents;
       llvm::SmallVector<mlir::Value> lBounds;
-      fir::ExtendedValue exv = converter.getLocalSymbols().lookupSymbol(ultimate).toExtendedValue();
+      fir::ExtendedValue exv =
+          converter.getSymbolExtendedValue(ultimate, &converter.getLocalSymbols());
       if (sba.isArray()) {
         if (const auto *box = exv.getBoxOf<fir::ArrayBoxValue>()) {
           // assumed-size arrays have a first fir.underfined operation

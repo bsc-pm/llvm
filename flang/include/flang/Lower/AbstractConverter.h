@@ -28,11 +28,6 @@ class KindMapping;
 class FirOpBuilder;
 } // namespace fir
 
-namespace fir {
-class KindMapping;
-class FirOpBuilder;
-} // namespace fir
-
 namespace Fortran {
 namespace common {
 template <typename>
@@ -57,7 +52,6 @@ class DerivedTypeSpec;
 
 namespace lower {
 class SymMap;
-struct SymbolBox;
 namespace pft {
 struct Variable;
 }
@@ -77,7 +71,6 @@ class AbstractConverter {
 public:
   // TODO: huge hacks
   virtual Fortran::lower::SymMap &getLocalSymbols() = 0;
-  virtual fir::ExtendedValue getExtended(Fortran::lower::SymbolBox) = 0;
   //===--------------------------------------------------------------------===//
   // Symbols
   //===--------------------------------------------------------------------===//
@@ -86,7 +79,8 @@ public:
   virtual mlir::Value getSymbolAddress(SymbolRef sym) = 0;
 
   virtual fir::ExtendedValue
-  getSymbolExtendedValue(const Fortran::semantics::Symbol &sym) = 0;
+  getSymbolExtendedValue(const Fortran::semantics::Symbol &sym,
+                         Fortran::lower::SymMap *symMap = nullptr) = 0;
 
   /// Get the binding of an implied do variable by name.
   virtual mlir::Value impliedDoBinding(llvm::StringRef name) = 0;
@@ -238,6 +232,9 @@ public:
   virtual mlir::MLIRContext &getMLIRContext() = 0;
   /// Unique a symbol
   virtual std::string mangleName(const Fortran::semantics::Symbol &) = 0;
+  /// Unique a derived type
+  virtual std::string
+  mangleName(const Fortran::semantics::DerivedTypeSpec &) = 0;
   /// Get the KindMap.
   virtual const fir::KindMapping &getKindMap() = 0;
 

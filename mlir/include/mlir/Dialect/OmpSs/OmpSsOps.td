@@ -14,6 +14,7 @@
 #ifndef OMPSS_OPS
 #define OMPSS_OPS
 
+include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
@@ -26,7 +27,6 @@ def OmpSs_Dialect : Dialect {
   let cppNamespace = "::mlir::oss";
 
   let useDefaultAttributePrinterParser = 1;
-  let useFoldAPI = kEmitFoldAdaptorFolder;
 }
 
 // Type which can be constraint accepting standard integers, indices and

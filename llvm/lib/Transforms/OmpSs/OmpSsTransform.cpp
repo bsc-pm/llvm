@@ -1,9 +1,8 @@
 //===- OmpSs.cpp -- Strip parts of Debug Info --------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -2775,7 +2774,7 @@ struct OmpSsDirective {
         Nanos6TaskDeclSourceStr ? Nanos6TaskDeclSourceStr : Nanos6TaskLocStr,
         // Set device_function_name only in case of task pure device
         // in order to let nanos6 identify them
-        (Nanos6TaskDevFuncStr && !DirEnv.DeviceInfo.Ndrange.empty())
+        Nanos6TaskDevFuncStr
           ? Nanos6TaskDevFuncStr
           : ConstantPointerNull::get(PtrTy))),
         ("implementations_var_" + F.getName()).str());

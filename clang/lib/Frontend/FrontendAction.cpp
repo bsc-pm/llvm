@@ -429,11 +429,9 @@ static std::error_code collectModuleHeaderIncludes(
   }
 
   // Recurse into submodules.
-  for (clang::Module::submodule_iterator Sub = Module->submodule_begin(),
-                                      SubEnd = Module->submodule_end();
-       Sub != SubEnd; ++Sub)
+  for (auto *Submodule : Module->submodules())
     if (std::error_code Err = collectModuleHeaderIncludes(
-            LangOpts, FileMgr, Diag, ModMap, *Sub, Includes))
+            LangOpts, FileMgr, Diag, ModMap, Submodule, Includes))
       return Err;
 
   return std::error_code();
@@ -1117,6 +1115,9 @@ void FrontendAction::EndSourceFile() {
   // FrontendAction.
   CI.clearOutputFiles(/*EraseFiles=*/shouldEraseOutputFiles());
 
+  // The resources are owned by AST when the current file is AST.
+  // So we reset the resources here to avoid users accessing it
+  // accidently.
   if (isCurrentFileAST()) {
     if (DisableFree) {
       CI.resetAndLeakPreprocessor();

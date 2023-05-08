@@ -80,28 +80,26 @@ void testArraySubscripts(int *p, int **pp) {
 
 void testArraySubscriptsWithAuto(int *p, int **pp) {
   int a[10];
-  auto ap1 = a;   // expected-warning{{'ap1' is an unsafe pointer used for buffer access}}
+  auto ap1 = a;   // expected-warning{{'ap1' is an unsafe pointer used for buffer access}} \
+		     expected-note{{change type of 'ap1' to 'std::span' to preserve bounds information}}
 
   foo(ap1[1]);    // expected-note{{used in buffer access here}}
 
-  auto ap2 = p;   // expected-warning{{'ap2' is an unsafe pointer used for buffer access}}
+  auto ap2 = p;   // expected-warning{{'ap2' is an unsafe pointer used for buffer access}} \
+  		     expected-note{{change type of 'ap2' to 'std::span' to preserve bounds information}}
 
   foo(ap2[1]);    // expected-note{{used in buffer access here}}
 
-  auto ap3 = pp;  // expected-warning{{'ap3' is an unsafe pointer used for buffer access}}
+  auto ap3 = pp;  // expected-warning{{'ap3' is an unsafe pointer used for buffer access}} \
+		     expected-note{{change type of 'ap3' to 'std::span' to preserve bounds information}}
 
   foo(ap3[1][1]); // expected-note{{used in buffer access here}}
                   // expected-warning@-1{{unsafe buffer access}}
 
-  auto ap4 = *pp; // expected-warning{{'ap4' is an unsafe pointer used for buffer access}}
+  auto ap4 = *pp; // expected-warning{{'ap4' is an unsafe pointer used for buffer access}} \
+  		     expected-note{{change type of 'ap4' to 'std::span' to preserve bounds information}}
 
   foo(ap4[1]);    // expected-note{{used in buffer access here}}
-}
-
-//TODO: do not warn for unevaluated context
-void testUnevaluatedContext(int * p) {// expected-warning{{'p' is an unsafe pointer used for buffer access}}
-  foo(sizeof(p[1]),             // expected-note{{used in buffer access here}}
-      sizeof(decltype(p[1])));  // expected-note{{used in buffer access here}}
 }
 
 void testQualifiedParameters(const int * p, const int * const q, const int a[10], const int b[10][10]) {
@@ -355,7 +353,8 @@ void testMultiLineDeclStmt(int * p) {
   auto
 
 
-  ap1 = p;      // expected-warning{{'ap1' is an unsafe pointer used for buffer access}}
+  ap1 = p;      // expected-warning{{'ap1' is an unsafe pointer used for buffer access}} \
+         	   expected-note{{change type of 'ap1' to 'std::span' to preserve bounds information}}
 
   foo(ap1[1]);  // expected-note{{used in buffer access here}}
 }

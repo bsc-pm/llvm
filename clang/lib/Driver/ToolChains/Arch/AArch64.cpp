@@ -12,9 +12,8 @@
 #include "clang/Driver/DriverDiagnostic.h"
 #include "clang/Driver/Options.h"
 #include "llvm/Option/ArgList.h"
-#include "llvm/Support/AArch64TargetParser.h"
-#include "llvm/Support/TargetParser.h"
-#include "llvm/Support/Host.h"
+#include "llvm/TargetParser/AArch64TargetParser.h"
+#include "llvm/TargetParser/Host.h"
 
 using namespace clang::driver;
 using namespace clang::driver::tools;
@@ -407,7 +406,7 @@ void aarch64::getAArch64TargetFeatures(const Driver &D,
     else if (*I == "+crypto") {
       HasCrypto = true;
       HasNoCrypto = false;
-    } else if (*I == "-crypto") {
+    } else if (*I == "-crypto" || *I == "-neon") {
       HasCrypto = false;
       HasNoCrypto = true;
       HasSM4 = HasSHA2 = HasSHA3 = HasAES = false;
@@ -607,7 +606,7 @@ fp16_fml_fallthrough:
       Features.push_back("+fix-cortex-a53-835769");
     else
       Features.push_back("-fix-cortex-a53-835769");
-  } else if (Triple.isAndroid()) {
+  } else if (Triple.isAndroid() || Triple.isOHOSFamily()) {
     // Enabled A53 errata (835769) workaround by default on android
     Features.push_back("+fix-cortex-a53-835769");
   } else if (Triple.isOSFuchsia()) {

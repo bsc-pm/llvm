@@ -1,4 +1,4 @@
-add_libc_testsuite(libc_time_unittests)
+add_custom_target(libc_time_unittests)
 
 add_libc_unittest(
   asctime
@@ -62,10 +62,10 @@ add_libc_unittest(
   CXX_STANDARD
     20
   DEPENDS
-    libc.include.errno
     libc.include.time
     libc.src.time.gettimeofday
     libc.src.time.nanosleep
+    libc.src.errno.errno
 )
 
 add_libc_unittest(
@@ -119,9 +119,9 @@ add_libc_unittest(
   CXX_STANDARD
     20
   DEPENDS
-    libc.include.errno
     libc.include.time
     libc.src.time.nanosleep
+    libc.src.errno.errno
 )
 
 add_libc_unittest(
@@ -131,9 +131,9 @@ add_libc_unittest(
   SRCS
     time_test.cpp
   DEPENDS
-    libc.include.errno
     libc.include.time
     libc.src.time.time
+    libc.src.errno.errno
 )
 
 add_libc_unittest(
@@ -143,7 +143,7 @@ add_libc_unittest(
   SRCS
     clock_test.cpp
   DEPENDS
-    libc.include.errno
     libc.include.time
     libc.src.time.clock
+    libc.src.errno.errno
 )

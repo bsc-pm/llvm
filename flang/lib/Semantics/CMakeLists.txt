@@ -61,4 +61,5 @@ add_flang_library(FortranSemantics
   FrontendOmpSs
   FrontendOpenMP
   FrontendOpenACC
+  TargetParser
 )

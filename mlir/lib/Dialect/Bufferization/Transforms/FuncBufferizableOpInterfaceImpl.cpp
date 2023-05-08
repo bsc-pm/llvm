@@ -55,8 +55,7 @@ static func::ReturnOp getAssumedUniqueReturnOp(FuncOp funcOp) {
 
 /// Return the index-th bufferized function argument type. This assumes that the
 /// specified argument is a tensor. If the tensor is ranked, a layout map may be
-/// specified by the user. If no layout map is specified, the default layout map
-/// (as per `options.functionBoundaryTypeConversion`) is used.
+/// specified by the user (as per `options.functionArgTypeConverterFn`).
 static BaseMemRefType
 getBufferizedFunctionArgType(FuncOp funcOp, int64_t index,
                              const BufferizationOptions &options) {
@@ -64,15 +63,8 @@ getBufferizedFunctionArgType(FuncOp funcOp, int64_t index,
       funcOp.getFunctionType().getInput(index).dyn_cast<TensorType>();
   assert(tensorType && "expected TensorType");
 
-  BaseMemRefType memrefType;
-  if (options.functionBoundaryTypeConversion ==
-      LayoutMapOption::IdentityLayoutMap) {
-    memrefType = getMemRefTypeWithStaticIdentityLayout(tensorType);
-  } else {
-    // Note: Layout maps on function parameters cannot be inferred. The best we
-    // can do at the moment is "fully dynamic".
-    memrefType = getMemRefTypeWithFullyDynamicLayout(tensorType);
-  }
+  BaseMemRefType memrefType = options.functionArgTypeConverterFn(
+      tensorType, *options.defaultMemorySpace, funcOp, options);
 
   auto layoutAttr = funcOp.getArgAttrOfType<AffineMapAttr>(
       index, BufferizationDialect::kBufferLayoutAttrName);
@@ -172,52 +164,37 @@ struct CallOpInterface
         opOperand.getOperandNumber());
   }
 
-  SmallVector<OpResult> getAliasingOpResult(Operation *op, OpOperand &opOperand,
+  AliasingOpResultList getAliasingOpResults(Operation *op, OpOperand &opOperand,
                                             const AnalysisState &state) const {
     func::CallOp callOp = cast<func::CallOp>(op);
     FuncOp funcOp = getCalledFunction(callOp);
     assert(funcOp && "expected CallOp to a FuncOp");
     if (getFuncOpAnalysisState(state, funcOp) != FuncOpAnalysisState::Analyzed)
       // FuncOp not analyzed yet. Any OpResult may be aliasing.
-      return detail::unknownGetAliasingOpResult(opOperand);
+      return detail::unknownGetAliasingOpResults(opOperand);
 
     // Get aliasing results from state.
     const FuncAnalysisState &funcState = getFuncAnalysisState(state);
     auto aliasingReturnVals =
         funcState.aliasingReturnVals.lookup(funcOp).lookup(
             opOperand.getOperandNumber());
-    SmallVector<OpResult> result;
-    for (int64_t resultIdx : aliasingReturnVals)
-      result.push_back(callOp->getOpResult(resultIdx));
-    return result;
-  }
 
-  BufferRelation bufferRelation(Operation *op, OpResult opResult,
-                                const AnalysisState &state) const {
-    func::CallOp callOp = cast<func::CallOp>(op);
-    FuncOp funcOp = getCalledFunction(callOp);
-    assert(funcOp && "expected CallOp to a FuncOp");
-    if (getFuncOpAnalysisState(state, funcOp) !=
-        FuncOpAnalysisState::Analyzed) {
-      // Function not analyzed yet. The conservative answer is "None".
-      return BufferRelation::Unknown;
-    }
-
-    const FuncAnalysisState &funcState = getFuncAnalysisState(state);
-    std::optional<int64_t> maybeEquiv =
-        getEquivalentFuncArgIdx(funcOp, funcState, opResult.getResultNumber());
-    if (maybeEquiv) {
-#ifndef NDEBUG
-      SmallVector<OpOperand *> aliasingOpOperands =
-          getAliasingOpOperand(op, opResult, state);
-      assert(aliasingOpOperands.size() == 1 &&
-             "expected exactly 1 aliasing OpOperand");
-      assert(aliasingOpOperands.front()->getOperandNumber() == *maybeEquiv &&
+    // Check if the aliasing OpResult is equivalent to the OpOperand.
+    std::optional<int64_t> equivalent = {};
+    if (aliasingReturnVals.size() == 1) {
+      equivalent = getEquivalentFuncArgIdx(funcOp, funcState,
+                                           aliasingReturnVals.front());
+      assert((!equivalent.has_value() ||
+              *equivalent == opOperand.getOperandNumber()) &&
              "inconsistent analysis state");
-#endif
-      return BufferRelation::Equivalent;
     }
-    return BufferRelation::Unknown;
+    AliasingOpResultList result;
+    for (int64_t resultIdx : aliasingReturnVals)
+      result.addAlias({callOp->getOpResult(resultIdx),
+                       equivalent.has_value() ? BufferRelation::Equivalent
+                                              : BufferRelation::Unknown,
+                       /*isDefinite=*/equivalent.has_value()});
+    return result;
   }
 
   /// All function arguments are writable. It is the responsibility of the
@@ -329,7 +306,7 @@ struct ReturnOpInterface
     return false;
   }
 
-  SmallVector<OpResult> getAliasingOpResult(Operation *op, OpOperand &opOperand,
+  AliasingOpResultList getAliasingOpResults(Operation *op, OpOperand &opOperand,
                                             const AnalysisState &state) const {
     return {};
   }
@@ -436,14 +413,10 @@ struct FuncOpInterface
         continue;
       }
 
-      BaseMemRefType resultType;
-      if (options.functionBoundaryTypeConversion ==
-          LayoutMapOption::IdentityLayoutMap) {
-        resultType = getMemRefTypeWithStaticIdentityLayout(tensorType);
-      } else {
-        // Note: If `InferLayoutMap`, cast are later folded away.
-        resultType = getMemRefTypeWithFullyDynamicLayout(tensorType);
-      }
+      // Note: If `inferFunctionResultLayout = true`, cast are later folded
+      // away.
+      BaseMemRefType resultType = options.functionArgTypeConverterFn(
+          tensorType, *options.defaultMemorySpace, funcOp, options);
       Value toMemrefOp = rewriter.create<bufferization::ToMemrefOp>(
           loc, resultType, returnVal);
       returnValues.push_back(toMemrefOp);

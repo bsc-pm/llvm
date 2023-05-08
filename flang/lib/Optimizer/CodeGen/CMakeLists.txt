@@ -6,17 +6,17 @@ add_flang_library(FIRCodeGen
   TBAABuilder.cpp
   Target.cpp
   TargetRewrite.cpp
+  TypeConverter.cpp
 
   DEPENDS
-  FIRBuilder
   FIRDialect
-  FIRSupport
   FIROptCodeGenPassIncGen
   CGOpsIncGen
 
   LINK_LIBS
   FIRBuilder
   FIRDialect
+  FIRDialectSupport
   FIRSupport
   MLIRComplexToLLVM
   MLIRComplexToStandard
@@ -24,7 +24,9 @@ add_flang_library(FIRCodeGen
   MLIRMathToLLVM
   MLIRMathToLibm
   MLIROmpSsToLLVM
+  MLIROpenACCToLLVM
   MLIROpenMPToLLVM
+  MLIRBuiltinToLLVMIRTranslation
   MLIRLLVMToLLVMIRTranslation
   MLIRTargetLLVMIRExport
 

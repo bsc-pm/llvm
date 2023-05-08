@@ -46,7 +46,7 @@
 // PPC64-NEXT:    ret void, !dbg [[DBG9:![0-9]+]]
 //
 // AARCH64-LABEL: define {{[^@]+}}@gen
-// AARCH64-SAME: (ptr noundef [[P:%.*]], i32 noundef [[INIT1:%.*]], i32 noundef [[UB1:%.*]], i32 noundef [[STEP1:%.*]], i32 noundef [[INIT2:%.*]], i32 noundef [[UB2:%.*]], i32 noundef [[STEP2:%.*]]) #[[ATTR0:[0-9]+]] !dbg [[DBG9:![0-9]+]] {
+// AARCH64-SAME: (ptr noundef [[P:%.*]], i32 noundef [[INIT1:%.*]], i32 noundef [[UB1:%.*]], i32 noundef [[STEP1:%.*]], i32 noundef [[INIT2:%.*]], i32 noundef [[UB2:%.*]], i32 noundef [[STEP2:%.*]]) #[[ATTR0:[0-9]+]] !dbg [[DBG5:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[P_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    [[INIT1_ADDR:%.*]] = alloca i32, align 4
@@ -62,7 +62,7 @@
 // AARCH64-NEXT:    store i32 [[INIT2]], ptr [[INIT2_ADDR]], align 4
 // AARCH64-NEXT:    store i32 [[UB2]], ptr [[UB2_ADDR]], align 4
 // AARCH64-NEXT:    store i32 [[STEP2]], ptr [[STEP2_ADDR]], align 4
-// AARCH64-NEXT:    ret void, !dbg [[DBG13:![0-9]+]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG9:![0-9]+]]
 //
 void gen(int (*p)[N], int init1, int ub1, int step1, int init2, int ub2, int step2) {}
 
@@ -96,7 +96,7 @@ void gen(int (*p)[N], int init1, int ub1, int step1, int init2, int ub2, int ste
 // LIN64-NEXT:    store i32 0, ptr [[CALL_ARG4]], align 4, !dbg [[DBG15:![0-9]+]]
 // LIN64-NEXT:    store i32 3, ptr [[CALL_ARG5]], align 4, !dbg [[DBG16:![0-9]+]]
 // LIN64-NEXT:    store i32 1, ptr [[CALL_ARG6]], align 4, !dbg [[DBG17:![0-9]+]]
-// LIN64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.PRIVATE"(ptr [[I_CALL_ARG]], i32 undef), "QUAL.OSS.PRIVATE"(ptr [[J_CALL_ARG]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG1]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG2]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG3]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG4]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG5]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG6]], i32 undef), "QUAL.OSS.MULTIDEP.RANGE.OUT"(ptr [[I_CALL_ARG]], ptr [[J_CALL_ARG]], ptr @compute_dep, ptr [[I_CALL_ARG]], ptr [[CALL_ARG1]], ptr [[CALL_ARG2]], ptr [[CALL_ARG3]], ptr [[J_CALL_ARG]], ptr [[CALL_ARG4]], ptr [[CALL_ARG5]], ptr [[CALL_ARG6]], ptr [[CALL_ARG]], [53 x i8] c"{ p[i][j], i = init1:ub1:step1, j =init2:ub2:step2 }\00", ptr @compute_dep.1, ptr [[CALL_ARG]], ptr [[I_CALL_ARG]], ptr [[J_CALL_ARG]], ptr [[CALL_ARG1]], ptr [[CALL_ARG4]], ptr [[CALL_ARG2]], ptr [[CALL_ARG5]], ptr [[CALL_ARG3]], ptr [[CALL_ARG6]]), "QUAL.OSS.DECL.SOURCE"([8 x i8] c"gen:9:9\00") ], !dbg [[DBG18:![0-9]+]]
+// LIN64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.PRIVATE"(ptr [[I_CALL_ARG]], i32 undef), "QUAL.OSS.PRIVATE"(ptr [[J_CALL_ARG]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG1]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG2]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG3]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG4]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG5]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG6]], i32 undef), "QUAL.OSS.DEVICE.DEVFUNC"([4 x i8] c"gen\00"), "QUAL.OSS.MULTIDEP.RANGE.OUT"(ptr [[I_CALL_ARG]], ptr [[J_CALL_ARG]], ptr @compute_dep, ptr [[I_CALL_ARG]], ptr [[CALL_ARG1]], ptr [[CALL_ARG2]], ptr [[CALL_ARG3]], ptr [[J_CALL_ARG]], ptr [[CALL_ARG4]], ptr [[CALL_ARG5]], ptr [[CALL_ARG6]], ptr [[CALL_ARG]], [53 x i8] c"{ p[i][j], i = init1:ub1:step1, j =init2:ub2:step2 }\00", ptr @compute_dep.1, ptr [[CALL_ARG]], ptr [[I_CALL_ARG]], ptr [[J_CALL_ARG]], ptr [[CALL_ARG1]], ptr [[CALL_ARG4]], ptr [[CALL_ARG2]], ptr [[CALL_ARG5]], ptr [[CALL_ARG3]], ptr [[CALL_ARG6]]), "QUAL.OSS.DECL.SOURCE"([30 x i8] c"task_function_multideps.c:9:9\00") ], !dbg [[DBG18:![0-9]+]]
 // LIN64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[CALL_ARG]], align 8, !dbg [[DBG11]]
 // LIN64-NEXT:    [[TMP2:%.*]] = load i32, ptr [[CALL_ARG1]], align 4, !dbg [[DBG12]]
 // LIN64-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CALL_ARG2]], align 4, !dbg [[DBG13]]
@@ -114,7 +114,7 @@ void gen(int (*p)[N], int init1, int ub1, int step1, int init2, int ub2, int ste
 // LIN64-NEXT:    store i32 0, ptr [[CALL_ARG12]], align 4, !dbg [[DBG23:![0-9]+]]
 // LIN64-NEXT:    store i32 3, ptr [[CALL_ARG13]], align 4, !dbg [[DBG24:![0-9]+]]
 // LIN64-NEXT:    store i32 1, ptr [[CALL_ARG14]], align 4, !dbg [[DBG25:![0-9]+]]
-// LIN64-NEXT:    [[TMP8:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.PRIVATE"(ptr [[I_CALL_ARG15]], i32 undef), "QUAL.OSS.PRIVATE"(ptr [[J_CALL_ARG16]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG7]], ptr undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG9]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG10]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG11]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG12]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG13]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG14]], i32 undef), "QUAL.OSS.MULTIDEP.RANGE.OUT"(ptr [[I_CALL_ARG15]], ptr [[J_CALL_ARG16]], ptr @compute_dep.2, ptr [[I_CALL_ARG15]], ptr [[CALL_ARG9]], ptr [[CALL_ARG10]], ptr [[CALL_ARG11]], ptr [[J_CALL_ARG16]], ptr [[CALL_ARG12]], ptr [[CALL_ARG13]], ptr [[CALL_ARG14]], ptr [[CALL_ARG7]], [53 x i8] c"{ p[i][j], i = init1:ub1:step1, j =init2:ub2:step2 }\00", ptr @compute_dep.3, ptr [[CALL_ARG7]], ptr [[I_CALL_ARG15]], ptr [[J_CALL_ARG16]], ptr [[CALL_ARG9]], ptr [[CALL_ARG12]], ptr [[CALL_ARG10]], ptr [[CALL_ARG13]], ptr [[CALL_ARG11]], ptr [[CALL_ARG14]]), "QUAL.OSS.DECL.SOURCE"([8 x i8] c"gen:9:9\00") ], !dbg [[DBG26:![0-9]+]]
+// LIN64-NEXT:    [[TMP8:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.PRIVATE"(ptr [[I_CALL_ARG15]], i32 undef), "QUAL.OSS.PRIVATE"(ptr [[J_CALL_ARG16]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG7]], ptr undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG9]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG10]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG11]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG12]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG13]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG14]], i32 undef), "QUAL.OSS.DEVICE.DEVFUNC"([4 x i8] c"gen\00"), "QUAL.OSS.MULTIDEP.RANGE.OUT"(ptr [[I_CALL_ARG15]], ptr [[J_CALL_ARG16]], ptr @compute_dep.2, ptr [[I_CALL_ARG15]], ptr [[CALL_ARG9]], ptr [[CALL_ARG10]], ptr [[CALL_ARG11]], ptr [[J_CALL_ARG16]], ptr [[CALL_ARG12]], ptr [[CALL_ARG13]], ptr [[CALL_ARG14]], ptr [[CALL_ARG7]], [53 x i8] c"{ p[i][j], i = init1:ub1:step1, j =init2:ub2:step2 }\00", ptr @compute_dep.3, ptr [[CALL_ARG7]], ptr [[I_CALL_ARG15]], ptr [[J_CALL_ARG16]], ptr [[CALL_ARG9]], ptr [[CALL_ARG12]], ptr [[CALL_ARG10]], ptr [[CALL_ARG13]], ptr [[CALL_ARG11]], ptr [[CALL_ARG14]]), "QUAL.OSS.DECL.SOURCE"([30 x i8] c"task_function_multideps.c:9:9\00") ], !dbg [[DBG26:![0-9]+]]
 // LIN64-NEXT:    [[TMP9:%.*]] = load ptr, ptr [[CALL_ARG7]], align 8, !dbg [[DBG19]]
 // LIN64-NEXT:    [[TMP10:%.*]] = load i32, ptr [[CALL_ARG9]], align 4, !dbg [[DBG20]]
 // LIN64-NEXT:    [[TMP11:%.*]] = load i32, ptr [[CALL_ARG10]], align 4, !dbg [[DBG21]]
@@ -156,7 +156,7 @@ void gen(int (*p)[N], int init1, int ub1, int step1, int init2, int ub2, int ste
 // PPC64-NEXT:    store i32 0, ptr [[CALL_ARG4]], align 4, !dbg [[DBG15:![0-9]+]]
 // PPC64-NEXT:    store i32 3, ptr [[CALL_ARG5]], align 4, !dbg [[DBG16:![0-9]+]]
 // PPC64-NEXT:    store i32 1, ptr [[CALL_ARG6]], align 4, !dbg [[DBG17:![0-9]+]]
-// PPC64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.PRIVATE"(ptr [[I_CALL_ARG]], i32 undef), "QUAL.OSS.PRIVATE"(ptr [[J_CALL_ARG]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG1]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG2]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG3]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG4]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG5]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG6]], i32 undef), "QUAL.OSS.MULTIDEP.RANGE.OUT"(ptr [[I_CALL_ARG]], ptr [[J_CALL_ARG]], ptr @compute_dep, ptr [[I_CALL_ARG]], ptr [[CALL_ARG1]], ptr [[CALL_ARG2]], ptr [[CALL_ARG3]], ptr [[J_CALL_ARG]], ptr [[CALL_ARG4]], ptr [[CALL_ARG5]], ptr [[CALL_ARG6]], ptr [[CALL_ARG]], [53 x i8] c"{ p[i][j], i = init1:ub1:step1, j =init2:ub2:step2 }\00", ptr @compute_dep.1, ptr [[CALL_ARG]], ptr [[I_CALL_ARG]], ptr [[J_CALL_ARG]], ptr [[CALL_ARG1]], ptr [[CALL_ARG4]], ptr [[CALL_ARG2]], ptr [[CALL_ARG5]], ptr [[CALL_ARG3]], ptr [[CALL_ARG6]]), "QUAL.OSS.DECL.SOURCE"([8 x i8] c"gen:9:9\00") ], !dbg [[DBG18:![0-9]+]]
+// PPC64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.PRIVATE"(ptr [[I_CALL_ARG]], i32 undef), "QUAL.OSS.PRIVATE"(ptr [[J_CALL_ARG]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG1]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG2]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG3]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG4]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG5]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG6]], i32 undef), "QUAL.OSS.DEVICE.DEVFUNC"([4 x i8] c"gen\00"), "QUAL.OSS.MULTIDEP.RANGE.OUT"(ptr [[I_CALL_ARG]], ptr [[J_CALL_ARG]], ptr @compute_dep, ptr [[I_CALL_ARG]], ptr [[CALL_ARG1]], ptr [[CALL_ARG2]], ptr [[CALL_ARG3]], ptr [[J_CALL_ARG]], ptr [[CALL_ARG4]], ptr [[CALL_ARG5]], ptr [[CALL_ARG6]], ptr [[CALL_ARG]], [53 x i8] c"{ p[i][j], i = init1:ub1:step1, j =init2:ub2:step2 }\00", ptr @compute_dep.1, ptr [[CALL_ARG]], ptr [[I_CALL_ARG]], ptr [[J_CALL_ARG]], ptr [[CALL_ARG1]], ptr [[CALL_ARG4]], ptr [[CALL_ARG2]], ptr [[CALL_ARG5]], ptr [[CALL_ARG3]], ptr [[CALL_ARG6]]), "QUAL.OSS.DECL.SOURCE"([30 x i8] c"task_function_multideps.c:9:9\00") ], !dbg [[DBG18:![0-9]+]]
 // PPC64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[CALL_ARG]], align 8, !dbg [[DBG11]]
 // PPC64-NEXT:    [[TMP2:%.*]] = load i32, ptr [[CALL_ARG1]], align 4, !dbg [[DBG12]]
 // PPC64-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CALL_ARG2]], align 4, !dbg [[DBG13]]
@@ -174,7 +174,7 @@ void gen(int (*p)[N], int init1, int ub1, int step1, int init2, int ub2, int ste
 // PPC64-NEXT:    store i32 0, ptr [[CALL_ARG12]], align 4, !dbg [[DBG23:![0-9]+]]
 // PPC64-NEXT:    store i32 3, ptr [[CALL_ARG13]], align 4, !dbg [[DBG24:![0-9]+]]
 // PPC64-NEXT:    store i32 1, ptr [[CALL_ARG14]], align 4, !dbg [[DBG25:![0-9]+]]
-// PPC64-NEXT:    [[TMP8:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.PRIVATE"(ptr [[I_CALL_ARG15]], i32 undef), "QUAL.OSS.PRIVATE"(ptr [[J_CALL_ARG16]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG7]], ptr undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG9]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG10]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG11]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG12]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG13]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG14]], i32 undef), "QUAL.OSS.MULTIDEP.RANGE.OUT"(ptr [[I_CALL_ARG15]], ptr [[J_CALL_ARG16]], ptr @compute_dep.2, ptr [[I_CALL_ARG15]], ptr [[CALL_ARG9]], ptr [[CALL_ARG10]], ptr [[CALL_ARG11]], ptr [[J_CALL_ARG16]], ptr [[CALL_ARG12]], ptr [[CALL_ARG13]], ptr [[CALL_ARG14]], ptr [[CALL_ARG7]], [53 x i8] c"{ p[i][j], i = init1:ub1:step1, j =init2:ub2:step2 }\00", ptr @compute_dep.3, ptr [[CALL_ARG7]], ptr [[I_CALL_ARG15]], ptr [[J_CALL_ARG16]], ptr [[CALL_ARG9]], ptr [[CALL_ARG12]], ptr [[CALL_ARG10]], ptr [[CALL_ARG13]], ptr [[CALL_ARG11]], ptr [[CALL_ARG14]]), "QUAL.OSS.DECL.SOURCE"([8 x i8] c"gen:9:9\00") ], !dbg [[DBG26:![0-9]+]]
+// PPC64-NEXT:    [[TMP8:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.PRIVATE"(ptr [[I_CALL_ARG15]], i32 undef), "QUAL.OSS.PRIVATE"(ptr [[J_CALL_ARG16]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG7]], ptr undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG9]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG10]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG11]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG12]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG13]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG14]], i32 undef), "QUAL.OSS.DEVICE.DEVFUNC"([4 x i8] c"gen\00"), "QUAL.OSS.MULTIDEP.RANGE.OUT"(ptr [[I_CALL_ARG15]], ptr [[J_CALL_ARG16]], ptr @compute_dep.2, ptr [[I_CALL_ARG15]], ptr [[CALL_ARG9]], ptr [[CALL_ARG10]], ptr [[CALL_ARG11]], ptr [[J_CALL_ARG16]], ptr [[CALL_ARG12]], ptr [[CALL_ARG13]], ptr [[CALL_ARG14]], ptr [[CALL_ARG7]], [53 x i8] c"{ p[i][j], i = init1:ub1:step1, j =init2:ub2:step2 }\00", ptr @compute_dep.3, ptr [[CALL_ARG7]], ptr [[I_CALL_ARG15]], ptr [[J_CALL_ARG16]], ptr [[CALL_ARG9]], ptr [[CALL_ARG12]], ptr [[CALL_ARG10]], ptr [[CALL_ARG13]], ptr [[CALL_ARG11]], ptr [[CALL_ARG14]]), "QUAL.OSS.DECL.SOURCE"([30 x i8] c"task_function_multideps.c:9:9\00") ], !dbg [[DBG26:![0-9]+]]
 // PPC64-NEXT:    [[TMP9:%.*]] = load ptr, ptr [[CALL_ARG7]], align 8, !dbg [[DBG19]]
 // PPC64-NEXT:    [[TMP10:%.*]] = load i32, ptr [[CALL_ARG9]], align 4, !dbg [[DBG20]]
 // PPC64-NEXT:    [[TMP11:%.*]] = load i32, ptr [[CALL_ARG10]], align 4, !dbg [[DBG21]]
@@ -187,7 +187,7 @@ void gen(int (*p)[N], int init1, int ub1, int step1, int init2, int ub2, int ste
 // PPC64-NEXT:    ret i32 0, !dbg [[DBG27:![0-9]+]]
 //
 // AARCH64-LABEL: define {{[^@]+}}@main
-// AARCH64-SAME: () #[[ATTR0]] !dbg [[DBG14:![0-9]+]] {
+// AARCH64-SAME: () #[[ATTR0]] !dbg [[DBG10:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[M:%.*]] = alloca [4 x [4 x i32]], align 4
 // AARCH64-NEXT:    [[CALL_ARG:%.*]] = alloca ptr, align 8
@@ -208,43 +208,43 @@ void gen(int (*p)[N], int init1, int ub1, int step1, int init2, int ub2, int ste
 // AARCH64-NEXT:    [[CALL_ARG14:%.*]] = alloca i32, align 4
 // AARCH64-NEXT:    [[I_CALL_ARG15:%.*]] = alloca i32, align 4
 // AARCH64-NEXT:    [[J_CALL_ARG16:%.*]] = alloca i32, align 4
-// AARCH64-NEXT:    [[ARRAYDECAY:%.*]] = getelementptr inbounds [4 x [4 x i32]], ptr [[M]], i64 0, i64 0, !dbg [[DBG15:![0-9]+]]
-// AARCH64-NEXT:    store ptr [[ARRAYDECAY]], ptr [[CALL_ARG]], align 8, !dbg [[DBG15]]
-// AARCH64-NEXT:    store i32 0, ptr [[CALL_ARG1]], align 4, !dbg [[DBG16:![0-9]+]]
-// AARCH64-NEXT:    store i32 3, ptr [[CALL_ARG2]], align 4, !dbg [[DBG17:![0-9]+]]
-// AARCH64-NEXT:    store i32 1, ptr [[CALL_ARG3]], align 4, !dbg [[DBG18:![0-9]+]]
-// AARCH64-NEXT:    store i32 0, ptr [[CALL_ARG4]], align 4, !dbg [[DBG19:![0-9]+]]
-// AARCH64-NEXT:    store i32 3, ptr [[CALL_ARG5]], align 4, !dbg [[DBG20:![0-9]+]]
-// AARCH64-NEXT:    store i32 1, ptr [[CALL_ARG6]], align 4, !dbg [[DBG21:![0-9]+]]
-// AARCH64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.PRIVATE"(ptr [[I_CALL_ARG]], i32 undef), "QUAL.OSS.PRIVATE"(ptr [[J_CALL_ARG]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG1]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG2]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG3]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG4]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG5]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG6]], i32 undef), "QUAL.OSS.MULTIDEP.RANGE.OUT"(ptr [[I_CALL_ARG]], ptr [[J_CALL_ARG]], ptr @compute_dep, ptr [[I_CALL_ARG]], ptr [[CALL_ARG1]], ptr [[CALL_ARG2]], ptr [[CALL_ARG3]], ptr [[J_CALL_ARG]], ptr [[CALL_ARG4]], ptr [[CALL_ARG5]], ptr [[CALL_ARG6]], ptr [[CALL_ARG]], [53 x i8] c"{ p[i][j], i = init1:ub1:step1, j =init2:ub2:step2 }\00", ptr @compute_dep.1, ptr [[CALL_ARG]], ptr [[I_CALL_ARG]], ptr [[J_CALL_ARG]], ptr [[CALL_ARG1]], ptr [[CALL_ARG4]], ptr [[CALL_ARG2]], ptr [[CALL_ARG5]], ptr [[CALL_ARG3]], ptr [[CALL_ARG6]]), "QUAL.OSS.DECL.SOURCE"([8 x i8] c"gen:9:9\00") ], !dbg [[DBG22:![0-9]+]]
-// AARCH64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[CALL_ARG]], align 8, !dbg [[DBG15]]
-// AARCH64-NEXT:    [[TMP2:%.*]] = load i32, ptr [[CALL_ARG1]], align 4, !dbg [[DBG16]]
-// AARCH64-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CALL_ARG2]], align 4, !dbg [[DBG17]]
-// AARCH64-NEXT:    [[TMP4:%.*]] = load i32, ptr [[CALL_ARG3]], align 4, !dbg [[DBG18]]
-// AARCH64-NEXT:    [[TMP5:%.*]] = load i32, ptr [[CALL_ARG4]], align 4, !dbg [[DBG19]]
-// AARCH64-NEXT:    [[TMP6:%.*]] = load i32, ptr [[CALL_ARG5]], align 4, !dbg [[DBG20]]
-// AARCH64-NEXT:    [[TMP7:%.*]] = load i32, ptr [[CALL_ARG6]], align 4, !dbg [[DBG21]]
-// AARCH64-NEXT:    call void @gen(ptr noundef [[TMP1]], i32 noundef [[TMP2]], i32 noundef [[TMP3]], i32 noundef [[TMP4]], i32 noundef [[TMP5]], i32 noundef [[TMP6]], i32 noundef [[TMP7]]), !dbg [[DBG22]]
-// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG22]]
-// AARCH64-NEXT:    [[ARRAYDECAY8:%.*]] = getelementptr inbounds [4 x [4 x i32]], ptr [[M]], i64 0, i64 0, !dbg [[DBG23:![0-9]+]]
-// AARCH64-NEXT:    store ptr [[ARRAYDECAY8]], ptr [[CALL_ARG7]], align 8, !dbg [[DBG23]]
-// AARCH64-NEXT:    store i32 0, ptr [[CALL_ARG9]], align 4, !dbg [[DBG24:![0-9]+]]
-// AARCH64-NEXT:    store i32 3, ptr [[CALL_ARG10]], align 4, !dbg [[DBG25:![0-9]+]]
-// AARCH64-NEXT:    store i32 1, ptr [[CALL_ARG11]], align 4, !dbg [[DBG26:![0-9]+]]
-// AARCH64-NEXT:    store i32 0, ptr [[CALL_ARG12]], align 4, !dbg [[DBG27:![0-9]+]]
-// AARCH64-NEXT:    store i32 3, ptr [[CALL_ARG13]], align 4, !dbg [[DBG28:![0-9]+]]
-// AARCH64-NEXT:    store i32 1, ptr [[CALL_ARG14]], align 4, !dbg [[DBG29:![0-9]+]]
-// AARCH64-NEXT:    [[TMP8:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.PRIVATE"(ptr [[I_CALL_ARG15]], i32 undef), "QUAL.OSS.PRIVATE"(ptr [[J_CALL_ARG16]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG7]], ptr undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG9]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG10]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG11]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG12]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG13]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG14]], i32 undef), "QUAL.OSS.MULTIDEP.RANGE.OUT"(ptr [[I_CALL_ARG15]], ptr [[J_CALL_ARG16]], ptr @compute_dep.2, ptr [[I_CALL_ARG15]], ptr [[CALL_ARG9]], ptr [[CALL_ARG10]], ptr [[CALL_ARG11]], ptr [[J_CALL_ARG16]], ptr [[CALL_ARG12]], ptr [[CALL_ARG13]], ptr [[CALL_ARG14]], ptr [[CALL_ARG7]], [53 x i8] c"{ p[i][j], i = init1:ub1:step1, j =init2:ub2:step2 }\00", ptr @compute_dep.3, ptr [[CALL_ARG7]], ptr [[I_CALL_ARG15]], ptr [[J_CALL_ARG16]], ptr [[CALL_ARG9]], ptr [[CALL_ARG12]], ptr [[CALL_ARG10]], ptr [[CALL_ARG13]], ptr [[CALL_ARG11]], ptr [[CALL_ARG14]]), "QUAL.OSS.DECL.SOURCE"([8 x i8] c"gen:9:9\00") ], !dbg [[DBG30:![0-9]+]]
-// AARCH64-NEXT:    [[TMP9:%.*]] = load ptr, ptr [[CALL_ARG7]], align 8, !dbg [[DBG23]]
-// AARCH64-NEXT:    [[TMP10:%.*]] = load i32, ptr [[CALL_ARG9]], align 4, !dbg [[DBG24]]
-// AARCH64-NEXT:    [[TMP11:%.*]] = load i32, ptr [[CALL_ARG10]], align 4, !dbg [[DBG25]]
-// AARCH64-NEXT:    [[TMP12:%.*]] = load i32, ptr [[CALL_ARG11]], align 4, !dbg [[DBG26]]
-// AARCH64-NEXT:    [[TMP13:%.*]] = load i32, ptr [[CALL_ARG12]], align 4, !dbg [[DBG27]]
-// AARCH64-NEXT:    [[TMP14:%.*]] = load i32, ptr [[CALL_ARG13]], align 4, !dbg [[DBG28]]
-// AARCH64-NEXT:    [[TMP15:%.*]] = load i32, ptr [[CALL_ARG14]], align 4, !dbg [[DBG29]]
-// AARCH64-NEXT:    call void @gen(ptr noundef [[TMP9]], i32 noundef [[TMP10]], i32 noundef [[TMP11]], i32 noundef [[TMP12]], i32 noundef [[TMP13]], i32 noundef [[TMP14]], i32 noundef [[TMP15]]), !dbg [[DBG30]]
-// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP8]]), !dbg [[DBG30]]
-// AARCH64-NEXT:    ret i32 0, !dbg [[DBG31:![0-9]+]]
+// AARCH64-NEXT:    [[ARRAYDECAY:%.*]] = getelementptr inbounds [4 x [4 x i32]], ptr [[M]], i64 0, i64 0, !dbg [[DBG11:![0-9]+]]
+// AARCH64-NEXT:    store ptr [[ARRAYDECAY]], ptr [[CALL_ARG]], align 8, !dbg [[DBG11]]
+// AARCH64-NEXT:    store i32 0, ptr [[CALL_ARG1]], align 4, !dbg [[DBG12:![0-9]+]]
+// AARCH64-NEXT:    store i32 3, ptr [[CALL_ARG2]], align 4, !dbg [[DBG13:![0-9]+]]
+// AARCH64-NEXT:    store i32 1, ptr [[CALL_ARG3]], align 4, !dbg [[DBG14:![0-9]+]]
+// AARCH64-NEXT:    store i32 0, ptr [[CALL_ARG4]], align 4, !dbg [[DBG15:![0-9]+]]
+// AARCH64-NEXT:    store i32 3, ptr [[CALL_ARG5]], align 4, !dbg [[DBG16:![0-9]+]]
+// AARCH64-NEXT:    store i32 1, ptr [[CALL_ARG6]], align 4, !dbg [[DBG17:![0-9]+]]
+// AARCH64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.PRIVATE"(ptr [[I_CALL_ARG]], i32 undef), "QUAL.OSS.PRIVATE"(ptr [[J_CALL_ARG]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG1]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG2]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG3]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG4]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG5]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG6]], i32 undef), "QUAL.OSS.DEVICE.DEVFUNC"([4 x i8] c"gen\00"), "QUAL.OSS.MULTIDEP.RANGE.OUT"(ptr [[I_CALL_ARG]], ptr [[J_CALL_ARG]], ptr @compute_dep, ptr [[I_CALL_ARG]], ptr [[CALL_ARG1]], ptr [[CALL_ARG2]], ptr [[CALL_ARG3]], ptr [[J_CALL_ARG]], ptr [[CALL_ARG4]], ptr [[CALL_ARG5]], ptr [[CALL_ARG6]], ptr [[CALL_ARG]], [53 x i8] c"{ p[i][j], i = init1:ub1:step1, j =init2:ub2:step2 }\00", ptr @compute_dep.1, ptr [[CALL_ARG]], ptr [[I_CALL_ARG]], ptr [[J_CALL_ARG]], ptr [[CALL_ARG1]], ptr [[CALL_ARG4]], ptr [[CALL_ARG2]], ptr [[CALL_ARG5]], ptr [[CALL_ARG3]], ptr [[CALL_ARG6]]), "QUAL.OSS.DECL.SOURCE"([30 x i8] c"task_function_multideps.c:9:9\00") ], !dbg [[DBG18:![0-9]+]]
+// AARCH64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[CALL_ARG]], align 8, !dbg [[DBG11]]
+// AARCH64-NEXT:    [[TMP2:%.*]] = load i32, ptr [[CALL_ARG1]], align 4, !dbg [[DBG12]]
+// AARCH64-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CALL_ARG2]], align 4, !dbg [[DBG13]]
+// AARCH64-NEXT:    [[TMP4:%.*]] = load i32, ptr [[CALL_ARG3]], align 4, !dbg [[DBG14]]
+// AARCH64-NEXT:    [[TMP5:%.*]] = load i32, ptr [[CALL_ARG4]], align 4, !dbg [[DBG15]]
+// AARCH64-NEXT:    [[TMP6:%.*]] = load i32, ptr [[CALL_ARG5]], align 4, !dbg [[DBG16]]
+// AARCH64-NEXT:    [[TMP7:%.*]] = load i32, ptr [[CALL_ARG6]], align 4, !dbg [[DBG17]]
+// AARCH64-NEXT:    call void @gen(ptr noundef [[TMP1]], i32 noundef [[TMP2]], i32 noundef [[TMP3]], i32 noundef [[TMP4]], i32 noundef [[TMP5]], i32 noundef [[TMP6]], i32 noundef [[TMP7]]), !dbg [[DBG18]]
+// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG18]]
+// AARCH64-NEXT:    [[ARRAYDECAY8:%.*]] = getelementptr inbounds [4 x [4 x i32]], ptr [[M]], i64 0, i64 0, !dbg [[DBG19:![0-9]+]]
+// AARCH64-NEXT:    store ptr [[ARRAYDECAY8]], ptr [[CALL_ARG7]], align 8, !dbg [[DBG19]]
+// AARCH64-NEXT:    store i32 0, ptr [[CALL_ARG9]], align 4, !dbg [[DBG20:![0-9]+]]
+// AARCH64-NEXT:    store i32 3, ptr [[CALL_ARG10]], align 4, !dbg [[DBG21:![0-9]+]]
+// AARCH64-NEXT:    store i32 1, ptr [[CALL_ARG11]], align 4, !dbg [[DBG22:![0-9]+]]
+// AARCH64-NEXT:    store i32 0, ptr [[CALL_ARG12]], align 4, !dbg [[DBG23:![0-9]+]]
+// AARCH64-NEXT:    store i32 3, ptr [[CALL_ARG13]], align 4, !dbg [[DBG24:![0-9]+]]
+// AARCH64-NEXT:    store i32 1, ptr [[CALL_ARG14]], align 4, !dbg [[DBG25:![0-9]+]]
+// AARCH64-NEXT:    [[TMP8:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.PRIVATE"(ptr [[I_CALL_ARG15]], i32 undef), "QUAL.OSS.PRIVATE"(ptr [[J_CALL_ARG16]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG7]], ptr undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG9]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG10]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG11]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG12]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG13]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG14]], i32 undef), "QUAL.OSS.DEVICE.DEVFUNC"([4 x i8] c"gen\00"), "QUAL.OSS.MULTIDEP.RANGE.OUT"(ptr [[I_CALL_ARG15]], ptr [[J_CALL_ARG16]], ptr @compute_dep.2, ptr [[I_CALL_ARG15]], ptr [[CALL_ARG9]], ptr [[CALL_ARG10]], ptr [[CALL_ARG11]], ptr [[J_CALL_ARG16]], ptr [[CALL_ARG12]], ptr [[CALL_ARG13]], ptr [[CALL_ARG14]], ptr [[CALL_ARG7]], [53 x i8] c"{ p[i][j], i = init1:ub1:step1, j =init2:ub2:step2 }\00", ptr @compute_dep.3, ptr [[CALL_ARG7]], ptr [[I_CALL_ARG15]], ptr [[J_CALL_ARG16]], ptr [[CALL_ARG9]], ptr [[CALL_ARG12]], ptr [[CALL_ARG10]], ptr [[CALL_ARG13]], ptr [[CALL_ARG11]], ptr [[CALL_ARG14]]), "QUAL.OSS.DECL.SOURCE"([30 x i8] c"task_function_multideps.c:9:9\00") ], !dbg [[DBG26:![0-9]+]]
+// AARCH64-NEXT:    [[TMP9:%.*]] = load ptr, ptr [[CALL_ARG7]], align 8, !dbg [[DBG19]]
+// AARCH64-NEXT:    [[TMP10:%.*]] = load i32, ptr [[CALL_ARG9]], align 4, !dbg [[DBG20]]
+// AARCH64-NEXT:    [[TMP11:%.*]] = load i32, ptr [[CALL_ARG10]], align 4, !dbg [[DBG21]]
+// AARCH64-NEXT:    [[TMP12:%.*]] = load i32, ptr [[CALL_ARG11]], align 4, !dbg [[DBG22]]
+// AARCH64-NEXT:    [[TMP13:%.*]] = load i32, ptr [[CALL_ARG12]], align 4, !dbg [[DBG23]]
+// AARCH64-NEXT:    [[TMP14:%.*]] = load i32, ptr [[CALL_ARG13]], align 4, !dbg [[DBG24]]
+// AARCH64-NEXT:    [[TMP15:%.*]] = load i32, ptr [[CALL_ARG14]], align 4, !dbg [[DBG25]]
+// AARCH64-NEXT:    call void @gen(ptr noundef [[TMP9]], i32 noundef [[TMP10]], i32 noundef [[TMP11]], i32 noundef [[TMP12]], i32 noundef [[TMP13]], i32 noundef [[TMP14]], i32 noundef [[TMP15]]), !dbg [[DBG26]]
+// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP8]]), !dbg [[DBG26]]
+// AARCH64-NEXT:    ret i32 0, !dbg [[DBG27:![0-9]+]]
 //
 int main() {
     int M[N][N];

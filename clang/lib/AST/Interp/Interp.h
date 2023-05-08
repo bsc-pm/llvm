@@ -16,6 +16,7 @@
 #include "Boolean.h"
 #include "Floating.h"
 #include "Function.h"
+#include "FunctionPointer.h"
 #include "InterpFrame.h"
 #include "InterpStack.h"
 #include "InterpState.h"
@@ -818,6 +819,22 @@ bool InitGlobal(InterpState &S, CodePtr OpPC, uint32_t I) {
   return true;
 }
 
+/// 1) Converts the value on top of the stack to an APValue
+/// 2) Sets that APValue on \Temp
+/// 3) Initialized global with index \I with that
+template <PrimType Name, class T = typename PrimConv<Name>::T>
+bool InitGlobalTemp(InterpState &S, CodePtr OpPC, uint32_t I,
+                    const LifetimeExtendedTemporaryDecl *Temp) {
+  assert(Temp);
+  const T Value = S.Stk.peek<T>();
+  APValue APV = Value.toAPValue();
+  APValue *Cached = Temp->getOrCreateValue(true);
+  *Cached = APV;
+
+  S.P.getGlobal(I)->deref<T>() = S.Stk.pop<T>();
+  return true;
+}
+
 template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool InitThisField(InterpState &S, CodePtr OpPC, uint32_t I) {
   if (S.checkingPotentialConstantExpression())
@@ -1439,21 +1456,59 @@ inline bool ExpandPtr(InterpState &S, CodePtr OpPC) {
   return true;
 }
 
-inline bool Call(InterpState &S, CodePtr &PC, const Function *Func) {
-  auto NewFrame = std::make_unique<InterpFrame>(S, Func, PC);
-  Pointer ThisPtr;
+// 1) Pops an integral value from the stack
+// 2) Peeks a pointer
+// 3) Pushes a new pointer that's a narrowed array
+//   element of the peeked pointer with the value
+//   from 1) added as offset.
+//
+// This leaves the original pointer on the stack and pushes a new one
+// with the offset applied and narrowed.
+template <PrimType Name, class T = typename PrimConv<Name>::T>
+inline bool ArrayElemPtr(InterpState &S, CodePtr OpPC) {
+  const T &Offset = S.Stk.pop<T>();
+  const Pointer &Ptr = S.Stk.peek<Pointer>();
+
+  if (!OffsetHelper<T, ArithOp::Add>(S, OpPC, Offset, Ptr))
+    return false;
+
+  return NarrowPtr(S, OpPC);
+}
+
+template <PrimType Name, class T = typename PrimConv<Name>::T>
+inline bool ArrayElemPtrPop(InterpState &S, CodePtr OpPC) {
+  const T &Offset = S.Stk.pop<T>();
+  const Pointer &Ptr = S.Stk.pop<Pointer>();
+
+  if (!OffsetHelper<T, ArithOp::Add>(S, OpPC, Offset, Ptr))
+    return false;
+
+  return NarrowPtr(S, OpPC);
+}
+
+inline bool CheckGlobalCtor(InterpState &S, CodePtr OpPC) {
+  const Pointer &Obj = S.Stk.peek<Pointer>();
+  return CheckCtorCall(S, OpPC, Obj);
+}
+
+inline bool Call(InterpState &S, CodePtr OpPC, const Function *Func) {
   if (Func->hasThisPointer()) {
-    ThisPtr = NewFrame->getThis();
-    if (!CheckInvoke(S, PC, ThisPtr))
+    size_t ThisOffset =
+        Func->getArgSize() + (Func->hasRVO() ? primSize(PT_Ptr) : 0);
+
+    const Pointer &ThisPtr = S.Stk.peek<Pointer>(ThisOffset);
+
+    if (!CheckInvoke(S, OpPC, ThisPtr))
       return false;
 
     if (S.checkingPotentialConstantExpression())
       return false;
   }
 
-  if (!CheckCallable(S, PC, Func))
+  if (!CheckCallable(S, OpPC, Func))
     return false;
 
+  auto NewFrame = std::make_unique<InterpFrame>(S, Func, OpPC);
   InterpFrame *FrameBefore = S.Current;
   S.Current = NewFrame.get();
 
@@ -1464,11 +1519,6 @@ inline bool Call(InterpState &S, CodePtr &PC, const Function *Func) {
   if (Interpret(S, CallResult)) {
     NewFrame.release(); // Frame was delete'd already.
     assert(S.Current == FrameBefore);
-
-    // For constructors, check that all fields have been initialized.
-    if (Func->isConstructor() && !CheckCtorCall(S, PC, ThisPtr))
-      return false;
-
     return true;
   }
 
@@ -1490,6 +1540,22 @@ inline bool CallBI(InterpState &S, CodePtr &PC, const Function *Func) {
   }
   S.Current = FrameBefore;
   return false;
+}
+
+inline bool CallPtr(InterpState &S, CodePtr OpPC) {
+  const FunctionPointer &FuncPtr = S.Stk.pop<FunctionPointer>();
+
+  const Function *F = FuncPtr.getFunction();
+  if (!F || !F->isConstexpr())
+    return false;
+
+  return Call(S, OpPC, F);
+}
+
+inline bool GetFnPtr(InterpState &S, CodePtr &PC, const Function *Func) {
+  assert(Func);
+  S.Stk.push<FunctionPointer>(Func);
+  return true;
 }
 
 //===----------------------------------------------------------------------===//

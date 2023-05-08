@@ -11,6 +11,7 @@ tablegen(LLVM NVPTXGenSubtargetInfo.inc -gen-subtarget)
 add_public_tablegen_target(NVPTXCommonTableGen)
 
 set(NVPTXCodeGen_sources
+  NVPTXAliasAnalysis.cpp
   NVPTXAllocaHoisting.cpp
   NVPTXAtomicLower.cpp
   NVPTXAsmPrinter.cpp
@@ -60,7 +61,7 @@ add_llvm_target(NVPTXCodeGen
 
   ADD_TO_COMPONENT
   NVPTX
-)
+  )
 
 add_subdirectory(MCTargetDesc)
 add_subdirectory(TargetInfo)

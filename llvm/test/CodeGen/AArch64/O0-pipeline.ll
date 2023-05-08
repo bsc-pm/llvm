@@ -26,9 +26,12 @@
 ; CHECK-NEXT:       Expand vector predication intrinsics
 ; CHECK-NEXT:       Scalarize Masked Memory Intrinsics
 ; CHECK-NEXT:       Expand reduction intrinsics
+; CHECK-NEXT:     AArch64 Globals Tagging
+; CHECK-NEXT:     FunctionPass Manager
 ; CHECK-NEXT:       AArch64 Stack Tagging
 ; CHECK-NEXT:       SME ABI Pass
 ; CHECK-NEXT:       Exception handling preparation
+; CHECK-NEXT:       Prepare callbr
 ; CHECK-NEXT:       Safe Stack instrumentation pass
 ; CHECK-NEXT:       Insert stack protectors
 ; CHECK-NEXT:       Module Verifier
@@ -36,11 +39,12 @@
 ; CHECK-NEXT:       IRTranslator
 ; CHECK-NEXT:       Analysis for ComputingKnownBits
 ; CHECK-NEXT:       AArch64O0PreLegalizerCombiner
+; CHECK-NEXT:       Localizer
 ; CHECK-NEXT:       Analysis containing CSE Info
+; CHECK-NEXT:       Analysis for ComputingKnownBits
 ; CHECK-NEXT:       Legalizer
 ; CHECK-NEXT:       AArch64PostLegalizerLowering
 ; CHECK-NEXT:       RegBankSelect
-; CHECK-NEXT:       Localizer
 ; CHECK-NEXT:       Analysis for ComputingKnownBits
 ; CHECK-NEXT:       InstructionSelect
 ; CHECK-NEXT:       ResetMachineFunction

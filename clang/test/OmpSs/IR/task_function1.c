@@ -67,7 +67,7 @@ void bar() {
 // LIN64-NEXT:    [[TMP7:%.*]] = load i32, ptr [[CALL_ARG]], align 4, !dbg [[DBG17:![0-9]+]]
 // LIN64-NEXT:    [[TMP8:%.*]] = zext i32 [[TMP7]] to i64, !dbg [[DBG18:![0-9]+]]
 // LIN64-NEXT:    store ptr [[VLA]], ptr [[CALL_ARG1]], align 8, !dbg [[DBG19:![0-9]+]]
-// LIN64-NEXT:    [[TMP9:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG1]], ptr undef), "QUAL.OSS.DEP.IN"(ptr [[CALL_ARG1]], [3 x i8] c"*a\00", ptr @compute_dep, ptr [[CALL_ARG1]], i64 [[TMP8]]), "QUAL.OSS.CAPTURED"(i64 [[TMP8]]), "QUAL.OSS.DECL.SOURCE"([8 x i8] c"foo:7:9\00") ], !dbg [[DBG18]]
+// LIN64-NEXT:    [[TMP9:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG1]], ptr undef), "QUAL.OSS.DEVICE.DEVFUNC"([4 x i8] c"foo\00"), "QUAL.OSS.DEP.IN"(ptr [[CALL_ARG1]], [3 x i8] c"*a\00", ptr @compute_dep, ptr [[CALL_ARG1]], i64 [[TMP8]]), "QUAL.OSS.CAPTURED"(i64 [[TMP8]]), "QUAL.OSS.DECL.SOURCE"([21 x i8] c"task_function1.c:7:9\00") ], !dbg [[DBG18]]
 // LIN64-NEXT:    [[TMP10:%.*]] = load i32, ptr [[CALL_ARG]], align 4, !dbg [[DBG16]]
 // LIN64-NEXT:    [[TMP11:%.*]] = load ptr, ptr [[CALL_ARG1]], align 8, !dbg [[DBG19]]
 // LIN64-NEXT:    call void @foo(i32 noundef [[TMP10]], ptr noundef [[TMP11]]), !dbg [[DBG18]]
@@ -85,7 +85,7 @@ void bar() {
 // LIN64-NEXT:    [[DOTADDR:%.*]] = alloca i64, align 8
 // LIN64-NEXT:    store ptr [[A]], ptr [[A_ADDR]], align 8
 // LIN64-NEXT:    store i64 [[TMP0]], ptr [[DOTADDR]], align 8
-// LIN64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[A]], align 8, !dbg [[DBG23:![0-9]+]]
+// LIN64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[A]], align 8, !dbg [[DBG22:![0-9]+]]
 // LIN64-NEXT:    [[TMP2:%.*]] = mul i64 [[TMP0]], 4
 // LIN64-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP0]], 4
 // LIN64-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
@@ -96,22 +96,22 @@ void bar() {
 // LIN64-NEXT:    store i64 0, ptr [[TMP6]], align 8
 // LIN64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
 // LIN64-NEXT:    store i64 [[TMP3]], ptr [[TMP7]], align 8
-// LIN64-NEXT:    [[TMP8:%.*]] = load [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], align 8, !dbg [[DBG23]]
-// LIN64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T]] [[TMP8]], !dbg [[DBG23]]
+// LIN64-NEXT:    [[TMP8:%.*]] = load [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], align 8, !dbg [[DBG22]]
+// LIN64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T]] [[TMP8]], !dbg [[DBG22]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@foo1
-// LIN64-SAME: (i32 noundef [[SIZE:%.*]], ptr noundef [[P:%.*]]) #[[ATTR0]] !dbg [[DBG25:![0-9]+]] {
+// LIN64-SAME: (i32 noundef [[SIZE:%.*]], ptr noundef [[P:%.*]]) #[[ATTR0]] !dbg [[DBG24:![0-9]+]] {
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    [[SIZE_ADDR:%.*]] = alloca i32, align 4
 // LIN64-NEXT:    [[P_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    store i32 [[SIZE]], ptr [[SIZE_ADDR]], align 4
 // LIN64-NEXT:    store ptr [[P]], ptr [[P_ADDR]], align 8
-// LIN64-NEXT:    ret void, !dbg [[DBG26:![0-9]+]]
+// LIN64-NEXT:    ret void, !dbg [[DBG25:![0-9]+]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@bar
-// LIN64-SAME: () #[[ATTR0]] !dbg [[DBG27:![0-9]+]] {
+// LIN64-SAME: () #[[ATTR0]] !dbg [[DBG26:![0-9]+]] {
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    [[N:%.*]] = alloca i32, align 4
 // LIN64-NEXT:    [[V:%.*]] = alloca ptr, align 8
@@ -119,41 +119,41 @@ void bar() {
 // LIN64-NEXT:    [[CALL_ARG1:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    [[CALL_ARG2:%.*]] = alloca i32, align 4
 // LIN64-NEXT:    [[CALL_ARG4:%.*]] = alloca ptr, align 8
-// LIN64-NEXT:    store i32 10, ptr [[N]], align 4, !dbg [[DBG28:![0-9]+]]
-// LIN64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG29:![0-9]+]]
-// LIN64-NEXT:    [[DIV:%.*]] = sdiv i32 [[TMP0]], 55, !dbg [[DBG30:![0-9]+]]
-// LIN64-NEXT:    store i32 [[DIV]], ptr [[CALL_ARG]], align 4, !dbg [[DBG30]]
-// LIN64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[V]], align 8, !dbg [[DBG31:![0-9]+]]
-// LIN64-NEXT:    store ptr [[TMP1]], ptr [[CALL_ARG1]], align 8, !dbg [[DBG31]]
-// LIN64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG1]], ptr undef), "QUAL.OSS.DEP.OUT"(ptr [[CALL_ARG1]], [11 x i8] c"[size/77]p\00", ptr @compute_dep.1, ptr [[CALL_ARG1]], ptr [[CALL_ARG]]), "QUAL.OSS.DECL.SOURCE"([10 x i8] c"foo1:20:9\00") ], !dbg [[DBG32:![0-9]+]]
-// LIN64-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CALL_ARG]], align 4, !dbg [[DBG30]]
-// LIN64-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[CALL_ARG1]], align 8, !dbg [[DBG31]]
-// LIN64-NEXT:    call void @foo1(i32 noundef [[TMP3]], ptr noundef [[TMP4]]), !dbg [[DBG32]]
-// LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP2]]), !dbg [[DBG32]]
-// LIN64-NEXT:    [[TMP5:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG33:![0-9]+]]
-// LIN64-NEXT:    [[DIV3:%.*]] = sdiv i32 [[TMP5]], 99, !dbg [[DBG34:![0-9]+]]
-// LIN64-NEXT:    store i32 [[DIV3]], ptr [[CALL_ARG2]], align 4, !dbg [[DBG34]]
-// LIN64-NEXT:    [[TMP6:%.*]] = load ptr, ptr [[V]], align 8, !dbg [[DBG35:![0-9]+]]
-// LIN64-NEXT:    store ptr [[TMP6]], ptr [[CALL_ARG4]], align 8, !dbg [[DBG35]]
-// LIN64-NEXT:    [[TMP7:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG2]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG4]], ptr undef), "QUAL.OSS.DEP.OUT"(ptr [[CALL_ARG4]], [11 x i8] c"[size/77]p\00", ptr @compute_dep.2, ptr [[CALL_ARG4]], ptr [[CALL_ARG2]]), "QUAL.OSS.DECL.SOURCE"([10 x i8] c"foo1:20:9\00") ], !dbg [[DBG36:![0-9]+]]
-// LIN64-NEXT:    [[TMP8:%.*]] = load i32, ptr [[CALL_ARG2]], align 4, !dbg [[DBG34]]
-// LIN64-NEXT:    [[TMP9:%.*]] = load ptr, ptr [[CALL_ARG4]], align 8, !dbg [[DBG35]]
-// LIN64-NEXT:    call void @foo1(i32 noundef [[TMP8]], ptr noundef [[TMP9]]), !dbg [[DBG36]]
-// LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP7]]), !dbg [[DBG36]]
-// LIN64-NEXT:    ret void, !dbg [[DBG37:![0-9]+]]
+// LIN64-NEXT:    store i32 10, ptr [[N]], align 4, !dbg [[DBG27:![0-9]+]]
+// LIN64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG28:![0-9]+]]
+// LIN64-NEXT:    [[DIV:%.*]] = sdiv i32 [[TMP0]], 55, !dbg [[DBG29:![0-9]+]]
+// LIN64-NEXT:    store i32 [[DIV]], ptr [[CALL_ARG]], align 4, !dbg [[DBG29]]
+// LIN64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[V]], align 8, !dbg [[DBG30:![0-9]+]]
+// LIN64-NEXT:    store ptr [[TMP1]], ptr [[CALL_ARG1]], align 8, !dbg [[DBG30]]
+// LIN64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG1]], ptr undef), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo1\00"), "QUAL.OSS.DEP.OUT"(ptr [[CALL_ARG1]], [11 x i8] c"[size/77]p\00", ptr @compute_dep.1, ptr [[CALL_ARG1]], ptr [[CALL_ARG]]), "QUAL.OSS.DECL.SOURCE"([22 x i8] c"task_function1.c:20:9\00") ], !dbg [[DBG31:![0-9]+]]
+// LIN64-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CALL_ARG]], align 4, !dbg [[DBG29]]
+// LIN64-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[CALL_ARG1]], align 8, !dbg [[DBG30]]
+// LIN64-NEXT:    call void @foo1(i32 noundef [[TMP3]], ptr noundef [[TMP4]]), !dbg [[DBG31]]
+// LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP2]]), !dbg [[DBG31]]
+// LIN64-NEXT:    [[TMP5:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG32:![0-9]+]]
+// LIN64-NEXT:    [[DIV3:%.*]] = sdiv i32 [[TMP5]], 99, !dbg [[DBG33:![0-9]+]]
+// LIN64-NEXT:    store i32 [[DIV3]], ptr [[CALL_ARG2]], align 4, !dbg [[DBG33]]
+// LIN64-NEXT:    [[TMP6:%.*]] = load ptr, ptr [[V]], align 8, !dbg [[DBG34:![0-9]+]]
+// LIN64-NEXT:    store ptr [[TMP6]], ptr [[CALL_ARG4]], align 8, !dbg [[DBG34]]
+// LIN64-NEXT:    [[TMP7:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG2]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG4]], ptr undef), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo1\00"), "QUAL.OSS.DEP.OUT"(ptr [[CALL_ARG4]], [11 x i8] c"[size/77]p\00", ptr @compute_dep.2, ptr [[CALL_ARG4]], ptr [[CALL_ARG2]]), "QUAL.OSS.DECL.SOURCE"([22 x i8] c"task_function1.c:20:9\00") ], !dbg [[DBG35:![0-9]+]]
+// LIN64-NEXT:    [[TMP8:%.*]] = load i32, ptr [[CALL_ARG2]], align 4, !dbg [[DBG33]]
+// LIN64-NEXT:    [[TMP9:%.*]] = load ptr, ptr [[CALL_ARG4]], align 8, !dbg [[DBG34]]
+// LIN64-NEXT:    call void @foo1(i32 noundef [[TMP8]], ptr noundef [[TMP9]]), !dbg [[DBG35]]
+// LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP7]]), !dbg [[DBG35]]
+// LIN64-NEXT:    ret void, !dbg [[DBG36:![0-9]+]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@compute_dep.1
-// LIN64-SAME: (ptr [[P:%.*]], ptr [[SIZE:%.*]]) #[[ATTR3]] !dbg [[DBG38:![0-9]+]] {
+// LIN64-SAME: (ptr [[P:%.*]], ptr [[SIZE:%.*]]) #[[ATTR3]] !dbg [[DBG37:![0-9]+]] {
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T_0:%.*]], align 8
 // LIN64-NEXT:    [[P_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    [[SIZE_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    store ptr [[P]], ptr [[P_ADDR]], align 8
 // LIN64-NEXT:    store ptr [[SIZE]], ptr [[SIZE_ADDR]], align 8
-// LIN64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[P]], align 8, !dbg [[DBG39:![0-9]+]]
-// LIN64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[SIZE]], align 4, !dbg [[DBG41:![0-9]+]]
-// LIN64-NEXT:    [[DIV:%.*]] = sdiv i32 [[TMP1]], 77, !dbg [[DBG42:![0-9]+]]
+// LIN64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[P]], align 8, !dbg [[DBG38:![0-9]+]]
+// LIN64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[SIZE]], align 4, !dbg [[DBG40:![0-9]+]]
+// LIN64-NEXT:    [[DIV:%.*]] = sdiv i32 [[TMP1]], 77, !dbg [[DBG41:![0-9]+]]
 // LIN64-NEXT:    [[TMP2:%.*]] = zext i32 [[DIV]] to i64
 // LIN64-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 4
 // LIN64-NEXT:    [[TMP4:%.*]] = mul i64 [[TMP2]], 4
@@ -165,21 +165,21 @@ void bar() {
 // LIN64-NEXT:    store i64 0, ptr [[TMP7]], align 8
 // LIN64-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 3
 // LIN64-NEXT:    store i64 [[TMP4]], ptr [[TMP8]], align 8
-// LIN64-NEXT:    [[TMP9:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], align 8, !dbg [[DBG43:![0-9]+]]
-// LIN64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_0]] [[TMP9]], !dbg [[DBG43]]
+// LIN64-NEXT:    [[TMP9:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], align 8, !dbg [[DBG42:![0-9]+]]
+// LIN64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_0]] [[TMP9]], !dbg [[DBG42]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@compute_dep.2
-// LIN64-SAME: (ptr [[P:%.*]], ptr [[SIZE:%.*]]) #[[ATTR3]] !dbg [[DBG44:![0-9]+]] {
+// LIN64-SAME: (ptr [[P:%.*]], ptr [[SIZE:%.*]]) #[[ATTR3]] !dbg [[DBG43:![0-9]+]] {
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T_1:%.*]], align 8
 // LIN64-NEXT:    [[P_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    [[SIZE_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    store ptr [[P]], ptr [[P_ADDR]], align 8
 // LIN64-NEXT:    store ptr [[SIZE]], ptr [[SIZE_ADDR]], align 8
-// LIN64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[P]], align 8, !dbg [[DBG45:![0-9]+]]
-// LIN64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[SIZE]], align 4, !dbg [[DBG47:![0-9]+]]
-// LIN64-NEXT:    [[DIV:%.*]] = sdiv i32 [[TMP1]], 77, !dbg [[DBG48:![0-9]+]]
+// LIN64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[P]], align 8, !dbg [[DBG44:![0-9]+]]
+// LIN64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[SIZE]], align 4, !dbg [[DBG46:![0-9]+]]
+// LIN64-NEXT:    [[DIV:%.*]] = sdiv i32 [[TMP1]], 77, !dbg [[DBG47:![0-9]+]]
 // LIN64-NEXT:    [[TMP2:%.*]] = zext i32 [[DIV]] to i64
 // LIN64-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 4
 // LIN64-NEXT:    [[TMP4:%.*]] = mul i64 [[TMP2]], 4
@@ -191,8 +191,8 @@ void bar() {
 // LIN64-NEXT:    store i64 0, ptr [[TMP7]], align 8
 // LIN64-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 3
 // LIN64-NEXT:    store i64 [[TMP4]], ptr [[TMP8]], align 8
-// LIN64-NEXT:    [[TMP9:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], align 8, !dbg [[DBG49:![0-9]+]]
-// LIN64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_1]] [[TMP9]], !dbg [[DBG49]]
+// LIN64-NEXT:    [[TMP9:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], align 8, !dbg [[DBG48:![0-9]+]]
+// LIN64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_1]] [[TMP9]], !dbg [[DBG48]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@foo
@@ -232,7 +232,7 @@ void bar() {
 // PPC64-NEXT:    [[TMP7:%.*]] = load i32, ptr [[CALL_ARG]], align 4, !dbg [[DBG17:![0-9]+]]
 // PPC64-NEXT:    [[TMP8:%.*]] = zext i32 [[TMP7]] to i64, !dbg [[DBG18:![0-9]+]]
 // PPC64-NEXT:    store ptr [[VLA]], ptr [[CALL_ARG1]], align 8, !dbg [[DBG19:![0-9]+]]
-// PPC64-NEXT:    [[TMP9:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG1]], ptr undef), "QUAL.OSS.DEP.IN"(ptr [[CALL_ARG1]], [3 x i8] c"*a\00", ptr @compute_dep, ptr [[CALL_ARG1]], i64 [[TMP8]]), "QUAL.OSS.CAPTURED"(i64 [[TMP8]]), "QUAL.OSS.DECL.SOURCE"([8 x i8] c"foo:7:9\00") ], !dbg [[DBG18]]
+// PPC64-NEXT:    [[TMP9:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG1]], ptr undef), "QUAL.OSS.DEVICE.DEVFUNC"([4 x i8] c"foo\00"), "QUAL.OSS.DEP.IN"(ptr [[CALL_ARG1]], [3 x i8] c"*a\00", ptr @compute_dep, ptr [[CALL_ARG1]], i64 [[TMP8]]), "QUAL.OSS.CAPTURED"(i64 [[TMP8]]), "QUAL.OSS.DECL.SOURCE"([21 x i8] c"task_function1.c:7:9\00") ], !dbg [[DBG18]]
 // PPC64-NEXT:    [[TMP10:%.*]] = load i32, ptr [[CALL_ARG]], align 4, !dbg [[DBG16]]
 // PPC64-NEXT:    [[TMP11:%.*]] = load ptr, ptr [[CALL_ARG1]], align 8, !dbg [[DBG19]]
 // PPC64-NEXT:    call void @foo(i32 noundef signext [[TMP10]], ptr noundef [[TMP11]]), !dbg [[DBG18]]
@@ -250,7 +250,7 @@ void bar() {
 // PPC64-NEXT:    [[DOTADDR:%.*]] = alloca i64, align 8
 // PPC64-NEXT:    store ptr [[A]], ptr [[A_ADDR]], align 8
 // PPC64-NEXT:    store i64 [[TMP0]], ptr [[DOTADDR]], align 8
-// PPC64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[A]], align 8, !dbg [[DBG23:![0-9]+]]
+// PPC64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[A]], align 8, !dbg [[DBG22:![0-9]+]]
 // PPC64-NEXT:    [[TMP2:%.*]] = mul i64 [[TMP0]], 4
 // PPC64-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP0]], 4
 // PPC64-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
@@ -261,22 +261,22 @@ void bar() {
 // PPC64-NEXT:    store i64 0, ptr [[TMP6]], align 8
 // PPC64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
 // PPC64-NEXT:    store i64 [[TMP3]], ptr [[TMP7]], align 8
-// PPC64-NEXT:    [[TMP8:%.*]] = load [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], align 8, !dbg [[DBG23]]
-// PPC64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T]] [[TMP8]], !dbg [[DBG23]]
+// PPC64-NEXT:    [[TMP8:%.*]] = load [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], align 8, !dbg [[DBG22]]
+// PPC64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T]] [[TMP8]], !dbg [[DBG22]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@foo1
-// PPC64-SAME: (i32 noundef signext [[SIZE:%.*]], ptr noundef [[P:%.*]]) #[[ATTR0]] !dbg [[DBG25:![0-9]+]] {
+// PPC64-SAME: (i32 noundef signext [[SIZE:%.*]], ptr noundef [[P:%.*]]) #[[ATTR0]] !dbg [[DBG24:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[SIZE_ADDR:%.*]] = alloca i32, align 4
 // PPC64-NEXT:    [[P_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store i32 [[SIZE]], ptr [[SIZE_ADDR]], align 4
 // PPC64-NEXT:    store ptr [[P]], ptr [[P_ADDR]], align 8
-// PPC64-NEXT:    ret void, !dbg [[DBG26:![0-9]+]]
+// PPC64-NEXT:    ret void, !dbg [[DBG25:![0-9]+]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@bar
-// PPC64-SAME: () #[[ATTR0]] !dbg [[DBG27:![0-9]+]] {
+// PPC64-SAME: () #[[ATTR0]] !dbg [[DBG26:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[N:%.*]] = alloca i32, align 4
 // PPC64-NEXT:    [[V:%.*]] = alloca ptr, align 8
@@ -284,41 +284,41 @@ void bar() {
 // PPC64-NEXT:    [[CALL_ARG1:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    [[CALL_ARG2:%.*]] = alloca i32, align 4
 // PPC64-NEXT:    [[CALL_ARG4:%.*]] = alloca ptr, align 8
-// PPC64-NEXT:    store i32 10, ptr [[N]], align 4, !dbg [[DBG28:![0-9]+]]
-// PPC64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG29:![0-9]+]]
-// PPC64-NEXT:    [[DIV:%.*]] = sdiv i32 [[TMP0]], 55, !dbg [[DBG30:![0-9]+]]
-// PPC64-NEXT:    store i32 [[DIV]], ptr [[CALL_ARG]], align 4, !dbg [[DBG30]]
-// PPC64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[V]], align 8, !dbg [[DBG31:![0-9]+]]
-// PPC64-NEXT:    store ptr [[TMP1]], ptr [[CALL_ARG1]], align 8, !dbg [[DBG31]]
-// PPC64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG1]], ptr undef), "QUAL.OSS.DEP.OUT"(ptr [[CALL_ARG1]], [11 x i8] c"[size/77]p\00", ptr @compute_dep.1, ptr [[CALL_ARG1]], ptr [[CALL_ARG]]), "QUAL.OSS.DECL.SOURCE"([10 x i8] c"foo1:20:9\00") ], !dbg [[DBG32:![0-9]+]]
-// PPC64-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CALL_ARG]], align 4, !dbg [[DBG30]]
-// PPC64-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[CALL_ARG1]], align 8, !dbg [[DBG31]]
-// PPC64-NEXT:    call void @foo1(i32 noundef signext [[TMP3]], ptr noundef [[TMP4]]), !dbg [[DBG32]]
-// PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP2]]), !dbg [[DBG32]]
-// PPC64-NEXT:    [[TMP5:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG33:![0-9]+]]
-// PPC64-NEXT:    [[DIV3:%.*]] = sdiv i32 [[TMP5]], 99, !dbg [[DBG34:![0-9]+]]
-// PPC64-NEXT:    store i32 [[DIV3]], ptr [[CALL_ARG2]], align 4, !dbg [[DBG34]]
-// PPC64-NEXT:    [[TMP6:%.*]] = load ptr, ptr [[V]], align 8, !dbg [[DBG35:![0-9]+]]
-// PPC64-NEXT:    store ptr [[TMP6]], ptr [[CALL_ARG4]], align 8, !dbg [[DBG35]]
-// PPC64-NEXT:    [[TMP7:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG2]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG4]], ptr undef), "QUAL.OSS.DEP.OUT"(ptr [[CALL_ARG4]], [11 x i8] c"[size/77]p\00", ptr @compute_dep.2, ptr [[CALL_ARG4]], ptr [[CALL_ARG2]]), "QUAL.OSS.DECL.SOURCE"([10 x i8] c"foo1:20:9\00") ], !dbg [[DBG36:![0-9]+]]
-// PPC64-NEXT:    [[TMP8:%.*]] = load i32, ptr [[CALL_ARG2]], align 4, !dbg [[DBG34]]
-// PPC64-NEXT:    [[TMP9:%.*]] = load ptr, ptr [[CALL_ARG4]], align 8, !dbg [[DBG35]]
-// PPC64-NEXT:    call void @foo1(i32 noundef signext [[TMP8]], ptr noundef [[TMP9]]), !dbg [[DBG36]]
-// PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP7]]), !dbg [[DBG36]]
-// PPC64-NEXT:    ret void, !dbg [[DBG37:![0-9]+]]
+// PPC64-NEXT:    store i32 10, ptr [[N]], align 4, !dbg [[DBG27:![0-9]+]]
+// PPC64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG28:![0-9]+]]
+// PPC64-NEXT:    [[DIV:%.*]] = sdiv i32 [[TMP0]], 55, !dbg [[DBG29:![0-9]+]]
+// PPC64-NEXT:    store i32 [[DIV]], ptr [[CALL_ARG]], align 4, !dbg [[DBG29]]
+// PPC64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[V]], align 8, !dbg [[DBG30:![0-9]+]]
+// PPC64-NEXT:    store ptr [[TMP1]], ptr [[CALL_ARG1]], align 8, !dbg [[DBG30]]
+// PPC64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG1]], ptr undef), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo1\00"), "QUAL.OSS.DEP.OUT"(ptr [[CALL_ARG1]], [11 x i8] c"[size/77]p\00", ptr @compute_dep.1, ptr [[CALL_ARG1]], ptr [[CALL_ARG]]), "QUAL.OSS.DECL.SOURCE"([22 x i8] c"task_function1.c:20:9\00") ], !dbg [[DBG31:![0-9]+]]
+// PPC64-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CALL_ARG]], align 4, !dbg [[DBG29]]
+// PPC64-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[CALL_ARG1]], align 8, !dbg [[DBG30]]
+// PPC64-NEXT:    call void @foo1(i32 noundef signext [[TMP3]], ptr noundef [[TMP4]]), !dbg [[DBG31]]
+// PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP2]]), !dbg [[DBG31]]
+// PPC64-NEXT:    [[TMP5:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG32:![0-9]+]]
+// PPC64-NEXT:    [[DIV3:%.*]] = sdiv i32 [[TMP5]], 99, !dbg [[DBG33:![0-9]+]]
+// PPC64-NEXT:    store i32 [[DIV3]], ptr [[CALL_ARG2]], align 4, !dbg [[DBG33]]
+// PPC64-NEXT:    [[TMP6:%.*]] = load ptr, ptr [[V]], align 8, !dbg [[DBG34:![0-9]+]]
+// PPC64-NEXT:    store ptr [[TMP6]], ptr [[CALL_ARG4]], align 8, !dbg [[DBG34]]
+// PPC64-NEXT:    [[TMP7:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG2]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG4]], ptr undef), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo1\00"), "QUAL.OSS.DEP.OUT"(ptr [[CALL_ARG4]], [11 x i8] c"[size/77]p\00", ptr @compute_dep.2, ptr [[CALL_ARG4]], ptr [[CALL_ARG2]]), "QUAL.OSS.DECL.SOURCE"([22 x i8] c"task_function1.c:20:9\00") ], !dbg [[DBG35:![0-9]+]]
+// PPC64-NEXT:    [[TMP8:%.*]] = load i32, ptr [[CALL_ARG2]], align 4, !dbg [[DBG33]]
+// PPC64-NEXT:    [[TMP9:%.*]] = load ptr, ptr [[CALL_ARG4]], align 8, !dbg [[DBG34]]
+// PPC64-NEXT:    call void @foo1(i32 noundef signext [[TMP8]], ptr noundef [[TMP9]]), !dbg [[DBG35]]
+// PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP7]]), !dbg [[DBG35]]
+// PPC64-NEXT:    ret void, !dbg [[DBG36:![0-9]+]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@compute_dep.1
-// PPC64-SAME: (ptr [[P:%.*]], ptr [[SIZE:%.*]]) !dbg [[DBG38:![0-9]+]] {
+// PPC64-SAME: (ptr [[P:%.*]], ptr [[SIZE:%.*]]) !dbg [[DBG37:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T_0:%.*]], align 8
 // PPC64-NEXT:    [[P_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    [[SIZE_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store ptr [[P]], ptr [[P_ADDR]], align 8
 // PPC64-NEXT:    store ptr [[SIZE]], ptr [[SIZE_ADDR]], align 8
-// PPC64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[P]], align 8, !dbg [[DBG39:![0-9]+]]
-// PPC64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[SIZE]], align 4, !dbg [[DBG41:![0-9]+]]
-// PPC64-NEXT:    [[DIV:%.*]] = sdiv i32 [[TMP1]], 77, !dbg [[DBG42:![0-9]+]]
+// PPC64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[P]], align 8, !dbg [[DBG38:![0-9]+]]
+// PPC64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[SIZE]], align 4, !dbg [[DBG40:![0-9]+]]
+// PPC64-NEXT:    [[DIV:%.*]] = sdiv i32 [[TMP1]], 77, !dbg [[DBG41:![0-9]+]]
 // PPC64-NEXT:    [[TMP2:%.*]] = zext i32 [[DIV]] to i64
 // PPC64-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 4
 // PPC64-NEXT:    [[TMP4:%.*]] = mul i64 [[TMP2]], 4
@@ -330,21 +330,21 @@ void bar() {
 // PPC64-NEXT:    store i64 0, ptr [[TMP7]], align 8
 // PPC64-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 3
 // PPC64-NEXT:    store i64 [[TMP4]], ptr [[TMP8]], align 8
-// PPC64-NEXT:    [[TMP9:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], align 8, !dbg [[DBG43:![0-9]+]]
-// PPC64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_0]] [[TMP9]], !dbg [[DBG43]]
+// PPC64-NEXT:    [[TMP9:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], align 8, !dbg [[DBG42:![0-9]+]]
+// PPC64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_0]] [[TMP9]], !dbg [[DBG42]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@compute_dep.2
-// PPC64-SAME: (ptr [[P:%.*]], ptr [[SIZE:%.*]]) !dbg [[DBG44:![0-9]+]] {
+// PPC64-SAME: (ptr [[P:%.*]], ptr [[SIZE:%.*]]) !dbg [[DBG43:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T_1:%.*]], align 8
 // PPC64-NEXT:    [[P_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    [[SIZE_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store ptr [[P]], ptr [[P_ADDR]], align 8
 // PPC64-NEXT:    store ptr [[SIZE]], ptr [[SIZE_ADDR]], align 8
-// PPC64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[P]], align 8, !dbg [[DBG45:![0-9]+]]
-// PPC64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[SIZE]], align 4, !dbg [[DBG47:![0-9]+]]
-// PPC64-NEXT:    [[DIV:%.*]] = sdiv i32 [[TMP1]], 77, !dbg [[DBG48:![0-9]+]]
+// PPC64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[P]], align 8, !dbg [[DBG44:![0-9]+]]
+// PPC64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[SIZE]], align 4, !dbg [[DBG46:![0-9]+]]
+// PPC64-NEXT:    [[DIV:%.*]] = sdiv i32 [[TMP1]], 77, !dbg [[DBG47:![0-9]+]]
 // PPC64-NEXT:    [[TMP2:%.*]] = zext i32 [[DIV]] to i64
 // PPC64-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 4
 // PPC64-NEXT:    [[TMP4:%.*]] = mul i64 [[TMP2]], 4
@@ -356,8 +356,8 @@ void bar() {
 // PPC64-NEXT:    store i64 0, ptr [[TMP7]], align 8
 // PPC64-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 3
 // PPC64-NEXT:    store i64 [[TMP4]], ptr [[TMP8]], align 8
-// PPC64-NEXT:    [[TMP9:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], align 8, !dbg [[DBG49:![0-9]+]]
-// PPC64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_1]] [[TMP9]], !dbg [[DBG49]]
+// PPC64-NEXT:    [[TMP9:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], align 8, !dbg [[DBG48:![0-9]+]]
+// PPC64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_1]] [[TMP9]], !dbg [[DBG48]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@foo
@@ -397,7 +397,7 @@ void bar() {
 // AARCH64-NEXT:    [[TMP7:%.*]] = load i32, ptr [[CALL_ARG]], align 4, !dbg [[DBG17:![0-9]+]]
 // AARCH64-NEXT:    [[TMP8:%.*]] = zext i32 [[TMP7]] to i64, !dbg [[DBG18:![0-9]+]]
 // AARCH64-NEXT:    store ptr [[VLA]], ptr [[CALL_ARG1]], align 8, !dbg [[DBG19:![0-9]+]]
-// AARCH64-NEXT:    [[TMP9:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG1]], ptr undef), "QUAL.OSS.DEP.IN"(ptr [[CALL_ARG1]], [3 x i8] c"*a\00", ptr @compute_dep, ptr [[CALL_ARG1]], i64 [[TMP8]]), "QUAL.OSS.CAPTURED"(i64 [[TMP8]]), "QUAL.OSS.DECL.SOURCE"([8 x i8] c"foo:7:9\00") ], !dbg [[DBG18]]
+// AARCH64-NEXT:    [[TMP9:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG1]], ptr undef), "QUAL.OSS.DEVICE.DEVFUNC"([4 x i8] c"foo\00"), "QUAL.OSS.DEP.IN"(ptr [[CALL_ARG1]], [3 x i8] c"*a\00", ptr @compute_dep, ptr [[CALL_ARG1]], i64 [[TMP8]]), "QUAL.OSS.CAPTURED"(i64 [[TMP8]]), "QUAL.OSS.DECL.SOURCE"([21 x i8] c"task_function1.c:7:9\00") ], !dbg [[DBG18]]
 // AARCH64-NEXT:    [[TMP10:%.*]] = load i32, ptr [[CALL_ARG]], align 4, !dbg [[DBG16]]
 // AARCH64-NEXT:    [[TMP11:%.*]] = load ptr, ptr [[CALL_ARG1]], align 8, !dbg [[DBG19]]
 // AARCH64-NEXT:    call void @foo(i32 noundef [[TMP10]], ptr noundef [[TMP11]]), !dbg [[DBG18]]
@@ -415,7 +415,7 @@ void bar() {
 // AARCH64-NEXT:    [[DOTADDR:%.*]] = alloca i64, align 8
 // AARCH64-NEXT:    store ptr [[A]], ptr [[A_ADDR]], align 8
 // AARCH64-NEXT:    store i64 [[TMP0]], ptr [[DOTADDR]], align 8
-// AARCH64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[A]], align 8, !dbg [[DBG23:![0-9]+]]
+// AARCH64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[A]], align 8, !dbg [[DBG22:![0-9]+]]
 // AARCH64-NEXT:    [[TMP2:%.*]] = mul i64 [[TMP0]], 4
 // AARCH64-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP0]], 4
 // AARCH64-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
@@ -426,22 +426,22 @@ void bar() {
 // AARCH64-NEXT:    store i64 0, ptr [[TMP6]], align 8
 // AARCH64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
 // AARCH64-NEXT:    store i64 [[TMP3]], ptr [[TMP7]], align 8
-// AARCH64-NEXT:    [[TMP8:%.*]] = load [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], align 8, !dbg [[DBG23]]
-// AARCH64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T]] [[TMP8]], !dbg [[DBG23]]
+// AARCH64-NEXT:    [[TMP8:%.*]] = load [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], align 8, !dbg [[DBG22]]
+// AARCH64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T]] [[TMP8]], !dbg [[DBG22]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@foo1
-// AARCH64-SAME: (i32 noundef [[SIZE:%.*]], ptr noundef [[P:%.*]]) #[[ATTR0]] !dbg [[DBG25:![0-9]+]] {
+// AARCH64-SAME: (i32 noundef [[SIZE:%.*]], ptr noundef [[P:%.*]]) #[[ATTR0]] !dbg [[DBG24:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[SIZE_ADDR:%.*]] = alloca i32, align 4
 // AARCH64-NEXT:    [[P_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    store i32 [[SIZE]], ptr [[SIZE_ADDR]], align 4
 // AARCH64-NEXT:    store ptr [[P]], ptr [[P_ADDR]], align 8
-// AARCH64-NEXT:    ret void, !dbg [[DBG26:![0-9]+]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG25:![0-9]+]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@bar
-// AARCH64-SAME: () #[[ATTR0]] !dbg [[DBG27:![0-9]+]] {
+// AARCH64-SAME: () #[[ATTR0]] !dbg [[DBG26:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[N:%.*]] = alloca i32, align 4
 // AARCH64-NEXT:    [[V:%.*]] = alloca ptr, align 8
@@ -449,41 +449,41 @@ void bar() {
 // AARCH64-NEXT:    [[CALL_ARG1:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    [[CALL_ARG2:%.*]] = alloca i32, align 4
 // AARCH64-NEXT:    [[CALL_ARG4:%.*]] = alloca ptr, align 8
-// AARCH64-NEXT:    store i32 10, ptr [[N]], align 4, !dbg [[DBG28:![0-9]+]]
-// AARCH64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG29:![0-9]+]]
-// AARCH64-NEXT:    [[DIV:%.*]] = sdiv i32 [[TMP0]], 55, !dbg [[DBG30:![0-9]+]]
-// AARCH64-NEXT:    store i32 [[DIV]], ptr [[CALL_ARG]], align 4, !dbg [[DBG30]]
-// AARCH64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[V]], align 8, !dbg [[DBG31:![0-9]+]]
-// AARCH64-NEXT:    store ptr [[TMP1]], ptr [[CALL_ARG1]], align 8, !dbg [[DBG31]]
-// AARCH64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG1]], ptr undef), "QUAL.OSS.DEP.OUT"(ptr [[CALL_ARG1]], [11 x i8] c"[size/77]p\00", ptr @compute_dep.1, ptr [[CALL_ARG1]], ptr [[CALL_ARG]]), "QUAL.OSS.DECL.SOURCE"([10 x i8] c"foo1:20:9\00") ], !dbg [[DBG32:![0-9]+]]
-// AARCH64-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CALL_ARG]], align 4, !dbg [[DBG30]]
-// AARCH64-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[CALL_ARG1]], align 8, !dbg [[DBG31]]
-// AARCH64-NEXT:    call void @foo1(i32 noundef [[TMP3]], ptr noundef [[TMP4]]), !dbg [[DBG32]]
-// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP2]]), !dbg [[DBG32]]
-// AARCH64-NEXT:    [[TMP5:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG33:![0-9]+]]
-// AARCH64-NEXT:    [[DIV3:%.*]] = sdiv i32 [[TMP5]], 99, !dbg [[DBG34:![0-9]+]]
-// AARCH64-NEXT:    store i32 [[DIV3]], ptr [[CALL_ARG2]], align 4, !dbg [[DBG34]]
-// AARCH64-NEXT:    [[TMP6:%.*]] = load ptr, ptr [[V]], align 8, !dbg [[DBG35:![0-9]+]]
-// AARCH64-NEXT:    store ptr [[TMP6]], ptr [[CALL_ARG4]], align 8, !dbg [[DBG35]]
-// AARCH64-NEXT:    [[TMP7:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG2]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG4]], ptr undef), "QUAL.OSS.DEP.OUT"(ptr [[CALL_ARG4]], [11 x i8] c"[size/77]p\00", ptr @compute_dep.2, ptr [[CALL_ARG4]], ptr [[CALL_ARG2]]), "QUAL.OSS.DECL.SOURCE"([10 x i8] c"foo1:20:9\00") ], !dbg [[DBG36:![0-9]+]]
-// AARCH64-NEXT:    [[TMP8:%.*]] = load i32, ptr [[CALL_ARG2]], align 4, !dbg [[DBG34]]
-// AARCH64-NEXT:    [[TMP9:%.*]] = load ptr, ptr [[CALL_ARG4]], align 8, !dbg [[DBG35]]
-// AARCH64-NEXT:    call void @foo1(i32 noundef [[TMP8]], ptr noundef [[TMP9]]), !dbg [[DBG36]]
-// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP7]]), !dbg [[DBG36]]
-// AARCH64-NEXT:    ret void, !dbg [[DBG37:![0-9]+]]
+// AARCH64-NEXT:    store i32 10, ptr [[N]], align 4, !dbg [[DBG27:![0-9]+]]
+// AARCH64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG28:![0-9]+]]
+// AARCH64-NEXT:    [[DIV:%.*]] = sdiv i32 [[TMP0]], 55, !dbg [[DBG29:![0-9]+]]
+// AARCH64-NEXT:    store i32 [[DIV]], ptr [[CALL_ARG]], align 4, !dbg [[DBG29]]
+// AARCH64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[V]], align 8, !dbg [[DBG30:![0-9]+]]
+// AARCH64-NEXT:    store ptr [[TMP1]], ptr [[CALL_ARG1]], align 8, !dbg [[DBG30]]
+// AARCH64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG1]], ptr undef), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo1\00"), "QUAL.OSS.DEP.OUT"(ptr [[CALL_ARG1]], [11 x i8] c"[size/77]p\00", ptr @compute_dep.1, ptr [[CALL_ARG1]], ptr [[CALL_ARG]]), "QUAL.OSS.DECL.SOURCE"([22 x i8] c"task_function1.c:20:9\00") ], !dbg [[DBG31:![0-9]+]]
+// AARCH64-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CALL_ARG]], align 4, !dbg [[DBG29]]
+// AARCH64-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[CALL_ARG1]], align 8, !dbg [[DBG30]]
+// AARCH64-NEXT:    call void @foo1(i32 noundef [[TMP3]], ptr noundef [[TMP4]]), !dbg [[DBG31]]
+// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP2]]), !dbg [[DBG31]]
+// AARCH64-NEXT:    [[TMP5:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG32:![0-9]+]]
+// AARCH64-NEXT:    [[DIV3:%.*]] = sdiv i32 [[TMP5]], 99, !dbg [[DBG33:![0-9]+]]
+// AARCH64-NEXT:    store i32 [[DIV3]], ptr [[CALL_ARG2]], align 4, !dbg [[DBG33]]
+// AARCH64-NEXT:    [[TMP6:%.*]] = load ptr, ptr [[V]], align 8, !dbg [[DBG34:![0-9]+]]
+// AARCH64-NEXT:    store ptr [[TMP6]], ptr [[CALL_ARG4]], align 8, !dbg [[DBG34]]
+// AARCH64-NEXT:    [[TMP7:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG2]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG4]], ptr undef), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo1\00"), "QUAL.OSS.DEP.OUT"(ptr [[CALL_ARG4]], [11 x i8] c"[size/77]p\00", ptr @compute_dep.2, ptr [[CALL_ARG4]], ptr [[CALL_ARG2]]), "QUAL.OSS.DECL.SOURCE"([22 x i8] c"task_function1.c:20:9\00") ], !dbg [[DBG35:![0-9]+]]
+// AARCH64-NEXT:    [[TMP8:%.*]] = load i32, ptr [[CALL_ARG2]], align 4, !dbg [[DBG33]]
+// AARCH64-NEXT:    [[TMP9:%.*]] = load ptr, ptr [[CALL_ARG4]], align 8, !dbg [[DBG34]]
+// AARCH64-NEXT:    call void @foo1(i32 noundef [[TMP8]], ptr noundef [[TMP9]]), !dbg [[DBG35]]
+// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP7]]), !dbg [[DBG35]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG36:![0-9]+]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@compute_dep.1
-// AARCH64-SAME: (ptr [[P:%.*]], ptr [[SIZE:%.*]]) !dbg [[DBG38:![0-9]+]] {
+// AARCH64-SAME: (ptr [[P:%.*]], ptr [[SIZE:%.*]]) !dbg [[DBG37:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T_0:%.*]], align 8
 // AARCH64-NEXT:    [[P_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    [[SIZE_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    store ptr [[P]], ptr [[P_ADDR]], align 8
 // AARCH64-NEXT:    store ptr [[SIZE]], ptr [[SIZE_ADDR]], align 8
-// AARCH64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[P]], align 8, !dbg [[DBG39:![0-9]+]]
-// AARCH64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[SIZE]], align 4, !dbg [[DBG41:![0-9]+]]
-// AARCH64-NEXT:    [[DIV:%.*]] = sdiv i32 [[TMP1]], 77, !dbg [[DBG42:![0-9]+]]
+// AARCH64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[P]], align 8, !dbg [[DBG38:![0-9]+]]
+// AARCH64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[SIZE]], align 4, !dbg [[DBG40:![0-9]+]]
+// AARCH64-NEXT:    [[DIV:%.*]] = sdiv i32 [[TMP1]], 77, !dbg [[DBG41:![0-9]+]]
 // AARCH64-NEXT:    [[TMP2:%.*]] = zext i32 [[DIV]] to i64
 // AARCH64-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 4
 // AARCH64-NEXT:    [[TMP4:%.*]] = mul i64 [[TMP2]], 4
@@ -495,21 +495,21 @@ void bar() {
 // AARCH64-NEXT:    store i64 0, ptr [[TMP7]], align 8
 // AARCH64-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 3
 // AARCH64-NEXT:    store i64 [[TMP4]], ptr [[TMP8]], align 8
-// AARCH64-NEXT:    [[TMP9:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], align 8, !dbg [[DBG43:![0-9]+]]
-// AARCH64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_0]] [[TMP9]], !dbg [[DBG43]]
+// AARCH64-NEXT:    [[TMP9:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], align 8, !dbg [[DBG42:![0-9]+]]
+// AARCH64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_0]] [[TMP9]], !dbg [[DBG42]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@compute_dep.2
-// AARCH64-SAME: (ptr [[P:%.*]], ptr [[SIZE:%.*]]) !dbg [[DBG44:![0-9]+]] {
+// AARCH64-SAME: (ptr [[P:%.*]], ptr [[SIZE:%.*]]) !dbg [[DBG43:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T_1:%.*]], align 8
 // AARCH64-NEXT:    [[P_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    [[SIZE_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    store ptr [[P]], ptr [[P_ADDR]], align 8
 // AARCH64-NEXT:    store ptr [[SIZE]], ptr [[SIZE_ADDR]], align 8
-// AARCH64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[P]], align 8, !dbg [[DBG45:![0-9]+]]
-// AARCH64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[SIZE]], align 4, !dbg [[DBG47:![0-9]+]]
-// AARCH64-NEXT:    [[DIV:%.*]] = sdiv i32 [[TMP1]], 77, !dbg [[DBG48:![0-9]+]]
+// AARCH64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[P]], align 8, !dbg [[DBG44:![0-9]+]]
+// AARCH64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[SIZE]], align 4, !dbg [[DBG46:![0-9]+]]
+// AARCH64-NEXT:    [[DIV:%.*]] = sdiv i32 [[TMP1]], 77, !dbg [[DBG47:![0-9]+]]
 // AARCH64-NEXT:    [[TMP2:%.*]] = zext i32 [[DIV]] to i64
 // AARCH64-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 4
 // AARCH64-NEXT:    [[TMP4:%.*]] = mul i64 [[TMP2]], 4
@@ -521,6 +521,6 @@ void bar() {
 // AARCH64-NEXT:    store i64 0, ptr [[TMP7]], align 8
 // AARCH64-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 3
 // AARCH64-NEXT:    store i64 [[TMP4]], ptr [[TMP8]], align 8
-// AARCH64-NEXT:    [[TMP9:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], align 8, !dbg [[DBG49:![0-9]+]]
-// AARCH64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_1]] [[TMP9]], !dbg [[DBG49]]
+// AARCH64-NEXT:    [[TMP9:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], align 8, !dbg [[DBG48:![0-9]+]]
+// AARCH64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_1]] [[TMP9]], !dbg [[DBG48]]
 //

@@ -27,6 +27,7 @@ def Sint64 : Type;
 def Uint64 : Type;
 def Float : Type;
 def Ptr : Type;
+def FnPtr : Type;
 
 //===----------------------------------------------------------------------===//
 // Types transferred to the interpreter.
@@ -49,6 +50,7 @@ def ArgRecordDecl : ArgType { let Name = "const RecordDecl *"; }
 def ArgRecordField : ArgType { let Name = "const Record::Field *"; }
 def ArgFltSemantics : ArgType { let Name = "const llvm::fltSemantics *"; }
 def ArgRoundingMode : ArgType { let Name = "llvm::RoundingMode"; }
+def ArgLETD: ArgType { let Name = "const LifetimeExtendedTemporaryDecl *"; }
 
 //===----------------------------------------------------------------------===//
 // Classes of types instructions operate on.
@@ -76,7 +78,7 @@ def AluTypeClass : TypeClass {
 }
 
 def PtrTypeClass : TypeClass {
-  let Types = [Ptr];
+  let Types = [Ptr, FnPtr];
 }
 
 def BoolTypeClass : TypeClass {
@@ -177,13 +179,16 @@ def NoRet : Opcode {}
 def Call : Opcode {
   let Args = [ArgFunction];
   let Types = [];
-  let ChangesPC = 1;
 }
 
 def CallBI : Opcode {
   let Args = [ArgFunction];
   let Types = [];
-  let ChangesPC = 1;
+}
+
+def CallPtr : Opcode {
+  let Args = [];
+  let Types = [];
 }
 
 //===----------------------------------------------------------------------===//
@@ -227,6 +232,7 @@ def Zero : Opcode {
 // [] -> [Pointer]
 def Null : Opcode {
   let Types = [PtrTypeClass];
+  let HasGroup = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -305,6 +311,9 @@ def RVOPtr : Opcode;
 def NarrowPtr : Opcode;
 // [Pointer] -> [Pointer]
 def ExpandPtr : Opcode;
+// [Pointer, Offset] -> [Pointer]
+def ArrayElemPtr : AluOpcode;
+def ArrayElemPtrPop : AluOpcode;
 
 //===----------------------------------------------------------------------===//
 // Direct field accessors
@@ -327,10 +336,16 @@ def GetLocal : AccessOpcode { let HasCustomEval = 1; }
 // [] -> [Pointer]
 def SetLocal : AccessOpcode { let HasCustomEval = 1; }
 
+def CheckGlobalCtor : Opcode {}
+
 // [] -> [Value]
 def GetGlobal : AccessOpcode;
 // [Value] -> []
 def InitGlobal : AccessOpcode;
+// [Value] -> []
+def InitGlobalTemp : AccessOpcode {
+  let Args = [ArgUint32, ArgLETD];
+}
 // [Value] -> []
 def SetGlobal : AccessOpcode;
 
@@ -436,6 +451,14 @@ def IncPtr : Opcode {
 def DecPtr : Opcode {
   let HasGroup = 0;
 }
+
+//===----------------------------------------------------------------------===//
+// Function pointers.
+//===----------------------------------------------------------------------===//
+def GetFnPtr : Opcode {
+  let Args = [ArgFunction];
+}
+
 
 //===----------------------------------------------------------------------===//
 // Binary operators.

@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <type_traits>
 #include <optional>
+#include <type_traits>
 
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 
@@ -19,6 +19,8 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
@@ -100,7 +102,8 @@ static void getXferIndices(OpBuilder &b, OpTy xferOp, Value iv,
     AffineExpr d0, d1;
     bindDims(xferOp.getContext(), d0, d1);
     Value offset = adaptor.getIndices()[*dim];
-    indices[*dim] = makeComposedAffineApply(b, loc, d0 + d1, {offset, iv});
+    indices[*dim] =
+        affine::makeComposedAffineApply(b, loc, d0 + d1, {offset, iv});
   }
 }
 
@@ -176,7 +179,8 @@ static Value generateInBoundsCheck(
     AffineExpr d0, d1;
     bindDims(xferOp.getContext(), d0, d1);
     Value base = xferOp.getIndices()[*dim];
-    Value memrefIdx = makeComposedAffineApply(b, loc, d0 + d1, {base, iv});
+    Value memrefIdx =
+        affine::makeComposedAffineApply(b, loc, d0 + d1, {base, iv});
     cond = lb.create<arith::CmpIOp>(arith::CmpIPredicate::sgt, memrefDim,
                                     memrefIdx);
   }
@@ -1032,7 +1036,7 @@ struct UnrollTransferWriteConversion
     auto vec = getDataVector(xferOp);
     auto xferVecType = xferOp.getVectorType();
     int64_t dimSize = xferVecType.getShape()[0];
-    auto source = xferOp.getSource(); // memref or tensor to be written to.
+    Value source = xferOp.getSource(); // memref or tensor to be written to.
     auto sourceType = isTensorOp(xferOp) ? xferOp.getShapedType() : Type();
 
     // Generate fully unrolled loop of transfer ops.
@@ -1109,7 +1113,8 @@ get1dMemrefIndices(OpBuilder &b, OpTy xferOp, Value iv,
     AffineExpr d0, d1;
     bindDims(xferOp.getContext(), d0, d1);
     Value offset = memrefIndices[dim];
-    memrefIndices[dim] = makeComposedAffineApply(b, loc, d0 + d1, {offset, iv});
+    memrefIndices[dim] =
+        affine::makeComposedAffineApply(b, loc, d0 + d1, {offset, iv});
     return dim;
   }
 

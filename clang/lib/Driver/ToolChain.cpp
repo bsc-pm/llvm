@@ -25,7 +25,6 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/Triple.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/MC/MCTargetOptions.h"
@@ -38,9 +37,10 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FileUtilities.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/TargetParser.h"
 #include "llvm/Support/VersionTuple.h"
 #include "llvm/Support/VirtualFileSystem.h"
+#include "llvm/TargetParser/TargetParser.h"
+#include "llvm/TargetParser/Triple.h"
 #include <cassert>
 #include <cstddef>
 #include <cstring>
@@ -86,7 +86,8 @@ ToolChain::ToolChain(const Driver &D, const llvm::Triple &T,
     addIfExists(getLibraryPaths(), Path);
   for (const auto &Path : getStdlibPaths())
     addIfExists(getFilePaths(), Path);
-  addIfExists(getFilePaths(), getArchSpecificLibPath());
+  for (const auto &Path : getArchSpecificLibPaths())
+    addIfExists(getFilePaths(), Path);
 }
 
 llvm::Expected<std::unique_ptr<llvm::MemoryBuffer>>
@@ -419,6 +420,7 @@ Tool *ToolChain::getTool(Action::ActionClass AC) const {
   case Action::LipoJobClass:
   case Action::DsymutilJobClass:
   case Action::VerifyDebugInfoJobClass:
+  case Action::BinaryAnalyzeJobClass:
     llvm_unreachable("Invalid tool kind.");
 
   case Action::CompileJobClass:
@@ -620,11 +622,20 @@ ToolChain::path_list ToolChain::getStdlibPaths() const {
   return Paths;
 }
 
-std::string ToolChain::getArchSpecificLibPath() const {
-  SmallString<128> Path(getDriver().ResourceDir);
-  llvm::sys::path::append(Path, "lib", getOSLibName(),
-                          llvm::Triple::getArchTypeName(getArch()));
-  return std::string(Path.str());
+ToolChain::path_list ToolChain::getArchSpecificLibPaths() const {
+  path_list Paths;
+
+  auto AddPath = [&](const ArrayRef<StringRef> &SS) {
+    SmallString<128> Path(getDriver().ResourceDir);
+    llvm::sys::path::append(Path, "lib");
+    for (auto &S : SS)
+      llvm::sys::path::append(Path, S);
+    Paths.push_back(std::string(Path.str()));
+  };
+
+  AddPath({getTriple().str()});
+  AddPath({getOSLibName(), llvm::Triple::getArchTypeName(getArch())});
+  return Paths;
 }
 
 bool ToolChain::needsProfileRT(const ArgList &Args) {

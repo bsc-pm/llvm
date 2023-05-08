@@ -151,12 +151,6 @@ bool BitsRecTy::typeIsConvertibleTo(const RecTy *RHS) const {
   return (kind == BitRecTyKind && Size == 1) || (kind == IntRecTyKind);
 }
 
-bool BitsRecTy::typeIsA(const RecTy *RHS) const {
-  if (const BitsRecTy *RHSb = dyn_cast<BitsRecTy>(RHS))
-    return RHSb->Size == Size;
-  return false;
-}
-
 IntRecTy *IntRecTy::get(RecordKeeper &RK) {
   return &RK.getImpl().SharedIntRecTy;
 }
@@ -778,6 +772,14 @@ void UnOpInit::Profile(FoldingSetNodeID &ID) const {
 Init *UnOpInit::Fold(Record *CurRec, bool IsFinal) const {
   RecordKeeper &RK = getRecordKeeper();
   switch (getOpcode()) {
+  case TOLOWER:
+    if (StringInit *LHSs = dyn_cast<StringInit>(LHS))
+      return StringInit::get(RK, LHSs->getValue().lower());
+    break;
+  case TOUPPER:
+    if (StringInit *LHSs = dyn_cast<StringInit>(LHS))
+      return StringInit::get(RK, LHSs->getValue().upper());
+    break;
   case CAST:
     if (isa<StringRecTy>(getType())) {
       if (StringInit *LHSs = dyn_cast<StringInit>(LHS))
@@ -792,37 +794,40 @@ Init *UnOpInit::Fold(Record *CurRec, bool IsFinal) const {
 
     } else if (isa<RecordRecTy>(getType())) {
       if (StringInit *Name = dyn_cast<StringInit>(LHS)) {
-        if (!CurRec && !IsFinal)
-          break;
-        assert(CurRec && "NULL pointer");
-        Record *D;
-
-        // Self-references are allowed, but their resolution is delayed until
-        // the final resolve to ensure that we get the correct type for them.
-        auto *Anonymous = dyn_cast<AnonymousNameInit>(CurRec->getNameInit());
-        if (Name == CurRec->getNameInit() ||
-            (Anonymous && Name == Anonymous->getNameInit())) {
-          if (!IsFinal)
-            break;
-          D = CurRec;
-        } else {
-          D = CurRec->getRecords().getDef(Name->getValue());
-          if (!D) {
-            if (IsFinal)
-              PrintFatalError(CurRec->getLoc(),
-                              Twine("Undefined reference to record: '") +
-                              Name->getValue() + "'\n");
-            break;
+        Record *D = RK.getDef(Name->getValue());
+        if (!D && CurRec) {
+          // Self-references are allowed, but their resolution is delayed until
+          // the final resolve to ensure that we get the correct type for them.
+          auto *Anonymous = dyn_cast<AnonymousNameInit>(CurRec->getNameInit());
+          if (Name == CurRec->getNameInit() ||
+              (Anonymous && Name == Anonymous->getNameInit())) {
+            if (!IsFinal)
+              break;
+            D = CurRec;
           }
+        }
+
+        auto PrintFatalErrorHelper = [CurRec](const Twine &T) {
+          if (CurRec)
+            PrintFatalError(CurRec->getLoc(), T);
+          else
+            PrintFatalError(T);
+        };
+
+        if (!D) {
+          if (IsFinal) {
+            PrintFatalErrorHelper(Twine("Undefined reference to record: '") +
+                                  Name->getValue() + "'\n");
+          }
+          break;
         }
 
         DefInit *DI = DefInit::get(D);
         if (!DI->getType()->typeIsA(getType())) {
-          PrintFatalError(CurRec->getLoc(),
-                          Twine("Expected type '") +
-                          getType()->getAsString() + "', got '" +
-                          DI->getType()->getAsString() + "' in: " +
-                          getAsString() + "\n");
+          PrintFatalErrorHelper(Twine("Expected type '") +
+                                getType()->getAsString() + "', got '" +
+                                DI->getType()->getAsString() + "' in: " +
+                                getAsString() + "\n");
         }
         return DI;
       }
@@ -927,6 +932,12 @@ std::string UnOpInit::getAsString() const {
   case EMPTY: Result = "!empty"; break;
   case GETDAGOP: Result = "!getdagop"; break;
   case LOG2 : Result = "!logtwo"; break;
+  case TOLOWER:
+    Result = "!tolower";
+    break;
+  case TOUPPER:
+    Result = "!toupper";
+    break;
   }
   return Result + "(" + LHS->getAsString() + ")";
 }
@@ -1189,6 +1200,25 @@ std::optional<bool> BinOpInit::CompareInit(unsigned Opc, Init *LHS, Init *RHS) c
     }
     break;
   }
+  case RANGE: {
+    auto *LHSi = dyn_cast<IntInit>(LHS);
+    auto *RHSi = dyn_cast<IntInit>(RHS);
+    if (!LHSi || !RHSi)
+      break;
+
+    auto Start = LHSi->getValue();
+    auto End = RHSi->getValue();
+    SmallVector<Init *, 8> Args;
+    if (Start < End) {
+      // Half-open interval (excludes `End`)
+      Args.reserve(End - Start);
+      for (auto i = Start; i < End; ++i)
+        Args.push_back(IntInit::get(getRecordKeeper(), i));
+    } else {
+      // Empty set
+    }
+    return ListInit::get(Args, LHSi->getType());
+  }
   case STRCONCAT: {
     StringInit *LHSs = dyn_cast<StringInit>(LHS);
     StringInit *RHSs = dyn_cast<StringInit>(RHS);
@@ -1314,6 +1344,7 @@ std::string BinOpInit::getAsString() const {
   case LISTCONCAT: Result = "!listconcat"; break;
   case LISTSPLAT: Result = "!listsplat"; break;
   case LISTREMOVE: Result = "!listremove"; break;
+  case RANGE: Result = "!range"; break;
   case STRCONCAT: Result = "!strconcat"; break;
   case INTERLEAVE: Result = "!interleave"; break;
   case SETDAGOP: Result = "!setdagop"; break;
@@ -1772,34 +1803,34 @@ void ExistsOpInit::Profile(FoldingSetNodeID &ID) const {
 
 Init *ExistsOpInit::Fold(Record *CurRec, bool IsFinal) const {
   if (StringInit *Name = dyn_cast<StringInit>(Expr)) {
-    if (!CurRec && !IsFinal)
-      return const_cast<ExistsOpInit *>(this);
-
-    // Self-references are allowed, but their resolution is delayed until
-    // the final resolve to ensure that we get the correct type for them.
-    auto *Anonymous = dyn_cast<AnonymousNameInit>(CurRec->getNameInit());
-    if (Name == CurRec->getNameInit() ||
-        (Anonymous && Name == Anonymous->getNameInit())) {
-      if (!IsFinal)
-        return const_cast<ExistsOpInit *>(this);
-
-      // No doubt that there exists a record, so we should check if types are
-      // compatiable.
-      return IntInit::get(getRecordKeeper(),
-                          CurRec->getType()->typeIsA(CheckType));
-    }
 
     // Look up all defined records to see if we can find one.
     Record *D = CheckType->getRecordKeeper().getDef(Name->getValue());
-    if (!D) {
-      if (IsFinal)
-        return IntInit::get(getRecordKeeper(), 0);
-      return const_cast<ExistsOpInit *>(this);
+    if (D) {
+      // Check if types are compatible.
+      return IntInit::get(getRecordKeeper(),
+                          DefInit::get(D)->getType()->typeIsA(CheckType));
     }
 
-    // Check if types are compatiable.
-    return IntInit::get(getRecordKeeper(),
-                        DefInit::get(D)->getType()->typeIsA(CheckType));
+    if (CurRec) {
+      // Self-references are allowed, but their resolution is delayed until
+      // the final resolve to ensure that we get the correct type for them.
+      auto *Anonymous = dyn_cast<AnonymousNameInit>(CurRec->getNameInit());
+      if (Name == CurRec->getNameInit() ||
+          (Anonymous && Name == Anonymous->getNameInit())) {
+        if (!IsFinal)
+          return const_cast<ExistsOpInit *>(this);
+
+        // No doubt that there exists a record, so we should check if types are
+        // compatible.
+        return IntInit::get(getRecordKeeper(),
+                            CurRec->getType()->typeIsA(CheckType));
+      }
+    }
+
+    if (IsFinal)
+      return IntInit::get(getRecordKeeper(), 0);
+    return const_cast<ExistsOpInit *>(this);
   }
   return const_cast<ExistsOpInit *>(this);
 }
@@ -2259,7 +2290,7 @@ Init *CondOpInit::Fold(Record *CurRec) const {
   }
 
   PrintFatalError(CurRec->getLoc(),
-                  CurRec->getName() +
+                  CurRec->getNameInitAsString() +
                   " does not have any true condition in:" +
                   this->getAsString());
   return nullptr;
@@ -2988,6 +3019,10 @@ std::vector<Record *> RecordKeeper::getAllDerivedDefinitions(
                           }))
       Defs.push_back(OneDef.second.get());
   }
+
+  llvm::sort(Defs, [](Record *LHS, Record *RHS) {
+    return LHS->getName().compare_numeric(RHS->getName()) < 0;
+  });
 
   return Defs;
 }

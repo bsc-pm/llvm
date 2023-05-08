@@ -30,7 +30,7 @@
 #include "llvm/CodeGen/ComplexDeinterleavingPass.h"
 #include "llvm/CodeGen/DAGCombine.h"
 #include "llvm/CodeGen/ISDOpcodes.h"
-#include "llvm/CodeGen/LowLevelType.h"
+#include "llvm/CodeGen/LowLevelTypeUtils.h"
 #include "llvm/CodeGen/RuntimeLibcalls.h"
 #include "llvm/CodeGen/SelectionDAG.h"
 #include "llvm/CodeGen/SelectionDAGNodes.h"
@@ -74,7 +74,6 @@ class GISelKnownBits;
 class IntrinsicInst;
 class IRBuilderBase;
 struct KnownBits;
-class LegacyDivergenceAnalysis;
 class LLVMContext;
 class MachineBasicBlock;
 class MachineFunction;
@@ -282,6 +281,15 @@ public:
     Expensive = 2   // Negated expression is more expensive.
   };
 
+  /// Enum of different potentially desirable ways to fold (and/or (setcc ...),
+  /// (setcc ...)).
+  enum AndOrSETCCFoldKind : uint8_t {
+    None = 0,   // No fold is preferable.
+    AddAnd = 1, // Fold with `Add` op and `And` op is preferable.
+    NotAnd = 2, // Fold with `Not` op and `And` op is preferable.
+    ABS = 4,    // Fold with `llvm.abs` op is preferable.
+  };
+
   class ArgListEntry {
   public:
     Value *Val = nullptr;
@@ -425,6 +433,13 @@ public:
     return MachineMemOperand::MONone;
   }
 
+  /// This callback is used to inspect load/store SDNode.
+  /// The default implementation does nothing.
+  virtual MachineMemOperand::Flags
+  getTargetMMOFlags(const MemSDNode &Node) const {
+    return MachineMemOperand::MONone;
+  }
+
   MachineMemOperand::Flags
   getLoadMemOperandFlags(const LoadInst &LI, const DataLayout &DL,
                          AssumptionCache *AC = nullptr,
@@ -441,6 +456,12 @@ public:
   /// Return true if the @llvm.get.active.lane.mask intrinsic should be expanded
   /// using generic code in SelectionDAGBuilder.
   virtual bool shouldExpandGetActiveLaneMask(EVT VT, EVT OpVT) const {
+    return true;
+  }
+
+  // Return true if op(vecreduce(x), vecreduce(y)) should be reassociated to
+  // vecreduce(op(x, y)) for the reduction opcode RedOpc.
+  virtual bool shouldReassociateReduction(unsigned RedOpc, EVT VT) const {
     return true;
   }
 
@@ -638,14 +659,6 @@ public:
   /// gen prepare.
   virtual bool preferZeroCompareBranch() const { return false; }
 
-  /// Return true if it is safe to transform an integer-domain bitwise operation
-  /// into the equivalent floating-point operation. This should be set to true
-  /// if the target has IEEE-754-compliant fabs/fneg operations for the input
-  /// type.
-  virtual bool hasBitPreservingFPLogic(EVT VT) const {
-    return false;
-  }
-
   /// Return true if it is cheaper to split the store of a merged int val
   /// from a pair of smaller values into multiple stores.
   virtual bool isMultiStoresCheaperThanBitsMerge(EVT LTy, EVT HTy) const {
@@ -664,6 +677,13 @@ public:
   /// \endcode
   virtual bool isMaskAndCmp0FoldingBeneficial(const Instruction &AndI) const {
     return false;
+  }
+
+  /// Return true if it is valid to merge the TargetMMOFlags in two SDNodes.
+  virtual bool
+  areTwoSDNodeTargetMMOFlagsMergeable(const MemSDNode &NodeX,
+                                      const MemSDNode &NodeY) const {
+    return true;
   }
 
   /// Use bitwise logic to make pairs of compares more efficient. For example:
@@ -789,8 +809,14 @@ public:
     return true;
   }
 
+  // By default prefer folding (abs (sub nsw x, y)) -> abds(x, y). Some targets
+  // may want to avoid this to prevent loss of sub_nsw pattern.
+  virtual bool preferABDSToABSWithNSW(EVT VT) const {
+    return true;
+  }
+
   // Return true if the target wants to transform Op(Splat(X)) -> Splat(Op(X))
-  virtual bool preferScalarizeSplat(unsigned Opc) const { return true; }
+  virtual bool preferScalarizeSplat(SDNode *N) const { return true; }
 
   /// Return true if the target wants to use the optimization that
   /// turns ext(promotableInst1(...(promotableInstN(load)))) into
@@ -1514,15 +1540,16 @@ public:
   EVT getMemValueType(const DataLayout &DL, Type *Ty,
                       bool AllowUnknown = false) const {
     // Lower scalar pointers to native pointer types.
-    if (PointerType *PTy = dyn_cast<PointerType>(Ty))
+    if (auto *PTy = dyn_cast<PointerType>(Ty))
       return getPointerMemTy(DL, PTy->getAddressSpace());
-    else if (VectorType *VTy = dyn_cast<VectorType>(Ty)) {
-      Type *Elm = VTy->getElementType();
-      if (PointerType *PT = dyn_cast<PointerType>(Elm)) {
-        EVT PointerTy(getPointerMemTy(DL, PT->getAddressSpace()));
-        Elm = PointerTy.getTypeForEVT(Ty->getContext());
+
+    if (auto *VTy = dyn_cast<VectorType>(Ty)) {
+      Type *EltTy = VTy->getElementType();
+      if (auto *PTy = dyn_cast<PointerType>(EltTy)) {
+        EVT PointerTy(getPointerMemTy(DL, PTy->getAddressSpace()));
+        EltTy = PointerTy.getTypeForEVT(Ty->getContext());
       }
-      return EVT::getVectorVT(Ty->getContext(), EVT::getEVT(Elm, false),
+      return EVT::getVectorVT(Ty->getContext(), EVT::getEVT(EltTy, false),
                               VTy->getElementCount());
     }
 
@@ -1549,11 +1576,8 @@ public:
 
   /// Return the type of registers that this ValueType will eventually require.
   MVT getRegisterType(LLVMContext &Context, EVT VT) const {
-    if (VT.isSimple()) {
-      assert((unsigned)VT.getSimpleVT().SimpleTy <
-             std::size(RegisterTypeForVT));
-      return RegisterTypeForVT[VT.getSimpleVT().SimpleTy];
-    }
+    if (VT.isSimple())
+      return getRegisterType(VT.getSimpleVT());
     if (VT.isVector()) {
       EVT VT1;
       MVT RegisterVT;
@@ -1641,6 +1665,10 @@ public:
 
     return true;
   }
+
+  /// Return true (the default) if it is profitable to remove a sext_inreg(x)
+  /// where the sext is redundant, and use x directly.
+  virtual bool shouldRemoveRedundantExtend(SDValue Op) const { return true; }
 
   /// When splitting a value of the specified type into parts, does the Lo
   /// or Hi part come first?  This usually follows the endianness, except
@@ -2694,6 +2722,8 @@ public:
     case ISD::AVGFLOORU:
     case ISD::AVGCEILS:
     case ISD::AVGCEILU:
+    case ISD::ABDS:
+    case ISD::ABDU:
       return true;
     default: return false;
     }
@@ -2831,6 +2861,13 @@ public:
                       getApproximateEVTForLLT(ToTy, DL, Ctx));
   }
 
+  /// Return true if zero-extending the specific node Val to type VT2 is free
+  /// (either because it's implicitly zero-extended such as ARM ldrb / ldrh or
+  /// because it's folded such as X86 zero-extending loads).
+  virtual bool isZExtFree(SDValue Val, EVT VT2) const {
+    return isZExtFree(Val.getValueType(), VT2);
+  }
+
   /// Return true if sign-extension from FromTy to ToTy is cheaper than
   /// zero-extension.
   virtual bool isSExtCheaperThanZExt(EVT FromTy, EVT ToTy) const {
@@ -2914,13 +2951,6 @@ public:
   virtual bool lowerInterleavedStore(StoreInst *SI, ShuffleVectorInst *SVI,
                                      unsigned Factor) const {
     return false;
-  }
-
-  /// Return true if zero-extending the specific node Val to type VT2 is free
-  /// (either because it's implicitly zero-extended such as ARM ldrb / ldrh or
-  /// because it's folded such as X86 zero-extending loads).
-  virtual bool isZExtFree(SDValue Val, EVT VT2) const {
-    return isZExtFree(Val.getValueType(), VT2);
   }
 
   /// Return true if an fpext operation is free (for instance, because
@@ -3039,10 +3069,10 @@ public:
     return false;
   }
 
-  /// Return true if it's profitable to narrow operations of type VT1 to
-  /// VT2. e.g. on x86, it's profitable to narrow from i32 to i8 but not from
+  /// Return true if it's profitable to narrow operations of type SrcVT to
+  /// DestVT. e.g. on x86, it's profitable to narrow from i32 to i8 but not from
   /// i32 to i16.
-  virtual bool isNarrowingProfitable(EVT /*VT1*/, EVT /*VT2*/) const {
+  virtual bool isNarrowingProfitable(EVT SrcVT, EVT DestVT) const {
     return false;
   }
 
@@ -3302,7 +3332,7 @@ private:
   /// register class is the largest legal super-reg register class of the
   /// register class of the specified type. e.g. On x86, i8, i16, and i32's
   /// representative class would be GR32.
-  const TargetRegisterClass *RepRegClassForVT[MVT::VALUETYPE_SIZE];
+  const TargetRegisterClass *RepRegClassForVT[MVT::VALUETYPE_SIZE] = {0};
 
   /// This indicates the "cost" of the "representative" register class for each
   /// ValueType. The cost is used by the scheduler to approximate register
@@ -3521,7 +3551,7 @@ public:
 
   virtual bool isSDNodeSourceOfDivergence(const SDNode *N,
                                           FunctionLoweringInfo *FLI,
-                                          LegacyDivergenceAnalysis *DA) const {
+                                          UniformityInfo *UA) const {
     return false;
   }
 
@@ -3702,7 +3732,8 @@ public:
   /// Convert x+y to (VT)((SmallVT)x+(SmallVT)y) if the casts are free.  This
   /// uses isZExtFree and ZERO_EXTEND for the widening cast, but it could be
   /// generalized for targets with other types of implicit widening casts.
-  bool ShrinkDemandedOp(SDValue Op, unsigned BitWidth, const APInt &Demanded,
+  bool ShrinkDemandedOp(SDValue Op, unsigned BitWidth,
+                        const APInt &DemandedBits,
                         TargetLoweringOpt &TLO) const;
 
   /// Look at Op.  At this point, we know that only the DemandedBits bits of the
@@ -4003,6 +4034,29 @@ public:
   virtual bool isDesirableToCommuteWithShift(const SDNode *N,
                                              CombineLevel Level) const {
     return true;
+  }
+
+  // Return AndOrSETCCFoldKind::{AddAnd, ABS} if its desirable to try and
+  // optimize LogicOp(SETCC0, SETCC1). An example (what is implemented as of
+  // writing this) is:
+  //    With C as a power of 2 and C != 0 and C != INT_MIN:
+  //    AddAnd:
+  //     (icmp eq A, C) | (icmp eq A, -C)
+  //            -> (icmp eq and(add(A, C), ~(C + C)), 0)
+  //     (icmp ne A, C) & (icmp ne A, -C)w
+  //            -> (icmp ne and(add(A, C), ~(C + C)), 0)
+  //    ABS:
+  //     (icmp eq A, C) | (icmp eq A, -C)
+  //            -> (icmp eq Abs(A), C)
+  //     (icmp ne A, C) & (icmp ne A, -C)w
+  //            -> (icmp ne Abs(A), C)
+  //
+  // @param LogicOp the logic op
+  // @param SETCC0 the first of the SETCC nodes
+  // @param SETCC0 the second of the SETCC nodes
+  virtual AndOrSETCCFoldKind isDesirableToCombineLogicOpOfSETCC(
+      const SDNode *LogicOp, const SDNode *SETCC0, const SDNode *SETCC1) const {
+    return AndOrSETCCFoldKind::None;
   }
 
   /// Return true if it is profitable to combine an XOR of a logical shift
@@ -4459,7 +4513,7 @@ public:
   /// necessary information.
   virtual EVT getTypeForExtReturn(LLVMContext &Context, EVT VT,
                                        ISD::NodeType /*ExtendKind*/) const {
-    EVT MinVT = getRegisterType(Context, MVT::i32);
+    EVT MinVT = getRegisterType(MVT::i32);
     return VT.bitsLT(MinVT) ? MinVT : VT;
   }
 
@@ -4490,8 +4544,8 @@ public:
 
   /// Returns a 0 terminated array of rounding control registers that can be
   /// attached into strict FP call.
-  virtual const MCPhysReg *getRoundingControlRegisters() const {
-    return nullptr;
+  virtual ArrayRef<MCPhysReg> getRoundingControlRegisters() const {
+    return ArrayRef<MCPhysReg>();
   }
 
   /// This callback is used to prepare for a volatile or atomic load.
@@ -4715,7 +4769,7 @@ public:
                                             SelectionDAG &DAG) const;
 
   // Lower custom output constraints. If invalid, return SDValue().
-  virtual SDValue LowerAsmOutputForConstraint(SDValue &Chain, SDValue &Flag,
+  virtual SDValue LowerAsmOutputForConstraint(SDValue &Chain, SDValue &Glue,
                                               const SDLoc &DL,
                                               const AsmOperandInfo &OpInfo,
                                               SelectionDAG &DAG) const;
@@ -4928,7 +4982,7 @@ public:
   /// \param Test The test to perform.
   /// \param Flags The optimization flags.
   /// \returns The expansion result or SDValue() if it fails.
-  SDValue expandIS_FPCLASS(EVT ResultVT, SDValue Op, unsigned Test,
+  SDValue expandIS_FPCLASS(EVT ResultVT, SDValue Op, FPClassTest Test,
                            SDNodeFlags Flags, const SDLoc &DL,
                            SelectionDAG &DAG) const;
 

@@ -9,9 +9,6 @@
 // UNSUPPORTED: system-aix
 // CHECK-DRIVER: i = 10
 // RUN: cat %s | not clang-repl | FileCheck %s
-
-// We mark it as XFAIL because in upstream the test is failing
-// XFAIL: *
 BOOM!
 extern "C" int printf(const char *, ...);
 int i = 42;

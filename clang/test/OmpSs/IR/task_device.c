@@ -16,16 +16,16 @@ void foo3();
 // LIN64-LABEL: define {{[^@]+}}@bar
 // LIN64-SAME: () #[[ATTR0:[0-9]+]] !dbg [[DBG5:![0-9]+]] {
 // LIN64-NEXT:  entry:
-// LIN64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 0), "QUAL.OSS.DEVICE.DEVFUNC"([4 x i8] c"foo\00"), "QUAL.OSS.DECL.SOURCE"([8 x i8] c"foo:7:9\00") ], !dbg [[DBG9:![0-9]+]]
+// LIN64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 0), "QUAL.OSS.DEVICE.DEVFUNC"([4 x i8] c"foo\00"), "QUAL.OSS.DECL.SOURCE"([18 x i8] c"task_device.c:7:9\00") ], !dbg [[DBG9:![0-9]+]]
 // LIN64-NEXT:    call void (...) @foo(), !dbg [[DBG9]]
 // LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG9]]
-// LIN64-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 1), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo1\00"), "QUAL.OSS.DECL.SOURCE"([9 x i8] c"foo1:9:9\00") ], !dbg [[DBG10:![0-9]+]]
+// LIN64-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 1), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo1\00"), "QUAL.OSS.DECL.SOURCE"([18 x i8] c"task_device.c:9:9\00") ], !dbg [[DBG10:![0-9]+]]
 // LIN64-NEXT:    call void (...) @foo1(), !dbg [[DBG10]]
 // LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP1]]), !dbg [[DBG10]]
-// LIN64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 4), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo2\00"), "QUAL.OSS.DECL.SOURCE"([10 x i8] c"foo2:11:9\00") ], !dbg [[DBG11:![0-9]+]]
+// LIN64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 4), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo2\00"), "QUAL.OSS.DECL.SOURCE"([19 x i8] c"task_device.c:11:9\00") ], !dbg [[DBG11:![0-9]+]]
 // LIN64-NEXT:    call void (...) @foo2(), !dbg [[DBG11]]
 // LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP2]]), !dbg [[DBG11]]
-// LIN64-NEXT:    [[TMP3:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 5), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo3\00"), "QUAL.OSS.DECL.SOURCE"([10 x i8] c"foo3:13:9\00") ], !dbg [[DBG12:![0-9]+]]
+// LIN64-NEXT:    [[TMP3:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 5), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo3\00"), "QUAL.OSS.DECL.SOURCE"([19 x i8] c"task_device.c:13:9\00") ], !dbg [[DBG12:![0-9]+]]
 // LIN64-NEXT:    call void (...) @foo3(), !dbg [[DBG12]]
 // LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP3]]), !dbg [[DBG12]]
 // LIN64-NEXT:    [[TMP4:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 1) ], !dbg [[DBG13:![0-9]+]]
@@ -37,16 +37,16 @@ void foo3();
 // PPC64-LABEL: define {{[^@]+}}@bar
 // PPC64-SAME: () #[[ATTR0:[0-9]+]] !dbg [[DBG5:![0-9]+]] {
 // PPC64-NEXT:  entry:
-// PPC64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 0), "QUAL.OSS.DEVICE.DEVFUNC"([4 x i8] c"foo\00"), "QUAL.OSS.DECL.SOURCE"([8 x i8] c"foo:7:9\00") ], !dbg [[DBG9:![0-9]+]]
+// PPC64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 0), "QUAL.OSS.DEVICE.DEVFUNC"([4 x i8] c"foo\00"), "QUAL.OSS.DECL.SOURCE"([18 x i8] c"task_device.c:7:9\00") ], !dbg [[DBG9:![0-9]+]]
 // PPC64-NEXT:    call void @foo(), !dbg [[DBG9]]
 // PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG9]]
-// PPC64-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 1), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo1\00"), "QUAL.OSS.DECL.SOURCE"([9 x i8] c"foo1:9:9\00") ], !dbg [[DBG10:![0-9]+]]
+// PPC64-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 1), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo1\00"), "QUAL.OSS.DECL.SOURCE"([18 x i8] c"task_device.c:9:9\00") ], !dbg [[DBG10:![0-9]+]]
 // PPC64-NEXT:    call void @foo1(), !dbg [[DBG10]]
 // PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP1]]), !dbg [[DBG10]]
-// PPC64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 4), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo2\00"), "QUAL.OSS.DECL.SOURCE"([10 x i8] c"foo2:11:9\00") ], !dbg [[DBG11:![0-9]+]]
+// PPC64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 4), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo2\00"), "QUAL.OSS.DECL.SOURCE"([19 x i8] c"task_device.c:11:9\00") ], !dbg [[DBG11:![0-9]+]]
 // PPC64-NEXT:    call void @foo2(), !dbg [[DBG11]]
 // PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP2]]), !dbg [[DBG11]]
-// PPC64-NEXT:    [[TMP3:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 5), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo3\00"), "QUAL.OSS.DECL.SOURCE"([10 x i8] c"foo3:13:9\00") ], !dbg [[DBG12:![0-9]+]]
+// PPC64-NEXT:    [[TMP3:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 5), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo3\00"), "QUAL.OSS.DECL.SOURCE"([19 x i8] c"task_device.c:13:9\00") ], !dbg [[DBG12:![0-9]+]]
 // PPC64-NEXT:    call void @foo3(), !dbg [[DBG12]]
 // PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP3]]), !dbg [[DBG12]]
 // PPC64-NEXT:    [[TMP4:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 1) ], !dbg [[DBG13:![0-9]+]]
@@ -56,25 +56,25 @@ void foo3();
 // PPC64-NEXT:    ret void, !dbg [[DBG17:![0-9]+]]
 //
 // AARCH64-LABEL: define {{[^@]+}}@bar
-// AARCH64-SAME: () #[[ATTR0:[0-9]+]] !dbg [[DBG9:![0-9]+]] {
+// AARCH64-SAME: () #[[ATTR0:[0-9]+]] !dbg [[DBG5:![0-9]+]] {
 // AARCH64-NEXT:  entry:
-// AARCH64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 0), "QUAL.OSS.DEVICE.DEVFUNC"([4 x i8] c"foo\00"), "QUAL.OSS.DECL.SOURCE"([8 x i8] c"foo:7:9\00") ], !dbg [[DBG13:![0-9]+]]
-// AARCH64-NEXT:    call void @foo(), !dbg [[DBG13]]
-// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG13]]
-// AARCH64-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 1), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo1\00"), "QUAL.OSS.DECL.SOURCE"([9 x i8] c"foo1:9:9\00") ], !dbg [[DBG14:![0-9]+]]
-// AARCH64-NEXT:    call void @foo1(), !dbg [[DBG14]]
-// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP1]]), !dbg [[DBG14]]
-// AARCH64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 4), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo2\00"), "QUAL.OSS.DECL.SOURCE"([10 x i8] c"foo2:11:9\00") ], !dbg [[DBG15:![0-9]+]]
-// AARCH64-NEXT:    call void @foo2(), !dbg [[DBG15]]
-// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP2]]), !dbg [[DBG15]]
-// AARCH64-NEXT:    [[TMP3:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 5), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo3\00"), "QUAL.OSS.DECL.SOURCE"([10 x i8] c"foo3:13:9\00") ], !dbg [[DBG16:![0-9]+]]
-// AARCH64-NEXT:    call void @foo3(), !dbg [[DBG16]]
-// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP3]]), !dbg [[DBG16]]
-// AARCH64-NEXT:    [[TMP4:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 1) ], !dbg [[DBG17:![0-9]+]]
-// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP4]]), !dbg [[DBG18:![0-9]+]]
-// AARCH64-NEXT:    [[TMP5:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 4) ], !dbg [[DBG19:![0-9]+]]
-// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP5]]), !dbg [[DBG20:![0-9]+]]
-// AARCH64-NEXT:    ret void, !dbg [[DBG21:![0-9]+]]
+// AARCH64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 0), "QUAL.OSS.DEVICE.DEVFUNC"([4 x i8] c"foo\00"), "QUAL.OSS.DECL.SOURCE"([18 x i8] c"task_device.c:7:9\00") ], !dbg [[DBG9:![0-9]+]]
+// AARCH64-NEXT:    call void @foo(), !dbg [[DBG9]]
+// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG9]]
+// AARCH64-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 1), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo1\00"), "QUAL.OSS.DECL.SOURCE"([18 x i8] c"task_device.c:9:9\00") ], !dbg [[DBG10:![0-9]+]]
+// AARCH64-NEXT:    call void @foo1(), !dbg [[DBG10]]
+// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP1]]), !dbg [[DBG10]]
+// AARCH64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 4), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo2\00"), "QUAL.OSS.DECL.SOURCE"([19 x i8] c"task_device.c:11:9\00") ], !dbg [[DBG11:![0-9]+]]
+// AARCH64-NEXT:    call void @foo2(), !dbg [[DBG11]]
+// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP2]]), !dbg [[DBG11]]
+// AARCH64-NEXT:    [[TMP3:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 5), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo3\00"), "QUAL.OSS.DECL.SOURCE"([19 x i8] c"task_device.c:13:9\00") ], !dbg [[DBG12:![0-9]+]]
+// AARCH64-NEXT:    call void @foo3(), !dbg [[DBG12]]
+// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP3]]), !dbg [[DBG12]]
+// AARCH64-NEXT:    [[TMP4:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 1) ], !dbg [[DBG13:![0-9]+]]
+// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP4]]), !dbg [[DBG14:![0-9]+]]
+// AARCH64-NEXT:    [[TMP5:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 4) ], !dbg [[DBG15:![0-9]+]]
+// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP5]]), !dbg [[DBG16:![0-9]+]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG17:![0-9]+]]
 //
 void bar() {
     foo();

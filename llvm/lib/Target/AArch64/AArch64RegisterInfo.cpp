@@ -19,7 +19,6 @@
 #include "MCTargetDesc/AArch64AddressingModes.h"
 #include "MCTargetDesc/AArch64InstPrinter.h"
 #include "llvm/ADT/BitVector.h"
-#include "llvm/ADT/Triple.h"
 #include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
@@ -31,6 +30,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetOptions.h"
+#include "llvm/TargetParser/Triple.h"
 
 using namespace llvm;
 
@@ -309,12 +309,11 @@ void AArch64RegisterInfo::UpdateCustomCallPreservedMask(MachineFunction &MF,
 
   for (size_t i = 0; i < AArch64::GPR64commonRegClass.getNumRegs(); ++i) {
     if (MF.getSubtarget<AArch64Subtarget>().isXRegCustomCalleeSaved(i)) {
-      for (MCSubRegIterator SubReg(AArch64::GPR64commonRegClass.getRegister(i),
-                                   this, true);
-           SubReg.isValid(); ++SubReg) {
+      for (MCPhysReg SubReg :
+           subregs_inclusive(AArch64::GPR64commonRegClass.getRegister(i))) {
         // See TargetRegisterInfo::getCallPreservedMask for how to interpret the
         // register mask.
-        UpdatedMask[*SubReg / 32] |= 1u << (*SubReg % 32);
+        UpdatedMask[SubReg / 32] |= 1u << (SubReg % 32);
       }
     }
   }
@@ -419,9 +418,8 @@ AArch64RegisterInfo::getStrictlyReservedRegs(const MachineFunction &MF) const {
 
   // SME tiles are not allocatable.
   if (MF.getSubtarget<AArch64Subtarget>().hasSME()) {
-    for (MCSubRegIterator SubReg(AArch64::ZA, this, /*self=*/true);
-         SubReg.isValid(); ++SubReg)
-      Reserved.set(*SubReg);
+    for (MCPhysReg SubReg : subregs_inclusive(AArch64::ZA))
+      Reserved.set(SubReg);
   }
 
   markSuperRegs(Reserved, AArch64::FPCR);

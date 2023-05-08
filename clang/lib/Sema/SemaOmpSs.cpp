@@ -1,9 +1,8 @@
 //===--- SemaOmpSs.cpp - Semantic Analysis for OmpSs constructs ---------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 /// \file
@@ -5262,7 +5261,7 @@ static bool actOnOSSReductionKindClause(
     if (Outline) {
       if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(RefExpr->IgnoreParenImpCasts())) {
         if (const VarDecl *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
-          if (!(VD->getType()->isReferenceType() || VD->hasGlobalStorage())) {
+          if (VD->hasGlobalStorage() || !VD->getType()->isReferenceType()) {
             S.Diag(ELoc, diag::err_oss_expected_lvalue_reference_or_global_or_dereference_or_array_item)
               << 1 << DRE->getSourceRange();
             return false;

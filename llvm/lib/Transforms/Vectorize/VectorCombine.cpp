@@ -25,11 +25,8 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/PatternMatch.h"
-#include "llvm/InitializePasses.h"
-#include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Transforms/Utils/Local.h"
-#include "llvm/Transforms/Vectorize.h"
 #include <numeric>
 
 #define DEBUG_TYPE "vector-combine"
@@ -1565,7 +1562,7 @@ bool VectorCombine::foldSelectShuffle(Instruction &I, bool FromReduction) {
   // Calculate our ReconstructMasks from the OrigReconstructMasks and the
   // modified order of the input shuffles.
   SmallVector<SmallVector<int>> ReconstructMasks;
-  for (auto Mask : OrigReconstructMasks) {
+  for (const auto &Mask : OrigReconstructMasks) {
     SmallVector<int> ReconstructMask;
     for (int M : Mask) {
       auto FindIndex = [](const SmallVector<std::pair<int, int>> &V, int M) {
@@ -1660,16 +1657,16 @@ bool VectorCombine::foldSelectShuffle(Instruction &I, bool FromReduction) {
           return SSV->getOperand(Op);
     return SV->getOperand(Op);
   };
-  Builder.SetInsertPoint(SVI0A->getNextNode());
+  Builder.SetInsertPoint(SVI0A->getInsertionPointAfterDef());
   Value *NSV0A = Builder.CreateShuffleVector(GetShuffleOperand(SVI0A, 0),
                                              GetShuffleOperand(SVI0A, 1), V1A);
-  Builder.SetInsertPoint(SVI0B->getNextNode());
+  Builder.SetInsertPoint(SVI0B->getInsertionPointAfterDef());
   Value *NSV0B = Builder.CreateShuffleVector(GetShuffleOperand(SVI0B, 0),
                                              GetShuffleOperand(SVI0B, 1), V1B);
-  Builder.SetInsertPoint(SVI1A->getNextNode());
+  Builder.SetInsertPoint(SVI1A->getInsertionPointAfterDef());
   Value *NSV1A = Builder.CreateShuffleVector(GetShuffleOperand(SVI1A, 0),
                                              GetShuffleOperand(SVI1A, 1), V2A);
-  Builder.SetInsertPoint(SVI1B->getNextNode());
+  Builder.SetInsertPoint(SVI1B->getInsertionPointAfterDef());
   Value *NSV1B = Builder.CreateShuffleVector(GetShuffleOperand(SVI1B, 0),
                                              GetShuffleOperand(SVI1B, 1), V2B);
   Builder.SetInsertPoint(Op0);
@@ -1809,54 +1806,6 @@ bool VectorCombine::run() {
   }
 
   return MadeChange;
-}
-
-// Pass manager boilerplate below here.
-
-namespace {
-class VectorCombineLegacyPass : public FunctionPass {
-public:
-  static char ID;
-  VectorCombineLegacyPass() : FunctionPass(ID) {
-    initializeVectorCombineLegacyPassPass(*PassRegistry::getPassRegistry());
-  }
-
-  void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.addRequired<AssumptionCacheTracker>();
-    AU.addRequired<DominatorTreeWrapperPass>();
-    AU.addRequired<TargetTransformInfoWrapperPass>();
-    AU.addRequired<AAResultsWrapperPass>();
-    AU.setPreservesCFG();
-    AU.addPreserved<DominatorTreeWrapperPass>();
-    AU.addPreserved<GlobalsAAWrapperPass>();
-    AU.addPreserved<AAResultsWrapperPass>();
-    AU.addPreserved<BasicAAWrapperPass>();
-    FunctionPass::getAnalysisUsage(AU);
-  }
-
-  bool runOnFunction(Function &F) override {
-    if (skipFunction(F))
-      return false;
-    auto &AC = getAnalysis<AssumptionCacheTracker>().getAssumptionCache(F);
-    auto &TTI = getAnalysis<TargetTransformInfoWrapperPass>().getTTI(F);
-    auto &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
-    auto &AA = getAnalysis<AAResultsWrapperPass>().getAAResults();
-    VectorCombine Combiner(F, TTI, DT, AA, AC, false);
-    return Combiner.run();
-  }
-};
-} // namespace
-
-char VectorCombineLegacyPass::ID = 0;
-INITIALIZE_PASS_BEGIN(VectorCombineLegacyPass, "vector-combine",
-                      "Optimize scalar/vector ops", false,
-                      false)
-INITIALIZE_PASS_DEPENDENCY(AssumptionCacheTracker)
-INITIALIZE_PASS_DEPENDENCY(DominatorTreeWrapperPass)
-INITIALIZE_PASS_END(VectorCombineLegacyPass, "vector-combine",
-                    "Optimize scalar/vector ops", false, false)
-Pass *llvm::createVectorCombinePass() {
-  return new VectorCombineLegacyPass();
 }
 
 PreservedAnalyses VectorCombinePass::run(Function &F,
