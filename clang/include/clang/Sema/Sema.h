@@ -12561,53 +12561,6 @@ public:
   OSSClause *ActOnOmpSsPriorityClause(Expr *E, SourceLocation StartLoc,
                                       SourceLocation LParenLoc,
                                       SourceLocation EndLoc);
-  /// Called on well-formed 'num_instances' clause.
-  OSSClause *ActOnOmpSsNumInstancesClause(Expr *E, SourceLocation StartLoc,
-                                          SourceLocation LParenLoc,
-                                          SourceLocation EndLoc);
-
-  /// Called on well-formed 'onto' clause.
-  OSSClause *ActOnOmpSsOntoClause(Expr *E, SourceLocation StartLoc,
-                                  SourceLocation LParenLoc,
-                                  SourceLocation EndLoc);
-
-  /// Called on well-formed 'num_repetitions' clause.
-  OSSClause *ActOnOmpSsNumRepetitionsClause(Expr *E, SourceLocation StartLoc,
-                                            SourceLocation LParenLoc,
-                                            SourceLocation EndLoc);
-
-  /// Called on well-formed 'period' clause.
-  OSSClause *ActOnOmpSsPeriodClause(Expr *E, SourceLocation StartLoc,
-                                    SourceLocation LParenLoc,
-                                    SourceLocation EndLoc);
-
-  /// Called on well-formed 'affinity' clause.
-  OSSClause *ActOnOmpSsAffinityClause(Expr *E, SourceLocation StartLoc,
-                                      SourceLocation LParenLoc,
-                                      SourceLocation EndLoc);
-
-  /// Called on well-formed 'copy_in' clause.
-  OSSClause *ActOnOmpSsCopyInClause(ArrayRef<Expr *> Vars,
-                                    SourceLocation StartLoc,
-                                    SourceLocation LParenLoc,
-                                    SourceLocation EndLoc);
-
-  /// Called on well-formed 'copy_out' clause.
-  OSSClause *ActOnOmpSsCopyOutClause(ArrayRef<Expr *> Vars,
-                                     SourceLocation StartLoc,
-                                     SourceLocation LParenLoc,
-                                     SourceLocation EndLoc);
-
-  /// Called on well-formed 'copy_inout' clause.
-  OSSClause *ActOnOmpSsCopyInOutClause(ArrayRef<Expr *> Vars,
-                                       SourceLocation StartLoc,
-                                       SourceLocation LParenLoc,
-                                       SourceLocation EndLoc);
-
-  /// Called on well-formed 'copy_deps' clause.
-  OSSClause *ActOnOmpSsCopyDepsClause(SourceLocation StartLoc,
-                                      SourceLocation EndLoc);
-
   /// Called on well-formed 'label' clause.
   OSSClause *ActOnOmpSsLabelClause(ArrayRef<Expr *> VarList, SourceLocation StartLoc,
                                    SourceLocation LParenLoc,

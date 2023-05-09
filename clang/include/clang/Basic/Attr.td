@@ -3800,7 +3800,7 @@ def OSSTaskDecl : Attr {
   ];
   let AdditionalMembers = [{
     void printPrettyPragma(raw_ostream & OS, const PrintingPolicy &Policy)
-        const;
+        const; 
   }];
 }
 

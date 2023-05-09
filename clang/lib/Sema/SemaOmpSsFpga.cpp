@@ -150,9 +150,6 @@ bool Sema::CheckFpgaLocalmems(FunctionDecl *FD) {
     for (auto *localmem : list) {
       auto *arrShapingExpr = dyn_cast<OSSArrayShapingExpr>(localmem);
       if (!arrShapingExpr) {
-        Diag(localmem->getExprLoc(),
-             diag::err_oss_fpga_expected_array_to_place_in_localmem);
-        foundError = true;
         continue;
       }
 
@@ -229,6 +226,6 @@ bool Sema::ActOnOmpSsDeclareTaskDirectiveWithFpga(Decl *ADecl) {
     return false;
   }
 
-  Context.ompssFpgaDecls.push_back(ADecl);
+  Context.ompssFpgaDecls.push_back(FD);
   return true;
 }

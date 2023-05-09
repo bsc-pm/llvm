@@ -193,18 +193,26 @@ bool GenerateExtractedOriginalFunction(
         !file->getName().endswith(".fpga")) {
       continue;
     }
-    auto loc = SourceMgr.getIncludeLoc(SourceMgr.translateFile(file));
-    auto *data = SourceMgr.getCharacterData(loc);
-    // Just to make sure I don't overrun a buffer later
-    auto bufferData = SourceMgr.getBufferData(SourceMgr.getFileID(loc));
-    const auto *endChar = bufferData.data() + bufferData.size();
-    auto *dataEndInclude = data;
-    for (; dataEndInclude < endChar && *dataEndInclude != '\n' &&
-           *dataEndInclude != '\r' && *dataEndInclude != '\0';
-         ++dataEndInclude)
-      ;
+    StringRef headerInclude;
+    // We need to generate a string with two " and the path
+    std::string headerIncludeStorage =
+        std::string("\"").append(file->tryGetRealPathName()).append("\"");
+    headerInclude = headerIncludeStorage;
+    if (headerInclude.size() == 2) /*Missing path*/ {
+      // This extracts the path from the source file
+      auto loc = SourceMgr.getIncludeLoc(SourceMgr.translateFile(file));
+      auto *data = SourceMgr.getCharacterData(loc);
+      // Just to make sure I don't overrun a buffer later
+      auto bufferData = SourceMgr.getBufferData(SourceMgr.getFileID(loc));
+      const auto *endChar = bufferData.data() + bufferData.size();
+      auto *dataEndInclude = data;
+      for (; dataEndInclude < endChar && *dataEndInclude != '\n' &&
+             *dataEndInclude != '\r' && *dataEndInclude != '\0';
+           ++dataEndInclude)
+        ;
 
-    llvm::StringRef headerInclude(data, dataEndInclude - data);
+      headerInclude = StringRef(data, dataEndInclude - data);
+    }
     outputFile << "#include " << headerInclude << '\n';
   }
 
@@ -722,18 +730,27 @@ OMPIF_COMM_WORLD
           !file->getName().endswith(".fpga")) {
         continue;
       }
-      auto loc = SourceMgr.getIncludeLoc(SourceMgr.translateFile(file));
-      auto *data = SourceMgr.getCharacterData(loc);
-      // Just to make sure I don't overrun a buffer later
-      auto bufferData = SourceMgr.getBufferData(SourceMgr.getFileID(loc));
-      const auto *endChar = bufferData.data() + bufferData.size();
-      auto *dataEndInclude = data;
-      for (; dataEndInclude < endChar && *dataEndInclude != '\n' &&
-             *dataEndInclude != '\r' && *dataEndInclude != '\0';
-           ++dataEndInclude)
-        ;
+      StringRef headerInclude;
+      // We need to generate a string with two " and the path
+      std::string headerIncludeStorage =
+          std::string("\"").append(file->tryGetRealPathName()).append("\"");
+      headerInclude = headerIncludeStorage;
+      if (headerInclude.size() == 2) /*Missing path*/ {
+        // This extracts the path from the source file
+        auto loc = SourceMgr.getIncludeLoc(SourceMgr.translateFile(file));
+        auto *data = SourceMgr.getCharacterData(loc);
+        // Just to make sure I don't overrun a buffer later
+        auto bufferData = SourceMgr.getBufferData(SourceMgr.getFileID(loc));
+        const auto *endChar = bufferData.data() + bufferData.size();
+        auto *dataEndInclude = data;
+        for (; dataEndInclude < endChar && *dataEndInclude != '\n' &&
+               *dataEndInclude != '\r' && *dataEndInclude != '\0';
+             ++dataEndInclude)
+          ;
 
-      llvm::StringRef headerInclude(data, dataEndInclude - data);
+        headerInclude = StringRef(data, dataEndInclude - data);
+      }
+
       OutputHeaders << "#include " << headerInclude << '\n';
     }
 
@@ -1435,9 +1452,7 @@ void FPGAWrapperGen::ActOnOmpSsFpgaExtractFiles(clang::ASTContext &Ctx) {
     return;
   }
 
-  for (auto *decl : Ctx.ompssFpgaDecls) {
-    auto *FD = dyn_cast<FunctionDecl>(decl);
-
+  for (auto *FD : Ctx.ompssFpgaDecls) {
     auto funcName = FD->getName();
     if (CI.getFrontendOpts().OmpSsFpgaDump) {
       llvm::outs() << funcName << '\n';
@@ -1498,6 +1513,8 @@ void FPGAWrapperGen::ActOnOmpSsFpgaGenerateWrapperCodeFiles(
 }
 
 void FPGAWrapperGen::HandleTranslationUnit(clang::ASTContext &Ctx) {
+  if (CI.getDiagnostics().hasErrorOccurred())
+    return;
   if (CI.getFrontendOpts().OmpSsFpgaExtract &&
       CI.getFrontendOpts().OmpSsFpgaWrapperCode) {
     CI.getDiagnostics().Report(diag::err_oss_fpga_wrapper_code_and_extract);

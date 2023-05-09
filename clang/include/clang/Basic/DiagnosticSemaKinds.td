@@ -11547,26 +11547,10 @@ def err_oss_clause_expect_constant_between : Error<
   "expected value between %0 and %1, but got %2 in '%3' clause">;
 def err_oss_ndrange_expect_nelems : Error<
   "'ndrange(%0, argument-list)' clause requires %1 or %2 arguments in argument-list, but got %3">;
-def err_oss_ndrange_incompatible_device : Error<
-  "ndrange cannot be used with other devices than cuda and opencl">;
-def err_oss_num_instances_incompatible_device : Error<
-  "num_instances cannot be used with other devices than fpga">;
-def err_oss_onto_incompatible_device : Error<
-  "onto cannot be used with other devices than fpga">;
-def err_oss_num_repetitions_incompatible_device : Error<
-  "num_repetitions cannot be used with other devices than fpga">;
-def err_oss_period_incompatible_device : Error<
-  "period cannot be used with other devices than fpga">;
-def err_oss_affinity_incompatible_device : Error<
-  "affinity cannot be used with other devices than fpga">;
-def err_oss_copy_deps_incompatible_device : Error<
-  "copy_deps cannot be used with other devices than fpga">;
-def err_oss_copy_in_incompatible_device : Error<
-  "copy_in cannot be used with other devices than fpga">;
-def err_oss_copy_out_incompatible_device : Error<
-  "copy_out cannot be used with other devices than fpga">;
-def err_oss_copy_inout_incompatible_device : Error<
-  "copy_inout cannot be used with other devices than fpga">;
+def err_oss_clause_incompatible_device : Error<
+  "clause %0 cannot be used with other devices than %1">;
+def err_oss_copy_inout_must_be_an_array_shapping_expr : Error<
+  "All copy_in/out clauses must hold an array shaping expression">;
 def err_oss_ompss_fpga_hls_tasks_dir_missing_dir: Error<
   "-fompss-fpga-hls-tasks-dir needs a valid directory">;
 def err_oss_inline_device_not_supported : Error<

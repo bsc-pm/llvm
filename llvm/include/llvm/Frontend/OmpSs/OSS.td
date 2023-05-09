@@ -169,31 +169,22 @@ def OSSC_Unknown : Clause<"unknown"> {
   let isDefault = true;
 }
 def OSSC_Num_instances: Clause<"num_instances"> {
-  let clangClass = "OSSNumInstancesClause";
 }
 def OSSC_Onto: Clause<"onto"> {
-  let clangClass = "OSSOntoClause";
 }
 def OSSC_Num_repetitions: Clause<"num_repetitions"> {
-  let clangClass = "OSSNumRepetitionsClause";
 }
 def OSSC_Period: Clause<"period"> {
-  let clangClass = "OSSPeriodClause";
 }
 def OSSC_Affinity: Clause<"affinity"> {
-  let clangClass = "OSSAffinityClause";
 }
 def OSSC_CopyIn: Clause<"copy_in"> {
-  let clangClass = "OSSCopyInClause";
 }
 def OSSC_CopyOut: Clause<"copy_out"> {
-  let clangClass = "OSSCopyOutClause";
 }
 def OSSC_CopyInOut: Clause<"copy_inout"> {
-  let clangClass = "OSSCopyInOutClause";
 }
 def OSSC_Copy_deps: Clause<"copy_deps"> {
-  let clangClass = "OSSCopyDepsClause";
 }
 
 //===----------------------------------------------------------------------===//
@@ -228,15 +219,6 @@ def OSS_Task : Directive<"task"> {
     VersionedClause<OSSC_Wait>,
     VersionedClause<OSSC_Onready>,
     VersionedClause<OSSC_Device>,
-    VersionedClause<OSSC_Num_instances>,
-    VersionedClause<OSSC_Onto>,
-    VersionedClause<OSSC_Num_repetitions>,
-    VersionedClause<OSSC_Period>,
-    VersionedClause<OSSC_Affinity>,
-    VersionedClause<OSSC_CopyIn>,
-    VersionedClause<OSSC_CopyOut>,
-    VersionedClause<OSSC_CopyInOut>,
-    VersionedClause<OSSC_Copy_deps>,
   ];
 }
 def OSS_DeclareTask : Directive<"declare task"> {

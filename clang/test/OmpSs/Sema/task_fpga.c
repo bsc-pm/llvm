@@ -44,10 +44,3 @@ void ontoerr1() {}
 
 #pragma oss task device(fpga) onto(0x600000000) // expected-error {{Task type too wide: 2bits arch + 32bits hash}}
 void ontoerr2() {}
-
-void dependencyNormalFunc();  // expected-error {{This function is depended by an fpga kernel, but we couldn't locate its body. Make sure it is visible in this translation unit.}}
-
-#pragma oss task device(fpga)
-void missingDependBody() { // expected-note {{The fpga kernel}}
-    dependencyNormalFunc();
-}

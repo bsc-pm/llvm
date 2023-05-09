@@ -4737,9 +4737,6 @@ void Driver::BuildJobs(Compilation &C) const {
   // into a single offloading action. We should count all inputs to the action
   // as outputs. Also ignore device-only outputs if we're compiling with
   // -fsyntax-only.
-  //
-  // FPGAWrapperGen of type TY_PP_FPGA_WRAPPERGEN_C or
-  // TY_PP_FPGA_WRAPPERGEN_CXX.
   if (FinalOutput) {
     unsigned NumOutputs = 0;
     unsigned NumIfsOutputs = 0;

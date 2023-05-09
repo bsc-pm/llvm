@@ -30,6 +30,7 @@
 #include "clang/Sema/ScopeInfo.h"
 #include "clang/Sema/SemaInternal.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
+#include "llvm/Frontend/OmpSs/OSS.h.inc"
 
 using namespace clang;
 using namespace llvm::oss;
@@ -4441,14 +4442,16 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
         NumInstances, OSSC_num_instances, /*StrictlyPositive=*/true,
         /*Outline=*/true);
     if (DevType != OSSTaskDeclAttr::Fpga)
-      Diag(DeviceLoc, diag::err_oss_num_instances_incompatible_device);
+      Diag(DeviceLoc, diag::err_oss_clause_incompatible_device)
+          << getOmpSsClauseName(OSSC_num_instances) << "fpga";
   }
   if (Onto) {
     OntoRes = CheckNonNegativeIntegerValue(Onto, OSSC_onto,
                                            /*StrictlyPositive=*/false,
                                            /*Outline=*/true);
     if (DevType != OSSTaskDeclAttr::Fpga)
-      Diag(DeviceLoc, diag::err_oss_onto_incompatible_device);
+      Diag(DeviceLoc, diag::err_oss_clause_incompatible_device)
+          << getOmpSsClauseName(OSSC_onto) << "fpga";
     uint64_t onto =
         OntoRes.get()->getIntegerConstantExpr(Context)->getZExtValue();
     // Check that arch bits are set
@@ -4464,33 +4467,64 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
         NumRepetitions, OSSC_num_repetitions, /*StrictlyPositive=*/true,
         /*Outline=*/true);
     if (DevType != OSSTaskDeclAttr::Fpga)
-      Diag(DeviceLoc, diag::err_oss_num_repetitions_incompatible_device);
+      Diag(DeviceLoc, diag::err_oss_clause_incompatible_device)
+          << getOmpSsClauseName(OSSC_num_repetitions) << "fpga";
   }
   if (Period) {
     PeriodRes = CheckNonNegativeIntegerValue(Period, OSSC_period,
                                              /*StrictlyPositive=*/true,
                                              /*Outline=*/true);
     if (DevType != OSSTaskDeclAttr::Fpga)
-      Diag(DeviceLoc, diag::err_oss_period_incompatible_device);
+      Diag(DeviceLoc, diag::err_oss_clause_incompatible_device)
+          << getOmpSsClauseName(OSSC_period) << "fpga";
   }
   if (Affinity) {
     AffinityRes = CheckNonNegativeIntegerValue(Affinity, OSSC_affinity,
                                                /*StrictlyPositive=*/true,
                                                /*Outline=*/true);
     if (DevType != OSSTaskDeclAttr::Fpga)
-      Diag(DeviceLoc, diag::err_oss_affinity_incompatible_device);
+      Diag(DeviceLoc, diag::err_oss_clause_incompatible_device)
+          << getOmpSsClauseName(OSSC_affinity) << "fpga";
   }
   if (CopyDeps && DevType != OSSTaskDeclAttr::Fpga) {
-    Diag(DeviceLoc, diag::err_oss_copy_deps_incompatible_device);
+    Diag(DeviceLoc, diag::err_oss_clause_incompatible_device)
+        << getOmpSsClauseName(OSSC_copy_deps) << "fpga";
   }
-  if (!CopyIn.empty() && DevType != OSSTaskDeclAttr::Fpga) {
-    Diag(DeviceLoc, diag::err_oss_copy_in_incompatible_device);
+  if (!CopyIn.empty()) {
+    for (Expr *e : CopyIn) {
+      if (!dyn_cast<OSSArrayShapingExpr>(e)) {
+        Diag(e->getExprLoc(),
+             diag::err_oss_fpga_expected_array_to_place_in_localmem);
+      }
+    }
+    if (DevType != OSSTaskDeclAttr::Fpga) {
+      Diag(DeviceLoc, diag::err_oss_clause_incompatible_device)
+          << getOmpSsClauseName(OSSC_copy_in) << "fpga";
+    }
   }
-  if (!CopyOut.empty() && DevType != OSSTaskDeclAttr::Fpga) {
-    Diag(DeviceLoc, diag::err_oss_copy_out_incompatible_device);
+  if (!CopyOut.empty()) {
+    for (Expr *e : CopyOut) {
+      if (!dyn_cast<OSSArrayShapingExpr>(e)) {
+        Diag(e->getExprLoc(),
+             diag::err_oss_fpga_expected_array_to_place_in_localmem);
+      }
+    }
+    if (DevType != OSSTaskDeclAttr::Fpga) {
+      Diag(DeviceLoc, diag::err_oss_clause_incompatible_device)
+          << getOmpSsClauseName(OSSC_copy_out) << "fpga";
+    }
   }
-  if (!CopyInOut.empty() && DevType != OSSTaskDeclAttr::Fpga) {
-    Diag(DeviceLoc, diag::err_oss_copy_inout_incompatible_device);
+  if (!CopyInOut.empty()) {
+    for (Expr *e : CopyInOut) {
+      if (!dyn_cast<OSSArrayShapingExpr>(e)) {
+        Diag(e->getExprLoc(),
+             diag::err_oss_fpga_expected_array_to_place_in_localmem);
+      }
+    }
+    if (DevType != OSSTaskDeclAttr::Fpga) {
+      Diag(DeviceLoc, diag::err_oss_clause_incompatible_device)
+          << getOmpSsClauseName(OSSC_copy_inout) << "fpga";
+    }
   }
   OSSClauseDSAChecker OSSClauseChecker(/*Stack=*/nullptr, *this);
   for (Expr *RefExpr : Ins) {
@@ -4619,7 +4653,8 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   if (!Ndranges.empty()) {
     if (!(DevType == OSSTaskDeclAttr::DeviceType::Cuda
         || DevType == OSSTaskDeclAttr::DeviceType::Opencl))
-      Diag(DeviceLoc, diag::err_oss_ndrange_incompatible_device);
+      Diag(DeviceLoc, diag::err_oss_clause_incompatible_device)
+          << getOmpSsClauseName(OSSC_ndrange) << "cuda and opencl";
 
     checkNdrange(*this, NdrangeLoc, Ndranges, NdrangesRes, /*Outline=*/true);
   }
@@ -4679,13 +4714,7 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   ADecl->addAttr(NewAttr);
   switch (OSSTaskDeclAttr::DeviceType(Device)) {
   case OSSTaskDeclAttr::Fpga:
-    if (!ActOnOmpSsDeclareTaskDirectiveWithFpga(ADecl)) {
-      ADecl->dropAttr<OSSTaskDeclAttr>(); // The target device does not support
-                                          // this kind of function. Let's
-                                          // generate a normal function, and
-                                          // assume that the Act function has
-                                          // emitted errors.
-    }
+    ActOnOmpSsDeclareTaskDirectiveWithFpga(ADecl);
     break;
   case OSSTaskDeclAttr::Smp:
   case OSSTaskDeclAttr::Cuda:
@@ -5699,15 +5728,6 @@ Sema::ActOnOmpSsVarListClause(
     Res = ActOnOmpSsDependClause({ OSSC_DEPEND_mutexinoutset, OSSC_DEPEND_weak }, DepLoc, ColonLoc, Vars,
                                  StartLoc, LParenLoc, EndLoc, /*OSSSyntax=*/true);
     break;
-  case OSSC_copy_in:
-    Res = ActOnOmpSsCopyInClause(Vars, StartLoc, LParenLoc, EndLoc);
-    break;
-  case OSSC_copy_out:
-    Res = ActOnOmpSsCopyOutClause(Vars, StartLoc, LParenLoc, EndLoc);
-    break;
-  case OSSC_copy_inout:
-    Res = ActOnOmpSsCopyInOutClause(Vars, StartLoc, LParenLoc, EndLoc);
-    break;
   default:
     llvm_unreachable("Clause is not allowed.");
   }
@@ -5979,124 +5999,6 @@ Sema::ActOnOmpSsPrivateClause(ArrayRef<Expr *> Vars,
   return OSSPrivateClause::Create(Context, StartLoc, LParenLoc, EndLoc, ClauseVars, PrivateCopies);
 }
 
-OSSClause *Sema::ActOnOmpSsCopyInClause(ArrayRef<Expr *> Vars,
-                                        SourceLocation StartLoc,
-                                        SourceLocation LParenLoc,
-                                        SourceLocation EndLoc) {
-  SmallVector<Expr *, 8> ClauseVars;
-  for (Expr *RefExpr : Vars) {
-
-    SourceLocation ELoc;
-    SourceRange ERange;
-
-    auto Res = getPrivateItem(*this, RefExpr, ELoc, ERange);
-    ValueDecl *D = Res.first;
-    if (!D) {
-      continue;
-    }
-
-    if (RequireCompleteType(ELoc, D->getType(), diag::err_oss_incomplete_type))
-      continue;
-
-    DSAStackTy::DSAVarData DVar = DSAStack->getCurrentDSA(D);
-    if (DVar.CKind != OSSC_unknown && DVar.CKind != OSSC_copy_in &&
-        DVar.RefExpr) {
-      Diag(ELoc, diag::err_oss_wrong_dsa)
-          << getOmpSsClauseName(DVar.CKind) << getOmpSsClauseName(OSSC_copy_in);
-      continue;
-    }
-
-    DSAStack->addDSA(D, RefExpr, OSSC_copy_in, /*Ignore=*/false,
-                     /*IsBase=*/true, /*Implicit=*/false);
-    ClauseVars.push_back(RefExpr);
-  }
-
-  if (Vars.empty())
-    return nullptr;
-
-  return OSSCopyInClause::Create(Context, StartLoc, LParenLoc, EndLoc,
-                                 ClauseVars);
-}
-
-OSSClause *Sema::ActOnOmpSsCopyOutClause(ArrayRef<Expr *> Vars,
-                                         SourceLocation StartLoc,
-                                         SourceLocation LParenLoc,
-                                         SourceLocation EndLoc) {
-  SmallVector<Expr *, 8> ClauseVars;
-  for (Expr *RefExpr : Vars) {
-
-    SourceLocation ELoc;
-    SourceRange ERange;
-
-    auto Res = getPrivateItem(*this, RefExpr, ELoc, ERange);
-    ValueDecl *D = Res.first;
-    if (!D) {
-      continue;
-    }
-
-    if (RequireCompleteType(ELoc, D->getType(), diag::err_oss_incomplete_type))
-      continue;
-
-    DSAStackTy::DSAVarData DVar = DSAStack->getCurrentDSA(D);
-    if (DVar.CKind != OSSC_unknown && DVar.CKind != OSSC_copy_out &&
-        DVar.RefExpr) {
-      Diag(ELoc, diag::err_oss_wrong_dsa) << getOmpSsClauseName(DVar.CKind)
-                                          << getOmpSsClauseName(OSSC_copy_out);
-      continue;
-    }
-
-    DSAStack->addDSA(D, RefExpr, OSSC_copy_out, /*Ignore=*/false,
-                     /*IsBase=*/true, /*Implicit=*/false);
-    ClauseVars.push_back(RefExpr);
-  }
-
-  if (Vars.empty())
-    return nullptr;
-
-  return OSSCopyOutClause::Create(Context, StartLoc, LParenLoc, EndLoc,
-                                  ClauseVars);
-}
-
-OSSClause *Sema::ActOnOmpSsCopyInOutClause(ArrayRef<Expr *> Vars,
-                                           SourceLocation StartLoc,
-                                           SourceLocation LParenLoc,
-                                           SourceLocation EndLoc) {
-  SmallVector<Expr *, 8> ClauseVars;
-  for (Expr *RefExpr : Vars) {
-
-    SourceLocation ELoc;
-    SourceRange ERange;
-
-    auto Res = getPrivateItem(*this, RefExpr, ELoc, ERange);
-    ValueDecl *D = Res.first;
-    if (!D) {
-      continue;
-    }
-
-    if (RequireCompleteType(ELoc, D->getType(), diag::err_oss_incomplete_type))
-      continue;
-
-    DSAStackTy::DSAVarData DVar = DSAStack->getCurrentDSA(D);
-    if (DVar.CKind != OSSC_unknown && DVar.CKind != OSSC_copy_inout &&
-        DVar.RefExpr) {
-      Diag(ELoc, diag::err_oss_wrong_dsa)
-          << getOmpSsClauseName(DVar.CKind)
-          << getOmpSsClauseName(OSSC_copy_inout);
-      continue;
-    }
-
-    DSAStack->addDSA(D, RefExpr, OSSC_copy_inout, /*Ignore=*/false,
-                     /*IsBase=*/true, /*Implicit=*/false);
-    ClauseVars.push_back(RefExpr);
-  }
-
-  if (Vars.empty())
-    return nullptr;
-
-  return OSSCopyInOutClause::Create(Context, StartLoc, LParenLoc, EndLoc,
-                                    ClauseVars);
-}
-
 OSSClause *
 Sema::ActOnOmpSsFirstprivateClause(ArrayRef<Expr *> Vars,
                        SourceLocation StartLoc,
@@ -6361,65 +6263,6 @@ OSSClause *Sema::ActOnOmpSsPriorityClause(Expr *E,
   return new (Context) OSSPriorityClause(Res.get(), StartLoc, LParenLoc, EndLoc);
 }
 
-OSSClause *Sema::ActOnOmpSsNumInstancesClause(Expr *E, SourceLocation StartLoc,
-                                              SourceLocation LParenLoc,
-                                              SourceLocation EndLoc) {
-  ExprResult Res = CheckSignedIntegerValue(E, /*Outline=*/false);
-  if (Res.isInvalid())
-    return nullptr;
-
-  return new (Context)
-      OSSNumInstancesClause(Res.get(), StartLoc, LParenLoc, EndLoc);
-}
-
-OSSClause *Sema::ActOnOmpSsOntoClause(Expr *E, SourceLocation StartLoc,
-                                      SourceLocation LParenLoc,
-                                      SourceLocation EndLoc) {
-  ExprResult Res = CheckSignedIntegerValue(E, /*Outline=*/false);
-  if (Res.isInvalid())
-    return nullptr;
-
-  return new (Context) OSSOntoClause(Res.get(), StartLoc, LParenLoc, EndLoc);
-}
-
-OSSClause *Sema::ActOnOmpSsNumRepetitionsClause(Expr *E,
-                                                SourceLocation StartLoc,
-                                                SourceLocation LParenLoc,
-                                                SourceLocation EndLoc) {
-  ExprResult Res = CheckSignedIntegerValue(E, /*Outline=*/false);
-  if (Res.isInvalid())
-    return nullptr;
-
-  return new (Context)
-      OSSNumRepetitionsClause(Res.get(), StartLoc, LParenLoc, EndLoc);
-}
-
-OSSClause *Sema::ActOnOmpSsPeriodClause(Expr *E, SourceLocation StartLoc,
-                                        SourceLocation LParenLoc,
-                                        SourceLocation EndLoc) {
-  ExprResult Res = CheckSignedIntegerValue(E, /*Outline=*/false);
-  if (Res.isInvalid())
-    return nullptr;
-
-  return new (Context) OSSPeriodClause(Res.get(), StartLoc, LParenLoc, EndLoc);
-}
-
-OSSClause *Sema::ActOnOmpSsAffinityClause(Expr *E, SourceLocation StartLoc,
-                                          SourceLocation LParenLoc,
-                                          SourceLocation EndLoc) {
-  ExprResult Res = CheckSignedIntegerValue(E, /*Outline=*/false);
-  if (Res.isInvalid())
-    return nullptr;
-
-  return new (Context)
-      OSSAffinityClause(Res.get(), StartLoc, LParenLoc, EndLoc);
-}
-
-OSSClause *Sema::ActOnOmpSsCopyDepsClause(SourceLocation StartLoc,
-                                          SourceLocation EndLoc) {
-  return new (Context) OSSCopyDepsClause(StartLoc, EndLoc);
-}
-
 OSSClause *Sema::ActOnOmpSsLabelClause(ArrayRef<Expr *> VarList,
                                        SourceLocation StartLoc,
                                        SourceLocation LParenLoc,
@@ -6550,9 +6393,6 @@ OSSClause *Sema::ActOnOmpSsClause(OmpSsClauseKind Kind,
                                   SourceLocation EndLoc) {
   OSSClause *Res = nullptr;
   switch (Kind) {
-  case OSSC_copy_deps:
-    Res = ActOnOmpSsCopyDepsClause(StartLoc, EndLoc);
-    break;
   case OSSC_wait:
     Res = ActOnOmpSsWaitClause(StartLoc, EndLoc);
     break;
