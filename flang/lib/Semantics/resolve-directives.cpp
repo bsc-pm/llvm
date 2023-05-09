@@ -457,6 +457,11 @@ public:
     return false;
   }
 
+  bool Pre(const parser::OmpClause::UseDevicePtr &x) {
+    ResolveOmpObjectList(x.v, Symbol::Flag::OmpUseDevicePtr);
+    return false;
+  }
+
   void Post(const parser::Name &);
 
   // Keep track of labels in the statements that causes jumps to target labels
@@ -527,7 +532,7 @@ private:
       Symbol::Flag::OmpPrivate, Symbol::Flag::OmpLinear,
       Symbol::Flag::OmpFirstPrivate, Symbol::Flag::OmpLastPrivate,
       Symbol::Flag::OmpReduction, Symbol::Flag::OmpCriticalLock,
-      Symbol::Flag::OmpCopyIn};
+      Symbol::Flag::OmpCopyIn, Symbol::Flag::OmpUseDevicePtr};
 
   static constexpr Symbol::Flags ompFlagsRequireMark{
       Symbol::Flag::OmpThreadprivate};

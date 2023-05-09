@@ -11231,6 +11231,7 @@ X86TargetLowering::LowerBUILD_VECTOR(SDValue Op, SelectionDAG &DAG) const {
   APInt ZeroMask = APInt::getZero(NumElems);
   APInt NonZeroMask = APInt::getZero(NumElems);
   bool IsAllConstants = true;
+  bool OneUseFrozenUndefs = true;
   SmallSet<SDValue, 8> Values;
   unsigned NumConstants = NumElems;
   for (unsigned i = 0; i < NumElems; ++i) {
@@ -11239,7 +11240,8 @@ X86TargetLowering::LowerBUILD_VECTOR(SDValue Op, SelectionDAG &DAG) const {
       UndefMask.setBit(i);
       continue;
     }
-    if (Elt.getOpcode() == ISD::FREEZE && Elt.getOperand(0).isUndef()) {
+    if (ISD::isFreezeUndef(Elt.getNode())) {
+      OneUseFrozenUndefs = OneUseFrozenUndefs && Elt->hasOneUse();
       FrozenUndefMask.setBit(i);
       continue;
     }
@@ -11259,9 +11261,13 @@ X86TargetLowering::LowerBUILD_VECTOR(SDValue Op, SelectionDAG &DAG) const {
   if (UndefMask.isAllOnes())
     return DAG.getUNDEF(VT);
 
-  // All undef/freeze(undef) vector. Return an FREEZE UNDEF.
-  if ((UndefMask | FrozenUndefMask).isAllOnes())
+  // All undef/freeze(undef) vector. Return a FREEZE UNDEF.
+  if (OneUseFrozenUndefs && (UndefMask | FrozenUndefMask).isAllOnes())
     return DAG.getFreeze(DAG.getUNDEF(VT));
+
+  // All undef/freeze(undef)/zero vector. Return a zero vector.
+  if ((UndefMask | FrozenUndefMask | ZeroMask).isAllOnes())
+    return getZeroVector(VT, Subtarget, DAG, dl);
 
   // If we have multiple FREEZE-UNDEF operands, we are likely going to end up
   // lowering into a suboptimal insertion sequence. Instead, thaw the UNDEF in
@@ -11657,8 +11663,13 @@ static SDValue LowerAVXCONCAT_VECTORS(SDValue Op, SelectionDAG &DAG,
     SDValue SubVec = Op.getOperand(i);
     if (SubVec.isUndef())
       continue;
-    if (ISD::isFreezeUndef(SubVec.getNode()) && SubVec.hasOneUse())
-      ++NumFreezeUndef;
+    if (ISD::isFreezeUndef(SubVec.getNode())) {
+        // If the freeze(undef) has multiple uses then we must fold to zero.
+        if (SubVec.hasOneUse())
+          ++NumFreezeUndef;
+        else
+          ++NumZero;
+    }
     else if (ISD::isBuildVectorAllZeros(SubVec.getNode()))
       ++NumZero;
     else {
@@ -38582,6 +38593,23 @@ void X86TargetLowering::computeKnownBitsForTargetNode(const SDValue Op,
 
     // PSADBW - fills low 16 bits and zeros upper 48 bits of each i64 result.
     Known.Zero.setBitsFrom(16);
+    break;
+  }
+  case X86ISD::PCMPGT:
+  case X86ISD::PCMPEQ: {
+    KnownBits KnownLhs =
+        DAG.computeKnownBits(Op.getOperand(0), DemandedElts, Depth + 1);
+    KnownBits KnownRhs =
+        DAG.computeKnownBits(Op.getOperand(1), DemandedElts, Depth + 1);
+    std::optional<bool> Res = Opc == X86ISD::PCMPEQ
+                                  ? KnownBits::eq(KnownLhs, KnownRhs)
+                                  : KnownBits::sgt(KnownLhs, KnownRhs);
+    if (Res) {
+      if (*Res)
+        Known.setAllOnes();
+      else
+        Known.setAllZero();
+    }
     break;
   }
   case X86ISD::PMULUDQ: {

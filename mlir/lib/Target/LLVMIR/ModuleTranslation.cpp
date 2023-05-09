@@ -22,6 +22,7 @@
 #include "mlir/Dialect/LLVMIR/Transforms/LegalizeForExport.h"
 #include "mlir/Dialect/OmpSs/OmpSsDialect.h"
 #include "mlir/Dialect/OpenMP/OpenMPDialect.h"
+#include "mlir/Dialect/OpenMP/OpenMPInterfaces.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -450,6 +451,7 @@ ModuleTranslation::ModuleTranslation(Operation *module,
   assert(satisfiesLLVMModule(mlirModule) &&
          "mlirModule should honor LLVM's module semantics.");
 }
+
 ModuleTranslation::~ModuleTranslation() {
   if (ompBuilder)
     ompBuilder->finalize();
@@ -771,6 +773,10 @@ LogicalResult ModuleTranslation::convertGlobals() {
           /*Data=*/nullptr);
     }
   }
+
+  for (auto op : getModuleBody(mlirModule).getOps<LLVM::GlobalOp>())
+    if (failed(convertDialectAttributes(op)))
+      return failure();
 
   return success();
 }
@@ -1251,6 +1257,26 @@ SmallVector<llvm::Value *> ModuleTranslation::lookupValues(ValueRange values) {
   for (Value v : values)
     remapped.push_back(lookupValue(v));
   return remapped;
+}
+
+llvm::OpenMPIRBuilder *ModuleTranslation::getOpenMPBuilder() {
+  if (!ompBuilder) {
+    ompBuilder = std::make_unique<llvm::OpenMPIRBuilder>(*llvmModule);
+    ompBuilder->initialize();
+
+    bool isDevice = false;
+    if (auto offloadMod =
+            dyn_cast<mlir::omp::OffloadModuleInterface>(mlirModule))
+      isDevice = offloadMod.getIsDevice();
+
+    // TODO: set the flags when available
+    llvm::OpenMPIRBuilderConfig Config(
+        isDevice, /* IsTargetCodegen */ false,
+        /* HasRequiresUnifiedSharedMemory */ false,
+        /* OpenMPOffloadMandatory */ false);
+    ompBuilder->setConfig(Config);
+  }
+  return ompBuilder.get();
 }
 
 const llvm::DILocation *

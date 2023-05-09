@@ -3223,11 +3223,13 @@ def fdebug_default_version: Joined<["-"], "fdebug-default-version=">, Group<f_Gr
 def fdebug_prefix_map_EQ
   : Joined<["-"], "fdebug-prefix-map=">, Group<f_Group>,
     Flags<[CC1Option,CC1AsOption]>,
-    HelpText<"remap file source paths in debug info">;
+    MetaVarName<"<old>=<new>">,
+    HelpText<"For paths in debug info, remap directory <old> to <new>. If multiple options match a path, the last option wins">;
 def fcoverage_prefix_map_EQ
   : Joined<["-"], "fcoverage-prefix-map=">, Group<f_Group>,
     Flags<[CC1Option]>,
-    HelpText<"remap file source paths in coverage mapping">;
+    MetaVarName<"<old>=<new>">,
+    HelpText<"remap file source paths <old> to <new> in coverage mapping. If there are multiple options, prefix replacement is applied in reverse order starting from the last one">;
 def ffile_prefix_map_EQ
   : Joined<["-"], "ffile-prefix-map=">, Group<f_Group>,
     HelpText<"remap file source paths in debug info, predefined preprocessor "

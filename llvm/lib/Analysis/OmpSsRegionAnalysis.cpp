@@ -488,6 +488,10 @@ void DirectiveEnvironment::verifyVLADimsInfo() {
   for (const auto &VLAWithDimsMap : VLADimsInfo) {
     if (!valueInDSABundles(VLAWithDimsMap.first))
       llvm_unreachable("VLA dims OperandBundle must have an associated DSA");
+    if (!(getDSAType(VLAWithDimsMap.first)->isSingleValueType()
+          || getDSAType(VLAWithDimsMap.first)->isStructTy()))
+      llvm_unreachable("VLA type is not scalar");
+
     // VLA Dims that are not Captured is an error
     for (auto *V : VLAWithDimsMap.second) {
       if (!valueInCapturedBundle(V))

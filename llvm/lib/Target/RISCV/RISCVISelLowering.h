@@ -28,7 +28,6 @@ namespace RISCVISD {
 enum NodeType : unsigned {
   FIRST_NUMBER = ISD::BUILTIN_OP_END,
   RET_GLUE,
-  URET_GLUE,
   SRET_GLUE,
   MRET_GLUE,
   CALL,
@@ -119,6 +118,7 @@ enum NodeType : unsigned {
   // inserter.
   FROUND,
 
+  FPCLASS,
   // READ_CYCLE_WIDE - A read of the 64-bit cycle CSR on a 32-bit target
   // (returns (Lo, Hi)). It takes a chain operand.
   READ_CYCLE_WIDE,
@@ -344,10 +344,12 @@ enum NodeType : unsigned {
   STRICT_VFNCVT_ROD_VL,
   STRICT_SINT_TO_FP_VL,
   STRICT_UINT_TO_FP_VL,
+  STRICT_VFCVT_RM_X_F_VL,
   STRICT_VFCVT_RTZ_X_F_VL,
   STRICT_VFCVT_RTZ_XU_F_VL,
   STRICT_FSETCC_VL,
   STRICT_FSETCCS_VL,
+  STRICT_VFROUND_NOEXCEPT_VL,
 
   // WARNING: Do not add anything in the end unless you want the node to
   // have memop! In fact, starting from FIRST_TARGET_MEMORY_OPCODE all
