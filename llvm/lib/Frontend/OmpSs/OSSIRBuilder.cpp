@@ -39,6 +39,23 @@ void OmpSsIRBuilder::initialize() {
 void OmpSsIRBuilder::finalize() {
 }
 
+static llvm::Type *getDsaOrVlaElemType(
+    llvm::Value *Val,
+    llvm::Type *Ty,
+    const llvm::OmpSsIRBuilder::DirectiveClausesInfo &DirClauses) {
+
+  for (auto &List : DirClauses.VlaDims) {
+    if (find(List, Val) != List.end()) {
+      while (llvm::ArrayType *ArrTy = dyn_cast<ArrayType>(Ty)) {
+        Ty = ArrTy->getElementType();
+      }
+      return Ty;
+    }
+  }
+  return Ty;
+}
+
+
 void OmpSsIRBuilder::emitDirectiveData(
     SmallVector<llvm::OperandBundleDef, 8> &TaskInfo,
     const DirectiveClausesInfo &DirClauses) {
@@ -87,13 +104,13 @@ void OmpSsIRBuilder::emitDirectiveData(
   }
   for (auto &p : DirClauses.Shareds)
     TaskInfo.emplace_back(
-      "QUAL.OSS.SHARED", ArrayRef<Value*>{p.first, llvm::UndefValue::get(p.second)});
+      "QUAL.OSS.SHARED", ArrayRef<Value*>{p.first, llvm::UndefValue::get(getDsaOrVlaElemType(p.first, p.second, DirClauses))});
   for (auto &p : DirClauses.Privates)
     TaskInfo.emplace_back(
-      "QUAL.OSS.PRIVATE", ArrayRef<Value*>{p.first, llvm::UndefValue::get(p.second)});
+      "QUAL.OSS.PRIVATE", ArrayRef<Value*>{p.first, llvm::UndefValue::get(getDsaOrVlaElemType(p.first, p.second, DirClauses))});
   for (auto &p : DirClauses.Firstprivates)
     TaskInfo.emplace_back(
-      "QUAL.OSS.FIRSTPRIVATE", ArrayRef<Value*>{p.first, llvm::UndefValue::get(p.second)});
+      "QUAL.OSS.FIRSTPRIVATE", ArrayRef<Value*>{p.first, llvm::UndefValue::get(getDsaOrVlaElemType(p.first, p.second, DirClauses))});
   for (auto &p : DirClauses.Copies)
     TaskInfo.emplace_back(
       "QUAL.OSS.COPY", ArrayRef<Value*>{p.first, p.second});
