@@ -541,7 +541,7 @@ fir::ExtendedValue Fortran::lower::genOmpSsCallOpAndResult(
       mlir::Type fromTy = fir::unwrapRefType(fst.getType());
       if (fir::isa_builtin_cptr_type(fromTy) &&
           Fortran::lower::isCPtrArgByValueType(snd)) {
-        cast = genRecordCPtrValueArg(converter, fst, fromTy);
+        cast = genRecordCPtrValueArg(builder, loc, fst, fromTy);
       } else if (fir::isa_derived(snd)) {
         // FIXME: This seems like a serious bug elsewhere in lowering. Paper
         // over the problem for now.
