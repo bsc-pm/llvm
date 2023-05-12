@@ -1082,6 +1082,7 @@ struct OmpSsDirective {
     if (!IsShared) {
       assert(!isa<LoadInst>(UnpackedDSA));
       DepBase = IRBTranslate.CreateLoad(UnpackedDSATy, DepBase);
+      AddrToTranslate = DepBase;
       // HUGE FIXME! (1)
       // flang POINTER used in dependencies are firstprivate
       // fir.box. We want to translate the buffer, so here
