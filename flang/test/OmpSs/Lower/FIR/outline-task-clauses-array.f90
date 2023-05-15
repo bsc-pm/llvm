@@ -25,75 +25,74 @@ PROGRAM MAIN
   !$OSS TASKWAIT
 END PROGRAM MAIN 
 
-
-! FIRDialect-LABEL: func.func @_QPs1(
-! FIRDialect-SAME:                   %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.array<10xi32>> {fir.bindc_name = "x"}) {
-! FIRDialect:         return
-! FIRDialect:       }
-
-! FIRDialect-LABEL: func.func @_QMmooPs2(
-! FIRDialect-SAME:                       %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.array<10xi32>> {fir.bindc_name = "x"}) {
-! FIRDialect:         return
-! FIRDialect:       }
-
-! FIRDialect-LABEL: func.func @_QQmain() {
-! FIRDialect:         %[[VAL_0:[-0-9A-Za-z._]+]] = fir.address_of(@_QFEx) : !fir.ref<!fir.array<10xi32>>
-! FIRDialect:         %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant 10 : index
-! FIRDialect:         %[[VAL_2:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_0]] : !fir.ref<!fir.array<10xi32>>) function(@compute.dep0) arguments(%[[VAL_0]] : !fir.ref<!fir.array<10xi32>>) -> i32
-! FIRDialect:         oss.task shared(%[[VAL_0]] : !fir.ref<!fir.array<10xi32>>) captures(%[[VAL_1]] : index) inout(%[[VAL_2]] : i32) {
-! FIRDialect:           fir.call @_QPs1(%[[VAL_0]]) fastmath<contract> : (!fir.ref<!fir.array<10xi32>>) -> ()
-! FIRDialect:           oss.terminator
+! FIRDialect-LABEL:   func.func @_QPs1(
+! FIRDialect-SAME:                     %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.array<10xi32>> {fir.bindc_name = "x"}) {
+! FIRDialect:           return
 ! FIRDialect:         }
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_0]] : !fir.ref<!fir.array<10xi32>>) function(@compute.dep1) arguments(%[[VAL_0]] : !fir.ref<!fir.array<10xi32>>) -> i32
-! FIRDialect:         oss.task shared(%[[VAL_0]] : !fir.ref<!fir.array<10xi32>>) captures(%[[VAL_1]] : index) inout(%[[VAL_3]] : i32) {
-! FIRDialect:           fir.call @_QMmooPs2(%[[VAL_0]]) fastmath<contract> : (!fir.ref<!fir.array<10xi32>>) -> ()
-! FIRDialect:           oss.terminator
+
+! FIRDialect-LABEL:   func.func @_QMmooPs2(
+! FIRDialect-SAME:                         %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.array<10xi32>> {fir.bindc_name = "x"}) {
+! FIRDialect:           return
 ! FIRDialect:         }
-! FIRDialect:         oss.taskwait
-! FIRDialect:         return
-! FIRDialect:       }
 
-! FIRDialect-LABEL: fir.global internal @_QFEx : !fir.array<10xi32> {
-! FIRDialect:         %[[VAL_0:[-0-9A-Za-z._]+]] = fir.undefined !fir.array<10xi32>
-! FIRDialect:         fir.has_value %[[VAL_0]] : !fir.array<10xi32>
-! FIRDialect:       }
+! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "main"} {
+! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.address_of(@_QFEx) : !fir.ref<!fir.array<10xi32>>
+! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant 10 : index
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_0]] : !fir.ref<!fir.array<10xi32>>) function(@compute.dep0) arguments(%[[VAL_0]] : !fir.ref<!fir.array<10xi32>>) -> i32
+! FIRDialect:           oss.task shared(%[[VAL_0]] : !fir.ref<!fir.array<10xi32>>) captures(%[[VAL_1]] : index) inout(%[[VAL_2]] : i32) {
+! FIRDialect:             fir.call @_QPs1(%[[VAL_0]]) fastmath<contract> : (!fir.ref<!fir.array<10xi32>>) -> ()
+! FIRDialect:             oss.terminator
+! FIRDialect:           }
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_0]] : !fir.ref<!fir.array<10xi32>>) function(@compute.dep1) arguments(%[[VAL_0]] : !fir.ref<!fir.array<10xi32>>) -> i32
+! FIRDialect:           oss.task shared(%[[VAL_0]] : !fir.ref<!fir.array<10xi32>>) captures(%[[VAL_1]] : index) inout(%[[VAL_3]] : i32) {
+! FIRDialect:             fir.call @_QMmooPs2(%[[VAL_0]]) fastmath<contract> : (!fir.ref<!fir.array<10xi32>>) -> ()
+! FIRDialect:             oss.terminator
+! FIRDialect:           }
+! FIRDialect:           oss.taskwait
+! FIRDialect:           return
+! FIRDialect:         }
 
-! FIRDialect-LABEL: func.func @compute.dep0(
-! FIRDialect-SAME:                          %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.array<10xi32>>) -> (!fir.ref<!fir.array<10xi32>>, i64, i64, i64) {
-! FIRDialect:         %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant 10 : index
-! FIRDialect:         %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant 10 : i64
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = arith.constant 1 : i64
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = arith.constant 10 : i64
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]] = arith.constant 1 : i64
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 4 : i64
-! FIRDialect:         %[[VAL_7:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_3]], %[[VAL_3]] : i64
-! FIRDialect:         %[[VAL_8:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_4]], %[[VAL_3]] : i64
-! FIRDialect:         %[[VAL_9:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_8]], %[[VAL_5]] : i64
-! FIRDialect:         %[[VAL_10:[-0-9A-Za-z._]+]] = arith.muli %[[VAL_2]], %[[VAL_6]] : i64
-! FIRDialect:         %[[VAL_11:[-0-9A-Za-z._]+]] = arith.muli %[[VAL_7]], %[[VAL_6]] : i64
-! FIRDialect:         %[[VAL_12:[-0-9A-Za-z._]+]] = arith.muli %[[VAL_9]], %[[VAL_6]] : i64
-! FIRDialect:         return %[[VAL_0]], %[[VAL_10]], %[[VAL_11]], %[[VAL_12]] : !fir.ref<!fir.array<10xi32>>, i64, i64, i64
-! FIRDialect:       }
+! FIRDialect-LABEL:   fir.global internal @_QFEx : !fir.array<10xi32> {
+! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.undefined !fir.array<10xi32>
+! FIRDialect:           fir.has_value %[[VAL_0]] : !fir.array<10xi32>
+! FIRDialect:         }
 
-! FIRDialect-LABEL: func.func @compute.dep1(
-! FIRDialect-SAME:                          %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.array<10xi32>>) -> (!fir.ref<!fir.array<10xi32>>, i64, i64, i64) {
-! FIRDialect:         %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant 10 : index
-! FIRDialect:         %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant 10 : i64
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = arith.constant 1 : i64
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = arith.constant 10 : i64
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]] = arith.constant 1 : i64
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 4 : i64
-! FIRDialect:         %[[VAL_7:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_3]], %[[VAL_3]] : i64
-! FIRDialect:         %[[VAL_8:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_4]], %[[VAL_3]] : i64
-! FIRDialect:         %[[VAL_9:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_8]], %[[VAL_5]] : i64
-! FIRDialect:         %[[VAL_10:[-0-9A-Za-z._]+]] = arith.muli %[[VAL_2]], %[[VAL_6]] : i64
-! FIRDialect:         %[[VAL_11:[-0-9A-Za-z._]+]] = arith.muli %[[VAL_7]], %[[VAL_6]] : i64
-! FIRDialect:         %[[VAL_12:[-0-9A-Za-z._]+]] = arith.muli %[[VAL_9]], %[[VAL_6]] : i64
-! FIRDialect:         return %[[VAL_0]], %[[VAL_10]], %[[VAL_11]], %[[VAL_12]] : !fir.ref<!fir.array<10xi32>>, i64, i64, i64
-! FIRDialect:       }
+! FIRDialect-LABEL:   func.func @compute.dep0(
+! FIRDialect-SAME:                            %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.array<10xi32>>) -> (!fir.ref<!fir.array<10xi32>>, i64, i64, i64) {
+! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant 10 : index
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant 10 : i64
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = arith.constant 1 : i64
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = arith.constant 10 : i64
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = arith.constant 1 : i64
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 4 : i64
+! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_3]], %[[VAL_3]] : i64
+! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_4]], %[[VAL_3]] : i64
+! FIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_8]], %[[VAL_5]] : i64
+! FIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]] = arith.muli %[[VAL_2]], %[[VAL_6]] : i64
+! FIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = arith.muli %[[VAL_7]], %[[VAL_6]] : i64
+! FIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = arith.muli %[[VAL_9]], %[[VAL_6]] : i64
+! FIRDialect:           return %[[VAL_0]], %[[VAL_10]], %[[VAL_11]], %[[VAL_12]] : !fir.ref<!fir.array<10xi32>>, i64, i64, i64
+! FIRDialect:         }
 
-! FIRDialect-LABEL: fir.global @_QQEnvironmentDefaults constant : !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>> {
-! FIRDialect:         %[[VAL_0:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>>
-! FIRDialect:         fir.has_value %[[VAL_0]] : !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>>
-! FIRDialect:       }
+! FIRDialect-LABEL:   func.func @compute.dep1(
+! FIRDialect-SAME:                            %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.array<10xi32>>) -> (!fir.ref<!fir.array<10xi32>>, i64, i64, i64) {
+! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant 10 : index
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant 10 : i64
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = arith.constant 1 : i64
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = arith.constant 10 : i64
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = arith.constant 1 : i64
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 4 : i64
+! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_3]], %[[VAL_3]] : i64
+! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_4]], %[[VAL_3]] : i64
+! FIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_8]], %[[VAL_5]] : i64
+! FIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]] = arith.muli %[[VAL_2]], %[[VAL_6]] : i64
+! FIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = arith.muli %[[VAL_7]], %[[VAL_6]] : i64
+! FIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = arith.muli %[[VAL_9]], %[[VAL_6]] : i64
+! FIRDialect:           return %[[VAL_0]], %[[VAL_10]], %[[VAL_11]], %[[VAL_12]] : !fir.ref<!fir.array<10xi32>>, i64, i64, i64
+! FIRDialect:         }
+
+! FIRDialect-LABEL:   fir.global @_QQEnvironmentDefaults constant : !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>> {
+! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>>
+! FIRDialect:           fir.has_value %[[VAL_0]] : !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>>
+! FIRDialect:         }
 

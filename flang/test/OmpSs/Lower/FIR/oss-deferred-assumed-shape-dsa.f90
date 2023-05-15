@@ -76,1008 +76,1005 @@ SUBROUTINE FOO(DUMMY_ALLOC, DUMMY_PTR, DUMMY_ARRAY)
 END SUBROUTINE
 END PROGRAM
 
-
-
-
-! FIRDialect-LABEL: func.func @_QQmain() {
-! FIRDialect:         %[[VAL_0:[-0-9A-Za-z._]+]] = fir.address_of(@_QFEarray) : !fir.ref<!fir.array<10xi32>>
-! FIRDialect:         %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant 10 : index
-! FIRDialect:         %[[VAL_2:[-0-9A-Za-z._]+]] = fir.address_of(@_QFEglob_alloc) : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = fir.address_of(@_QFEglob_ptr) : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:         oss.task shared(%[[VAL_2]], %[[VAL_3]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>, !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) {
-! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
-! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.load %[[VAL_2]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_5]], %[[VAL_6]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_5]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
-! FIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_7]]#0 : (index) -> i64
-! FIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_9]], %[[VAL_10]] : i64
-! FIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_8]], %[[VAL_11]] : (!fir.heap<!fir.array<?xi32>>, i64) -> !fir.ref<i32>
-! FIRDialect:           fir.store %[[VAL_4]] to %[[VAL_12]] : !fir.ref<i32>
-! FIRDialect:           %[[VAL_13:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
-! FIRDialect:           %[[VAL_14:[-0-9A-Za-z._]+]] = fir.load %[[VAL_3]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_15:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:           %[[VAL_16:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_14]], %[[VAL_15]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:           %[[VAL_17:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
-! FIRDialect:           %[[VAL_18:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_16]]#0 : (index) -> i64
-! FIRDialect:           %[[VAL_19:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_17]], %[[VAL_18]] : i64
-! FIRDialect:           %[[VAL_20:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_14]], %[[VAL_19]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, i64) -> !fir.ref<i32>
-! FIRDialect:           fir.store %[[VAL_13]] to %[[VAL_20]] : !fir.ref<i32>
-! FIRDialect:           oss.terminator
-! FIRDialect:         }
-! FIRDialect:         %[[VAL_21:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_2]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) function(@compute.copy0) -> i32
-! FIRDialect:         %[[VAL_22:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_2]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) function(@compute.deinit0) -> i32
-! FIRDialect:         %[[VAL_23:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_3]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) function(@compute.init0) -> i32
-! FIRDialect:         %[[VAL_24:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_3]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) function(@compute.deinit1) -> i32
-! FIRDialect:         oss.task private(%[[VAL_3]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) firstprivate(%[[VAL_2]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) copy(%[[VAL_21]] : i32) init(%[[VAL_23]] : i32) deinit(%[[VAL_22]], %[[VAL_24]] : i32, i32) {
-! FIRDialect:           %[[VAL_25:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
-! FIRDialect:           %[[VAL_26:[-0-9A-Za-z._]+]] = fir.load %[[VAL_2]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_27:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:           %[[VAL_28:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_26]], %[[VAL_27]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:           %[[VAL_29:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_26]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           %[[VAL_30:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
-! FIRDialect:           %[[VAL_31:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_28]]#0 : (index) -> i64
-! FIRDialect:           %[[VAL_32:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_30]], %[[VAL_31]] : i64
-! FIRDialect:           %[[VAL_33:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_29]], %[[VAL_32]] : (!fir.heap<!fir.array<?xi32>>, i64) -> !fir.ref<i32>
-! FIRDialect:           fir.store %[[VAL_25]] to %[[VAL_33]] : !fir.ref<i32>
-! FIRDialect:           %[[VAL_34:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
-! FIRDialect:           %[[VAL_35:[-0-9A-Za-z._]+]] = fir.load %[[VAL_3]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_36:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:           %[[VAL_37:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_35]], %[[VAL_36]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:           %[[VAL_38:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
-! FIRDialect:           %[[VAL_39:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_37]]#0 : (index) -> i64
-! FIRDialect:           %[[VAL_40:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_38]], %[[VAL_39]] : i64
-! FIRDialect:           %[[VAL_41:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_35]], %[[VAL_40]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, i64) -> !fir.ref<i32>
-! FIRDialect:           fir.store %[[VAL_34]] to %[[VAL_41]] : !fir.ref<i32>
-! FIRDialect:           oss.terminator
-! FIRDialect:         }
-! FIRDialect:         %[[VAL_42:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_2]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) function(@compute.copy1) -> i32
-! FIRDialect:         %[[VAL_43:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_2]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) function(@compute.deinit2) -> i32
-! FIRDialect:         %[[VAL_44:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_3]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) function(@compute.copy2) -> i32
-! FIRDialect:         %[[VAL_45:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_3]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) function(@compute.deinit3) -> i32
-! FIRDialect:         oss.task firstprivate(%[[VAL_2]], %[[VAL_3]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>, !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) copy(%[[VAL_42]], %[[VAL_44]] : i32, i32) deinit(%[[VAL_43]], %[[VAL_45]] : i32, i32) {
-! FIRDialect:           %[[VAL_46:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
-! FIRDialect:           %[[VAL_47:[-0-9A-Za-z._]+]] = fir.load %[[VAL_2]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_48:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:           %[[VAL_49:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_47]], %[[VAL_48]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:           %[[VAL_50:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_47]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           %[[VAL_51:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
-! FIRDialect:           %[[VAL_52:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_49]]#0 : (index) -> i64
-! FIRDialect:           %[[VAL_53:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_51]], %[[VAL_52]] : i64
-! FIRDialect:           %[[VAL_54:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_50]], %[[VAL_53]] : (!fir.heap<!fir.array<?xi32>>, i64) -> !fir.ref<i32>
-! FIRDialect:           fir.store %[[VAL_46]] to %[[VAL_54]] : !fir.ref<i32>
-! FIRDialect:           %[[VAL_55:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
-! FIRDialect:           %[[VAL_56:[-0-9A-Za-z._]+]] = fir.load %[[VAL_3]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_57:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:           %[[VAL_58:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_56]], %[[VAL_57]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:           %[[VAL_59:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
-! FIRDialect:           %[[VAL_60:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_58]]#0 : (index) -> i64
-! FIRDialect:           %[[VAL_61:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_59]], %[[VAL_60]] : i64
-! FIRDialect:           %[[VAL_62:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_56]], %[[VAL_61]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, i64) -> !fir.ref<i32>
-! FIRDialect:           fir.store %[[VAL_55]] to %[[VAL_62]] : !fir.ref<i32>
-! FIRDialect:           oss.terminator
-! FIRDialect:         }
-! FIRDialect:         %[[VAL_63:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_1]] : (index) -> !fir.shape<1>
-! FIRDialect:         %[[VAL_64:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_0]](%[[VAL_63]]) : (!fir.ref<!fir.array<10xi32>>, !fir.shape<1>) -> !fir.box<!fir.array<10xi32>>
-! FIRDialect:         %[[VAL_65:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_64]] : (!fir.box<!fir.array<10xi32>>) -> !fir.box<!fir.array<?xi32>>
-! FIRDialect:         fir.call @_QFPfoo(%[[VAL_2]], %[[VAL_3]], %[[VAL_65]]) fastmath<contract> : (!fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>, !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>, !fir.box<!fir.array<?xi32>>) -> ()
-! FIRDialect:         return
-! FIRDialect:       }
-
-! FIRDialect-LABEL: func.func @_QFPfoo(
-! FIRDialect-SAME:                     %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>> {fir.bindc_name = "dummy_alloc"},
-! FIRDialect-SAME:                     %[[VAL_1:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>> {fir.bindc_name = "dummy_ptr"},
-! FIRDialect-SAME:                     %[[VAL_2:[-0-9A-Za-z._]+]]: !fir.box<!fir.array<?xi32>> {fir.bindc_name = "dummy_array"}) {
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.heap<!fir.array<?xi32>>> {bindc_name = "local_alloc", uniq_name = "_QFfooElocal_alloc"}
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_5]] : (index) -> !fir.shape<1>
-! FIRDialect:         %[[VAL_7:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_4]](%[[VAL_6]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
-! FIRDialect:         fir.store %[[VAL_7]] to %[[VAL_3]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_8:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.ptr<!fir.array<?xi32>>> {bindc_name = "local_ptr", uniq_name = "_QFfooElocal_ptr"}
-! FIRDialect:         %[[VAL_9:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ptr<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_10:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:         %[[VAL_11:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_10]] : (index) -> !fir.shape<1>
-! FIRDialect:         %[[VAL_12:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_9]](%[[VAL_11]]) : (!fir.ptr<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
-! FIRDialect:         fir.store %[[VAL_12]] to %[[VAL_8]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:         oss.task shared(%[[VAL_0]], %[[VAL_1]], %[[VAL_2]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>, !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>, !fir.box<!fir.array<?xi32>>) {
-! FIRDialect:           %[[VAL_13:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
-! FIRDialect:           %[[VAL_14:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_15:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:           %[[VAL_16:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_14]], %[[VAL_15]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:           %[[VAL_17:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_14]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           %[[VAL_18:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
-! FIRDialect:           %[[VAL_19:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_16]]#0 : (index) -> i64
-! FIRDialect:           %[[VAL_20:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_18]], %[[VAL_19]] : i64
-! FIRDialect:           %[[VAL_21:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_17]], %[[VAL_20]] : (!fir.heap<!fir.array<?xi32>>, i64) -> !fir.ref<i32>
-! FIRDialect:           fir.store %[[VAL_13]] to %[[VAL_21]] : !fir.ref<i32>
-! FIRDialect:           %[[VAL_22:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
-! FIRDialect:           %[[VAL_23:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_24:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:           %[[VAL_25:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_23]], %[[VAL_24]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:           %[[VAL_26:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
-! FIRDialect:           %[[VAL_27:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_25]]#0 : (index) -> i64
-! FIRDialect:           %[[VAL_28:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_26]], %[[VAL_27]] : i64
-! FIRDialect:           %[[VAL_29:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_23]], %[[VAL_28]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, i64) -> !fir.ref<i32>
-! FIRDialect:           fir.store %[[VAL_22]] to %[[VAL_29]] : !fir.ref<i32>
-! FIRDialect:           %[[VAL_30:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
-! FIRDialect:           %[[VAL_31:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
-! FIRDialect:           %[[VAL_32:[-0-9A-Za-z._]+]] = arith.constant 1 : i64
-! FIRDialect:           %[[VAL_33:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_31]], %[[VAL_32]] : i64
-! FIRDialect:           %[[VAL_34:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_2]], %[[VAL_33]] : (!fir.box<!fir.array<?xi32>>, i64) -> !fir.ref<i32>
-! FIRDialect:           fir.store %[[VAL_30]] to %[[VAL_34]] : !fir.ref<i32>
-! FIRDialect:           oss.terminator
-! FIRDialect:         }
-! FIRDialect:         %[[VAL_35:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) function(@compute.copy3) -> i32
-! FIRDialect:         %[[VAL_36:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) function(@compute.deinit4) -> i32
-! FIRDialect:         %[[VAL_37:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) function(@compute.init1) -> i32
-! FIRDialect:         %[[VAL_38:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) function(@compute.deinit5) -> i32
-! FIRDialect:         oss.task private(%[[VAL_1]], %[[VAL_2]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>, !fir.box<!fir.array<?xi32>>) firstprivate(%[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) copy(%[[VAL_35]] : i32) init(%[[VAL_37]] : i32) deinit(%[[VAL_36]], %[[VAL_38]] : i32, i32) {
-! FIRDialect:           %[[VAL_39:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
-! FIRDialect:           %[[VAL_40:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_41:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:           %[[VAL_42:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_40]], %[[VAL_41]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:           %[[VAL_43:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_40]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           %[[VAL_44:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
-! FIRDialect:           %[[VAL_45:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_42]]#0 : (index) -> i64
-! FIRDialect:           %[[VAL_46:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_44]], %[[VAL_45]] : i64
-! FIRDialect:           %[[VAL_47:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_43]], %[[VAL_46]] : (!fir.heap<!fir.array<?xi32>>, i64) -> !fir.ref<i32>
-! FIRDialect:           fir.store %[[VAL_39]] to %[[VAL_47]] : !fir.ref<i32>
-! FIRDialect:           %[[VAL_48:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
-! FIRDialect:           %[[VAL_49:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_50:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:           %[[VAL_51:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_49]], %[[VAL_50]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:           %[[VAL_52:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
-! FIRDialect:           %[[VAL_53:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_51]]#0 : (index) -> i64
-! FIRDialect:           %[[VAL_54:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_52]], %[[VAL_53]] : i64
-! FIRDialect:           %[[VAL_55:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_49]], %[[VAL_54]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, i64) -> !fir.ref<i32>
-! FIRDialect:           fir.store %[[VAL_48]] to %[[VAL_55]] : !fir.ref<i32>
-! FIRDialect:           %[[VAL_56:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
-! FIRDialect:           %[[VAL_57:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
-! FIRDialect:           %[[VAL_58:[-0-9A-Za-z._]+]] = arith.constant 1 : i64
-! FIRDialect:           %[[VAL_59:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_57]], %[[VAL_58]] : i64
-! FIRDialect:           %[[VAL_60:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_2]], %[[VAL_59]] : (!fir.box<!fir.array<?xi32>>, i64) -> !fir.ref<i32>
-! FIRDialect:           fir.store %[[VAL_56]] to %[[VAL_60]] : !fir.ref<i32>
-! FIRDialect:           oss.terminator
-! FIRDialect:         }
-! FIRDialect:         %[[VAL_61:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) function(@compute.copy4) -> i32
-! FIRDialect:         %[[VAL_62:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) function(@compute.deinit6) -> i32
-! FIRDialect:         %[[VAL_63:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) function(@compute.copy5) -> i32
-! FIRDialect:         %[[VAL_64:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) function(@compute.deinit7) -> i32
-! FIRDialect:         oss.task firstprivate(%[[VAL_0]], %[[VAL_1]], %[[VAL_2]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>, !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>, !fir.box<!fir.array<?xi32>>) copy(%[[VAL_61]], %[[VAL_63]] : i32, i32) deinit(%[[VAL_62]], %[[VAL_64]] : i32, i32) {
-! FIRDialect:           %[[VAL_65:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
-! FIRDialect:           %[[VAL_66:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_67:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:           %[[VAL_68:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_66]], %[[VAL_67]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:           %[[VAL_69:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_66]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           %[[VAL_70:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
-! FIRDialect:           %[[VAL_71:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_68]]#0 : (index) -> i64
-! FIRDialect:           %[[VAL_72:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_70]], %[[VAL_71]] : i64
-! FIRDialect:           %[[VAL_73:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_69]], %[[VAL_72]] : (!fir.heap<!fir.array<?xi32>>, i64) -> !fir.ref<i32>
-! FIRDialect:           fir.store %[[VAL_65]] to %[[VAL_73]] : !fir.ref<i32>
-! FIRDialect:           %[[VAL_74:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
-! FIRDialect:           %[[VAL_75:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_76:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:           %[[VAL_77:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_75]], %[[VAL_76]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:           %[[VAL_78:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
-! FIRDialect:           %[[VAL_79:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_77]]#0 : (index) -> i64
-! FIRDialect:           %[[VAL_80:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_78]], %[[VAL_79]] : i64
-! FIRDialect:           %[[VAL_81:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_75]], %[[VAL_80]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, i64) -> !fir.ref<i32>
-! FIRDialect:           fir.store %[[VAL_74]] to %[[VAL_81]] : !fir.ref<i32>
-! FIRDialect:           %[[VAL_82:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
-! FIRDialect:           %[[VAL_83:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
-! FIRDialect:           %[[VAL_84:[-0-9A-Za-z._]+]] = arith.constant 1 : i64
-! FIRDialect:           %[[VAL_85:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_83]], %[[VAL_84]] : i64
-! FIRDialect:           %[[VAL_86:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_2]], %[[VAL_85]] : (!fir.box<!fir.array<?xi32>>, i64) -> !fir.ref<i32>
-! FIRDialect:           fir.store %[[VAL_82]] to %[[VAL_86]] : !fir.ref<i32>
-! FIRDialect:           oss.terminator
-! FIRDialect:         }
-! FIRDialect:         oss.task shared(%[[VAL_3]], %[[VAL_8]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>, !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) {
-! FIRDialect:           %[[VAL_87:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
-! FIRDialect:           %[[VAL_88:[-0-9A-Za-z._]+]] = fir.load %[[VAL_3]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_89:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:           %[[VAL_90:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_88]], %[[VAL_89]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:           %[[VAL_91:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_88]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           %[[VAL_92:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
-! FIRDialect:           %[[VAL_93:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_90]]#0 : (index) -> i64
-! FIRDialect:           %[[VAL_94:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_92]], %[[VAL_93]] : i64
-! FIRDialect:           %[[VAL_95:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_91]], %[[VAL_94]] : (!fir.heap<!fir.array<?xi32>>, i64) -> !fir.ref<i32>
-! FIRDialect:           fir.store %[[VAL_87]] to %[[VAL_95]] : !fir.ref<i32>
-! FIRDialect:           %[[VAL_96:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
-! FIRDialect:           %[[VAL_97:[-0-9A-Za-z._]+]] = fir.load %[[VAL_8]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_98:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:           %[[VAL_99:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_97]], %[[VAL_98]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:           %[[VAL_100:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
-! FIRDialect:           %[[VAL_101:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_99]]#0 : (index) -> i64
-! FIRDialect:           %[[VAL_102:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_100]], %[[VAL_101]] : i64
-! FIRDialect:           %[[VAL_103:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_97]], %[[VAL_102]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, i64) -> !fir.ref<i32>
-! FIRDialect:           fir.store %[[VAL_96]] to %[[VAL_103]] : !fir.ref<i32>
-! FIRDialect:           oss.terminator
-! FIRDialect:         }
-! FIRDialect:         %[[VAL_104:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_3]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) function(@compute.copy6) -> i32
-! FIRDialect:         %[[VAL_105:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_3]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) function(@compute.deinit8) -> i32
-! FIRDialect:         %[[VAL_106:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_8]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) function(@compute.init2) -> i32
-! FIRDialect:         %[[VAL_107:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_8]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) function(@compute.deinit9) -> i32
-! FIRDialect:         oss.task private(%[[VAL_8]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) firstprivate(%[[VAL_3]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) copy(%[[VAL_104]] : i32) init(%[[VAL_106]] : i32) deinit(%[[VAL_105]], %[[VAL_107]] : i32, i32) {
-! FIRDialect:           %[[VAL_108:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
-! FIRDialect:           %[[VAL_109:[-0-9A-Za-z._]+]] = fir.load %[[VAL_3]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_110:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:           %[[VAL_111:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_109]], %[[VAL_110]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:           %[[VAL_112:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_109]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           %[[VAL_113:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
-! FIRDialect:           %[[VAL_114:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_111]]#0 : (index) -> i64
-! FIRDialect:           %[[VAL_115:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_113]], %[[VAL_114]] : i64
-! FIRDialect:           %[[VAL_116:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_112]], %[[VAL_115]] : (!fir.heap<!fir.array<?xi32>>, i64) -> !fir.ref<i32>
-! FIRDialect:           fir.store %[[VAL_108]] to %[[VAL_116]] : !fir.ref<i32>
-! FIRDialect:           %[[VAL_117:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
-! FIRDialect:           %[[VAL_118:[-0-9A-Za-z._]+]] = fir.load %[[VAL_8]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_119:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:           %[[VAL_120:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_118]], %[[VAL_119]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:           %[[VAL_121:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
-! FIRDialect:           %[[VAL_122:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_120]]#0 : (index) -> i64
-! FIRDialect:           %[[VAL_123:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_121]], %[[VAL_122]] : i64
-! FIRDialect:           %[[VAL_124:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_118]], %[[VAL_123]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, i64) -> !fir.ref<i32>
-! FIRDialect:           fir.store %[[VAL_117]] to %[[VAL_124]] : !fir.ref<i32>
-! FIRDialect:           oss.terminator
-! FIRDialect:         }
-! FIRDialect:         %[[VAL_125:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_3]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) function(@compute.copy7) -> i32
-! FIRDialect:         %[[VAL_126:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_3]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) function(@compute.deinit10) -> i32
-! FIRDialect:         %[[VAL_127:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_8]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) function(@compute.copy8) -> i32
-! FIRDialect:         %[[VAL_128:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_8]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) function(@compute.deinit11) -> i32
-! FIRDialect:         oss.task firstprivate(%[[VAL_3]], %[[VAL_8]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>, !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) copy(%[[VAL_125]], %[[VAL_127]] : i32, i32) deinit(%[[VAL_126]], %[[VAL_128]] : i32, i32) {
-! FIRDialect:           %[[VAL_129:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
-! FIRDialect:           %[[VAL_130:[-0-9A-Za-z._]+]] = fir.load %[[VAL_3]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_131:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:           %[[VAL_132:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_130]], %[[VAL_131]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:           %[[VAL_133:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_130]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           %[[VAL_134:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
-! FIRDialect:           %[[VAL_135:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_132]]#0 : (index) -> i64
-! FIRDialect:           %[[VAL_136:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_134]], %[[VAL_135]] : i64
-! FIRDialect:           %[[VAL_137:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_133]], %[[VAL_136]] : (!fir.heap<!fir.array<?xi32>>, i64) -> !fir.ref<i32>
-! FIRDialect:           fir.store %[[VAL_129]] to %[[VAL_137]] : !fir.ref<i32>
-! FIRDialect:           %[[VAL_138:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
-! FIRDialect:           %[[VAL_139:[-0-9A-Za-z._]+]] = fir.load %[[VAL_8]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_140:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:           %[[VAL_141:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_139]], %[[VAL_140]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:           %[[VAL_142:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
-! FIRDialect:           %[[VAL_143:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_141]]#0 : (index) -> i64
-! FIRDialect:           %[[VAL_144:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_142]], %[[VAL_143]] : i64
-! FIRDialect:           %[[VAL_145:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_139]], %[[VAL_144]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, i64) -> !fir.ref<i32>
-! FIRDialect:           fir.store %[[VAL_138]] to %[[VAL_145]] : !fir.ref<i32>
-! FIRDialect:           oss.terminator
-! FIRDialect:         }
-! FIRDialect:         return
-! FIRDialect:       }
-
-! FIRDialect-LABEL: fir.global internal @_QFEarray : !fir.array<10xi32> {
-! FIRDialect:         %[[VAL_0:[-0-9A-Za-z._]+]] = fir.undefined !fir.array<10xi32>
-! FIRDialect:         fir.has_value %[[VAL_0]] : !fir.array<10xi32>
-! FIRDialect:       }
-
-! FIRDialect-LABEL: fir.global internal @_QFEglob_alloc : !fir.box<!fir.heap<!fir.array<?xi32>>> {
-! FIRDialect:         %[[VAL_0:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:         %[[VAL_2:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_1]] : (index) -> !fir.shape<1>
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_0]](%[[VAL_2]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
-! FIRDialect:         fir.has_value %[[VAL_3]] : !fir.box<!fir.heap<!fir.array<?xi32>>>
-! FIRDialect:       }
-
-! FIRDialect-LABEL: fir.global internal @_QFEglob_ptr : !fir.box<!fir.ptr<!fir.array<?xi32>>> {
-! FIRDialect:         %[[VAL_0:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ptr<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:         %[[VAL_2:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_1]] : (index) -> !fir.shape<1>
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_0]](%[[VAL_2]]) : (!fir.ptr<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
-! FIRDialect:         fir.has_value %[[VAL_3]] : !fir.box<!fir.ptr<!fir.array<?xi32>>>
-! FIRDialect:       }
-
-! FIRDialect-LABEL: func.func @compute.copy0(
-! FIRDialect-SAME:                           %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                           %[[VAL_1:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                           %[[VAL_2:[-0-9A-Za-z._]+]]: i64) -> i32 {
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_3]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_4]] : (!fir.heap<!fir.array<?xi32>>) -> i64
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 0 : i64
-! FIRDialect:         %[[VAL_7:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_5]], %[[VAL_6]] : i64
-! FIRDialect:         fir.if %[[VAL_7]] {
-! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_8]], %[[VAL_9]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_8]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : index
-! FIRDialect:           %[[VAL_13:[-0-9A-Za-z._]+]] = fir.shape_shift %[[VAL_10]]#0, %[[VAL_10]]#1 : (index, index) -> !fir.shapeshift<1>
-! FIRDialect:           %[[VAL_14:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_11]](%[[VAL_13]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.array<?xi32>
-! FIRDialect:           %[[VAL_15:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_16:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_15]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           %[[VAL_17:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_16]] : (!fir.heap<!fir.array<?xi32>>) -> i64
-! FIRDialect:           %[[VAL_18:[-0-9A-Za-z._]+]] = arith.constant 0 : i64
-! FIRDialect:           %[[VAL_19:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_17]], %[[VAL_18]] : i64
-! FIRDialect:           %[[VAL_20:[-0-9A-Za-z._]+]]:2 = fir.if %[[VAL_19]] -> (i1, !fir.heap<!fir.array<?xi32>>) {
-! FIRDialect:             %[[VAL_21:[-0-9A-Za-z._]+]] = arith.constant false
-! FIRDialect:             %[[VAL_22:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:             %[[VAL_23:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_15]], %[[VAL_22]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:             %[[VAL_24:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_23]]#1, %[[VAL_10]]#1 : index
-! FIRDialect:             %[[VAL_25:[-0-9A-Za-z._]+]] = arith.select %[[VAL_24]], %[[VAL_24]], %[[VAL_21]] : i1
-! FIRDialect:             %[[VAL_26:[-0-9A-Za-z._]+]] = fir.if %[[VAL_25]] -> (!fir.heap<!fir.array<?xi32>>) {
-! FIRDialect:               %[[VAL_27:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xi32>, %[[VAL_10]]#1 {uniq_name = ".auto.alloc"}
-! FIRDialect:               fir.result %[[VAL_27]] : !fir.heap<!fir.array<?xi32>>
-! FIRDialect:             } else {
-! FIRDialect:               fir.result %[[VAL_16]] : !fir.heap<!fir.array<?xi32>>
-! FIRDialect:             }
-! FIRDialect:             fir.result %[[VAL_25]], %[[VAL_28:[-0-9A-Za-z._]+]] : i1, !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           } else {
-! FIRDialect:             %[[VAL_29:[-0-9A-Za-z._]+]] = arith.constant true
-! FIRDialect:             %[[VAL_30:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xi32>, %[[VAL_10]]#1 {uniq_name = ".auto.alloc"}
-! FIRDialect:             fir.result %[[VAL_29]], %[[VAL_30]] : i1, !fir.heap<!fir.array<?xi32>>
+! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "p"} {
+! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.address_of(@_QFEarray) : !fir.ref<!fir.array<10xi32>>
+! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant 10 : index
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.address_of(@_QFEglob_alloc) : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.address_of(@_QFEglob_ptr) : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:           oss.task shared(%[[VAL_2]], %[[VAL_3]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>, !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) {
+! FIRDialect:             %[[VAL_4:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
+! FIRDialect:             %[[VAL_5:[-0-9A-Za-z._]+]] = fir.load %[[VAL_2]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:             %[[VAL_7:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_5]], %[[VAL_6]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:             %[[VAL_8:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_5]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
+! FIRDialect:             %[[VAL_10:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_7]]#0 : (index) -> i64
+! FIRDialect:             %[[VAL_11:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_9]], %[[VAL_10]] : i64
+! FIRDialect:             %[[VAL_12:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_8]], %[[VAL_11]] : (!fir.heap<!fir.array<?xi32>>, i64) -> !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_4]] to %[[VAL_12]] : !fir.ref<i32>
+! FIRDialect:             %[[VAL_13:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
+! FIRDialect:             %[[VAL_14:[-0-9A-Za-z._]+]] = fir.load %[[VAL_3]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_15:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:             %[[VAL_16:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_14]], %[[VAL_15]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:             %[[VAL_17:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
+! FIRDialect:             %[[VAL_18:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_16]]#0 : (index) -> i64
+! FIRDialect:             %[[VAL_19:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_17]], %[[VAL_18]] : i64
+! FIRDialect:             %[[VAL_20:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_14]], %[[VAL_19]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, i64) -> !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_13]] to %[[VAL_20]] : !fir.ref<i32>
+! FIRDialect:             oss.terminator
 ! FIRDialect:           }
-! FIRDialect:           fir.if %[[VAL_31:[-0-9A-Za-z._]+]]#0 {
-! FIRDialect:             %[[VAL_32:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:             fir.if %[[VAL_19]] {
-! FIRDialect:               fir.freemem %[[VAL_16]] : !fir.heap<!fir.array<?xi32>>
-! FIRDialect:             }
-! FIRDialect:             %[[VAL_33:[-0-9A-Za-z._]+]] = fir.shape_shift %[[VAL_10]]#0, %[[VAL_10]]#1 : (index, index) -> !fir.shapeshift<1>
-! FIRDialect:             %[[VAL_34:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_31]]#1(%[[VAL_33]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
-! FIRDialect:             fir.store %[[VAL_34]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_21:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_2]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) function(@compute.copy0) -> i32
+! FIRDialect:           %[[VAL_22:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_2]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) function(@compute.deinit0) -> i32
+! FIRDialect:           %[[VAL_23:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_3]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) function(@compute.init0) -> i32
+! FIRDialect:           %[[VAL_24:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_3]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) function(@compute.deinit1) -> i32
+! FIRDialect:           oss.task private(%[[VAL_3]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) firstprivate(%[[VAL_2]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) copy(%[[VAL_21]] : i32) init(%[[VAL_23]] : i32) deinit(%[[VAL_22]], %[[VAL_24]] : i32, i32) {
+! FIRDialect:             %[[VAL_25:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
+! FIRDialect:             %[[VAL_26:[-0-9A-Za-z._]+]] = fir.load %[[VAL_2]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_27:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:             %[[VAL_28:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_26]], %[[VAL_27]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:             %[[VAL_29:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_26]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             %[[VAL_30:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
+! FIRDialect:             %[[VAL_31:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_28]]#0 : (index) -> i64
+! FIRDialect:             %[[VAL_32:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_30]], %[[VAL_31]] : i64
+! FIRDialect:             %[[VAL_33:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_29]], %[[VAL_32]] : (!fir.heap<!fir.array<?xi32>>, i64) -> !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_25]] to %[[VAL_33]] : !fir.ref<i32>
+! FIRDialect:             %[[VAL_34:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
+! FIRDialect:             %[[VAL_35:[-0-9A-Za-z._]+]] = fir.load %[[VAL_3]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_36:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:             %[[VAL_37:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_35]], %[[VAL_36]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:             %[[VAL_38:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
+! FIRDialect:             %[[VAL_39:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_37]]#0 : (index) -> i64
+! FIRDialect:             %[[VAL_40:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_38]], %[[VAL_39]] : i64
+! FIRDialect:             %[[VAL_41:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_35]], %[[VAL_40]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, i64) -> !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_34]] to %[[VAL_41]] : !fir.ref<i32>
+! FIRDialect:             oss.terminator
 ! FIRDialect:           }
+! FIRDialect:           %[[VAL_42:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_2]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) function(@compute.copy1) -> i32
+! FIRDialect:           %[[VAL_43:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_2]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) function(@compute.deinit2) -> i32
+! FIRDialect:           %[[VAL_44:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_3]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) function(@compute.copy2) -> i32
+! FIRDialect:           %[[VAL_45:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_3]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) function(@compute.deinit3) -> i32
+! FIRDialect:           oss.task firstprivate(%[[VAL_2]], %[[VAL_3]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>, !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) copy(%[[VAL_42]], %[[VAL_44]] : i32, i32) deinit(%[[VAL_43]], %[[VAL_45]] : i32, i32) {
+! FIRDialect:             %[[VAL_46:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
+! FIRDialect:             %[[VAL_47:[-0-9A-Za-z._]+]] = fir.load %[[VAL_2]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_48:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:             %[[VAL_49:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_47]], %[[VAL_48]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:             %[[VAL_50:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_47]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             %[[VAL_51:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
+! FIRDialect:             %[[VAL_52:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_49]]#0 : (index) -> i64
+! FIRDialect:             %[[VAL_53:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_51]], %[[VAL_52]] : i64
+! FIRDialect:             %[[VAL_54:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_50]], %[[VAL_53]] : (!fir.heap<!fir.array<?xi32>>, i64) -> !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_46]] to %[[VAL_54]] : !fir.ref<i32>
+! FIRDialect:             %[[VAL_55:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
+! FIRDialect:             %[[VAL_56:[-0-9A-Za-z._]+]] = fir.load %[[VAL_3]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_57:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:             %[[VAL_58:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_56]], %[[VAL_57]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:             %[[VAL_59:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
+! FIRDialect:             %[[VAL_60:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_58]]#0 : (index) -> i64
+! FIRDialect:             %[[VAL_61:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_59]], %[[VAL_60]] : i64
+! FIRDialect:             %[[VAL_62:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_56]], %[[VAL_61]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, i64) -> !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_55]] to %[[VAL_62]] : !fir.ref<i32>
+! FIRDialect:             oss.terminator
+! FIRDialect:           }
+! FIRDialect:           %[[VAL_63:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_1]] : (index) -> !fir.shape<1>
+! FIRDialect:           %[[VAL_64:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_0]](%[[VAL_63]]) : (!fir.ref<!fir.array<10xi32>>, !fir.shape<1>) -> !fir.box<!fir.array<10xi32>>
+! FIRDialect:           %[[VAL_65:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_64]] : (!fir.box<!fir.array<10xi32>>) -> !fir.box<!fir.array<?xi32>>
+! FIRDialect:           fir.call @_QFPfoo(%[[VAL_2]], %[[VAL_3]], %[[VAL_65]]) fastmath<contract> : (!fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>, !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>, !fir.box<!fir.array<?xi32>>) -> ()
+! FIRDialect:           return
 ! FIRDialect:         }
-! FIRDialect:         %[[VAL_35:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         return %[[VAL_35]] : i32
-! FIRDialect:       }
 
-! FIRDialect-LABEL: func.func @compute.deinit0(
+! FIRDialect-LABEL:   func.func @_QFPfoo(
+! FIRDialect-SAME:                       %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>> {fir.bindc_name = "dummy_alloc"},
+! FIRDialect-SAME:                       %[[VAL_1:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>> {fir.bindc_name = "dummy_ptr"},
+! FIRDialect-SAME:                       %[[VAL_2:[-0-9A-Za-z._]+]]: !fir.box<!fir.array<?xi32>> {fir.bindc_name = "dummy_array"}) {
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.heap<!fir.array<?xi32>>> {bindc_name = "local_alloc", uniq_name = "_QFFfooElocal_alloc"}
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_5]] : (index) -> !fir.shape<1>
+! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_4]](%[[VAL_6]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
+! FIRDialect:           fir.store %[[VAL_7]] to %[[VAL_3]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.ptr<!fir.array<?xi32>>> {bindc_name = "local_ptr", uniq_name = "_QFFfooElocal_ptr"}
+! FIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ptr<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_10]] : (index) -> !fir.shape<1>
+! FIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_9]](%[[VAL_11]]) : (!fir.ptr<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
+! FIRDialect:           fir.store %[[VAL_12]] to %[[VAL_8]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:           oss.task shared(%[[VAL_0]], %[[VAL_1]], %[[VAL_2]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>, !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>, !fir.box<!fir.array<?xi32>>) {
+! FIRDialect:             %[[VAL_13:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
+! FIRDialect:             %[[VAL_14:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_15:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:             %[[VAL_16:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_14]], %[[VAL_15]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:             %[[VAL_17:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_14]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             %[[VAL_18:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
+! FIRDialect:             %[[VAL_19:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_16]]#0 : (index) -> i64
+! FIRDialect:             %[[VAL_20:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_18]], %[[VAL_19]] : i64
+! FIRDialect:             %[[VAL_21:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_17]], %[[VAL_20]] : (!fir.heap<!fir.array<?xi32>>, i64) -> !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_13]] to %[[VAL_21]] : !fir.ref<i32>
+! FIRDialect:             %[[VAL_22:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
+! FIRDialect:             %[[VAL_23:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_24:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:             %[[VAL_25:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_23]], %[[VAL_24]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:             %[[VAL_26:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
+! FIRDialect:             %[[VAL_27:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_25]]#0 : (index) -> i64
+! FIRDialect:             %[[VAL_28:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_26]], %[[VAL_27]] : i64
+! FIRDialect:             %[[VAL_29:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_23]], %[[VAL_28]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, i64) -> !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_22]] to %[[VAL_29]] : !fir.ref<i32>
+! FIRDialect:             %[[VAL_30:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
+! FIRDialect:             %[[VAL_31:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
+! FIRDialect:             %[[VAL_32:[-0-9A-Za-z._]+]] = arith.constant 1 : i64
+! FIRDialect:             %[[VAL_33:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_31]], %[[VAL_32]] : i64
+! FIRDialect:             %[[VAL_34:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_2]], %[[VAL_33]] : (!fir.box<!fir.array<?xi32>>, i64) -> !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_30]] to %[[VAL_34]] : !fir.ref<i32>
+! FIRDialect:             oss.terminator
+! FIRDialect:           }
+! FIRDialect:           %[[VAL_35:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) function(@compute.copy3) -> i32
+! FIRDialect:           %[[VAL_36:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) function(@compute.deinit4) -> i32
+! FIRDialect:           %[[VAL_37:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) function(@compute.init1) -> i32
+! FIRDialect:           %[[VAL_38:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) function(@compute.deinit5) -> i32
+! FIRDialect:           oss.task private(%[[VAL_1]], %[[VAL_2]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>, !fir.box<!fir.array<?xi32>>) firstprivate(%[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) copy(%[[VAL_35]] : i32) init(%[[VAL_37]] : i32) deinit(%[[VAL_36]], %[[VAL_38]] : i32, i32) {
+! FIRDialect:             %[[VAL_39:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
+! FIRDialect:             %[[VAL_40:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_41:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:             %[[VAL_42:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_40]], %[[VAL_41]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:             %[[VAL_43:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_40]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             %[[VAL_44:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
+! FIRDialect:             %[[VAL_45:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_42]]#0 : (index) -> i64
+! FIRDialect:             %[[VAL_46:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_44]], %[[VAL_45]] : i64
+! FIRDialect:             %[[VAL_47:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_43]], %[[VAL_46]] : (!fir.heap<!fir.array<?xi32>>, i64) -> !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_39]] to %[[VAL_47]] : !fir.ref<i32>
+! FIRDialect:             %[[VAL_48:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
+! FIRDialect:             %[[VAL_49:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_50:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:             %[[VAL_51:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_49]], %[[VAL_50]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:             %[[VAL_52:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
+! FIRDialect:             %[[VAL_53:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_51]]#0 : (index) -> i64
+! FIRDialect:             %[[VAL_54:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_52]], %[[VAL_53]] : i64
+! FIRDialect:             %[[VAL_55:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_49]], %[[VAL_54]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, i64) -> !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_48]] to %[[VAL_55]] : !fir.ref<i32>
+! FIRDialect:             %[[VAL_56:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
+! FIRDialect:             %[[VAL_57:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
+! FIRDialect:             %[[VAL_58:[-0-9A-Za-z._]+]] = arith.constant 1 : i64
+! FIRDialect:             %[[VAL_59:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_57]], %[[VAL_58]] : i64
+! FIRDialect:             %[[VAL_60:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_2]], %[[VAL_59]] : (!fir.box<!fir.array<?xi32>>, i64) -> !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_56]] to %[[VAL_60]] : !fir.ref<i32>
+! FIRDialect:             oss.terminator
+! FIRDialect:           }
+! FIRDialect:           %[[VAL_61:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) function(@compute.copy4) -> i32
+! FIRDialect:           %[[VAL_62:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) function(@compute.deinit6) -> i32
+! FIRDialect:           %[[VAL_63:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) function(@compute.copy5) -> i32
+! FIRDialect:           %[[VAL_64:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) function(@compute.deinit7) -> i32
+! FIRDialect:           oss.task firstprivate(%[[VAL_0]], %[[VAL_1]], %[[VAL_2]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>, !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>, !fir.box<!fir.array<?xi32>>) copy(%[[VAL_61]], %[[VAL_63]] : i32, i32) deinit(%[[VAL_62]], %[[VAL_64]] : i32, i32) {
+! FIRDialect:             %[[VAL_65:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
+! FIRDialect:             %[[VAL_66:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_67:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:             %[[VAL_68:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_66]], %[[VAL_67]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:             %[[VAL_69:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_66]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             %[[VAL_70:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
+! FIRDialect:             %[[VAL_71:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_68]]#0 : (index) -> i64
+! FIRDialect:             %[[VAL_72:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_70]], %[[VAL_71]] : i64
+! FIRDialect:             %[[VAL_73:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_69]], %[[VAL_72]] : (!fir.heap<!fir.array<?xi32>>, i64) -> !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_65]] to %[[VAL_73]] : !fir.ref<i32>
+! FIRDialect:             %[[VAL_74:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
+! FIRDialect:             %[[VAL_75:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_76:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:             %[[VAL_77:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_75]], %[[VAL_76]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:             %[[VAL_78:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
+! FIRDialect:             %[[VAL_79:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_77]]#0 : (index) -> i64
+! FIRDialect:             %[[VAL_80:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_78]], %[[VAL_79]] : i64
+! FIRDialect:             %[[VAL_81:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_75]], %[[VAL_80]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, i64) -> !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_74]] to %[[VAL_81]] : !fir.ref<i32>
+! FIRDialect:             %[[VAL_82:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
+! FIRDialect:             %[[VAL_83:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
+! FIRDialect:             %[[VAL_84:[-0-9A-Za-z._]+]] = arith.constant 1 : i64
+! FIRDialect:             %[[VAL_85:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_83]], %[[VAL_84]] : i64
+! FIRDialect:             %[[VAL_86:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_2]], %[[VAL_85]] : (!fir.box<!fir.array<?xi32>>, i64) -> !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_82]] to %[[VAL_86]] : !fir.ref<i32>
+! FIRDialect:             oss.terminator
+! FIRDialect:           }
+! FIRDialect:           oss.task shared(%[[VAL_3]], %[[VAL_8]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>, !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) {
+! FIRDialect:             %[[VAL_87:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
+! FIRDialect:             %[[VAL_88:[-0-9A-Za-z._]+]] = fir.load %[[VAL_3]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_89:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:             %[[VAL_90:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_88]], %[[VAL_89]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:             %[[VAL_91:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_88]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             %[[VAL_92:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
+! FIRDialect:             %[[VAL_93:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_90]]#0 : (index) -> i64
+! FIRDialect:             %[[VAL_94:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_92]], %[[VAL_93]] : i64
+! FIRDialect:             %[[VAL_95:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_91]], %[[VAL_94]] : (!fir.heap<!fir.array<?xi32>>, i64) -> !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_87]] to %[[VAL_95]] : !fir.ref<i32>
+! FIRDialect:             %[[VAL_96:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
+! FIRDialect:             %[[VAL_97:[-0-9A-Za-z._]+]] = fir.load %[[VAL_8]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_98:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:             %[[VAL_99:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_97]], %[[VAL_98]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:             %[[VAL_100:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
+! FIRDialect:             %[[VAL_101:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_99]]#0 : (index) -> i64
+! FIRDialect:             %[[VAL_102:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_100]], %[[VAL_101]] : i64
+! FIRDialect:             %[[VAL_103:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_97]], %[[VAL_102]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, i64) -> !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_96]] to %[[VAL_103]] : !fir.ref<i32>
+! FIRDialect:             oss.terminator
+! FIRDialect:           }
+! FIRDialect:           %[[VAL_104:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_3]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) function(@compute.copy6) -> i32
+! FIRDialect:           %[[VAL_105:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_3]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) function(@compute.deinit8) -> i32
+! FIRDialect:           %[[VAL_106:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_8]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) function(@compute.init2) -> i32
+! FIRDialect:           %[[VAL_107:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_8]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) function(@compute.deinit9) -> i32
+! FIRDialect:           oss.task private(%[[VAL_8]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) firstprivate(%[[VAL_3]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) copy(%[[VAL_104]] : i32) init(%[[VAL_106]] : i32) deinit(%[[VAL_105]], %[[VAL_107]] : i32, i32) {
+! FIRDialect:             %[[VAL_108:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
+! FIRDialect:             %[[VAL_109:[-0-9A-Za-z._]+]] = fir.load %[[VAL_3]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_110:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:             %[[VAL_111:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_109]], %[[VAL_110]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:             %[[VAL_112:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_109]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             %[[VAL_113:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
+! FIRDialect:             %[[VAL_114:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_111]]#0 : (index) -> i64
+! FIRDialect:             %[[VAL_115:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_113]], %[[VAL_114]] : i64
+! FIRDialect:             %[[VAL_116:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_112]], %[[VAL_115]] : (!fir.heap<!fir.array<?xi32>>, i64) -> !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_108]] to %[[VAL_116]] : !fir.ref<i32>
+! FIRDialect:             %[[VAL_117:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
+! FIRDialect:             %[[VAL_118:[-0-9A-Za-z._]+]] = fir.load %[[VAL_8]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_119:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:             %[[VAL_120:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_118]], %[[VAL_119]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:             %[[VAL_121:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
+! FIRDialect:             %[[VAL_122:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_120]]#0 : (index) -> i64
+! FIRDialect:             %[[VAL_123:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_121]], %[[VAL_122]] : i64
+! FIRDialect:             %[[VAL_124:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_118]], %[[VAL_123]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, i64) -> !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_117]] to %[[VAL_124]] : !fir.ref<i32>
+! FIRDialect:             oss.terminator
+! FIRDialect:           }
+! FIRDialect:           %[[VAL_125:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_3]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) function(@compute.copy7) -> i32
+! FIRDialect:           %[[VAL_126:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_3]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) function(@compute.deinit10) -> i32
+! FIRDialect:           %[[VAL_127:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_8]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) function(@compute.copy8) -> i32
+! FIRDialect:           %[[VAL_128:[-0-9A-Za-z._]+]] = oss.copy base(%[[VAL_8]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) function(@compute.deinit11) -> i32
+! FIRDialect:           oss.task firstprivate(%[[VAL_3]], %[[VAL_8]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>, !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) copy(%[[VAL_125]], %[[VAL_127]] : i32, i32) deinit(%[[VAL_126]], %[[VAL_128]] : i32, i32) {
+! FIRDialect:             %[[VAL_129:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
+! FIRDialect:             %[[VAL_130:[-0-9A-Za-z._]+]] = fir.load %[[VAL_3]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_131:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:             %[[VAL_132:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_130]], %[[VAL_131]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:             %[[VAL_133:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_130]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             %[[VAL_134:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
+! FIRDialect:             %[[VAL_135:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_132]]#0 : (index) -> i64
+! FIRDialect:             %[[VAL_136:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_134]], %[[VAL_135]] : i64
+! FIRDialect:             %[[VAL_137:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_133]], %[[VAL_136]] : (!fir.heap<!fir.array<?xi32>>, i64) -> !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_129]] to %[[VAL_137]] : !fir.ref<i32>
+! FIRDialect:             %[[VAL_138:[-0-9A-Za-z._]+]] = arith.constant 7 : i32
+! FIRDialect:             %[[VAL_139:[-0-9A-Za-z._]+]] = fir.load %[[VAL_8]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_140:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:             %[[VAL_141:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_139]], %[[VAL_140]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:             %[[VAL_142:[-0-9A-Za-z._]+]] = arith.constant 7 : i64
+! FIRDialect:             %[[VAL_143:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_141]]#0 : (index) -> i64
+! FIRDialect:             %[[VAL_144:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_142]], %[[VAL_143]] : i64
+! FIRDialect:             %[[VAL_145:[-0-9A-Za-z._]+]] = fir.coordinate_of %[[VAL_139]], %[[VAL_144]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, i64) -> !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_138]] to %[[VAL_145]] : !fir.ref<i32>
+! FIRDialect:             oss.terminator
+! FIRDialect:           }
+! FIRDialect:           return
+! FIRDialect:         }
+
+! FIRDialect-LABEL:   fir.global internal @_QFEarray : !fir.array<10xi32> {
+! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.undefined !fir.array<10xi32>
+! FIRDialect:           fir.has_value %[[VAL_0]] : !fir.array<10xi32>
+! FIRDialect:         }
+
+! FIRDialect-LABEL:   fir.global internal @_QFEglob_alloc : !fir.box<!fir.heap<!fir.array<?xi32>>> {
+! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_1]] : (index) -> !fir.shape<1>
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_0]](%[[VAL_2]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
+! FIRDialect:           fir.has_value %[[VAL_3]] : !fir.box<!fir.heap<!fir.array<?xi32>>>
+! FIRDialect:         }
+
+! FIRDialect-LABEL:   fir.global internal @_QFEglob_ptr : !fir.box<!fir.ptr<!fir.array<?xi32>>> {
+! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ptr<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_1]] : (index) -> !fir.shape<1>
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_0]](%[[VAL_2]]) : (!fir.ptr<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
+! FIRDialect:           fir.has_value %[[VAL_3]] : !fir.box<!fir.ptr<!fir.array<?xi32>>>
+! FIRDialect:         }
+
+! FIRDialect-LABEL:   func.func @compute.copy0(
 ! FIRDialect-SAME:                             %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                             %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
-! FIRDialect:         %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant false
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = fir.absent !fir.box<none>
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ref<none>
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]] = arith.constant 0 : i32
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_7:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_6]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         fir.freemem %[[VAL_7]] : !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_8:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:         %[[VAL_10:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_9]] : (index) -> !fir.shape<1>
-! FIRDialect:         %[[VAL_11:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_8]](%[[VAL_10]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
-! FIRDialect:         fir.store %[[VAL_11]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         return %[[VAL_12]] : i32
-! FIRDialect:       }
+! FIRDialect-SAME:                             %[[VAL_1:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                             %[[VAL_2:[-0-9A-Za-z._]+]]: i64) -> i32 {
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_3]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_4]] : (!fir.heap<!fir.array<?xi32>>) -> i64
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 0 : i64
+! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_5]], %[[VAL_6]] : i64
+! FIRDialect:           fir.if %[[VAL_7]] {
+! FIRDialect:             %[[VAL_8:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:             %[[VAL_10:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_8]], %[[VAL_9]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:             %[[VAL_11:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_8]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : index
+! FIRDialect:             %[[VAL_13:[-0-9A-Za-z._]+]] = fir.shape_shift %[[VAL_10]]#0, %[[VAL_10]]#1 : (index, index) -> !fir.shapeshift<1>
+! FIRDialect:             %[[VAL_14:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_11]](%[[VAL_13]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.array<?xi32>
+! FIRDialect:             %[[VAL_15:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_16:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_15]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             %[[VAL_17:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_16]] : (!fir.heap<!fir.array<?xi32>>) -> i64
+! FIRDialect:             %[[VAL_18:[-0-9A-Za-z._]+]] = arith.constant 0 : i64
+! FIRDialect:             %[[VAL_19:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_17]], %[[VAL_18]] : i64
+! FIRDialect:             %[[VAL_20:[-0-9A-Za-z._]+]]:2 = fir.if %[[VAL_19]] -> (i1, !fir.heap<!fir.array<?xi32>>) {
+! FIRDialect:               %[[VAL_21:[-0-9A-Za-z._]+]] = arith.constant false
+! FIRDialect:               %[[VAL_22:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:               %[[VAL_23:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_15]], %[[VAL_22]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:               %[[VAL_24:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_23]]#1, %[[VAL_10]]#1 : index
+! FIRDialect:               %[[VAL_25:[-0-9A-Za-z._]+]] = arith.select %[[VAL_24]], %[[VAL_24]], %[[VAL_21]] : i1
+! FIRDialect:               %[[VAL_26:[-0-9A-Za-z._]+]] = fir.if %[[VAL_25]] -> (!fir.heap<!fir.array<?xi32>>) {
+! FIRDialect:                 %[[VAL_27:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xi32>, %[[VAL_10]]#1 {uniq_name = ".auto.alloc"}
+! FIRDialect:                 fir.result %[[VAL_27]] : !fir.heap<!fir.array<?xi32>>
+! FIRDialect:               } else {
+! FIRDialect:                 fir.result %[[VAL_16]] : !fir.heap<!fir.array<?xi32>>
+! FIRDialect:               }
+! FIRDialect:               fir.result %[[VAL_25]], %[[VAL_28:[-0-9A-Za-z._]+]] : i1, !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             } else {
+! FIRDialect:               %[[VAL_29:[-0-9A-Za-z._]+]] = arith.constant true
+! FIRDialect:               %[[VAL_30:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xi32>, %[[VAL_10]]#1 {uniq_name = ".auto.alloc"}
+! FIRDialect:               fir.result %[[VAL_29]], %[[VAL_30]] : i1, !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             }
+! FIRDialect:             fir.if %[[VAL_31:[-0-9A-Za-z._]+]]#0 {
+! FIRDialect:               %[[VAL_32:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:               fir.if %[[VAL_19]] {
+! FIRDialect:                 fir.freemem %[[VAL_16]] : !fir.heap<!fir.array<?xi32>>
+! FIRDialect:               }
+! FIRDialect:               %[[VAL_33:[-0-9A-Za-z._]+]] = fir.shape_shift %[[VAL_10]]#0, %[[VAL_10]]#1 : (index, index) -> !fir.shapeshift<1>
+! FIRDialect:               %[[VAL_34:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_31]]#1(%[[VAL_33]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
+! FIRDialect:               fir.store %[[VAL_34]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             }
+! FIRDialect:           }
+! FIRDialect:           %[[VAL_35:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           return %[[VAL_35]] : i32
+! FIRDialect:         }
 
-! FIRDialect-LABEL: func.func @compute.init0(
-! FIRDialect-SAME:                           %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                           %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
-! FIRDialect:         %[[VAL_2:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ptr<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_2]](%[[VAL_4]]) : (!fir.ptr<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
-! FIRDialect:         fir.store %[[VAL_5]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         return %[[VAL_6]] : i32
-! FIRDialect:       }
+! FIRDialect-LABEL:   func.func @compute.deinit0(
+! FIRDialect-SAME:                               %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                               %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant false
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.absent !fir.box<none>
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ref<none>
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = arith.constant 0 : i32
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_6]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           fir.freemem %[[VAL_7]] : !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_9]] : (index) -> !fir.shape<1>
+! FIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_8]](%[[VAL_10]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
+! FIRDialect:           fir.store %[[VAL_11]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           return %[[VAL_12]] : i32
+! FIRDialect:         }
 
-! FIRDialect-LABEL: func.func @compute.deinit1(
+! FIRDialect-LABEL:   func.func @compute.init0(
 ! FIRDialect-SAME:                             %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
 ! FIRDialect-SAME:                             %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
-! FIRDialect:         %[[VAL_2:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ptr<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_2]](%[[VAL_4]]) : (!fir.ptr<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
-! FIRDialect:         fir.store %[[VAL_5]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         return %[[VAL_6]] : i32
-! FIRDialect:       }
-
-! FIRDialect-LABEL: func.func @compute.copy1(
-! FIRDialect-SAME:                           %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                           %[[VAL_1:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                           %[[VAL_2:[-0-9A-Za-z._]+]]: i64) -> i32 {
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_3]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_4]] : (!fir.heap<!fir.array<?xi32>>) -> i64
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 0 : i64
-! FIRDialect:         %[[VAL_7:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_5]], %[[VAL_6]] : i64
-! FIRDialect:         fir.if %[[VAL_7]] {
-! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_8]], %[[VAL_9]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_8]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : index
-! FIRDialect:           %[[VAL_13:[-0-9A-Za-z._]+]] = fir.shape_shift %[[VAL_10]]#0, %[[VAL_10]]#1 : (index, index) -> !fir.shapeshift<1>
-! FIRDialect:           %[[VAL_14:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_11]](%[[VAL_13]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.array<?xi32>
-! FIRDialect:           %[[VAL_15:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_16:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_15]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           %[[VAL_17:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_16]] : (!fir.heap<!fir.array<?xi32>>) -> i64
-! FIRDialect:           %[[VAL_18:[-0-9A-Za-z._]+]] = arith.constant 0 : i64
-! FIRDialect:           %[[VAL_19:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_17]], %[[VAL_18]] : i64
-! FIRDialect:           %[[VAL_20:[-0-9A-Za-z._]+]]:2 = fir.if %[[VAL_19]] -> (i1, !fir.heap<!fir.array<?xi32>>) {
-! FIRDialect:             %[[VAL_21:[-0-9A-Za-z._]+]] = arith.constant false
-! FIRDialect:             %[[VAL_22:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:             %[[VAL_23:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_15]], %[[VAL_22]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:             %[[VAL_24:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_23]]#1, %[[VAL_10]]#1 : index
-! FIRDialect:             %[[VAL_25:[-0-9A-Za-z._]+]] = arith.select %[[VAL_24]], %[[VAL_24]], %[[VAL_21]] : i1
-! FIRDialect:             %[[VAL_26:[-0-9A-Za-z._]+]] = fir.if %[[VAL_25]] -> (!fir.heap<!fir.array<?xi32>>) {
-! FIRDialect:               %[[VAL_27:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xi32>, %[[VAL_10]]#1 {uniq_name = ".auto.alloc"}
-! FIRDialect:               %[[VAL_28:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_10]]#1 : (index) -> !fir.shape<1>
-! FIRDialect:               %[[VAL_29:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_27]](%[[VAL_28]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.array<?xi32>
-! FIRDialect:               %[[VAL_30:[-0-9A-Za-z._]+]] = arith.constant 1 : index
-! FIRDialect:               %[[VAL_31:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:               %[[VAL_32:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_10]]#1, %[[VAL_30]] : index
-! FIRDialect:               %[[VAL_33:[-0-9A-Za-z._]+]] = fir.do_loop %[[VAL_34:[-0-9A-Za-z._]+]] = %[[VAL_31]] to %[[VAL_32]] step %[[VAL_30]] unordered iter_args(%[[VAL_35:[-0-9A-Za-z._]+]] = %[[VAL_29]]) -> (!fir.array<?xi32>) {
-! FIRDialect:                 %[[VAL_36:[-0-9A-Za-z._]+]] = fir.array_fetch %[[VAL_14]], %[[VAL_34]] : (!fir.array<?xi32>, index) -> i32
-! FIRDialect:                 %[[VAL_37:[-0-9A-Za-z._]+]] = fir.array_update %[[VAL_35]], %[[VAL_36]], %[[VAL_34]] : (!fir.array<?xi32>, i32, index) -> !fir.array<?xi32>
-! FIRDialect:                 %[[VAL_38:[-0-9A-Za-z._]+]] = fir.undefined index
-! FIRDialect:                 fir.result %[[VAL_37]] : !fir.array<?xi32>
-! FIRDialect:               }
-! FIRDialect:               %[[VAL_39:[-0-9A-Za-z._]+]] = fir.undefined index
-! FIRDialect:               fir.array_merge_store %[[VAL_29]], %[[VAL_40:[-0-9A-Za-z._]+]] to %[[VAL_27]] : !fir.array<?xi32>, !fir.array<?xi32>, !fir.heap<!fir.array<?xi32>>
-! FIRDialect:               fir.result %[[VAL_27]] : !fir.heap<!fir.array<?xi32>>
-! FIRDialect:             } else {
-! FIRDialect:               %[[VAL_41:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_10]]#1 : (index) -> !fir.shape<1>
-! FIRDialect:               %[[VAL_42:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_16]](%[[VAL_41]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.array<?xi32>
-! FIRDialect:               %[[VAL_43:[-0-9A-Za-z._]+]] = arith.constant 1 : index
-! FIRDialect:               %[[VAL_44:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:               %[[VAL_45:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_10]]#1, %[[VAL_43]] : index
-! FIRDialect:               %[[VAL_46:[-0-9A-Za-z._]+]] = fir.do_loop %[[VAL_47:[-0-9A-Za-z._]+]] = %[[VAL_44]] to %[[VAL_45]] step %[[VAL_43]] unordered iter_args(%[[VAL_48:[-0-9A-Za-z._]+]] = %[[VAL_42]]) -> (!fir.array<?xi32>) {
-! FIRDialect:                 %[[VAL_49:[-0-9A-Za-z._]+]] = fir.array_fetch %[[VAL_14]], %[[VAL_47]] : (!fir.array<?xi32>, index) -> i32
-! FIRDialect:                 %[[VAL_50:[-0-9A-Za-z._]+]] = fir.array_update %[[VAL_48]], %[[VAL_49]], %[[VAL_47]] : (!fir.array<?xi32>, i32, index) -> !fir.array<?xi32>
-! FIRDialect:                 %[[VAL_51:[-0-9A-Za-z._]+]] = fir.undefined index
-! FIRDialect:                 fir.result %[[VAL_50]] : !fir.array<?xi32>
-! FIRDialect:               }
-! FIRDialect:               %[[VAL_52:[-0-9A-Za-z._]+]] = fir.undefined index
-! FIRDialect:               fir.array_merge_store %[[VAL_42]], %[[VAL_53:[-0-9A-Za-z._]+]] to %[[VAL_16]] : !fir.array<?xi32>, !fir.array<?xi32>, !fir.heap<!fir.array<?xi32>>
-! FIRDialect:               fir.result %[[VAL_16]] : !fir.heap<!fir.array<?xi32>>
-! FIRDialect:             }
-! FIRDialect:             fir.result %[[VAL_25]], %[[VAL_54:[-0-9A-Za-z._]+]] : i1, !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           } else {
-! FIRDialect:             %[[VAL_55:[-0-9A-Za-z._]+]] = arith.constant true
-! FIRDialect:             %[[VAL_56:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xi32>, %[[VAL_10]]#1 {uniq_name = ".auto.alloc"}
-! FIRDialect:             %[[VAL_57:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_10]]#1 : (index) -> !fir.shape<1>
-! FIRDialect:             %[[VAL_58:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_56]](%[[VAL_57]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.array<?xi32>
-! FIRDialect:             %[[VAL_59:[-0-9A-Za-z._]+]] = arith.constant 1 : index
-! FIRDialect:             %[[VAL_60:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:             %[[VAL_61:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_10]]#1, %[[VAL_59]] : index
-! FIRDialect:             %[[VAL_62:[-0-9A-Za-z._]+]] = fir.do_loop %[[VAL_63:[-0-9A-Za-z._]+]] = %[[VAL_60]] to %[[VAL_61]] step %[[VAL_59]] unordered iter_args(%[[VAL_64:[-0-9A-Za-z._]+]] = %[[VAL_58]]) -> (!fir.array<?xi32>) {
-! FIRDialect:               %[[VAL_65:[-0-9A-Za-z._]+]] = fir.array_fetch %[[VAL_14]], %[[VAL_63]] : (!fir.array<?xi32>, index) -> i32
-! FIRDialect:               %[[VAL_66:[-0-9A-Za-z._]+]] = fir.array_update %[[VAL_64]], %[[VAL_65]], %[[VAL_63]] : (!fir.array<?xi32>, i32, index) -> !fir.array<?xi32>
-! FIRDialect:               %[[VAL_67:[-0-9A-Za-z._]+]] = fir.undefined index
-! FIRDialect:               fir.result %[[VAL_66]] : !fir.array<?xi32>
-! FIRDialect:             }
-! FIRDialect:             %[[VAL_68:[-0-9A-Za-z._]+]] = fir.undefined index
-! FIRDialect:             fir.array_merge_store %[[VAL_58]], %[[VAL_69:[-0-9A-Za-z._]+]] to %[[VAL_56]] : !fir.array<?xi32>, !fir.array<?xi32>, !fir.heap<!fir.array<?xi32>>
-! FIRDialect:             fir.result %[[VAL_55]], %[[VAL_56]] : i1, !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           }
-! FIRDialect:           fir.if %[[VAL_70:[-0-9A-Za-z._]+]]#0 {
-! FIRDialect:             %[[VAL_71:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:             fir.if %[[VAL_19]] {
-! FIRDialect:               fir.freemem %[[VAL_16]] : !fir.heap<!fir.array<?xi32>>
-! FIRDialect:             }
-! FIRDialect:             %[[VAL_72:[-0-9A-Za-z._]+]] = fir.shape_shift %[[VAL_10]]#0, %[[VAL_10]]#1 : (index, index) -> !fir.shapeshift<1>
-! FIRDialect:             %[[VAL_73:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_70]]#1(%[[VAL_72]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
-! FIRDialect:             fir.store %[[VAL_73]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           }
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ptr<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_2]](%[[VAL_4]]) : (!fir.ptr<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
+! FIRDialect:           fir.store %[[VAL_5]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           return %[[VAL_6]] : i32
 ! FIRDialect:         }
-! FIRDialect:         %[[VAL_74:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         return %[[VAL_74]] : i32
-! FIRDialect:       }
 
-! FIRDialect-LABEL: func.func @compute.deinit2(
+! FIRDialect-LABEL:   func.func @compute.deinit1(
+! FIRDialect-SAME:                               %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                               %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ptr<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_2]](%[[VAL_4]]) : (!fir.ptr<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
+! FIRDialect:           fir.store %[[VAL_5]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           return %[[VAL_6]] : i32
+! FIRDialect:         }
+
+! FIRDialect-LABEL:   func.func @compute.copy1(
 ! FIRDialect-SAME:                             %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                             %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
-! FIRDialect:         %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant false
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = fir.absent !fir.box<none>
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ref<none>
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]] = arith.constant 0 : i32
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_7:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_6]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         fir.freemem %[[VAL_7]] : !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_8:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:         %[[VAL_10:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_9]] : (index) -> !fir.shape<1>
-! FIRDialect:         %[[VAL_11:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_8]](%[[VAL_10]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
-! FIRDialect:         fir.store %[[VAL_11]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         return %[[VAL_12]] : i32
-! FIRDialect:       }
+! FIRDialect-SAME:                             %[[VAL_1:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                             %[[VAL_2:[-0-9A-Za-z._]+]]: i64) -> i32 {
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_3]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_4]] : (!fir.heap<!fir.array<?xi32>>) -> i64
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 0 : i64
+! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_5]], %[[VAL_6]] : i64
+! FIRDialect:           fir.if %[[VAL_7]] {
+! FIRDialect:             %[[VAL_8:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:             %[[VAL_10:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_8]], %[[VAL_9]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:             %[[VAL_11:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_8]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : index
+! FIRDialect:             %[[VAL_13:[-0-9A-Za-z._]+]] = fir.shape_shift %[[VAL_10]]#0, %[[VAL_10]]#1 : (index, index) -> !fir.shapeshift<1>
+! FIRDialect:             %[[VAL_14:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_11]](%[[VAL_13]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.array<?xi32>
+! FIRDialect:             %[[VAL_15:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_16:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_15]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             %[[VAL_17:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_16]] : (!fir.heap<!fir.array<?xi32>>) -> i64
+! FIRDialect:             %[[VAL_18:[-0-9A-Za-z._]+]] = arith.constant 0 : i64
+! FIRDialect:             %[[VAL_19:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_17]], %[[VAL_18]] : i64
+! FIRDialect:             %[[VAL_20:[-0-9A-Za-z._]+]]:2 = fir.if %[[VAL_19]] -> (i1, !fir.heap<!fir.array<?xi32>>) {
+! FIRDialect:               %[[VAL_21:[-0-9A-Za-z._]+]] = arith.constant false
+! FIRDialect:               %[[VAL_22:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:               %[[VAL_23:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_15]], %[[VAL_22]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:               %[[VAL_24:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_23]]#1, %[[VAL_10]]#1 : index
+! FIRDialect:               %[[VAL_25:[-0-9A-Za-z._]+]] = arith.select %[[VAL_24]], %[[VAL_24]], %[[VAL_21]] : i1
+! FIRDialect:               %[[VAL_26:[-0-9A-Za-z._]+]] = fir.if %[[VAL_25]] -> (!fir.heap<!fir.array<?xi32>>) {
+! FIRDialect:                 %[[VAL_27:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xi32>, %[[VAL_10]]#1 {uniq_name = ".auto.alloc"}
+! FIRDialect:                 %[[VAL_28:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_10]]#1 : (index) -> !fir.shape<1>
+! FIRDialect:                 %[[VAL_29:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_27]](%[[VAL_28]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.array<?xi32>
+! FIRDialect:                 %[[VAL_30:[-0-9A-Za-z._]+]] = arith.constant 1 : index
+! FIRDialect:                 %[[VAL_31:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:                 %[[VAL_32:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_10]]#1, %[[VAL_30]] : index
+! FIRDialect:                 %[[VAL_33:[-0-9A-Za-z._]+]] = fir.do_loop %[[VAL_34:[-0-9A-Za-z._]+]] = %[[VAL_31]] to %[[VAL_32]] step %[[VAL_30]] unordered iter_args(%[[VAL_35:[-0-9A-Za-z._]+]] = %[[VAL_29]]) -> (!fir.array<?xi32>) {
+! FIRDialect:                   %[[VAL_36:[-0-9A-Za-z._]+]] = fir.array_fetch %[[VAL_14]], %[[VAL_34]] : (!fir.array<?xi32>, index) -> i32
+! FIRDialect:                   %[[VAL_37:[-0-9A-Za-z._]+]] = fir.array_update %[[VAL_35]], %[[VAL_36]], %[[VAL_34]] : (!fir.array<?xi32>, i32, index) -> !fir.array<?xi32>
+! FIRDialect:                   %[[VAL_38:[-0-9A-Za-z._]+]] = fir.undefined index
+! FIRDialect:                   fir.result %[[VAL_37]] : !fir.array<?xi32>
+! FIRDialect:                 }
+! FIRDialect:                 %[[VAL_39:[-0-9A-Za-z._]+]] = fir.undefined index
+! FIRDialect:                 fir.array_merge_store %[[VAL_29]], %[[VAL_40:[-0-9A-Za-z._]+]] to %[[VAL_27]] : !fir.array<?xi32>, !fir.array<?xi32>, !fir.heap<!fir.array<?xi32>>
+! FIRDialect:                 fir.result %[[VAL_27]] : !fir.heap<!fir.array<?xi32>>
+! FIRDialect:               } else {
+! FIRDialect:                 %[[VAL_41:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_10]]#1 : (index) -> !fir.shape<1>
+! FIRDialect:                 %[[VAL_42:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_16]](%[[VAL_41]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.array<?xi32>
+! FIRDialect:                 %[[VAL_43:[-0-9A-Za-z._]+]] = arith.constant 1 : index
+! FIRDialect:                 %[[VAL_44:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:                 %[[VAL_45:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_10]]#1, %[[VAL_43]] : index
+! FIRDialect:                 %[[VAL_46:[-0-9A-Za-z._]+]] = fir.do_loop %[[VAL_47:[-0-9A-Za-z._]+]] = %[[VAL_44]] to %[[VAL_45]] step %[[VAL_43]] unordered iter_args(%[[VAL_48:[-0-9A-Za-z._]+]] = %[[VAL_42]]) -> (!fir.array<?xi32>) {
+! FIRDialect:                   %[[VAL_49:[-0-9A-Za-z._]+]] = fir.array_fetch %[[VAL_14]], %[[VAL_47]] : (!fir.array<?xi32>, index) -> i32
+! FIRDialect:                   %[[VAL_50:[-0-9A-Za-z._]+]] = fir.array_update %[[VAL_48]], %[[VAL_49]], %[[VAL_47]] : (!fir.array<?xi32>, i32, index) -> !fir.array<?xi32>
+! FIRDialect:                   %[[VAL_51:[-0-9A-Za-z._]+]] = fir.undefined index
+! FIRDialect:                   fir.result %[[VAL_50]] : !fir.array<?xi32>
+! FIRDialect:                 }
+! FIRDialect:                 %[[VAL_52:[-0-9A-Za-z._]+]] = fir.undefined index
+! FIRDialect:                 fir.array_merge_store %[[VAL_42]], %[[VAL_53:[-0-9A-Za-z._]+]] to %[[VAL_16]] : !fir.array<?xi32>, !fir.array<?xi32>, !fir.heap<!fir.array<?xi32>>
+! FIRDialect:                 fir.result %[[VAL_16]] : !fir.heap<!fir.array<?xi32>>
+! FIRDialect:               }
+! FIRDialect:               fir.result %[[VAL_25]], %[[VAL_54:[-0-9A-Za-z._]+]] : i1, !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             } else {
+! FIRDialect:               %[[VAL_55:[-0-9A-Za-z._]+]] = arith.constant true
+! FIRDialect:               %[[VAL_56:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xi32>, %[[VAL_10]]#1 {uniq_name = ".auto.alloc"}
+! FIRDialect:               %[[VAL_57:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_10]]#1 : (index) -> !fir.shape<1>
+! FIRDialect:               %[[VAL_58:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_56]](%[[VAL_57]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.array<?xi32>
+! FIRDialect:               %[[VAL_59:[-0-9A-Za-z._]+]] = arith.constant 1 : index
+! FIRDialect:               %[[VAL_60:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:               %[[VAL_61:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_10]]#1, %[[VAL_59]] : index
+! FIRDialect:               %[[VAL_62:[-0-9A-Za-z._]+]] = fir.do_loop %[[VAL_63:[-0-9A-Za-z._]+]] = %[[VAL_60]] to %[[VAL_61]] step %[[VAL_59]] unordered iter_args(%[[VAL_64:[-0-9A-Za-z._]+]] = %[[VAL_58]]) -> (!fir.array<?xi32>) {
+! FIRDialect:                 %[[VAL_65:[-0-9A-Za-z._]+]] = fir.array_fetch %[[VAL_14]], %[[VAL_63]] : (!fir.array<?xi32>, index) -> i32
+! FIRDialect:                 %[[VAL_66:[-0-9A-Za-z._]+]] = fir.array_update %[[VAL_64]], %[[VAL_65]], %[[VAL_63]] : (!fir.array<?xi32>, i32, index) -> !fir.array<?xi32>
+! FIRDialect:                 %[[VAL_67:[-0-9A-Za-z._]+]] = fir.undefined index
+! FIRDialect:                 fir.result %[[VAL_66]] : !fir.array<?xi32>
+! FIRDialect:               }
+! FIRDialect:               %[[VAL_68:[-0-9A-Za-z._]+]] = fir.undefined index
+! FIRDialect:               fir.array_merge_store %[[VAL_58]], %[[VAL_69:[-0-9A-Za-z._]+]] to %[[VAL_56]] : !fir.array<?xi32>, !fir.array<?xi32>, !fir.heap<!fir.array<?xi32>>
+! FIRDialect:               fir.result %[[VAL_55]], %[[VAL_56]] : i1, !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             }
+! FIRDialect:             fir.if %[[VAL_70:[-0-9A-Za-z._]+]]#0 {
+! FIRDialect:               %[[VAL_71:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:               fir.if %[[VAL_19]] {
+! FIRDialect:                 fir.freemem %[[VAL_16]] : !fir.heap<!fir.array<?xi32>>
+! FIRDialect:               }
+! FIRDialect:               %[[VAL_72:[-0-9A-Za-z._]+]] = fir.shape_shift %[[VAL_10]]#0, %[[VAL_10]]#1 : (index, index) -> !fir.shapeshift<1>
+! FIRDialect:               %[[VAL_73:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_70]]#1(%[[VAL_72]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
+! FIRDialect:               fir.store %[[VAL_73]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             }
+! FIRDialect:           }
+! FIRDialect:           %[[VAL_74:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           return %[[VAL_74]] : i32
+! FIRDialect:         }
 
-! FIRDialect-LABEL: func.func @compute.copy2(
-! FIRDialect-SAME:                           %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                           %[[VAL_1:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                           %[[VAL_2:[-0-9A-Za-z._]+]]: i64) -> i32 {
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_3]], %[[VAL_4]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = fir.shift %[[VAL_5]]#0 : (index) -> !fir.shift<1>
-! FIRDialect:         %[[VAL_7:[-0-9A-Za-z._]+]] = fir.rebox %[[VAL_3]](%[[VAL_6]]) : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, !fir.shift<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
-! FIRDialect:         fir.store %[[VAL_7]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_8:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         return %[[VAL_8]] : i32
-! FIRDialect:       }
+! FIRDialect-LABEL:   func.func @compute.deinit2(
+! FIRDialect-SAME:                               %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                               %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant false
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.absent !fir.box<none>
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ref<none>
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = arith.constant 0 : i32
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_6]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           fir.freemem %[[VAL_7]] : !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_9]] : (index) -> !fir.shape<1>
+! FIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_8]](%[[VAL_10]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
+! FIRDialect:           fir.store %[[VAL_11]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           return %[[VAL_12]] : i32
+! FIRDialect:         }
 
-! FIRDialect-LABEL: func.func @compute.deinit3(
+! FIRDialect-LABEL:   func.func @compute.copy2(
+! FIRDialect-SAME:                             %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                             %[[VAL_1:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                             %[[VAL_2:[-0-9A-Za-z._]+]]: i64) -> i32 {
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_3]], %[[VAL_4]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = fir.shift %[[VAL_5]]#0 : (index) -> !fir.shift<1>
+! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = fir.rebox %[[VAL_3]](%[[VAL_6]]) : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, !fir.shift<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
+! FIRDialect:           fir.store %[[VAL_7]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           return %[[VAL_8]] : i32
+! FIRDialect:         }
+
+! FIRDialect-LABEL:   func.func @compute.deinit3(
+! FIRDialect-SAME:                               %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                               %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ptr<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_2]](%[[VAL_4]]) : (!fir.ptr<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
+! FIRDialect:           fir.store %[[VAL_5]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           return %[[VAL_6]] : i32
+! FIRDialect:         }
+
+! FIRDialect-LABEL:   func.func @compute.copy3(
+! FIRDialect-SAME:                             %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                             %[[VAL_1:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                             %[[VAL_2:[-0-9A-Za-z._]+]]: i64) -> i32 {
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_3]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_4]] : (!fir.heap<!fir.array<?xi32>>) -> i64
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 0 : i64
+! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_5]], %[[VAL_6]] : i64
+! FIRDialect:           fir.if %[[VAL_7]] {
+! FIRDialect:             %[[VAL_8:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:             %[[VAL_10:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_8]], %[[VAL_9]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:             %[[VAL_11:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_8]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : index
+! FIRDialect:             %[[VAL_13:[-0-9A-Za-z._]+]] = fir.shape_shift %[[VAL_10]]#0, %[[VAL_10]]#1 : (index, index) -> !fir.shapeshift<1>
+! FIRDialect:             %[[VAL_14:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_11]](%[[VAL_13]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.array<?xi32>
+! FIRDialect:             %[[VAL_15:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_16:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_15]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             %[[VAL_17:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_16]] : (!fir.heap<!fir.array<?xi32>>) -> i64
+! FIRDialect:             %[[VAL_18:[-0-9A-Za-z._]+]] = arith.constant 0 : i64
+! FIRDialect:             %[[VAL_19:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_17]], %[[VAL_18]] : i64
+! FIRDialect:             %[[VAL_20:[-0-9A-Za-z._]+]]:2 = fir.if %[[VAL_19]] -> (i1, !fir.heap<!fir.array<?xi32>>) {
+! FIRDialect:               %[[VAL_21:[-0-9A-Za-z._]+]] = arith.constant false
+! FIRDialect:               %[[VAL_22:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:               %[[VAL_23:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_15]], %[[VAL_22]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:               %[[VAL_24:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_23]]#1, %[[VAL_10]]#1 : index
+! FIRDialect:               %[[VAL_25:[-0-9A-Za-z._]+]] = arith.select %[[VAL_24]], %[[VAL_24]], %[[VAL_21]] : i1
+! FIRDialect:               %[[VAL_26:[-0-9A-Za-z._]+]] = fir.if %[[VAL_25]] -> (!fir.heap<!fir.array<?xi32>>) {
+! FIRDialect:                 %[[VAL_27:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xi32>, %[[VAL_10]]#1 {uniq_name = ".auto.alloc"}
+! FIRDialect:                 fir.result %[[VAL_27]] : !fir.heap<!fir.array<?xi32>>
+! FIRDialect:               } else {
+! FIRDialect:                 fir.result %[[VAL_16]] : !fir.heap<!fir.array<?xi32>>
+! FIRDialect:               }
+! FIRDialect:               fir.result %[[VAL_25]], %[[VAL_28:[-0-9A-Za-z._]+]] : i1, !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             } else {
+! FIRDialect:               %[[VAL_29:[-0-9A-Za-z._]+]] = arith.constant true
+! FIRDialect:               %[[VAL_30:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xi32>, %[[VAL_10]]#1 {uniq_name = ".auto.alloc"}
+! FIRDialect:               fir.result %[[VAL_29]], %[[VAL_30]] : i1, !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             }
+! FIRDialect:             fir.if %[[VAL_31:[-0-9A-Za-z._]+]]#0 {
+! FIRDialect:               %[[VAL_32:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:               fir.if %[[VAL_19]] {
+! FIRDialect:                 fir.freemem %[[VAL_16]] : !fir.heap<!fir.array<?xi32>>
+! FIRDialect:               }
+! FIRDialect:               %[[VAL_33:[-0-9A-Za-z._]+]] = fir.shape_shift %[[VAL_10]]#0, %[[VAL_10]]#1 : (index, index) -> !fir.shapeshift<1>
+! FIRDialect:               %[[VAL_34:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_31]]#1(%[[VAL_33]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
+! FIRDialect:               fir.store %[[VAL_34]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             }
+! FIRDialect:           }
+! FIRDialect:           %[[VAL_35:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           return %[[VAL_35]] : i32
+! FIRDialect:         }
+
+! FIRDialect-LABEL:   func.func @compute.deinit4(
+! FIRDialect-SAME:                               %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                               %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant false
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.absent !fir.box<none>
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ref<none>
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = arith.constant 0 : i32
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_6]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           fir.freemem %[[VAL_7]] : !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_9]] : (index) -> !fir.shape<1>
+! FIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_8]](%[[VAL_10]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
+! FIRDialect:           fir.store %[[VAL_11]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           return %[[VAL_12]] : i32
+! FIRDialect:         }
+
+! FIRDialect-LABEL:   func.func @compute.init1(
 ! FIRDialect-SAME:                             %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
 ! FIRDialect-SAME:                             %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
-! FIRDialect:         %[[VAL_2:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ptr<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_2]](%[[VAL_4]]) : (!fir.ptr<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
-! FIRDialect:         fir.store %[[VAL_5]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         return %[[VAL_6]] : i32
-! FIRDialect:       }
-
-! FIRDialect-LABEL: func.func @compute.copy3(
-! FIRDialect-SAME:                           %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                           %[[VAL_1:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                           %[[VAL_2:[-0-9A-Za-z._]+]]: i64) -> i32 {
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_3]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_4]] : (!fir.heap<!fir.array<?xi32>>) -> i64
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 0 : i64
-! FIRDialect:         %[[VAL_7:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_5]], %[[VAL_6]] : i64
-! FIRDialect:         fir.if %[[VAL_7]] {
-! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_8]], %[[VAL_9]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_8]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : index
-! FIRDialect:           %[[VAL_13:[-0-9A-Za-z._]+]] = fir.shape_shift %[[VAL_10]]#0, %[[VAL_10]]#1 : (index, index) -> !fir.shapeshift<1>
-! FIRDialect:           %[[VAL_14:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_11]](%[[VAL_13]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.array<?xi32>
-! FIRDialect:           %[[VAL_15:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_16:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_15]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           %[[VAL_17:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_16]] : (!fir.heap<!fir.array<?xi32>>) -> i64
-! FIRDialect:           %[[VAL_18:[-0-9A-Za-z._]+]] = arith.constant 0 : i64
-! FIRDialect:           %[[VAL_19:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_17]], %[[VAL_18]] : i64
-! FIRDialect:           %[[VAL_20:[-0-9A-Za-z._]+]]:2 = fir.if %[[VAL_19]] -> (i1, !fir.heap<!fir.array<?xi32>>) {
-! FIRDialect:             %[[VAL_21:[-0-9A-Za-z._]+]] = arith.constant false
-! FIRDialect:             %[[VAL_22:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:             %[[VAL_23:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_15]], %[[VAL_22]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:             %[[VAL_24:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_23]]#1, %[[VAL_10]]#1 : index
-! FIRDialect:             %[[VAL_25:[-0-9A-Za-z._]+]] = arith.select %[[VAL_24]], %[[VAL_24]], %[[VAL_21]] : i1
-! FIRDialect:             %[[VAL_26:[-0-9A-Za-z._]+]] = fir.if %[[VAL_25]] -> (!fir.heap<!fir.array<?xi32>>) {
-! FIRDialect:               %[[VAL_27:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xi32>, %[[VAL_10]]#1 {uniq_name = ".auto.alloc"}
-! FIRDialect:               fir.result %[[VAL_27]] : !fir.heap<!fir.array<?xi32>>
-! FIRDialect:             } else {
-! FIRDialect:               fir.result %[[VAL_16]] : !fir.heap<!fir.array<?xi32>>
-! FIRDialect:             }
-! FIRDialect:             fir.result %[[VAL_25]], %[[VAL_28:[-0-9A-Za-z._]+]] : i1, !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           } else {
-! FIRDialect:             %[[VAL_29:[-0-9A-Za-z._]+]] = arith.constant true
-! FIRDialect:             %[[VAL_30:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xi32>, %[[VAL_10]]#1 {uniq_name = ".auto.alloc"}
-! FIRDialect:             fir.result %[[VAL_29]], %[[VAL_30]] : i1, !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           }
-! FIRDialect:           fir.if %[[VAL_31:[-0-9A-Za-z._]+]]#0 {
-! FIRDialect:             %[[VAL_32:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:             fir.if %[[VAL_19]] {
-! FIRDialect:               fir.freemem %[[VAL_16]] : !fir.heap<!fir.array<?xi32>>
-! FIRDialect:             }
-! FIRDialect:             %[[VAL_33:[-0-9A-Za-z._]+]] = fir.shape_shift %[[VAL_10]]#0, %[[VAL_10]]#1 : (index, index) -> !fir.shapeshift<1>
-! FIRDialect:             %[[VAL_34:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_31]]#1(%[[VAL_33]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
-! FIRDialect:             fir.store %[[VAL_34]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           }
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ptr<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_2]](%[[VAL_4]]) : (!fir.ptr<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
+! FIRDialect:           fir.store %[[VAL_5]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           return %[[VAL_6]] : i32
 ! FIRDialect:         }
-! FIRDialect:         %[[VAL_35:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         return %[[VAL_35]] : i32
-! FIRDialect:       }
 
-! FIRDialect-LABEL: func.func @compute.deinit4(
+! FIRDialect-LABEL:   func.func @compute.deinit5(
+! FIRDialect-SAME:                               %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                               %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ptr<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_2]](%[[VAL_4]]) : (!fir.ptr<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
+! FIRDialect:           fir.store %[[VAL_5]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           return %[[VAL_6]] : i32
+! FIRDialect:         }
+
+! FIRDialect-LABEL:   func.func @compute.copy4(
 ! FIRDialect-SAME:                             %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                             %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
-! FIRDialect:         %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant false
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = fir.absent !fir.box<none>
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ref<none>
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]] = arith.constant 0 : i32
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_7:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_6]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         fir.freemem %[[VAL_7]] : !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_8:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:         %[[VAL_10:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_9]] : (index) -> !fir.shape<1>
-! FIRDialect:         %[[VAL_11:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_8]](%[[VAL_10]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
-! FIRDialect:         fir.store %[[VAL_11]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         return %[[VAL_12]] : i32
-! FIRDialect:       }
+! FIRDialect-SAME:                             %[[VAL_1:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                             %[[VAL_2:[-0-9A-Za-z._]+]]: i64) -> i32 {
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_3]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_4]] : (!fir.heap<!fir.array<?xi32>>) -> i64
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 0 : i64
+! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_5]], %[[VAL_6]] : i64
+! FIRDialect:           fir.if %[[VAL_7]] {
+! FIRDialect:             %[[VAL_8:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:             %[[VAL_10:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_8]], %[[VAL_9]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:             %[[VAL_11:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_8]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : index
+! FIRDialect:             %[[VAL_13:[-0-9A-Za-z._]+]] = fir.shape_shift %[[VAL_10]]#0, %[[VAL_10]]#1 : (index, index) -> !fir.shapeshift<1>
+! FIRDialect:             %[[VAL_14:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_11]](%[[VAL_13]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.array<?xi32>
+! FIRDialect:             %[[VAL_15:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_16:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_15]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             %[[VAL_17:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_16]] : (!fir.heap<!fir.array<?xi32>>) -> i64
+! FIRDialect:             %[[VAL_18:[-0-9A-Za-z._]+]] = arith.constant 0 : i64
+! FIRDialect:             %[[VAL_19:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_17]], %[[VAL_18]] : i64
+! FIRDialect:             %[[VAL_20:[-0-9A-Za-z._]+]]:2 = fir.if %[[VAL_19]] -> (i1, !fir.heap<!fir.array<?xi32>>) {
+! FIRDialect:               %[[VAL_21:[-0-9A-Za-z._]+]] = arith.constant false
+! FIRDialect:               %[[VAL_22:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:               %[[VAL_23:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_15]], %[[VAL_22]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:               %[[VAL_24:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_23]]#1, %[[VAL_10]]#1 : index
+! FIRDialect:               %[[VAL_25:[-0-9A-Za-z._]+]] = arith.select %[[VAL_24]], %[[VAL_24]], %[[VAL_21]] : i1
+! FIRDialect:               %[[VAL_26:[-0-9A-Za-z._]+]] = fir.if %[[VAL_25]] -> (!fir.heap<!fir.array<?xi32>>) {
+! FIRDialect:                 %[[VAL_27:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xi32>, %[[VAL_10]]#1 {uniq_name = ".auto.alloc"}
+! FIRDialect:                 %[[VAL_28:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_10]]#1 : (index) -> !fir.shape<1>
+! FIRDialect:                 %[[VAL_29:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_27]](%[[VAL_28]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.array<?xi32>
+! FIRDialect:                 %[[VAL_30:[-0-9A-Za-z._]+]] = arith.constant 1 : index
+! FIRDialect:                 %[[VAL_31:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:                 %[[VAL_32:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_10]]#1, %[[VAL_30]] : index
+! FIRDialect:                 %[[VAL_33:[-0-9A-Za-z._]+]] = fir.do_loop %[[VAL_34:[-0-9A-Za-z._]+]] = %[[VAL_31]] to %[[VAL_32]] step %[[VAL_30]] unordered iter_args(%[[VAL_35:[-0-9A-Za-z._]+]] = %[[VAL_29]]) -> (!fir.array<?xi32>) {
+! FIRDialect:                   %[[VAL_36:[-0-9A-Za-z._]+]] = fir.array_fetch %[[VAL_14]], %[[VAL_34]] : (!fir.array<?xi32>, index) -> i32
+! FIRDialect:                   %[[VAL_37:[-0-9A-Za-z._]+]] = fir.array_update %[[VAL_35]], %[[VAL_36]], %[[VAL_34]] : (!fir.array<?xi32>, i32, index) -> !fir.array<?xi32>
+! FIRDialect:                   %[[VAL_38:[-0-9A-Za-z._]+]] = fir.undefined index
+! FIRDialect:                   fir.result %[[VAL_37]] : !fir.array<?xi32>
+! FIRDialect:                 }
+! FIRDialect:                 %[[VAL_39:[-0-9A-Za-z._]+]] = fir.undefined index
+! FIRDialect:                 fir.array_merge_store %[[VAL_29]], %[[VAL_40:[-0-9A-Za-z._]+]] to %[[VAL_27]] : !fir.array<?xi32>, !fir.array<?xi32>, !fir.heap<!fir.array<?xi32>>
+! FIRDialect:                 fir.result %[[VAL_27]] : !fir.heap<!fir.array<?xi32>>
+! FIRDialect:               } else {
+! FIRDialect:                 %[[VAL_41:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_10]]#1 : (index) -> !fir.shape<1>
+! FIRDialect:                 %[[VAL_42:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_16]](%[[VAL_41]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.array<?xi32>
+! FIRDialect:                 %[[VAL_43:[-0-9A-Za-z._]+]] = arith.constant 1 : index
+! FIRDialect:                 %[[VAL_44:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:                 %[[VAL_45:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_10]]#1, %[[VAL_43]] : index
+! FIRDialect:                 %[[VAL_46:[-0-9A-Za-z._]+]] = fir.do_loop %[[VAL_47:[-0-9A-Za-z._]+]] = %[[VAL_44]] to %[[VAL_45]] step %[[VAL_43]] unordered iter_args(%[[VAL_48:[-0-9A-Za-z._]+]] = %[[VAL_42]]) -> (!fir.array<?xi32>) {
+! FIRDialect:                   %[[VAL_49:[-0-9A-Za-z._]+]] = fir.array_fetch %[[VAL_14]], %[[VAL_47]] : (!fir.array<?xi32>, index) -> i32
+! FIRDialect:                   %[[VAL_50:[-0-9A-Za-z._]+]] = fir.array_update %[[VAL_48]], %[[VAL_49]], %[[VAL_47]] : (!fir.array<?xi32>, i32, index) -> !fir.array<?xi32>
+! FIRDialect:                   %[[VAL_51:[-0-9A-Za-z._]+]] = fir.undefined index
+! FIRDialect:                   fir.result %[[VAL_50]] : !fir.array<?xi32>
+! FIRDialect:                 }
+! FIRDialect:                 %[[VAL_52:[-0-9A-Za-z._]+]] = fir.undefined index
+! FIRDialect:                 fir.array_merge_store %[[VAL_42]], %[[VAL_53:[-0-9A-Za-z._]+]] to %[[VAL_16]] : !fir.array<?xi32>, !fir.array<?xi32>, !fir.heap<!fir.array<?xi32>>
+! FIRDialect:                 fir.result %[[VAL_16]] : !fir.heap<!fir.array<?xi32>>
+! FIRDialect:               }
+! FIRDialect:               fir.result %[[VAL_25]], %[[VAL_54:[-0-9A-Za-z._]+]] : i1, !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             } else {
+! FIRDialect:               %[[VAL_55:[-0-9A-Za-z._]+]] = arith.constant true
+! FIRDialect:               %[[VAL_56:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xi32>, %[[VAL_10]]#1 {uniq_name = ".auto.alloc"}
+! FIRDialect:               %[[VAL_57:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_10]]#1 : (index) -> !fir.shape<1>
+! FIRDialect:               %[[VAL_58:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_56]](%[[VAL_57]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.array<?xi32>
+! FIRDialect:               %[[VAL_59:[-0-9A-Za-z._]+]] = arith.constant 1 : index
+! FIRDialect:               %[[VAL_60:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:               %[[VAL_61:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_10]]#1, %[[VAL_59]] : index
+! FIRDialect:               %[[VAL_62:[-0-9A-Za-z._]+]] = fir.do_loop %[[VAL_63:[-0-9A-Za-z._]+]] = %[[VAL_60]] to %[[VAL_61]] step %[[VAL_59]] unordered iter_args(%[[VAL_64:[-0-9A-Za-z._]+]] = %[[VAL_58]]) -> (!fir.array<?xi32>) {
+! FIRDialect:                 %[[VAL_65:[-0-9A-Za-z._]+]] = fir.array_fetch %[[VAL_14]], %[[VAL_63]] : (!fir.array<?xi32>, index) -> i32
+! FIRDialect:                 %[[VAL_66:[-0-9A-Za-z._]+]] = fir.array_update %[[VAL_64]], %[[VAL_65]], %[[VAL_63]] : (!fir.array<?xi32>, i32, index) -> !fir.array<?xi32>
+! FIRDialect:                 %[[VAL_67:[-0-9A-Za-z._]+]] = fir.undefined index
+! FIRDialect:                 fir.result %[[VAL_66]] : !fir.array<?xi32>
+! FIRDialect:               }
+! FIRDialect:               %[[VAL_68:[-0-9A-Za-z._]+]] = fir.undefined index
+! FIRDialect:               fir.array_merge_store %[[VAL_58]], %[[VAL_69:[-0-9A-Za-z._]+]] to %[[VAL_56]] : !fir.array<?xi32>, !fir.array<?xi32>, !fir.heap<!fir.array<?xi32>>
+! FIRDialect:               fir.result %[[VAL_55]], %[[VAL_56]] : i1, !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             }
+! FIRDialect:             fir.if %[[VAL_70:[-0-9A-Za-z._]+]]#0 {
+! FIRDialect:               %[[VAL_71:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:               fir.if %[[VAL_19]] {
+! FIRDialect:                 fir.freemem %[[VAL_16]] : !fir.heap<!fir.array<?xi32>>
+! FIRDialect:               }
+! FIRDialect:               %[[VAL_72:[-0-9A-Za-z._]+]] = fir.shape_shift %[[VAL_10]]#0, %[[VAL_10]]#1 : (index, index) -> !fir.shapeshift<1>
+! FIRDialect:               %[[VAL_73:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_70]]#1(%[[VAL_72]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
+! FIRDialect:               fir.store %[[VAL_73]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             }
+! FIRDialect:           }
+! FIRDialect:           %[[VAL_74:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           return %[[VAL_74]] : i32
+! FIRDialect:         }
 
-! FIRDialect-LABEL: func.func @compute.init1(
-! FIRDialect-SAME:                           %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                           %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
-! FIRDialect:         %[[VAL_2:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ptr<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_2]](%[[VAL_4]]) : (!fir.ptr<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
-! FIRDialect:         fir.store %[[VAL_5]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         return %[[VAL_6]] : i32
-! FIRDialect:       }
+! FIRDialect-LABEL:   func.func @compute.deinit6(
+! FIRDialect-SAME:                               %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                               %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant false
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.absent !fir.box<none>
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ref<none>
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = arith.constant 0 : i32
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_6]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           fir.freemem %[[VAL_7]] : !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_9]] : (index) -> !fir.shape<1>
+! FIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_8]](%[[VAL_10]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
+! FIRDialect:           fir.store %[[VAL_11]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           return %[[VAL_12]] : i32
+! FIRDialect:         }
 
-! FIRDialect-LABEL: func.func @compute.deinit5(
+! FIRDialect-LABEL:   func.func @compute.copy5(
+! FIRDialect-SAME:                             %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                             %[[VAL_1:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                             %[[VAL_2:[-0-9A-Za-z._]+]]: i64) -> i32 {
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_3]], %[[VAL_4]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = fir.shift %[[VAL_5]]#0 : (index) -> !fir.shift<1>
+! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = fir.rebox %[[VAL_3]](%[[VAL_6]]) : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, !fir.shift<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
+! FIRDialect:           fir.store %[[VAL_7]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           return %[[VAL_8]] : i32
+! FIRDialect:         }
+
+! FIRDialect-LABEL:   func.func @compute.deinit7(
+! FIRDialect-SAME:                               %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                               %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ptr<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_2]](%[[VAL_4]]) : (!fir.ptr<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
+! FIRDialect:           fir.store %[[VAL_5]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           return %[[VAL_6]] : i32
+! FIRDialect:         }
+
+! FIRDialect-LABEL:   func.func @compute.copy6(
+! FIRDialect-SAME:                             %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                             %[[VAL_1:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                             %[[VAL_2:[-0-9A-Za-z._]+]]: i64) -> i32 {
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_3]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_4]] : (!fir.heap<!fir.array<?xi32>>) -> i64
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 0 : i64
+! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_5]], %[[VAL_6]] : i64
+! FIRDialect:           fir.if %[[VAL_7]] {
+! FIRDialect:             %[[VAL_8:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:             %[[VAL_10:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_8]], %[[VAL_9]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:             %[[VAL_11:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_8]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : index
+! FIRDialect:             %[[VAL_13:[-0-9A-Za-z._]+]] = fir.shape_shift %[[VAL_10]]#0, %[[VAL_10]]#1 : (index, index) -> !fir.shapeshift<1>
+! FIRDialect:             %[[VAL_14:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_11]](%[[VAL_13]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.array<?xi32>
+! FIRDialect:             %[[VAL_15:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_16:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_15]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             %[[VAL_17:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_16]] : (!fir.heap<!fir.array<?xi32>>) -> i64
+! FIRDialect:             %[[VAL_18:[-0-9A-Za-z._]+]] = arith.constant 0 : i64
+! FIRDialect:             %[[VAL_19:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_17]], %[[VAL_18]] : i64
+! FIRDialect:             %[[VAL_20:[-0-9A-Za-z._]+]]:2 = fir.if %[[VAL_19]] -> (i1, !fir.heap<!fir.array<?xi32>>) {
+! FIRDialect:               %[[VAL_21:[-0-9A-Za-z._]+]] = arith.constant false
+! FIRDialect:               %[[VAL_22:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:               %[[VAL_23:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_15]], %[[VAL_22]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:               %[[VAL_24:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_23]]#1, %[[VAL_10]]#1 : index
+! FIRDialect:               %[[VAL_25:[-0-9A-Za-z._]+]] = arith.select %[[VAL_24]], %[[VAL_24]], %[[VAL_21]] : i1
+! FIRDialect:               %[[VAL_26:[-0-9A-Za-z._]+]] = fir.if %[[VAL_25]] -> (!fir.heap<!fir.array<?xi32>>) {
+! FIRDialect:                 %[[VAL_27:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xi32>, %[[VAL_10]]#1 {uniq_name = ".auto.alloc"}
+! FIRDialect:                 fir.result %[[VAL_27]] : !fir.heap<!fir.array<?xi32>>
+! FIRDialect:               } else {
+! FIRDialect:                 fir.result %[[VAL_16]] : !fir.heap<!fir.array<?xi32>>
+! FIRDialect:               }
+! FIRDialect:               fir.result %[[VAL_25]], %[[VAL_28:[-0-9A-Za-z._]+]] : i1, !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             } else {
+! FIRDialect:               %[[VAL_29:[-0-9A-Za-z._]+]] = arith.constant true
+! FIRDialect:               %[[VAL_30:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xi32>, %[[VAL_10]]#1 {uniq_name = ".auto.alloc"}
+! FIRDialect:               fir.result %[[VAL_29]], %[[VAL_30]] : i1, !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             }
+! FIRDialect:             fir.if %[[VAL_31:[-0-9A-Za-z._]+]]#0 {
+! FIRDialect:               %[[VAL_32:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:               fir.if %[[VAL_19]] {
+! FIRDialect:                 fir.freemem %[[VAL_16]] : !fir.heap<!fir.array<?xi32>>
+! FIRDialect:               }
+! FIRDialect:               %[[VAL_33:[-0-9A-Za-z._]+]] = fir.shape_shift %[[VAL_10]]#0, %[[VAL_10]]#1 : (index, index) -> !fir.shapeshift<1>
+! FIRDialect:               %[[VAL_34:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_31]]#1(%[[VAL_33]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
+! FIRDialect:               fir.store %[[VAL_34]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             }
+! FIRDialect:           }
+! FIRDialect:           %[[VAL_35:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           return %[[VAL_35]] : i32
+! FIRDialect:         }
+
+! FIRDialect-LABEL:   func.func @compute.deinit8(
+! FIRDialect-SAME:                               %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                               %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant false
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.absent !fir.box<none>
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ref<none>
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = arith.constant 0 : i32
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_6]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           fir.freemem %[[VAL_7]] : !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_9]] : (index) -> !fir.shape<1>
+! FIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_8]](%[[VAL_10]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
+! FIRDialect:           fir.store %[[VAL_11]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           return %[[VAL_12]] : i32
+! FIRDialect:         }
+
+! FIRDialect-LABEL:   func.func @compute.init2(
 ! FIRDialect-SAME:                             %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
 ! FIRDialect-SAME:                             %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
-! FIRDialect:         %[[VAL_2:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ptr<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_2]](%[[VAL_4]]) : (!fir.ptr<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
-! FIRDialect:         fir.store %[[VAL_5]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         return %[[VAL_6]] : i32
-! FIRDialect:       }
-
-! FIRDialect-LABEL: func.func @compute.copy4(
-! FIRDialect-SAME:                           %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                           %[[VAL_1:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                           %[[VAL_2:[-0-9A-Za-z._]+]]: i64) -> i32 {
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_3]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_4]] : (!fir.heap<!fir.array<?xi32>>) -> i64
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 0 : i64
-! FIRDialect:         %[[VAL_7:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_5]], %[[VAL_6]] : i64
-! FIRDialect:         fir.if %[[VAL_7]] {
-! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_8]], %[[VAL_9]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_8]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : index
-! FIRDialect:           %[[VAL_13:[-0-9A-Za-z._]+]] = fir.shape_shift %[[VAL_10]]#0, %[[VAL_10]]#1 : (index, index) -> !fir.shapeshift<1>
-! FIRDialect:           %[[VAL_14:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_11]](%[[VAL_13]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.array<?xi32>
-! FIRDialect:           %[[VAL_15:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_16:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_15]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           %[[VAL_17:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_16]] : (!fir.heap<!fir.array<?xi32>>) -> i64
-! FIRDialect:           %[[VAL_18:[-0-9A-Za-z._]+]] = arith.constant 0 : i64
-! FIRDialect:           %[[VAL_19:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_17]], %[[VAL_18]] : i64
-! FIRDialect:           %[[VAL_20:[-0-9A-Za-z._]+]]:2 = fir.if %[[VAL_19]] -> (i1, !fir.heap<!fir.array<?xi32>>) {
-! FIRDialect:             %[[VAL_21:[-0-9A-Za-z._]+]] = arith.constant false
-! FIRDialect:             %[[VAL_22:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:             %[[VAL_23:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_15]], %[[VAL_22]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:             %[[VAL_24:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_23]]#1, %[[VAL_10]]#1 : index
-! FIRDialect:             %[[VAL_25:[-0-9A-Za-z._]+]] = arith.select %[[VAL_24]], %[[VAL_24]], %[[VAL_21]] : i1
-! FIRDialect:             %[[VAL_26:[-0-9A-Za-z._]+]] = fir.if %[[VAL_25]] -> (!fir.heap<!fir.array<?xi32>>) {
-! FIRDialect:               %[[VAL_27:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xi32>, %[[VAL_10]]#1 {uniq_name = ".auto.alloc"}
-! FIRDialect:               %[[VAL_28:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_10]]#1 : (index) -> !fir.shape<1>
-! FIRDialect:               %[[VAL_29:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_27]](%[[VAL_28]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.array<?xi32>
-! FIRDialect:               %[[VAL_30:[-0-9A-Za-z._]+]] = arith.constant 1 : index
-! FIRDialect:               %[[VAL_31:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:               %[[VAL_32:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_10]]#1, %[[VAL_30]] : index
-! FIRDialect:               %[[VAL_33:[-0-9A-Za-z._]+]] = fir.do_loop %[[VAL_34:[-0-9A-Za-z._]+]] = %[[VAL_31]] to %[[VAL_32]] step %[[VAL_30]] unordered iter_args(%[[VAL_35:[-0-9A-Za-z._]+]] = %[[VAL_29]]) -> (!fir.array<?xi32>) {
-! FIRDialect:                 %[[VAL_36:[-0-9A-Za-z._]+]] = fir.array_fetch %[[VAL_14]], %[[VAL_34]] : (!fir.array<?xi32>, index) -> i32
-! FIRDialect:                 %[[VAL_37:[-0-9A-Za-z._]+]] = fir.array_update %[[VAL_35]], %[[VAL_36]], %[[VAL_34]] : (!fir.array<?xi32>, i32, index) -> !fir.array<?xi32>
-! FIRDialect:                 %[[VAL_38:[-0-9A-Za-z._]+]] = fir.undefined index
-! FIRDialect:                 fir.result %[[VAL_37]] : !fir.array<?xi32>
-! FIRDialect:               }
-! FIRDialect:               %[[VAL_39:[-0-9A-Za-z._]+]] = fir.undefined index
-! FIRDialect:               fir.array_merge_store %[[VAL_29]], %[[VAL_40:[-0-9A-Za-z._]+]] to %[[VAL_27]] : !fir.array<?xi32>, !fir.array<?xi32>, !fir.heap<!fir.array<?xi32>>
-! FIRDialect:               fir.result %[[VAL_27]] : !fir.heap<!fir.array<?xi32>>
-! FIRDialect:             } else {
-! FIRDialect:               %[[VAL_41:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_10]]#1 : (index) -> !fir.shape<1>
-! FIRDialect:               %[[VAL_42:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_16]](%[[VAL_41]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.array<?xi32>
-! FIRDialect:               %[[VAL_43:[-0-9A-Za-z._]+]] = arith.constant 1 : index
-! FIRDialect:               %[[VAL_44:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:               %[[VAL_45:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_10]]#1, %[[VAL_43]] : index
-! FIRDialect:               %[[VAL_46:[-0-9A-Za-z._]+]] = fir.do_loop %[[VAL_47:[-0-9A-Za-z._]+]] = %[[VAL_44]] to %[[VAL_45]] step %[[VAL_43]] unordered iter_args(%[[VAL_48:[-0-9A-Za-z._]+]] = %[[VAL_42]]) -> (!fir.array<?xi32>) {
-! FIRDialect:                 %[[VAL_49:[-0-9A-Za-z._]+]] = fir.array_fetch %[[VAL_14]], %[[VAL_47]] : (!fir.array<?xi32>, index) -> i32
-! FIRDialect:                 %[[VAL_50:[-0-9A-Za-z._]+]] = fir.array_update %[[VAL_48]], %[[VAL_49]], %[[VAL_47]] : (!fir.array<?xi32>, i32, index) -> !fir.array<?xi32>
-! FIRDialect:                 %[[VAL_51:[-0-9A-Za-z._]+]] = fir.undefined index
-! FIRDialect:                 fir.result %[[VAL_50]] : !fir.array<?xi32>
-! FIRDialect:               }
-! FIRDialect:               %[[VAL_52:[-0-9A-Za-z._]+]] = fir.undefined index
-! FIRDialect:               fir.array_merge_store %[[VAL_42]], %[[VAL_53:[-0-9A-Za-z._]+]] to %[[VAL_16]] : !fir.array<?xi32>, !fir.array<?xi32>, !fir.heap<!fir.array<?xi32>>
-! FIRDialect:               fir.result %[[VAL_16]] : !fir.heap<!fir.array<?xi32>>
-! FIRDialect:             }
-! FIRDialect:             fir.result %[[VAL_25]], %[[VAL_54:[-0-9A-Za-z._]+]] : i1, !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           } else {
-! FIRDialect:             %[[VAL_55:[-0-9A-Za-z._]+]] = arith.constant true
-! FIRDialect:             %[[VAL_56:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xi32>, %[[VAL_10]]#1 {uniq_name = ".auto.alloc"}
-! FIRDialect:             %[[VAL_57:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_10]]#1 : (index) -> !fir.shape<1>
-! FIRDialect:             %[[VAL_58:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_56]](%[[VAL_57]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.array<?xi32>
-! FIRDialect:             %[[VAL_59:[-0-9A-Za-z._]+]] = arith.constant 1 : index
-! FIRDialect:             %[[VAL_60:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:             %[[VAL_61:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_10]]#1, %[[VAL_59]] : index
-! FIRDialect:             %[[VAL_62:[-0-9A-Za-z._]+]] = fir.do_loop %[[VAL_63:[-0-9A-Za-z._]+]] = %[[VAL_60]] to %[[VAL_61]] step %[[VAL_59]] unordered iter_args(%[[VAL_64:[-0-9A-Za-z._]+]] = %[[VAL_58]]) -> (!fir.array<?xi32>) {
-! FIRDialect:               %[[VAL_65:[-0-9A-Za-z._]+]] = fir.array_fetch %[[VAL_14]], %[[VAL_63]] : (!fir.array<?xi32>, index) -> i32
-! FIRDialect:               %[[VAL_66:[-0-9A-Za-z._]+]] = fir.array_update %[[VAL_64]], %[[VAL_65]], %[[VAL_63]] : (!fir.array<?xi32>, i32, index) -> !fir.array<?xi32>
-! FIRDialect:               %[[VAL_67:[-0-9A-Za-z._]+]] = fir.undefined index
-! FIRDialect:               fir.result %[[VAL_66]] : !fir.array<?xi32>
-! FIRDialect:             }
-! FIRDialect:             %[[VAL_68:[-0-9A-Za-z._]+]] = fir.undefined index
-! FIRDialect:             fir.array_merge_store %[[VAL_58]], %[[VAL_69:[-0-9A-Za-z._]+]] to %[[VAL_56]] : !fir.array<?xi32>, !fir.array<?xi32>, !fir.heap<!fir.array<?xi32>>
-! FIRDialect:             fir.result %[[VAL_55]], %[[VAL_56]] : i1, !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           }
-! FIRDialect:           fir.if %[[VAL_70:[-0-9A-Za-z._]+]]#0 {
-! FIRDialect:             %[[VAL_71:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:             fir.if %[[VAL_19]] {
-! FIRDialect:               fir.freemem %[[VAL_16]] : !fir.heap<!fir.array<?xi32>>
-! FIRDialect:             }
-! FIRDialect:             %[[VAL_72:[-0-9A-Za-z._]+]] = fir.shape_shift %[[VAL_10]]#0, %[[VAL_10]]#1 : (index, index) -> !fir.shapeshift<1>
-! FIRDialect:             %[[VAL_73:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_70]]#1(%[[VAL_72]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
-! FIRDialect:             fir.store %[[VAL_73]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           }
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ptr<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_2]](%[[VAL_4]]) : (!fir.ptr<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
+! FIRDialect:           fir.store %[[VAL_5]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           return %[[VAL_6]] : i32
 ! FIRDialect:         }
-! FIRDialect:         %[[VAL_74:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         return %[[VAL_74]] : i32
-! FIRDialect:       }
 
-! FIRDialect-LABEL: func.func @compute.deinit6(
+! FIRDialect-LABEL:   func.func @compute.deinit9(
+! FIRDialect-SAME:                               %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                               %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ptr<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_2]](%[[VAL_4]]) : (!fir.ptr<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
+! FIRDialect:           fir.store %[[VAL_5]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           return %[[VAL_6]] : i32
+! FIRDialect:         }
+
+! FIRDialect-LABEL:   func.func @compute.copy7(
 ! FIRDialect-SAME:                             %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                             %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
-! FIRDialect:         %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant false
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = fir.absent !fir.box<none>
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ref<none>
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]] = arith.constant 0 : i32
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_7:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_6]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         fir.freemem %[[VAL_7]] : !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_8:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:         %[[VAL_10:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_9]] : (index) -> !fir.shape<1>
-! FIRDialect:         %[[VAL_11:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_8]](%[[VAL_10]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
-! FIRDialect:         fir.store %[[VAL_11]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         return %[[VAL_12]] : i32
-! FIRDialect:       }
-
-! FIRDialect-LABEL: func.func @compute.copy5(
-! FIRDialect-SAME:                           %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                           %[[VAL_1:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                           %[[VAL_2:[-0-9A-Za-z._]+]]: i64) -> i32 {
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_3]], %[[VAL_4]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = fir.shift %[[VAL_5]]#0 : (index) -> !fir.shift<1>
-! FIRDialect:         %[[VAL_7:[-0-9A-Za-z._]+]] = fir.rebox %[[VAL_3]](%[[VAL_6]]) : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, !fir.shift<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
-! FIRDialect:         fir.store %[[VAL_7]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_8:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         return %[[VAL_8]] : i32
-! FIRDialect:       }
-
-! FIRDialect-LABEL: func.func @compute.deinit7(
-! FIRDialect-SAME:                             %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                             %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
-! FIRDialect:         %[[VAL_2:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ptr<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_2]](%[[VAL_4]]) : (!fir.ptr<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
-! FIRDialect:         fir.store %[[VAL_5]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         return %[[VAL_6]] : i32
-! FIRDialect:       }
-
-! FIRDialect-LABEL: func.func @compute.copy6(
-! FIRDialect-SAME:                           %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                           %[[VAL_1:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                           %[[VAL_2:[-0-9A-Za-z._]+]]: i64) -> i32 {
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_3]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_4]] : (!fir.heap<!fir.array<?xi32>>) -> i64
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 0 : i64
-! FIRDialect:         %[[VAL_7:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_5]], %[[VAL_6]] : i64
-! FIRDialect:         fir.if %[[VAL_7]] {
-! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_8]], %[[VAL_9]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_8]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : index
-! FIRDialect:           %[[VAL_13:[-0-9A-Za-z._]+]] = fir.shape_shift %[[VAL_10]]#0, %[[VAL_10]]#1 : (index, index) -> !fir.shapeshift<1>
-! FIRDialect:           %[[VAL_14:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_11]](%[[VAL_13]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.array<?xi32>
-! FIRDialect:           %[[VAL_15:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_16:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_15]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           %[[VAL_17:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_16]] : (!fir.heap<!fir.array<?xi32>>) -> i64
-! FIRDialect:           %[[VAL_18:[-0-9A-Za-z._]+]] = arith.constant 0 : i64
-! FIRDialect:           %[[VAL_19:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_17]], %[[VAL_18]] : i64
-! FIRDialect:           %[[VAL_20:[-0-9A-Za-z._]+]]:2 = fir.if %[[VAL_19]] -> (i1, !fir.heap<!fir.array<?xi32>>) {
-! FIRDialect:             %[[VAL_21:[-0-9A-Za-z._]+]] = arith.constant false
-! FIRDialect:             %[[VAL_22:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:             %[[VAL_23:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_15]], %[[VAL_22]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:             %[[VAL_24:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_23]]#1, %[[VAL_10]]#1 : index
-! FIRDialect:             %[[VAL_25:[-0-9A-Za-z._]+]] = arith.select %[[VAL_24]], %[[VAL_24]], %[[VAL_21]] : i1
-! FIRDialect:             %[[VAL_26:[-0-9A-Za-z._]+]] = fir.if %[[VAL_25]] -> (!fir.heap<!fir.array<?xi32>>) {
-! FIRDialect:               %[[VAL_27:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xi32>, %[[VAL_10]]#1 {uniq_name = ".auto.alloc"}
-! FIRDialect:               fir.result %[[VAL_27]] : !fir.heap<!fir.array<?xi32>>
-! FIRDialect:             } else {
-! FIRDialect:               fir.result %[[VAL_16]] : !fir.heap<!fir.array<?xi32>>
-! FIRDialect:             }
-! FIRDialect:             fir.result %[[VAL_25]], %[[VAL_28:[-0-9A-Za-z._]+]] : i1, !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           } else {
-! FIRDialect:             %[[VAL_29:[-0-9A-Za-z._]+]] = arith.constant true
-! FIRDialect:             %[[VAL_30:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xi32>, %[[VAL_10]]#1 {uniq_name = ".auto.alloc"}
-! FIRDialect:             fir.result %[[VAL_29]], %[[VAL_30]] : i1, !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           }
-! FIRDialect:           fir.if %[[VAL_31:[-0-9A-Za-z._]+]]#0 {
-! FIRDialect:             %[[VAL_32:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:             fir.if %[[VAL_19]] {
-! FIRDialect:               fir.freemem %[[VAL_16]] : !fir.heap<!fir.array<?xi32>>
-! FIRDialect:             }
-! FIRDialect:             %[[VAL_33:[-0-9A-Za-z._]+]] = fir.shape_shift %[[VAL_10]]#0, %[[VAL_10]]#1 : (index, index) -> !fir.shapeshift<1>
-! FIRDialect:             %[[VAL_34:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_31]]#1(%[[VAL_33]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
-! FIRDialect:             fir.store %[[VAL_34]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           }
-! FIRDialect:         }
-! FIRDialect:         %[[VAL_35:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         return %[[VAL_35]] : i32
-! FIRDialect:       }
-
-! FIRDialect-LABEL: func.func @compute.deinit8(
-! FIRDialect-SAME:                             %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                             %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
-! FIRDialect:         %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant false
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = fir.absent !fir.box<none>
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ref<none>
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]] = arith.constant 0 : i32
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_7:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_6]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         fir.freemem %[[VAL_7]] : !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_8:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:         %[[VAL_10:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_9]] : (index) -> !fir.shape<1>
-! FIRDialect:         %[[VAL_11:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_8]](%[[VAL_10]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
-! FIRDialect:         fir.store %[[VAL_11]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         return %[[VAL_12]] : i32
-! FIRDialect:       }
-
-! FIRDialect-LABEL: func.func @compute.init2(
-! FIRDialect-SAME:                           %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                           %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
-! FIRDialect:         %[[VAL_2:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ptr<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_2]](%[[VAL_4]]) : (!fir.ptr<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
-! FIRDialect:         fir.store %[[VAL_5]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         return %[[VAL_6]] : i32
-! FIRDialect:       }
-
-! FIRDialect-LABEL: func.func @compute.deinit9(
-! FIRDialect-SAME:                             %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                             %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
-! FIRDialect:         %[[VAL_2:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ptr<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_2]](%[[VAL_4]]) : (!fir.ptr<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
-! FIRDialect:         fir.store %[[VAL_5]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         return %[[VAL_6]] : i32
-! FIRDialect:       }
-
-! FIRDialect-LABEL: func.func @compute.copy7(
-! FIRDialect-SAME:                           %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                           %[[VAL_1:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                           %[[VAL_2:[-0-9A-Za-z._]+]]: i64) -> i32 {
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_3]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_4]] : (!fir.heap<!fir.array<?xi32>>) -> i64
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 0 : i64
-! FIRDialect:         %[[VAL_7:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_5]], %[[VAL_6]] : i64
-! FIRDialect:         fir.if %[[VAL_7]] {
-! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_8]], %[[VAL_9]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_8]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : index
-! FIRDialect:           %[[VAL_13:[-0-9A-Za-z._]+]] = fir.shape_shift %[[VAL_10]]#0, %[[VAL_10]]#1 : (index, index) -> !fir.shapeshift<1>
-! FIRDialect:           %[[VAL_14:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_11]](%[[VAL_13]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.array<?xi32>
-! FIRDialect:           %[[VAL_15:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           %[[VAL_16:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_15]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           %[[VAL_17:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_16]] : (!fir.heap<!fir.array<?xi32>>) -> i64
-! FIRDialect:           %[[VAL_18:[-0-9A-Za-z._]+]] = arith.constant 0 : i64
-! FIRDialect:           %[[VAL_19:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_17]], %[[VAL_18]] : i64
-! FIRDialect:           %[[VAL_20:[-0-9A-Za-z._]+]]:2 = fir.if %[[VAL_19]] -> (i1, !fir.heap<!fir.array<?xi32>>) {
-! FIRDialect:             %[[VAL_21:[-0-9A-Za-z._]+]] = arith.constant false
-! FIRDialect:             %[[VAL_22:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:             %[[VAL_23:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_15]], %[[VAL_22]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:             %[[VAL_24:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_23]]#1, %[[VAL_10]]#1 : index
-! FIRDialect:             %[[VAL_25:[-0-9A-Za-z._]+]] = arith.select %[[VAL_24]], %[[VAL_24]], %[[VAL_21]] : i1
-! FIRDialect:             %[[VAL_26:[-0-9A-Za-z._]+]] = fir.if %[[VAL_25]] -> (!fir.heap<!fir.array<?xi32>>) {
-! FIRDialect:               %[[VAL_27:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xi32>, %[[VAL_10]]#1 {uniq_name = ".auto.alloc"}
-! FIRDialect:               %[[VAL_28:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_10]]#1 : (index) -> !fir.shape<1>
-! FIRDialect:               %[[VAL_29:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_27]](%[[VAL_28]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.array<?xi32>
-! FIRDialect:               %[[VAL_30:[-0-9A-Za-z._]+]] = arith.constant 1 : index
-! FIRDialect:               %[[VAL_31:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:               %[[VAL_32:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_10]]#1, %[[VAL_30]] : index
-! FIRDialect:               %[[VAL_33:[-0-9A-Za-z._]+]] = fir.do_loop %[[VAL_34:[-0-9A-Za-z._]+]] = %[[VAL_31]] to %[[VAL_32]] step %[[VAL_30]] unordered iter_args(%[[VAL_35:[-0-9A-Za-z._]+]] = %[[VAL_29]]) -> (!fir.array<?xi32>) {
-! FIRDialect:                 %[[VAL_36:[-0-9A-Za-z._]+]] = fir.array_fetch %[[VAL_14]], %[[VAL_34]] : (!fir.array<?xi32>, index) -> i32
-! FIRDialect:                 %[[VAL_37:[-0-9A-Za-z._]+]] = fir.array_update %[[VAL_35]], %[[VAL_36]], %[[VAL_34]] : (!fir.array<?xi32>, i32, index) -> !fir.array<?xi32>
-! FIRDialect:                 %[[VAL_38:[-0-9A-Za-z._]+]] = fir.undefined index
-! FIRDialect:                 fir.result %[[VAL_37]] : !fir.array<?xi32>
+! FIRDialect-SAME:                             %[[VAL_1:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                             %[[VAL_2:[-0-9A-Za-z._]+]]: i64) -> i32 {
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_3]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_4]] : (!fir.heap<!fir.array<?xi32>>) -> i64
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 0 : i64
+! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_5]], %[[VAL_6]] : i64
+! FIRDialect:           fir.if %[[VAL_7]] {
+! FIRDialect:             %[[VAL_8:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:             %[[VAL_10:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_8]], %[[VAL_9]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:             %[[VAL_11:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_8]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : index
+! FIRDialect:             %[[VAL_13:[-0-9A-Za-z._]+]] = fir.shape_shift %[[VAL_10]]#0, %[[VAL_10]]#1 : (index, index) -> !fir.shapeshift<1>
+! FIRDialect:             %[[VAL_14:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_11]](%[[VAL_13]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.array<?xi32>
+! FIRDialect:             %[[VAL_15:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:             %[[VAL_16:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_15]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:             %[[VAL_17:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_16]] : (!fir.heap<!fir.array<?xi32>>) -> i64
+! FIRDialect:             %[[VAL_18:[-0-9A-Za-z._]+]] = arith.constant 0 : i64
+! FIRDialect:             %[[VAL_19:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_17]], %[[VAL_18]] : i64
+! FIRDialect:             %[[VAL_20:[-0-9A-Za-z._]+]]:2 = fir.if %[[VAL_19]] -> (i1, !fir.heap<!fir.array<?xi32>>) {
+! FIRDialect:               %[[VAL_21:[-0-9A-Za-z._]+]] = arith.constant false
+! FIRDialect:               %[[VAL_22:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:               %[[VAL_23:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_15]], %[[VAL_22]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:               %[[VAL_24:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_23]]#1, %[[VAL_10]]#1 : index
+! FIRDialect:               %[[VAL_25:[-0-9A-Za-z._]+]] = arith.select %[[VAL_24]], %[[VAL_24]], %[[VAL_21]] : i1
+! FIRDialect:               %[[VAL_26:[-0-9A-Za-z._]+]] = fir.if %[[VAL_25]] -> (!fir.heap<!fir.array<?xi32>>) {
+! FIRDialect:                 %[[VAL_27:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xi32>, %[[VAL_10]]#1 {uniq_name = ".auto.alloc"}
+! FIRDialect:                 %[[VAL_28:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_10]]#1 : (index) -> !fir.shape<1>
+! FIRDialect:                 %[[VAL_29:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_27]](%[[VAL_28]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.array<?xi32>
+! FIRDialect:                 %[[VAL_30:[-0-9A-Za-z._]+]] = arith.constant 1 : index
+! FIRDialect:                 %[[VAL_31:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:                 %[[VAL_32:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_10]]#1, %[[VAL_30]] : index
+! FIRDialect:                 %[[VAL_33:[-0-9A-Za-z._]+]] = fir.do_loop %[[VAL_34:[-0-9A-Za-z._]+]] = %[[VAL_31]] to %[[VAL_32]] step %[[VAL_30]] unordered iter_args(%[[VAL_35:[-0-9A-Za-z._]+]] = %[[VAL_29]]) -> (!fir.array<?xi32>) {
+! FIRDialect:                   %[[VAL_36:[-0-9A-Za-z._]+]] = fir.array_fetch %[[VAL_14]], %[[VAL_34]] : (!fir.array<?xi32>, index) -> i32
+! FIRDialect:                   %[[VAL_37:[-0-9A-Za-z._]+]] = fir.array_update %[[VAL_35]], %[[VAL_36]], %[[VAL_34]] : (!fir.array<?xi32>, i32, index) -> !fir.array<?xi32>
+! FIRDialect:                   %[[VAL_38:[-0-9A-Za-z._]+]] = fir.undefined index
+! FIRDialect:                   fir.result %[[VAL_37]] : !fir.array<?xi32>
+! FIRDialect:                 }
+! FIRDialect:                 %[[VAL_39:[-0-9A-Za-z._]+]] = fir.undefined index
+! FIRDialect:                 fir.array_merge_store %[[VAL_29]], %[[VAL_40:[-0-9A-Za-z._]+]] to %[[VAL_27]] : !fir.array<?xi32>, !fir.array<?xi32>, !fir.heap<!fir.array<?xi32>>
+! FIRDialect:                 fir.result %[[VAL_27]] : !fir.heap<!fir.array<?xi32>>
+! FIRDialect:               } else {
+! FIRDialect:                 %[[VAL_41:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_10]]#1 : (index) -> !fir.shape<1>
+! FIRDialect:                 %[[VAL_42:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_16]](%[[VAL_41]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.array<?xi32>
+! FIRDialect:                 %[[VAL_43:[-0-9A-Za-z._]+]] = arith.constant 1 : index
+! FIRDialect:                 %[[VAL_44:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:                 %[[VAL_45:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_10]]#1, %[[VAL_43]] : index
+! FIRDialect:                 %[[VAL_46:[-0-9A-Za-z._]+]] = fir.do_loop %[[VAL_47:[-0-9A-Za-z._]+]] = %[[VAL_44]] to %[[VAL_45]] step %[[VAL_43]] unordered iter_args(%[[VAL_48:[-0-9A-Za-z._]+]] = %[[VAL_42]]) -> (!fir.array<?xi32>) {
+! FIRDialect:                   %[[VAL_49:[-0-9A-Za-z._]+]] = fir.array_fetch %[[VAL_14]], %[[VAL_47]] : (!fir.array<?xi32>, index) -> i32
+! FIRDialect:                   %[[VAL_50:[-0-9A-Za-z._]+]] = fir.array_update %[[VAL_48]], %[[VAL_49]], %[[VAL_47]] : (!fir.array<?xi32>, i32, index) -> !fir.array<?xi32>
+! FIRDialect:                   %[[VAL_51:[-0-9A-Za-z._]+]] = fir.undefined index
+! FIRDialect:                   fir.result %[[VAL_50]] : !fir.array<?xi32>
+! FIRDialect:                 }
+! FIRDialect:                 %[[VAL_52:[-0-9A-Za-z._]+]] = fir.undefined index
+! FIRDialect:                 fir.array_merge_store %[[VAL_42]], %[[VAL_53:[-0-9A-Za-z._]+]] to %[[VAL_16]] : !fir.array<?xi32>, !fir.array<?xi32>, !fir.heap<!fir.array<?xi32>>
+! FIRDialect:                 fir.result %[[VAL_16]] : !fir.heap<!fir.array<?xi32>>
 ! FIRDialect:               }
-! FIRDialect:               %[[VAL_39:[-0-9A-Za-z._]+]] = fir.undefined index
-! FIRDialect:               fir.array_merge_store %[[VAL_29]], %[[VAL_40:[-0-9A-Za-z._]+]] to %[[VAL_27]] : !fir.array<?xi32>, !fir.array<?xi32>, !fir.heap<!fir.array<?xi32>>
-! FIRDialect:               fir.result %[[VAL_27]] : !fir.heap<!fir.array<?xi32>>
+! FIRDialect:               fir.result %[[VAL_25]], %[[VAL_54:[-0-9A-Za-z._]+]] : i1, !fir.heap<!fir.array<?xi32>>
 ! FIRDialect:             } else {
-! FIRDialect:               %[[VAL_41:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_10]]#1 : (index) -> !fir.shape<1>
-! FIRDialect:               %[[VAL_42:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_16]](%[[VAL_41]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.array<?xi32>
-! FIRDialect:               %[[VAL_43:[-0-9A-Za-z._]+]] = arith.constant 1 : index
-! FIRDialect:               %[[VAL_44:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:               %[[VAL_45:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_10]]#1, %[[VAL_43]] : index
-! FIRDialect:               %[[VAL_46:[-0-9A-Za-z._]+]] = fir.do_loop %[[VAL_47:[-0-9A-Za-z._]+]] = %[[VAL_44]] to %[[VAL_45]] step %[[VAL_43]] unordered iter_args(%[[VAL_48:[-0-9A-Za-z._]+]] = %[[VAL_42]]) -> (!fir.array<?xi32>) {
-! FIRDialect:                 %[[VAL_49:[-0-9A-Za-z._]+]] = fir.array_fetch %[[VAL_14]], %[[VAL_47]] : (!fir.array<?xi32>, index) -> i32
-! FIRDialect:                 %[[VAL_50:[-0-9A-Za-z._]+]] = fir.array_update %[[VAL_48]], %[[VAL_49]], %[[VAL_47]] : (!fir.array<?xi32>, i32, index) -> !fir.array<?xi32>
-! FIRDialect:                 %[[VAL_51:[-0-9A-Za-z._]+]] = fir.undefined index
-! FIRDialect:                 fir.result %[[VAL_50]] : !fir.array<?xi32>
+! FIRDialect:               %[[VAL_55:[-0-9A-Za-z._]+]] = arith.constant true
+! FIRDialect:               %[[VAL_56:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xi32>, %[[VAL_10]]#1 {uniq_name = ".auto.alloc"}
+! FIRDialect:               %[[VAL_57:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_10]]#1 : (index) -> !fir.shape<1>
+! FIRDialect:               %[[VAL_58:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_56]](%[[VAL_57]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.array<?xi32>
+! FIRDialect:               %[[VAL_59:[-0-9A-Za-z._]+]] = arith.constant 1 : index
+! FIRDialect:               %[[VAL_60:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:               %[[VAL_61:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_10]]#1, %[[VAL_59]] : index
+! FIRDialect:               %[[VAL_62:[-0-9A-Za-z._]+]] = fir.do_loop %[[VAL_63:[-0-9A-Za-z._]+]] = %[[VAL_60]] to %[[VAL_61]] step %[[VAL_59]] unordered iter_args(%[[VAL_64:[-0-9A-Za-z._]+]] = %[[VAL_58]]) -> (!fir.array<?xi32>) {
+! FIRDialect:                 %[[VAL_65:[-0-9A-Za-z._]+]] = fir.array_fetch %[[VAL_14]], %[[VAL_63]] : (!fir.array<?xi32>, index) -> i32
+! FIRDialect:                 %[[VAL_66:[-0-9A-Za-z._]+]] = fir.array_update %[[VAL_64]], %[[VAL_65]], %[[VAL_63]] : (!fir.array<?xi32>, i32, index) -> !fir.array<?xi32>
+! FIRDialect:                 %[[VAL_67:[-0-9A-Za-z._]+]] = fir.undefined index
+! FIRDialect:                 fir.result %[[VAL_66]] : !fir.array<?xi32>
 ! FIRDialect:               }
-! FIRDialect:               %[[VAL_52:[-0-9A-Za-z._]+]] = fir.undefined index
-! FIRDialect:               fir.array_merge_store %[[VAL_42]], %[[VAL_53:[-0-9A-Za-z._]+]] to %[[VAL_16]] : !fir.array<?xi32>, !fir.array<?xi32>, !fir.heap<!fir.array<?xi32>>
-! FIRDialect:               fir.result %[[VAL_16]] : !fir.heap<!fir.array<?xi32>>
+! FIRDialect:               %[[VAL_68:[-0-9A-Za-z._]+]] = fir.undefined index
+! FIRDialect:               fir.array_merge_store %[[VAL_58]], %[[VAL_69:[-0-9A-Za-z._]+]] to %[[VAL_56]] : !fir.array<?xi32>, !fir.array<?xi32>, !fir.heap<!fir.array<?xi32>>
+! FIRDialect:               fir.result %[[VAL_55]], %[[VAL_56]] : i1, !fir.heap<!fir.array<?xi32>>
 ! FIRDialect:             }
-! FIRDialect:             fir.result %[[VAL_25]], %[[VAL_54:[-0-9A-Za-z._]+]] : i1, !fir.heap<!fir.array<?xi32>>
-! FIRDialect:           } else {
-! FIRDialect:             %[[VAL_55:[-0-9A-Za-z._]+]] = arith.constant true
-! FIRDialect:             %[[VAL_56:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xi32>, %[[VAL_10]]#1 {uniq_name = ".auto.alloc"}
-! FIRDialect:             %[[VAL_57:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_10]]#1 : (index) -> !fir.shape<1>
-! FIRDialect:             %[[VAL_58:[-0-9A-Za-z._]+]] = fir.array_load %[[VAL_56]](%[[VAL_57]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.array<?xi32>
-! FIRDialect:             %[[VAL_59:[-0-9A-Za-z._]+]] = arith.constant 1 : index
-! FIRDialect:             %[[VAL_60:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:             %[[VAL_61:[-0-9A-Za-z._]+]] = arith.subi %[[VAL_10]]#1, %[[VAL_59]] : index
-! FIRDialect:             %[[VAL_62:[-0-9A-Za-z._]+]] = fir.do_loop %[[VAL_63:[-0-9A-Za-z._]+]] = %[[VAL_60]] to %[[VAL_61]] step %[[VAL_59]] unordered iter_args(%[[VAL_64:[-0-9A-Za-z._]+]] = %[[VAL_58]]) -> (!fir.array<?xi32>) {
-! FIRDialect:               %[[VAL_65:[-0-9A-Za-z._]+]] = fir.array_fetch %[[VAL_14]], %[[VAL_63]] : (!fir.array<?xi32>, index) -> i32
-! FIRDialect:               %[[VAL_66:[-0-9A-Za-z._]+]] = fir.array_update %[[VAL_64]], %[[VAL_65]], %[[VAL_63]] : (!fir.array<?xi32>, i32, index) -> !fir.array<?xi32>
-! FIRDialect:               %[[VAL_67:[-0-9A-Za-z._]+]] = fir.undefined index
-! FIRDialect:               fir.result %[[VAL_66]] : !fir.array<?xi32>
+! FIRDialect:             fir.if %[[VAL_70:[-0-9A-Za-z._]+]]#0 {
+! FIRDialect:               %[[VAL_71:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:               fir.if %[[VAL_19]] {
+! FIRDialect:                 fir.freemem %[[VAL_16]] : !fir.heap<!fir.array<?xi32>>
+! FIRDialect:               }
+! FIRDialect:               %[[VAL_72:[-0-9A-Za-z._]+]] = fir.shape_shift %[[VAL_10]]#0, %[[VAL_10]]#1 : (index, index) -> !fir.shapeshift<1>
+! FIRDialect:               %[[VAL_73:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_70]]#1(%[[VAL_72]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
+! FIRDialect:               fir.store %[[VAL_73]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
 ! FIRDialect:             }
-! FIRDialect:             %[[VAL_68:[-0-9A-Za-z._]+]] = fir.undefined index
-! FIRDialect:             fir.array_merge_store %[[VAL_58]], %[[VAL_69:[-0-9A-Za-z._]+]] to %[[VAL_56]] : !fir.array<?xi32>, !fir.array<?xi32>, !fir.heap<!fir.array<?xi32>>
-! FIRDialect:             fir.result %[[VAL_55]], %[[VAL_56]] : i1, !fir.heap<!fir.array<?xi32>>
 ! FIRDialect:           }
-! FIRDialect:           fir.if %[[VAL_70:[-0-9A-Za-z._]+]]#0 {
-! FIRDialect:             %[[VAL_71:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:             fir.if %[[VAL_19]] {
-! FIRDialect:               fir.freemem %[[VAL_16]] : !fir.heap<!fir.array<?xi32>>
-! FIRDialect:             }
-! FIRDialect:             %[[VAL_72:[-0-9A-Za-z._]+]] = fir.shape_shift %[[VAL_10]]#0, %[[VAL_10]]#1 : (index, index) -> !fir.shapeshift<1>
-! FIRDialect:             %[[VAL_73:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_70]]#1(%[[VAL_72]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
-! FIRDialect:             fir.store %[[VAL_73]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:           }
+! FIRDialect:           %[[VAL_74:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           return %[[VAL_74]] : i32
 ! FIRDialect:         }
-! FIRDialect:         %[[VAL_74:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         return %[[VAL_74]] : i32
-! FIRDialect:       }
 
-! FIRDialect-LABEL: func.func @compute.deinit10(
-! FIRDialect-SAME:                              %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                              %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
-! FIRDialect:         %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant false
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = fir.absent !fir.box<none>
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ref<none>
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]] = arith.constant 0 : i32
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_7:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_6]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         fir.freemem %[[VAL_7]] : !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_8:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.heap<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:         %[[VAL_10:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_9]] : (index) -> !fir.shape<1>
-! FIRDialect:         %[[VAL_11:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_8]](%[[VAL_10]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
-! FIRDialect:         fir.store %[[VAL_11]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         return %[[VAL_12]] : i32
-! FIRDialect:       }
+! FIRDialect-LABEL:   func.func @compute.deinit10(
+! FIRDialect-SAME:                                %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                                %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant false
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.absent !fir.box<none>
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ref<none>
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = arith.constant 0 : i32
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_6]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           fir.freemem %[[VAL_7]] : !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.heap<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_9]] : (index) -> !fir.shape<1>
+! FIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_8]](%[[VAL_10]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
+! FIRDialect:           fir.store %[[VAL_11]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           return %[[VAL_12]] : i32
+! FIRDialect:         }
 
-! FIRDialect-LABEL: func.func @compute.copy8(
-! FIRDialect-SAME:                           %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                           %[[VAL_1:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                           %[[VAL_2:[-0-9A-Za-z._]+]]: i64) -> i32 {
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_3]], %[[VAL_4]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, index) -> (index, index, index)
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = fir.shift %[[VAL_5]]#0 : (index) -> !fir.shift<1>
-! FIRDialect:         %[[VAL_7:[-0-9A-Za-z._]+]] = fir.rebox %[[VAL_3]](%[[VAL_6]]) : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, !fir.shift<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
-! FIRDialect:         fir.store %[[VAL_7]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_8:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         return %[[VAL_8]] : i32
-! FIRDialect:       }
+! FIRDialect-LABEL:   func.func @compute.copy8(
+! FIRDialect-SAME:                             %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                             %[[VAL_1:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                             %[[VAL_2:[-0-9A-Za-z._]+]]: i64) -> i32 {
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_3]], %[[VAL_4]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, index) -> (index, index, index)
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = fir.shift %[[VAL_5]]#0 : (index) -> !fir.shift<1>
+! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = fir.rebox %[[VAL_3]](%[[VAL_6]]) : (!fir.box<!fir.ptr<!fir.array<?xi32>>>, !fir.shift<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
+! FIRDialect:           fir.store %[[VAL_7]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           return %[[VAL_8]] : i32
+! FIRDialect:         }
 
-! FIRDialect-LABEL: func.func @compute.deinit11(
-! FIRDialect-SAME:                              %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
-! FIRDialect-SAME:                              %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
-! FIRDialect:         %[[VAL_2:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ptr<!fir.array<?xi32>>
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! FIRDialect:         %[[VAL_4:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
-! FIRDialect:         %[[VAL_5:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_2]](%[[VAL_4]]) : (!fir.ptr<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
-! FIRDialect:         fir.store %[[VAL_5]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! FIRDialect:         %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         return %[[VAL_6]] : i32
-! FIRDialect:       }
+! FIRDialect-LABEL:   func.func @compute.deinit11(
+! FIRDialect-SAME:                                %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>,
+! FIRDialect-SAME:                                %[[VAL_1:[-0-9A-Za-z._]+]]: i64) -> i32 {
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ptr<!fir.array<?xi32>>
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_2]](%[[VAL_4]]) : (!fir.ptr<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
+! FIRDialect:           fir.store %[[VAL_5]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           return %[[VAL_6]] : i32
+! FIRDialect:         }
 
-! FIRDialect-LABEL: fir.global @_QQEnvironmentDefaults constant : !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>> {
-! FIRDialect:         %[[VAL_0:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>>
-! FIRDialect:         fir.has_value %[[VAL_0]] : !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>>
-! FIRDialect:       }
+! FIRDialect-LABEL:   fir.global @_QQEnvironmentDefaults constant : !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>> {
+! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>>
+! FIRDialect:           fir.has_value %[[VAL_0]] : !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>>
+! FIRDialect:         }
 

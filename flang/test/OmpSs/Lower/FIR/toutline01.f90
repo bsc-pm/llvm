@@ -16,26 +16,19 @@ subroutine test3(a)
   call test3b(b)
 end subroutine test3
 
-
-! CHECK-LABEL: func.func @_QPtest3(
-! CHECK-SAME:                      %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<f32> {fir.bindc_name = "a"}) {
-! CHECK:         %[[VAL_1:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.heap<!fir.array<?xf32>>> {bindc_name = "b", uniq_name = "_QFtest3Eb"}
-! CHECK:         %[[VAL_2:[-0-9A-Za-z._]+]] = fir.alloca !fir.heap<!fir.array<?xf32>> {uniq_name = "_QFtest3Eb.addr"}
-! CHECK:         %[[VAL_3:[-0-9A-Za-z._]+]] = fir.alloca index {uniq_name = "_QFtest3Eb.lb0"}
-! CHECK:         %[[VAL_4:[-0-9A-Za-z._]+]] = fir.alloca index {uniq_name = "_QFtest3Eb.ext0"}
-! CHECK:         %[[VAL_5:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.heap<!fir.array<?xf32>>
-! CHECK:         fir.store %[[VAL_5]] to %[[VAL_2]] : !fir.ref<!fir.heap<!fir.array<?xf32>>>
-! CHECK:         %[[VAL_6:[-0-9A-Za-z._]+]] = fir.load %[[VAL_3]] : !fir.ref<index>
-! CHECK:         %[[VAL_7:[-0-9A-Za-z._]+]] = fir.load %[[VAL_4]] : !fir.ref<index>
-! CHECK:         %[[VAL_8:[-0-9A-Za-z._]+]] = fir.load %[[VAL_2]] : !fir.ref<!fir.heap<!fir.array<?xf32>>>
-! CHECK:         %[[VAL_9:[-0-9A-Za-z._]+]] = fir.shape_shift %[[VAL_6]], %[[VAL_7]] : (index, index) -> !fir.shapeshift<1>
-! CHECK:         %[[VAL_10:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_8]](%[[VAL_9]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shapeshift<1>) -> !fir.box<!fir.heap<!fir.array<?xf32>>>
-! CHECK:         fir.store %[[VAL_10]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>
-! CHECK:         oss.task shared(%[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>) {
-! CHECK:           fir.call @_QPtest3b(%[[VAL_1]]) fastmath<contract> : (!fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>) -> ()
-! CHECK:           oss.terminator
+! CHECK-LABEL:   func.func @_QPtest3(
+! CHECK-SAME:                        %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<f32> {fir.bindc_name = "a"}) {
+! CHECK:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.heap<!fir.array<?xf32>>> {bindc_name = "b", uniq_name = "_QFtest3Eb"}
+! CHECK:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.heap<!fir.array<?xf32>>
+! CHECK:           %[[VAL_3:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! CHECK:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
+! CHECK:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_2]](%[[VAL_4]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?xf32>>>
+! CHECK:           fir.store %[[VAL_5]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>
+! CHECK:           oss.task shared(%[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>) {
+! CHECK:             fir.call @_QPtest3b(%[[VAL_1]]) fastmath<contract> : (!fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>) -> ()
+! CHECK:             oss.terminator
+! CHECK:           }
+! CHECK:           return
 ! CHECK:         }
-! CHECK:         return
-! CHECK:       }
-! CHECK:       func.func private @_QPtest3b(!fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>)
+! CHECK:         func.func private @_QPtest3b(!fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>)
 

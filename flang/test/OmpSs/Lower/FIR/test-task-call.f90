@@ -22,29 +22,29 @@ PROGRAM MAIN
   !$OSS TASKWAIT
 END PROGRAM MAIN
 
-! FIRDialect-LABEL: func.func @_QMmooPs1(
-! FIRDialect-SAME:                       %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<i32> {fir.bindc_name = "x"}) {
-! FIRDialect:         %[[VAL_1:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<i32>
-! FIRDialect:         %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         %[[VAL_3:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_1]], %[[VAL_2]] : i32
-! FIRDialect:         fir.store %[[VAL_3]] to %[[VAL_0]] : !fir.ref<i32>
-! FIRDialect:         return
-! FIRDialect:       }
-
-! FIRDialect-LABEL: func.func @_QQmain() {
-! FIRDialect:         %[[VAL_0:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "x", uniq_name = "_QFEx"}
-! FIRDialect:         %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:         fir.store %[[VAL_1]] to %[[VAL_0]] : !fir.ref<i32>
-! FIRDialect:         oss.task firstprivate(%[[VAL_0]] : !fir.ref<i32>) {
-! FIRDialect:           fir.call @_QMmooPs1(%[[VAL_0]]) fastmath<contract> : (!fir.ref<i32>) -> ()
-! FIRDialect:           oss.terminator
+! FIRDialect-LABEL:   func.func @_QMmooPs1(
+! FIRDialect-SAME:                         %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<i32> {fir.bindc_name = "x"}) {
+! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<i32>
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_1]], %[[VAL_2]] : i32
+! FIRDialect:           fir.store %[[VAL_3]] to %[[VAL_0]] : !fir.ref<i32>
+! FIRDialect:           return
 ! FIRDialect:         }
-! FIRDialect:         oss.taskwait
-! FIRDialect:         return
-! FIRDialect:       }
 
-! FIRDialect-LABEL: fir.global @_QQEnvironmentDefaults constant : !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>> {
-! FIRDialect:         %[[VAL_0:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>>
-! FIRDialect:         fir.has_value %[[VAL_0]] : !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>>
-! FIRDialect:       }
+! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "main"} {
+! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "x", uniq_name = "_QFEx"}
+! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           fir.store %[[VAL_1]] to %[[VAL_0]] : !fir.ref<i32>
+! FIRDialect:           oss.task firstprivate(%[[VAL_0]] : !fir.ref<i32>) {
+! FIRDialect:             fir.call @_QMmooPs1(%[[VAL_0]]) fastmath<contract> : (!fir.ref<i32>) -> ()
+! FIRDialect:             oss.terminator
+! FIRDialect:           }
+! FIRDialect:           oss.taskwait
+! FIRDialect:           return
+! FIRDialect:         }
+
+! FIRDialect-LABEL:   fir.global @_QQEnvironmentDefaults constant : !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>> {
+! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>>
+! FIRDialect:           fir.has_value %[[VAL_0]] : !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>>
+! FIRDialect:         }
 
