@@ -3,8 +3,8 @@
 ! Check for assumed-size arrays shared
 
 !DEF: /s (Subroutine) Subprogram
-!DEF: /s/x ObjectEntity INTEGER(4)
-!DEF: /s/array ObjectEntity INTEGER(4)
+!DEF: /s/x OMPSS2_CAPTURE ObjectEntity INTEGER(4)
+!DEF: /s/array OMPSS2_CAPTURE ObjectEntity INTEGER(4)
 subroutine s (x, array)
  !REF: /s/x
  integer x(10)

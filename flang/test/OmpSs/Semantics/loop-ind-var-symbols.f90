@@ -2,9 +2,9 @@
 
 !DEF: /p1 MainProgram
 program p1
- !DEF: /p1/i ObjectEntity INTEGER(4)
+ !DEF: /p1/i OMPSS2_CAPTURE ObjectEntity INTEGER(4)
  integer i
- !DEF: /p1/j ObjectEntity INTEGER(4)
+ !DEF: /p1/j OMPSS2_CAPTURE ObjectEntity INTEGER(4)
  integer j
 !$oss task do
  !DEF: /p1/OtherConstruct1/i (OSSPrivate) HostAssoc INTEGER(4)

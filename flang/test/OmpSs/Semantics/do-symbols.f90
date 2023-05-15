@@ -4,9 +4,9 @@
 
 !DEF: /p MainProgram
 program p
- !DEF: /p/i ObjectEntity INTEGER(4)
+ !DEF: /p/i OMPSS2_CAPTURE ObjectEntity INTEGER(4)
  integer i
- !DEF: /p/j ObjectEntity INTEGER(4)
+ !DEF: /p/j OMPSS2_CAPTURE ObjectEntity INTEGER(4)
  integer j
  !DEF: /p/k ObjectEntity INTEGER(4)
  integer k(10)
@@ -16,7 +16,7 @@ program p
  end do
 !$oss end task
 !$oss task
- !DEF: /p/OtherConstruct2/i (OSSPrivate) HostAssoc INTEGER(4)
+ !DEF: /p/OtherConstruct2/i OMPSS2_CAPTURE (OSSPrivate) HostAssoc INTEGER(4)
  !DEF: /p/OtherConstruct2/j (OSSPrivate) HostAssoc INTEGER(4)
  print *, ((i+j, j=1,10), i=1,10)
 !$oss end task
