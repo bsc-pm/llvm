@@ -3370,6 +3370,9 @@ env variable KMP_FREE_AGENT_NUM_THREADS */
 extern std::atomic<int> __kmp_free_agent_active_nth; //Actual number of free agents active
 extern int __kmp_free_agent_clause_dflt; //Value obtained from env variable KMP_FREE_AGENT_DEFAULT_CLAUSE
 extern int __kmp_sched_own_tasks_in_order; //Value obtained from env variable KMP_SCHED_OWN_TASKS_IN_ORDER
+
+extern int __kmp_immed_successor; // Value obtained from env variable KMP_IMMED_SUCCESSOR
+
 /* -------------------------------------------------------------------------- */
 /* Global list of allowed teams for the free agent threads. All elements are  */
 /* read/write protected. Active free agents have a copy of this list in       */
@@ -4091,6 +4094,9 @@ KMP_EXPORT void __kmpc_omp_taskwait_deps_51(ident_t *loc_ref, kmp_int32 gtid,
 
 extern kmp_int32 __kmp_omp_task(kmp_int32 gtid, kmp_task_t *new_task,
                                 bool serialize_immediate);
+
+extern kmp_int32 __kmp_omp_task_with_immed(kmp_int32 gtid, kmp_task_t *new_task,
+                                bool serialize_immediate, bool execute);
 
 KMP_EXPORT kmp_int32 __kmpc_cancel(ident_t *loc_ref, kmp_int32 gtid,
                                    kmp_int32 cncl_kind);

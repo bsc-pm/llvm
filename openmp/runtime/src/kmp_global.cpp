@@ -580,4 +580,7 @@ int __kmp_free_agent_allowed_teams_length = 0;
 // Task scheduling order
 int __kmp_sched_own_tasks_in_order = FALSE;
 
+// Task dependencies immediate successor
+int __kmp_immed_successor = FALSE;
+
 // end of file //

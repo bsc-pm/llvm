@@ -5385,6 +5385,20 @@ static void __kmp_stg_print_sched_own_tasks_in_order(kmp_str_buf_t *buffer,
 }
 
 // -----------------------------------------------------------------------------
+// KMP_IMMED_SUCCESSOR
+static void __kmp_stg_parse_immed_successor(char const *name,
+                                                      char const *value,
+                                                      void *data){
+  __kmp_stg_parse_bool(name, value, &__kmp_immed_successor);
+}
+
+static void __kmp_stg_print_immed_successor(kmp_str_buf_t *buffer,
+                                                      char const *name,
+                                                      void *data){
+  __kmp_stg_print_bool(buffer, name, __kmp_immed_successor);
+}
+
+// -----------------------------------------------------------------------------
 // Table.
 
 static kmp_setting_t __kmp_stg_table[] = {
@@ -5664,6 +5678,10 @@ static kmp_setting_t __kmp_stg_table[] = {
     // Tasks scheduling order
     {"KMP_SCHED_OWN_TASKS_IN_ORDER", __kmp_stg_parse_sched_own_tasks_in_order,
       __kmp_stg_print_sched_own_tasks_in_order, NULL, 0, 0},
+
+    // Task dependencies immediate successor
+    {"KMP_IMMED_SUCCESSOR", __kmp_stg_parse_immed_successor,
+      __kmp_stg_print_immed_successor, NULL, 0, 0},
 
 #if KMP_HAVE_UMWAIT
     {"KMP_TPAUSE", __kmp_stg_parse_tpause, __kmp_stg_print_tpause, NULL, 0, 0},

@@ -163,7 +163,9 @@ static inline void __kmp_release_deps(kmp_int32 gtid, kmp_taskdata_t *task) {
             __kmp_omp_task(gtid, successor->dn.task, false);
           }
         } else {
-          __kmp_omp_task(gtid, successor->dn.task, false);
+          //__kmp_omp_task(gtid, successor->dn.task, false);
+          __kmp_omp_task_with_immed(gtid, successor->dn.task, false, 
+                  __kmp_immed_successor && !(p->next));
         }
       }
     }

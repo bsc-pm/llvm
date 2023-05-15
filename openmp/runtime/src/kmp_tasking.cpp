@@ -2019,6 +2019,32 @@ kmp_int32 __kmp_omp_task(kmp_int32 gtid, kmp_task_t *new_task,
   return TASK_CURRENT_NOT_QUEUED;
 }
 
+// __kmp_omp_task_with_immed: Schedule a non-thread-switchable task for execution
+//
+// gtid: Global Thread ID of encountering thread
+// new_task:non-thread-switchable task thunk allocated by __kmp_omp_task_alloc()
+// serialize_immediate: if TRUE then if the task is executed immediately its
+// execution will be serialized
+// execute: if TRUE then the task will be executed immediately
+// Returns:
+//    TASK_CURRENT_NOT_QUEUED (0) if did not suspend and queue current task to
+//    be resumed later.
+//    TASK_CURRENT_QUEUED (1) if suspended and queued the current task to be
+//    resumed later.
+kmp_int32 __kmp_omp_task_with_immed(kmp_int32 gtid, kmp_task_t *new_task,
+                             bool serialize_immediate, bool execute) {
+    kmp_taskdata_t *new_taskdata = KMP_TASK_TO_TASKDATA(new_task);
+    if (execute) {
+        kmp_taskdata_t *current_task = __kmp_threads[gtid]->th.th_current_task;
+        if (serialize_immediate)
+          new_taskdata->td_flags.task_serial = 1;
+        __kmp_invoke_task(gtid, new_task, current_task);
+    } else {
+        return __kmp_omp_task(gtid, new_task, serialize_immediate);
+    }
+    return TASK_CURRENT_NOT_QUEUED;
+}
+
 // __kmpc_omp_task: Wrapper around __kmp_omp_task to schedule a
 // non-thread-switchable task from the parent thread only!
 //
