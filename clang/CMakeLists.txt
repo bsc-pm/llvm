@@ -246,8 +246,11 @@ set(CLANG_DEFAULT_OPENMP_RUNTIME "libomp" CACHE STRING
 set(CLANG_DEFAULT_OMPSS2_RUNTIME "libnanos6" CACHE STRING
   "Default OmpSs-2 runtime used by -fompss-2.")
 
-set(CLANG_DEFAULT_OMPSS2_RUNTIME_HOME "" CACHE STRING
-  "OmpSs-2 home directory.")
+set(CLANG_DEFAULT_NANOS6_HOME "" CACHE STRING
+  "OmpSs-2 nanos6 home directory.")
+
+set(CLANG_DEFAULT_NODES_HOME "" CACHE STRING
+  "OmpSs-2 NODES home directory.")
 
 set(CLANG_SYSTEMZ_DEFAULT_ARCH "z10" CACHE STRING "SystemZ Default Arch")
 

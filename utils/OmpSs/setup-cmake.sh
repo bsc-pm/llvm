@@ -352,12 +352,21 @@ else
 fi
 
 ################################################################################
-# OMPSS2_RUNTIME_HOME
+# NANOS6_HOME
 ################################################################################
 
-if [ -n "${OMPSS2_RUNTIME_HOME}" ];
+if [ -n "${NANOS6_HOME}" ];
 then
-  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCLANG_DEFAULT_OMPSS2_RUNTIME_HOME=${OMPSS2_RUNTIME_HOME}")
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCLANG_DEFAULT_NANOS6_HOME=${NANOS6_HOME}")
+fi
+
+################################################################################
+# NODES_HOME
+################################################################################
+
+if [ -n "${NODES_HOME}" ];
+then
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCLANG_DEFAULT_NODES_HOME=${NODES_HOME}")
 fi
 
 ################################################################################

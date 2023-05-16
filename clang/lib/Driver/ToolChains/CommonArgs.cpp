@@ -931,12 +931,37 @@ void tools::addOmpSsRuntimeLibs(
   if (!Args.hasFlag(options::OPT_fompss, options::OPT_fompss_EQ, options::OPT_fno_ompss, false))
     return;
 
-  std::string RuntimeDefaultHome(CLANG_DEFAULT_OMPSS2_RUNTIME_HOME);
-  std::optional<std::string> RuntimeHome =
-    llvm::sys::Process::GetEnv("OMPSS2_RUNTIME_HOME");
+  std::string Nanos6DefaultHome(CLANG_DEFAULT_NANOS6_HOME);
+  std::optional<std::string> Nanos6Home =
+    llvm::sys::Process::GetEnv("NANOS6_HOME");
 
-  // First look at environment OMPSS2_RUNTIME_HOME,
-  // then CMAKE defined variable.
+  std::string NODESDefaultHome(CLANG_DEFAULT_NODES_HOME);
+  std::optional<std::string> NODESHome =
+    llvm::sys::Process::GetEnv("NODES_HOME");
+
+  Driver::OmpSsRuntimeKind RTKind = TC.getDriver().getOmpSsRuntime(Args);
+
+  std::string RuntimeDefaultHome;
+  std::optional<std::string> RuntimeHome;
+  std::string RuntimeLibPrefix;
+  switch (RTKind) {
+  case Driver::OSSRT_NANOS6:
+    RuntimeDefaultHome = Nanos6DefaultHome;
+    RuntimeHome = Nanos6Home;
+    RuntimeLibPrefix = "nanos6";
+    break;
+  case Driver::OSSRT_NODES:
+    RuntimeDefaultHome = NODESDefaultHome;
+    RuntimeHome = NODESHome;
+    RuntimeLibPrefix = "nodes";
+    break;
+  case Driver::OSSRT_Unknown:
+    // Already diagnosed.
+    return;
+  }
+
+  // First look at environment,then CMAKE
+  // defined variable.
   //
   // Default to compiler lib dir. in case both are not defined.
   std::string HomePath;
@@ -944,24 +969,6 @@ void tools::addOmpSsRuntimeLibs(
     HomePath = RuntimeHome.value();
   } else if (!RuntimeDefaultHome.empty()) {
     HomePath = RuntimeDefaultHome;
-  }
-
-  Driver::OmpSsRuntimeKind RTKind = TC.getDriver().getOmpSsRuntime(Args);
-
-  if (RTKind == Driver::OSSRT_Unknown)
-    // Already diagnosed.
-    return;
-
-  std::string RuntimeLibPrefix;
-  switch (RTKind) {
-  case Driver::OSSRT_NANOS6:
-    RuntimeLibPrefix = "nanos6";
-    break;
-  case Driver::OSSRT_NODES:
-    RuntimeLibPrefix = "nodes";
-    break;
-  case Driver::OSSRT_Unknown:
-    break;
   }
 
   if (!HomePath.empty()) {
@@ -991,12 +998,34 @@ void tools::addOmpSsRuntimeInclude(
   if (Args.getLastArg(options::OPT_fdo_not_use_ompss_runtime))
     return;
 
-  std::string RuntimeDefaultHome(CLANG_DEFAULT_OMPSS2_RUNTIME_HOME);
-  std::optional<std::string> RuntimeHome =
-    llvm::sys::Process::GetEnv("OMPSS2_RUNTIME_HOME");
+  std::string Nanos6DefaultHome(CLANG_DEFAULT_NANOS6_HOME);
+  std::optional<std::string> Nanos6Home =
+    llvm::sys::Process::GetEnv("NANOS6_HOME");
 
-  // First look at environment OMPSS2_RUNTIME_HOME,
-  // then CMAKE defined variable.
+  std::string NODESDefaultHome(CLANG_DEFAULT_NODES_HOME);
+  std::optional<std::string> NODESHome =
+    llvm::sys::Process::GetEnv("NODES_HOME");
+
+  Driver::OmpSsRuntimeKind RTKind = TC.getDriver().getOmpSsRuntime(Args);
+
+  std::string RuntimeDefaultHome;
+  std::optional<std::string> RuntimeHome;
+  switch (RTKind) {
+  case Driver::OSSRT_NANOS6:
+    RuntimeDefaultHome = Nanos6DefaultHome;
+    RuntimeHome = Nanos6Home;
+    break;
+  case Driver::OSSRT_NODES:
+    RuntimeDefaultHome = NODESDefaultHome;
+    RuntimeHome = NODESHome;
+    break;
+  case Driver::OSSRT_Unknown:
+    // Already diagnosed.
+    return;
+  }
+
+  // First look at environment,then CMAKE
+  // defined variable.
   //
   // Default to compiler lib dir. in case both are not defined.
   std::string HomePath;
