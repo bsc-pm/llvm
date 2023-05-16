@@ -619,16 +619,6 @@ namespace clang {
     Expected<OSSClause *> VisitOSSFinalClause(OSSFinalClause *C);
     Expected<OSSClause *> VisitOSSCostClause(OSSCostClause *C);
     Expected<OSSClause *> VisitOSSPriorityClause(OSSPriorityClause *C);
-    Expected<OSSClause *> VisitOSSNumInstancesClause(OSSNumInstancesClause *C);
-    Expected<OSSClause *> VisitOSSOntoClause(OSSOntoClause *C);
-    Expected<OSSClause *>
-    VisitOSSNumRepetitionsClause(OSSNumRepetitionsClause *C);
-    Expected<OSSClause *> VisitOSSPeriodClause(OSSPeriodClause *C);
-    Expected<OSSClause *> VisitOSSAffinityClause(OSSAffinityClause *C);
-    Expected<OSSClause *> VisitOSSCopyInClause(OSSCopyInClause *C);
-    Expected<OSSClause *> VisitOSSCopyOutClause(OSSCopyOutClause *C);
-    Expected<OSSClause *> VisitOSSCopyInOutClause(OSSCopyInOutClause *C);
-    Expected<OSSClause *> VisitOSSCopyDepsClause(OSSCopyDepsClause *C);
     Expected<OSSClause *> VisitOSSLabelClause(OSSLabelClause *C);
     Expected<OSSClause *> VisitOSSOnreadyClause(OSSOnreadyClause *C);
     Expected<OSSClause *> VisitOSSChunksizeClause(OSSChunksizeClause *C);
@@ -7137,119 +7127,6 @@ ASTNodeImporter::VisitOSSPriorityClause(OSSPriorityClause *C) {
     return std::move(Err);
   return new (Importer.getToContext())
       OSSPriorityClause(expr, beginLoc, lParenLoc, endLoc);
-}
-
-Expected<OSSClause *>
-ASTNodeImporter::VisitOSSNumInstancesClause(OSSNumInstancesClause *C) {
-  Error Err = Error::success();
-  auto beginLoc = importChecked(Err, C->getBeginLoc());
-  auto endLoc = importChecked(Err, C->getEndLoc());
-  auto lParenLoc = importChecked(Err, C->getLParenLoc());
-  auto *expr = importChecked(Err, C->getExpression());
-  if (Err)
-    return std::move(Err);
-  return new (Importer.getToContext())
-      OSSNumInstancesClause(expr, beginLoc, lParenLoc, endLoc);
-}
-
-Expected<OSSClause *> ASTNodeImporter::VisitOSSOntoClause(OSSOntoClause *C) {
-  Error Err = Error::success();
-  auto beginLoc = importChecked(Err, C->getBeginLoc());
-  auto endLoc = importChecked(Err, C->getEndLoc());
-  auto lParenLoc = importChecked(Err, C->getLParenLoc());
-  auto *expr = importChecked(Err, C->getExpression());
-  if (Err)
-    return std::move(Err);
-  return new (Importer.getToContext())
-      OSSOntoClause(expr, beginLoc, lParenLoc, endLoc);
-}
-
-Expected<OSSClause *>
-ASTNodeImporter::VisitOSSNumRepetitionsClause(OSSNumRepetitionsClause *C) {
-  Error Err = Error::success();
-  auto beginLoc = importChecked(Err, C->getBeginLoc());
-  auto endLoc = importChecked(Err, C->getEndLoc());
-  auto lParenLoc = importChecked(Err, C->getLParenLoc());
-  auto *expr = importChecked(Err, C->getExpression());
-  if (Err)
-    return std::move(Err);
-  return new (Importer.getToContext())
-      OSSNumRepetitionsClause(expr, beginLoc, lParenLoc, endLoc);
-}
-
-Expected<OSSClause *>
-ASTNodeImporter::VisitOSSPeriodClause(OSSPeriodClause *C) {
-  Error Err = Error::success();
-  auto beginLoc = importChecked(Err, C->getBeginLoc());
-  auto endLoc = importChecked(Err, C->getEndLoc());
-  auto lParenLoc = importChecked(Err, C->getLParenLoc());
-  auto *expr = importChecked(Err, C->getExpression());
-  if (Err)
-    return std::move(Err);
-  return new (Importer.getToContext())
-      OSSPeriodClause(expr, beginLoc, lParenLoc, endLoc);
-}
-
-Expected<OSSClause *>
-ASTNodeImporter::VisitOSSAffinityClause(OSSAffinityClause *C) {
-  Error Err = Error::success();
-  auto beginLoc = importChecked(Err, C->getBeginLoc());
-  auto endLoc = importChecked(Err, C->getEndLoc());
-  auto lParenLoc = importChecked(Err, C->getLParenLoc());
-  auto *expr = importChecked(Err, C->getExpression());
-  if (Err)
-    return std::move(Err);
-  return new (Importer.getToContext())
-      OSSAffinityClause(expr, beginLoc, lParenLoc, endLoc);
-}
-
-Expected<OSSClause *>
-ASTNodeImporter::VisitOSSCopyInClause(OSSCopyInClause *C) {
-  llvm::SmallVector<Expr *, 16> Vars(C->varlist_size());
-  Error Err = ImportContainerChecked(C->varlists(), Vars);
-  auto beginLoc = importChecked(Err, C->getBeginLoc());
-  auto endLoc = importChecked(Err, C->getEndLoc());
-  auto lParenLoc = importChecked(Err, C->getLParenLoc());
-  if (Err)
-    return std::move(Err);
-  return OSSCopyInClause::Create(Importer.getToContext(), beginLoc, lParenLoc,
-                                 endLoc, Vars);
-}
-
-Expected<OSSClause *>
-ASTNodeImporter::VisitOSSCopyOutClause(OSSCopyOutClause *C) {
-  llvm::SmallVector<Expr *, 16> Vars(C->varlist_size());
-  Error Err = ImportContainerChecked(C->varlists(), Vars);
-  auto beginLoc = importChecked(Err, C->getBeginLoc());
-  auto endLoc = importChecked(Err, C->getEndLoc());
-  auto lParenLoc = importChecked(Err, C->getLParenLoc());
-  if (Err)
-    return std::move(Err);
-  return OSSCopyOutClause::Create(Importer.getToContext(), beginLoc, lParenLoc,
-                                  endLoc, Vars);
-}
-
-Expected<OSSClause *>
-ASTNodeImporter::VisitOSSCopyInOutClause(OSSCopyInOutClause *C) {
-  llvm::SmallVector<Expr *, 16> Vars(C->varlist_size());
-  Error Err = ImportContainerChecked(C->varlists(), Vars);
-  auto beginLoc = importChecked(Err, C->getBeginLoc());
-  auto endLoc = importChecked(Err, C->getEndLoc());
-  auto lParenLoc = importChecked(Err, C->getLParenLoc());
-  if (Err)
-    return std::move(Err);
-  return OSSCopyInOutClause::Create(Importer.getToContext(), beginLoc,
-                                    lParenLoc, endLoc, Vars);
-}
-
-Expected<OSSClause *>
-ASTNodeImporter::VisitOSSCopyDepsClause(OSSCopyDepsClause *C) {
-  Error Err = Error::success();
-  auto beginLoc = importChecked(Err, C->getBeginLoc());
-  auto endLoc = importChecked(Err, C->getEndLoc());
-  if (Err)
-    return std::move(Err);
-  return new (Importer.getToContext()) OSSCopyDepsClause(beginLoc, endLoc);
 }
 
 Expected<OSSClause *> ASTNodeImporter::VisitOSSLabelClause(OSSLabelClause *C) {
