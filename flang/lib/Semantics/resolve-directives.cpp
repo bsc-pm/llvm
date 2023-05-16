@@ -2629,8 +2629,6 @@ void OSSAttributeVisitor::MaterializeDSAs(DirContext &context) {
     if (DiagnoseUnsupportedDataTypes(context, *sym, info.source))
       continue;
     if (auto *new_sym{ResolveOSS(*sym, info.ossFlag, currScope())}) {
-      // Set OmpSs-2 attribute to force using the box in lowering
-      sym->attrs().set(Attr::OMPSS2_CAPTURE);
       AddToContextObjectWithDSA(*new_sym, info.ossFlag);
     }
   }
