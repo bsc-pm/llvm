@@ -2558,10 +2558,14 @@ void OSSAttributeVisitor::OSSImplicitVisitor::Post(const parser::Name &name) {
 
   gatherNonDummySymbolsFromStmtFunctionStmt(sym, symList);
 
-  for (auto &symbol : symList) {
+  for (auto *symbol : symList) {
     // Skip I in T%I
     // Skip calls
     // Skip .ASDF.
+
+    if (UseDetails *details{symbol->detailsIf<UseDetails>()})
+      symbol = const_cast<Symbol *>(&details->symbol());
+
     if (symbol->owner().IsDerivedType()
         || symbol->has<ProcEntityDetails>()
         || symbol->has<SubprogramDetails>()
