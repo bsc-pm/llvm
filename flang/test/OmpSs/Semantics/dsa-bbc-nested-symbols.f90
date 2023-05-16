@@ -35,19 +35,19 @@ end program
 !CHECK: OtherConstruct scope: size=0 alignment=1
 !CHECK:   i (OSSFirstPrivate): HostAssoc
 !CHECK:   OtherConstruct scope: size=0 alignment=1
-!CHECK:     i, OMPSS2_CAPTURE (OSSShared): HostAssoc
+!CHECK:     i (OSSShared): HostAssoc
 !CHECK:     OtherConstruct scope: size=0 alignment=1
-!CHECK:       i, OMPSS2_CAPTURE (OSSFirstPrivate): HostAssoc
+!CHECK:       i (OSSFirstPrivate): HostAssoc
 !CHECK: OtherConstruct scope: size=0 alignment=1
-!CHECK:   i, OMPSS2_CAPTURE (OSSPrivate): HostAssoc
+!CHECK:   i (OSSPrivate): HostAssoc
 !CHECK:   OtherConstruct scope: size=0 alignment=1
-!CHECK:     i, OMPSS2_CAPTURE (OSSPrivate): HostAssoc
+!CHECK:     i (OSSPrivate): HostAssoc
 !CHECK: OtherConstruct scope: size=0 alignment=1
-!CHECK:   i, OMPSS2_CAPTURE (OSSFirstPrivate): HostAssoc
+!CHECK:   i (OSSFirstPrivate): HostAssoc
 !CHECK:   OtherConstruct scope: size=0 alignment=1
-!CHECK:     i, OMPSS2_CAPTURE (OSSFirstPrivate): HostAssoc
+!CHECK:     i (OSSFirstPrivate): HostAssoc
 !CHECK: OtherConstruct scope: size=0 alignment=1
-!CHECK:   i, OMPSS2_CAPTURE (OSSShared): HostAssoc
+!CHECK:   i (OSSShared): HostAssoc
 !CHECK:   OtherConstruct scope: size=0 alignment=1
-!CHECK:     i, OMPSS2_CAPTURE (OSSFirstPrivate): HostAssoc
+!CHECK:     i (OSSFirstPrivate): HostAssoc
 

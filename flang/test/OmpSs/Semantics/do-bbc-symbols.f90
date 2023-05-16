@@ -19,5 +19,5 @@ end program
 !CHECK: OtherConstruct scope: size=0 alignment=1
 !CHECK:   i (OSSPrivate): HostAssoc
 !CHECK: OtherConstruct scope: size=0 alignment=1
-!CHECK:   i, OMPSS2_CAPTURE (OSSPrivate): HostAssoc
+!CHECK:   i (OSSPrivate): HostAssoc
 !CHECK:   j (OSSPrivate): HostAssoc
