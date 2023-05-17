@@ -1265,6 +1265,11 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
   // OmpSs-2
   if (LangOpts.OmpSs)
     Builder.defineMacro("_OMPSS_2", "1");
+  if (LangOpts.OmpSsRuntimeName == std::string("libnodes"))
+    Builder.defineMacro("_OMPSS_2_NODES", "1");
+  else
+    Builder.defineMacro("_OMPSS_2_NANOS6", "1");
+
 
   // CUDA device path compilaton
   if (LangOpts.CUDAIsDevice && !LangOpts.HIP) {
