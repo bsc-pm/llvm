@@ -6163,6 +6163,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     case Driver::OSSRT_NANOS6:
     case Driver::OSSRT_NODES:
       CmdArgs.push_back("-fompss-2");
+      Args.AddAllArgs(CmdArgs, options::OPT_fompss_EQ);
       break;
     default:
       break;
