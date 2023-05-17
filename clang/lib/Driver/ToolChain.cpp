@@ -12,6 +12,7 @@
 #include "ToolChains/Clang.h"
 #include "ToolChains/Flang.h"
 #include "ToolChains/InterfaceStubs.h"
+#include "ToolChains/Mercurium.h"
 #include "clang/Basic/ObjCRuntime.h"
 #include "clang/Basic/Sanitizers.h"
 #include "clang/Config/config.h"
@@ -339,6 +340,12 @@ Tool *ToolChain::getClang() const {
   if (!Clang)
     Clang.reset(new tools::Clang(*this, useIntegratedBackend()));
   return Clang.get();
+}
+
+Tool *ToolChain::getMercurium() const {
+  if (!Mercurium)
+    Mercurium.reset(new tools::mercurium::Mercurium(*this));
+  return Mercurium.get();
 }
 
 Tool *ToolChain::getFlang() const {
