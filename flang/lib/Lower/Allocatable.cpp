@@ -868,6 +868,7 @@ createMutableProperties(Fortran::lower::AbstractConverter &converter,
       useDescForMutableBox || mayBeCapturedInInternalProc(sym) ||
       isPolymorphicPointer(sym) || isPolymorphicAllocatable(sym))
     return {};
+  llvm_unreachable("");
   fir::MutableProperties mutableProperties;
   std::string name = converter.mangleName(sym);
   mlir::Type baseAddrTy = converter.genType(sym);

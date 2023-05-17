@@ -2548,6 +2548,17 @@ static void gatherNonDummySymbolsFromStmtFunctionStmt(
   }
 }
 
+static
+bool MustDiscard(const Fortran::semantics::Symbol *symbol) {
+  return symbol->owner().IsDerivedType()
+      || symbol->has<ProcEntityDetails>()
+      || symbol->has<SubprogramDetails>()
+      || (symbol->has<UseDetails>() && MustDiscard(&symbol->get<UseDetails>().symbol()))
+      || symbol->has<UseErrorDetails>()
+      || symbol->has<AssocEntityDetails>()
+      || symbol->has<MiscDetails>();
+}
+
 // For OmpSs-2 constructs, check all the data-refs within the constructs
 // and adjust the symbol for each Name if necessary
 void OSSAttributeVisitor::OSSImplicitVisitor::Post(const parser::Name &name) {
@@ -2563,16 +2574,7 @@ void OSSAttributeVisitor::OSSImplicitVisitor::Post(const parser::Name &name) {
     // Skip calls
     // Skip .ASDF.
 
-    if (UseDetails *details{symbol->detailsIf<UseDetails>()})
-      symbol = const_cast<Symbol *>(&details->symbol());
-
-    if (symbol->owner().IsDerivedType()
-        || symbol->has<ProcEntityDetails>()
-        || symbol->has<SubprogramDetails>()
-        || symbol->has<UseDetails>()
-        || symbol->has<UseErrorDetails>()
-        || symbol->has<AssocEntityDetails>()
-        || symbol->has<MiscDetails>())
+    if (MustDiscard(symbol))
       continue;
 
     // stmt-function symbols don't appear to have a source
