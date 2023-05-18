@@ -44,6 +44,53 @@ struct DirectiveFinalInfo {
   ValueToValueMapTy VMap;
 };
 
+static void registerCheckVersion(Module &M) {
+  Function *Func = cast<Function>(nanos6Api::registerCtorCheckVersionFuncCallee(M).getCallee());
+  if (Func->empty()) {
+    Func->setLinkage(GlobalValue::InternalLinkage);
+    BasicBlock *EntryBB = BasicBlock::Create(M.getContext(), "entry", Func);
+    Instruction *RetInst = ReturnInst::Create(M.getContext());
+    RetInst->insertInto(EntryBB, EntryBB->end());
+
+    appendToGlobalCtors(M, Func, 65535);
+
+    BasicBlock &Entry = Func->getEntryBlock();
+
+    // struct nanos6_version_t {
+    //   uint64_t family;
+    //   uint64_t majorversion;
+    //   uint64_t minor_version;
+    // };
+
+    Type *Int64Ty = Type::getInt64Ty(M.getContext());
+
+    SmallVector<Constant *, 4> Versions;
+    const size_t NUM_VERSIONS = 1;
+    const size_t TUPLE_SIZE = 3;
+    const size_t TOTAL_ELEMS = TUPLE_SIZE*NUM_VERSIONS;
+    Constant *NumVersionsValue = ConstantInt::get(Int64Ty, NUM_VERSIONS);
+    // family
+    Versions.push_back(
+      ConstantInt::get(Int64Ty, 0));
+    // major_version
+    Versions.push_back(
+      ConstantInt::get(Int64Ty, 1));
+    // minor_version
+    Versions.push_back(
+      ConstantInt::get(Int64Ty, 0));
+
+    GlobalVariable *VersionListValue =
+      new GlobalVariable(M, ArrayType::get(Int64Ty, TOTAL_ELEMS),
+        /*isConstant=*/true, GlobalVariable::InternalLinkage,
+        ConstantArray::get(ArrayType::get(Int64Ty, TOTAL_ELEMS),
+          Versions), "nanos6_versions");
+
+    IRBuilder<> BBBuilder(&Entry.back());
+    BBBuilder.CreateCall(
+      nanos6Api::checkVersionFuncCallee(M), {NumVersionsValue, VersionListValue});
+  }
+}
+
 struct OmpSsDirective {
   Module &M;
   LLVMContext &Ctx;
@@ -3120,6 +3167,11 @@ struct OmpSsFunction {
 
     DirectiveFunctionInfo &DirectiveFuncInfo = LookupDirectiveFunctionInfo(F).getFuncInfo();
 
+    // Emit check version call if translation unit has at least one ompss-2
+    // directive
+    if (DirectiveFuncInfo.PostOrder.empty())
+      registerCheckVersion(M);
+
     buildFinalCloneBBs(DirectiveFuncInfo);
     for (size_t i = 0; i < DirectiveFuncInfo.PostOrder.size(); ++i) {
       DirectiveInfo &DirInfo = *DirectiveFuncInfo.PostOrder[i];
@@ -3140,6 +3192,9 @@ struct OmpSsModule {
   function_ref<OmpSsRegionAnalysis &(Function &)> LookupDirectiveFunctionInfo;
 
   void registerAssert(StringRef Str) {
+    // Emit check version call if translation unit has at least one ompss-2
+    // directive
+    registerCheckVersion(M);
     Function *Func = cast<Function>(nanos6Api::registerCtorAssertFuncCallee(M).getCallee());
     if (Func->empty()) {
       Func->setLinkage(GlobalValue::InternalLinkage);
