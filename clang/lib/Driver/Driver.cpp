@@ -777,6 +777,11 @@ Driver::OpenMPRuntimeKind Driver::getOpenMPRuntime(const ArgList &Args) const {
 Driver::OmpSsRuntimeKind Driver::getOmpSsRuntime(const ArgList &Args) const {
   StringRef RuntimeName(CLANG_DEFAULT_OMPSS2_RUNTIME);
 
+  std::optional<std::string> OMPSS2Runtime =
+      llvm::sys::Process::GetEnv("OMPSS2_RUNTIME");
+  if (OMPSS2Runtime && !OMPSS2Runtime->empty())
+    RuntimeName = OMPSS2Runtime.value();
+
   const Arg *A = Args.getLastArg(options::OPT_fompss_EQ);
   if (A)
     RuntimeName = A->getValue();
@@ -790,6 +795,9 @@ Driver::OmpSsRuntimeKind Driver::getOmpSsRuntime(const ArgList &Args) const {
     if (A)
       Diag(diag::err_drv_unsupported_option_argument)
           << A->getSpelling() << A->getValue();
+    else if (OMPSS2Runtime && !OMPSS2Runtime->empty())
+      Diag(diag::err_drv_unsupported_option_argument)
+          << "-fompss-2=" << OMPSS2Runtime.value();
     else
       // FIXME: We could use a nicer diagnostic here.
       Diag(diag::err_drv_unsupported_opt) << "-fompss-2";
