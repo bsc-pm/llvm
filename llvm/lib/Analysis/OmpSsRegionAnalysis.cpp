@@ -155,20 +155,26 @@ void DirectiveEnvironment::gatherDirInfo(OperandBundleDef &OB) {
 
 void DirectiveEnvironment::gatherSharedInfo(OperandBundleDef &OB) {
   assert(OB.input_size() == 2 && "Only allowed two Values per OperandBundle");
-  DSAInfo.Shared.insert(OB.inputs()[0]);
-  DSAInfo.SharedTy.push_back(OB.inputs()[1]->getType());
+  if (DSAInfo.Shared.insert(OB.inputs()[0]))
+    DSAInfo.SharedTy.push_back(OB.inputs()[1]->getType());
+  assert(DSAInfo.Shared.size() == DSAInfo.SharedTy.size() &&
+    "Size mismatch with Shared values and types");
 }
 
 void DirectiveEnvironment::gatherPrivateInfo(OperandBundleDef &OB) {
   assert(OB.input_size() == 2 && "Only allowed two Values per OperandBundle");
-  DSAInfo.Private.insert(OB.inputs()[0]);
-  DSAInfo.PrivateTy.push_back(OB.inputs()[1]->getType());
+  if (DSAInfo.Private.insert(OB.inputs()[0]))
+    DSAInfo.PrivateTy.push_back(OB.inputs()[1]->getType());
+  assert(DSAInfo.Private.size() == DSAInfo.PrivateTy.size() &&
+    "Size mismatch with Private values and types");
 }
 
 void DirectiveEnvironment::gatherFirstprivateInfo(OperandBundleDef &OB) {
   assert(OB.input_size() == 2 && "Only allowed two Values per OperandBundle");
-  DSAInfo.Firstprivate.insert(OB.inputs()[0]);
-  DSAInfo.FirstprivateTy.push_back(OB.inputs()[1]->getType());
+  if (DSAInfo.Firstprivate.insert(OB.inputs()[0]))
+    DSAInfo.FirstprivateTy.push_back(OB.inputs()[1]->getType());
+  assert(DSAInfo.Firstprivate.size() == DSAInfo.FirstprivateTy.size() &&
+    "Size mismatch with Firstprivate values and types");
 }
 
 void DirectiveEnvironment::gatherVLADimsInfo(OperandBundleDef &OB) {
