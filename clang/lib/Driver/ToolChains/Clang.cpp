@@ -1204,8 +1204,7 @@ void Clang::AddPreprocessingOptions(Compilation &C, const JobAction &JA,
     CmdArgs.push_back("__clang_openmp_device_functions.h");
   }
 
-  if (Args.getLastArg(options::OPT_fompss))
-    addOmpSsRuntimeInclude(CmdArgs, getToolChain(), Args);
+  addOmpSsRuntimeInclude(CmdArgs, getToolChain(), Args);
 
   // Add -i* options, and automatically translate to
   // -include-pch/-include-pth for transparent PCH support. It's

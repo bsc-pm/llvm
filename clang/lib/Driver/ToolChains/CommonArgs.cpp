@@ -997,6 +997,8 @@ void tools::addOmpSsRuntimeInclude(
   // -fdo-not-use-ompss-2-rt means ignoring OmpSs-2 runtime
   if (Args.getLastArg(options::OPT_fdo_not_use_ompss_runtime))
     return;
+  if (!Args.hasFlag(options::OPT_fompss, options::OPT_fompss_EQ, options::OPT_fno_ompss, false))
+    return;
 
   std::string Nanos6DefaultHome(CLANG_DEFAULT_NANOS6_HOME);
   std::optional<std::string> Nanos6Home =
