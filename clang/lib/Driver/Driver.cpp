@@ -4771,6 +4771,8 @@ void Driver::BuildJobs(Compilation &C) const {
       if (A->getType() != types::TY_Nothing &&
           A->getType() != types::TY_DX_CONTAINER &&
           A->getKind() != Action::FPGAWrapperGenJobClass &&
+          A->getKind() != Action::FPGAMercuriumJobClass &&
+          A->getKind() != Action::FPGAAitJobClass &&
           !(A->getKind() == Action::IfsMergeJobClass ||
             (A->getType() == clang::driver::types::TY_IFS_CPP &&
              A->getKind() == clang::driver::Action::CompileJobClass &&

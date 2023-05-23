@@ -4780,6 +4780,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
       ExtractAPIIgnoresFileArg->render(Args, CmdArgs);
   } else if (isa<FPGAWrapperGenJobAction>(JA)) {
     CmdArgs.push_back("-fompss-fpga");
+    CmdArgs.push_back("-fompss-fpga-hls-tasks-dir");
+    CmdArgs.push_back(
+        cast<FPGAWrapperGenJobAction>(JA).getOutputDirPath().data());
   } else {
     assert((isa<CompileJobAction>(JA) || isa<BackendJobAction>(JA)) &&
            "Invalid action for clang tool.");
@@ -6181,11 +6184,6 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   }
   if (Args.getLastArg(options::OPT_fompss_fpga_check_limits_memory_port) && !IsCuda) {
     CmdArgs.push_back("-fompss-fpga-check-limits-memory-port");
-  }
-  if (Arg *A = Args.getLastArg(options::OPT_fompss_fpga_hls_tasks_dir);
-      A && !IsCuda) {
-    CmdArgs.push_back("-fompss-fpga-hls-tasks-dir");
-    CmdArgs.push_back(A->getValue());
   }
   if (Arg *A =
           Args.getLastArg(options::OPT_fompss_fpga_memory_port_width); A && !IsCuda) {
