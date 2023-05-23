@@ -234,11 +234,6 @@ bool Sema::ActOnOmpSsDeclareTaskDirectiveWithFpga(Decl *ADecl) {
     return false;
   }
 
-  if (!FD->doesThisDeclarationHaveABody()) {
-    Diag(ADecl->getLocation(), diag::err_oss_function_with_body_expected);
-    return false;
-  }
-
   if (CheckFpgaLocalmems(FD)) {
     return false;
   }

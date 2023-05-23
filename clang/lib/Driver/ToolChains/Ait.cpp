@@ -82,7 +82,8 @@ std::string MergeJsonParts(const FPGAAitJobAction &AitJA) {
                              "FPGAWrapperWrapperGenJobAction");
     std::ifstream t(std::string(WrappeGenInput->getOutputDirPath()) +
                     "/extracted.json.part");
-    assert(t.is_open());
+    if (!t.is_open())
+      continue;
     t.seekg(0, std::ios::end);
     size_t size = t.tellg();
     std::string buffer(size, '\0');

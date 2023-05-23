@@ -11628,8 +11628,6 @@ def err_oss_member_device_no_smp : Error<
   "device(%0) is not allowed in member functions">;
 def err_oss_function_expected : Error<
   "'#pragma oss task' can only be applied to functions">;
-def err_oss_function_with_body_expected : Error<
-  "'#pragma oss task device(fpga)' can only be applied to functions with bodies for now">;
 def err_oss_fpga_transform_broken : Error<
   "'#pragma oss task device(fpga)' we failed while making transformations on the code. Please, file a bug report!">;
 def err_oss_fpga_dependency_analisis : Error<

@@ -10,6 +10,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "clang/AST/Stmt.h"
 #include "clang/Basic/DiagnosticFrontend.h"
 #include "clang/Frontend/OmpSsFgpaWrapperGen.h"
 
@@ -126,6 +127,19 @@ getAbsoluteDirExport(const SourceManager &SourceMgr, const std::string &path,
   }
   return std::string(realPathStr.begin(), realPathStr.end());
 }
+
+bool isDeclInSameFileAsMainDeclOrBodyDecl(SourceManager &sourceManager,
+                                          Decl *otherDecl, FunctionDecl *ToFD) {
+  const FunctionDecl *ToFDBody;
+  ToFD->getBody(ToFDBody);
+  auto otherFile =
+      sourceManager.getFileID(otherDecl->getSourceRange().getBegin());
+  auto ToFile = sourceManager.getFileID(ToFD->getSourceRange().getBegin());
+  auto ToBodyFile =
+      sourceManager.getFileID(ToFDBody->getSourceRange().getBegin());
+  return otherFile != ToFile && otherFile != ToBodyFile;
+}
+
 template <class Callable>
 bool GenerateExtractedOriginalFunction(
     Callable &&Diag, llvm::raw_ostream &outputFile, FunctionDecl *FD,
@@ -146,7 +160,11 @@ bool GenerateExtractedOriginalFunction(
   ASTImporter importer(toContext, toMgr.getFileManager(), sourceContext,
                        SourceMgr.getFileManager(), true);
 
-  auto importedOrErr = importer.Import(FD);
+  const FunctionDecl *bodyPart;
+  bool res = FD->hasBody(bodyPart);
+  assert(res &&
+         "We should have already validated that this declaration had a body");
+  auto importedOrErr = importer.Import(bodyPart);
   if (!importedOrErr) {
     auto err = importedOrErr.takeError();
     std::string out;
@@ -192,8 +210,7 @@ bool GenerateExtractedOriginalFunction(
   std::string out;
   llvm::raw_string_ostream stream(out);
   for (Decl *otherDecl : toContext.getTranslationUnitDecl()->decls()) {
-    if (SourceMgr.getFileID(otherDecl->getSourceRange().getBegin()) !=
-        SourceMgr.getFileID(FD->getSourceRange().getBegin())) {
+    if (isDeclInSameFileAsMainDeclOrBodyDecl(SourceMgr, otherDecl, FD)) {
       // Skip dependency not originating in the file.
       continue;
     }
@@ -515,8 +532,8 @@ OMPIF_COMM_WORLD
              name.starts_with("nanos6_fpga_memcpy_wideport_");
     };
     for (Decl *otherDecl : ToContext.getTranslationUnitDecl()->decls()) {
-      if (ToSourceManager.getFileID(otherDecl->getSourceRange().getBegin()) !=
-          ToSourceManager.getFileID(ToFD->getSourceRange().getBegin())) {
+      if (isDeclInSameFileAsMainDeclOrBodyDecl(ToSourceManager, otherDecl,
+                                               ToFD)) {
         // Skip dependency not originating in the file.
         continue;
       }
@@ -545,8 +562,8 @@ OMPIF_COMM_WORLD
     NeedsDeps = needsDeps;
     ReplacementMap = std::move(replacementMap);
     for (Decl *otherDecl : ToContext.getTranslationUnitDecl()->decls()) {
-      if (ToSourceManager.getFileID(otherDecl->getSourceRange().getBegin()) !=
-          ToSourceManager.getFileID(ToFD->getSourceRange().getBegin())) {
+      if (isDeclInSameFileAsMainDeclOrBodyDecl(ToSourceManager, otherDecl,
+                                               ToFD)) {
         // Skip dependency not originating in the file.
         continue;
       }
@@ -1195,6 +1212,24 @@ OMPIF_COMM_WORLD
       return false;
     }
     ToFD = dyn_cast<FunctionDecl>(*importedOrErr);
+
+    const FunctionDecl *bodyPart;
+    bool res = OriginalFD->hasBody(bodyPart);
+    if (bodyPart != OriginalFD) {
+      assert(
+          res &&
+          "We should have already validated that this declaration had a body");
+      auto importedOrErr = importer.Import(bodyPart);
+      if (!importedOrErr) {
+        auto err = importedOrErr.takeError();
+        std::string out;
+        llvm::raw_string_ostream stream(out);
+        stream << err;
+        Diag(OriginalFD->getLocation(), diag::err_oss_fpga_dependency_analisis)
+            << out;
+        return false;
+      }
+    }
     return true;
   }
 
@@ -1332,6 +1367,9 @@ void FPGAWrapperGen::ActOnOmpSsFpgaGenerateWrapperCodeFiles(
   llvm::raw_os_ostream outputJsonFile(outputJson);
   for (auto *decl : Ctx.ompssFpgaDecls) {
     auto *FD = dyn_cast<FunctionDecl>(decl);
+
+    if (!FD->hasBody())
+      continue;
 
     auto funcName = FD->getName();
     auto fileName = (funcName.str() + "_hls_automatic_clang.cpp");
