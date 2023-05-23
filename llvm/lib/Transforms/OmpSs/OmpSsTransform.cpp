@@ -86,8 +86,9 @@ static void registerCheckVersion(Module &M) {
           Versions), "nanos6_versions");
 
     IRBuilder<> BBBuilder(&Entry.back());
+    Constant *SourceFilenameGV = BBBuilder.CreateGlobalStringPtr(M.getSourceFileName());
     BBBuilder.CreateCall(
-      nanos6Api::checkVersionFuncCallee(M), {NumVersionsValue, VersionListValue});
+      nanos6Api::checkVersionFuncCallee(M), {NumVersionsValue, VersionListValue, SourceFilenameGV});
   }
 }
 

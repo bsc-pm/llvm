@@ -255,7 +255,7 @@ FunctionCallee registerAssertFuncCallee(Module &M);
 // NOTE: This does not belong to nanos6 API
 FunctionCallee registerCtorCheckVersionFuncCallee(Module &M);
 
-// void nanos6_check_version(uint64_t size, nanos6_version_t *arr);
+// void nanos6_check_version(uint64_t size, nanos6_version_t *arr, const char *source);
 FunctionCallee checkVersionFuncCallee(Module &M);
 
 }
