@@ -431,6 +431,7 @@ FunctionCallee checkVersionFuncCallee(Module &M) {
   return M.getOrInsertFunction("nanos6_check_version",
     Type::getVoidTy(M.getContext()),
     Type::getInt64Ty(M.getContext()),
+    PointerType::getUnqual(M.getContext()),
     PointerType::getUnqual(M.getContext())
   );
 }
