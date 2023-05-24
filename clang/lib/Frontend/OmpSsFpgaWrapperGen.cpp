@@ -432,13 +432,13 @@ struct __mcxx_ptr_t {
     return __mcxx_ptr_t<const T>(ptr, val);
   }
   template <typename V> inline __mcxx_ptr_t<T> operator+(V const val) const {
-    return __mcxx_ptr_t<T>(this->ptr + val, this->val + val * sizeof(T));
+    return __mcxx_ptr_t<T>(ptr, this->val + val * sizeof(T));
   }
   template <typename V> inline __mcxx_ptr_t<T> operator-(V const val) const {
-    return __mcxx_ptr_t<T>(this->ptr - val, this->val - val * sizeof(T));
+    return __mcxx_ptr_t<T>(ptr, this->val - val * sizeof(T));
   }
   template <typename V> inline operator V() const { return (V)val; }
-  T& operator[](long long int i) { return ptr[i]; }
+  T& operator[](long long int i) { return ptr[val/sizeof(T)+i]; }
 };
 )";
     }
@@ -756,9 +756,7 @@ OMPIF_COMM_WORLD
           Output << "      " << symbolName << ".val = mcxx_offset_" << paramId
                  << ";\n";
           Output << "      " << symbolName << ".ptr = mcxx_" << symbolName
-                 << " + mcxx_offset_" << paramId << "/sizeof(";
-          pointedType.print(Output, printPol);
-          Output << ");\n";
+                 << ";\n";
         } else if (it == Localmems.end()) {
           QualType pointedType = paramType->getPointeeType();
           Output << "      " << symbolName << " = mcxx_" << symbolName
