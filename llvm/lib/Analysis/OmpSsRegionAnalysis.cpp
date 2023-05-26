@@ -155,26 +155,20 @@ void DirectiveEnvironment::gatherDirInfo(OperandBundleDef &OB) {
 
 void DirectiveEnvironment::gatherSharedInfo(OperandBundleDef &OB) {
   assert(OB.input_size() == 2 && "Only allowed two Values per OperandBundle");
-  if (DSAInfo.Shared.insert(OB.inputs()[0]))
-    DSAInfo.SharedTy.push_back(OB.inputs()[1]->getType());
-  assert(DSAInfo.Shared.size() == DSAInfo.SharedTy.size() &&
-    "Size mismatch with Shared values and types");
+  DSAInfo.Shared.insert(
+    std::make_pair(OB.inputs()[0], OB.inputs()[1]->getType()));
 }
 
 void DirectiveEnvironment::gatherPrivateInfo(OperandBundleDef &OB) {
   assert(OB.input_size() == 2 && "Only allowed two Values per OperandBundle");
-  if (DSAInfo.Private.insert(OB.inputs()[0]))
-    DSAInfo.PrivateTy.push_back(OB.inputs()[1]->getType());
-  assert(DSAInfo.Private.size() == DSAInfo.PrivateTy.size() &&
-    "Size mismatch with Private values and types");
+  DSAInfo.Private.insert(
+    std::make_pair(OB.inputs()[0], OB.inputs()[1]->getType()));
 }
 
 void DirectiveEnvironment::gatherFirstprivateInfo(OperandBundleDef &OB) {
   assert(OB.input_size() == 2 && "Only allowed two Values per OperandBundle");
-  if (DSAInfo.Firstprivate.insert(OB.inputs()[0]))
-    DSAInfo.FirstprivateTy.push_back(OB.inputs()[1]->getType());
-  assert(DSAInfo.Firstprivate.size() == DSAInfo.FirstprivateTy.size() &&
-    "Size mismatch with Firstprivate values and types");
+  DSAInfo.Firstprivate.insert(
+    std::make_pair(OB.inputs()[0], OB.inputs()[1]->getType()));
 }
 
 void DirectiveEnvironment::gatherVLADimsInfo(OperandBundleDef &OB) {
@@ -572,22 +566,18 @@ void DirectiveEnvironment::verifyDeviceInfo() {
 void DirectiveEnvironment::verifyNonPODInfo() {
   for (const auto &InitMap : NonPODsInfo.Inits) {
     // INIT may only be in private clauses
-    auto It = find(DSAInfo.Private, InitMap.first);
-    if (It == DSAInfo.Private.end())
+    if (!DSAInfo.Private.count(InitMap.first))
       llvm_unreachable("Non-POD INIT OperandBundle must have a PRIVATE DSA");
   }
   for (const auto &DeinitMap : NonPODsInfo.Deinits) {
-      // DEINIT may only be in firstprivate clauses
-      auto PrivateIt = find(DSAInfo.Private, DeinitMap.first);
-      auto FirstprivateIt = find(DSAInfo.Firstprivate, DeinitMap.first);
-      if (FirstprivateIt == DSAInfo.Firstprivate.end()
-          && PrivateIt == DSAInfo.Private.end())
+      // DEINIT may only be in private and firstprivate clauses
+      if (!DSAInfo.Private.count(DeinitMap.first)
+          && !DSAInfo.Firstprivate.count(DeinitMap.first))
         llvm_unreachable("Non-POD DEINIT OperandBundle must have a PRIVATE or FIRSTPRIVATE DSA");
   }
   for (const auto &CopyMap : NonPODsInfo.Copies) {
     // COPY may only be in firstprivate clauses
-    auto It = find(DSAInfo.Firstprivate, CopyMap.first);
-    if (It == DSAInfo.Firstprivate.end())
+    if (!DSAInfo.Firstprivate.count(CopyMap.first))
       llvm_unreachable("Non-POD COPY OperandBundle must have a FIRSTPRIVATE DSA");
   }
 }
@@ -841,9 +831,9 @@ void OmpSsRegionAnalysis::print_verbose(
       // Count VLAs and DSAs, Well-formed VLA must have a DSA and dimensions.
       // That is, it must have a frequency of 2
       std::map<const Value *, size_t> DSAVLADimsFreqMap;
-      for (Value *V : DirEnv.DSAInfo.Shared) DSAVLADimsFreqMap[V]++;
-      for (Value *V : DirEnv.DSAInfo.Private) DSAVLADimsFreqMap[V]++;
-      for (Value *V : DirEnv.DSAInfo.Firstprivate) DSAVLADimsFreqMap[V]++;
+      for (const auto &Pair : DirEnv.DSAInfo.Shared) DSAVLADimsFreqMap[Pair.first]++;
+      for (const auto &Pair : DirEnv.DSAInfo.Private) DSAVLADimsFreqMap[Pair.first]++;
+      for (const auto &Pair : DirEnv.DSAInfo.Firstprivate) DSAVLADimsFreqMap[Pair.first]++;
 
       for (const auto &VLAWithDimsMap : DirEnv.VLADimsInfo) {
         DSAVLADimsFreqMap[VLAWithDimsMap.first]++;
@@ -870,8 +860,7 @@ void OmpSsRegionAnalysis::print_verbose(
     }
     else if (PrintVerboseLevel == PV_NonPODDSAMissing) {
       for (const auto &InitsPair : DirEnv.NonPODsInfo.Inits) {
-        auto It = find(DirEnv.DSAInfo.Private, InitsPair.first);
-        if (It == DirEnv.DSAInfo.Private.end()) {
+        if (!DirEnv.DSAInfo.Private.count(InitsPair.first)) {
           dbgs() << "\n";
           dbgs() << SpaceMultiplierStr
                  << "[Init] ";
@@ -879,8 +868,7 @@ void OmpSsRegionAnalysis::print_verbose(
         }
       }
       for (const auto &CopiesPair : DirEnv.NonPODsInfo.Copies) {
-        auto It = find(DirEnv.DSAInfo.Firstprivate, CopiesPair.first);
-        if (It == DirEnv.DSAInfo.Firstprivate.end()) {
+        if (!DirEnv.DSAInfo.Firstprivate.count(CopiesPair.first)) {
           dbgs() << "\n";
           dbgs() << SpaceMultiplierStr
                  << "[Copy] ";
@@ -888,10 +876,8 @@ void OmpSsRegionAnalysis::print_verbose(
         }
       }
       for (const auto &DeinitsPair : DirEnv.NonPODsInfo.Deinits) {
-        auto PrivateIt = find(DirEnv.DSAInfo.Private, DeinitsPair.first);
-        auto FirstprivateIt = find(DirEnv.DSAInfo.Firstprivate, DeinitsPair.first);
-        if (FirstprivateIt == DirEnv.DSAInfo.Firstprivate.end()
-            && PrivateIt == DirEnv.DSAInfo.Private.end()) {
+        if (!DirEnv.DSAInfo.Private.count(DeinitsPair.first)
+            && !DirEnv.DSAInfo.Firstprivate.count(DeinitsPair.first)) {
           dbgs() << "\n";
           dbgs() << SpaceMultiplierStr
                  << "[Deinit] ";

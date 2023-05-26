@@ -1154,7 +1154,8 @@ struct OmpSsDirective {
     IRBuilder<> BBBuilder(&OlFunc->getEntryBlock());
     Function::arg_iterator AI = OlFunc->arg_begin();
     Value *OlDepsFuncTaskArgs = &*AI++;
-    for (Value *V : DSAInfo.Shared) {
+    for (const auto &Pair : DSAInfo.Shared) {
+      Value *V = Pair.first;
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Int32Ty);
       Idx[1] = ConstantInt::get(Int32Ty, StructToIdxMap.lookup(V));
@@ -1167,7 +1168,8 @@ struct OmpSsDirective {
 
       UnpackedList.push_back(LGEP);
     }
-    for (Value *V : DSAInfo.Private) {
+    for (const auto &Pair : DSAInfo.Private) {
+      Value *V = Pair.first;
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Int32Ty);
       Idx[1] = ConstantInt::get(Int32Ty, StructToIdxMap.lookup(V));
@@ -1181,7 +1183,8 @@ struct OmpSsDirective {
 
       UnpackedList.push_back(GEP);
     }
-    for (Value *V : DSAInfo.Firstprivate) {
+    for (const auto &Pair : DSAInfo.Firstprivate) {
+      Value *V = Pair.first;
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Int32Ty);
       Idx[1] = ConstantInt::get(Int32Ty, StructToIdxMap.lookup(V));
@@ -1389,8 +1392,8 @@ struct OmpSsDirective {
         Int8Ty, TaskArgsDstLi8IdxGEP, VLASize);
     }
 
-    for (size_t i = 0; i < DSAInfo.Shared.size(); ++i) {
-      Value *V = DSAInfo.Shared[i];
+    for (const auto &Pair : DSAInfo.Shared) {
+      Value *V = Pair.first;
 
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Int32Ty);
@@ -1405,9 +1408,9 @@ struct OmpSsDirective {
           IRB.CreateLoad(PtrTy, GEPSrc),
           GEPDst);
     }
-    for (size_t i = 0; i < DSAInfo.Private.size(); ++i) {
-      Value *V = DSAInfo.Private[i];
-      Type *Ty = DSAInfo.PrivateTy[i];
+    for (const auto &Pair : DSAInfo.Private) {
+      Value *V = Pair.first;
+      Type *Ty = Pair.second;
       // Call custom constructor generated in clang in non-pods
       // Leave pods unititialized
       auto It = NonPODsInfo.Inits.find(V);
@@ -1448,9 +1451,9 @@ struct OmpSsDirective {
         IRB.CreateCall(FunctionCallee(cast<Function>(It->second)), ArrayRef<Value*>{GEP, NSize});
       }
     }
-    for (size_t i = 0; i < DSAInfo.Firstprivate.size(); ++i) {
-      Value *V = DSAInfo.Firstprivate[i];
-      Type *Ty = DSAInfo.FirstprivateTy[i];
+    for (const auto &Pair : DSAInfo.Firstprivate) {
+      Value *V = Pair.first;
+      Type *Ty = Pair.second;
       Align TyAlign = DL.getPrefTypeAlign(Ty);
 
       // Compute num elements
@@ -1569,13 +1572,14 @@ struct OmpSsDirective {
 
     // Private and Firstprivate must be stored in the struct
     // Captured values (i.e. VLA dimensions) are not pointers
-    for (Value *V : DSAInfo.Shared) {
+    for (const auto &Pair : DSAInfo.Shared) {
+      Value *V = Pair.first;
       TaskArgsMemberTy.push_back(PtrTy);
       StructToIdxMap[V] = TaskArgsIdx++;
     }
-    for (size_t i = 0; i < DSAInfo.Private.size(); ++i) {
-      Value *V = DSAInfo.Private[i];
-      Type *Ty = DSAInfo.PrivateTy[i];
+    for (const auto &Pair : DSAInfo.Private) {
+      Value *V = Pair.first;
+      Type *Ty = Pair.second;
       // VLAs
       if (VLADimsInfo.count(V))
         TaskArgsMemberTy.push_back(PtrTy);
@@ -1583,9 +1587,9 @@ struct OmpSsDirective {
         TaskArgsMemberTy.push_back(Ty);
       StructToIdxMap[V] = TaskArgsIdx++;
     }
-    for (size_t i = 0; i < DSAInfo.Firstprivate.size(); ++i) {
-      Value *V = DSAInfo.Firstprivate[i];
-      Type *Ty = DSAInfo.FirstprivateTy[i];
+    for (const auto &Pair : DSAInfo.Firstprivate) {
+      Value *V = Pair.first;
+      Type *Ty = Pair.second;
       // VLAs
       if (VLADimsInfo.count(V))
         TaskArgsMemberTy.push_back(PtrTy);
@@ -2571,7 +2575,8 @@ struct OmpSsDirective {
       TaskArgsVarLi8IdxGEP = IRB.CreateGEP(Int8Ty, TaskArgsVarLi8IdxGEP, VLASize);
     }
 
-    for (Value *V : DSAInfo.Shared) {
+    for (const auto &Pair : DSAInfo.Shared) {
+      Value *V = Pair.first;
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Int32Ty);
       Idx[1] = ConstantInt::get(Int32Ty, TaskArgsToStructIdxMap[V]);
@@ -2580,9 +2585,9 @@ struct OmpSsDirective {
           TaskArgsVarL, Idx, "gep_" + V->getName());
       IRB.CreateStore(V, GEP);
     }
-    for (size_t i = 0; i < DSAInfo.Private.size(); ++i) {
-      Value *V = DSAInfo.Private[i];
-      Type *Ty = DSAInfo.PrivateTy[i];
+    for (const auto &Pair : DSAInfo.Private) {
+      Value *V = Pair.first;
+      Type *Ty = Pair.second;
       // Call custom constructor generated in clang in non-pods
       // Leave pods unititialized
       auto It = DirEnv.NonPODsInfo.Inits.find(V);
@@ -2615,9 +2620,9 @@ struct OmpSsDirective {
         IRB.CreateCall(FunctionCallee(cast<Function>(It->second)), ArrayRef<Value*>{GEP, NSize});
       }
     }
-    for (size_t i = 0; i < DSAInfo.Firstprivate.size(); ++i) {
-      Value *V = DSAInfo.Firstprivate[i];
-      Type *Ty = DSAInfo.FirstprivateTy[i];
+    for (const auto &Pair : DSAInfo.Firstprivate) {
+      Value *V = Pair.first;
+      Type *Ty = Pair.second;
       Align TyAlign = DL.getPrefTypeAlign(Ty);
 
       // Compute num elements
