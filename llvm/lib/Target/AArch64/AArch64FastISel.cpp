@@ -35,6 +35,7 @@
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineMemOperand.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
+#include "llvm/CodeGen/MachineValueType.h"
 #include "llvm/CodeGen/RuntimeLibcalls.h"
 #include "llvm/CodeGen/ValueTypes.h"
 #include "llvm/IR/Argument.h"
@@ -53,6 +54,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/IntrinsicsAArch64.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/User.h"
@@ -65,7 +67,6 @@
 #include "llvm/Support/CodeGen.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/MachineValueType.h"
 #include "llvm/Support/MathExtras.h"
 #include <algorithm>
 #include <cassert>
@@ -3021,7 +3022,7 @@ bool AArch64FastISel::processCallArgs(CallLoweringInfo &CLI,
   CCInfo.AnalyzeCallOperands(OutVTs, CLI.OutFlags, CCAssignFnForCall(CC));
 
   // Get a count of how many bytes are to be pushed on the stack.
-  NumBytes = CCInfo.getNextStackOffset();
+  NumBytes = CCInfo.getStackSize();
 
   // Issue CALLSEQ_START
   unsigned AdjStackDown = TII.getCallFrameSetupOpcode();
@@ -3774,6 +3775,57 @@ bool AArch64FastISel::fastLowerIntrinsicCall(const IntrinsicInst *II) {
     assert((ResultReg1 + 1) == ResultReg2 &&
            "Nonconsecutive result registers.");
     updateValueMap(II, ResultReg1, 2);
+    return true;
+  }
+  case Intrinsic::aarch64_crc32b:
+  case Intrinsic::aarch64_crc32h:
+  case Intrinsic::aarch64_crc32w:
+  case Intrinsic::aarch64_crc32x:
+  case Intrinsic::aarch64_crc32cb:
+  case Intrinsic::aarch64_crc32ch:
+  case Intrinsic::aarch64_crc32cw:
+  case Intrinsic::aarch64_crc32cx: {
+    if (!Subtarget->hasCRC())
+      return false;
+
+    unsigned Opc;
+    switch (II->getIntrinsicID()) {
+    default:
+      llvm_unreachable("Unexpected intrinsic!");
+    case Intrinsic::aarch64_crc32b:
+      Opc = AArch64::CRC32Brr;
+      break;
+    case Intrinsic::aarch64_crc32h:
+      Opc = AArch64::CRC32Hrr;
+      break;
+    case Intrinsic::aarch64_crc32w:
+      Opc = AArch64::CRC32Wrr;
+      break;
+    case Intrinsic::aarch64_crc32x:
+      Opc = AArch64::CRC32Xrr;
+      break;
+    case Intrinsic::aarch64_crc32cb:
+      Opc = AArch64::CRC32CBrr;
+      break;
+    case Intrinsic::aarch64_crc32ch:
+      Opc = AArch64::CRC32CHrr;
+      break;
+    case Intrinsic::aarch64_crc32cw:
+      Opc = AArch64::CRC32CWrr;
+      break;
+    case Intrinsic::aarch64_crc32cx:
+      Opc = AArch64::CRC32CXrr;
+      break;
+    }
+
+    Register LHSReg = getRegForValue(II->getArgOperand(0));
+    Register RHSReg = getRegForValue(II->getArgOperand(1));
+    if (!LHSReg || !RHSReg)
+      return false;
+
+    Register ResultReg =
+        fastEmitInst_rr(Opc, &AArch64::GPR32RegClass, LHSReg, RHSReg);
+    updateValueMap(II, ResultReg);
     return true;
   }
   }

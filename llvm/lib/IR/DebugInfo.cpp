@@ -868,8 +868,7 @@ unsigned llvm::getDebugMetadataVersionFromModule(const Module &M) {
   return 0;
 }
 
-void Instruction::applyMergedLocation(const DILocation *LocA,
-                                      const DILocation *LocB) {
+void Instruction::applyMergedLocation(DILocation *LocA, DILocation *LocB) {
   setDebugLoc(DILocation::getMergedLocation(LocA, LocB));
 }
 
@@ -1919,7 +1918,9 @@ bool at::calculateFragmentIntersect(
 /// Return std::nullopt if any properties are not constants.
 static std::optional<AssignmentInfo>
 getAssignmentInfoImpl(const DataLayout &DL, const Value *StoreDest,
-                      uint64_t SizeInBits) {
+                      TypeSize SizeInBits) {
+  if (SizeInBits.isScalable())
+    return std::nullopt;
   APInt GEPOffset(DL.getIndexTypeSizeInBits(StoreDest->getType()), 0);
   const Value *Base = StoreDest->stripAndAccumulateConstantOffsets(
       DL, GEPOffset, /*AllowNonInbounds*/ true);
@@ -1941,19 +1942,18 @@ std::optional<AssignmentInfo> at::getAssignmentInfo(const DataLayout &DL,
     // We can't use a non-const size, bail.
     return std::nullopt;
   uint64_t SizeInBits = 8 * ConstLengthInBytes->getZExtValue();
-  return getAssignmentInfoImpl(DL, StoreDest, SizeInBits);
+  return getAssignmentInfoImpl(DL, StoreDest, TypeSize::getFixed(SizeInBits));
 }
 
 std::optional<AssignmentInfo> at::getAssignmentInfo(const DataLayout &DL,
                                                     const StoreInst *SI) {
-  const Value *StoreDest = SI->getPointerOperand();
-  uint64_t SizeInBits = DL.getTypeSizeInBits(SI->getValueOperand()->getType());
-  return getAssignmentInfoImpl(DL, StoreDest, SizeInBits);
+  TypeSize SizeInBits = DL.getTypeSizeInBits(SI->getValueOperand()->getType());
+  return getAssignmentInfoImpl(DL, SI->getPointerOperand(), SizeInBits);
 }
 
 std::optional<AssignmentInfo> at::getAssignmentInfo(const DataLayout &DL,
                                                     const AllocaInst *AI) {
-  uint64_t SizeInBits = DL.getTypeSizeInBits(AI->getAllocatedType());
+  TypeSize SizeInBits = DL.getTypeSizeInBits(AI->getAllocatedType());
   return getAssignmentInfoImpl(DL, AI, SizeInBits);
 }
 
@@ -2103,6 +2103,7 @@ bool AssignmentTrackingPass::runOnFunction(Function &F) {
     return /*Changed*/ false;
 
   bool Changed = false;
+  auto *DL = &F.getParent()->getDataLayout();
   // Collect a map of {backing storage : dbg.declares} (currently "backing
   // storage" is limited to Allocas). We'll use this to find dbg.declares to
   // delete after running `trackAssignments`.
@@ -2127,13 +2128,15 @@ bool AssignmentTrackingPass::runOnFunction(Function &F) {
         // FIXME: Skip VLAs for now (let these variables use dbg.declares).
         if (!Alloca->isStaticAlloca())
           continue;
+        // Similarly, skip scalable vectors (use dbg.declares instead).
+        if (auto Sz = Alloca->getAllocationSize(*DL); Sz && Sz->isScalable())
+          continue;
         DbgDeclares[Alloca].insert(DDI);
         Vars[Alloca].insert(VarRecord(DDI));
       }
     }
   }
 
-  auto DL = std::make_unique<DataLayout>(F.getParent());
   // FIXME: Locals can be backed by caller allocas (sret, byval).
   // Note: trackAssignments doesn't respect dbg.declare's IR positions (as it
   // doesn't "understand" dbg.declares). However, this doesn't appear to break

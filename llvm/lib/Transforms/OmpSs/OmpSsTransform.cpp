@@ -1643,12 +1643,12 @@ struct OmpSsDirective {
 
     // int *offset_table;
     // Type *OffsetTableTy = nanos6Api::Nanos6TaskInfo::getInstance(M).getOffsetTableDataType();
-    ArrayRef<uint64_t> MemberOffsetsList =
+    ArrayRef<TypeSize> MemberOffsetsList =
       DL.getStructLayout(TaskArgsTy)->getMemberOffsets();
     if (!DeviceInfo.empty())
       MemberOffsetsList = MemberOffsetsList.drop_front(DeviceArgsSize);
     SmallVector<Constant *, 4> TaskOffsetList;
-    for (const uint64_t &val : MemberOffsetsList) {
+    for (const TypeSize &val : MemberOffsetsList) {
       TaskOffsetList.push_back(
         ConstantInt::get(Int32Ty, val));
     }

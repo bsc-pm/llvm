@@ -9,6 +9,7 @@
 #include "Gnu.h"
 #include "Arch/ARM.h"
 #include "Arch/CSKY.h"
+#include "Arch/LoongArch.h"
 #include "Arch/Mips.h"
 #include "Arch/PPC.h"
 #include "Arch/RISCV.h"
@@ -598,14 +599,6 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   // these dependencies need to be listed before the C runtime below (i.e.
   // AddRuntTimeLibs).
   if (D.IsFlangMode()) {
-    // A Fortran main program will be lowered to a function named _QQmain. Make
-    // _QQmain an undefined symbol, so that it's correctly resolved even when
-    // creating executable from archives. This is a workaround for how and where
-    // Flang's `main` is defined. For more context, see:
-    //   *  https://github.com/llvm/llvm-project/issues/54787
-    if (!Args.hasArg(options::OPT_shared))
-      CmdArgs.push_back("--undefined=_QQmain");
-
     addFortranRuntimeLibraryPath(ToolChain, Args, CmdArgs);
     addFortranRuntimeLibs(ToolChain, CmdArgs);
     CmdArgs.push_back("-lm");
@@ -867,6 +860,13 @@ void tools::gnutools::Assembler::ConstructJob(Compilation &C,
     Args.AddLastArg(CmdArgs, options::OPT_march_EQ);
     normalizeCPUNamesForAssembler(Args, CmdArgs);
 
+    break;
+  }
+  // TODO: handle loongarch32.
+  case llvm::Triple::loongarch64: {
+    StringRef ABIName =
+        loongarch::getLoongArchABI(D, Args, getToolChain().getTriple());
+    CmdArgs.push_back(Args.MakeArgString("-mabi=" + ABIName));
     break;
   }
   case llvm::Triple::mips:
