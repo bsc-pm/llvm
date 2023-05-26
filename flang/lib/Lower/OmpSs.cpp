@@ -12,6 +12,7 @@
 
 #include "flang/Lower/OmpSs.h"
 #include "flang/Lower/ConvertVariable.h"
+#include "flang/Lower/ConvertExprToHLFIR.h"
 #include "flang/Lower/StatementContext.h"
 #include "flang/Common/idioms.h"
 #include "flang/Lower/Allocatable.h"
@@ -22,6 +23,7 @@
 #include "flang/Lower/CallInterface.h"
 #include "flang/Lower/ConvertExpr.h"
 #include "flang/Optimizer/Builder/FIRBuilder.h"
+#include "flang/Optimizer/Builder/HLFIRTools.h"
 #include "flang/Optimizer/Builder/BoxValue.h"
 #include "flang/Optimizer/Builder/MutableBox.h"
 #include "flang/Optimizer/Dialect/FIROps.h"
@@ -56,6 +58,15 @@ static mlir::Value addOperands(
   llvm_unreachable("addOperands");
 }
 
+static mlir::Value addHLFIROperands(
+    Fortran::lower::AbstractConverter &converter,
+    Fortran::lower::SymbolRef sym) {
+  auto loc = converter.genUnknownLocation();
+  Fortran::lower::StatementContext stmtCtx;
+  hlfir::Entity rhs = Fortran::lower::convertExprToHLFIR(
+      loc, converter, Fortran::evaluate::AsGenericExpr(sym).value(), converter.getLocalSymbols(), stmtCtx);
+  return rhs;
+}
 
 static void genObjectList(const Fortran::parser::OSSObjectList &objectList,
                           Fortran::lower::AbstractConverter &converter,
@@ -760,14 +771,20 @@ namespace {
 
       for (const auto &sym : implicitDSAs.sharedList) {
         sharedClauseOperands_.insert(addOperands(converter, sym));
+        if (converter.getLoweringOptions().getLowerToHighLevelFIR())
+          sharedClauseOperands_.insert(addHLFIROperands(converter, sym));
         addAdditionalInfo(sym);
       }
       for (const auto &sym : implicitDSAs.privateList) {
         privateClauseOperands_.insert(addOperands(converter, sym));
+        if (converter.getLoweringOptions().getLowerToHighLevelFIR())
+          privateClauseOperands_.insert(addHLFIROperands(converter, sym));
         addAdditionalInfo(sym, /*InitNeeded=*/true);
       }
       for (const auto &sym : implicitDSAs.firstprivateList) {
         firstprivateClauseOperands_.insert(addOperands(converter, sym));
+        if (converter.getLoweringOptions().getLowerToHighLevelFIR())
+          firstprivateClauseOperands_.insert(addHLFIROperands(converter, sym));
         addAdditionalInfo(sym, /*InitNeeded=*/false, /*CopyNeeded=*/true);
       }
     }

@@ -48,9 +48,9 @@ public:
     Value *Final = nullptr;
     Value *Cost = nullptr;
     Value *Priority = nullptr;
-    SmallVector<std::pair<Value *, Type *>> Shareds;
-    SmallVector<std::pair<Value *, Type *>> Privates;
-    SmallVector<std::pair<Value *, Type *>> Firstprivates;
+    MapVector<Value *, Type *> Shareds;
+    MapVector<Value *, Type *> Privates;
+    MapVector<Value *, Type *> Firstprivates;
     SmallVector<std::pair<Value *, Value *>> Copies;
     SmallVector<std::pair<Value *, Value *>> Inits;
     SmallVector<std::pair<Value *, Value *>> Deinits;

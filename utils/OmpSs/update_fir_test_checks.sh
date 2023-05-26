@@ -55,7 +55,7 @@ fi
 
 tmpfile=/tmp/test.mlir
 echo "${runline[*]} > ${tmpfile}"
-$(${runline[*]} > ${tmpfile})
+$(eval ${runline[*]} > ${tmpfile})
 
 echo "${update_mlir_test} ${tmpfile} --check-prefix ${prefix}"
 #ret=$(${update_mlir_test} ${tmpfile} --check-prefix ${prefix})

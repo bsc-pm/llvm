@@ -116,14 +116,14 @@ static void gatherDirectiveClauses(
       DirClauses.Priority = moduleTranslation.lookupValue(priorityExprVar);
   if constexpr (Op::allowsShared())
     for (auto sharedExprVar : cast<Op>(opInst).getSharedVars())
-      DirClauses.Shareds.emplace_back(
+      DirClauses.Shareds.insert(std::make_pair(
         moduleTranslation.lookupValue(sharedExprVar),
-        moduleTranslation.convertType(cast<mlir::LLVM::LLVMPointerType>(sharedExprVar.getType()).getElementType()));
+        moduleTranslation.convertType(cast<mlir::LLVM::LLVMPointerType>(sharedExprVar.getType()).getElementType())));
   if constexpr (Op::allowsPrivate()) {
     for (auto privateExprVar : cast<Op>(opInst).getPrivateVars())
-      DirClauses.Privates.emplace_back(
+      DirClauses.Privates.insert(std::make_pair(
         moduleTranslation.lookupValue(privateExprVar),
-        moduleTranslation.convertType(cast<mlir::LLVM::LLVMPointerType>(privateExprVar.getType()).getElementType()));
+        moduleTranslation.convertType(cast<mlir::LLVM::LLVMPointerType>(privateExprVar.getType()).getElementType())));
     for (auto initExprVar : cast<Op>(opInst).getInitVars()) {
       Operation *op = initExprVar.getDefiningOp();
       auto copyOp = cast<oss::CopyOp>(op);
@@ -141,9 +141,9 @@ static void gatherDirectiveClauses(
   }
   if constexpr (Op::allowsFirstprivate()) {
     for (auto firstprivateExprVar : cast<Op>(opInst).getFirstprivateVars())
-      DirClauses.Firstprivates.emplace_back(
+      DirClauses.Firstprivates.insert(std::make_pair(
         moduleTranslation.lookupValue(firstprivateExprVar),
-        moduleTranslation.convertType(cast<mlir::LLVM::LLVMPointerType>(firstprivateExprVar.getType()).getElementType()));
+        moduleTranslation.convertType(cast<mlir::LLVM::LLVMPointerType>(firstprivateExprVar.getType()).getElementType())));
     for (auto copyExprVar : cast<Op>(opInst).getCopyVars()) {
       Operation *op = copyExprVar.getDefiningOp();
       auto copyOp = cast<oss::CopyOp>(op);
