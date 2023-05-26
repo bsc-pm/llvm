@@ -21,12 +21,9 @@ namespace llvm {
 
 // Data-sharing lists.
 struct DirectiveDSAInfo {
-  SetVector<Value *> Shared;
-  SetVector<Value *> Private;
-  SetVector<Value *> Firstprivate;
-  SmallVector<Type *, 4> SharedTy;
-  SmallVector<Type *, 4> PrivateTy;
-  SmallVector<Type *, 4> FirstprivateTy;
+  MapVector<Value *, Type *> Shared;
+  MapVector<Value *, Type *> Private;
+  MapVector<Value *, Type *> Firstprivate;
 };
 
 // <VLA, VLA_dims>
@@ -262,13 +259,10 @@ struct DirectiveEnvironment {
   std::map<Value *, int> DepSymToIdx;
 
   // returns if V is in DSAInfo
-  bool valueInDSABundles(const Value *V) const {
-    auto SharedIt = find(DSAInfo.Shared, V);
-    auto PrivateIt = find(DSAInfo.Private, V);
-    auto FirstprivateIt = find(DSAInfo.Firstprivate, V);
-    if (SharedIt == DSAInfo.Shared.end()
-        && PrivateIt == DSAInfo.Private.end()
-        && FirstprivateIt == DSAInfo.Firstprivate.end())
+  bool valueInDSABundles(Value *V) const {
+    if (!DSAInfo.Shared.count(V)
+        && !DSAInfo.Private.count(V)
+        && !DSAInfo.Firstprivate.count(V))
       return false;
 
     return true;
@@ -276,15 +270,15 @@ struct DirectiveEnvironment {
 
   // returns if the associated type of V
   Type *getDSAType(const Value *V) const {
-    for (size_t i = 0; i < DSAInfo.Shared.size(); ++i)
-      if (DSAInfo.Shared[i] == V)
-        return DSAInfo.SharedTy[i];
-    for (size_t i = 0; i < DSAInfo.Private.size(); ++i)
-      if (DSAInfo.Private[i] == V)
-        return DSAInfo.PrivateTy[i];
-    for (size_t i = 0; i < DSAInfo.Firstprivate.size(); ++i)
-      if (DSAInfo.Firstprivate[i] == V)
-        return DSAInfo.FirstprivateTy[i];
+    for (const auto &Pair : DSAInfo.Shared)
+      if (Pair.first == V)
+        return Pair.second;
+    for (const auto &Pair : DSAInfo.Private)
+      if (Pair.first == V)
+        return Pair.second;
+    for (const auto &Pair : DSAInfo.Firstprivate)
+      if (Pair.first == V)
+        return Pair.second;
     llvm_unreachable("Expected Value to be in DSAInfo");
   }
 
