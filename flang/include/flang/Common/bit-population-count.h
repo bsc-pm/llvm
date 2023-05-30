@@ -15,6 +15,7 @@
 // when POPCNT is odd.
 
 #include <climits>
+#include <cstdint>
 #include <type_traits>
 
 namespace Fortran::common {
@@ -75,6 +76,13 @@ inline constexpr int BitPopulationCount(INT x) {
   x = (x & 0x33) + ((x >> 2) & 0x33);
   // Last step: 1 8-bit field, with [0..8]
   return (x & 0xf) + (x >> 4);
+}
+
+template <typename INT, std::enable_if_t<sizeof(INT) == 16, int> = 0>
+inline constexpr int BitPopulationCount(INT x) {
+  uint64_t low = x;
+  uint64_t high = x >> 64;
+  return BitPopulationCount(low) + BitPopulationCount(high);
 }
 
 template <typename INT> inline constexpr bool Parity(INT x) {

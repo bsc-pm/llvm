@@ -29,8 +29,14 @@
 /* Default OpenMP runtime used by -fopenmp. */
 #define CLANG_DEFAULT_OPENMP_RUNTIME "${CLANG_DEFAULT_OPENMP_RUNTIME}"
 
-/* Nanos6 home directory. */
+/* Default OmpSs-2 runtime used by -fompss-2. */
+#define CLANG_DEFAULT_OMPSS2_RUNTIME "${CLANG_DEFAULT_OMPSS2_RUNTIME}"
+
+/* Default OmpSs-2 Nanos6 home directory. */
 #define CLANG_DEFAULT_NANOS6_HOME "${CLANG_DEFAULT_NANOS6_HOME}"
+
+/* Default OmpSs-2 NODES home directory. */
+#define CLANG_DEFAULT_NODES_HOME "${CLANG_DEFAULT_NODES_HOME}"
 
 /* Default architecture for SystemZ. */
 #define CLANG_SYSTEMZ_DEFAULT_ARCH "${CLANG_SYSTEMZ_DEFAULT_ARCH}"

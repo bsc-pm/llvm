@@ -141,5 +141,8 @@ constexpr Parser<OmpSsConstruct> ompssConstruct;
 constexpr Parser<OSSEndLoopDirective> ossEndLoopDirective;
 constexpr Parser<OmpSsOutlineTask> ompssOutlineTask;
 constexpr Parser<OmpSsOutlineTaskConstruct> ompssOutlineTaskConstruct;
+constexpr Parser<IntrinsicVectorTypeSpec> intrinsicVectorTypeSpec; // Extension
+constexpr Parser<VectorTypeSpec> vectorTypeSpec; // Extension
+constexpr Parser<UnsignedTypeSpec> unsignedTypeSpec; // Extension
 } // namespace Fortran::parser
 #endif // FORTRAN_PARSER_TYPE_PARSERS_H_

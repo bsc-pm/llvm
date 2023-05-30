@@ -171,6 +171,25 @@ Nanos6TaskInfo& Nanos6TaskInfo::getInstance(Module &M) {
   return *instance.get();
 }
 
+Nanos6Version& Nanos6Version::getInstance(Module &M) {
+  static auto instance = std::unique_ptr<Nanos6Version>(nullptr);
+  if (!instance) {
+    instance.reset(new Nanos6Version);
+    instance->Ty = StructType::create(M.getContext(),
+      "nanos6_version_t");
+
+    // uint64_t family;
+    instance->FamilyTy = Type::getInt64Ty(M.getContext());
+    // uint64_t version;
+    instance->VersionTy = Type::getInt64Ty(M.getContext());
+
+    instance->Ty->setBody({
+      instance->FamilyTy, instance->VersionTy
+    });
+  }
+  return *instance.get();
+}
+
 StringRef Nanos6MultidepFactory::getDependTypeStrFromType(
     DependInfo::DependType DType) {
   switch (DType) {
@@ -402,6 +421,20 @@ FunctionCallee registerAssertFuncCallee(Module &M) {
   );
 }
 
+FunctionCallee registerCtorCheckVersionFuncCallee(Module &M) {
+  return M.getOrInsertFunction("nanos6_constructor_check_version",
+    Type::getVoidTy(M.getContext())
+  );
+}
 
-} // end namospace llvm
+FunctionCallee checkVersionFuncCallee(Module &M) {
+  return M.getOrInsertFunction("nanos6_check_version",
+    Type::getVoidTy(M.getContext()),
+    Type::getInt64Ty(M.getContext()),
+    PointerType::getUnqual(M.getContext()),
+    PointerType::getUnqual(M.getContext())
+  );
+}
+
 } // end namospace nanos6Api
+} // end namospace llvm

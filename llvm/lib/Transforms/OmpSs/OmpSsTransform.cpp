@@ -44,6 +44,54 @@ struct DirectiveFinalInfo {
   ValueToValueMapTy VMap;
 };
 
+static void registerCheckVersion(Module &M) {
+  Function *Func = cast<Function>(nanos6Api::registerCtorCheckVersionFuncCallee(M).getCallee());
+  if (Func->empty()) {
+    Func->setLinkage(GlobalValue::InternalLinkage);
+    BasicBlock *EntryBB = BasicBlock::Create(M.getContext(), "entry", Func);
+    Instruction *RetInst = ReturnInst::Create(M.getContext());
+    RetInst->insertInto(EntryBB, EntryBB->end());
+
+    appendToGlobalCtors(M, Func, 65535);
+
+    BasicBlock &Entry = Func->getEntryBlock();
+
+    // struct nanos6_version_t {
+    //   uint64_t family;
+    //   uint64_t majorversion;
+    //   uint64_t minor_version;
+    // };
+
+    Type *Int64Ty = Type::getInt64Ty(M.getContext());
+
+    SmallVector<Constant *, 4> Versions;
+    const size_t NUM_VERSIONS = 1;
+    const size_t TUPLE_SIZE = 3;
+    const size_t TOTAL_ELEMS = TUPLE_SIZE*NUM_VERSIONS;
+    Constant *NumVersionsValue = ConstantInt::get(Int64Ty, NUM_VERSIONS);
+    // family
+    Versions.push_back(
+      ConstantInt::get(Int64Ty, 0));
+    // major_version
+    Versions.push_back(
+      ConstantInt::get(Int64Ty, 1));
+    // minor_version
+    Versions.push_back(
+      ConstantInt::get(Int64Ty, 0));
+
+    GlobalVariable *VersionListValue =
+      new GlobalVariable(M, ArrayType::get(Int64Ty, TOTAL_ELEMS),
+        /*isConstant=*/true, GlobalVariable::InternalLinkage,
+        ConstantArray::get(ArrayType::get(Int64Ty, TOTAL_ELEMS),
+          Versions), "nanos6_versions");
+
+    IRBuilder<> BBBuilder(&Entry.back());
+    Constant *SourceFilenameGV = BBBuilder.CreateGlobalStringPtr(M.getSourceFileName());
+    BBBuilder.CreateCall(
+      nanos6Api::checkVersionFuncCallee(M), {NumVersionsValue, VersionListValue, SourceFilenameGV});
+  }
+}
+
 struct OmpSsDirective {
   Module &M;
   LLVMContext &Ctx;
@@ -1137,7 +1185,8 @@ struct OmpSsDirective {
     IRBuilder<> BBBuilder(&OlFunc->getEntryBlock());
     Function::arg_iterator AI = OlFunc->arg_begin();
     Value *OlDepsFuncTaskArgs = &*AI++;
-    for (Value *V : DSAInfo.Shared) {
+    for (const auto &Pair : DSAInfo.Shared) {
+      Value *V = Pair.first;
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Int32Ty);
       Idx[1] = ConstantInt::get(Int32Ty, StructToIdxMap.lookup(V));
@@ -1150,9 +1199,9 @@ struct OmpSsDirective {
 
       UnpackedList.push_back(LGEP);
     }
-    for (size_t i = 0; i < DSAInfo.Private.size(); ++i) {
-      Value *V = DSAInfo.Private[i];
-      Type *Ty = DSAInfo.PrivateTy[i];
+    for (const auto &Pair : DSAInfo.Private) {
+      Value *V = Pair.first;
+      Type *Ty = Pair.second;
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Int32Ty);
       Idx[1] = ConstantInt::get(Int32Ty, StructToIdxMap.lookup(V));
@@ -1167,9 +1216,9 @@ struct OmpSsDirective {
       UnpackedList.push_back(GEP);
       UnpackedToTypeMap[GEP] = Ty;
     }
-    for (size_t i = 0; i < DSAInfo.Firstprivate.size(); ++i) {
-      Value *V = DSAInfo.Firstprivate[i];
-      Type *Ty = DSAInfo.FirstprivateTy[i];
+    for (const auto &Pair : DSAInfo.Firstprivate) {
+      Value *V = Pair.first;
+      Type *Ty = Pair.second;
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Int32Ty);
       Idx[1] = ConstantInt::get(Int32Ty, StructToIdxMap.lookup(V));
@@ -1371,8 +1420,8 @@ struct OmpSsDirective {
         Int8Ty, TaskArgsDstLi8IdxGEP, VLASize);
     }
 
-    for (size_t i = 0; i < DSAInfo.Shared.size(); ++i) {
-      Value *V = DSAInfo.Shared[i];
+    for (const auto &Pair : DSAInfo.Shared) {
+      Value *V = Pair.first;
 
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Int32Ty);
@@ -1387,9 +1436,9 @@ struct OmpSsDirective {
           IRB.CreateLoad(PtrTy, GEPSrc),
           GEPDst);
     }
-    for (size_t i = 0; i < DSAInfo.Private.size(); ++i) {
-      Value *V = DSAInfo.Private[i];
-      Type *Ty = DSAInfo.PrivateTy[i];
+    for (const auto &Pair : DSAInfo.Private) {
+      Value *V = Pair.first;
+      Type *Ty = Pair.second;
       // Call custom constructor generated in clang in non-pods
       // Leave pods unititialized
       auto It = NonPODsInfo.Inits.find(V);
@@ -1430,9 +1479,9 @@ struct OmpSsDirective {
         IRB.CreateCall(FunctionCallee(cast<Function>(It->second)), ArrayRef<Value*>{GEP, NSize});
       }
     }
-    for (size_t i = 0; i < DSAInfo.Firstprivate.size(); ++i) {
-      Value *V = DSAInfo.Firstprivate[i];
-      Type *Ty = DSAInfo.FirstprivateTy[i];
+    for (const auto &Pair : DSAInfo.Firstprivate) {
+      Value *V = Pair.first;
+      Type *Ty = Pair.second;
       Align TyAlign = DL.getPrefTypeAlign(Ty);
 
       // Compute num elements
@@ -1551,13 +1600,14 @@ struct OmpSsDirective {
 
     // Private and Firstprivate must be stored in the struct
     // Captured values (i.e. VLA dimensions) are not pointers
-    for (Value *V : DSAInfo.Shared) {
+    for (const auto &Pair : DSAInfo.Shared) {
+      Value *V = Pair.first;
       TaskArgsMemberTy.push_back(PtrTy);
       StructToIdxMap[V] = TaskArgsIdx++;
     }
-    for (size_t i = 0; i < DSAInfo.Private.size(); ++i) {
-      Value *V = DSAInfo.Private[i];
-      Type *Ty = DSAInfo.PrivateTy[i];
+    for (const auto &Pair : DSAInfo.Private) {
+      Value *V = Pair.first;
+      Type *Ty = Pair.second;
       // VLAs
       if (VLADimsInfo.count(V))
         TaskArgsMemberTy.push_back(PtrTy);
@@ -1565,9 +1615,9 @@ struct OmpSsDirective {
         TaskArgsMemberTy.push_back(Ty);
       StructToIdxMap[V] = TaskArgsIdx++;
     }
-    for (size_t i = 0; i < DSAInfo.Firstprivate.size(); ++i) {
-      Value *V = DSAInfo.Firstprivate[i];
-      Type *Ty = DSAInfo.FirstprivateTy[i];
+    for (const auto &Pair : DSAInfo.Firstprivate) {
+      Value *V = Pair.first;
+      Type *Ty = Pair.second;
       // VLAs
       if (VLADimsInfo.count(V))
         TaskArgsMemberTy.push_back(PtrTy);
@@ -1625,12 +1675,12 @@ struct OmpSsDirective {
 
     // int *offset_table;
     // Type *OffsetTableTy = nanos6Api::Nanos6TaskInfo::getInstance(M).getOffsetTableDataType();
-    ArrayRef<uint64_t> MemberOffsetsList =
+    ArrayRef<TypeSize> MemberOffsetsList =
       DL.getStructLayout(TaskArgsTy)->getMemberOffsets();
     if (!DeviceInfo.empty())
       MemberOffsetsList = MemberOffsetsList.drop_front(DeviceArgsSize);
     SmallVector<Constant *, 4> TaskOffsetList;
-    for (const uint64_t &val : MemberOffsetsList) {
+    for (const TypeSize &val : MemberOffsetsList) {
       TaskOffsetList.push_back(
         ConstantInt::get(Int32Ty, val));
     }
@@ -2558,7 +2608,8 @@ struct OmpSsDirective {
       TaskArgsVarLi8IdxGEP = IRB.CreateGEP(Int8Ty, TaskArgsVarLi8IdxGEP, VLASize);
     }
 
-    for (Value *V : DSAInfo.Shared) {
+    for (const auto &Pair : DSAInfo.Shared) {
+      Value *V = Pair.first;
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Int32Ty);
       Idx[1] = ConstantInt::get(Int32Ty, TaskArgsToStructIdxMap[V]);
@@ -2567,9 +2618,9 @@ struct OmpSsDirective {
           TaskArgsVarL, Idx, "gep_" + V->getName());
       IRB.CreateStore(V, GEP);
     }
-    for (size_t i = 0; i < DSAInfo.Private.size(); ++i) {
-      Value *V = DSAInfo.Private[i];
-      Type *Ty = DSAInfo.PrivateTy[i];
+    for (const auto &Pair : DSAInfo.Private) {
+      Value *V = Pair.first;
+      Type *Ty = Pair.second;
       // Call custom constructor generated in clang in non-pods
       // Leave pods unititialized
       auto It = DirEnv.NonPODsInfo.Inits.find(V);
@@ -2602,9 +2653,9 @@ struct OmpSsDirective {
         IRB.CreateCall(FunctionCallee(cast<Function>(It->second)), ArrayRef<Value*>{GEP, NSize});
       }
     }
-    for (size_t i = 0; i < DSAInfo.Firstprivate.size(); ++i) {
-      Value *V = DSAInfo.Firstprivate[i];
-      Type *Ty = DSAInfo.FirstprivateTy[i];
+    for (const auto &Pair : DSAInfo.Firstprivate) {
+      Value *V = Pair.first;
+      Type *Ty = Pair.second;
       Align TyAlign = DL.getPrefTypeAlign(Ty);
 
       // Compute num elements
@@ -3159,6 +3210,11 @@ struct OmpSsFunction {
 
     DirectiveFunctionInfo &DirectiveFuncInfo = LookupDirectiveFunctionInfo(F).getFuncInfo();
 
+    // Emit check version call if translation unit has at least one ompss-2
+    // directive
+    if (DirectiveFuncInfo.PostOrder.empty())
+      registerCheckVersion(M);
+
     buildFinalCloneBBs(DirectiveFuncInfo);
     for (size_t i = 0; i < DirectiveFuncInfo.PostOrder.size(); ++i) {
       DirectiveInfo &DirInfo = *DirectiveFuncInfo.PostOrder[i];
@@ -3179,6 +3235,9 @@ struct OmpSsModule {
   function_ref<OmpSsRegionAnalysis &(Function &)> LookupDirectiveFunctionInfo;
 
   void registerAssert(StringRef Str) {
+    // Emit check version call if translation unit has at least one ompss-2
+    // directive
+    registerCheckVersion(M);
     Function *Func = cast<Function>(nanos6Api::registerCtorAssertFuncCallee(M).getCallee());
     if (Func->empty()) {
       Func->setLinkage(GlobalValue::InternalLinkage);

@@ -140,6 +140,18 @@ public:
     OMPRT_IOMP5
   };
 
+  enum OmpSsRuntimeKind {
+    /// An unknown OmpSs-2 runtime. We can't generate effective OmpSs-2 code
+    /// without knowing what runtime to target.
+    OSSRT_Unknown,
+
+    // Nanos6 runtime
+    OSSRT_NANOS6,
+
+    // NODES runtime
+    OSSRT_NODES,
+  };
+
   // Diag - Forwarding function for diagnostics.
   DiagnosticBuilder Diag(unsigned DiagID) const {
     return Diags.Report(DiagID);
@@ -433,6 +445,9 @@ public:
 
   /// Compute the desired OpenMP runtime from the flags provided.
   OpenMPRuntimeKind getOpenMPRuntime(const llvm::opt::ArgList &Args) const;
+
+  /// Compute the desired OmpSs-2 runtime from the flags provided.
+  OmpSsRuntimeKind getOmpSsRuntime(const llvm::opt::ArgList &Args) const;
 
   /// @}
   /// @name Primary Functionality

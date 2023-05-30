@@ -32,7 +32,7 @@ public:
   // When the bitset fits in a word, use a custom local bitset class that is
   // more amenable to constexpr evaluation than the current std::bitset<>.
   using bitsetType =
-      std::conditional_t<(BITS <= 64), common::BitSet<BITS>, std::bitset<BITS>>;
+      std::conditional_t<(BITS <= 128), common::BitSet<BITS>, std::bitset<BITS>>;
   using enumerationType = ENUM;
 
   constexpr EnumSet() {}

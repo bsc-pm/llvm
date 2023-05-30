@@ -21,6 +21,7 @@
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/ThreadPool.h"
+#include <algorithm>
 #include <mutex>
 #include <unordered_map>
 
@@ -274,7 +275,7 @@ void mergeLegacyProfiles(const SmallVectorImpl<std::string> &Filenames) {
       report_error(Filename, EC);
 
     StringRef Buf = MB.get()->getBuffer();
-
+    ProfileTy *Profile;
     {
       std::lock_guard<std::mutex> Lock(BoltedCollectionMutex);
       // Check if the string "boltedcollection" is in the first line
@@ -292,6 +293,8 @@ void mergeLegacyProfiles(const SmallVectorImpl<std::string> &Filenames) {
               "cannot mix profile collected in BOLT and non-BOLT deployments");
         BoltedCollection = false;
       }
+
+      Profile = &Profiles[tid];
     }
 
     SmallVector<StringRef> Lines;
@@ -304,14 +307,15 @@ void mergeLegacyProfiles(const SmallVectorImpl<std::string> &Filenames) {
       uint64_t Count;
       if (Line.substr(Pos + 1, Line.size() - Pos).getAsInteger(10, Count))
         report_error(Filename, "Malformed / corrupted profile counter");
-      Count += Profiles[tid].lookup(Signature);
-      Profiles[tid].insert_or_assign(Signature, Count);
+      Count += Profile->lookup(Signature);
+      Profile->insert_or_assign(Signature, Count);
     }
   };
 
   // The final reduction has non-trivial cost, make sure each thread has at
   // least 4 tasks.
-  ThreadPoolStrategy S = optimal_concurrency(Filenames.size() / 4);
+  ThreadPoolStrategy S = optimal_concurrency(
+      std::max(Filenames.size() / 4, static_cast<size_t>(1)));
   ThreadPool Pool(S);
   DenseMap<llvm::thread::id, ProfileTy> ParsedProfiles(Pool.getThreadCount());
   for (const auto &Filename : Filenames)

@@ -148,6 +148,23 @@ public:
   Type *getArgIdxTableDataType() const { return ArgIdxTableDataTy; }
 };
 
+class Nanos6Version {
+private:
+  StructType *Ty;
+  Type *FamilyTy;
+  Type *VersionTy;
+
+  Nanos6Version(){};
+  Nanos6Version(const Nanos6TaskInfo&){};
+public:
+  ~Nanos6Version(){};
+
+  static Nanos6Version& getInstance(Module &M);
+  StructType *getType() const { return Ty; }
+  Type *getFamilyType() const { return FamilyTy; }
+  Type *getVersionType() const { return VersionTy; }
+};
+
 class Nanos6MultidepFactory {
   const size_t MAX_DEP_DIMS = 8;
 private:
@@ -233,6 +250,14 @@ FunctionCallee registerCtorAssertFuncCallee(Module &M);
 
 // void nanos6_config_assert(const char *str);
 FunctionCallee registerAssertFuncCallee(Module &M);
+
+// void nanos6_constructor_check_version(void);
+// NOTE: This does not belong to nanos6 API
+FunctionCallee registerCtorCheckVersionFuncCallee(Module &M);
+
+// void nanos6_check_version(uint64_t size, nanos6_version_t *arr, const char *source);
+FunctionCallee checkVersionFuncCallee(Module &M);
+
 }
 }
 

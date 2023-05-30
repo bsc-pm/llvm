@@ -75,9 +75,8 @@ bool Parser::isCXXDeclarationStatement(
       switch (Tok.getKind()) {
       case tok::identifier: {
         IdentifierInfo *II = Tok.getIdentifierInfo();
-        bool isDeductionGuide =
-            Actions.isDeductionGuideName(getCurScope(), *II, Tok.getLocation(),
-                                         /*Template=*/nullptr);
+        bool isDeductionGuide = Actions.isDeductionGuideName(
+            getCurScope(), *II, Tok.getLocation(), SS, /*Template=*/nullptr);
         if (Actions.isCurrentClassName(*II, getCurScope(), &SS) ||
             isDeductionGuide) {
           if (isConstructorDeclarator(/*Unqualified=*/SS.isEmpty(),
@@ -89,10 +88,8 @@ bool Parser::isCXXDeclarationStatement(
       }
       case tok::kw_operator:
         return true;
-      case tok::annot_cxxscope: // Check if this is a dtor.
-        if (NextToken().is(tok::tilde))
-          return true;
-        break;
+      case tok::tilde:
+        return true;
       default:
         break;
       }
@@ -266,6 +263,7 @@ Parser::TPResult Parser::TryConsumeDeclarationSpecifier() {
 ///    attribute-specifier-seqopt type-specifier-seq declarator
 ///
 Parser::TPResult Parser::TryParseSimpleDeclaration(bool AllowForRangeDecl) {
+  bool DeclSpecifierIsAuto = Tok.is(tok::kw_auto);
   if (TryConsumeDeclarationSpecifier() == TPResult::Error)
     return TPResult::Error;
 
@@ -281,7 +279,8 @@ Parser::TPResult Parser::TryParseSimpleDeclaration(bool AllowForRangeDecl) {
     assert(TPR == TPResult::False);
   }
 
-  TPResult TPR = TryParseInitDeclaratorList();
+  TPResult TPR = TryParseInitDeclaratorList(
+      /*mayHaveTrailingReturnType=*/DeclSpecifierIsAuto);
   if (TPR != TPResult::Ambiguous)
     return TPR;
 
@@ -318,10 +317,15 @@ Parser::TPResult Parser::TryParseSimpleDeclaration(bool AllowForRangeDecl) {
 ///         '{' initializer-list ','[opt] '}'
 ///         '{' '}'
 ///
-Parser::TPResult Parser::TryParseInitDeclaratorList() {
+Parser::TPResult
+Parser::TryParseInitDeclaratorList(bool MayHaveTrailingReturnType) {
   while (true) {
     // declarator
-    TPResult TPR = TryParseDeclarator(false/*mayBeAbstract*/);
+    TPResult TPR = TryParseDeclarator(
+        /*mayBeAbstract=*/false,
+        /*mayHaveIdentifier=*/true,
+        /*mayHaveDirectInit=*/false,
+        /*mayHaveTrailingReturnType=*/MayHaveTrailingReturnType);
     if (TPR != TPResult::Ambiguous)
       return TPR;
 
@@ -536,13 +540,18 @@ Parser::isCXXConditionDeclarationOrInitStatement(bool CanBeInitStatement,
   RevertingTentativeParsingAction PA(*this);
 
   // FIXME: A tag definition unambiguously tells us this is an init-statement.
+  bool MayHaveTrailingReturnType = Tok.is(tok::kw_auto);
   if (State.update(TryConsumeDeclarationSpecifier()))
     return State.result();
   assert(Tok.is(tok::l_paren) && "Expected '('");
 
   while (true) {
     // Consume a declarator.
-    if (State.update(TryParseDeclarator(false/*mayBeAbstract*/)))
+    if (State.update(TryParseDeclarator(
+            /*mayBeAbstract=*/false,
+            /*mayHaveIdentifier=*/true,
+            /*mayHaveDirectInit=*/false,
+            /*mayHaveTrailingReturnType=*/MayHaveTrailingReturnType)))
       return State.result();
 
     // Attributes, asm label, or an initializer imply this is not an expression.
@@ -627,13 +636,16 @@ bool Parser::isCXXTypeId(TentativeCXXTypeIdContext Context, bool &isAmbiguous) {
   // We need tentative parsing...
 
   RevertingTentativeParsingAction PA(*this);
+  bool MayHaveTrailingReturnType = Tok.is(tok::kw_auto);
 
   // type-specifier-seq
   TryConsumeDeclarationSpecifier();
   assert(Tok.is(tok::l_paren) && "Expected '('");
 
   // declarator
-  TPR = TryParseDeclarator(true/*mayBeAbstract*/, false/*mayHaveIdentifier*/);
+  TPR = TryParseDeclarator(true /*mayBeAbstract*/, false /*mayHaveIdentifier*/,
+                           /*mayHaveDirectInit=*/false,
+                           MayHaveTrailingReturnType);
 
   // In case of an error, let the declaration parsing code handle it.
   if (TPR == TPResult::Error)
@@ -662,6 +674,9 @@ bool Parser::isCXXTypeId(TentativeCXXTypeIdContext Context, bool &isAmbiguous) {
       TPR = TPResult::True;
       isAmbiguous = true;
 
+    } else if (Context == TypeIdInTrailingReturnType) {
+      TPR = TPResult::True;
+      isAmbiguous = true;
     } else
       TPR = TPResult::False;
   }
@@ -1046,7 +1061,8 @@ Parser::TPResult Parser::TryParseOperatorId() {
 ///
 Parser::TPResult Parser::TryParseDeclarator(bool mayBeAbstract,
                                             bool mayHaveIdentifier,
-                                            bool mayHaveDirectInit) {
+                                            bool mayHaveDirectInit,
+                                            bool mayHaveTrailingReturnType) {
   // declarator:
   //   direct-declarator
   //   ptr-operator declarator
@@ -1088,7 +1104,7 @@ Parser::TPResult Parser::TryParseDeclarator(bool mayBeAbstract,
              ImplicitTypenameContext::No))) { // 'int(int)' is a function.
       // '(' parameter-declaration-clause ')' cv-qualifier-seq[opt]
       //        exception-specification[opt]
-      TPResult TPR = TryParseFunctionDeclarator();
+      TPResult TPR = TryParseFunctionDeclarator(mayHaveTrailingReturnType);
       if (TPR != TPResult::Ambiguous)
         return TPR;
     } else {
@@ -1127,7 +1143,7 @@ Parser::TPResult Parser::TryParseDeclarator(bool mayBeAbstract,
       // direct-declarator '(' parameter-declaration-clause ')'
       //        cv-qualifier-seq[opt] exception-specification[opt]
       ConsumeParen();
-      TPR = TryParseFunctionDeclarator();
+      TPR = TryParseFunctionDeclarator(mayHaveTrailingReturnType);
     } else if (Tok.is(tok::l_square)) {
       // direct-declarator '[' constant-expression[opt] ']'
       // direct-abstract-declarator[opt] '[' constant-expression[opt] ']'
@@ -1394,6 +1410,16 @@ Parser::isCXXDeclarationSpecifier(ImplicitTypenameContext AllowImplicitTypename,
     return isCXXDeclarationSpecifier(ImplicitTypenameContext::Yes,
                                      BracedCastResult, InvalidAsDeclSpec);
 
+  case tok::kw_auto: {
+    if (!getLangOpts().CPlusPlus23)
+      return TPResult::True;
+    if (NextToken().is(tok::l_brace))
+      return TPResult::False;
+    if (NextToken().is(tok::l_paren))
+      return TPResult::Ambiguous;
+    return TPResult::True;
+  }
+
   case tok::coloncolon: {    // ::foo::bar
     const Token &Next = NextToken();
     if (Next.isOneOf(tok::kw_new,       // ::new
@@ -1427,7 +1453,6 @@ Parser::isCXXDeclarationSpecifier(ImplicitTypenameContext AllowImplicitTypename,
   case tok::kw_static:
   case tok::kw_extern:
   case tok::kw_mutable:
-  case tok::kw_auto:
   case tok::kw___thread:
   case tok::kw_thread_local:
   case tok::kw__Thread_local:
@@ -2006,6 +2031,7 @@ Parser::TPResult Parser::TryParseParameterDeclarationClause(
       return TPR;
 
     bool SeenType = false;
+    bool DeclarationSpecifierIsAuto = Tok.is(tok::kw_auto);
     do {
       SeenType |= isCXXDeclarationSpecifierAType();
       if (TryConsumeDeclarationSpecifier() == TPResult::Error)
@@ -2027,7 +2053,11 @@ Parser::TPResult Parser::TryParseParameterDeclarationClause(
 
     // declarator
     // abstract-declarator[opt]
-    TPR = TryParseDeclarator(true/*mayBeAbstract*/);
+    TPR = TryParseDeclarator(
+        /*mayBeAbstract=*/true,
+        /*mayHaveIdentifier=*/true,
+        /*mayHaveDirectInit=*/false,
+        /*mayHaveTrailingReturnType=*/DeclarationSpecifierIsAuto);
     if (TPR != TPResult::Ambiguous)
       return TPR;
 
@@ -2081,7 +2111,8 @@ Parser::TPResult Parser::TryParseParameterDeclarationClause(
 /// exception-specification:
 ///   'throw' '(' type-id-list[opt] ')'
 ///
-Parser::TPResult Parser::TryParseFunctionDeclarator() {
+Parser::TPResult
+Parser::TryParseFunctionDeclarator(bool MayHaveTrailingReturnType) {
   // The '(' is already parsed.
 
   TPResult TPR = TryParseParameterDeclarationClause();
@@ -2126,7 +2157,50 @@ Parser::TPResult Parser::TryParseFunctionDeclarator() {
     }
   }
 
+  // attribute-specifier-seq
+  if (!TrySkipAttributes())
+    return TPResult::Ambiguous;
+
+  // trailing-return-type
+  if (Tok.is(tok::arrow) && MayHaveTrailingReturnType) {
+    if (TPR == TPResult::True)
+      return TPR;
+    ConsumeToken();
+    if (Tok.is(tok::identifier) && NameAfterArrowIsNonType()) {
+      return TPResult::False;
+    }
+    if (isCXXTypeId(TentativeCXXTypeIdContext::TypeIdInTrailingReturnType))
+      return TPResult::True;
+  }
+
   return TPResult::Ambiguous;
+}
+
+// When parsing an identifier after an arrow it may be a member expression,
+// in which case we should not annotate it as an independant expression
+// so we just lookup that name, if it's not a type the construct is not
+// a function declaration.
+bool Parser::NameAfterArrowIsNonType() {
+  assert(Tok.is(tok::identifier));
+  Token Next = NextToken();
+  if (Next.is(tok::coloncolon))
+    return false;
+  IdentifierInfo *Name = Tok.getIdentifierInfo();
+  SourceLocation NameLoc = Tok.getLocation();
+  CXXScopeSpec SS;
+  TentativeParseCCC CCC(Next);
+  Sema::NameClassification Classification =
+      Actions.ClassifyName(getCurScope(), SS, Name, NameLoc, Next, &CCC);
+  switch (Classification.getKind()) {
+  case Sema::NC_OverloadSet:
+  case Sema::NC_NonType:
+  case Sema::NC_VarTemplate:
+  case Sema::NC_FunctionTemplate:
+    return true;
+  default:
+    break;
+  }
+  return false;
 }
 
 /// '[' constant-expression[opt] ']'

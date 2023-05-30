@@ -1520,6 +1520,9 @@ void TextNodeDumper::VisitVectorType(const VectorType *T) {
   case VectorType::SveFixedLengthPredicateVector:
     OS << " fixed-length sve predicate vector";
     break;
+  case VectorType::RVVFixedLengthDataVector:
+    OS << " fixed-length rvv data vector";
+    break;
   }
   OS << " " << T->getNumElements();
 }
@@ -1843,7 +1846,8 @@ void TextNodeDumper::VisitVarDecl(const VarDecl *D) {
   if (D->hasInit()) {
     const Expr *E = D->getInit();
     // Only dump the value of constexpr VarDecls for now.
-    if (E && !E->isValueDependent() && D->isConstexpr()) {
+    if (E && !E->isValueDependent() && D->isConstexpr() &&
+        !D->getType()->isDependentType()) {
       const APValue *Value = D->evaluateValue();
       if (Value)
         AddChild("value", [=] { Visit(*Value, E->getType()); });
