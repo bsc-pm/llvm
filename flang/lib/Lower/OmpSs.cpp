@@ -892,6 +892,8 @@ namespace {
       converter.getLocalSymbols().symbolMapStack.emplace_back(localSymbols.symbolMapStack.back());
 
       if (box->isAllocatable()) {
+        // disassociate dst to be in a consistent state
+        fir::factory::disassociateMutableBox(firOpBuilder, loc, newBoxDst);
         mlir::Value isAllocated = fir::factory::genIsAllocatedOrAssociatedTest(firOpBuilder, loc, newBoxSrc);
         firOpBuilder.genIfThen(loc, isAllocated)
             .genThen([&]() {
@@ -1123,7 +1125,12 @@ namespace {
       converter.getLocalSymbols().symbolMapStack.emplace_back(localSymbols.symbolMapStack.back());
 
       if (box->isAllocatable()) {
-        emitOSSDeinitExpr(converter, newBoxDst, loc);
+        mlir::Value isAllocated = fir::factory::genIsAllocatedOrAssociatedTest(firOpBuilder, loc, newBoxDst);
+        firOpBuilder.genIfThen(loc, isAllocated)
+            .genThen([&]() {
+          emitOSSDeinitExpr(converter, newBoxDst, loc);
+        })
+        .end();
       } else {
         fir::factory::disassociateMutableBox(firOpBuilder, loc, newBoxDst);
       }

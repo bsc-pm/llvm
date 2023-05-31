@@ -30,6 +30,7 @@ subroutine test(s, fp, p)
    print *, ALLOCATED(fp)
    print *, ALLOCATED(p)
    print *, fp
+   p = 0 ! private(p) is allocated but not initialized
    print *, p
    fp = 10
    print *, fp
