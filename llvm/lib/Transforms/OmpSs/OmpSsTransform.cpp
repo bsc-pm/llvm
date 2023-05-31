@@ -3212,7 +3212,7 @@ struct OmpSsFunction {
 
     // Emit check version call if translation unit has at least one ompss-2
     // directive
-    if (DirectiveFuncInfo.PostOrder.empty())
+    if (!DirectiveFuncInfo.PostOrder.empty())
       registerCheckVersion(M);
 
     buildFinalCloneBBs(DirectiveFuncInfo);
