@@ -131,13 +131,6 @@ static void gatherDirectiveClauses(
         moduleTranslation.lookupValue(copyOp.getBase()),
         moduleTranslation.lookupFunction(copyOp.getFunction()));
     }
-    for (auto deinitExprVar : cast<Op>(opInst).getDeinitVars()) {
-      Operation *op = deinitExprVar.getDefiningOp();
-      auto deinitOp = cast<oss::CopyOp>(op);
-      DirClauses.Deinits.emplace_back(
-        moduleTranslation.lookupValue(deinitOp.getBase()),
-        moduleTranslation.lookupFunction(deinitOp.getFunction()));
-    }
   }
   if constexpr (Op::allowsFirstprivate()) {
     for (auto firstprivateExprVar : cast<Op>(opInst).getFirstprivateVars())
@@ -151,6 +144,8 @@ static void gatherDirectiveClauses(
         moduleTranslation.lookupValue(copyOp.getBase()),
         moduleTranslation.lookupFunction(copyOp.getFunction()));
     }
+  }
+  if constexpr (Op::allowsPrivate() || Op::allowsFirstprivate())
     for (auto deinitExprVar : cast<Op>(opInst).getDeinitVars()) {
       Operation *op = deinitExprVar.getDefiningOp();
       auto deinitOp = cast<oss::CopyOp>(op);
@@ -158,7 +153,6 @@ static void gatherDirectiveClauses(
         moduleTranslation.lookupValue(deinitOp.getBase()),
         moduleTranslation.lookupFunction(deinitOp.getFunction()));
     }
-  }
   if constexpr (Op::allowsVlaDims())
     for (auto vlaDimExprVar : cast<Op>(opInst).getVlaDimsVars()){
       Operation *op = vlaDimExprVar.getDefiningOp();
