@@ -27,60 +27,62 @@ end module
 
 
 
-! CHECK-LABEL: func.func @_QMtestsPtest_assumed_shape_to_contiguous(
-! CHECK-SAME:                                                       %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.box<!fir.array<?xf32>> {fir.bindc_name = "x"}) {
-! CHECK:         %[[VAL_1:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.array<?xf32>>
-! CHECK:         %[[VAL_2:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_0]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<none>
-! CHECK:         %[[VAL_3:[-0-9A-Za-z._]+]] = fir.call @_FortranAIsContiguous(%[[VAL_2]]) fastmath<contract> : (!fir.box<none>) -> i1
-! CHECK:         %[[VAL_4:[-0-9A-Za-z._]+]] = fir.if %[[VAL_3]] -> (!fir.heap<!fir.array<?xf32>>) {
-! CHECK:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_0]] : (!fir.box<!fir.array<?xf32>>) -> !fir.heap<!fir.array<?xf32>>
-! CHECK:           fir.result %[[VAL_5]] : !fir.heap<!fir.array<?xf32>>
-! CHECK:         } else {
-! CHECK:           %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! CHECK:           %[[VAL_7:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_0]], %[[VAL_6]] : (!fir.box<!fir.array<?xf32>>, index) -> (index, index, index)
-! CHECK:           %[[VAL_8:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xf32>, %[[VAL_7]]#1 {uniq_name = ".copyinout"}
-! CHECK:           %[[VAL_9:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_7]]#1 : (index) -> !fir.shape<1>
-! CHECK:           %[[VAL_10:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_8]](%[[VAL_9]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.array<?xf32>>
-! CHECK:           fir.store %[[VAL_10]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.array<?xf32>>>
-! CHECK:           %[[VAL_11:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl.b4d60586e3fd2783e6df785ac7d99835) : !fir.ref<!fir.char<1,67>>
-! CHECK:           %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 23 : i32
-! CHECK:           %[[VAL_13:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_1]] : (!fir.ref<!fir.box<!fir.array<?xf32>>>) -> !fir.ref<!fir.box<none>>
-! CHECK:           %[[VAL_14:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_0]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<none>
-! CHECK:           %[[VAL_15:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_11]] : (!fir.ref<!fir.char<1,67>>) -> !fir.ref<i8>
-! CHECK:           %[[VAL_16:[-0-9A-Za-z._]+]] = fir.call @_FortranAAssign(%[[VAL_13]], %[[VAL_14]], %[[VAL_15]], %[[VAL_12]]) fastmath<contract> : (!fir.ref<!fir.box<none>>, !fir.box<none>, !fir.ref<i8>, i32) -> none
-! CHECK:           fir.result %[[VAL_8]] : !fir.heap<!fir.array<?xf32>>
-! CHECK:         }
-! CHECK:         %[[VAL_17:[-0-9A-Za-z._]+]] = arith.constant 0 : index
-! CHECK:         %[[VAL_18:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_0]], %[[VAL_17]] : (!fir.box<!fir.array<?xf32>>, index) -> (index, index, index)
-! CHECK:         %[[VAL_19:[-0-9A-Za-z._]+]] = arith.constant false
-! CHECK:         %[[VAL_20:[-0-9A-Za-z._]+]] = arith.cmpi eq, %[[VAL_3]], %[[VAL_19]] : i1
-! CHECK:         %[[VAL_21:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_18]]#1 : (index) -> !fir.shape<1>
-! CHECK:         %[[VAL_22:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_23:[-0-9A-Za-z._]+]](%[[VAL_21]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.array<?xf32>>
-! CHECK:         oss.task firstprivate(%[[VAL_22]], %[[VAL_0]] : !fir.box<!fir.array<?xf32>>, !fir.box<!fir.array<?xf32>>) shared(%[[VAL_23]] : !fir.heap<!fir.array<?xf32>>) captures(%[[VAL_18]]#1, %[[VAL_20]] : index, i1) {
-! CHECK:           %[[VAL_24:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.array<?xf32>> {pinned}
-! CHECK:           fir.call @_QPtakes_contiguous(%[[VAL_22]]) fastmath<contract> : (!fir.box<!fir.array<?xf32>>) -> ()
-! CHECK:           fir.if %[[VAL_20]] {
-! CHECK:             %[[VAL_25:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_18]]#1 : (index) -> !fir.shape<1>
-! CHECK:             %[[VAL_26:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_23]](%[[VAL_25]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.array<?xf32>>
-! CHECK:             fir.store %[[VAL_0]] to %[[VAL_24]] : !fir.ref<!fir.box<!fir.array<?xf32>>>
-! CHECK:             %[[VAL_27:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl.b4d60586e3fd2783e6df785ac7d99835) : !fir.ref<!fir.char<1,67>>
-! CHECK:             %[[VAL_28:[-0-9A-Za-z._]+]] = arith.constant 23 : i32
-! CHECK:             %[[VAL_29:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_24]] : (!fir.ref<!fir.box<!fir.array<?xf32>>>) -> !fir.ref<!fir.box<none>>
-! CHECK:             %[[VAL_30:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_26]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<none>
-! CHECK:             %[[VAL_31:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_27]] : (!fir.ref<!fir.char<1,67>>) -> !fir.ref<i8>
-! CHECK:             %[[VAL_32:[-0-9A-Za-z._]+]] = fir.call @_FortranAAssign(%[[VAL_29]], %[[VAL_30]], %[[VAL_31]], %[[VAL_28]]) fastmath<contract> : (!fir.ref<!fir.box<none>>, !fir.box<none>, !fir.ref<i8>, i32) -> none
-! CHECK:             fir.freemem %[[VAL_23]] : !fir.heap<!fir.array<?xf32>>
+! CHECK-LABEL:   func.func @_QMtestsPtest_assumed_shape_to_contiguous(
+! CHECK-SAME:                                                         %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.box<!fir.array<?xf32>> {fir.bindc_name = "x"}) {
+! CHECK:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.array<?xf32>>
+! CHECK:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_0]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<none>
+! CHECK:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.call @_FortranAIsContiguous(%[[VAL_2]]) fastmath<contract> : (!fir.box<none>) -> i1
+! CHECK:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.if %[[VAL_3]] -> (!fir.heap<!fir.array<?xf32>>) {
+! CHECK:             %[[VAL_5:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_0]] : (!fir.box<!fir.array<?xf32>>) -> !fir.heap<!fir.array<?xf32>>
+! CHECK:             fir.result %[[VAL_5]] : !fir.heap<!fir.array<?xf32>>
+! CHECK:           } else {
+! CHECK:             %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! CHECK:             %[[VAL_7:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_0]], %[[VAL_6]] : (!fir.box<!fir.array<?xf32>>, index) -> (index, index, index)
+! CHECK:             %[[VAL_8:[-0-9A-Za-z._]+]] = fir.allocmem !fir.array<?xf32>, %[[VAL_7]]#1 {uniq_name = ".copyinout"}
+! CHECK:             %[[VAL_9:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_7]]#1 : (index) -> !fir.shape<1>
+! CHECK:             %[[VAL_10:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_8]](%[[VAL_9]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.array<?xf32>>
+! CHECK:             fir.store %[[VAL_10]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.array<?xf32>>>
+! CHECK:             %[[VAL_11:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl.b4d60586e3fd2783e6df785ac7d99835) : !fir.ref<!fir.char<1,67>>
+! CHECK:             %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 23 : i32
+! CHECK:             %[[VAL_13:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_1]] : (!fir.ref<!fir.box<!fir.array<?xf32>>>) -> !fir.ref<!fir.box<none>>
+! CHECK:             %[[VAL_14:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_0]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<none>
+! CHECK:             %[[VAL_15:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_11]] : (!fir.ref<!fir.char<1,67>>) -> !fir.ref<i8>
+! CHECK:             %[[VAL_16:[-0-9A-Za-z._]+]] = fir.call @_FortranAAssignTemporary(%[[VAL_13]], %[[VAL_14]], %[[VAL_15]], %[[VAL_12]]) fastmath<contract> : (!fir.ref<!fir.box<none>>, !fir.box<none>, !fir.ref<i8>, i32) -> none
+! CHECK:             fir.result %[[VAL_8]] : !fir.heap<!fir.array<?xf32>>
 ! CHECK:           }
-! CHECK:           oss.terminator
+! CHECK:           %[[VAL_17:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! CHECK:           %[[VAL_18:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_0]], %[[VAL_17]] : (!fir.box<!fir.array<?xf32>>, index) -> (index, index, index)
+! CHECK:           %[[VAL_19:[-0-9A-Za-z._]+]] = arith.constant false
+! CHECK:           %[[VAL_20:[-0-9A-Za-z._]+]] = arith.cmpi eq, %[[VAL_3]], %[[VAL_19]] : i1
+! CHECK:           %[[VAL_21:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_18]]#1 : (index) -> !fir.shape<1>
+! CHECK:           %[[VAL_22:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_23:[-0-9A-Za-z._]+]](%[[VAL_21]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.array<?xf32>>
+! CHECK:           oss.task firstprivate(%[[VAL_22]], %[[VAL_0]] : !fir.box<!fir.array<?xf32>>, !fir.box<!fir.array<?xf32>>) shared(%[[VAL_23]] : !fir.heap<!fir.array<?xf32>>) captures(%[[VAL_18]]#1, %[[VAL_20]] : index, i1) {
+! CHECK:             %[[VAL_24:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.array<?xf32>> {pinned}
+! CHECK:             fir.call @_QPtakes_contiguous(%[[VAL_22]]) fastmath<contract> : (!fir.box<!fir.array<?xf32>>) -> ()
+! CHECK:             fir.if %[[VAL_20]] {
+! CHECK:               %[[VAL_25:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_18]]#1 : (index) -> !fir.shape<1>
+! CHECK:               %[[VAL_26:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_23]](%[[VAL_25]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.array<?xf32>>
+! CHECK:               fir.store %[[VAL_0]] to %[[VAL_24]] : !fir.ref<!fir.box<!fir.array<?xf32>>>
+! CHECK:               %[[VAL_27:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl.b4d60586e3fd2783e6df785ac7d99835) : !fir.ref<!fir.char<1,67>>
+! CHECK:               %[[VAL_28:[-0-9A-Za-z._]+]] = arith.constant 23 : i32
+! CHECK:               %[[VAL_29:[-0-9A-Za-z._]+]] = arith.constant true
+! CHECK:               %[[VAL_30:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_24]] : (!fir.ref<!fir.box<!fir.array<?xf32>>>) -> !fir.ref<!fir.box<none>>
+! CHECK:               %[[VAL_31:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_26]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<none>
+! CHECK:               %[[VAL_32:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_27]] : (!fir.ref<!fir.char<1,67>>) -> !fir.ref<i8>
+! CHECK:               %[[VAL_33:[-0-9A-Za-z._]+]] = fir.call @_FortranACopyOutAssign(%[[VAL_30]], %[[VAL_31]], %[[VAL_29]], %[[VAL_32]], %[[VAL_28]]) fastmath<contract> : (!fir.ref<!fir.box<none>>, !fir.box<none>, i1, !fir.ref<i8>, i32) -> none
+! CHECK:               fir.freemem %[[VAL_23]] : !fir.heap<!fir.array<?xf32>>
+! CHECK:             }
+! CHECK:             oss.terminator
+! CHECK:           }
+! CHECK:           return
 ! CHECK:         }
-! CHECK:         return
-! CHECK:       }
-! CHECK:       func.func private @_QPtakes_contiguous(!fir.box<!fir.array<?xf32>> {fir.contiguous})
-! CHECK:       func.func private @_FortranAIsContiguous(!fir.box<none>) -> i1 attributes {fir.runtime}
-! CHECK:       func.func private @_FortranAAssign(!fir.ref<!fir.box<none>>, !fir.box<none>, !fir.ref<i8>, i32) -> none attributes {fir.runtime}
+! CHECK:         func.func private @_QPtakes_contiguous(!fir.box<!fir.array<?xf32>> {fir.contiguous})
+! CHECK:         func.func private @_FortranAIsContiguous(!fir.box<none>) -> i1 attributes {fir.runtime}
+! CHECK:         func.func private @_FortranAAssignTemporary(!fir.ref<!fir.box<none>>, !fir.box<none>, !fir.ref<i8>, i32) -> none attributes {fir.runtime}
 
-! CHECK-LABEL: fir.global linkonce @_QQcl.b4d60586e3fd2783e6df785ac7d99835 constant : !fir.char<1,67> {
-! CHECK:         %[[VAL_0:[-0-9A-Za-z._]+]] = fir.string_lit "/home/rpenacob/llvm-mono/flang/test/OmpSs/Lower/FIR/toutline03.f90\00"(67) : !fir.char<1,67>
-! CHECK:         fir.has_value %[[VAL_0]] : !fir.char<1,67>
-! CHECK:       }
+! CHECK-LABEL:   fir.global internal @_QQcl.b4d60586e3fd2783e6df785ac7d99835 constant : !fir.char<1,67> {
+! CHECK:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.string_lit "/home/rpenacob/llvm-mono/flang/test/OmpSs/Lower/FIR/toutline03.f90\00"(67) : !fir.char<1,67>
+! CHECK:           fir.has_value %[[VAL_0]] : !fir.char<1,67>
+! CHECK:         }
+! CHECK:         func.func private @_FortranACopyOutAssign(!fir.ref<!fir.box<none>>, !fir.box<none>, i1, !fir.ref<i8>, i32) -> none attributes {fir.runtime}
 

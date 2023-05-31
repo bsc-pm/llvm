@@ -11,8 +11,7 @@ PROGRAM P
   !$OSS END TASK
 END
 
-! HLFIRToLLVMIR-LABEL:   
-! HLFIRToLLVMIR-SAME:    %[[VAL_0:[-0-9A-Za-z._]+]] = alloca i32, i64 1, align 4
+! HLFIRToLLVMIR:         %[[VAL_0:[-0-9A-Za-z._]+]] = alloca i32, i64 1, align 4
 ! HLFIRToLLVMIR:         %[[VAL_1:[-0-9A-Za-z._]+]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr %[[VAL_0]], i32 undef) ]
 ! HLFIRToLLVMIR:         br label %[[VAL_2:[-0-9A-Za-z._]+]]
 ! HLFIRToLLVMIR:       oss.end:                                          ; preds = %[[VAL_2]]

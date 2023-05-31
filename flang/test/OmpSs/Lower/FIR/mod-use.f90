@@ -16,7 +16,7 @@ PROGRAM P
 END
 
 ! FIRDialect-LABEL:   fir.global @_QMmodEx : i32 {
-! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.undefined i32
+! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.zero_bits i32
 ! FIRDialect:           fir.has_value %[[VAL_0]] : i32
 ! FIRDialect:         }
 
