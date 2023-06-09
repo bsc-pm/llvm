@@ -364,7 +364,8 @@ public:
   llvm::SmallVector<Stmt *, 1> copyParamTaskCall(
       llvm::SmallDenseMap<const ParmVarDecl *, LocalmemInfo> &copies,
       VarDecl *copiesDecl, ParmVarDecl *param, int &copId, int paramId,
-      Expr *accessedMember, QualType typeMember) {
+      Expr *accessedMember, QualType typeMember, bool isSmpTask,
+      FunctionDecl *declFunctionTask, CallExpr *callExpr) {
 
     llvm::SmallVector<Stmt *, 1> stmts;
 
@@ -395,12 +396,19 @@ public:
           BinaryOperator::Opcode::BO_Assign, typeMember,
           ExprValueKind::VK_LValue, ExprObjectKind::OK_Ordinary, {}, {}));
 
-      auto *sizeArray = [&] {
+      Expr *sizeArray = [&]() -> Expr * {
         if (copy.second.FixedArrayRef) {
-          return makeIntegerLiteral(ComputeArrayRefSize(
-              Ctx, copy.second.FixedArrayRef,
+          if (!isSmpTask) {
+            return makeIntegerLiteral(
+                ComputeArrayRefSize(Ctx, copy.second.FixedArrayRef,
+                                    Ctx.getTypeSize(GetElementTypePointerTo(
+                                        copy.first->getType())) /
+                                        Ctx.getCharWidth()));
+          }
+          return makeExprRuntimeComputeSize(
+              Ctx, copy.second.FixedArrayRef, declFunctionTask, callExpr,
               Ctx.getTypeSize(GetElementTypePointerTo(copy.first->getType())) /
-                  Ctx.getCharWidth()));
+                  Ctx.getCharWidth());
         }
         // UnaryExprOrTypeTraitExpr e(UnaryExprOrTypeTrait::UETT_SizeOf, );
         return makeIntegerLiteral(
@@ -419,6 +427,8 @@ public:
   }
 
   bool TaskCall(CallExpr *callExpr, OSSTaskDeclAttr *attr) {
+    auto *declFunctionTask = dyn_cast<FunctionDecl>(callExpr->getCalleeDecl());
+
     auto dependencyMap = computeDependencyMap(attr, true);
 
     llvm::SmallVector<Stmt *, 1> stmts;
@@ -536,7 +546,9 @@ public:
           ExprValueKind::VK_LValue, ExprObjectKind::OK_Ordinary, {}, {}));
 
       stmts.append(copyParamTaskCall(copies, copiesDecl, param, copId, paramId,
-                                     accessedMember, typeMember));
+                                     accessedMember, typeMember,
+                                     attr->getDevice() != OSSTaskDeclAttr::Fpga,
+                                     declFunctionTask, callExpr));
 
       if (auto dependIt = dependencyMap.find(param);
           dependIt != dependencyMap.end()) {
@@ -587,7 +599,6 @@ public:
 
     llvm::SmallVector<Expr *, 10> arguments;
 
-    auto *declFunctionTask = dyn_cast<FunctionDecl>(callExpr->getCalleeDecl());
     arguments.push_back(makeIntegerLiteral(GenOnto(Ctx, declFunctionTask)));
     if (auto *affinity =
             llvm::dyn_cast_or_null<DeclRefExpr>(attr->getAffinity())) {
@@ -810,6 +821,33 @@ public:
                                 makeCallToFunc(McxxTaskwait, {SapawnIn, out}),
                                 FPGAInstrumentationApiCalls::WaitTasks));
     return true;
+  }
+
+  Expr *makeExprRuntimeComputeSize(ASTContext &Ctx,
+                                   const OSSArrayShapingExpr *arrayType,
+                                   FunctionDecl *declFunctionTask,
+                                   CallExpr *callExpr, uint64_t baseType) {
+    Expr *totalSize = makeIntegerLiteral(baseType);
+
+    for (auto *shape : arrayType->getShapes()) {
+      Expr *exprToMul = const_cast<Expr *>(shape->IgnoreParenImpCasts());
+      if (auto *paramExpr =
+              dyn_cast_or_null<DeclRefExpr>(shape->IgnoreParenImpCasts())) {
+        auto *param = dyn_cast_or_null<ParmVarDecl>(paramExpr->getDecl());
+        if (param) {
+          for (unsigned i = 0; i < declFunctionTask->param_size(); ++i) {
+            if (declFunctionTask->getParamDecl(i) == param) {
+              exprToMul = callExpr->getArg(i);
+            }
+          }
+        }
+      }
+      totalSize = BinaryOperator::Create(
+          Ctx, exprToMul, totalSize, BinaryOperatorKind::BO_Mul, Ctx.IntTy,
+          callExpr->getValueKind(), callExpr->getObjectKind(), SourceLocation{},
+          {});
+    }
+    return totalSize;
   }
 };
 
