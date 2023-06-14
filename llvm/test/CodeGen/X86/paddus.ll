@@ -450,10 +450,9 @@ define <64 x i8> @test13(<64 x i8> %x) {
 ;
 ; AVX512-LABEL: test13:
 ; AVX512:       # %bb.0:
-; AVX512-NEXT:    vpternlogd $255, %zmm2, %zmm2, %zmm2
-; AVX512-NEXT:    vpsubb %zmm2, %zmm0, %zmm1
-; AVX512-NEXT:    vpcmpeqb %zmm2, %zmm0, %k1
-; AVX512-NEXT:    vmovdqu8 %zmm2, %zmm1 {%k1}
+; AVX512-NEXT:    vpternlogd $255, %zmm1, %zmm1, %zmm1
+; AVX512-NEXT:    vpcmpneqb %zmm1, %zmm0, %k1
+; AVX512-NEXT:    vpsubb %zmm1, %zmm0, %zmm1 {%k1}
 ; AVX512-NEXT:    vmovdqa64 %zmm1, %zmm0
 ; AVX512-NEXT:    retq
   %1 = add <64 x i8> %x, <i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1, i8 1>
@@ -614,7 +613,7 @@ define <64 x i8> @test17(<64 x i8> %x) {
 ;
 ; AVX1-LABEL: test17:
 ; AVX1:       # %bb.0:
-; AVX1-NEXT:    vmovaps {{.*#+}} ymm2 = [128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128]
+; AVX1-NEXT:    vbroadcastss {{.*#+}} ymm2 = [128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128]
 ; AVX1-NEXT:    vxorps %ymm2, %ymm0, %ymm3
 ; AVX1-NEXT:    vxorps %ymm2, %ymm1, %ymm2
 ; AVX1-NEXT:    vextractf128 $1, %ymm2, %xmm4
@@ -1203,10 +1202,9 @@ define <32 x i16> @test31(<32 x i16> %x) {
 ;
 ; AVX512-LABEL: test31:
 ; AVX512:       # %bb.0:
-; AVX512-NEXT:    vpternlogd $255, %zmm2, %zmm2, %zmm2
-; AVX512-NEXT:    vpsubw %zmm2, %zmm0, %zmm1
-; AVX512-NEXT:    vpcmpeqw %zmm2, %zmm0, %k1
-; AVX512-NEXT:    vmovdqu16 %zmm2, %zmm1 {%k1}
+; AVX512-NEXT:    vpternlogd $255, %zmm1, %zmm1, %zmm1
+; AVX512-NEXT:    vpcmpneqw %zmm1, %zmm0, %k1
+; AVX512-NEXT:    vpsubw %zmm1, %zmm0, %zmm1 {%k1}
 ; AVX512-NEXT:    vmovdqa64 %zmm1, %zmm0
 ; AVX512-NEXT:    retq
   %1 = add <32 x i16> %x, <i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1>
@@ -1423,7 +1421,7 @@ define <32 x i16> @test35(<32 x i16> %x) {
 ;
 ; AVX1-LABEL: test35:
 ; AVX1:       # %bb.0:
-; AVX1-NEXT:    vmovaps {{.*#+}} ymm2 = [32768,32768,32768,32768,32768,32768,32768,32768,32768,32768,32768,32768,32768,32768,32768,32768]
+; AVX1-NEXT:    vbroadcastss {{.*#+}} ymm2 = [32768,32768,32768,32768,32768,32768,32768,32768,32768,32768,32768,32768,32768,32768,32768,32768]
 ; AVX1-NEXT:    vxorps %ymm2, %ymm0, %ymm3
 ; AVX1-NEXT:    vxorps %ymm2, %ymm1, %ymm2
 ; AVX1-NEXT:    vextractf128 $1, %ymm2, %xmm4

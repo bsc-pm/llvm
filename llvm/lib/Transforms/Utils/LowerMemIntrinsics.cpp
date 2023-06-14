@@ -12,8 +12,11 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/MDBuilder.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include <optional>
+
+#define DEBUG_TYPE "lower-mem-intrinsics"
 
 using namespace llvm;
 
@@ -373,10 +376,11 @@ void llvm::createMemCpyLoopUnknownSize(
 //   }
 //   return dst;
 // }
-static void createMemMoveLoop(Instruction *InsertBefore, Value *SrcAddr,
+static bool createMemMoveLoop(Instruction *InsertBefore, Value *SrcAddr,
                               Value *DstAddr, Value *CopyLen, Align SrcAlign,
                               Align DstAlign, bool SrcIsVolatile,
-                              bool DstIsVolatile) {
+                              bool DstIsVolatile,
+                              const TargetTransformInfo &TTI) {
   Type *TypeOfCopyLen = CopyLen->getType();
   BasicBlock *OrigBB = InsertBefore->getParent();
   Function *F = OrigBB->getParent();
@@ -385,10 +389,26 @@ static void createMemMoveLoop(Instruction *InsertBefore, Value *SrcAddr,
   // TODO: Use different element type if possible?
   IRBuilder<> CastBuilder(InsertBefore);
   Type *EltTy = CastBuilder.getInt8Ty();
-  Type *PtrTy =
-      CastBuilder.getInt8PtrTy(SrcAddr->getType()->getPointerAddressSpace());
-  SrcAddr = CastBuilder.CreateBitCast(SrcAddr, PtrTy);
-  DstAddr = CastBuilder.CreateBitCast(DstAddr, PtrTy);
+
+  unsigned SrcAS = SrcAddr->getType()->getPointerAddressSpace();
+  unsigned DstAS = DstAddr->getType()->getPointerAddressSpace();
+  if (SrcAS != DstAS) {
+    if (TTI.isValidAddrSpaceCast(DstAS, SrcAS))
+      DstAddr = CastBuilder.CreateAddrSpaceCast(DstAddr, SrcAddr->getType());
+    else if (TTI.isValidAddrSpaceCast(SrcAS, DstAS))
+      SrcAddr = CastBuilder.CreateAddrSpaceCast(SrcAddr, DstAddr->getType());
+    else {
+      // We don't know generically if it's legal to introduce an
+      // addrspacecast. We need to know either if it's legal to insert an
+      // addrspacecast, or if the address spaces cannot alias.
+      //
+      // TODO: Check if address spaces cannot alias and lower as memcpy.
+      LLVM_DEBUG(
+          dbgs() << "Do not know how to expand memmove between different "
+                    "address spaces\n");
+      return false;
+    }
+  }
 
   // Create the a comparison of src and dst, based on which we jump to either
   // the forward-copy part of the function (if src >= dst) or the backwards-copy
@@ -464,6 +484,7 @@ static void createMemMoveLoop(Instruction *InsertBefore, Value *SrcAddr,
 
   BranchInst::Create(ExitBB, FwdLoopBB, CompareN, ElseTerm);
   ElseTerm->eraseFromParent();
+  return true;
 }
 
 static void createMemSetLoop(Instruction *InsertBefore, Value *DstAddr,
@@ -552,15 +573,17 @@ void llvm::expandMemCpyAsLoop(MemCpyInst *Memcpy,
   }
 }
 
-void llvm::expandMemMoveAsLoop(MemMoveInst *Memmove) {
-  createMemMoveLoop(/* InsertBefore */ Memmove,
-                    /* SrcAddr */ Memmove->getRawSource(),
-                    /* DstAddr */ Memmove->getRawDest(),
-                    /* CopyLen */ Memmove->getLength(),
-                    /* SrcAlign */ Memmove->getSourceAlign().valueOrOne(),
-                    /* DestAlign */ Memmove->getDestAlign().valueOrOne(),
-                    /* SrcIsVolatile */ Memmove->isVolatile(),
-                    /* DstIsVolatile */ Memmove->isVolatile());
+bool llvm::expandMemMoveAsLoop(MemMoveInst *Memmove,
+                               const TargetTransformInfo &TTI) {
+  return createMemMoveLoop(
+      /* InsertBefore */ Memmove,
+      /* SrcAddr */ Memmove->getRawSource(),
+      /* DstAddr */ Memmove->getRawDest(),
+      /* CopyLen */ Memmove->getLength(),
+      /* SrcAlign */ Memmove->getSourceAlign().valueOrOne(),
+      /* DestAlign */ Memmove->getDestAlign().valueOrOne(),
+      /* SrcIsVolatile */ Memmove->isVolatile(),
+      /* DstIsVolatile */ Memmove->isVolatile(), TTI);
 }
 
 void llvm::expandMemSetAsLoop(MemSetInst *Memset) {

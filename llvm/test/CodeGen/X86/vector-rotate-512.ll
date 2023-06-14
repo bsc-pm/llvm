@@ -313,7 +313,7 @@ define <16 x i32> @splatvar_rotate_v16i32(<16 x i32> %a, <16 x i32> %b) nounwind
 define <32 x i16> @splatvar_rotate_v32i16(<32 x i16> %a, <32 x i16> %b) nounwind {
 ; AVX512F-LABEL: splatvar_rotate_v32i16:
 ; AVX512F:       # %bb.0:
-; AVX512F-NEXT:    vpbroadcastq {{.*#+}} xmm2 = [15,15]
+; AVX512F-NEXT:    vpbroadcastq {{.*#+}} xmm2 = [15,0,0,0,15,0,0,0]
 ; AVX512F-NEXT:    vpandn %xmm2, %xmm1, %xmm3
 ; AVX512F-NEXT:    vextracti64x4 $1, %zmm0, %ymm4
 ; AVX512F-NEXT:    vpsrlw $1, %ymm4, %ymm5
@@ -330,7 +330,7 @@ define <32 x i16> @splatvar_rotate_v32i16(<32 x i16> %a, <32 x i16> %b) nounwind
 ;
 ; AVX512VL-LABEL: splatvar_rotate_v32i16:
 ; AVX512VL:       # %bb.0:
-; AVX512VL-NEXT:    vpbroadcastq {{.*#+}} xmm2 = [15,15]
+; AVX512VL-NEXT:    vpbroadcastq {{.*#+}} xmm2 = [15,0,0,0,15,0,0,0]
 ; AVX512VL-NEXT:    vpandn %xmm2, %xmm1, %xmm3
 ; AVX512VL-NEXT:    vextracti64x4 $1, %zmm0, %ymm4
 ; AVX512VL-NEXT:    vpsrlw $1, %ymm4, %ymm5
@@ -347,7 +347,7 @@ define <32 x i16> @splatvar_rotate_v32i16(<32 x i16> %a, <32 x i16> %b) nounwind
 ;
 ; AVX512BW-LABEL: splatvar_rotate_v32i16:
 ; AVX512BW:       # %bb.0:
-; AVX512BW-NEXT:    vmovdqa {{.*#+}} xmm2 = [15,0,0,0]
+; AVX512BW-NEXT:    vpbroadcastq {{.*#+}} xmm2 = [15,0,0,0,15,0,0,0]
 ; AVX512BW-NEXT:    vpandn %xmm2, %xmm1, %xmm3
 ; AVX512BW-NEXT:    vpsrlw $1, %zmm0, %zmm4
 ; AVX512BW-NEXT:    vpsrlw %xmm3, %zmm4, %zmm3
@@ -358,7 +358,7 @@ define <32 x i16> @splatvar_rotate_v32i16(<32 x i16> %a, <32 x i16> %b) nounwind
 ;
 ; AVX512VLBW-LABEL: splatvar_rotate_v32i16:
 ; AVX512VLBW:       # %bb.0:
-; AVX512VLBW-NEXT:    vmovdqa {{.*#+}} xmm2 = [15,0,0,0]
+; AVX512VLBW-NEXT:    vpbroadcastq {{.*#+}} xmm2 = [15,0,0,0,15,0,0,0]
 ; AVX512VLBW-NEXT:    vpandn %xmm2, %xmm1, %xmm3
 ; AVX512VLBW-NEXT:    vpsrlw $1, %zmm0, %zmm4
 ; AVX512VLBW-NEXT:    vpsrlw %xmm3, %zmm4, %zmm3

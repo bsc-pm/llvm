@@ -1759,7 +1759,7 @@ CodeGenTypes::GetFunctionType(const CGFunctionInfo &FI) {
 
 llvm::Type *CodeGenTypes::GetFunctionTypeForVTable(GlobalDecl GD) {
   const CXXMethodDecl *MD = cast<CXXMethodDecl>(GD.getDecl());
-  const FunctionProtoType *FPT = MD->getType()->getAs<FunctionProtoType>();
+  const FunctionProtoType *FPT = MD->getType()->castAs<FunctionProtoType>();
 
   if (!isFuncTypeConvertible(FPT))
     return llvm::StructType::get(getLLVMContext());
@@ -2033,7 +2033,8 @@ void CodeGenModule::mergeDefaultFunctionDefinitionAttributes(
   llvm::AttrBuilder FuncAttrs(F.getContext());
   getTrivialDefaultFunctionAttributes(F.getName(), F.hasOptNone(),
                                       /*AttrOnCallSite=*/false, FuncAttrs);
-  GetCPUAndFeaturesAttributes(GlobalDecl(), FuncAttrs);
+  GetCPUAndFeaturesAttributes(GlobalDecl(), FuncAttrs,
+                              /*AddTargetFeatures=*/false);
 
   if (!WillInternalize && F.isInterposable()) {
     // Do not promote "dynamic" denormal-fp-math to this translation unit's
@@ -4919,25 +4920,6 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
         CGM, Loc, dyn_cast_or_null<FunctionDecl>(CurCodeDecl), FD, CallArgs);
   }
 
-#ifndef NDEBUG
-  if (!(CallInfo.isVariadic() && CallInfo.getArgStruct())) {
-    // For an inalloca varargs function, we don't expect CallInfo to match the
-    // function pointer's type, because the inalloca struct a will have extra
-    // fields in it for the varargs parameters.  Code later in this function
-    // bitcasts the function pointer to the type derived from CallInfo.
-    //
-    // In other cases, we assert that the types match up (until pointers stop
-    // having pointee types).
-    if (Callee.isVirtual())
-      assert(IRFuncTy == Callee.getVirtualFunctionType());
-    else {
-      llvm::PointerType *PtrTy =
-          llvm::cast<llvm::PointerType>(Callee.getFunctionPointer()->getType());
-      assert(PtrTy->isOpaqueOrPointeeTypeMatches(IRFuncTy));
-    }
-  }
-#endif
-
   // 1. Set up the arguments.
 
   // If we're using inalloca, insert the allocation after the stack save.
@@ -5156,9 +5138,8 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
           I->copyInto(*this, AI);
         } else {
           // Skip the extra memcpy call.
-          auto *T = llvm::PointerType::getWithSamePointeeType(
-              cast<llvm::PointerType>(V->getType()),
-              CGM.getDataLayout().getAllocaAddrSpace());
+          auto *T = llvm::PointerType::get(
+              CGM.getLLVMContext(), CGM.getDataLayout().getAllocaAddrSpace());
 
           llvm::Value *Val = getTargetHooks().performAddrSpaceCast(
               *this, V, LangAS::Default, CGM.getASTAllocaAddressSpace(), T,
@@ -5725,7 +5706,6 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
           assert(unpaddedIndex == 0);
         Builder.CreateStore(elt, eltAddr);
       }
-      // FALLTHROUGH
       [[fallthrough]];
     }
 

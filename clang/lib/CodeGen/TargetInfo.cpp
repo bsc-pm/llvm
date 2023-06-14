@@ -1930,9 +1930,21 @@ ABIArgInfo X86_32ABIInfo::classifyArgumentType(QualType Ty,
     llvm::IntegerType *PaddingType = NeedsPadding ? Int32 : nullptr;
 
     // Pass over-aligned aggregates on Windows indirectly. This behavior was
-    // added in MSVC 2015.
-    if (IsWin32StructABI && TI.isAlignRequired() && TI.Align > 32)
-      return getIndirectResult(Ty, /*ByVal=*/false, State);
+    // added in MSVC 2015. Use the required alignment from the record layout,
+    // since that may be less than the regular type alignment, and types with
+    // required alignment of less than 4 bytes are not passed indirectly.
+    if (IsWin32StructABI) {
+      unsigned AlignInBits = 0;
+      if (RT) {
+        const ASTRecordLayout &Layout =
+          getContext().getASTRecordLayout(RT->getDecl());
+        AlignInBits = getContext().toBits(Layout.getRequiredAlignment());
+      } else if (TI.isAlignRequired()) {
+        AlignInBits = TI.Align;
+      }
+      if (AlignInBits > 32)
+        return getIndirectResult(Ty, /*ByVal=*/false, State);
+    }
 
     // Expand small (<= 128-bit) record types when we know that the stack layout
     // of those arguments will match the struct. This is important because the
@@ -2580,6 +2592,7 @@ public:
                             const FunctionDecl *Callee,
                             const CallArgList &Args) const override;
 };
+} // namespace
 
 static void initFeatureMaps(const ASTContext &Ctx,
                             llvm::StringMap<bool> &CallerMap,
@@ -2678,7 +2691,7 @@ void X86_64TargetCodeGenInfo::checkFunctionCallABI(
   }
 }
 
-static std::string qualifyWindowsLibrary(llvm::StringRef Lib) {
+std::string TargetCodeGenInfo::qualifyWindowsLibrary(StringRef Lib) {
   // If the argument does not end in .lib, automatically add the suffix.
   // If the argument contains a space, enclose it in quotes.
   // This matches the behavior of MSVC.
@@ -2691,6 +2704,7 @@ static std::string qualifyWindowsLibrary(llvm::StringRef Lib) {
   return ArgStr;
 }
 
+namespace {
 class WinX86_32TargetCodeGenInfo : public X86_32TargetCodeGenInfo {
 public:
   WinX86_32TargetCodeGenInfo(CodeGen::CodeGenTypes &CGT,
@@ -2714,11 +2728,11 @@ public:
     Opt = "/FAILIFMISMATCH:\"" + Name.str() + "=" + Value.str() + "\"";
   }
 };
+} // namespace
 
-static void addStackProbeTargetAttributes(const Decl *D, llvm::GlobalValue *GV,
-                                          CodeGen::CodeGenModule &CGM) {
+void TargetCodeGenInfo::addStackProbeTargetAttributes(
+    const Decl *D, llvm::GlobalValue *GV, CodeGen::CodeGenModule &CGM) const {
   if (llvm::Function *Fn = dyn_cast_or_null<llvm::Function>(GV)) {
-
     if (CGM.getCodeGenOpts().StackProbeSize != 4096)
       Fn->addFnAttr("stack-probe-size",
                     llvm::utostr(CGM.getCodeGenOpts().StackProbeSize));
@@ -2735,6 +2749,7 @@ void WinX86_32TargetCodeGenInfo::setTargetAttributes(
   addStackProbeTargetAttributes(D, GV, CGM);
 }
 
+namespace {
 class WinX86_64TargetCodeGenInfo : public TargetCodeGenInfo {
 public:
   WinX86_64TargetCodeGenInfo(CodeGen::CodeGenTypes &CGT,
@@ -2773,6 +2788,7 @@ public:
     Opt = "/FAILIFMISMATCH:\"" + Name.str() + "=" + Value.str() + "\"";
   }
 };
+} // namespace
 
 void WinX86_64TargetCodeGenInfo::setTargetAttributes(
     const Decl *D, llvm::GlobalValue *GV, CodeGen::CodeGenModule &CGM) const {
@@ -2789,7 +2805,6 @@ void WinX86_64TargetCodeGenInfo::setTargetAttributes(
   }
 
   addStackProbeTargetAttributes(D, GV, CGM);
-}
 }
 
 void X86_64ABIInfo::postMerge(unsigned AggregateSize, Class &Lo,
@@ -9232,7 +9247,7 @@ private:
     // Single value types.
     auto *PtrTy = llvm::dyn_cast<llvm::PointerType>(Ty);
     if (PtrTy && PtrTy->getAddressSpace() == FromAS)
-      return llvm::PointerType::getWithSamePointeeType(PtrTy, ToAS);
+      return llvm::PointerType::get(Ty->getContext(), ToAS);
     return Ty;
   }
 
@@ -9629,8 +9644,8 @@ llvm::Constant *AMDGPUTargetCodeGenInfo::getNullPointer(
     return llvm::ConstantPointerNull::get(PT);
 
   auto &Ctx = CGM.getContext();
-  auto NPT = llvm::PointerType::getWithSamePointeeType(
-      PT, Ctx.getTargetAddressSpace(LangAS::opencl_generic));
+  auto NPT = llvm::PointerType::get(
+      PT->getContext(), Ctx.getTargetAddressSpace(LangAS::opencl_generic));
   return llvm::ConstantExpr::getAddrSpaceCast(
       llvm::ConstantPointerNull::get(NPT), PT);
 }
@@ -10624,7 +10639,7 @@ ABIArgInfo SPIRVABIInfo::classifyKernelArgumentType(QualType Ty) const {
     auto GlobalAS = getContext().getTargetAddressSpace(LangAS::cuda_device);
     auto *PtrTy = llvm::dyn_cast<llvm::PointerType>(LTy);
     if (PtrTy && PtrTy->getAddressSpace() == DefaultAS) {
-      LTy = llvm::PointerType::getWithSamePointeeType(PtrTy, GlobalAS);
+      LTy = llvm::PointerType::get(PtrTy->getContext(), GlobalAS);
       return ABIArgInfo::getDirect(LTy, 0, nullptr, false);
     }
 

@@ -155,33 +155,35 @@ static const RISCVSupportedExtension SupportedExperimentalExtensions[] = {
     {"ztso", RISCVExtensionVersion{0, 1}},
 
     // vector crypto
-    {"zvbb", RISCVExtensionVersion{0, 5}},
-    {"zvbc", RISCVExtensionVersion{0, 5}},
-    {"zvkg", RISCVExtensionVersion{0, 5}},
-    {"zvkn", RISCVExtensionVersion{0, 5}},
-    {"zvkned", RISCVExtensionVersion{0, 5}},
-    {"zvkng", RISCVExtensionVersion{0, 5}},
-    {"zvknha", RISCVExtensionVersion{0, 5}},
-    {"zvknhb", RISCVExtensionVersion{0, 5}},
-    {"zvks", RISCVExtensionVersion{0, 5}},
-    {"zvksed", RISCVExtensionVersion{0, 5}},
-    {"zvksg", RISCVExtensionVersion{0, 5}},
-    {"zvksh", RISCVExtensionVersion{0, 5}},
-    {"zvkt", RISCVExtensionVersion{0, 5}},
+    {"zvbb", RISCVExtensionVersion{0, 9}},
+    {"zvbc", RISCVExtensionVersion{0, 9}},
+    {"zvkg", RISCVExtensionVersion{0, 9}},
+    {"zvkn", RISCVExtensionVersion{0, 9}},
+    {"zvknc", RISCVExtensionVersion{0, 9}},
+    {"zvkned", RISCVExtensionVersion{0, 9}},
+    {"zvkng", RISCVExtensionVersion{0, 9}},
+    {"zvknha", RISCVExtensionVersion{0, 9}},
+    {"zvknhb", RISCVExtensionVersion{0, 9}},
+    {"zvks", RISCVExtensionVersion{0, 9}},
+    {"zvksc", RISCVExtensionVersion{0, 9}},
+    {"zvksed", RISCVExtensionVersion{0, 9}},
+    {"zvksg", RISCVExtensionVersion{0, 9}},
+    {"zvksh", RISCVExtensionVersion{0, 9}},
+    {"zvkt", RISCVExtensionVersion{0, 9}},
 };
 
 static bool stripExperimentalPrefix(StringRef &Ext) {
   return Ext.consume_front("experimental-");
 }
 
-// This function finds the first character that doesn't belong to a version
+// This function finds the last character that doesn't belong to a version
 // (e.g. zba1p0 is extension 'zba' of version '1p0'). So the function will
 // consume [0-9]*p[0-9]* starting from the backward. An extension name will not
 // end with a digit or the letter 'p', so this function will parse correctly.
 // NOTE: This function is NOT able to take empty strings or strings that only
 // have version numbers and no extension name. It assumes the extension name
 // will be at least more than one character.
-static size_t findFirstNonVersionCharacter(StringRef Ext) {
+static size_t findLastNonVersionCharacter(StringRef Ext) {
   assert(!Ext.empty() &&
          "Already guarded by if-statement in ::parseArchString");
 
@@ -699,9 +701,10 @@ RISCVISAInfo::parseArchString(StringRef Arch, bool EnableExperimentalExtension,
 
   auto StdExtsItr = StdExts.begin();
   auto StdExtsEnd = StdExts.end();
-  auto GoToNextExt = [](StringRef::iterator &I, unsigned ConsumeLength) {
+  auto GoToNextExt = [](StringRef::iterator &I, unsigned ConsumeLength,
+                        StringRef::iterator E) {
     I += 1 + ConsumeLength;
-    if (*I == '_')
+    if (I != E && *I == '_')
       ++I;
   };
   for (auto I = Exts.begin(), E = Exts.end(); I != E;) {
@@ -737,7 +740,7 @@ RISCVISAInfo::parseArchString(StringRef Arch, bool EnableExperimentalExtension,
                                      ExperimentalExtensionVersionCheck)) {
       if (IgnoreUnknown) {
         consumeError(std::move(E));
-        GoToNextExt(I, ConsumeLength);
+        GoToNextExt(I, ConsumeLength, Exts.end());
         continue;
       }
       return std::move(E);
@@ -747,7 +750,7 @@ RISCVISAInfo::parseArchString(StringRef Arch, bool EnableExperimentalExtension,
     // Currently LLVM supports only "mafdcvh".
     if (!isSupportedExtension(StringRef(&C, 1))) {
       if (IgnoreUnknown) {
-        GoToNextExt(I, ConsumeLength);
+        GoToNextExt(I, ConsumeLength, Exts.end());
         continue;
       }
       return createStringError(errc::invalid_argument,
@@ -758,7 +761,7 @@ RISCVISAInfo::parseArchString(StringRef Arch, bool EnableExperimentalExtension,
 
     // Consume full extension name and version, including any optional '_'
     // between this extension and the next
-    GoToNextExt(I, ConsumeLength);
+    GoToNextExt(I, ConsumeLength, Exts.end());
   }
 
   // Handle other types of extensions other than the standard
@@ -788,7 +791,7 @@ RISCVISAInfo::parseArchString(StringRef Arch, bool EnableExperimentalExtension,
 
       StringRef Type = getExtensionType(Ext);
       StringRef Desc = getExtensionTypeDesc(Ext);
-      auto Pos = findFirstNonVersionCharacter(Ext) + 1;
+      auto Pos = findLastNonVersionCharacter(Ext) + 1;
       StringRef Name(Ext.substr(0, Pos));
       StringRef Vers(Ext.substr(Pos));
 
@@ -943,13 +946,13 @@ static const char *ImpliedExtsZve64x[] = {"zve32x", "zvl64b"};
 static const char *ImpliedExtsZvfbfmin[] = {"zve32f"};
 static const char *ImpliedExtsZvfbfwma[] = {"zve32f"};
 static const char *ImpliedExtsZvfh[] = {"zve32f", "zfhmin"};
-static const char *ImpliedExtsZvkn[] = {"zvbb", "zvbc", "zvkned", "zvknhb",
-                                        "zvkt"};
+static const char *ImpliedExtsZvkn[] = {"zvbb", "zvkned", "zvknhb", "zvkt"};
+static const char *ImpliedExtsZvknc[] = {"zvbc", "zvkn"};
 static const char *ImpliedExtsZvkng[] = {"zvkg", "zvkn"};
 static const char *ImpliedExtsZvknhb[] = {"zvknha"};
-static const char *ImpliedExtsZvks[] = {"zvbb", "zvbc", "zvksed", "zvksh",
-                                        "zvkt"};
-static const char *ImpliedExtsZvksg[] = {"zvks", "zvkg"};
+static const char *ImpliedExtsZvks[] = {"zvbb", "zvksed", "zvksh", "zvkt"};
+static const char *ImpliedExtsZvksc[] = {"zvbc", "zvks"};
+static const char *ImpliedExtsZvksg[] = {"zvkg", "zvks"};
 static const char *ImpliedExtsZvl1024b[] = {"zvl512b"};
 static const char *ImpliedExtsZvl128b[] = {"zvl64b"};
 static const char *ImpliedExtsZvl16384b[] = {"zvl8192b"};
@@ -1005,9 +1008,11 @@ static constexpr ImpliedExtsEntry ImpliedExts[] = {
     {{"zvfbfwma"}, {ImpliedExtsZvfbfwma}},
     {{"zvfh"}, {ImpliedExtsZvfh}},
     {{"zvkn"}, {ImpliedExtsZvkn}},
+    {{"zvknc"}, {ImpliedExtsZvknc}},
     {{"zvkng"}, {ImpliedExtsZvkng}},
     {{"zvknhb"}, {ImpliedExtsZvknhb}},
     {{"zvks"}, {ImpliedExtsZvks}},
+    {{"zvksc"}, {ImpliedExtsZvksc}},
     {{"zvksg"}, {ImpliedExtsZvksg}},
     {{"zvl1024b"}, {ImpliedExtsZvl1024b}},
     {{"zvl128b"}, {ImpliedExtsZvl128b}},

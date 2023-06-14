@@ -59,11 +59,6 @@ void AddStaticDeviceLibsLinking(Compilation &C, const Tool &T,
                                 llvm::opt::ArgStringList &CmdArgs,
                                 StringRef Arch, StringRef Target,
                                 bool isBitCodeSDL, bool postClangLink);
-void AddStaticDeviceLibsPostLinking(const Driver &D,
-                                    const llvm::opt::ArgList &DriverArgs,
-                                    llvm::opt::ArgStringList &CmdArgs,
-                                    StringRef Arch, StringRef Target,
-                                    bool isBitCodeSDL, bool postClangLink);
 void AddStaticDeviceLibs(Compilation *C, const Tool *T, const JobAction *JA,
                          const InputInfoList *Inputs, const Driver &D,
                          const llvm::opt::ArgList &DriverArgs,
@@ -154,6 +149,7 @@ void addOmpSsRuntimeInclude(llvm::opt::ArgStringList &CmdArgs, const ToolChain &
 
 const char *getAsNeededOption(const ToolChain &TC, bool as_needed);
 
+llvm::opt::Arg *getLastCSProfileGenerateArg(const llvm::opt::ArgList &Args);
 llvm::opt::Arg *getLastProfileUseArg(const llvm::opt::ArgList &Args);
 llvm::opt::Arg *getLastProfileSampleUseArg(const llvm::opt::ArgList &Args);
 
@@ -208,9 +204,8 @@ SmallString<128> getStatsFileName(const llvm::opt::ArgList &Args,
                                   const InputInfo &Output,
                                   const InputInfo &Input, const Driver &D);
 
-/// \p Flag must be a flag accepted by the driver with its leading '-' removed,
-//     otherwise '-print-multi-lib' will not emit them correctly.
-void addMultilibFlag(bool Enabled, const char *const Flag,
+/// \p Flag must be a flag accepted by the driver.
+void addMultilibFlag(bool Enabled, const StringRef Flag,
                      Multilib::flags_list &Flags);
 
 void addX86AlignBranchArgs(const Driver &D, const llvm::opt::ArgList &Args,
