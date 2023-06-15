@@ -17,6 +17,7 @@
 #include "check-arithmeticif.h"
 #include "check-case.h"
 #include "check-coarray.h"
+#include "check-cuda.h"
 #include "check-data.h"
 #include "check-deallocate.h"
 #include "check-declarations.h"
@@ -71,12 +72,13 @@ static void GetSymbolNames(const Scope &scope, NameToSymbolMap &symbols) {
 // children are visited, Leave is called after. No two checkers may have the
 // same Enter or Leave function. Each checker must be constructible from
 // SemanticsContext and have BaseChecker as a virtual base class.
-template <typename... C> class SemanticsVisitor : public virtual C... {
+template <typename... C>
+class SemanticsVisitor : public virtual BaseChecker, public virtual C... {
 public:
-  using C::Enter...;
-  using C::Leave...;
   using BaseChecker::Enter;
   using BaseChecker::Leave;
+  using C::Enter...;
+  using C::Leave...;
   SemanticsVisitor(SemanticsContext &context)
       : C{context}..., context_{context} {}
 
@@ -160,12 +162,14 @@ private:
 };
 
 using StatementSemanticsPass1 = ExprChecker;
-using StatementSemanticsPass2 = SemanticsVisitor<AccStructureChecker,
-    AllocateChecker, ArithmeticIfStmtChecker, AssignmentChecker, CaseChecker,
-    CoarrayChecker, DataChecker, DeallocateChecker, DoForallChecker,
-    IfStmtChecker, IoChecker, MiscChecker, NamelistChecker, NullifyChecker,
-    OmpStructureChecker, OSSStructureChecker, PurityChecker, ReturnStmtChecker,
-    SelectRankConstructChecker, SelectTypeChecker, StopChecker>;
+using StatementSemanticsPass2 = SemanticsVisitor<AllocateChecker,
+    ArithmeticIfStmtChecker, AssignmentChecker, CaseChecker, CoarrayChecker,
+    DataChecker, DeallocateChecker, DoForallChecker, IfStmtChecker, IoChecker,
+    MiscChecker, NamelistChecker, NullifyChecker, PurityChecker,
+    ReturnStmtChecker, SelectRankConstructChecker, SelectTypeChecker,
+    StopChecker>;
+using StatementSemanticsPass3 =
+    SemanticsVisitor<AccStructureChecker, OmpStructureChecker, OSSStructureChecker, CUDAChecker>;
 
 static bool PerformStatementSemantics(
     SemanticsContext &context, parser::Program &program) {
@@ -176,6 +180,12 @@ static bool PerformStatementSemantics(
   StatementSemanticsPass1{context}.Walk(program);
   StatementSemanticsPass2 pass2{context};
   pass2.Walk(program);
+  if (context.languageFeatures().IsEnabled(common::LanguageFeature::OpenACC) ||
+      context.languageFeatures().IsEnabled(common::LanguageFeature::OpenMP) ||
+      context.languageFeatures().IsEnabled(common::LanguageFeature::OmpSs) ||
+      context.languageFeatures().IsEnabled(common::LanguageFeature::CUDA)) {
+    StatementSemanticsPass3{context}.Walk(program);
+  }
   if (!context.AnyFatalError()) {
     pass2.CompileDataInitializationsIntoInitializers();
   }
@@ -478,6 +488,14 @@ void SemanticsContext::UsePPCFortranBuiltinTypesModule() {
   }
 }
 
+const Scope &SemanticsContext::GetCUDABuiltinsScope() {
+  if (!cudaBuiltinsScope_) {
+    cudaBuiltinsScope_ = GetBuiltinModule("__cuda_builtins");
+    CHECK(cudaBuiltinsScope_.value() != nullptr);
+  }
+  return **cudaBuiltinsScope_;
+}
+
 void SemanticsContext::UsePPCFortranBuiltinsModule() {
   if (ppcBuiltinsScope_ == nullptr) {
     ppcBuiltinsScope_ = GetBuiltinModule("__fortran_ppc_intrinsics");
@@ -500,17 +518,19 @@ bool Semantics::Perform() {
                     .statement.v.source == "__fortran_builtins" ||
             std::get<parser::Statement<parser::ModuleStmt>>(
                 frontModule->value().t)
-                    .statement.v.source == "__fortran_ppc_intrinsics" ||
-            std::get<parser::Statement<parser::ModuleStmt>>(
-                frontModule->value().t)
                     .statement.v.source == "__fortran_ppc_types")) {
       // Don't try to read the builtins module when we're actually building it.
+    } else if (frontModule &&
+        std::get<parser::Statement<parser::ModuleStmt>>(frontModule->value().t)
+                .statement.v.source == "__fortran_ppc_intrinsics") {
+      // The derived type definition for the vectors is needed.
+      context_.UsePPCFortranBuiltinTypesModule();
     } else {
       context_.UseFortranBuiltinsModule();
       llvm::Triple targetTriple{llvm::Triple(
           llvm::Triple::normalize(llvm::sys::getDefaultTargetTriple()))};
       // Only use __Fortran_PPC_intrinsics module when targetting PowerPC arch
-      if (targetTriple.isPPC()) {
+      if (context_.targetCharacteristics().isPPC()) {
         context_.UsePPCFortranBuiltinTypesModule();
         context_.UsePPCFortranBuiltinsModule();
       }
@@ -521,6 +541,7 @@ bool Semantics::Perform() {
       CanonicalizeAcc(context_.messages(), program_) &&
       CanonicalizeOmp(context_.messages(), program_) &&
       CanonicalizeOSS(context_.messages(), program_) &&
+      CanonicalizeCUDA(program_) &&
       PerformStatementSemantics(context_, program_) &&
       ModFileWriter{context_}.WriteAll();
 }
@@ -562,7 +583,7 @@ void DoDumpSymbols(llvm::raw_ostream &os, const Scope &scope, int indent) {
   if (scope.derivedTypeSpec()) {
     os << " instantiation of " << *scope.derivedTypeSpec();
   }
-  os << '\n';
+  os << " sourceRange=" << scope.sourceRange().size() << " bytes\n";
   ++indent;
   for (const auto &pair : scope) {
     const auto &symbol{*pair.second};

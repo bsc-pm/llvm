@@ -14,6 +14,7 @@ add_llvm_unittest(SupportTests
   BinaryStreamTest.cpp
   BLAKE3Test.cpp
   BlockFrequencyTest.cpp
+  BalancedPartitioningTest.cpp
   BranchProbabilityTest.cpp
   CachePruningTest.cpp
   CrashRecoveryTest.cpp
@@ -79,7 +80,6 @@ add_llvm_unittest(SupportTests
   SuffixTreeTest.cpp
   SwapByteOrderTest.cpp
   TarWriterTest.cpp
-  TaskQueueTest.cpp
   ThreadPool.cpp
   Threading.cpp
   TimerTest.cpp

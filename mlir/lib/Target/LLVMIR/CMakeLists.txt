@@ -40,7 +40,6 @@ add_mlir_translation_library(MLIRTargetLLVMIRExport
   MLIRLLVMDialect
   MLIRLLVMIRTransforms
   MLIRTranslateLib
-  MLIROpenMPDialect
   )
 
 add_mlir_translation_library(MLIRToLLVMIRTranslationRegistration

@@ -203,9 +203,8 @@ Sema::Sema(Preprocessor &pp, ASTContext &ctxt, ASTConsumer &consumer,
       VisContext(nullptr), PragmaAttributeCurrentTargetDecl(nullptr),
       IsBuildingRecoveryCallExpr(false), LateTemplateParser(nullptr),
       LateTemplateParserCleanup(nullptr), OpaqueParser(nullptr), IdResolver(pp),
-      StdInitializerList(nullptr),
-      StdCoroutineTraitsCache(nullptr), CXXTypeInfoDecl(nullptr),
-      MSVCGuidDecl(nullptr), StdSourceLocationImplDecl(nullptr),
+      StdInitializerList(nullptr), StdCoroutineTraitsCache(nullptr),
+      CXXTypeInfoDecl(nullptr), StdSourceLocationImplDecl(nullptr),
       NSNumberDecl(nullptr), NSValueDecl(nullptr), NSStringDecl(nullptr),
       StringWithUTF8StringMethod(nullptr),
       ValueWithBytesObjCTypeMethod(nullptr), NSArrayDecl(nullptr),
@@ -220,7 +219,7 @@ Sema::Sema(Preprocessor &pp, ASTContext &ctxt, ASTConsumer &consumer,
       DisableTypoCorrection(false), TyposCorrected(0), AnalysisWarnings(*this),
       ThreadSafetyDeclCache(nullptr), VarDataSharingAttributesStack(nullptr),
       VarDataSharingAttributesStackOmpSs(nullptr),
-      CurScope(nullptr), Ident_super(nullptr), Ident___float128(nullptr) {
+      CurScope(nullptr), Ident_super(nullptr) {
   assert(pp.TUKind == TUKind);
   TUScope = nullptr;
   isConstantEvaluatedOverride = false;
@@ -1190,7 +1189,7 @@ void Sema::ActOnEndOfTranslationUnit() {
         !(isa<FunctionDecl>(PrevDecl) || isa<VarDecl>(PrevDecl)))
       for (const auto &WI : WeakIDs.second)
         Diag(WI.getLocation(), diag::warn_attribute_wrong_decl_type)
-            << "'weak'" << ExpectedVariableOrFunction;
+            << "'weak'" << /*isRegularKeyword=*/0 << ExpectedVariableOrFunction;
     else
       for (const auto &WI : WeakIDs.second)
         Diag(WI.getLocation(), diag::warn_weak_identifier_undeclared)
@@ -2689,12 +2688,6 @@ IdentifierInfo *Sema::getSuperIdentifier() const {
   if (!Ident_super)
     Ident_super = &Context.Idents.get("super");
   return Ident_super;
-}
-
-IdentifierInfo *Sema::getFloat128Identifier() const {
-  if (!Ident___float128)
-    Ident___float128 = &Context.Idents.get("__float128");
-  return Ident___float128;
 }
 
 void Sema::PushCapturedRegionScope(Scope *S, CapturedDecl *CD, RecordDecl *RD,

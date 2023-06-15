@@ -188,7 +188,7 @@ private:
   /// Track symbols symbols processed during and after the registration
   /// to avoid infinite loops between type conversions and global variable
   /// creation.
-  llvm::SmallSetVector<Fortran::semantics::SymbolRef, 64> seen;
+  llvm::SmallSetVector<Fortran::semantics::SymbolRef, 32> seen;
 };
 
 class DispatchTableConverter {
@@ -618,23 +618,6 @@ public:
           return fir::substBase(hexv, temp);
         });
 
-    // Replace all uses of the original with the clone/copy,
-    // esepcially for loop bounds (that uses the variable being privatised)
-    // since loop bounds use old values that need to be fixed by using the
-    // new copied value.
-    // Not able to use replaceAllUsesWith() because uses outside
-    // the loop body should not use the clone.
-    // FIXME: Call privatization before the loop operation.
-    mlir::Region &curRegion = getFirOpBuilder().getRegion();
-    mlir::Value oldVal = fir::getBase(hexv);
-    mlir::Value cloneVal = fir::getBase(exv);
-    for (auto &oper : curRegion.getOps()) {
-      for (unsigned int ii = 0; ii < oper.getNumOperands(); ++ii) {
-        if (oper.getOperand(ii) == oldVal) {
-          oper.setOperand(ii, cloneVal);
-        }
-      }
-    }
     return bindIfNewSymbol(sym, exv);
   }
 
@@ -1327,11 +1310,11 @@ private:
   void genFIR(const Fortran::parser::CallStmt &stmt) {
     Fortran::lower::StatementContext stmtCtx;
     Fortran::lower::pft::Evaluation &eval = getEval();
-    setCurrentPosition(stmt.v.source);
+    setCurrentPosition(stmt.source);
     assert(stmt.typedCall && "Call was not analyzed");
 
     // Check if is outline task
-    const Fortran::parser::Call &call{stmt.v};
+    const Fortran::parser::Call &call{stmt.call};
     const auto &designator{std::get<Fortran::parser::ProcedureDesignator>(call.t)};
     if (const auto *name{std::get_if<Fortran::parser::Name>(&designator.u)}) {
       auto &ultimate{name->symbol->GetUltimate()};
@@ -1375,7 +1358,7 @@ private:
     llvm::SmallVector<Fortran::parser::Label> labelList;
     int64_t index = 0;
     for (const Fortran::parser::ActualArgSpec &arg :
-         std::get<std::list<Fortran::parser::ActualArgSpec>>(stmt.v.t)) {
+         std::get<std::list<Fortran::parser::ActualArgSpec>>(stmt.call.t)) {
       const auto &actual = std::get<Fortran::parser::ActualArg>(arg.t);
       if (const auto *altReturn =
               std::get_if<Fortran::parser::AltReturnSpec>(&actual.u)) {

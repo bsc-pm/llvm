@@ -23,7 +23,7 @@
 
 _LIBCPP_BEGIN_NAMESPACE_FILESYSTEM
 
-_LIBCPP_AVAILABILITY_FILESYSTEM_PUSH
+_LIBCPP_AVAILABILITY_FILESYSTEM_LIBRARY_PUSH
 
 class _LIBCPP_TYPE_VIS file_status {
 public:
@@ -58,12 +58,20 @@ public:
   _LIBCPP_INLINE_VISIBILITY
   void permissions(perms __p) noexcept { __prms_ = __p; }
 
+#  if _LIBCPP_STD_VER >= 20
+
+  _LIBCPP_HIDE_FROM_ABI friend bool operator==(const file_status& __lhs, const file_status& __rhs) noexcept {
+    return __lhs.type() == __rhs.type() && __lhs.permissions() == __rhs.permissions();
+  }
+
+#  endif
+
 private:
   file_type __ft_;
   perms __prms_;
 };
 
-_LIBCPP_AVAILABILITY_FILESYSTEM_POP
+_LIBCPP_AVAILABILITY_FILESYSTEM_LIBRARY_POP
 
 _LIBCPP_END_NAMESPACE_FILESYSTEM
 
