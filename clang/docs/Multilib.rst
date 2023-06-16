@@ -59,6 +59,7 @@ Multilib processing
 
 Clang goes through the following steps to use multilib from a configuration
 file:
+
 #. Normalize command line options. Clang can accept the same
    information via different options - for example,
    ``--target=arm-none-eabi -march=armv7-m`` and
@@ -78,10 +79,12 @@ file:
    a match.
    If more than one variant matches then a toolchain may opt to either use only
    the *last* matching multilib variant, or may use all matching variants,
-   thereby :ref:`layering<Multilib layering>` them.
+   thereby :ref:`layering<multilib-layering>` them.
 #. Generate ``-isystem`` and ``-L`` options. Iterate in reverse order over
    the matching multilib variants, and generate ``-isystem`` and ``-L``
    options based on the multilib variant's directory.
+
+.. _multilib-layering:
 
 Multilib layering
 =================
@@ -91,6 +94,7 @@ matches.
 
 It is up to the ToolChain subclass to decide what to do in this case.
 There are two options permitted:
+
 #. Use only the *last* matching multilib variant. This option exists primarily
    for compatibility with the previous multilib design.
 #. Use all matching variants, thereby layering them.
@@ -149,6 +153,7 @@ For a more comprehensive example see
 ``clang/test/Driver/baremetal-multilib.yaml`` in the ``llvm-project`` sources.
 
 .. code-block:: yaml
+
   # multilib.yaml
 
   # This format is experimental and is likely to change!

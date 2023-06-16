@@ -15,6 +15,7 @@
 #include "CIndexer.h"
 #include "CLog.h"
 #include "CXCursor.h"
+#include "CXFile.h"
 #include "CXSourceLocation.h"
 #include "CXString.h"
 #include "CXTranslationUnit.h"
@@ -4681,16 +4682,16 @@ CXString clang_getFileName(CXFile SFile) {
   if (!SFile)
     return cxstring::createNull();
 
-  FileEntry *FEnt = static_cast<FileEntry *>(SFile);
-  return cxstring::createRef(FEnt->getName());
+  FileEntryRef FEnt = *cxfile::getFileEntryRef(SFile);
+  return cxstring::createRef(FEnt.getName());
 }
 
 time_t clang_getFileTime(CXFile SFile) {
   if (!SFile)
     return 0;
 
-  FileEntry *FEnt = static_cast<FileEntry *>(SFile);
-  return FEnt->getModificationTime();
+  FileEntryRef FEnt = *cxfile::getFileEntryRef(SFile);
+  return FEnt.getModificationTime();
 }
 
 CXFile clang_getFile(CXTranslationUnit TU, const char *file_name) {
@@ -4702,10 +4703,7 @@ CXFile clang_getFile(CXTranslationUnit TU, const char *file_name) {
   ASTUnit *CXXUnit = cxtu::getASTUnit(TU);
 
   FileManager &FMgr = CXXUnit->getFileManager();
-  auto File = FMgr.getFile(file_name);
-  if (!File)
-    return nullptr;
-  return const_cast<FileEntry *>(*File);
+  return cxfile::makeCXFile(FMgr.getOptionalFileRef(file_name));
 }
 
 const char *clang_getFileContents(CXTranslationUnit TU, CXFile file,
@@ -4716,7 +4714,7 @@ const char *clang_getFileContents(CXTranslationUnit TU, CXFile file,
   }
 
   const SourceManager &SM = cxtu::getASTUnit(TU)->getSourceManager();
-  FileID fid = SM.translateFile(static_cast<FileEntry *>(file));
+  FileID fid = SM.translateFile(*cxfile::getFileEntryRef(file));
   std::optional<llvm::MemoryBufferRef> buf = SM.getBufferOrNone(fid);
   if (!buf) {
     if (size)
@@ -4738,7 +4736,7 @@ unsigned clang_isFileMultipleIncludeGuarded(CXTranslationUnit TU, CXFile file) {
     return 0;
 
   ASTUnit *CXXUnit = cxtu::getASTUnit(TU);
-  FileEntry *FEnt = static_cast<FileEntry *>(file);
+  FileEntryRef FEnt = *cxfile::getFileEntryRef(file);
   return CXXUnit->getPreprocessor()
       .getHeaderSearchInfo()
       .isFileMultipleIncludeGuarded(FEnt);
@@ -4748,11 +4746,11 @@ int clang_getFileUniqueID(CXFile file, CXFileUniqueID *outID) {
   if (!file || !outID)
     return 1;
 
-  FileEntry *FEnt = static_cast<FileEntry *>(file);
-  const llvm::sys::fs::UniqueID &ID = FEnt->getUniqueID();
+  FileEntryRef FEnt = *cxfile::getFileEntryRef(file);
+  const llvm::sys::fs::UniqueID &ID = FEnt.getUniqueID();
   outID->data[0] = ID.getDevice();
   outID->data[1] = ID.getFile();
-  outID->data[2] = FEnt->getModificationTime();
+  outID->data[2] = FEnt.getModificationTime();
   return 0;
 }
 
@@ -4763,17 +4761,17 @@ int clang_File_isEqual(CXFile file1, CXFile file2) {
   if (!file1 || !file2)
     return false;
 
-  FileEntry *FEnt1 = static_cast<FileEntry *>(file1);
-  FileEntry *FEnt2 = static_cast<FileEntry *>(file2);
-  return FEnt1->getUniqueID() == FEnt2->getUniqueID();
+  FileEntryRef FEnt1 = *cxfile::getFileEntryRef(file1);
+  FileEntryRef FEnt2 = *cxfile::getFileEntryRef(file2);
+  return FEnt1.getUniqueID() == FEnt2.getUniqueID();
 }
 
 CXString clang_File_tryGetRealPathName(CXFile SFile) {
   if (!SFile)
     return cxstring::createNull();
 
-  FileEntry *FEnt = static_cast<FileEntry *>(SFile);
-  return cxstring::createRef(FEnt->tryGetRealPathName());
+  FileEntryRef FEnt = *cxfile::getFileEntryRef(SFile);
+  return cxstring::createRef(FEnt.getFileEntry().tryGetRealPathName());
 }
 
 //===----------------------------------------------------------------------===//
@@ -8623,8 +8621,7 @@ CXFile clang_getIncludedFile(CXCursor cursor) {
     return nullptr;
 
   const InclusionDirective *ID = getCursorInclusionDirective(cursor);
-  OptionalFileEntryRef File = ID->getFile();
-  return const_cast<FileEntry *>(File ? &File->getFileEntry() : nullptr);
+  return cxfile::makeCXFile(ID->getFile());
 }
 
 unsigned clang_Cursor_getObjCPropertyAttributes(CXCursor C, unsigned reserved) {
@@ -8820,12 +8817,11 @@ CXModule clang_getModuleForFile(CXTranslationUnit TU, CXFile File) {
   }
   if (!File)
     return nullptr;
-  FileEntry *FE = static_cast<FileEntry *>(File);
+  FileEntryRef FE = *cxfile::getFileEntryRef(File);
 
   ASTUnit &Unit = *cxtu::getASTUnit(TU);
   HeaderSearch &HS = Unit.getPreprocessor().getHeaderSearchInfo();
-  // TODO: Make CXFile a FileEntryRef.
-  ModuleMap::KnownHeader Header = HS.findModuleForHeader(FE->getLastRef());
+  ModuleMap::KnownHeader Header = HS.findModuleForHeader(FE);
 
   return Header.getModule();
 }
@@ -8834,9 +8830,7 @@ CXFile clang_Module_getASTFile(CXModule CXMod) {
   if (!CXMod)
     return nullptr;
   Module *Mod = static_cast<Module *>(CXMod);
-  if (auto File = Mod->getASTFile())
-    return const_cast<FileEntry *>(&File->getFileEntry());
-  return nullptr;
+  return cxfile::makeCXFile(Mod->getASTFile());
 }
 
 CXModule clang_Module_getParent(CXModule CXMod) {
@@ -8877,7 +8871,7 @@ unsigned clang_Module_getNumTopLevelHeaders(CXTranslationUnit TU,
     return 0;
   Module *Mod = static_cast<Module *>(CXMod);
   FileManager &FileMgr = cxtu::getASTUnit(TU)->getFileManager();
-  ArrayRef<const FileEntry *> TopHeaders = Mod->getTopHeaders(FileMgr);
+  ArrayRef<FileEntryRef> TopHeaders = Mod->getTopHeaders(FileMgr);
   return TopHeaders.size();
 }
 
@@ -8892,9 +8886,9 @@ CXFile clang_Module_getTopLevelHeader(CXTranslationUnit TU, CXModule CXMod,
   Module *Mod = static_cast<Module *>(CXMod);
   FileManager &FileMgr = cxtu::getASTUnit(TU)->getFileManager();
 
-  ArrayRef<const FileEntry *> TopHeaders = Mod->getTopHeaders(FileMgr);
+  ArrayRef<FileEntryRef> TopHeaders = Mod->getTopHeaders(FileMgr);
   if (Index < TopHeaders.size())
-    return const_cast<FileEntry *>(TopHeaders[Index]);
+    return cxfile::makeCXFile(TopHeaders[Index]);
 
   return nullptr;
 }
@@ -9270,7 +9264,7 @@ CXSourceRangeList *clang_getSkippedRanges(CXTranslationUnit TU, CXFile file) {
 
   ASTContext &Ctx = astUnit->getASTContext();
   SourceManager &sm = Ctx.getSourceManager();
-  FileEntry *fileEntry = static_cast<FileEntry *>(file);
+  FileEntryRef fileEntry = *cxfile::getFileEntryRef(file);
   FileID wantedFileID = sm.translateFile(fileEntry);
   bool isMainFile = wantedFileID == sm.getMainFileID();
 
@@ -9544,8 +9538,8 @@ Logger &cxindex::Logger::operator<<(CXTranslationUnit TU) {
   return *this;
 }
 
-Logger &cxindex::Logger::operator<<(const FileEntry *FE) {
-  *this << FE->getName();
+Logger &cxindex::Logger::operator<<(FileEntryRef FE) {
+  *this << FE.getName();
   return *this;
 }
 
