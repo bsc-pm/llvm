@@ -124,7 +124,7 @@ attributes #1 = { nounwind }
 ; CHECK:       codeRepl:
 ; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS]], align 8, !dbg [[DBG14]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG14]]
-; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_main, ptr @task_invocation_info_main, ptr null, i64 64, ptr [[TMP0]], ptr [[TMP1]], i64 0, i64 [[TMP7]]), !dbg [[DBG14]]
+; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_main, ptr @task_invocation_info_main, ptr null, i64 64, ptr [[TMP0]], ptr [[TMP1]], i64 2, i64 [[TMP7]]), !dbg [[DBG14]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = load ptr, ptr [[TMP0]], align 8, !dbg [[DBG14]]
 ; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP8]], i64 64, !dbg [[DBG14]]
 ; CHECK-NEXT:    [[GEP_DEV_NDRANGE0:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN:%.*]], ptr [[TMP8]], i32 0, i32 0, !dbg [[DBG14]]

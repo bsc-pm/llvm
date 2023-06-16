@@ -125,6 +125,31 @@ struct OmpSsDirective {
   // function entry.
   SmallVectorImpl<Instruction *> &PostMoveInstructions;
 
+  /// InFinalRAIIObject - This sets the OmpSsDirective::InFinalCtx bool and
+  /// restores it when destroyed.  This says that in the current lowering task
+  /// we are in a final context so we have to set if(0) flag by hand.
+  /// NOTE: this only affects device ndrange tasks
+  class InFinalRAIIObject {
+    OmpSsDirective &P;
+    bool OldVal;
+  public:
+    InFinalRAIIObject(OmpSsDirective &p, bool Value = true)
+      : P(p), OldVal(P.InFinalCtx) {
+      P.InFinalCtx = Value;
+    }
+
+    /// restore - This can be used to restore the state early, before the dtor
+    /// is run.
+    void restore() {
+      P.InFinalCtx = OldVal;
+    }
+
+    ~InFinalRAIIObject() {
+      restore();
+    }
+  };
+  bool InFinalCtx = false;
+
   OmpSsDirective(Module &M, Function &F, DirectiveInfo &DirInfo,
                  DirectiveFinalInfo &FinalInfo,
                  SmallVectorImpl<Instruction *> &PostMoveInstructions)
@@ -2078,7 +2103,17 @@ struct OmpSsDirective {
           IRB.CreateZExt(DirEnv.Final,
                          Int64Ty));
     }
-    if (DirEnv.If) {
+    // Device Ndrange tasks default to if(0) in
+    // final context
+    if (InFinalCtx) {
+      TaskFlagsVar =
+        IRB.CreateOr(
+          TaskFlagsVar,
+          IRB.CreateShl(
+            IRB.CreateZExt(
+              IRB.getTrue(), Int64Ty),
+              1));
+    } else if (DirEnv.If) {
       TaskFlagsVar =
         IRB.CreateOr(
           TaskFlagsVar,
@@ -2918,6 +2953,8 @@ struct OmpSsDirective {
     if (!DirEnv.isOmpSsTaskDirective())
       return;
 
+    InFinalRAIIObject InFinalRAII(*this);
+
     if (DirEnv.isOmpSsTaskDirective())
       buildFinalCondCFG();
 
@@ -2943,12 +2980,8 @@ struct OmpSsDirective {
         bool IsDeviceWithNdrange =
           !InnerDirInfo.DirEnv.DeviceInfo.empty()
             && !InnerDirInfo.DirEnv.DeviceInfo.Ndrange.empty();
-        if (IsDeviceWithNdrange) {
-          llvm::Value *TmpIf = InnerDirInfo.DirEnv.If;
-          InnerDirInfo.DirEnv.If = ConstantInt::getFalse(Ctx);
+        if (IsDeviceWithNdrange)
           lowerTaskImpl(InnerDirInfo, CloneEntryI, CloneExitI);
-          InnerDirInfo.DirEnv.If = TmpIf;
-        }
 
         CloneExitI->eraseFromParent();
         CloneEntryI->eraseFromParent();
