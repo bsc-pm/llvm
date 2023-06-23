@@ -129,6 +129,7 @@ MODULE_PASS("memprof-module", ModuleMemProfilerPass())
 MODULE_PASS("poison-checking", PoisonCheckingPass())
 MODULE_PASS("pseudo-probe-update", PseudoProbeUpdatePass())
 MODULE_PASS("ompss-2", OmpSsPass())
+MODULE_PASS("ompss-2-pre", OmpSsPreprocessingPass())
 #undef MODULE_PASS
 
 #ifndef MODULE_PASS_WITH_PARAMS
