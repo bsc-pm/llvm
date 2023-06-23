@@ -9,7 +9,6 @@
 #define LLVM_ANALYSIS_OMPSSREGIONANALYSIS_H
 
 #include "llvm/IR/PassManager.h"
-#include "llvm/Pass.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/IR/Dominators.h"

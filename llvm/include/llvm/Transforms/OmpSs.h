@@ -18,15 +18,7 @@
 
 namespace llvm {
 
-class BasicBlockPass;
-class Function;
-class FunctionPass;
 class ModulePass;
-class Pass;
-class GetElementPtrInst;
-class PassInfo;
-class TargetLowering;
-class TargetMachine;
 
 //===----------------------------------------------------------------------===//
 //
