@@ -417,6 +417,7 @@ int main(int argc, char **argv) {
   // Initialize passes
   PassRegistry &Registry = *PassRegistry::getPassRegistry();
   initializeOmpSsLegacyPassPass(Registry);
+  initializeOmpSsPreprocessingLegacyPassPass(Registry);
   initializeCore(Registry);
   initializeScalarOpts(Registry);
   initializeVectorization(Registry);
