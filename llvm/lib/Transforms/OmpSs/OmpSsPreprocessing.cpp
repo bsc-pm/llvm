@@ -8,15 +8,12 @@
 
 #include "llvm/Transforms/OmpSsPreprocessing.h"
 
-#include "llvm/Pass.h"
 #include "llvm/InitializePasses.h"
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/CFG.h"
 #include "llvm/IR/Dominators.h"
-#include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LegacyPassManager.h"
-#include "llvm/IR/Module.h"
+#include "llvm/Transforms/Utils/Local.h"
+
 using namespace llvm;
 
 namespace {
@@ -32,6 +29,9 @@ struct OmpSsPreprocessingModule {
       return false;
 
     bool Modified = false;
+    for (auto &F : M)
+      if (!F.isDeclaration())
+        Modified = removeUnreachableBlocks(F);
     return Modified;
   }
 };
@@ -51,13 +51,14 @@ struct OmpSsPreprocessingLegacyPass : public ModulePass {
 
   StringRef getPassName() const override { return "OmpSs-2 CFG pre-lowering transforms"; }
 
-  void getAnalysisUsage(AnalysisUsage &AU) const override {
-  }
+  void getAnalysisUsage(AnalysisUsage &AU) const override { }
 };
 
 } // end namespace
 
 PreservedAnalyses OmpSsPreprocessingPass::run(Module &M, ModuleAnalysisManager &AM) {
+  if (!OmpSsPreprocessingModule(M).run())
+    return PreservedAnalyses::all();
   return PreservedAnalyses::none();
 }
 
