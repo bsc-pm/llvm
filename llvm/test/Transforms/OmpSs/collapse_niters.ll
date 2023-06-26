@@ -447,7 +447,7 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP49]]), !dbg [[DBG14]]
 ; CHECK-NEXT:    br label [[FOR_END58:%.*]], !dbg [[DBG14]]
 ; CHECK:       final.end53:
-; CHECK-NEXT:    call void @nanos6_taskwait(ptr @[[GLOB4:[0-9]+]]), !dbg [[DBG23:![0-9]+]]
+; CHECK-NEXT:    call void @nanos6_taskwait(ptr @[[GLOB5:[0-9]+]]), !dbg [[DBG23:![0-9]+]]
 ; CHECK-NEXT:    ret i32 0, !dbg [[DBG24:![0-9]+]]
 ; CHECK:       final.then:
 ; CHECK-NEXT:    call fastcc void @compute_lb(), !dbg [[DBG11]]
@@ -799,6 +799,12 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    ret void, !dbg [[DBG96:![0-9]+]]
 ;
 ;
+; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_check_version() {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    tail call void @nanos6_check_version(i64 1, ptr nonnull @nanos6_versions, ptr nonnull @[[GLOB0:[0-9]+]])
+; CHECK-NEXT:    ret void
+;
+;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_main
 ; CHECK-SAME: (ptr nocapture writeonly [[TASK_ARGS:%.*]], ptr nocapture readonly [[LOOP_BOUNDS:%.*]], ptr nocapture readnone [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR3:[0-9]+]] {
 ; CHECK-NEXT:  entry:
@@ -811,13 +817,13 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK:       for.incr8.i.preheader:
 ; CHECK-NEXT:    [[GEP_J:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN:%.*]], ptr [[TASK_ARGS]], i64 0, i32 1
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[LOOP_BOUNDS_VAL1]], -1, !dbg [[DBG98]]
-; CHECK-NEXT:    [[TMP3:%.*]] = udiv i64 [[TMP2]], 9, !dbg [[DBG98]]
-; CHECK-NEXT:    [[TMP4:%.*]] = mul nuw i64 [[TMP3]], 9, !dbg [[DBG98]]
-; CHECK-NEXT:    [[DOTNEG_I_LE:%.*]] = sub i64 [[TMP4]], [[TMP2]], !dbg [[DBG98]]
-; CHECK-NEXT:    [[TMP5:%.*]] = trunc i64 [[TMP3]] to i32, !dbg [[DBG98]]
-; CHECK-NEXT:    [[TMP6:%.*]] = sub i32 10, [[TMP5]], !dbg [[DBG98]]
-; CHECK-NEXT:    [[TMP7:%.*]] = trunc i64 [[DOTNEG_I_LE]] to i32, !dbg [[DBG98]]
-; CHECK-NEXT:    [[TMP8:%.*]] = add i32 [[TMP7]], 10, !dbg [[DBG98]]
+; CHECK-NEXT:    [[TMP3:%.*]] = udiv i64 [[TMP2]], 9
+; CHECK-NEXT:    [[TMP4:%.*]] = mul nuw i64 [[TMP3]], 9
+; CHECK-NEXT:    [[DOTNEG_I_LE:%.*]] = sub i64 [[TMP4]], [[TMP2]]
+; CHECK-NEXT:    [[TMP5:%.*]] = trunc i64 [[TMP3]] to i32
+; CHECK-NEXT:    [[TMP6:%.*]] = sub i32 10, [[TMP5]]
+; CHECK-NEXT:    [[TMP7:%.*]] = trunc i64 [[DOTNEG_I_LE]] to i32
+; CHECK-NEXT:    [[TMP8:%.*]] = add i32 [[TMP7]], 10
 ; CHECK-NEXT:    store i32 [[TMP6]], ptr [[TASK_ARGS]], align 4, !dbg [[DBG98]]
 ; CHECK-NEXT:    store i32 [[TMP8]], ptr [[GEP_J]], align 4, !dbg [[DBG98]]
 ; CHECK-NEXT:    br label [[NANOS6_UNPACKED_TASK_REGION_MAIN_EXIT]]
@@ -846,13 +852,13 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK:       for.incr23.i.preheader:
 ; CHECK-NEXT:    [[GEP_J2:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN_0:%.*]], ptr [[TASK_ARGS]], i64 0, i32 1
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[LOOP_BOUNDS_VAL1]], -1, !dbg [[DBG100]]
-; CHECK-NEXT:    [[TMP3:%.*]] = udiv i64 [[TMP2]], 10, !dbg [[DBG100]]
-; CHECK-NEXT:    [[TMP4:%.*]] = mul nuw i64 [[TMP3]], 10, !dbg [[DBG100]]
-; CHECK-NEXT:    [[DOTNEG_I_LE:%.*]] = sub i64 [[TMP4]], [[TMP2]], !dbg [[DBG100]]
-; CHECK-NEXT:    [[TMP5:%.*]] = trunc i64 [[TMP3]] to i32, !dbg [[DBG100]]
-; CHECK-NEXT:    [[TMP6:%.*]] = sub i32 10, [[TMP5]], !dbg [[DBG100]]
-; CHECK-NEXT:    [[TMP7:%.*]] = trunc i64 [[DOTNEG_I_LE]] to i32, !dbg [[DBG100]]
-; CHECK-NEXT:    [[TMP8:%.*]] = add i32 [[TMP7]], 10, !dbg [[DBG100]]
+; CHECK-NEXT:    [[TMP3:%.*]] = udiv i64 [[TMP2]], 10
+; CHECK-NEXT:    [[TMP4:%.*]] = mul nuw i64 [[TMP3]], 10
+; CHECK-NEXT:    [[DOTNEG_I_LE:%.*]] = sub i64 [[TMP4]], [[TMP2]]
+; CHECK-NEXT:    [[TMP5:%.*]] = trunc i64 [[TMP3]] to i32
+; CHECK-NEXT:    [[TMP6:%.*]] = sub i32 10, [[TMP5]]
+; CHECK-NEXT:    [[TMP7:%.*]] = trunc i64 [[DOTNEG_I_LE]] to i32
+; CHECK-NEXT:    [[TMP8:%.*]] = add i32 [[TMP7]], 10
 ; CHECK-NEXT:    store i32 [[TMP6]], ptr [[TASK_ARGS]], align 4, !dbg [[DBG100]]
 ; CHECK-NEXT:    store i32 [[TMP8]], ptr [[GEP_J2]], align 4, !dbg [[DBG100]]
 ; CHECK-NEXT:    br label [[NANOS6_UNPACKED_TASK_REGION_MAIN_4_EXIT]]
@@ -872,12 +878,12 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK:       for.incr41.i.preheader:
 ; CHECK-NEXT:    [[GEP_J4:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN_1:%.*]], ptr [[TASK_ARGS]], i64 0, i32 1
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[LOOP_BOUNDS_VAL1]], -1, !dbg [[DBG102]]
-; CHECK-NEXT:    [[TMP3:%.*]] = udiv i64 [[TMP2]], 10, !dbg [[DBG102]]
-; CHECK-NEXT:    [[DOTNEG_I_LE:%.*]] = mul i64 [[TMP3]], 4294967286, !dbg [[DBG102]]
-; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[DOTNEG_I_LE]], [[TMP2]], !dbg [[DBG102]]
-; CHECK-NEXT:    [[TMP5:%.*]] = trunc i64 [[TMP3]] to i32, !dbg [[DBG102]]
-; CHECK-NEXT:    [[TMP6:%.*]] = sub i32 10, [[TMP5]], !dbg [[DBG102]]
-; CHECK-NEXT:    [[TMP7:%.*]] = trunc i64 [[TMP4]] to i32, !dbg [[DBG102]]
+; CHECK-NEXT:    [[TMP3:%.*]] = udiv i64 [[TMP2]], 10
+; CHECK-NEXT:    [[DOTNEG_I_LE:%.*]] = mul i64 [[TMP3]], 4294967286
+; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[DOTNEG_I_LE]], [[TMP2]]
+; CHECK-NEXT:    [[TMP5:%.*]] = trunc i64 [[TMP3]] to i32
+; CHECK-NEXT:    [[TMP6:%.*]] = sub i32 10, [[TMP5]]
+; CHECK-NEXT:    [[TMP7:%.*]] = trunc i64 [[TMP4]] to i32
 ; CHECK-NEXT:    store i32 [[TMP6]], ptr [[TASK_ARGS]], align 4, !dbg [[DBG102]]
 ; CHECK-NEXT:    store i32 [[TMP7]], ptr [[GEP_J4]], align 4, !dbg [[DBG102]]
 ; CHECK-NEXT:    br label [[NANOS6_UNPACKED_TASK_REGION_MAIN_14_EXIT]]
@@ -897,13 +903,13 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK:       for.incr59.i.preheader:
 ; CHECK-NEXT:    [[GEP_J6:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN_2:%.*]], ptr [[TASK_ARGS]], i64 0, i32 1
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[LOOP_BOUNDS_VAL1]], -1, !dbg [[DBG104]]
-; CHECK-NEXT:    [[TMP3:%.*]] = udiv i64 [[TMP2]], 9, !dbg [[DBG104]]
-; CHECK-NEXT:    [[DOTNEG_I_LE:%.*]] = mul i64 [[TMP3]], 4294967287, !dbg [[DBG104]]
-; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[DOTNEG_I_LE]], [[TMP2]], !dbg [[DBG104]]
-; CHECK-NEXT:    [[TMP5:%.*]] = trunc i64 [[TMP3]] to i32, !dbg [[DBG104]]
-; CHECK-NEXT:    [[TMP6:%.*]] = sub i32 10, [[TMP5]], !dbg [[DBG104]]
-; CHECK-NEXT:    [[TMP7:%.*]] = trunc i64 [[TMP4]] to i32, !dbg [[DBG104]]
-; CHECK-NEXT:    [[TMP8:%.*]] = add i32 [[TMP7]], 1, !dbg [[DBG104]]
+; CHECK-NEXT:    [[TMP3:%.*]] = udiv i64 [[TMP2]], 9
+; CHECK-NEXT:    [[DOTNEG_I_LE:%.*]] = mul i64 [[TMP3]], 4294967287
+; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[DOTNEG_I_LE]], [[TMP2]]
+; CHECK-NEXT:    [[TMP5:%.*]] = trunc i64 [[TMP3]] to i32
+; CHECK-NEXT:    [[TMP6:%.*]] = sub i32 10, [[TMP5]]
+; CHECK-NEXT:    [[TMP7:%.*]] = trunc i64 [[TMP4]] to i32
+; CHECK-NEXT:    [[TMP8:%.*]] = add i32 [[TMP7]], 1
 ; CHECK-NEXT:    store i32 [[TMP6]], ptr [[TASK_ARGS]], align 4, !dbg [[DBG104]]
 ; CHECK-NEXT:    store i32 [[TMP8]], ptr [[GEP_J6]], align 4, !dbg [[DBG104]]
 ; CHECK-NEXT:    br label [[NANOS6_UNPACKED_TASK_REGION_MAIN_24_EXIT]]
