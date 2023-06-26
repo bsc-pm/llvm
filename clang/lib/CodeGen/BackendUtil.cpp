@@ -74,6 +74,7 @@
 #include "llvm/Transforms/Instrumentation/ThreadSanitizer.h"
 #include "llvm/Transforms/ObjCARC.h"
 #include "llvm/Transforms/OmpSs.h"
+#include "llvm/Transforms/OmpSsPreprocessing.h"
 #include "llvm/Transforms/Scalar/EarlyCSE.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Scalar/JumpThreading.h"
@@ -906,8 +907,10 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
 
   ModulePassManager EarlyMPM;
   if (LangOpts.OmpSs) {
-    if (!CodeGenOpts.DisableLLVMPasses)
+    if (!CodeGenOpts.DisableLLVMPasses) {
+      EarlyMPM.addPass(OmpSsPreprocessingPass());
       EarlyMPM.addPass(OmpSsPass());
+    }
   }
 
   ModulePassManager MPM;
