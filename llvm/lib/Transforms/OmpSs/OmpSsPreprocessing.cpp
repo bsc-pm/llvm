@@ -31,7 +31,9 @@ struct OmpSsPreprocessingModule {
     bool Modified = false;
     for (auto &F : M)
       if (!F.isDeclaration())
-        Modified = removeUnreachableBlocks(F);
+        Modified = removeUnreachableBlocks(
+          F, /*DTU=*/nullptr, /*MSSAU=*/nullptr,
+          /*UnreachNotReturnF=*/false);
     return Modified;
   }
 };

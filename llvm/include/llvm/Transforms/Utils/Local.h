@@ -367,7 +367,7 @@ Instruction *removeUnwindEdge(BasicBlock *BB, DomTreeUpdater *DTU = nullptr);
 ///
 /// Returns true if any basic block was removed.
 bool removeUnreachableBlocks(Function &F, DomTreeUpdater *DTU = nullptr,
-                             MemorySSAUpdater *MSSAU = nullptr);
+                             MemorySSAUpdater *MSSAU = nullptr, bool UnreachNotReturnF = true);
 
 /// Combine the metadata of two instructions so that K can replace J. Some
 /// metadata kinds can only be kept if K does not move, meaning it dominated
