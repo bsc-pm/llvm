@@ -64,6 +64,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_os_ostream.h"
@@ -147,7 +148,9 @@ bool GenerateExtractedOriginalFunction(
     SourceManager &SourceMgr, Preprocessor &PP) {
   // Dependency resolution. We use the ASTImporter utility, which is able to
   // manage any sort of C++ construct during resolution.
-  DiagnosticsEngine toDiagnostics(new DiagnosticIDs(), new DiagnosticOptions());
+  DiagnosticsEngine toDiagnostics(new DiagnosticIDs(), new DiagnosticOptions(),
+                                  SourceMgr.getDiagnostics().getClient(),
+                                  false);
   FileManager fileManager(SourceMgr.getFileManager().getFileSystemOpts());
   SourceManager toMgr(toDiagnostics, fileManager);
   LangOptions toLangOpts(sourceContext.getLangOpts());
@@ -171,6 +174,7 @@ bool GenerateExtractedOriginalFunction(
     llvm::raw_string_ostream stream(out);
     stream << err;
     Diag(FD->getLocation(), diag::err_oss_fpga_dependency_analisis) << out;
+    llvm::consumeError(std::move(err));
     return false;
   }
 
@@ -1207,6 +1211,7 @@ OMPIF_COMM_WORLD
       stream << err;
       Diag(OriginalFD->getLocation(), diag::err_oss_fpga_dependency_analisis)
           << out;
+      llvm::consumeError(std::move(err));
       return false;
     }
     ToFD = dyn_cast<FunctionDecl>(*importedOrErr);
@@ -1225,6 +1230,7 @@ OMPIF_COMM_WORLD
         stream << err;
         Diag(OriginalFD->getLocation(), diag::err_oss_fpga_dependency_analisis)
             << out;
+        llvm::consumeError(std::move(err));
         return false;
       }
     }
@@ -1241,7 +1247,8 @@ public:
         TaskFuncName(std::string(FuncName) + "_moved"), PP(PP), CI(CI),
         printPol(SourceContext.getLangOpts()), OriginalFD(FD),
         OriginalContext(SourceContext), OriginalSourceMgr(SourceMgr),
-        ToDiagnosticsEngine(new DiagnosticIDs(), new DiagnosticOptions()),
+        ToDiagnosticsEngine(new DiagnosticIDs(), new DiagnosticOptions(),
+                            SourceMgr.getDiagnostics().getClient(), false),
         ToFileManager(SourceMgr.getFileManager().getFileSystemOpts()),
         ToSourceManager(ToDiagnosticsEngine, ToFileManager),
         ToLangOpts(SourceContext.getLangOpts()), ToIdentifierTable(),
@@ -1251,6 +1258,7 @@ public:
     printPol.adjustForCPlusPlus();
     printPol.Replacements = &ReplacementMap;
     ToContext.InitBuiltinTypes(OriginalContext.getTargetInfo());
+    ToContext.getDiagnostics();
   }
 
   bool GenerateWrapperFile() {
@@ -1313,7 +1321,7 @@ public:
     OutputJson << "},\n";
   }
 };
-}
+} // namespace
 void FPGAWrapperGen::ActOnOmpSsFpgaExtractFiles(clang::ASTContext &Ctx) {
   if (Ctx.ompssFpgaDecls.empty())
     return;
