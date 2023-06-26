@@ -2362,7 +2362,7 @@ BasicBlock *llvm::changeToInvokeAndSplitBasicBlock(CallInst *CI,
 
 static bool markAliveBlocks(Function &F,
                             SmallPtrSetImpl<BasicBlock *> &Reachable,
-                            DomTreeUpdater *DTU = nullptr) {
+                            DomTreeUpdater *DTU = nullptr, bool UnreachNotReturnF = true) {
   SmallVector<BasicBlock*, 128> Worklist;
   BasicBlock *BB = &F.front();
   Worklist.push_back(BB);
@@ -2417,7 +2417,7 @@ static bool markAliveBlocks(Function &F,
           Changed = true;
           break;
         }
-        if (CI->doesNotReturn() && !CI->isMustTailCall()) {
+        if (UnreachNotReturnF && CI->doesNotReturn() && !CI->isMustTailCall()) {
           // If we found a call to a no-return function, insert an unreachable
           // instruction after it.  Make sure there isn't *already* one there
           // though.
@@ -2459,7 +2459,7 @@ static bool markAliveBlocks(Function &F,
         changeToUnreachable(II, false, DTU);
         Changed = true;
       } else {
-        if (II->doesNotReturn() &&
+        if (UnreachNotReturnF && II->doesNotReturn() &&
             !isa<UnreachableInst>(II->getNormalDest()->front())) {
           // If we found an invoke of a no-return function,
           // create a new empty basic block with an `unreachable` terminator,
@@ -2597,9 +2597,9 @@ Instruction *llvm::removeUnwindEdge(BasicBlock *BB, DomTreeUpdater *DTU) {
 /// if they are in a dead cycle.  Return true if a change was made, false
 /// otherwise.
 bool llvm::removeUnreachableBlocks(Function &F, DomTreeUpdater *DTU,
-                                   MemorySSAUpdater *MSSAU) {
+                                   MemorySSAUpdater *MSSAU, bool UnreachNotReturnF) {
   SmallPtrSet<BasicBlock *, 16> Reachable;
-  bool Changed = markAliveBlocks(F, Reachable, DTU);
+  bool Changed = markAliveBlocks(F, Reachable, DTU, UnreachNotReturnF);
 
   // If there are unreachable blocks in the CFG...
   if (Reachable.size() == F.size())
