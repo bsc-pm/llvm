@@ -362,6 +362,11 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
   assert(OSSDeviceDevFuncEntry->second == LLVMContext::OB_oss_device_dev_func &&
          "oss_device_dev_func operand bundle id drifted!");
   (void)OSSDeviceDevFuncEntry;
+
+  auto *OSSDeviceCallOrderEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEVICE.CALL.ORDER");
+  assert(OSSDeviceCallOrderEntry->second == LLVMContext::OB_oss_device_call_order &&
+         "oss_device_call_order operand bundle id drifted!");
+  (void)OSSDeviceCallOrderEntry;
   // END OmpSs IDs
 
   SyncScope::ID SingleThreadSSID =

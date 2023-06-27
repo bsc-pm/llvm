@@ -69,6 +69,7 @@ enum OmpSsBundleKind {
   OSSB_device,
   OSSB_device_ndrange,
   OSSB_device_dev_func,
+  OSSB_device_call_order,
   OSSB_onready,
   OSSB_while_cond,
   OSSB_in,
@@ -165,6 +166,8 @@ const char *getBundleStr(OmpSsBundleKind Kind) {
     return "QUAL.OSS.DEVICE.NDRANGE";
   case OSSB_device_dev_func:
     return "QUAL.OSS.DEVICE.DEVFUNC";
+  case OSSB_device_call_order:
+    return "QUAL.OSS.DEVICE.CALL.ORDER";
   case OSSB_onready:
     return "QUAL.OSS.ONREADY";
   case OSSB_while_cond:
@@ -2894,6 +2897,9 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   ASTContext &Ctx = CGM.getContext();
 
   SmallVector<Expr *, 4> ParmCopies;
+  // Annotate which are the call arguments. Used to place them
+  // first in the task args.
+  SmallVector<llvm::Value *, 4> CallValues;
   SmallVector<Expr *, 4> FirstprivateCopies;
   SmallVector<Expr *, 4> PrivateCopies;
   SmallVector<Expr *, 4> SharedCopies;
@@ -2936,6 +2942,10 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       FirstprivateCopies.push_back(ParmRef);
 
       LValue ParmLV = CGF.EmitLValue(ParmRef);
+
+      // Annotate the call argument
+      CallValues.push_back(ParmLV.getPointer(CGF));
+
       InitScope.addPrivate(*ParI, [&CGF, &ParmLV]() -> Address { return ParmLV.getAddress(CGF); });
       // We do need to do this every time because the next param may use the previous one
       (void)InitScope.Privatize();
@@ -2947,8 +2957,13 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       // function parameter address. The first because we rewrite the call expr and
       // the second because the dependency is made over that Decl
       LValue ParmLV = CGF.EmitLValue(ParmRef);
+
+      // Annotate the call argument
+      CallValues.push_back(ParmLV.getPointer(CGF));
+
       CaptureMapStack.back().try_emplace(*ParI, ParmLV.getAddress(CGF));
       CaptureMapStack.back().try_emplace(cast<VarDecl>(cast<DeclRefExpr>(ParmRef)->getDecl()), ParmLV.getAddress(CGF));
+
     }
 
     ParmCopies.push_back(ParmRef);
@@ -3170,6 +3185,11 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       EmitIgnoredWrapperCallBundle(
         getBundleStr(OSSB_onready), "compute_onready", CGF, E, TaskInfo);
     }
+
+    // Annotate device call arguments order.
+    if (HasNdrange)
+      TaskInfo.emplace_back(
+          getBundleStr(OSSB_device_call_order), CallValues);
 
     assert(Attr->reductions_size() == Attr->reductionLHSs_size() &&
            Attr->reductions_size() == Attr->reductionRHSs_size() &&

@@ -104,6 +104,8 @@ struct OmpSsDirective {
   Type *Int8Ty;
   Type *Int64Ty;
   PointerType *PtrTy;
+  bool HasDevice;
+
   // 6 for ndrange and 1 for shm_size
   const size_t DeviceArgsSize = 7;
   nanos6Api::Nanos6MultidepFactory MultidepFactory;
@@ -159,6 +161,7 @@ struct OmpSsDirective {
         FinalInfo(FinalInfo),
         Int32Ty(Type::getInt32Ty(Ctx)), Int8Ty(Type::getInt8Ty(Ctx)),
         Int64Ty(Type::getInt64Ty(Ctx)), PtrTy(PointerType::getUnqual(Ctx)),
+        HasDevice(!DeviceInfo.empty()),
         PostMoveInstructions(PostMoveInstructions)
         {}
 
@@ -1163,15 +1166,19 @@ struct OmpSsDirective {
       Type *TaskArgsTy, Function *OlFunc, const MapVector<Value *, size_t> &StructToIdxMap,
       SmallVectorImpl<Value *> &UnpackedList) {
     UnpackedList.clear();
+    UnpackedList.resize(StructToIdxMap.size());
 
     IRBuilder<> BBBuilder(&OlFunc->getEntryBlock());
     Function::arg_iterator AI = OlFunc->arg_begin();
     Value *OlDepsFuncTaskArgs = &*AI++;
     for (const auto &Pair : DSAInfo.Shared) {
       Value *V = Pair.first;
+
+      size_t IdxI = StructToIdxMap.lookup(V);
+
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Int32Ty);
-      Idx[1] = ConstantInt::get(Int32Ty, StructToIdxMap.lookup(V));
+      Idx[1] = ConstantInt::get(Int32Ty, IdxI);
       Value *GEP = BBBuilder.CreateGEP(
           TaskArgsTy,
           OlDepsFuncTaskArgs, Idx, "gep_" + V->getName());
@@ -1179,13 +1186,16 @@ struct OmpSsDirective {
           BBBuilder.CreateLoad(PtrTy, GEP,
                                "load_" + GEP->getName());
 
-      UnpackedList.push_back(LGEP);
+      UnpackedList[HasDevice ? IdxI - DeviceArgsSize : IdxI] = LGEP;
     }
     for (const auto &Pair : DSAInfo.Private) {
       Value *V = Pair.first;
+
+      size_t IdxI = StructToIdxMap.lookup(V);
+
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Int32Ty);
-      Idx[1] = ConstantInt::get(Int32Ty, StructToIdxMap.lookup(V));
+      Idx[1] = ConstantInt::get(Int32Ty, IdxI);
       Value *GEP = BBBuilder.CreateGEP(
           TaskArgsTy,
           OlDepsFuncTaskArgs, Idx, "gep_" + V->getName());
@@ -1194,13 +1204,16 @@ struct OmpSsDirective {
       if (VLADimsInfo.count(V))
         GEP = BBBuilder.CreateLoad(PtrTy, GEP, "load_" + GEP->getName());
 
-      UnpackedList.push_back(GEP);
+      UnpackedList[HasDevice ? IdxI - DeviceArgsSize : IdxI] = GEP;
     }
     for (const auto &Pair : DSAInfo.Firstprivate) {
       Value *V = Pair.first;
+
+      size_t IdxI = StructToIdxMap.lookup(V);
+
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Int32Ty);
-      Idx[1] = ConstantInt::get(Int32Ty, StructToIdxMap.lookup(V));
+      Idx[1] = ConstantInt::get(Int32Ty, IdxI);
       Value *GEP = BBBuilder.CreateGEP(
           TaskArgsTy,
           OlDepsFuncTaskArgs, Idx, "gep_" + V->getName());
@@ -1209,18 +1222,20 @@ struct OmpSsDirective {
       if (VLADimsInfo.count(V))
         GEP = BBBuilder.CreateLoad(PtrTy, GEP, "load_" + GEP->getName());
 
-      UnpackedList.push_back(GEP);
+      UnpackedList[HasDevice ? IdxI - DeviceArgsSize : IdxI] = GEP;
     }
     for (Value *V : CapturedInfo) {
+      size_t IdxI = StructToIdxMap.lookup(V);
+
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Int32Ty);
-      Idx[1] = ConstantInt::get(Int32Ty, StructToIdxMap.lookup(V));
+      Idx[1] = ConstantInt::get(Int32Ty, IdxI);
       Value *GEP = BBBuilder.CreateGEP(
           TaskArgsTy,
           OlDepsFuncTaskArgs, Idx, "capt_gep" + V->getName());
       Value *LGEP =
           BBBuilder.CreateLoad(V->getType(), GEP, "load_" + GEP->getName());
-      UnpackedList.push_back(LGEP);
+      UnpackedList[HasDevice ? IdxI - DeviceArgsSize : IdxI] = LGEP;
     }
   }
 
@@ -1230,8 +1245,7 @@ struct OmpSsDirective {
       IRBuilder<> &IRBEntry,
       const std::map<Value *, int> &DepSymToIdx,
       const MapVector<Value *, size_t> &StructToIdxMap,
-      SmallVector<Value *, 4> &UnpackParams,
-      bool HasDevice) {
+      SmallVector<Value *, 4> &UnpackParams) {
 
     for (const auto &p : DepSymToIdx) {
       Value *DepBaseDSA = p.first;
@@ -1299,10 +1313,8 @@ struct OmpSsDirective {
       IRBIfThen.SetInsertPoint(IfThenBB->getTerminator());
       IRBIfEnd.SetInsertPoint(IfEndBB->getTerminator());
 
-      bool HasDevice = !DirInfo.DirEnv.DeviceInfo.empty();
-
       dupTranlationNeededArgs(
-          IRBEntry, DirInfo.DirEnv.DepSymToIdx, StructToIdxMap, UnpackParams, HasDevice);
+          IRBEntry, DirInfo.DirEnv.DepSymToIdx, StructToIdxMap, UnpackParams);
 
       // Preserve the params before translation. And replace used after build all
       // compute_dep calls
@@ -1563,6 +1575,7 @@ struct OmpSsDirective {
     SmallVector<Type *, 4> TaskArgsMemberTy;
     size_t TaskArgsIdx = 0;
 
+    SmallPtrSet<Value *, 4> Visited;
     if (!DeviceInfo.empty()) {
       // Add device info
 
@@ -1581,39 +1594,72 @@ struct OmpSsDirective {
       // size_t shm_size;
       TaskArgsMemberTy.push_back(Int64Ty);
       TaskArgsIdx++;
+
+      // Give priority to the device all arguments
+      for (Value *V : DeviceInfo.CallOrder) {
+        StructToIdxMap[V] = TaskArgsIdx++;
+        Visited.insert(V);
+      }
     }
+
+    // Extend TaskArgsMemberTy including the CallOrder values.
+    TaskArgsMemberTy.resize(TaskArgsMemberTy.size() + Visited.size());
 
     // Private and Firstprivate must be stored in the struct
     // Captured values (i.e. VLA dimensions) are not pointers
     for (const auto &Pair : DSAInfo.Shared) {
       Value *V = Pair.first;
-      TaskArgsMemberTy.push_back(PtrTy);
-      StructToIdxMap[V] = TaskArgsIdx++;
+      if (!Visited.count(V)) {
+        TaskArgsMemberTy.push_back(PtrTy);
+        StructToIdxMap[V] = TaskArgsIdx++;
+      } else {
+        TaskArgsMemberTy[StructToIdxMap.lookup(V)] = PtrTy;
+      }
     }
     for (const auto &Pair : DSAInfo.Private) {
       Value *V = Pair.first;
       Type *Ty = Pair.second;
-      // VLAs
-      if (VLADimsInfo.count(V))
-        TaskArgsMemberTy.push_back(PtrTy);
-      else
-        TaskArgsMemberTy.push_back(Ty);
-      StructToIdxMap[V] = TaskArgsIdx++;
+      if (!Visited.count(V)) {
+        // VLAs
+        if (VLADimsInfo.count(V))
+          TaskArgsMemberTy.push_back(PtrTy);
+        else
+          TaskArgsMemberTy.push_back(Ty);
+        StructToIdxMap[V] = TaskArgsIdx++;
+      } else {
+        // VLAs
+        if (VLADimsInfo.count(V))
+          TaskArgsMemberTy[StructToIdxMap.lookup(V)] = PtrTy;
+        else
+          TaskArgsMemberTy[StructToIdxMap.lookup(V)] = Ty;
+      }
     }
     for (const auto &Pair : DSAInfo.Firstprivate) {
       Value *V = Pair.first;
       Type *Ty = Pair.second;
-      // VLAs
-      if (VLADimsInfo.count(V))
-        TaskArgsMemberTy.push_back(PtrTy);
-      else
-        TaskArgsMemberTy.push_back(Ty);
-      StructToIdxMap[V] = TaskArgsIdx++;
+      if (!Visited.count(V)) {
+        // VLAs
+        if (VLADimsInfo.count(V))
+          TaskArgsMemberTy.push_back(PtrTy);
+        else
+          TaskArgsMemberTy.push_back(Ty);
+        StructToIdxMap[V] = TaskArgsIdx++;
+      } else {
+        // VLAs
+        if (VLADimsInfo.count(V))
+          TaskArgsMemberTy[StructToIdxMap.lookup(V)] = PtrTy;
+        else
+          TaskArgsMemberTy[StructToIdxMap.lookup(V)] = Ty;
+      }
     }
     for (Value *V : CapturedInfo) {
       assert(!V->getType()->isPointerTy() && "Captures are not pointers");
-      TaskArgsMemberTy.push_back(V->getType());
-      StructToIdxMap[V] = TaskArgsIdx++;
+      if (!Visited.count(V)) {
+        TaskArgsMemberTy.push_back(V->getType());
+        StructToIdxMap[V] = TaskArgsIdx++;
+      } else {
+        TaskArgsMemberTy[StructToIdxMap.lookup(V)] = V->getType();
+      }
     }
     return StructType::create(Ctx, TaskArgsMemberTy, Str);
   }
