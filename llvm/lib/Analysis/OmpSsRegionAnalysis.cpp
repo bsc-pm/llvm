@@ -314,6 +314,11 @@ void DirectiveEnvironment::gatherDeviceDevFuncInfo(OperandBundleDef &OB) {
   DeviceInfo.DevFuncStringRef = DevFuncDataArray->getAsCString();
 }
 
+void DirectiveEnvironment::gatherDeviceCallOrderInfo(OperandBundleDef &OB) {
+  assert(DeviceInfo.CallOrder.empty() && "Only allowed one OperandBundle with this Id");
+  DeviceInfo.CallOrder.append(OB.input_begin(), OB.input_end());
+}
+
 void DirectiveEnvironment::gatherCapturedInfo(OperandBundleDef &OB) {
   assert(CapturedInfo.empty() && "Only allowed one OperandBundle with this Id");
   CapturedInfo.insert(OB.input_begin(), OB.input_end());
@@ -542,6 +547,12 @@ void DirectiveEnvironment::verifyDeviceInfo() {
   // TODO: add a check for DeviceInfo.Kind != (cuda | opencl)
   if (!DeviceInfo.Kind && !DeviceInfo.Ndrange.empty())
     llvm_unreachable("It is expected to have a device kind when used ndrange");
+  if (!DeviceInfo.Kind && !DeviceInfo.CallOrder.empty())
+    llvm_unreachable("It is expected to have a device kind when call order is set");
+  for (auto *V : DeviceInfo.CallOrder)
+    if (!valueInDSABundles(V)
+        && !valueInCapturedBundle(V))
+    llvm_unreachable("Call order value has no associated DSA or capture");
   if (DeviceInfo.NumDims != 0) {
     if (DeviceInfo.NumDims < 1 || DeviceInfo.NumDims > 3)
       llvm_unreachable("Num dimensions is expected to be 1, 2 or 3");
@@ -718,6 +729,9 @@ DirectiveEnvironment::DirectiveEnvironment(const Instruction *I) {
       break;
     case LLVMContext::OB_oss_device_dev_func:
       gatherDeviceDevFuncInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_device_call_order:
+      gatherDeviceCallOrderInfo(OBDef);
       break;
     case LLVMContext::OB_oss_captured:
       gatherCapturedInfo(OBDef);

@@ -155,6 +155,8 @@ struct DirectiveDeviceInfo {
   // The arguments of the call to function.
   size_t NumDims = 0;
   SmallVector<Value *, 4> Ndrange;
+  // Call order args must be first in the task args
+  SmallVector<Value *, 4> CallOrder;
   bool HasLocalSize = true;
   StringRef DevFuncStringRef;
   bool empty() const {
@@ -305,6 +307,7 @@ private:
   void gatherDeviceInfo(OperandBundleDef &OBDef);
   void gatherDeviceNdrangeInfo(OperandBundleDef &OBDef);
   void gatherDeviceDevFuncInfo(OperandBundleDef &OBDef);
+  void gatherDeviceCallOrderInfo(OperandBundleDef &OBDef);
   void gatherCapturedInfo(OperandBundleDef &OBDef);
   void gatherNonPODInitInfo(OperandBundleDef &OBDef);
   void gatherNonPODDeinitInfo(OperandBundleDef &OBDef);

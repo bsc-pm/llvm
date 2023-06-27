@@ -150,6 +150,7 @@ public:
     OB_oss_device = 60,                           // "OB_oss_device"
     OB_oss_device_ndrange = 61,                   // "OB_oss_device_ndrange"
     OB_oss_device_dev_func = 62,                  // "OB_oss_device_dev_func"
+    OB_oss_device_call_order = 63,                // "OB_oss_device_call_order"
   };
 
   /// getMDKindID - Return a unique non-zero ID for the specified metadata kind.
