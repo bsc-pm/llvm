@@ -2617,8 +2617,13 @@ struct OmpSsDirective {
       GEP = IRB.CreateGEP(
           TaskArgsTy,
           TaskArgsVarL, Idx, "gep_dev_shm");
-      IRB.CreateStore(
-        ConstantInt::get(Int64Ty, 0), GEP);
+      if (DeviceInfo.Shmem) {
+        IRB.CreateStore(
+          IRB.CreateZExtOrTrunc(DeviceInfo.Shmem, Int64Ty), GEP);
+      } else {
+        IRB.CreateStore(
+          ConstantInt::get(Int64Ty, 0), GEP);
+      }
     }
 
     // First point VLAs to its according space in task args

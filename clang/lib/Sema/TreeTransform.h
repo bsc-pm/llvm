@@ -1726,6 +1726,17 @@ public:
                                           EndLoc);
   }
 
+  /// Build a new OmpSs 'shmem' clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSShmemClause(Expr *Condition, SourceLocation StartLoc,
+                                   SourceLocation LParenLoc,
+                                   SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsShmemClause(Condition, StartLoc, LParenLoc,
+                                           EndLoc);
+  }
+
   /// Build a new OmpSs 'label' clause.
   ///
   /// By default, performs semantic analysis to build the new OmpSs clause.
@@ -11195,6 +11206,15 @@ OSSClause *TreeTransform<Derived>::TransformOSSPriorityClause(OSSPriorityClause 
     return nullptr;
   return getDerived().RebuildOSSPriorityClause(E.get(), C->getBeginLoc(),
                                                C->getLParenLoc(), C->getEndLoc());
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSShmemClause(OSSShmemClause *C) {
+  ExprResult E = getDerived().TransformExpr(C->getExpression());
+  if (E.isInvalid())
+    return nullptr;
+  return getDerived().RebuildOSSShmemClause(E.get(), C->getBeginLoc(),
+                                            C->getLParenLoc(), C->getEndLoc());
 }
 
 template <typename Derived>

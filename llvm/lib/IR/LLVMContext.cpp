@@ -367,6 +367,11 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
   assert(OSSDeviceCallOrderEntry->second == LLVMContext::OB_oss_device_call_order &&
          "oss_device_call_order operand bundle id drifted!");
   (void)OSSDeviceCallOrderEntry;
+
+  auto *OSSDeviceShmemEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEVICE.SHMEM");
+  assert(OSSDeviceShmemEntry->second == LLVMContext::OB_oss_device_shmem &&
+         "oss_device_shmem operand bundle id drifted!");
+  (void)OSSDeviceShmemEntry;
   // END OmpSs IDs
 
   SyncScope::ID SingleThreadSSID =

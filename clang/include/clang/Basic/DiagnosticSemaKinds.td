@@ -11601,6 +11601,8 @@ def err_oss_ndrange_incompatible_device : Error<
   "ndrange cannot be used with other devices than cuda and opencl">;
 def err_oss_inline_device_not_supported : Error<
   "device(%0) is not supported in inline directives">;
+def err_oss_shmem_without_ndrange : Error<
+  "shmem clause requires ndrange clause to be specified">;
 
 def err_oss_call_expr_support : Error<
   "call expressions are not supported">;

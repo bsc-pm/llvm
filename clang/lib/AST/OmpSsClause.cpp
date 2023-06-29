@@ -298,6 +298,12 @@ void OSSClausePrinter::VisitOSSUpdateClause(OSSUpdateClause *Node) {
   OS << "update";
 }
 
+void OSSClausePrinter::VisitOSSShmemClause(OSSShmemClause *Node) {
+  OS << "shmem(";
+  Node->getExpression()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
 void OSSClausePrinter::VisitOSSOnreadyClause(OSSOnreadyClause *Node) {
   OS << "onready(";
   Node->getExpression()->printPretty(OS, nullptr, Policy, 0);

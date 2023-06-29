@@ -57,6 +57,9 @@ def OSSC_Wait : Clause<"wait"> {
 def OSSC_Update : Clause<"update"> {
   let clangClass = "OSSUpdateClause";
 }
+def OSSC_Shmem : Clause<"shmem"> {
+  let clangClass = "OSSShmemClause";
+}
 def OSSC_Onready : Clause<"onready"> {
   let clangClass = "OSSOnreadyClause";
 }
@@ -225,6 +228,7 @@ def OSS_DeclareTask : Directive<"declare task"> {
     VersionedClause<OSSC_Priority>,
     VersionedClause<OSSC_Label>,
     VersionedClause<OSSC_Wait>,
+    VersionedClause<OSSC_Shmem>,
     VersionedClause<OSSC_Onready>,
     VersionedClause<OSSC_Device>,
     VersionedClause<OSSC_Ndrange>,

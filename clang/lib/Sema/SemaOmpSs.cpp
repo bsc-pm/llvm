@@ -4306,7 +4306,7 @@ static bool actOnOSSReductionKindClause(
 Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     DeclGroupPtrTy DG,
     Expr *If, Expr *Final, Expr *Cost, Expr *Priority,
-    Expr *Onready, bool Wait,
+    Expr *Shmem, Expr *Onready, bool Wait,
     unsigned Device, SourceLocation DeviceLoc,
     ArrayRef<Expr *> Labels,
     ArrayRef<Expr *> Ins, ArrayRef<Expr *> Outs, ArrayRef<Expr *> Inouts,
@@ -4390,7 +4390,7 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   // or our associated function
   ADecl->addAttr(OSSTaskDeclSentinelAttr::CreateImplicit(Context, SR));
 
-  ExprResult IfRes, FinalRes, CostRes, PriorityRes, OnreadyRes;
+  ExprResult IfRes, FinalRes, CostRes, PriorityRes, ShmemRes, OnreadyRes;
   SmallVector<Expr *, 2> LabelsRes;
   SmallVector<Expr *, 4> NdrangesRes;
   OSSTaskDeclAttr::DeviceType DevType = OSSTaskDeclAttr::DeviceType::Unknown;
@@ -4413,6 +4413,10 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     if (Labels.size() == 2)
       LabelsRes.push_back(
         CheckIsConstCharPtrConvertibleExpr(Labels[1], /*ConstConstraint=*/false).get());
+  }
+  if (Shmem) {
+    ShmemRes = CheckNonNegativeIntegerValue(
+      Shmem, OSSC_shmem, /*StrictlyPositive=*/false, /*Outline=*/true);
   }
   if (Onready) {
     OnreadyRes = Onready;
@@ -4553,6 +4557,9 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
       Diag(DeviceLoc, diag::err_oss_ndrange_incompatible_device);
 
     checkNdrange(*this, NdrangeLoc, Ndranges, NdrangesRes, /*Outline=*/true);
+  } else if (Shmem) {
+    // It is an error to specify shmem without ndrange
+    Diag(Shmem->getExprLoc(), diag::err_oss_shmem_without_ndrange);
   }
 
   // FIXME: the specs says the underlying type of a enum
@@ -4566,7 +4573,7 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   auto *NewAttr = OSSTaskDeclAttr::CreateImplicit(
     Context,
     IfRes.get(), FinalRes.get(), CostRes.get(), PriorityRes.get(),
-    Wait, DevType,
+    ShmemRes.get(), Wait, DevType,
     OnreadyRes.get(),
     const_cast<Expr **>(LabelsRes.data()), LabelsRes.size(),
     const_cast<Expr **>(Ins.data()), Ins.size(),
@@ -6143,6 +6150,20 @@ OSSClause *Sema::ActOnOmpSsPriorityClause(Expr *E,
   return new (Context) OSSPriorityClause(Res.get(), StartLoc, LParenLoc, EndLoc);
 }
 
+OSSClause *Sema::ActOnOmpSsShmemClause(Expr *E,
+                                       SourceLocation StartLoc,
+                                       SourceLocation LParenLoc,
+                                       SourceLocation EndLoc) {
+  // The parameter of the shmem() clause must be >= 0
+  // expression.
+  ExprResult Res = CheckNonNegativeIntegerValue(
+    E, OSSC_shmem, /*StrictlyPositive=*/false, /*Outline=*/false);
+  if (Res.isInvalid())
+    return nullptr;
+
+  return new (Context) OSSShmemClause(Res.get(), StartLoc, LParenLoc, EndLoc);
+}
+
 OSSClause *Sema::ActOnOmpSsLabelClause(ArrayRef<Expr *> VarList,
                                        SourceLocation StartLoc,
                                        SourceLocation LParenLoc,
@@ -6246,6 +6267,9 @@ OSSClause *Sema::ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind, Expr *Expr,
     break;
   case OSSC_priority:
     Res = ActOnOmpSsPriorityClause(Expr, StartLoc, LParenLoc, EndLoc);
+    break;
+  case OSSC_shmem:
+    Res = ActOnOmpSsShmemClause(Expr, StartLoc, LParenLoc, EndLoc);
     break;
   case OSSC_onready:
     Res = ActOnOmpSsOnreadyClause(Expr, StartLoc, LParenLoc, EndLoc);

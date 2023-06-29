@@ -1699,6 +1699,58 @@ public:
   }
 };
 
+/// This represents 'shmem' clause in the
+/// '#pragma oss task directive.
+///
+/// \code
+/// #pragma oss task device(cuda) ndrange(1, 1, 1) shmem(foo(N))
+/// \endcode
+/// In this example directive '#pragma oss task for' has simple 'shmem'
+/// clause with expression 'foo(N)'.
+class OSSShmemClause : public OSSClause {
+  friend class OSSClauseReader;
+
+  /// Location of '('.
+  SourceLocation LParenLoc;
+
+  /// Expression of the 'shmem' clause.
+  Stmt *Expression = nullptr;
+
+  /// Set expression.
+  void setExpression(Expr *E) { Expression = E; }
+
+public:
+  /// Build 'shmem' clause with expression \a E.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param E Expression of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSShmemClause(Expr *E, SourceLocation StartLoc, SourceLocation LParenLoc,
+                SourceLocation EndLoc)
+      : OSSClause(llvm::oss::OSSC_shmem, StartLoc, EndLoc), LParenLoc(LParenLoc),
+        Expression(E) {}
+
+  /// Build an empty clause.
+  OSSShmemClause()
+      : OSSClause(llvm::oss::OSSC_shmem, SourceLocation(), SourceLocation()) {}
+
+  /// Sets the location of '('.
+  void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
+
+  /// Returns the location of '('.
+  SourceLocation getLParenLoc() const { return LParenLoc; }
+
+  /// Returns expression.
+  Expr *getExpression() const { return cast_or_null<Expr>(Expression); }
+
+  child_range children() { return child_range(&Expression, &Expression + 1); }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == llvm::oss::OSSC_shmem;
+  }
+};
+
 /// This represents 'read' clause in the '#pragma oss atomic' directive.
 ///
 /// \code
