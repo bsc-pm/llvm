@@ -112,12 +112,13 @@ static ExprResult *getSingleClause(
     OmpSsClauseKind CKind,
     ExprResult &IfRes, ExprResult &FinalRes,
     ExprResult &CostRes, ExprResult &PriorityRes,
-    ExprResult &OnreadyRes) {
+    ExprResult &ShmemRes, ExprResult &OnreadyRes) {
 
     if (CKind == OSSC_if) return &IfRes;
     if (CKind == OSSC_final) return &FinalRes;
     if (CKind == OSSC_cost) return &CostRes;
     if (CKind == OSSC_priority) return &PriorityRes;
+    if (CKind == OSSC_shmem) return &ShmemRes;
     if (CKind == OSSC_onready) return &OnreadyRes;
     return nullptr;
 }
@@ -186,7 +187,7 @@ static OmpSsClauseKind getOmpSsClauseFromDependKinds(ArrayRef<OmpSsDependClauseK
 bool Parser::ParseDeclareTaskClauses(
     ExprResult &IfRes, ExprResult &FinalRes,
     ExprResult &CostRes, ExprResult &PriorityRes,
-    ExprResult &OnreadyRes, bool &Wait,
+    ExprResult &ShmemRes, ExprResult &OnreadyRes, bool &Wait,
     unsigned &Device, SourceLocation &DeviceLoc,
     SmallVectorImpl<Expr *> &Labels,
     SmallVectorImpl<Expr *> &Ins, SmallVectorImpl<Expr *> &Outs,
@@ -243,6 +244,7 @@ bool Parser::ParseDeclareTaskClauses(
     case OSSC_final:
     case OSSC_cost:
     case OSSC_priority:
+    case OSSC_shmem:
     case OSSC_onready: {
       ConsumeToken();
       if (FirstClauses[unsigned(CKind)]) {
@@ -252,7 +254,7 @@ bool Parser::ParseDeclareTaskClauses(
       }
       SourceLocation RLoc;
       SingleClause = getSingleClause(
-        CKind, IfRes, FinalRes, CostRes, PriorityRes, OnreadyRes);
+        CKind, IfRes, FinalRes, CostRes, PriorityRes, ShmemRes, OnreadyRes);
       *SingleClause = ParseOmpSsParensExpr(getOmpSsClauseName(CKind), RLoc);
 
       if (SingleClause->isInvalid())
@@ -433,6 +435,7 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
   ExprResult FinalRes;
   ExprResult CostRes;
   ExprResult PriorityRes;
+  ExprResult ShmemRes;
   ExprResult OnreadyRes;
   bool Wait = false;
   // This value means no clause seen
@@ -471,7 +474,7 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
   bool IsError =
       ParseDeclareTaskClauses(IfRes, FinalRes,
                               CostRes, PriorityRes,
-                              OnreadyRes, Wait,
+                              ShmemRes, OnreadyRes, Wait,
                               Device, DeviceLoc,
                               Labels,
                               Ins, Outs, Inouts,
@@ -500,7 +503,7 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
       Ptr,
       IfRes.get(), FinalRes.get(),
       CostRes.get(), PriorityRes.get(),
-      OnreadyRes.get(), Wait,
+      ShmemRes.get(), OnreadyRes.get(), Wait,
       Device, DeviceLoc,
       Labels,
       Ins, Outs, Inouts,
@@ -957,6 +960,7 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
   case OSSC_final:
   case OSSC_cost:
   case OSSC_priority:
+  case OSSC_shmem:
   case OSSC_onready:
   case OSSC_chunksize:
   case OSSC_grainsize:

@@ -11,15 +11,23 @@ void foo4(int *x);
 #pragma oss task device(cuda) ndrange(1, *x, 1) // expected-error {{expression must have integral or unscoped enumeration type, not 'int *'}}
 template<typename T>
 void foo5(T *x);
+#pragma oss task device(cuda) ndrange(1, -1, -1) // expected-error 2 {{argument to 'ndrange' clause must be a strictly positive integer value}}
+void foo6();
+#pragma oss task device(cuda) ndrange(1, N, N) // expected-error 4 {{argument to 'ndrange' clause must be a strictly positive integer value}}
+template<int N>
+void foo7();
 
-// TODO: template test?
-// TODO: check integer > 0?
 
 void bar() {
     int x;
     int *p;
     foo5(&x);
     foo5(&p); // expected-note {{in instantiation of function template specialization 'foo5<int *>' requested here}}
+    foo7<-1>(); // expected-note {{in instantiation of function template specialization 'foo7<-1>' requested here}}
+    foo7<0>(); // expected-note {{in instantiation of function template specialization 'foo7<0>' requested here}}
+    foo7<1>();
+    #pragma oss task device(cuda) ndrange(1, 1, 1) // expected-error {{unexpected OmpSs-2 clause 'ndrange' in directive '#pragma oss task'}}
+    {}
 }
 
 

@@ -3388,7 +3388,7 @@ private:
   bool ParseDeclareTaskClauses(
       ExprResult &IfRes, ExprResult &FinalRes,
       ExprResult &CostRes, ExprResult &PriorityRes,
-      ExprResult &OnreadyRes, bool &Wait,
+      ExprResult &ShmemRes, ExprResult &OnreadyRes, bool &Wait,
       unsigned &Device, SourceLocation &DeviceLoc,
       SmallVectorImpl<Expr *> &Labels,
       SmallVectorImpl<Expr *> &Ins, SmallVectorImpl<Expr *> &Outs,

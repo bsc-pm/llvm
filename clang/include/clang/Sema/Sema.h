@@ -12433,7 +12433,7 @@ public:
   DeclGroupPtrTy ActOnOmpSsDeclareTaskDirective(
       DeclGroupPtrTy DG,
       Expr *If, Expr *Final, Expr *Cost, Expr *Priority,
-      Expr *Onready, bool Wait,
+      Expr *Shmem, Expr *Onready, bool Wait,
       unsigned Device, SourceLocation DeviceLoc,
       ArrayRef<Expr *> Labels,
       ArrayRef<Expr *> Ins, ArrayRef<Expr *> Outs, ArrayRef<Expr *> Inouts,
@@ -12565,6 +12565,10 @@ public:
                                       SourceLocation EndLoc);
   /// Called on well-formed 'label' clause.
   OSSClause *ActOnOmpSsLabelClause(ArrayRef<Expr *> VarList, SourceLocation StartLoc,
+                                   SourceLocation LParenLoc,
+                                   SourceLocation EndLoc);
+  /// Called on well-formed 'shmem' clause.
+  OSSClause *ActOnOmpSsShmemClause(Expr *E, SourceLocation StartLoc,
                                    SourceLocation LParenLoc,
                                    SourceLocation EndLoc);
   /// Called on well-formed 'onready' clause.

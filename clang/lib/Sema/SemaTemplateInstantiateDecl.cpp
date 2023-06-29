@@ -322,6 +322,7 @@ void Sema::InstantiateOSSDeclareTaskAttr(
   ExprResult FinalRes;
   ExprResult CostRes;
   ExprResult PriorityRes;
+  ExprResult ShmemRes;
   ExprResult OnreadyRes;
   bool Wait = Attr.getWait();
   // This value means no clause seen
@@ -420,6 +421,9 @@ void Sema::InstantiateOSSDeclareTaskAttr(
   if (auto *E = Attr.getPriorityExpr())
     PriorityRes = Subst(E);
 
+  if (auto *E = Attr.getShmemExpr())
+    ShmemRes = Subst(E);
+
   if (auto *E = Attr.getOnreadyExpr())
     OnreadyRes = Subst(E);
 
@@ -475,7 +479,7 @@ void Sema::InstantiateOSSDeclareTaskAttr(
     ConvertDeclToDeclGroup(New),
     IfRes.get(), FinalRes.get(),
     CostRes.get(), PriorityRes.get(),
-    OnreadyRes.get(), Wait,
+    ShmemRes.get(), OnreadyRes.get(), Wait,
     Device, SourceLocation(),
     Labels,
     Ins, Outs, Inouts,

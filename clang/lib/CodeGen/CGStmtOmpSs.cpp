@@ -210,6 +210,8 @@ static void AddDeviceData(const OSSExecutableDirective &S, OSSTaskDeviceDataTy &
   }
   if (!S.getClausesOfKind<OSSNdrangeClause>().empty())
     llvm_unreachable("Ndrange is not supported in inline constructs");
+  if (!S.getClausesOfKind<OSSShmemClause>().empty())
+    llvm_unreachable("Shmem is not supported in inline constructs");
 }
 
 // Convenience function to add all info from a task directive

@@ -70,6 +70,7 @@ enum OmpSsBundleKind {
   OSSB_device_ndrange,
   OSSB_device_dev_func,
   OSSB_device_call_order,
+  OSSB_device_shmem,
   OSSB_onready,
   OSSB_while_cond,
   OSSB_in,
@@ -168,6 +169,8 @@ const char *getBundleStr(OmpSsBundleKind Kind) {
     return "QUAL.OSS.DEVICE.DEVFUNC";
   case OSSB_device_call_order:
     return "QUAL.OSS.DEVICE.CALL.ORDER";
+  case OSSB_device_shmem:
+    return "QUAL.OSS.DEVICE.SHMEM";
   case OSSB_onready:
     return "QUAL.OSS.ONREADY";
   case OSSB_while_cond:
@@ -3180,6 +3183,11 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       }
       TaskInfo.emplace_back(
           getBundleStr(OSSB_device_ndrange), Result);
+    }
+    if (Attr->getShmemExpr()) {
+      assert(HasNdrange && "shmem clause requires ndrange too");
+      llvm::Value *V = CGF.EmitScalarExpr(Attr->getShmemExpr());
+      TaskInfo.emplace_back(getBundleStr(OSSB_device_shmem), V);
     }
     if (const Expr *E = Attr->getOnreadyExpr()) {
       EmitIgnoredWrapperCallBundle(

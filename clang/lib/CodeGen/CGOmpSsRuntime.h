@@ -98,10 +98,8 @@ struct OSSTaskReductionDataTy final {
 
 struct OSSTaskDeviceDataTy final {
   OmpSsDeviceClauseKind DvKind = OSSC_DEVICE_unknown;
-  SmallVector<const Expr *, 4> Ndranges;
-
   bool empty() const {
-    return DvKind == OSSC_DEVICE_unknown && Ndranges.empty();
+    return DvKind == OSSC_DEVICE_unknown;
   }
 };
 

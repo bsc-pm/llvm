@@ -319,6 +319,12 @@ void DirectiveEnvironment::gatherDeviceCallOrderInfo(OperandBundleDef &OB) {
   DeviceInfo.CallOrder.append(OB.input_begin(), OB.input_end());
 }
 
+void DirectiveEnvironment::gatherDeviceShmemInfo(OperandBundleDef &OB) {
+  assert(!DeviceInfo.Shmem && "Only allowed one OperandBundle with this Id");
+  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  DeviceInfo.Shmem = OB.inputs()[0];
+}
+
 void DirectiveEnvironment::gatherCapturedInfo(OperandBundleDef &OB) {
   assert(CapturedInfo.empty() && "Only allowed one OperandBundle with this Id");
   CapturedInfo.insert(OB.input_begin(), OB.input_end());
@@ -549,6 +555,8 @@ void DirectiveEnvironment::verifyDeviceInfo() {
     llvm_unreachable("It is expected to have a device kind when used ndrange");
   if (!DeviceInfo.Kind && !DeviceInfo.CallOrder.empty())
     llvm_unreachable("It is expected to have a device kind when call order is set");
+  if (!DeviceInfo.Kind && DeviceInfo.Shmem)
+    llvm_unreachable("It is expected to have a device kind when used shmem");
   for (auto *V : DeviceInfo.CallOrder)
     if (!valueInDSABundles(V)
         && !valueInCapturedBundle(V))
@@ -732,6 +740,9 @@ DirectiveEnvironment::DirectiveEnvironment(const Instruction *I) {
       break;
     case LLVMContext::OB_oss_device_call_order:
       gatherDeviceCallOrderInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_device_shmem:
+      gatherDeviceShmemInfo(OBDef);
       break;
     case LLVMContext::OB_oss_captured:
       gatherCapturedInfo(OBDef);
