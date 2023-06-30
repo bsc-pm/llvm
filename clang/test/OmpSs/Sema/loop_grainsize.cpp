@@ -21,12 +21,14 @@ void bar(int n) {
     for (int i = 0; i < 10; ++i) {}
     #pragma oss taskloop for grainsize(n)
     for (int i = 0; i < 10; ++i) {}
-    #pragma oss taskloop grainsize(m) // expected-error {{argument to 'grainsize' clause must be a non-negative integer value}}
+    #pragma oss taskloop grainsize(m) // expected-error {{argument to 'grainsize' clause must be a strictly positive integer value}}
     for (int i = 0; i < 10; ++i) {}
-    #pragma oss taskloop for grainsize(m) // expected-error {{argument to 'grainsize' clause must be a non-negative integer value}}
+    #pragma oss taskloop for grainsize(m) // expected-error {{argument to 'grainsize' clause must be a strictly positive integer value}}
     for (int i = 0; i < 10; ++i) {}
-    #pragma oss taskloop grainsize(-1) // expected-error {{argument to 'grainsize' clause must be a non-negative integer value}}
+    #pragma oss taskloop grainsize(-1) // expected-error {{argument to 'grainsize' clause must be a strictly positive integer value}}
     for (int i = 0; i < 10; ++i) {}
-    #pragma oss taskloop for grainsize(-1) // expected-error {{argument to 'grainsize' clause must be a non-negative integer value}}
+    #pragma oss taskloop for grainsize(-1) // expected-error {{argument to 'grainsize' clause must be a strictly positive integer value}}
+    for (int i = 0; i < 10; ++i) {}
+    #pragma oss taskloop for grainsize(0) // expected-error {{argument to 'grainsize' clause must be a strictly positive integer value}}
     for (int i = 0; i < 10; ++i) {}
 }

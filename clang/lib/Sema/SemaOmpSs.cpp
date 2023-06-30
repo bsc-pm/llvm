@@ -6204,7 +6204,7 @@ OSSClause *Sema::ActOnOmpSsChunksizeClause(
   // The parameter of the chunksize() clause must be > 0
   // expression.
   ExprResult Res = CheckNonNegativeIntegerValue(
-    E, OSSC_chunksize, /*StrictlyPositive=*/false, /*Outline=*/false);
+    E, OSSC_chunksize, /*StrictlyPositive=*/true, /*Outline=*/false);
   if (Res.isInvalid())
     return nullptr;
 
@@ -6217,7 +6217,7 @@ OSSClause *Sema::ActOnOmpSsGrainsizeClause(
   // The parameter of the grainsize() clause must be > 0
   // expression.
   ExprResult Res = CheckNonNegativeIntegerValue(
-    E, OSSC_grainsize, /*StrictlyPositive=*/false, /*Outline=*/false);
+    E, OSSC_grainsize, /*StrictlyPositive=*/true, /*Outline=*/false);
   if (Res.isInvalid())
     return nullptr;
 
@@ -6230,7 +6230,7 @@ OSSClause *Sema::ActOnOmpSsUnrollClause(
   // The parameter of the unroll() clause must be > 0
   // expression.
   ExprResult Res = CheckNonNegativeIntegerValue(
-    E, OSSC_grainsize, /*StrictlyPositive=*/false, /*Outline=*/false);
+    E, OSSC_grainsize, /*StrictlyPositive=*/true, /*Outline=*/false);
   if (Res.isInvalid())
     return nullptr;
 
