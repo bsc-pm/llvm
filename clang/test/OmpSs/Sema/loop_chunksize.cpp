@@ -21,12 +21,14 @@ void bar(int n) {
     for (int i = 0; i < 10; ++i) {}
     #pragma oss taskloop for chunksize(n)
     for (int i = 0; i < 10; ++i) {}
-    #pragma oss task for chunksize(m) // expected-error {{argument to 'chunksize' clause must be a non-negative integer value}}
+    #pragma oss task for chunksize(m) // expected-error {{argument to 'chunksize' clause must be a strictly positive integer value}}
     for (int i = 0; i < 10; ++i) {}
-    #pragma oss taskloop for chunksize(m) // expected-error {{argument to 'chunksize' clause must be a non-negative integer value}}
+    #pragma oss taskloop for chunksize(m) // expected-error {{argument to 'chunksize' clause must be a strictly positive integer value}}
     for (int i = 0; i < 10; ++i) {}
-    #pragma oss task for chunksize(-1) // expected-error {{argument to 'chunksize' clause must be a non-negative integer value}}
+    #pragma oss task for chunksize(-1) // expected-error {{argument to 'chunksize' clause must be a strictly positive integer value}}
     for (int i = 0; i < 10; ++i) {}
-    #pragma oss taskloop for chunksize(-1) // expected-error {{argument to 'chunksize' clause must be a non-negative integer value}}
+    #pragma oss taskloop for chunksize(-1) // expected-error {{argument to 'chunksize' clause must be a strictly positive integer value}}
+    for (int i = 0; i < 10; ++i) {}
+    #pragma oss taskloop for chunksize(0) // expected-error {{argument to 'chunksize' clause must be a strictly positive integer value}}
     for (int i = 0; i < 10; ++i) {}
 }
