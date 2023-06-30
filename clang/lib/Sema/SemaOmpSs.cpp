@@ -6230,7 +6230,7 @@ OSSClause *Sema::ActOnOmpSsUnrollClause(
   // The parameter of the unroll() clause must be > 0
   // expression.
   ExprResult Res = CheckNonNegativeIntegerValue(
-    E, OSSC_grainsize, /*StrictlyPositive=*/true, /*Outline=*/false);
+    E, OSSC_unroll, /*StrictlyPositive=*/true, /*Outline=*/false);
   if (Res.isInvalid())
     return nullptr;
 
