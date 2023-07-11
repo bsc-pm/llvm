@@ -1813,14 +1813,11 @@ struct OmpSsDirective {
     }
   }
 
-  // Final codes need to float nested directives constant allocas to be placed
-  // at the beginning of the final code
-  // Loop directives need to float body constant allocas to the beginning of
-  // the loop
-  // This function does this assuming all the allocas are placed just
-  // after the Entry intrinsic (because clang does that)
-  void gatherConstAllocas(
-      SmallVectorImpl<Instruction *> &Allocas, Instruction *Entry) {
+  // Final codes need to float nested directives constant allocas
+  // Loop directives need to float body constant allocas
+  // This function annotates them assuming all the allocas are placed just
+  // after the Entry intrinsic (because clang does that).
+  void gatherConstAllocas(Instruction *Entry) {
     BasicBlock::iterator It = Entry->getParent()->begin();
     // Skip Entry intrinsic
     ++It;
@@ -1829,7 +1826,7 @@ struct OmpSsDirective {
     while (It != Entry->getParent()->end()) {
       if (auto *II = dyn_cast<AllocaInst>(&*It)) {
         if (isa<ConstantInt>(II->getArraySize()))
-          Allocas.push_back(II);
+          PostMoveInstructions.push_back(II);
       } else {
         break;
       }
@@ -2237,17 +2234,6 @@ struct OmpSsDirective {
       Instruction *& NewEntryI, Instruction *& NewExitI,
       SmallVectorImpl<Value *> &NormalizedUBs,
       SmallVectorImpl<Instruction *> &CollapseIterBB) {
-
-    SmallVector<Instruction *, 4> Allocas;
-    gatherConstAllocas(Allocas, DirInfo.Entry);
-    // Move the allocas before the loop start
-    {
-      IRBuilder<> IRB(DirInfo.Entry);
-      for (Instruction *I : Allocas) {
-        I->removeFromParent();
-        IRB.Insert(I, I->getName());
-      }
-    }
 
     // This is used for nanos6_create_loop
     // NOTE: all values have nanos6 upper_bound type
@@ -3045,7 +3031,7 @@ struct OmpSsDirective {
       Instruction *CloneEntryI = FinalInfo.InnerClonedEntries[i];
       Instruction *CloneExitI = FinalInfo.InnerClonedExits[i];
 
-      gatherConstAllocas(Allocas, CloneEntryI);
+      gatherConstAllocas(CloneEntryI);
 
       if (IsLoop) {
         DirectiveLoopInfo FinalLoopInfo = InnerDirInfo.DirEnv.LoopInfo;
@@ -3066,7 +3052,8 @@ struct OmpSsDirective {
     Instruction *CloneEntryI = cast<Instruction>(FinalInfo.VMap.lookup(DirInfo.Entry));
     Instruction *CloneExitI = cast<Instruction>(FinalInfo.VMap.lookup(DirInfo.Exit));
 
-    gatherConstAllocas(Allocas, CloneEntryI);
+    gatherConstAllocas(CloneEntryI);
+    gatherConstAllocas(OrigEntryI);
 
     Instruction *NewCloneEntryI = CloneEntryI;
     if (IsLoop) {
@@ -3145,17 +3132,9 @@ struct OmpSsFunction {
 
   void relocateInstrs() {
     for (auto *I : PostMoveInstructions) {
-      Function *TmpF = nullptr;
-      for (User *U : I->users()) {
-        if (Instruction *I2 = dyn_cast<Instruction>(U)) {
-          Function *DstF = cast<Function>(I2->getParent()->getParent());
-          assert((!TmpF || TmpF == DstF) &&
-            "Instruction I has uses in differents functions");
-          TmpF = DstF;
-          Instruction *TI = DstF->getEntryBlock().getTerminator();
-          I->moveBefore(TI);
-        }
-      }
+      Function *DstF = cast<Function>(I->getParent()->getParent());
+      Instruction *TI = DstF->getEntryBlock().getTerminator();
+      I->moveBefore(TI);
     }
   }
 

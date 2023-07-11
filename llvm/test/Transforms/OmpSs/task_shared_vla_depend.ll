@@ -168,6 +168,7 @@ attributes #3 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    store i64 [[TMP1]], ptr [[__VLA_EXPR0]], align 8, !dbg [[DBG11]]
 ; CHECK-NEXT:    store i64 [[TMP3]], ptr [[__VLA_EXPR1]], align 8, !dbg [[DBG11]]
 ; CHECK-NEXT:    store i64 [[TMP5]], ptr [[__VLA_EXPR2]], align 8, !dbg [[DBG11]]
+; CHECK-NEXT:    [[SIZE_CLONE:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    [[TMP9:%.*]] = alloca ptr, align 8, !dbg [[DBG16:![0-9]+]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = alloca ptr, align 8, !dbg [[DBG16]]
 ; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG16]]
@@ -197,7 +198,6 @@ attributes #3 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    call void @llvm.stackrestore(ptr [[TMP16]]), !dbg [[DBG17]]
 ; CHECK-NEXT:    ret void, !dbg [[DBG17]]
 ; CHECK:       final.then:
-; CHECK-NEXT:    [[SIZE_CLONE:%.*]] = alloca i32, align 4, !dbg [[DBG16]]
 ; CHECK-NEXT:    [[TMP17:%.*]] = mul nuw i64 [[TMP1]], [[TMP3]], !dbg [[DBG18:![0-9]+]]
 ; CHECK-NEXT:    [[TMP18:%.*]] = mul nuw i64 [[TMP17]], [[TMP5]], !dbg [[DBG18]]
 ; CHECK-NEXT:    [[TMP19:%.*]] = mul nuw i64 4, [[TMP18]], !dbg [[DBG18]]
@@ -248,6 +248,12 @@ attributes #3 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T]] [[TMP15]]
 ;
 ;
+; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_check_version() {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    call void @nanos6_check_version(i64 1, ptr @nanos6_versions, ptr @[[GLOB0:[0-9]+]])
+; CHECK-NEXT:    ret void
+;
+;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_duplicate_foo
 ; CHECK-SAME: (ptr [[TASK_ARGS_SRC:%.*]], ptr [[TASK_ARGS_DST:%.*]]) {
 ; CHECK-NEXT:  entry:
@@ -275,9 +281,9 @@ attributes #3 = { "min-legal-vector-width"="0" }
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_foo
 ; CHECK-SAME: (ptr [[VLA:%.*]], i64 [[TMP0:%.*]], i64 [[TMP1:%.*]], i64 [[TMP2:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG21:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
+; CHECK-NEXT:    [[SIZE:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    br label [[TMP3:%.*]], !dbg [[DBG22:![0-9]+]]
 ; CHECK:       3:
-; CHECK-NEXT:    [[SIZE:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    [[TMP4:%.*]] = mul nuw i64 [[TMP0]], [[TMP1]], !dbg [[DBG23:![0-9]+]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = mul nuw i64 [[TMP4]], [[TMP2]], !dbg [[DBG23]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = mul nuw i64 4, [[TMP5]], !dbg [[DBG23]]
@@ -335,7 +341,7 @@ attributes #3 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[TMP12:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T]] [[TMP3]], 7
 ; CHECK-NEXT:    [[TMP13:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T]] [[TMP3]], 8
 ; CHECK-NEXT:    [[TMP14:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T]] [[TMP4]], 9
-; CHECK-NEXT:    call void @nanos6_register_region_read_depinfo3(ptr [[HANDLER]], i32 0, ptr @[[GLOB1:[0-9]+]], ptr [[TMP5]], i64 [[TMP6]], i64 [[TMP7]], i64 [[TMP8]], i64 [[TMP9]], i64 [[TMP10]], i64 [[TMP11]], i64 [[TMP12]], i64 [[TMP13]], i64 [[TMP14]])
+; CHECK-NEXT:    call void @nanos6_register_region_read_depinfo3(ptr [[HANDLER]], i32 0, ptr @[[GLOB2:[0-9]+]], ptr [[TMP5]], i64 [[TMP6]], i64 [[TMP7]], i64 [[TMP8]], i64 [[TMP9]], i64 [[TMP10]], i64 [[TMP11]], i64 [[TMP12]], i64 [[TMP13]], i64 [[TMP14]])
 ; CHECK-NEXT:    ret void
 ;
 ;

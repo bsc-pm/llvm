@@ -121,6 +121,8 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[I:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    store i32 0, ptr [[RETVAL]], align 4
 ; CHECK-NEXT:    store i32 0, ptr [[I]], align 4, !dbg [[DBG9:![0-9]+]]
+; CHECK-NEXT:    [[ARRAY1_CLONE1:%.*]] = alloca [10 x i32], align 16
+; CHECK-NEXT:    [[ARRAY_CLONE:%.*]] = alloca [10 x i32], align 16
 ; CHECK-NEXT:    [[TMP0:%.*]] = alloca ptr, align 8, !dbg [[DBG10:![0-9]+]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = alloca ptr, align 8, !dbg [[DBG10]]
 ; CHECK-NEXT:    [[NUM_DEPS15:%.*]] = alloca i64, align 8, !dbg [[DBG10]]
@@ -147,8 +149,6 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[TMP14:%.*]] = load i32, ptr [[RETVAL]], align 4, !dbg [[DBG11:![0-9]+]]
 ; CHECK-NEXT:    ret i32 [[TMP14]], !dbg [[DBG11]]
 ; CHECK:       final.then9:
-; CHECK-NEXT:    [[ARRAY1_CLONE1:%.*]] = alloca [10 x i32], align 16, !dbg [[DBG10]]
-; CHECK-NEXT:    [[ARRAY_CLONE:%.*]] = alloca [10 x i32], align 16, !dbg [[DBG10]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = call i32 @compute_lb(), !dbg [[DBG10]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = call i32 @compute_ub(), !dbg [[DBG10]]
 ; CHECK-NEXT:    [[TMP17:%.*]] = call i32 @compute_step(), !dbg [[DBG10]]
@@ -209,12 +209,18 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    ret i32 1, !dbg [[DBG26:![0-9]+]]
 ;
 ;
+; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_check_version() {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    call void @nanos6_check_version(i64 1, ptr @nanos6_versions, ptr @[[GLOB0:[0-9]+]])
+; CHECK-NEXT:    ret void
+;
+;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_main
 ; CHECK-SAME: (ptr [[I:%.*]], ptr [[ARRAY:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG28:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
+; CHECK-NEXT:    [[ARRAY1:%.*]] = alloca [10 x i32], align 16
 ; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG29:![0-9]+]]
 ; CHECK:       0:
-; CHECK-NEXT:    [[ARRAY1:%.*]] = alloca [10 x i32], align 16
 ; CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr [[I]], align 4, !dbg [[DBG30:![0-9]+]]
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp sgt i32 [[TMP1]], 78, !dbg [[DBG31:![0-9]+]]
 ; CHECK-NEXT:    br i1 [[CMP]], label [[IF_THEN:%.*]], label [[IF_END:%.*]], !dbg [[DBG30]]
@@ -254,9 +260,11 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_main.4
 ; CHECK-SAME: (ptr [[I:%.*]], ptr [[LOOP_BOUNDS:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG36:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
+; CHECK-NEXT:    [[ARRAY1_CLONE:%.*]] = alloca [10 x i32], align 16
 ; CHECK-NEXT:    [[TMP0:%.*]] = alloca ptr, align 8, !dbg [[DBG37:![0-9]+]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = alloca ptr, align 8, !dbg [[DBG37]]
 ; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG37]]
+; CHECK-NEXT:    [[ARRAY:%.*]] = alloca [10 x i32], align 16
 ; CHECK-NEXT:    br label [[TMP2:%.*]], !dbg [[DBG38:![0-9]+]]
 ; CHECK:       2:
 ; CHECK-NEXT:    [[LB_GEP:%.*]] = getelementptr [[NANOS6_LOOP_BOUNDS_T:%.*]], ptr [[LOOP_BOUNDS]], i32 0, i32 0, !dbg [[DBG38]]
@@ -265,7 +273,6 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[UB_GEP:%.*]] = getelementptr [[NANOS6_LOOP_BOUNDS_T]], ptr [[LOOP_BOUNDS]], i32 0, i32 1, !dbg [[DBG38]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = load i64, ptr [[UB_GEP]], align 8, !dbg [[DBG38]]
 ; CHECK-NEXT:    [[UB:%.*]] = trunc i64 [[TMP4]] to i32, !dbg [[DBG38]]
-; CHECK-NEXT:    [[ARRAY:%.*]] = alloca [10 x i32], align 16, !dbg [[DBG38]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = call i32 @compute_lb(), !dbg [[DBG38]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = call i32 @compute_ub(), !dbg [[DBG38]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = call i32 @compute_step(), !dbg [[DBG38]]
@@ -302,7 +309,6 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[TMP28:%.*]] = icmp ne i32 [[TMP27]], 0, !dbg [[DBG37]]
 ; CHECK-NEXT:    br i1 [[TMP28]], label [[FINAL_THEN:%.*]], label [[CODEREPL:%.*]], !dbg [[DBG37]]
 ; CHECK:       final.then:
-; CHECK-NEXT:    [[ARRAY1_CLONE:%.*]] = alloca [10 x i32], align 16, !dbg [[DBG37]]
 ; CHECK-NEXT:    [[TMP29:%.*]] = load i32, ptr [[I]], align 4, !dbg [[DBG39:![0-9]+]]
 ; CHECK-NEXT:    [[CMP_CLONE:%.*]] = icmp sgt i32 [[TMP29]], 78, !dbg [[DBG40:![0-9]+]]
 ; CHECK-NEXT:    br i1 [[CMP_CLONE]], label [[IF_THEN_CLONE:%.*]], label [[IF_END_CLONE:%.*]], !dbg [[DBG39]]
