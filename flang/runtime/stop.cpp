@@ -132,9 +132,12 @@ void RTNAME(PauseStatementText)(const char *code, std::size_t length) {
   std::exit(EXIT_FAILURE);
 }
 
-[[noreturn]] void RTNAME(ProgramEndStatement)() {
+void RTNAME(ProgramEndStatement)() {
   CloseAllExternalUnits("END statement");
-  std::exit(EXIT_SUCCESS);
+  // Here there should be a:
+  //   std::exit(EXIT_SUCCESS);
+  // but nanos6 has problems supporting 'exit' so get rid of
+  // it for now
 }
 
 [[noreturn]] void RTNAME(Exit)(int status) {

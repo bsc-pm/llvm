@@ -80,6 +80,9 @@ bool isWholeAllocatable(const SomeExpr &expr);
 /// Is \p expr a reference to an entity with the POINTER attribute?
 bool isWholePointer(const SomeExpr &expr);
 
+void emitOSSDeinitExpr(AbstractConverter &converter,
+                       const fir::MutableBoxValue &box, mlir::Location loc);
+
 /// Read the length from \p box for an assumed length character allocatable or
 /// pointer dummy argument given by \p sym.
 mlir::Value getAssumedCharAllocatableOrPointerLen(

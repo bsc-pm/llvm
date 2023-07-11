@@ -27,7 +27,7 @@ ENUM_CLASS(LanguageFeature, BackslashEscapes, OldDebugLines,
     SignedPrimary, FileName, Carriagecontrol, Convert, Dispose,
     IOListLeadingComma, AbbreviatedEditDescriptor, ProgramParentheses,
     PercentRefAndVal, OmitFunctionDummies, CrayPointer, Hollerith, ArithmeticIF,
-    Assign, AssignedGOTO, Pause, OpenACC, OpenMP, CUDA, CruftAfterAmpersand,
+    Assign, AssignedGOTO, Pause, OmpSs, OpenACC, OpenMP, CUDA, CruftAfterAmpersand,
     ClassicCComments, AdditionalFormats, BigIntLiterals, RealDoControls,
     EquivalenceNumericWithCharacter, EquivalenceNonDefaultNumeric,
     EquivalenceSameNonSequence, AdditionalIntrinsics, AnonymousParents,
@@ -52,6 +52,7 @@ public:
   LanguageFeatureControl() {
     // These features must be explicitly enabled by command line options.
     disable_.set(LanguageFeature::OldDebugLines);
+    disable_.set(LanguageFeature::OmpSs);
     disable_.set(LanguageFeature::OpenACC);
     disable_.set(LanguageFeature::OpenMP);
     disable_.set(LanguageFeature::CUDA); // !@cuf
@@ -79,7 +80,7 @@ public:
   bool IsEnabled(LanguageFeature f) const { return !disable_.test(f); }
   bool ShouldWarn(LanguageFeature f) const {
     return (warnAllLanguage_ && f != LanguageFeature::OpenMP &&
-               f != LanguageFeature::OpenACC) ||
+               f != LanguageFeature::OpenACC && f != LanguageFeature::OmpSs) ||
         warnLanguage_.test(f);
   }
   bool ShouldWarn(UsageWarning w) const {

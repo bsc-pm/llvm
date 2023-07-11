@@ -18,9 +18,10 @@ namespace Fortran::semantics {
 
 class SemanticsContext;
 
-// Name resolution for OpenACC and OpenMP directives
+// Name resolution for OpenACC, OpenMP and OmpSs-2 directives
 void ResolveAccParts(SemanticsContext &, const parser::ProgramUnit &);
 void ResolveOmpParts(SemanticsContext &, const parser::ProgramUnit &);
+void ResolveOSSParts(SemanticsContext &, const parser::ProgramUnit &);
 
 } // namespace Fortran::semantics
 #endif

@@ -28,6 +28,7 @@ class raw_ostream;
 }
 namespace Fortran::parser {
 struct Expr;
+struct OmpSsOutlineTaskConstruct;
 }
 
 namespace Fortran::semantics {
@@ -115,6 +116,8 @@ public:
     CHECK(result_ != nullptr);
     result_ = &result;
   }
+  void setOutlineTask(const parser::OmpSsOutlineTaskConstruct &x) { outlineTask_ = &x; }
+  const parser::OmpSsOutlineTaskConstruct *getOutlineTask() const { return outlineTask_; }
   bool defaultIgnoreTKR() const { return defaultIgnoreTKR_; }
   void set_defaultIgnoreTKR(bool yes) { defaultIgnoreTKR_ = yes; }
   std::optional<common::CUDASubprogramAttrs> cudaSubprogramAttrs() const {
@@ -149,6 +152,7 @@ private:
   // interface.  For MODULE PROCEDURE, this is the declared interface if it
   // appeared in an ancestor (sub)module.
   Symbol *moduleInterface_{nullptr};
+  const parser::OmpSsOutlineTaskConstruct *outlineTask_{nullptr};
   bool defaultIgnoreTKR_{false};
   // CUDA ATTRIBUTES(...) from subroutine/function prefix
   std::optional<common::CUDASubprogramAttrs> cudaSubprogramAttrs_;
@@ -597,6 +601,10 @@ public:
       AccCopyIn, AccCopyOut, AccCreate, AccDelete, AccPresent,
       // OpenACC miscellaneous flags
       AccCommonBlock, AccThreadPrivate, AccReduction, AccNone, AccPreDetermined,
+      // OmpSs-2 data-sharing attribute
+      OSSShared, OSSPrivate, OSSFirstPrivate,
+      // OmpSs-2 miscellaneous flags
+      OSSNone, OSSOutlineTask,
       // OpenMP data-sharing attribute
       OmpShared, OmpPrivate, OmpLinear, OmpFirstPrivate, OmpLastPrivate,
       // OpenMP data-mapping attribute
@@ -658,6 +666,11 @@ public:
   // Assign the details of the symbol from one of the variants.
   // Only allowed in certain cases.
   void set_details(Details &&);
+
+  void set_ossAdditionalSym(Symbol &sym) {
+    ossAdditionalSym_ = &sym;
+  }
+  Symbol *getOssAdditionalSym() const { return ossAdditionalSym_; }
 
   // Can the details of this symbol be replaced with the given details?
   bool CanReplaceDetails(const Details &details) const;
@@ -750,6 +763,7 @@ private:
   std::size_t size_{0}; // size in bytes
   std::size_t offset_{0}; // byte offset in scope or common block
   Details details_;
+  Symbol *ossAdditionalSym_{nullptr};
 
   Symbol() {} // only created in class Symbols
   std::string GetDetailsName() const;

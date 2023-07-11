@@ -1,0 +1,28 @@
+! RUN: %python %S/../../Semantics/test_errors.py %s %flang_fc1 -fompss-2
+
+!$OSS TASK INOUT(A(3)) IN(B) 
+SUBROUTINE S1(A,B)
+  IMPLICIT NONE
+  INTEGER :: A(10)
+  INTEGER :: B
+  A = A + B
+END SUBROUTINE S1
+
+PROGRAM MAIN
+  IMPLICIT NONE
+  INTEGER :: X(10)
+  INTEGER :: Y
+  INTERFACE
+  SUBROUTINE S1(A,B)
+    IMPLICIT NONE
+    INTEGER :: A(10)
+    INTEGER :: B
+  END SUBROUTINE S1
+  END INTERFACE
+  X = 1
+  Y = 2
+  CALL S1(B=Y,A=X)
+  CALL S1(X,Y)
+  !$OSS TASKWAIT
+  IF (any(X /= 5)) STOP "ERROR"
+END PROGRAM MAIN 

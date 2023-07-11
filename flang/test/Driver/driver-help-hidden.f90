@@ -54,6 +54,7 @@
 ! CHECK-NEXT: -fno-stack-arrays      Allocate array temporaries on the heap (default)
 ! CHECK-NEXT: -fno-version-loops-for-stride
 ! CHECK-NEXT:                        Do not create unit-strided loops (default)
+! CHECK-NEXT: -fompss-2              Parse OmpSs-2 pragmas and generate parallel code.
 ! CHECK-NEXT: -fopenacc              Enable OpenACC
 ! CHECK-NEXT: -fopenmp-version=<value>
 ! CHECK-NEXT:                        Set OpenMP version (e.g. 45 for OpenMP 4.5, 50 for OpenMP 5.0). Default value is 50 for Clang and 11 for Flang

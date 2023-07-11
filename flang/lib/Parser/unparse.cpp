@@ -2722,6 +2722,7 @@ public:
   WALK_NESTED_ENUM(OmpCancelType, Type) // OMP cancel-type
   WALK_NESTED_ENUM(OmpOrderClause, Type) // OMP order-type
   WALK_NESTED_ENUM(OmpOrderModifier, Kind) // OMP order-modifier
+  WALK_NESTED_ENUM(OSSDefaultClause, Type) // OSS DEFAULT
 #undef WALK_NESTED_ENUM
 
   void Unparse(const CUFKernelDoConstruct::Directive &x) {
@@ -2756,6 +2757,172 @@ public:
     Walk(std::get<std::optional<DoConstruct>>(x.t));
   }
 
+  // OmpSs-2 Clauses & Directives
+  void Unparse(const OSSObject &x) {
+    std::visit(common::visitors{
+                   [&](const Designator &y) { Walk(y); },
+                   [&](const Name &y) { Put("/"), Walk(y), Put("/"); },
+               },
+        x.u);
+  }
+
+  void Unparse(const OSSObjectList &x) { Walk(x.v, ","); }
+
+  void Unparse(const OSSClauseList &x) { Walk(" ", x.v, " "); }
+
+  void Unparse(const OSSDependenceType &x) {
+    switch (x.v) {
+    case OSSDependenceType::Type::In:
+      Word("IN");
+      break;
+    case OSSDependenceType::Type::Out:
+      Word("OUT");
+      break;
+    case OSSDependenceType::Type::Inout:
+      Word("INOUT");
+      break;
+    case OSSDependenceType::Type::Inoutset:
+      Word("INOUTSET");
+      break;
+    case OSSDependenceType::Type::Mutexinoutset:
+      Word("MUTEXINOUTSET");
+      break;
+    case OSSDependenceType::Type::Weakin:
+      Word("WEAK, IN");
+      break;
+    case OSSDependenceType::Type::Weakout:
+      Word("WEAK, OUT");
+      break;
+    case OSSDependenceType::Type::Weakinout:
+      Word("WEAK, INOUT");
+      break;
+    case OSSDependenceType::Type::Weakinoutset:
+      Word("WEAK, INOUTSET");
+      break;
+    case OSSDependenceType::Type::Weakmutexinoutset:
+      Word("WEAK, MUTEXINOUTSET");
+      break;
+    }
+  }
+
+  void Unparse(const OSSDependClause::InOut &x) {
+    Walk(std::get<OSSDependenceType>(x.t));
+    Put(":");
+    Walk(std::get<OSSObjectList>(x.t));
+  }
+
+  void Unparse(const OSSReductionClause &x) {
+    Walk(std::get<OSSReductionOperator>(x.t));
+    Put(":");
+    Walk(std::get<std::list<Designator>>(x.t), ",");
+  }
+
+#define GEN_FLANG_CLAUSE_UNPARSE
+#include "llvm/Frontend/OmpSs/OSS.inc"
+  void Unparse(const OSSBlockDirective &x) {
+    switch (x.v) {
+    case llvm::oss::Directive::OSSD_task:
+      Word("TASK ");
+      break;
+    default:
+      // Nothing to be done
+      break;
+    }
+  }
+
+  void Unparse(const OSSLoopDirective &x) {
+    switch (x.v) {
+    case llvm::oss::Directive::OSSD_task_for:
+      Word("TASK DO ");
+      break;
+    case llvm::oss::Directive::OSSD_taskloop:
+      Word("TASKLOOP ");
+      break;
+    case llvm::oss::Directive::OSSD_taskloop_for:
+      Word("TASKLOOP DO ");
+      break;
+    default:
+      // Nothing to be done
+      break;
+    }
+  }
+
+  void Unparse(const OSSEndLoopDirective &x) {
+    BeginOmpSs();
+    Word("!$OSS END ");
+    Walk(std::get<OSSLoopDirective>(x.t));
+    Walk(std::get<OSSClauseList>(x.t));
+    Put("\n");
+    EndOmpSs();
+  }
+
+  void Unparse(const OmpSsLoopConstruct &x) {
+    BeginOmpSs();
+    Word("!$OSS ");
+    Walk(std::get<OSSBeginLoopDirective>(x.t));
+    Put("\n");
+    EndOmpSs();
+    Walk(std::get<std::optional<DoConstruct>>(x.t));
+    Walk(std::get<std::optional<OSSEndLoopDirective>>(x.t));
+  }
+
+  void Unparse(const OSSSimpleStandaloneDirective &x) {
+    switch (x.v) {
+    case llvm::oss::Directive::OSSD_taskwait:
+      Word("TASKWAIT ");
+      break;
+    case llvm::oss::Directive::OSSD_release:
+      Word("RELEASE ");
+      break;
+    default:
+      // Nothing to be done
+      break;
+    }
+  }
+
+  void Unparse(const OmpSsSimpleStandaloneConstruct &x) {
+    BeginOmpSs();
+    Word("!$OSS ");
+    Walk(std::get<OSSSimpleStandaloneDirective>(x.t));
+    Walk(std::get<OSSClauseList>(x.t));
+    Put("\n");
+    EndOmpSs();
+  }
+
+  void Unparse(const OSSSimpleOutlineTaskDirective &x) {
+    switch (x.v) {
+    case llvm::oss::Directive::OSSD_declare_task:
+      Word("TASK ");
+      break;
+    default:
+      // Nothing to be done
+      break;
+    }
+  }
+
+  void Unparse(const OmpSsSimpleOutlineTaskConstruct &x){
+    BeginOmpSs();
+    Word("!$OSS ");
+    Walk(std::get<OSSSimpleOutlineTaskDirective>(x.t));
+    Walk(std::get<OSSClauseList>(x.t));
+    Put("\n");
+    EndOmpSs();
+  }
+
+  void Unparse(const OmpSsBlockConstruct &x) {
+    BeginOmpSs();
+    Word("!$OSS ");
+    Walk(std::get<OSSBeginBlockDirective>(x.t));
+    Put("\n");
+    EndOmpSs();
+    Walk(std::get<Block>(x.t), "");
+    BeginOmpSs();
+    Word("!$OSS END ");
+    Walk(std::get<OSSEndBlockDirective>(x.t));
+    Put("\n");
+    EndOmpSs();
+  }
+
   void Done() const { CHECK(indent_ == 0); }
 
 private:
@@ -2772,6 +2939,8 @@ private:
     CHECK(indent_ >= indentationAmount_);
     indent_ -= indentationAmount_;
   }
+  void BeginOmpSs() { ompssDirective_ = true; }
+  void EndOmpSs() { ompssDirective_ = false; }
   void BeginOpenMP() { openmpDirective_ = true; }
   void EndOpenMP() { openmpDirective_ = false; }
   void BeginOpenACC() { openaccDirective_ = true; }
@@ -2845,6 +3014,7 @@ private:
   std::set<CharBlock> structureComponents_;
   Encoding encoding_{Encoding::UTF_8};
   bool capitalizeKeywords_{true};
+  bool ompssDirective_{false};
   bool openaccDirective_{false};
   bool openmpDirective_{false};
   bool backslashEscapes_{false};
@@ -2854,7 +3024,7 @@ private:
 
 void UnparseVisitor::Put(char ch) {
   int sav = indent_;
-  if (openmpDirective_ || openaccDirective_) {
+  if (ompssDirective_ || openmpDirective_ || openaccDirective_) {
     indent_ = 0;
   }
   if (column_ <= 1) {
@@ -2872,7 +3042,10 @@ void UnparseVisitor::Put(char ch) {
     for (int j{0}; j < indent_; ++j) {
       out_ << ' ';
     }
-    if (openmpDirective_) {
+    if (ompssDirective_) {
+      out_ << "!$OSS&";
+      column_ = 8;
+    } else if (openmpDirective_) {
       out_ << "!$OMP&";
       column_ = 8;
     } else if (openaccDirective_) {
@@ -2884,7 +3057,7 @@ void UnparseVisitor::Put(char ch) {
     }
   }
   out_ << ch;
-  if (openmpDirective_ || openaccDirective_) {
+  if (ompssDirective_ || openmpDirective_ || openaccDirective_) {
     indent_ = sav;
   }
 }
@@ -2942,5 +3115,7 @@ void Unparse(llvm::raw_ostream &out, const A &root, Encoding encoding,
 template void Unparse<Program>(llvm::raw_ostream &, const Program &, Encoding,
     bool, bool, preStatementType *, AnalyzedObjectsAsFortran *);
 template void Unparse<Expr>(llvm::raw_ostream &, const Expr &, Encoding, bool,
+    bool, preStatementType *, AnalyzedObjectsAsFortran *);
+template void Unparse<OmpSsSimpleOutlineTaskConstruct>(llvm::raw_ostream &, const OmpSsSimpleOutlineTaskConstruct &, Encoding, bool,
     bool, preStatementType *, AnalyzedObjectsAsFortran *);
 } // namespace Fortran::parser

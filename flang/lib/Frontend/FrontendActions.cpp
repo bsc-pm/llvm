@@ -62,6 +62,7 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/TargetParser/TargetParser.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
+#include "llvm/Transforms/OmpSs.h"
 #include <memory>
 #include <system_error>
 
@@ -841,6 +842,7 @@ static void generateMachineCodeOrAssemblyImpl(clang::DiagnosticsEngine &diags,
 }
 
 void CodeGenAction::runOptimizationPipeline(llvm::raw_pwrite_stream &os) {
+  auto fortranOpts = getInstance().getInvocation().getFortranOpts();
   auto opts = getInstance().getInvocation().getCodeGenOpts();
   auto &diags = getInstance().getDiagnostics();
   llvm::OptimizationLevel level = mapToLevel(opts);
@@ -881,6 +883,17 @@ void CodeGenAction::runOptimizationPipeline(llvm::raw_pwrite_stream &os) {
   pb.registerFunctionAnalyses(fam);
   pb.registerLoopAnalyses(lam);
   pb.crossRegisterProxies(lam, fam, cgam, mam);
+
+  // OmpSs-2
+  if (fortranOpts.features.IsEnabled(
+      Fortran::common::LanguageFeature::OmpSs)) {
+
+    llvm::ModulePassManager earlympm;
+    earlympm.addPass(llvm::OmpSsPass());
+
+    // Run the passes.
+    earlympm.run(*llvmModule, mam);
+  }
 
   // Create the pass manager.
   llvm::ModulePassManager mpm;

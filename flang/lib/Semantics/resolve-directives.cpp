@@ -10,6 +10,7 @@
 
 #include "check-acc-structure.h"
 #include "check-omp-structure.h"
+#include "check-oss-structure.h"
 #include "resolve-names-utils.h"
 #include "flang/Common/idioms.h"
 #include "flang/Evaluate/fold.h"
@@ -42,6 +43,17 @@ protected:
     std::map<const Symbol *, Symbol::Flag> objectWithDSA;
     bool withinConstruct{false};
     std::int64_t associatedLoopLevel{0};
+
+    // OmpSs-2
+    // data-sharing assigned before materialization
+    struct DSAInfo {
+      Symbol::Flag ossFlag;
+      parser::CharBlock source;
+      // Indicates if the DSA is explicit or from a dep base
+      bool isBase;
+    };
+    std::map<Symbol *, DSAInfo> beforeDSAMat; // on one directive
+    // end OmpSs-2
   };
 
   DirContext &GetContext() {
@@ -79,7 +91,15 @@ protected:
     GetContext().associatedLoopLevel = level;
   }
   Symbol &MakeAssocSymbol(const SourceName &name, Symbol &prev, Scope &scope) {
-    const auto pair{scope.try_emplace(name, Attrs{}, HostAssocDetails{prev})};
+    const auto pair{scope.try_emplace(name, prev.attrs(), HostAssocDetails{prev})};
+    return *pair.first->second;
+  }
+  Symbol &OSSMakeAssocSymbol(
+      const SourceName &name, Symbol &prev, Scope &scope) {
+    const auto pair{scope.try_emplace(name, prev.attrs(), HostAssocDetails{prev})};
+    // Create a temporal symbol without inserting it in a scope
+    Symbol &tmpSym{scope.MakeSymbol(name, prev.attrs(), common::Clone(prev.details()))};
+    pair.first->second->set_ossAdditionalSym(tmpSym);
     return *pair.first->second;
   }
   Symbol &MakeAssocSymbol(const SourceName &name, Symbol &prev) {
@@ -103,6 +123,7 @@ protected:
   Symbol *DeclarePrivateAccessEntity(
       const parser::Name &, Symbol::Flag, Scope &);
   Symbol *DeclarePrivateAccessEntity(Symbol &, Symbol::Flag, Scope &);
+  Symbol *OSSDeclarePrivateAccessEntity(Symbol &, Symbol::Flag, Scope &);
   Symbol *DeclareOrMarkOtherAccessEntity(const parser::Name &, Symbol::Flag);
 
   UnorderedSymbolSet dataSharingAttributeObjects_; // on one directive
@@ -588,6 +609,301 @@ private:
   std::int64_t ordCollapseLevel{0};
 };
 
+// This visitor diagnoses abound improper use of variables
+// in a task outline
+class OSSOutlineVisitor : DirectiveAttributeVisitor<llvm::oss::Directive> {
+public:
+  explicit OSSOutlineVisitor(SemanticsContext &context)
+      : DirectiveAttributeVisitor(context) {}
+
+  template <typename A> void Walk(const A &x) { parser::Walk(x, *this); }
+  template <typename A> bool Pre(const A &) { return true; }
+  template <typename A> void Post(const A &) {}
+
+  bool Pre(const parser::InterfaceBlock &);
+  bool Pre(const parser::OmpSsOutlineTask &);
+  bool Pre(const parser::InterfaceBody::OmpSsIfaceOutlineTask &);
+  void Post(const parser::Name &);
+};
+
+// Data-sharing and Data-mapping attributes for data-refs in OmpSs-2 construct
+class OSSAttributeVisitor : DirectiveAttributeVisitor<llvm::oss::Directive> {
+public:
+  explicit OSSAttributeVisitor(SemanticsContext &context)
+      : DirectiveAttributeVisitor(context) {}
+
+  template <typename A> void Walk(const A &x) { parser::Walk(x, *this); }
+  template <typename A> bool Pre(const A &) { return true; }
+  template <typename A> void Post(const A &) {}
+
+  bool Pre(const parser::OmpSsBlockConstruct &);
+  void Post(const parser::OmpSsBlockConstruct &) { PopContext(); }
+
+  // Avoid walking through this parse tree. Already donde manually.
+  bool Pre(const parser::OSSBeginBlockDirective &) { return false; }
+
+  bool Pre(const parser::OmpSsOutlineTask &);
+
+  bool Pre(const parser::InterfaceBody::OmpSsIfaceOutlineTask &);
+
+  bool Pre(const parser::OmpSsStandaloneConstruct &);
+  void Post(const parser::OmpSsStandaloneConstruct &) { PopContext(); }
+
+  // Avoid walking through this parse tree. Already donde manually.
+  bool Pre(const parser::OSSSimpleStandaloneDirective &) { return false; }
+
+  bool Pre(const parser::OmpSsLoopConstruct &);
+  void Post(const parser::OmpSsLoopConstruct &) { PopContext(); }
+
+  // Avoid walking through this parse tree. Already donde manually.
+  bool Pre(const parser::OSSBeginLoopDirective &) { return false; }
+
+  // 2.15.3 Data-Sharing Attribute Clauses
+  void Post(const parser::OSSDefaultClause &);
+  bool Pre(const parser::OSSClause::Shared &x) {
+    ResolveDsaOSSObjectList(x.v, Symbol::Flag::OSSShared);
+    return false;
+  }
+  bool Pre(const parser::OSSClause::Private &x) {
+    ResolveDsaOSSObjectList(x.v, Symbol::Flag::OSSPrivate);
+    return false;
+  }
+  bool Pre(const parser::OSSClause::Firstprivate &x) {
+    ResolveDsaOSSObjectList(x.v, Symbol::Flag::OSSFirstPrivate);
+    return false;
+  }
+  bool Pre(const parser::OSSDependClause &x) {
+    ResolveDependClause(std::get<parser::OSSDependClause::InOut>(x.u));
+    return false;
+  }
+  bool Pre(const parser::OSSClause::In &x) {
+    ResolveDepOSSObjectList(x.v);
+    return false;
+  }
+  bool Pre(const parser::OSSClause::Out &x) {
+    ResolveDepOSSObjectList(x.v);
+    return false;
+  }
+  bool Pre(const parser::OSSClause::Inout &x) {
+    ResolveDepOSSObjectList(x.v);
+    return false;
+  }
+  bool Pre(const parser::OSSClause::Concurrent &x) {
+    ResolveDepOSSObjectList(x.v);
+    return false;
+  }
+  bool Pre(const parser::OSSClause::Commutative &x) {
+    ResolveDepOSSObjectList(x.v);
+    return false;
+  }
+  bool Pre(const parser::OSSClause::Weakin &x) {
+    ResolveDepOSSObjectList(x.v);
+    return false;
+  }
+  bool Pre(const parser::OSSClause::Weakout &x) {
+    ResolveDepOSSObjectList(x.v);
+    return false;
+  }
+  bool Pre(const parser::OSSClause::Weakinout &x) {
+    ResolveDepOSSObjectList(x.v);
+    return false;
+  }
+  bool Pre(const parser::OSSClause::Weakconcurrent &x) {
+    ResolveDepOSSObjectList(x.v);
+    return false;
+  }
+  bool Pre(const parser::OSSClause::Weakcommutative &x) {
+    ResolveDepOSSObjectList(x.v);
+    return false;
+  }
+  void Post(const parser::Name &);
+
+private:
+  class OSSDependVisitor {
+    std::vector<std::pair<const parser::Name *, bool>> names;
+    SemanticsContext &context_;
+    // We visit the base of all the expressions, so the first
+    // decl value is the dep base.
+    bool isBase = true;
+    // Dependency base size, used in Lower
+    // 0 means unset
+    size_t elemSize = 0;
+
+    size_t ComputeElemTypeSize(Symbol *sym) {
+      if (auto chars{evaluate::characteristics::TypeAndShape::Characterize(
+              *sym, context_.foldingContext())}) {
+        // element size only
+        if (auto size{ToInt64(chars->type().MeasureSizeInBytes(
+                context_.foldingContext(), true /*aligned*/))}) {
+          return static_cast<std::size_t>(*size);
+        }
+      }
+      return 0;
+    }
+  public:
+    explicit OSSDependVisitor(SemanticsContext &context)
+        : context_(context) {}
+
+    template <typename A> void Walk(const A &x) { parser::Walk(x, *this); }
+    template <typename A> bool Pre(const A &) { return true; }
+    template <typename A> void Post(const A &) {}
+    bool Pre(const parser::StructureComponent &x) {
+      if (!x.component.symbol)
+        elemSize = -1;
+      if (!elemSize)
+        elemSize = ComputeElemTypeSize(x.component.symbol);
+      Walk(x.base);
+      return false;
+    }
+    bool Pre(const parser::ArrayElement &x) {
+      Walk(x.base);
+      Walk(x.subscripts);
+      return false;
+    }
+    bool Pre(const parser::CoindexedNamedObject &x) {
+      context_.Say(parser::FindSourceLocation(x),
+          "Coarrays are not supported in DEPEND clause"_err_en_US);
+      return false;
+    }
+    void Post(const parser::Name &name) {
+      names.push_back({&name, isBase});
+      isBase = false;
+      if (!name.symbol)
+        elemSize = -1;
+      if (!elemSize)
+        elemSize = ComputeElemTypeSize(name.symbol);
+    }
+    const auto &getNames() const { return names; }
+    size_t getElemSize() const {
+      if (!elemSize)
+        llvm_unreachable("elemSize unset");
+      return elemSize;
+    }
+  };
+  class OSSDoVisitor {
+    std::vector<const parser::Name *> names;
+    SemanticsContext &context_;
+
+    // TODO: copy pasted
+    const parser::Name &GetLoopIndex(const parser::DoConstruct &x) {
+      using Bounds = parser::LoopControl::Bounds;
+      return std::get<Bounds>(x.GetLoopControl()->u).name.thing;
+    }
+
+  public:
+    explicit OSSDoVisitor(SemanticsContext &context)
+        : context_(context) {}
+
+    template <typename A> void Walk(const A &x) { parser::Walk(x, *this); }
+    template <typename A> bool Pre(const A &) { return true; }
+    template <typename A> void Post(const A &) {}
+    bool Pre(const parser::DoConstruct &x) {
+      if (x.GetLoopControl()) {
+        if (x.IsDoNormal()) {
+          const parser::Name &iv{GetLoopIndex(x)};
+          names.push_back(&iv);
+        } else if (x.IsDoConcurrent()) {
+          const auto &concurrent{std::get<parser::LoopControl::Concurrent>(x.GetLoopControl()->u)};
+          const auto &concurrentHeader{std::get<parser::ConcurrentHeader>(concurrent.t)};
+          const auto &concurrentControlList{std::get<std::list<parser::ConcurrentControl>>(concurrentHeader.t)};
+          for (const parser::ConcurrentControl &concurrentControl : concurrentControlList) {
+            const parser::Name &name = std::get<parser::Name>(concurrentControl.t);
+            context_.Say(name.source, "DO CONCURRENT is not supported yet in OmpSs-2 constructs"_err_en_US);
+            // names.push_back(&name);
+          }
+        }
+      }
+      return true;
+    }
+    bool Pre(const parser::OutputImpliedDo &x) {
+      const auto &control{std::get<parser::IoImpliedDoControl>(x.t)};
+      const parser::Name &name{control.name.thing.thing};
+      names.push_back(&name);
+      return true;
+    }
+    bool Pre(const parser::ForallStmt &x) {
+      const auto &concurrentHeader{std::get<common::Indirection<parser::ConcurrentHeader>>(x.t)};
+      const auto &concurrentControlList{std::get<std::list<parser::ConcurrentControl>>(concurrentHeader.value().t)};
+      for (const parser::ConcurrentControl &concurrentControl : concurrentControlList) {
+        const parser::Name &name = std::get<parser::Name>(concurrentControl.t);
+        context_.Say(name.source, "FORALL is not supported yet in OmpSs-2 constructs"_err_en_US);
+        // names.push_back(&name);
+      }
+      return true;
+    }
+    const auto &getNames() const { return names; }
+  };
+
+  class OSSImplicitVisitor {
+    std::vector<std::tuple<Symbol *, parser::CharBlock, Symbol::Flag>> symbols;
+    SemanticsContext &context_;
+    std::vector<DirContext> dirContext_; // used as a stack
+
+  public:
+    explicit OSSImplicitVisitor(
+      SemanticsContext &context, std::vector<DirContext> &dirContext)
+        : context_(context), dirContext_(dirContext) {}
+
+    template <typename A> void Walk(const A &x) { parser::Walk(x, *this); }
+    template <typename A> bool Pre(const A &) { return true; }
+    template <typename A> void Post(const A &) {}
+    void Post(const parser::Name &name);
+    const auto &getSymbols() const { return symbols; }
+    DirContext &GetContext() {
+      CHECK(!dirContext_.empty());
+      return dirContext_.back();
+    }
+    Scope &currScope() { return GetContext().scope; }
+    Symbol *GetSymbolFromName(const parser::Name &);
+  };
+
+  static constexpr Symbol::Flags dataSharingAttributeFlags{
+      Symbol::Flag::OSSShared, Symbol::Flag::OSSPrivate,
+      Symbol::Flag::OSSFirstPrivate};
+  static constexpr Symbol::Flags privateAttributeFlags{
+      Symbol::Flag::OSSPrivate, Symbol::Flag::OSSFirstPrivate};
+
+  // Materialize DSAs computed from clauses.
+  void MaterializeDSAs(DirContext &context);
+
+  // Materialize DSAs computed from clauses.
+  bool DiagnoseUnsupportedDataTypes(DirContext &context, const Symbol &sym, parser::CharBlock);
+
+  // Make loop index a private variable
+  template <typename A> void PrivatizeLoopIndexes(const A &);
+
+  // Walk over directive body and assign an implicit DSA
+  // to variables
+  template <typename A> void DeduceBodyImplicitDsas(const A &);
+
+  void ResolveDsaOSSObjectList(const parser::OSSObjectList &, Symbol::Flag);
+  void ResolveDepOSSObjectList(const parser::OSSObjectList &);
+  void ResolveDependClause(const parser::OSSDependClause::InOut &);
+
+  // These functions analyze possible conflicts between data-sharings:
+  // 1. previousIsBase == true:
+  //    - DSA: conflict always, promotion is not allowed here
+  //               Example: in(array) firstprivate(array)
+  //               Example: shared(array) firstprivate(array)
+  //    - Dep: conflict if the item we're analyzing is a dep base.
+  //               Example: firstprivate(x) in(x)
+  //           If not we may perform promotion
+  //               Example: shared(x) in(array(x))
+  // 2. previousIsBase == false:
+  //    - DSA: promotion allowed
+  //               Example: in(array(i)) shared(i)
+  //    - Dep: promotion allowed
+  //               Example: in(array(i), i)
+  void ResolveDsaOSSObject(const parser::OSSObject &, Symbol::Flag);
+  void ResolveDepOSSObject(const parser::OSSObject &);
+
+  Symbol *ResolveOSS(const parser::Name &, Symbol::Flag, Scope &);
+  Symbol *ResolveOSS(Symbol &, Symbol::Flag, Scope &);
+
+  Symbol *GetSymbolFromName(const parser::Name &);
+
+};
+
 template <typename T>
 bool DirectiveAttributeVisitor<T>::HasDataSharingAttributeObject(
     const Symbol &object) {
@@ -641,6 +957,19 @@ Symbol *DirectiveAttributeVisitor<T>::DeclarePrivateAccessEntity(
       // The symbol in copyin clause must be threadprivate entity.
       symbol.set(Symbol::Flag::OmpThreadprivate);
     }
+    return &symbol;
+  } else {
+    object.set(flag);
+    return &object;
+  }
+}
+
+template <typename T>
+Symbol *DirectiveAttributeVisitor<T>::OSSDeclarePrivateAccessEntity(
+    Symbol &object, Symbol::Flag flag, Scope &scope) {
+  if (object.owner() != currScope()) {
+    auto &symbol{OSSMakeAssocSymbol(object.name(), object, scope)};
+    symbol.set(flag);
     return &symbol;
   } else {
     object.set(flag);
@@ -1985,6 +2314,575 @@ bool OmpAttributeVisitor::HasSymbolInEnclosingScope(
     const Symbol &symbol, Scope &scope) {
   const auto symbols{scope.parent().GetSymbols()};
   return llvm::is_contained(symbols, symbol);
+}
+
+bool OSSOutlineVisitor::Pre(const parser::InterfaceBlock &x){
+  const auto &stmt{std::get<parser::Statement<parser::InterfaceStmt>>(x.t)};
+  if (const auto &generic{std::get<std::optional<parser::GenericSpec>>(stmt.statement.u)}){
+    const auto &spec_list{std::get<std::list<parser::InterfaceSpecification>>(x.t)};
+    for (const parser::InterfaceSpecification &spec : spec_list) {
+      if (const auto *body{std::get_if<parser::InterfaceBody>(&spec.u)}) {
+        if (const auto *task{std::get_if<parser::InterfaceBody::OmpSsIfaceOutlineTask>(&body->u)}){
+          context_.Say(parser::FindSourceLocation(*task),
+                "A task outline does not allow Generic Specifier Interfaces"_err_en_US);
+        }
+      }
+    }
+  }
+  return true;
+}
+
+bool OSSOutlineVisitor::Pre(const parser::OmpSsOutlineTask &x){
+  const auto &stmt{std::get<parser::Statement<parser::OmpSsOutlineTaskConstruct>>(x.t)};
+  const auto &simpleConstruct{std::get<parser::OmpSsSimpleOutlineTaskConstruct>(stmt.statement.t)};
+  const auto &dir{std::get<parser::OSSSimpleOutlineTaskDirective>(simpleConstruct.t)};
+
+  switch (dir.v) {
+  case llvm::oss::Directive::OSSD_declare_task:
+    PushContext(simpleConstruct.source, dir.v);
+    break;
+  default:
+    // TODO others
+    break;
+  }
+
+  // Walk over clauses manually
+  GetContext().withinConstruct = true;
+  Walk(simpleConstruct.t);
+
+  PopContext();
+  return false;
+}
+
+bool OSSOutlineVisitor::Pre(const parser::InterfaceBody::OmpSsIfaceOutlineTask &x){
+  const auto &stmt{std::get<parser::Statement<common::Indirection<parser::OmpSsOutlineTaskConstruct>>>(x.t)};
+  const auto &simpleConstruct{std::get<parser::OmpSsSimpleOutlineTaskConstruct>(stmt.statement.value().t)};
+  const auto &dir{std::get<parser::OSSSimpleOutlineTaskDirective>(simpleConstruct.t)};
+
+  switch (dir.v) {
+  case llvm::oss::Directive::OSSD_declare_task:
+    PushContext(simpleConstruct.source, dir.v);
+    break;
+  default:
+    // TODO others
+    break;
+  }
+
+  // Walk over clauses manually
+  GetContext().withinConstruct = true;
+  Walk(simpleConstruct.t);
+
+  PopContext();
+  return false;
+}
+
+void OSSOutlineVisitor::Post(const parser::Name &name) {
+  auto *symbol{name.symbol};
+  if (!symbol) return;
+  // Look up only variables in pragmas
+  if (dirContext_.empty() || !GetContext().withinConstruct) return;
+  // Skip I in T%I
+  // Skip calls
+  if (symbol->owner().IsDerivedType()
+      || symbol->has<ProcEntityDetails>()
+      || symbol->has<SubprogramDetails>()) return;
+  if (!IsDummy(*symbol)){
+    context_.Say(name.source,
+          "In a task outline '%s' must be a dummyArgument"_err_en_US,
+          symbol->name());
+  }
+  else if (symbol->attrs().test(Attr::VALUE)){
+    context_.Say(name.source,
+          "In a task outline '%s' cannot be a Value"_err_en_US,
+          symbol->name());
+  }
+}
+
+bool OSSAttributeVisitor::Pre(const parser::OmpSsBlockConstruct &x) {
+  const auto &beginBlockDir{std::get<parser::OSSBeginBlockDirective>(x.t)};
+  // TODO: type based access is better
+  const auto &block{std::get<1>(x.t)};
+  const auto &beginDir{std::get<parser::OSSBlockDirective>(beginBlockDir.t)};
+  switch (beginDir.v) {
+  case llvm::oss::Directive::OSSD_task:
+    PushContext(beginDir.source, beginDir.v);
+    break;
+  default:
+    // TODO others
+    break;
+  }
+  ClearDataSharingAttributeObjects();
+
+  PrivatizeLoopIndexes(block);
+  // Walk over clauses manually
+  Walk(beginBlockDir.t);
+  GetContext().withinConstruct = true;
+  DeduceBodyImplicitDsas(block);
+
+  MaterializeDSAs(GetContext());
+
+  return true;
+}
+
+bool OSSAttributeVisitor::Pre(const parser::OmpSsOutlineTask &x) {
+  const auto &stmt{std::get<parser::Statement<parser::OmpSsOutlineTaskConstruct>>(x.t)};
+  const auto &simpleConstruct{std::get<parser::OmpSsSimpleOutlineTaskConstruct>(stmt.statement.t)};
+  const auto &dir{std::get<parser::OSSSimpleOutlineTaskDirective>(simpleConstruct.t)};
+
+  const auto &func{std::get<common::Indirection<parser::SubroutineSubprogram>>(x.t)};
+  const auto &subroutine{func.value()};
+  const auto &stmt_subroutine{std::get<parser::Statement<parser::SubroutineStmt>>(subroutine.t)};
+  const auto &name{std::get<parser::Name>(stmt_subroutine.statement.t)};
+
+  switch (dir.v) {
+  case llvm::oss::Directive::OSSD_declare_task:
+    PushContext(name.source, dir.v);
+    break;
+  default:
+    // TODO others
+    break;
+  }
+
+  // Walk over clauses manually
+  Walk(simpleConstruct.t);
+  GetContext().withinConstruct = true;
+  PopContext();
+
+  Walk(subroutine.t);
+  return false;
+}
+
+bool OSSAttributeVisitor::Pre(const parser::InterfaceBody::OmpSsIfaceOutlineTask &x) {
+  const auto &stmt{std::get<parser::Statement<common::Indirection<parser::OmpSsOutlineTaskConstruct>>>(x.t)};
+  const auto &simpleConstruct{std::get<parser::OmpSsSimpleOutlineTaskConstruct>(stmt.statement.value().t)};
+  const auto &dir{std::get<parser::OSSSimpleOutlineTaskDirective>(simpleConstruct.t)};
+
+  const auto &stmt_subroutine{std::get<parser::Statement<parser::SubroutineStmt>>(x.t)};
+  const auto &name{std::get<parser::Name>(stmt_subroutine.statement.t)};
+
+  switch (dir.v) {
+  case llvm::oss::Directive::OSSD_declare_task:
+    PushContext(name.source, dir.v);
+    break;
+  default:
+    // TODO others
+    break;
+  }
+
+  // Walk over clauses manually
+  Walk(simpleConstruct.t);
+  GetContext().withinConstruct = true;
+  PopContext();
+
+  return false;
+}
+
+bool OSSAttributeVisitor::Pre(const parser::OmpSsStandaloneConstruct &x) {
+  const auto &simpleConstruct{std::get<parser::OmpSsSimpleStandaloneConstruct>(x.u)};
+  const auto &dir{std::get<parser::OSSSimpleStandaloneDirective>(simpleConstruct.t)};
+  switch (dir.v) {
+  case llvm::oss::Directive::OSSD_release:
+  case llvm::oss::Directive::OSSD_taskwait:
+    PushContext(dir.source, dir.v);
+    break;
+  default:
+    // TODO others
+    break;
+  }
+  ClearDataSharingAttributeObjects();
+
+  // Walk over clauses manually
+  Walk(simpleConstruct.t);
+  GetContext().withinConstruct = true;
+
+  MaterializeDSAs(GetContext());
+  return true;
+}
+
+bool OSSAttributeVisitor::Pre(const parser::OmpSsLoopConstruct &x) {
+  const auto &beginLoopDir{std::get<parser::OSSBeginLoopDirective>(x.t)};
+  // TODO: type based access is better
+  const auto &block{std::get<1>(x.t)};
+  const auto &beginDir{std::get<parser::OSSLoopDirective>(beginLoopDir.t)};
+  switch (beginDir.v) {
+  case llvm::oss::Directive::OSSD_task_for:
+  case llvm::oss::Directive::OSSD_taskloop:
+  case llvm::oss::Directive::OSSD_taskloop_for:
+    PushContext(beginDir.source, beginDir.v);
+    break;
+  default:
+    break;
+  }
+  ClearDataSharingAttributeObjects();
+
+  PrivatizeLoopIndexes(block);
+  // Walk over clauses manually
+  Walk(beginLoopDir.t);
+  GetContext().withinConstruct = true;
+  DeduceBodyImplicitDsas(block);
+
+  MaterializeDSAs(GetContext());
+  return true;
+}
+
+void OSSAttributeVisitor::Post(const parser::OSSDefaultClause &x) {
+  if (!dirContext_.empty()) {
+    switch (x.v) {
+    case parser::OSSDefaultClause::Type::Private:
+      SetContextDefaultDSA(Symbol::Flag::OSSPrivate);
+      break;
+    case parser::OSSDefaultClause::Type::Firstprivate:
+      SetContextDefaultDSA(Symbol::Flag::OSSFirstPrivate);
+      break;
+    case parser::OSSDefaultClause::Type::Shared:
+      SetContextDefaultDSA(Symbol::Flag::OSSShared);
+      break;
+    case parser::OSSDefaultClause::Type::None:
+      SetContextDefaultDSA(Symbol::Flag::OSSNone);
+      break;
+    }
+  }
+}
+
+// For OmpSs-2 constructs, check all the data-refs within the constructs
+// and adjust the symbol for each Name if necessary
+void OSSAttributeVisitor::Post(const parser::Name &name) {
+  if (!dirContext_.empty() && GetContext().withinConstruct) {
+    auto *symbol{GetSymbolFromName(name)};
+    if (!symbol) return;
+    // Skip I in T%I
+    // Skip calls
+    if (!symbol->owner().IsDerivedType()
+        && !symbol->has<ProcEntityDetails>()
+        && !symbol->has<SubprogramDetails>()) {
+      if (Symbol *found{currScope().FindSymbol(name.source)}) {
+        if (symbol != found) {
+          name.symbol = found; // adjust the symbol within region
+        }
+      }
+    }
+  } // within OmpSs-2 construct
+}
+
+static void gatherNonDummySymbolsFromStmtFunctionStmt(
+    Symbol *sym, llvm::SmallVector<Symbol *> &symList) {
+  if (const auto *subprogram{sym->detailsIf<SubprogramDetails>()}) {
+    if (!subprogram->stmtFunction())
+      return;
+    for (const Symbol &sym1 : evaluate::CollectSymbols(*subprogram->stmtFunction())) {
+      bool found = false;
+      for (size_t i = 0; i < subprogram->dummyArgs().size(); ++i) {
+        if (subprogram->dummyArgs()[i] == &sym1) {
+          found = true;
+          break;
+        }
+      }
+      if (!found)
+        symList.push_back(const_cast<Symbol *>(&sym1));
+    }
+  }
+}
+
+static
+bool MustDiscard(const Fortran::semantics::Symbol *symbol) {
+  return symbol->owner().IsDerivedType()
+      || symbol->has<ProcEntityDetails>()
+      || symbol->has<SubprogramDetails>()
+      || (symbol->has<UseDetails>() && MustDiscard(&symbol->get<UseDetails>().symbol()))
+      || symbol->has<UseErrorDetails>()
+      || symbol->has<AssocEntityDetails>()
+      || symbol->has<MiscDetails>();
+}
+
+// For OmpSs-2 constructs, check all the data-refs within the constructs
+// and adjust the symbol for each Name if necessary
+void OSSAttributeVisitor::OSSImplicitVisitor::Post(const parser::Name &name) {
+  auto *sym{GetSymbolFromName(name)};
+  if (!sym) return;
+  llvm::SmallVector<Symbol *> symList;
+  symList.push_back(sym);
+
+  gatherNonDummySymbolsFromStmtFunctionStmt(sym, symList);
+
+  for (auto *symbol : symList) {
+    // Skip I in T%I
+    // Skip calls
+    // Skip .ASDF.
+
+    if (MustDiscard(symbol))
+      continue;
+
+    // stmt-function symbols don't appear to have a source
+    parser::CharBlock source = symbol == sym ? name.source : nullptr;
+
+    // If a parent task has a private dsa inherit it
+    Symbol::Flag ossParentFlag = Symbol::Flag::AccShared;
+    for (auto it = dirContext_.rbegin() + 1; it != dirContext_.rend(); ++it) {
+      DirContext &context = *it;
+      auto it1{context.beforeDSAMat.find(symbol)};
+      if (it1 != context.beforeDSAMat.end()) {
+        if (it1->second.ossFlag == Symbol::Flag::OSSFirstPrivate ||
+            it1->second.ossFlag == Symbol::Flag::OSSPrivate) {
+          ossParentFlag = it1->second.ossFlag;
+        }
+      }
+    }
+    auto it{GetContext().beforeDSAMat.find(symbol)};
+    if (it == GetContext().beforeDSAMat.end()) {
+      if (GetContext().defaultDSA == Symbol::Flag::OSSNone) {
+        context_.Say(name.source,
+            "The DEFAULT(NONE) clause requires that '%s' must be listed in "
+            "a data-sharing attribute clause"_err_en_US,
+            symbol->name());
+      } else if (GetContext().defaultDSA != Symbol::Flag::AccShared) {
+        // TODO: Do not use AccShared, use an OSSUnspecified or similar
+        symbols.emplace_back(symbol, source, GetContext().defaultDSA);
+      } else if (ossParentFlag != Symbol::Flag::AccShared) {
+        // TODO: Do not use AccShared, use an OSSUnspecified or similar
+        // parent inheritance
+        symbols.emplace_back(symbol, source, ossParentFlag);
+      } else {
+        // Implicit rules
+        Symbol::Flag ossFlag = Symbol::Flag::OSSFirstPrivate;
+        // Assumed-size arrays are shared.
+        if (const auto *details{symbol->detailsIf<semantics::ObjectEntityDetails>()}) {
+          if (details->IsAssumedSize())
+            ossFlag = Symbol::Flag::OSSShared;
+        }
+        // Named constants are shared
+        // Since they are emitted inside the task leave them without
+        // data-sharing
+        if (symbol->attrs().test(Attr::PARAMETER))
+          return;
+
+        symbols.emplace_back(symbol, source, ossFlag);
+      }
+    }
+  }
+}
+
+void OSSAttributeVisitor::MaterializeDSAs(DirContext &context) {
+  for (const auto &[sym, info] : context.beforeDSAMat) {
+    if (DiagnoseUnsupportedDataTypes(context, *sym, info.source))
+      continue;
+    if (auto *new_sym{ResolveOSS(*sym, info.ossFlag, currScope())}) {
+      AddToContextObjectWithDSA(*new_sym, info.ossFlag);
+    }
+  }
+}
+
+// TODO: I've put this here because the data-sharing resolution
+// is a bit tricky. OpenMP does a lot of checks in check-omp-structure.
+// Should we move this to that stage of semantic? There we only check
+// trivial things like we get an integer in the clause
+bool OSSAttributeVisitor::DiagnoseUnsupportedDataTypes(DirContext &context, const Symbol &sym, parser::CharBlock source) {
+  if (const DeclTypeSpec *type{sym.GetType()}) {
+    if (type->category() == DeclTypeSpec::Character) {
+      context_.Say(source, "CHARACTER data type is not supported"_err_en_US);
+      return true;
+    }
+    if (const DerivedTypeSpec *derived{sym.GetType()->AsDerived()}) {
+      // 4.5.5.2 When finalization occurs
+      // NOTE: I'm not sure if it is easy to support this
+      if (Fortran::semantics::IsFinalizable(*derived)) {
+        context_.Say(source, "finalizable type is not supported"_err_en_US);
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+template <typename A>
+void OSSAttributeVisitor::PrivatizeLoopIndexes(const A &x) {
+  OSSDoVisitor doVisitor{context_};
+  doVisitor.Walk(x);
+  for (auto *name : doVisitor.getNames()) {
+    Symbol::Flag ossFlag = Symbol::Flag::OSSPrivate;
+
+    Symbol *sym = GetSymbolFromName(*name);
+    if (!sym) return;
+    GetContext().beforeDSAMat[sym] = {ossFlag, name->source, /*isBase=*/true};
+  }
+}
+
+template <typename A>
+void OSSAttributeVisitor::DeduceBodyImplicitDsas(const A &x) {
+  OSSImplicitVisitor implicitVisitor{context_, dirContext_};
+  implicitVisitor.Walk(x);
+  for (const auto &[sym, source, ossFlag] : implicitVisitor.getSymbols()) {
+    GetContext().beforeDSAMat[sym] = {ossFlag, source, /*isBase=*/true};
+  }
+}
+
+void OSSAttributeVisitor::ResolveDsaOSSObjectList(
+    const parser::OSSObjectList &ossObjectList, Symbol::Flag ossFlag) {
+  for (const auto &ossObject : ossObjectList.v) {
+    ResolveDsaOSSObject(ossObject, ossFlag);
+  }
+}
+
+void OSSAttributeVisitor::ResolveDepOSSObjectList(
+    const parser::OSSObjectList &ossObjectList) {
+  for (const auto &ossObject : ossObjectList.v) {
+    ResolveDepOSSObject(ossObject);
+  }
+}
+
+void OSSAttributeVisitor::ResolveDependClause(const parser::OSSDependClause::InOut &x) {
+  // TODO: CHECK dep types (weakconcurrent)
+  ResolveDepOSSObjectList(std::get<parser::OSSObjectList>(x.t));
+}
+
+void OSSAttributeVisitor::ResolveDsaOSSObject(
+    const parser::OSSObject &ossObject, Symbol::Flag ossFlag) {
+  std::visit(
+      common::visitors{
+          [&](const parser::Designator &designator) {
+            if (const auto *name{GetDesignatorNameIfDataRef(designator)}) {
+              Symbol *sym = GetSymbolFromName(*name);
+              if (!sym) return;
+              if (sym->attrs().test(Attr::PARAMETER)) {
+                context_.Say(name->source, "expected variable"_err_en_US);
+                return;
+              }
+              // Assumed-size arrays are shared.
+              if (const auto *details{sym->detailsIf<semantics::ObjectEntityDetails>()}) {
+                if (details->IsAssumedSize() && ossFlag != Symbol::Flag::OSSShared)
+                  context_.Say(
+                    name->source, "Assumed size array cannot be %s"_err_en_US,
+                    Symbol::EnumToString(ossFlag));
+              }
+
+              if (GetContext().beforeDSAMat.count(sym)) {
+                auto &[infoOssFlag, infoSource, infoIsBase] = GetContext().beforeDSAMat[sym];
+                if (infoIsBase && infoOssFlag != ossFlag) {
+                  context_.Say(designator.source,
+                      "data-sharing mismatch '%s' vs '%s'"_err_en_US,
+                      Symbol::EnumToString(infoOssFlag),
+                      Symbol::EnumToString(ossFlag));
+                } else if (infoOssFlag == Symbol::Flag::OSSFirstPrivate &&
+                           ossFlag == Symbol::Flag::OSSShared) {
+                  // Promote
+                  infoOssFlag = ossFlag;
+                  infoSource = designator.source;
+                  infoIsBase = true;
+                }
+              } else {
+                GetContext().beforeDSAMat[sym] = {ossFlag, designator.source, /*isBase=*/true};
+              }
+            } else {
+              context_.Say(designator.source,
+                  "expected variable"_err_en_US);
+            }
+          },
+          [&](const parser::Name &name) { // common block
+              context_.Say(name.source,
+                  "COMMON is not supported yet"_err_en_US);
+          },
+      },
+      ossObject.u);
+}
+
+void OSSAttributeVisitor::ResolveDepOSSObject(
+    const parser::OSSObject &ossObject) {
+  std::visit(
+      common::visitors{
+          [&](const parser::Designator &designator) {
+            // Array sections to be changed to substrings as needed
+            if (AnalyzeExpr(context_, designator)) {
+              if (std::holds_alternative<parser::Substring>(designator.u)) {
+                context_.Say(designator.source,
+                    "Substrings are not allowed on OmpSs-2 "
+                    "clauses"_err_en_US);
+                return;
+              }
+            }
+            if (const auto *dataRef{std::get_if<parser::DataRef>(&designator.u)}) {
+              OSSDependVisitor depVisitor{context_};
+              depVisitor.Walk(*dataRef);
+              ossObject.elemSize = depVisitor.getElemSize();
+              for (const auto &[name, isBase] : depVisitor.getNames()) {
+                Symbol *sym = GetSymbolFromName(*name);
+                if (!sym) return;
+                // Ignore constants since they will be created inside
+                // construct
+                if (sym->attrs().test(Attr::PARAMETER)) {
+                  return;
+                }
+
+                bool IsAssumedSize = false;
+                if (const auto *details{sym->detailsIf<semantics::ObjectEntityDetails>()})
+                  IsAssumedSize = details->IsAssumedSize();
+
+                Symbol::Flag ossFlag = Symbol::Flag::OSSShared;
+                if (IsPointer(*sym) || (!isBase && !IsAssumedSize))
+                  ossFlag = Symbol::Flag::OSSFirstPrivate;
+
+                if (GetContext().beforeDSAMat.count(sym)) {
+                  auto &[infoOssFlag, infoSource, infoIsBase] = GetContext().beforeDSAMat[sym];
+                  if (isBase && infoIsBase && infoOssFlag != ossFlag) {
+                    context_.Say(designator.source,
+                        "data-sharing mismatch '%s' vs '%s'"_err_en_US,
+                        Symbol::EnumToString(infoOssFlag),
+                        Symbol::EnumToString(ossFlag));
+                  } else if (infoOssFlag == Symbol::Flag::OSSFirstPrivate &&
+                             ossFlag == Symbol::Flag::OSSShared) {
+                    // Promote
+                    infoOssFlag = ossFlag;
+                    infoSource = name->source;
+                    infoIsBase = isBase || infoIsBase;
+                  }
+                } else {
+                    GetContext().beforeDSAMat[sym] = {ossFlag, name->source, isBase};
+                }
+              }
+            }
+          },
+          [&](const parser::Name &name) { // common block
+              context_.Say(name.source,
+                  "COMMON is not allowed"_err_en_US);
+          },
+      },
+      ossObject.u);
+}
+
+Symbol *OSSAttributeVisitor::ResolveOSS(
+    const parser::Name &name, Symbol::Flag ossFlag, Scope &scope) {
+  if (dataSharingAttributeFlags.test(ossFlag)) {
+    return DeclarePrivateAccessEntity(name, ossFlag, scope);
+  }
+  return nullptr;
+}
+
+Symbol *OSSAttributeVisitor::ResolveOSS(
+    Symbol &symbol, Symbol::Flag ossFlag, Scope &scope) {
+  if (privateAttributeFlags.test(ossFlag)) {
+    return OSSDeclarePrivateAccessEntity(symbol, ossFlag, scope);
+  } else if (dataSharingAttributeFlags.test(ossFlag)) {
+    return DeclarePrivateAccessEntity(symbol, ossFlag, scope);
+  }
+  return nullptr;
+}
+
+Symbol *OSSAttributeVisitor::GetSymbolFromName(const parser::Name &name) {
+  if (!name.symbol)
+    return nullptr;
+  return name.symbol;
+}
+
+Symbol *OSSAttributeVisitor::OSSImplicitVisitor::GetSymbolFromName(const parser::Name &name) {
+  if (!name.symbol)
+    return nullptr;
+  return name.symbol;
+}
+
+void ResolveOSSParts(
+    SemanticsContext &context, const parser::ProgramUnit &node) {
+  if (context.IsEnabled(common::LanguageFeature::OmpSs)) {
+    OSSOutlineVisitor{context}.Walk(node);
+    OSSAttributeVisitor{context}.Walk(node);
+  }
 }
 
 } // namespace Fortran::semantics

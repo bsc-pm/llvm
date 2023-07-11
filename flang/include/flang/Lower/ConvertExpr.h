@@ -36,6 +36,7 @@ class ShapeOp;
 namespace Fortran::lower {
 
 class AbstractConverter;
+class CallerInterface;
 class ExplicitIterSpace;
 class ImplicitIterSpace;
 class StatementContext;
@@ -174,7 +175,8 @@ void createAllocatableArrayAssignment(AbstractConverter &converter,
                                       ExplicitIterSpace &explicitIterSpace,
                                       ImplicitIterSpace &implicitIterSpace,
                                       SymMap &symMap,
-                                      StatementContext &stmtCtx);
+                                      StatementContext &stmtCtx,
+                                      bool DoNotInitialize = false);
 
 /// Lower a pointer assignment in an explicit iteration space. The explicit
 /// space iterates over a data structure with a type of `!fir.array<...
@@ -224,6 +226,22 @@ mlir::Value createSubroutineCall(AbstractConverter &converter,
                                  ImplicitIterSpace &implicitIterSpace,
                                  SymMap &symMap, StatementContext &stmtCtx,
                                  bool isUserDefAssignment);
+struct OSSCreateCall {
+  Fortran::lower::AbstractConverter &converter;
+  Fortran::lower::CallerInterface &caller;
+  Fortran::lower::StatementContext &stmtCtx;
+  std::function<void(Fortran::lower::SymMap &,
+                     const llvm::SmallVector<mlir::Value>&)> BodyGen;
+
+  OSSCreateCall(Fortran::lower::AbstractConverter &converter,
+                Fortran::lower::CallerInterface &caller,
+                Fortran::lower::StatementContext &stmtCtx,
+                std::function<void(Fortran::lower::SymMap &,
+                                   const llvm::SmallVector<mlir::Value>&)> BodyGen)
+  : converter(converter), caller(caller), stmtCtx(stmtCtx), BodyGen(BodyGen)
+  {}
+  void run();
+};
 
 // Attribute for an alloca that is a trivial adaptor for converting a value to
 // pass-by-ref semantics for a VALUE parameter. The optimizer may be able to

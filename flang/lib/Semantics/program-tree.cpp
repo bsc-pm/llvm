@@ -165,6 +165,15 @@ ProgramTree ProgramTree::Build(const parser::SubroutineSubprogram &x) {
       .set_bindingSpec(bindingSpec);
 }
 
+ProgramTree ProgramTree::Build(const parser::OmpSsOutlineTask &x) {
+  const auto &end{std::get<common::Indirection<parser::SubroutineSubprogram>>(x.t)};
+  const auto &subroutine{end.value()};
+  const auto &stmt_subroutine{std::get<parser::Statement<parser::SubroutineStmt>>(subroutine.t)};
+  const auto &end_subroutine{std::get<parser::Statement<parser::EndSubroutineStmt>>(subroutine.t)};
+  const auto &name{std::get<parser::Name>(stmt_subroutine.statement.t)};
+  return BuildSubprogramTree(name, subroutine).set_stmt(stmt_subroutine).set_endStmt(end_subroutine);
+}
+
 ProgramTree ProgramTree::Build(const parser::SeparateModuleSubprogram &x) {
   const auto &stmt{std::get<parser::Statement<parser::MpSubprogramStmt>>(x.t)};
   const auto &end{

@@ -4,6 +4,7 @@ add_flang_library(FortranSemantics
   canonicalize-acc.cpp
   canonicalize-do.cpp
   canonicalize-omp.cpp
+  canonicalize-oss.cpp
   check-acc-structure.cpp
   check-allocate.cpp
   check-arithmeticif.cpp
@@ -20,6 +21,7 @@ add_flang_library(FortranSemantics
   check-namelist.cpp
   check-nullify.cpp
   check-omp-structure.cpp
+  check-oss-structure.cpp
   check-purity.cpp
   check-return.cpp
   check-select-rank.cpp
@@ -48,6 +50,7 @@ add_flang_library(FortranSemantics
   DEPENDS
   acc_gen
   omp_gen
+  oss_gen
 
   LINK_LIBS
   FortranCommon
@@ -56,6 +59,7 @@ add_flang_library(FortranSemantics
 
   LINK_COMPONENTS
   Support
+  FrontendOmpSs
   FrontendOpenMP
   FrontendOpenACC
   TargetParser

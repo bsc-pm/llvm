@@ -22,6 +22,7 @@ add_flang_library(FortranLower
   IterationSpace.cpp
   LoweringOptions.cpp
   Mangler.cpp
+  OmpSs.cpp
   OpenACC.cpp
   OpenMP.cpp
   PFTBuilder.cpp

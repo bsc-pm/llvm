@@ -11,6 +11,7 @@
 #include "canonicalize-acc.h"
 #include "canonicalize-do.h"
 #include "canonicalize-omp.h"
+#include "canonicalize-oss.h"
 #include "check-acc-structure.h"
 #include "check-allocate.h"
 #include "check-arithmeticif.h"
@@ -26,6 +27,7 @@
 #include "check-namelist.h"
 #include "check-nullify.h"
 #include "check-omp-structure.h"
+#include "check-oss-structure.h"
 #include "check-purity.h"
 #include "check-return.h"
 #include "check-select-rank.h"
@@ -167,7 +169,7 @@ using StatementSemanticsPass2 = SemanticsVisitor<AllocateChecker,
     ReturnStmtChecker, SelectRankConstructChecker, SelectTypeChecker,
     StopChecker>;
 using StatementSemanticsPass3 =
-    SemanticsVisitor<AccStructureChecker, OmpStructureChecker, CUDAChecker>;
+    SemanticsVisitor<AccStructureChecker, OmpStructureChecker, OSSStructureChecker, CUDAChecker>;
 
 static bool PerformStatementSemantics(
     SemanticsContext &context, parser::Program &program) {
@@ -180,6 +182,7 @@ static bool PerformStatementSemantics(
   pass2.Walk(program);
   if (context.languageFeatures().IsEnabled(common::LanguageFeature::OpenACC) ||
       context.languageFeatures().IsEnabled(common::LanguageFeature::OpenMP) ||
+      context.languageFeatures().IsEnabled(common::LanguageFeature::OmpSs) ||
       context.languageFeatures().IsEnabled(common::LanguageFeature::CUDA)) {
     StatementSemanticsPass3{context}.Walk(program);
   }
@@ -537,6 +540,7 @@ bool Semantics::Perform() {
       parser::CanonicalizeDo(program_) && // force line break
       CanonicalizeAcc(context_.messages(), program_) &&
       CanonicalizeOmp(context_.messages(), program_) &&
+      CanonicalizeOSS(context_.messages(), program_) &&
       CanonicalizeCUDA(program_) &&
       PerformStatementSemantics(context_, program_) &&
       ModFileWriter{context_}.WriteAll();

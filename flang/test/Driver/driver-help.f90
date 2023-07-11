@@ -50,6 +50,7 @@
 ! HELP-NEXT: -fno-stack-arrays      Allocate array temporaries on the heap (default)
 ! HELP-NEXT: -fno-version-loops-for-stride
 ! HELP-NEXT:                        Do not create unit-strided loops (default)
+! HELP-NEXT: -fompss-2              Parse OmpSs-2 pragmas and generate parallel code.
 ! HELP-NEXT: -fopenacc              Enable OpenACC
 ! HELP-NEXT: -fopenmp-version=<value>
 ! HELP-NEXT:                        Set OpenMP version (e.g. 45 for OpenMP 4.5, 50 for OpenMP 5.0). Default value is 50 for Clang and 11 for Flang
@@ -155,6 +156,7 @@
 ! HELP-FC1-NEXT: -fno-stack-arrays      Allocate array temporaries on the heap (default)
 ! HELP-FC1-NEXT: -fno-version-loops-for-stride
 ! HELP-FC1-NEXT:                        Do not create unit-strided loops (default)
+! HELP-FC1-NEXT: -fompss-2              Parse OmpSs-2 pragmas and generate parallel code.
 ! HELP-FC1-NEXT: -fopenacc              Enable OpenACC
 ! HELP-FC1-NEXT: -fopenmp-host-ir-file-path <value> 
 ! HELP-FC1-NEXT:                        Path to the IR file produced by the frontend for the host.

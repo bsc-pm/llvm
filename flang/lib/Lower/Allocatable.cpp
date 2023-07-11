@@ -983,6 +983,14 @@ bool Fortran::lower::isWholePointer(const Fortran::lower::SomeExpr &expr) {
   return false;
 }
 
+void Fortran::lower::emitOSSDeinitExpr(
+    AbstractConverter &converter, const fir::MutableBoxValue &box, mlir::Location loc) {
+  fir::FirOpBuilder &builder = converter.getFirOpBuilder();
+  ErrorManager errorManager;
+  errorManager.init(converter, loc, nullptr, nullptr);
+  genDeallocate(builder, loc, box, errorManager);
+}
+
 mlir::Value Fortran::lower::getAssumedCharAllocatableOrPointerLen(
     fir::FirOpBuilder &builder, mlir::Location loc,
     const Fortran::semantics::Symbol &sym, mlir::Value box) {

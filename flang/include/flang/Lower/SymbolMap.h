@@ -315,7 +315,7 @@ public:
     return std::nullopt;
   }
 
-private:
+// private:
   /// Add `symbol` to the current map and bind a `box`.
   void makeSym(semantics::SymbolRef symRef, const SymbolBox &box,
                bool force = false) {

@@ -50,6 +50,11 @@ public:
     return true;
   }
   void Post(const parser::OpenMPThreadprivate &) { currStmt_ = std::nullopt; }
+  bool Pre(const parser::OSSClause &clause) {
+    currStmt_ = clause.source;
+    return true;
+  }
+  void Post(const parser::OSSClause &) { currStmt_ = std::nullopt; }
   void Post(const parser::Name &name);
 
 private:

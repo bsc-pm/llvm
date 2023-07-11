@@ -720,7 +720,12 @@ static bool parseDialectArgs(CompilerInvocation &res, llvm::opt::ArgList &args,
   if (args.hasArg(clang::driver::options::OPT_flarge_sizes))
     res.getDefaultKinds().set_sizeIntegerKind(8);
 
+  // -fompss-2
   // -fopenmp and -fopenacc
+  if (args.hasArg(clang::driver::options::OPT_fompss)) {
+    res.getFrontendOpts().features.Enable(
+        Fortran::common::LanguageFeature::OmpSs);
+  }
   if (args.hasArg(clang::driver::options::OPT_fopenacc)) {
     res.getFrontendOpts().features.Enable(
         Fortran::common::LanguageFeature::OpenACC);
@@ -1016,6 +1021,10 @@ void CompilerInvocation::setDefaultPredefinitions() {
                                              FLANG_VERSION_PATCHLEVEL_STRING);
 
   // Add predefinitions based on extensions enabled
+  if (frontendOptions.features.IsEnabled(
+          Fortran::common::LanguageFeature::OmpSs)) {
+    fortranOptions.predefinitions.emplace_back("_OMPSS_2", "1");
+  }
   if (frontendOptions.features.IsEnabled(
           Fortran::common::LanguageFeature::OpenACC)) {
     fortranOptions.predefinitions.emplace_back("_OPENACC", "202011");

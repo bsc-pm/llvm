@@ -37,6 +37,7 @@ namespace Fortran::parser {
 static constexpr auto programUnit{
     construct<ProgramUnit>(indirect(Parser<Module>{})) ||
     construct<ProgramUnit>(indirect(functionSubprogram)) ||
+    construct<ProgramUnit>(indirect(ompssOutlineTask)) ||
     construct<ProgramUnit>(indirect(subroutineSubprogram)) ||
     construct<ProgramUnit>(indirect(Parser<Submodule>{})) ||
     construct<ProgramUnit>(indirect(Parser<BlockData>{})) ||
@@ -82,6 +83,7 @@ TYPE_CONTEXT_PARSER("specification part"_en_US,
 // are allowed, and so we have a variant production for declaration-construct
 // that implements those constraints.
 constexpr auto execPartLookAhead{first(actionStmt >> ok, openaccConstruct >> ok,
+    ompssConstruct >> ok,
     openmpConstruct >> ok, "ASSOCIATE ("_tok, "BLOCK"_tok, "SELECT"_tok,
     "CHANGE TEAM"_sptok, "CRITICAL"_tok, "DO"_tok, "IF ("_tok, "WHERE ("_tok,
     "FORALL ("_tok, "!$CUF"_tok)};
@@ -241,6 +243,7 @@ TYPE_CONTEXT_PARSER("module subprogram part"_en_US,
 //         function-subprogram | subroutine-subprogram |
 //         separate-module-subprogram
 TYPE_PARSER(construct<ModuleSubprogram>(indirect(functionSubprogram)) ||
+    construct<ModuleSubprogram>(indirect(ompssOutlineTask)) ||
     construct<ModuleSubprogram>(indirect(subroutineSubprogram)) ||
     construct<ModuleSubprogram>(indirect(Parser<SeparateModuleSubprogram>{})))
 
@@ -343,7 +346,10 @@ TYPE_CONTEXT_PARSER("interface body"_en_US,
             indirect(limitedSpecificationPart), statement(endFunctionStmt))) ||
         construct<InterfaceBody>(construct<InterfaceBody::Subroutine>(
             statement(subroutineStmt), indirect(limitedSpecificationPart),
-            statement(endSubroutineStmt))))
+            statement(endSubroutineStmt))) ||
+        construct<InterfaceBody>(construct<InterfaceBody::OmpSsIfaceOutlineTask>(
+            statement(indirect(ompssOutlineTaskConstruct)), statement(subroutineStmt),
+            indirect(limitedSpecificationPart), statement(endSubroutineStmt))))
 
 // R1507 specific-procedure -> procedure-name
 constexpr auto specificProcedures{

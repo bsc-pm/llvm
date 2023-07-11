@@ -24,6 +24,7 @@
 
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Frontend/OpenMP/OMPIRBuilder.h"
+#include "llvm/Frontend/OmpSs/OSSIRBuilder.h"
 
 namespace llvm {
 class BasicBlock;
@@ -166,6 +167,16 @@ public:
 
   /// Returns the LLVM module in which the IR is being constructed.
   llvm::Module *getLLVMModule() { return llvmModule.get(); }
+
+  /// Returns the OmpSs-2 IR builder associated with the LLVM IR module being
+  /// constructed.
+  llvm::OmpSsIRBuilder *getOmpSsBuilder() {
+    if (!ossBuilder) {
+      ossBuilder = std::make_unique<llvm::OmpSsIRBuilder>(*llvmModule);
+      ossBuilder->initialize();
+    }
+    return ossBuilder.get();
+  }
 
   /// Translates the given location.
   llvm::DILocation *translateLoc(Location loc, llvm::DILocalScope *scope);
@@ -310,6 +321,9 @@ private:
 
   /// Builder for LLVM IR generation of OpenMP constructs.
   std::unique_ptr<llvm::OpenMPIRBuilder> ompBuilder;
+
+  /// Builder for LLVM IR generation of OmpSs-2 constructs.
+  std::unique_ptr<llvm::OmpSsIRBuilder> ossBuilder;
 
   /// Mappings between llvm.mlir.global definitions and corresponding globals.
   DenseMap<Operation *, llvm::GlobalValue *> globalsMapping;

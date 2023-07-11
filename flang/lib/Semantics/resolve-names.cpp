@@ -861,6 +861,9 @@ public:
   void Post(const parser::InterfaceBody::Subroutine &);
   bool Pre(const parser::InterfaceBody::Function &);
   void Post(const parser::InterfaceBody::Function &);
+  bool Pre(const parser::InterfaceBody::OmpSsIfaceOutlineTask &);
+  void Post(const parser::InterfaceBody::OmpSsIfaceOutlineTask &);
+  bool Pre(const parser::OmpSsOutlineTaskConstruct &) { return false; }
   bool Pre(const parser::Suffix &);
   bool Pre(const parser::PrefixSpec &);
   bool Pre(const parser::PrefixSpec::Attributes &);
@@ -1462,12 +1465,139 @@ void OmpVisitor::Post(const parser::OpenMPBlockConstruct &x) {
   }
 }
 
+// Create scopes for OmpSs constructs
+class OSSVisitor : public virtual DeclarationVisitor {
+public:
+  void AddOSSSourceRange(const parser::CharBlock &);
+
+  static bool NeedsScope(const parser::OmpSsBlockConstruct &);
+
+  bool Pre(const parser::OmpSsBlockConstruct &);
+  void Post(const parser::OmpSsBlockConstruct &);
+  bool Pre(const parser::OSSBeginBlockDirective &x) {
+    AddOSSSourceRange(x.source);
+    return true;
+  }
+  void Post(const parser::OSSBeginBlockDirective &) {
+    messageHandler().set_currStmtSource(std::nullopt);
+  }
+  bool Pre(const parser::OSSEndBlockDirective &x) {
+    AddOSSSourceRange(x.source);
+    return true;
+  }
+  void Post(const parser::OSSEndBlockDirective &) {
+    messageHandler().set_currStmtSource(std::nullopt);
+  }
+
+  bool Pre(const parser::OmpSsLoopConstruct &) {
+    PushScope(Scope::Kind::OtherConstruct, nullptr);
+    return true;
+  }
+  void Post(const parser::OmpSsLoopConstruct &) { PopScope(); }
+  bool Pre(const parser::OSSBeginLoopDirective &x) {
+    AddOSSSourceRange(x.source);
+    return true;
+  }
+  void Post(const parser::OSSBeginLoopDirective &) {
+    messageHandler().set_currStmtSource(std::nullopt);
+  }
+  bool Pre(const parser::OSSEndLoopDirective &x) {
+    AddOSSSourceRange(x.source);
+    return true;
+  }
+  void Post(const parser::OSSEndLoopDirective &) {
+    messageHandler().set_currStmtSource(std::nullopt);
+  }
+
+  bool Pre(const parser::OmpSsSimpleStandaloneConstruct &) {
+    PushScope(Scope::Kind::OtherConstruct, nullptr);
+    return true;
+  }
+  void Post(const parser::OmpSsSimpleStandaloneConstruct &) { PopScope(); }
+  bool Pre(const parser::OSSSimpleStandaloneDirective &x) {
+    AddOSSSourceRange(x.source);
+    return true;
+  }
+  void Post(const parser::OSSSimpleStandaloneDirective &) {
+    messageHandler().set_currStmtSource(std::nullopt);
+  }
+
+  // At this point, name resolution is already done in the ProgramUnit
+  // Simulate we're in the same scope to resolve our pragma names
+  bool Pre(const parser::OmpSsOutlineTask &x) {
+    const auto &stmt{std::get<parser::Statement<parser::OmpSsOutlineTaskConstruct>>(x.t)};
+    const auto &simpleConstruct{std::get<parser::OmpSsSimpleOutlineTaskConstruct>(stmt.statement.t)};
+
+    const auto &func{std::get<common::Indirection<parser::SubroutineSubprogram>>(x.t)};
+    const auto &subroutine{func.value()};
+    const auto &stmt_subroutine{std::get<parser::Statement<parser::SubroutineStmt>>(subroutine.t)};
+    const auto &name{std::get<parser::Name>(stmt_subroutine.statement.t)};
+
+    auto symbol = name.symbol;
+    symbol->set(Symbol::Flag::OSSOutlineTask);
+    auto *details{symbol->detailsIf<semantics::SubprogramDetails>()};
+    details->setOutlineTask(stmt.statement);
+
+    Scope *scope = symbol->scope();
+    assert(scope);
+    Scope *tmp = &currScope();
+
+    // Simulate we are in subroutine scope, where the pragma symbols are.
+    SetScope(*scope);
+    Walk(simpleConstruct.t);
+    SetScope(*tmp);
+    return false;
+  }
+
+  bool Pre(const parser::OmpSsSimpleOutlineTaskConstruct &) {
+    PushScope(Scope::Kind::OtherConstruct, nullptr);
+    return true;
+  }
+  void Post(const parser::OmpSsSimpleOutlineTaskConstruct &) { PopScope(); }
+  bool Pre(const parser::OSSSimpleOutlineTaskDirective &x) {
+    AddOSSSourceRange(x.source);
+    return true;
+  }
+  void Post(const parser::OSSSimpleOutlineTaskDirective &) {
+    messageHandler().set_currStmtSource(std::nullopt);
+  }
+};
+
+bool OSSVisitor::NeedsScope(const parser::OmpSsBlockConstruct &x) {
+  const auto &beginBlockDir{std::get<parser::OSSBeginBlockDirective>(x.t)};
+  const auto &beginDir{std::get<parser::OSSBlockDirective>(beginBlockDir.t)};
+  switch (beginDir.v) {
+  // TODO: what directives do not need scope?
+  default:
+    return true;
+  }
+}
+
+void OSSVisitor::AddOSSSourceRange(const parser::CharBlock &source) {
+  messageHandler().set_currStmtSource(source);
+  currScope().AddSourceRange(source);
+}
+
+bool OSSVisitor::Pre(const parser::OmpSsBlockConstruct &x) {
+  if (NeedsScope(x)) {
+    PushScope(Scope::Kind::OtherConstruct, nullptr);
+  }
+  return true;
+}
+
+void OSSVisitor::Post(const parser::OmpSsBlockConstruct &x) {
+  if (NeedsScope(x)) {
+    PopScope();
+  }
+}
+
 // Walk the parse tree and resolve names to symbols.
 class ResolveNamesVisitor : public virtual ScopeHandler,
                             public ModuleVisitor,
                             public SubprogramVisitor,
                             public ConstructVisitor,
                             public OmpVisitor,
+                            public OSSVisitor,
                             public AccVisitor {
 public:
   using AccVisitor::Post;
@@ -1485,6 +1615,8 @@ public:
   using ModuleVisitor::Pre;
   using OmpVisitor::Post;
   using OmpVisitor::Pre;
+  using OSSVisitor::Post;
+  using OSSVisitor::Pre;
   using ScopeHandler::Post;
   using ScopeHandler::Pre;
   using SubprogramVisitor::Post;
@@ -3623,6 +3755,32 @@ void SubprogramVisitor::Post(const parser::InterfaceBody::Function &x) {
   const auto &maybeSuffix{
       std::get<std::optional<parser::Suffix>>(stmt.statement.t)};
   EndSubprogram(stmt.source, maybeSuffix ? &maybeSuffix->binding : nullptr);
+}
+bool SubprogramVisitor::Pre(const parser::InterfaceBody::OmpSsIfaceOutlineTask &x) {
+  const auto &name{std::get<parser::Name>(
+      std::get<parser::Statement<parser::SubroutineStmt>>(x.t).statement.t)};
+  return BeginSubprogram(name, Symbol::Flag::Subroutine);
+}
+void SubprogramVisitor::Post(const parser::InterfaceBody::OmpSsIfaceOutlineTask &x) {
+  EndSubprogram();
+  const auto &name{std::get<parser::Name>(
+      std::get<parser::Statement<parser::SubroutineStmt>>(x.t).statement.t)};
+  const auto &stmt{std::get<parser::Statement<common::Indirection<parser::OmpSsOutlineTaskConstruct>>>(x.t)};
+  const auto &simpleConstruct{std::get<parser::OmpSsSimpleOutlineTaskConstruct>(stmt.statement.value().t)};
+
+  auto symbol = name.symbol;
+  symbol->set(Symbol::Flag::OSSOutlineTask);
+  auto *details{symbol->detailsIf<semantics::SubprogramDetails>()};
+  details->setOutlineTask(stmt.statement.value());
+
+  Scope *scope = symbol->scope();
+  assert(scope);
+  Scope *tmp = &currScope();
+
+  // Simulate we are in subroutine scope, where the pragma symbols are.
+  SetScope(*scope);
+  Walk(simpleConstruct.t);
+  SetScope(*tmp);
 }
 
 bool SubprogramVisitor::Pre(const parser::SubroutineStmt &stmt) {
@@ -8139,6 +8297,31 @@ bool ResolveNamesVisitor::Pre(const parser::ProgramUnit &x) {
   ResolveExecutionParts(root);
   ResolveAccParts(context(), x);
   ResolveOmpParts(context(), x);
+  // Walk over OmpSsOutlineTask since ProgramUnit does not do it
+  if (const auto *outline{std::get_if<common::Indirection<parser::OmpSsOutlineTask>>(&x.u)}) {
+    Walk(*outline);
+  } else if (const auto *module{std::get_if<common::Indirection<parser::Module>>(&x.u)}) {
+    if (const auto &subps{std::get<std::optional<parser::ModuleSubprogramPart>>(module->value().t)}) {
+      if (subps) {
+        for (const auto &subp :
+            std::get<std::list<parser::ModuleSubprogram>>(subps->t)) {
+          if (const auto *outline{std::get_if<common::Indirection<parser::OmpSsOutlineTask>>(&subp.u)})
+            Walk(*outline);
+        }
+      }
+    }
+  } else if (const auto *main{std::get_if<common::Indirection<parser::MainProgram>>(&x.u)}) {
+    if (const auto &subps{std::get<std::optional<parser::InternalSubprogramPart>>(main->value().t)}) {
+      if (subps) {
+        for (const auto &subp :
+            std::get<std::list<parser::InternalSubprogram>>(subps->t)) {
+          if (const auto *outline{std::get_if<common::Indirection<parser::OmpSsOutlineTask>>(&subp.u)})
+            Walk(*outline);
+        }
+      }
+    }
+  }
+  ResolveOSSParts(context(), x);
   return false;
 }
 
@@ -8181,8 +8364,13 @@ bool ResolveNamesVisitor::Pre(const parser::Program &x) {
         disordered = true;
       }
     }
-    for (SourceName used : common::visit(
-             [](const auto &indUnit) { return GetUses(indUnit.value()); },
+    for (SourceName used : common::visit(common::visitors{
+             [&](const common::Indirection<parser::OmpSsOutlineTask> &indUnit) {
+               return GetUses(
+                 std::get<common::Indirection<parser::SubroutineSubprogram>>(
+                   indUnit.value().t).value());
+             },
+             [](const auto &indUnit) { return GetUses(indUnit.value()); }},
              progUnit.u)) {
       uses.insert(used);
     }

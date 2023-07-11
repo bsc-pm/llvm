@@ -1,0 +1,28 @@
+! RUN: %flang_fc1 -fompss-2 -fdebug-unparse %s | FileCheck %s
+
+PROGRAM P1
+
+!$OSS TASK DO
+    DO I = 1, 10
+        CONTINUE
+    END DO
+
+!$OSS TASKLOOP
+    DO I = 1, 10
+        CONTINUE
+    END DO
+
+!$OSS TASKLOOP DO
+    DO I = 1, 10
+        CONTINUE
+    END DO
+
+END PROGRAM
+
+!CHECK: !$OSS TASK DO
+!CHECK-NOT: !$OSS END TASK DO
+!CHECK: !$OSS TASKLOOP
+!CHECK-NOT: !$OSS END TASKLOOP
+!CHECK: !$OSS
+!CHECK-NOT: !$OSS END
+

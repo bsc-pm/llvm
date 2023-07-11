@@ -252,6 +252,7 @@ categorise_opts()
       # Options that are needed for both Flang and the external driver.
       [[ $opt =~ -I.* ]] ||
       [[ $opt =~ -J.* ]] ||
+      [[ $opt == "-fompss-2" ]] ||
       [[ $opt == "-fopenmp" ]] ||
       [[ $opt == "-fopenacc" ]]; then
       flang_opts+=($opt)

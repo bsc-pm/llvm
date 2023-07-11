@@ -27,6 +27,7 @@
 // CHECK-SAME: nvgpu
 // CHECK-SAME: nvvm
 // CHECK-SAME: omp
+// CHECK-SAME: oss
 // CHECK-SAME: pdl
 // CHECK-SAME: pdl_interp
 // CHECK-SAME: quant

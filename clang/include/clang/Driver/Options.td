@@ -2741,7 +2741,7 @@ def fomit_frame_pointer : Flag<["-"], "fomit-frame-pointer">, Group<f_Group>,
   "Some stack unwinding cases, such as profilers and sanitizers, may prefer specifying -fno-omit-frame-pointer. "
   "On many targets, -O1 and higher omit the frame pointer by default. "
   "-m[no-]omit-leaf-frame-pointer takes precedence for leaf functions">;
-def fompss : Flag<["-"], "fompss-2">, Group<f_Group>, Flags<[CC1Option, NoArgumentUnused]>,
+def fompss : Flag<["-"], "fompss-2">, Group<f_Group>, Flags<[CC1Option, NoArgumentUnused, FlangOption, FC1Option]>,
   HelpText<"Parse OmpSs-2 pragmas and generate parallel code.">,
   MarshallingInfoFlag<LangOpts<"OmpSs">>;
 def fompss_EQ : Joined<["-"], "fompss-2=">, Group<f_Group>, Flags<[CC1Option]>,
