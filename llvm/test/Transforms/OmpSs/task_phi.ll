@@ -118,6 +118,7 @@ attributes #1 = { nounwind }
 ; CHECK-NEXT:    [[B_ADDR:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    store i32 [[A]], ptr [[A_ADDR]], align 4
 ; CHECK-NEXT:    store i32 [[B]], ptr [[B_ADDR]], align 4
+; CHECK-NEXT:    [[L_CLONE:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = alloca ptr, align 8, !dbg [[DBG9:![0-9]+]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = alloca ptr, align 8, !dbg [[DBG9]]
 ; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG9]]
@@ -136,10 +137,9 @@ attributes #1 = { nounwind }
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP4]]), !dbg [[DBG9]]
 ; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG9]]
 ; CHECK:       final.end:
-; CHECK-NEXT:    call void @nanos6_taskwait(ptr @[[GLOB1:[0-9]+]]), !dbg [[DBG10:![0-9]+]]
+; CHECK-NEXT:    call void @nanos6_taskwait(ptr @[[GLOB2:[0-9]+]]), !dbg [[DBG10:![0-9]+]]
 ; CHECK-NEXT:    ret void, !dbg [[DBG11:![0-9]+]]
 ; CHECK:       final.then:
-; CHECK-NEXT:    [[L_CLONE:%.*]] = alloca i32, align 4, !dbg [[DBG9]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = load i32, ptr [[A_ADDR]], align 4, !dbg [[DBG12:![0-9]+]]
 ; CHECK-NEXT:    [[TOBOOL_CLONE:%.*]] = icmp ne i32 [[TMP5]], 0, !dbg [[DBG12]]
 ; CHECK-NEXT:    br i1 [[TOBOOL_CLONE]], label [[LOR_END_CLONE:%.*]], label [[LOR_RHS_CLONE:%.*]], !dbg [[DBG13:![0-9]+]]
@@ -179,12 +179,18 @@ attributes #1 = { nounwind }
 ; CHECK-NEXT:    ret i32 0, !dbg [[DBG23:![0-9]+]]
 ;
 ;
+; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_check_version() {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    call void @nanos6_check_version(i64 1, ptr @nanos6_versions, ptr @[[GLOB0:[0-9]+]])
+; CHECK-NEXT:    ret void
+;
+;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_fold_if
 ; CHECK-SAME: (ptr [[A_ADDR:%.*]], ptr [[B_ADDR:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG24:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
+; CHECK-NEXT:    [[L:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG25:![0-9]+]]
 ; CHECK:       0:
-; CHECK-NEXT:    [[L:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr [[A_ADDR]], align 4, !dbg [[DBG26:![0-9]+]]
 ; CHECK-NEXT:    [[TOBOOL:%.*]] = icmp ne i32 [[TMP1]], 0, !dbg [[DBG26]]
 ; CHECK-NEXT:    br i1 [[TOBOOL]], label [[LOR_END:%.*]], label [[LOR_RHS:%.*]], !dbg [[DBG27:![0-9]+]]

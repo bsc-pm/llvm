@@ -75,6 +75,7 @@ attributes #1 = { nounwind }
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[RETVAL:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    store i32 0, ptr [[RETVAL]], align 4
+; CHECK-NEXT:    [[I_CLONE:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = alloca ptr, align 8, !dbg [[DBG8:![0-9]+]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = alloca ptr, align 8, !dbg [[DBG8]]
 ; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG8]]
@@ -92,7 +93,6 @@ attributes #1 = { nounwind }
 ; CHECK-NEXT:    [[TMP5:%.*]] = load i32, ptr [[RETVAL]], align 4, !dbg [[DBG9:![0-9]+]]
 ; CHECK-NEXT:    ret i32 [[TMP5]], !dbg [[DBG9]]
 ; CHECK:       final.then:
-; CHECK-NEXT:    [[I_CLONE:%.*]] = alloca i32, align 4, !dbg [[DBG8]]
 ; CHECK-NEXT:    store i32 0, ptr [[I_CLONE]], align 4, !dbg [[DBG10:![0-9]+]]
 ; CHECK-NEXT:    br label [[FOR_COND_CLONE:%.*]], !dbg [[DBG11:![0-9]+]]
 ; CHECK:       for.cond.clone:
@@ -114,12 +114,18 @@ attributes #1 = { nounwind }
 ; CHECK-NEXT:    br i1 [[TMP9]], label [[FINAL_THEN:%.*]], label [[CODEREPL:%.*]], !dbg [[DBG8]]
 ;
 ;
+; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_check_version() {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    call void @nanos6_check_version(i64 1, ptr @nanos6_versions, ptr @[[GLOB0:[0-9]+]])
+; CHECK-NEXT:    ret void
+;
+;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_main
 ; CHECK-SAME: (ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG18:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
+; CHECK-NEXT:    [[I:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG19:![0-9]+]]
 ; CHECK:       0:
-; CHECK-NEXT:    [[I:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    store i32 0, ptr [[I]], align 4, !dbg [[DBG20:![0-9]+]]
 ; CHECK-NEXT:    br label [[FOR_COND:%.*]], !dbg [[DBG21:![0-9]+]]
 ; CHECK:       for.cond:
