@@ -91,19 +91,23 @@ protected:
     GetContext().associatedLoopLevel = level;
   }
   Symbol &MakeAssocSymbol(const SourceName &name, Symbol &prev, Scope &scope) {
+    const auto pair{scope.try_emplace(name, Attrs{}, HostAssocDetails{prev})};
+    return *pair.first->second;
+  }
+  Symbol &MakeAssocSymbol(const SourceName &name, Symbol &prev) {
+    return MakeAssocSymbol(name, prev, currScope());
+  }
+  Symbol &OSSMakeAssocSymbol(const SourceName &name, Symbol &prev, Scope &scope) {
     const auto pair{scope.try_emplace(name, prev.attrs(), HostAssocDetails{prev})};
     return *pair.first->second;
   }
-  Symbol &OSSMakeAssocSymbol(
+  Symbol &OSSMakeAssocSymbolWithClone(
       const SourceName &name, Symbol &prev, Scope &scope) {
     const auto pair{scope.try_emplace(name, prev.attrs(), HostAssocDetails{prev})};
     // Create a temporal symbol without inserting it in a scope
     Symbol &tmpSym{scope.MakeSymbol(name, prev.attrs(), common::Clone(prev.details()))};
     pair.first->second->set_ossAdditionalSym(tmpSym);
     return *pair.first->second;
-  }
-  Symbol &MakeAssocSymbol(const SourceName &name, Symbol &prev) {
-    return MakeAssocSymbol(name, prev, currScope());
   }
   static const parser::Name *GetDesignatorNameIfDataRef(
       const parser::Designator &designator) {
@@ -124,6 +128,7 @@ protected:
       const parser::Name &, Symbol::Flag, Scope &);
   Symbol *DeclarePrivateAccessEntity(Symbol &, Symbol::Flag, Scope &);
   Symbol *OSSDeclarePrivateAccessEntity(Symbol &, Symbol::Flag, Scope &);
+  Symbol *OSSDeclarePrivateAccessEntityWithClone(Symbol &, Symbol::Flag, Scope &);
   Symbol *DeclareOrMarkOtherAccessEntity(const parser::Name &, Symbol::Flag);
 
   UnorderedSymbolSet dataSharingAttributeObjects_; // on one directive
@@ -897,7 +902,6 @@ private:
   void ResolveDsaOSSObject(const parser::OSSObject &, Symbol::Flag);
   void ResolveDepOSSObject(const parser::OSSObject &);
 
-  Symbol *ResolveOSS(const parser::Name &, Symbol::Flag, Scope &);
   Symbol *ResolveOSS(Symbol &, Symbol::Flag, Scope &);
 
   Symbol *GetSymbolFromName(const parser::Name &);
@@ -969,6 +973,19 @@ Symbol *DirectiveAttributeVisitor<T>::OSSDeclarePrivateAccessEntity(
     Symbol &object, Symbol::Flag flag, Scope &scope) {
   if (object.owner() != currScope()) {
     auto &symbol{OSSMakeAssocSymbol(object.name(), object, scope)};
+    symbol.set(flag);
+    return &symbol;
+  } else {
+    object.set(flag);
+    return &object;
+  }
+}
+
+template <typename T>
+Symbol *DirectiveAttributeVisitor<T>::OSSDeclarePrivateAccessEntityWithClone(
+    Symbol &object, Symbol::Flag flag, Scope &scope) {
+  if (object.owner() != currScope()) {
+    auto &symbol{OSSMakeAssocSymbolWithClone(object.name(), object, scope)};
     symbol.set(flag);
     return &symbol;
   } else {
@@ -2848,19 +2865,11 @@ void OSSAttributeVisitor::ResolveDepOSSObject(
 }
 
 Symbol *OSSAttributeVisitor::ResolveOSS(
-    const parser::Name &name, Symbol::Flag ossFlag, Scope &scope) {
-  if (dataSharingAttributeFlags.test(ossFlag)) {
-    return DeclarePrivateAccessEntity(name, ossFlag, scope);
-  }
-  return nullptr;
-}
-
-Symbol *OSSAttributeVisitor::ResolveOSS(
     Symbol &symbol, Symbol::Flag ossFlag, Scope &scope) {
   if (privateAttributeFlags.test(ossFlag)) {
-    return OSSDeclarePrivateAccessEntity(symbol, ossFlag, scope);
+    return OSSDeclarePrivateAccessEntityWithClone(symbol, ossFlag, scope);
   } else if (dataSharingAttributeFlags.test(ossFlag)) {
-    return DeclarePrivateAccessEntity(symbol, ossFlag, scope);
+    return OSSDeclarePrivateAccessEntity(symbol, ossFlag, scope);
   }
   return nullptr;
 }
