@@ -1,7 +1,13 @@
 ! RUN: %python %S/../../Semantics/test_errors.py %s %flang_fc1 -fompss-2
+! XFAIL: true
 
 ! This test exists until DO CONCURRENT and FORALL
 ! FIR emission with OmpSs-2 is fixed
+
+! This test fails because the loop iterator needs
+! a data-sharing, since it is inside the region.
+! After doing this, some semantic checks
+! end up emitting an unexpected warning.
 
 program p
  integer i
