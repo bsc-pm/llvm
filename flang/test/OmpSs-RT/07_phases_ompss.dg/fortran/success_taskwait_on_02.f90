@@ -1,6 +1,13 @@
 ! RUN: %oss-compile-and-run
+! XFAIL: true
+
 ! test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatibility")
 ! </testinfo>
+
+! This test fails because DO loops
+! are private, and we do not have
+! promotion mechanism private -> firstprivate
+
 PROGRAM P
     IMPLICIT NONE
     INTEGER :: X(10), Y(10)

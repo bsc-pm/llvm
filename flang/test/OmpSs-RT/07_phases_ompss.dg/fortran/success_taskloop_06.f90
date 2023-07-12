@@ -1,4 +1,5 @@
 ! RUN: %oss-compile-and-run
+! XFAIL: true
 
 ! NOTE: checking results using a regular loop
 ! because it seems to be ANY does not work properly

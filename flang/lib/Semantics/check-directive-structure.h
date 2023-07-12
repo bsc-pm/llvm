@@ -333,6 +333,8 @@ protected:
 
   void CheckRequireAtLeastOneOf();
 
+  void EmitUnsupported(C clause);
+
   void CheckAllowed(C clause);
 
   void CheckAtLeastOneClause();
@@ -441,6 +443,27 @@ std::string DirectiveStructureChecker<D, C, PC,
     ClauseEnumSize>::ContextDirectiveAsFortran() {
   return parser::ToUpperCaseLetters(
       getDirectiveName(GetContext().directive).str());
+}
+
+// Useful in directives added in frontend, but they are not
+// implemented yet
+template <typename D, typename C, typename PC, std::size_t ClauseEnumSize>
+void DirectiveStructureChecker<D, C, PC, ClauseEnumSize>::EmitUnsupported(
+    C clause) {
+  if (!GetContext().allowedClauses.test(clause) &&
+      !GetContext().allowedOnceClauses.test(clause) &&
+      !GetContext().allowedExclusiveClauses.test(clause) &&
+      !GetContext().requiredClauses.test(clause)) {
+    context_.Say(GetContext().clauseSource,
+        "%s clause is not allowed on the %s directive"_err_en_US,
+        parser::ToUpperCaseLetters(getClauseName(clause).str()),
+        parser::ToUpperCaseLetters(GetContext().directiveSource.ToString()));
+  } else {
+    context_.Say(GetContext().clauseSource,
+        "%s clause is not supported on the %s directive"_err_en_US,
+        parser::ToUpperCaseLetters(getClauseName(clause).str()),
+        parser::ToUpperCaseLetters(GetContext().directiveSource.ToString()));
+  }
 }
 
 // Check that clauses present on the directive are allowed clauses.

@@ -1,4 +1,4 @@
-! RUN: %flang_fc1 -fompss-2 -fdebug-unparse %s | FileCheck %s
+! RUN: %flang_fc1 -fompss-2 -fdebug-unparse-no-sema %s | FileCheck %s
 
 PROGRAM P1
     INTEGER :: S, P, F

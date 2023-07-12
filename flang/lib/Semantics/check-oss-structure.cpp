@@ -12,6 +12,12 @@
 
 namespace Fortran::semantics {
 
+// Use in clauses that are not supported yet
+#define EMIT_UNSUPPORTED(X, Y) \
+  void OSSStructureChecker::Enter(const parser::OSSClause::X &) { \
+    EmitUnsupported(llvm::oss::Clause::Y); \
+  }
+
 // Use when clause falls under 'struct OmpClause' in 'parse-tree.h'.
 #define CHECK_SIMPLE_CLAUSE(X, Y) \
   void OSSStructureChecker::Enter(const parser::OSSClause::X &) { \
@@ -208,17 +214,10 @@ CHECK_SIMPLE_CLAUSE(Relaxed, OSSC_relaxed)
 
 CHECK_SIMPLE_CLAUSE(Unknown, OSSC_unknown)
 
-void OSSStructureChecker::Enter(const parser::OSSClause::Depend &) {
-  CheckAllowed(llvm::oss::Clause::OSSC_depend);
-}
+CHECK_SIMPLE_CLAUSE(Depend, OSSC_depend)
 
-void OSSStructureChecker::Enter(const parser::OSSClause::Reduction &) {
-  CheckAllowed(llvm::oss::Clause::OSSC_reduction);
-}
-
-void OSSStructureChecker::Enter(const parser::OSSClause::Weakreduction &) {
-  CheckAllowed(llvm::oss::Clause::OSSC_weakreduction);
-}
+EMIT_UNSUPPORTED(Reduction, OSSC_reduction)
+EMIT_UNSUPPORTED(Weakreduction, OSSC_weakreduction)
 
 llvm::StringRef OSSStructureChecker::getClauseName(llvm::oss::Clause clause) {
   return llvm::oss::getOmpSsClauseName(clause);
