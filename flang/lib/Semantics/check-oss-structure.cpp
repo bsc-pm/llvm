@@ -145,17 +145,17 @@ CHECK_SIMPLE_CLAUSE(Priority, OSSC_priority)
 
 CHECK_SIMPLE_CLAUSE(Label, OSSC_label)
 
-CHECK_SIMPLE_CLAUSE(Wait, OSSC_wait)
+EMIT_UNSUPPORTED(Wait, OSSC_wait)
 
-CHECK_SIMPLE_CLAUSE(Update, OSSC_update)
+EMIT_UNSUPPORTED(Update, OSSC_update)
 
-CHECK_SIMPLE_CLAUSE(Shmem, OSSC_shmem)
+EMIT_UNSUPPORTED(Shmem, OSSC_shmem)
 
-CHECK_SIMPLE_CLAUSE(Onready, OSSC_onready)
+EMIT_UNSUPPORTED(Onready, OSSC_onready)
 
 CHECK_SIMPLE_CLAUSE(Default, OSSC_default)
 
-CHECK_SIMPLE_CLAUSE(Device, OSSC_device)
+EMIT_UNSUPPORTED(Device, OSSC_device)
 
 CHECK_SIMPLE_CLAUSE(Private, OSSC_private)
 
@@ -163,7 +163,7 @@ CHECK_SIMPLE_CLAUSE(Firstprivate, OSSC_firstprivate)
 
 CHECK_SIMPLE_CLAUSE(Shared, OSSC_shared)
 
-CHECK_SIMPLE_CLAUSE(On, OSSC_on)
+EMIT_UNSUPPORTED(On, OSSC_on)
 
 CHECK_SIMPLE_CLAUSE(In, OSSC_in)
 
@@ -188,29 +188,29 @@ CHECK_SIMPLE_CLAUSE(Weakcommutative, OSSC_weakcommutative)
 CHECK_REQ_SCALAR_INT_CLAUSE(Grainsize, OSSC_grainsize)
 CHECK_REQ_SCALAR_INT_CLAUSE(Chunksize, OSSC_chunksize)
 
-CHECK_SIMPLE_CLAUSE(Unroll, OSSC_unroll)
+EMIT_UNSUPPORTED(Unroll, OSSC_unroll)
 
-CHECK_SIMPLE_CLAUSE(Collapse, OSSC_collapse)
+EMIT_UNSUPPORTED(Collapse, OSSC_collapse)
 
-CHECK_SIMPLE_CLAUSE(Ndrange, OSSC_ndrange)
+EMIT_UNSUPPORTED(Ndrange, OSSC_ndrange)
 
-CHECK_SIMPLE_CLAUSE(Read, OSSC_read)
+EMIT_UNSUPPORTED(Read, OSSC_read)
 
-CHECK_SIMPLE_CLAUSE(Write, OSSC_write)
+EMIT_UNSUPPORTED(Write, OSSC_write)
 
-CHECK_SIMPLE_CLAUSE(Capture, OSSC_capture)
+EMIT_UNSUPPORTED(Capture, OSSC_capture)
 
-CHECK_SIMPLE_CLAUSE(Compare, OSSC_compare)
+EMIT_UNSUPPORTED(Compare, OSSC_compare)
 
-CHECK_SIMPLE_CLAUSE(SeqCst, OSSC_seq_cst)
+EMIT_UNSUPPORTED(SeqCst, OSSC_seq_cst)
 
-CHECK_SIMPLE_CLAUSE(AcqRel, OSSC_acq_rel)
+EMIT_UNSUPPORTED(AcqRel, OSSC_acq_rel)
 
-CHECK_SIMPLE_CLAUSE(Acquire, OSSC_acquire)
+EMIT_UNSUPPORTED(Acquire, OSSC_acquire)
 
-CHECK_SIMPLE_CLAUSE(Release, OSSC_release)
+EMIT_UNSUPPORTED(Release, OSSC_release)
 
-CHECK_SIMPLE_CLAUSE(Relaxed, OSSC_relaxed)
+EMIT_UNSUPPORTED(Relaxed, OSSC_relaxed)
 
 CHECK_SIMPLE_CLAUSE(Unknown, OSSC_unknown)
 

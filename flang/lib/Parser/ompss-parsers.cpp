@@ -90,6 +90,8 @@ TYPE_PARSER(
                       parenthesized(scalarDefaultCharExpr))) ||
     "ON" >> construct<OSSClause>(construct<OSSClause::Inout>(
                           parenthesized(Parser<OSSObjectList>{}))) ||
+    "ONREADY" >> construct<OSSClause>(construct<OSSClause::Onready>(
+                    parenthesized(expr))) ||
     "OUT" >> construct<OSSClause>(construct<OSSClause::Out>(
                           parenthesized(Parser<OSSObjectList>{}))) ||
     "PRIORITY" >> construct<OSSClause>(construct<OSSClause::Priority>(
@@ -100,6 +102,8 @@ TYPE_PARSER(
         construct<OSSClause>(parenthesized(Parser<OSSReductionClause>{})) ||
     "SHARED" >> construct<OSSClause>(construct<OSSClause::Shared>(
                     parenthesized(Parser<OSSObjectList>{}))) ||
+    "SHMEM" >> construct<OSSClause>(construct<OSSClause::Shmem>(
+                    parenthesized(scalarIntExpr))) ||
     "WAIT" >> construct<OSSClause>(construct<OSSClause::Wait>()) ||
     "WEAKCOMMUTATIVE" >> construct<OSSClause>(construct<OSSClause::Weakcommutative>(
                           parenthesized(Parser<OSSObjectList>{}))) ||

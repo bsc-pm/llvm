@@ -59,9 +59,11 @@ def OSSC_Update : Clause<"update"> {
 }
 def OSSC_Shmem : Clause<"shmem"> {
   let clangClass = "OSSShmemClause";
+  let flangClass = "ScalarIntExpr";
 }
 def OSSC_Onready : Clause<"onready"> {
   let clangClass = "OSSOnreadyClause";
+  let flangClass = "Expr";
 }
 def OSSC_Default : Clause<"default"> {
   let clangClass = "OSSDefaultClause";
