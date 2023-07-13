@@ -68,14 +68,18 @@ TYPE_PARSER(construct<OSSReductionClause>(
 
 // Clauses
 TYPE_PARSER(
+    "ACQ_REL" >> construct<OSSClause>(construct<OSSClause::AcqRel>()) ||
+    "ACQUIRE" >> construct<OSSClause>(construct<OSSClause::Acquire>()) ||
     "COST" >> construct<OSSClause>(construct<OSSClause::Cost>(
                       parenthesized(scalarIntExpr))) ||
     "CHUNKSIZE" >> construct<OSSClause>(construct<OSSClause::Chunksize>(
                        parenthesized(scalarIntExpr))) ||
+    "CAPTURE" >> construct<OSSClause>(construct<OSSClause::Capture>()) ||
     "COLLAPSE" >> construct<OSSClause>(construct<OSSClause::Collapse>(
                       parenthesized(scalarIntConstantExpr))) ||
     "COMMUTATIVE" >> construct<OSSClause>(construct<OSSClause::Commutative>(
                           parenthesized(Parser<OSSObjectList>{}))) ||
+    "COMPARE" >> construct<OSSClause>(construct<OSSClause::Compare>()) ||
     "CONCURRENT" >> construct<OSSClause>(construct<OSSClause::Concurrent>(
                           parenthesized(Parser<OSSObjectList>{}))) ||
     "DEFAULT"_id >> construct<OSSClause>(construct<OSSClause::Default>(
@@ -108,14 +112,19 @@ TYPE_PARSER(
                       parenthesized(scalarIntExpr))) ||
     "PRIVATE" >> construct<OSSClause>(construct<OSSClause::Private>(
                      parenthesized(Parser<OSSObjectList>{}))) ||
+    "READ" >> construct<OSSClause>(construct<OSSClause::Read>()) ||
     "REDUCTION" >>
         construct<OSSClause>(parenthesized(Parser<OSSReductionClause>{})) ||
+    "RELAXED" >> construct<OSSClause>(construct<OSSClause::Relaxed>()) ||
+    "RELEASE" >> construct<OSSClause>(construct<OSSClause::Release>()) ||
+    "SEQ_CST" >> construct<OSSClause>(construct<OSSClause::SeqCst>()) ||
     "SHARED" >> construct<OSSClause>(construct<OSSClause::Shared>(
                     parenthesized(Parser<OSSObjectList>{}))) ||
     "SHMEM" >> construct<OSSClause>(construct<OSSClause::Shmem>(
                     parenthesized(scalarIntExpr))) ||
     "UNROLL" >> construct<OSSClause>(construct<OSSClause::Unroll>(
                       parenthesized(scalarIntExpr))) ||
+    "UPDATE" >> construct<OSSClause>(construct<OSSClause::Update>()) ||
     "WAIT" >> construct<OSSClause>(construct<OSSClause::Wait>()) ||
     "WEAKCOMMUTATIVE" >> construct<OSSClause>(construct<OSSClause::Weakcommutative>(
                           parenthesized(Parser<OSSObjectList>{}))) ||
@@ -126,7 +135,8 @@ TYPE_PARSER(
     "WEAKINOUT" >> construct<OSSClause>(construct<OSSClause::Weakinout>(
                           parenthesized(Parser<OSSObjectList>{}))) ||
     "WEAKOUT" >> construct<OSSClause>(construct<OSSClause::Weakout>(
-                          parenthesized(Parser<OSSObjectList>{}))))
+                          parenthesized(Parser<OSSObjectList>{}))) ||
+    "WRITE" >> construct<OSSClause>(construct<OSSClause::Write>()))
 
 TYPE_PARSER(sourced(construct<OSSClauseList>(
     many(maybe(","_tok) >> sourced(Parser<OSSClause>{})))))
