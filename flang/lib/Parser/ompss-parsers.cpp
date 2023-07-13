@@ -32,6 +32,12 @@ TYPE_PARSER(construct<OSSDefaultClause>(
     "SHARED" >> pure(OSSDefaultClause::Type::Shared) ||
     "NONE" >> pure(OSSDefaultClause::Type::None)))
 
+TYPE_PARSER(construct<OSSDeviceClause>(
+    "CUDA" >> pure(OSSDeviceClause::Type::Cuda) ||
+    "FPGA" >> pure(OSSDeviceClause::Type::Fpga) ||
+    "OPENCL" >> pure(OSSDeviceClause::Type::Opencl) ||
+    "SMP" >> pure(OSSDeviceClause::Type::Smp)))
+
 TYPE_PARSER(
     construct<OSSDependenceType>(first(
         "IN, WEAK" >> pure(OSSDependenceType::Type::Weakin),
@@ -66,14 +72,18 @@ TYPE_PARSER(
                       parenthesized(scalarIntExpr))) ||
     "CHUNKSIZE" >> construct<OSSClause>(construct<OSSClause::Chunksize>(
                        parenthesized(scalarIntExpr))) ||
+    "COLLAPSE" >> construct<OSSClause>(construct<OSSClause::Collapse>(
+                      parenthesized(scalarIntConstantExpr))) ||
     "COMMUTATIVE" >> construct<OSSClause>(construct<OSSClause::Commutative>(
                           parenthesized(Parser<OSSObjectList>{}))) ||
     "CONCURRENT" >> construct<OSSClause>(construct<OSSClause::Concurrent>(
                           parenthesized(Parser<OSSObjectList>{}))) ||
-    "DEFAULT"_id >>
-        construct<OSSClause>(parenthesized(Parser<OSSDefaultClause>{})) ||
+    "DEFAULT"_id >> construct<OSSClause>(construct<OSSClause::Default>(
+                        parenthesized(Parser<OSSDefaultClause>{}))) ||
     "DEPEND" >>
         construct<OSSClause>(parenthesized(Parser<OSSDependClause>{})) ||
+    "DEVICE" >> construct<OSSClause>(construct<OSSClause::Device>(
+                    parenthesized(Parser<OSSDeviceClause>{}))) ||
     "FINAL" >> construct<OSSClause>(construct<OSSClause::Final>(
                    parenthesized(scalarLogicalExpr))) ||
     "FIRSTPRIVATE" >> construct<OSSClause>(construct<OSSClause::Firstprivate>(
@@ -104,6 +114,8 @@ TYPE_PARSER(
                     parenthesized(Parser<OSSObjectList>{}))) ||
     "SHMEM" >> construct<OSSClause>(construct<OSSClause::Shmem>(
                     parenthesized(scalarIntExpr))) ||
+    "UNROLL" >> construct<OSSClause>(construct<OSSClause::Unroll>(
+                      parenthesized(scalarIntExpr))) ||
     "WAIT" >> construct<OSSClause>(construct<OSSClause::Wait>()) ||
     "WEAKCOMMUTATIVE" >> construct<OSSClause>(construct<OSSClause::Weakcommutative>(
                           parenthesized(Parser<OSSObjectList>{}))) ||

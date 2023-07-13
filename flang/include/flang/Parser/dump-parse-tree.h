@@ -789,6 +789,9 @@ public:
   NODE(parser, OSSReductionOperator)
   NODE(parser, OSSReductionClause)
 
+  NODE(parser, OSSDeviceClause)
+  NODE_ENUM(OSSDeviceClause, Type)
+
   NODE(parser, OSSSimpleStandaloneDirective)
 
   NODE(parser, OSSBlockDirective)

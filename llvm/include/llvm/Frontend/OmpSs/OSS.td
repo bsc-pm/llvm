@@ -71,6 +71,7 @@ def OSSC_Default : Clause<"default"> {
 }
 def OSSC_Device : Clause<"device"> {
   let clangClass = "OSSDeviceClause";
+  let flangClass = "OSSDeviceClause";
 }
 def OSSC_Private : Clause<"private"> {
   let clangClass = "OSSPrivateClause";
@@ -135,9 +136,11 @@ def OSSC_ChunkSize : Clause<"chunksize"> {
 }
 def OSSC_Unroll : Clause<"unroll"> {
   let clangClass = "OSSUnrollClause";
+  let flangClass = "ScalarIntExpr";
 }
 def OSSC_Collapse : Clause<"collapse"> {
   let clangClass = "OSSCollapseClause";
+  let flangClass = "ScalarIntConstantExpr";
 }
 def OSSC_Ndrange : Clause<"ndrange"> {
   let clangClass = "OSSNdrangeClause";

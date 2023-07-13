@@ -2723,6 +2723,7 @@ public:
   WALK_NESTED_ENUM(OmpOrderClause, Type) // OMP order-type
   WALK_NESTED_ENUM(OmpOrderModifier, Kind) // OMP order-modifier
   WALK_NESTED_ENUM(OSSDefaultClause, Type) // OSS DEFAULT
+  WALK_NESTED_ENUM(OSSDeviceClause, Type) // OSS DEVICE
 #undef WALK_NESTED_ENUM
 
   void Unparse(const CUFKernelDoConstruct::Directive &x) {

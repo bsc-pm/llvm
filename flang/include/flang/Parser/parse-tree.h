@@ -4335,6 +4335,11 @@ struct OSSDependClause {
   std::variant<InOut> u;
 };
 
+struct OSSDeviceClause {
+  ENUM_CLASS(Type, Cuda, Fpga, Opencl, Smp)
+  WRAPPER_CLASS_BOILERPLATE(OSSDeviceClause, Type);
+};
+
 struct OSSReductionOperator {
   UNION_CLASS_BOILERPLATE(OSSReductionOperator);
   std::variant<DefinedOperator, ProcedureDesignator> u;
