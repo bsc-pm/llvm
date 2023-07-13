@@ -693,6 +693,10 @@ public:
     ResolveDepOSSObjectList(x.v);
     return false;
   }
+  bool Pre(const parser::OSSClause::On &x) {
+    ResolveDepOSSObjectList(x.v);
+    return false;
+  }
   bool Pre(const parser::OSSClause::Concurrent &x) {
     ResolveDepOSSObjectList(x.v);
     return false;

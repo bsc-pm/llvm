@@ -1486,6 +1486,13 @@ namespace {
             mlir::Value op = getComputeDep(ossObject);
             inoutClauseOperands_.push_back(op);
           }
+        } else if (const auto &onClause =
+                       std::get_if<Fortran::parser::OSSClause::On>(
+                           &clause.u)) {
+          for (const auto &ossObject : onClause->v.v) {
+            mlir::Value op = getComputeDep(ossObject);
+            inoutClauseOperands_.push_back(op);
+          }
         } else if (const auto &concurrentClause =
                        std::get_if<Fortran::parser::OSSClause::Concurrent>(
                            &clause.u)) {

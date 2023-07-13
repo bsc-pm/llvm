@@ -98,7 +98,7 @@ TYPE_PARSER(
                           parenthesized(Parser<OSSObjectList>{}))) ||
     "LABEL" >> construct<OSSClause>(construct<OSSClause::Label>(
                       parenthesized(scalarDefaultCharExpr))) ||
-    "ON" >> construct<OSSClause>(construct<OSSClause::Inout>(
+    "ON"_id >> construct<OSSClause>(construct<OSSClause::On>(
                           parenthesized(Parser<OSSObjectList>{}))) ||
     "ONREADY" >> construct<OSSClause>(construct<OSSClause::Onready>(
                     parenthesized(expr))) ||

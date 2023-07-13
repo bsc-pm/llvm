@@ -9,6 +9,7 @@ program taskwait
     !$OSS TASKWAIT
     !$OSS TASKWAIT DEPEND(IN: I)
     !$OSS TASKWAIT IN(I)
+    !$OSS TASKWAIT ON(I)
 
 end program
 
@@ -27,3 +28,8 @@ end program
 !FIRDialect-NEXT:  oss.task if(%[[FALSE_0]] : i1)
 !FIRDialect-SAME:  shared(%[[VAR_I]] : !fir.ref<i32>)
 !FIRDialect-SAME:  in(%[[DEP_1]] : i32)
+!FIRDialect:  %[[DEP_2:.*]] = oss.dependency base(%[[VAR_I]] : !fir.ref<i32>) function(@compute.dep2) arguments(%[[VAR_I]] : !fir.ref<i32>) -> i32
+!FIRDialect-NEXT:  %[[FALSE_1:.*]] = arith.constant false
+!FIRDialect-NEXT:  oss.task if(%[[FALSE_1]] : i1)
+!FIRDialect-SAME:  shared(%[[VAR_I]] : !fir.ref<i32>)
+!FIRDialect-SAME:  inout(%[[DEP_2]] : i32)

@@ -89,7 +89,6 @@ def OSSC_Depend : Clause<"depend"> {
   let clangClass = "OSSDependClause";
   let flangClass = "OSSDependClause";
 }
-def OSSC_On : Clause<"on"> {}
 def OSSC_In : Clause<"in"> {
   let flangClass = "OSSObjectList";
 }
@@ -97,6 +96,9 @@ def OSSC_Out : Clause<"out"> {
   let flangClass = "OSSObjectList";
 }
 def OSSC_Inout : Clause<"inout"> {
+  let flangClass = "OSSObjectList";
+}
+def OSSC_On : Clause<"on"> {
   let flangClass = "OSSObjectList";
 }
 def OSSC_Concurrent : Clause<"concurrent"> {
