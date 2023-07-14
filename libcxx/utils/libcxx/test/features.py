@@ -307,7 +307,7 @@ macros = {
     "_LIBCPP_HAS_NO_LOCALIZATION": "no-localization",
     "_LIBCPP_HAS_NO_WIDE_CHARACTERS": "no-wide-characters",
     "_LIBCPP_HAS_NO_UNICODE": "libcpp-has-no-unicode",
-    "_LIBCPP_ENABLE_DEBUG_MODE": "libcpp-has-debug-mode",
+    "_LIBCPP_PSTL_CPU_BACKEND_LIBDISPATCH": "libcpp-pstl-cpu-backend-libdispatch",
 }
 for macro, feature in macros.items():
     DEFAULT_FEATURES.append(
@@ -522,7 +522,7 @@ DEFAULT_FEATURES += [
     Feature(
         name="availability-pmr-missing",
         when=lambda cfg: BooleanExpression.evaluate(
-            "stdlib=apple-libc++ && target={{.+}}-apple-macosx{{(10.9|10.10|10.11|10.12|10.13|10.14|10.15|11.0)(.0)?}}",
+            "stdlib=apple-libc++ && target={{.+}}-apple-macosx{{(10.9|10.10|10.11|10.12|10.13|10.14|10.15|11.0|12.0|13.0)(.0)?}}",
             cfg.available_features,
         ),
     ),

@@ -214,6 +214,17 @@ class RVInst<dag outs, dag ins, string opcodestr, string argstr,
   // in bits 63:31. Used by the SExtWRemoval pass.
   bit IsSignExtendingOpW = 0;
   let TSFlags{18} = IsSignExtendingOpW;
+
+  bit HasRoundModeOp = 0;
+  let TSFlags{19} =  HasRoundModeOp;
+
+  // This is only valid when HasRoundModeOp is set to 1. HasRoundModeOp is set
+  // to 1 for vector fixed-point or floating-point intrinsics. This bit is
+  // processed under pass 'RISCVInsertReadWriteCSR' pass to distinguish between
+  // fixed-point / floating-point instructions and emit appropriate read/write
+  // to the correct CSR.
+  bit UsesVXRM = 0;
+  let TSFlags{20} =  UsesVXRM;
 }
 
 // Pseudo instructions

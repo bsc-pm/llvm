@@ -598,7 +598,9 @@ public:
       // OpenACC data-sharing attribute
       AccPrivate, AccFirstPrivate, AccShared,
       // OpenACC data-mapping attribute
-      AccCopyIn, AccCopyOut, AccCreate, AccDelete, AccPresent,
+      AccCopy, AccCopyIn, AccCopyOut, AccCreate, AccDelete, AccPresent,
+      // OpenACC data-movement attribute
+      AccDevice, AccHost, AccSelf,
       // OpenACC miscellaneous flags
       AccCommonBlock, AccThreadPrivate, AccReduction, AccNone, AccPreDetermined,
       // OmpSs-2 data-sharing attribute

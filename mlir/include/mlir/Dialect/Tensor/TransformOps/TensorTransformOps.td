@@ -63,6 +63,18 @@ def ApplyFoldTensorSubsetOpsPatternsOp : Op<Transform_Dialect,
   let assemblyFormat = "attr-dict";
 }
 
+def ApplyFoldTensorSubsetOpsIntoVectorTransfersPatternsOp : Op<Transform_Dialect,
+    "apply_patterns.tensor.fold_tensor_subset_ops_into_vector_transfers",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
+  let description = [{
+    Indicates that tensor.extract_slice -> vector.transfer_read and
+    vector.transfer_write -> tensor.insert_slice op chains should be folded into
+    vector tranfer read and write ops
+  }];
+
+  let assemblyFormat = "attr-dict";
+}
+
 def ApplyMergeConsecutiveInsertExtractSlicePatternsOp : Op<Transform_Dialect,
     "apply_patterns.tensor.merge_consecutive_insert_extract_slice",
     [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
@@ -138,6 +150,7 @@ def MakeLoopIndependentOp
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::Operation *target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);

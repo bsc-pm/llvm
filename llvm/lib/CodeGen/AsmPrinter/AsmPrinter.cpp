@@ -26,6 +26,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Twine.h"
@@ -485,6 +486,11 @@ bool AsmPrinter::doInitialization(Module &M) {
     }
   }
 
+  // On AIX, emit bytes for llvm.commandline metadata after .file so that the
+  // C_INFO symbol is preserved if any csect is kept by the linker.
+  if (TM.getTargetTriple().isOSBinFormatXCOFF())
+    emitModuleCommandLines(M);
+
   GCModuleInfo *MI = getAnalysisIfAvailable<GCModuleInfo>();
   assert(MI && "AsmPrinter didn't require GCModuleInfo?");
   for (const auto &I : *MI)
@@ -724,8 +730,8 @@ void AsmPrinter::emitGlobalVariable(const GlobalVariable *GV) {
 
     if (T.getArch() != Triple::aarch64 || !T.isAndroid())
       OutContext.reportError(SMLoc(),
-                             "Tagged symbols (-fsanitize=memtag-globals) are "
-                             "only supported on aarch64 + Android.");
+                             "tagged symbols (-fsanitize=memtag-globals) are "
+                             "only supported on AArch64 Android");
     OutStreamer->emitSymbolAttribute(EmittedSym, MAI->getMemtagAttr());
   }
 
@@ -2329,7 +2335,9 @@ bool AsmPrinter::doFinalization(Module &M) {
   emitModuleIdents(M);
 
   // Emit bytes for llvm.commandline metadata.
-  emitModuleCommandLines(M);
+  // The command line metadata is emitted earlier on XCOFF.
+  if (!TM.getTargetTriple().isOSBinFormatXCOFF())
+    emitModuleCommandLines(M);
 
   // Emit .note.GNU-split-stack and .note.GNU-no-split-stack sections if
   // split-stack is used.
@@ -4013,14 +4021,16 @@ void AsmPrinter::emitXRayTable() {
 
     if (TM.Options.XRayFunctionIndex)
       FnSledIndex = OutContext.getELFSection(
-          "xray_fn_idx", ELF::SHT_PROGBITS, Flags | ELF::SHF_WRITE, 0,
-          GroupName, F.hasComdat(), MCSection::NonUniqueID, LinkedToSym);
+          "xray_fn_idx", ELF::SHT_PROGBITS, Flags, 0, GroupName, F.hasComdat(),
+          MCSection::NonUniqueID, LinkedToSym);
   } else if (MF->getSubtarget().getTargetTriple().isOSBinFormatMachO()) {
-    InstMap = OutContext.getMachOSection("__DATA", "xray_instr_map", 0,
+    InstMap = OutContext.getMachOSection("__DATA", "xray_instr_map",
+                                         MachO::S_ATTR_LIVE_SUPPORT,
                                          SectionKind::getReadOnlyWithRel());
     if (TM.Options.XRayFunctionIndex)
-      FnSledIndex = OutContext.getMachOSection(
-          "__DATA", "xray_fn_idx", 0, SectionKind::getReadOnlyWithRel());
+      FnSledIndex = OutContext.getMachOSection("__DATA", "xray_fn_idx",
+                                               MachO::S_ATTR_LIVE_SUPPORT,
+                                               SectionKind::getReadOnly());
   } else {
     llvm_unreachable("Unsupported target");
   }
@@ -4031,7 +4041,8 @@ void AsmPrinter::emitXRayTable() {
   // per-function, we are able to create an index entry that will represent the
   // range of sleds associated with a function.
   auto &Ctx = OutContext;
-  MCSymbol *SledsStart = OutContext.createTempSymbol("xray_sleds_start", true);
+  MCSymbol *SledsStart =
+      OutContext.createLinkerPrivateSymbol("xray_sleds_start");
   OutStreamer->switchSection(InstMap);
   OutStreamer->emitLabel(SledsStart);
   for (const auto &Sled : Sleds) {
@@ -4062,8 +4073,17 @@ void AsmPrinter::emitXRayTable() {
     OutStreamer->switchSection(FnSledIndex);
     OutStreamer->emitCodeAlignment(Align(2 * WordSizeBytes),
                                    &getSubtargetInfo());
-    OutStreamer->emitSymbolValue(SledsStart, WordSizeBytes, false);
-    OutStreamer->emitSymbolValue(SledsEnd, WordSizeBytes, false);
+    // For Mach-O, use an "l" symbol as the atom of this subsection. The label
+    // difference uses a SUBTRACTOR external relocation which references the
+    // symbol.
+    MCSymbol *Dot = Ctx.createLinkerPrivateSymbol("xray_fn_idx");
+    OutStreamer->emitLabel(Dot);
+    OutStreamer->emitValueImpl(
+        MCBinaryExpr::createSub(MCSymbolRefExpr::create(SledsStart, Ctx),
+                                MCSymbolRefExpr::create(Dot, Ctx), Ctx),
+        WordSizeBytes);
+    OutStreamer->emitValueImpl(MCConstantExpr::create(Sleds.size(), Ctx),
+                               WordSizeBytes);
     OutStreamer->switchSection(PrevSection);
   }
   Sleds.clear();

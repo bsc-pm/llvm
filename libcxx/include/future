@@ -367,6 +367,7 @@ template <class R, class Alloc> struct uses_allocator<packaged_task<R>, Alloc>;
 #include <__chrono/time_point.h>
 #include <__config>
 #include <__exception/exception_ptr.h>
+#include <__memory/addressof.h>
 #include <__memory/allocator.h>
 #include <__memory/allocator_arg_t.h>
 #include <__memory/allocator_destructor.h>
@@ -1396,7 +1397,7 @@ template <class _Rp>
 void
 promise<_Rp>::set_exception(exception_ptr __p)
 {
-    _LIBCPP_ASSERT( __p != nullptr, "promise::set_exception: received nullptr" );
+    _LIBCPP_ASSERT_UNCATEGORIZED( __p != nullptr, "promise::set_exception: received nullptr" );
     if (__state_ == nullptr)
         __throw_future_error(future_errc::no_state);
     __state_->set_exception(__p);
@@ -1424,7 +1425,7 @@ template <class _Rp>
 void
 promise<_Rp>::set_exception_at_thread_exit(exception_ptr __p)
 {
-    _LIBCPP_ASSERT( __p != nullptr, "promise::set_exception_at_thread_exit: received nullptr" );
+    _LIBCPP_ASSERT_UNCATEGORIZED( __p != nullptr, "promise::set_exception_at_thread_exit: received nullptr" );
     if (__state_ == nullptr)
         __throw_future_error(future_errc::no_state);
     __state_->set_exception_at_thread_exit(__p);
@@ -1530,7 +1531,7 @@ template <class _Rp>
 void
 promise<_Rp&>::set_exception(exception_ptr __p)
 {
-    _LIBCPP_ASSERT( __p != nullptr, "promise::set_exception: received nullptr" );
+    _LIBCPP_ASSERT_UNCATEGORIZED( __p != nullptr, "promise::set_exception: received nullptr" );
     if (__state_ == nullptr)
         __throw_future_error(future_errc::no_state);
     __state_->set_exception(__p);
@@ -1549,7 +1550,7 @@ template <class _Rp>
 void
 promise<_Rp&>::set_exception_at_thread_exit(exception_ptr __p)
 {
-    _LIBCPP_ASSERT( __p != nullptr, "promise::set_exception_at_thread_exit: received nullptr" );
+    _LIBCPP_ASSERT_UNCATEGORIZED( __p != nullptr, "promise::set_exception_at_thread_exit: received nullptr" );
     if (__state_ == nullptr)
         __throw_future_error(future_errc::no_state);
     __state_->set_exception_at_thread_exit(__p);

@@ -31,6 +31,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/Assumptions.h"
+#include "llvm/IR/AttributeMask.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/DataLayout.h"
@@ -1293,7 +1294,7 @@ static llvm::Value *CreateCoercedLoad(Address Src, llvm::Type *Ty,
     //
     // FIXME: Assert that we aren't truncating non-padding bits when have access
     // to that information.
-    Src = CGF.Builder.CreateElementBitCast(Src, Ty);
+    Src = Src.withElementType(Ty);
     return CGF.Builder.CreateLoad(Src);
   }
 
@@ -1403,7 +1404,7 @@ static void CreateCoercedStore(llvm::Value *Src,
   if (isa<llvm::ScalableVectorType>(SrcTy) ||
       isa<llvm::ScalableVectorType>(DstTy) ||
       SrcSize.getFixedValue() <= DstSize.getFixedValue()) {
-    Dst = CGF.Builder.CreateElementBitCast(Dst, SrcTy);
+    Dst = Dst.withElementType(SrcTy);
     CGF.EmitAggregateStore(Src, Dst, DstIsVolatile);
   } else {
     // Otherwise do coercion through memory. This is stupid, but
@@ -1427,10 +1428,10 @@ static void CreateCoercedStore(llvm::Value *Src,
 static Address emitAddressAtOffset(CodeGenFunction &CGF, Address addr,
                                    const ABIArgInfo &info) {
   if (unsigned offset = info.getDirectOffset()) {
-    addr = CGF.Builder.CreateElementBitCast(addr, CGF.Int8Ty);
+    addr = addr.withElementType(CGF.Int8Ty);
     addr = CGF.Builder.CreateConstInBoundsByteGEP(addr,
                                              CharUnits::fromQuantity(offset));
-    addr = CGF.Builder.CreateElementBitCast(addr, info.getCoerceToType());
+    addr = addr.withElementType(info.getCoerceToType());
   }
   return addr;
 }
@@ -1853,8 +1854,9 @@ addMergableDefaultFunctionAttributes(const CodeGenOptions &CodeGenOpts,
                        FuncAttrs);
 }
 
-void CodeGenModule::getTrivialDefaultFunctionAttributes(
-    StringRef Name, bool HasOptnone, bool AttrOnCallSite,
+static void getTrivialDefaultFunctionAttributes(
+    StringRef Name, bool HasOptnone, const CodeGenOptions &CodeGenOpts,
+    const LangOptions &LangOpts, bool AttrOnCallSite,
     llvm::AttrBuilder &FuncAttrs) {
   // OptimizeNoneAttr takes precedence over -Os or -Oz. No warning needed.
   if (!HasOptnone) {
@@ -1975,7 +1977,7 @@ void CodeGenModule::getTrivialDefaultFunctionAttributes(
     }
   }
 
-  if (getLangOpts().assumeFunctionsAreConvergent()) {
+  if (LangOpts.assumeFunctionsAreConvergent()) {
     // Conservatively, mark all functions and calls in CUDA and OpenCL as
     // convergent (meaning, they may call an intrinsically convergent op, such
     // as __syncthreads() / barrier(), and so can't have certain optimizations
@@ -1986,8 +1988,8 @@ void CodeGenModule::getTrivialDefaultFunctionAttributes(
 
   // TODO: NoUnwind attribute should be added for other GPU modes HIP,
   // OpenMP offload. AFAIK, neither of them support exceptions in device code.
-  if ((getLangOpts().CUDA && getLangOpts().CUDAIsDevice) ||
-      getLangOpts().OpenCL || getLangOpts().SYCLIsDevice) {
+  if ((LangOpts.CUDA && LangOpts.CUDAIsDevice) || LangOpts.OpenCL ||
+      LangOpts.SYCLIsDevice) {
     FuncAttrs.addAttribute(llvm::Attribute::NoUnwind);
   }
 
@@ -1998,36 +2000,25 @@ void CodeGenModule::getTrivialDefaultFunctionAttributes(
   }
 }
 
-void CodeGenModule::getDefaultFunctionAttributes(StringRef Name,
-                                                 bool HasOptnone,
-                                                 bool AttrOnCallSite,
-                                                 llvm::AttrBuilder &FuncAttrs) {
-  getTrivialDefaultFunctionAttributes(Name, HasOptnone, AttrOnCallSite,
-                                      FuncAttrs);
-  if (!AttrOnCallSite) {
-    // If we're just getting the default, get the default values for mergeable
-    // attributes.
-    addMergableDefaultFunctionAttributes(CodeGenOpts, FuncAttrs);
-  }
-}
+/// Adds attributes to \p F according to our \p CodeGenOpts and \p LangOpts, as
+/// though we had emitted it ourselves. We remove any attributes on F that
+/// conflict with the attributes we add here.
+static void mergeDefaultFunctionDefinitionAttributes(
+    llvm::Function &F, const CodeGenOptions CodeGenOpts,
+    const LangOptions &LangOpts, const TargetOptions &TargetOpts,
+    bool WillInternalize) {
 
-void CodeGenModule::addDefaultFunctionDefinitionAttributes(llvm::Function &F) {
   llvm::AttrBuilder FuncAttrs(F.getContext());
-  getDefaultFunctionAttributes(F.getName(), F.hasOptNone(),
-                               /* AttrOnCallSite = */ false, FuncAttrs);
-  // TODO: call GetCPUAndFeaturesAttributes?
-  F.addFnAttrs(FuncAttrs);
-}
+  // Here we only extract the options that are relevant compared to the version
+  // from GetCPUAndFeaturesAttributes.
+  if (!TargetOpts.CPU.empty())
+    FuncAttrs.addAttribute("target-cpu", TargetOpts.CPU);
+  if (!TargetOpts.TuneCPU.empty())
+    FuncAttrs.addAttribute("tune-cpu", TargetOpts.TuneCPU);
 
-/// Apply default attributes to \p F, accounting for merge semantics of
-/// attributes that should not overwrite existing attributes.
-void CodeGenModule::mergeDefaultFunctionDefinitionAttributes(
-    llvm::Function &F, bool WillInternalize) {
-  llvm::AttrBuilder FuncAttrs(F.getContext());
-  getTrivialDefaultFunctionAttributes(F.getName(), F.hasOptNone(),
-                                      /*AttrOnCallSite=*/false, FuncAttrs);
-  GetCPUAndFeaturesAttributes(GlobalDecl(), FuncAttrs,
-                              /*AddTargetFeatures=*/false);
+  ::getTrivialDefaultFunctionAttributes(F.getName(), F.hasOptNone(),
+                                        CodeGenOpts, LangOpts,
+                                        /*AttrOnCallSite=*/false, FuncAttrs);
 
   if (!WillInternalize && F.isInterposable()) {
     // Do not promote "dynamic" denormal-fp-math to this translation unit's
@@ -2070,6 +2061,52 @@ void CodeGenModule::mergeDefaultFunctionDefinitionAttributes(
   F.removeFnAttrs(AttrsToRemove);
   addDenormalModeAttrs(Merged, MergedF32, FuncAttrs);
   F.addFnAttrs(FuncAttrs);
+}
+
+void clang::CodeGen::mergeDefaultFunctionDefinitionAttributes(
+    llvm::Function &F, const CodeGenOptions CodeGenOpts,
+    const LangOptions &LangOpts, const TargetOptions &TargetOpts,
+    bool WillInternalize) {
+
+  ::mergeDefaultFunctionDefinitionAttributes(F, CodeGenOpts, LangOpts,
+                                             TargetOpts, WillInternalize);
+}
+
+void CodeGenModule::getTrivialDefaultFunctionAttributes(
+    StringRef Name, bool HasOptnone, bool AttrOnCallSite,
+    llvm::AttrBuilder &FuncAttrs) {
+  ::getTrivialDefaultFunctionAttributes(Name, HasOptnone, getCodeGenOpts(),
+                                        getLangOpts(), AttrOnCallSite,
+                                        FuncAttrs);
+}
+
+void CodeGenModule::getDefaultFunctionAttributes(StringRef Name,
+                                                 bool HasOptnone,
+                                                 bool AttrOnCallSite,
+                                                 llvm::AttrBuilder &FuncAttrs) {
+  getTrivialDefaultFunctionAttributes(Name, HasOptnone, AttrOnCallSite,
+                                      FuncAttrs);
+  // If we're just getting the default, get the default values for mergeable
+  // attributes.
+  if (!AttrOnCallSite)
+    addMergableDefaultFunctionAttributes(CodeGenOpts, FuncAttrs);
+}
+
+void CodeGenModule::addDefaultFunctionDefinitionAttributes(llvm::Function &F) {
+  llvm::AttrBuilder FuncAttrs(F.getContext());
+  getDefaultFunctionAttributes(F.getName(), F.hasOptNone(),
+                               /* AttrOnCallSite = */ false, FuncAttrs);
+  // TODO: call GetCPUAndFeaturesAttributes?
+  F.addFnAttrs(FuncAttrs);
+}
+
+/// Apply default attributes to \p F, accounting for merge semantics of
+/// attributes that should not overwrite existing attributes.
+void CodeGenModule::mergeDefaultFunctionDefinitionAttributes(
+    llvm::Function &F, bool WillInternalize) {
+  ::mergeDefaultFunctionDefinitionAttributes(F, getCodeGenOpts(), getLangOpts(),
+                                             getTarget().getTargetOpts(),
+                                             WillInternalize);
 }
 
 void CodeGenModule::addDefaultFunctionDefinitionAttributes(
@@ -2313,6 +2350,9 @@ void CodeGenModule::ConstructAttributeList(StringRef Name,
           FuncAttrs.addAttribute(llvm::Attribute::NoReturn);
         NBA = Fn->getAttr<NoBuiltinAttr>();
       }
+    }
+
+    if (isa<FunctionDecl>(TargetDecl) || isa<VarDecl>(TargetDecl)) {
       // Only place nomerge attribute on call sites, never functions. This
       // allows it to work on indirect virtual function calls.
       if (AttrOnCallSite && TargetDecl->hasAttr<NoMergeAttr>())
@@ -3158,7 +3198,7 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
 
           Address AddrToStoreInto = Address::invalid();
           if (SrcSize <= DstSize) {
-            AddrToStoreInto = Builder.CreateElementBitCast(Ptr, STy);
+            AddrToStoreInto = Ptr.withElementType(STy);
           } else {
             AddrToStoreInto =
                 CreateTempAlloca(STy, Alloca.getAlignment(), "coerce");
@@ -3203,7 +3243,7 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
       ArgVals.push_back(ParamValue::forIndirect(alloca));
 
       auto coercionType = ArgI.getCoerceAndExpandType();
-      alloca = Builder.CreateElementBitCast(alloca, coercionType);
+      alloca = alloca.withElementType(coercionType);
 
       unsigned argIndex = FirstIRArg;
       for (unsigned i = 0, e = coercionType->getNumElements(); i != e; ++i) {
@@ -3805,7 +3845,7 @@ void CodeGenFunction::EmitFunctionEpilog(const CGFunctionInfo &FI,
 
     // Load all of the coerced elements out into results.
     llvm::SmallVector<llvm::Value*, 4> results;
-    Address addr = Builder.CreateElementBitCast(ReturnValue, coercionType);
+    Address addr = ReturnValue.withElementType(coercionType);
     for (unsigned i = 0, e = coercionType->getNumElements(); i != e; ++i) {
       auto coercedEltType = coercionType->getElementType(i);
       if (ABIArgInfo::isPaddingForCoerceAndExpand(coercedEltType))
@@ -5031,10 +5071,7 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
         // Store the RValue into the argument struct.
         Address Addr =
             Builder.CreateStructGEP(ArgMemory, ArgInfo.getInAllocaFieldIndex());
-        // There are some cases where a trivial bitcast is not avoidable.  The
-        // definition of a type later in a translation unit may change it's type
-        // from {}* to (%struct.foo*)*.
-        Addr = Builder.CreateElementBitCast(Addr, ConvertTypeForMem(I->Ty));
+        Addr = Addr.withElementType(ConvertTypeForMem(I->Ty));
         I->copyInto(*this, Addr);
       }
       break;
@@ -5229,7 +5266,7 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
           Builder.CreateMemCpy(TempAlloca, Src, SrcSize);
           Src = TempAlloca;
         } else {
-          Src = Builder.CreateElementBitCast(Src, STy);
+          Src = Src.withElementType(STy);
         }
 
         assert(NumIRArgs == STy->getNumElements());
@@ -5293,7 +5330,7 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
         Builder.CreateStore(RV.getScalarVal(), addr);
       }
 
-      addr = Builder.CreateElementBitCast(addr, coercionType);
+      addr = addr.withElementType(coercionType);
 
       unsigned IRArgPos = FirstIRArg;
       for (unsigned i = 0, e = coercionType->getNumElements(); i != e; ++i) {
@@ -5649,8 +5686,7 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
     case ABIArgInfo::CoerceAndExpand: {
       auto coercionType = RetAI.getCoerceAndExpandType();
 
-      Address addr = SRetPtr;
-      addr = Builder.CreateElementBitCast(addr, coercionType);
+      Address addr = SRetPtr.withElementType(coercionType);
 
       assert(CI->getType() == RetAI.getUnpaddedCoerceAndExpandType());
       bool requiresExtract = isa<llvm::StructType>(CI->getType());

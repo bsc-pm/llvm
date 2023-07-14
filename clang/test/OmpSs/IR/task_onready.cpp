@@ -271,7 +271,7 @@ void bar(int n) {
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@_ZN1S3fooEv
-// PPC64-SAME: (ptr noundef nonnull align 4 dereferenceable(4) [[THIS:%.*]]) #[[ATTR0]] comdat align 2 !dbg [[DBG36:![0-9]+]] {
+// PPC64-SAME: (ptr noundef nonnull align 4 dereferenceable(4) [[THIS:%.*]]) #[[ATTR0]] comdat !dbg [[DBG36:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8

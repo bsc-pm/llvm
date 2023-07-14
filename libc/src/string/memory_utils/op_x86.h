@@ -40,18 +40,17 @@
 namespace __llvm_libc::x86 {
 
 // A set of constants to check compile time features.
-LIBC_INLINE static constexpr bool kSse2 = LLVM_LIBC_IS_DEFINED(__SSE2__);
-LIBC_INLINE static constexpr bool kSse41 = LLVM_LIBC_IS_DEFINED(__SSE4_1__);
-LIBC_INLINE static constexpr bool kAvx = LLVM_LIBC_IS_DEFINED(__AVX__);
-LIBC_INLINE static constexpr bool kAvx2 = LLVM_LIBC_IS_DEFINED(__AVX2__);
-LIBC_INLINE static constexpr bool kAvx512F = LLVM_LIBC_IS_DEFINED(__AVX512F__);
-LIBC_INLINE static constexpr bool kAvx512BW =
-    LLVM_LIBC_IS_DEFINED(__AVX512BW__);
+LIBC_INLINE_VAR constexpr bool kSse2 = LLVM_LIBC_IS_DEFINED(__SSE2__);
+LIBC_INLINE_VAR constexpr bool kSse41 = LLVM_LIBC_IS_DEFINED(__SSE4_1__);
+LIBC_INLINE_VAR constexpr bool kAvx = LLVM_LIBC_IS_DEFINED(__AVX__);
+LIBC_INLINE_VAR constexpr bool kAvx2 = LLVM_LIBC_IS_DEFINED(__AVX2__);
+LIBC_INLINE_VAR constexpr bool kAvx512F = LLVM_LIBC_IS_DEFINED(__AVX512F__);
+LIBC_INLINE_VAR constexpr bool kAvx512BW = LLVM_LIBC_IS_DEFINED(__AVX512BW__);
 
 ///////////////////////////////////////////////////////////////////////////////
 // Memcpy repmovsb implementation
 struct Memcpy {
-  static void repmovsb(void *dst, const void *src, size_t count) {
+  LIBC_INLINE static void repmovsb(void *dst, const void *src, size_t count) {
     asm volatile("rep movsb" : "+D"(dst), "+S"(src), "+c"(count) : : "memory");
   }
 };
@@ -130,8 +129,7 @@ LIBC_INLINE __m128i bytewise_reverse(__m128i value) {
                                               8, 9, 10, 11, 12, 13, 14, 15));
 }
 LIBC_INLINE uint16_t big_endian_cmp_mask(__m128i max, __m128i value) {
-  return static_cast<uint16_t>(
-      _mm_movemask_epi8(bytewise_reverse(_mm_cmpeq_epi8(max, value))));
+  return static_cast<uint16_t>(_mm_movemask_epi8(bytewise_reverse(_mm_cmpeq_epi8(max, value))));
 }
 template <> LIBC_INLINE bool eq<__m128i>(CPtr p1, CPtr p2, size_t offset) {
   const auto a = load<__m128i>(p1, offset);

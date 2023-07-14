@@ -273,7 +273,7 @@ bool MCAssembler::evaluateFixup(const MCAsmLayout &Layout,
     "FKF_IsAlignedDownTo32Bits is only allowed on PC-relative fixups!");
 
   if (IsPCRel) {
-    uint32_t Offset = Layout.getFragmentOffset(DF) + Fixup.getOffset();
+    uint64_t Offset = Layout.getFragmentOffset(DF) + Fixup.getOffset();
 
     // A number of ARM fixups in Thumb mode require that the effective PC
     // address be determined as the 32-bit aligned version of the actual offset.
@@ -1112,8 +1112,12 @@ bool MCAssembler::relaxDwarfCallFrameFragment(MCAsmLayout &Layout,
   MCContext &Context = Layout.getAssembler().getContext();
   int64_t Value;
   bool Abs = DF.getAddrDelta().evaluateAsAbsolute(Value, Layout);
-  assert(Abs && "CFA with invalid expression");
-  (void)Abs;
+  if (!Abs) {
+    getContext().reportError(DF.getAddrDelta().getLoc(),
+                             "invalid CFI advance_loc expression");
+    DF.setAddrDelta(MCConstantExpr::create(0, Context));
+    return false;
+  }
 
   SmallVectorImpl<char> &Data = DF.getContents();
   uint64_t OldSize = Data.size();

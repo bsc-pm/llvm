@@ -92,6 +92,11 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
          "kcfi operand bundle id drifted!");
   (void)KCFIEntry;
 
+  auto *ConvergenceCtrlEntry = pImpl->getOrInsertBundleTag("convergencectrl");
+  assert(ConvergenceCtrlEntry->second == LLVMContext::OB_convergencectrl &&
+         "convergencectrl operand bundle id drifted!");
+  (void)ConvergenceCtrlEntry;
+
   // OmpSs IDs
   auto *OSSDirEntry = pImpl->getOrInsertBundleTag("DIR.OSS");
   assert(OSSDirEntry->second == LLVMContext::OB_oss_dir &&

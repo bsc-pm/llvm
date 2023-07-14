@@ -24,48 +24,50 @@ namespace __llvm_libc {
 
 // Allows compile time error reporting in `if constexpr` branches.
 template <bool flag = false>
-static void deferred_static_assert(const char *msg) {
+LIBC_INLINE void deferred_static_assert(const char *msg) {
   static_assert(flag, "compilation error");
   (void)msg;
 }
 
 // Return whether `value` is zero or a power of two.
-static constexpr bool is_power2_or_zero(size_t value) {
+LIBC_INLINE constexpr bool is_power2_or_zero(size_t value) {
   return (value & (value - 1U)) == 0;
 }
 
 // Return whether `value` is a power of two.
-static constexpr bool is_power2(size_t value) {
+LIBC_INLINE constexpr bool is_power2(size_t value) {
   return value && is_power2_or_zero(value);
 }
 
 // Compile time version of log2 that handles 0.
-static constexpr size_t log2s(size_t value) {
+LIBC_INLINE constexpr size_t log2s(size_t value) {
   return (value == 0 || value == 1) ? 0 : 1 + log2s(value / 2);
 }
 
 // Returns the first power of two preceding value or value if it is already a
 // power of two (or 0 when value is 0).
-static constexpr size_t le_power2(size_t value) {
+LIBC_INLINE constexpr size_t le_power2(size_t value) {
   return value == 0 ? value : 1ULL << log2s(value);
 }
 
 // Returns the first power of two following value or value if it is already a
 // power of two (or 0 when value is 0).
-static constexpr size_t ge_power2(size_t value) {
+LIBC_INLINE constexpr size_t ge_power2(size_t value) {
   return is_power2_or_zero(value) ? value : 1ULL << (log2s(value) + 1);
 }
 
 // Returns the number of bytes to substract from ptr to get to the previous
 // multiple of alignment. If ptr is already aligned returns 0.
-template <size_t alignment> uintptr_t distance_to_align_down(const void *ptr) {
+template <size_t alignment>
+LIBC_INLINE uintptr_t distance_to_align_down(const void *ptr) {
   static_assert(is_power2(alignment), "alignment must be a power of 2");
   return reinterpret_cast<uintptr_t>(ptr) & (alignment - 1U);
 }
 
 // Returns the number of bytes to add to ptr to get to the next multiple of
 // alignment. If ptr is already aligned returns 0.
-template <size_t alignment> uintptr_t distance_to_align_up(const void *ptr) {
+template <size_t alignment>
+LIBC_INLINE uintptr_t distance_to_align_up(const void *ptr) {
   static_assert(is_power2(alignment), "alignment must be a power of 2");
   // The logic is not straightforward and involves unsigned modulo arithmetic
   // but the generated code is as fast as it can be.
@@ -75,12 +77,13 @@ template <size_t alignment> uintptr_t distance_to_align_up(const void *ptr) {
 // Returns the number of bytes to add to ptr to get to the next multiple of
 // alignment. If ptr is already aligned returns alignment.
 template <size_t alignment>
-uintptr_t distance_to_next_aligned(const void *ptr) {
+LIBC_INLINE uintptr_t distance_to_next_aligned(const void *ptr) {
   return alignment - distance_to_align_down<alignment>(ptr);
 }
 
 // Returns the same pointer but notifies the compiler that it is aligned.
-template <size_t alignment, typename T> static T *assume_aligned(T *ptr) {
+template <size_t alignment, typename T>
+LIBC_INLINE T *assume_aligned(T *ptr) {
   return reinterpret_cast<T *>(__builtin_assume_aligned(ptr, alignment));
 }
 
@@ -197,13 +200,25 @@ LIBC_INLINE MemcmpReturnType cmp_uint32_t(uint32_t a, uint32_t b) {
 // 'b' differ.
 LIBC_INLINE MemcmpReturnType cmp_neq_uint64_t(uint64_t a, uint64_t b) {
 #if defined(LIBC_TARGET_ARCH_IS_X86_64)
-  // On x86, we choose the returned values so that they are just one unit appart
-  // as this allows for better code generation.
-  static constexpr int32_t POSITIVE = INT32_MAX;
-  static constexpr int32_t NEGATIVE = INT32_MIN;
-  static_assert(cpp::bit_cast<uint32_t>(NEGATIVE) -
-                    cpp::bit_cast<uint32_t>(POSITIVE) ==
-                1);
+  // On x86, the best strategy would be to use 'INT32_MAX' and 'INT32_MIN' for
+  // positive and negative value respectively as they are one value apart:
+  //   xor     eax, eax         <- free
+  //   cmp     rdi, rsi         <- serializing
+  //   adc     eax, 2147483647  <- serializing
+
+  // Unfortunately we found instances of client code that negate the result of
+  // 'memcmp' to reverse ordering. Because signed integers are not symmetric
+  // (e.g., int8_t ∈ [-128, 127]) returning 'INT_MIN' would break such code as
+  // `-INT_MIN` is not representable as an int32_t.
+
+  // As a consequence, we use 5 and -5 which is still OK nice in terms of
+  // latency.
+  //   cmp     rdi, rsi         <- serializing
+  //   mov     ecx, -5          <- can be done in parallel
+  //   mov     eax, 5           <- can be done in parallel
+  //   cmovb   eax, ecx         <- serializing
+  static constexpr int32_t POSITIVE = 5;
+  static constexpr int32_t NEGATIVE = -5;
 #else
   // On RISC-V we simply use '1' and '-1' as it leads to branchless code.
   // On ARMv8, both strategies lead to the same performance.

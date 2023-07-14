@@ -25,6 +25,7 @@
 #include "llvm/Analysis/UniformityAnalysis.h"
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/CodeGen/Analysis.h"
+#include "llvm/CodeGen/ByteProvider.h"
 #include "llvm/CodeGen/FunctionLoweringInfo.h"
 #include "llvm/CodeGen/GlobalISel/GISelKnownBits.h"
 #include "llvm/CodeGen/GlobalISel/MIPatternMatch.h"
@@ -39,6 +40,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/KnownBits.h"
 #include "llvm/Support/ModRef.h"
+#include <optional>
 
 using namespace llvm;
 
@@ -57,14 +59,14 @@ static cl::opt<bool> UseDivergentRegisterIndexing(
   cl::desc("Use indirect register addressing for divergent indexes"),
   cl::init(false));
 
-static bool hasFP32Denormals(const MachineFunction &MF) {
+static bool denormalModeIsFlushAllF32(const MachineFunction &MF) {
   const SIMachineFunctionInfo *Info = MF.getInfo<SIMachineFunctionInfo>();
-  return Info->getMode().allFP32Denormals();
+  return Info->getMode().FP32Denormals == DenormalMode::getPreserveSign();
 }
 
-static bool hasFP64FP16Denormals(const MachineFunction &MF) {
+static bool denormalModeIsFlushAllF64F16(const MachineFunction &MF) {
   const SIMachineFunctionInfo *Info = MF.getInfo<SIMachineFunctionInfo>();
-  return Info->getMode().allFP64FP16Denormals();
+  return Info->getMode().FP64FP16Denormals == DenormalMode::getPreserveSign();
 }
 
 static unsigned findFirstFreeSGPR(CCState &CCInfo) {
@@ -474,6 +476,7 @@ SITargetLowering::SITargetLowering(const TargetMachine &TM,
   setOperationAction(ISD::FFLOOR, MVT::f64, Legal);
   setOperationAction({ISD::FLDEXP, ISD::STRICT_FLDEXP}, {MVT::f32, MVT::f64},
                      Legal);
+  setOperationAction(ISD::FFREXP, {MVT::f32, MVT::f64}, Custom);
 
   setOperationAction({ISD::FSIN, ISD::FCOS, ISD::FDIV}, MVT::f32, Custom);
   setOperationAction(ISD::FDIV, MVT::f64, Custom);
@@ -518,9 +521,9 @@ SITargetLowering::SITargetLowering(const TargetMachine &TM,
     AddPromotedToType(ISD::STORE, MVT::f16, MVT::i16);
 
     // F16 - VOP1 Actions.
-    setOperationAction(
-        {ISD::FP_ROUND, ISD::FCOS, ISD::FSIN, ISD::FROUND, ISD::FPTRUNC_ROUND},
-        MVT::f16, Custom);
+    setOperationAction({ISD::FP_ROUND, ISD::STRICT_FP_ROUND, ISD::FCOS,
+                        ISD::FSIN, ISD::FROUND, ISD::FPTRUNC_ROUND},
+                       MVT::f16, Custom);
 
     setOperationAction({ISD::SINT_TO_FP, ISD::UINT_TO_FP}, MVT::i16, Custom);
 
@@ -531,6 +534,7 @@ SITargetLowering::SITargetLowering(const TargetMachine &TM,
     // F16 - VOP2 Actions.
     setOperationAction({ISD::BR_CC, ISD::SELECT_CC}, MVT::f16, Expand);
     setOperationAction({ISD::FLDEXP, ISD::STRICT_FLDEXP}, MVT::f16, Custom);
+    setOperationAction(ISD::FFREXP, MVT::f16, Custom);
     setOperationAction(ISD::FDIV, MVT::f16, Custom);
 
     // F16 - VOP3 Actions.
@@ -826,10 +830,10 @@ bool SITargetLowering::isFPExtFoldable(const SelectionDAG &DAG, unsigned Opcode,
                                        EVT DestVT, EVT SrcVT) const {
   return ((Opcode == ISD::FMAD && Subtarget->hasMadMixInsts()) ||
           (Opcode == ISD::FMA && Subtarget->hasFmaMixInsts())) &&
-    DestVT.getScalarType() == MVT::f32 &&
-    SrcVT.getScalarType() == MVT::f16 &&
-    // TODO: This probably only requires no input flushing?
-    !hasFP32Denormals(DAG.getMachineFunction());
+         DestVT.getScalarType() == MVT::f32 &&
+         SrcVT.getScalarType() == MVT::f16 &&
+         // TODO: This probably only requires no input flushing?
+         denormalModeIsFlushAllF32(DAG.getMachineFunction());
 }
 
 bool SITargetLowering::isFPExtFoldable(const MachineInstr &MI, unsigned Opcode,
@@ -839,7 +843,7 @@ bool SITargetLowering::isFPExtFoldable(const MachineInstr &MI, unsigned Opcode,
          DestTy.getScalarSizeInBits() == 32 &&
          SrcTy.getScalarSizeInBits() == 16 &&
          // TODO: This probably only requires no input flushing?
-         !hasFP32Denormals(*MI.getMF());
+         denormalModeIsFlushAllF32(*MI.getMF());
 }
 
 bool SITargetLowering::isShuffleMaskLegal(ArrayRef<int>, EVT) const {
@@ -1104,8 +1108,6 @@ bool SITargetLowering::getTgtMemIntrinsic(IntrinsicInfo &Info,
   }
 
   switch (IntrID) {
-  case Intrinsic::amdgcn_atomic_inc:
-  case Intrinsic::amdgcn_atomic_dec:
   case Intrinsic::amdgcn_ds_ordered_add:
   case Intrinsic::amdgcn_ds_ordered_swap:
   case Intrinsic::amdgcn_ds_fadd:
@@ -1256,8 +1258,6 @@ bool SITargetLowering::getAddrModeArguments(IntrinsicInst *II,
                                             SmallVectorImpl<Value*> &Ops,
                                             Type *&AccessTy) const {
   switch (II->getIntrinsicID()) {
-  case Intrinsic::amdgcn_atomic_inc:
-  case Intrinsic::amdgcn_atomic_dec:
   case Intrinsic::amdgcn_ds_ordered_add:
   case Intrinsic::amdgcn_ds_ordered_swap:
   case Intrinsic::amdgcn_ds_append:
@@ -3200,21 +3200,6 @@ SDValue SITargetLowering::LowerCall(CallLoweringInfo &CLI,
                               "unsupported required tail call to function ");
   }
 
-  if (AMDGPU::isShader(CallConv)) {
-    // Note the issue is with the CC of the called function, not of the call
-    // itself.
-    return lowerUnhandledCall(CLI, InVals,
-                              "unsupported call to a shader function ");
-  }
-
-  if (AMDGPU::isShader(MF.getFunction().getCallingConv()) &&
-      CallConv != CallingConv::AMDGPU_Gfx) {
-    // Only allow calls with specific calling conventions.
-    return lowerUnhandledCall(CLI, InVals,
-                              "unsupported calling convention for call from "
-                              "graphics shader of function ");
-  }
-
   if (IsTailCall) {
     IsTailCall = isEligibleForTailCallOptimization(
       Callee, CallConv, IsVarArg, Outs, OutVals, Ins, DAG);
@@ -4661,7 +4646,7 @@ bool SITargetLowering::isFMAFasterThanFMulAndFAdd(const MachineFunction &MF,
     // Otherwise f32 mad is always full rate and returns the same result as
     // the separate operations so should be preferred over fma.
     // However does not support denormals.
-    if (hasFP32Denormals(MF))
+    if (!denormalModeIsFlushAllF32(MF))
       return Subtarget->hasFastFMAF32() || Subtarget->hasDLInsts();
 
     // If the subtarget has v_fmac_f32, that's just as good as v_mac_f32.
@@ -4670,7 +4655,7 @@ bool SITargetLowering::isFMAFasterThanFMulAndFAdd(const MachineFunction &MF,
   case MVT::f64:
     return true;
   case MVT::f16:
-    return Subtarget->has16BitInsts() && hasFP64FP16Denormals(MF);
+    return Subtarget->has16BitInsts() && !denormalModeIsFlushAllF64F16(MF);
   default:
     break;
   }
@@ -4699,9 +4684,10 @@ bool SITargetLowering::isFMADLegal(const MachineInstr &MI, LLT Ty) const {
     return false;
 
   if (Ty.getScalarSizeInBits() == 16)
-    return Subtarget->hasMadF16() && !hasFP64FP16Denormals(*MI.getMF());
+    return Subtarget->hasMadF16() && denormalModeIsFlushAllF64F16(*MI.getMF());
   if (Ty.getScalarSizeInBits() == 32)
-    return Subtarget->hasMadMacF32Insts() && !hasFP32Denormals(*MI.getMF());
+    return Subtarget->hasMadMacF32Insts() &&
+           denormalModeIsFlushAllF32(*MI.getMF());
 
   return false;
 }
@@ -4713,10 +4699,10 @@ bool SITargetLowering::isFMADLegal(const SelectionDAG &DAG,
   EVT VT = N->getValueType(0);
   if (VT == MVT::f32)
     return Subtarget->hasMadMacF32Insts() &&
-           !hasFP32Denormals(DAG.getMachineFunction());
+           denormalModeIsFlushAllF32(DAG.getMachineFunction());
   if (VT == MVT::f16) {
     return Subtarget->hasMadF16() &&
-           !hasFP64FP16Denormals(DAG.getMachineFunction());
+           denormalModeIsFlushAllF64F16(DAG.getMachineFunction());
   }
 
   return false;
@@ -4824,6 +4810,7 @@ SDValue SITargetLowering::LowerOperation(SDValue Op, SelectionDAG &DAG) const {
     return LowerTrig(Op, DAG);
   case ISD::SELECT: return LowerSELECT(Op, DAG);
   case ISD::FDIV: return LowerFDIV(Op, DAG);
+  case ISD::FFREXP: return LowerFFREXP(Op, DAG);
   case ISD::ATOMIC_CMP_SWAP: return LowerATOMIC_CMP_SWAP(Op, DAG);
   case ISD::STORE: return LowerSTORE(Op, DAG);
   case ISD::GlobalAddress: {
@@ -4848,6 +4835,7 @@ SDValue SITargetLowering::LowerOperation(SDValue Op, SelectionDAG &DAG) const {
   case ISD::BUILD_VECTOR:
     return lowerBUILD_VECTOR(Op, DAG);
   case ISD::FP_ROUND:
+  case ISD::STRICT_FP_ROUND:
     return lowerFP_ROUND(Op, DAG);
   case ISD::FPTRUNC_ROUND: {
     unsigned Opc;
@@ -5270,6 +5258,7 @@ void SITargetLowering::ReplaceNodeResults(SDNode *N,
     return;
   }
   default:
+    AMDGPUTargetLowering::ReplaceNodeResults(N, Results, DAG);
     break;
   }
 }
@@ -5475,6 +5464,10 @@ SDValue SITargetLowering::lowerFP_ROUND(SDValue Op, SelectionDAG &DAG) const {
   SDValue Src = Op.getOperand(0);
   EVT SrcVT = Src.getValueType();
   if (SrcVT != MVT::f64)
+    return Op;
+
+  // TODO: Handle strictfp
+  if (Op.getOpcode() != ISD::FP_ROUND)
     return Op;
 
   SDLoc DL(Op);
@@ -7492,20 +7485,12 @@ SDValue SITargetLowering::LowerINTRINSIC_W_CHAIN(SDValue Op,
                                    M->getVTList(), Ops, M->getMemoryVT(),
                                    M->getMemOperand());
   }
-  case Intrinsic::amdgcn_atomic_inc:
-  case Intrinsic::amdgcn_atomic_dec:
   case Intrinsic::amdgcn_ds_fadd: {
     MemSDNode *M = cast<MemSDNode>(Op);
     unsigned Opc;
     switch (IntrID) {
     case Intrinsic::amdgcn_ds_fadd:
       Opc = ISD::ATOMIC_LOAD_FADD;
-      break;
-    case Intrinsic::amdgcn_atomic_inc:
-      Opc = ISD::ATOMIC_LOAD_UINC_WRAP;
-      break;
-    case Intrinsic::amdgcn_atomic_dec:
-      Opc = ISD::ATOMIC_LOAD_UDEC_WRAP;
       break;
     }
 
@@ -7518,12 +7503,6 @@ SDValue SITargetLowering::LowerINTRINSIC_W_CHAIN(SDValue Op,
     MemSDNode *M = cast<MemSDNode>(Op);
     unsigned Opc;
     switch (IntrID) {
-    case Intrinsic::amdgcn_atomic_inc:
-      Opc = ISD::ATOMIC_LOAD_UINC_WRAP;
-      break;
-    case Intrinsic::amdgcn_atomic_dec:
-      Opc = ISD::ATOMIC_LOAD_UDEC_WRAP;
-      break;
     case Intrinsic::amdgcn_ds_fmin:
       Opc = AMDGPUISD::ATOMIC_LOAD_FMIN;
       break;
@@ -9152,26 +9131,30 @@ SDValue SITargetLowering::lowerFastUnsafeFDIV(SDValue Op,
   EVT VT = Op.getValueType();
   const SDNodeFlags Flags = Op->getFlags();
 
-  bool AllowInaccurateRcp = Flags.hasApproximateFuncs();
-
-  // Without !fpmath accuracy information, we can't do more because we don't
-  // know exactly whether rcp is accurate enough to meet !fpmath requirement.
-  if (!AllowInaccurateRcp)
-    return SDValue();
+  bool AllowInaccurateRcp = Flags.hasApproximateFuncs() ||
+                            DAG.getTarget().Options.UnsafeFPMath;
 
   if (const ConstantFPSDNode *CLHS = dyn_cast<ConstantFPSDNode>(LHS)) {
+    // Without !fpmath accuracy information, we can't do more because we don't
+    // know exactly whether rcp is accurate enough to meet !fpmath requirement.
+    // f16 is always accurate enough
+    if (!AllowInaccurateRcp && VT != MVT::f16)
+      return SDValue();
+
     if (CLHS->isExactlyValue(1.0)) {
       // v_rcp_f32 and v_rsq_f32 do not support denormals, and according to
       // the CI documentation has a worst case error of 1 ulp.
       // OpenCL requires <= 2.5 ulp for 1.0 / x, so it should always be OK to
       // use it as long as we aren't trying to use denormals.
       //
-      // v_rcp_f16 and v_rsq_f16 DO support denormals.
+      // v_rcp_f16 and v_rsq_f16 DO support denormals and 0.51ulp.
 
       // 1.0 / sqrt(x) -> rsq(x)
 
       // XXX - Is UnsafeFPMath sufficient to do this for f64? The maximum ULP
       // error seems really high at 2^29 ULP.
+
+      // XXX - do we need afn for this or is arcp sufficent?
       if (RHS.getOpcode() == ISD::FSQRT)
         return DAG.getNode(AMDGPUISD::RSQ, SL, VT, RHS.getOperand(0));
 
@@ -9186,6 +9169,11 @@ SDValue SITargetLowering::lowerFastUnsafeFDIV(SDValue Op,
       return DAG.getNode(AMDGPUISD::RCP, SL, VT, FNegRHS);
     }
   }
+
+  // For f16 require arcp only.
+  // For f32 require afn+arcp.
+  if (!AllowInaccurateRcp && (VT != MVT::f16 || !Flags.hasAllowReciprocal()))
+    return SDValue();
 
   // Turn into multiply by the reciprocal.
   // x / y -> x * (1.0 / y)
@@ -9320,15 +9308,13 @@ SDValue SITargetLowering::lowerFDIV_FAST(SDValue Op, SelectionDAG &DAG) const {
 
 // Returns immediate value for setting the F32 denorm mode when using the
 // S_DENORM_MODE instruction.
-static SDValue getSPDenormModeValue(int SPDenormMode, SelectionDAG &DAG,
-                                    const SDLoc &SL, const GCNSubtarget *ST) {
+static SDValue getSPDenormModeValue(uint32_t SPDenormMode, SelectionDAG &DAG,
+                                    const SIMachineFunctionInfo *Info,
+                                    const GCNSubtarget *ST) {
   assert(ST->hasDenormModeInst() && "Requires S_DENORM_MODE");
-  int DPDenormModeDefault = hasFP64FP16Denormals(DAG.getMachineFunction())
-                                ? FP_DENORM_FLUSH_NONE
-                                : FP_DENORM_FLUSH_IN_FLUSH_OUT;
-
-  int Mode = SPDenormMode | (DPDenormModeDefault << 2);
-  return DAG.getTargetConstant(Mode, SL, MVT::i32);
+  uint32_t DPDenormModeDefault = Info->getMode().fpDenormModeDPValue();
+  uint32_t Mode = SPDenormMode | (DPDenormModeDefault << 2);
+  return DAG.getTargetConstant(Mode, SDLoc(), MVT::i32);
 }
 
 SDValue SITargetLowering::LowerFDIV32(SDValue Op, SelectionDAG &DAG) const {
@@ -9366,7 +9352,11 @@ SDValue SITargetLowering::LowerFDIV32(SDValue Op, SelectionDAG &DAG) const {
                                (1 << AMDGPU::Hwreg::WIDTH_M1_SHIFT_);
   const SDValue BitField = DAG.getTargetConstant(Denorm32Reg, SL, MVT::i32);
 
-  const bool HasFP32Denormals = hasFP32Denormals(DAG.getMachineFunction());
+  const MachineFunction &MF = DAG.getMachineFunction();
+  const SIMachineFunctionInfo *Info = MF.getInfo<SIMachineFunctionInfo>();
+  const DenormalMode DenormMode = Info->getMode().FP32Denormals;
+
+  const bool HasFP32Denormals = DenormMode == DenormalMode::getIEEE();
 
   if (!HasFP32Denormals) {
     // Note we can't use the STRICT_FMA/STRICT_FMUL for the non-strict FDIV
@@ -9378,7 +9368,7 @@ SDValue SITargetLowering::LowerFDIV32(SDValue Op, SelectionDAG &DAG) const {
     SDNode *EnableDenorm;
     if (Subtarget->hasDenormModeInst()) {
       const SDValue EnableDenormValue =
-          getSPDenormModeValue(FP_DENORM_FLUSH_NONE, DAG, SL, Subtarget);
+          getSPDenormModeValue(FP_DENORM_FLUSH_NONE, DAG, Info, Subtarget);
 
       EnableDenorm = DAG.getNode(AMDGPUISD::DENORM_MODE, SL, BindParamVTs,
                                  DAG.getEntryNode(), EnableDenormValue).getNode();
@@ -9418,10 +9408,13 @@ SDValue SITargetLowering::LowerFDIV32(SDValue Op, SelectionDAG &DAG) const {
                              NumeratorScaled, Fma3, Flags);
 
   if (!HasFP32Denormals) {
+    // FIXME: This mishandles dynamic denormal mode. We need to query the
+    // current mode and restore the original.
+
     SDNode *DisableDenorm;
     if (Subtarget->hasDenormModeInst()) {
-      const SDValue DisableDenormValue =
-          getSPDenormModeValue(FP_DENORM_FLUSH_IN_FLUSH_OUT, DAG, SL, Subtarget);
+      const SDValue DisableDenormValue = getSPDenormModeValue(
+          FP_DENORM_FLUSH_IN_FLUSH_OUT, DAG, Info, Subtarget);
 
       DisableDenorm = DAG.getNode(AMDGPUISD::DENORM_MODE, SL, MVT::Other,
                                   Fma4.getValue(1), DisableDenormValue,
@@ -9527,6 +9520,38 @@ SDValue SITargetLowering::LowerFDIV(SDValue Op, SelectionDAG &DAG) const {
     return LowerFDIV16(Op, DAG);
 
   llvm_unreachable("Unexpected type for fdiv");
+}
+
+SDValue SITargetLowering::LowerFFREXP(SDValue Op, SelectionDAG &DAG) const {
+  SDLoc dl(Op);
+  SDValue Val = Op.getOperand(0);
+  EVT VT = Val.getValueType();
+  EVT ResultExpVT = Op->getValueType(1);
+  EVT InstrExpVT = VT == MVT::f16 ? MVT::i16 : MVT::i32;
+
+  SDValue Mant = DAG.getNode(
+      ISD::INTRINSIC_WO_CHAIN, dl, VT,
+      DAG.getTargetConstant(Intrinsic::amdgcn_frexp_mant, dl, MVT::i32), Val);
+
+  SDValue Exp = DAG.getNode(
+      ISD::INTRINSIC_WO_CHAIN, dl, InstrExpVT,
+      DAG.getTargetConstant(Intrinsic::amdgcn_frexp_exp, dl, MVT::i32), Val);
+
+  const GCNSubtarget &ST =
+      DAG.getMachineFunction().getSubtarget<GCNSubtarget>();
+  if (ST.hasFractBug()) {
+    SDValue Fabs = DAG.getNode(ISD::FABS, dl, VT, Val);
+    SDValue Inf = DAG.getConstantFP(
+        APFloat::getInf(SelectionDAG::EVTToAPFloatSemantics(VT)), dl, VT);
+
+    SDValue IsFinite = DAG.getSetCC(dl, MVT::i1, Fabs, Inf, ISD::SETOLT);
+    SDValue Zero = DAG.getConstant(0, dl, InstrExpVT);
+    Exp = DAG.getNode(ISD::SELECT, dl, InstrExpVT, IsFinite, Exp, Zero);
+    Mant = DAG.getNode(ISD::SELECT, dl, VT, IsFinite, Mant, Val);
+  }
+
+  SDValue CastExp = DAG.getSExtOrTrunc(Exp, dl, ResultExpVT);
+  return DAG.getMergeValues({Mant, CastExp}, dl);
 }
 
 SDValue SITargetLowering::LowerSTORE(SDValue Op, SelectionDAG &DAG) const {
@@ -9924,7 +9949,7 @@ static uint32_t getConstantPermuteMask(uint32_t C) {
 // value 0-3 selects corresponding source byte;
 // value 0xc selects zero;
 // value 0xff selects 0xff.
-static uint32_t getPermuteMask(SelectionDAG &DAG, SDValue V) {
+static uint32_t getPermuteMask(SDValue V) {
   assert(V.getValueSizeInBits() == 32);
 
   if (V.getNumOperands() != 2)
@@ -9940,15 +9965,13 @@ static uint32_t getPermuteMask(SelectionDAG &DAG, SDValue V) {
   default:
     break;
   case ISD::AND:
-    if (uint32_t ConstMask = getConstantPermuteMask(C)) {
+    if (uint32_t ConstMask = getConstantPermuteMask(C))
       return (0x03020100 & ConstMask) | (0x0c0c0c0c & ~ConstMask);
-    }
     break;
 
   case ISD::OR:
-    if (uint32_t ConstMask = getConstantPermuteMask(C)) {
+    if (uint32_t ConstMask = getConstantPermuteMask(C))
       return (0x03020100 & ~ConstMask) | ConstMask;
-    }
     break;
 
   case ISD::SHL:
@@ -10107,8 +10130,8 @@ SDValue SITargetLowering::performAndCombine(SDNode *N,
   const SIInstrInfo *TII = getSubtarget()->getInstrInfo();
   if (VT == MVT::i32 && LHS.hasOneUse() && RHS.hasOneUse() &&
       N->isDivergent() && TII->pseudoToMCOpcode(AMDGPU::V_PERM_B32_e64) != -1) {
-    uint32_t LHSMask = getPermuteMask(DAG, LHS);
-    uint32_t RHSMask = getPermuteMask(DAG, RHS);
+    uint32_t LHSMask = getPermuteMask(LHS);
+    uint32_t RHSMask = getPermuteMask(RHS);
     if (LHSMask != ~0u && RHSMask != ~0u) {
       // Canonicalize the expression in an attempt to have fewer unique masks
       // and therefore fewer registers used to hold the masks.
@@ -10152,6 +10175,325 @@ SDValue SITargetLowering::performAndCombine(SDNode *N,
   }
 
   return SDValue();
+}
+
+// A key component of v_perm is a mapping between byte position of the src
+// operands, and the byte position of the dest. To provide such, we need: 1. the
+// node that provides x byte of the dest of the OR, and 2. the byte of the node
+// used to provide that x byte. calculateByteProvider finds which node provides
+// a certain byte of the dest of the OR, and calculateSrcByte takes that node,
+// and finds an ultimate src and byte position For example: The supported
+// LoadCombine pattern for vector loads is as follows
+//                                t1
+//                                or
+//                      /                  \
+//                      t2                 t3
+//                     zext                shl
+//                      |                   |     \
+//                     t4                  t5     16
+//                     or                 anyext
+//                 /        \               |
+//                t6        t7             t8
+//               srl        shl             or
+//            /    |      /     \         /     \
+//           t9   t10    t11   t12      t13    t14
+//         trunc*  8    trunc*  8      and     and
+//           |            |          /    |     |    \
+//          t15          t16        t17  t18   t19   t20
+//                                trunc*  255   srl   -256
+//                                   |         /   \
+//                                  t15       t15  16
+//
+// *In this example, the truncs are from i32->i16
+//
+// calculateByteProvider would find t6, t7, t13, and t14 for bytes 0-3
+// respectively. calculateSrcByte would find (given node) -> ultimate src &
+// byteposition: t6 -> t15 & 1, t7 -> t16 & 0, t13 -> t15 & 0, t14 -> t15 & 3.
+// After finding the mapping, we can combine the tree into vperm t15, t16,
+// 0x05000407
+
+// Find the source and byte position from a node.
+// \p DestByte is the byte position of the dest of the or that the src
+// ultimately provides. \p SrcIndex is the byte of the src that maps to this
+// dest of the or byte. \p Depth tracks how many recursive iterations we have
+// performed.
+static const std::optional<ByteProvider<SDValue>>
+calculateSrcByte(const SDValue Op, uint64_t DestByte, uint64_t SrcIndex = 0,
+                 unsigned Depth = 0) {
+  // We may need to recursively traverse a series of SRLs
+  if (Depth >= 6)
+    return std::nullopt;
+
+  switch (Op->getOpcode()) {
+  case ISD::TRUNCATE: {
+    if (Op->getOperand(0).getScalarValueSizeInBits() != 32)
+      return std::nullopt;
+    return calculateSrcByte(Op->getOperand(0), DestByte, SrcIndex, Depth + 1);
+  }
+
+  case ISD::SRL: {
+    auto ShiftOp = dyn_cast<ConstantSDNode>(Op->getOperand(1));
+    if (!ShiftOp)
+      return std::nullopt;
+
+    uint64_t BitShift = ShiftOp->getZExtValue();
+
+    if (BitShift % 8 != 0)
+      return std::nullopt;
+
+    SrcIndex += BitShift / 8;
+
+    return calculateSrcByte(Op->getOperand(0), DestByte, SrcIndex, Depth + 1);
+  }
+
+  default: {
+    if (Op.getScalarValueSizeInBits() != 32)
+      return std::nullopt;
+
+    return ByteProvider<SDValue>::getSrc(Op, DestByte, SrcIndex);
+  }
+  }
+  llvm_unreachable("fully handled switch");
+}
+
+// For a byte position in the result of an Or, traverse the tree and find the
+// node (and the byte of the node) which ultimately provides this {Or,
+// BytePosition}. \p Op is the operand we are currently examining. \p Index is
+// the byte position of the Op that corresponds with the originally requested
+// byte of the Or \p Depth tracks how many recursive iterations we have
+// performed. \p StartingIndex is the originally requested byte of the Or
+static const std::optional<ByteProvider<SDValue>>
+calculateByteProvider(const SDValue &Op, unsigned Index, unsigned Depth,
+                      unsigned StartingIndex = 0) {
+  // Finding Src tree of RHS of or typically requires at least 1 additional
+  // depth
+  if (Depth > 6)
+    return std::nullopt;
+
+  unsigned BitWidth = Op.getScalarValueSizeInBits();
+  if (BitWidth % 8 != 0)
+    return std::nullopt;
+  assert(Index < BitWidth / 8 && "invalid index requested");
+
+  switch (Op.getOpcode()) {
+  case ISD::OR: {
+    auto RHS = calculateByteProvider(Op.getOperand(1), Index, Depth + 1,
+                                     StartingIndex);
+    if (!RHS)
+      return std::nullopt;
+    auto LHS = calculateByteProvider(Op.getOperand(0), Index, Depth + 1,
+                                     StartingIndex);
+    if (!LHS)
+      return std::nullopt;
+    // A well formed Or will have two ByteProviders for each byte, one of which
+    // is constant zero
+    if (!LHS->isConstantZero() && !RHS->isConstantZero())
+      return std::nullopt;
+    if (!LHS || LHS->isConstantZero())
+      return RHS;
+    if (!RHS || RHS->isConstantZero())
+      return LHS;
+    return std::nullopt;
+  }
+
+  case ISD::AND: {
+    auto BitMaskOp = dyn_cast<ConstantSDNode>(Op->getOperand(1));
+    if (!BitMaskOp)
+      return std::nullopt;
+
+    uint32_t BitMask = BitMaskOp->getZExtValue();
+    // Bits we expect for our StartingIndex
+    uint32_t IndexMask = 0xFF << (Index * 8);
+
+    if ((IndexMask & BitMask) != IndexMask) {
+      // If the result of the and partially provides the byte, then it
+      // is not well formatted
+      if (IndexMask & BitMask)
+        return std::nullopt;
+      return ByteProvider<SDValue>::getConstantZero();
+    }
+
+    return calculateSrcByte(Op->getOperand(0), StartingIndex, Index);
+  }
+
+  case ISD::SRL: {
+    auto ShiftOp = dyn_cast<ConstantSDNode>(Op->getOperand(1));
+    if (!ShiftOp)
+      return std::nullopt;
+
+    uint64_t BitShift = ShiftOp->getZExtValue();
+    if (BitShift % 8)
+      return std::nullopt;
+
+    auto BitsProvided = Op.getScalarValueSizeInBits();
+    if (BitsProvided % 8 != 0)
+      return std::nullopt;
+
+    uint64_t BytesProvided = BitsProvided / 8;
+    uint64_t ByteShift = BitShift / 8;
+    // The dest of shift will have good [0 : (BytesProvided - ByteShift)] bytes.
+    // If the byte we are trying to provide (as tracked by index) falls in this
+    // range, then the SRL provides the byte. The byte of interest of the src of
+    // the SRL is Index + ByteShift
+    return BytesProvided - ByteShift > Index
+               ? calculateSrcByte(Op->getOperand(0), StartingIndex,
+                                  Index + ByteShift)
+               : ByteProvider<SDValue>::getConstantZero();
+  }
+
+  case ISD::SHL: {
+    auto ShiftOp = dyn_cast<ConstantSDNode>(Op->getOperand(1));
+    if (!ShiftOp)
+      return std::nullopt;
+
+    uint64_t BitShift = ShiftOp->getZExtValue();
+    if (BitShift % 8 != 0)
+      return std::nullopt;
+    uint64_t ByteShift = BitShift / 8;
+
+    // If we are shifting by an amount greater than (or equal to)
+    // the index we are trying to provide, then it provides 0s. If not,
+    // then this bytes are not definitively 0s, and the corresponding byte
+    // of interest is Index - ByteShift of the src
+    return Index < ByteShift
+               ? ByteProvider<SDValue>::getConstantZero()
+               : calculateByteProvider(Op.getOperand(0), Index - ByteShift,
+                                       Depth + 1, StartingIndex);
+  }
+  case ISD::ANY_EXTEND:
+  case ISD::SIGN_EXTEND:
+  case ISD::ZERO_EXTEND: {
+    SDValue NarrowOp = Op->getOperand(0);
+    unsigned NarrowBitWidth = NarrowOp.getScalarValueSizeInBits();
+    if (NarrowBitWidth % 8 != 0)
+      return std::nullopt;
+    uint64_t NarrowByteWidth = NarrowBitWidth / 8;
+
+    if (Index >= NarrowByteWidth)
+      return Op.getOpcode() == ISD::ZERO_EXTEND
+                 ? std::optional<ByteProvider<SDValue>>(
+                       ByteProvider<SDValue>::getConstantZero())
+                 : std::nullopt;
+    return calculateByteProvider(NarrowOp, Index, Depth + 1, StartingIndex);
+  }
+
+  case ISD::TRUNCATE: {
+    unsigned NarrowBitWidth = Op.getScalarValueSizeInBits();
+    if (NarrowBitWidth % 8 != 0)
+      return std::nullopt;
+    uint64_t NarrowByteWidth = NarrowBitWidth / 8;
+
+    if (NarrowByteWidth >= Index) {
+      return calculateByteProvider(Op.getOperand(0), Index, Depth + 1,
+                                   StartingIndex);
+    }
+
+    return std::nullopt;
+  }
+
+  case ISD::LOAD: {
+    auto L = cast<LoadSDNode>(Op.getNode());
+    unsigned NarrowBitWidth = L->getMemoryVT().getSizeInBits();
+    if (NarrowBitWidth % 8 != 0)
+      return std::nullopt;
+    uint64_t NarrowByteWidth = NarrowBitWidth / 8;
+
+    // If the width of the load does not reach byte we are trying to provide for
+    // and it is not a ZEXTLOAD, then the load does not provide for the byte in
+    // question
+    if (Index >= NarrowByteWidth) {
+      return L->getExtensionType() == ISD::ZEXTLOAD
+                 ? std::optional<ByteProvider<SDValue>>(
+                       ByteProvider<SDValue>::getConstantZero())
+                 : std::nullopt;
+    }
+
+    if (NarrowByteWidth > Index) {
+      return calculateSrcByte(Op, StartingIndex, Index);
+    }
+
+    return std::nullopt;
+  }
+
+  case ISD::BSWAP:
+    return calculateByteProvider(Op->getOperand(0), BitWidth / 8 - Index - 1,
+                                 Depth + 1, StartingIndex);
+  default: {
+    return std::nullopt;
+  }
+  }
+
+  llvm_unreachable("fully handled switch");
+}
+
+// Returns true if the Operand is a scalar and is 16 bits
+static bool is16BitScalarOp(SDValue &Operand) {
+  switch (Operand.getOpcode()) {
+  case ISD::ANY_EXTEND:
+  case ISD::SIGN_EXTEND:
+  case ISD::ZERO_EXTEND: {
+    auto OpVT = Operand.getOperand(0).getValueType();
+    return !OpVT.isVector() && OpVT.getSizeInBits() == 16;
+  }
+  case ISD::LOAD: {
+    LoadSDNode *L = cast<LoadSDNode>(Operand.getNode());
+    auto ExtType = cast<LoadSDNode>(L)->getExtensionType();
+    if (ExtType == ISD::ZEXTLOAD || ExtType == ISD::SEXTLOAD ||
+        ExtType == ISD::EXTLOAD) {
+      auto MemVT = L->getMemoryVT();
+      return !MemVT.isVector() && MemVT.getSizeInBits() == 16;
+    }
+    return false;
+  }
+  default:
+    return false;
+  }
+}
+
+// Returns true if the mask matches consecutive bytes, and the first byte
+// begins at a power of 2 byte offset from 0th byte
+static bool addresses16Bits(int Mask) {
+  int Low8 = Mask & 0xff;
+  int Hi8 = (Mask & 0xff00) >> 8;
+
+  assert(Low8 < 8 && Hi8 < 8);
+  // Are the bytes contiguous in the order of increasing addresses.
+  bool IsConsecutive = (Hi8 - Low8 == 1);
+  // Is the first byte at location that is aligned for 16 bit instructions.
+  // A counter example is taking 2 consecutive bytes starting at the 8th bit.
+  // In this case, we still need code to extract the 16 bit operand, so it
+  // is better to use i8 v_perm
+  bool Is16Aligned = !(Low8 % 2);
+
+  return IsConsecutive && Is16Aligned;
+}
+
+// Do not lower into v_perm if the operands are actually 16 bit
+// and the selected bits (based on PermMask) correspond with two
+// easily addressable 16 bit operands.
+static bool hasEightBitAccesses(uint64_t PermMask, SDValue &Op,
+                                SDValue &OtherOp) {
+  int Low16 = PermMask & 0xffff;
+  int Hi16 = (PermMask & 0xffff0000) >> 16;
+
+  // ByteProvider only accepts 32 bit operands
+  assert(Op.getValueType().getSizeInBits() == 32);
+  assert(OtherOp.getValueType().getSizeInBits() == 32);
+
+  auto OpIs16Bit = is16BitScalarOp(Op);
+  auto OtherOpIs16Bit = is16BitScalarOp(Op);
+
+  // If there is a size mismatch, then we must use masking on at least one
+  // operand
+  if (OpIs16Bit != OtherOpIs16Bit)
+    return true;
+
+  // If both operands are 16 bit, return whether or not we cleanly address both
+  if (is16BitScalarOp(Op) && is16BitScalarOp(OtherOp))
+    return !addresses16Bits(Low16) || !addresses16Bits(Hi16);
+
+  // Both are 32 bit operands
+  return true;
 }
 
 SDValue SITargetLowering::performOrCombine(SDNode *N,
@@ -10204,8 +10546,36 @@ SDValue SITargetLowering::performOrCombine(SDNode *N,
   const SIInstrInfo *TII = getSubtarget()->getInstrInfo();
   if (VT == MVT::i32 && LHS.hasOneUse() && RHS.hasOneUse() &&
       N->isDivergent() && TII->pseudoToMCOpcode(AMDGPU::V_PERM_B32_e64) != -1) {
-    uint32_t LHSMask = getPermuteMask(DAG, LHS);
-    uint32_t RHSMask = getPermuteMask(DAG, RHS);
+
+    // If all the uses of an or need to extract the individual elements, do not
+    // attempt to lower into v_perm
+    auto usesCombinedOperand = [](SDNode *OrUse) {
+      // If we have any non-vectorized use, then it is a candidate for v_perm
+      if (OrUse->getOpcode() != ISD::BITCAST ||
+          !OrUse->getValueType(0).isVector())
+        return true;
+
+      // If we have any non-vectorized use, then it is a candidate for v_perm
+      for (auto VUse : OrUse->uses()) {
+        if (!VUse->getValueType(0).isVector())
+          return true;
+
+        // If the use of a vector is a store, then combining via a v_perm
+        // is beneficial.
+        // TODO -- whitelist more uses
+        for (auto VectorwiseOp : {ISD::STORE, ISD::CopyToReg, ISD::CopyFromReg})
+          if (VUse->getOpcode() == VectorwiseOp)
+            return true;
+      }
+      return false;
+    };
+
+    if (!any_of(N->uses(), usesCombinedOperand))
+      return SDValue();
+
+    uint32_t LHSMask = getPermuteMask(LHS);
+    uint32_t RHSMask = getPermuteMask(RHS);
+
     if (LHSMask != ~0u && RHSMask != ~0u) {
       // Canonicalize the expression in an attempt to have fewer unique masks
       // and therefore fewer registers used to hold the masks.
@@ -10236,6 +10606,71 @@ SDValue SITargetLowering::performOrCombine(SDNode *N,
         return DAG.getNode(AMDGPUISD::PERM, DL, MVT::i32,
                            LHS.getOperand(0), RHS.getOperand(0),
                            DAG.getConstant(Sel, DL, MVT::i32));
+      }
+    }
+    if (LHSMask == ~0u || RHSMask == ~0u) {
+      SmallVector<ByteProvider<SDValue>, 8> PermNodes;
+
+      // VT is known to be MVT::i32, so we need to provide 4 bytes.
+      assert(VT == MVT::i32);
+      for (int i = 0; i < 4; i++) {
+        // Find the ByteProvider that provides the ith byte of the result of OR
+        std::optional<ByteProvider<SDValue>> P =
+            calculateByteProvider(SDValue(N, 0), i, 0, /*StartingIndex = */ i);
+        // TODO support constantZero
+        if (!P || P->isConstantZero())
+          return SDValue();
+
+        PermNodes.push_back(*P);
+      }
+      if (PermNodes.size() != 4)
+        return SDValue();
+
+      int FirstSrc = 0;
+      std::optional<int> SecondSrc;
+      uint64_t permMask = 0x00000000;
+      for (size_t i = 0; i < PermNodes.size(); i++) {
+        auto PermOp = PermNodes[i];
+        // Since the mask is applied to Src1:Src2, Src1 bytes must be offset
+        // by sizeof(Src2) = 4
+        int SrcByteAdjust = 4;
+
+        if (!PermOp.hasSameSrc(PermNodes[FirstSrc])) {
+          if (SecondSrc.has_value())
+            if (!PermOp.hasSameSrc(PermNodes[*SecondSrc]))
+              return SDValue();
+          // Set the index of the second distinct Src node
+          SecondSrc = i;
+          assert(PermNodes[*SecondSrc].Src->getValueType().getSizeInBits() ==
+                 32);
+          SrcByteAdjust = 0;
+        }
+        assert(PermOp.SrcOffset + SrcByteAdjust < 8);
+        assert(!DAG.getDataLayout().isBigEndian());
+        permMask |= (PermOp.SrcOffset + SrcByteAdjust) << (i * 8);
+      }
+
+      SDValue Op = *PermNodes[FirstSrc].Src;
+      SDValue OtherOp = SecondSrc.has_value() ? *PermNodes[*SecondSrc].Src
+                                              : *PermNodes[FirstSrc].Src;
+
+      // Check that we are not just extracting the bytes in order from an op
+      if (Op == OtherOp) {
+        int Low16 = permMask & 0xffff;
+        int Hi16 = (permMask & 0xffff0000) >> 16;
+
+        bool WellFormedLow = (Low16 == 0x0504) || (Low16 == 0x0100);
+        bool WellFormedHi = (Hi16 == 0x0706) || (Hi16 == 0x0302);
+
+        // The perm op would really just produce Op. So combine into Op
+        if (WellFormedLow && WellFormedHi)
+          return Op;
+      }
+
+      if (hasEightBitAccesses(permMask, Op, OtherOp)) {
+        SDLoc DL(N);
+        return DAG.getNode(AMDGPUISD::PERM, DL, MVT::i32, Op, OtherOp,
+                           DAG.getConstant(permMask, DL, MVT::i32));
       }
     }
   }
@@ -11356,10 +11791,11 @@ unsigned SITargetLowering::getFusedOpcode(const SelectionDAG &DAG,
 
   // Only do this if we are not trying to support denormals. v_mad_f32 does not
   // support denormals ever.
-  if (((VT == MVT::f32 && !hasFP32Denormals(DAG.getMachineFunction())) ||
-       (VT == MVT::f16 && !hasFP64FP16Denormals(DAG.getMachineFunction()) &&
-        getSubtarget()->hasMadF16())) &&
-       isOperationLegal(ISD::FMAD, VT))
+  if (((VT == MVT::f32 &&
+        denormalModeIsFlushAllF32(DAG.getMachineFunction())) ||
+       (VT == MVT::f16 && Subtarget->hasMadF16() &&
+        denormalModeIsFlushAllF64F16(DAG.getMachineFunction()))) &&
+      isOperationLegal(ISD::FMAD, VT))
     return ISD::FMAD;
 
   const TargetOptions &Options = DAG.getTarget().Options;
@@ -12969,6 +13405,15 @@ void SITargetLowering::finalizeLowering(MachineFunction &MF) const {
     reservePrivateMemoryRegs(getTargetMachine(), MF, *TRI, *Info);
   }
 
+  // TODO: Move this logic to getReservedRegs()
+  // Reserve the SGPR(s) to save/restore EXEC for WWM spill/copy handling.
+  unsigned MaxNumSGPRs = ST.getMaxNumSGPRs(MF);
+  Register SReg = ST.isWave32()
+                      ? AMDGPU::SGPR_32RegClass.getRegister(MaxNumSGPRs - 1)
+                      : TRI->getAlignedHighSGPRForRC(MF, /*Align=*/2,
+                                                     &AMDGPU::SGPR_64RegClass);
+  Info->setSGPRForEXECCopy(SReg);
+
   assert(!TRI->isSubRegister(Info->getScratchRSrcReg(),
                              Info->getStackPtrOffsetReg()));
   if (Info->getStackPtrOffsetReg() != AMDGPU::SP_REG)
@@ -13308,10 +13753,10 @@ bool SITargetLowering::denormalsEnabledForType(const SelectionDAG &DAG,
                                                EVT VT) const {
   switch (VT.getScalarType().getSimpleVT().SimpleTy) {
   case MVT::f32:
-    return hasFP32Denormals(DAG.getMachineFunction());
+    return !denormalModeIsFlushAllF32(DAG.getMachineFunction());
   case MVT::f64:
   case MVT::f16:
-    return hasFP64FP16Denormals(DAG.getMachineFunction());
+    return !denormalModeIsFlushAllF64F16(DAG.getMachineFunction());
   default:
     return false;
   }
@@ -13321,10 +13766,10 @@ bool SITargetLowering::denormalsEnabledForType(LLT Ty,
                                                MachineFunction &MF) const {
   switch (Ty.getScalarSizeInBits()) {
   case 32:
-    return hasFP32Denormals(MF);
+    return !denormalModeIsFlushAllF32(MF);
   case 64:
   case 16:
-    return hasFP64FP16Denormals(MF);
+    return !denormalModeIsFlushAllF64F16(MF);
   default:
     return false;
   }
@@ -13638,7 +14083,7 @@ bool SITargetLowering::isReassocProfitable(SelectionDAG &DAG, SDValue N0,
 
 bool SITargetLowering::isReassocProfitable(MachineRegisterInfo &MRI,
                                            Register N0, Register N1) const {
-  return true; // FIXME: handle regbanks
+  return MRI.hasOneNonDBGUse(N0); // FIXME: handle regbanks
 }
 
 MachineMemOperand::Flags

@@ -186,6 +186,10 @@ $insert_f[[]]$insert_vector[[]]
 #define DEF(X) const Foo *X;
 #define BAZ(X) const X x
 
+// No missing include insertion for ambiguous macro refs.
+#if defined(FOO)
+#endif
+
   void foo() {
     $b[[b]]();
 
@@ -210,7 +214,7 @@ $insert_f[[]]$insert_vector[[]]
 })cpp");
 
   TestTU TU;
-  TU.Filename = "foo.cpp";
+  TU.Filename = "main.cpp";
   TU.AdditionalFiles["a.h"] = guard("#include \"b.h\"");
   TU.AdditionalFiles["b.h"] = guard("void b();");
 

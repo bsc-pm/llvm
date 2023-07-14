@@ -111,7 +111,7 @@ int main() {
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@_ZN1S3fooEi
-// PPC64-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]], i32 noundef signext [[A:%.*]]) #[[ATTR0]] align 2 !dbg [[DBG10:![0-9]+]] {
+// PPC64-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]], i32 noundef signext [[A:%.*]]) #[[ATTR0]] !dbg [[DBG10:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    [[A_ADDR:%.*]] = alloca i32, align 4
@@ -158,7 +158,7 @@ int main() {
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@_ZN1SC1Ev
-// PPC64-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) unnamed_addr #[[ATTR3:[0-9]+]] comdat align 2 !dbg [[DBG21:![0-9]+]] {
+// PPC64-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) unnamed_addr #[[ATTR3:[0-9]+]] comdat !dbg [[DBG21:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
@@ -168,7 +168,7 @@ int main() {
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@_ZN1SC2Ev
-// PPC64-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) unnamed_addr #[[ATTR3]] comdat align 2 !dbg [[DBG24:![0-9]+]] {
+// PPC64-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) unnamed_addr #[[ATTR3]] comdat !dbg [[DBG24:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8

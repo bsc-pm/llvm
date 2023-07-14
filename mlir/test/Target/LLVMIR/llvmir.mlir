@@ -39,6 +39,21 @@ llvm.mlir.global internal constant @string_const("foobar") : !llvm.array<6 x i8>
 // CHECK: @int_global_undef = internal global i64 undef
 llvm.mlir.global internal @int_global_undef() : i64
 
+// CHECK: @f8E4M3FN_global_as_i8 = internal global i8 60
+llvm.mlir.global internal @f8E4M3FN_global_as_i8(1.5 : f8E4M3FN) : i8
+
+// CHECK: @f8E5M2_global_as_i8 = internal global i8 62
+llvm.mlir.global internal @f8E5M2_global_as_i8(1.5 : f8E5M2) : i8
+
+// CHECK: @f8E4M3FNUZ_global_as_i8 = internal global i8 68
+llvm.mlir.global internal @f8E4M3FNUZ_global_as_i8(1.5 : f8E4M3FNUZ) : i8
+
+// CHECK: @f8E5M2FNUZ_global_as_i8 = internal global i8 66
+llvm.mlir.global internal @f8E5M2FNUZ_global_as_i8(1.5 : f8E5M2FNUZ) : i8
+
+// CHECK: @f8E4M3B11FNUZ_global_as_i8 = internal global i8 92
+llvm.mlir.global internal @f8E4M3B11FNUZ_global_as_i8(1.5 : f8E4M3B11FNUZ) : i8
+
 // CHECK: @explicit_undef = global i32 undef
 llvm.mlir.global external @explicit_undef() : i32 {
   %0 = llvm.mlir.undef : i32
@@ -1610,6 +1625,50 @@ llvm.func @invoke_phis() -> i32 attributes { personality = @__gxx_personality_v0
 llvm.func @hasGCFunction() attributes { garbageCollector = "statepoint-example" } {
     llvm.return
 }
+
+// -----
+
+// CHECK-LABEL: @gc_decl
+// CHECK-SAME: gc "statepoint-example"
+llvm.func @gc_decl() attributes { garbageCollector = "statepoint-example" }
+
+// -----
+
+// CHECK-LABEL: @section_func
+// CHECK-SAME: section ".section.name"
+llvm.func @section_func() attributes { section = ".section.name" } {
+    llvm.return
+}
+
+// -----
+
+// CHECK-LABEL: @local_unnamed_addr_func
+// CHECK-SAME: local_unnamed_addr
+llvm.func local_unnamed_addr @local_unnamed_addr_func() {
+    llvm.return
+}
+
+// -----
+
+// CHECK-LABEL: @unnamed_addr_func
+// CHECK-SAME: unnamed_addr
+llvm.func unnamed_addr @unnamed_addr_func()
+
+// -----
+
+// CHECK-LABEL: @align_func
+// CHECK-SAME: align 2
+llvm.func @align_func() attributes {alignment = 2 : i64} {
+    llvm.return
+}
+
+// -----
+
+// CHECK-LABEL: @align_decl
+// CHECK-SAME: align 64
+llvm.func @align_decl() attributes {alignment = 64 : i64}
+
+// -----
 
 // CHECK-LABEL: @callFreezeOp
 llvm.func @callFreezeOp(%x : i32) {

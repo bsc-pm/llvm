@@ -20,6 +20,7 @@
 #include "flang/Optimizer/Builder/Complex.h"
 #include "flang/Optimizer/Builder/FIRBuilder.h"
 #include "flang/Optimizer/Builder/MutableBox.h"
+#include "flang/Optimizer/Builder/PPCIntrinsicCall.h"
 #include "flang/Optimizer/Builder/Runtime/Allocatable.h"
 #include "flang/Optimizer/Builder/Runtime/Character.h"
 #include "flang/Optimizer/Builder/Runtime/Command.h"
@@ -37,6 +38,7 @@
 #include "flang/Optimizer/Support/FatalError.h"
 #include "flang/Optimizer/Support/Utils.h"
 #include "flang/Runtime/entry-names.h"
+#include "flang/Runtime/ieee_arithmetic.h"
 #include "flang/Runtime/iostat.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -45,6 +47,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
+#include "llvm/Support/raw_ostream.h"
 #include <optional>
 
 #define DEBUG_TYPE "flang-lower-intrinsic"
@@ -89,88 +92,6 @@ static bool isStaticallyPresent(const fir::ExtendedValue &exv) {
   return !isStaticallyAbsent(exv);
 }
 
-//===----------------------------------------------------------------------===//
-// Helper functions for argument handling in vector intrinsics.
-//===----------------------------------------------------------------------===//
-static mlir::Type getConvertedElementType(mlir::MLIRContext *context,
-                                          mlir::Type eleTy) {
-  if (eleTy.isa<mlir::IntegerType>() && !eleTy.isSignlessInteger()) {
-    const auto intTy{eleTy.dyn_cast<mlir::IntegerType>()};
-    auto newEleTy{mlir::IntegerType::get(context, intTy.getWidth())};
-    return newEleTy;
-  }
-  return eleTy;
-}
-
-// Wrapper struct to encapsulate information for a vector type. Preserves
-// sign of eleTy if eleTy is signed/unsigned integer. Helps with vector type
-// conversions.
-struct VecTypeInfo {
-  mlir::Type eleTy;
-  uint64_t len;
-
-  mlir::Type toFirVectorType() { return fir::VectorType::get(len, eleTy); }
-
-  // We need a builder to do the signless element conversion.
-  mlir::Type toMlirVectorType(mlir::MLIRContext *context) {
-    // Will convert to eleTy to signless int if eleTy is signed/unsigned int.
-    auto convEleTy{getConvertedElementType(context, eleTy)};
-    return mlir::VectorType::get(len, convEleTy);
-  }
-
-  bool isFloat32() { return mlir::isa<mlir::Float32Type>(eleTy); }
-
-  bool isFloat64() { return mlir::isa<mlir::Float64Type>(eleTy); }
-
-  bool isFloat() { return isFloat32() || isFloat64(); }
-};
-
-static llvm::SmallVector<mlir::Value, 4>
-getBasesForArgs(llvm::ArrayRef<fir::ExtendedValue> args) {
-  llvm::SmallVector<mlir::Value, 4> baseVec;
-  for (auto arg : args)
-    baseVec.push_back(getBase(arg));
-  return baseVec;
-}
-
-static llvm::SmallVector<mlir::Type, 4>
-getTypesForArgs(llvm::ArrayRef<mlir::Value> args) {
-  llvm::SmallVector<mlir::Type, 4> typeVec;
-  for (auto arg : args)
-    typeVec.push_back(arg.getType());
-  return typeVec;
-}
-
-// Returns a VecTypeInfo with element type and length of given fir vector type.
-// Preserves signness of fir vector type if element type of integer.
-static VecTypeInfo getVecTypeFromFirType(mlir::Type firTy) {
-  assert(firTy.isa<fir::VectorType>());
-  VecTypeInfo vecTyInfo;
-  vecTyInfo.eleTy = firTy.dyn_cast<fir::VectorType>().getEleTy();
-  vecTyInfo.len = firTy.dyn_cast<fir::VectorType>().getLen();
-  return vecTyInfo;
-}
-
-static VecTypeInfo getVecTypeFromFir(mlir::Value firVec) {
-  return getVecTypeFromFirType(firVec.getType());
-}
-
-// Converts array of fir vectors to mlir vectors.
-static llvm::SmallVector<mlir::Value, 4>
-convertVecArgs(fir::FirOpBuilder &builder, mlir::Location loc,
-               VecTypeInfo vecTyInfo, llvm::SmallVector<mlir::Value, 4> args) {
-  llvm::SmallVector<mlir::Value, 4> newArgs;
-  auto ty{vecTyInfo.toMlirVectorType(builder.getContext())};
-  assert(ty && "unknown mlir vector type");
-  for (size_t i = 0; i < args.size(); i++)
-    newArgs.push_back(builder.createConvert(loc, ty, args[i]));
-  return newArgs;
-}
-
-constexpr auto asValue = fir::LowerIntrinsicArgAs::Value;
-constexpr auto asAddr = fir::LowerIntrinsicArgAs::Addr;
-constexpr auto asBox = fir::LowerIntrinsicArgAs::Box;
-constexpr auto asInquired = fir::LowerIntrinsicArgAs::Inquired;
 using I = IntrinsicLibrary;
 
 /// Flag to indicate that an intrinsic argument has to be handled as
@@ -350,13 +271,30 @@ static constexpr IntrinsicHandler handlers[]{
     {"ibits", &I::genIbits},
     {"ibset", &I::genIbset},
     {"ichar", &I::genIchar},
+    {"ieee_class", &I::genIeeeClass},
     {"ieee_class_eq", &I::genIeeeTypeCompare<mlir::arith::CmpIPredicate::eq>},
     {"ieee_class_ne", &I::genIeeeTypeCompare<mlir::arith::CmpIPredicate::ne>},
+    {"ieee_copy_sign", &I::genIeeeCopySign},
+    {"ieee_get_rounding_mode",
+     &I::genIeeeGetRoundingMode,
+     {{{"round_value", asAddr, handleDynamicOptional},
+       {"radix", asValue, handleDynamicOptional}}},
+     /*isElemental=*/false},
     {"ieee_is_finite", &I::genIeeeIsFinite},
-    {"ieee_is_nan", &I::genIsNan},
+    {"ieee_is_nan", &I::genIeeeIsNan},
+    {"ieee_is_negative", &I::genIeeeIsNegative},
     {"ieee_is_normal", &I::genIeeeIsNormal},
     {"ieee_round_eq", &I::genIeeeTypeCompare<mlir::arith::CmpIPredicate::eq>},
     {"ieee_round_ne", &I::genIeeeTypeCompare<mlir::arith::CmpIPredicate::ne>},
+    {"ieee_set_rounding_mode",
+     &I::genIeeeSetRoundingMode,
+     {{{"round_value", asValue, handleDynamicOptional},
+       {"radix", asValue, handleDynamicOptional}}},
+     /*isElemental=*/false},
+    {"ieee_signbit", &I::genIeeeSignbit},
+    {"ieee_support_rounding", &I::genIeeeSupportRounding},
+    {"ieee_unordered", &I::genIeeeUnordered},
+    {"ieee_value", &I::genIeeeValue},
     {"ieor", &I::genIeor},
     {"index",
      &I::genIndex,
@@ -379,7 +317,7 @@ static constexpr IntrinsicHandler handlers[]{
     {"is_iostat_eor", &I::genIsIostatValue<Fortran::runtime::io::IostatEor>},
     {"ishft", &I::genIshft},
     {"ishftc", &I::genIshftc},
-    {"isnan", &I::genIsNan},
+    {"isnan", &I::genIeeeIsNan},
     {"lbound",
      &I::genLbound,
      {{{"array", asInquired}, {"dim", asValue}, {"kind", asValue}}},
@@ -600,38 +538,6 @@ static constexpr IntrinsicHandler handlers[]{
      /*isElemental=*/true},
 };
 
-// PPC specific intrinsic handlers.
-static constexpr IntrinsicHandler ppcHandlers[]{
-    {"__ppc_mtfsf",
-     &I::genMtfsf<false>,
-     {{{"mask", asValue}, {"r", asValue}}},
-     /*isElemental=*/false},
-    {"__ppc_mtfsfi",
-     &I::genMtfsf<true>,
-     {{{"bf", asValue}, {"i", asValue}}},
-     /*isElemental=*/false},
-    {"__ppc_vec_add",
-     &I::genVecAddAndMulSubXor<VecOp::Add>,
-     {{{"arg1", asValue}, {"arg2", asValue}}},
-     /*isElemental=*/true},
-    {"__ppc_vec_and",
-     &I::genVecAddAndMulSubXor<VecOp::And>,
-     {{{"arg1", asValue}, {"arg2", asValue}}},
-     /*isElemental=*/true},
-    {"__ppc_vec_mul",
-     &I::genVecAddAndMulSubXor<VecOp::Mul>,
-     {{{"arg1", asValue}, {"arg2", asValue}}},
-     /*isElemental=*/true},
-    {"__ppc_vec_sub",
-     &I::genVecAddAndMulSubXor<VecOp::Sub>,
-     {{{"arg1", asValue}, {"arg2", asValue}}},
-     /*isElemental=*/true},
-    {"__ppc_vec_xor",
-     &I::genVecAddAndMulSubXor<VecOp::Xor>,
-     {{{"arg1", asValue}, {"arg2", asValue}}},
-     /*isElemental=*/true},
-};
-
 static const IntrinsicHandler *findIntrinsicHandler(llvm::StringRef name) {
   auto compare = [](const IntrinsicHandler &handler, llvm::StringRef name) {
     return name.compare(handler.name) > 0;
@@ -639,15 +545,6 @@ static const IntrinsicHandler *findIntrinsicHandler(llvm::StringRef name) {
   auto result = llvm::lower_bound(handlers, name, compare);
   return result != std::end(handlers) && result->name == name ? result
                                                               : nullptr;
-}
-
-static const IntrinsicHandler *findPPCIntrinsicHandler(llvm::StringRef name) {
-  auto compare = [](const IntrinsicHandler &ppcHandler, llvm::StringRef name) {
-    return name.compare(ppcHandler.name) > 0;
-  };
-  auto result = llvm::lower_bound(ppcHandlers, name, compare);
-  return result != std::end(ppcHandlers) && result->name == name ? result
-                                                                 : nullptr;
 }
 
 /// To make fir output more readable for debug, one can outline all intrinsic
@@ -679,10 +576,10 @@ static llvm::cl::opt<bool>
                                       "dialect to lower complex operations"),
                        llvm::cl::init(false));
 
-static mlir::Value genLibCall(fir::FirOpBuilder &builder, mlir::Location loc,
-                              llvm::StringRef libFuncName,
-                              mlir::FunctionType libFuncType,
-                              llvm::ArrayRef<mlir::Value> args) {
+mlir::Value genLibCall(fir::FirOpBuilder &builder, mlir::Location loc,
+                       llvm::StringRef libFuncName,
+                       mlir::FunctionType libFuncType,
+                       llvm::ArrayRef<mlir::Value> args) {
   LLVM_DEBUG(llvm::dbgs() << "Generating '" << libFuncName
                           << "' call with type ";
              libFuncType.dump(); llvm::dbgs() << "\n");
@@ -738,9 +635,11 @@ static mlir::Value genLibCall(fir::FirOpBuilder &builder, mlir::Location loc,
   return libCall.getResult(0);
 }
 
-static mlir::Value genLibSplitComplexArgsCall(
-    fir::FirOpBuilder &builder, mlir::Location loc, llvm::StringRef libFuncName,
-    mlir::FunctionType libFuncType, llvm::ArrayRef<mlir::Value> args) {
+mlir::Value genLibSplitComplexArgsCall(fir::FirOpBuilder &builder,
+                                       mlir::Location loc,
+                                       llvm::StringRef libFuncName,
+                                       mlir::FunctionType libFuncType,
+                                       llvm::ArrayRef<mlir::Value> args) {
   assert(args.size() == 2 && "Incorrect #args to genLibSplitComplexArgsCall");
 
   auto getSplitComplexArgsType = [&builder, &args]() -> mlir::FunctionType {
@@ -787,10 +686,10 @@ static mlir::Value genLibSplitComplexArgsCall(
 }
 
 template <typename T>
-static mlir::Value genMathOp(fir::FirOpBuilder &builder, mlir::Location loc,
-                             llvm::StringRef mathLibFuncName,
-                             mlir::FunctionType mathLibFuncType,
-                             llvm::ArrayRef<mlir::Value> args) {
+mlir::Value genMathOp(fir::FirOpBuilder &builder, mlir::Location loc,
+                      llvm::StringRef mathLibFuncName,
+                      mlir::FunctionType mathLibFuncType,
+                      llvm::ArrayRef<mlir::Value> args) {
   // TODO: we have to annotate the math operations with flags
   //       that will allow to define FP accuracy/exception
   //       behavior per operation, so that after early multi-module
@@ -829,11 +728,10 @@ static mlir::Value genMathOp(fir::FirOpBuilder &builder, mlir::Location loc,
 }
 
 template <typename T>
-static mlir::Value genComplexMathOp(fir::FirOpBuilder &builder,
-                                    mlir::Location loc,
-                                    llvm::StringRef mathLibFuncName,
-                                    mlir::FunctionType mathLibFuncType,
-                                    llvm::ArrayRef<mlir::Value> args) {
+mlir::Value genComplexMathOp(fir::FirOpBuilder &builder, mlir::Location loc,
+                             llvm::StringRef mathLibFuncName,
+                             mlir::FunctionType mathLibFuncType,
+                             llvm::ArrayRef<mlir::Value> args) {
   mlir::Value result;
   if (disableMlirComplex ||
       (mathRuntimeVersion == preciseVersion && !mathLibFuncName.empty())) {
@@ -1136,64 +1034,6 @@ static constexpr MathOperation mathOperations[] = {
      genComplexMathOp<mlir::complex::TanhOp>},
 };
 
-static constexpr MathOperation ppcMathOperations[] = {
-    // fcfi is just another name for fcfid, there is no llvm.ppc.fcfi.
-    {"__ppc_fcfi", "llvm.ppc.fcfid", genFuncType<Ty::Real<8>, Ty::Real<8>>,
-     genLibCall},
-    {"__ppc_fcfid", "llvm.ppc.fcfid", genFuncType<Ty::Real<8>, Ty::Real<8>>,
-     genLibCall},
-    {"__ppc_fcfud", "llvm.ppc.fcfud", genFuncType<Ty::Real<8>, Ty::Real<8>>,
-     genLibCall},
-    {"__ppc_fctid", "llvm.ppc.fctid", genFuncType<Ty::Real<8>, Ty::Real<8>>,
-     genLibCall},
-    {"__ppc_fctidz", "llvm.ppc.fctidz", genFuncType<Ty::Real<8>, Ty::Real<8>>,
-     genLibCall},
-    {"__ppc_fctiw", "llvm.ppc.fctiw", genFuncType<Ty::Real<8>, Ty::Real<8>>,
-     genLibCall},
-    {"__ppc_fctiwz", "llvm.ppc.fctiwz", genFuncType<Ty::Real<8>, Ty::Real<8>>,
-     genLibCall},
-    {"__ppc_fctudz", "llvm.ppc.fctudz", genFuncType<Ty::Real<8>, Ty::Real<8>>,
-     genLibCall},
-    {"__ppc_fctuwz", "llvm.ppc.fctuwz", genFuncType<Ty::Real<8>, Ty::Real<8>>,
-     genLibCall},
-    {"__ppc_fmadd", "llvm.fma.f32",
-     genFuncType<Ty::Real<4>, Ty::Real<4>, Ty::Real<4>, Ty::Real<4>>,
-     genMathOp<mlir::math::FmaOp>},
-    {"__ppc_fmadd", "llvm.fma.f64",
-     genFuncType<Ty::Real<8>, Ty::Real<8>, Ty::Real<8>, Ty::Real<8>>,
-     genMathOp<mlir::math::FmaOp>},
-    {"__ppc_fmsub", "llvm.ppc.fmsubs",
-     genFuncType<Ty::Real<4>, Ty::Real<4>, Ty::Real<4>, Ty::Real<4>>,
-     genLibCall},
-    {"__ppc_fmsub", "llvm.ppc.fmsub",
-     genFuncType<Ty::Real<8>, Ty::Real<8>, Ty::Real<8>, Ty::Real<8>>,
-     genLibCall},
-    {"__ppc_fnabs", "llvm.ppc.fnabss", genFuncType<Ty::Real<4>, Ty::Real<4>>,
-     genLibCall},
-    {"__ppc_fnabs", "llvm.ppc.fnabs", genFuncType<Ty::Real<8>, Ty::Real<8>>,
-     genLibCall},
-    {"__ppc_fnmadd", "llvm.ppc.fnmadds",
-     genFuncType<Ty::Real<4>, Ty::Real<4>, Ty::Real<4>, Ty::Real<4>>,
-     genLibCall},
-    {"__ppc_fnmadd", "llvm.ppc.fnmadd",
-     genFuncType<Ty::Real<8>, Ty::Real<8>, Ty::Real<8>, Ty::Real<8>>,
-     genLibCall},
-    {"__ppc_fnmsub", "llvm.ppc.fnmsub.f32",
-     genFuncType<Ty::Real<4>, Ty::Real<4>, Ty::Real<4>, Ty::Real<4>>,
-     genLibCall},
-    {"__ppc_fnmsub", "llvm.ppc.fnmsub.f64",
-     genFuncType<Ty::Real<8>, Ty::Real<8>, Ty::Real<8>, Ty::Real<8>>,
-     genLibCall},
-    {"__ppc_fre", "llvm.ppc.fre", genFuncType<Ty::Real<8>, Ty::Real<8>>,
-     genLibCall},
-    {"__ppc_fres", "llvm.ppc.fres", genFuncType<Ty::Real<4>, Ty::Real<4>>,
-     genLibCall},
-    {"__ppc_frsqrte", "llvm.ppc.frsqrte", genFuncType<Ty::Real<8>, Ty::Real<8>>,
-     genLibCall},
-    {"__ppc_frsqrtes", "llvm.ppc.frsqrtes",
-     genFuncType<Ty::Real<4>, Ty::Real<4>>, genLibCall},
-};
-
 // This helper class computes a "distance" between two function types.
 // The distance measures how many narrowing conversions of actual arguments
 // and result of "from" must be made in order to use "to" instead of "from".
@@ -1338,10 +1178,6 @@ using RtMap = Fortran::common::StaticMultimapView<MathOperation>;
 static constexpr RtMap mathOps(mathOperations);
 static_assert(mathOps.Verify() && "map must be sorted");
 
-// PPC
-static constexpr RtMap ppcMathOps(ppcMathOperations);
-static_assert(ppcMathOps.Verify() && "map must be sorted");
-
 /// Look for a MathOperation entry specifying how to lower a mathematical
 /// operation defined by \p name with its result' and operands' types
 /// specified in the form of a FunctionType \p funcType.
@@ -1363,7 +1199,7 @@ searchMathOperation(fir::FirOpBuilder &builder, llvm::StringRef name,
 
   // Search ppcMathOps only if targetting PowerPC arch
   if (fir::getTargetTriple(mod).isPPC() && range.first == range.second) {
-    range = ppcMathOps.equal_range(name);
+    range = checkPPCMathOperationsRange(name);
   }
   for (auto iter = range.first; iter != range.second && iter; ++iter) {
     const auto &impl = *iter;
@@ -1789,6 +1625,7 @@ mlir::func::FuncOp IntrinsicLibrary::getWrapper(GeneratorType generator,
     // its calls will be.
     auto localBuilder =
         std::make_unique<fir::FirOpBuilder>(function, builder.getKindMap());
+    localBuilder->setFastMathFlags(builder.getFastMathFlags());
     localBuilder->setInsertionPointToStart(&function.front());
     // Location of code inside wrapper of the wrapper is independent from
     // the location of the intrinsic call.
@@ -1854,7 +1691,13 @@ IntrinsicLibrary::outlineInWrapper(GeneratorType generator,
   }
 
   mlir::FunctionType funcType = getFunctionType(resultType, args, builder);
-  mlir::func::FuncOp wrapper = getWrapper(generator, name, funcType);
+  std::string funcName{name};
+  llvm::raw_string_ostream nameOS{funcName};
+  if (std::string fmfString{builder.getFastMathFlagsString()};
+      !fmfString.empty()) {
+    nameOS << '.' << fmfString;
+  }
+  mlir::func::FuncOp wrapper = getWrapper(generator, funcName, funcType);
   return builder.create<fir::CallOp>(loc, wrapper, args).getResult(0);
 }
 
@@ -3382,72 +3225,648 @@ IntrinsicLibrary::genIchar(mlir::Type resultType,
   return builder.create<mlir::arith::ExtUIOp>(loc, resultType, code);
 }
 
+// Return a reference to the contents of a derived type with one field.
+// Also return the field type.
+static std::pair<mlir::Value, mlir::Type>
+getFieldRef(fir::FirOpBuilder &builder, mlir::Location loc, mlir::Value rec) {
+  auto recType =
+      fir::unwrapPassByRefType(rec.getType()).dyn_cast<fir::RecordType>();
+  assert(recType.getTypeList().size() == 1 && "expected exactly one component");
+  auto [fieldName, fieldTy] = recType.getTypeList().front();
+  mlir::Value field = builder.create<fir::FieldIndexOp>(
+      loc, fir::FieldType::get(recType.getContext()), fieldName, recType,
+      fir::getTypeParams(rec));
+  return {builder.create<fir::CoordinateOp>(loc, builder.getRefType(fieldTy),
+                                            rec, field),
+          fieldTy};
+}
+
 // IEEE_CLASS_TYPE OPERATOR(==), OPERATOR(/=)
 // IEEE_ROUND_TYPE OPERATOR(==), OPERATOR(/=)
 template <mlir::arith::CmpIPredicate pred>
-fir::ExtendedValue
+mlir::Value
 IntrinsicLibrary::genIeeeTypeCompare(mlir::Type resultType,
-                                     llvm::ArrayRef<fir::ExtendedValue> args) {
+                                     llvm::ArrayRef<mlir::Value> args) {
   assert(args.size() == 2);
-  mlir::Value arg0 = fir::getBase(args[0]);
-  mlir::Value arg1 = fir::getBase(args[1]);
-  auto recType =
-      fir::unwrapPassByRefType(arg0.getType()).dyn_cast<fir::RecordType>();
-  assert(recType.getTypeList().size() == 1 && "expected exactly one component");
-  auto [fieldName, fieldType] = recType.getTypeList().front();
-  mlir::Type fieldIndexType = fir::FieldType::get(recType.getContext());
-  mlir::Value field = builder.create<fir::FieldIndexOp>(
-      loc, fieldIndexType, fieldName, recType, fir::getTypeParams(arg0));
-  mlir::Value left = builder.create<fir::LoadOp>(
-      loc, fieldType,
-      builder.create<fir::CoordinateOp>(loc, builder.getRefType(fieldType),
-                                        arg0, field));
-  mlir::Value right = builder.create<fir::LoadOp>(
-      loc, fieldType,
-      builder.create<fir::CoordinateOp>(loc, builder.getRefType(fieldType),
-                                        arg1, field));
+  auto [leftRef, fieldTy] = getFieldRef(builder, loc, fir::getBase(args[0]));
+  auto [rightRef, ignore] = getFieldRef(builder, loc, fir::getBase(args[1]));
+  mlir::Value left = builder.create<fir::LoadOp>(loc, fieldTy, leftRef);
+  mlir::Value right = builder.create<fir::LoadOp>(loc, fieldTy, rightRef);
   return builder.create<mlir::arith::CmpIOp>(loc, pred, left, right);
+}
+
+// IEEE_CLASS
+mlir::Value IntrinsicLibrary::genIeeeClass(mlir::Type resultType,
+                                           llvm::ArrayRef<mlir::Value> args) {
+  // Classify REAL argument X as one of 11 IEEE_CLASS_TYPE values via
+  // a table lookup on an index built from 5 values derived from X.
+  // In indexing order, the values are:
+  //
+  //   [s] sign bit
+  //   [e] exponent != 0
+  //   [m] exponent == 1..1 (max exponent)
+  //   [l] low-order significand != 0
+  //   [h] high-order significand (kind=10: 2 bits; other kinds: 1 bit)
+  //
+  // kind=10 values have an explicit high-order integer significand bit,
+  // whereas this bit is implicit for other kinds. This requires using a 6-bit
+  // index into a 64-slot table for kind=10 argument classification queries
+  // vs. a 5-bit index into a 32-slot table for other argument kind queries.
+  // The instruction sequence is the same for the two cases.
+  //
+  // Placing the [l] and [h] significand bits in "swapped" order rather than
+  // "natural" order enables more efficient generated code.
+
+  assert(args.size() == 1);
+  mlir::Value realVal = fir::getBase(args[0]);
+  mlir::FloatType realType = realVal.getType().dyn_cast<mlir::FloatType>();
+  mlir::Type intType = builder.getIntegerType(realType.getWidth());
+  mlir::Value intVal =
+      builder.create<mlir::arith::BitcastOp>(loc, intType, realVal);
+  llvm::StringRef tableName = RTNAME_STRING(IeeeClassTable);
+  uint64_t highSignificandSize = (realType.getWidth() == 80) + 1;
+
+  // Get masks and shift counts.
+  mlir::Value signShift, highSignificandShift, exponentMask, lowSignificandMask;
+  auto createIntegerConstant = [&](uint64_t k) {
+    return builder.createIntegerConstant(loc, intType, k);
+  };
+  auto getMasksAndShifts = [&](uint64_t totalSize, uint64_t exponentSize,
+                               uint64_t significandSize,
+                               bool hasExplicitBit = false) {
+    assert(1 + exponentSize + significandSize == totalSize &&
+           "invalid floating point fields");
+    constexpr uint64_t one = 1; // type promotion
+    uint64_t lowSignificandSize = significandSize - hasExplicitBit - 1;
+    signShift = createIntegerConstant(totalSize - 1 - hasExplicitBit - 4);
+    highSignificandShift = createIntegerConstant(lowSignificandSize);
+    if (totalSize <= 64) {
+      exponentMask =
+          createIntegerConstant(((one << exponentSize) - 1) << significandSize);
+      lowSignificandMask =
+          createIntegerConstant((one << lowSignificandSize) - 1);
+      return;
+    }
+    // Mlir can't directly build large constants. Build them in steps.
+    // The folded end result is the same.
+    mlir::Value sixtyfour = createIntegerConstant(64);
+    exponentMask = createIntegerConstant(((one << exponentSize) - 1)
+                                         << (significandSize - 64));
+    exponentMask =
+        builder.create<mlir::arith::ShLIOp>(loc, exponentMask, sixtyfour);
+    if (lowSignificandSize <= 64) {
+      lowSignificandMask =
+          createIntegerConstant((one << lowSignificandSize) - 1);
+      return;
+    }
+    mlir::Value ones = createIntegerConstant(0xffffffffffffffff);
+    lowSignificandMask =
+        createIntegerConstant((one << (lowSignificandSize - 64)) - 1);
+    lowSignificandMask =
+        builder.create<mlir::arith::ShLIOp>(loc, lowSignificandMask, sixtyfour);
+    lowSignificandMask =
+        builder.create<mlir::arith::OrIOp>(loc, lowSignificandMask, ones);
+  };
+  switch (realType.getWidth()) {
+  case 16:
+    if (realType.isF16()) {
+      // kind=2: 1 sign bit, 5 exponent bits, 10 significand bits
+      getMasksAndShifts(16, 5, 10);
+    } else {
+      // kind=3: 1 sign bit, 8 exponent bits, 7 significand bits
+      getMasksAndShifts(16, 8, 7);
+    }
+    break;
+  case 32: // kind=4: 1 sign bit, 8 exponent bits, 23 significand bits
+    getMasksAndShifts(32, 8, 23);
+    break;
+  case 64: // kind=8: 1 sign bit, 11 exponent bits, 52 significand bits
+    getMasksAndShifts(64, 11, 52);
+    break;
+  case 80: // kind=10: 1 sign bit, 15 exponent bits, 1+63 significand bits
+    getMasksAndShifts(80, 15, 64, /*hasExplicitBit=*/true);
+    tableName = RTNAME_STRING(IeeeClassTable_10);
+    break;
+  case 128: // kind=16: 1 sign bit, 15 exponent bits, 112 significand bits
+    getMasksAndShifts(128, 15, 112);
+    break;
+  default:
+    llvm_unreachable("unknown real type");
+  }
+
+  // [s] sign bit
+  int pos = 3 + highSignificandSize;
+  mlir::Value index = builder.create<mlir::arith::AndIOp>(
+      loc, builder.create<mlir::arith::ShRUIOp>(loc, intVal, signShift),
+      createIntegerConstant(1 << pos));
+
+  // [e] exponent != 0
+  mlir::Value exponent =
+      builder.create<mlir::arith::AndIOp>(loc, intVal, exponentMask);
+  mlir::Value zero = createIntegerConstant(0);
+  index = builder.create<mlir::arith::OrIOp>(
+      loc, index,
+      builder.create<mlir::arith::SelectOp>(
+          loc,
+          builder.create<mlir::arith::CmpIOp>(
+              loc, mlir::arith::CmpIPredicate::ne, exponent, zero),
+          createIntegerConstant(1 << --pos), zero));
+
+  // [m] exponent == 1..1 (max exponent)
+  index = builder.create<mlir::arith::OrIOp>(
+      loc, index,
+      builder.create<mlir::arith::SelectOp>(
+          loc,
+          builder.create<mlir::arith::CmpIOp>(
+              loc, mlir::arith::CmpIPredicate::eq, exponent, exponentMask),
+          createIntegerConstant(1 << --pos), zero));
+
+  // [l] low-order significand != 0
+  index = builder.create<mlir::arith::OrIOp>(
+      loc, index,
+      builder.create<mlir::arith::SelectOp>(
+          loc,
+          builder.create<mlir::arith::CmpIOp>(
+              loc, mlir::arith::CmpIPredicate::ne,
+              builder.create<mlir::arith::AndIOp>(loc, intVal,
+                                                  lowSignificandMask),
+              zero),
+          createIntegerConstant(1 << --pos), zero));
+
+  // [h] high-order significand (1 or 2 bits)
+  index = builder.create<mlir::arith::OrIOp>(
+      loc, index,
+      builder.create<mlir::arith::AndIOp>(
+          loc,
+          builder.create<mlir::arith::ShRUIOp>(loc, intVal,
+                                               highSignificandShift),
+          createIntegerConstant((1 << highSignificandSize) - 1)));
+
+  int tableSize = 1 << (4 + highSignificandSize);
+  mlir::Type int8Ty = builder.getIntegerType(8);
+  mlir::Type tableTy = fir::SequenceType::get(tableSize, int8Ty);
+  if (!builder.getNamedGlobal(tableName)) {
+    llvm::SmallVector<mlir::Attribute, 64> values;
+    auto insert = [&](std::int8_t which) {
+      values.push_back(builder.getIntegerAttr(int8Ty, which));
+    };
+    // If indexing value [e] is 0, value [m] can't be 1. (If the exponent is 0,
+    // it can't be the max exponent). Use IEEE_OTHER_VALUE for impossible
+    // combinations.
+    constexpr std::int8_t impossible = _FORTRAN_RUNTIME_IEEE_OTHER_VALUE;
+    if (tableSize == 32) {
+      //   s   e m   l h     kinds 2,3,4,8,16
+      //   ===================================================================
+      /*   0   0 0   0 0  */ insert(_FORTRAN_RUNTIME_IEEE_POSITIVE_ZERO);
+      /*   0   0 0   0 1  */ insert(_FORTRAN_RUNTIME_IEEE_POSITIVE_SUBNORMAL);
+      /*   0   0 0   1 0  */ insert(_FORTRAN_RUNTIME_IEEE_POSITIVE_SUBNORMAL);
+      /*   0   0 0   1 1  */ insert(_FORTRAN_RUNTIME_IEEE_POSITIVE_SUBNORMAL);
+      /*   0   0 1   0 0  */ insert(impossible);
+      /*   0   0 1   0 1  */ insert(impossible);
+      /*   0   0 1   1 0  */ insert(impossible);
+      /*   0   0 1   1 1  */ insert(impossible);
+      /*   0   1 0   0 0  */ insert(_FORTRAN_RUNTIME_IEEE_POSITIVE_NORMAL);
+      /*   0   1 0   0 1  */ insert(_FORTRAN_RUNTIME_IEEE_POSITIVE_NORMAL);
+      /*   0   1 0   1 0  */ insert(_FORTRAN_RUNTIME_IEEE_POSITIVE_NORMAL);
+      /*   0   1 0   1 1  */ insert(_FORTRAN_RUNTIME_IEEE_POSITIVE_NORMAL);
+      /*   0   1 1   0 0  */ insert(_FORTRAN_RUNTIME_IEEE_POSITIVE_INF);
+      /*   0   1 1   0 1  */ insert(_FORTRAN_RUNTIME_IEEE_QUIET_NAN);
+      /*   0   1 1   1 0  */ insert(_FORTRAN_RUNTIME_IEEE_SIGNALING_NAN);
+      /*   0   1 1   1 1  */ insert(_FORTRAN_RUNTIME_IEEE_QUIET_NAN);
+      /*   1   0 0   0 0  */ insert(_FORTRAN_RUNTIME_IEEE_NEGATIVE_ZERO);
+      /*   1   0 0   0 1  */ insert(_FORTRAN_RUNTIME_IEEE_NEGATIVE_SUBNORMAL);
+      /*   1   0 0   1 0  */ insert(_FORTRAN_RUNTIME_IEEE_NEGATIVE_SUBNORMAL);
+      /*   1   0 0   1 1  */ insert(_FORTRAN_RUNTIME_IEEE_NEGATIVE_SUBNORMAL);
+      /*   1   0 1   0 0  */ insert(impossible);
+      /*   1   0 1   0 1  */ insert(impossible);
+      /*   1   0 1   1 0  */ insert(impossible);
+      /*   1   0 1   1 1  */ insert(impossible);
+      /*   1   1 0   0 0  */ insert(_FORTRAN_RUNTIME_IEEE_NEGATIVE_NORMAL);
+      /*   1   1 0   0 1  */ insert(_FORTRAN_RUNTIME_IEEE_NEGATIVE_NORMAL);
+      /*   1   1 0   1 0  */ insert(_FORTRAN_RUNTIME_IEEE_NEGATIVE_NORMAL);
+      /*   1   1 0   1 1  */ insert(_FORTRAN_RUNTIME_IEEE_NEGATIVE_NORMAL);
+      /*   1   1 1   0 0  */ insert(_FORTRAN_RUNTIME_IEEE_NEGATIVE_INF);
+      /*   1   1 1   0 1  */ insert(_FORTRAN_RUNTIME_IEEE_QUIET_NAN);
+      /*   1   1 1   1 0  */ insert(_FORTRAN_RUNTIME_IEEE_SIGNALING_NAN);
+      /*   1   1 1   1 1  */ insert(_FORTRAN_RUNTIME_IEEE_QUIET_NAN);
+    } else {
+      // Unlike values of other kinds, kind=10 values can be "invalid", and
+      // can appear in code. Use IEEE_OTHER_VALUE for invalid bit patterns.
+      // Runtime IO may print an invalid value as a NaN.
+      constexpr std::int8_t invalid = _FORTRAN_RUNTIME_IEEE_OTHER_VALUE;
+      //   s   e m   l  h    kind 10
+      //   ===================================================================
+      /*   0   0 0   0 00 */ insert(_FORTRAN_RUNTIME_IEEE_POSITIVE_ZERO);
+      /*   0   0 0   0 01 */ insert(_FORTRAN_RUNTIME_IEEE_POSITIVE_SUBNORMAL);
+      /*   0   0 0   0 10 */ insert(_FORTRAN_RUNTIME_IEEE_POSITIVE_SUBNORMAL);
+      /*   0   0 0   0 11 */ insert(_FORTRAN_RUNTIME_IEEE_POSITIVE_SUBNORMAL);
+      /*   0   0 0   1 00 */ insert(_FORTRAN_RUNTIME_IEEE_POSITIVE_SUBNORMAL);
+      /*   0   0 0   1 01 */ insert(_FORTRAN_RUNTIME_IEEE_POSITIVE_SUBNORMAL);
+      /*   0   0 0   1 10 */ insert(_FORTRAN_RUNTIME_IEEE_POSITIVE_SUBNORMAL);
+      /*   0   0 0   1 11 */ insert(_FORTRAN_RUNTIME_IEEE_POSITIVE_SUBNORMAL);
+      /*   0   0 1   0 00 */ insert(impossible);
+      /*   0   0 1   0 01 */ insert(impossible);
+      /*   0   0 1   0 10 */ insert(impossible);
+      /*   0   0 1   0 11 */ insert(impossible);
+      /*   0   0 1   1 00 */ insert(impossible);
+      /*   0   0 1   1 01 */ insert(impossible);
+      /*   0   0 1   1 10 */ insert(impossible);
+      /*   0   0 1   1 11 */ insert(impossible);
+      /*   0   1 0   0 00 */ insert(invalid);
+      /*   0   1 0   0 01 */ insert(invalid);
+      /*   0   1 0   0 10 */ insert(_FORTRAN_RUNTIME_IEEE_POSITIVE_NORMAL);
+      /*   0   1 0   0 11 */ insert(_FORTRAN_RUNTIME_IEEE_POSITIVE_NORMAL);
+      /*   0   1 0   1 00 */ insert(invalid);
+      /*   0   1 0   1 01 */ insert(invalid);
+      /*   0   1 0   1 10 */ insert(_FORTRAN_RUNTIME_IEEE_POSITIVE_NORMAL);
+      /*   0   1 0   1 11 */ insert(_FORTRAN_RUNTIME_IEEE_POSITIVE_NORMAL);
+      /*   0   1 1   0 00 */ insert(invalid);
+      /*   0   1 1   0 01 */ insert(invalid);
+      /*   0   1 1   0 10 */ insert(_FORTRAN_RUNTIME_IEEE_POSITIVE_INF);
+      /*   0   1 1   0 11 */ insert(_FORTRAN_RUNTIME_IEEE_QUIET_NAN);
+      /*   0   1 1   1 00 */ insert(invalid);
+      /*   0   1 1   1 01 */ insert(invalid);
+      /*   0   1 1   1 10 */ insert(_FORTRAN_RUNTIME_IEEE_SIGNALING_NAN);
+      /*   0   1 1   1 11 */ insert(_FORTRAN_RUNTIME_IEEE_QUIET_NAN);
+      /*   1   0 0   0 00 */ insert(_FORTRAN_RUNTIME_IEEE_NEGATIVE_ZERO);
+      /*   1   0 0   0 01 */ insert(_FORTRAN_RUNTIME_IEEE_NEGATIVE_SUBNORMAL);
+      /*   1   0 0   0 10 */ insert(_FORTRAN_RUNTIME_IEEE_NEGATIVE_SUBNORMAL);
+      /*   1   0 0   0 11 */ insert(_FORTRAN_RUNTIME_IEEE_NEGATIVE_SUBNORMAL);
+      /*   1   0 0   1 00 */ insert(_FORTRAN_RUNTIME_IEEE_NEGATIVE_SUBNORMAL);
+      /*   1   0 0   1 01 */ insert(_FORTRAN_RUNTIME_IEEE_NEGATIVE_SUBNORMAL);
+      /*   1   0 0   1 10 */ insert(_FORTRAN_RUNTIME_IEEE_NEGATIVE_SUBNORMAL);
+      /*   1   0 0   1 11 */ insert(_FORTRAN_RUNTIME_IEEE_NEGATIVE_SUBNORMAL);
+      /*   1   0 1   0 00 */ insert(impossible);
+      /*   1   0 1   0 01 */ insert(impossible);
+      /*   1   0 1   0 10 */ insert(impossible);
+      /*   1   0 1   0 11 */ insert(impossible);
+      /*   1   0 1   1 00 */ insert(impossible);
+      /*   1   0 1   1 01 */ insert(impossible);
+      /*   1   0 1   1 10 */ insert(impossible);
+      /*   1   0 1   1 11 */ insert(impossible);
+      /*   1   1 0   0 00 */ insert(invalid);
+      /*   1   1 0   0 01 */ insert(invalid);
+      /*   1   1 0   0 10 */ insert(_FORTRAN_RUNTIME_IEEE_NEGATIVE_NORMAL);
+      /*   1   1 0   0 11 */ insert(_FORTRAN_RUNTIME_IEEE_NEGATIVE_NORMAL);
+      /*   1   1 0   1 00 */ insert(invalid);
+      /*   1   1 0   1 01 */ insert(invalid);
+      /*   1   1 0   1 10 */ insert(_FORTRAN_RUNTIME_IEEE_NEGATIVE_NORMAL);
+      /*   1   1 0   1 11 */ insert(_FORTRAN_RUNTIME_IEEE_NEGATIVE_NORMAL);
+      /*   1   1 1   0 00 */ insert(invalid);
+      /*   1   1 1   0 01 */ insert(invalid);
+      /*   1   1 1   0 10 */ insert(_FORTRAN_RUNTIME_IEEE_NEGATIVE_INF);
+      /*   1   1 1   0 11 */ insert(_FORTRAN_RUNTIME_IEEE_QUIET_NAN);
+      /*   1   1 1   1 00 */ insert(invalid);
+      /*   1   1 1   1 01 */ insert(invalid);
+      /*   1   1 1   1 10 */ insert(_FORTRAN_RUNTIME_IEEE_SIGNALING_NAN);
+      /*   1   1 1   1 11 */ insert(_FORTRAN_RUNTIME_IEEE_QUIET_NAN);
+    }
+    builder.createGlobalConstant(
+        loc, tableTy, tableName, builder.createLinkOnceLinkage(),
+        mlir::DenseElementsAttr::get(
+            mlir::RankedTensorType::get(tableSize, int8Ty), values));
+  }
+
+  return builder.create<fir::CoordinateOp>(
+      loc, builder.getRefType(resultType),
+      builder.create<fir::AddrOfOp>(loc, builder.getRefType(tableTy),
+                                    builder.getSymbolRefAttr(tableName)),
+      index);
+}
+
+// IEEE_COPY_SIGN
+mlir::Value
+IntrinsicLibrary::genIeeeCopySign(mlir::Type resultType,
+                                  llvm::ArrayRef<mlir::Value> args) {
+  // Copy the sign of REAL arg Y to REAL arg X.
+  assert(args.size() == 2);
+  mlir::Value xRealVal = fir::getBase(args[0]);
+  mlir::Value yRealVal = fir::getBase(args[1]);
+  mlir::FloatType xRealType = xRealVal.getType().dyn_cast<mlir::FloatType>();
+  mlir::FloatType yRealType = yRealVal.getType().dyn_cast<mlir::FloatType>();
+
+  if (yRealType == mlir::FloatType::getBF16(builder.getContext())) {
+    // Workaround: CopySignOp and BitcastOp don't work for kind 3 arg Y.
+    // This conversion should always preserve the sign bit.
+    yRealVal = builder.createConvert(
+        loc, mlir::FloatType::getF32(builder.getContext()), yRealVal);
+    yRealType = mlir::FloatType::getF32(builder.getContext());
+  }
+
+  // Args have the same type.
+  if (xRealType == yRealType)
+    return builder.create<mlir::LLVM::CopySignOp>(loc, xRealVal, yRealVal);
+
+  // Args have different types.
+  mlir::Type xIntType = builder.getIntegerType(xRealType.getWidth());
+  mlir::Type yIntType = builder.getIntegerType(yRealType.getWidth());
+  mlir::Value xIntVal =
+      builder.create<mlir::arith::BitcastOp>(loc, xIntType, xRealVal);
+  mlir::Value yIntVal =
+      builder.create<mlir::arith::BitcastOp>(loc, yIntType, yRealVal);
+  mlir::Value xZero = builder.createIntegerConstant(loc, xIntType, 0);
+  mlir::Value yZero = builder.createIntegerConstant(loc, yIntType, 0);
+  mlir::Value xOne = builder.createIntegerConstant(loc, xIntType, 1);
+  mlir::Value ySign = builder.create<mlir::arith::ShRUIOp>(
+      loc, yIntVal,
+      builder.createIntegerConstant(loc, yIntType, yRealType.getWidth() - 1));
+  mlir::Value xAbs = builder.create<mlir::arith::ShRUIOp>(
+      loc, builder.create<mlir::arith::ShLIOp>(loc, xIntVal, xOne), xOne);
+  mlir::Value xSign = builder.create<mlir::arith::SelectOp>(
+      loc,
+      builder.create<mlir::arith::CmpIOp>(loc, mlir::arith::CmpIPredicate::eq,
+                                          ySign, yZero),
+      xZero,
+      builder.create<mlir::arith::ShLIOp>(
+          loc, xOne,
+          builder.createIntegerConstant(loc, xIntType,
+                                        xRealType.getWidth() - 1)));
+  return builder.create<mlir::arith::BitcastOp>(
+      loc, xRealType, builder.create<mlir::arith::OrIOp>(loc, xAbs, xSign));
+}
+
+// Check that an explicit ieee_[get|set]_rounding_mode call radix value is 2.
+static void checkRadix(fir::FirOpBuilder &builder, mlir::Location loc,
+                       mlir::Value radix, std::string procName) {
+  mlir::Value notTwo = builder.create<mlir::arith::CmpIOp>(
+      loc, mlir::arith::CmpIPredicate::ne, radix,
+      builder.createIntegerConstant(loc, radix.getType(), 2));
+  auto ifOp = builder.create<fir::IfOp>(loc, notTwo,
+                                        /*withElseRegion=*/false);
+  builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
+  fir::runtime::genReportFatalUserError(builder, loc,
+                                        procName + " radix argument must be 2");
+  builder.setInsertionPointAfter(ifOp);
+}
+
+// IEEE_GET_ROUNDING_MODE
+void IntrinsicLibrary::genIeeeGetRoundingMode(
+    llvm::ArrayRef<fir::ExtendedValue> args) {
+  // Set arg ROUNDING_VALUE to the current floating point rounding mode.
+  // Values are chosen to match the llvm.get.rounding encoding.
+  // Generate an error if the value of optional arg RADIX is not 2.
+  assert(args.size() == 1 || args.size() == 2);
+  if (args.size() == 2)
+    checkRadix(builder, loc, fir::getBase(args[1]), "ieee_get_rounding_mode");
+  auto [fieldRef, fieldTy] = getFieldRef(builder, loc, fir::getBase(args[0]));
+  mlir::func::FuncOp getRound = fir::factory::getLlvmGetRounding(builder);
+  mlir::Value mode = builder.create<fir::CallOp>(loc, getRound).getResult(0);
+  mode = builder.createConvert(loc, fieldTy, mode);
+  builder.create<fir::StoreOp>(loc, mode, fieldRef);
+}
+
+mlir::Value IntrinsicLibrary::genIsFPClass(mlir::Type resultType,
+                                           llvm::ArrayRef<mlir::Value> args,
+                                           int fpclass) {
+  assert(args.size() == 1);
+  mlir::Type i1Ty = builder.getI1Type();
+  mlir::Value isfpclass =
+      builder.create<mlir::LLVM::IsFPClass>(loc, i1Ty, args[0], fpclass);
+  return builder.createConvert(loc, resultType, isfpclass);
 }
 
 // IEEE_IS_FINITE
 mlir::Value
 IntrinsicLibrary::genIeeeIsFinite(mlir::Type resultType,
                                   llvm::ArrayRef<mlir::Value> args) {
-  // IEEE_IS_FINITE(X) is true iff exponent(X) is the max exponent of kind(X).
+  // Check if arg X is a (negative or positive) (normal, denormal, or zero).
   assert(args.size() == 1);
-  mlir::Value floatVal = fir::getBase(args[0]);
-  mlir::FloatType floatType = floatVal.getType().dyn_cast<mlir::FloatType>();
-  int floatBits = floatType.getWidth();
-  mlir::Type intType = builder.getIntegerType(
-      floatType.isa<mlir::Float80Type>() ? 128 : floatBits);
-  mlir::Value intVal =
-      builder.create<mlir::arith::BitcastOp>(loc, intType, floatVal);
-  int significandBits;
-  if (floatType.isa<mlir::Float32Type>())
-    significandBits = 23;
-  else if (floatType.isa<mlir::Float64Type>())
-    significandBits = 52;
-  else // problems elsewhere for other kinds
-    TODO(loc, "intrinsic module procedure: ieee_is_finite");
-  mlir::Value significand =
-      builder.createIntegerConstant(loc, intType, significandBits);
-  int exponentBits = floatBits - 1 - significandBits;
-  mlir::Value maxExponent =
-      builder.createIntegerConstant(loc, intType, (1 << exponentBits) - 1);
-  mlir::Value exponent = genIbits(
-      intType, {intVal, significand,
-                builder.createIntegerConstant(loc, intType, exponentBits)});
-  return builder.createConvert(
-      loc, resultType,
-      builder.create<mlir::arith::CmpIOp>(loc, mlir::arith::CmpIPredicate::ne,
-                                          exponent, maxExponent));
+  return genIsFPClass(resultType, args, 0b0111111000);
 }
 
+// IEEE_IS_NAN
+mlir::Value IntrinsicLibrary::genIeeeIsNan(mlir::Type resultType,
+                                           llvm::ArrayRef<mlir::Value> args) {
+  // Check if arg X is a (signaling or quiet) NaN.
+  assert(args.size() == 1);
+  return genIsFPClass(resultType, args, 0b0000000011);
+}
+
+// IEEE_IS_NEGATIVE
+mlir::Value
+IntrinsicLibrary::genIeeeIsNegative(mlir::Type resultType,
+                                    llvm::ArrayRef<mlir::Value> args) {
+  // Check if arg X is a negative (infinity, normal, denormal or zero).
+  assert(args.size() == 1);
+  return genIsFPClass(resultType, args, 0b0000111100);
+}
+
+// IEEE_IS_NORMAL
 mlir::Value
 IntrinsicLibrary::genIeeeIsNormal(mlir::Type resultType,
                                   llvm::ArrayRef<mlir::Value> args) {
-  // Check if is positive or negative normal
-  return genIsFPClass(resultType, args, 0b101101000);
+  // Check if arg X is a (negative or positive) (normal or zero).
+  assert(args.size() == 1);
+  return genIsFPClass(resultType, args, 0b0101101000);
+}
+
+// IEEE_SET_ROUNDING_MODE
+void IntrinsicLibrary::genIeeeSetRoundingMode(
+    llvm::ArrayRef<fir::ExtendedValue> args) {
+  // Set the current floating point rounding mode to the value of arg
+  // ROUNDING_VALUE. Values are llvm.get.rounding encoding values.
+  // Generate an error if the value of optional arg RADIX is not 2.
+  assert(args.size() == 1 || args.size() == 2);
+  if (args.size() == 2)
+    checkRadix(builder, loc, fir::getBase(args[1]), "ieee_set_rounding_mode");
+  auto [fieldRef, ignore] = getFieldRef(builder, loc, fir::getBase(args[0]));
+  mlir::func::FuncOp setRound = fir::factory::getLlvmSetRounding(builder);
+  mlir::Value mode = builder.create<fir::LoadOp>(loc, fieldRef);
+  mode = builder.create<fir::ConvertOp>(
+      loc, setRound.getFunctionType().getInput(0), mode);
+  builder.create<fir::CallOp>(loc, setRound, mode);
+}
+
+// IEEE_SIGNBIT
+mlir::Value IntrinsicLibrary::genIeeeSignbit(mlir::Type resultType,
+                                             llvm::ArrayRef<mlir::Value> args) {
+  // Check if the sign bit of arg X is set.
+  assert(args.size() == 1);
+  mlir::Value realVal = fir::getBase(args[0]);
+  mlir::FloatType realType = realVal.getType().dyn_cast<mlir::FloatType>();
+  int bitWidth = realType.getWidth();
+  if (realType == mlir::FloatType::getBF16(builder.getContext())) {
+    // Workaround: can't bitcast or convert real(3) to integer(2) or real(2).
+    realVal = builder.createConvert(
+        loc, mlir::FloatType::getF32(builder.getContext()), realVal);
+    bitWidth = 32;
+  }
+  mlir::Type intType = builder.getIntegerType(bitWidth);
+  mlir::Value intVal =
+      builder.create<mlir::arith::BitcastOp>(loc, intType, realVal);
+  mlir::Value shift = builder.createIntegerConstant(loc, intType, bitWidth - 1);
+  mlir::Value sign = builder.create<mlir::arith::ShRUIOp>(loc, intVal, shift);
+  return builder.createConvert(loc, resultType, sign);
+}
+
+// IEEE_SUPPORT_ROUNDING
+mlir::Value
+IntrinsicLibrary::genIeeeSupportRounding(mlir::Type resultType,
+                                         llvm::ArrayRef<mlir::Value> args) {
+  // Check if floating point rounding mode ROUND_VALUE is supported.
+  // Rounding is supported either for all type kinds or none.
+  // An optional X kind argument is therefore ignored.
+  // Values are chosen to match the llvm.get.rounding encoding:
+  //  0 - toward zero [supported]
+  //  1 - to nearest, ties to even [supported] - default
+  //  2 - toward positive infinity [supported]
+  //  3 - toward negative infinity [supported]
+  //  4 - to nearest, ties away from zero [not supported]
+  assert(args.size() == 1 || args.size() == 2);
+  auto [fieldRef, fieldTy] = getFieldRef(builder, loc, fir::getBase(args[0]));
+  mlir::Value mode = builder.create<fir::LoadOp>(loc, fieldRef);
+  mlir::Value lbOk = builder.create<mlir::arith::CmpIOp>(
+      loc, mlir::arith::CmpIPredicate::sge, mode,
+      builder.createIntegerConstant(loc, fieldTy,
+                                    _FORTRAN_RUNTIME_IEEE_TO_ZERO));
+  mlir::Value ubOk = builder.create<mlir::arith::CmpIOp>(
+      loc, mlir::arith::CmpIPredicate::sle, mode,
+      builder.createIntegerConstant(loc, fieldTy, _FORTRAN_RUNTIME_IEEE_DOWN));
+  return builder.createConvert(
+      loc, resultType, builder.create<mlir::arith::AndIOp>(loc, lbOk, ubOk));
+}
+
+// IEEE_UNORDERED
+mlir::Value
+IntrinsicLibrary::genIeeeUnordered(mlir::Type resultType,
+                                   llvm::ArrayRef<mlir::Value> args) {
+  // Check if REAL args X or Y or both are (signaling or quiet) NaNs.
+  assert(args.size() == 2);
+  mlir::Type i1Ty = builder.getI1Type();
+  mlir::Value xIsNan = genIsFPClass(i1Ty, args[0], 0b0000000011);
+  mlir::Value yIsNan = genIsFPClass(i1Ty, args[1], 0b0000000011);
+  mlir::Value res = builder.create<mlir::arith::OrIOp>(loc, xIsNan, yIsNan);
+  return builder.createConvert(loc, resultType, res);
+}
+
+// IEEE_VALUE
+mlir::Value IntrinsicLibrary::genIeeeValue(mlir::Type resultType,
+                                           llvm::ArrayRef<mlir::Value> args) {
+  // Return a KIND(X) REAL number of IEEE_CLASS_TYPE CLASS.
+  assert(args.size() == 2);
+  mlir::FloatType realType =
+      fir::getBase(args[0]).getType().dyn_cast<mlir::FloatType>();
+  int bitWidth = realType.getWidth();
+  mlir::Type intType = builder.getIntegerType(bitWidth);
+  mlir::Type valueTy = bitWidth <= 64 ? intType : builder.getIntegerType(64);
+  constexpr int tableSize = _FORTRAN_RUNTIME_IEEE_OTHER_VALUE + 1;
+  mlir::Type tableTy = fir::SequenceType::get(tableSize, valueTy);
+  std::string tableName = RTNAME_STRING(IeeeValueTable_) +
+                          std::to_string(realType.isBF16() ? 3 : bitWidth >> 3);
+  if (!builder.getNamedGlobal(tableName)) {
+    llvm::SmallVector<mlir::Attribute, tableSize> values;
+    auto insert = [&](std::int64_t v) {
+      values.push_back(builder.getIntegerAttr(valueTy, v));
+    };
+    insert(0); // placeholder
+    switch (bitWidth) {
+    case 16:
+      if (realType.isF16()) {
+        // kind=2: 1 sign bit, 5 exponent bits, 10 significand bits
+        /* IEEE_SIGNALING_NAN      */ insert(0x7d00);
+        /* IEEE_QUIET_NAN          */ insert(0x7e00);
+        /* IEEE_NEGATIVE_INF       */ insert(0xfc00);
+        /* IEEE_NEGATIVE_NORMAL    */ insert(0xbc00);
+        /* IEEE_NEGATIVE_SUBNORMAL */ insert(0x8200);
+        /* IEEE_NEGATIVE_ZERO      */ insert(0x8000);
+        /* IEEE_POSITIVE_ZERO      */ insert(0x0000);
+        /* IEEE_POSITIVE_SUBNORMAL */ insert(0x0200);
+        /* IEEE_POSITIVE_NORMAL    */ insert(0x3c00); // 1.0
+        /* IEEE_POSITIVE_INF       */ insert(0x7c00);
+        break;
+      }
+      assert(realType.isBF16() && "unknown 16-bit real type");
+      // kind=3: 1 sign bit, 8 exponent bits, 7 significand bits
+      /* IEEE_SIGNALING_NAN      */ insert(0x7fa0);
+      /* IEEE_QUIET_NAN          */ insert(0x7fc0);
+      /* IEEE_NEGATIVE_INF       */ insert(0xff80);
+      /* IEEE_NEGATIVE_NORMAL    */ insert(0xbf80);
+      /* IEEE_NEGATIVE_SUBNORMAL */ insert(0x8040);
+      /* IEEE_NEGATIVE_ZERO      */ insert(0x8000);
+      /* IEEE_POSITIVE_ZERO      */ insert(0x0000);
+      /* IEEE_POSITIVE_SUBNORMAL */ insert(0x0040);
+      /* IEEE_POSITIVE_NORMAL    */ insert(0x3f80); // 1.0
+      /* IEEE_POSITIVE_INF       */ insert(0x7f80);
+      break;
+    case 32:
+      // kind=4: 1 sign bit, 8 exponent bits, 23 significand bits
+      /* IEEE_SIGNALING_NAN      */ insert(0x7fa00000);
+      /* IEEE_QUIET_NAN          */ insert(0x7fc00000);
+      /* IEEE_NEGATIVE_INF       */ insert(0xff800000);
+      /* IEEE_NEGATIVE_NORMAL    */ insert(0xbf800000);
+      /* IEEE_NEGATIVE_SUBNORMAL */ insert(0x80400000);
+      /* IEEE_NEGATIVE_ZERO      */ insert(0x80000000);
+      /* IEEE_POSITIVE_ZERO      */ insert(0x00000000);
+      /* IEEE_POSITIVE_SUBNORMAL */ insert(0x00400000);
+      /* IEEE_POSITIVE_NORMAL    */ insert(0x3f800000); // 1.0
+      /* IEEE_POSITIVE_INF       */ insert(0x7f800000);
+      break;
+    case 64:
+      // kind=8: 1 sign bit, 11 exponent bits, 52 significand bits
+      /* IEEE_SIGNALING_NAN      */ insert(0x7ff4000000000000);
+      /* IEEE_QUIET_NAN          */ insert(0x7ff8000000000000);
+      /* IEEE_NEGATIVE_INF       */ insert(0xfff0000000000000);
+      /* IEEE_NEGATIVE_NORMAL    */ insert(0xbff0000000000000);
+      /* IEEE_NEGATIVE_SUBNORMAL */ insert(0x8008000000000000);
+      /* IEEE_NEGATIVE_ZERO      */ insert(0x8000000000000000);
+      /* IEEE_POSITIVE_ZERO      */ insert(0x0000000000000000);
+      /* IEEE_POSITIVE_SUBNORMAL */ insert(0x0008000000000000);
+      /* IEEE_POSITIVE_NORMAL    */ insert(0x3ff0000000000000); // 1.0
+      /* IEEE_POSITIVE_INF       */ insert(0x7ff0000000000000);
+      break;
+    case 80:
+      // kind=10: 1 sign bit, 15 exponent bits, 1+63 significand bits
+      // 64 high order bits; 16 low order bits are 0.
+      /* IEEE_SIGNALING_NAN      */ insert(0x7fffa00000000000);
+      /* IEEE_QUIET_NAN          */ insert(0x7fffc00000000000);
+      /* IEEE_NEGATIVE_INF       */ insert(0xffff800000000000);
+      /* IEEE_NEGATIVE_NORMAL    */ insert(0xbfff800000000000);
+      /* IEEE_NEGATIVE_SUBNORMAL */ insert(0x8000400000000000);
+      /* IEEE_NEGATIVE_ZERO      */ insert(0x8000000000000000);
+      /* IEEE_POSITIVE_ZERO      */ insert(0x0000000000000000);
+      /* IEEE_POSITIVE_SUBNORMAL */ insert(0x0000400000000000);
+      /* IEEE_POSITIVE_NORMAL    */ insert(0x3fff800000000000); // 1.0
+      /* IEEE_POSITIVE_INF       */ insert(0x7fff800000000000);
+      break;
+    case 128:
+      // kind=16: 1 sign bit, 15 exponent bits, 112 significand bits
+      // 64 high order bits; 64 low order bits are 0.
+      /* IEEE_SIGNALING_NAN      */ insert(0x7fff400000000000);
+      /* IEEE_QUIET_NAN          */ insert(0x7fff800000000000);
+      /* IEEE_NEGATIVE_INF       */ insert(0xffff000000000000);
+      /* IEEE_NEGATIVE_NORMAL    */ insert(0xbfff000000000000);
+      /* IEEE_NEGATIVE_SUBNORMAL */ insert(0x8000200000000000);
+      /* IEEE_NEGATIVE_ZERO      */ insert(0x8000000000000000);
+      /* IEEE_POSITIVE_ZERO      */ insert(0x0000000000000000);
+      /* IEEE_POSITIVE_SUBNORMAL */ insert(0x0000200000000000);
+      /* IEEE_POSITIVE_NORMAL    */ insert(0x3fff000000000000); // 1.0
+      /* IEEE_POSITIVE_INF       */ insert(0x7fff000000000000);
+      break;
+    default:
+      llvm_unreachable("unknown real type");
+    }
+    insert(0); // IEEE_OTHER_VALUE
+    assert(values.size() == tableSize && "ieee value mismatch");
+    builder.createGlobalConstant(
+        loc, tableTy, tableName, builder.createLinkOnceLinkage(),
+        mlir::DenseElementsAttr::get(
+            mlir::RankedTensorType::get(tableSize, valueTy), values));
+  }
+
+  auto [fieldRef, ignore] = getFieldRef(builder, loc, fir::getBase(args[1]));
+  mlir::Value which = builder.create<fir::LoadOp>(loc, fieldRef);
+  mlir::Value bits = builder.create<fir::LoadOp>(
+      loc,
+      builder.create<fir::CoordinateOp>(
+          loc, builder.getRefType(valueTy),
+          builder.create<fir::AddrOfOp>(loc, builder.getRefType(tableTy),
+                                        builder.getSymbolRefAttr(tableName)),
+          which));
+  if (bitWidth > 64)
+    bits = builder.create<mlir::arith::ShLIOp>(
+        loc, builder.createConvert(loc, intType, bits),
+        builder.createIntegerConstant(loc, intType, bitWidth - 64));
+  return builder.create<mlir::arith::BitcastOp>(loc, realType, bits);
 }
 
 // IEOR
@@ -3549,24 +3968,6 @@ IntrinsicLibrary::genIsIostatValue(mlir::Type resultType,
   return builder.create<mlir::arith::CmpIOp>(
       loc, mlir::arith::CmpIPredicate::eq, args[0],
       builder.createIntegerConstant(loc, args[0].getType(), value));
-}
-
-mlir::Value IntrinsicLibrary::genIsFPClass(mlir::Type resultType,
-                                           llvm::ArrayRef<mlir::Value> args,
-                                           int fpclass) {
-  assert(args.size() == 1);
-  mlir::MLIRContext *context = builder.getContext();
-  mlir::IntegerType i1ty = mlir::IntegerType::get(context, 1);
-
-  mlir::Value isfpclass =
-      builder.create<mlir::LLVM::IsFPClass>(loc, i1ty, args[0], fpclass);
-  return builder.createConvert(loc, resultType, isfpclass);
-}
-
-mlir::Value IntrinsicLibrary::genIsNan(mlir::Type resultType,
-                                       llvm::ArrayRef<mlir::Value> args) {
-  // Check is signaling or quiet nan
-  return genIsFPClass(resultType, args, 0b11);
 }
 
 // ISHFT
@@ -3821,20 +4222,21 @@ IntrinsicLibrary::genMerge(mlir::Type,
   // used.
   mlir::Value tsourceCast = tsource;
   mlir::Value fsourceCast = fsource;
+  auto convertToStaticType = [&](mlir::Value polymorphic,
+                                 mlir::Value other) -> mlir::Value {
+    mlir::Type otherType = other.getType();
+    if (otherType.isa<fir::BaseBoxType>())
+      return builder.create<fir::ReboxOp>(loc, otherType, polymorphic,
+                                          /*shape*/ mlir::Value{},
+                                          /*slice=*/mlir::Value{});
+    return builder.create<fir::BoxAddrOp>(loc, otherType, polymorphic);
+  };
   if (fir::isPolymorphicType(tsource.getType()) &&
       !fir::isPolymorphicType(fsource.getType())) {
-    tsourceCast = builder.create<fir::ReboxOp>(loc, fsource.getType(), tsource,
-                                               /*shape*/ mlir::Value{},
-                                               /*slice=*/mlir::Value{});
-
-    // builder.createConvert(loc, fsource.getType(), tsource);
+    tsourceCast = convertToStaticType(tsource, fsource);
   } else if (!fir::isPolymorphicType(tsource.getType()) &&
              fir::isPolymorphicType(fsource.getType())) {
-    fsourceCast = builder.create<fir::ReboxOp>(loc, tsource.getType(), fsource,
-                                               /*shape*/ mlir::Value{},
-                                               /*slice=*/mlir::Value{});
-
-    // fsourceCast = builder.createConvert(loc, tsource.getType(), fsource);
+    fsourceCast = convertToStaticType(fsource, tsource);
   } else {
     // FSOURCE and TSOURCE are not polymorphic.
     // FSOURCE has the same type as TSOURCE, but they may not have the same MLIR
@@ -4604,73 +5006,6 @@ mlir::Value IntrinsicLibrary::genTrailz(mlir::Type resultType,
   return builder.createConvert(loc, resultType, result);
 }
 
-// VEC_ADD, VEC_AND, VEC_SUB, VEC_MUL, VEC_XOR
-template <VecOp vop>
-fir::ExtendedValue IntrinsicLibrary::genVecAddAndMulSubXor(
-    mlir::Type resultType, llvm::ArrayRef<fir::ExtendedValue> args) {
-  assert(args.size() == 2);
-  auto argBases{getBasesForArgs(args)};
-  auto argsTy{getTypesForArgs(argBases)};
-  assert(argsTy[0].isa<fir::VectorType>() && argsTy[1].isa<fir::VectorType>());
-
-  auto vecTyInfo{getVecTypeFromFir(argBases[0])};
-
-  const auto isInteger{vecTyInfo.eleTy.isa<mlir::IntegerType>()};
-  const auto isFloat{vecTyInfo.eleTy.isa<mlir::FloatType>()};
-  assert((isInteger || isFloat) && "unknown vector type");
-
-  auto vargs{convertVecArgs(builder, loc, vecTyInfo, argBases)};
-
-  mlir::Value r{nullptr};
-  switch (vop) {
-  case VecOp::Add:
-    if (isInteger)
-      r = builder.create<mlir::arith::AddIOp>(loc, vargs[0], vargs[1]);
-    else if (isFloat)
-      r = builder.create<mlir::arith::AddFOp>(loc, vargs[0], vargs[1]);
-    break;
-  case VecOp::Mul:
-    if (isInteger)
-      r = builder.create<mlir::arith::MulIOp>(loc, vargs[0], vargs[1]);
-    else if (isFloat)
-      r = builder.create<mlir::arith::MulFOp>(loc, vargs[0], vargs[1]);
-    break;
-  case VecOp::Sub:
-    if (isInteger)
-      r = builder.create<mlir::arith::SubIOp>(loc, vargs[0], vargs[1]);
-    else if (isFloat)
-      r = builder.create<mlir::arith::SubFOp>(loc, vargs[0], vargs[1]);
-    break;
-  case VecOp::And:
-  case VecOp::Xor: {
-    mlir::Value arg1{nullptr};
-    mlir::Value arg2{nullptr};
-    if (isInteger) {
-      arg1 = vargs[0];
-      arg2 = vargs[1];
-    } else if (isFloat) {
-      // bitcast the arguments to integer
-      auto wd{vecTyInfo.eleTy.dyn_cast<mlir::FloatType>().getWidth()};
-      auto ftype{builder.getIntegerType(wd)};
-      auto bcVecTy{mlir::VectorType::get(vecTyInfo.len, ftype)};
-      arg1 = builder.create<mlir::vector::BitCastOp>(loc, bcVecTy, vargs[0]);
-      arg2 = builder.create<mlir::vector::BitCastOp>(loc, bcVecTy, vargs[1]);
-    }
-    if (vop == VecOp::And)
-      r = builder.create<mlir::arith::AndIOp>(loc, arg1, arg2);
-    else if (vop == VecOp::Xor)
-      r = builder.create<mlir::arith::XOrIOp>(loc, arg1, arg2);
-
-    if (isFloat)
-      r = builder.create<mlir::vector::BitCastOp>(loc, vargs[0].getType(), r);
-
-    break;
-  }
-  }
-
-  return builder.createConvert(loc, argsTy[0], r);
-}
-
 static bool hasDefaultLowerBound(const fir::ExtendedValue &exv) {
   return exv.match(
       [](const fir::ArrayBoxValue &arr) { return arr.getLBounds().empty(); },
@@ -4760,7 +5095,6 @@ IntrinsicLibrary::genLbound(mlir::Type resultType,
     if (boxValue->hasAssumedRank())
       TODO(loc, "intrinsic: lbound with assumed rank argument");
 
-  //===----------------------------------------------------------------------===//
   mlir::Type indexType = builder.getIndexType();
 
   // Semantics builds signatures for LBOUND calls as either
@@ -5374,33 +5708,6 @@ mlir::Value IntrinsicLibrary::genExtremum(mlir::Type,
     result = builder.create<mlir::arith::SelectOp>(loc, mask, result, arg);
   }
   return result;
-}
-
-//===----------------------------------------------------------------------===//
-// PowerPC specific intrinsic handlers.
-//===----------------------------------------------------------------------===//
-template <bool isImm>
-void IntrinsicLibrary::genMtfsf(llvm::ArrayRef<fir::ExtendedValue> args) {
-  assert(args.size() == 2);
-  llvm::SmallVector<mlir::Value> scalarArgs;
-  for (const fir::ExtendedValue &arg : args)
-    if (arg.getUnboxed())
-      scalarArgs.emplace_back(fir::getBase(arg));
-    else
-      mlir::emitError(loc, "nonscalar intrinsic argument");
-
-  mlir::FunctionType libFuncType;
-  mlir::func::FuncOp funcOp;
-  if (isImm) {
-    libFuncType = genFuncType<Ty::Void, Ty::Integer<4>, Ty::Integer<4>>(
-        builder.getContext(), builder);
-    funcOp = builder.addNamedFunction(loc, "llvm.ppc.mtfsfi", libFuncType);
-  } else {
-    libFuncType = genFuncType<Ty::Void, Ty::Integer<4>, Ty::Real<8>>(
-        builder.getContext(), builder);
-    funcOp = builder.addNamedFunction(loc, "llvm.ppc.mtfsf", libFuncType);
-  }
-  builder.create<fir::CallOp>(loc, funcOp, scalarArgs);
 }
 
 //===----------------------------------------------------------------------===//

@@ -10,7 +10,7 @@ asm_main:
         .cfi_offset 6, -16
         movq    %rsp, %rbp
         .cfi_def_cfa_register 6
-        callq   abort
+        callq   abort_function
 .L:
         .cfi_def_cfa 7, 8
         .cfi_restore 6
@@ -18,8 +18,13 @@ asm_main:
         ud2
         .cfi_endproc
 
+        .globl abort_function
+abort_function:
+        .cfi_startproc
+        ud2
+        .cfi_endproc
+
 	.data
 	.globl  g_hard_abort
 g_hard_abort:
 	.byte   1
-	.size   g_hard_abort, 1

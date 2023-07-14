@@ -19,8 +19,8 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/MC/MCInstrDesc.h"
-#include "llvm/MC/SubtargetFeature.h"
 #include "llvm/Support/RISCVISAInfo.h"
+#include "llvm/TargetParser/SubtargetFeature.h"
 
 namespace llvm {
 
@@ -107,6 +107,12 @@ enum {
   // in bits 63:31. Used by the SExtWRemoval pass.
   IsSignExtendingOpWShift = UsesMaskPolicyShift + 1,
   IsSignExtendingOpWMask = 1ULL << IsSignExtendingOpWShift,
+
+  HasRoundModeOpShift = IsSignExtendingOpWShift + 1,
+  HasRoundModeOpMask = 1 << HasRoundModeOpShift,
+
+  UsesVXRMShift = HasRoundModeOpShift + 1,
+  UsesVXRMMask = 1 << UsesVXRMShift,
 };
 
 enum VLMUL : uint8_t {
@@ -163,6 +169,14 @@ static inline bool isRVVWideningReduction(uint64_t TSFlags) {
 static inline bool usesMaskPolicy(uint64_t TSFlags) {
   return TSFlags & UsesMaskPolicyMask;
 }
+
+/// \returns true if there is a rounding mode operand for this instruction
+static inline bool hasRoundModeOp(uint64_t TSFlags) {
+  return TSFlags & HasRoundModeOpMask;
+}
+
+/// \returns true if this instruction uses vxrm
+static inline bool usesVXRM(uint64_t TSFlags) { return TSFlags & UsesVXRMMask; }
 
 static inline unsigned getVLOpNum(const MCInstrDesc &Desc) {
   const uint64_t TSFlags = Desc.TSFlags;

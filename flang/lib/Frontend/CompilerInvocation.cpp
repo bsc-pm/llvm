@@ -740,8 +740,8 @@ static bool parseDialectArgs(CompilerInvocation &res, llvm::opt::ArgList &args,
             res.getLangOpts().OpenMPVersion, diags)) {
       res.getLangOpts().OpenMPVersion = Version;
     }
-    if (args.hasArg(clang::driver::options::OPT_fopenmp_is_device)) {
-      res.getLangOpts().OpenMPIsDevice = 1;
+    if (args.hasArg(clang::driver::options::OPT_fopenmp_is_target_device)) {
+      res.getLangOpts().OpenMPIsTargetDevice = 1;
 
       // Get OpenMP host file path if any and report if a non existent file is
       // found
@@ -925,6 +925,10 @@ bool CompilerInvocation::createFromArgs(
     res.loweringOpts.setLowerToHighLevelFIR(true);
   }
 
+  if (args.hasArg(clang::driver::options::OPT_flang_experimental_polymorphism)) {
+    res.loweringOpts.setPolymorphicTypeImpl(true);
+  }
+
   success &= parseFrontendArgs(res.getFrontendOpts(), args, diags);
   parseTargetArgs(res.getTargetOpts(), args);
   parsePreprocessorArgs(res.getPreprocessorOpts(), args);
@@ -1027,7 +1031,7 @@ void CompilerInvocation::setDefaultPredefinitions() {
   }
   if (frontendOptions.features.IsEnabled(
           Fortran::common::LanguageFeature::OpenACC)) {
-    fortranOptions.predefinitions.emplace_back("_OPENACC", "202011");
+    fortranOptions.predefinitions.emplace_back("_OPENACC", "202211");
   }
   if (frontendOptions.features.IsEnabled(
           Fortran::common::LanguageFeature::OpenMP)) {

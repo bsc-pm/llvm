@@ -82,7 +82,7 @@ __device__ void test_numeric_type() {
 // instead of fma(_Float16, _Float16, _Float16).
 
 // CXX14-LABEL: define{{.*}}@_Z8test_fma
-// CXX14: call {{.*}}@__ocml_fma_f16
+// CXX14: call contract half @llvm.fma.f16
 __device__ double test_fma(_Float16 h, int i) {
   return fma(h, h, i);
 }
@@ -103,7 +103,7 @@ __device__ size_t test_size_t() {
 // Check there is no ambiguity when calling overloaded math functions.
 
 // CHECK-LABEL: define{{.*}}@_Z10test_floorv
-// CHECK: call {{.*}}double @__ocml_floor_f64(double
+// CHECK: call {{.*}}double @llvm.floor.f64(double
 __device__ float test_floor() {
   return floor(5);
 }
@@ -120,12 +120,12 @@ __device__ double test_isnan() {
   double d = 5.0;
   float f = 5.0;
 
-  // AMD_INT_RETURN: fcmp contract uno float
-  // AMD_BOOL_RETURN: fcmp contract uno float
+  // AMD_INT_RETURN: call i1 @llvm.is.fpclass.f32(float {{.*}}, i32 3)
+  // AMD_BOOL_RETURN: call i1 @llvm.is.fpclass.f32(float {{.*}}, i32 3)
   r += isnan(f);
 
-  // AMD_INT_RETURN: fcmp contract uno double
-  // AMD_BOOL_RETURN: fcmp contract uno double
+  // AMD_INT_RETURN: call i1 @llvm.is.fpclass.f64(double {{.*}}, i32 3)
+  // AMD_BOOL_RETURN: call i1 @llvm.is.fpclass.f64(double {{.*}}, i32 3)
   r += isnan(d);
 
   return r ;

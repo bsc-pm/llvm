@@ -17,8 +17,8 @@ end subroutine
 
 
 
-! CHECK-LABEL:   func.func @_QPtest_assumed_shape_to_array(
-! CHECK-SAME:                                              %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.box<!fir.array<?xf32>> {fir.bindc_name = "x"}) {
+! CHECK-LABEL: module attributes {fir.defaultkind = "a1c4d8i4l4r4", fir.kindmap = "", llvm.target_triple = "x86_64-unknown-linux-gnu"} {
+! CHECK:         func.func @_QPtest_assumed_shape_to_array(%[[VAL_0:[-0-9A-Za-z._]+]]: !fir.box<!fir.array<?xf32>> {fir.bindc_name = "x"}) {
 ! CHECK:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.array<?xf32>>
 ! CHECK:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_0]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<none>
 ! CHECK:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.call @_FortranAIsContiguous(%[[VAL_2]]) fastmath<contract> : (!fir.box<none>) -> i1
@@ -42,19 +42,19 @@ end subroutine
 ! CHECK:           }
 ! CHECK:           %[[VAL_17:[-0-9A-Za-z._]+]] = arith.constant false
 ! CHECK:           %[[VAL_18:[-0-9A-Za-z._]+]] = arith.cmpi eq, %[[VAL_3]], %[[VAL_17]] : i1
-! CHECK:           %[[VAL_19:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_20:[-0-9A-Za-z._]+]] : (!fir.heap<!fir.array<?xf32>>) -> !fir.ref<!fir.array<10xf32>>
+! CHECK:           %[[VAL_19:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_4]] : (!fir.heap<!fir.array<?xf32>>) -> !fir.ref<!fir.array<10xf32>>
 ! CHECK:           fir.call @_QPbar(%[[VAL_19]]) fastmath<contract> : (!fir.ref<!fir.array<10xf32>>) -> ()
 ! CHECK:           fir.if %[[VAL_18]] {
-! CHECK:             fir.freemem %[[VAL_20]] : !fir.heap<!fir.array<?xf32>>
+! CHECK:             fir.freemem %[[VAL_4]] : !fir.heap<!fir.array<?xf32>>
 ! CHECK:           }
 ! CHECK:           return
 ! CHECK:         }
 ! CHECK:         func.func private @_QPbar(!fir.ref<!fir.array<10xf32>>)
 ! CHECK:         func.func private @_FortranAIsContiguous(!fir.box<none>) -> i1 attributes {fir.runtime}
 ! CHECK:         func.func private @_FortranAAssignTemporary(!fir.ref<!fir.box<none>>, !fir.box<none>, !fir.ref<i8>, i32) -> none attributes {fir.runtime}
-
-! CHECK-LABEL:   fir.global internal @_QQcl.15bb3546db13f18936259fad06b908b5 constant : !fir.char<1,67> {
-! CHECK:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.string_lit "/home/rpenacob/llvm-mono/flang/test/OmpSs/Lower/FIR/toutline07.f90\00"(67) : !fir.char<1,67>
-! CHECK:           fir.has_value %[[VAL_0]] : !fir.char<1,67>
+! CHECK:         fir.global linkonce @_QQcl.15bb3546db13f18936259fad06b908b5 constant : !fir.char<1,67> {
+! CHECK:           %[[VAL_20:[-0-9A-Za-z._]+]] = fir.string_lit "/home/rpenacob/llvm-mono/flang/test/OmpSs/Lower/FIR/toutline07.f90\00"(67) : !fir.char<1,67>
+! CHECK:           fir.has_value %[[VAL_20]] : !fir.char<1,67>
 ! CHECK:         }
+! CHECK:       }
 

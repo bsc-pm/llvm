@@ -18,6 +18,7 @@
 #include "DwarfUnit.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/DIE.h"
@@ -494,6 +495,7 @@ static StringRef getObjCMethodName(StringRef In) {
 void DwarfDebug::addSubprogramNames(const DICompileUnit &CU,
                                     const DISubprogram *SP, DIE &Die) {
   if (getAccelTableKind() != AccelTableKind::Apple &&
+      CU.getNameTableKind() != DICompileUnit::DebugNameTableKind::Apple &&
       CU.getNameTableKind() == DICompileUnit::DebugNameTableKind::None)
     return;
 
@@ -2606,11 +2608,10 @@ void DwarfDebug::emitDebugLocEntry(ByteStreamer &Streamer,
   for (const auto &Op : Expr) {
     assert(Op.getCode() != dwarf::DW_OP_const_type &&
            "3 operand ops not yet supported");
+    assert(!Op.getSubCode() && "SubOps not yet supported");
     Streamer.emitInt8(Op.getCode(), Comment != End ? *(Comment++) : "");
     Offset++;
-    for (unsigned I = 0; I < 2; ++I) {
-      if (Op.getDescription().Op[I] == Encoding::SizeNA)
-        continue;
+    for (unsigned I = 0; I < Op.getDescription().Op.size(); ++I) {
       if (Op.getDescription().Op[I] == Encoding::BaseTypeRef) {
         unsigned Length =
           Streamer.emitDIERef(*CU->ExprRefedBaseTypes[Op.getRawOperand(I)].Die);
@@ -3535,10 +3536,11 @@ template <typename DataT>
 void DwarfDebug::addAccelNameImpl(const DICompileUnit &CU,
                                   AccelTable<DataT> &AppleAccel, StringRef Name,
                                   const DIE &Die) {
-  if (getAccelTableKind() == AccelTableKind::None)
+  if (getAccelTableKind() == AccelTableKind::None || Name.empty())
     return;
 
   if (getAccelTableKind() != AccelTableKind::Apple &&
+      CU.getNameTableKind() != DICompileUnit::DebugNameTableKind::Apple &&
       CU.getNameTableKind() != DICompileUnit::DebugNameTableKind::Default)
     return;
 

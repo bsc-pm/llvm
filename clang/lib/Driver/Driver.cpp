@@ -546,14 +546,15 @@ static llvm::Triple computeTargetTriple(const Driver &D,
   if (Target.isOSBinFormatMachO()) {
     // If an explicit Darwin arch name is given, that trumps all.
     if (!DarwinArchName.empty()) {
-      tools::darwin::setTripleTypeForMachOArchName(Target, DarwinArchName);
+      tools::darwin::setTripleTypeForMachOArchName(Target, DarwinArchName,
+                                                   Args);
       return Target;
     }
 
     // Handle the Darwin '-arch' flag.
     if (Arg *A = Args.getLastArg(options::OPT_arch)) {
       StringRef ArchName = A->getValue();
-      tools::darwin::setTripleTypeForMachOArchName(Target, ArchName);
+      tools::darwin::setTripleTypeForMachOArchName(Target, ArchName, Args);
     }
   }
 
@@ -1468,6 +1469,36 @@ Compilation *Driver::BuildCompilation(ArrayRef<const char *> ArgList) {
       UArgs->hasArg(options::OPT__SLASH_arm64EC)) {
     getDiags().Report(clang::diag::warn_target_override_arm64ec)
         << TC.getTriple().str();
+  }
+
+  // A common user mistake is specifying a target of aarch64-none-eabi or
+  // arm-none-elf whereas the correct names are aarch64-none-elf &
+  // arm-none-eabi. Detect these cases and issue a warning.
+  if (TC.getTriple().getOS() == llvm::Triple::UnknownOS &&
+      TC.getTriple().getVendor() == llvm::Triple::UnknownVendor) {
+    switch (TC.getTriple().getArch()) {
+    case llvm::Triple::arm:
+    case llvm::Triple::armeb:
+    case llvm::Triple::thumb:
+    case llvm::Triple::thumbeb:
+      if (TC.getTriple().getEnvironmentName() == "elf") {
+        Diag(diag::warn_target_unrecognized_env)
+            << TargetTriple
+            << (TC.getTriple().getArchName().str() + "-none-eabi");
+      }
+      break;
+    case llvm::Triple::aarch64:
+    case llvm::Triple::aarch64_be:
+    case llvm::Triple::aarch64_32:
+      if (TC.getTriple().getEnvironmentName().startswith("eabi")) {
+        Diag(diag::warn_target_unrecognized_env)
+            << TargetTriple
+            << (TC.getTriple().getArchName().str() + "-none-elf");
+      }
+      break;
+    default:
+      break;
+    }
   }
 
   // The compilation takes ownership of Args.
@@ -2949,7 +2980,12 @@ class OffloadingActionBuilder final {
     CudaActionBuilderBase(Compilation &C, DerivedArgList &Args,
                           const Driver::InputList &Inputs,
                           Action::OffloadKind OFKind)
-        : DeviceActionBuilder(C, Args, Inputs, OFKind) {}
+        : DeviceActionBuilder(C, Args, Inputs, OFKind) {
+
+      CompileDeviceOnly = C.getDriver().offloadDeviceOnly();
+      Relocatable = Args.hasFlag(options::OPT_fgpu_rdc,
+                                 options::OPT_fno_gpu_rdc, /*Default=*/false);
+    }
 
     ActionBuilderReturnCode addDeviceDependences(Action *HostAction) override {
       // While generating code for CUDA, we only depend on the host input action
@@ -3102,9 +3138,6 @@ class OffloadingActionBuilder final {
           !C.hasOffloadToolChain<Action::OFK_HIP>())
         return false;
 
-      Relocatable = Args.hasFlag(options::OPT_fgpu_rdc,
-                                 options::OPT_fno_gpu_rdc, /*Default=*/false);
-
       const ToolChain *HostTC = C.getSingleOffloadToolChain<Action::OFK_Host>();
       assert(HostTC && "No toolchain for host compilation.");
       if (HostTC->getTriple().isNVPTX() ||
@@ -3123,7 +3156,6 @@ class OffloadingActionBuilder final {
               : C.getSingleOffloadToolChain<Action::OFK_HIP>());
 
       CompileHostOnly = C.getDriver().offloadHostOnly();
-      CompileDeviceOnly = C.getDriver().offloadDeviceOnly();
       EmitLLVM = Args.getLastArg(options::OPT_emit_llvm);
       EmitAsm = Args.getLastArg(options::OPT_S);
       FixedCUID = Args.getLastArgValue(options::OPT_cuid_EQ);
@@ -3355,16 +3387,40 @@ class OffloadingActionBuilder final {
     // only compilation. Bundle other type of output files only if
     // --gpu-bundle-output is specified for device only compilation.
     std::optional<bool> BundleOutput;
+    std::optional<bool> EmitReloc;
 
   public:
     HIPActionBuilder(Compilation &C, DerivedArgList &Args,
                      const Driver::InputList &Inputs)
         : CudaActionBuilderBase(C, Args, Inputs, Action::OFK_HIP) {
+
       DefaultCudaArch = CudaArch::GFX906;
+
+      if (Args.hasArg(options::OPT_fhip_emit_relocatable,
+                      options::OPT_fno_hip_emit_relocatable)) {
+        EmitReloc = Args.hasFlag(options::OPT_fhip_emit_relocatable,
+                                 options::OPT_fno_hip_emit_relocatable, false);
+
+        if (*EmitReloc) {
+          if (Relocatable) {
+            C.getDriver().Diag(diag::err_opt_not_valid_with_opt)
+                << "-fhip-emit-relocatable"
+                << "-fgpu-rdc";
+          }
+
+          if (!CompileDeviceOnly) {
+            C.getDriver().Diag(diag::err_opt_not_valid_without_opt)
+                << "-fhip-emit-relocatable"
+                << "--cuda-device-only";
+          }
+        }
+      }
+
       if (Args.hasArg(options::OPT_gpu_bundle_output,
                       options::OPT_no_gpu_bundle_output))
         BundleOutput = Args.hasFlag(options::OPT_gpu_bundle_output,
-                                    options::OPT_no_gpu_bundle_output, true);
+                                    options::OPT_no_gpu_bundle_output, true) &&
+                       (!EmitReloc || !*EmitReloc);
     }
 
     bool canUseBundlerUnbundler() const override { return true; }
@@ -3411,8 +3467,10 @@ class OffloadingActionBuilder final {
       assert(!CompileHostOnly &&
              "Not expecting HIP actions in host-only compilation.");
 
+      bool ShouldLink = !EmitReloc || !*EmitReloc;
+
       if (!Relocatable && CurPhase == phases::Backend && !EmitLLVM &&
-          !EmitAsm) {
+          !EmitAsm && ShouldLink) {
         // If we are in backend phase, we attempt to generate the fat binary.
         // We compile each arch to IR and use a link action to generate code
         // object containing ISA. Then we use a special "link" action to create
@@ -3488,6 +3546,8 @@ class OffloadingActionBuilder final {
 
         return CompileDeviceOnly ? ABRT_Ignore_Host : ABRT_Success;
       } else if (CurPhase == phases::Link) {
+        if (!ShouldLink)
+          return ABRT_Success;
         // Save CudaDeviceActions to DeviceLinkerInputs for each GPU subarch.
         // This happens to each device action originated from each input file.
         // Later on, device actions in DeviceLinkerInputs are used to create
@@ -3525,8 +3585,11 @@ class OffloadingActionBuilder final {
         CudaDeviceActions.clear();
       }
 
-      return (CompileDeviceOnly && CurPhase == FinalPhase) ? ABRT_Ignore_Host
-                                                           : ABRT_Success;
+      return (CompileDeviceOnly &&
+              (CurPhase == FinalPhase ||
+               (!ShouldLink && CurPhase == phases::Assemble)))
+                 ? ABRT_Ignore_Host
+                 : ABRT_Success;
     }
 
     void appendLinkDeviceActions(ActionList &AL) override {
@@ -3677,7 +3740,6 @@ public:
         ++InactiveBuilders;
         continue;
       }
-
       auto RetCode =
           SB->getDeviceDependences(DDeps, CurPhase, FinalPhase, Phases);
 
@@ -3928,12 +3990,13 @@ void Driver::handleArguments(Compilation &C, DerivedArgList &Args,
     // `-dumpdir x-` to cc1. If -o is unspecified, use
     // stem(getDefaultImageName()) (usually stem("a.out") = "a").
     if (!Args.hasArg(options::OPT_dumpdir)) {
+      Arg *FinalOutput = Args.getLastArg(options::OPT_o, options::OPT__SLASH_o);
       Arg *Arg = Args.MakeSeparateArg(
           nullptr, getOpts().getOption(options::OPT_dumpdir),
-          Args.MakeArgString(Args.getLastArgValue(
-                                 options::OPT_o,
-                                 llvm::sys::path::stem(getDefaultImageName())) +
-                             "-"));
+          Args.MakeArgString(
+              (FinalOutput ? FinalOutput->getValue()
+                           : llvm::sys::path::stem(getDefaultImageName())) +
+              "-"));
       Arg->claim();
       Args.append(Arg);
     }
@@ -4925,7 +4988,8 @@ void Driver::BuildJobs(Compilation &C) const {
       // In clang-cl, don't mention unknown arguments here since they have
       // already been warned about.
       if (!IsCLMode() || !A->getOption().matches(options::OPT_UNKNOWN)) {
-        if (A->getOption().hasFlag(options::TargetSpecific)) {
+        if (A->getOption().hasFlag(options::TargetSpecific) &&
+            !A->isIgnoredTargetSpecific()) {
           Diag(diag::err_drv_unsupported_opt_for_target)
               << A->getSpelling() << getTargetTriple();
         } else {

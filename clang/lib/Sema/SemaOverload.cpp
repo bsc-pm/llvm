@@ -6468,7 +6468,7 @@ void Sema::AddOverloadCandidate(
     OverloadCandidateSet &CandidateSet, bool SuppressUserConversions,
     bool PartialOverloading, bool AllowExplicit, bool AllowExplicitConversions,
     ADLCallKind IsADLCandidate, ConversionSequenceList EarlyConversions,
-    OverloadCandidateParamOrder PO) {
+    OverloadCandidateParamOrder PO, bool AggregateCandidateDeduction) {
   const FunctionProtoType *Proto
     = dyn_cast<FunctionProtoType>(Function->getType()->getAs<FunctionType>());
   assert(Proto && "Functions without a prototype cannot be overloaded");
@@ -6635,7 +6635,8 @@ void Sema::AddOverloadCandidate(
   // parameter list is truncated on the right, so that there are
   // exactly m parameters.
   unsigned MinRequiredArgs = Function->getMinRequiredArguments();
-  if (Args.size() < MinRequiredArgs && !PartialOverloading) {
+  if (!AggregateCandidateDeduction && Args.size() < MinRequiredArgs &&
+      !PartialOverloading) {
     // Not enough arguments.
     Candidate.Viable = false;
     Candidate.FailureKind = ovl_fail_too_few_arguments;
@@ -7261,7 +7262,8 @@ void Sema::AddMethodTemplateCandidate(
   ConversionSequenceList Conversions;
   if (TemplateDeductionResult Result = DeduceTemplateArguments(
           MethodTmpl, ExplicitTemplateArgs, Args, Specialization, Info,
-          PartialOverloading, [&](ArrayRef<QualType> ParamTypes) {
+          PartialOverloading, /*AggregateDeductionCandidate=*/false,
+          [&](ArrayRef<QualType> ParamTypes) {
             return CheckNonDependentConversions(
                 MethodTmpl, ParamTypes, Args, CandidateSet, Conversions,
                 SuppressUserConversions, ActingContext, ObjectType,
@@ -7314,7 +7316,7 @@ void Sema::AddTemplateOverloadCandidate(
     TemplateArgumentListInfo *ExplicitTemplateArgs, ArrayRef<Expr *> Args,
     OverloadCandidateSet &CandidateSet, bool SuppressUserConversions,
     bool PartialOverloading, bool AllowExplicit, ADLCallKind IsADLCandidate,
-    OverloadCandidateParamOrder PO) {
+    OverloadCandidateParamOrder PO, bool AggregateCandidateDeduction) {
   if (!CandidateSet.isNewCandidate(FunctionTemplate, PO))
     return;
 
@@ -7344,7 +7346,8 @@ void Sema::AddTemplateOverloadCandidate(
   ConversionSequenceList Conversions;
   if (TemplateDeductionResult Result = DeduceTemplateArguments(
           FunctionTemplate, ExplicitTemplateArgs, Args, Specialization, Info,
-          PartialOverloading, [&](ArrayRef<QualType> ParamTypes) {
+          PartialOverloading, AggregateCandidateDeduction,
+          [&](ArrayRef<QualType> ParamTypes) {
             return CheckNonDependentConversions(
                 FunctionTemplate, ParamTypes, Args, CandidateSet, Conversions,
                 SuppressUserConversions, nullptr, QualType(), {}, PO);
@@ -7380,7 +7383,8 @@ void Sema::AddTemplateOverloadCandidate(
   AddOverloadCandidate(
       Specialization, FoundDecl, Args, CandidateSet, SuppressUserConversions,
       PartialOverloading, AllowExplicit,
-      /*AllowExplicitConversions*/ false, IsADLCandidate, Conversions, PO);
+      /*AllowExplicitConversions=*/false, IsADLCandidate, Conversions, PO,
+      Info.AggregateDeductionCandidateHasMismatchedArity);
 }
 
 /// Check that implicit conversion sequences can be formed for each argument
@@ -10147,7 +10151,7 @@ bool clang::isBetterOverloadCandidate(
         return Guide2->isImplicit();
 
       //  -- F1 is the copy deduction candidate(16.3.1.8) and F2 is not
-      if (Guide1->isCopyDeductionCandidate())
+      if (Guide1->getDeductionCandidateKind() == DeductionCandidate::Copy)
         return true;
     }
   }
@@ -10821,15 +10825,6 @@ static void DiagnoseBadConversion(Sema &S, OverloadCandidate *Cand,
       return;
     }
 
-    if (FromQs.hasUnaligned() != ToQs.hasUnaligned()) {
-      S.Diag(Fn->getLocation(), diag::note_ovl_candidate_bad_unaligned)
-          << (unsigned)FnKindPair.first << (unsigned)FnKindPair.second << FnDesc
-          << (FromExpr ? FromExpr->getSourceRange() : SourceRange()) << FromTy
-          << FromQs.hasUnaligned() << I + 1;
-      MaybeEmitInheritedConstructorNote(S, Cand->FoundDecl);
-      return;
-    }
-
     unsigned CVR = FromQs.getCVRQualifiers() & ~ToQs.getCVRQualifiers();
     assert(CVR && "expected qualifiers mismatch");
 
@@ -11037,11 +11032,13 @@ static void DiagnoseArityMismatch(Sema &S, NamedDecl *Found, Decl *D,
   if (modeCount == 1 && Fn->getParamDecl(0)->getDeclName())
     S.Diag(Fn->getLocation(), diag::note_ovl_candidate_arity_one)
         << (unsigned)FnKindPair.first << (unsigned)FnKindPair.second
-        << Description << mode << Fn->getParamDecl(0) << NumFormalArgs;
+        << Description << mode << Fn->getParamDecl(0) << NumFormalArgs
+        << Fn->getParametersSourceRange();
   else
     S.Diag(Fn->getLocation(), diag::note_ovl_candidate_arity)
         << (unsigned)FnKindPair.first << (unsigned)FnKindPair.second
-        << Description << mode << modeCount << NumFormalArgs;
+        << Description << mode << modeCount << NumFormalArgs
+        << Fn->getParametersSourceRange();
 
   MaybeEmitInheritedConstructorNote(S, Found);
 }
@@ -14022,8 +14019,8 @@ ExprResult Sema::CreateOverloadedBinOp(SourceLocation OpLoc,
               Diag(FnDecl->getLocation(),
                    diag::note_ovl_ambiguous_oper_binary_reversed_self);
               // Mark member== const or provide matching != to disallow reversed
-              // args. Eg. 
-              // struct S { bool operator==(const S&); }; 
+              // args. Eg.
+              // struct S { bool operator==(const S&); };
               // S()==S();
               if (auto *MD = dyn_cast<CXXMethodDecl>(FnDecl))
                 if (Op == OverloadedOperatorKind::OO_EqualEqual &&

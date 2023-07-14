@@ -83,7 +83,7 @@ void bar() {
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@_ZN1S4foo1Ei
-// PPC64-SAME: (ptr noundef nonnull align 4 dereferenceable(4) [[THIS:%.*]], i32 noundef signext [[X:%.*]]) #[[ATTR0]] comdat align 2 !dbg [[DBG16:![0-9]+]] {
+// PPC64-SAME: (ptr noundef nonnull align 4 dereferenceable(4) [[THIS:%.*]], i32 noundef signext [[X:%.*]]) #[[ATTR0]] comdat !dbg [[DBG16:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    [[X_ADDR:%.*]] = alloca i32, align 4
