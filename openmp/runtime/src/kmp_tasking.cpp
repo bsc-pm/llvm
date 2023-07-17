@@ -1073,9 +1073,8 @@ static void __kmp_task_finish(kmp_int32 gtid, kmp_task_t *task,
     = KMP_TEST_THEN_ADD32(&taskdata->td_allow_completion_event.pending_events_count, -1);
   bool completed = pending_events_count == 1;
   if (!completed) {
-    // task finished execution
-    KMP_DEBUG_ASSERT(taskdata->td_flags.executing == 1);
-    taskdata->td_flags.executing = 0; // suspend the finishing task
+    // no access to taskdata after this point!
+    // __kmp_fulfill_event might free taskdata at any time from now
 
 #if OMPT_SUPPORT
     // For a detached task, which is not completed, we switch back
@@ -1085,10 +1084,6 @@ static void __kmp_task_finish(kmp_int32 gtid, kmp_task_t *task,
       __ompt_task_finish(task, resumed_task, ompt_task_detach);
 #endif
 
-    // no access to taskdata after this point!
-    // __kmp_fulfill_event might free taskdata at any time from now
-
-    taskdata->td_flags.proxy = TASK_PROXY; // proxify!
   }
 
   // Tasks with valid target async handles must be re-enqueued.
@@ -4469,6 +4464,11 @@ void __kmp_fulfill_event(kmp_event_t *event) {
 #endif
 
   if (fulfilled) {
+    // task finished execution
+    KMP_DEBUG_ASSERT(taskdata->td_flags.executing == 1);
+    taskdata->td_flags.executing = 0; // suspend the finishing task
+    taskdata->td_flags.proxy = TASK_PROXY; // proxify!
+
 #if OMPT_SUPPORT
       // We free ptask afterwards and know the task is finished,
       // so locking is not necessary
