@@ -162,6 +162,7 @@ void nanos6_decrease_task_event_counter(void *event_counter,
 
         int gtid = __kmp_get_gtid();
 
+        // task finished execution
         KMP_DEBUG_ASSERT(taskdata->td_flags.executing == 1);
         taskdata->td_flags.executing = 0; // suspend the finishing task
         taskdata->td_flags.proxy = TASK_PROXY; // proxify!
