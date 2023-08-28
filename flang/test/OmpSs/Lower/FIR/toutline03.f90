@@ -27,7 +27,7 @@ end module
 
 
 
-! CHECK-LABEL: module attributes {fir.defaultkind = "a1c4d8i4l4r4", fir.kindmap = "", llvm.target_triple = "x86_64-unknown-linux-gnu"} {
+! CHECK-LABEL: module attributes {fir.defaultkind = "a1c4d8i4l4r4", fir.kindmap = "", llvm.target_triple = "{{.*}}-unknown-linux-gnu"} {
 ! CHECK:         func.func @_QMtestsPtest_assumed_shape_to_contiguous(%[[VAL_0:[-0-9A-Za-z._]+]]: !fir.box<!fir.array<?xf32>> {fir.bindc_name = "x"}) {
 ! CHECK:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.array<?xf32>>
 ! CHECK:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_0]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<none>
@@ -42,7 +42,7 @@ end module
 ! CHECK:             %[[VAL_9:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_7]]#1 : (index) -> !fir.shape<1>
 ! CHECK:             %[[VAL_10:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_8]](%[[VAL_9]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.array<?xf32>>
 ! CHECK:             fir.store %[[VAL_10]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.array<?xf32>>>
-! CHECK:             %[[VAL_11:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl.{{.*}}) : !fir.ref<!fir.char<1,67>>
+! CHECK:             %[[VAL_11:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl.{{.*}})
 ! CHECK:             %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 23 : i32
 ! CHECK:             %[[VAL_13:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_1]] : (!fir.ref<!fir.box<!fir.array<?xf32>>>) -> !fir.ref<!fir.box<none>>
 ! CHECK:             %[[VAL_14:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_0]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<none>
@@ -63,7 +63,7 @@ end module
 ! CHECK:               %[[VAL_24:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_18]]#1 : (index) -> !fir.shape<1>
 ! CHECK:               %[[VAL_25:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_4]](%[[VAL_24]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.array<?xf32>>
 ! CHECK:               fir.store %[[VAL_0]] to %[[VAL_23]] : !fir.ref<!fir.box<!fir.array<?xf32>>>
-! CHECK:               %[[VAL_26:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl.{{.*}}) : !fir.ref<!fir.char<1,67>>
+! CHECK:               %[[VAL_26:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl.{{.*}})
 ! CHECK:               %[[VAL_27:[-0-9A-Za-z._]+]] = arith.constant 23 : i32
 ! CHECK:               %[[VAL_28:[-0-9A-Za-z._]+]] = arith.constant true
 ! CHECK:               %[[VAL_29:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_23]] : (!fir.ref<!fir.box<!fir.array<?xf32>>>) -> !fir.ref<!fir.box<none>>

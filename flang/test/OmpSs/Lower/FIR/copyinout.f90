@@ -23,7 +23,7 @@ subroutine bar_intent_out(x)
 end subroutine
 
 
-! FIRDialect-LABEL: module attributes {fir.defaultkind = "a1c4d8i4l4r4", fir.kindmap = "", llvm.target_triple = "x86_64-unknown-linux-gnu"} {
+! FIRDialect-LABEL: module attributes {fir.defaultkind = "a1c4d8i4l4r4", fir.kindmap = "", llvm.target_triple = "{{.*}}-unknown-linux-gnu"} {
 ! FIRDialect:         func.func @_QPtest_intent_in(%[[VAL_0:[-0-9A-Za-z._]+]]: !fir.box<!fir.array<?xf32>> {fir.bindc_name = "x"}) {
 ! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.array<?xf32>>
 ! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_0]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<none>
@@ -38,7 +38,7 @@ end subroutine
 ! FIRDialect:             %[[VAL_9:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_7]]#1 : (index) -> !fir.shape<1>
 ! FIRDialect:             %[[VAL_10:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_8]](%[[VAL_9]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.array<?xf32>>
 ! FIRDialect:             fir.store %[[VAL_10]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.array<?xf32>>>
-! FIRDialect:             %[[VAL_11:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl.{{.*}}) : !fir.ref<!fir.char<1,66>>
+! FIRDialect:             %[[VAL_11:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl.{{.*}})
 ! FIRDialect:             %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 5 : i32
 ! FIRDialect:             %[[VAL_13:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_1]] : (!fir.ref<!fir.box<!fir.array<?xf32>>>) -> !fir.ref<!fir.box<none>>
 ! FIRDialect:             %[[VAL_14:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_0]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<none>
@@ -88,7 +88,7 @@ end subroutine
 ! FIRDialect:               %[[VAL_37:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_32]]#1 : (index) -> !fir.shape<1>
 ! FIRDialect:               %[[VAL_38:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_26]](%[[VAL_37]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.array<?xf32>>
 ! FIRDialect:               fir.store %[[VAL_23]] to %[[VAL_35]] : !fir.ref<!fir.box<!fir.array<?xf32>>>
-! FIRDialect:               %[[VAL_39:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl.{{.*}}) : !fir.ref<!fir.char<1,66>>
+! FIRDialect:               %[[VAL_39:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl.{{.*}})
 ! FIRDialect:               %[[VAL_40:[-0-9A-Za-z._]+]] = arith.constant 16 : i32
 ! FIRDialect:               %[[VAL_41:[-0-9A-Za-z._]+]] = arith.constant true
 ! FIRDialect:               %[[VAL_42:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_35]] : (!fir.ref<!fir.box<!fir.array<?xf32>>>) -> !fir.ref<!fir.box<none>>
