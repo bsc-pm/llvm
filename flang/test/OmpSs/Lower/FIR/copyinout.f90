@@ -38,7 +38,7 @@ end subroutine
 ! FIRDialect:             %[[VAL_9:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_7]]#1 : (index) -> !fir.shape<1>
 ! FIRDialect:             %[[VAL_10:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_8]](%[[VAL_9]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.array<?xf32>>
 ! FIRDialect:             fir.store %[[VAL_10]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.array<?xf32>>>
-! FIRDialect:             %[[VAL_11:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl.8f2d0f6342c0c913c244b419469ae9a0) : !fir.ref<!fir.char<1,66>>
+! FIRDialect:             %[[VAL_11:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl.{{.*}}) : !fir.ref<!fir.char<1,66>>
 ! FIRDialect:             %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 5 : i32
 ! FIRDialect:             %[[VAL_13:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_1]] : (!fir.ref<!fir.box<!fir.array<?xf32>>>) -> !fir.ref<!fir.box<none>>
 ! FIRDialect:             %[[VAL_14:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_0]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<none>
@@ -88,7 +88,7 @@ end subroutine
 ! FIRDialect:               %[[VAL_37:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_32]]#1 : (index) -> !fir.shape<1>
 ! FIRDialect:               %[[VAL_38:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_26]](%[[VAL_37]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.array<?xf32>>
 ! FIRDialect:               fir.store %[[VAL_23]] to %[[VAL_35]] : !fir.ref<!fir.box<!fir.array<?xf32>>>
-! FIRDialect:               %[[VAL_39:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl.8f2d0f6342c0c913c244b419469ae9a0) : !fir.ref<!fir.char<1,66>>
+! FIRDialect:               %[[VAL_39:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl.{{.*}}) : !fir.ref<!fir.char<1,66>>
 ! FIRDialect:               %[[VAL_40:[-0-9A-Za-z._]+]] = arith.constant 16 : i32
 ! FIRDialect:               %[[VAL_41:[-0-9A-Za-z._]+]] = arith.constant true
 ! FIRDialect:               %[[VAL_42:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_35]] : (!fir.ref<!fir.box<!fir.array<?xf32>>>) -> !fir.ref<!fir.box<none>>
@@ -107,10 +107,6 @@ end subroutine
 ! FIRDialect:         }
 ! FIRDialect:         func.func private @_FortranAIsContiguous(!fir.box<none>) -> i1 attributes {fir.runtime}
 ! FIRDialect:         func.func private @_FortranAAssignTemporary(!fir.ref<!fir.box<none>>, !fir.box<none>, !fir.ref<i8>, i32) -> none attributes {fir.runtime}
-! FIRDialect:         fir.global linkonce @_QQcl.8f2d0f6342c0c913c244b419469ae9a0 constant : !fir.char<1,66> {
-! FIRDialect:           %[[VAL_47:[-0-9A-Za-z._]+]] = fir.string_lit "/home/rpenacob/llvm-mono/flang/test/OmpSs/Lower/FIR/copyinout.f90\00"(66) : !fir.char<1,66>
-! FIRDialect:           fir.has_value %[[VAL_47]] : !fir.char<1,66>
-! FIRDialect:         }
 ! FIRDialect:         func.func private @_FortranACopyOutAssign(!fir.ref<!fir.box<none>>, !fir.box<none>, i1, !fir.ref<i8>, i32) -> none attributes {fir.runtime}
 ! FIRDialect:       }
 

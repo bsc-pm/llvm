@@ -32,7 +32,7 @@ end subroutine
 ! CHECK:             %[[VAL_9:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_7]]#1 : (index) -> !fir.shape<1>
 ! CHECK:             %[[VAL_10:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_8]](%[[VAL_9]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.array<?xf32>>
 ! CHECK:             fir.store %[[VAL_10]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.array<?xf32>>>
-! CHECK:             %[[VAL_11:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl.15bb3546db13f18936259fad06b908b5) : !fir.ref<!fir.char<1,67>>
+! CHECK:             %[[VAL_11:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl.{{.*}}) : !fir.ref<!fir.char<1,67>>
 ! CHECK:             %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 15 : i32
 ! CHECK:             %[[VAL_13:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_1]] : (!fir.ref<!fir.box<!fir.array<?xf32>>>) -> !fir.ref<!fir.box<none>>
 ! CHECK:             %[[VAL_14:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_0]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<none>
@@ -52,9 +52,5 @@ end subroutine
 ! CHECK:         func.func private @_QPbar(!fir.ref<!fir.array<10xf32>>)
 ! CHECK:         func.func private @_FortranAIsContiguous(!fir.box<none>) -> i1 attributes {fir.runtime}
 ! CHECK:         func.func private @_FortranAAssignTemporary(!fir.ref<!fir.box<none>>, !fir.box<none>, !fir.ref<i8>, i32) -> none attributes {fir.runtime}
-! CHECK:         fir.global linkonce @_QQcl.15bb3546db13f18936259fad06b908b5 constant : !fir.char<1,67> {
-! CHECK:           %[[VAL_20:[-0-9A-Za-z._]+]] = fir.string_lit "/home/rpenacob/llvm-mono/flang/test/OmpSs/Lower/FIR/toutline07.f90\00"(67) : !fir.char<1,67>
-! CHECK:           fir.has_value %[[VAL_20]] : !fir.char<1,67>
-! CHECK:         }
 ! CHECK:       }
 
