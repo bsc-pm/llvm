@@ -46,7 +46,7 @@ end module
 ! CHECK:             %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 23 : i32
 ! CHECK:             %[[VAL_13:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_1]] : (!fir.ref<!fir.box<!fir.array<?xf32>>>) -> !fir.ref<!fir.box<none>>
 ! CHECK:             %[[VAL_14:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_0]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<none>
-! CHECK:             %[[VAL_15:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_11]] : (!fir.ref<!fir.char<1,67>>) -> !fir.ref<i8>
+! CHECK:             %[[VAL_15:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_11]]
 ! CHECK:             %[[VAL_16:[-0-9A-Za-z._]+]] = fir.call @_FortranAAssignTemporary(%[[VAL_13]], %[[VAL_14]], %[[VAL_15]], %[[VAL_12]]) fastmath<contract> : (!fir.ref<!fir.box<none>>, !fir.box<none>, !fir.ref<i8>, i32) -> none
 ! CHECK:             fir.result %[[VAL_8]] : !fir.heap<!fir.array<?xf32>>
 ! CHECK:           }
@@ -68,7 +68,7 @@ end module
 ! CHECK:               %[[VAL_28:[-0-9A-Za-z._]+]] = arith.constant true
 ! CHECK:               %[[VAL_29:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_23]] : (!fir.ref<!fir.box<!fir.array<?xf32>>>) -> !fir.ref<!fir.box<none>>
 ! CHECK:               %[[VAL_30:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_25]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<none>
-! CHECK:               %[[VAL_31:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_26]] : (!fir.ref<!fir.char<1,67>>) -> !fir.ref<i8>
+! CHECK:               %[[VAL_31:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_26]]
 ! CHECK:               %[[VAL_32:[-0-9A-Za-z._]+]] = fir.call @_FortranACopyOutAssign(%[[VAL_29]], %[[VAL_30]], %[[VAL_28]], %[[VAL_31]], %[[VAL_27]]) fastmath<contract> : (!fir.ref<!fir.box<none>>, !fir.box<none>, i1, !fir.ref<i8>, i32) -> none
 ! CHECK:               fir.freemem %[[VAL_4]] : !fir.heap<!fir.array<?xf32>>
 ! CHECK:             }

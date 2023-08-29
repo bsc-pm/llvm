@@ -36,7 +36,7 @@ end subroutine
 ! CHECK:             %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 15 : i32
 ! CHECK:             %[[VAL_13:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_1]] : (!fir.ref<!fir.box<!fir.array<?xf32>>>) -> !fir.ref<!fir.box<none>>
 ! CHECK:             %[[VAL_14:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_0]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<none>
-! CHECK:             %[[VAL_15:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_11]] : (!fir.ref<!fir.char<1,67>>) -> !fir.ref<i8>
+! CHECK:             %[[VAL_15:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_11]]
 ! CHECK:             %[[VAL_16:[-0-9A-Za-z._]+]] = fir.call @_FortranAAssignTemporary(%[[VAL_13]], %[[VAL_14]], %[[VAL_15]], %[[VAL_12]]) fastmath<contract> : (!fir.ref<!fir.box<none>>, !fir.box<none>, !fir.ref<i8>, i32) -> none
 ! CHECK:             fir.result %[[VAL_8]] : !fir.heap<!fir.array<?xf32>>
 ! CHECK:           }

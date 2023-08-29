@@ -42,7 +42,7 @@ end subroutine
 ! FIRDialect:             %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 5 : i32
 ! FIRDialect:             %[[VAL_13:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_1]] : (!fir.ref<!fir.box<!fir.array<?xf32>>>) -> !fir.ref<!fir.box<none>>
 ! FIRDialect:             %[[VAL_14:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_0]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<none>
-! FIRDialect:             %[[VAL_15:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_11]] : (!fir.ref<!fir.char<1,66>>) -> !fir.ref<i8>
+! FIRDialect:             %[[VAL_15:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_11]]
 ! FIRDialect:             %[[VAL_16:[-0-9A-Za-z._]+]] = fir.call @_FortranAAssignTemporary(%[[VAL_13]], %[[VAL_14]], %[[VAL_15]], %[[VAL_12]]) fastmath<contract> : (!fir.ref<!fir.box<none>>, !fir.box<none>, !fir.ref<i8>, i32) -> none
 ! FIRDialect:             fir.result %[[VAL_8]] : !fir.heap<!fir.array<?xf32>>
 ! FIRDialect:           }
@@ -93,7 +93,7 @@ end subroutine
 ! FIRDialect:               %[[VAL_41:[-0-9A-Za-z._]+]] = arith.constant true
 ! FIRDialect:               %[[VAL_42:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_35]] : (!fir.ref<!fir.box<!fir.array<?xf32>>>) -> !fir.ref<!fir.box<none>>
 ! FIRDialect:               %[[VAL_43:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_38]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<none>
-! FIRDialect:               %[[VAL_44:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_39]] : (!fir.ref<!fir.char<1,66>>) -> !fir.ref<i8>
+! FIRDialect:               %[[VAL_44:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_39]]
 ! FIRDialect:               %[[VAL_45:[-0-9A-Za-z._]+]] = fir.call @_FortranACopyOutAssign(%[[VAL_42]], %[[VAL_43]], %[[VAL_41]], %[[VAL_44]], %[[VAL_40]]) fastmath<contract> : (!fir.ref<!fir.box<none>>, !fir.box<none>, i1, !fir.ref<i8>, i32) -> none
 ! FIRDialect:               fir.freemem %[[VAL_26]] : !fir.heap<!fir.array<?xf32>>
 ! FIRDialect:             }
