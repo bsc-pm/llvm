@@ -840,6 +840,11 @@ StmtResult Parser::ParseHlsPragma(ParsedStmtContext Allowed) {
         ConsumeToken();
       }
     } else {
+        if (Tok.isOneOf(tok::l_square, tok::r_square)) {
+            //May want to look inside the bracket and add identifiers to the reference list
+            //just consuming the tokens should be fine
+            ConsumeBracket();
+        }
       ConsumeToken();
     }
   }
