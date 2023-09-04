@@ -1113,24 +1113,7 @@ static void __kmp_task_finish(kmp_int32 gtid, kmp_task_t *task,
   KMP_DEBUG_ASSERT(taskdata->td_flags.started == 1);
   KMP_DEBUG_ASSERT(taskdata->td_flags.freed == 0);
 
-  // Remove task finish event
-  kmp_uint32 pending_events_count
-    = KMP_TEST_THEN_ADD32(&taskdata->td_allow_completion_event.pending_events_count, -1);
-  bool completed = pending_events_count == 1;
-  if (!completed) {
-    // no access to taskdata after this point!
-    // __kmp_fulfill_event might free taskdata at any time from now
-
-#if OMPT_SUPPORT
-    // For a detached task, which is not completed, we switch back
-    // the omp_fulfill_event signals completion
-    // locking is necessary to avoid a race with ompt_task_late_fulfill
-    if (ompt)
-      __ompt_task_finish(task, resumed_task, ompt_task_detach);
-#endif
-
-  }
-
+  bool completed = true;
   // Tasks with valid target async handles must be re-enqueued.
   if (taskdata->td_target_data.async_handle != NULL) {
     // Note: no need to translate gtid to its shadow. If the current thread is a
@@ -1140,6 +1123,26 @@ static void __kmp_task_finish(kmp_int32 gtid, kmp_task_t *task,
     if (KMP_HIDDEN_HELPER_THREAD(gtid))
       __kmp_hidden_helper_worker_thread_signal();
     completed = false;
+  }
+
+  if (completed) {
+    // Remove task finish event
+    kmp_uint32 pending_events_count
+      = KMP_TEST_THEN_ADD32(&taskdata->td_allow_completion_event.pending_events_count, -1);
+    completed = pending_events_count == 1;
+    if (!completed) {
+      // no access to taskdata after this point!
+      // __kmp_fulfill_event might free taskdata at any time from now
+
+#if OMPT_SUPPORT
+      // For a detached task, which is not completed, we switch back
+      // the omp_fulfill_event signals completion
+      // locking is necessary to avoid a race with ompt_task_late_fulfill
+      if (ompt)
+        __ompt_task_finish(task, resumed_task, ompt_task_detach);
+#endif
+
+    }
   }
 
   if (completed) {
