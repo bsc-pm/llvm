@@ -17,6 +17,7 @@ void foo(int *p) {
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int *' lvalue ParmVar 0x{{.*}} 'p' 'int *'
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'const int' lvalue Var 0x{{.*}} 'N' 'const int' non_odr_use_constant
-// CHECK-NEXT: OSSFirstprivateClause 0x{{.*}} <<invalid sloc>> <implicit>
+// CHECK: OSSFirstprivateClause 0x{{.*}} <<invalid sloc>> <implicit>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int *' lvalue ParmVar 0x{{.*}} 'p' 'int *'
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'const int' lvalue Var 0x{{.*}} 'N' 'const int' non_odr_use_constant
+

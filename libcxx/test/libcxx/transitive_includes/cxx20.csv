@@ -88,12 +88,14 @@ bitset cstddef
 bitset cstdint
 bitset cstdlib
 bitset cstring
+bitset cwchar
 bitset initializer_list
 bitset iosfwd
 bitset limits
 bitset new
 bitset stdexcept
 bitset string
+bitset string_view
 bitset type_traits
 bitset version
 ccomplex complex
@@ -117,7 +119,6 @@ chrono compare
 chrono concepts
 chrono cstddef
 chrono cstdint
-chrono cstdlib
 chrono cstring
 chrono ctime
 chrono limits
@@ -133,6 +134,7 @@ chrono tuple
 chrono type_traits
 chrono version
 cinttypes cstdint
+cmath limits
 cmath type_traits
 cmath version
 codecvt atomic
@@ -151,6 +153,7 @@ codecvt mutex
 codecvt new
 codecvt stdexcept
 codecvt string
+codecvt tuple
 codecvt type_traits
 codecvt typeinfo
 codecvt version
@@ -310,7 +313,6 @@ format array
 format cmath
 format cstddef
 format cstdint
-format cstdlib
 format initializer_list
 format limits
 format locale
@@ -362,6 +364,7 @@ fstream new
 fstream ostream
 fstream stdexcept
 fstream string
+fstream tuple
 fstream type_traits
 fstream typeinfo
 fstream version
@@ -411,6 +414,7 @@ iomanip istream
 iomanip version
 ios atomic
 ios cctype
+ios cerrno
 ios clocale
 ios concepts
 ios cstddef
@@ -426,6 +430,7 @@ ios new
 ios stdexcept
 ios string
 ios system_error
+ios tuple
 ios type_traits
 ios typeinfo
 ios version
@@ -508,6 +513,7 @@ locale new
 locale stdexcept
 locale streambuf
 locale string
+locale tuple
 locale type_traits
 locale typeinfo
 locale version
@@ -644,11 +650,21 @@ ostream string
 ostream type_traits
 ostream typeinfo
 ostream version
+print array
+print cerrno
+print cmath
 print cstddef
 print cstdint
+print cstdio
 print initializer_list
 print limits
+print locale
+print new
+print optional
+print stdexcept
+print string
 print string_view
+print tuple
 print version
 queue compare
 queue concepts
@@ -713,6 +729,7 @@ regex mutex
 regex new
 regex stdexcept
 regex string
+regex tuple
 regex type_traits
 regex typeinfo
 regex utility
@@ -800,8 +817,12 @@ stdexcept iosfwd
 stop_token atomic
 stop_token cstddef
 stop_token cstdint
+stop_token cstring
+stop_token ctime
 stop_token limits
+stop_token ratio
 stop_token thread
+stop_token type_traits
 stop_token version
 streambuf cstdint
 streambuf ios
@@ -864,7 +885,6 @@ thread cerrno
 thread compare
 thread cstddef
 thread cstdint
-thread cstdlib
 thread cstring
 thread ctime
 thread functional
@@ -873,6 +893,7 @@ thread limits
 thread locale
 thread new
 thread ratio
+thread sstream
 thread stdexcept
 thread string
 thread string_view

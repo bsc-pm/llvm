@@ -62,27 +62,33 @@ StorageLocation &DataflowAnalysisContext::createStorageLocation(QualType Type) {
   if (!Type.isNull() && Type->isRecordType()) {
     llvm::DenseMap<const ValueDecl *, StorageLocation *> FieldLocs;
     for (const FieldDecl *Field : getModeledFields(Type))
-      FieldLocs.insert({Field, &createStorageLocation(Field->getType())});
-    return arena().create<AggregateStorageLocation>(Type, std::move(FieldLocs));
+      if (Field->getType()->isReferenceType())
+        FieldLocs.insert({Field, nullptr});
+      else
+        FieldLocs.insert({Field, &createStorageLocation(
+                                     Field->getType().getNonReferenceType())});
+    return arena().create<RecordStorageLocation>(Type, std::move(FieldLocs));
   }
   return arena().create<ScalarStorageLocation>(Type);
 }
 
 StorageLocation &
 DataflowAnalysisContext::getStableStorageLocation(const VarDecl &D) {
-  if (auto *Loc = getStorageLocation(D))
+  if (auto *Loc = DeclToLoc.lookup(&D))
     return *Loc;
-  auto &Loc = createStorageLocation(D.getType());
-  setStorageLocation(D, Loc);
+  auto &Loc = createStorageLocation(D.getType().getNonReferenceType());
+  DeclToLoc[&D] = &Loc;
   return Loc;
 }
 
 StorageLocation &
 DataflowAnalysisContext::getStableStorageLocation(const Expr &E) {
-  if (auto *Loc = getStorageLocation(E))
+  const Expr &CanonE = ignoreCFGOmittedNodes(E);
+
+  if (auto *Loc = ExprToLoc.lookup(&CanonE))
     return *Loc;
-  auto &Loc = createStorageLocation(E.getType());
-  setStorageLocation(E, Loc);
+  auto &Loc = createStorageLocation(CanonE.getType());
+  ExprToLoc[&CanonE] = &Loc;
   return Loc;
 }
 

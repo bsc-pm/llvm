@@ -247,7 +247,7 @@ attributes #5 = { nounwind "frame-pointer"="none" "no-trapping-math"="true" "sta
 ; CHECK-NEXT:    store i32 [[N]], ptr [[N_ADDR]], align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N_ADDR]], align 4, !dbg [[DBG9:![0-9]+]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64, !dbg [[DBG10:![0-9]+]]
-; CHECK-NEXT:    [[TMP2:%.*]] = call ptr @llvm.stacksave(), !dbg [[DBG10]]
+; CHECK-NEXT:    [[TMP2:%.*]] = call ptr @llvm.stacksave.p0(), !dbg [[DBG10]]
 ; CHECK-NEXT:    store ptr [[TMP2]], ptr [[SAVED_STACK]], align 8, !dbg [[DBG10]]
 ; CHECK-NEXT:    [[VLA:%.*]] = alloca i32, i64 [[TMP1]], align 16, !dbg [[DBG10]]
 ; CHECK-NEXT:    store i64 [[TMP1]], ptr [[__VLA_EXPR0]], align 8, !dbg [[DBG10]]
@@ -303,7 +303,7 @@ attributes #5 = { nounwind "frame-pointer"="none" "no-trapping-math"="true" "sta
 ; CHECK-NEXT:    br label [[FINAL_END1:%.*]], !dbg [[DBG12]]
 ; CHECK:       final.end1:
 ; CHECK-NEXT:    [[TMP26:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG13:![0-9]+]]
-; CHECK-NEXT:    call void @llvm.stackrestore(ptr [[TMP26]]), !dbg [[DBG13]]
+; CHECK-NEXT:    call void @llvm.stackrestore.p0(ptr [[TMP26]]), !dbg [[DBG13]]
 ; CHECK-NEXT:    ret void, !dbg [[DBG13]]
 ; CHECK:       final.then:
 ; CHECK-NEXT:    br label [[FINAL_END]], !dbg [[DBG12]]
@@ -328,7 +328,7 @@ attributes #5 = { nounwind "frame-pointer"="none" "no-trapping-math"="true" "sta
 ; CHECK-NEXT:    store i32 [[N]], ptr [[N_ADDR]], align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N_ADDR]], align 4, !dbg [[DBG15:![0-9]+]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64, !dbg [[DBG16:![0-9]+]]
-; CHECK-NEXT:    [[TMP2:%.*]] = call ptr @llvm.stacksave(), !dbg [[DBG16]]
+; CHECK-NEXT:    [[TMP2:%.*]] = call ptr @llvm.stacksave.p0(), !dbg [[DBG16]]
 ; CHECK-NEXT:    store ptr [[TMP2]], ptr [[SAVED_STACK]], align 8, !dbg [[DBG16]]
 ; CHECK-NEXT:    [[VLA:%.*]] = alloca [[STRUCT_S:%.*]], i64 [[TMP1]], align 16, !dbg [[DBG16]]
 ; CHECK-NEXT:    store i64 [[TMP1]], ptr [[__VLA_EXPR0]], align 8, !dbg [[DBG16]]
@@ -404,12 +404,12 @@ attributes #5 = { nounwind "frame-pointer"="none" "no-trapping-math"="true" "sta
 ; CHECK:       arraydestroy.body:
 ; CHECK-NEXT:    [[ARRAYDESTROY_ELEMENTPAST:%.*]] = phi ptr [ [[TMP27]], [[FINAL_END2]] ], [ [[ARRAYDESTROY_ELEMENT:%.*]], [[ARRAYDESTROY_BODY]] ], !dbg [[DBG20]]
 ; CHECK-NEXT:    [[ARRAYDESTROY_ELEMENT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYDESTROY_ELEMENTPAST]], i64 -1, !dbg [[DBG20]]
-; CHECK-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYDESTROY_ELEMENT]]) #[[ATTR2:[0-9]+]], !dbg [[DBG20]]
+; CHECK-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYDESTROY_ELEMENT]]) #[[ATTR1:[0-9]+]], !dbg [[DBG20]]
 ; CHECK-NEXT:    [[ARRAYDESTROY_DONE:%.*]] = icmp eq ptr [[ARRAYDESTROY_ELEMENT]], [[VLA]], !dbg [[DBG20]]
 ; CHECK-NEXT:    br i1 [[ARRAYDESTROY_DONE]], label [[ARRAYDESTROY_DONE1]], label [[ARRAYDESTROY_BODY]], !dbg [[DBG20]]
 ; CHECK:       arraydestroy.done1:
 ; CHECK-NEXT:    [[TMP28:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG20]]
-; CHECK-NEXT:    call void @llvm.stackrestore(ptr [[TMP28]]), !dbg [[DBG20]]
+; CHECK-NEXT:    call void @llvm.stackrestore.p0(ptr [[TMP28]]), !dbg [[DBG20]]
 ; CHECK-NEXT:    ret void, !dbg [[DBG20]]
 ; CHECK:       final.then:
 ; CHECK-NEXT:    br label [[FINAL_END]], !dbg [[DBG19]]
@@ -426,7 +426,7 @@ attributes #5 = { nounwind "frame-pointer"="none" "no-trapping-math"="true" "sta
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@oss_ctor_ZN1SC1Ev
-; CHECK-SAME: (ptr noundef [[TMP0:%.*]], i64 noundef [[TMP1:%.*]]) #[[ATTR4:[0-9]+]] !dbg [[DBG21:![0-9]+]] {
+; CHECK-SAME: (ptr noundef [[TMP0:%.*]], i64 noundef [[TMP1:%.*]]) #[[ATTR3:[0-9]+]] !dbg [[DBG21:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[DOTADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    [[DOTADDR1:%.*]] = alloca i64, align 8
@@ -447,7 +447,7 @@ attributes #5 = { nounwind "frame-pointer"="none" "no-trapping-math"="true" "sta
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@oss_dtor_ZN1SD1Ev
-; CHECK-SAME: (ptr noundef [[TMP0:%.*]], i64 noundef [[TMP1:%.*]]) #[[ATTR4]] !dbg [[DBG25:![0-9]+]] {
+; CHECK-SAME: (ptr noundef [[TMP0:%.*]], i64 noundef [[TMP1:%.*]]) #[[ATTR3]] !dbg [[DBG25:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[DOTADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    [[DOTADDR1:%.*]] = alloca i64, align 8
@@ -459,7 +459,7 @@ attributes #5 = { nounwind "frame-pointer"="none" "no-trapping-math"="true" "sta
 ; CHECK-NEXT:    br label [[ARRAYDTOR_LOOP:%.*]], !dbg [[DBG26]]
 ; CHECK:       arraydtor.loop:
 ; CHECK-NEXT:    [[ARRAYDTOR_DST_CUR:%.*]] = phi ptr [ [[TMP2]], [[ENTRY:%.*]] ], [ [[ARRAYDTOR_DST_NEXT:%.*]], [[ARRAYDTOR_LOOP]] ], !dbg [[DBG26]]
-; CHECK-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYDTOR_DST_CUR]]) #[[ATTR2]], !dbg [[DBG26]]
+; CHECK-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYDTOR_DST_CUR]]) #[[ATTR1]], !dbg [[DBG26]]
 ; CHECK-NEXT:    [[ARRAYDTOR_DST_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYDTOR_DST_CUR]], i64 1, !dbg [[DBG26]]
 ; CHECK-NEXT:    [[ARRAYDTOR_DONE:%.*]] = icmp eq ptr [[ARRAYDTOR_DST_NEXT]], [[ARRAYDTOR_DST_END]], !dbg [[DBG26]]
 ; CHECK-NEXT:    br i1 [[ARRAYDTOR_DONE]], label [[ARRAYDTOR_CONT:%.*]], label [[ARRAYDTOR_LOOP]], !dbg [[DBG26]]
@@ -468,7 +468,7 @@ attributes #5 = { nounwind "frame-pointer"="none" "no-trapping-math"="true" "sta
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@oss_copy_ctor_ZN1SC1ERKS_
-; CHECK-SAME: (ptr noundef [[TMP0:%.*]], ptr noundef [[TMP1:%.*]], i64 noundef [[TMP2:%.*]]) #[[ATTR4]] !dbg [[DBG27:![0-9]+]] {
+; CHECK-SAME: (ptr noundef [[TMP0:%.*]], ptr noundef [[TMP1:%.*]], i64 noundef [[TMP2:%.*]]) #[[ATTR3]] !dbg [[DBG27:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[DOTADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    [[DOTADDR1:%.*]] = alloca ptr, align 8

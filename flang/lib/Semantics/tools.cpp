@@ -1208,13 +1208,13 @@ ComponentIterator<componentKind>::const_iterator::PlanComponentTraversal(
           // Order Component (only visit parents)
           traverse = component.test(Symbol::Flag::ParentComp);
         } else if constexpr (componentKind == ComponentKind::Direct) {
-          traverse = !IsAllocatableOrPointer(component);
+          traverse = !IsAllocatableOrObjectPointer(&component);
         } else if constexpr (componentKind == ComponentKind::Ultimate) {
-          traverse = !IsAllocatableOrPointer(component);
+          traverse = !IsAllocatableOrObjectPointer(&component);
         } else if constexpr (componentKind == ComponentKind::Potential) {
           traverse = !IsPointer(component);
         } else if constexpr (componentKind == ComponentKind::Scope) {
-          traverse = !IsAllocatableOrPointer(component);
+          traverse = !IsAllocatableOrObjectPointer(&component);
         } else if constexpr (componentKind ==
             ComponentKind::PotentialAndPointer) {
           traverse = !IsPointer(component);
@@ -1248,7 +1248,7 @@ static bool StopAtComponentPre(const Symbol &component) {
     return true;
   } else if constexpr (componentKind == ComponentKind::Ultimate) {
     return component.has<ProcEntityDetails>() ||
-        IsAllocatableOrPointer(component) ||
+        IsAllocatableOrObjectPointer(&component) ||
         (component.get<ObjectEntityDetails>().type() &&
             component.get<ObjectEntityDetails>().type()->AsIntrinsic());
   } else if constexpr (componentKind == ComponentKind::Potential) {
@@ -1627,6 +1627,32 @@ void WarnOnDeferredLengthCharacterScalar(SemanticsContext &context,
       }
     }
   }
+}
+
+bool CouldBeDataPointerValuedFunction(const Symbol *original) {
+  if (original) {
+    const Symbol &ultimate{original->GetUltimate()};
+    if (const Symbol * result{FindFunctionResult(ultimate)}) {
+      return IsPointer(*result) && !IsProcedure(*result);
+    }
+    if (const auto *generic{ultimate.detailsIf<GenericDetails>()}) {
+      for (const SymbolRef &ref : generic->specificProcs()) {
+        if (CouldBeDataPointerValuedFunction(&*ref)) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+std::string GetModuleOrSubmoduleName(const Symbol &symbol) {
+  const auto &details{symbol.get<ModuleDetails>()};
+  std::string result{symbol.name().ToString()};
+  if (details.ancestor() && details.ancestor()->symbol()) {
+    result = details.ancestor()->symbol()->name().ToString() + ':' + result;
+  }
+  return result;
 }
 
 } // namespace Fortran::semantics

@@ -200,6 +200,16 @@ ParseResult IncludeOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 //===----------------------------------------------------------------------===//
+// LiteralOp
+//===----------------------------------------------------------------------===//
+
+/// The literal op requires a non-empty value.
+LogicalResult emitc::LiteralOp::verify() {
+  if (getValue().empty())
+    return emitOpError() << "value must not be empty";
+  return success();
+}
+//===----------------------------------------------------------------------===//
 // SubOp
 //===----------------------------------------------------------------------===//
 
@@ -220,7 +230,6 @@ LogicalResult SubOp::verify() {
       !resultType.isa<IntegerType, emitc::OpaqueType>())
     return emitOpError("requires that the result is an integer or of opaque "
                        "type if lhs and rhs are pointers");
-
   return success();
 }
 
@@ -247,6 +256,12 @@ LogicalResult emitc::VariableOp::verify() {
 
 #define GET_OP_CLASSES
 #include "mlir/Dialect/EmitC/IR/EmitC.cpp.inc"
+
+//===----------------------------------------------------------------------===//
+// EmitC Enums
+//===----------------------------------------------------------------------===//
+
+#include "mlir/Dialect/EmitC/IR/EmitCEnums.cpp.inc"
 
 //===----------------------------------------------------------------------===//
 // EmitC Attributes

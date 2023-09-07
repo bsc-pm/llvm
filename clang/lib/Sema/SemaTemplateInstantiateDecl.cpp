@@ -1642,11 +1642,14 @@ Decl *TemplateDeclInstantiator::VisitStaticAssertDecl(StaticAssertDecl *D) {
   if (InstantiatedAssertExpr.isInvalid())
     return nullptr;
 
-  return SemaRef.BuildStaticAssertDeclaration(D->getLocation(),
-                                              InstantiatedAssertExpr.get(),
-                                              D->getMessage(),
-                                              D->getRParenLoc(),
-                                              D->isFailed());
+  ExprResult InstantiatedMessageExpr =
+      SemaRef.SubstExpr(D->getMessage(), TemplateArgs);
+  if (InstantiatedMessageExpr.isInvalid())
+    return nullptr;
+
+  return SemaRef.BuildStaticAssertDeclaration(
+      D->getLocation(), InstantiatedAssertExpr.get(),
+      InstantiatedMessageExpr.get(), D->getRParenLoc(), D->isFailed());
 }
 
 Decl *TemplateDeclInstantiator::VisitEnumDecl(EnumDecl *D) {
@@ -5367,6 +5370,7 @@ void Sema::InstantiateFunctionDefinition(SourceLocation PointOfInstantiation,
     } IR{*this, PatternRec, NewRec};
 
     TypeSourceInfo *NewSI = IR.TransformType(Function->getTypeSourceInfo());
+    assert(NewSI && "Type Transform failed?");
     Function->setType(NewSI->getType());
     Function->setTypeSourceInfo(NewSI);
 

@@ -168,8 +168,6 @@ using StatementSemanticsPass2 = SemanticsVisitor<AllocateChecker,
     MiscChecker, NamelistChecker, NullifyChecker, PurityChecker,
     ReturnStmtChecker, SelectRankConstructChecker, SelectTypeChecker,
     StopChecker>;
-using StatementSemanticsPass3 =
-    SemanticsVisitor<AccStructureChecker, OmpStructureChecker, OSSStructureChecker, CUDAChecker>;
 
 static bool PerformStatementSemantics(
     SemanticsContext &context, parser::Program &program) {
@@ -180,11 +178,17 @@ static bool PerformStatementSemantics(
   StatementSemanticsPass1{context}.Walk(program);
   StatementSemanticsPass2 pass2{context};
   pass2.Walk(program);
-  if (context.languageFeatures().IsEnabled(common::LanguageFeature::OpenACC) ||
-      context.languageFeatures().IsEnabled(common::LanguageFeature::OpenMP) ||
-      context.languageFeatures().IsEnabled(common::LanguageFeature::OmpSs) ||
-      context.languageFeatures().IsEnabled(common::LanguageFeature::CUDA)) {
-    StatementSemanticsPass3{context}.Walk(program);
+  if (context.languageFeatures().IsEnabled(common::LanguageFeature::OmpSs)) {
+    SemanticsVisitor<OSSStructureChecker>{context}.Walk(program);
+  }
+  if (context.languageFeatures().IsEnabled(common::LanguageFeature::OpenACC)) {
+    SemanticsVisitor<AccStructureChecker>{context}.Walk(program);
+  }
+  if (context.languageFeatures().IsEnabled(common::LanguageFeature::OpenMP)) {
+    SemanticsVisitor<OmpStructureChecker>{context}.Walk(program);
+  }
+  if (context.languageFeatures().IsEnabled(common::LanguageFeature::CUDA)) {
+    SemanticsVisitor<CUDAChecker>{context}.Walk(program);
   }
   if (!context.AnyFatalError()) {
     pass2.CompileDataInitializationsIntoInitializers();
@@ -356,17 +360,54 @@ void SemanticsContext::CheckError(const Symbol &symbol) {
   }
 }
 
+bool SemanticsContext::ScopeIndexComparator::operator()(
+    parser::CharBlock x, parser::CharBlock y) const {
+  return x.begin() < y.begin() ||
+      (x.begin() == y.begin() && x.size() > y.size());
+}
+
+auto SemanticsContext::SearchScopeIndex(parser::CharBlock source)
+    -> ScopeIndex::iterator {
+  if (!scopeIndex_.empty()) {
+    auto iter{scopeIndex_.upper_bound(source)};
+    auto begin{scopeIndex_.begin()};
+    do {
+      --iter;
+      if (iter->first.Contains(source)) {
+        return iter;
+      }
+    } while (iter != begin);
+  }
+  return scopeIndex_.end();
+}
+
 const Scope &SemanticsContext::FindScope(parser::CharBlock source) const {
   return const_cast<SemanticsContext *>(this)->FindScope(source);
 }
 
 Scope &SemanticsContext::FindScope(parser::CharBlock source) {
-  if (auto *scope{globalScope_.FindScope(source)}) {
-    return *scope;
+  if (auto iter{SearchScopeIndex(source)}; iter != scopeIndex_.end()) {
+    return iter->second;
   } else {
     common::die(
         "SemanticsContext::FindScope(): invalid source location for '%s'",
         source.ToString().c_str());
+  }
+}
+
+void SemanticsContext::UpdateScopeIndex(
+    Scope &scope, parser::CharBlock newSource) {
+  if (scope.sourceRange().empty()) {
+    scopeIndex_.emplace(newSource, scope);
+  } else if (!scope.sourceRange().Contains(newSource)) {
+    auto iter{SearchScopeIndex(scope.sourceRange())};
+    CHECK(iter != scopeIndex_.end());
+    while (&iter->second != &scope) {
+      CHECK(iter != scopeIndex_.begin());
+      --iter;
+    }
+    scopeIndex_.erase(iter);
+    scopeIndex_.emplace(newSource, scope);
   }
 }
 
@@ -521,8 +562,11 @@ bool Semantics::Perform() {
                     .statement.v.source == "__ppc_types")) {
       // Don't try to read the builtins module when we're actually building it.
     } else if (frontModule &&
-        std::get<parser::Statement<parser::ModuleStmt>>(frontModule->value().t)
-                .statement.v.source == "__ppc_intrinsics") {
+        (std::get<parser::Statement<parser::ModuleStmt>>(frontModule->value().t)
+                    .statement.v.source == "__ppc_intrinsics" ||
+            std::get<parser::Statement<parser::ModuleStmt>>(
+                frontModule->value().t)
+                    .statement.v.source == "mma")) {
       // The derived type definition for the vectors is needed.
       context_.UsePPCBuiltinTypesModule();
     } else {

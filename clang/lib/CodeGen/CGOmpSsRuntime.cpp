@@ -1435,7 +1435,7 @@ llvm::Function *CGOmpSsRuntime::createCallWrapperFunc(
   for (auto &Arg : Args)
     ArgTypes.push_back(C.getCanonicalParamType(Arg->getType()));
   const CGFunctionInfo &FuncInfo = CGF.CGM.getTypes().arrangeLLVMFunctionInfo(
-    GetReturnType(RetQ), /*instanceMethod=*/false, /*chainCall=*/false,
+    GetReturnType(RetQ), FnInfoOpts::None,
     ArgTypes, FunctionType::ExtInfo(CC_Trivial), {}, RequiredArgs::All);
 
   llvm::FunctionType *FuncType = CGF.CGM.getTypes().GetFunctionType(FuncInfo);

@@ -67,7 +67,7 @@ public:
   DefGen(const AttrOrTypeDef &def);
 
   void emitDecl(raw_ostream &os) const {
-    if (storageCls) {
+    if (storageCls && def.genStorageClass()) {
       NamespaceEmitter ns(os, def.getStorageNamespace());
       os << "struct " << def.getStorageClassName() << ";\n";
     }
@@ -763,7 +763,7 @@ static const char *const dialectDynamicTypeParserDispatch = R"(
   {
     auto parseResult = parseOptionalDynamicType(mnemonic, parser, genType);
     if (parseResult.has_value()) {
-      if (::mlir::succeeded(parseResult.getValue()))
+      if (::mlir::succeeded(parseResult.value()))
         return genType;
       return ::mlir::Type();
     }

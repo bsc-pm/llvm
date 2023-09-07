@@ -11,7 +11,9 @@
 #include <filesystem>
 #include <time.h>
 
-#include "time_utils.h"
+#if defined(_LIBCPP_WIN32API)
+#  include "time_utils.h"
+#endif
 
 #if defined(_LIBCPP_WIN32API)
 # define WIN32_LEAN_AND_MEAN
@@ -27,7 +29,7 @@
 # include <sys/time.h> // for gettimeofday and timeval
 #endif
 
-#if defined(__APPLE__) || (defined(_POSIX_TIMERS) && _POSIX_TIMERS > 0)
+#if defined(__APPLE__) || defined (__gnu_hurd__) || (defined(_POSIX_TIMERS) && _POSIX_TIMERS > 0)
 # define _LIBCPP_HAS_CLOCK_GETTIME
 #endif
 

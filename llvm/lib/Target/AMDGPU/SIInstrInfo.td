@@ -604,14 +604,14 @@ def atomic_store_64_glue : PatFrag <
 }
 
 let IsAtomic = 1, AddressSpaces = StoreAddress_local.AddrSpaces in {
-def atomic_store_8_local_m0 : PatFrag<(ops node:$ptr, node:$val),
-                                       (atomic_store_8_glue node:$ptr, node:$val)>;
-def atomic_store_16_local_m0 : PatFrag<(ops node:$ptr, node:$val),
-                                       (atomic_store_16_glue node:$ptr, node:$val)>;
-def atomic_store_32_local_m0 : PatFrag<(ops node:$ptr, node:$val),
-                                       (atomic_store_32_glue node:$ptr, node:$val)>;
-def atomic_store_64_local_m0 : PatFrag<(ops node:$ptr, node:$val),
-                                       (atomic_store_64_glue node:$ptr, node:$val)>;
+def atomic_store_8_local_m0 : PatFrag<(ops node:$val, node:$ptr),
+                                       (atomic_store_8_glue node:$val, node:$ptr)>;
+def atomic_store_16_local_m0 : PatFrag<(ops node:$val, node:$ptr),
+                                       (atomic_store_16_glue node:$val, node:$ptr)>;
+def atomic_store_32_local_m0 : PatFrag<(ops node:$val, node:$ptr),
+                                       (atomic_store_32_glue node:$val, node:$ptr)>;
+def atomic_store_64_local_m0 : PatFrag<(ops node:$val, node:$ptr),
+                                       (atomic_store_64_glue node:$val, node:$ptr)>;
 } // End let IsAtomic = 1, AddressSpaces = StoreAddress_local.AddrSpaces
 
 
@@ -1340,7 +1340,16 @@ def DS128Bit8ByteAligned : ComplexPattern<iPTR, 3, "SelectDS128Bit8ByteAligned">
 def MOVRELOffset : ComplexPattern<iPTR, 2, "SelectMOVRELOffset">;
 
 def VOP3Mods0 : ComplexPattern<untyped, 4, "SelectVOP3Mods0">;
+
+// Modifiers for floating point instructions.
 def VOP3Mods  : ComplexPattern<untyped, 2, "SelectVOP3Mods">;
+
+// VOP3 modifiers used for instructions that do not read canonicalized
+// floating point values (i.e. integer operations with FP source
+// modifiers)
+def VOP3ModsNonCanonicalizing : ComplexPattern<untyped, 2,
+  "SelectVOP3ModsNonCanonicalizing">;
+
 def VOP3NoMods : ComplexPattern<untyped, 1, "SelectVOP3NoMods">;
 
 def VOP3OMods : ComplexPattern<untyped, 3, "SelectVOP3OMods">;

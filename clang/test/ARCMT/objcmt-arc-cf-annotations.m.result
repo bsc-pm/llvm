@@ -1769,7 +1769,6 @@ void rdar_10824732(void) {
 }
 
 // Stop tracking objects passed to functions, which take callbacks as parameters.
-// radar://10973977
 typedef int (*CloseCallback) (void *);
 void ReaderForIO(CloseCallback ioclose, void *ioctx);
 int IOClose(void *context);
@@ -1794,7 +1793,7 @@ int IOClose(void *context);
 }
 @end
 
-// Object escapes through a selector callback: radar://11398514
+// Object escapes through a selector callback
 extern id NSApp;
 @interface MySheetController
 - (id<SInS>)inputS;

@@ -144,9 +144,8 @@ Address CodeGenFunction::CreateMemTemp(QualType Ty, CharUnits Align,
     auto *VectorTy = llvm::FixedVectorType::get(ArrayTy->getElementType(),
                                                 ArrayTy->getNumElements());
 
-    Result = Address(
-        Builder.CreateBitCast(Result.getPointer(), VectorTy->getPointerTo()),
-        VectorTy, Result.getAlignment(), KnownNonNull);
+    Result = Address(Result.getPointer(), VectorTy, Result.getAlignment(),
+                     KnownNonNull);
   }
   return Result;
 }
@@ -396,7 +395,7 @@ static Address createReferenceTemporary(CodeGenFunction &CGF,
     QualType Ty = Inner->getType();
     if (CGF.CGM.getCodeGenOpts().MergeAllConstants &&
         (Ty->isArrayType() || Ty->isRecordType()) &&
-        CGF.CGM.isTypeConstant(Ty, true, false))
+        Ty.isConstantStorage(CGF.getContext(), true, false))
       if (auto Init = ConstantEmitter(CGF).tryEmitAbstract(Inner, Ty)) {
         auto AS = CGF.CGM.GetGlobalConstantAddressSpace();
         auto *GV = new llvm::GlobalVariable(
@@ -750,9 +749,8 @@ void CodeGenFunction::EmitTypeCheck(TypeCheckKind TCK, SourceLocation Loc,
       llvm::Value *Min = Builder.getFalse();
       llvm::Value *NullIsUnknown = Builder.getFalse();
       llvm::Value *Dynamic = Builder.getFalse();
-      llvm::Value *CastAddr = Builder.CreateBitCast(Ptr, Int8PtrTy);
       llvm::Value *LargeEnough = Builder.CreateICmpUGE(
-          Builder.CreateCall(F, {CastAddr, Min, NullIsUnknown, Dynamic}), Size);
+          Builder.CreateCall(F, {Ptr, Min, NullIsUnknown, Dynamic}), Size);
       Checks.push_back(std::make_pair(LargeEnough, SanitizerKind::ObjectSize));
     }
   }
@@ -829,9 +827,7 @@ void CodeGenFunction::EmitTypeCheck(TypeCheckKind TCK, SourceLocation Loc,
 
       // Load the vptr, and compute hash_16_bytes(TypeHash, vptr).
       llvm::Value *Low = llvm::ConstantInt::get(Int64Ty, TypeHash);
-      llvm::Type *VPtrTy = llvm::PointerType::get(IntPtrTy, 0);
-      Address VPtrAddr(Builder.CreateBitCast(Ptr, VPtrTy), IntPtrTy,
-                       getPointerAlign());
+      Address VPtrAddr(Ptr, IntPtrTy, getPointerAlign());
       llvm::Value *VPtrVal = Builder.CreateLoad(VPtrAddr);
       llvm::Value *High = Builder.CreateZExt(VPtrVal, Int64Ty);
 
@@ -2500,14 +2496,6 @@ static void setObjCGCLValueClass(const ASTContext &Ctx, const Expr *E,
   }
 }
 
-static llvm::Value *
-EmitBitCastOfLValueToProperType(CodeGenFunction &CGF,
-                                llvm::Value *V, llvm::Type *IRType,
-                                StringRef Name = StringRef()) {
-  unsigned AS = cast<llvm::PointerType>(V->getType())->getAddressSpace();
-  return CGF.Builder.CreateBitCast(V, IRType->getPointerTo(AS), Name);
-}
-
 static LValue EmitThreadPrivateVarDeclLValue(
     CodeGenFunction &CGF, const VarDecl *VD, QualType T, Address Addr,
     llvm::Type *RealVarTy, SourceLocation Loc) {
@@ -2608,7 +2596,6 @@ static LValue EmitGlobalVarDeclLValue(CodeGenFunction &CGF,
     V = CGF.Builder.CreateThreadLocalAddress(V);
 
   llvm::Type *RealVarTy = CGF.getTypes().ConvertTypeForMem(VD->getType());
-  V = EmitBitCastOfLValueToProperType(CGF, V, RealVarTy);
   CharUnits Alignment = CGF.getContext().getDeclAlign(VD);
   Address Addr(V, RealVarTy, Alignment);
   // Emit reference to the private copy of the variable if it is an OpenMP
@@ -2700,8 +2687,7 @@ static LValue EmitGlobalNamedRegister(const VarDecl *VD, CodeGenModule &CGM) {
 /// this context.
 static bool canEmitSpuriousReferenceToVariable(CodeGenFunction &CGF,
                                                const DeclRefExpr *E,
-                                               const VarDecl *VD,
-                                               bool IsConstant) {
+                                               const VarDecl *VD) {
   // For a variable declared in an enclosing scope, do not emit a spurious
   // reference even if we have a capture, as that will emit an unwarranted
   // reference to our capture state, and will likely generate worse code than
@@ -2734,7 +2720,7 @@ static bool canEmitSpuriousReferenceToVariable(CodeGenFunction &CGF,
   // We can emit a spurious reference only if the linkage implies that we'll
   // be emitting a non-interposable symbol that will be retained until link
   // time.
-  switch (CGF.CGM.getLLVMLinkageVarDefinition(VD, IsConstant)) {
+  switch (CGF.CGM.getLLVMLinkageVarDefinition(VD)) {
   case llvm::GlobalValue::ExternalLinkage:
   case llvm::GlobalValue::LinkOnceODRLinkage:
   case llvm::GlobalValue::WeakODRLinkage:
@@ -2784,7 +2770,7 @@ LValue CodeGenFunction::EmitDeclRefLValue(const DeclRefExpr *E) {
           && VD->getType()->isReferenceType()) &&
       E->isNonOdrUse() == NOUR_Constant &&
         (VD->getType()->isReferenceType() ||
-         !canEmitSpuriousReferenceToVariable(*this, E, VD, true))) {
+         !canEmitSpuriousReferenceToVariable(*this, E, VD))) {
       VD->getAnyInitializer(VD);
       llvm::Constant *Val = ConstantEmitter(*this).emitAbstract(
           E->getLocation(), *VD->evaluateValue(), VD->getType());
@@ -2886,7 +2872,7 @@ LValue CodeGenFunction::EmitDeclRefLValue(const DeclRefExpr *E) {
     // some reason; most likely, because it's in an outer function.
     } else if (VD->isStaticLocal()) {
       llvm::Constant *var = CGM.getOrCreateStaticVarDecl(
-          *VD, CGM.getLLVMLinkageVarDefinition(VD, /*IsConstant=*/false));
+          *VD, CGM.getLLVMLinkageVarDefinition(VD));
       addr = Address(
           var, ConvertTypeForMem(VD->getType()), getContext().getDeclAlign(VD));
 
@@ -3448,8 +3434,7 @@ void CodeGenFunction::EmitCfiSlowPathCheck(
         "__cfi_slowpath_diag",
         llvm::FunctionType::get(VoidTy, {Int64Ty, Int8PtrTy, Int8PtrTy},
                                 false));
-    CheckCall = Builder.CreateCall(
-        SlowPathFn, {TypeId, Ptr, Builder.CreateBitCast(InfoPtr, Int8PtrTy)});
+    CheckCall = Builder.CreateCall(SlowPathFn, {TypeId, Ptr, InfoPtr});
   } else {
     SlowPathFn = CGM.getModule().getOrInsertFunction(
         "__cfi_slowpath",
@@ -3472,14 +3457,12 @@ void CodeGenFunction::EmitCfiCheckStub() {
   llvm::Function *F = llvm::Function::Create(
       llvm::FunctionType::get(VoidTy, {Int64Ty, Int8PtrTy, Int8PtrTy}, false),
       llvm::GlobalValue::WeakAnyLinkage, "__cfi_check", M);
+  F->setAlignment(llvm::Align(4096));
   CGM.setDSOLocal(F);
   llvm::BasicBlock *BB = llvm::BasicBlock::Create(Ctx, "entry", F);
-  // FIXME: consider emitting an intrinsic call like
-  // call void @llvm.cfi_check(i64 %0, i8* %1, i8* %2)
-  // which can be lowered in CrossDSOCFI pass to the actual contents of
-  // __cfi_check. This would allow inlining of __cfi_check calls.
-  llvm::CallInst::Create(
-      llvm::Intrinsic::getDeclaration(M, llvm::Intrinsic::trap), "", BB);
+  // CrossDSOCFI pass is not executed if there is no executable code.
+  SmallVector<llvm::Value*> Args{F->getArg(2), F->getArg(1)};
+  llvm::CallInst::Create(M->getFunction("__cfi_check_fail"), Args, "", BB);
   llvm::ReturnInst::Create(Ctx, nullptr, BB);
 }
 
@@ -5367,6 +5350,10 @@ RValue CodeGenFunction::EmitCall(QualType CalleeType, const CGCallee &OrigCallee
   const Decl *TargetDecl =
       OrigCallee.getAbstractInfo().getCalleeDecl().getDecl();
 
+  assert((!isa_and_present<FunctionDecl>(TargetDecl) ||
+          !cast<FunctionDecl>(TargetDecl)->isImmediateFunction()) &&
+         "trying to emit a call to an immediate function");
+
   CalleeType = getContext().getCanonicalType(CalleeType);
 
   auto PointeeType = cast<PointerType>(CalleeType)->getPointeeType();
@@ -5409,8 +5396,7 @@ RValue CodeGenFunction::EmitCall(QualType CalleeType, const CGCallee &OrigCallee
         AlignedCalleePtr = CalleePtr;
       }
 
-      llvm::Value *CalleePrefixStruct = Builder.CreateBitCast(
-          AlignedCalleePtr, llvm::PointerType::getUnqual(PrefixStructTy));
+      llvm::Value *CalleePrefixStruct = AlignedCalleePtr;
       llvm::Value *CalleeSigPtr =
           Builder.CreateConstGEP2_32(PrefixStructTy, CalleePrefixStruct, -1, 0);
       llvm::Value *CalleeSig =
@@ -5457,9 +5443,8 @@ RValue CodeGenFunction::EmitCall(QualType CalleeType, const CGCallee &OrigCallee
     llvm::Value *TypeId = llvm::MetadataAsValue::get(getLLVMContext(), MD);
 
     llvm::Value *CalleePtr = Callee.getFunctionPointer();
-    llvm::Value *CastedCallee = Builder.CreateBitCast(CalleePtr, Int8PtrTy);
     llvm::Value *TypeTest = Builder.CreateCall(
-        CGM.getIntrinsic(llvm::Intrinsic::type_test), {CastedCallee, TypeId});
+        CGM.getIntrinsic(llvm::Intrinsic::type_test), {CalleePtr, TypeId});
 
     auto CrossDsoTypeId = CGM.CreateCrossDsoCfiTypeId(MD);
     llvm::Constant *StaticData[] = {
@@ -5469,18 +5454,17 @@ RValue CodeGenFunction::EmitCall(QualType CalleeType, const CGCallee &OrigCallee
     };
     if (CGM.getCodeGenOpts().SanitizeCfiCrossDso && CrossDsoTypeId) {
       EmitCfiSlowPathCheck(SanitizerKind::CFIICall, TypeTest, CrossDsoTypeId,
-                           CastedCallee, StaticData);
+                           CalleePtr, StaticData);
     } else {
       EmitCheck(std::make_pair(TypeTest, SanitizerKind::CFIICall),
                 SanitizerHandler::CFICheckFail, StaticData,
-                {CastedCallee, llvm::UndefValue::get(IntPtrTy)});
+                {CalleePtr, llvm::UndefValue::get(IntPtrTy)});
     }
   }
 
   CallArgList Args;
   if (Chain)
-    Args.add(RValue::get(Builder.CreateBitCast(Chain, CGM.VoidPtrTy)),
-             CGM.getContext().VoidPtrTy);
+    Args.add(RValue::get(Chain), CGM.getContext().VoidPtrTy);
 
   // C++17 requires that we evaluate arguments to a call using assignment syntax
   // right-to-left, and that we evaluate arguments to certain other operators
@@ -5551,10 +5535,8 @@ RValue CodeGenFunction::EmitCall(QualType CalleeType, const CGCallee &OrigCallee
       isa<CUDAKernelCallExpr>(E) &&
       (!TargetDecl || !isa<FunctionDecl>(TargetDecl))) {
     llvm::Value *Handle = Callee.getFunctionPointer();
-    auto *Cast =
-        Builder.CreateBitCast(Handle, Handle->getType()->getPointerTo());
     auto *Stub = Builder.CreateLoad(
-        Address(Cast, Handle->getType(), CGM.getPointerAlign()));
+        Address(Handle, Handle->getType(), CGM.getPointerAlign()));
     Callee.setFunctionPointer(Stub);
   }
   llvm::CallBase *CallOrInvoke = nullptr;
@@ -5623,6 +5605,48 @@ void CodeGenFunction::SetFPAccuracy(llvm::Value *Val, float Accuracy) {
   llvm::MDNode *Node = MDHelper.createFPMath(Accuracy);
 
   cast<llvm::Instruction>(Val)->setMetadata(llvm::LLVMContext::MD_fpmath, Node);
+}
+
+void CodeGenFunction::SetSqrtFPAccuracy(llvm::Value *Val) {
+  llvm::Type *EltTy = Val->getType()->getScalarType();
+  if (!EltTy->isFloatTy())
+    return;
+
+  if ((getLangOpts().OpenCL &&
+       !CGM.getCodeGenOpts().OpenCLCorrectlyRoundedDivSqrt) ||
+      (getLangOpts().HIP && getLangOpts().CUDAIsDevice &&
+       !CGM.getCodeGenOpts().HIPCorrectlyRoundedDivSqrt)) {
+    // OpenCL v1.1 s7.4: minimum accuracy of single precision / is 3ulp
+    //
+    // OpenCL v1.2 s5.6.4.2: The -cl-fp32-correctly-rounded-divide-sqrt
+    // build option allows an application to specify that single precision
+    // floating-point divide (x/y and 1/x) and sqrt used in the program
+    // source are correctly rounded.
+    //
+    // TODO: CUDA has a prec-sqrt flag
+    SetFPAccuracy(Val, 3.0f);
+  }
+}
+
+void CodeGenFunction::SetDivFPAccuracy(llvm::Value *Val) {
+  llvm::Type *EltTy = Val->getType()->getScalarType();
+  if (!EltTy->isFloatTy())
+    return;
+
+  if ((getLangOpts().OpenCL &&
+       !CGM.getCodeGenOpts().OpenCLCorrectlyRoundedDivSqrt) ||
+      (getLangOpts().HIP && getLangOpts().CUDAIsDevice &&
+       !CGM.getCodeGenOpts().HIPCorrectlyRoundedDivSqrt)) {
+    // OpenCL v1.1 s7.4: minimum accuracy of single precision / is 2.5ulp
+    //
+    // OpenCL v1.2 s5.6.4.2: The -cl-fp32-correctly-rounded-divide-sqrt
+    // build option allows an application to specify that single precision
+    // floating-point divide (x/y and 1/x) and sqrt used in the program
+    // source are correctly rounded.
+    //
+    // TODO: CUDA has a prec-div flag
+    SetFPAccuracy(Val, 2.5f);
+  }
 }
 
 namespace {

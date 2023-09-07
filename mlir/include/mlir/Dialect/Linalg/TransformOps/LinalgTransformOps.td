@@ -128,6 +128,14 @@ def BufferizeToAllocationOp : Op<Transform_Dialect,
     a fully dynamic layout is assumed for best compatibility. Users should use
     "memref.tensor_store" when possible.
 
+    "memref.alloc" is used for new buffer allocations. The buffer is deallocated
+    at the end of the block. Custom allocation ops can be specified via
+    `alloc_op`. Currently supported are "memref.alloc" and "memref.alloca". In
+    case of a "memref.alloca", the buffer is not deallocated.
+
+    If `bufferize_destination_only` is set, only the destination operands of the
+    op are bufferized to a new memory allocation, but not the op itself.
+
     #### Return modes
 
     This operation consumes the `target` handle and produces the
@@ -137,12 +145,15 @@ def BufferizeToAllocationOp : Op<Transform_Dialect,
   let arguments = (ins TransformHandleTypeInterface:$target,
                        OptionalAttr<AnyAttr>:$memory_space,
                        DefaultValuedAttr<StrAttr, "\"memref.tensor_store\"">:
-                           $memcpy_op);
-  let hasVerifier = 1;
+                           $memcpy_op,
+                       DefaultValuedAttr<StrAttr, "\"memref.alloc\"">:
+                           $alloc_op,
+                       UnitAttr:$bufferize_destination_only);
   let results = (outs Transform_AnyValue:$allocated_buffer,
                       Transform_AnyOpType:$new_ops);
   let assemblyFormat = "$target attr-dict `:` type($target)";
-  
+  let hasVerifier = 1;
+
   let builders = [
     OpBuilder<(ins "Value":$target, "Attribute":$memorySpace)>,
     OpBuilder<(ins "Value":$target, "int64_t":$memorySpace)>
@@ -919,6 +930,14 @@ def PadOp : Op<Transform_Dialect, "structured.pad",
     provides as operation attributes. The operation returns a handle to the
     padded operation and to the padding operation ("tensor.pad").
 
+    To preserve tensor SSA use-def chains, the unpadded result is copied back to
+    the original destination tensor of the targeted op. The op that copies back
+    the result can be customized with `copy_back_op`:
+
+    * "bufferization.copy_tensor" (default)
+    * "linalg.copy"
+    * "none" (no copy back)
+
     #### Return modes
 
     This operation ignores non-Linalg ops and drops them in the return.
@@ -940,9 +959,10 @@ def PadOp : Op<Transform_Dialect, "structured.pad",
          DefaultValuedAttr<
           TypedArrayAttrBase<I64ArrayAttr, "array of arrays of i64">,
           "{}">:$transpose_paddings,
-         DefaultValuedAttr<BoolAttr, "true">:$copy_back);
+         DefaultValuedAttr<StrAttr, "::mlir::bufferization::CopyTensorOp::getOperationName()">:$copy_back_op);
   let results = (outs TransformHandleTypeInterface:$padded,
-                      TransformHandleTypeInterface:$pad);
+                      TransformHandleTypeInterface:$pad,
+                      TransformHandleTypeInterface:$copy);
 
   let assemblyFormat =
     "$target attr-dict `:` functional-type(operands, results)";
@@ -959,10 +979,13 @@ def PadOp : Op<Transform_Dialect, "structured.pad",
                    CArg<"ArrayRef<int64_t>", "{}">:$padToMultipleOf,
                    CArg<"ArrayRef<int64_t>", "{}">:$packPaddings,
                    CArg<"ArrayRef<Attribute>", "{}">:$transposePaddings,
-                   CArg<"bool", "false">:$copyBack)>
+                   CArg<"StringRef", "::mlir::bufferization::CopyTensorOp::getOperationName()">:$copyBackOp)>
   ];
 
   let extraClassDeclaration = [{
+    /// copy_back_op attribute value indicating that no copy back is desired.
+    static constexpr StringRef kCopyOpNone = "none";
+
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::linalg::LinalgOp target,
@@ -1193,6 +1216,33 @@ def ScalarizeOp : Op<Transform_Dialect, "structured.scalarize",
 }
 
 //===----------------------------------------------------------------------===//
+// DecomposeInterfaceOp
+//===----------------------------------------------------------------------===//
+
+def DecomposeInterfaceOp : Op<Transform_Dialect, "structured.decompose_interface",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformOpInterface,
+     TransformEachOpTrait,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    TODO
+  }];
+
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs TransformHandleTypeInterface:$transformed);
+  let assemblyFormat =
+      "$target attr-dict `:` functional-type(operands, results)";
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
+        ::mlir::Operation *target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+//===----------------------------------------------------------------------===//
 // RewriteInDestinationPassingStyleOp.
 //===----------------------------------------------------------------------===//
 
@@ -1275,8 +1325,8 @@ def SplitOp : Op<Transform_Dialect, "structured.split",
                        I64Attr:$static_split_point);
   let results = (outs TransformHandleTypeInterface:$first,
                       TransformHandleTypeInterface:$second);
-  let hasVerifier = 1;
   let hasCustomAssemblyFormat = 1;
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -2029,8 +2079,20 @@ def MaskedVectorizeOp : Op<Transform_Dialect, "structured.masked_vectorize",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformOpInterface, ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
-    Vectorize the target ops, which must be Linalg ops, with masked vectors
-    of the specified size.
+    Vectorize the target ops, which must be Linalg ops. 
+
+    Use the optional vector sizes to specify exactly what configuration the
+    vectorizer should use. It will then use masked vectors of the specified
+    size to enforce this configuration ("masked vectorization"). If no vector
+    sizes are specified, the vectorizer will infer the shapes to use from the
+    target Linalg ops ("regular vectorization"). More specifically:
+
+    ```mlir
+    # Masked vectorization - vector sizes are specified explicitly
+    transform.structured.masked_vectorize %target vector_sizes [1, 4] : !transform.any_op
+    # Regular vectorization - vector sizes are inferred from the target Op
+    transform.structured.masked_vectorize %target : !transform.any_op
+    ```
 
     The vector sizes can be either static or dynamic (SSA values). In case of
     SSA values, the handle must be mapped to exactly one payload op with
@@ -2040,19 +2102,19 @@ def MaskedVectorizeOp : Op<Transform_Dialect, "structured.masked_vectorize",
     counterpart iteration space sizes.
 
     Typically this operator should be applied to linalg operations that have
-    already be tiled to the appropriate sizes.
+    already been tiled to the appropriate sizes.
 
     #### Return modes:
 
-    This operation produces a definite failure if the dynamic vector sizes (SSA
-    values) do not satisfy the constraints mentioned above. It produces a
-    silenceable failure if at least one target op is not a Linalg op or fails to
-    vectorize.
+    This operation produces a silenceable failure if at least one target op is
+    not a Linalg op or fails to vectorize. It produces a definite failure if
+    the dynamic vector sizes (SSA values) do not satisfy the constraints
+    mentioned above. 
   }];
 
   let arguments = (ins TransformHandleTypeInterface:$target,
                        Variadic<TransformHandleTypeInterface>:$vector_sizes,
-                       UnitAttr:$vectorize_nd_extract,
+                       OptionalAttr<UnitAttr>:$vectorize_nd_extract,
                        DefaultValuedOptionalAttr<DenseBoolArrayAttr, "{}">:
                           $scalable_sizes,
                        DefaultValuedOptionalAttr<DenseI64ArrayAttr, "{}">:
@@ -2060,15 +2122,16 @@ def MaskedVectorizeOp : Op<Transform_Dialect, "structured.masked_vectorize",
 
   let results = (outs);
   let assemblyFormat = [{
-      $target
+      $target oilist(
       `vector_sizes` custom<DynamicIndexList>($vector_sizes,
                                               $static_vector_sizes,
                                               type($vector_sizes),
-                                              $scalable_sizes)
+                                              $scalable_sizes) |
+      `vectorize_nd_extract` $vectorize_nd_extract
+      )
       attr-dict
       `:` type($target)
   }];
-
   let hasVerifier = 1;
 
   let extraClassDeclaration = [{
@@ -2300,16 +2363,17 @@ def InsertSliceToCopyOp :
 
 def MapCopyToThreadsOp :
   Op<Transform_Dialect, "structured.gpu.map_copy_to_threads",
-    [FunctionalStyleTransformOpTrait, 
+    [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
-     TransformEachOpTrait, 
+     TransformEachOpTrait,
      TransformOpInterface]> {
   let description = [{
-    Targeted mapping of a copy operation on tensors to a GPU thread mapping.
+    Targeted mapping of a linalg.copy / tensor.pad operation on tensors to a GPU
+    thread mapping.
 
-    This operation implements a greedy heuristic that determines a good 
-    distribution of threads to break down the copy operation into.
-    The heuristic is driven by considerations related to the underlying 
+    This operation implements a greedy heuristic that determines a good
+    distribution of threads to break down the copy/pad operation into.
+    The heuristic is driven by considerations related to the underlying
     architecture for which good high-level decisions are needed assuming certain
     hardware features. Relevant features are exposed via first-class attributes
     to control the behavior of the transformation at a high level.
@@ -2317,22 +2381,25 @@ def MapCopyToThreadsOp :
     For now, a single heuristic is implemented and can be extended on a per-need
     basis.
 
-    #### Return modes:
+    #### Return modes
 
-    The operation always succeeds and returns a handle to the relevant tiled
-    linalg.copy op.
+    This operation fails definitely if there is an unsupported op (i.e., not
+    linalg.copy / tensor.pad) among the targeted op. Otherwise, the operation
+    always succeeds and returns a handle to the relevant tiled linalg.copy /
+    tensor.pad op and the enclosing scf.forall op.
   }];
 
   let arguments = (ins TransformHandleTypeInterface:$target,
                        I64Attr:$total_num_threads,
                        I64Attr:$desired_bit_alignment);
-  let results = (outs TransformHandleTypeInterface:$transformed);
+  let results = (outs TransformHandleTypeInterface:$forall_op,
+                      TransformHandleTypeInterface:$tiled_op);
 
   let assemblyFormat = [{
     $target
     `total_num_threads` `=` $total_num_threads
     `desired_bit_alignment` `=` $desired_bit_alignment
-    attr-dict 
+    attr-dict
     `:` functional-type(operands, results)
   }];
 
@@ -2342,7 +2409,7 @@ def MapCopyToThreadsOp :
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::linalg::CopyOp copyOp,
+        ::mlir::Operation *target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
 

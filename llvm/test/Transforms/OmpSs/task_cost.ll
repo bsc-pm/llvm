@@ -133,7 +133,7 @@ attributes #3 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    store i32 [[N]], ptr [[N_ADDR]], align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N_ADDR]], align 4, !dbg [[DBG9:![0-9]+]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64, !dbg [[DBG10:![0-9]+]]
-; CHECK-NEXT:    [[TMP2:%.*]] = call ptr @llvm.stacksave(), !dbg [[DBG10]]
+; CHECK-NEXT:    [[TMP2:%.*]] = call ptr @llvm.stacksave.p0(), !dbg [[DBG10]]
 ; CHECK-NEXT:    store ptr [[TMP2]], ptr [[SAVED_STACK]], align 8, !dbg [[DBG10]]
 ; CHECK-NEXT:    [[VLA:%.*]] = alloca i32, i64 [[TMP1]], align 16, !dbg [[DBG10]]
 ; CHECK-NEXT:    store i64 [[TMP1]], ptr [[__VLA_EXPR0]], align 8, !dbg [[DBG10]]
@@ -196,7 +196,7 @@ attributes #3 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    br label [[FINAL_END7:%.*]], !dbg [[DBG13]]
 ; CHECK:       final.end7:
 ; CHECK-NEXT:    [[TMP26:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG14:![0-9]+]]
-; CHECK-NEXT:    call void @llvm.stackrestore(ptr [[TMP26]]), !dbg [[DBG14]]
+; CHECK-NEXT:    call void @llvm.stackrestore.p0(ptr [[TMP26]]), !dbg [[DBG14]]
 ; CHECK-NEXT:    ret void, !dbg [[DBG14]]
 ; CHECK:       final.then:
 ; CHECK-NEXT:    br label [[FINAL_END]], !dbg [[DBG12]]
@@ -219,7 +219,7 @@ attributes #3 = { "min-legal-vector-width"="0" }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@compute_cost
-; CHECK-SAME: () #[[ATTR3:[0-9]+]] !dbg [[DBG15:![0-9]+]] {
+; CHECK-SAME: () #[[ATTR2:[0-9]+]] !dbg [[DBG15:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[CALL:%.*]] = call noundef i32 @_Z3fooIiET_v(), !dbg [[DBG16:![0-9]+]]
 ; CHECK-NEXT:    ret i32 [[CALL]], !dbg [[DBG16]]
@@ -232,7 +232,7 @@ attributes #3 = { "min-legal-vector-width"="0" }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@compute_cost.1
-; CHECK-SAME: (ptr [[N:%.*]]) #[[ATTR3]] !dbg [[DBG20:![0-9]+]] {
+; CHECK-SAME: (ptr [[N:%.*]]) #[[ATTR2]] !dbg [[DBG20:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[N_ADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    store ptr [[N]], ptr [[N_ADDR]], align 8
@@ -241,7 +241,7 @@ attributes #3 = { "min-legal-vector-width"="0" }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@compute_cost.2
-; CHECK-SAME: (ptr [[VLA:%.*]], i64 [[TMP0:%.*]]) #[[ATTR3]] !dbg [[DBG23:![0-9]+]] {
+; CHECK-SAME: (ptr [[VLA:%.*]], i64 [[TMP0:%.*]]) #[[ATTR2]] !dbg [[DBG23:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[VLA_ADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    [[DOTADDR:%.*]] = alloca i64, align 8

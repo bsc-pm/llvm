@@ -172,7 +172,7 @@ def ExternalNameConversion : Pass<"external-name-interop", "mlir::ModuleOp"> {
   }];
   let constructor = "::fir::createExternalNameConversionPass()";
   let options = [
-    Option<"appendUnderscore", "append-underscore",
+    Option<"appendUnderscoreOpt", "append-underscore",
            "bool", /*default=*/"true",
            "Append trailing underscore to external names.">
   ];
@@ -308,7 +308,22 @@ def OMPEarlyOutliningPass
     the optimizer to perform transforms across target region boundaries.
   }];
   let constructor = "::fir::createOMPEarlyOutliningPass()";
+}
+
+def OMPMarkDeclareTargetPass
+    : Pass<"omp-mark-declare-target", "mlir::ModuleOp"> {
+  let summary = "Marks all functions called by an OpenMP declare target function as declare target";
+  let constructor = "::fir::createOMPMarkDeclareTargetPass()";
   let dependentDialects = ["mlir::omp::OpenMPDialect"];
+}
+
+def OMPFunctionFiltering : Pass<"omp-function-filtering"> {
+  let summary = "Filters out functions intended for the host when compiling "
+                "for the target device.";
+  let constructor = "::fir::createOMPFunctionFilteringPass()";
+  let dependentDialects = [
+    "mlir::func::FuncDialect"
+  ];
 }
 
 #endif // FLANG_OPTIMIZER_TRANSFORMS_PASSES

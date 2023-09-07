@@ -55,6 +55,7 @@
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/TargetParser/SubtargetFeature.h"
 #include "llvm/TargetParser/Triple.h"
+#include "llvm/Transforms/IPO/EmbedBitcodePass.h"
 #include "llvm/Transforms/IPO/LowerTypeTests.h"
 #include "llvm/Transforms/IPO/ThinLTOBitcodeWriter.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
@@ -103,7 +104,7 @@ namespace {
 
 // Default filename used for profile generation.
 std::string getDefaultProfileGenName() {
-  return DebugInfoCorrelate ? "default_%p.proflite" : "default_%m.profraw";
+  return DebugInfoCorrelate ? "default_%m.proflite" : "default_%m.profraw";
 }
 
 class EmitAssemblyHelper {
@@ -769,7 +770,8 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
         CodeGenOpts.InstrProfileOutput.empty() ? getDefaultProfileGenName()
                                                : CodeGenOpts.InstrProfileOutput,
         "", "", CodeGenOpts.MemoryProfileUsePath, nullptr, PGOOptions::IRInstr,
-        PGOOptions::NoCSAction, CodeGenOpts.DebugInfoForProfiling);
+        PGOOptions::NoCSAction, CodeGenOpts.DebugInfoForProfiling,
+        /*PseudoProbeForProfiling=*/false, CodeGenOpts.AtomicProfileUpdate);
   else if (CodeGenOpts.hasProfileIRUse()) {
     // -fprofile-use.
     auto CSAction = CodeGenOpts.hasProfileCSIRUse() ? PGOOptions::CSIRUse
@@ -1025,7 +1027,12 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
           });
     }
 
-    if (IsThinLTO || (IsLTO && CodeGenOpts.UnifiedLTO)) {
+    bool IsThinOrUnifiedLTO = IsThinLTO || (IsLTO && CodeGenOpts.UnifiedLTO);
+    if (CodeGenOpts.FatLTO) {
+      MPM = PB.buildFatLTODefaultPipeline(Level, IsThinOrUnifiedLTO,
+                                          IsThinOrUnifiedLTO ||
+                                              shouldEmitRegularLTOSummary());
+    } else if (IsThinOrUnifiedLTO) {
       MPM = PB.buildThinLTOPreLinkDefaultPipeline(Level);
     } else if (IsLTO) {
       MPM = PB.buildLTOPreLinkDefaultPipeline(Level);
@@ -1080,6 +1087,21 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
         MPM.addPass(PrintModulePass(*OS, "", CodeGenOpts.EmitLLVMUseLists,
                                     EmitLTOSummary));
     }
+  }
+  if (CodeGenOpts.FatLTO) {
+    // Set module flags, like EnableSplitLTOUnit and UnifiedLTO, since FatLTO
+    // uses a different action than Backend_EmitBC or Backend_EmitLL.
+    bool IsThinOrUnifiedLTO =
+        CodeGenOpts.PrepareForThinLTO ||
+        (CodeGenOpts.PrepareForLTO && CodeGenOpts.UnifiedLTO);
+    if (!TheModule->getModuleFlag("ThinLTO"))
+      TheModule->addModuleFlag(Module::Error, "ThinLTO",
+                               uint32_t(IsThinOrUnifiedLTO));
+    if (!TheModule->getModuleFlag("EnableSplitLTOUnit"))
+      TheModule->addModuleFlag(Module::Error, "EnableSplitLTOUnit",
+                               uint32_t(CodeGenOpts.EnableSplitLTOUnit));
+    if (CodeGenOpts.UnifiedLTO && !TheModule->getModuleFlag("UnifiedLTO"))
+      TheModule->addModuleFlag(Module::Error, "UnifiedLTO", uint32_t(1));
   }
 
   // [OmpSs-2] Now that we have all of the passes ready, run them.
@@ -1165,7 +1187,7 @@ static void runThinLTOBackend(
     const clang::TargetOptions &TOpts, const LangOptions &LOpts,
     std::unique_ptr<raw_pwrite_stream> OS, std::string SampleProfile,
     std::string ProfileRemapping, BackendAction Action) {
-  StringMap<DenseMap<GlobalValue::GUID, GlobalValueSummary *>>
+  DenseMap<StringRef, DenseMap<GlobalValue::GUID, GlobalValueSummary *>>
       ModuleToDefinedGVSummaries;
   CombinedIndex->collectDefinedGVSummariesPerModule(ModuleToDefinedGVSummaries);
 
@@ -1348,7 +1370,7 @@ void clang::EmbedObject(llvm::Module *M, const CodeGenOptions &CGOpts,
   for (StringRef OffloadObject : CGOpts.OffloadObjects) {
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ObjectOrErr =
         llvm::MemoryBuffer::getFileOrSTDIN(OffloadObject);
-    if (std::error_code EC = ObjectOrErr.getError()) {
+    if (ObjectOrErr.getError()) {
       auto DiagID = Diags.getCustomDiagID(DiagnosticsEngine::Error,
                                           "could not open '%0' for embedding");
       Diags.Report(DiagID) << OffloadObject;

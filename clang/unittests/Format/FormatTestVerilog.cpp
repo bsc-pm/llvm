@@ -807,7 +807,8 @@ TEST_F(FormatTestVerilog, If) {
                "  if (x)\n"
                "    x = x;",
                Style);
-  Style.SpacesInConditionalStatement = true;
+  Style.SpacesInParens = FormatStyle::SIPO_Custom;
+  Style.SpacesInParensOptions.InConditionalStatements = true;
   verifyFormat("if ( x )\n"
                "  x = x;\n"
                "else if ( x )\n"
@@ -903,7 +904,8 @@ TEST_F(FormatTestVerilog, Loop) {
   verifyFormat("repeat (x) begin\n"
                "end");
   auto Style = getDefaultStyle();
-  Style.SpacesInConditionalStatement = true;
+  Style.SpacesInParens = FormatStyle::SIPO_Custom;
+  Style.SpacesInParensOptions.InConditionalStatements = true;
   verifyFormat("foreach ( x[x] )\n"
                "  x = x;",
                Style);
@@ -1153,6 +1155,66 @@ TEST_F(FormatTestVerilog, Streaming) {
   verifyFormat("{>>byte{j}} = x;");
   verifyFormat("{<<{j}} = x;");
   verifyFormat("{<<byte{j}} = x;");
+}
+
+TEST_F(FormatTestVerilog, StringLiteral) {
+  // Long strings should be broken.
+  verifyFormat(R"(x({"xxxxxxxxxxxxxxxx ",
+   "xxxx"});)",
+               R"(x({"xxxxxxxxxxxxxxxx xxxx"});)",
+               getStyleWithColumns(getDefaultStyle(), 23));
+  verifyFormat(R"(x({"xxxxxxxxxxxxxxxx",
+   " xxxx"});)",
+               R"(x({"xxxxxxxxxxxxxxxx xxxx"});)",
+               getStyleWithColumns(getDefaultStyle(), 22));
+  // Braces should be added when they don't already exist.
+  verifyFormat(R"(x({"xxxxxxxxxxxxxxxx ",
+   "xxxx"});)",
+               R"(x("xxxxxxxxxxxxxxxx xxxx");)",
+               getStyleWithColumns(getDefaultStyle(), 23));
+  verifyFormat(R"(x({"xxxxxxxxxxxxxxxx",
+   " xxxx"});)",
+               R"(x("xxxxxxxxxxxxxxxx xxxx");)",
+               getStyleWithColumns(getDefaultStyle(), 22));
+  verifyFormat(R"(x({{"xxxxxxxxxxxxxxxx ",
+    "xxxx"} == x});)",
+               R"(x({"xxxxxxxxxxxxxxxx xxxx" == x});)",
+               getStyleWithColumns(getDefaultStyle(), 24));
+  verifyFormat(R"(string x = {"xxxxxxxxxxxxxxxx ",
+            "xxxxxxxx"};)",
+               R"(string x = "xxxxxxxxxxxxxxxx xxxxxxxx";)",
+               getStyleWithColumns(getDefaultStyle(), 32));
+  // Space around braces should be correct.
+  auto Style = getStyleWithColumns(getDefaultStyle(), 24);
+  Style.Cpp11BracedListStyle = false;
+  verifyFormat(R"(x({ "xxxxxxxxxxxxxxxx ",
+    "xxxx" });)",
+               R"(x("xxxxxxxxxxxxxxxx xxxx");)", Style);
+  // Braces should not be added twice.
+  verifyFormat(R"(x({"xxxxxxxx",
+   "xxxxxxxx",
+   "xxxxxx"});)",
+               R"(x("xxxxxxxxxxxxxxxxxxxxxx");)",
+               getStyleWithColumns(getDefaultStyle(), 14));
+  verifyFormat(R"(x({"xxxxxxxxxxxxxxxx ",
+   "xxxxxxxxxxxxxxxx ",
+   "xxxx"});)",
+               R"(x("xxxxxxxxxxxxxxxx xxxxxxxxxxxxxxxx xxxx");)",
+               getStyleWithColumns(getDefaultStyle(), 23));
+  verifyFormat(R"(x({"xxxxxxxxxxxxxxxx ",
+   "xxxxxxxxxxxxxxxx ",
+   "xxxx"});)",
+               R"(x({"xxxxxxxxxxxxxxxx xxxxxxxxxxxxxxxx ", "xxxx"});)",
+               getStyleWithColumns(getDefaultStyle(), 23));
+  // These kinds of strings don't exist in Verilog.
+  verifyNoCrash(R"(x(@"xxxxxxxxxxxxxxxx xxxx");)",
+                getStyleWithColumns(getDefaultStyle(), 23));
+  verifyNoCrash(R"(x(u"xxxxxxxxxxxxxxxx xxxx");)",
+                getStyleWithColumns(getDefaultStyle(), 23));
+  verifyNoCrash(R"(x(u8"xxxxxxxxxxxxxxxx xxxx");)",
+                getStyleWithColumns(getDefaultStyle(), 23));
+  verifyNoCrash(R"(x(_T("xxxxxxxxxxxxxxxx xxxx"));)",
+                getStyleWithColumns(getDefaultStyle(), 23));
 }
 
 TEST_F(FormatTestVerilog, StructLiteral) {

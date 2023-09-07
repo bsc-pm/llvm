@@ -18,7 +18,7 @@
 // LIN64-NEXT:    [[TMP2:%.*]] = load i32, ptr [[N_ADDR]], align 4, !dbg [[DBG11:![0-9]+]]
 // LIN64-NEXT:    [[ADD:%.*]] = add nsw i32 [[TMP2]], 1, !dbg [[DBG12:![0-9]+]]
 // LIN64-NEXT:    [[TMP3:%.*]] = zext i32 [[ADD]] to i64, !dbg [[DBG10]]
-// LIN64-NEXT:    [[TMP4:%.*]] = call ptr @llvm.stacksave(), !dbg [[DBG10]]
+// LIN64-NEXT:    [[TMP4:%.*]] = call ptr @llvm.stacksave.p0(), !dbg [[DBG10]]
 // LIN64-NEXT:    store ptr [[TMP4]], ptr [[SAVED_STACK]], align 8, !dbg [[DBG10]]
 // LIN64-NEXT:    [[TMP5:%.*]] = mul nuw i64 [[TMP1]], 7, !dbg [[DBG10]]
 // LIN64-NEXT:    [[TMP6:%.*]] = mul nuw i64 [[TMP5]], [[TMP3]], !dbg [[DBG10]]
@@ -36,7 +36,7 @@
 // LIN64-NEXT:    [[TMP12:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[P_ARRAY]], ptr undef), "QUAL.OSS.CAPTURED"(i64 [[TMP9]], i64 7, i64 [[TMP11]], i64 7), "QUAL.OSS.DEP.IN"(ptr [[P_ARRAY]], [11 x i8] c"p_array[0]\00", ptr @compute_dep.2, ptr [[P_ARRAY]], i64 [[TMP9]], i64 7, i64 [[TMP11]]) ], !dbg [[DBG20:![0-9]+]]
 // LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP12]]), !dbg [[DBG21:![0-9]+]]
 // LIN64-NEXT:    [[TMP13:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG22:![0-9]+]]
-// LIN64-NEXT:    call void @llvm.stackrestore(ptr [[TMP13]]), !dbg [[DBG22]]
+// LIN64-NEXT:    call void @llvm.stackrestore.p0(ptr [[TMP13]]), !dbg [[DBG22]]
 // LIN64-NEXT:    ret void, !dbg [[DBG22]]
 //
 // PPC64-LABEL: @foo(
@@ -53,7 +53,7 @@
 // PPC64-NEXT:    [[TMP2:%.*]] = load i32, ptr [[N_ADDR]], align 4, !dbg [[DBG11:![0-9]+]]
 // PPC64-NEXT:    [[ADD:%.*]] = add nsw i32 [[TMP2]], 1, !dbg [[DBG12:![0-9]+]]
 // PPC64-NEXT:    [[TMP3:%.*]] = zext i32 [[ADD]] to i64, !dbg [[DBG10]]
-// PPC64-NEXT:    [[TMP4:%.*]] = call ptr @llvm.stacksave(), !dbg [[DBG10]]
+// PPC64-NEXT:    [[TMP4:%.*]] = call ptr @llvm.stacksave.p0(), !dbg [[DBG10]]
 // PPC64-NEXT:    store ptr [[TMP4]], ptr [[SAVED_STACK]], align 8, !dbg [[DBG10]]
 // PPC64-NEXT:    [[TMP5:%.*]] = mul nuw i64 [[TMP1]], 7, !dbg [[DBG10]]
 // PPC64-NEXT:    [[TMP6:%.*]] = mul nuw i64 [[TMP5]], [[TMP3]], !dbg [[DBG10]]
@@ -71,7 +71,7 @@
 // PPC64-NEXT:    [[TMP12:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[P_ARRAY]], ptr undef), "QUAL.OSS.CAPTURED"(i64 [[TMP9]], i64 7, i64 [[TMP11]], i64 7), "QUAL.OSS.DEP.IN"(ptr [[P_ARRAY]], [11 x i8] c"p_array[0]\00", ptr @compute_dep.2, ptr [[P_ARRAY]], i64 [[TMP9]], i64 7, i64 [[TMP11]]) ], !dbg [[DBG20:![0-9]+]]
 // PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP12]]), !dbg [[DBG21:![0-9]+]]
 // PPC64-NEXT:    [[TMP13:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG22:![0-9]+]]
-// PPC64-NEXT:    call void @llvm.stackrestore(ptr [[TMP13]]), !dbg [[DBG22]]
+// PPC64-NEXT:    call void @llvm.stackrestore.p0(ptr [[TMP13]]), !dbg [[DBG22]]
 // PPC64-NEXT:    ret void, !dbg [[DBG22]]
 //
 // AARCH64-LABEL: @foo(
@@ -88,7 +88,7 @@
 // AARCH64-NEXT:    [[TMP2:%.*]] = load i32, ptr [[N_ADDR]], align 4, !dbg [[DBG11:![0-9]+]]
 // AARCH64-NEXT:    [[ADD:%.*]] = add nsw i32 [[TMP2]], 1, !dbg [[DBG12:![0-9]+]]
 // AARCH64-NEXT:    [[TMP3:%.*]] = zext i32 [[ADD]] to i64, !dbg [[DBG10]]
-// AARCH64-NEXT:    [[TMP4:%.*]] = call ptr @llvm.stacksave(), !dbg [[DBG10]]
+// AARCH64-NEXT:    [[TMP4:%.*]] = call ptr @llvm.stacksave.p0(), !dbg [[DBG10]]
 // AARCH64-NEXT:    store ptr [[TMP4]], ptr [[SAVED_STACK]], align 8, !dbg [[DBG10]]
 // AARCH64-NEXT:    [[TMP5:%.*]] = mul nuw i64 [[TMP1]], 7, !dbg [[DBG10]]
 // AARCH64-NEXT:    [[TMP6:%.*]] = mul nuw i64 [[TMP5]], [[TMP3]], !dbg [[DBG10]]
@@ -106,7 +106,7 @@
 // AARCH64-NEXT:    [[TMP12:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[P_ARRAY]], ptr undef), "QUAL.OSS.CAPTURED"(i64 [[TMP9]], i64 7, i64 [[TMP11]], i64 7), "QUAL.OSS.DEP.IN"(ptr [[P_ARRAY]], [11 x i8] c"p_array[0]\00", ptr @compute_dep.2, ptr [[P_ARRAY]], i64 [[TMP9]], i64 7, i64 [[TMP11]]) ], !dbg [[DBG20:![0-9]+]]
 // AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP12]]), !dbg [[DBG21:![0-9]+]]
 // AARCH64-NEXT:    [[TMP13:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG22:![0-9]+]]
-// AARCH64-NEXT:    call void @llvm.stackrestore(ptr [[TMP13]]), !dbg [[DBG22]]
+// AARCH64-NEXT:    call void @llvm.stackrestore.p0(ptr [[TMP13]]), !dbg [[DBG22]]
 // AARCH64-NEXT:    ret void, !dbg [[DBG22]]
 //
 void foo(int n) {
@@ -136,7 +136,7 @@ int p;
 // LIN64-NEXT:    [[TMP4:%.*]] = zext i32 [[TMP3]] to i64, !dbg [[DBG38]]
 // LIN64-NEXT:    [[TMP5:%.*]] = load i32, ptr @p, align 4, !dbg [[DBG40:![0-9]+]]
 // LIN64-NEXT:    [[TMP6:%.*]] = zext i32 [[TMP5]] to i64, !dbg [[DBG38]]
-// LIN64-NEXT:    [[TMP7:%.*]] = call ptr @llvm.stacksave(), !dbg [[DBG38]]
+// LIN64-NEXT:    [[TMP7:%.*]] = call ptr @llvm.stacksave.p0(), !dbg [[DBG38]]
 // LIN64-NEXT:    store ptr [[TMP7]], ptr [[SAVED_STACK]], align 8, !dbg [[DBG38]]
 // LIN64-NEXT:    [[TMP8:%.*]] = mul nuw i64 [[TMP2]], 7, !dbg [[DBG38]]
 // LIN64-NEXT:    [[TMP9:%.*]] = mul nuw i64 [[TMP8]], [[TMP4]], !dbg [[DBG38]]
@@ -146,7 +146,7 @@ int p;
 // LIN64-NEXT:    store i64 [[TMP4]], ptr [[__VLA_EXPR1]], align 8, !dbg [[DBG38]]
 // LIN64-NEXT:    store i64 [[TMP6]], ptr [[__VLA_EXPR2]], align 8, !dbg [[DBG38]]
 // LIN64-NEXT:    [[TMP11:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG41:![0-9]+]]
-// LIN64-NEXT:    call void @llvm.stackrestore(ptr [[TMP11]]), !dbg [[DBG41]]
+// LIN64-NEXT:    call void @llvm.stackrestore.p0(ptr [[TMP11]]), !dbg [[DBG41]]
 // LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG41]]
 // LIN64-NEXT:    [[TMP12:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr @p, i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[X_ADDR]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[Y]], i32 undef) ], !dbg [[DBG42:![0-9]+]]
 // LIN64-NEXT:    [[Z:%.*]] = alloca i32, align 4
@@ -175,7 +175,7 @@ int p;
 // PPC64-NEXT:    [[TMP4:%.*]] = zext i32 [[TMP3]] to i64, !dbg [[DBG38]]
 // PPC64-NEXT:    [[TMP5:%.*]] = load i32, ptr @p, align 4, !dbg [[DBG40:![0-9]+]]
 // PPC64-NEXT:    [[TMP6:%.*]] = zext i32 [[TMP5]] to i64, !dbg [[DBG38]]
-// PPC64-NEXT:    [[TMP7:%.*]] = call ptr @llvm.stacksave(), !dbg [[DBG38]]
+// PPC64-NEXT:    [[TMP7:%.*]] = call ptr @llvm.stacksave.p0(), !dbg [[DBG38]]
 // PPC64-NEXT:    store ptr [[TMP7]], ptr [[SAVED_STACK]], align 8, !dbg [[DBG38]]
 // PPC64-NEXT:    [[TMP8:%.*]] = mul nuw i64 [[TMP2]], 7, !dbg [[DBG38]]
 // PPC64-NEXT:    [[TMP9:%.*]] = mul nuw i64 [[TMP8]], [[TMP4]], !dbg [[DBG38]]
@@ -185,7 +185,7 @@ int p;
 // PPC64-NEXT:    store i64 [[TMP4]], ptr [[__VLA_EXPR1]], align 8, !dbg [[DBG38]]
 // PPC64-NEXT:    store i64 [[TMP6]], ptr [[__VLA_EXPR2]], align 8, !dbg [[DBG38]]
 // PPC64-NEXT:    [[TMP11:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG41:![0-9]+]]
-// PPC64-NEXT:    call void @llvm.stackrestore(ptr [[TMP11]]), !dbg [[DBG41]]
+// PPC64-NEXT:    call void @llvm.stackrestore.p0(ptr [[TMP11]]), !dbg [[DBG41]]
 // PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG41]]
 // PPC64-NEXT:    [[TMP12:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr @p, i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[X_ADDR]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[Y]], i32 undef) ], !dbg [[DBG42:![0-9]+]]
 // PPC64-NEXT:    [[Z:%.*]] = alloca i32, align 4
@@ -214,7 +214,7 @@ int p;
 // AARCH64-NEXT:    [[TMP4:%.*]] = zext i32 [[TMP3]] to i64, !dbg [[DBG38]]
 // AARCH64-NEXT:    [[TMP5:%.*]] = load i32, ptr @p, align 4, !dbg [[DBG40:![0-9]+]]
 // AARCH64-NEXT:    [[TMP6:%.*]] = zext i32 [[TMP5]] to i64, !dbg [[DBG38]]
-// AARCH64-NEXT:    [[TMP7:%.*]] = call ptr @llvm.stacksave(), !dbg [[DBG38]]
+// AARCH64-NEXT:    [[TMP7:%.*]] = call ptr @llvm.stacksave.p0(), !dbg [[DBG38]]
 // AARCH64-NEXT:    store ptr [[TMP7]], ptr [[SAVED_STACK]], align 8, !dbg [[DBG38]]
 // AARCH64-NEXT:    [[TMP8:%.*]] = mul nuw i64 [[TMP2]], 7, !dbg [[DBG38]]
 // AARCH64-NEXT:    [[TMP9:%.*]] = mul nuw i64 [[TMP8]], [[TMP4]], !dbg [[DBG38]]
@@ -224,7 +224,7 @@ int p;
 // AARCH64-NEXT:    store i64 [[TMP4]], ptr [[__VLA_EXPR1]], align 8, !dbg [[DBG38]]
 // AARCH64-NEXT:    store i64 [[TMP6]], ptr [[__VLA_EXPR2]], align 8, !dbg [[DBG38]]
 // AARCH64-NEXT:    [[TMP11:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG41:![0-9]+]]
-// AARCH64-NEXT:    call void @llvm.stackrestore(ptr [[TMP11]]), !dbg [[DBG41]]
+// AARCH64-NEXT:    call void @llvm.stackrestore.p0(ptr [[TMP11]]), !dbg [[DBG41]]
 // AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG41]]
 // AARCH64-NEXT:    [[TMP12:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr @p, i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[X_ADDR]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[Y]], i32 undef) ], !dbg [[DBG42:![0-9]+]]
 // AARCH64-NEXT:    [[Z:%.*]] = alloca i32, align 4
@@ -263,7 +263,7 @@ void foo1(int x) {
 // LIN64-NEXT:    [[TMP2:%.*]] = load i32, ptr [[Y]], align 4, !dbg [[DBG55:![0-9]+]]
 // LIN64-NEXT:    [[ADD1:%.*]] = add nsw i32 [[TMP2]], 1, !dbg [[DBG56:![0-9]+]]
 // LIN64-NEXT:    [[TMP3:%.*]] = zext i32 [[ADD1]] to i64, !dbg [[DBG54]]
-// LIN64-NEXT:    [[TMP4:%.*]] = call ptr @llvm.stacksave(), !dbg [[DBG54]]
+// LIN64-NEXT:    [[TMP4:%.*]] = call ptr @llvm.stacksave.p0(), !dbg [[DBG54]]
 // LIN64-NEXT:    store ptr [[TMP4]], ptr [[SAVED_STACK]], align 8, !dbg [[DBG54]]
 // LIN64-NEXT:    [[TMP5:%.*]] = mul nuw i64 [[TMP1]], [[TMP3]], !dbg [[DBG54]]
 // LIN64-NEXT:    [[VLA:%.*]] = alloca i32, i64 [[TMP5]], align 16, !dbg [[DBG54]]
@@ -276,7 +276,7 @@ void foo1(int x) {
 // LIN64-NEXT:    store i32 1, ptr [[ARRAYIDX2]], align 4, !dbg [[DBG59:![0-9]+]]
 // LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP6]]), !dbg [[DBG60:![0-9]+]]
 // LIN64-NEXT:    [[TMP8:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG61:![0-9]+]]
-// LIN64-NEXT:    call void @llvm.stackrestore(ptr [[TMP8]]), !dbg [[DBG61]]
+// LIN64-NEXT:    call void @llvm.stackrestore.p0(ptr [[TMP8]]), !dbg [[DBG61]]
 // LIN64-NEXT:    ret void, !dbg [[DBG61]]
 //
 // PPC64-LABEL: @foo2(
@@ -293,7 +293,7 @@ void foo1(int x) {
 // PPC64-NEXT:    [[TMP2:%.*]] = load i32, ptr [[Y]], align 4, !dbg [[DBG55:![0-9]+]]
 // PPC64-NEXT:    [[ADD1:%.*]] = add nsw i32 [[TMP2]], 1, !dbg [[DBG56:![0-9]+]]
 // PPC64-NEXT:    [[TMP3:%.*]] = zext i32 [[ADD1]] to i64, !dbg [[DBG54]]
-// PPC64-NEXT:    [[TMP4:%.*]] = call ptr @llvm.stacksave(), !dbg [[DBG54]]
+// PPC64-NEXT:    [[TMP4:%.*]] = call ptr @llvm.stacksave.p0(), !dbg [[DBG54]]
 // PPC64-NEXT:    store ptr [[TMP4]], ptr [[SAVED_STACK]], align 8, !dbg [[DBG54]]
 // PPC64-NEXT:    [[TMP5:%.*]] = mul nuw i64 [[TMP1]], [[TMP3]], !dbg [[DBG54]]
 // PPC64-NEXT:    [[VLA:%.*]] = alloca i32, i64 [[TMP5]], align 4, !dbg [[DBG54]]
@@ -306,7 +306,7 @@ void foo1(int x) {
 // PPC64-NEXT:    store i32 1, ptr [[ARRAYIDX2]], align 4, !dbg [[DBG59:![0-9]+]]
 // PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP6]]), !dbg [[DBG60:![0-9]+]]
 // PPC64-NEXT:    [[TMP8:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG61:![0-9]+]]
-// PPC64-NEXT:    call void @llvm.stackrestore(ptr [[TMP8]]), !dbg [[DBG61]]
+// PPC64-NEXT:    call void @llvm.stackrestore.p0(ptr [[TMP8]]), !dbg [[DBG61]]
 // PPC64-NEXT:    ret void, !dbg [[DBG61]]
 //
 // AARCH64-LABEL: @foo2(
@@ -323,7 +323,7 @@ void foo1(int x) {
 // AARCH64-NEXT:    [[TMP2:%.*]] = load i32, ptr [[Y]], align 4, !dbg [[DBG55:![0-9]+]]
 // AARCH64-NEXT:    [[ADD1:%.*]] = add nsw i32 [[TMP2]], 1, !dbg [[DBG56:![0-9]+]]
 // AARCH64-NEXT:    [[TMP3:%.*]] = zext i32 [[ADD1]] to i64, !dbg [[DBG54]]
-// AARCH64-NEXT:    [[TMP4:%.*]] = call ptr @llvm.stacksave(), !dbg [[DBG54]]
+// AARCH64-NEXT:    [[TMP4:%.*]] = call ptr @llvm.stacksave.p0(), !dbg [[DBG54]]
 // AARCH64-NEXT:    store ptr [[TMP4]], ptr [[SAVED_STACK]], align 8, !dbg [[DBG54]]
 // AARCH64-NEXT:    [[TMP5:%.*]] = mul nuw i64 [[TMP1]], [[TMP3]], !dbg [[DBG54]]
 // AARCH64-NEXT:    [[VLA:%.*]] = alloca i32, i64 [[TMP5]], align 4, !dbg [[DBG54]]
@@ -336,7 +336,7 @@ void foo1(int x) {
 // AARCH64-NEXT:    store i32 1, ptr [[ARRAYIDX2]], align 4, !dbg [[DBG59:![0-9]+]]
 // AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP6]]), !dbg [[DBG60:![0-9]+]]
 // AARCH64-NEXT:    [[TMP8:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG61:![0-9]+]]
-// AARCH64-NEXT:    call void @llvm.stackrestore(ptr [[TMP8]]), !dbg [[DBG61]]
+// AARCH64-NEXT:    call void @llvm.stackrestore.p0(ptr [[TMP8]]), !dbg [[DBG61]]
 // AARCH64-NEXT:    ret void, !dbg [[DBG61]]
 //
 void foo2(int x) {

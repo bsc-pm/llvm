@@ -912,6 +912,17 @@ CXXMethodDecl *Sema::CreateLambdaCallOperator(SourceRange IntroducerRange,
   return Method;
 }
 
+void Sema::AddTemplateParametersToLambdaCallOperator(
+    CXXMethodDecl *CallOperator, CXXRecordDecl *Class,
+    TemplateParameterList *TemplateParams) {
+  assert(TemplateParams && "no template parameters");
+  FunctionTemplateDecl *TemplateMethod = FunctionTemplateDecl::Create(
+      Context, Class, CallOperator->getLocation(), CallOperator->getDeclName(),
+      TemplateParams, CallOperator);
+  TemplateMethod->setAccess(AS_public);
+  CallOperator->setDescribedFunctionTemplate(TemplateMethod);
+}
+
 void Sema::CompleteLambdaCallOperator(
     CXXMethodDecl *Method, SourceLocation LambdaLoc,
     SourceLocation CallOperatorLoc, Expr *TrailingRequiresClause,
@@ -930,11 +941,11 @@ void Sema::CompleteLambdaCallOperator(
   DeclContext *DC = Method->getLexicalDeclContext();
   Method->setLexicalDeclContext(LSI->Lambda);
   if (TemplateParams) {
-    FunctionTemplateDecl *TemplateMethod = FunctionTemplateDecl::Create(
-        Context, LSI->Lambda, Method->getLocation(), Method->getDeclName(),
-        TemplateParams, Method);
-    TemplateMethod->setAccess(AS_public);
-    Method->setDescribedFunctionTemplate(TemplateMethod);
+    FunctionTemplateDecl *TemplateMethod =
+        Method->getDescribedFunctionTemplate();
+    assert(TemplateMethod &&
+           "AddTemplateParametersToLambdaCallOperator should have been called");
+
     LSI->Lambda->addDecl(TemplateMethod);
     TemplateMethod->setLexicalDeclContext(DC);
   } else {
@@ -1168,11 +1179,15 @@ void Sema::ActOnLambdaExpressionAfterIntroducer(LambdaIntroducer &Intro,
             << C->Id << It->second->getBeginLoc()
             << FixItHint::CreateRemoval(
                    SourceRange(getLocForEndOfToken(PrevCaptureLoc), C->Loc));
-      } else
+        Var->setInvalidDecl();
+      } else if (Var && Var->isPlaceholderVar(getLangOpts())) {
+        DiagPlaceholderVariableDefinition(C->Loc);
+      } else {
         // Previous capture captured something different (one or both was
         // an init-capture): no fixit.
         Diag(C->Loc, diag::err_capture_more_than_once) << C->Id;
-      continue;
+        continue;
+      }
     }
 
     // Ignore invalid decls; they'll just confuse the code later.
@@ -1258,6 +1273,17 @@ void Sema::ActOnLambdaClosureParameters(
       PushOnScopeChains(Param, LambdaScope, false);
   }
 
+  // After the parameter list, we may parse a noexcept/requires/trailing return
+  // type which need to know whether the call operator constiture a dependent
+  // context, so we need to setup the FunctionTemplateDecl of generic lambdas
+  // now.
+  TemplateParameterList *TemplateParams =
+      getGenericLambdaTemplateParameterList(LSI, *this);
+  if (TemplateParams) {
+    AddTemplateParametersToLambdaCallOperator(LSI->CallOperator, LSI->Lambda,
+                                              TemplateParams);
+    LSI->Lambda->setLambdaIsGeneric(true);
+  }
   LSI->AfterParameterList = true;
 }
 
@@ -1633,6 +1659,11 @@ static void addFunctionPointerConversion(Sema &S, SourceRange IntroducerRange,
   Conversion->setAccess(AS_public);
   Conversion->setImplicit(true);
 
+  // A non-generic lambda may still be a templated entity. We need to preserve
+  // constraints when converting the lambda to a function pointer. See GH63181.
+  if (Expr *Requires = CallOperator->getTrailingRequiresClause())
+    Conversion->setTrailingRequiresClause(Requires);
+
   if (Class->isGenericLambda()) {
     // Create a template version of the conversion operator, using the template
     // parameter list of the function call operator.
@@ -1868,6 +1899,12 @@ bool Sema::DiagnoseUnusedLambdaCapture(SourceRange CaptureRange,
     return false;
 
   if (From.isVLATypeCapture())
+    return false;
+
+  // FIXME: maybe we should warn on these if we can find a sensible diagnostic
+  // message
+  if (From.isInitCapture() &&
+      From.getVariable()->isPlaceholderVar(getLangOpts()))
     return false;
 
   auto diag = Diag(From.getLocation(), diag::warn_unused_lambda_capture);

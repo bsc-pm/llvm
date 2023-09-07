@@ -194,11 +194,11 @@ attributes #4 = { nounwind }
 ; CHECK-NEXT:    store i32 10, ptr [[X]], align 4, !dbg [[DBG9:![0-9]+]]
 ; CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr [[X]], align 4, !dbg [[DBG10:![0-9]+]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64, !dbg [[DBG11:![0-9]+]]
-; CHECK-NEXT:    [[TMP2:%.*]] = call ptr @llvm.stacksave(), !dbg [[DBG11]]
+; CHECK-NEXT:    [[TMP2:%.*]] = call ptr @llvm.stacksave.p0(), !dbg [[DBG11]]
 ; CHECK-NEXT:    store ptr [[TMP2]], ptr [[SAVED_STACK]], align 8, !dbg [[DBG11]]
 ; CHECK-NEXT:    [[VLA:%.*]] = alloca i32, i64 [[TMP1]], align 16, !dbg [[DBG11]]
 ; CHECK-NEXT:    store i64 [[TMP1]], ptr [[__VLA_EXPR0]], align 8, !dbg [[DBG11]]
-; CHECK-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[S]]) #[[ATTR4:[0-9]+]], !dbg [[DBG12:![0-9]+]]
+; CHECK-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[S]]) #[[ATTR3:[0-9]+]], !dbg [[DBG12:![0-9]+]]
 ; CHECK-NEXT:    call void @_ZN1S3fooEv(ptr noundef nonnull align 4 dereferenceable(4) [[S]]), !dbg [[DBG13:![0-9]+]]
 ; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds [10 x i32], ptr [[ARRAY]], i64 0, i64 0, !dbg [[DBG14:![0-9]+]]
 ; CHECK-NEXT:    store i32 43, ptr [[ARRAYIDX]], align 16, !dbg [[DBG15:![0-9]+]]
@@ -238,7 +238,7 @@ attributes #4 = { nounwind }
 ; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG19]]
 ; CHECK:       final.end:
 ; CHECK-NEXT:    [[TMP16:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG20:![0-9]+]]
-; CHECK-NEXT:    call void @llvm.stackrestore(ptr [[TMP16]]), !dbg [[DBG20]]
+; CHECK-NEXT:    call void @llvm.stackrestore.p0(ptr [[TMP16]]), !dbg [[DBG20]]
 ; CHECK-NEXT:    ret i32 0, !dbg [[DBG20]]
 ; CHECK:       final.then:
 ; CHECK-NEXT:    [[TMP17:%.*]] = load i32, ptr [[X]], align 4, !dbg [[DBG21:![0-9]+]]
@@ -260,17 +260,17 @@ attributes #4 = { nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZN1SC1Ev
-; CHECK-SAME: (ptr noundef nonnull align 4 dereferenceable(4) [[THIS:%.*]]) unnamed_addr #[[ATTR2:[0-9]+]] comdat align 2 !dbg [[DBG26:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull align 4 dereferenceable(4) [[THIS:%.*]]) unnamed_addr #[[ATTR1:[0-9]+]] comdat align 2 !dbg [[DBG26:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
 ; CHECK-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-; CHECK-NEXT:    call void @_ZN1SC2Ev(ptr noundef nonnull align 4 dereferenceable(4) [[THIS1]]) #[[ATTR4]], !dbg [[DBG27:![0-9]+]]
+; CHECK-NEXT:    call void @_ZN1SC2Ev(ptr noundef nonnull align 4 dereferenceable(4) [[THIS1]]) #[[ATTR3]], !dbg [[DBG27:![0-9]+]]
 ; CHECK-NEXT:    ret void, !dbg [[DBG27]]
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZN1S3fooEv
-; CHECK-SAME: (ptr noundef nonnull align 4 dereferenceable(4) [[THIS:%.*]]) #[[ATTR3:[0-9]+]] comdat align 2 !dbg [[DBG28:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull align 4 dereferenceable(4) [[THIS:%.*]]) #[[ATTR2:[0-9]+]] comdat align 2 !dbg [[DBG28:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
@@ -309,7 +309,7 @@ attributes #4 = { nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZN1SC2Ev
-; CHECK-SAME: (ptr noundef nonnull align 4 dereferenceable(4) [[THIS:%.*]]) unnamed_addr #[[ATTR2]] comdat align 2 !dbg [[DBG35:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull align 4 dereferenceable(4) [[THIS:%.*]]) unnamed_addr #[[ATTR1]] comdat align 2 !dbg [[DBG35:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8

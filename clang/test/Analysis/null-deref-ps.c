@@ -289,7 +289,7 @@ void pr4759(void) {
 }
 
 // Relax function call arguments invalidation to be aware of const
-// arguments. Test with function pointers. radar://10595327
+// arguments. Test with function pointers.
 void ttt(const int *nptr);
 void ttt2(const int *nptr);
 typedef void (*NoConstType)(int*);

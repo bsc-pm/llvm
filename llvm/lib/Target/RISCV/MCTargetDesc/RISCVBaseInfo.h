@@ -203,6 +203,35 @@ static inline unsigned getVecPolicyOpNum(const MCInstrDesc &Desc) {
   return Desc.getNumOperands() - 1;
 }
 
+/// \returns  the index to the rounding mode immediate value if any, otherwise
+/// returns -1.
+static inline int getFRMOpNum(const MCInstrDesc &Desc) {
+  const uint64_t TSFlags = Desc.TSFlags;
+  if (!hasRoundModeOp(TSFlags) || usesVXRM(TSFlags))
+    return -1;
+
+  // The operand order
+  // --------------------------------------
+  // | n-1 (if any)   | n-2  | n-3 | n-4 |
+  // | policy         | sew  | vl  | frm |
+  // --------------------------------------
+  return getVLOpNum(Desc) - 1;
+}
+
+/// \returns  the index to the rounding mode immediate value if any, otherwise
+/// returns -1.
+static inline int getVXRMOpNum(const MCInstrDesc &Desc) {
+  const uint64_t TSFlags = Desc.TSFlags;
+  if (!hasRoundModeOp(TSFlags) || !usesVXRM(TSFlags))
+    return -1;
+  // The operand order
+  // --------------------------------------
+  // | n-1 (if any)   | n-2  | n-3 | n-4  |
+  // | policy         | sew  | vl  | vxrm |
+  // --------------------------------------
+  return getVLOpNum(Desc) - 1;
+}
+
 // Is the first def operand tied to the first use operand. This is true for
 // vector pseudo instructions that have a merge operand for tail/mask
 // undisturbed. It's also true for vector FMA instructions where one of the
@@ -363,7 +392,6 @@ int getLoadFPImm(APFloat FPImm);
 namespace RISCVSysReg {
 struct SysReg {
   const char *Name;
-  const char *AltName;
   const char *DeprecatedName;
   unsigned Encoding;
   // FIXME: add these additional fields when needed.
@@ -387,9 +415,22 @@ struct SysReg {
       return true;
     return (FeaturesRequired & ActiveFeatures) == FeaturesRequired;
   }
+
+  bool haveVendorRequiredFeatures(const FeatureBitset &ActiveFeatures) const {
+    // Not in 32-bit mode.
+    if (isRV32Only && ActiveFeatures[RISCV::Feature64Bit])
+      return false;
+    // No required feature associated with the system register.
+    if (FeaturesRequired.none())
+      return false;
+    return (FeaturesRequired & ActiveFeatures) == FeaturesRequired;
+  }
 };
 
+struct SiFiveReg : SysReg {};
+
 #define GET_SysRegsList_DECL
+#define GET_SiFiveRegsList_DECL
 #include "RISCVGenSearchableTables.inc"
 } // end namespace RISCVSysReg
 

@@ -68,6 +68,7 @@
 #include "llvm/Analysis/ScopedNoAliasAA.h"
 #include "llvm/Analysis/StackLifetime.h"
 #include "llvm/Analysis/StackSafetyAnalysis.h"
+#include "llvm/Analysis/StructuralHash.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Analysis/TypeBasedAliasAnalysis.h"
@@ -696,7 +697,7 @@ Expected<bool> parseCoroSplitPassOptions(StringRef Params) {
 }
 
 Expected<bool> parsePostOrderFunctionAttrsPassOptions(StringRef Params) {
-  return parseSinglePassOption(Params, "skip-non-recursive",
+  return parseSinglePassOption(Params, "skip-non-recursive-function-attrs",
                                "PostOrderFunctionAttrs");
 }
 
@@ -848,6 +849,9 @@ Expected<SimplifyCFGOptions> parseSimplifyCFGOptions(StringRef Params) {
 
 Expected<InstCombineOptions> parseInstCombineOptions(StringRef Params) {
   InstCombineOptions Result;
+  // When specifying "instcombine" in -passes enable fix-point verification by
+  // default, as this is what most tests should use.
+  Result.setVerifyFixpoint(true);
   while (!Params.empty()) {
     StringRef ParamName;
     std::tie(ParamName, Params) = Params.split(';');
@@ -855,6 +859,8 @@ Expected<InstCombineOptions> parseInstCombineOptions(StringRef Params) {
     bool Enable = !ParamName.consume_front("no-");
     if (ParamName == "use-loop-info") {
       Result.setUseLoopInfo(Enable);
+    } else if (ParamName == "verify-fixpoint") {
+      Result.setVerifyFixpoint(Enable);
     } else if (Enable && ParamName.consume_front("max-iterations=")) {
       APInt MaxIterations;
       if (ParamName.getAsInteger(0, MaxIterations))
@@ -1089,6 +1095,11 @@ Expected<std::string> parseMemProfUsePassOptions(StringRef Params) {
     }
   }
   return Result;
+}
+
+Expected<bool> parseStructuralHashPrinterPassOptions(StringRef Params) {
+  return parseSinglePassOption(Params, "detailed",
+                               "StructuralHashPrinterPass");
 }
 
 } // namespace

@@ -11,7 +11,7 @@ END
 
 ! HLFIRToLLVMDialect-LABEL:   llvm.func @_QQmain() attributes {fir.bindc_name = "p"} {
 ! HLFIRToLLVMDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
-! HLFIRToLLVMDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_0]] x i32 {bindc_name = "x", in_type = i32, operand_segment_sizes = array<i32: 0, 0>, uniq_name = "_QFEx"} : (i64) -> !llvm.ptr<i32>
+! HLFIRToLLVMDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_0]] x i32 {bindc_name = "x", in_type = i32, operandSegmentSizes = array<i32: 0, 0>, uniq_name = "_QFEx"} : (i64) -> !llvm.ptr<i32>
 ! HLFIRToLLVMDialect:           oss.task firstprivate(%[[VAL_1]], %[[VAL_1]] : !llvm.ptr<i32>, !llvm.ptr<i32>) {
 ! HLFIRToLLVMDialect:             %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.constant(777 : i32) : i32
 ! HLFIRToLLVMDialect:             llvm.store %[[VAL_2]], %[[VAL_1]] : !llvm.ptr<i32>

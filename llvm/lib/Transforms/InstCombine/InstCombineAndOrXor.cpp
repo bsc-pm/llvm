@@ -1713,24 +1713,37 @@ Instruction *InstCombinerImpl::foldCastedBitwiseLogic(BinaryOperator &I) {
 
   Value *Op0 = I.getOperand(0), *Op1 = I.getOperand(1);
 
-  // ( A << (X - 1) ) | ((A > 0) zext to iX)
-  // <=> A < 0 | A > 0
-  // <=> (A != 0) zext to iX
-  Value *A;
-  ICmpInst::Predicate Pred;
+  // fold bitwise(A >> BW - 1, zext(icmp))     (BW is the scalar bits of the
+  // type of A)
+  //   -> bitwise(zext(A < 0), zext(icmp))
+  //   -> zext(bitwise(A < 0, icmp))
+  auto FoldBitwiseICmpZeroWithICmp = [&](Value *Op0,
+                                         Value *Op1) -> Instruction * {
+    ICmpInst::Predicate Pred;
+    Value *A;
+    bool IsMatched =
+        match(Op0,
+              m_OneUse(m_LShr(
+                  m_Value(A),
+                  m_SpecificInt(Op0->getType()->getScalarSizeInBits() - 1)))) &&
+        match(Op1, m_OneUse(m_ZExt(m_ICmp(Pred, m_Value(), m_Value()))));
 
-  auto MatchOrZExtICmp = [&](Value *Op0, Value *Op1) -> bool {
-    return match(Op0, m_LShr(m_Value(A), m_SpecificInt(Op0->getType()->getScalarSizeInBits() - 1))) &&
-           match(Op1, m_ZExt(m_ICmp(Pred, m_Specific(A), m_Zero())));
+    if (!IsMatched)
+      return nullptr;
+
+    auto *ICmpL =
+        Builder.CreateICmpSLT(A, Constant::getNullValue(A->getType()));
+    auto *ICmpR = cast<ZExtInst>(Op1)->getOperand(0);
+    auto *BitwiseOp = Builder.CreateBinOp(LogicOpc, ICmpL, ICmpR);
+
+    return new ZExtInst(BitwiseOp, Op0->getType());
   };
 
-  if (LogicOpc == Instruction::Or &&
-      (MatchOrZExtICmp(Op0, Op1) || MatchOrZExtICmp(Op1, Op0)) &&
-      Pred == ICmpInst::ICMP_SGT) {
-      Value *Cmp =
-          Builder.CreateICmpNE(A, Constant::getNullValue(A->getType()));
-      return new ZExtInst(Cmp, A->getType());
-  }
+  if (auto *Ret = FoldBitwiseICmpZeroWithICmp(Op0, Op1))
+    return Ret;
+
+  if (auto *Ret = FoldBitwiseICmpZeroWithICmp(Op1, Op0))
+    return Ret;
 
   CastInst *Cast0 = dyn_cast<CastInst>(Op0);
   if (!Cast0)
@@ -2131,10 +2144,9 @@ static Instruction *canonicalizeLogicFirst(BinaryOperator &I,
     llvm_unreachable("Unexpected BinaryOp!");
   }
 
-  auto *Add = cast<BinaryOperator>(Op0);
   Value *NewBinOp = Builder.CreateBinOp(OpC, X, ConstantInt::get(Ty, *C));
   return BinaryOperator::CreateWithCopiedFlags(Instruction::Add, NewBinOp,
-                                               ConstantInt::get(Ty, *C2), Add);
+                                               ConstantInt::get(Ty, *C2), Op0);
 }
 
 // binop(shift(ShiftedC1, ShAmt), shift(ShiftedC2, add(ShAmt, AddC))) ->
@@ -2440,6 +2452,28 @@ Instruction *InstCombinerImpl::visitAnd(BinaryOperator &I) {
                                     ConstantInt::getNullValue(Ty));
         }
       }
+    }
+  }
+
+  // If we are clearing the sign bit of a floating-point value, convert this to
+  // fabs, then cast back to integer.
+  //
+  // This is a generous interpretation for noimplicitfloat, this is not a true
+  // floating-point operation.
+  //
+  // Assumes any IEEE-represented type has the sign bit in the high bit.
+  // TODO: Unify with APInt matcher. This version allows undef unlike m_APInt
+  Value *CastOp;
+  if (match(Op0, m_BitCast(m_Value(CastOp))) &&
+      match(Op1, m_MaxSignedValue()) &&
+      !Builder.GetInsertBlock()->getParent()->hasFnAttribute(
+        Attribute::NoImplicitFloat)) {
+    Type *EltTy = CastOp->getType()->getScalarType();
+    if (EltTy->isFloatingPointTy() && EltTy->isIEEE() &&
+        EltTy->getPrimitiveSizeInBits() ==
+        I.getType()->getScalarType()->getPrimitiveSizeInBits()) {
+      Value *FAbs = Builder.CreateUnaryIntrinsic(Intrinsic::fabs, CastOp);
+      return new BitCastInst(FAbs, I.getType());
     }
   }
 
@@ -3708,6 +3742,31 @@ Instruction *InstCombinerImpl::visitOr(BinaryOperator &I) {
   if (Instruction *Res = foldBinOpOfDisplacedShifts(I))
     return Res;
 
+  // If we are setting the sign bit of a floating-point value, convert
+  // this to fneg(fabs), then cast back to integer.
+  //
+  // If the result isn't immediately cast back to a float, this will increase
+  // the number of instructions. This is still probably a better canonical form
+  // as it enables FP value tracking.
+  //
+  // Assumes any IEEE-represented type has the sign bit in the high bit.
+  //
+  // This is generous interpretation of noimplicitfloat, this is not a true
+  // floating-point operation.
+  Value *CastOp;
+  if (match(Op0, m_BitCast(m_Value(CastOp))) && match(Op1, m_SignMask()) &&
+      !Builder.GetInsertBlock()->getParent()->hasFnAttribute(
+          Attribute::NoImplicitFloat)) {
+    Type *EltTy = CastOp->getType()->getScalarType();
+    if (EltTy->isFloatingPointTy() && EltTy->isIEEE() &&
+        EltTy->getPrimitiveSizeInBits() ==
+        I.getType()->getScalarType()->getPrimitiveSizeInBits()) {
+      Value *FAbs = Builder.CreateUnaryIntrinsic(Intrinsic::fabs, CastOp);
+      Value *FNegFAbs = Builder.CreateFNeg(FAbs);
+      return new BitCastInst(FNegFAbs, I.getType());
+    }
+  }
+
   return nullptr;
 }
 
@@ -4453,6 +4512,27 @@ Instruction *InstCombinerImpl::visitXor(BinaryOperator &I) {
       // TODO: We could handle 'ashr' here as well. That would be matching
       //       a 'not' op and moving it before the shift. Doing that requires
       //       preventing the inverse fold in canShiftBinOpWithConstantRHS().
+    }
+
+    // If we are XORing the sign bit of a floating-point value, convert
+    // this to fneg, then cast back to integer.
+    //
+    // This is generous interpretation of noimplicitfloat, this is not a true
+    // floating-point operation.
+    //
+    // Assumes any IEEE-represented type has the sign bit in the high bit.
+    // TODO: Unify with APInt matcher. This version allows undef unlike m_APInt
+    Value *CastOp;
+    if (match(Op0, m_BitCast(m_Value(CastOp))) && match(Op1, m_SignMask()) &&
+        !Builder.GetInsertBlock()->getParent()->hasFnAttribute(
+            Attribute::NoImplicitFloat)) {
+      Type *EltTy = CastOp->getType()->getScalarType();
+      if (EltTy->isFloatingPointTy() && EltTy->isIEEE() &&
+          EltTy->getPrimitiveSizeInBits() ==
+          I.getType()->getScalarType()->getPrimitiveSizeInBits()) {
+        Value *FNeg = Builder.CreateFNeg(CastOp);
+        return new BitCastInst(FNeg, I.getType());
+      }
     }
   }
 

@@ -346,7 +346,7 @@ attributes #4 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    store i32 [[N]], ptr [[N_ADDR]], align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N_ADDR]], align 4, !dbg [[DBG9:![0-9]+]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64, !dbg [[DBG10:![0-9]+]]
-; CHECK-NEXT:    [[TMP2:%.*]] = call ptr @llvm.stacksave(), !dbg [[DBG10]]
+; CHECK-NEXT:    [[TMP2:%.*]] = call ptr @llvm.stacksave.p0(), !dbg [[DBG10]]
 ; CHECK-NEXT:    store ptr [[TMP2]], ptr [[SAVED_STACK]], align 8, !dbg [[DBG10]]
 ; CHECK-NEXT:    [[VLA:%.*]] = alloca i32, i64 [[TMP1]], align 16, !dbg [[DBG10]]
 ; CHECK-NEXT:    store i64 [[TMP1]], ptr [[__VLA_EXPR0]], align 8, !dbg [[DBG10]]
@@ -377,7 +377,7 @@ attributes #4 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG11]]
 ; CHECK:       final.end:
 ; CHECK-NEXT:    [[TMP12:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG12:![0-9]+]]
-; CHECK-NEXT:    call void @llvm.stackrestore(ptr [[TMP12]]), !dbg [[DBG12]]
+; CHECK-NEXT:    call void @llvm.stackrestore.p0(ptr [[TMP12]]), !dbg [[DBG12]]
 ; CHECK-NEXT:    ret void, !dbg [[DBG12]]
 ; CHECK:       final.then:
 ; CHECK-NEXT:    br label [[FINAL_END]], !dbg [[DBG12]]
@@ -388,7 +388,7 @@ attributes #4 = { "min-legal-vector-width"="0" }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@red_init
-; CHECK-SAME: (ptr noundef [[TMP0:%.*]], ptr noundef [[TMP1:%.*]], i64 noundef [[TMP2:%.*]]) #[[ATTR3:[0-9]+]] !dbg [[DBG13:![0-9]+]] {
+; CHECK-SAME: (ptr noundef [[TMP0:%.*]], ptr noundef [[TMP1:%.*]], i64 noundef [[TMP2:%.*]]) #[[ATTR2:[0-9]+]] !dbg [[DBG13:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[DOTADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    [[DOTADDR1:%.*]] = alloca ptr, align 8
@@ -415,7 +415,7 @@ attributes #4 = { "min-legal-vector-width"="0" }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@red_comb
-; CHECK-SAME: (ptr noundef [[TMP0:%.*]], ptr noundef [[TMP1:%.*]], i64 noundef [[TMP2:%.*]]) #[[ATTR3]] !dbg [[DBG16:![0-9]+]] {
+; CHECK-SAME: (ptr noundef [[TMP0:%.*]], ptr noundef [[TMP1:%.*]], i64 noundef [[TMP2:%.*]]) #[[ATTR2]] !dbg [[DBG16:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[DOTADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    [[DOTADDR1:%.*]] = alloca ptr, align 8
@@ -445,7 +445,7 @@ attributes #4 = { "min-legal-vector-width"="0" }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@compute_dep
-; CHECK-SAME: (ptr [[N:%.*]]) #[[ATTR4:[0-9]+]] !dbg [[DBG21:![0-9]+]] {
+; CHECK-SAME: (ptr [[N:%.*]]) #[[ATTR3:[0-9]+]] !dbg [[DBG21:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T:%.*]], align 8
 ; CHECK-NEXT:    [[N_ADDR:%.*]] = alloca ptr, align 8
@@ -463,7 +463,7 @@ attributes #4 = { "min-legal-vector-width"="0" }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@compute_dep.1
-; CHECK-SAME: (ptr [[ARRAY:%.*]], i64 [[TMP0:%.*]]) #[[ATTR4]] !dbg [[DBG22:![0-9]+]] {
+; CHECK-SAME: (ptr [[ARRAY:%.*]], i64 [[TMP0:%.*]]) #[[ATTR3]] !dbg [[DBG22:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T_0:%.*]], align 8
 ; CHECK-NEXT:    [[ARRAY_ADDR:%.*]] = alloca ptr, align 8
@@ -493,7 +493,7 @@ attributes #4 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    store i32 [[N]], ptr [[N_ADDR]], align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N_ADDR]], align 4, !dbg [[DBG24:![0-9]+]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64, !dbg [[DBG25:![0-9]+]]
-; CHECK-NEXT:    [[TMP2:%.*]] = call ptr @llvm.stacksave(), !dbg [[DBG25]]
+; CHECK-NEXT:    [[TMP2:%.*]] = call ptr @llvm.stacksave.p0(), !dbg [[DBG25]]
 ; CHECK-NEXT:    store ptr [[TMP2]], ptr [[SAVED_STACK]], align 8, !dbg [[DBG25]]
 ; CHECK-NEXT:    [[VLA:%.*]] = alloca i32, i64 [[TMP1]], align 16, !dbg [[DBG25]]
 ; CHECK-NEXT:    store i64 [[TMP1]], ptr [[__VLA_EXPR0]], align 8, !dbg [[DBG25]]
@@ -524,7 +524,7 @@ attributes #4 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG26]]
 ; CHECK:       final.end:
 ; CHECK-NEXT:    [[TMP12:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG27:![0-9]+]]
-; CHECK-NEXT:    call void @llvm.stackrestore(ptr [[TMP12]]), !dbg [[DBG27]]
+; CHECK-NEXT:    call void @llvm.stackrestore.p0(ptr [[TMP12]]), !dbg [[DBG27]]
 ; CHECK-NEXT:    ret void, !dbg [[DBG27]]
 ; CHECK:       final.then:
 ; CHECK-NEXT:    br label [[FINAL_END]], !dbg [[DBG27]]
@@ -535,7 +535,7 @@ attributes #4 = { "min-legal-vector-width"="0" }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@red_init.2
-; CHECK-SAME: (ptr noundef [[TMP0:%.*]], ptr noundef [[TMP1:%.*]], i64 noundef [[TMP2:%.*]]) #[[ATTR3]] !dbg [[DBG28:![0-9]+]] {
+; CHECK-SAME: (ptr noundef [[TMP0:%.*]], ptr noundef [[TMP1:%.*]], i64 noundef [[TMP2:%.*]]) #[[ATTR2]] !dbg [[DBG28:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[DOTADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    [[DOTADDR1:%.*]] = alloca ptr, align 8
@@ -562,7 +562,7 @@ attributes #4 = { "min-legal-vector-width"="0" }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@red_comb.3
-; CHECK-SAME: (ptr noundef [[TMP0:%.*]], ptr noundef [[TMP1:%.*]], i64 noundef [[TMP2:%.*]]) #[[ATTR3]] !dbg [[DBG31:![0-9]+]] {
+; CHECK-SAME: (ptr noundef [[TMP0:%.*]], ptr noundef [[TMP1:%.*]], i64 noundef [[TMP2:%.*]]) #[[ATTR2]] !dbg [[DBG31:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[DOTADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    [[DOTADDR1:%.*]] = alloca ptr, align 8
@@ -592,7 +592,7 @@ attributes #4 = { "min-legal-vector-width"="0" }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@compute_dep.4
-; CHECK-SAME: (ptr [[N:%.*]]) #[[ATTR4]] !dbg [[DBG35:![0-9]+]] {
+; CHECK-SAME: (ptr [[N:%.*]]) #[[ATTR3]] !dbg [[DBG35:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T_1:%.*]], align 8
 ; CHECK-NEXT:    [[N_ADDR:%.*]] = alloca ptr, align 8
@@ -610,7 +610,7 @@ attributes #4 = { "min-legal-vector-width"="0" }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@compute_dep.5
-; CHECK-SAME: (ptr [[ARRAY:%.*]], i64 [[TMP0:%.*]]) #[[ATTR4]] !dbg [[DBG36:![0-9]+]] {
+; CHECK-SAME: (ptr [[ARRAY:%.*]], i64 [[TMP0:%.*]]) #[[ATTR3]] !dbg [[DBG36:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T_2:%.*]], align 8
 ; CHECK-NEXT:    [[ARRAY_ADDR:%.*]] = alloca ptr, align 8
@@ -720,14 +720,14 @@ attributes #4 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[TMP4:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T]] [[TMP1]], 1
 ; CHECK-NEXT:    [[TMP5:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T]] [[TMP1]], 2
 ; CHECK-NEXT:    [[TMP6:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T]] [[TMP2]], 3
-; CHECK-NEXT:    call void @nanos6_register_region_reduction_depinfo1(i32 -1, i32 0, ptr [[HANDLER]], i32 0, ptr @[[GLOB1:[0-9]+]], ptr [[TMP3]], i64 [[TMP4]], i64 [[TMP5]], i64 [[TMP6]])
+; CHECK-NEXT:    call void @nanos6_register_region_reduction_depinfo1(i32 -1, i32 0, ptr [[HANDLER]], i32 0, ptr @[[GLOB2:[0-9]+]], ptr [[TMP3]], i64 [[TMP4]], i64 [[TMP5]], i64 [[TMP6]])
 ; CHECK-NEXT:    [[TMP7:%.*]] = call [[STRUCT__DEPEND_UNPACK_T_0:%.*]] @compute_dep.1(ptr [[VLA]], i64 [[TMP0]])
 ; CHECK-NEXT:    [[TMP8:%.*]] = call [[STRUCT__DEPEND_UNPACK_T_0]] @compute_dep.1(ptr [[VLA]], i64 [[TMP0]])
 ; CHECK-NEXT:    [[TMP9:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_0]] [[TMP7]], 0
 ; CHECK-NEXT:    [[TMP10:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_0]] [[TMP7]], 1
 ; CHECK-NEXT:    [[TMP11:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_0]] [[TMP7]], 2
 ; CHECK-NEXT:    [[TMP12:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_0]] [[TMP8]], 3
-; CHECK-NEXT:    call void @nanos6_register_region_reduction_depinfo1(i32 -1, i32 0, ptr [[HANDLER]], i32 1, ptr @[[GLOB2:[0-9]+]], ptr [[TMP9]], i64 [[TMP10]], i64 [[TMP11]], i64 [[TMP12]])
+; CHECK-NEXT:    call void @nanos6_register_region_reduction_depinfo1(i32 -1, i32 0, ptr [[HANDLER]], i32 1, ptr @[[GLOB3:[0-9]+]], ptr [[TMP9]], i64 [[TMP10]], i64 [[TMP11]], i64 [[TMP12]])
 ; CHECK-NEXT:    ret void
 ;
 ;
@@ -832,14 +832,14 @@ attributes #4 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[TMP4:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_1]] [[TMP1]], 1
 ; CHECK-NEXT:    [[TMP5:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_1]] [[TMP1]], 2
 ; CHECK-NEXT:    [[TMP6:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_1]] [[TMP2]], 3
-; CHECK-NEXT:    call void @nanos6_register_region_reduction_depinfo1(i32 6000, i32 0, ptr [[HANDLER]], i32 0, ptr @[[GLOB4:[0-9]+]], ptr [[TMP3]], i64 [[TMP4]], i64 [[TMP5]], i64 [[TMP6]])
+; CHECK-NEXT:    call void @nanos6_register_region_reduction_depinfo1(i32 6000, i32 0, ptr [[HANDLER]], i32 0, ptr @[[GLOB5:[0-9]+]], ptr [[TMP3]], i64 [[TMP4]], i64 [[TMP5]], i64 [[TMP6]])
 ; CHECK-NEXT:    [[TMP7:%.*]] = call [[STRUCT__DEPEND_UNPACK_T_2:%.*]] @compute_dep.5(ptr [[VLA]], i64 [[TMP0]])
 ; CHECK-NEXT:    [[TMP8:%.*]] = call [[STRUCT__DEPEND_UNPACK_T_2]] @compute_dep.5(ptr [[VLA]], i64 [[TMP0]])
 ; CHECK-NEXT:    [[TMP9:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_2]] [[TMP7]], 0
 ; CHECK-NEXT:    [[TMP10:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_2]] [[TMP7]], 1
 ; CHECK-NEXT:    [[TMP11:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_2]] [[TMP7]], 2
 ; CHECK-NEXT:    [[TMP12:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_2]] [[TMP8]], 3
-; CHECK-NEXT:    call void @nanos6_register_region_reduction_depinfo1(i32 6000, i32 0, ptr [[HANDLER]], i32 1, ptr @[[GLOB5:[0-9]+]], ptr [[TMP9]], i64 [[TMP10]], i64 [[TMP11]], i64 [[TMP12]])
+; CHECK-NEXT:    call void @nanos6_register_region_reduction_depinfo1(i32 6000, i32 0, ptr [[HANDLER]], i32 1, ptr @[[GLOB6:[0-9]+]], ptr [[TMP9]], i64 [[TMP10]], i64 [[TMP11]], i64 [[TMP12]])
 ; CHECK-NEXT:    ret void
 ;
 ;

@@ -19,6 +19,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <optional>
 
 namespace mlir::arith {
@@ -79,10 +80,14 @@ LogicalResult EmulateFloatPattern::match(Operation *op) const {
 void EmulateFloatPattern::rewrite(Operation *op, ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const {
   Location loc = op->getLoc();
-  TypeConverter *converter = getTypeConverter();
+  const TypeConverter *converter = getTypeConverter();
   SmallVector<Type> resultTypes;
-  LogicalResult pass = converter->convertTypes(op->getResultTypes(), resultTypes);
-  (void) pass;
+  if (failed(converter->convertTypes(op->getResultTypes(), resultTypes))) {
+    // Note to anyone looking for this error message: this is a "can't happen".
+    // If you're seeing it, there's a bug.
+    op->emitOpError("type conversion failed in float emulation");
+    return;
+  }
   Operation *expandedOp =
       rewriter.create(loc, op->getName().getIdentifier(), operands, resultTypes,
                       op->getAttrs(), op->getSuccessors(), /*regions=*/{});
@@ -131,8 +136,8 @@ void mlir::arith::populateEmulateUnsupportedFloatsLegality(
       vector::ContractionOp, vector::ReductionOp, vector::MultiDimReductionOp,
       vector::FMAOp, vector::OuterProductOp, vector::MatmulOp, vector::ScanOp>(
       [&](Operation *op) { return converter.isLegal(op); });
-  target.addLegalOp<arith::ExtFOp, arith::TruncFOp, arith::ConstantOp,
-                    vector::SplatOp>();
+  target.addLegalOp<arith::BitcastOp, arith::ExtFOp, arith::TruncFOp,
+                    arith::ConstantOp, vector::SplatOp>();
 }
 
 void EmulateUnsupportedFloatsPass::runOnOperation() {

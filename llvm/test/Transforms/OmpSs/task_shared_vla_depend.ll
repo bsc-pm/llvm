@@ -160,7 +160,7 @@ attributes #3 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[TMP4:%.*]] = load i32, ptr [[Z_ADDR]], align 4, !dbg [[DBG14:![0-9]+]]
 ; CHECK-NEXT:    [[ADD2:%.*]] = add nsw i32 [[TMP4]], 3, !dbg [[DBG15:![0-9]+]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = zext i32 [[ADD2]] to i64, !dbg [[DBG11]]
-; CHECK-NEXT:    [[TMP6:%.*]] = call ptr @llvm.stacksave(), !dbg [[DBG11]]
+; CHECK-NEXT:    [[TMP6:%.*]] = call ptr @llvm.stacksave.p0(), !dbg [[DBG11]]
 ; CHECK-NEXT:    store ptr [[TMP6]], ptr [[SAVED_STACK]], align 8, !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = mul nuw i64 [[TMP1]], [[TMP3]], !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = mul nuw i64 [[TMP7]], [[TMP5]], !dbg [[DBG11]]
@@ -195,7 +195,7 @@ attributes #3 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG16]]
 ; CHECK:       final.end:
 ; CHECK-NEXT:    [[TMP16:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG17:![0-9]+]]
-; CHECK-NEXT:    call void @llvm.stackrestore(ptr [[TMP16]]), !dbg [[DBG17]]
+; CHECK-NEXT:    call void @llvm.stackrestore.p0(ptr [[TMP16]]), !dbg [[DBG17]]
 ; CHECK-NEXT:    ret void, !dbg [[DBG17]]
 ; CHECK:       final.then:
 ; CHECK-NEXT:    [[TMP17:%.*]] = mul nuw i64 [[TMP1]], [[TMP3]], !dbg [[DBG18:![0-9]+]]
@@ -211,7 +211,7 @@ attributes #3 = { "min-legal-vector-width"="0" }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@compute_dep
-; CHECK-SAME: (ptr [[VLA:%.*]], i64 [[TMP0:%.*]], i64 [[TMP1:%.*]], i64 [[TMP2:%.*]]) #[[ATTR3:[0-9]+]] !dbg [[DBG20:![0-9]+]] {
+; CHECK-SAME: (ptr [[VLA:%.*]], i64 [[TMP0:%.*]], i64 [[TMP1:%.*]], i64 [[TMP2:%.*]]) #[[ATTR2:[0-9]+]] !dbg [[DBG20:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T:%.*]], align 8
 ; CHECK-NEXT:    [[VLA_ADDR:%.*]] = alloca ptr, align 8

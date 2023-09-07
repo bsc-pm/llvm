@@ -254,7 +254,7 @@ void rdar_6777003(int x) {
 }
 
 // Check that the pointer-to-conts arguments do not get invalidated by Obj C 
-// interfaces. radar://10595327
+// interfaces.
 int rdar_10595327(char *str) {
   char fl = str[0]; 
   int *p = 0;

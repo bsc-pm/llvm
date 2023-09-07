@@ -18,6 +18,8 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/DataTypes.h"
 #include "llvm/Support/FormattedStream.h"
+#include <functional>
+#include <memory>
 
 namespace llvm {
 class StringRef;
@@ -30,6 +32,12 @@ class Arg;
 namespace object {
 class RelocationRef;
 struct VersionEntry;
+
+class COFFObjectFile;
+class ELFObjectFileBase;
+class MachOObjectFile;
+class WasmObjectFile;
+class XCOFFObjectFile;
 } // namespace object
 
 namespace objdump {
@@ -69,12 +77,18 @@ class Dumper {
   const object::ObjectFile &O;
   StringSet<> Warnings;
 
+protected:
+  std::function<Error(const Twine &Msg)> WarningHandler;
+
 public:
-  Dumper(const object::ObjectFile &O) : O(O) {}
+  Dumper(const object::ObjectFile &O);
+  virtual ~Dumper() {}
 
   void reportUniqueWarning(Error Err);
   void reportUniqueWarning(const Twine &Msg);
 
+  virtual void printPrivateHeaders();
+  virtual void printDynamicRelocations() {}
   void printSymbolTable(StringRef ArchiveName,
                         StringRef ArchitectureName = StringRef(),
                         bool DumpDynamic = false);
@@ -84,6 +98,12 @@ public:
                    StringRef ArchitectureName, bool DumpDynamic);
   void printRelocations();
 };
+
+std::unique_ptr<Dumper> createCOFFDumper(const object::COFFObjectFile &Obj);
+std::unique_ptr<Dumper> createELFDumper(const object::ELFObjectFileBase &Obj);
+std::unique_ptr<Dumper> createMachODumper(const object::MachOObjectFile &Obj);
+std::unique_ptr<Dumper> createWasmDumper(const object::WasmObjectFile &Obj);
+std::unique_ptr<Dumper> createXCOFFDumper(const object::XCOFFObjectFile &Obj);
 
 // Various helper functions.
 
@@ -97,7 +117,6 @@ object::SectionFilter ToolSectionFilter(const llvm::object::ObjectFile &O,
                                         uint64_t *Idx = nullptr);
 
 bool isRelocAddressLess(object::RelocationRef A, object::RelocationRef B);
-void printDynamicRelocations(const object::ObjectFile *O);
 void printSectionHeaders(object::ObjectFile &O);
 void printSectionContents(const object::ObjectFile *O);
 [[noreturn]] void reportError(StringRef File, const Twine &Message);
@@ -118,7 +137,8 @@ void invalidArgValue(const opt::Arg *A);
 std::string getFileNameForError(const object::Archive::Child &C,
                                 unsigned Index);
 SymbolInfoTy createSymbolInfo(const object::ObjectFile &Obj,
-                              const object::SymbolRef &Symbol);
+                              const object::SymbolRef &Symbol,
+                              bool IsMappingSymbol = false);
 unsigned getInstStartColumn(const MCSubtargetInfo &STI);
 void printRawData(llvm::ArrayRef<uint8_t> Bytes, uint64_t Address,
                   llvm::formatted_raw_ostream &OS,

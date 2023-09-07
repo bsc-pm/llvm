@@ -28,7 +28,7 @@ int main() {
     #pragma oss task in( { v1[ii], i=}, v) // expected-error {{expected expression}} expected-error {{expected ':' or ';'}}
     #pragma oss task in( { v1[ii], i=:}, v) // expected-error 2 {{expected expression}}
     #pragma oss task in( { v1[ii], i=0:}, v) // expected-error {{expected expression}}
-    #pragma oss task in( { v1[ii], i=0::}, v) // expected-error 2 {{expected expression}}
+    #pragma oss task in( { v1[ii], i=0::}, v) // expected-error {{expected ':' or ';'}}
     #pragma oss task in( { v1[ii], i=0:10:}, v) // expected-error {{expected expression}}
     #pragma oss task in( { v1[ii], i=0:10:1}, v)
     #pragma oss task in( { v1[ii], i=0:10:1,}, v) // expected-error {{expected iterator identifier}}

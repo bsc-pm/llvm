@@ -1245,7 +1245,7 @@ LoopConstrainer::calculateSubRanges(bool IsSignedPredicate) const {
     // `End`, decrementing by one every time.
     //
     //  * if `Smallest` sign-overflows we know `End` is `INT_SMAX`. Since the
-    //    induction variable is decreasing we know that that the smallest value
+    //    induction variable is decreasing we know that the smallest value
     //    the loop body is actually executed with is `INT_SMIN` == `Smallest`.
     //
     //  * if `Greatest` sign-overflows, we know it can only be `INT_SMIN`.  In
@@ -1716,6 +1716,28 @@ bool LoopConstrainer::run() {
   if (PostL)
     CanonicalizeLoop(PostL, false);
   CanonicalizeLoop(&OriginalLoop, true);
+
+  /// At this point:
+  /// - We've broken a "main loop" out of the loop in a way that the "main loop"
+  /// runs with the induction variable in a subset of [Begin, End).
+  /// - There is no overflow when computing "main loop" exit limit.
+  /// - Max latch taken count of the loop is limited.
+  /// It guarantees that induction variable will not overflow iterating in the
+  /// "main loop".
+  if (isa<OverflowingBinaryOperator>(MainLoopStructure.IndVarBase))
+    if (IsSignedPredicate)
+      cast<BinaryOperator>(MainLoopStructure.IndVarBase)
+          ->setHasNoSignedWrap(true);
+  /// TODO: support unsigned predicate.
+  /// To add NUW flag we need to prove that both operands of BO are
+  /// non-negative. E.g:
+  /// ...
+  /// %iv.next = add nsw i32 %iv, -1
+  /// %cmp = icmp ult i32 %iv.next, %n
+  /// br i1 %cmp, label %loopexit, label %loop
+  ///
+  /// -1 is MAX_UINT in terms of unsigned int. Adding anything but zero will
+  /// overflow, therefore NUW flag is not legal here.
 
   return true;
 }

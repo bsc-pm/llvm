@@ -350,4 +350,51 @@ TEST(SolverTest, LowTimeoutResultsInTimedOut) {
   EXPECT_EQ(solver.solve({A, B}).getStatus(), Solver::Result::Status::TimedOut);
 }
 
+TEST(SolverTest, ReachedLimitsReflectsTimeouts) {
+  WatchedLiteralsSolver solver(10);
+  ConstraintContext Ctx;
+  auto X = Ctx.atom();
+  auto Y = Ctx.atom();
+  auto Z = Ctx.atom();
+  auto W = Ctx.atom();
+
+  // !(X v Y) <=> !X ^ !Y
+  auto A = Ctx.iff(Ctx.neg(Ctx.disj(X, Y)), Ctx.conj(Ctx.neg(X), Ctx.neg(Y)));
+
+  // !(Z ^ W) <=> !Z v !W
+  auto B = Ctx.iff(Ctx.neg(Ctx.conj(Z, W)), Ctx.disj(Ctx.neg(Z), Ctx.neg(W)));
+
+  // A ^ B
+  ASSERT_EQ(solver.solve({A, B}).getStatus(), Solver::Result::Status::TimedOut);
+  EXPECT_TRUE(solver.reachedLimit());
+}
+
+TEST(SolverTest, SimpleButLargeContradiction) {
+  // This test ensures that the solver takes a short-cut on known
+  // contradictory inputs, without using max_iterations. At the time
+  // this test is added, formulas that are easily recognized to be
+  // contradictory at CNF construction time would lead to timeout.
+  WatchedLiteralsSolver solver(10);
+  ConstraintContext Ctx;
+  auto first = Ctx.atom();
+  auto last = first;
+  for (int i = 1; i < 10000; ++i) {
+    last = Ctx.conj(last, Ctx.atom());
+  }
+  last = Ctx.conj(Ctx.neg(first), last);
+  ASSERT_EQ(solver.solve({last}).getStatus(),
+            Solver::Result::Status::Unsatisfiable);
+  EXPECT_FALSE(solver.reachedLimit());
+
+  first = Ctx.atom();
+  last = Ctx.neg(first);
+  for (int i = 1; i < 10000; ++i) {
+    last = Ctx.conj(last, Ctx.neg(Ctx.atom()));
+  }
+  last = Ctx.conj(first, last);
+  ASSERT_EQ(solver.solve({last}).getStatus(),
+            Solver::Result::Status::Unsatisfiable);
+  EXPECT_FALSE(solver.reachedLimit());
+}
+
 } // namespace

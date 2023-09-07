@@ -1302,7 +1302,7 @@ void radar_11358224_test_double_assign_ints_positive_2(void)
 
 // Assume that functions which take a function pointer can free memory even if
 // they are defined in system headers and take the const pointer to the
-// allocated memory. (radar://11160612)
+// allocated memory.
 int const_ptr_and_callback(int, const char*, int n, void(*)(void*));
 void r11160612_1(void) {
   char *x = malloc(12);
@@ -1459,7 +1459,7 @@ void testCGContextLeak(void)
   // object doesn't escape and it hasn't been freed in this function.
 }
 
-// Allow xpc context to escape. radar://11635258
+// Allow xpc context to escape.
 // TODO: Would be great if we checked that the finalize_connection_context actually releases it.
 static void finalize_connection_context(void *ctx) {
   int *context = ctx;

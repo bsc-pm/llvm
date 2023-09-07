@@ -738,6 +738,8 @@ enum SectionType {
   eSectionTypeDWARFDebugLocDwo,
   eSectionTypeDWARFDebugLocListsDwo,
   eSectionTypeDWARFDebugTuIndex,
+  eSectionTypeCTF,
+  eSectionTypeSwiftModules,
 };
 
 FLAGS_ENUM(EmulateInstructionOptions){

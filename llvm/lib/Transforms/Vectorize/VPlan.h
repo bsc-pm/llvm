@@ -349,8 +349,11 @@ struct VPTransformState {
   /// vector of instructions.
   void addMetadata(ArrayRef<Value *> To, Instruction *From);
 
-  /// Set the debug location in the builder using the debug location in \p V.
-  void setDebugLocFromInst(const Value *V);
+  /// Set the debug location in the builder using the debug location \p DL.
+  void setDebugLocFrom(DebugLoc DL);
+
+  /// Construct the vector value of a scalarized value \p V one lane at a time.
+  void packScalarIntoVectorValue(VPValue *Def, const VPIteration &Instance);
 
   /// Hold state information used when constructing the CFG of the output IR,
   /// traversing the VPBasicBlocks and generating corresponding IR BasicBlocks.
@@ -693,7 +696,7 @@ public:
 };
 
 /// VPRecipeBase is a base class modeling a sequence of one or more output IR
-/// instructions. VPRecipeBase owns the the VPValues it defines through VPDef
+/// instructions. VPRecipeBase owns the VPValues it defines through VPDef
 /// and is responsible for deleting its defined values. Single-value
 /// VPRecipeBases that also inherit from VPValue must make sure to inherit from
 /// VPRecipeBase before VPValue.
@@ -808,11 +811,201 @@ public:
     return R->getVPDefID() == VPDefID;                                         \
   }
 
+/// Class to record LLVM IR flag for a recipe along with it.
+class VPRecipeWithIRFlags : public VPRecipeBase {
+  enum class OperationType : unsigned char {
+    Cmp,
+    OverflowingBinOp,
+    PossiblyExactOp,
+    GEPOp,
+    FPMathOp,
+    Other
+  };
+
+public:
+  struct WrapFlagsTy {
+    char HasNUW : 1;
+    char HasNSW : 1;
+
+    WrapFlagsTy(bool HasNUW, bool HasNSW) : HasNUW(HasNUW), HasNSW(HasNSW) {}
+  };
+
+private:
+  struct ExactFlagsTy {
+    char IsExact : 1;
+  };
+  struct GEPFlagsTy {
+    char IsInBounds : 1;
+  };
+  struct FastMathFlagsTy {
+    char AllowReassoc : 1;
+    char NoNaNs : 1;
+    char NoInfs : 1;
+    char NoSignedZeros : 1;
+    char AllowReciprocal : 1;
+    char AllowContract : 1;
+    char ApproxFunc : 1;
+
+    FastMathFlagsTy(const FastMathFlags &FMF);
+  };
+
+  OperationType OpType;
+
+  union {
+    CmpInst::Predicate CmpPredicate;
+    WrapFlagsTy WrapFlags;
+    ExactFlagsTy ExactFlags;
+    GEPFlagsTy GEPFlags;
+    FastMathFlagsTy FMFs;
+    unsigned AllFlags;
+  };
+
+public:
+  template <typename IterT>
+  VPRecipeWithIRFlags(const unsigned char SC, IterT Operands)
+      : VPRecipeBase(SC, Operands) {
+    OpType = OperationType::Other;
+    AllFlags = 0;
+  }
+
+  template <typename IterT>
+  VPRecipeWithIRFlags(const unsigned char SC, IterT Operands, Instruction &I)
+      : VPRecipeWithIRFlags(SC, Operands) {
+    if (auto *Op = dyn_cast<CmpInst>(&I)) {
+      OpType = OperationType::Cmp;
+      CmpPredicate = Op->getPredicate();
+    } else if (auto *Op = dyn_cast<OverflowingBinaryOperator>(&I)) {
+      OpType = OperationType::OverflowingBinOp;
+      WrapFlags = {Op->hasNoUnsignedWrap(), Op->hasNoSignedWrap()};
+    } else if (auto *Op = dyn_cast<PossiblyExactOperator>(&I)) {
+      OpType = OperationType::PossiblyExactOp;
+      ExactFlags.IsExact = Op->isExact();
+    } else if (auto *GEP = dyn_cast<GetElementPtrInst>(&I)) {
+      OpType = OperationType::GEPOp;
+      GEPFlags.IsInBounds = GEP->isInBounds();
+    } else if (auto *Op = dyn_cast<FPMathOperator>(&I)) {
+      OpType = OperationType::FPMathOp;
+      FMFs = Op->getFastMathFlags();
+    }
+  }
+
+  template <typename IterT>
+  VPRecipeWithIRFlags(const unsigned char SC, IterT Operands,
+                      CmpInst::Predicate Pred)
+      : VPRecipeBase(SC, Operands), OpType(OperationType::Cmp),
+        CmpPredicate(Pred) {}
+
+  template <typename IterT>
+  VPRecipeWithIRFlags(const unsigned char SC, IterT Operands,
+                      WrapFlagsTy WrapFlags)
+      : VPRecipeBase(SC, Operands), OpType(OperationType::OverflowingBinOp),
+        WrapFlags(WrapFlags) {}
+
+  template <typename IterT>
+  VPRecipeWithIRFlags(const unsigned char SC, IterT Operands,
+                      FastMathFlags FMFs)
+      : VPRecipeBase(SC, Operands), OpType(OperationType::FPMathOp),
+        FMFs(FMFs) {}
+
+  static inline bool classof(const VPRecipeBase *R) {
+    return R->getVPDefID() == VPRecipeBase::VPInstructionSC ||
+           R->getVPDefID() == VPRecipeBase::VPWidenSC ||
+           R->getVPDefID() == VPRecipeBase::VPWidenGEPSC ||
+           R->getVPDefID() == VPRecipeBase::VPReplicateSC;
+  }
+
+  /// Drop all poison-generating flags.
+  void dropPoisonGeneratingFlags() {
+    // NOTE: This needs to be kept in-sync with
+    // Instruction::dropPoisonGeneratingFlags.
+    switch (OpType) {
+    case OperationType::OverflowingBinOp:
+      WrapFlags.HasNUW = false;
+      WrapFlags.HasNSW = false;
+      break;
+    case OperationType::PossiblyExactOp:
+      ExactFlags.IsExact = false;
+      break;
+    case OperationType::GEPOp:
+      GEPFlags.IsInBounds = false;
+      break;
+    case OperationType::FPMathOp:
+      FMFs.NoNaNs = false;
+      FMFs.NoInfs = false;
+      break;
+    case OperationType::Cmp:
+    case OperationType::Other:
+      break;
+    }
+  }
+
+  /// Set the IR flags for \p I.
+  void setFlags(Instruction *I) const {
+    switch (OpType) {
+    case OperationType::OverflowingBinOp:
+      I->setHasNoUnsignedWrap(WrapFlags.HasNUW);
+      I->setHasNoSignedWrap(WrapFlags.HasNSW);
+      break;
+    case OperationType::PossiblyExactOp:
+      I->setIsExact(ExactFlags.IsExact);
+      break;
+    case OperationType::GEPOp:
+      cast<GetElementPtrInst>(I)->setIsInBounds(GEPFlags.IsInBounds);
+      break;
+    case OperationType::FPMathOp:
+      I->setHasAllowReassoc(FMFs.AllowReassoc);
+      I->setHasNoNaNs(FMFs.NoNaNs);
+      I->setHasNoInfs(FMFs.NoInfs);
+      I->setHasNoSignedZeros(FMFs.NoSignedZeros);
+      I->setHasAllowReciprocal(FMFs.AllowReciprocal);
+      I->setHasAllowContract(FMFs.AllowContract);
+      I->setHasApproxFunc(FMFs.ApproxFunc);
+      break;
+    case OperationType::Cmp:
+    case OperationType::Other:
+      break;
+    }
+  }
+
+  CmpInst::Predicate getPredicate() const {
+    assert(OpType == OperationType::Cmp &&
+           "recipe doesn't have a compare predicate");
+    return CmpPredicate;
+  }
+
+  bool isInBounds() const {
+    assert(OpType == OperationType::GEPOp &&
+           "recipe doesn't have inbounds flag");
+    return GEPFlags.IsInBounds;
+  }
+
+  /// Returns true if the recipe has fast-math flags.
+  bool hasFastMathFlags() const { return OpType == OperationType::FPMathOp; }
+
+  FastMathFlags getFastMathFlags() const;
+
+  bool hasNoUnsignedWrap() const {
+    assert(OpType == OperationType::OverflowingBinOp &&
+           "recipe doesn't have a NUW flag");
+    return WrapFlags.HasNUW;
+  }
+
+  bool hasNoSignedWrap() const {
+    assert(OpType == OperationType::OverflowingBinOp &&
+           "recipe doesn't have a NSW flag");
+    return WrapFlags.HasNSW;
+  }
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  void printFlags(raw_ostream &O) const;
+#endif
+};
+
 /// This is a concrete Recipe that models a single VPlan-level instruction.
 /// While as any Recipe it may generate a sequence of IR instructions when
 /// executed, these instructions would always form a single-def expression as
 /// the VPInstruction is also a single def-use vertex.
-class VPInstruction : public VPRecipeBase, public VPValue {
+class VPInstruction : public VPRecipeWithIRFlags, public VPValue {
   friend class VPlanSlp;
 
 public:
@@ -822,17 +1015,14 @@ public:
         Instruction::OtherOpsEnd + 1, // Combines the incoming and previous
                                       // values of a first-order recurrence.
     Not,
-    ICmpULE,
     SLPLoad,
     SLPStore,
     ActiveLaneMask,
     CalculateTripCountMinusVF,
     CanonicalIVIncrement,
-    CanonicalIVIncrementNUW,
-    // The next two are similar to the above, but instead increment the
+    // The next op is similar to the above, but instead increment the
     // canonical IV separately for each unrolled part.
     CanonicalIVIncrementForPart,
-    CanonicalIVIncrementForPartNUW,
     BranchOnCount,
     BranchOnCond
   };
@@ -840,7 +1030,6 @@ public:
 private:
   typedef unsigned char OpcodeTy;
   OpcodeTy Opcode;
-  FastMathFlags FMF;
   DebugLoc DL;
 
   /// An optional name that can be used for the generated IR instruction.
@@ -852,25 +1041,37 @@ private:
   /// one.
   Value *generateInstruction(VPTransformState &State, unsigned Part);
 
+#if !defined(NDEBUG)
+  /// Return true if the VPInstruction is a floating point math operation, i.e.
+  /// has fast-math flags.
+  bool isFPMathOp() const;
+#endif
+
 protected:
   void setUnderlyingInstr(Instruction *I) { setUnderlyingValue(I); }
 
 public:
   VPInstruction(unsigned Opcode, ArrayRef<VPValue *> Operands, DebugLoc DL,
                 const Twine &Name = "")
-      : VPRecipeBase(VPDef::VPInstructionSC, Operands), VPValue(this),
+      : VPRecipeWithIRFlags(VPDef::VPInstructionSC, Operands), VPValue(this),
         Opcode(Opcode), DL(DL), Name(Name.str()) {}
 
   VPInstruction(unsigned Opcode, std::initializer_list<VPValue *> Operands,
                 DebugLoc DL = {}, const Twine &Name = "")
       : VPInstruction(Opcode, ArrayRef<VPValue *>(Operands), DL, Name) {}
 
-  VP_CLASSOF_IMPL(VPDef::VPInstructionSC)
+  VPInstruction(unsigned Opcode, CmpInst::Predicate Pred, VPValue *A,
+                VPValue *B, DebugLoc DL = {}, const Twine &Name = "");
 
-  VPInstruction *clone() const {
-    SmallVector<VPValue *, 2> Operands(operands());
-    return new VPInstruction(Opcode, Operands, DL, Name);
-  }
+  VPInstruction(unsigned Opcode, std::initializer_list<VPValue *> Operands,
+                WrapFlagsTy WrapFlags, DebugLoc DL = {}, const Twine &Name = "")
+      : VPRecipeWithIRFlags(VPDef::VPInstructionSC, Operands, WrapFlags),
+        VPValue(this), Opcode(Opcode), DL(DL), Name(Name.str()) {}
+
+  VPInstruction(unsigned Opcode, std::initializer_list<VPValue *> Operands,
+                FastMathFlags FMFs, DebugLoc DL = {}, const Twine &Name = "");
+
+  VP_CLASSOF_IMPL(VPDef::VPInstructionSC)
 
   unsigned getOpcode() const { return Opcode; }
 
@@ -918,9 +1119,6 @@ public:
     }
   }
 
-  /// Set the fast-math flags.
-  void setFastMathFlags(FastMathFlags FMFNew);
-
   /// Returns true if the recipe only uses the first lane of operand \p Op.
   bool onlyFirstLaneUsed(const VPValue *Op) const override {
     assert(is_contained(operands(), Op) &&
@@ -933,168 +1131,12 @@ public:
     case VPInstruction::ActiveLaneMask:
     case VPInstruction::CalculateTripCountMinusVF:
     case VPInstruction::CanonicalIVIncrement:
-    case VPInstruction::CanonicalIVIncrementNUW:
     case VPInstruction::CanonicalIVIncrementForPart:
-    case VPInstruction::CanonicalIVIncrementForPartNUW:
     case VPInstruction::BranchOnCount:
       return true;
     };
     llvm_unreachable("switch should return");
   }
-};
-
-/// Class to record LLVM IR flag for a recipe along with it.
-class VPRecipeWithIRFlags : public VPRecipeBase {
-  enum class OperationType : unsigned char {
-    OverflowingBinOp,
-    PossiblyExactOp,
-    GEPOp,
-    FPMathOp,
-    Other
-  };
-  struct WrapFlagsTy {
-    char HasNUW : 1;
-    char HasNSW : 1;
-  };
-  struct ExactFlagsTy {
-    char IsExact : 1;
-  };
-  struct GEPFlagsTy {
-    char IsInBounds : 1;
-  };
-  struct FastMathFlagsTy {
-    char AllowReassoc : 1;
-    char NoNaNs : 1;
-    char NoInfs : 1;
-    char NoSignedZeros : 1;
-    char AllowReciprocal : 1;
-    char AllowContract : 1;
-    char ApproxFunc : 1;
-  };
-
-  OperationType OpType;
-
-  union {
-    WrapFlagsTy WrapFlags;
-    ExactFlagsTy ExactFlags;
-    GEPFlagsTy GEPFlags;
-    FastMathFlagsTy FMFs;
-    unsigned char AllFlags;
-  };
-
-public:
-  template <typename IterT>
-  VPRecipeWithIRFlags(const unsigned char SC, iterator_range<IterT> Operands)
-      : VPRecipeBase(SC, Operands) {
-    OpType = OperationType::Other;
-    AllFlags = 0;
-  }
-
-  template <typename IterT>
-  VPRecipeWithIRFlags(const unsigned char SC, iterator_range<IterT> Operands,
-                      Instruction &I)
-      : VPRecipeWithIRFlags(SC, Operands) {
-    if (auto *Op = dyn_cast<OverflowingBinaryOperator>(&I)) {
-      OpType = OperationType::OverflowingBinOp;
-      WrapFlags.HasNUW = Op->hasNoUnsignedWrap();
-      WrapFlags.HasNSW = Op->hasNoSignedWrap();
-    } else if (auto *Op = dyn_cast<PossiblyExactOperator>(&I)) {
-      OpType = OperationType::PossiblyExactOp;
-      ExactFlags.IsExact = Op->isExact();
-    } else if (auto *GEP = dyn_cast<GetElementPtrInst>(&I)) {
-      OpType = OperationType::GEPOp;
-      GEPFlags.IsInBounds = GEP->isInBounds();
-    } else if (auto *Op = dyn_cast<FPMathOperator>(&I)) {
-      OpType = OperationType::FPMathOp;
-      FastMathFlags FMF = Op->getFastMathFlags();
-      FMFs.AllowReassoc = FMF.allowReassoc();
-      FMFs.NoNaNs = FMF.noNaNs();
-      FMFs.NoInfs = FMF.noInfs();
-      FMFs.NoSignedZeros = FMF.noSignedZeros();
-      FMFs.AllowReciprocal = FMF.allowReciprocal();
-      FMFs.AllowContract = FMF.allowContract();
-      FMFs.ApproxFunc = FMF.approxFunc();
-    }
-  }
-
-  static inline bool classof(const VPRecipeBase *R) {
-    return R->getVPDefID() == VPRecipeBase::VPWidenSC ||
-           R->getVPDefID() == VPRecipeBase::VPWidenGEPSC ||
-           R->getVPDefID() == VPRecipeBase::VPReplicateSC;
-  }
-
-  /// Drop all poison-generating flags.
-  void dropPoisonGeneratingFlags() {
-    // NOTE: This needs to be kept in-sync with
-    // Instruction::dropPoisonGeneratingFlags.
-    switch (OpType) {
-    case OperationType::OverflowingBinOp:
-      WrapFlags.HasNUW = false;
-      WrapFlags.HasNSW = false;
-      break;
-    case OperationType::PossiblyExactOp:
-      ExactFlags.IsExact = false;
-      break;
-    case OperationType::GEPOp:
-      GEPFlags.IsInBounds = false;
-      break;
-    case OperationType::FPMathOp:
-      FMFs.NoNaNs = false;
-      FMFs.NoInfs = false;
-      break;
-    case OperationType::Other:
-      break;
-    }
-  }
-
-  /// Set the IR flags for \p I.
-  void setFlags(Instruction *I) const {
-    switch (OpType) {
-    case OperationType::OverflowingBinOp:
-      I->setHasNoUnsignedWrap(WrapFlags.HasNUW);
-      I->setHasNoSignedWrap(WrapFlags.HasNSW);
-      break;
-    case OperationType::PossiblyExactOp:
-      I->setIsExact(ExactFlags.IsExact);
-      break;
-    case OperationType::GEPOp:
-      cast<GetElementPtrInst>(I)->setIsInBounds(GEPFlags.IsInBounds);
-      break;
-    case OperationType::FPMathOp:
-      I->setHasAllowReassoc(FMFs.AllowReassoc);
-      I->setHasNoNaNs(FMFs.NoNaNs);
-      I->setHasNoInfs(FMFs.NoInfs);
-      I->setHasNoSignedZeros(FMFs.NoSignedZeros);
-      I->setHasAllowReciprocal(FMFs.AllowReciprocal);
-      I->setHasAllowContract(FMFs.AllowContract);
-      I->setHasApproxFunc(FMFs.ApproxFunc);
-      break;
-    case OperationType::Other:
-      break;
-    }
-  }
-
-  bool isInBounds() const {
-    assert(OpType == OperationType::GEPOp &&
-           "recipe doesn't have inbounds flag");
-    return GEPFlags.IsInBounds;
-  }
-
-#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-  FastMathFlags getFastMathFlags() const {
-    FastMathFlags Res;
-    Res.setAllowReassoc(FMFs.AllowReassoc);
-    Res.setNoNaNs(FMFs.NoNaNs);
-    Res.setNoInfs(FMFs.NoInfs);
-    Res.setNoSignedZeros(FMFs.NoSignedZeros);
-    Res.setAllowReciprocal(FMFs.AllowReciprocal);
-    Res.setAllowContract(FMFs.AllowContract);
-    Res.setApproxFunc(FMFs.ApproxFunc);
-    return Res;
-  }
-
-  void printFlags(raw_ostream &O) const;
-#endif
 };
 
 /// VPWidenRecipe is a recipe for producing a copy of vector type its
@@ -1701,16 +1743,13 @@ public:
 /// The Operands are {ChainOp, VecOp, [Condition]}.
 class VPReductionRecipe : public VPRecipeBase, public VPValue {
   /// The recurrence decriptor for the reduction in question.
-  const RecurrenceDescriptor *RdxDesc;
-  /// Pointer to the TTI, needed to create the target reduction
-  const TargetTransformInfo *TTI;
+  const RecurrenceDescriptor &RdxDesc;
 
 public:
-  VPReductionRecipe(const RecurrenceDescriptor *R, Instruction *I,
-                    VPValue *ChainOp, VPValue *VecOp, VPValue *CondOp,
-                    const TargetTransformInfo *TTI)
+  VPReductionRecipe(const RecurrenceDescriptor &R, Instruction *I,
+                    VPValue *ChainOp, VPValue *VecOp, VPValue *CondOp)
       : VPRecipeBase(VPDef::VPReductionSC, {ChainOp, VecOp}), VPValue(this, I),
-        RdxDesc(R), TTI(TTI) {
+        RdxDesc(R) {
     if (CondOp)
       addOperand(CondOp);
   }
@@ -2113,19 +2152,24 @@ public:
 /// an IV with different start and step values, using Start + CanonicalIV *
 /// Step.
 class VPDerivedIVRecipe : public VPRecipeBase, public VPValue {
-  /// The type of the result value. It may be smaller than the type of the
-  /// induction and in this case it will get truncated to ResultTy.
-  Type *ResultTy;
+  /// If not nullptr, the result of the induction will get truncated to
+  /// TruncResultTy.
+  Type *TruncResultTy;
 
-  /// Induction descriptor for the induction the canonical IV is transformed to.
-  const InductionDescriptor &IndDesc;
+  /// Kind of the induction.
+  const InductionDescriptor::InductionKind Kind;
+  /// If not nullptr, the floating point induction binary operator. Must be set
+  /// for floating point inductions.
+  const FPMathOperator *FPBinOp;
 
 public:
   VPDerivedIVRecipe(const InductionDescriptor &IndDesc, VPValue *Start,
                     VPCanonicalIVPHIRecipe *CanonicalIV, VPValue *Step,
-                    Type *ResultTy)
+                    Type *TruncResultTy)
       : VPRecipeBase(VPDef::VPDerivedIVSC, {Start, CanonicalIV, Step}),
-        VPValue(this), ResultTy(ResultTy), IndDesc(IndDesc) {}
+        VPValue(this), TruncResultTy(TruncResultTy), Kind(IndDesc.getKind()),
+        FPBinOp(dyn_cast_or_null<FPMathOperator>(IndDesc.getInductionBinOp())) {
+  }
 
   ~VPDerivedIVRecipe() override = default;
 
@@ -2581,12 +2625,6 @@ public:
     }
 
     return getVPValue(V);
-  }
-
-  void removeVPValueFor(Value *V) {
-    assert(Value2VPValueEnabled &&
-           "IR value to VPValue mapping may be out of date!");
-    Value2VPValue.erase(V);
   }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)

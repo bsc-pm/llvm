@@ -272,6 +272,19 @@ TEST_F(TokenAnnotatorTest, UnderstandsUsesOfStarAndAmp) {
   Tokens = annotate("template <enable_if_t<foo && !bar>* = nullptr> void f();");
   ASSERT_EQ(Tokens.size(), 19u) << Tokens;
   EXPECT_TOKEN(Tokens[5], tok::ampamp, TT_BinaryOperator);
+
+  FormatStyle Style = getLLVMStyle();
+  Style.TypeNames.push_back("MYI");
+  Tokens = annotate("if (MYI *p{nullptr})", Style);
+  ASSERT_EQ(Tokens.size(), 10u) << Tokens;
+  EXPECT_TOKEN(Tokens[2], tok::identifier, TT_TypeName);
+  EXPECT_TOKEN(Tokens[3], tok::star, TT_PointerOrReference);
+
+  Style.TypeNames.push_back("Class");
+  Tokens = annotate("if (Class *obj {getObj()})", Style);
+  ASSERT_EQ(Tokens.size(), 12u) << Tokens;
+  EXPECT_TOKEN(Tokens[2], tok::identifier, TT_TypeName);
+  EXPECT_TOKEN(Tokens[3], tok::star, TT_PointerOrReference);
 }
 
 TEST_F(TokenAnnotatorTest, UnderstandsUsesOfPlusAndMinus) {
@@ -717,6 +730,16 @@ TEST_F(TokenAnnotatorTest, UnderstandsOverloadedOperators) {
   EXPECT_TOKEN(Tokens[9], tok::plus, TT_OverloadedOperator);
   EXPECT_TOKEN(Tokens[10], tok::l_paren, TT_OverloadedOperatorLParen);
   EXPECT_TOKEN(Tokens[12], tok::star, TT_BinaryOperator);
+
+  Tokens = annotate("std::vector<Foo> operator()(Foo &foo);");
+  ASSERT_EQ(Tokens.size(), 16u) << Tokens;
+  EXPECT_TOKEN(Tokens[3], tok::less, TT_TemplateOpener);
+  EXPECT_TOKEN(Tokens[5], tok::greater, TT_TemplateCloser);
+  EXPECT_TOKEN(Tokens[6], tok::kw_operator, TT_FunctionDeclarationName);
+  EXPECT_TOKEN(Tokens[7], tok::l_paren, TT_OverloadedOperator);
+  EXPECT_TOKEN(Tokens[8], tok::r_paren, TT_OverloadedOperator);
+  EXPECT_TOKEN(Tokens[9], tok::l_paren, TT_OverloadedOperatorLParen);
+  EXPECT_TOKEN(Tokens[11], tok::amp, TT_PointerOrReference);
 }
 
 TEST_F(TokenAnnotatorTest, OverloadedOperatorInTemplate) {
@@ -1566,6 +1589,59 @@ TEST_F(TokenAnnotatorTest, UnderstandsFunctionDeclarationNames) {
   Tokens = annotate("void f [[noreturn]] () {}");
   ASSERT_EQ(Tokens.size(), 12u) << Tokens;
   EXPECT_TOKEN(Tokens[1], tok::identifier, TT_FunctionDeclarationName);
+
+  Tokens = annotate("class Foo { public: Foo(); };");
+  ASSERT_EQ(Tokens.size(), 12u) << Tokens;
+  EXPECT_TOKEN(Tokens[5], tok::identifier, TT_FunctionDeclarationName);
+
+  Tokens = annotate("class Foo { public: ~Foo(); };");
+  ASSERT_EQ(Tokens.size(), 13u) << Tokens;
+  EXPECT_TOKEN(Tokens[6], tok::identifier, TT_FunctionDeclarationName);
+
+  Tokens = annotate("struct Foo { [[deprecated]] Foo() {} };");
+  ASSERT_EQ(Tokens.size(), 16u) << Tokens;
+  EXPECT_TOKEN(Tokens[8], tok::identifier, TT_FunctionDeclarationName);
+  EXPECT_TOKEN(Tokens[11], tok::l_brace, TT_FunctionLBrace);
+
+  Tokens = annotate("struct Foo { [[deprecated]] ~Foo() {} };");
+  ASSERT_EQ(Tokens.size(), 17u) << Tokens;
+  EXPECT_TOKEN(Tokens[9], tok::identifier, TT_FunctionDeclarationName);
+  EXPECT_TOKEN(Tokens[12], tok::l_brace, TT_FunctionLBrace);
+
+  Tokens = annotate("struct Foo { Foo() [[deprecated]] {} };");
+  ASSERT_EQ(Tokens.size(), 16u) << Tokens;
+  EXPECT_TOKEN(Tokens[3], tok::identifier, TT_FunctionDeclarationName);
+  EXPECT_TOKEN(Tokens[11], tok::l_brace, TT_FunctionLBrace);
+
+  Tokens = annotate("struct Foo { ~Foo() [[deprecated]] {} };");
+  ASSERT_EQ(Tokens.size(), 17u) << Tokens;
+  EXPECT_TOKEN(Tokens[4], tok::identifier, TT_FunctionDeclarationName);
+  EXPECT_TOKEN(Tokens[12], tok::l_brace, TT_FunctionLBrace);
+
+  Tokens = annotate("struct Foo { [[deprecated]] explicit Foo() {} };");
+  ASSERT_EQ(Tokens.size(), 17u) << Tokens;
+  EXPECT_TOKEN(Tokens[9], tok::identifier, TT_FunctionDeclarationName);
+  EXPECT_TOKEN(Tokens[12], tok::l_brace, TT_FunctionLBrace);
+
+  Tokens = annotate("struct Foo { virtual [[deprecated]] ~Foo() {} };");
+  ASSERT_EQ(Tokens.size(), 18u) << Tokens;
+  EXPECT_TOKEN(Tokens[10], tok::identifier, TT_FunctionDeclarationName);
+  EXPECT_TOKEN(Tokens[13], tok::l_brace, TT_FunctionLBrace);
+
+  Tokens = annotate("Foo::Foo() {}");
+  ASSERT_EQ(Tokens.size(), 8u) << Tokens;
+  EXPECT_TOKEN(Tokens[2], tok::identifier, TT_FunctionDeclarationName);
+  EXPECT_TOKEN(Tokens[5], tok::l_brace, TT_FunctionLBrace);
+
+  Tokens = annotate("Foo::~Foo() {}");
+  ASSERT_EQ(Tokens.size(), 9u) << Tokens;
+  EXPECT_TOKEN(Tokens[3], tok::identifier, TT_FunctionDeclarationName);
+  EXPECT_TOKEN(Tokens[6], tok::l_brace, TT_FunctionLBrace);
+
+  Tokens = annotate("#define FOO Foo::\n"
+                    "FOO Foo();");
+  ASSERT_EQ(Tokens.size(), 11u) << Tokens;
+  EXPECT_TOKEN(Tokens[6], tok::identifier, TT_FunctionDeclarationName);
 }
 
 TEST_F(TokenAnnotatorTest, UnderstandsC11GenericSelection) {
@@ -1792,6 +1868,30 @@ TEST_F(TokenAnnotatorTest, UnderstandsVerilogOperators) {
   EXPECT_TOKEN(Tokens[2], tok::l_paren, TT_Unknown);
   EXPECT_TOKEN(Tokens[5], tok::comma, TT_Unknown);
   EXPECT_TOKEN(Tokens[8], tok::r_paren, TT_Unknown);
+
+  // String literals in concatenation.
+  Tokens = Annotate("x = {\"\"};");
+  ASSERT_EQ(Tokens.size(), 7u) << Tokens;
+  EXPECT_TOKEN(Tokens[3], tok::string_literal, TT_StringInConcatenation);
+  Tokens = Annotate("x = {\"\", \"\"};");
+  ASSERT_EQ(Tokens.size(), 9u) << Tokens;
+  EXPECT_TOKEN(Tokens[3], tok::string_literal, TT_StringInConcatenation);
+  EXPECT_TOKEN(Tokens[5], tok::string_literal, TT_StringInConcatenation);
+  Tokens = Annotate("x = '{{\"\"}};");
+  ASSERT_EQ(Tokens.size(), 10u) << Tokens;
+  EXPECT_TOKEN(Tokens[5], tok::string_literal, TT_StringInConcatenation);
+  // Cases where the string should not be annotated that type.  Fix the
+  // `TT_Unknown` if needed in the future.
+  Tokens = Annotate("x = {\"\" == \"\"};");
+  ASSERT_EQ(Tokens.size(), 9u) << Tokens;
+  EXPECT_TOKEN(Tokens[3], tok::string_literal, TT_Unknown);
+  EXPECT_TOKEN(Tokens[5], tok::string_literal, TT_Unknown);
+  Tokens = Annotate("x = {(\"\")};");
+  ASSERT_EQ(Tokens.size(), 9u) << Tokens;
+  EXPECT_TOKEN(Tokens[4], tok::string_literal, TT_Unknown);
+  Tokens = Annotate("x = '{\"\"};");
+  ASSERT_EQ(Tokens.size(), 8u) << Tokens;
+  EXPECT_TOKEN(Tokens[4], tok::string_literal, TT_Unknown);
 }
 
 TEST_F(TokenAnnotatorTest, UnderstandConstructors) {

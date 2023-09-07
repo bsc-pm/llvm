@@ -474,6 +474,9 @@ Instruction *InstCombinerImpl::visitMul(BinaryOperator &I) {
   if (Instruction *Ext = narrowMathIfNoOverflow(I))
     return Ext;
 
+  if (Instruction *Res = foldBinOpOfSelectAndCastOfSelectCondition(I))
+    return Res;
+
   // min(X, Y) * max(X, Y) => X * Y.
   if (match(&I, m_CombineOr(m_c_Mul(m_SMax(m_Value(X), m_Value(Y)),
                                     m_c_SMin(m_Deferred(X), m_Deferred(Y))),
@@ -799,7 +802,7 @@ Instruction *InstCombinerImpl::visitFMul(BinaryOperator &I) {
       I.hasNoSignedZeros() && match(Start, m_Zero()))
     return replaceInstUsesWith(I, Start);
 
-  // minimun(X, Y) * maximum(X, Y) => X * Y.
+  // minimum(X, Y) * maximum(X, Y) => X * Y.
   if (match(&I,
             m_c_FMul(m_Intrinsic<Intrinsic::maximum>(m_Value(X), m_Value(Y)),
                      m_c_Intrinsic<Intrinsic::minimum>(m_Deferred(X),

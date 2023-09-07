@@ -929,6 +929,8 @@ void OMPClauseProfiler::VisitOMPXDynCGroupMemClause(
 void OMPClauseProfiler::VisitOMPDoacrossClause(const OMPDoacrossClause *C) {
   VisitOMPClauseList(C);
 }
+void OMPClauseProfiler::VisitOMPXAttributeClause(const OMPXAttributeClause *C) {
+}
 } // namespace
 
 void
@@ -992,6 +994,10 @@ void StmtProfiler::VisitOMPSectionsDirective(const OMPSectionsDirective *S) {
 }
 
 void StmtProfiler::VisitOMPSectionDirective(const OMPSectionDirective *S) {
+  VisitOMPExecutableDirective(S);
+}
+
+void StmtProfiler::VisitOMPScopeDirective(const OMPScopeDirective *S) {
   VisitOMPExecutableDirective(S);
 }
 

@@ -301,7 +301,7 @@ attributes #6 = { nounwind "frame-pointer"="none" "no-trapping-math"="true" "sta
 ; CHECK-NEXT:    [[I2:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG9:![0-9]+]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64, !dbg [[DBG10:![0-9]+]]
-; CHECK-NEXT:    [[TMP2:%.*]] = call ptr @llvm.stacksave(), !dbg [[DBG10]]
+; CHECK-NEXT:    [[TMP2:%.*]] = call ptr @llvm.stacksave.p0(), !dbg [[DBG10]]
 ; CHECK-NEXT:    store ptr [[TMP2]], ptr [[SAVED_STACK]], align 8, !dbg [[DBG10]]
 ; CHECK-NEXT:    [[VLA:%.*]] = alloca [[STRUCT_S:%.*]], i64 [[TMP1]], align 16, !dbg [[DBG10]]
 ; CHECK-NEXT:    store i64 [[TMP1]], ptr [[__VLA_EXPR0]], align 8, !dbg [[DBG10]]
@@ -425,12 +425,12 @@ attributes #6 = { nounwind "frame-pointer"="none" "no-trapping-math"="true" "sta
 ; CHECK:       arraydestroy.body:
 ; CHECK-NEXT:    [[ARRAYDESTROY_ELEMENTPAST:%.*]] = phi ptr [ [[TMP59]], [[FINAL_END26:%.*]] ], [ [[ARRAYDESTROY_ELEMENT:%.*]], [[ARRAYDESTROY_BODY]] ], !dbg [[DBG18]]
 ; CHECK-NEXT:    [[ARRAYDESTROY_ELEMENT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYDESTROY_ELEMENTPAST]], i64 -1, !dbg [[DBG18]]
-; CHECK-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 1 dereferenceable(1) [[ARRAYDESTROY_ELEMENT]]) #[[ATTR3:[0-9]+]], !dbg [[DBG18]]
+; CHECK-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 1 dereferenceable(1) [[ARRAYDESTROY_ELEMENT]]) #[[ATTR2:[0-9]+]], !dbg [[DBG18]]
 ; CHECK-NEXT:    [[ARRAYDESTROY_DONE:%.*]] = icmp eq ptr [[ARRAYDESTROY_ELEMENT]], [[VLA]], !dbg [[DBG18]]
 ; CHECK-NEXT:    br i1 [[ARRAYDESTROY_DONE]], label [[ARRAYDESTROY_DONE3]], label [[ARRAYDESTROY_BODY]], !dbg [[DBG18]]
 ; CHECK:       arraydestroy.done3:
 ; CHECK-NEXT:    [[TMP60:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG18]]
-; CHECK-NEXT:    call void @llvm.stackrestore(ptr [[TMP60]]), !dbg [[DBG18]]
+; CHECK-NEXT:    call void @llvm.stackrestore.p0(ptr [[TMP60]]), !dbg [[DBG18]]
 ; CHECK-NEXT:    ret void, !dbg [[DBG18]]
 ; CHECK:       final.then:
 ; CHECK-NEXT:    [[TMP61:%.*]] = call i32 @compute_lb(), !dbg [[DBG12]]
@@ -516,25 +516,25 @@ attributes #6 = { nounwind "frame-pointer"="none" "no-trapping-math"="true" "sta
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@compute_lb
-; CHECK-SAME: () #[[ATTR4:[0-9]+]] !dbg [[DBG19:![0-9]+]] {
+; CHECK-SAME: () #[[ATTR3:[0-9]+]] !dbg [[DBG19:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    ret i32 0, !dbg [[DBG20:![0-9]+]]
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@compute_ub
-; CHECK-SAME: () #[[ATTR4]] !dbg [[DBG22:![0-9]+]] {
+; CHECK-SAME: () #[[ATTR3]] !dbg [[DBG22:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    ret i32 10, !dbg [[DBG23:![0-9]+]]
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@compute_step
-; CHECK-SAME: () #[[ATTR4]] !dbg [[DBG25:![0-9]+]] {
+; CHECK-SAME: () #[[ATTR3]] !dbg [[DBG25:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    ret i32 1, !dbg [[DBG26:![0-9]+]]
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@oss_ctor_ZN1SC1Ev
-; CHECK-SAME: (ptr noundef [[TMP0:%.*]], i64 noundef [[TMP1:%.*]]) #[[ATTR5:[0-9]+]] !dbg [[DBG28:![0-9]+]] {
+; CHECK-SAME: (ptr noundef [[TMP0:%.*]], i64 noundef [[TMP1:%.*]]) #[[ATTR4:[0-9]+]] !dbg [[DBG28:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[DOTADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    [[DOTADDR1:%.*]] = alloca i64, align 8
@@ -555,7 +555,7 @@ attributes #6 = { nounwind "frame-pointer"="none" "no-trapping-math"="true" "sta
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@oss_dtor_ZN1SD1Ev
-; CHECK-SAME: (ptr noundef [[TMP0:%.*]], i64 noundef [[TMP1:%.*]]) #[[ATTR5]] !dbg [[DBG32:![0-9]+]] {
+; CHECK-SAME: (ptr noundef [[TMP0:%.*]], i64 noundef [[TMP1:%.*]]) #[[ATTR4]] !dbg [[DBG32:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[DOTADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    [[DOTADDR1:%.*]] = alloca i64, align 8
@@ -567,7 +567,7 @@ attributes #6 = { nounwind "frame-pointer"="none" "no-trapping-math"="true" "sta
 ; CHECK-NEXT:    br label [[ARRAYDTOR_LOOP:%.*]], !dbg [[DBG33]]
 ; CHECK:       arraydtor.loop:
 ; CHECK-NEXT:    [[ARRAYDTOR_DST_CUR:%.*]] = phi ptr [ [[TMP2]], [[ENTRY:%.*]] ], [ [[ARRAYDTOR_DST_NEXT:%.*]], [[ARRAYDTOR_LOOP]] ], !dbg [[DBG33]]
-; CHECK-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 1 dereferenceable(1) [[ARRAYDTOR_DST_CUR]]) #[[ATTR3]], !dbg [[DBG33]]
+; CHECK-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 1 dereferenceable(1) [[ARRAYDTOR_DST_CUR]]) #[[ATTR2]], !dbg [[DBG33]]
 ; CHECK-NEXT:    [[ARRAYDTOR_DST_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYDTOR_DST_CUR]], i64 1, !dbg [[DBG33]]
 ; CHECK-NEXT:    [[ARRAYDTOR_DONE:%.*]] = icmp eq ptr [[ARRAYDTOR_DST_NEXT]], [[ARRAYDTOR_DST_END]], !dbg [[DBG33]]
 ; CHECK-NEXT:    br i1 [[ARRAYDTOR_DONE]], label [[ARRAYDTOR_CONT:%.*]], label [[ARRAYDTOR_LOOP]], !dbg [[DBG33]]
@@ -576,25 +576,25 @@ attributes #6 = { nounwind "frame-pointer"="none" "no-trapping-math"="true" "sta
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@compute_lb.1
-; CHECK-SAME: () #[[ATTR4]] !dbg [[DBG34:![0-9]+]] {
+; CHECK-SAME: () #[[ATTR3]] !dbg [[DBG34:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    ret i32 0, !dbg [[DBG35:![0-9]+]]
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@compute_ub.2
-; CHECK-SAME: () #[[ATTR4]] !dbg [[DBG37:![0-9]+]] {
+; CHECK-SAME: () #[[ATTR3]] !dbg [[DBG37:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    ret i32 10, !dbg [[DBG38:![0-9]+]]
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@compute_step.3
-; CHECK-SAME: () #[[ATTR4]] !dbg [[DBG40:![0-9]+]] {
+; CHECK-SAME: () #[[ATTR3]] !dbg [[DBG40:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    ret i32 1, !dbg [[DBG41:![0-9]+]]
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@oss_copy_ctor_ZN1SC1ERKS_
-; CHECK-SAME: (ptr noundef [[TMP0:%.*]], ptr noundef [[TMP1:%.*]], i64 noundef [[TMP2:%.*]]) #[[ATTR5]] !dbg [[DBG43:![0-9]+]] {
+; CHECK-SAME: (ptr noundef [[TMP0:%.*]], ptr noundef [[TMP1:%.*]], i64 noundef [[TMP2:%.*]]) #[[ATTR4]] !dbg [[DBG43:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[DOTADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    [[DOTADDR1:%.*]] = alloca ptr, align 8
@@ -620,19 +620,19 @@ attributes #6 = { nounwind "frame-pointer"="none" "no-trapping-math"="true" "sta
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@compute_lb.4
-; CHECK-SAME: () #[[ATTR4]] !dbg [[DBG47:![0-9]+]] {
+; CHECK-SAME: () #[[ATTR3]] !dbg [[DBG47:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    ret i32 0, !dbg [[DBG48:![0-9]+]]
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@compute_ub.5
-; CHECK-SAME: () #[[ATTR4]] !dbg [[DBG50:![0-9]+]] {
+; CHECK-SAME: () #[[ATTR3]] !dbg [[DBG50:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    ret i32 10, !dbg [[DBG51:![0-9]+]]
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@compute_step.6
-; CHECK-SAME: () #[[ATTR4]] !dbg [[DBG53:![0-9]+]] {
+; CHECK-SAME: () #[[ATTR3]] !dbg [[DBG53:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    ret i32 1, !dbg [[DBG54:![0-9]+]]
 ;
