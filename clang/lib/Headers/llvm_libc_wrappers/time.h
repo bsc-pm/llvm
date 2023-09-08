@@ -6,14 +6,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include_next <time.h>
+
 #ifndef __CLANG_LLVM_LIBC_WRAPPERS_TIME_H__
 #define __CLANG_LLVM_LIBC_WRAPPERS_TIME_H__
 
 #if !defined(_OPENMP) && !defined(__HIP__) && !defined(__CUDA__)
 #error "This file is for GPU offloading compilation only"
 #endif
-
-#include_next <time.h>
 
 #if __has_include(<llvm-libc-decls/time.h>)
 
