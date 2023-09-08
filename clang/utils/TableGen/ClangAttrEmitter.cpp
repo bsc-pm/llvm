@@ -2390,7 +2390,7 @@ static void emitClangAttrUnevaluatedStringLiteralList(RecordKeeper &Records,
     uint64_t Bits = 0;
     assert(Args.size() <= 64 && "unsupported number of arguments in attribute");
     for (uint32_t N = 0; N < Args.size(); ++N) {
-      Bits |= uint64_t(isStringLiteralArgument(Args[N]) << N);
+      Bits |= (uint64_t(isStringLiteralArgument(Args[N])) << N);
       // If we have a variadic string argument, set all the remaining bits to 1
       if (isVariadicStringLiteralArgument(Args[N])) {
         Bits |= maskTrailingZeros<decltype(Bits)>(N);
