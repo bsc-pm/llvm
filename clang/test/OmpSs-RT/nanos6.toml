@@ -1,6 +1,6 @@
 # This file is part of Nanos6 and is licensed under the terms contained in the COPYING file
 #
-# Copyright (C) 2020-2021 Barcelona Supercomputing Center (BSC)
+# Copyright (C) 2020-2023 Barcelona Supercomputing Center (BSC)
 
 # The Nanos6 default configuration file. More details about the configuration options and the possible
 # values are available on the OmpSs-2 User Guide (https://pm.bsc.es/ftp/ompss-2/doc/user-guide/) or on
@@ -15,7 +15,7 @@
 	# Possible values: "discrete", "regions"
 	dependencies = "discrete"
 	# Choose the instrumentation variant to run. Default is "none"
-	# Possible values: "none", "ctf", "extrae", "graph", "lint", "stats", "verbose"
+	# Possible values: "none", "ctf", "ovni", "extrae", "graph", "lint", "stats", "verbose"
 	instrument = "verbose"
 
 [turbo]
@@ -24,15 +24,24 @@
 	# results. It enables flush-to-zero (FZ) and denormals are zero (DAZ) optimizations in Intel®
 	# processors. Default is false
 	enabled = false
+	# Enable a warm-up of the memory allocation arenas for worker threads. This will enable a "warmup"
+	# phase when worker threads are first created, which basically implies performing memory allocation.
+	# When using Jemalloc, the first memory allocation on each thread may incur performance penalties,
+	# and for some Linux kernel versions it will serialize the initialization of workers. This has negative
+	# effects on application performance, since the application will start running while workers are
+	# performing the first memory allocation.
+	# This option will prevent this effect. The initialization time of the runtime will be higher, but
+	# once the "main" starts everything will be ready. Default is true
+	warmup = true
 
 [scheduler]
 	# Choose the task scheduling policy. Default is "fifo"
 	# Possible values: "fifo", "lifo"
 	policy = "fifo"
-	# Enable the immediate successor feature to improve cache data reutilization between successor
-	# tasks. If enabled, when a CPU finishes a task it starts executing the successor task (computed
-	# through their data dependencies). Default is true
-	immediate_successor = 1.0
+	# Probability of enabling the immediate successor feature to improve cache data reutilization between
+	# successor tasks. If enabled, when a CPU finishes a task it starts executing the successor task
+	# (computed through their data dependencies). Default is 0.75
+	immediate_successor = 0.75
 	# Indicate whether the scheduler should consider task priorities defined by the user in the
 	# task's priority clause. Default is true
 	priority = true
@@ -46,13 +55,16 @@
 	# works for the 'hybrid' policy. This number will be divided by the number of active CPUs to
 	# obtain a "busy_iters per CPU" metric for each individual CPU to busy-wait for
 	busy_iters = 240000
-
-[taskfor]
-	# Choose the total number of CPU groups that will execute the worksharing tasks (taskfors). Default
-	# is none (not set), which means that the runtime will create one taskfor group per NUMA node
-	# groups = 1
-	# Indicate whether should print the taskfor groups information
-	report = false
+	# The CPUs that should be in sponge mode. A sponge CPU is a CPU that the runtime system has available
+	# but it does not execute any task (or runtime code) on it. Such CPUs are useful to reduce the system
+	# noise. The runtime leaves these CPUs free (without consuming CPU time) so that the system can schedule
+	# other threads and interruptions on them.
+	# The option accepts a list of CPU system identifiers that must be in sponge mode. The user is responsible
+	# for ensuring the runtime can progress with the specified set of sponge CPUs. If DLB is enabled, this
+	# option is ignored.
+	# As an example, sponge_cpus = [ 2, 8 ] would leave the CPUs with system id 2 and 8 free to absorb noise.
+	# By default, there are no sponge CPUs, and the runtime uses all CPUs from the process CPU mask
+	sponge_cpus = [ ]
 
 [throttle]
 	# Enable throttle to stop creating tasks when certain conditions are met. Default is false
@@ -116,97 +128,9 @@
 [devices]
 
 [instrument]
-	[instrument.ctf]
-		# Choose the temporary directory where to store intermediate CTF files. Default is none
-		# (not set), which means that $TMPDIR will be used if present, or /tmp otherwise
-		# tmpdir = "/tmp"
-		[instrument.ctf.converter]
-			# Indicate whether the trace converter should automatically generate the trace after
-			# executing a program with CTF instrumentation. Default is true
-			enabled = true
-			# Use the fast converter. This feature is experimental and generates a trace compatible
-			# with just a subset of Paraver cfgs. Default is false
-			fast = false
-			# Indicate the location of the ctf2prv converter script. Default is none (not set),
-			# which means that the $CTF2PRV will be used if present, or ctf2prv in $PATH
-			# otherwise
-			# location = "path/to/ctf2prv"
-		# Choose the events that will be traced
-		[instrument.ctf.events]
-			# Linux Kernel events options. Nanos6 can collect Linux kernel internal events using the
-			# perf_event_open system call. This requires to set /proc/sys/kernel/perf_event_paranoid
-			# to -1 and read permissions for either /sys/kernel/tracing or /sys/kernel/debug/tracing.
-			# Events can be selected individually and/or using Nanos6-defined presets
-			[instrument.ctf.events.kernel]
-				# Select one or more predefined sets of events. Available options are:
-				#  - preemption: Trace context switches and interrupts
-				#  - context_switch: Trace context switches
-				#  - syscall: Trace all kernel syscalls entry and exit
-				# presets = [
-				# 	"preemption"
-				# ]
-				# Provide a file with a list of individual events to enable, one event per line.
-				# Lines starting with "#" are omitted.
-				# file = "./nanos6_kernel_events"
-				# Exclude selected events. Disable events even if enabled in a preset or the
-				# user provided file.
-				# exclude = [
-				# 	"sys_enter_gettimeofday",
-				# 	"sys_exit_gettimeofday"
-				# ]
-	[instrument.extrae]
-		# Indicate whether the trace should show the activity of the threads instead of the CPUs'
-		# activity. Default is false, which shows the activity of CPUs
-		as_threads = false
-		# Choose the detail level of the information generated in extrae traces. Default is 1
-		detail_level = 1
-	[instrument.graph]
-		# Indicate whether the resulting PDF should be opened automatically with the display
-		# command. Default is false
-		display = false
-		# Choose the command to be used to automatically display the resulting PDF
-		display_command = "xdg-open"
-		# Indicate whether the graph nodes should remove the directories from the source code
-		# file names. Default is false
-		shorten_filenames = false
-		# Indicate whether should show the internal data structures that determine when tasks
-		# are ready. Default is false
-		show_dependency_structures = false
-		# Include the information about the range of data or region that is covered when showing
-		# internal data structures. Default is false
-		show_regions = false
-		# Indicate whether should show the internal data structures that do not determine dependencies
-		# or that are redundant by transitivity. Default is false
-		show_spurious_dependency_structures = false
-		# Choose whether should force future and previous dependencies to be shown with different
-		# graphical attributes. Default is false
-		show_dead_dependencies = false
-		# Include the internal data structures after they are no longer relevant. Default is false
-		show_dead_dependency_structures = false
-		# Instead of trying to collapse in one step as many related changes as possible, show one
-		# at a time. Default is false
-		show_all_steps = false
-		# Show superaccess links. Default is true
-		show_superaccess_links = true
-		# Choose whether to emit a table next to the graph with a description of the changes in
-		# each frame. Default is false
-		show_log = false
 	[instrument.stats]
 		# The outfile file for emitting the statistics. Default is the standard error
 		output_file = "/dev/stderr"
-	[instrument.verbose]
-		# Output device or file for verbose log. Default is "/dev/stderr"
-		output_file = "/dev/stderr"
-		# Print timestamps on log. Default is true
-		timestamps = true
-		# Delay verbose output to prevent mixing with application output. Default is false
-		dump_only_on_exit = false
-		# Verbose log concepts to display. Possible values on README.md
-		areas = ["DependenciesByAccess"]
-		# areas = ["all", "!ComputePlaceManagement", "!DependenciesByAccess", "!DependenciesByAccessLinks",
-		# 	"!DependenciesByGroup", "!LeaderThread", "!TaskStatus",	"!ThreadManagement"]
-
-[memory]
 
 [misc]
 	# Stack size of threads created by the runtime. Default is 8M
