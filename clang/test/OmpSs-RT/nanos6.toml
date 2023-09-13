@@ -15,7 +15,7 @@
 	# Possible values: "discrete", "regions"
 	dependencies = "discrete"
 	# Choose the instrumentation variant to run. Default is "none"
-	# Possible values: "none", "ctf", "ovni", "extrae", "graph", "lint", "stats", "verbose"
+	# Possible values: "none", "ctf", "ovni", "extrae", "lint", "verbose"
 	instrument = "verbose"
 
 [turbo]
@@ -128,9 +128,6 @@
 [devices]
 
 [instrument]
-	[instrument.stats]
-		# The outfile file for emitting the statistics. Default is the standard error
-		output_file = "/dev/stderr"
 
 [misc]
 	# Stack size of threads created by the runtime. Default is 8M
