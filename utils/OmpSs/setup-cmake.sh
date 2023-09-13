@@ -85,6 +85,7 @@ CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_BUILD_TYPE=${BUILD_TYPE}")
 if [ "${INSTALL_TYPE}" = "Distribution" ];
 then
   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_INSTALL_TOOLCHAIN_ONLY=ON")
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_TOOLCHAIN_UTILITIES=FileCheck;not")
   info "Distribution installation type"
 elif [ -n "${INSTALL_TYPE}" ];
 then
@@ -244,13 +245,25 @@ else
 fi
 
 
+RUNTIMES_ARGS=""
 if [ -n "${CFLAGS}" ];
 then
   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_C_FLAGS=${CFLAGS}")
+  RUNTIMES_ARGS="-DCMAKE_C_FLAGS=${CFLAGS}"
 fi
 if [ -n "${CXXFLAGS}" ];
 then
   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_CXX_FLAGS=${CXXFLAGS}")
+  if [ -n "${RUNTIMES_ARGS}" ];
+  then
+    RUNTIMES_ARGS+=";"
+  fi
+  RUNTIMES_ARGS+="-DCMAKE_CXX_FLAGS=${CXXFLAGS}"
+fi
+
+if [ -n "${RUNTIMES_ARGS}" ];
+then
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DRUNTIMES_CMAKE_ARGS=${RUNTIMES_ARGS}")
 fi
 
 ################################################################################
@@ -431,7 +444,7 @@ fi
 # Extra runtimes we may want to build
 ################################################################################
 
-EXTRA_RUNTIMES=""
+EXTRA_RUNTIMES="openmp"
 
 ################################################################################
 # Compiler-rt for installations
@@ -440,7 +453,7 @@ EXTRA_RUNTIMES=""
 
 if [ "${ENABLE_COMPILER_RT}" = 1 ];
 then
-  EXTRA_RUNTIMES+="compiler-rt"
+  EXTRA_RUNTIMES+=";compiler-rt"
   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCOMPILER_RT_CAN_EXECUTE_TESTS=OFF")
   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCOMPILER_RT_INCLUDE_TESTS=OFF")
   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCOMPILER_RT_BUILD_SANITIZERS=ON")
@@ -466,7 +479,7 @@ fi
 # LLVM projects built
 ################################################################################
 
-LLVM_ENABLE_PROJECTS="-DLLVM_ENABLE_PROJECTS=clang;openmp;lld"
+LLVM_ENABLE_PROJECTS="-DLLVM_ENABLE_PROJECTS=clang;lld"
 if [ "$DISABLE_FORTRAN" != 1 ];
 then
   LLVM_ENABLE_PROJECTS+=";flang"
