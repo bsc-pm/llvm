@@ -128,6 +128,67 @@
 [devices]
 
 [instrument]
+	[instrument.ctf]
+		# Choose the temporary directory where to store intermediate CTF files. Default is none
+		# (not set), which means that $TMPDIR will be used if present, or /tmp otherwise
+		# tmpdir = "/tmp"
+		[instrument.ctf.converter]
+			# Indicate whether the trace converter should automatically generate the trace after
+			# executing a program with CTF instrumentation. Default is true
+			enabled = true
+			# Use the fast converter. This feature is experimental and generates a trace compatible
+			# with just a subset of Paraver cfgs. Default is false
+			fast = false
+			# Indicate the location of the ctf2prv converter script. Default is none (not set),
+			# which means that the $CTF2PRV will be used if present, or ctf2prv in $PATH
+			# otherwise
+			# location = "path/to/ctf2prv"
+		# Choose the events that will be traced
+		[instrument.ctf.events]
+			# Linux Kernel events options. Nanos6 can collect Linux kernel internal events using the
+			# perf_event_open system call. This requires to set /proc/sys/kernel/perf_event_paranoid
+			# to -1 and read permissions for either /sys/kernel/tracing or /sys/kernel/debug/tracing.
+			# Events can be selected individually and/or using Nanos6-defined presets
+			[instrument.ctf.events.kernel]
+				# Select one or more predefined sets of events. Available options are:
+				#  - preemption: Trace context switches and interrupts
+				#  - context_switch: Trace context switches
+				#  - syscall: Trace all kernel syscalls entry and exit
+				# presets = [
+				# 	"preemption"
+				# ]
+				# Provide a file with a list of individual events to enable, one event per line.
+				# Lines starting with "#" are omitted.
+				# file = "./nanos6_kernel_events"
+				# Exclude selected events. Disable events even if enabled in a preset or the
+				# user provided file.
+				# exclude = [
+				# 	"sys_enter_gettimeofday",
+				# 	"sys_exit_gettimeofday"
+				# ]
+	[instrument.ovni]
+		# Level of detail. Selects what should be instrumented:
+		# 1 = Tasks
+		# 2 = Tasks + simple subsystem (the default)
+		# 3 = Tasks + full subsystem + memory (huge performance penalty)
+		level = 2
+	[instrument.extrae]
+		# Indicate whether the trace should show the activity of the threads instead of the CPUs'
+		# activity. Default is false, which shows the activity of CPUs
+		as_threads = false
+		# Choose the detail level of the information generated in extrae traces. Default is 1
+		detail_level = 1
+	[instrument.verbose]
+		# Output device or file for verbose log. Default is "/dev/stderr"
+		output_file = "/dev/stderr"
+		# Print timestamps on log. Default is true
+		timestamps = true
+		# Delay verbose output to prevent mixing with application output. Default is false
+		dump_only_on_exit = false
+		# Verbose log concepts to display. Possible values on README.md
+		areas = ["DependenciesByAccess"]
+		# areas = ["all", "!ComputePlaceManagement", "!DependenciesByAccess", "!DependenciesByAccessLinks",
+		# 	"!DependenciesByGroup", "!LeaderThread", "!TaskStatus",	"!ThreadManagement"]
 
 [misc]
 	# Stack size of threads created by the runtime. Default is 8M
