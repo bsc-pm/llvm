@@ -6398,7 +6398,7 @@ ASTNodeImporter::VisitFunctionTemplateDecl(FunctionTemplateDecl *D) {
       if (auto *FoundTemplate = dyn_cast<FunctionTemplateDecl>(FoundDecl)) {
         if (!hasSameVisibilityContextAndLinkage(FoundTemplate, D))
           continue;
-        if (IsStructuralMatch(D, FoundTemplate)) {
+        if (IsStructuralMatch(D, FoundTemplate, false)) {
           FunctionTemplateDecl *TemplateWithDef =
               getTemplateDefinition(FoundTemplate);
           if (D->isThisDeclarationADefinition() && TemplateWithDef)
