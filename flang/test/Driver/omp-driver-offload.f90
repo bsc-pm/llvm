@@ -2,6 +2,11 @@
 ! commands forward or expand to the appropriate commands 
 ! for flang-new -fc1 as expected.
 
+! We mark it as unsupported because in cte-amd amdgcn-arch binary
+! is found. This enables amdgcn-amd-amdhsa target and -fopenmp-target
+! does not fail
+! UNSUPPORTED: true
+
 ! Test regular -fopenmp with no offload
 ! RUN: %flang -### -fopenmp %s 2>&1 | FileCheck --check-prefixes=CHECK-OPENMP %s
 ! CHECK-OPENMP: "{{[^"]*}}flang-new" "-fc1" {{.*}} "-fopenmp" {{.*}}.f90"

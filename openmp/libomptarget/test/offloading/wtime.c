@@ -1,4 +1,8 @@
 // RUN: %libomptarget-compileopt-and-run-generic
+// We mark this test as unsupported because
+// cte-amd requires rocm >=5.3.0, this update
+// will never come.
+// UNSUPPORTED: true
 
 #include <assert.h>
 #include <omp.h>

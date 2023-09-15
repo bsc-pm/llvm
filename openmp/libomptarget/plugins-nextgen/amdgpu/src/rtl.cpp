@@ -1760,9 +1760,11 @@ struct AMDGPUDeviceTy : public GenericDeviceTy, AMDGenericDeviceTy {
     GridValues.GV_Warp_Size = WavefrontSize;
 
     // Get the frequency of the steady clock.
-    if (auto Err = getDeviceAttr(HSA_AMD_AGENT_INFO_TIMESTAMP_FREQUENCY,
-                                 ClockFrequency))
-      return Err;
+    // NOTE: rocm >= 5.3.0 is required but this will never come
+    // to cte-amd
+    // if (auto Err = getDeviceAttr(HSA_AMD_AGENT_INFO_TIMESTAMP_FREQUENCY,
+    //                              ClockFrequency))
+    //   return Err;
 
     // Load the grid values dependending on the wavefront.
     if (WavefrontSize == 32)
