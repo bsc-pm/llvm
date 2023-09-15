@@ -642,6 +642,12 @@ public:
   }
 
   bool VisitCallExpr(CallExpr *callExpr) {
+    if (!callExpr->getCalleeDecl() || ! dyn_cast<FunctionDecl>(callExpr->getCalleeDecl())
+            || dyn_cast<FunctionDecl>(callExpr->getCalleeDecl())->isOverloadedOperator()
+            || callExpr->getCalleeDecl()->getKind() == clang::Decl::CXXConversion
+            || callExpr->getCalleeDecl()->isImplicit() ) {
+      return true;
+    }
     if (auto *attr = callExpr->getCalleeDecl()->getAttr<OSSTaskDeclAttr>()) {
       return TaskCall(callExpr, attr);
     }
@@ -1175,6 +1181,12 @@ bool FPGAFunctionTreeVisitor::VisitOSSCriticalDirective(
 
 bool FPGAFunctionTreeVisitor::VisitCallExpr(CallExpr *n) {
   auto *sym = n->getCalleeDecl();
+  if (!sym || ! dyn_cast<FunctionDecl>(sym)
+          || dyn_cast<FunctionDecl>(sym)->isOverloadedOperator()
+          || sym->getKind() == clang::Decl::CXXConversion
+          || sym->isImplicit() ) {
+      return true;
+  }
   if (const NamedDecl *symNamed = dyn_cast<NamedDecl>(sym); symNamed) {
     auto symName = symNamed->getName();
 
