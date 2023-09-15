@@ -1,5 +1,9 @@
 // Basic offloading test for function compiled with flang
 // REQUIRES: flang, amdgcn-amd-amdhsa
+// Mark as unsupported because using OPENMP_TEST_FLAGS
+// to forward --gcc-toolchain (needed in the clusters)
+// is also forward here, but flang does not understand it
+// UNSUPPORTED: true
 
 // RUN: %flang -c -fopenmp -fopenmp-targets=amdgcn-amd-amdhsa \
 // RUN:   %S/../../Inputs/basic_array.f90 -o basic_array.o
