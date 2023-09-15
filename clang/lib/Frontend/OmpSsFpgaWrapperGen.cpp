@@ -1201,7 +1201,7 @@ OMPIF_COMM_WORLD
     // Dependency resolution. We use the ASTImporter utility, which is able to
     // manage any sort of C++ construct during resolution.
     ASTImporter importer(ToContext, ToFileManager, OriginalContext,
-                         OriginalSourceMgr.getFileManager(), true);
+                         OriginalSourceMgr.getFileManager(), false);
 
     auto importedOrErr = importer.Import(OriginalFD);
     if (!importedOrErr) {
