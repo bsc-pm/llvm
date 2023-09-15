@@ -408,6 +408,16 @@ fi
 CMAKE_INVOCATION_EXTRA_FLAGS+=("${LIT_ARGS}")
 
 ################################################################################
+# Targets to build
+################################################################################
+
+TARGETS="all"
+if [ -n "${TARGETS_TO_BUILD}" ];
+then
+  TARGETS="${TARGETS_TO_BUILD}"
+fi
+
+################################################################################
 # Sanitizer build
 ################################################################################
 
@@ -415,7 +425,8 @@ if [ "${ENABLE_SANITIZER}" = 1 ];
 then
   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_USE_SANITIZER=Address;Undefined")
   # We only run sanitizers on X86, so try to shave as much compilation time as possible
-  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_TARGETS_TO_BUILD=X86")
+  warning "Overriding targets to build to X86 since ENABLE_SANITIZER is 1"
+  TARGETS="X86"
 fi
 
 ################################################################################
@@ -490,6 +501,7 @@ run cmake -G "${BUILD_SYSTEM}" ${SRCDIR}/llvm \
    -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} \
    -DCLANG_DEFAULT_PIE_ON_LINUX=OFF \
    ${LLVM_ENABLE_PROJECTS} \
+   -DLLVM_TARGETS_TO_BUILD="${TARGETS}" \
    -DLLVM_ENABLE_RUNTIMES="${EXTRA_RUNTIMES}" \
    -DOPENMP_LLVM_LIT_EXECUTABLE="$(pwd)/bin/llvm-lit" \
    -DOPENMP_FILECHECK_EXECUTABLE="$(pwd)/bin/FileCheck" \
