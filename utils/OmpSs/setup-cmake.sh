@@ -418,6 +418,12 @@ then
 fi
 
 ################################################################################
+# Extra runtimes we may want to build
+################################################################################
+
+EXTRA_RUNTIMES=""
+
+################################################################################
 # Sanitizer build
 ################################################################################
 
@@ -427,6 +433,11 @@ then
   # We only run sanitizers on X86, so try to shave as much compilation time as possible
   warning "Overriding targets to build to X86 since ENABLE_SANITIZER is 1"
   TARGETS="X86"
+else
+  # Enable openmp in builds without sanitizers
+  # For some reason in sanitizer build the openmp is not compiled
+  # with them, but it is linked with libLLVM* having calls to asan...
+  EXTRA_RUNTIMES="openmp"
 fi
 
 ################################################################################
@@ -446,12 +457,6 @@ if [ -n "$TEST_OMPFLAGS" ];
 then
   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DOPENMP_TEST_FLAGS=$TEST_OMPFLAGS")
 fi
-
-################################################################################
-# Extra runtimes we may want to build
-################################################################################
-
-EXTRA_RUNTIMES="openmp"
 
 ################################################################################
 # Compiler-rt for installations
