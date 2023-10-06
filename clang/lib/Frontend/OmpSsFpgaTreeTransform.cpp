@@ -707,22 +707,39 @@ public:
     llvm::SmallVector<Expr *, 4> arguments(callExpr->arguments());
     auto mapping = WrapperPortMap[callExpr->getCalleeDecl()];
 
-    if (mapping[(int)WrapperPort::OMPIF_RANK])
+    bool needsReplacement = false;
+    if (mapping[(int)WrapperPort::OMPIF_RANK]) {
       arguments.push_back(makeDeclRefExpr(OmpIfRank));
-    if (mapping[(int)WrapperPort::OMPIF_SIZE])
+      needsReplacement = true;
+    }
+    if (mapping[(int)WrapperPort::OMPIF_SIZE]) {
       arguments.push_back(makeDeclRefExpr(OmpIfSize));
-    if (mapping[(int)WrapperPort::SPAWN_INPORT])
+      needsReplacement = true;
+    }
+    if (mapping[(int)WrapperPort::SPAWN_INPORT]) {
       arguments.push_back(makeDeclRefExpr(SpawnInPort));
-    if (mapping[(int)WrapperPort::INPORT])
+      needsReplacement = true;
+    }
+    if (mapping[(int)WrapperPort::INPORT]) {
       arguments.push_back(makeDeclRefExpr(InPort));
-    if (mapping[(int)WrapperPort::OUTPORT])
+      needsReplacement = true;
+    }
+    if (mapping[(int)WrapperPort::OUTPORT]) {
       arguments.push_back(makeDeclRefExpr(OutPort));
-    if (mapping[(int)WrapperPort::MEMORY_PORT])
+      needsReplacement = true;
+    }
+    if (mapping[(int)WrapperPort::MEMORY_PORT]) {
       arguments.push_back(makeDeclRefExpr(MemPort));
-    if (instrumented)
+      needsReplacement = true;
+    }
+    if (instrumented) {
       arguments.push_back(makeDeclRefExpr(InstrPort));
-    addReplacementOpStmt(callExpr,
-                         makeCallToWithDifferentParams(callExpr, arguments));
+      needsReplacement = true;
+    }
+    if (needsReplacement) {
+      addReplacementOpStmt(callExpr,
+          makeCallToWithDifferentParams(callExpr, arguments));
+    }
 
     return true;
   }
