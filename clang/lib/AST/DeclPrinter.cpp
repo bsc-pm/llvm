@@ -905,7 +905,8 @@ void DeclPrinter::VisitVarDecl(VarDecl *D) {
       ImplicitInit = true;
     } else if (CXXConstructExpr *Construct =
                    dyn_cast<CXXConstructExpr>(Init->IgnoreImplicit())) {
-      if (D->getInitStyle() == VarDecl::CallInit &&
+      if ( (D->getInitStyle() == VarDecl::CallInit ||
+            D->getInitStyle() == VarDecl::CInit) &&
           !Construct->isListInitialization()) {
         ImplicitInit = Construct->getNumArgs() == 0 ||
                        Construct->getArg(0)->isDefaultArgument();
