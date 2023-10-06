@@ -20,6 +20,8 @@
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "llvm/ADT/APSInt.h"
+#include "llvm/ADT/SmallSet.h"
+
 namespace clang {
 
 static constexpr uint8_t InstrumentationEventBurstBegin = 0b0000'0000;
@@ -79,6 +81,7 @@ class FPGAFunctionTreeVisitor
   FunctionCallTree Top;
   FunctionCallTree *Current;
   WrapperPortMap &wrapperPortMap;
+  llvm::SmallSet<CallExpr*, 32> visited;
 
   void propagatePort(WrapperPort port);
 

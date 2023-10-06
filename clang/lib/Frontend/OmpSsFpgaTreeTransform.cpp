@@ -1148,7 +1148,8 @@ void FPGAFunctionTreeVisitor::propagatePort(WrapperPort port) {
 
 FPGAFunctionTreeVisitor::FPGAFunctionTreeVisitor(FunctionDecl *startSymbol,
                                                  WrapperPortMap &wrapperPortMap)
-    : Top(startSymbol, nullptr), Current(&Top), wrapperPortMap(wrapperPortMap) {
+    : Top(startSymbol, nullptr), Current(&Top), wrapperPortMap(wrapperPortMap),
+    visited() {
 }
 
 bool FPGAFunctionTreeVisitor::VisitOSSTaskDirective(OSSTaskDirective *) {
@@ -1185,6 +1186,10 @@ bool FPGAFunctionTreeVisitor::VisitCallExpr(CallExpr *n) {
           || dyn_cast<FunctionDecl>(sym)->isOverloadedOperator()
           || sym->getKind() == clang::Decl::CXXConversion
           || sym->isImplicit() ) {
+      return true;
+  }
+  //Watch for recursive calls
+  if (!visited.insert(n).second) {
       return true;
   }
   if (const NamedDecl *symNamed = dyn_cast<NamedDecl>(sym); symNamed) {
