@@ -844,8 +844,11 @@ StmtResult Parser::ParseHlsPragma(ParsedStmtContext Allowed) {
             //May want to look inside the bracket and add identifiers to the reference list
             //just consuming the tokens should be fine
             ConsumeBracket();
+        } else if (Tok.isOneOf(tok::l_paren, tok::r_paren)) {
+            ConsumeParen();
+        } else {
+            ConsumeToken();
         }
-      ConsumeToken();
     }
   }
   EndLoc = ConsumeAnnotationToken();
