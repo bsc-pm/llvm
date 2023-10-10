@@ -128,7 +128,7 @@ bool Sema::CheckFpgaLocalmems(FunctionDecl *FD) {
         transformOSSArrayShapingExpr(arrShapingExpr);
       auto *arrExprBase = dyn_cast<DeclRefExpr>(
           arrShapingExpr->getBase()->IgnoreParenImpCasts());
-      assert(arrExprBase);
+      if (!arrExprBase) return;
       auto *decl = dyn_cast<ParmVarDecl>(arrExprBase->getDecl());
       assert(decl);
       auto res = currentAssignationsOfArrays.find(decl);
