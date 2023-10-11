@@ -397,6 +397,7 @@ template<class T>
 union __mcxx_cast {
   unsigned long long int raw;
   T typed;
+  __mcxx_cast() {}
 };
 )";
     Output << R"(
