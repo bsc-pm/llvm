@@ -1807,10 +1807,8 @@ void CGOmpSsRuntime::EmitDependencyList(
     llvm::Value *Ptr = DepVisitor.getPtr();
 
     uint64_t BaseElementSize =
-               NewCGF.CGM
-                 .getDataLayout()
-                 .getTypeStoreSize(NewCGF
-                                    .ConvertType(BaseElementTy));
+               NewCGF.getContext()
+                 .getTypeSizeInChars(BaseElementTy).getQuantity();
 
     List.push_back(Ptr);
     bool First = true;
