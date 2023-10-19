@@ -38,6 +38,9 @@
 /* Default OmpSs-2 NODES home directory. */
 #define CLANG_DEFAULT_NODES_HOME "${CLANG_DEFAULT_NODES_HOME}"
 
+/* Default OmpSs-2 nOS-V home directory. */
+#define CLANG_DEFAULT_NOSV_HOME "${CLANG_DEFAULT_NOSV_HOME}"
+
 /* Default architecture for SystemZ. */
 #define CLANG_SYSTEMZ_DEFAULT_ARCH "${CLANG_SYSTEMZ_DEFAULT_ARCH}"
 

@@ -974,6 +974,34 @@ void tools::addFortranRuntimeLibraryPath(const ToolChain &TC,
     CmdArgs.push_back(Args.MakeArgString("-L" + DefaultLibPath));
 }
 
+static void addNosvRuntimeLib(const ToolChain &TC, const ArgList &Args, ArgStringList &CmdArgs) {
+  std::string NOSVDefaultHome(CLANG_DEFAULT_NOSV_HOME);
+  std::optional<std::string> NOSVHome =
+    llvm::sys::Process::GetEnv("NOSV_HOME");
+
+  // First look at environment,then CMAKE
+  // defined variable.
+  //
+  // Default to compiler lib dir. in case both are not defined.
+  std::string HomePath;
+  if (NOSVHome && !NOSVHome->empty()) {
+    HomePath = NOSVHome.value();
+  } else if (!NOSVDefaultHome.empty()) {
+    HomePath = NOSVDefaultHome;
+  }
+
+  if (!HomePath.empty()) {
+    CmdArgs.push_back("-L");
+    CmdArgs.push_back(Args.MakeArgString(HomePath + "/lib"));
+    CmdArgs.push_back("-rpath");
+    CmdArgs.push_back(Args.MakeArgString(HomePath + "/lib"));
+  } else {
+    // Fallback to compiler installed dir.
+    CmdArgs.push_back("-rpath");
+    CmdArgs.push_back(Args.MakeArgString(std::string(TC.getDriver().getInstalledDir()) + "/../lib"));
+  }
+}
+
 void tools::addOmpSsRuntimeLibs(
     ArgStringList &CmdArgs, const ToolChain &TC, const ArgList &Args) {
 
@@ -991,7 +1019,13 @@ void tools::addOmpSsRuntimeLibs(
   std::optional<std::string> NODESHome =
     llvm::sys::Process::GetEnv("NODES_HOME");
 
+  std::string NOSVDefaultHome(CLANG_DEFAULT_NOSV_HOME);
+  std::optional<std::string> NOSVHome =
+    llvm::sys::Process::GetEnv("NOSV_HOME");
+
   Driver::OmpSsRuntimeKind RTKind = TC.getDriver().getOmpSsRuntime(Args);
+
+  bool NODESUsed = false;
 
   std::string RuntimeDefaultHome;
   std::optional<std::string> RuntimeHome;
@@ -1006,10 +1040,17 @@ void tools::addOmpSsRuntimeLibs(
     RuntimeDefaultHome = NODESDefaultHome;
     RuntimeHome = NODESHome;
     RuntimeLibPrefix = "nodes";
+    NODESUsed = true;
     break;
   case Driver::OSSRT_Unknown:
     // Already diagnosed.
     return;
+  }
+
+  // Add nOS-V before NODES
+  if (NODESUsed) {
+    CmdArgs.push_back("-lnosv");
+    addNosvRuntimeLib(TC, Args, CmdArgs);
   }
 
   // First look at environment,then CMAKE

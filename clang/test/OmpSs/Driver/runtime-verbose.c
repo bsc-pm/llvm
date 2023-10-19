@@ -7,9 +7,14 @@
 // CHECK-NANOS6: "{{[^"]*}}ld{{(.exe)?}}"
 // CHECK-NANOS6-SAME: "ASDF/lib/nanos6-main-wrapper.o"
 
+// Ensure nosv is placed before nodes
+// FIXME? Should we put nosv at the beginning of the whole
+// line?
 // CHECK-NODES: clang version{{.*}}
 // CHECK-NODES: "{{[^"]*}}clang{{[^"]*}}"
 // CHECK-NODES-SAME: "-I" "FDSA/include"
 // CHECK-NODES: "{{[^"]*}}ld{{(.exe)?}}"
+// CHECK-NODES-SAME: "-lnosv"
 // CHECK-NODES-SAME: "FDSA/lib/nodes-main-wrapper.o"
+// CHECK-NODES-SAME: "-lnodes"
 
