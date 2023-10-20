@@ -1040,10 +1040,6 @@ void tools::addOmpSsRuntimeLibs(
   std::optional<std::string> NODESHome =
     llvm::sys::Process::GetEnv("NODES_HOME");
 
-  std::string NOSVDefaultHome(CLANG_DEFAULT_NOSV_HOME);
-  std::optional<std::string> NOSVHome =
-    llvm::sys::Process::GetEnv("NOSV_HOME");
-
   Driver::OmpSsRuntimeKind RTKind = TC.getDriver().getOmpSsRuntime(Args);
 
   bool NODESUsed = false;
