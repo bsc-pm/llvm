@@ -335,7 +335,7 @@ protected:
 
   void EmitUnsupported(C clause);
 
-  void CheckAllowed(C clause);
+  void CheckAllowed(C clause, bool warnInsteadOfError = false);
 
   void CheckAtLeastOneClause();
 
@@ -475,15 +475,21 @@ void DirectiveStructureChecker<D, C, PC, ClauseEnumSize>::EmitUnsupported(
 // Check that clauses present on the directive are allowed clauses.
 template <typename D, typename C, typename PC, std::size_t ClauseEnumSize>
 void DirectiveStructureChecker<D, C, PC, ClauseEnumSize>::CheckAllowed(
-    C clause) {
+    C clause, bool warnInsteadOfError) {
   if (!GetContext().allowedClauses.test(clause) &&
       !GetContext().allowedOnceClauses.test(clause) &&
       !GetContext().allowedExclusiveClauses.test(clause) &&
       !GetContext().requiredClauses.test(clause)) {
-    context_.Say(GetContext().clauseSource,
-        "%s clause is not allowed on the %s directive"_err_en_US,
-        parser::ToUpperCaseLetters(getClauseName(clause).str()),
-        parser::ToUpperCaseLetters(GetContext().directiveSource.ToString()));
+    if (warnInsteadOfError)
+      context_.Say(GetContext().clauseSource,
+          "%s clause is not allowed on the %s directive and will be ignored"_port_en_US,
+          parser::ToUpperCaseLetters(getClauseName(clause).str()),
+          parser::ToUpperCaseLetters(GetContext().directiveSource.ToString()));
+    else
+      context_.Say(GetContext().clauseSource,
+          "%s clause is not allowed on the %s directive"_err_en_US,
+          parser::ToUpperCaseLetters(getClauseName(clause).str()),
+          parser::ToUpperCaseLetters(GetContext().directiveSource.ToString()));
     return;
   }
   if ((GetContext().allowedOnceClauses.test(clause) ||

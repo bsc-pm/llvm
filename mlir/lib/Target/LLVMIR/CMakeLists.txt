@@ -40,6 +40,7 @@ add_mlir_translation_library(MLIRTargetLLVMIRExport
   MLIRLLVMDialect
   MLIRLLVMIRTransforms
   MLIRTranslateLib
+  MLIRTransformUtils
   )
 
 add_mlir_translation_library(MLIRToLLVMIRTranslationRegistration
@@ -59,8 +60,6 @@ add_mlir_translation_library(MLIRToLLVMIRTranslationRegistration
   MLIROpenACCToLLVMIRTranslation
   MLIROpenMPToLLVMIRTranslation
   MLIRROCDLToLLVMIRTranslation
-  MLIRNVVMTarget
-  MLIRROCDLTarget
   )
 
 add_mlir_translation_library(MLIRTargetLLVMIRImport

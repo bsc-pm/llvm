@@ -43,6 +43,22 @@ def _getSuitableClangTidy(cfg):
         return None
 
 
+def _getAndroidDeviceApi(cfg):
+    return int(
+        programOutput(
+            cfg,
+            r"""
+                #include <android/api-level.h>
+                #include <stdio.h>
+                int main() {
+                    printf("%d\n", android_get_device_api_level());
+                    return 0;
+                }
+            """,
+        )
+    )
+
+
 DEFAULT_FEATURES = [
     Feature(
         name="thread-safety",
@@ -302,6 +318,7 @@ macros = {
     "_LIBCPP_HAS_NO_RANDOM_DEVICE": "no-random-device",
     "_LIBCPP_HAS_NO_LOCALIZATION": "no-localization",
     "_LIBCPP_HAS_NO_WIDE_CHARACTERS": "no-wide-characters",
+    "_LIBCPP_HAS_NO_TIME_ZONE_DATABASE": "no-tzdb",
     "_LIBCPP_HAS_NO_UNICODE": "libcpp-has-no-unicode",
     "_LIBCPP_HAS_NO_STD_MODULES":  "libcpp-has-no-std-modules",
     "_LIBCPP_PSTL_CPU_BACKEND_LIBDISPATCH": "libcpp-pstl-cpu-backend-libdispatch",
@@ -386,6 +403,15 @@ DEFAULT_FEATURES += [
         actions=[AddCompileFlag("-DTEST_WINDOWS_DLL")],
     ),
     Feature(name="linux", when=lambda cfg: "__linux__" in compilerMacros(cfg)),
+    Feature(name="android", when=lambda cfg: "__ANDROID__" in compilerMacros(cfg)),
+    Feature(
+        name=lambda cfg: "android-device-api={}".format(_getAndroidDeviceApi(cfg)),
+        when=lambda cfg: "__ANDROID__" in compilerMacros(cfg),
+    ),
+    Feature(
+        name="LIBCXX-ANDROID-FIXME",
+        when=lambda cfg: "__ANDROID__" in compilerMacros(cfg),
+    ),
     Feature(name="netbsd", when=lambda cfg: "__NetBSD__" in compilerMacros(cfg)),
     Feature(name="freebsd", when=lambda cfg: "__FreeBSD__" in compilerMacros(cfg)),
     Feature(
@@ -553,6 +579,15 @@ DEFAULT_FEATURES += [
         name="availability-aligned_allocation-missing",
         when=lambda cfg: BooleanExpression.evaluate(
             "stdlib=apple-libc++ && target={{.+}}-apple-macosx10.{{(9|10|11|12)(.0)?}}",
+            cfg.available_features,
+        ),
+    ),
+    # Tests that require time zone database support in the built library
+    Feature(
+        name="availability-tzdb-missing",
+        when=lambda cfg: BooleanExpression.evaluate(
+            # TODO(ldionne) Please provide the correct value.
+            "(stdlib=apple-libc++ && target={{.+}}-apple-macosx{{(10.9|10.10|10.11|10.12|10.13|10.14|10.15|11.0|12.0|13.0)(.0)?}})",
             cfg.available_features,
         ),
     ),

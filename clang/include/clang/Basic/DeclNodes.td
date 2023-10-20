@@ -103,7 +103,6 @@ def FriendTemplate : DeclNode<Decl>;
 def StaticAssert : DeclNode<Decl>;
 def Block : DeclNode<Decl, "blocks">, DeclContext;
 def Captured : DeclNode<Decl>, DeclContext;
-def ClassScopeFunctionSpecialization : DeclNode<Decl>;
 def Import : DeclNode<Decl>;
 def OSSAssert : DeclNode<Decl>;
 def OMPThreadPrivate : DeclNode<Decl>;

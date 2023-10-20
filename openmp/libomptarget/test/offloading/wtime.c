@@ -4,6 +4,8 @@
 // will never come.
 // UNSUPPORTED: true
 
+// UNSUPPORTED: amdgcn-amd-amdhsa
+
 #include <assert.h>
 #include <omp.h>
 #include <stdio.h>

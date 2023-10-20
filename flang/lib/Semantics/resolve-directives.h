@@ -11,6 +11,7 @@
 
 namespace Fortran::parser {
 struct Name;
+struct Program;
 struct ProgramUnit;
 } // namespace Fortran::parser
 
@@ -22,6 +23,7 @@ class SemanticsContext;
 void ResolveAccParts(SemanticsContext &, const parser::ProgramUnit &);
 void ResolveOmpParts(SemanticsContext &, const parser::ProgramUnit &);
 void ResolveOSSParts(SemanticsContext &, const parser::ProgramUnit &);
+void ResolveOmpTopLevelParts(SemanticsContext &, const parser::Program &);
 
 } // namespace Fortran::semantics
 #endif
