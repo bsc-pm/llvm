@@ -9,7 +9,9 @@ PROGRAM P
 END
 
 
-! HLFIRToLLVMDialect-LABEL:   llvm.func @_QQmain() attributes {fir.bindc_name = "p"} {
+
+! HLFIRToLLVMDialect-LABEL: module attributes {fir.defaultkind = "a1c4d8i4l4r4", fir.kindmap = "", llvm.target_triple = "x86_64-unknown-linux-gnu"} {
+! HLFIRToLLVMDialect:         llvm.func @_QQmain() attributes {fir.bindc_name = "p"} {
 ! HLFIRToLLVMDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
 ! HLFIRToLLVMDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_0]] x i32 {bindc_name = "x", in_type = i32, operandSegmentSizes = array<i32: 0, 0>, uniq_name = "_QFEx"} : (i64) -> !llvm.ptr<i32>
 ! HLFIRToLLVMDialect:           oss.task firstprivate(%[[VAL_1]], %[[VAL_1]] : !llvm.ptr<i32>, !llvm.ptr<i32>) {
@@ -19,9 +21,9 @@ END
 ! HLFIRToLLVMDialect:           }
 ! HLFIRToLLVMDialect:           llvm.return
 ! HLFIRToLLVMDialect:         }
-
-! HLFIRToLLVMDialect-LABEL:   llvm.mlir.global external constant @_QQEnvironmentDefaults() {addr_space = 0 : i32} : !llvm.ptr<struct<(i32, ptr<array<0 x struct<(ptr<i8>, ptr<i8>)>>>)>> {
-! HLFIRToLLVMDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.null : !llvm.ptr<struct<(i32, ptr<array<0 x struct<(ptr<i8>, ptr<i8>)>>>)>>
-! HLFIRToLLVMDialect:           llvm.return %[[VAL_0]] : !llvm.ptr<struct<(i32, ptr<array<0 x struct<(ptr<i8>, ptr<i8>)>>>)>>
+! HLFIRToLLVMDialect:         llvm.mlir.global external constant @_QQEnvironmentDefaults() {addr_space = 0 : i32} : !llvm.ptr<struct<(i32, ptr<array<0 x struct<(ptr<i8>, ptr<i8>)>>>)>> {
+! HLFIRToLLVMDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.mlir.zero : !llvm.ptr<struct<(i32, ptr<array<0 x struct<(ptr<i8>, ptr<i8>)>>>)>>
+! HLFIRToLLVMDialect:           llvm.return %[[VAL_3]] : !llvm.ptr<struct<(i32, ptr<array<0 x struct<(ptr<i8>, ptr<i8>)>>>)>>
 ! HLFIRToLLVMDialect:         }
+! HLFIRToLLVMDialect:       }
 

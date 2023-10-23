@@ -2974,8 +2974,7 @@ public:
           continue;
         }
         if (fir::isPointerType(argTy) &&
-            !Fortran::evaluate::IsObjectPointer(
-                *expr, converter.getFoldingContext())) {
+            !Fortran::evaluate::IsObjectPointer(*expr)) {
           // Passing a non POINTER actual argument to a POINTER dummy argument.
           // Create a pointer of the dummy argument type and assign the actual
           // argument to it.
@@ -2994,25 +2993,13 @@ public:
         }
         // Passing a POINTER to a POINTER, or an ALLOCATABLE to an ALLOCATABLE.
         fir::MutableBoxValue mutableBox = genMutableBoxValue(*expr);
+        if (fir::isAllocatableType(argTy) && arg.isIntentOut() &&
+            Fortran::semantics::IsBindCProcedure(*procRef.proc().GetSymbol()))
+          Fortran::lower::genDeallocateIfAllocated(converter, mutableBox, loc);
         mlir::Value irBox =
             fir::factory::getMutableIRBox(builder, loc, mutableBox);
         localSymbols.addSymbol(*sym, irBox);
         caller.placeInput(arg, irBox);
-        if (fir::isAllocatableType(argTy) && arg.isIntentOut() &&
-            Fortran::semantics::IsBindCProcedure(*procRef.proc().GetSymbol())) {
-          if (mutableBox.isDerived() || mutableBox.isPolymorphic() ||
-              mutableBox.isUnlimitedPolymorphic()) {
-            mlir::Value isAlloc = fir::factory::genIsAllocatedOrAssociatedTest(
-                builder, loc, mutableBox);
-            builder.genIfThen(loc, isAlloc)
-                .genThen([&]() {
-                  Fortran::lower::genDeallocateBox(converter, mutableBox, loc);
-                })
-                .end();
-          } else {
-            Fortran::lower::genDeallocateBox(converter, mutableBox, loc);
-          }
-        }
         continue;
       }
       if (arg.passBy == PassBy::BaseAddress || arg.passBy == PassBy::BoxChar ||
@@ -3032,7 +3019,22 @@ public:
                  arg.passBy == PassBy::CharBoxValueAttribute);
           auto helper = fir::factory::CharacterExprHelper{builder, loc};
           auto boxChar = argAddr.match(
-              [&](const fir::CharBoxValue &x) { return helper.createEmbox(x); },
+              [&](const fir::CharBoxValue &x) -> mlir::Value {
+                // If a character procedure was passed instead, handle the
+                // mismatch.
+                auto funcTy =
+                    x.getAddr().getType().dyn_cast<mlir::FunctionType>();
+                if (funcTy && funcTy.getNumResults() == 1 &&
+                    funcTy.getResult(0).isa<fir::BoxCharType>()) {
+                  auto boxTy = funcTy.getResult(0).cast<fir::BoxCharType>();
+                  mlir::Value ref = builder.createConvert(
+                      loc, builder.getRefType(boxTy.getEleTy()), x.getAddr());
+                  auto len = builder.create<fir::UndefOp>(
+                      loc, builder.getCharacterLengthType());
+                  return builder.create<fir::EmboxCharOp>(loc, boxTy, ref, len);
+                }
+                return helper.createEmbox(x);
+              },
               [&](const fir::CharArrayBoxValue &x) {
                 return helper.createEmbox(x);
               },
@@ -3092,8 +3094,7 @@ public:
           }
 
         } else if (arg.isOptional() &&
-                   Fortran::evaluate::IsAllocatableOrPointerObject(
-                       *expr, converter.getFoldingContext())) {
+                   Fortran::evaluate::IsAllocatableOrPointerObject(*expr)) {
           // Before lowering to an address, handle the allocatable/pointer
           // actual argument to optional fir.box dummy. It is legal to pass
           // unallocated/disassociated entity to an optional. In this case, an
@@ -3138,40 +3139,82 @@ public:
           localSymbols.addSymbol(*sym, select);
           caller.placeInput(arg, select);
         } else {
-          // Make sure a variable address is only passed if the expression is
-          // actually a variable.
-          mlir::Value box =
-              Fortran::evaluate::IsVariable(*expr)
-                  ? builder.createBox(loc, genBoxArg(*expr),
-                                      fir::isPolymorphicType(argTy))
-                  : builder.createBox(getLoc(), genTempExtAddr(*expr),
-                                      fir::isPolymorphicType(argTy));
+          auto dynamicType = expr->GetType();
+          mlir::Value box;
 
-          if (box.getType().isa<fir::BoxType>() &&
-              fir::isPolymorphicType(argTy)) {
-            // Rebox can only be performed on a present argument.
-            if (arg.isOptional()) {
-              mlir::Value isPresent = genActualIsPresentTest(builder, loc, box);
-              box =
-                  builder
-                      .genIfOp(loc, {argTy}, isPresent, /*withElseRegion=*/true)
-                      .genThen([&]() {
-                        auto rebox = builder
-                                         .create<fir::ReboxOp>(
-                                             loc, argTy, box, mlir::Value{},
-                                             /*slice=*/mlir::Value{})
-                                         .getResult();
-                        builder.create<fir::ResultOp>(loc, rebox);
-                      })
-                      .genElse([&]() {
-                        auto absent = builder.create<fir::AbsentOp>(loc, argTy)
-                                          .getResult();
-                        builder.create<fir::ResultOp>(loc, absent);
-                      })
-                      .getResults()[0];
-            } else {
-              box = builder.create<fir::ReboxOp>(loc, argTy, box, mlir::Value{},
-                                                 /*slice=*/mlir::Value{});
+          // Special case when an intrinsic scalar variable is passed to a
+          // function expecting an optional unlimited polymorphic dummy
+          // argument.
+          // The presence test needs to be performed before emboxing otherwise
+          // the program will crash.
+          if (dynamicType->category() !=
+                  Fortran::common::TypeCategory::Derived &&
+              expr->Rank() == 0 && fir::isUnlimitedPolymorphicType(argTy) &&
+              arg.isOptional()) {
+            ExtValue opt = lowerIntrinsicArgumentAsInquired(*expr);
+            mlir::Value isPresent = genActualIsPresentTest(builder, loc, opt);
+            box =
+                builder
+                    .genIfOp(loc, {argTy}, isPresent, /*withElseRegion=*/true)
+                    .genThen([&]() {
+                      auto boxed = builder.createBox(
+                          loc, genBoxArg(*expr), fir::isPolymorphicType(argTy));
+                      builder.create<fir::ResultOp>(loc, boxed);
+                    })
+                    .genElse([&]() {
+                      auto absent =
+                          builder.create<fir::AbsentOp>(loc, argTy).getResult();
+                      builder.create<fir::ResultOp>(loc, absent);
+                    })
+                    .getResults()[0];
+          } else {
+            // Make sure a variable address is only passed if the expression is
+            // actually a variable.
+            box = Fortran::evaluate::IsVariable(*expr)
+                      ? builder.createBox(loc, genBoxArg(*expr),
+                                          fir::isPolymorphicType(argTy),
+                                          fir::isAssumedType(argTy))
+                      : builder.createBox(getLoc(), genTempExtAddr(*expr),
+                                          fir::isPolymorphicType(argTy),
+                                          fir::isAssumedType(argTy));
+            if (box.getType().isa<fir::BoxType>() &&
+                fir::isPolymorphicType(argTy) && !fir::isAssumedType(argTy)) {
+              mlir::Type actualTy = argTy;
+              if (Fortran::lower::isParentComponent(*expr))
+                actualTy = fir::BoxType::get(converter.genType(*expr));
+              // Rebox can only be performed on a present argument.
+              if (arg.isOptional()) {
+                mlir::Value isPresent =
+                    genActualIsPresentTest(builder, loc, box);
+                box = builder
+                          .genIfOp(loc, {actualTy}, isPresent,
+                                   /*withElseRegion=*/true)
+                          .genThen([&]() {
+                            auto rebox =
+                                builder
+                                    .create<fir::ReboxOp>(
+                                        loc, actualTy, box, mlir::Value{},
+                                        /*slice=*/mlir::Value{})
+                                    .getResult();
+                            builder.create<fir::ResultOp>(loc, rebox);
+                          })
+                          .genElse([&]() {
+                            auto absent =
+                                builder.create<fir::AbsentOp>(loc, actualTy)
+                                    .getResult();
+                            builder.create<fir::ResultOp>(loc, absent);
+                          })
+                          .getResults()[0];
+              } else {
+                box = builder.create<fir::ReboxOp>(loc, actualTy, box,
+                                                   mlir::Value{},
+                                                   /*slice=*/mlir::Value{});
+              }
+            } else if (Fortran::lower::isParentComponent(*expr)) {
+              fir::ExtendedValue newExv =
+                  Fortran::lower::updateBoxForParentComponent(converter, box,
+                                                              *expr);
+              box = fir::getBase(newExv);
             }
           }
           localSymbols.addSymbol(*sym, box);
