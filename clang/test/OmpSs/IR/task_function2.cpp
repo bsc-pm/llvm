@@ -15,7 +15,7 @@ int main() {
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    [[CALL_ARG:%.*]] = alloca ptr, align 8
 // CHECK-NEXT:    store ptr null, ptr [[CALL_ARG]], align 8, !dbg [[DBG9:![0-9]+]]
-// CHECK-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.DEVICE.DEVFUNC"([14 x i8] c"_Z3fooIiEvPT_\00"), "QUAL.OSS.DECL.SOURCE"([23 x i8] c"task_function2.cpp:5:9\00") ], !dbg [[DBG10:![0-9]+]]
+// CHECK-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.DECL.SOURCE"([23 x i8] c"task_function2.cpp:5:9\00") ], !dbg [[DBG10:![0-9]+]]
 // CHECK-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[CALL_ARG]], align 8, !dbg [[DBG9]]
 // CHECK-NEXT:    call void @_Z3fooIiEvPT_(ptr noundef [[TMP1]]), !dbg [[DBG10]]
 // CHECK-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG10]]

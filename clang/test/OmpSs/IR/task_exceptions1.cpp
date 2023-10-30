@@ -18,12 +18,12 @@ void foo() {
 
 // CHECK-LABEL: @main(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE.DEVFUNC"([8 x i8] c"_Z3foov\00"), "QUAL.OSS.DECL.SOURCE"([25 x i8] c"task_exceptions1.cpp:5:9\00") ], !dbg [[DBG12:![0-9]+]]
+// CHECK-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DECL.SOURCE"([25 x i8] c"task_exceptions1.cpp:5:9\00") ], !dbg [[DBG12:![0-9]+]]
 // CHECK-NEXT:    invoke void @_Z3foov()
 // CHECK-NEXT:    to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG12]]
 // CHECK:       invoke.cont:
 // CHECK-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG12]]
-// CHECK-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE.DEVFUNC"([8 x i8] c"_Z3foov\00"), "QUAL.OSS.DECL.SOURCE"([25 x i8] c"task_exceptions1.cpp:5:9\00") ], !dbg [[DBG13:![0-9]+]]
+// CHECK-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DECL.SOURCE"([25 x i8] c"task_exceptions1.cpp:5:9\00") ], !dbg [[DBG13:![0-9]+]]
 // CHECK-NEXT:    invoke void @_Z3foov()
 // CHECK-NEXT:    to label [[INVOKE_CONT1:%.*]] unwind label [[TERMINATE_LPAD2:%.*]], !dbg [[DBG13]]
 // CHECK:       invoke.cont1:

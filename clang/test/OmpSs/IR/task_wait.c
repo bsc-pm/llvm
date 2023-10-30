@@ -12,7 +12,7 @@ void outline();
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.WAIT"(i1 true) ], !dbg [[DBG9:![0-9]+]]
 // LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG10:![0-9]+]]
-// LIN64-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.WAIT"(i1 true), "QUAL.OSS.DEVICE.DEVFUNC"([8 x i8] c"outline\00"), "QUAL.OSS.DECL.SOURCE"([16 x i8] c"task_wait.c:7:9\00") ], !dbg [[DBG11:![0-9]+]]
+// LIN64-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.WAIT"(i1 true), "QUAL.OSS.DECL.SOURCE"([16 x i8] c"task_wait.c:7:9\00") ], !dbg [[DBG11:![0-9]+]]
 // LIN64-NEXT:    call void (...) @outline(), !dbg [[DBG11]]
 // LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP1]]), !dbg [[DBG11]]
 // LIN64-NEXT:    ret void, !dbg [[DBG12:![0-9]+]]
@@ -22,7 +22,7 @@ void outline();
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.WAIT"(i1 true) ], !dbg [[DBG9:![0-9]+]]
 // PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG10:![0-9]+]]
-// PPC64-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.WAIT"(i1 true), "QUAL.OSS.DEVICE.DEVFUNC"([8 x i8] c"outline\00"), "QUAL.OSS.DECL.SOURCE"([16 x i8] c"task_wait.c:7:9\00") ], !dbg [[DBG11:![0-9]+]]
+// PPC64-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.WAIT"(i1 true), "QUAL.OSS.DECL.SOURCE"([16 x i8] c"task_wait.c:7:9\00") ], !dbg [[DBG11:![0-9]+]]
 // PPC64-NEXT:    call void @outline(), !dbg [[DBG11]]
 // PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP1]]), !dbg [[DBG11]]
 // PPC64-NEXT:    ret void, !dbg [[DBG12:![0-9]+]]
@@ -32,7 +32,7 @@ void outline();
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.WAIT"(i1 true) ], !dbg [[DBG9:![0-9]+]]
 // AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG10:![0-9]+]]
-// AARCH64-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.WAIT"(i1 true), "QUAL.OSS.DEVICE.DEVFUNC"([8 x i8] c"outline\00"), "QUAL.OSS.DECL.SOURCE"([16 x i8] c"task_wait.c:7:9\00") ], !dbg [[DBG11:![0-9]+]]
+// AARCH64-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.WAIT"(i1 true), "QUAL.OSS.DECL.SOURCE"([16 x i8] c"task_wait.c:7:9\00") ], !dbg [[DBG11:![0-9]+]]
 // AARCH64-NEXT:    call void @outline(), !dbg [[DBG11]]
 // AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP1]]), !dbg [[DBG11]]
 // AARCH64-NEXT:    ret void, !dbg [[DBG12:![0-9]+]]

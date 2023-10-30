@@ -46,7 +46,7 @@ int main() {
 // LIN64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
 // LIN64-NEXT:    store ptr [[A_ADDR]], ptr [[CALL_ARG]], align 8, !dbg [[DBG11:![0-9]+]]
 // LIN64-NEXT:    store ptr [[THIS1]], ptr [[CALL_ARG2]], align 8, !dbg [[DBG12:![0-9]+]]
-// LIN64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG2]], ptr undef), "QUAL.OSS.DEVICE.DEVFUNC"([12 x i8] c"_Z3barPiP1S\00"), "QUAL.OSS.DEP.IN"(ptr [[CALL_ARG]], [3 x i8] c"*a\00", ptr @compute_dep, ptr [[CALL_ARG]]), "QUAL.OSS.DECL.SOURCE"([15 x i8] c"this1.cpp:16:9\00") ], !dbg [[DBG13:![0-9]+]]
+// LIN64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG2]], ptr undef), "QUAL.OSS.DEP.IN"(ptr [[CALL_ARG]], [3 x i8] c"*a\00", ptr @compute_dep, ptr [[CALL_ARG]]), "QUAL.OSS.DECL.SOURCE"([15 x i8] c"this1.cpp:16:9\00") ], !dbg [[DBG13:![0-9]+]]
 // LIN64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[CALL_ARG]], align 8, !dbg [[DBG11]]
 // LIN64-NEXT:    [[TMP2:%.*]] = load ptr, ptr [[CALL_ARG2]], align 8, !dbg [[DBG12]]
 // LIN64-NEXT:    call void @_Z3barPiP1S(ptr noundef [[TMP1]], ptr noundef [[TMP2]]), !dbg [[DBG13]]
@@ -122,7 +122,7 @@ int main() {
 // PPC64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
 // PPC64-NEXT:    store ptr [[A_ADDR]], ptr [[CALL_ARG]], align 8, !dbg [[DBG11:![0-9]+]]
 // PPC64-NEXT:    store ptr [[THIS1]], ptr [[CALL_ARG2]], align 8, !dbg [[DBG12:![0-9]+]]
-// PPC64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG2]], ptr undef), "QUAL.OSS.DEVICE.DEVFUNC"([12 x i8] c"_Z3barPiP1S\00"), "QUAL.OSS.DEP.IN"(ptr [[CALL_ARG]], [3 x i8] c"*a\00", ptr @compute_dep, ptr [[CALL_ARG]]), "QUAL.OSS.DECL.SOURCE"([15 x i8] c"this1.cpp:16:9\00") ], !dbg [[DBG13:![0-9]+]]
+// PPC64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG2]], ptr undef), "QUAL.OSS.DEP.IN"(ptr [[CALL_ARG]], [3 x i8] c"*a\00", ptr @compute_dep, ptr [[CALL_ARG]]), "QUAL.OSS.DECL.SOURCE"([15 x i8] c"this1.cpp:16:9\00") ], !dbg [[DBG13:![0-9]+]]
 // PPC64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[CALL_ARG]], align 8, !dbg [[DBG11]]
 // PPC64-NEXT:    [[TMP2:%.*]] = load ptr, ptr [[CALL_ARG2]], align 8, !dbg [[DBG12]]
 // PPC64-NEXT:    call void @_Z3barPiP1S(ptr noundef [[TMP1]], ptr noundef [[TMP2]]), !dbg [[DBG13]]
@@ -198,7 +198,7 @@ int main() {
 // AARCH64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
 // AARCH64-NEXT:    store ptr [[A_ADDR]], ptr [[CALL_ARG]], align 8, !dbg [[DBG11:![0-9]+]]
 // AARCH64-NEXT:    store ptr [[THIS1]], ptr [[CALL_ARG2]], align 8, !dbg [[DBG12:![0-9]+]]
-// AARCH64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG2]], ptr undef), "QUAL.OSS.DEVICE.DEVFUNC"([12 x i8] c"_Z3barPiP1S\00"), "QUAL.OSS.DEP.IN"(ptr [[CALL_ARG]], [3 x i8] c"*a\00", ptr @compute_dep, ptr [[CALL_ARG]]), "QUAL.OSS.DECL.SOURCE"([15 x i8] c"this1.cpp:16:9\00") ], !dbg [[DBG13:![0-9]+]]
+// AARCH64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG2]], ptr undef), "QUAL.OSS.DEP.IN"(ptr [[CALL_ARG]], [3 x i8] c"*a\00", ptr @compute_dep, ptr [[CALL_ARG]]), "QUAL.OSS.DECL.SOURCE"([15 x i8] c"this1.cpp:16:9\00") ], !dbg [[DBG13:![0-9]+]]
 // AARCH64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[CALL_ARG]], align 8, !dbg [[DBG11]]
 // AARCH64-NEXT:    [[TMP2:%.*]] = load ptr, ptr [[CALL_ARG2]], align 8, !dbg [[DBG12]]
 // AARCH64-NEXT:    call void @_Z3barPiP1S(ptr noundef [[TMP1]], ptr noundef [[TMP2]]), !dbg [[DBG13]]

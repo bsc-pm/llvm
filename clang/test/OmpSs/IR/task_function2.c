@@ -33,7 +33,7 @@ void bar1(int *p) {
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    [[CALL_ARG:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    store ptr null, ptr [[CALL_ARG]], align 8, !dbg [[DBG11:![0-9]+]]
-// LIN64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo1\00"), "QUAL.OSS.DEP.CONCURRENT"(ptr [[CALL_ARG]], [9 x i8] c"p[1
+// LIN64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.DEP.CONCURRENT"(ptr [[CALL_ARG]], [9 x i8] c"p[1
 // LIN64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[CALL_ARG]], align 8, !dbg [[DBG11]]
 // LIN64-NEXT:    call void @foo1(ptr noundef [[TMP1]]), !dbg [[DBG12:![0-9]+]]
 // LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG12]]
@@ -120,7 +120,7 @@ void bar1(int *p) {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[CALL_ARG:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store ptr null, ptr [[CALL_ARG]], align 8, !dbg [[DBG11:![0-9]+]]
-// PPC64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo1\00"), "QUAL.OSS.DEP.CONCURRENT"(ptr [[CALL_ARG]], [9 x i8] c"p[1
+// PPC64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.DEP.CONCURRENT"(ptr [[CALL_ARG]], [9 x i8] c"p[1
 // PPC64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[CALL_ARG]], align 8, !dbg [[DBG11]]
 // PPC64-NEXT:    call void @foo1(ptr noundef [[TMP1]]), !dbg [[DBG12:![0-9]+]]
 // PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG12]]
@@ -207,7 +207,7 @@ void bar1(int *p) {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[CALL_ARG:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    store ptr null, ptr [[CALL_ARG]], align 8, !dbg [[DBG11:![0-9]+]]
-// AARCH64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo1\00"), "QUAL.OSS.DEP.CONCURRENT"(ptr [[CALL_ARG]], [9 x i8] c"p[1
+// AARCH64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.DEP.CONCURRENT"(ptr [[CALL_ARG]], [9 x i8] c"p[1
 // AARCH64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[CALL_ARG]], align 8, !dbg [[DBG11]]
 // AARCH64-NEXT:    call void @foo1(ptr noundef [[TMP1]]), !dbg [[DBG12:![0-9]+]]
 // AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG12]]

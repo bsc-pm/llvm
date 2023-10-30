@@ -3168,10 +3168,16 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
             CGF.ConvertType(CGF.getContext().IntTy),
             convertDeviceTypeToInt(Attr->getDevice())));
     }
-    TaskInfo.emplace_back(
-      getBundleStr(OSSB_device_dev_func),
-      llvm::ConstantDataArray::getString(
-        CGM.getLLVMContext(), CGF.CGM.getMangledName(GlobalDecl(FD))));
+
+    bool IsCudaPure =
+      Attr->getDevice() == OSSTaskDeclAttr::DeviceType::Cuda &&
+       Attr->ndranges_size() > 0;
+    if (Attr->getDevice() == OSSTaskDeclAttr::DeviceType::Fpga || IsCudaPure) {
+      TaskInfo.emplace_back(
+        getBundleStr(OSSB_device_dev_func),
+        llvm::ConstantDataArray::getString(
+          CGM.getLLVMContext(), CGF.CGM.getMangledName(GlobalDecl(FD))));
+    }
     if (Attr->ndranges_size() > 0) {
       HasNdrange = true;
       SmallVector<llvm::Value *, 4> Result;

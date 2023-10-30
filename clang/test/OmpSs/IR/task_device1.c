@@ -20,7 +20,7 @@ void foo2() {
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 1), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo1\00"), "QUAL.OSS.DEVICE.NDRANGE"(i32 1, i32 1, i32 1), "QUAL.OSS.DEVICE.CALL.ORDER"(), "QUAL.OSS.DECL.SOURCE"([19 x i8] c"task_device1.c:5:9\00") ], !dbg [[DBG11:![0-9]+]]
 // CHECK-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG11]]
-// CHECK-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 1), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo2\00"), "QUAL.OSS.DECL.SOURCE"([19 x i8] c"task_device1.c:8:9\00") ], !dbg [[DBG12:![0-9]+]]
+// CHECK-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 1), "QUAL.OSS.DECL.SOURCE"([19 x i8] c"task_device1.c:8:9\00") ], !dbg [[DBG12:![0-9]+]]
 // CHECK-NEXT:    call void @foo2(), !dbg [[DBG12]]
 // CHECK-NEXT:    call void @llvm.directive.region.exit(token [[TMP1]]), !dbg [[DBG12]]
 // CHECK-NEXT:    ret void, !dbg [[DBG13:![0-9]+]]

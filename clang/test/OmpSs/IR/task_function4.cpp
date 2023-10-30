@@ -22,7 +22,7 @@ int main() {
 // LIN64-NEXT:    [[X:%.*]] = alloca i32, align 4
 // LIN64-NEXT:    [[CALL_ARG:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    store ptr [[X]], ptr [[CALL_ARG]], align 8, !dbg [[DBG9:![0-9]+]]
-// LIN64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.DEVICE.DEVFUNC"([9 x i8] c"_Z3fooPi\00"), "QUAL.OSS.DEP.REDUCTION"(i32 -1, ptr [[CALL_ARG]], [5 x i8] c"[1]p\00", ptr @compute_dep, ptr [[CALL_ARG]]), "QUAL.OSS.DEP.REDUCTION.INIT"(ptr [[CALL_ARG]], ptr @red_init), "QUAL.OSS.DEP.REDUCTION.COMBINE"(ptr [[CALL_ARG]], ptr @red_comb), "QUAL.OSS.DECL.SOURCE"([24 x i8] c"task_function4.cpp:11:9\00") ], !dbg [[DBG10:![0-9]+]]
+// LIN64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.DEP.REDUCTION"(i32 -1, ptr [[CALL_ARG]], [5 x i8] c"[1]p\00", ptr @compute_dep, ptr [[CALL_ARG]]), "QUAL.OSS.DEP.REDUCTION.INIT"(ptr [[CALL_ARG]], ptr @red_init), "QUAL.OSS.DEP.REDUCTION.COMBINE"(ptr [[CALL_ARG]], ptr @red_comb), "QUAL.OSS.DECL.SOURCE"([24 x i8] c"task_function4.cpp:11:9\00") ], !dbg [[DBG10:![0-9]+]]
 // LIN64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[CALL_ARG]], align 8, !dbg [[DBG9]]
 // LIN64-NEXT:    call void @_Z3fooPi(ptr noundef [[TMP1]]), !dbg [[DBG10]]
 // LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG10]]
@@ -111,7 +111,7 @@ int main() {
 // PPC64-NEXT:    [[X:%.*]] = alloca i32, align 4
 // PPC64-NEXT:    [[CALL_ARG:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store ptr [[X]], ptr [[CALL_ARG]], align 8, !dbg [[DBG9:![0-9]+]]
-// PPC64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.DEVICE.DEVFUNC"([9 x i8] c"_Z3fooPi\00"), "QUAL.OSS.DEP.REDUCTION"(i32 -1, ptr [[CALL_ARG]], [5 x i8] c"[1]p\00", ptr @compute_dep, ptr [[CALL_ARG]]), "QUAL.OSS.DEP.REDUCTION.INIT"(ptr [[CALL_ARG]], ptr @red_init), "QUAL.OSS.DEP.REDUCTION.COMBINE"(ptr [[CALL_ARG]], ptr @red_comb), "QUAL.OSS.DECL.SOURCE"([24 x i8] c"task_function4.cpp:11:9\00") ], !dbg [[DBG10:![0-9]+]]
+// PPC64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.DEP.REDUCTION"(i32 -1, ptr [[CALL_ARG]], [5 x i8] c"[1]p\00", ptr @compute_dep, ptr [[CALL_ARG]]), "QUAL.OSS.DEP.REDUCTION.INIT"(ptr [[CALL_ARG]], ptr @red_init), "QUAL.OSS.DEP.REDUCTION.COMBINE"(ptr [[CALL_ARG]], ptr @red_comb), "QUAL.OSS.DECL.SOURCE"([24 x i8] c"task_function4.cpp:11:9\00") ], !dbg [[DBG10:![0-9]+]]
 // PPC64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[CALL_ARG]], align 8, !dbg [[DBG9]]
 // PPC64-NEXT:    call void @_Z3fooPi(ptr noundef [[TMP1]]), !dbg [[DBG10]]
 // PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG10]]
@@ -200,7 +200,7 @@ int main() {
 // AARCH64-NEXT:    [[X:%.*]] = alloca i32, align 4
 // AARCH64-NEXT:    [[CALL_ARG:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    store ptr [[X]], ptr [[CALL_ARG]], align 8, !dbg [[DBG9:![0-9]+]]
-// AARCH64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.DEVICE.DEVFUNC"([9 x i8] c"_Z3fooPi\00"), "QUAL.OSS.DEP.REDUCTION"(i32 -1, ptr [[CALL_ARG]], [5 x i8] c"[1]p\00", ptr @compute_dep, ptr [[CALL_ARG]]), "QUAL.OSS.DEP.REDUCTION.INIT"(ptr [[CALL_ARG]], ptr @red_init), "QUAL.OSS.DEP.REDUCTION.COMBINE"(ptr [[CALL_ARG]], ptr @red_comb), "QUAL.OSS.DECL.SOURCE"([24 x i8] c"task_function4.cpp:11:9\00") ], !dbg [[DBG10:![0-9]+]]
+// AARCH64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], ptr undef), "QUAL.OSS.DEP.REDUCTION"(i32 -1, ptr [[CALL_ARG]], [5 x i8] c"[1]p\00", ptr @compute_dep, ptr [[CALL_ARG]]), "QUAL.OSS.DEP.REDUCTION.INIT"(ptr [[CALL_ARG]], ptr @red_init), "QUAL.OSS.DEP.REDUCTION.COMBINE"(ptr [[CALL_ARG]], ptr @red_comb), "QUAL.OSS.DECL.SOURCE"([24 x i8] c"task_function4.cpp:11:9\00") ], !dbg [[DBG10:![0-9]+]]
 // AARCH64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[CALL_ARG]], align 8, !dbg [[DBG9]]
 // AARCH64-NEXT:    call void @_Z3fooPi(ptr noundef [[TMP1]]), !dbg [[DBG10]]
 // AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG10]]

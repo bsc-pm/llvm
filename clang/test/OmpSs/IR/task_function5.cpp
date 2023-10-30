@@ -20,7 +20,7 @@ int main(){
 // LIN64-NEXT:    [[A:%.*]] = alloca [[STRUCT_HALF:%.*]], align 4
 // LIN64-NEXT:    [[CALL_ARG:%.*]] = alloca [[STRUCT_HALF]], align 4
 // LIN64-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 4 [[CALL_ARG]], ptr align 4 [[A]], i64 4, i1 false), !dbg [[DBG9:![0-9]+]]
-// LIN64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], [[STRUCT_HALF]] undef), "QUAL.OSS.DEVICE.DEVFUNC"([12 x i8] c"_Z3foo4half\00"), "QUAL.OSS.DECL.SOURCE"([23 x i8] c"task_function5.cpp:9:9\00") ], !dbg [[DBG10:![0-9]+]]
+// LIN64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], [[STRUCT_HALF]] undef), "QUAL.OSS.DECL.SOURCE"([23 x i8] c"task_function5.cpp:9:9\00") ], !dbg [[DBG10:![0-9]+]]
 // LIN64-NEXT:    [[AGG_TMP:%.*]] = alloca [[STRUCT_HALF]], align 4
 // LIN64-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 4 [[AGG_TMP]], ptr align 4 [[CALL_ARG]], i64 4, i1 false), !dbg [[DBG9]]
 // LIN64-NEXT:    [[COERCE_DIVE:%.*]] = getelementptr inbounds [[STRUCT_HALF]], ptr [[AGG_TMP]], i32 0, i32 0, !dbg [[DBG10]]
@@ -37,7 +37,7 @@ int main(){
 // PPC64-NEXT:    [[A:%.*]] = alloca [[STRUCT_HALF:%.*]], align 4
 // PPC64-NEXT:    [[CALL_ARG:%.*]] = alloca [[STRUCT_HALF]], align 4
 // PPC64-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 4 [[CALL_ARG]], ptr align 4 [[A]], i64 4, i1 false), !dbg [[DBG9:![0-9]+]]
-// PPC64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], [[STRUCT_HALF]] undef), "QUAL.OSS.DEVICE.DEVFUNC"([12 x i8] c"_Z3foo4half\00"), "QUAL.OSS.DECL.SOURCE"([23 x i8] c"task_function5.cpp:9:9\00") ], !dbg [[DBG10:![0-9]+]]
+// PPC64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], [[STRUCT_HALF]] undef), "QUAL.OSS.DECL.SOURCE"([23 x i8] c"task_function5.cpp:9:9\00") ], !dbg [[DBG10:![0-9]+]]
 // PPC64-NEXT:    [[AGG_TMP:%.*]] = alloca [[STRUCT_HALF]], align 4
 // PPC64-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 4 [[AGG_TMP]], ptr align 4 [[CALL_ARG]], i64 4, i1 false), !dbg [[DBG9]]
 // PPC64-NEXT:    [[COERCE_DIVE:%.*]] = getelementptr inbounds [[STRUCT_HALF]], ptr [[AGG_TMP]], i32 0, i32 0, !dbg [[DBG10]]
@@ -54,7 +54,7 @@ int main(){
 // AARCH64-NEXT:    [[A:%.*]] = alloca [[STRUCT_HALF:%.*]], align 4
 // AARCH64-NEXT:    [[CALL_ARG:%.*]] = alloca [[STRUCT_HALF]], align 4
 // AARCH64-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 4 [[CALL_ARG]], ptr align 4 [[A]], i64 4, i1 false), !dbg [[DBG9:![0-9]+]]
-// AARCH64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], [[STRUCT_HALF]] undef), "QUAL.OSS.DEVICE.DEVFUNC"([12 x i8] c"_Z3foo4half\00"), "QUAL.OSS.DECL.SOURCE"([23 x i8] c"task_function5.cpp:9:9\00") ], !dbg [[DBG10:![0-9]+]]
+// AARCH64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[CALL_ARG]], [[STRUCT_HALF]] undef), "QUAL.OSS.DECL.SOURCE"([23 x i8] c"task_function5.cpp:9:9\00") ], !dbg [[DBG10:![0-9]+]]
 // AARCH64-NEXT:    [[AGG_TMP:%.*]] = alloca [[STRUCT_HALF]], align 4
 // AARCH64-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 4 [[AGG_TMP]], ptr align 4 [[CALL_ARG]], i64 4, i1 false), !dbg [[DBG9]]
 // AARCH64-NEXT:    [[COERCE_DIVE:%.*]] = getelementptr inbounds [[STRUCT_HALF]], ptr [[AGG_TMP]], i32 0, i32 0, !dbg [[DBG10]]
