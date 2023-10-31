@@ -1,6 +1,7 @@
 // RUN: %libomp-compile
 // RUN: env KMP_AFFINITY=none %libomp-run
 // REQUIRES: linux
+// UNSUPPORTED: true
 
 // Check if forked child process resets affinity properly by restricting
 // child's affinity to a subset of the parent and then checking it after

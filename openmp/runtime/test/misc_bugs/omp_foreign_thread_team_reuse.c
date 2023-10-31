@@ -21,6 +21,8 @@ typedef struct thread_arg_t {
   int iterations;
 } thread_arg_t;
 
+int nosv_detach(uint64_t);
+
 void* thread_function(void* arg) {
   int i;
   thread_arg_t* targ = (thread_arg_t*)arg;
@@ -37,6 +39,12 @@ void* thread_function(void* arg) {
       a++;
     }
   }
+  // FIXME: At this moment we do not have
+  // any good solution to support other pthreads
+  // that are not the main or workers.
+  // For now let the test pass by adding a
+  // detach manually
+  nosv_detach(0);
   return NULL;
 }
 

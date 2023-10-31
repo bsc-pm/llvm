@@ -20,6 +20,8 @@
 #include "kmp_stats.h"
 #include "ompt-specific.h"
 
+#include "instrum.h"
+
 #define MAX_MESSAGE 512
 
 // flags will be used in future, e.g. to implement openmp_strict library
@@ -1863,9 +1865,9 @@ There are no implicit barriers in the two "single" calls, rather the compiler
 should introduce an explicit barrier if it is required.
 */
 
-kmp_int32 __kmpc_single(ident_t *loc, kmp_int32 global_tid) {
+kmp_int32 __kmpc_single(ident_t *loc, kmp_int32 global_tid, omp_task_type_t *omp_task_type) {
   __kmp_assert_valid_gtid(global_tid);
-  kmp_int32 rc = __kmp_enter_single(global_tid, loc, TRUE);
+  kmp_int32 rc = __kmp_enter_single(global_tid, loc, TRUE, omp_task_type);
 
   if (rc) {
     // We are going to execute the single statement, so we should count it.
@@ -1916,9 +1918,9 @@ Mark the end of a <tt>single</tt> construct.  This function should
 only be called by the thread that executed the block of code protected
 by the `single` construct.
 */
-void __kmpc_end_single(ident_t *loc, kmp_int32 global_tid) {
+void __kmpc_end_single(ident_t *loc, kmp_int32 global_tid, omp_task_type_t *omp_task_type) {
   __kmp_assert_valid_gtid(global_tid);
-  __kmp_exit_single(global_tid);
+  __kmp_exit_single(global_tid, omp_task_type);
   KMP_POP_PARTITIONED_TIMER();
 
 #if OMPT_SUPPORT && OMPT_OPTIONAL
@@ -1943,7 +1945,7 @@ void __kmpc_end_single(ident_t *loc, kmp_int32 global_tid) {
 
 Mark the end of a statically scheduled loop.
 */
-void __kmpc_for_static_fini(ident_t *loc, kmp_int32 global_tid) {
+void __kmpc_for_static_fini(ident_t *loc, kmp_int32 global_tid, omp_task_type_t *omp_task_type) {
   KMP_POP_PARTITIONED_TIMER();
   KE_TRACE(10, ("__kmpc_for_static_fini called T#%d\n", global_tid));
 
@@ -1973,6 +1975,9 @@ void __kmpc_for_static_fini(ident_t *loc, kmp_int32 global_tid) {
 #endif
   if (__kmp_env_consistency_check)
     __kmp_pop_workshare(global_tid, ct_pdo, loc);
+
+  instr_ws_end((*omp_task_type)->instrum_id);
+  instr_for_static_exit();
 }
 
 // User routines which take C-style arguments (call by value)

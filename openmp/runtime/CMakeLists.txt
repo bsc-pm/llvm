@@ -24,6 +24,7 @@ include(LibompUtils)
 include(LibompGetArchitecture)
 include(LibompHandleFlags)
 include(LibompDefinitions)
+include(LibnosvFinding)
 
 # Determine the target architecture
 if(${OPENMP_STANDALONE_BUILD})

@@ -40,6 +40,7 @@
 #include "llvm/Support/AtomicOrdering.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/ModuleUtils.h"
 #include <cassert>
 #include <cstdint>
 #include <numeric>
@@ -2193,7 +2194,8 @@ void CGOpenMPRuntime::emitSingleRegion(CodeGenFunction &CGF,
                                        ArrayRef<const Expr *> CopyprivateVars,
                                        ArrayRef<const Expr *> SrcExprs,
                                        ArrayRef<const Expr *> DstExprs,
-                                       ArrayRef<const Expr *> AssignmentOps) {
+                                       ArrayRef<const Expr *> AssignmentOps,
+                                       llvm::GlobalVariable *NosvTaskTypeGV) {
   if (!CGF.HaveInsertPoint())
     return;
   assert(CopyprivateVars.size() == SrcExprs.size() &&
@@ -2218,7 +2220,7 @@ void CGOpenMPRuntime::emitSingleRegion(CodeGenFunction &CGF,
     CGF.Builder.CreateStore(CGF.Builder.getInt32(0), DidIt);
   }
   // Prepare arguments and build a call to __kmpc_single
-  llvm::Value *Args[] = {emitUpdateLocation(CGF, Loc), getThreadID(CGF, Loc)};
+  llvm::Value *Args[] = {emitUpdateLocation(CGF, Loc), getThreadID(CGF, Loc), NosvTaskTypeGV};
   CommonActionTy Action(OMPBuilder.getOrCreateRuntimeFunction(
                             CGM.getModule(), OMPRTL___kmpc_single),
                         Args,
@@ -2513,7 +2515,8 @@ static int addMonoNonMonoModifier(CodeGenModule &CGM, OpenMPSchedType Schedule,
 void CGOpenMPRuntime::emitForDispatchInit(
     CodeGenFunction &CGF, SourceLocation Loc,
     const OpenMPScheduleTy &ScheduleKind, unsigned IVSize, bool IVSigned,
-    bool Ordered, const DispatchRTInput &DispatchValues) {
+    bool Ordered, const DispatchRTInput &DispatchValues,
+    llvm::GlobalVariable *NosvTaskTypeGV) {
   if (!CGF.HaveInsertPoint())
     return;
   OpenMPSchedType Schedule = getRuntimeSchedule(
@@ -2538,17 +2541,18 @@ void CGOpenMPRuntime::emitForDispatchInit(
       DispatchValues.LB,                                     // Lower
       DispatchValues.UB,                                     // Upper
       CGF.Builder.getIntN(IVSize, 1),                        // Stride
-      Chunk                                                  // Chunk
+      Chunk,                                                 // Chunk
+      NosvTaskTypeGV                                         // "Task type" of the for
   };
   CGF.EmitRuntimeCall(OMPBuilder.createDispatchInitFunction(IVSize, IVSigned),
                       Args);
 }
 
 static void emitForStaticInitCall(
-    CodeGenFunction &CGF, llvm::Value *UpdateLocation, llvm::Value *ThreadId,
+    CodeGenFunction &CGF, SourceLocation Loc, llvm::Value *UpdateLocation, llvm::Value *ThreadId,
     llvm::FunctionCallee ForStaticInitFunction, OpenMPSchedType Schedule,
     OpenMPScheduleClauseModifier M1, OpenMPScheduleClauseModifier M2,
-    const CGOpenMPRuntime::StaticRTInput &Values) {
+    const CGOpenMPRuntime::StaticRTInput &Values, llvm::GlobalVariable *NosvTaskTypeGV) {
   if (!CGF.HaveInsertPoint())
     return;
 
@@ -2588,7 +2592,8 @@ static void emitForStaticInitCall(
       Values.UB.getPointer(),                           // &UB
       Values.ST.getPointer(),                           // &Stride
       CGF.Builder.getIntN(Values.IVSize, 1),            // Incr
-      Chunk                                             // Chunk
+      Chunk,                                            // Chunk
+      NosvTaskTypeGV                                    // "Task type" of the for
   };
   CGF.EmitRuntimeCall(ForStaticInitFunction, Args);
 }
@@ -2597,7 +2602,9 @@ void CGOpenMPRuntime::emitForStaticInit(CodeGenFunction &CGF,
                                         SourceLocation Loc,
                                         OpenMPDirectiveKind DKind,
                                         const OpenMPScheduleTy &ScheduleKind,
-                                        const StaticRTInput &Values) {
+                                        const StaticRTInput &Values,
+                                        llvm::GlobalVariable *NosvTaskTypeGV) {
+  assert(NosvTaskTypeGV && "task type is null");
   OpenMPSchedType ScheduleNum = getRuntimeSchedule(
       ScheduleKind.Schedule, Values.Chunk != nullptr, Values.Ordered);
   assert((isOpenMPWorksharingDirective(DKind) || (DKind == OMPD_loop)) &&
@@ -2611,14 +2618,16 @@ void CGOpenMPRuntime::emitForStaticInit(CodeGenFunction &CGF,
       OMPBuilder.createForStaticInitFunction(Values.IVSize, Values.IVSigned,
                                              false);
   auto DL = ApplyDebugLocation::CreateDefaultArtificial(CGF, Loc);
-  emitForStaticInitCall(CGF, UpdatedLocation, ThreadId, StaticInitFunction,
-                        ScheduleNum, ScheduleKind.M1, ScheduleKind.M2, Values);
+
+  emitForStaticInitCall(CGF, Loc, UpdatedLocation, ThreadId, StaticInitFunction,
+                        ScheduleNum, ScheduleKind.M1, ScheduleKind.M2, Values, NosvTaskTypeGV);
 }
 
 void CGOpenMPRuntime::emitDistributeStaticInit(
     CodeGenFunction &CGF, SourceLocation Loc,
     OpenMPDistScheduleClauseKind SchedKind,
-    const CGOpenMPRuntime::StaticRTInput &Values) {
+    const CGOpenMPRuntime::StaticRTInput &Values,
+    llvm::GlobalVariable *NosvTaskTypeGV) {
   OpenMPSchedType ScheduleNum =
       getRuntimeSchedule(SchedKind, Values.Chunk != nullptr);
   llvm::Value *UpdatedLocation =
@@ -2631,16 +2640,17 @@ void CGOpenMPRuntime::emitDistributeStaticInit(
   StaticInitFunction = OMPBuilder.createForStaticInitFunction(
       Values.IVSize, Values.IVSigned, isGPUDistribute);
 
-  emitForStaticInitCall(CGF, UpdatedLocation, ThreadId, StaticInitFunction,
+  emitForStaticInitCall(CGF, Loc, UpdatedLocation, ThreadId, StaticInitFunction,
                         ScheduleNum, OMPC_SCHEDULE_MODIFIER_unknown,
-                        OMPC_SCHEDULE_MODIFIER_unknown, Values);
+                        OMPC_SCHEDULE_MODIFIER_unknown, Values, NosvTaskTypeGV);
 }
 
 void CGOpenMPRuntime::emitForStaticFinish(CodeGenFunction &CGF,
                                           SourceLocation Loc,
-                                          OpenMPDirectiveKind DKind) {
+                                          OpenMPDirectiveKind DKind, llvm::GlobalVariable *NosvTaskTypeGV) {
   if (!CGF.HaveInsertPoint())
     return;
+  assert(NosvTaskTypeGV && "task type is null");
   // Call __kmpc_for_static_fini(ident_t *loc, kmp_int32 tid);
   llvm::Value *Args[] = {
       emitUpdateLocation(CGF, Loc,
@@ -2649,7 +2659,7 @@ void CGOpenMPRuntime::emitForStaticFinish(CodeGenFunction &CGF,
                              : isOpenMPLoopDirective(DKind)
                                    ? OMP_IDENT_WORK_LOOP
                                    : OMP_IDENT_WORK_SECTIONS),
-      getThreadID(CGF, Loc)};
+      getThreadID(CGF, Loc), NosvTaskTypeGV};
   auto DL = ApplyDebugLocation::CreateDefaultArtificial(CGF, Loc);
   if (isOpenMPDistributeDirective(DKind) &&
       CGM.getLangOpts().OpenMPIsTargetDevice &&
@@ -2680,7 +2690,8 @@ llvm::Value *CGOpenMPRuntime::emitForNext(CodeGenFunction &CGF,
                                           SourceLocation Loc, unsigned IVSize,
                                           bool IVSigned, Address IL,
                                           Address LB, Address UB,
-                                          Address ST) {
+                                          Address ST,
+                                          llvm::GlobalVariable *NosvTaskTypeGV) {
   // Call __kmpc_dispatch_next(
   //          ident_t *loc, kmp_int32 tid, kmp_int32 *p_lastiter,
   //          kmp_int[32|64] *p_lower, kmp_int[32|64] *p_upper,
@@ -2691,7 +2702,8 @@ llvm::Value *CGOpenMPRuntime::emitForNext(CodeGenFunction &CGF,
       IL.getPointer(), // &isLastIter
       LB.getPointer(), // &Lower
       UB.getPointer(), // &Upper
-      ST.getPointer()  // &Stride
+      ST.getPointer(), // &Stride
+      NosvTaskTypeGV
   };
   llvm::Value *Call = CGF.EmitRuntimeCall(
       OMPBuilder.createDispatchNextFunction(IVSize, IVSigned), Args);
@@ -3604,6 +3616,73 @@ static void getKmpAffinityType(ASTContext &C, QualType &KmpTaskAffinityInfoTy) {
   }
 }
 
+llvm::GlobalVariable *
+CGOpenMPRuntime::emitNosvTaskTypeRegister(CodeGenFunction &CGF, SourceLocation Loc, const Expr *Label) {
+  if (!CtorRegister) {
+    ASTContext &C = CGM.getContext();
+    llvm::LLVMContext &Ctx = CGM.getLLVMContext();
+    QualType PtrTy = CGM.getContext().VoidPtrTy;
+    {
+      FunctionArgList Args;
+      const auto &FnInfo =
+          CGM.getTypes().arrangeBuiltinFunctionDeclaration(C.VoidTy, Args);
+      llvm::FunctionType *FnTy = CGM.getTypes().GetFunctionType(FnInfo);
+      std::string Name = "__kmp_ctor_register_task_info";
+      CtorRegister = llvm::Function::Create(FnTy, llvm::GlobalValue::InternalLinkage,
+                                        Name, &CGM.getModule());
+      llvm::BasicBlock *EntryBB = llvm::BasicBlock::Create(Ctx, "entry", CtorRegister);
+      llvm::Instruction *RetInst = llvm::ReturnInst::Create(Ctx);
+      RetInst->insertInto(EntryBB, EntryBB->end());
+
+      CGM.AddGlobalCtor(CtorRegister);
+    }
+    {
+      FunctionArgList Args;
+      ImplicitParamDecl NosvTaskType(C, /*DC=*/nullptr, SourceLocation(),
+                                   /*Id=*/nullptr, PtrTy, ImplicitParamKind::Other);
+      ImplicitParamDecl OutlineFunc(C, /*DC=*/nullptr, SourceLocation(),
+                                  /*Id=*/nullptr, PtrTy, ImplicitParamKind::Other);
+      Args.push_back(&NosvTaskType);
+      Args.push_back(&OutlineFunc);
+      const auto &FnInfo =
+          CGM.getTypes().arrangeBuiltinFunctionDeclaration(C.VoidTy, Args);
+      llvm::FunctionType *FnTy = CGM.getTypes().GetFunctionType(FnInfo);
+      std::string Name = "__kmpc_register_task_info";
+      NosvRegister = llvm::Function::Create(FnTy, llvm::GlobalValue::ExternalLinkage,
+                                        Name, &CGM.getModule());
+    }
+  }
+  llvm::LLVMContext &Ctx = CGM.getLLVMContext();
+
+  llvm::BasicBlock &EntryBB = CtorRegister->getEntryBlock();
+  llvm::GlobalVariable *NosvTaskTypeGV = new llvm::GlobalVariable(
+    CGM.getModule(), llvm::PointerType::getUnqual(Ctx), /*isConstant=*/false, llvm::GlobalVariable::InternalLinkage,
+    llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(Ctx)));
+  llvm::IRBuilder<> BBBuilder(&EntryBB.back());
+
+  llvm::Value *LabelV = nullptr;
+  if (Label) {
+    LabelV = CGF.EmitScalarExpr(Label);
+  } else {
+    CGDebugInfo *DI = CGF.getDebugInfo();
+    // Get location information.
+    llvm::DebugLoc DbgLoc = DI->SourceLocToDebugLoc(Loc);
+
+    StringRef Name = CGM.getModule().getSourceFileName();
+    // Name = llvm::sys::path::filename(Name);
+    llvm::Constant *LabelC =
+      llvm::ConstantDataArray::getString(
+        CGM.getLLVMContext(),
+        (Name + ":" + Twine(DbgLoc.getLine()) + ":" + Twine(DbgLoc.getCol())).str());
+    LabelV = new llvm::GlobalVariable(
+      CGM.getModule(), LabelC->getType(), /*isConstant=*/true, llvm::GlobalVariable::InternalLinkage,
+      LabelC);
+  }
+  BBBuilder.CreateCall(NosvRegister, {NosvTaskTypeGV, LabelV});
+
+  return NosvTaskTypeGV;
+}
+
 CGOpenMPRuntime::TaskResultTy
 CGOpenMPRuntime::emitTaskInit(CodeGenFunction &CGF, SourceLocation Loc,
                               const OMPExecutableDirective &D,
@@ -3708,6 +3787,8 @@ CGOpenMPRuntime::emitTaskInit(CodeGenFunction &CGF, SourceLocation Loc,
       KmpTaskTWithPrivatesQTy, KmpTaskTQTy, SharedsPtrTy, TaskFunction,
       TaskPrivatesMap);
 
+  llvm::GlobalVariable *NosvTaskTypeGV = emitNosvTaskTypeRegister(CGF, Loc, Data.Label);
+
   // Build call kmp_task_t * __kmpc_omp_task_alloc(ident_t *, kmp_int32 gtid,
   // kmp_int32 flags, size_t sizeof_kmp_task_t, size_t sizeof_shareds,
   // kmp_routine_entry_t *task_entry);
@@ -3744,9 +3825,10 @@ CGOpenMPRuntime::emitTaskInit(CodeGenFunction &CGF, SourceLocation Loc,
   SmallVector<llvm::Value *, 8> AllocArgs = {emitUpdateLocation(CGF, Loc),
       getThreadID(CGF, Loc), TaskFlags, KmpTaskTWithPrivatesTySize,
       SharedsSize, CGF.Builder.CreatePointerBitCastOrAddrSpaceCast(
-          TaskEntry, KmpRoutineEntryPtrTy)};
+          TaskEntry, KmpRoutineEntryPtrTy), NosvTaskTypeGV};
   llvm::Value *NewTask;
   if (D.hasClausesOfKind<OMPNowaitClause>()) {
+    llvm_unreachable("");
     // Check if we have any device clause associated with the directive.
     const Expr *Device = nullptr;
     if (auto *C = D.getSingleClause<OMPDeviceClause>())
@@ -11898,7 +11980,8 @@ void CGOpenMPSIMDRuntime::emitSingleRegion(
     CodeGenFunction &CGF, const RegionCodeGenTy &SingleOpGen,
     SourceLocation Loc, ArrayRef<const Expr *> CopyprivateVars,
     ArrayRef<const Expr *> DestExprs, ArrayRef<const Expr *> SrcExprs,
-    ArrayRef<const Expr *> AssignmentOps) {
+    ArrayRef<const Expr *> AssignmentOps,
+    llvm::GlobalVariable *NosvTaskTypeGV) {
   llvm_unreachable("Not supported in SIMD-only mode");
 }
 
@@ -11920,19 +12003,22 @@ void CGOpenMPSIMDRuntime::emitBarrierCall(CodeGenFunction &CGF,
 void CGOpenMPSIMDRuntime::emitForDispatchInit(
     CodeGenFunction &CGF, SourceLocation Loc,
     const OpenMPScheduleTy &ScheduleKind, unsigned IVSize, bool IVSigned,
-    bool Ordered, const DispatchRTInput &DispatchValues) {
+    bool Ordered, const DispatchRTInput &DispatchValues,
+    llvm::GlobalVariable *NosvTaskTypeGV) {
   llvm_unreachable("Not supported in SIMD-only mode");
 }
 
 void CGOpenMPSIMDRuntime::emitForStaticInit(
     CodeGenFunction &CGF, SourceLocation Loc, OpenMPDirectiveKind DKind,
-    const OpenMPScheduleTy &ScheduleKind, const StaticRTInput &Values) {
+    const OpenMPScheduleTy &ScheduleKind, const StaticRTInput &Values,
+    llvm::GlobalVariable *NosvTaskTypeGV) {
   llvm_unreachable("Not supported in SIMD-only mode");
 }
 
 void CGOpenMPSIMDRuntime::emitDistributeStaticInit(
     CodeGenFunction &CGF, SourceLocation Loc,
-    OpenMPDistScheduleClauseKind SchedKind, const StaticRTInput &Values) {
+    OpenMPDistScheduleClauseKind SchedKind, const StaticRTInput &Values,
+    llvm::GlobalVariable *NosvTaskTypeGV) {
   llvm_unreachable("Not supported in SIMD-only mode");
 }
 
@@ -11945,7 +12031,8 @@ void CGOpenMPSIMDRuntime::emitForOrderedIterationEnd(CodeGenFunction &CGF,
 
 void CGOpenMPSIMDRuntime::emitForStaticFinish(CodeGenFunction &CGF,
                                               SourceLocation Loc,
-                                              OpenMPDirectiveKind DKind) {
+                                              OpenMPDirectiveKind DKind,
+                                              llvm::GlobalVariable *NosvTaskTypeGV) {
   llvm_unreachable("Not supported in SIMD-only mode");
 }
 
@@ -11953,7 +12040,8 @@ llvm::Value *CGOpenMPSIMDRuntime::emitForNext(CodeGenFunction &CGF,
                                               SourceLocation Loc,
                                               unsigned IVSize, bool IVSigned,
                                               Address IL, Address LB,
-                                              Address UB, Address ST) {
+                                              Address UB, Address ST,
+                                              llvm::GlobalVariable *NosvTaskTypeGV) {
   llvm_unreachable("Not supported in SIMD-only mode");
 }
 

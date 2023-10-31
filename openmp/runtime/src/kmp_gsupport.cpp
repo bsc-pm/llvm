@@ -218,7 +218,7 @@ int KMP_EXPAND_NAME(KMP_API_NAME_GOMP_SINGLE_START)(void) {
   // 3rd parameter == FALSE prevents kmp_enter_single from pushing a
   // workshare when USE_CHECKS is defined.  We need to avoid the push,
   // as there is no corresponding GOMP_single_end() call.
-  kmp_int32 rc = __kmp_enter_single(gtid, &loc, FALSE);
+  kmp_int32 rc = __kmp_enter_single(gtid, &loc, FALSE, /*omp_task_type=*/nullptr);
 
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   kmp_info_t *this_thr = __kmp_threads[gtid];
@@ -267,7 +267,7 @@ void *KMP_EXPAND_NAME(KMP_API_NAME_GOMP_SINGLE_COPY_START)(void) {
   // If this is the first thread to enter, return NULL.  The generated code will
   // then call GOMP_single_copy_end() for this thread only, with the
   // copyprivate data pointer as an argument.
-  if (__kmp_enter_single(gtid, &loc, FALSE))
+  if (__kmp_enter_single(gtid, &loc, FALSE, /*omp_task_type=*/nullptr))
     return NULL;
 
     // Wait for the first thread to set the copyprivate data pointer,
@@ -619,7 +619,8 @@ void KMP_EXPAND_NAME(KMP_API_NAME_GOMP_PARALLEL_END)(void) {
       {                                                                        \
         IF_OMPT_SUPPORT(OMPT_STORE_RETURN_ADDRESS(gtid);)                      \
         status = KMP_DISPATCH_NEXT(&loc, gtid, NULL, (kmp_int *)p_lb,          \
-                                   (kmp_int *)p_ub, (kmp_int *)&stride);       \
+                                   (kmp_int *)p_ub, (kmp_int *)&stride,        \
+                                   /*omp_task_type=*/nullptr);                 \
       }                                                                        \
       if (status) {                                                            \
         KMP_DEBUG_ASSERT(stride == str);                                       \
@@ -659,7 +660,8 @@ void KMP_EXPAND_NAME(KMP_API_NAME_GOMP_PARALLEL_END)(void) {
       {                                                                        \
         IF_OMPT_SUPPORT(OMPT_STORE_RETURN_ADDRESS(gtid);)                      \
         status = KMP_DISPATCH_NEXT(&loc, gtid, NULL, (kmp_int *)p_lb,          \
-                                   (kmp_int *)p_ub, (kmp_int *)&stride);       \
+                                   (kmp_int *)p_ub, (kmp_int *)&stride,        \
+                                   /*omp_task_type=*/nullptr);                 \
       }                                                                        \
       if (status) {                                                            \
         KMP_DEBUG_ASSERT(stride == str);                                       \
@@ -692,7 +694,8 @@ void KMP_EXPAND_NAME(KMP_API_NAME_GOMP_PARALLEL_END)(void) {
                                                                                \
     IF_OMPT_SUPPORT(OMPT_STORE_RETURN_ADDRESS(gtid);)                          \
     fini_code status = KMP_DISPATCH_NEXT(&loc, gtid, NULL, (kmp_int *)p_lb,    \
-                                         (kmp_int *)p_ub, (kmp_int *)&stride); \
+                                         (kmp_int *)p_ub, (kmp_int *)&stride,  \
+                                         /*omp_task_type=*/nullptr);           \
     if (status) {                                                              \
       *p_ub += (stride > 0) ? 1 : -1;                                          \
     }                                                                          \
@@ -779,7 +782,8 @@ LOOP_NEXT(KMP_EXPAND_NAME(KMP_API_NAME_GOMP_LOOP_ORDERED_RUNTIME_NEXT),
                         (str > 0) ? (ub - 1) : (ub + 1), str, chunk_sz,        \
                         (schedule) != kmp_sch_static);                         \
       status = KMP_DISPATCH_NEXT(&loc, gtid, NULL, (kmp_int *)p_lb,            \
-                                 (kmp_int *)p_ub, (kmp_int *)&stride);         \
+                                 (kmp_int *)p_ub, (kmp_int *)&stride,          \
+                                 /*omp_task_type=*/nullptr);                   \
       if (status) {                                                            \
         KMP_DEBUG_ASSERT(stride == str);                                       \
         *p_ub += (str > 0) ? 1 : -1;                                           \
@@ -825,7 +829,8 @@ LOOP_NEXT(KMP_EXPAND_NAME(KMP_API_NAME_GOMP_LOOP_ORDERED_RUNTIME_NEXT),
       KMP_DISPATCH_INIT(&loc, gtid, (schedule), lb,                            \
                         (str > 0) ? (ub - 1) : (ub + 1), str, chunk_sz, TRUE); \
       status = KMP_DISPATCH_NEXT(&loc, gtid, NULL, (kmp_int *)p_lb,            \
-                                 (kmp_int *)p_ub, (kmp_int *)&stride);         \
+                                 (kmp_int *)p_ub, (kmp_int *)&stride,          \
+                                 /*omp_task_type=*/nullptr);                   \
       if (status) {                                                            \
         KMP_DEBUG_ASSERT(stride == str);                                       \
         *p_ub += (str > 0) ? 1 : -1;                                           \
@@ -907,7 +912,8 @@ void KMP_EXPAND_NAME(KMP_API_NAME_GOMP_LOOP_END_NOWAIT)(void) {
                             (schedule) != kmp_sch_static);                     \
       status =                                                                 \
           KMP_DISPATCH_NEXT_ULL(&loc, gtid, NULL, (kmp_uint64 *)p_lb,          \
-                                (kmp_uint64 *)p_ub, (kmp_int64 *)&stride);     \
+                                (kmp_uint64 *)p_ub, (kmp_int64 *)&stride,      \
+                                 /*omp_task_type=*/nullptr);                   \
       if (status) {                                                            \
         KMP_DEBUG_ASSERT(stride == str2);                                      \
         *p_ub += (str > 0) ? 1 : -1;                                           \
@@ -945,7 +951,8 @@ void KMP_EXPAND_NAME(KMP_API_NAME_GOMP_LOOP_END_NOWAIT)(void) {
                             TRUE);                                             \
       status =                                                                 \
           KMP_DISPATCH_NEXT_ULL(&loc, gtid, NULL, (kmp_uint64 *)p_lb,          \
-                                (kmp_uint64 *)p_ub, (kmp_int64 *)&stride);     \
+                                (kmp_uint64 *)p_ub, (kmp_int64 *)&stride,      \
+                                /*omp_task_type=*/nullptr);                    \
       if (status) {                                                            \
         KMP_DEBUG_ASSERT((long long)stride == str2);                           \
         *p_ub += (str > 0) ? 1 : -1;                                           \
@@ -972,7 +979,8 @@ void KMP_EXPAND_NAME(KMP_API_NAME_GOMP_LOOP_END_NOWAIT)(void) {
                                                                                \
     fini_code status =                                                         \
         KMP_DISPATCH_NEXT_ULL(&loc, gtid, NULL, (kmp_uint64 *)p_lb,            \
-                              (kmp_uint64 *)p_ub, (kmp_int64 *)&stride);       \
+                              (kmp_uint64 *)p_ub, (kmp_int64 *)&stride,        \
+                              /*omp_task_type=*/nullptr);                      \
     if (status) {                                                              \
       *p_ub += (stride > 0) ? 1 : -1;                                          \
     }                                                                          \
@@ -1070,7 +1078,8 @@ LOOP_NEXT_ULL(KMP_EXPAND_NAME(KMP_API_NAME_GOMP_LOOP_ULL_ORDERED_RUNTIME_NEXT),
                             (schedule) != kmp_sch_static);                     \
       status =                                                                 \
           KMP_DISPATCH_NEXT_ULL(&loc, gtid, NULL, (kmp_uint64 *)p_lb,          \
-                                (kmp_uint64 *)p_ub, (kmp_int64 *)&stride);     \
+                                (kmp_uint64 *)p_ub, (kmp_int64 *)&stride,      \
+                                /*omp_task_type=*/nullptr);                    \
       if (status) {                                                            \
         KMP_DEBUG_ASSERT(stride == str);                                       \
         *p_ub += (str > 0) ? 1 : -1;                                           \
@@ -1118,7 +1127,8 @@ LOOP_NEXT_ULL(KMP_EXPAND_NAME(KMP_API_NAME_GOMP_LOOP_ULL_ORDERED_RUNTIME_NEXT),
                             TRUE);                                             \
       status =                                                                 \
           KMP_DISPATCH_NEXT_ULL(&loc, gtid, NULL, (kmp_uint64 *)p_lb,          \
-                                (kmp_uint64 *)p_ub, (kmp_int64 *)&stride);     \
+                                (kmp_uint64 *)p_ub, (kmp_int64 *)&stride,      \
+                                /*omp_task_type=*/nullptr);                    \
       if (status) {                                                            \
         KMP_DEBUG_ASSERT(stride == str);                                       \
         *p_ub += (str > 0) ? 1 : -1;                                           \
@@ -1249,7 +1259,7 @@ void KMP_EXPAND_NAME(KMP_API_NAME_GOMP_TASK)(void (*func)(void *), void *data,
 
   kmp_task_t *task = __kmp_task_alloc(
       &loc, gtid, input_flags, sizeof(kmp_task_t),
-      arg_size ? arg_size + arg_align - 1 : 0, (kmp_routine_entry_t)func);
+      arg_size ? arg_size + arg_align - 1 : 0, (kmp_routine_entry_t)func, nullptr);
 
   if (arg_size > 0) {
     if (arg_align > 0) {
@@ -1368,7 +1378,7 @@ unsigned KMP_EXPAND_NAME(KMP_API_NAME_GOMP_SECTIONS_START)(unsigned count) {
 
   KMP_DISPATCH_INIT(&loc, gtid, kmp_nm_dynamic_chunked, 1, count, 1, 1, TRUE);
 
-  status = KMP_DISPATCH_NEXT(&loc, gtid, NULL, &lb, &ub, &stride);
+  status = KMP_DISPATCH_NEXT(&loc, gtid, NULL, &lb, &ub, &stride, /*omp_task_entry=*/nullptr);
   if (status) {
     KMP_DEBUG_ASSERT(stride == 1);
     KMP_DEBUG_ASSERT(lb > 0);
@@ -1393,7 +1403,7 @@ unsigned KMP_EXPAND_NAME(KMP_API_NAME_GOMP_SECTIONS_NEXT)(void) {
   OMPT_STORE_RETURN_ADDRESS(gtid);
 #endif
 
-  status = KMP_DISPATCH_NEXT(&loc, gtid, NULL, &lb, &ub, &stride);
+  status = KMP_DISPATCH_NEXT(&loc, gtid, NULL, &lb, &ub, &stride, /*omp_task_type=*/nullptr);
   if (status) {
     KMP_DEBUG_ASSERT(stride == 1);
     KMP_DEBUG_ASSERT(lb > 0);
@@ -1830,7 +1840,7 @@ void __GOMP_taskloop(void (*func)(void *), void *data,
   // __kmp_task_alloc() sets up all other flags
   kmp_task_t *task =
       __kmp_task_alloc(&loc, gtid, input_flags, sizeof(kmp_task_t),
-                       arg_size + arg_align - 1, (kmp_routine_entry_t)func);
+                       arg_size + arg_align - 1, (kmp_routine_entry_t)func, nullptr);
   kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(task);
   taskdata->td_copy_func = copy_func;
   taskdata->td_size_loop_bounds = sizeof(T);

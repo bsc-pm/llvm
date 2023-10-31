@@ -56,6 +56,8 @@ static char *ProfileTraceFile = nullptr;
 #define SHM_SIZE 1024
 #endif
 
+#include "instrum.h"
+
 #if defined(KMP_GOMP_COMPAT)
 char const __kmp_version_alt_comp[] =
     KMP_VERSION_PREFIX "alternative compiler support: yes";
@@ -235,6 +237,115 @@ int __kmp_get_global_thread_id() {
   return i;
 }
 
+const kmp_uint32 TASK_TYPES_SIZE = 8*1024;
+struct omp_task_type task_types[TASK_TYPES_SIZE];
+kmp_uint32 task_types_idx = 0;
+// NOSV instrumentation instruments the thread every
+// nosv_init. This makes ovniemu to fail
+// Avoid initializing more than one time
+kmp_uint32 nosv_initialize_attempt = 0;
+
+void __kmpc_register_task_info(omp_task_type_t &omp_task_type, void *label) {
+  kmp_uint32 cur_nosv_initialize_attempt = KMP_TEST_THEN_ADD32(&nosv_initialize_attempt, 1);
+  if (!cur_nosv_initialize_attempt)
+    nosv_init();
+
+  kmp_uint32 cur_idx = KMP_TEST_THEN_ADD32(&task_types_idx, 1);
+  KMP_ASSERT(cur_idx < TASK_TYPES_SIZE);
+  omp_task_type = &task_types[cur_idx];
+
+  int res;
+  res = nosv_type_init(
+    &omp_task_type->nosv_task_type, &nosv_exec_task, &nosv_end_task, &nosv_complete_task, (const char *)label, NULL, NULL, NOSV_TYPE_INIT_NONE);
+  KMP_ASSERT(res == 0);
+  omp_task_type->instrum_id = cur_idx + 1;
+  omp_task_type->label = (const char *)label;
+
+  instr_type_create(omp_task_type->instrum_id, omp_task_type->label);
+}
+
+static void __kmp_nosv_init() {
+   char *env = getenv("OMP_AFFINITY_MODE");
+   if (env) {
+      if (!strcmp(env, "preferred")) {
+        nosv_default_affinity_type = NOSV_AFFINITY_TYPE_PREFERRED;
+      } else if (!strcmp(env, "strict")) {
+        nosv_default_affinity_type = NOSV_AFFINITY_TYPE_STRICT;
+      } else {
+        fprintf(stderr, "error: OMP_AFFINITY_MODE invalid. Expected \"preferred\" or \"strict\"\n");
+        exit(EXIT_FAILURE);
+      }
+   }
+
+   env = getenv("OMP_AFFINITY_NUMA_ID");
+   if (env) {
+      nosv_default_numa_id = atoi(env);
+      printf("you have selected numa id %d\n", nosv_default_numa_id);
+   }
+
+   env = getenv("OMP_YIELD");
+   if (env) {
+      if (!strcmp(env, "yield")) {
+        nosv_default_yield_type = 0;
+      } else if (!strcmp(env, "schedpoint")) {
+        nosv_default_yield_type = 1;
+      } else if (!strncmp(env, "waitfor=", 8)) {
+        nosv_default_yield_type = 2;
+        nosv_default_waitfor_time = strtoull(env + 8, NULL, 10);
+      } else {
+        fprintf(stderr, "error: OMP_YIELD invalid. Expected \"schedpoint\", \"yield\" or \"waitfor=<time>\"\n");
+        exit(EXIT_FAILURE);
+      }
+   }
+
+   env = getenv("OMP_OVNI");
+   if (env) {
+      nosv_enable_ovni = atoi(env);
+   }
+   intrum_check_ovni();
+
+   //env = getenv("OMP_AFFINITY_LEVEL");
+   //if (env) {
+   //   if (!strcmp(env, "cpu")) {
+   //     nosv_default_affinity_level = NOSV_AFFINITY_LEVEL_CPU;
+   //   } else if (!strcmp(env, "numa")) {
+   //     nosv_default_affinity_level = NOSV_AFFINITY_LEVEL_NUMA;
+   //   } else {
+   //     fprintf(stderr, "error: OMP_AFFINITY_LEVEL invalid. Expected \"numa\" or \"cpu\"\n");
+   //     exit(EXIT_FAILURE);
+   //   }
+   //}
+
+   kmp_uint32 cur_nosv_initialize_attempt = KMP_TEST_THEN_ADD32(&nosv_initialize_attempt, 1);
+   if (!cur_nosv_initialize_attempt)
+     nosv_init();
+
+   // Create nosv omp type once.
+   int res;
+   res = nosv_type_init(
+     &nosv_omp_impl_task_ty, NULL, NULL, NULL, "openmp", NULL, NULL, NOSV_TYPE_INIT_EXTERNAL);
+   KMP_ASSERT(res == 0);
+   // Attach first thread initializing the runtime
+   fprintf(stderr, "__kmp_nosv_init: initialized nosv, initializing openmp runtime, and nosv_attach this thread\n");
+
+   nosv_main_pid = getpid();
+   nosv_is_extenally_attached = nosv_self();
+   if (!nosv_is_extenally_attached) {
+     // Use case: OpenMP may run after other library ctor that uses
+     // nosv. This library could have attached the thread, so we do not
+     // have to attach it again.
+     nosv_task_t nosv_impl_task;
+     __kmp_nosv_attach(&nosv_impl_task, NULL);
+
+     instr_attached_enter();
+   }
+}
+
+__attribute__((constructor))
+static void __kmp_construct_initialization() {
+  __kmp_nosv_init();
+}
+
 int __kmp_get_global_thread_id_reg() {
   int gtid;
 
@@ -271,9 +382,7 @@ int __kmp_get_global_thread_id_reg() {
     __kmp_release_bootstrap_lock(&__kmp_initz_lock);
     /*__kmp_printf( "+++ %d\n", gtid ); */ /* GROO */
   }
-
   KMP_DEBUG_ASSERT(gtid >= 0);
-
   return gtid;
 }
 
@@ -679,10 +788,23 @@ void __kmp_parallel_dxo(int *gtid_ref, int *cid_ref, ident_t *loc_ref) {
 /* ------------------------------------------------------------------------ */
 /* The BARRIER for a SINGLE process section is always explicit   */
 
-int __kmp_enter_single(int gtid, ident_t *id_ref, int push_ws) {
+int __kmp_enter_single(int gtid, ident_t *id_ref, int push_ws, omp_task_type_t *omp_task_type) {
   int status;
   kmp_info_t *th;
   kmp_team_t *team;
+
+  // Be careful with all the exit points of the function to instrument
+  // it properly
+  // We should insert this instrumentation in the user code, since
+  // this violate the subsystem rules.
+  // This is a hack that is almost equivalent since the compiler wraps
+  // the user code with:
+  // if (__kmpc_single) {
+  //   user-code
+  //   __kmpc_end_single
+  // }
+  instr_single_enter();
+  instr_ws_execute((*omp_task_type)->instrum_id);
 
   if (!TCR_4(__kmp_init_parallel))
     __kmp_parallel_initialize();
@@ -729,15 +851,28 @@ int __kmp_enter_single(int gtid, ident_t *id_ref, int push_ws) {
     __kmp_itt_single_start(gtid);
   }
 #endif /* USE_ITT_BUILD */
+
+  // status == 0 means that the thread does not run
+  // the single code. Finish instrumentation here
+  if (!status) {
+    instr_ws_end((*omp_task_type)->instrum_id);
+    instr_single_exit();
+  }
+
   return status;
 }
 
-void __kmp_exit_single(int gtid) {
+void __kmp_exit_single(int gtid, omp_task_type_t *omp_task_type) {
 #if USE_ITT_BUILD
   __kmp_itt_single_end(gtid);
 #endif /* USE_ITT_BUILD */
   if (__kmp_env_consistency_check)
     __kmp_pop_workshare(gtid, ct_psingle, NULL);
+
+  // This function is run once the single user
+  // code has beed executed.
+  instr_ws_end((*omp_task_type)->instrum_id);
+  instr_single_exit();
 }
 
 /* determine if we can go parallel or must use a serialized parallel region and
@@ -4049,10 +4184,22 @@ int __kmp_register_root(int initial_thread) {
   if (ompd_state & OMPD_ENABLE_BP)
     ompd_bp_thread_begin();
 #endif
-
   KMP_MB();
   __kmp_release_bootstrap_lock(&__kmp_forkjoin_lock);
 
+  // main thread is already attached
+  // but newer pthreads that start a parallel
+  // are not
+  if (!nosv_self()) {
+    fprintf(stderr, "WARNING: %d thread is not the main thread nor a worker thread. "
+                    "May you consider adding a nosv_detach at the end of the thread code?\n", gtid);
+    nosv_task_t nosv_impl_task;
+    __kmp_nosv_attach(&nosv_impl_task, NULL);
+
+    instr_attached_enter();
+  }
+
+  __kmp_threads[gtid]->th.th_nosv_task = nosv_self();
   return gtid;
 }
 
@@ -6124,6 +6271,30 @@ void __kmp_internal_end_dest(void *specific_gtid) {
 
 __attribute__((destructor)) void __kmp_internal_end_dtor(void) {
   __kmp_internal_end_atexit();
+  // OpenMP only worths setup nosv_init in the middle initialize,
+  // used for serial task allocation and parallels.
+  // This means that sometimes we may not initialize nosv, so check
+  // this
+  if (nosv_main_pid == getpid()) {
+    fprintf(stderr, "(destructor) __kmp_internal_end_dtor: nosv shutdown and nosv_detach this thread %p\n", nosv_self());
+
+    if (!nosv_is_extenally_attached) {
+      instr_attached_exit();
+      KMP_ASSERT(nosv_self());
+      int res = nosv_detach(NOSV_DETACH_NONE);
+      KMP_ASSERT(res == 0);
+    }
+    nosv_type_destroy(nosv_omp_impl_task_ty, NOSV_TYPE_DESTROY_NONE);
+    for (auto &T : task_types) {
+      if (T.nosv_task_type)
+        nosv_type_destroy(T.nosv_task_type, NOSV_TYPE_DESTROY_NONE);
+    }
+
+    // There is only nosv_init, shutdown one time
+    nosv_shutdown();
+  } else {
+    fprintf(stderr, "WARNING: A thread that is not the main thread is executing the runtime dtor\n");
+  }
 }
 
 #endif

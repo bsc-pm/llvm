@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 typedef struct affinity_mask_t {
   size_t setsize;
   cpu_set_t *set;
@@ -65,14 +66,14 @@ static int affinity_mask_equal(const affinity_mask_t *mask1,
 }
 
 static void get_thread_affinity(affinity_mask_t *mask) {
-  if (sched_getaffinity(0, mask->setsize, mask->set) != 0) {
+  if (pthread_getaffinity_np(pthread_self(), mask->setsize, mask->set) != 0) {
     perror("sched_getaffinity()");
     exit(EXIT_FAILURE);
   }
 }
 
 static void set_thread_affinity(const affinity_mask_t *mask) {
-  if (sched_setaffinity(0, mask->setsize, mask->set) != 0) {
+  if (pthread_setaffinity_np(pthread_self(), mask->setsize, mask->set) != 0) {
     perror("sched_setaffinity()");
     exit(EXIT_FAILURE);
   }

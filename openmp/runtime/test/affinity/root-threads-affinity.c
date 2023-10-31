@@ -75,6 +75,8 @@ int place_and_affinity_match() {
   return 1;
 }
 
+int nosv_detach(uint64_t);
+
 void* thread_func(void *arg) {
   int place, nplaces;
   int root_id = *((int*)arg);
@@ -116,7 +118,7 @@ void* thread_func(void *arg) {
       fprintf(stderr, "error: place and affinity mask do not match for primary thread\n");
       exit (EXIT_FAILURE);
     }
-
+    nosv_detach(0);
   } else { // If worker root thread
     // Worker root threads, register with OpenMP through omp_set_num_threads()
     // if designated to, signal their arrival and then wait for the main root

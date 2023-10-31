@@ -2365,6 +2365,10 @@ void OMPClauseEnqueue::VisitOMPPartialClause(const OMPPartialClause *C) {
   Visitor->AddStmt(C->getFactor());
 }
 
+void OMPClauseEnqueue::VisitOMPLabelClause(const OMPLabelClause *C) {
+  llvm_unreachable("TODO");
+}
+
 void OMPClauseEnqueue::VisitOMPAllocatorClause(const OMPAllocatorClause *C) {
   Visitor->AddStmt(C->getAllocator());
 }

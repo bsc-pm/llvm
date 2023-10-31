@@ -92,9 +92,10 @@ static inline void __kmp_dephash_free(kmp_info_t *thread, kmp_dephash_t *h) {
 extern void __kmpc_give_task(kmp_task_t *ptask, kmp_int32 start);
 
 static inline void __kmp_release_deps(kmp_int32 gtid, kmp_taskdata_t *task) {
-
+  instr_release_deps_enter();
 #if OMPX_TASKGRAPH
   if (task->is_taskgraph && !(__kmp_tdg_is_recording(task->tdg->tdg_status))) {
+
     kmp_node_info_t *TaskInfo = &(task->tdg->record_map[task->td_task_id]);
 
     for (int i = 0; i < TaskInfo->nsuccessors; i++) {
@@ -105,6 +106,8 @@ static inline void __kmp_release_deps(kmp_int32 gtid, kmp_taskdata_t *task) {
         __kmp_omp_task(gtid, successor->task, false);
       }
     }
+
+    instr_release_deps_exit();
     return;
   }
 #endif
@@ -130,8 +133,10 @@ static inline void __kmp_release_deps(kmp_int32 gtid, kmp_taskdata_t *task) {
     task->td_dephash = NULL;
   }
 
-  if (!node)
+  if (!node) {
+    instr_release_deps_exit();
     return;
+  }
 
   KA_TRACE(20, ("__kmp_release_deps: T#%d notifying successors of task %p.\n",
                 gtid, task));
@@ -199,6 +204,8 @@ static inline void __kmp_release_deps(kmp_int32 gtid, kmp_taskdata_t *task) {
   }
 
   __kmp_node_deref(thread, node);
+
+  instr_release_deps_exit();
 
   KA_TRACE(
       20,

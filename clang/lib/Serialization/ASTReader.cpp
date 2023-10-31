@@ -10596,6 +10596,10 @@ void OMPClauseReader::VisitOMPPartialClause(OMPPartialClause *C) {
   C->setLParenLoc(Record.readSourceLocation());
 }
 
+void OMPClauseReader::VisitOMPLabelClause(OMPLabelClause *C) {
+  llvm_unreachable("TODO");
+}
+
 void OMPClauseReader::VisitOMPAllocatorClause(OMPAllocatorClause *C) {
   C->setAllocator(Record.readExpr());
   C->setLParenLoc(Record.readSourceLocation());

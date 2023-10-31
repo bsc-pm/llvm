@@ -53,13 +53,15 @@ typedef struct task {
 } * ptask, kmp_task_t;
 
 typedef int (*task_entry_t)(int, ptask);
+typedef void *nosv_task_type_t;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 extern int __kmpc_global_thread_num(void *id_ref);
+extern void __kmpc_register_task_info(nosv_task_type_t *nosv_task_type, void *label);
 extern int **__kmpc_omp_task_alloc(id *loc, int gtid, int flags, size_t sz,
-                                   size_t shar, task_entry_t rtn);
+                                   size_t shar, task_entry_t rtn, nosv_task_type_t*);
 extern kmp_int32 __kmpc_omp_task(ident_t *loc_ref, kmp_int32 gtid,
                                  kmp_task_t *new_task);
 extern omp_event_handle_t __kmpc_task_allow_completion_event(ident_t *loc_ref,
@@ -93,9 +95,11 @@ int main(int argc, char *argv[]) {
     {}
   */
   std::cout << "detaching...\n";
+  nosv_task_type_t nosv_task_type;
+  __kmpc_register_task_info(&nosv_task_type, NULL);
   ptask task = (ptask)__kmpc_omp_task_alloc(
       nullptr, gtid, PTASK_FLAG_DETACHABLE, sizeof(struct task),
-      sizeof(struct shar), &task_entry);
+      sizeof(struct shar), &task_entry, &nosv_task_type);
   omp_event_handle_t evt =
       (omp_event_handle_t)__kmpc_task_allow_completion_event(nullptr, gtid,
                                                              task);

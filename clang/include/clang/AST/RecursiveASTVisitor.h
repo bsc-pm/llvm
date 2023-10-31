@@ -3236,6 +3236,13 @@ bool RecursiveASTVisitor<Derived>::VisitOMPClauseWithPostUpdate(
 }
 
 template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOMPLabelClause(
+    OMPLabelClause *C) {
+  llvm_unreachable("TODO");
+  return true;
+}
+
+template <typename Derived>
 bool RecursiveASTVisitor<Derived>::VisitOMPAllocatorClause(
     OMPAllocatorClause *C) {
   TRY_TO(TraverseStmt(C->getAllocator()));

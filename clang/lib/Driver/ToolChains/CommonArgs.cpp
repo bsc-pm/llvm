@@ -926,6 +926,8 @@ void tools::addArchSpecificRPath(const ToolChain &TC, const ArgList &Args,
   }
 }
 
+static void addNosvRuntimeLib(const ToolChain &TC, const ArgList &Args, ArgStringList &CmdArgs);
+
 bool tools::addOpenMPRuntime(ArgStringList &CmdArgs, const ToolChain &TC,
                              const ArgList &Args, bool ForceStaticHostRuntime,
                              bool IsOffloadingHost, bool GompNeedsRT) {
@@ -942,6 +944,7 @@ bool tools::addOpenMPRuntime(ArgStringList &CmdArgs, const ToolChain &TC,
   if (ForceStaticHostRuntime)
     CmdArgs.push_back("-Bstatic");
 
+  CmdArgs.push_back("-lnosv");
   switch (RTKind) {
   case Driver::OMPRT_OMP:
     CmdArgs.push_back("-lomp");
@@ -973,6 +976,7 @@ bool tools::addOpenMPRuntime(ArgStringList &CmdArgs, const ToolChain &TC,
 
   addArchSpecificRPath(TC, Args, CmdArgs);
   addOpenMPRuntimeLibraryPath(TC, Args, CmdArgs);
+  addNosvRuntimeLib(TC, Args, CmdArgs);
 
   return true;
 }

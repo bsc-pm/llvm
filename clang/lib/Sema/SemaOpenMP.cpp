@@ -15467,6 +15467,9 @@ OMPClause *Sema::ActOnOpenMPSingleExprClause(OpenMPClauseKind Kind, Expr *Expr,
   case OMPC_message:
     Res = ActOnOpenMPMessageClause(Expr, StartLoc, LParenLoc, EndLoc);
     break;
+  case OMPC_label:
+    Res = ActOnOpenMPLabelClause(Expr, StartLoc, LParenLoc, EndLoc);
+    break;
   case OMPC_align:
     Res = ActOnOpenMPAlignClause(Expr, StartLoc, LParenLoc, EndLoc);
     break;
@@ -17121,6 +17124,20 @@ OMPClause *Sema::ActOnOpenMPMessageClause(Expr *ME, SourceLocation StartLoc,
     return nullptr;
   }
   return new (Context) OMPMessageClause(ME, StartLoc, LParenLoc, EndLoc);
+}
+
+OMPClause *Sema::ActOnOpenMPLabelClause(Expr *ME, SourceLocation StartLoc,
+                                          SourceLocation LParenLoc,
+                                          SourceLocation EndLoc) {
+  assert(ME && "NULL expr in Label clause");
+  SmallVector<Expr *, 2> ClauseVars;
+  ExprResult LabelRes;
+
+  LabelRes = CheckIsConstCharPtrConvertibleExpr(
+    ME, /*ConstConstraint=*/true);
+  ClauseVars.push_back(LabelRes.get());
+
+  return OMPLabelClause::Create(Context, StartLoc, LParenLoc, EndLoc, ClauseVars);
 }
 
 OMPClause *Sema::ActOnOpenMPOrderClause(

@@ -52,10 +52,12 @@ __task_dup_entry(ptask task_dst, ptask task_src, int lastpriv)
 // OpenMP RTL interfaces
 typedef unsigned long long kmp_uint64;
 typedef long long kmp_int64;
+typedef void *omp_task_type_t;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+void __kmpc_register_task_info(omp_task_type_t *omp_task_type, void *label);
 void
 __kmpc_taskloop(ident_t *loc, int gtid, kmp_task_t *task, int if_val,
                 kmp_uint64 *lb, kmp_uint64 *ub, kmp_int64 st,
@@ -63,7 +65,7 @@ __kmpc_taskloop(ident_t *loc, int gtid, kmp_task_t *task, int if_val,
 ptask
 __kmpc_omp_task_alloc( ident_t *loc, int gtid, int flags,
                   size_t sizeof_kmp_task_t, size_t sizeof_shareds,
-                  task_entry_t task_entry );
+                  task_entry_t task_entry, omp_task_type_t*);
 void __kmpc_atomic_fixed4_add(void *id_ref, int gtid, int * lhs, int rhs);
 int  __kmpc_global_thread_num(void *id_ref);
 #ifdef __cplusplus
@@ -115,7 +117,9 @@ int main()
         j = i;
     }
 */
-    task = __kmpc_omp_task_alloc(NULL,gtid,1,sizeof(struct task),sizeof(struct shar),&task_entry);
+    omp_task_type_t omp_task_type;
+    __kmpc_register_task_info(&omp_task_type, NULL);
+    task = __kmpc_omp_task_alloc(NULL,gtid,1,sizeof(struct task),sizeof(struct shar),&task_entry, &omp_task_type);
     psh = task->shareds;
     psh->pth_counter = &th_counter;
     psh->pcounter = &counter;

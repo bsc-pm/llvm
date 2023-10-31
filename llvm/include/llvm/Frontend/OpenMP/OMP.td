@@ -31,6 +31,9 @@ def OpenMP : DirectiveLanguage {
 // Definition of OpenMP clauses
 //===----------------------------------------------------------------------===//
 
+def OMPC_Label : Clause<"label"> {
+  let clangClass = "OMPLabelClause";
+}
 def OMPC_Allocator : Clause<"allocator"> {
   let clangClass = "OMPAllocatorClause";
   let flangClass = "ScalarIntExpr";
@@ -493,7 +496,8 @@ def OMP_Task : Directive<"task"> {
     VersionedClause<OMPC_Default>,
     VersionedClause<OMPC_If>,
     VersionedClause<OMPC_Final>,
-    VersionedClause<OMPC_Priority>
+    VersionedClause<OMPC_Priority>,
+    VersionedClause<OMPC_Label>
   ];
 }
 def OMP_Simd : Directive<"simd"> {
@@ -539,6 +543,9 @@ def OMP_For : Directive<"for"> {
     VersionedClause<OMPC_Allocate>,
     VersionedClause<OMPC_Order, 50>
   ];
+  let allowedOnceClauses = [
+    VersionedClause<OMPC_Label>
+  ];
 }
 def OMP_Do : Directive<"do"> {
   let allowedClauses = [
@@ -574,6 +581,9 @@ def OMP_Single : Directive<"single"> {
     VersionedClause<OMPC_CopyPrivate>,
     VersionedClause<OMPC_NoWait>,
     VersionedClause<OMPC_Allocate>
+  ];
+  let allowedOnceClauses = [
+    VersionedClause<OMPC_Label>
   ];
 }
 def OMP_Master : Directive<"master"> {}

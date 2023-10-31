@@ -68,6 +68,8 @@
 #include <dirent.h>
 #include <fcntl.h>
 
+#include "instrum.h"
+
 struct kmp_sys_timer {
   struct timespec start;
 };
@@ -467,6 +469,57 @@ static kmp_int32 __kmp_set_stack_info(int gtid, kmp_info_t *th) {
   return FALSE;
 }
 
+void numaid_to_nosv_affinity(uint32_t id, nosv_affinity_t *nosv_affinity, nosv_affinity_type_t type)
+{
+	*nosv_affinity = (nosv_affinity_t) {
+		.level = NOSV_AFFINITY_LEVEL_NUMA,
+		.type  = type,
+		.index = id
+	};
+}
+
+void cpuid_to_nosv_affinity(uint32_t id, nosv_affinity_t *nosv_affinity, nosv_affinity_type_t type)
+{
+	*nosv_affinity = (nosv_affinity_t) {
+		.level = NOSV_AFFINITY_LEVEL_CPU,
+		.type  = type,
+		.index = id
+	};
+}
+
+void __kmp_nosv_attach(nosv_task_t *nosv_impl_task, void *thr)
+{
+  int res;
+  // int cpu = -1;
+  nosv_affinity_t nosv_affinity;
+  nosv_affinity_t *pnosv_affinity = &nosv_affinity;
+
+  if (nosv_default_numa_id != -1) {
+    printf("nosv attaching to numa node %d\n", nosv_default_numa_id);
+    numaid_to_nosv_affinity(nosv_default_numa_id, pnosv_affinity, nosv_default_affinity_type);
+  //} else if (thr) { // TODO we are calling this function before thr is
+  //                  // initialized, disabling for now
+  //  int i;
+  //  KMP_CPU_SET_ITERATE(i, (thr->th.th_affin_mask) {
+  //    if (!KMP_CPU_ISSET(i, (thr->th.th_affin_mask)) {
+  //      continue;
+  //    }
+  //    if (cpu == -1) {
+  //      cpu = i;
+  //    } else {
+  //      fprintf(stderr, "warning: nosv affinity: more than one cpu per thread found\n");
+  //      pnosv_affinity = NULL;
+  //    }
+  //  }
+  //  cpuid_to_nosv_affinity((uint32_t) cpu, &nosv_affinity, nosv_default_affinity_type);
+  } else {
+    pnosv_affinity = NULL;
+  }
+
+  res = nosv_attach(nosv_impl_task, nosv_omp_impl_task_ty, 0, pnosv_affinity, NOSV_ATTACH_NONE);
+  KMP_ASSERT(res == 0);
+}
+
 static void *__kmp_launch_worker(void *thr) {
   int status, old_type, old_state;
 #ifdef KMP_BLOCK_SIGNALS
@@ -535,7 +588,26 @@ static void *__kmp_launch_worker(void *thr) {
 
   __kmp_check_stack_overlap((kmp_info_t *)thr);
 
+  int res;
+
+  instr_thread_init();
+  instr_thread_execute(-1, -1, 0);
+
+  nosv_task_t nosv_impl_task;
+  __kmp_nosv_attach(&nosv_impl_task, (kmp_info_t *) thr);
+  ((kmp_info_t *)thr)->th.th_nosv_task = nosv_impl_task;
+
+  instr_attached_enter();
+
   exit_val = __kmp_launch_thread((kmp_info_t *)thr);
+
+  instr_attached_exit();
+
+  res = nosv_detach(NOSV_DETACH_NONE);
+  ((kmp_info_t *)thr)->th.th_nosv_task = NULL;
+  KMP_ASSERT(res == 0);
+
+  instr_thread_end();
 
 #ifdef KMP_BLOCK_SIGNALS
   status = pthread_sigmask(SIG_SETMASK, &old_set, NULL);
@@ -1499,8 +1571,17 @@ static inline void __kmp_suspend_template(int th_gtid, C *flag) {
       KF_TRACE(15, ("__kmp_suspend_template: T#%d about to perform"
                     " pthread_cond_wait\n",
                     th_gtid));
-      status = pthread_cond_wait(&th->th.th_suspend_cv.c_cond,
+      // DTODO : Change this for nosv equivalent
+      if (th->th.th_nosv_task != NULL) {
+        __kmp_unlock_suspend_mx(th);
+        KMP_ASSERT(nosv_self() == th->th.th_nosv_task);
+        status = nosv_pause(0);
+        __kmp_lock_suspend_mx(th);
+      } else {
+        abort();
+        status = pthread_cond_wait(&th->th.th_suspend_cv.c_cond,
                                  &th->th.th_suspend_mx.m_mutex);
+      }
 #endif // USE_SUSPEND_TIMEOUT
 
       if ((status != 0) && (status != EINTR) && (status != ETIMEDOUT)) {
@@ -1664,9 +1745,15 @@ static inline void __kmp_resume_template(int target_gtid, C *flag) {
                  target_gtid, buffer);
   }
 #endif
-  status = pthread_cond_signal(&th->th.th_suspend_cv.c_cond);
-  KMP_CHECK_SYSFAIL("pthread_cond_signal", status);
-  __kmp_unlock_suspend_mx(th);
+  if (th->th.th_nosv_task != NULL) {
+    __kmp_unlock_suspend_mx(th);
+    status = nosv_submit(th->th.th_nosv_task, NOSV_SUBMIT_UNLOCKED);
+  } else {
+    abort();
+    status = pthread_cond_signal(&th->th.th_suspend_cv.c_cond);
+    KMP_CHECK_SYSFAIL("pthread_cond_signal", status);
+    __kmp_unlock_suspend_mx(th);
+  }
   KF_TRACE(30, ("__kmp_resume_template: T#%d exiting after signaling wake up"
                 " for T#%d\n",
                 gtid, target_gtid));
@@ -1724,7 +1811,18 @@ void __kmp_resume_monitor() {
 }
 #endif // KMP_USE_MONITOR
 
-void __kmp_yield() { sched_yield(); }
+void __kmp_yield() {
+	if (nosv_default_yield_type == 0) {
+		nosv_yield(NOSV_YIELD_NONE);
+	} else if (nosv_default_yield_type == 1) {
+		nosv_schedpoint(NOSV_SCHEDPOINT_NONE);
+	} else if (nosv_default_yield_type == 2) {
+		nosv_waitfor(nosv_default_waitfor_time, NULL);
+	} else {
+		fprintf(stderr, "error: nosv_defalt_yield_type invalid\n");
+		exit(EXIT_FAILURE);
+	}
+}
 
 void __kmp_gtid_set_specific(int gtid) {
   if (__kmp_init_gtid) {

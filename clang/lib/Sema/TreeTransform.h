@@ -1972,6 +1972,16 @@ public:
                                               EndLoc);
   }
 
+  /// Build a new OpenMP 'label' clause.
+  ///
+  /// By default, performs semantic analysis to build the new OpenMP clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OMPClause *RebuildOMPLabelClause(Expr *A, SourceLocation StartLoc,
+                                       SourceLocation LParenLoc,
+                                       SourceLocation EndLoc) {
+    return getSema().ActOnOpenMPLabelClause(A, StartLoc, LParenLoc, EndLoc);
+  }
+
   /// Build a new OpenMP 'allocator' clause.
   ///
   /// By default, performs semantic analysis to build the new OpenMP clause.
@@ -9976,6 +9986,22 @@ TreeTransform<Derived>::TransformOMPSafelenClause(OMPSafelenClause *C) {
     return nullptr;
   return getDerived().RebuildOMPSafelenClause(
       E.get(), C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
+}
+
+template <typename Derived>
+OMPClause *
+TreeTransform<Derived>::TransformOMPLabelClause(OMPLabelClause *C) {
+  llvm::SmallVector<Expr *, 16> Vars;
+  Vars.reserve(C->varlist_size());
+  assert(C->varlist_size() == 1);
+  for (auto *VE : C->varlists()) {
+    ExprResult EVar = getDerived().TransformExpr(cast<Expr>(VE));
+    if (EVar.isInvalid())
+      return nullptr;
+    Vars.push_back(EVar.get());
+  }
+  return getDerived().RebuildOMPLabelClause(
+      Vars[0], C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
 }
 
 template <typename Derived>

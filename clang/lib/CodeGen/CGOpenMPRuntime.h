@@ -102,6 +102,7 @@ struct OMPTaskDataTy final {
   SmallVector<const Expr *, 4> ReductionOrigs;
   SmallVector<const Expr *, 4> ReductionCopies;
   SmallVector<const Expr *, 4> ReductionOps;
+  const Expr *Label = nullptr;
   SmallVector<CanonicalDeclPtr<const VarDecl>, 4> PrivateLocals;
   struct DependData {
     OpenMPDependClauseKind DepKind = OMPC_DEPEND_unknown;
@@ -601,6 +602,12 @@ protected:
                             const OMPExecutableDirective &D,
                             llvm::Function *TaskFunction, QualType SharedsTy,
                             Address Shareds, const OMPTaskDataTy &Data);
+  llvm::Function *CtorRegister = nullptr;
+  llvm::Function *NosvRegister = nullptr;
+
+public:
+  llvm::GlobalVariable *emitNosvTaskTypeRegister(CodeGenFunction &CGF, SourceLocation Loc, const Expr *Label);
+protected:
 
   /// Emit update for lastprivate conditional data.
   void emitLastprivateConditionalUpdate(CodeGenFunction &CGF, LValue IVLVal,
@@ -850,7 +857,8 @@ public:
                                 ArrayRef<const Expr *> CopyprivateVars,
                                 ArrayRef<const Expr *> DestExprs,
                                 ArrayRef<const Expr *> SrcExprs,
-                                ArrayRef<const Expr *> AssignmentOps);
+                                ArrayRef<const Expr *> AssignmentOps,
+                                llvm::GlobalVariable *NosvTaskTypeGV);
 
   /// Emit an ordered region.
   /// \param OrderedOpGen Generator for the statement associated with the given
@@ -944,7 +952,8 @@ public:
   virtual void emitForDispatchInit(CodeGenFunction &CGF, SourceLocation Loc,
                                    const OpenMPScheduleTy &ScheduleKind,
                                    unsigned IVSize, bool IVSigned, bool Ordered,
-                                   const DispatchRTInput &DispatchValues);
+                                   const DispatchRTInput &DispatchValues,
+                                   llvm::GlobalVariable *NosvTaskTypeGV);
 
   /// Struct with the values to be passed to the static runtime function
   struct StaticRTInput {
@@ -993,7 +1002,8 @@ public:
   virtual void emitForStaticInit(CodeGenFunction &CGF, SourceLocation Loc,
                                  OpenMPDirectiveKind DKind,
                                  const OpenMPScheduleTy &ScheduleKind,
-                                 const StaticRTInput &Values);
+                                 const StaticRTInput &Values,
+                                 llvm::GlobalVariable *NosvTaskTypeGV);
 
   ///
   /// \param CGF Reference to current CodeGenFunction.
@@ -1004,7 +1014,8 @@ public:
   virtual void emitDistributeStaticInit(CodeGenFunction &CGF,
                                         SourceLocation Loc,
                                         OpenMPDistScheduleClauseKind SchedKind,
-                                        const StaticRTInput &Values);
+                                        const StaticRTInput &Values,
+                                        llvm::GlobalVariable *NosvTaskTypeGV);
 
   /// Call the appropriate runtime routine to notify that we finished
   /// iteration of the ordered loop with the dynamic scheduling.
@@ -1026,7 +1037,7 @@ public:
   /// \param DKind Kind of the directive for which the static finish is emitted.
   ///
   virtual void emitForStaticFinish(CodeGenFunction &CGF, SourceLocation Loc,
-                                   OpenMPDirectiveKind DKind);
+                                   OpenMPDirectiveKind DKind, llvm::GlobalVariable *NosvTaskTypeGV);
 
   /// Call __kmpc_dispatch_next(
   ///          ident_t *loc, kmp_int32 tid, kmp_int32 *p_lastiter,
@@ -1045,7 +1056,8 @@ public:
   virtual llvm::Value *emitForNext(CodeGenFunction &CGF, SourceLocation Loc,
                                    unsigned IVSize, bool IVSigned,
                                    Address IL, Address LB,
-                                   Address UB, Address ST);
+                                   Address UB, Address ST,
+                                   llvm::GlobalVariable *NosvTaskTypeGV);
 
   /// Emits call to void __kmpc_push_num_threads(ident_t *loc, kmp_int32
   /// global_tid, kmp_int32 num_threads) to generate code for 'num_threads'
@@ -1792,7 +1804,8 @@ public:
                         ArrayRef<const Expr *> CopyprivateVars,
                         ArrayRef<const Expr *> DestExprs,
                         ArrayRef<const Expr *> SrcExprs,
-                        ArrayRef<const Expr *> AssignmentOps) override;
+                        ArrayRef<const Expr *> AssignmentOps,
+                        llvm::GlobalVariable *NosvTaskTypeGV) override;
 
   /// Emit an ordered region.
   /// \param OrderedOpGen Generator for the statement associated with the given
@@ -1832,7 +1845,8 @@ public:
   void emitForDispatchInit(CodeGenFunction &CGF, SourceLocation Loc,
                            const OpenMPScheduleTy &ScheduleKind,
                            unsigned IVSize, bool IVSigned, bool Ordered,
-                           const DispatchRTInput &DispatchValues) override;
+                           const DispatchRTInput &DispatchValues,
+                           llvm::GlobalVariable *NosvTaskTypeGV) override;
 
   /// Call the appropriate runtime routine to initialize it before start
   /// of loop.
@@ -1852,7 +1866,8 @@ public:
   void emitForStaticInit(CodeGenFunction &CGF, SourceLocation Loc,
                          OpenMPDirectiveKind DKind,
                          const OpenMPScheduleTy &ScheduleKind,
-                         const StaticRTInput &Values) override;
+                         const StaticRTInput &Values,
+                         llvm::GlobalVariable *NosvTaskTypeGV) override;
 
   ///
   /// \param CGF Reference to current CodeGenFunction.
@@ -1862,7 +1877,8 @@ public:
   ///
   void emitDistributeStaticInit(CodeGenFunction &CGF, SourceLocation Loc,
                                 OpenMPDistScheduleClauseKind SchedKind,
-                                const StaticRTInput &Values) override;
+                                const StaticRTInput &Values,
+                                llvm::GlobalVariable *NosvTaskTypeGV) override;
 
   /// Call the appropriate runtime routine to notify that we finished
   /// iteration of the ordered loop with the dynamic scheduling.
@@ -1883,7 +1899,7 @@ public:
   /// \param DKind Kind of the directive for which the static finish is emitted.
   ///
   void emitForStaticFinish(CodeGenFunction &CGF, SourceLocation Loc,
-                           OpenMPDirectiveKind DKind) override;
+                           OpenMPDirectiveKind DKind, llvm::GlobalVariable *NosvTaskTypeGV) override;
 
   /// Call __kmpc_dispatch_next(
   ///          ident_t *loc, kmp_int32 tid, kmp_int32 *p_lastiter,
@@ -1901,7 +1917,8 @@ public:
   /// returned.
   llvm::Value *emitForNext(CodeGenFunction &CGF, SourceLocation Loc,
                            unsigned IVSize, bool IVSigned, Address IL,
-                           Address LB, Address UB, Address ST) override;
+                           Address LB, Address UB, Address ST,
+                           llvm::GlobalVariable *NosvTaskTypeGV) override;
 
   /// Emits call to void __kmpc_push_num_threads(ident_t *loc, kmp_int32
   /// global_tid, kmp_int32 num_threads) to generate code for 'num_threads'

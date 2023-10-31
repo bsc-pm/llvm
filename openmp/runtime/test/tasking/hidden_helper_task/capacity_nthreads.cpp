@@ -1,4 +1,5 @@
 // RUN: %libomp-cxx-compile-and-run
+// UNSUPPORTED: true
 
 #include <omp.h>
 

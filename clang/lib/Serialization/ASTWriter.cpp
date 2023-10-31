@@ -6547,6 +6547,10 @@ void OMPClauseWriter::VisitOMPPartialClause(OMPPartialClause *C) {
   Record.AddSourceLocation(C->getLParenLoc());
 }
 
+void OMPClauseWriter::VisitOMPLabelClause(OMPLabelClause *C) {
+  llvm_unreachable("TODO");
+}
+
 void OMPClauseWriter::VisitOMPAllocatorClause(OMPAllocatorClause *C) {
   Record.AddStmt(C->getAllocator());
   Record.AddSourceLocation(C->getLParenLoc());

@@ -338,6 +338,23 @@ OMPClause::child_range OMPNocontextClause::used_children() {
   return children();
 }
 
+OMPLabelClause *OMPLabelClause::Create(const ASTContext &C,
+                                         SourceLocation StartLoc,
+                                         SourceLocation LParenLoc,
+                                         SourceLocation EndLoc,
+                                         ArrayRef<Expr *> VL) {
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(VL.size()));
+  OMPLabelClause *Clause =
+      new (Mem) OMPLabelClause(StartLoc, LParenLoc, EndLoc, VL.size());
+  Clause->setVarRefs(VL);
+  return Clause;
+}
+
+OMPLabelClause *OMPLabelClause::CreateEmpty(const ASTContext &C, unsigned N) {
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(N));
+  return new (Mem) OMPLabelClause(N);
+}
+
 OMPOrderedClause *OMPOrderedClause::Create(const ASTContext &C, Expr *Num,
                                            unsigned NumLoops,
                                            SourceLocation StartLoc,
@@ -1782,6 +1799,13 @@ void OMPClausePrinter::VisitOMPPartialClause(OMPPartialClause *Node) {
     Factor->printPretty(OS, nullptr, Policy, 0);
     OS << ')';
   }
+}
+
+void OMPClausePrinter::VisitOMPLabelClause(OMPLabelClause *Node) {
+  llvm_unreachable("TODO");
+  // OS << "label(";
+  // Node->getLabel()->printPretty(OS, nullptr, Policy, 0);
+  // OS << ")";
 }
 
 void OMPClausePrinter::VisitOMPAllocatorClause(OMPAllocatorClause *Node) {

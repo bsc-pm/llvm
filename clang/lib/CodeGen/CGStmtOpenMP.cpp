@@ -2811,7 +2811,8 @@ void CodeGenFunction::EmitOMPOuterLoop(
     CodeGenFunction::OMPPrivateScope &LoopScope,
     const CodeGenFunction::OMPLoopArguments &LoopArgs,
     const CodeGenFunction::CodeGenLoopTy &CodeGenLoop,
-    const CodeGenFunction::CodeGenOrderedTy &CodeGenOrdered) {
+    const CodeGenFunction::CodeGenOrderedTy &CodeGenOrdered,
+    llvm::GlobalVariable *NosvTaskTypeGV) {
   CGOpenMPRuntime &RT = CGM.getOpenMPRuntime();
 
   const Expr *IVExpr = S.getIterationVariable();
@@ -2841,7 +2842,7 @@ void CodeGenFunction::EmitOMPOuterLoop(
   } else {
     BoolCondVal =
         RT.emitForNext(*this, S.getBeginLoc(), IVSize, IVSigned, LoopArgs.IL,
-                       LoopArgs.LB, LoopArgs.UB, LoopArgs.ST);
+                       LoopArgs.LB, LoopArgs.UB, LoopArgs.ST, NosvTaskTypeGV);
   }
 
   // If there are any cleanups between here and the loop-exit scope,
@@ -2914,10 +2915,10 @@ void CodeGenFunction::EmitOMPOuterLoop(
   EmitBlock(LoopExit.getBlock());
 
   // Tell the runtime we are done.
-  auto &&CodeGen = [DynamicOrOrdered, &S](CodeGenFunction &CGF) {
+  auto &&CodeGen = [DynamicOrOrdered, &S, NosvTaskTypeGV](CodeGenFunction &CGF) {
     if (!DynamicOrOrdered)
       CGF.CGM.getOpenMPRuntime().emitForStaticFinish(CGF, S.getEndLoc(),
-                                                     S.getDirectiveKind());
+                                                     S.getDirectiveKind(), NosvTaskTypeGV);
   };
   OMPCancelStack.emitExit(*this, S.getDirectiveKind(), CodeGen);
 }
@@ -2989,7 +2990,14 @@ void CodeGenFunction::EmitOMPForOuterLoop(
   const Expr *IVExpr = S.getIterationVariable();
   const unsigned IVSize = getContext().getTypeSize(IVExpr->getType());
   const bool IVSigned = IVExpr->getType()->hasSignedIntegerRepresentation();
-
+  // Check if the for has 'label' clause.
+  const Expr *LabelE = nullptr;
+  if (const auto *Clause = S.getSingleClause<OMPLabelClause>()) {
+    assert(Clause->varlist_size() == 1);
+    for (auto *VE : Clause->varlists())
+      LabelE = VE;
+  }
+  llvm::GlobalVariable *NosvTaskTypeGV = CGM.getOpenMPRuntime().emitNosvTaskTypeRegister(*this, S.getBeginLoc(), LabelE);
   if (DynamicOrOrdered) {
     const std::pair<llvm::Value *, llvm::Value *> DispatchBounds =
         CGDispatchBounds(*this, S, LoopArgs.LB, LoopArgs.UB);
@@ -2998,13 +3006,13 @@ void CodeGenFunction::EmitOMPForOuterLoop(
     CGOpenMPRuntime::DispatchRTInput DipatchRTInputValues = {LBVal, UBVal,
                                                              LoopArgs.Chunk};
     RT.emitForDispatchInit(*this, S.getBeginLoc(), ScheduleKind, IVSize,
-                           IVSigned, Ordered, DipatchRTInputValues);
+                           IVSigned, Ordered, DipatchRTInputValues, NosvTaskTypeGV);
   } else {
     CGOpenMPRuntime::StaticRTInput StaticInit(
         IVSize, IVSigned, Ordered, LoopArgs.IL, LoopArgs.LB, LoopArgs.UB,
         LoopArgs.ST, LoopArgs.Chunk);
     RT.emitForStaticInit(*this, S.getBeginLoc(), S.getDirectiveKind(),
-                         ScheduleKind, StaticInit);
+                         ScheduleKind, StaticInit, NosvTaskTypeGV);
   }
 
   auto &&CodeGenOrdered = [Ordered](CodeGenFunction &CGF, SourceLocation Loc,
@@ -3024,7 +3032,7 @@ void CodeGenFunction::EmitOMPForOuterLoop(
   OuterLoopArgs.NextLB = S.getNextLowerBound();
   OuterLoopArgs.NextUB = S.getNextUpperBound();
   EmitOMPOuterLoop(DynamicOrOrdered, IsMonotonic, S, LoopScope, OuterLoopArgs,
-                   emitOMPLoopBodyWithStopPoint, CodeGenOrdered);
+                   emitOMPLoopBodyWithStopPoint, CodeGenOrdered, NosvTaskTypeGV);
 }
 
 static void emitEmptyOrdered(CodeGenFunction &, SourceLocation Loc,
@@ -3049,7 +3057,15 @@ void CodeGenFunction::EmitOMPDistributeOuterLoop(
   CGOpenMPRuntime::StaticRTInput StaticInit(
       IVSize, IVSigned, /* Ordered = */ false, LoopArgs.IL, LoopArgs.LB,
       LoopArgs.UB, LoopArgs.ST, LoopArgs.Chunk);
-  RT.emitDistributeStaticInit(*this, S.getBeginLoc(), ScheduleKind, StaticInit);
+  // Check if the for has 'label' clause.
+  const Expr *LabelE = nullptr;
+  if (const auto *Clause = S.getSingleClause<OMPLabelClause>()) {
+    assert(Clause->varlist_size() == 1);
+    for (auto *VE : Clause->varlists())
+      LabelE = VE;
+  }
+  llvm::GlobalVariable *NosvTaskTypeGV = CGM.getOpenMPRuntime().emitNosvTaskTypeRegister(*this, S.getBeginLoc(), LabelE);
+  RT.emitDistributeStaticInit(*this, S.getBeginLoc(), ScheduleKind, StaticInit, NosvTaskTypeGV);
 
   // for combined 'distribute' and 'for' the increment expression of distribute
   // is stored in DistInc. For 'distribute' alone, it is in Inc.
@@ -3087,7 +3103,7 @@ void CodeGenFunction::EmitOMPDistributeOuterLoop(
 
   EmitOMPOuterLoop(/* DynamicOrOrdered = */ false, /* IsMonotonic = */ false, S,
                    LoopScope, OuterLoopArgs, CodeGenLoopContent,
-                   emitEmptyOrdered);
+                   emitEmptyOrdered, NosvTaskTypeGV);
 }
 
 static std::pair<LValue, LValue>
@@ -3397,6 +3413,16 @@ bool CodeGenFunction::EmitOMPWorksharingLoop(
                                  /* Chunked */ Chunk != nullptr) ||
            StaticChunkedOne) &&
           !Ordered) {
+
+        // Check if the for has 'label' clause.
+        const Expr *LabelE = nullptr;
+        if (const auto *Clause = S.getSingleClause<OMPLabelClause>()) {
+          assert(Clause->varlist_size() == 1);
+          for (auto *VE : Clause->varlists())
+            LabelE = VE;
+        }
+        llvm::GlobalVariable *NosvTaskTypeGV = CGM.getOpenMPRuntime().emitNosvTaskTypeRegister(*this, S.getBeginLoc(), LabelE);
+
         JumpDest LoopExit =
             getJumpDestInCurrentScope(createBasicBlock("omp.loop.exit"));
         emitCommonSimdLoop(
@@ -3411,7 +3437,7 @@ bool CodeGenFunction::EmitOMPWorksharingLoop(
             },
             [IVSize, IVSigned, Ordered, IL, LB, UB, ST, StaticChunkedOne, Chunk,
              &S, ScheduleKind, LoopExit,
-             &LoopScope](CodeGenFunction &CGF, PrePostActionTy &) {
+             &LoopScope, NosvTaskTypeGV](CodeGenFunction &CGF, PrePostActionTy &) {
               // OpenMP [2.7.1, Loop Construct, Description, table 2-1]
               // When no chunk_size is specified, the iteration space is divided
               // into chunks that are approximately equal in size, and at most
@@ -3423,7 +3449,7 @@ bool CodeGenFunction::EmitOMPWorksharingLoop(
                   StaticChunkedOne ? Chunk : nullptr);
               CGF.CGM.getOpenMPRuntime().emitForStaticInit(
                   CGF, S.getBeginLoc(), S.getDirectiveKind(), ScheduleKind,
-                  StaticInit);
+                  StaticInit, NosvTaskTypeGV);
               // UB = min(UB, GlobalUB);
               if (!StaticChunkedOne)
                 CGF.EmitIgnoredExpr(S.getEnsureUpperBound());
@@ -3454,9 +3480,9 @@ bool CodeGenFunction::EmitOMPWorksharingLoop(
             });
         EmitBlock(LoopExit.getBlock());
         // Tell the runtime we are done.
-        auto &&CodeGen = [&S](CodeGenFunction &CGF) {
+        auto &&CodeGen = [&S, NosvTaskTypeGV](CodeGenFunction &CGF) {
           CGF.CGM.getOpenMPRuntime().emitForStaticFinish(CGF, S.getEndLoc(),
-                                                         S.getDirectiveKind());
+                                                         S.getDirectiveKind(), NosvTaskTypeGV);
         };
         OMPCancelStack.emitExit(*this, S.getDirectiveKind(), CodeGen);
       } else {
@@ -4071,8 +4097,9 @@ void CodeGenFunction::EmitSections(const OMPExecutableDirective &S) {
     CGOpenMPRuntime::StaticRTInput StaticInit(
         /*IVSize=*/32, /*IVSigned=*/true, /*Ordered=*/false, IL.getAddress(CGF),
         LB.getAddress(CGF), UB.getAddress(CGF), ST.getAddress(CGF));
+    llvm::GlobalVariable *NosvTaskTypeGV = CGF.CGM.getOpenMPRuntime().emitNosvTaskTypeRegister(CGF, S.getBeginLoc(), /*Label=*/nullptr);
     CGF.CGM.getOpenMPRuntime().emitForStaticInit(
-        CGF, S.getBeginLoc(), S.getDirectiveKind(), ScheduleKind, StaticInit);
+        CGF, S.getBeginLoc(), S.getDirectiveKind(), ScheduleKind, StaticInit, NosvTaskTypeGV);
     // UB = min(UB, GlobalUB);
     llvm::Value *UBVal = CGF.EmitLoadOfScalar(UB, S.getBeginLoc());
     llvm::Value *MinUBGlobalUB = CGF.Builder.CreateSelect(
@@ -4084,9 +4111,9 @@ void CodeGenFunction::EmitSections(const OMPExecutableDirective &S) {
     CGF.EmitOMPInnerLoop(S, /*RequiresCleanup=*/false, Cond, Inc, BodyGen,
                          [](CodeGenFunction &) {});
     // Tell the runtime we are done.
-    auto &&CodeGen = [&S](CodeGenFunction &CGF) {
+    auto &&CodeGen = [&S, NosvTaskTypeGV](CodeGenFunction &CGF) {
       CGF.CGM.getOpenMPRuntime().emitForStaticFinish(CGF, S.getEndLoc(),
-                                                     S.getDirectiveKind());
+                                                     S.getDirectiveKind(), NosvTaskTypeGV);
     };
     CGF.OMPCancelStack.emitExit(CGF, S.getDirectiveKind(), CodeGen);
     CGF.EmitOMPReductionClauseFinal(S, /*ReductionKind=*/OMPD_parallel);
@@ -4249,9 +4276,18 @@ void CodeGenFunction::EmitOMPSingleDirective(const OMPSingleDirective &S) {
     auto LPCRegion =
         CGOpenMPRuntime::LastprivateConditionalRAII::disable(*this, S);
     OMPLexicalScope Scope(*this, S, OMPD_unknown);
+    // Check if the single has 'label' clause.
+    const Expr *LabelE = nullptr;
+    if (const auto *Clause = S.getSingleClause<OMPLabelClause>()) {
+      assert(Clause->varlist_size() == 1);
+      for (auto *VE : Clause->varlists())
+        LabelE = VE;
+    }
+    llvm::GlobalVariable *NosvTaskTypeGV = CGM.getOpenMPRuntime().emitNosvTaskTypeRegister(*this, S.getBeginLoc(), LabelE);
     CGM.getOpenMPRuntime().emitSingleRegion(*this, CodeGen, S.getBeginLoc(),
                                             CopyprivateVars, DestExprs,
-                                            SrcExprs, AssignmentOps);
+                                            SrcExprs, AssignmentOps,
+                                            NosvTaskTypeGV);
   }
   // Emit an implicit barrier at the end (to avoid data race on firstprivate
   // init or if no 'nowait' clause was specified and no 'copyprivate' clause).
@@ -4640,6 +4676,11 @@ void CodeGenFunction::EmitOMPTaskBasedDirective(
         EmitScalarExpr(Prio), Prio->getType(),
         getContext().getIntTypeForBitwidth(/*DestWidth=*/32, /*Signed=*/1),
         Prio->getExprLoc()));
+  }
+  // Check if the task has 'label' clause.
+  if (const auto *Clause = S.getSingleClause<OMPLabelClause>()) {
+    const Expr *Prio = *Clause->varlist_begin();
+    Data.Label = Prio;
   }
   // The first function argument for tasks is a thread id, the second one is a
   // part id (0 for tied tasks, >=0 for untied task).
@@ -5721,8 +5762,16 @@ void CodeGenFunction::EmitOMPDistributeLoop(const OMPLoopDirective &S,
             IVSize, IVSigned, /* Ordered = */ false, IL.getAddress(*this),
             LB.getAddress(*this), UB.getAddress(*this), ST.getAddress(*this),
             StaticChunked ? Chunk : nullptr);
+        // Check if the for has 'label' clause.
+        const Expr *LabelE = nullptr;
+        if (const auto *Clause = S.getSingleClause<OMPLabelClause>()) {
+          assert(Clause->varlist_size() == 1);
+          for (auto *VE : Clause->varlists())
+            LabelE = VE;
+        }
+        llvm::GlobalVariable *NosvTaskTypeGV = CGM.getOpenMPRuntime().emitNosvTaskTypeRegister(*this, S.getBeginLoc(), LabelE);
         RT.emitDistributeStaticInit(*this, S.getBeginLoc(), ScheduleKind,
-                                    StaticInit);
+                                    StaticInit, NosvTaskTypeGV);
         JumpDest LoopExit =
             getJumpDestInCurrentScope(createBasicBlock("omp.loop.exit"));
         // UB = min(UB, GlobalUB);
@@ -5790,7 +5839,7 @@ void CodeGenFunction::EmitOMPDistributeLoop(const OMPLoopDirective &S,
             });
         EmitBlock(LoopExit.getBlock());
         // Tell the runtime we are done.
-        RT.emitForStaticFinish(*this, S.getEndLoc(), S.getDirectiveKind());
+        RT.emitForStaticFinish(*this, S.getEndLoc(), S.getDirectiveKind(), NosvTaskTypeGV);
       } else {
         // Emit the outer loop, which requests its work chunk [LB..UB] from
         // runtime and runs the inner loop to process it.

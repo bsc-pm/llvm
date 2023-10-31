@@ -4589,6 +4589,12 @@ bool CompilerInvocation::CreateFromArgsImpl(
     Res.getCodeGenOpts().setDebugInfo(llvm::codegenoptions::LocTrackingOnly);
   }
 
+  // OmpSs, force line debug info
+  if (LangOpts.OpenMP
+      && Res.getCodeGenOpts().getDebugInfo() == llvm::codegenoptions::NoDebugInfo) {
+    Res.getCodeGenOpts().setDebugInfo(llvm::codegenoptions::LocTrackingOnly);
+  }
+
   // FIXME: Override value name discarding when asan or msan is used because the
   // backend passes depend on the name of the alloca in order to print out
   // names.

@@ -1,5 +1,12 @@
 // RUN: %libomp-compile-and-run | FileCheck %s
 // REQUIRES: ompt
+// UNSUPPORTED: true
+
+// Untied tasks and serialized parallels
+// are not supported.
+// Serialized parallel execute inline the task
+// and untied tasks schedule schedule again the task
+// so there are two __kmpc_omp_task executed inline
 
 #include "callback.h"
 #include <omp.h>

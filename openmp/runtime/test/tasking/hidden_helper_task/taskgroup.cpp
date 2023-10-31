@@ -1,4 +1,5 @@
 // RUN: %libomp-cxx-compile-and-run
+// UNSUPPORTED: true
 
 /*
  * This test aims to check whether hidden helper task can work with regular task

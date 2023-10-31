@@ -59,13 +59,15 @@ typedef struct DEP {
 } dep;
 
 typedef int(* task_entry_t)( int, ptask );
+typedef void *omp_task_type_t;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 extern int  __kmpc_global_thread_num(void *id_ref);
+extern void __kmpc_register_task_info(omp_task_type_t *omp_task_type, void *label);
 extern int** __kmpc_omp_task_alloc(id *loc, int gtid, int flags,
-                                   size_t sz, size_t shar, task_entry_t rtn);
+                                   size_t sz, size_t shar, task_entry_t rtn, omp_task_type_t*);
 extern int __kmpc_omp_task_with_deps(id *loc, int gtid, ptask task, int nd,
                dep *dep_lst, int nd_noalias, dep *noalias_dep_lst);
 extern int __kmpc_omp_task(id *loc, int gtid, kmp_task_t *task);
@@ -105,13 +107,20 @@ int main() {
   {
     #pragma omp master
     {
+      // FIXME: Trick to make CodeGen to build first __kmpc_register_task_info
+      // so extern will resolve to it instead of building a function declaration
+      #pragma omp task
+      {}
+      #pragma omp taskwait
       int gtid = __kmpc_global_thread_num(NULL);
 /*
       #pragma omp task depend(inout : nt)
       {}
 */
+      omp_task_type_t omp_task_type;
+      __kmpc_register_task_info(&omp_task_type, NULL);
       task = (ptask)__kmpc_omp_task_alloc(NULL,gtid,0,
-                        sizeof(struct task),sizeof(struct shar),&task_entry);
+                        sizeof(struct task),sizeof(struct shar),&task_entry, &omp_task_type);
       psh = task->shareds;
 
       dep sdep;

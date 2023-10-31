@@ -27,6 +27,8 @@
 #include "ompt-specific.h"
 #endif
 
+#include "instrum.h"
+
 #ifdef KMP_DEBUG
 //-------------------------------------------------------------------------
 // template for debug prints specification ( d, u, lld, llu )
@@ -75,7 +77,8 @@ static void __kmp_for_static_init(ident_t *loc, kmp_int32 global_tid,
                                   T *plower, T *pupper,
                                   typename traits_t<T>::signed_t *pstride,
                                   typename traits_t<T>::signed_t incr,
-                                  typename traits_t<T>::signed_t chunk
+                                  typename traits_t<T>::signed_t chunk,
+                                  omp_task_type_t *omp_task_type
 #if OMPT_SUPPORT && OMPT_OPTIONAL
                                   ,
                                   void *codeptr
@@ -98,6 +101,16 @@ static void __kmp_for_static_init(ident_t *loc, kmp_int32 global_tid,
   kmp_team_t *team;
   __kmp_assert_valid_gtid(gtid);
   kmp_info_t *th = __kmp_threads[gtid];
+
+  // Be careful with all the exit points of the function to instrument
+  // it properly
+  // We should insert this instrumentation in the user code, since
+  // this violate the subsystem rules.
+  // This is a hack that is almost equivalent since the compiler wraps
+  // the user code with __kmpc_omp_static_init and
+  // __kmpc_omp_static_fini
+  instr_for_static_enter();
+  instr_ws_execute((*omp_task_type)->instrum_id);
 
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   ompt_team_info_t *team_info = NULL;
@@ -872,9 +885,10 @@ increment and chunk size.
 void __kmpc_for_static_init_4(ident_t *loc, kmp_int32 gtid, kmp_int32 schedtype,
                               kmp_int32 *plastiter, kmp_int32 *plower,
                               kmp_int32 *pupper, kmp_int32 *pstride,
-                              kmp_int32 incr, kmp_int32 chunk) {
+                              kmp_int32 incr, kmp_int32 chunk,
+                              omp_task_type_t *omp_task_type) {
   __kmp_for_static_init<kmp_int32>(loc, gtid, schedtype, plastiter, plower,
-                                   pupper, pstride, incr, chunk
+                                   pupper, pstride, incr, chunk, omp_task_type
 #if OMPT_SUPPORT && OMPT_OPTIONAL
                                    ,
                                    OMPT_GET_RETURN_ADDRESS(0)
@@ -889,9 +903,10 @@ void __kmpc_for_static_init_4u(ident_t *loc, kmp_int32 gtid,
                                kmp_int32 schedtype, kmp_int32 *plastiter,
                                kmp_uint32 *plower, kmp_uint32 *pupper,
                                kmp_int32 *pstride, kmp_int32 incr,
-                               kmp_int32 chunk) {
+                               kmp_int32 chunk,
+                               omp_task_type_t *omp_task_type) {
   __kmp_for_static_init<kmp_uint32>(loc, gtid, schedtype, plastiter, plower,
-                                    pupper, pstride, incr, chunk
+                                    pupper, pstride, incr, chunk, omp_task_type
 #if OMPT_SUPPORT && OMPT_OPTIONAL
                                     ,
                                     OMPT_GET_RETURN_ADDRESS(0)
@@ -905,9 +920,10 @@ void __kmpc_for_static_init_4u(ident_t *loc, kmp_int32 gtid,
 void __kmpc_for_static_init_8(ident_t *loc, kmp_int32 gtid, kmp_int32 schedtype,
                               kmp_int32 *plastiter, kmp_int64 *plower,
                               kmp_int64 *pupper, kmp_int64 *pstride,
-                              kmp_int64 incr, kmp_int64 chunk) {
+                              kmp_int64 incr, kmp_int64 chunk,
+                              omp_task_type_t *omp_task_type) {
   __kmp_for_static_init<kmp_int64>(loc, gtid, schedtype, plastiter, plower,
-                                   pupper, pstride, incr, chunk
+                                   pupper, pstride, incr, chunk, omp_task_type
 #if OMPT_SUPPORT && OMPT_OPTIONAL
                                    ,
                                    OMPT_GET_RETURN_ADDRESS(0)
@@ -922,9 +938,10 @@ void __kmpc_for_static_init_8u(ident_t *loc, kmp_int32 gtid,
                                kmp_int32 schedtype, kmp_int32 *plastiter,
                                kmp_uint64 *plower, kmp_uint64 *pupper,
                                kmp_int64 *pstride, kmp_int64 incr,
-                               kmp_int64 chunk) {
+                               kmp_int64 chunk,
+                               omp_task_type_t *omp_task_type) {
   __kmp_for_static_init<kmp_uint64>(loc, gtid, schedtype, plastiter, plower,
-                                    pupper, pstride, incr, chunk
+                                    pupper, pstride, incr, chunk, omp_task_type
 #if OMPT_SUPPORT && OMPT_OPTIONAL
                                     ,
                                     OMPT_GET_RETURN_ADDRESS(0)

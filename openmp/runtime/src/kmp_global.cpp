@@ -66,6 +66,9 @@ int __kmp_version = 0;
 std::atomic<kmp_int32> __kmp_team_counter = 0;
 std::atomic<kmp_int32> __kmp_task_counter = 0;
 
+// Ovni
+std::atomic<kmp_int32> __kmp_instrum_task_counter = 0;
+
 size_t __kmp_stksize = KMP_DEFAULT_STKSIZE;
 #if KMP_USE_MONITOR
 size_t __kmp_monitor_stksize = 0; // auto adjust
@@ -223,6 +226,16 @@ int __kmp_mwait_enabled = FALSE;
 int __kmp_mwait_hints = 0;
 #endif
 
+int nosv_main_pid;
+bool nosv_is_extenally_attached;
+nosv_task_type_t nosv_omp_impl_task_ty;
+nosv_affinity_type_t nosv_default_affinity_type = NOSV_AFFINITY_TYPE_STRICT;
+nosv_affinity_level_t nosv_default_affinity_level = NOSV_AFFINITY_LEVEL_CPU;
+int nosv_enable_ovni = 0;
+uint32_t nosv_default_numa_id = -1;
+int nosv_default_yield_type = 0;
+uint64_t nosv_default_waitfor_time;
+
 #if KMP_HAVE_UMWAIT
 int __kmp_waitpkg_enabled = 0;
 int __kmp_tpause_state = 0;
@@ -353,7 +366,7 @@ omp_memspace_handle_t const llvm_omp_target_device_mem_space =
 KMP_BUILD_ASSERT(sizeof(kmp_tasking_flags_t) == 4);
 
 int __kmp_task_stealing_constraint = 1; /* Constrain task stealing by default */
-int __kmp_enable_task_throttling = 1;
+int __kmp_enable_task_throttling = 0;
 
 #ifdef DEBUG_SUSPEND
 int __kmp_suspend_count = 0;

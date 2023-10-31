@@ -30,13 +30,15 @@ typedef struct task {
   int f_priv;
 } task_t;
 typedef int(*entry_t)(int, task_t*);
+typedef void *omp_task_type_t;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 extern int __kmpc_global_thread_num(_id*);
+void __kmpc_register_task_info(omp_task_type_t *omp_task_type, void *label);
 task_t *__kmpc_omp_task_alloc(_id *loc, int gtid, int flags,
-                              size_t sz, size_t shar, entry_t rtn);
+                              size_t sz, size_t shar, entry_t rtn, omp_task_type_t*);
 int __kmpc_omp_task_with_deps(_id *loc, int gtid, task_t *task, int ndeps,
                               _dep *dep_lst, int nd_noalias, _dep *noalias_l);
 #ifdef __cplusplus
@@ -70,8 +72,10 @@ int main()
         static _id loc = {0, 2, 0, 0, ";test.c;func;67;0;;"};
         int gtid = __kmpc_global_thread_num(&loc);
 // instead of creating an empty task function we can now send NULL to runtime
+        omp_task_type_t omp_task_type;
+        __kmpc_register_task_info(&omp_task_type, NULL);
         task_t *ptr = __kmpc_omp_task_alloc(&loc, gtid, TIED,
-                                            sizeof(task_t), 0, NULL);
+                                            sizeof(task_t), 0, NULL, &omp_task_type);
         sdep[0].addr = (size_t)&i2;
         sdep[0].flags = 1; // 1-in, 2-out, 3-inout, 4-mtx, 8-inoutset
         sdep[1].addr = (size_t)&i1;

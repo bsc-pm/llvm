@@ -20,6 +20,8 @@
 #include "ompt-specific.h"
 #endif
 
+#include "instrum.h"
+
 /*!
 @defgroup WAIT_RELEASE Wait/Release operations
 
@@ -379,16 +381,21 @@ __kmp_wait_template(kmp_info_t *this_thr,
 #endif
   kmp_uint64 time;
 
+  instr_spin_wait_enter();
+
   KMP_FSYNC_SPIN_INIT(spin, NULL);
   if (flag->done_check()) {
     KMP_FSYNC_SPIN_ACQUIRED(CCAST(void *, spin));
+    instr_spin_wait_exit();
     return false;
   }
   th_gtid = this_thr->th.th_info.ds.ds_gtid;
   if (Cancellable) {
     kmp_team_t *team = this_thr->th.th_team;
-    if (team && team->t.t_cancel_request == cancel_parallel)
+    if (team && team->t.t_cancel_request == cancel_parallel) {
+      instr_spin_wait_exit();
       return true;
+    }
   }
 #if KMP_OS_UNIX
   if (final_spin)
@@ -696,9 +703,11 @@ final_spin=FALSE)
             &(task_team->tt.tt_unfinished_threads);
         KMP_ATOMIC_INC(unfinished_threads);
       }
+      instr_spin_wait_exit();
       return true;
     }
   }
+  instr_spin_wait_exit();
   return false;
 }
 

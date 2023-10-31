@@ -1784,6 +1784,8 @@ static int __kmp_barrier_template(enum barrier_type bt, int gtid, int is_split,
   KA_TRACE(15, ("__kmp_barrier: T#%d(%d:%d) has arrived\n", gtid,
                 __kmp_team_from_gtid(gtid)->t.t_id, __kmp_tid_from_gtid(gtid)));
 
+  instr_barrier_enter();
+
 #if OMPT_SUPPORT
   if (ompt_enabled.enabled) {
 #if OMPT_OPTIONAL
@@ -2073,6 +2075,8 @@ static int __kmp_barrier_template(enum barrier_type bt, int gtid, int is_split,
   }
 #endif
 
+  instr_barrier_exit();
+
   if (cancellable)
     return (int)cancelled;
   return status;
@@ -2160,6 +2164,8 @@ void __kmp_join_barrier(int gtid) {
   KMP_SET_THREAD_STATE_BLOCK(FORK_JOIN_BARRIER);
 
   KMP_DEBUG_ASSERT(__kmp_threads && __kmp_threads[gtid]);
+
+  instr_join_barrier_enter();
 
   kmp_info_t *this_thr = __kmp_threads[gtid];
   kmp_team_t *team;
@@ -2385,6 +2391,8 @@ void __kmp_join_barrier(int gtid) {
          gtid, team_id, tid, nproc));
   }
 #endif /* KMP_DEBUG */
+
+  instr_join_barrier_exit();
 
   // TODO now, mark worker threads as done so they may be disbanded
   KMP_MB(); // Flush all pending memory write invalidates.
