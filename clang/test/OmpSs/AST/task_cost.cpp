@@ -14,7 +14,7 @@ void bar(int n) {
 
 // CHECK: OSSTaskDirective 0x{{.*}} <line:{{.*}}:{{.*}}, col:{{.*}}>
 // CHECK-NEXT: OSSCostClause 0x{{.*}} <col:{{.*}}, col:{{.*}}>
-// CHECK-NEXT: CallExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int':'int'
+// CHECK-NEXT: CallExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int'
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int (*)()' <FunctionToPointerDecay>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int ()' lvalue Function 0x{{.*}} 'foo' 'int ()' (FunctionTemplate 0x{{.*}} 'foo')
 

@@ -2,7 +2,6 @@
 // We mark this test as unsupported because
 // cte-amd requires rocm >=5.3.0, this update
 // will never come.
-// UNSUPPORTED: true
 
 // UNSUPPORTED: amdgcn-amd-amdhsa
 

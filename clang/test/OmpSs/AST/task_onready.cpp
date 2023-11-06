@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -verify -fompss-2 -ferror-limit 100 -o - -std=c++11 %s
+// RUN: %clang_cc1 -verify -fompss-2 -ferror-limit 100 -o - -Wno-vla -std=c++11 %s
 // expected-no-diagnostics
 
 struct S {
@@ -51,8 +51,8 @@ void bar(int n) {
 // CHECK-NEXT: <<<NULL>>>
 // CHECK-NEXT: <<<NULL>>>
 // CHECK-NEXT: ArraySubscriptExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int *' lvalue
-// CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'int **':'int **' <LValueToRValue>
-// CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int **':'int **' lvalue ParmVar 0x{{.*}} 'vla' 'int **':'int **'
+// CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'int **' <LValueToRValue>
+// CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int **' lvalue ParmVar 0x{{.*}} 'vla' 'int **'
 // CHECK-NEXT: IntegerLiteral 0x{{.*}} <col:{{.*}}> 'int' 3
 
 // CHECK: OSSTaskDeclAttr 0x{{.*}} <line:{{.*}}:{{.*}}, col:{{.*}}> Implicit
@@ -61,7 +61,7 @@ void bar(int n) {
 // CHECK-NEXT: <<<NULL>>>
 // CHECK-NEXT: <<<NULL>>>
 // CHECK-NEXT: <<<NULL>>>
-// CHECK-NEXT: CallExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int *':'int *'
+// CHECK-NEXT: CallExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int *'
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int *(*)()' <FunctionToPointerDecay>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int *()' lvalue Function 0x{{.*}} 'foo' 'int *()' (FunctionTemplate 0x{{.*}} 'foo')
 
@@ -76,7 +76,7 @@ void bar(int n) {
 
 // CHECK: OSSTaskDirective 0x{{.*}} <line:{{.*}}:{{.*}}, col:{{.*}}>
 // CHECK-NEXT: OSSOnreadyClause 0x{{.*}} <col:{{.*}}, col:{{.*}}>
-// CHECK-NEXT: CallExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int':'int'
+// CHECK-NEXT: CallExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int'
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int (*)()' <FunctionToPointerDecay>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int ()' lvalue Function 0x{{.*}} 'foo' 'int ()' (FunctionTemplate 0x{{.*}} 'foo')
 

@@ -40,8 +40,8 @@ void bad() {
 // CHECK: ConstantExpr 0x{{.*}} <col:{{.*}}> 'int'
 // CHECK-NEXT: value: Int 1
 // CHECK-NEXT: IntegerLiteral 0x{{.*}} <col:{{.*}}> 'int' 1
-// CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int':'int' <LValueToRValue>
-// CHECK-NEXT: UnaryOperator 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int':'int' lvalue prefix '*' cannot overflow
+// CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int' <LValueToRValue>
+// CHECK-NEXT: UnaryOperator 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int' lvalue prefix '*' cannot overflow
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'int *' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int *' lvalue ParmVar 0x{{.*}} 'x' 'int *'
 // CHECK-NEXT: IntegerLiteral 0x{{.*}} <col:{{.*}}> 'int' 1

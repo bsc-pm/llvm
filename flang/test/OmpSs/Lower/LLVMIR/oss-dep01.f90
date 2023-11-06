@@ -76,12 +76,12 @@ end subroutine
 !LLVMIR: %[[X_PLUS_6:.*]] = add i32 %[[VAR_X_LOAD]], 6
 !LLVMIR: %[[X_PLUS_6_64:.*]] = sext i32 %[[X_PLUS_6]] to i64
 !LLVMIR: %{{.*}} = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"),
-!LLVMIR-SAME: "QUAL.OSS.SHARED"(ptr %[[VAR_ARRAY2]], i32 undef),
+!LLVMIR-SAME: "QUAL.OSS.SHARED"(ptr %[[VAR_ARRAY2]], ptr undef),
 !LLVMIR-SAME: "QUAL.OSS.VLA.DIMS"(ptr %[[VAR_ARRAY2]], i64 %[[VLA_EXTENT]]),
 !LLVMIR-SAME: "QUAL.OSS.DEP.OUT"(ptr %[[VAR_ARRAY2]], [11 x i8] c"dep string\00", ptr @compute.dep0, i64 %[[X_PLUS_6_64]], ptr %[[VAR_ARRAY2]]), "QUAL.OSS.CAPTURED"(i64 %[[VLA_EXTENT]], i64 4, i64 %[[X_PLUS_6_64]], i32 1, i32 10, i32 1) ]
 
 !LLVMIR: %{{.*}} = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00")
-!LLVMIR-SAME: "QUAL.OSS.SHARED"(ptr %1, i32 undef)
+!LLVMIR-SAME: "QUAL.OSS.SHARED"(ptr %1, ptr undef)
 !LLVMIR-SAME: "QUAL.OSS.FIRSTPRIVATE"(ptr %[[VAR_I]], i32 undef)
 !LLVMIR-SAME: "QUAL.OSS.DEP.OUT"(ptr %1, [11 x i8] c"dep string\00", ptr @compute.dep1, ptr %1, ptr %[[VAR_I]]), "QUAL.OSS.CAPTURED"(i64 undef, i32 1, i32 10, i32 1) ]
 
@@ -89,12 +89,12 @@ end subroutine
 !LLVMIR: %[[X_PLUS_6_0:.*]] = add i32 %[[VAR_X_LOAD_0]], 6
 !LLVMIR: %[[X_PLUS_6_64_0:.*]] = sext i32 %[[X_PLUS_6_0]] to i64
 !LLVMIR: %{{.*}} = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00")
-!LLVMIR-SAME: "QUAL.OSS.SHARED"(ptr %[[VAR_ARRAY2]], i32 undef)
+!LLVMIR-SAME: "QUAL.OSS.SHARED"(ptr %[[VAR_ARRAY2]], ptr undef)
 !LLVMIR-SAME: "QUAL.OSS.FIRSTPRIVATE"(ptr %[[VAR_I]], i32 undef),
 !LLVMIR-SAME: "QUAL.OSS.DEP.OUT"(ptr %[[VAR_ARRAY2]], [11 x i8] c"dep string\00", ptr @compute.dep2, i64 %[[X_PLUS_6_64_0]], ptr %[[VAR_ARRAY2]], ptr %[[VAR_I]]), "QUAL.OSS.CAPTURED"(i64 %[[VLA_EXTENT]], i64 4, i64 %[[X_PLUS_6_64_0]], i32 1, i32 10, i32 1) ]
 
 !LLVMIR: %{{.*}} = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00")
-!LLVMIR-SAME: "QUAL.OSS.SHARED"(ptr %1, i32 undef)
+!LLVMIR-SAME: "QUAL.OSS.SHARED"(ptr %1, ptr undef)
 !LLVMIR-SAME: "QUAL.OSS.FIRSTPRIVATE"(ptr %[[VAR_I]], i32 undef)
 !LLVMIR-SAME: "QUAL.OSS.DEP.OUT"(ptr %1, [11 x i8] c"dep string\00", ptr @compute.dep3, ptr %1, ptr %[[VAR_I]]), "QUAL.OSS.CAPTURED"(i64 undef, i32 1, i32 10, i32 1) ]
 
@@ -102,7 +102,7 @@ end subroutine
 !LLVMIR: %[[X_PLUS_6_1:.*]] = add i32 %[[VAR_X_LOAD_1]], 6
 !LLVMIR: %[[X_PLUS_6_64_1:.*]] = sext i32 %[[X_PLUS_6_1]] to i64
 !LLVMIR: %{{.*}} = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00")
-!LLVMIR-SAME: "QUAL.OSS.SHARED"(ptr %[[VAR_ARRAY2]], i32 undef)
+!LLVMIR-SAME: "QUAL.OSS.SHARED"(ptr %[[VAR_ARRAY2]], ptr undef)
 !LLVMIR-SAME: "QUAL.OSS.VLA.DIMS"(ptr %[[VAR_ARRAY2]], i64 %[[VLA_EXTENT]])
 !LLVMIR-SAME: "QUAL.OSS.DEP.OUT"(ptr %[[VAR_ARRAY2]], [11 x i8] c"dep string\00", ptr @compute.dep4, i64 %[[X_PLUS_6_64_1]], ptr %[[VAR_ARRAY2]]), "QUAL.OSS.CAPTURED"(i64 %[[VLA_EXTENT]], i64 4, i64 %[[X_PLUS_6_64_1]], i32 1, i32 10, i32 1) ]
 

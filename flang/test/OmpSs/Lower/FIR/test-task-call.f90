@@ -35,7 +35,8 @@ END PROGRAM MAIN
 ! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "x", uniq_name = "_QFEx"}
 ! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
 ! FIRDialect:           fir.store %[[VAL_1]] to %[[VAL_0]] : !fir.ref<i32>
-! FIRDialect:           oss.task firstprivate(%[[VAL_0]] : !fir.ref<i32>) {
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           oss.task firstprivate(%[[VAL_0]] : !fir.ref<i32>) firstprivate_type(%[[VAL_2]] : !fir.oss<i32>) {
 ! FIRDialect:             fir.call @_QMmooPs1(%[[VAL_0]]) fastmath<contract> : (!fir.ref<i32>) -> ()
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }

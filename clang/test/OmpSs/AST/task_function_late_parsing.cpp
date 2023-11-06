@@ -47,8 +47,8 @@ int main() {
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'char' lvalue Var 0x{{.*}} '.reduction.lhs' 'char'
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int' lvalue Var 0x{{.*}} 'p' 'int'
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'char' lvalue Var 0x{{.*}} 'q' 'char'
-// CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int':'int' lvalue OSSDeclareReduction 0x{{.*}} 'asdf' 'int':'int'
-// CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'char':'char' lvalue OSSDeclareReduction 0x{{.*}} 'asdf' 'char':'char'
+// CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int' lvalue OSSDeclareReduction 0x{{.*}} 'asdf' 'int'
+// CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'char' lvalue OSSDeclareReduction 0x{{.*}} 'asdf' 'char'
 
 
 

@@ -40,44 +40,48 @@ end subroutine
 
 end module
 
-! CHECK-LABEL: func.func @_QMcall_defsPtest_non_ptr_to_scalar_ptr(
-! CHECK-SAME:                                                     %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<i32> {fir.bindc_name = "p", fir.target}) {
-! CHECK:         %[[VAL_1:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.ptr<i32>>
-! CHECK:         %[[VAL_2:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_0]] : (!fir.ref<i32>) -> !fir.box<!fir.ptr<i32>>
-! CHECK:         fir.store %[[VAL_2]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<i32>>>
-! CHECK:         oss.task shared(%[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<i32>>>) {
-! CHECK:           fir.call @_QPscalar_ptr(%[[VAL_1]]) fastmath<contract> : (!fir.ref<!fir.box<!fir.ptr<i32>>>) -> ()
-! CHECK:           oss.terminator
-! CHECK:         }
-! CHECK:         return
-! CHECK:       }
 
-! CHECK-LABEL: func.func @_QMcall_defsPtest_non_ptr_to_array_ptr(
-! CHECK-SAME:                                                    %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.box<!fir.array<?xi32>> {fir.bindc_name = "p", fir.target}) {
-! CHECK:         %[[VAL_1:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.ptr<!fir.array<?xi32>>>
-! CHECK:         %[[VAL_2:[-0-9A-Za-z._]+]] = fir.rebox %[[VAL_0]] : (!fir.box<!fir.array<?xi32>>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
-! CHECK:         fir.store %[[VAL_2]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! CHECK:         oss.task shared(%[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) {
-! CHECK:           fir.call @_QParray_ptr(%[[VAL_1]]) fastmath<contract> : (!fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) -> ()
-! CHECK:           oss.terminator
+! CHECK-LABEL:   func.func @_QMcall_defsPtest_non_ptr_to_scalar_ptr(
+! CHECK-SAME:                                                       %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<i32> {fir.bindc_name = "p", fir.target}) {
+! CHECK:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.ptr<i32>>
+! CHECK:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_0]] : (!fir.ref<i32>) -> !fir.box<!fir.ptr<i32>>
+! CHECK:           fir.store %[[VAL_2]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<i32>>>
+! CHECK:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<!fir.box<!fir.ptr<i32>>>
+! CHECK:           oss.task shared(%[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<i32>>>) shared_type(%[[VAL_3]] : !fir.oss<!fir.box<!fir.ptr<i32>>>) {
+! CHECK:             fir.call @_QPscalar_ptr(%[[VAL_1]]) fastmath<contract> : (!fir.ref<!fir.box<!fir.ptr<i32>>>) -> ()
+! CHECK:             oss.terminator
+! CHECK:           }
+! CHECK:           return
 ! CHECK:         }
-! CHECK:         return
-! CHECK:       }
 
-! CHECK-LABEL: func.func @_QMcall_defsPtest_non_ptr_to_array_ptr_lower_bounds(
-! CHECK-SAME:                                                                 %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.box<!fir.array<?xi32>> {fir.bindc_name = "p", fir.target}) {
-! CHECK:         %[[VAL_1:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.ptr<!fir.array<?xi32>>>
-! CHECK:         %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant 42 : i64
-! CHECK:         %[[VAL_3:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_2]] : (i64) -> index
-! CHECK:         %[[VAL_4:[-0-9A-Za-z._]+]] = fir.shift %[[VAL_3]] : (index) -> !fir.shift<1>
-! CHECK:         %[[VAL_5:[-0-9A-Za-z._]+]] = fir.rebox %[[VAL_0]](%[[VAL_4]]) : (!fir.box<!fir.array<?xi32>>, !fir.shift<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
-! CHECK:         fir.store %[[VAL_5]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
-! CHECK:         oss.task shared(%[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) {
-! CHECK:           fir.call @_QParray_ptr(%[[VAL_1]]) fastmath<contract> : (!fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) -> ()
-! CHECK:           oss.terminator
+! CHECK-LABEL:   func.func @_QMcall_defsPtest_non_ptr_to_array_ptr(
+! CHECK-SAME:                                                      %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.box<!fir.array<?xi32>> {fir.bindc_name = "p", fir.target}) {
+! CHECK:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.ptr<!fir.array<?xi32>>>
+! CHECK:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.rebox %[[VAL_0]] : (!fir.box<!fir.array<?xi32>>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
+! CHECK:           fir.store %[[VAL_2]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! CHECK:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! CHECK:           oss.task shared(%[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) shared_type(%[[VAL_3]] : !fir.oss<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) {
+! CHECK:             fir.call @_QParray_ptr(%[[VAL_1]]) fastmath<contract> : (!fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) -> ()
+! CHECK:             oss.terminator
+! CHECK:           }
+! CHECK:           return
 ! CHECK:         }
-! CHECK:         return
-! CHECK:       }
-! CHECK:       func.func private @_QPscalar_ptr(!fir.ref<!fir.box<!fir.ptr<i32>>>)
-! CHECK:       func.func private @_QParray_ptr(!fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>)
+
+! CHECK-LABEL:   func.func @_QMcall_defsPtest_non_ptr_to_array_ptr_lower_bounds(
+! CHECK-SAME:                                                                   %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.box<!fir.array<?xi32>> {fir.bindc_name = "p", fir.target}) {
+! CHECK:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.ptr<!fir.array<?xi32>>>
+! CHECK:           %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant 42 : i64
+! CHECK:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_2]] : (i64) -> index
+! CHECK:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.shift %[[VAL_3]] : (index) -> !fir.shift<1>
+! CHECK:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.rebox %[[VAL_0]](%[[VAL_4]]) : (!fir.box<!fir.array<?xi32>>, !fir.shift<1>) -> !fir.box<!fir.ptr<!fir.array<?xi32>>>
+! CHECK:           fir.store %[[VAL_5]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! CHECK:           %[[VAL_6:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! CHECK:           oss.task shared(%[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) shared_type(%[[VAL_6]] : !fir.oss<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) {
+! CHECK:             fir.call @_QParray_ptr(%[[VAL_1]]) fastmath<contract> : (!fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) -> ()
+! CHECK:             oss.terminator
+! CHECK:           }
+! CHECK:           return
+! CHECK:         }
+! CHECK:         func.func private @_QPscalar_ptr(!fir.ref<!fir.box<!fir.ptr<i32>>>)
+! CHECK:         func.func private @_QParray_ptr(!fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>)
 

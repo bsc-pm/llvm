@@ -26,15 +26,15 @@ void bar()
 
 // CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:6:11, col:19>
 // CHECK-NEXT: OSSFirstprivateClause {{[a-z0-9]+}} <<invalid sloc>> <implicit>
-// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <line:8:11> 'int':'int' lvalue ParmVar {{[a-z0-9]+}} 't' 'int':'int'
+// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <line:8:11> 'int' lvalue ParmVar {{[a-z0-9]+}} 't' 'int'
 // CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:9:13, col:31>
 // CHECK-NEXT: OSSSharedClause {{[a-z0-9]+}} <col:22, col:30>
-// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:29> 'int':'int' lvalue Var {{[a-z0-9]+}} 'x' 'int':'int'
+// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:29> 'int' lvalue Var {{[a-z0-9]+}} 'x' 'int'
 
 // CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:6:11, col:19>
 // CHECK-NEXT: OSSFirstprivateClause {{[a-z0-9]+}} <<invalid sloc>> <implicit>
-// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <line:8:11> 'float':'float' lvalue ParmVar {{[a-z0-9]+}} 't' 'float':'float'
+// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <line:8:11> 'float' lvalue ParmVar {{[a-z0-9]+}} 't' 'float'
 // CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:9:13, col:31>
 // CHECK-NEXT: OSSSharedClause {{[a-z0-9]+}} <col:22, col:30>
-// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:29> 'float':'float' lvalue Var {{[a-z0-9]+}} 'x' 'float':'float'
+// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:29> 'float' lvalue Var {{[a-z0-9]+}} 'x' 'float'
 

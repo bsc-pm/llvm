@@ -14,17 +14,20 @@ PROGRAM S
 
 END PROGRAM
 
+
 ! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "s"} {
 ! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "i", uniq_name = "_QFEi"}
 ! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "j", uniq_name = "_QFEj"}
-! FIRDialect:           oss.task firstprivate(%[[VAL_0]], %[[VAL_1]] : !fir.ref<i32>, !fir.ref<i32>) {
-! FIRDialect:             %[[VAL_2:[-0-9A-Za-z._]+]] = fir.alloca i32 {adapt.valuebyref, pinned}
-! FIRDialect:             %[[VAL_3:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<i32>
-! FIRDialect:             %[[VAL_4:[-0-9A-Za-z._]+]] = arith.constant 4 : i32
-! FIRDialect:             %[[VAL_5:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_3]], %[[VAL_4]] : i32
-! FIRDialect:             fir.store %[[VAL_5]] to %[[VAL_2]] : !fir.ref<i32>
-! FIRDialect:             %[[VAL_6:[-0-9A-Za-z._]+]] = fir.load %[[VAL_2]] : !fir.ref<i32>
-! FIRDialect:             fir.store %[[VAL_6]] to %[[VAL_1]] : !fir.ref<i32>
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           oss.task firstprivate(%[[VAL_0]], %[[VAL_1]] : !fir.ref<i32>, !fir.ref<i32>) firstprivate_type(%[[VAL_2]], %[[VAL_3]] : !fir.oss<i32>, !fir.oss<i32>) {
+! FIRDialect:             %[[VAL_4:[-0-9A-Za-z._]+]] = fir.alloca i32 {adapt.valuebyref, pinned}
+! FIRDialect:             %[[VAL_5:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<i32>
+! FIRDialect:             %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 4 : i32
+! FIRDialect:             %[[VAL_7:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_5]], %[[VAL_6]] : i32
+! FIRDialect:             fir.store %[[VAL_7]] to %[[VAL_4]] : !fir.ref<i32>
+! FIRDialect:             %[[VAL_8:[-0-9A-Za-z._]+]] = fir.load %[[VAL_4]] : !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_8]] to %[[VAL_1]] : !fir.ref<i32>
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
 ! FIRDialect:           return

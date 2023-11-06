@@ -923,7 +923,7 @@ ExprResult Sema::ActOnOmpSsMultiDepIteratorInitListExpr(InitListExpr *InitList) 
   unsigned NumInits = InitList->getNumInits();
   ExprResult Res = ActOnIntegerConstant(SourceLocation(), NumInits);
 
-  QualType Ty = BuildArrayType(Context.IntTy, ArrayType::Normal, Res.get(), /*Quals=*/0,
+  QualType Ty = BuildArrayType(Context.IntTy, ArraySizeModifier::Normal, Res.get(), /*Quals=*/0,
                         SourceRange(), DeclarationName());
   VarDecl *DiscreteArrayDecl =
       buildVarDecl(*this, SourceLocation(), Ty, "discrete.array");

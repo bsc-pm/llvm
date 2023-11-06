@@ -18,6 +18,6 @@ void bar() {
 
 // CHECK: OSSTaskDirective {{[^ ]*}} <line:{{[^ ]*}}:{{[^ ]*}}, col:{{[^ ]*}}>
 // CHECK-NEXT: OSSReductionClause {{[^ ]*}} <col:{{[^ ]*}}, col:{{[^ ]*}}>
-// CHECK-NEXT: DeclRefExpr {{[^ ]*}} <col:{{[^ ]*}}> 'int':'int' lvalue ParmVar {{[^ ]*}} 'x' 'int':'int'
+// CHECK-NEXT: DeclRefExpr {{[^ ]*}} <col:{{[^ ]*}}> 'int' lvalue ParmVar {{[^ ]*}} 'x' 'int'
 // CHECK-NEXT: OSSSharedClause {{[^ ]*}} <<invalid sloc>> <implicit>
-// CHECK-NEXT: DeclRefExpr {{[^ ]*}} <col:{{[^ ]*}}> 'int':'int' lvalue ParmVar {{[^ ]*}} 'x' 'int':'int'
+// CHECK-NEXT: DeclRefExpr {{[^ ]*}} <col:{{[^ ]*}}> 'int' lvalue ParmVar {{[^ ]*}} 'x' 'int'

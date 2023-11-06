@@ -38,7 +38,7 @@ void bar()
 
 // CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:6:13, col:36>
 // CHECK-NEXT: OSSDependClause {{[a-z0-9]+}} <col:22, col:35>
-// CHECK-NEXT: UnaryOperator {{[a-z0-9]+}} <col:33, col:34> 'int':'int' lvalue prefix '*' cannot overflow
+// CHECK-NEXT: UnaryOperator {{[a-z0-9]+}} <col:33, col:34> 'int' lvalue prefix '*' cannot overflow
 // CHECK-NEXT: ImplicitCastExpr {{[a-z0-9]+}} <col:34> 'int *' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:34> 'int *' lvalue ParmVar {{[a-z0-9]+}} 't' 'int *'
 // CHECK-NEXT: OSSFirstprivateClause {{[a-z0-9]+}} <<invalid sloc>> <implicit>
@@ -104,8 +104,8 @@ void bar1() {
 // CHECK-NEXT: OSSArrayShapingExpr {{[a-z0-9]+}} <col:31, col:34> 'int[t][20]' lvalue
 // CHECK-NEXT: ImplicitCastExpr {{[a-z0-9]+}} <col:34> 'int (*)[20]' <ArrayToPointerDecay>
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:34> 'int[10][20]' lvalue Var {{[a-z0-9]+}} 'array' 'int[10][20]'
-// CHECK-NEXT: ImplicitCastExpr {{[a-z0-9]+}} <col:32> 'int':'int' <LValueToRValue>
-// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:32> 'int':'int' lvalue ParmVar {{[a-z0-9]+}} 't' 'int':'int'
+// CHECK-NEXT: ImplicitCastExpr {{[a-z0-9]+}} <col:32> 'int' <LValueToRValue>
+// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:32> 'int' lvalue ParmVar {{[a-z0-9]+}} 't' 'int'
 // CHECK-NEXT: OSSArrayShapingExpr {{[a-z0-9]+}} <col:41, col:50> 'int[1][2][3][20]' lvalue
 // CHECK-NEXT: ImplicitCastExpr {{[a-z0-9]+}} <col:50> 'int (*)[20]' <ArrayToPointerDecay>
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:50> 'int[10][20]' lvalue Var {{[a-z0-9]+}} 'array' 'int[10][20]'
@@ -115,15 +115,15 @@ void bar1() {
 // CHECK-NEXT: OSSSharedClause {{[a-z0-9]+}} <<invalid sloc>> <implicit>
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:34> 'int[10][20]' lvalue Var {{[a-z0-9]+}} 'array' 'int[10][20]'
 // CHECK-NEXT: OSSFirstprivateClause {{[a-z0-9]+}} <<invalid sloc>> <implicit>
-// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:32> 'int':'int' lvalue ParmVar {{[a-z0-9]+}} 't' 'int':'int'
+// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:32> 'int' lvalue ParmVar {{[a-z0-9]+}} 't' 'int'
 
 // CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:70:11, col:48>
 // CHECK-NEXT: OSSDependClause {{[a-z0-9]+}} <col:20, col:47>
 // CHECK-NEXT: OSSArrayShapingExpr {{[a-z0-9]+}} <col:31, col:34> 'int[t]' lvalue
 // CHECK-NEXT: ImplicitCastExpr {{[a-z0-9]+}} <col:34> 'int *' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:34> 'int *' lvalue Var {{[a-z0-9]+}} 'p' 'int *'
-// CHECK-NEXT: ImplicitCastExpr {{[a-z0-9]+}} <col:32> 'int':'int' <LValueToRValue>
-// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:32> 'int':'int' lvalue ParmVar {{[a-z0-9]+}} 't' 'int':'int'
+// CHECK-NEXT: ImplicitCastExpr {{[a-z0-9]+}} <col:32> 'int' <LValueToRValue>
+// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:32> 'int' lvalue ParmVar {{[a-z0-9]+}} 't' 'int'
 // CHECK-NEXT: OSSArrayShapingExpr {{[a-z0-9]+}} <col:37, col:46> 'int[1][2][3]' lvalue
 // CHECK-NEXT: ImplicitCastExpr {{[a-z0-9]+}} <col:46> 'int *' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:46> 'int *' lvalue Var {{[a-z0-9]+}} 'p' 'int *'
@@ -132,5 +132,5 @@ void bar1() {
 // CHECK-NEXT: IntegerLiteral {{[a-z0-9]+}} <col:44> 'int' 3
 // CHECK-NEXT: OSSFirstprivateClause {{[a-z0-9]+}} <<invalid sloc>> <implicit>
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:34> 'int *' lvalue Var {{[a-z0-9]+}} 'p' 'int *'
-// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:32> 'int':'int' lvalue ParmVar {{[a-z0-9]+}} 't' 'int':'int'
+// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:32> 'int' lvalue ParmVar {{[a-z0-9]+}} 't' 'int'
 

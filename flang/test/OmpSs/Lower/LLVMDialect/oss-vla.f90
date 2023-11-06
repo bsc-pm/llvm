@@ -52,7 +52,7 @@ subroutine task(X)
 
 end subroutine
 
-!LLVMIRDialect-LABEL: llvm.func @_QPtask(%arg0: !llvm.ptr<i32> {fir.bindc_name = "x"}) {
+!LLVMIRDialect-LABEL: llvm.func @_QPtask(%arg0: !llvm.ptr {fir.bindc_name = "x"}) {
 !LLVMIRDialect: %[[CONS_3:.*]] = llvm.mlir.constant(3 : index) : i64
 !LLVMIRDialect: %[[CONS_2:.*]] = llvm.mlir.constant(2 : index) : i64
 !LLVMIRDialect: %[[CONS_1:.*]] = llvm.mlir.constant(1 : index) : i64
@@ -72,22 +72,22 @@ end subroutine
 
 !LLVMIRDialect: %[[VAR_ARRAY4:.*]] = llvm.alloca
 
-!LLVMIRDialect: %[[VLA_1:.*]] = oss.vlaDim pointer(%[[VAR_ARRAY1]] : !llvm.ptr<i32>) sizes(%[[VAR_E1_1]], %[[CONS_3]] : i64, i64) -> i32
+!LLVMIRDialect: %[[VLA_1:.*]] = oss.vlaDim pointer(%[[VAR_ARRAY1]] : !llvm.ptr) sizes(%[[VAR_E1_1]], %[[CONS_3]] : i64, i64) -> i32
 !LLVMIRDialect: oss.task_for
 !LLVMIRDialect-SAME: vlaDims(%[[VLA_1]] : i32)
 !LLVMIRDialect-SAME: captures(%[[VAR_E1_1]], %[[CONS_3]] : i64, i64)
 
-!LLVMIRDialect: %[[VLA_2:.*]] = oss.vlaDim pointer(%[[VAR_ARRAY2]] : !llvm.ptr<i32>) sizes(%[[VAR_E1_1]], %[[CONS_2]] : i64, i64) lbs(%[[CONS_1]], %[[CONS_2]] : i64, i64) -> i32
+!LLVMIRDialect: %[[VLA_2:.*]] = oss.vlaDim pointer(%[[VAR_ARRAY2]] : !llvm.ptr) sizes(%[[VAR_E1_1]], %[[CONS_2]] : i64, i64) lbs(%[[CONS_1]], %[[CONS_2]] : i64, i64) -> i32
 !LLVMIRDialect: oss.task_for
 !LLVMIRDialect-SAME: vlaDims(%[[VLA_2]] : i32)
 !LLVMIRDialect-SAME: captures(%[[VAR_E1_1]], %[[CONS_2]], %[[CONS_1]], %[[CONS_2]] : i64, i64, i64, i64)
 
-!LLVMIRDialect: %[[VLA_3:.*]] = oss.vlaDim pointer(%[[VAR_ARRAY3]] : !llvm.ptr<i32>) sizes(%[[VAR_E1_2]], %[[CONS_3]] : i64, i64) lbs(%[[CONS_4]], %[[CONS_1]] : i64, i64) -> i32
+!LLVMIRDialect: %[[VLA_3:.*]] = oss.vlaDim pointer(%[[VAR_ARRAY3]] : !llvm.ptr) sizes(%[[VAR_E1_2]], %[[CONS_3]] : i64, i64) lbs(%[[CONS_4]], %[[CONS_1]] : i64, i64) -> i32
 !LLVMIRDialect: oss.task_for
 !LLVMIRDialect-SAME: vlaDims(%[[VLA_3]] : i32)
 !LLVMIRDialect-SAME: captures(%[[VAR_E1_2]], %[[CONS_3]], %[[CONS_4]], %[[CONS_1]] : i64, i64, i64, i64)
 
-!LLVMIRDialect: %[[VLA_4:.*]] = oss.vlaDim pointer(%[[VAR_ARRAY4]] : !llvm.ptr<i32>) sizes(%[[VAR_E1_2]], %[[CONS_2]] : i64, i64) lbs(%[[CONS_4]], %[[CONS_2]] : i64, i64) -> i32
+!LLVMIRDialect: %[[VLA_4:.*]] = oss.vlaDim pointer(%[[VAR_ARRAY4]] : !llvm.ptr) sizes(%[[VAR_E1_2]], %[[CONS_2]] : i64, i64) lbs(%[[CONS_4]], %[[CONS_2]] : i64, i64) -> i32
 !LLVMIRDialect: oss.task_for
 !LLVMIRDialect-SAME: vlaDims(%[[VLA_4]] : i32)
 !LLVMIRDialect-SAME: captures(%[[VAR_E1_2]], %[[CONS_2]], %[[CONS_4]], %[[CONS_2]] : i64, i64, i64, i64)

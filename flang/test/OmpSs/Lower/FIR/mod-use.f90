@@ -22,11 +22,12 @@ END
 
 ! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "p"} {
 ! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.address_of(@_QMmodEx) : !fir.ref<i32>
-! FIRDialect:           oss.task firstprivate(%[[VAL_0]] : !fir.ref<i32>) {
-! FIRDialect:             %[[VAL_1:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<i32>
-! FIRDialect:             %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:             %[[VAL_3:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_1]], %[[VAL_2]] : i32
-! FIRDialect:             fir.store %[[VAL_3]] to %[[VAL_0]] : !fir.ref<i32>
+! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           oss.task firstprivate(%[[VAL_0]] : !fir.ref<i32>) firstprivate_type(%[[VAL_1]] : !fir.oss<i32>) {
+! FIRDialect:             %[[VAL_2:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<i32>
+! FIRDialect:             %[[VAL_3:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:             %[[VAL_4:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_2]], %[[VAL_3]] : i32
+! FIRDialect:             fir.store %[[VAL_4]] to %[[VAL_0]] : !fir.ref<i32>
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
 ! FIRDialect:           return

@@ -11,9 +11,10 @@ END
 ! HLFIRToFIR-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "p"} {
 ! HLFIRToFIR:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "x", uniq_name = "_QFEx"}
 ! HLFIRToFIR:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_0]] {uniq_name = "_QFEx"} : (!fir.ref<i32>) -> !fir.ref<i32>
-! HLFIRToFIR:           oss.task firstprivate(%[[VAL_1]], %[[VAL_1]] : !fir.ref<i32>, !fir.ref<i32>) {
-! HLFIRToFIR:             %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant 777 : i32
-! HLFIRToFIR:             fir.store %[[VAL_2]] to %[[VAL_1]] : !fir.ref<i32>
+! HLFIRToFIR:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! HLFIRToFIR:           oss.task firstprivate(%[[VAL_1]], %[[VAL_1]] : !fir.ref<i32>, !fir.ref<i32>) firstprivate_type(%[[VAL_2]], %[[VAL_2]] : !fir.oss<i32>, !fir.oss<i32>) {
+! HLFIRToFIR:             %[[VAL_3:[-0-9A-Za-z._]+]] = arith.constant 777 : i32
+! HLFIRToFIR:             fir.store %[[VAL_3]] to %[[VAL_1]] : !fir.ref<i32>
 ! HLFIRToFIR:             oss.terminator
 ! HLFIRToFIR:           }
 ! HLFIRToFIR:           return

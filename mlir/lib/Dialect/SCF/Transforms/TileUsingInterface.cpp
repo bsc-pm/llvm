@@ -172,8 +172,9 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
         loc, offset, size, tileSize, ValueRange{},
         [&](OpBuilder &bodyBuilder, Location bodyLoc, Value iv,
             ValueRange /*iterArgs*/) {
-          sizes[loopRange.index()] = getBoundedTileSize(
-              bodyBuilder, bodyLoc, loopRange.value(), iv, tileSize);
+          sizes[loopRange.index()] =
+              getBoundedTileSize(bodyBuilder, bodyLoc, loopRange.value(), iv,
+                                 getAsOpFoldResult(tileSize));
           builder.create<scf::YieldOp>(loc);
         });
     offsets[loopRange.index()] = loop.getInductionVar();
@@ -522,7 +523,7 @@ getUntiledProducerFromSliceSource(OpOperand *source,
     scf::ForOp loop = *loopIt;
     if (iterArg.getOwner()->getParentOp() != loop)
       break;
-    source = &loop.getOpOperandForRegionIterArg(iterArg);
+    source = loop.getTiedLoopInit(iterArg);
     loopIt++;
   }
   if (loopIt == loops.rend())
@@ -608,8 +609,7 @@ mlir::scf::tileAndFuseProducerOfSlice(RewriterBase &rewriter,
   if (destinationInitArg &&
       (*destinationInitArg)->getOwner() == outerMostLoop) {
     unsigned iterArgNumber =
-        outerMostLoop.getResultForOpOperand(**destinationInitArg)
-            .getResultNumber();
+        outerMostLoop.getTiedLoopResult(*destinationInitArg).getResultNumber();
     int64_t resultNumber = fusableProducer.getResultNumber();
     if (auto dstOp =
             dyn_cast<DestinationStyleOpInterface>(fusableProducer.getOwner())) {

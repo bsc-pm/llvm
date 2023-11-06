@@ -36,6 +36,14 @@
 #include "mlir/Dialect/OmpSs/OmpSsDialect.h"
 #include "llvm/Support/Debug.h"
 
+mlir::Type getLLVMIRLowerableType(mlir::Type t) {
+  // Heap and Pointer types are already lowered to
+  // llvm.ptr which is fine
+  if (t.isa<fir::HeapType, fir::PointerType>())
+    return fir::OmpSsType::get(t);
+  return fir::OmpSsType::get(fir::unwrapRefType(t));
+}
+
 static const Fortran::parser::Name *
 getDesignatorNameIfDataRef(const Fortran::parser::Designator &designator) {
   const auto *dataRef = std::get_if<Fortran::parser::DataRef>(&designator.u);
@@ -769,6 +777,8 @@ namespace {
         const Fortran::lower::ImplicitDSAs &implicitDSAs)
       : converter(converter), context(context), eval(eval), scope(scope), stmtCtx(stmtCtx) {
 
+      auto &firOpBuilder = converter.getFirOpBuilder();
+      auto loc = converter.genUnknownLocation();
       for (const auto &sym : implicitDSAs.sharedList) {
         sharedClauseOperands_.insert(addOperands(converter, sym));
         if (converter.getLoweringOptions().getLowerToHighLevelFIR())
@@ -787,6 +797,25 @@ namespace {
           firstprivateClauseOperands_.insert(addHLFIROperands(converter, sym));
         addAdditionalInfo(sym, /*InitNeeded=*/false, /*CopyNeeded=*/true);
       }
+      // NOTE: This must happen after all DSA processing to match the correct parallel lists
+      for (const mlir::Value val : sharedClauseOperands_) {
+        mlir::Type ty = getLLVMIRLowerableType(val.getType());
+        auto a = firOpBuilder.create<fir::UndefOp>(loc, ty);
+        sharedTypeClauseOperands_.push_back(a);
+      }
+      for (const mlir::Value val : privateClauseOperands_) {
+        mlir::Type ty = getLLVMIRLowerableType(val.getType());
+        auto a = firOpBuilder.create<fir::UndefOp>(loc, ty);
+        privateTypeClauseOperands_.push_back(a);
+      }
+      for (const mlir::Value val : firstprivateClauseOperands_) {
+        mlir::Type ty = getLLVMIRLowerableType(val.getType());
+        auto a = firOpBuilder.create<fir::UndefOp>(loc, ty);
+        firstprivateTypeClauseOperands_.push_back(a);
+      }
+      assert(firstprivateTypeClauseOperands_.size() == firstprivateClauseOperands_.size());
+      assert(sharedTypeClauseOperands_.size() == sharedClauseOperands_.size());
+      assert(privateTypeClauseOperands_.size() == privateClauseOperands_.size());
     }
 
     mlir::Value getComputeDep(const Fortran::parser::OSSObject &ossObject) {
@@ -1552,11 +1581,14 @@ namespace {
     mlir::Value priorityClauseOperand() const { return priorityClauseOperand_; }
     mlir::oss::ClauseDefaultAttr defaultClauseOperand() const { return defaultClauseOperand_; }
     llvm::ArrayRef<mlir::Value> privateClauseOperands() const { return privateClauseOperands_.getArrayRef(); }
+    llvm::ArrayRef<mlir::Value> privateTypeClauseOperands() const { return privateTypeClauseOperands_; }
     llvm::ArrayRef<mlir::Value> firstprivateClauseOperands() const { return firstprivateClauseOperands_.getArrayRef(); }
+    llvm::ArrayRef<mlir::Value> firstprivateTypeClauseOperands() const { return firstprivateTypeClauseOperands_; }
     llvm::ArrayRef<mlir::Value> copyClauseOperands() const { return copyClauseOperands_.getArrayRef(); }
     llvm::ArrayRef<mlir::Value> initClauseOperands() const { return initClauseOperands_.getArrayRef(); }
     llvm::ArrayRef<mlir::Value> deinitClauseOperands() const { return deinitClauseOperands_.getArrayRef(); }
     llvm::ArrayRef<mlir::Value> sharedClauseOperands() const { return sharedClauseOperands_.getArrayRef(); }
+    llvm::ArrayRef<mlir::Value> sharedTypeClauseOperands() const { return sharedTypeClauseOperands_; }
     llvm::ArrayRef<mlir::Value> vlaDimsOperands() const { return vlaDimsOperands_; }
     llvm::ArrayRef<mlir::Value> captureOperands() const { return capturesOperands_.getArrayRef(); }
     mlir::Value chunksizeClauseOperand() const { return chunksizeClauseOperand_; }
@@ -1611,13 +1643,16 @@ namespace {
     mlir::Value priorityClauseOperand_;
     mlir::oss::ClauseDefaultAttr defaultClauseOperand_;
     llvm::SetVector<mlir::Value> privateClauseOperands_;
+    llvm::SmallVector<mlir::Value> privateTypeClauseOperands_;
     llvm::SetVector<mlir::Value> firstprivateClauseOperands_;
+    llvm::SmallVector<mlir::Value> firstprivateTypeClauseOperands_;
     // TODO: should this be a std::map or something to avoid
     // creating copy functions for symbols with the same type?
     llvm::SetVector<mlir::Value> copyClauseOperands_;
     llvm::SetVector<mlir::Value> initClauseOperands_;
     llvm::SetVector<mlir::Value> deinitClauseOperands_;
     llvm::SetVector<mlir::Value> sharedClauseOperands_;
+    llvm::SmallVector<mlir::Value> sharedTypeClauseOperands_;
     llvm::SmallVector<mlir::Value, 4> vlaDimsOperands_;
     llvm::SetVector<mlir::Value> capturesOperands_;
     mlir::Value chunksizeClauseOperand_;
@@ -1674,11 +1709,14 @@ static void genOSS(Fortran::lower::AbstractConverter &converter,
           clausesVisitor.priorityClauseOperand(),
           clausesVisitor.defaultClauseOperand(),
           clausesVisitor.privateClauseOperands(),
+          clausesVisitor.privateTypeClauseOperands(),
           clausesVisitor.firstprivateClauseOperands(),
+          clausesVisitor.firstprivateTypeClauseOperands(),
           clausesVisitor.copyClauseOperands(),
           clausesVisitor.initClauseOperands(),
           clausesVisitor.deinitClauseOperands(),
           clausesVisitor.sharedClauseOperands(),
+          clausesVisitor.sharedTypeClauseOperands(),
           clausesVisitor.vlaDimsOperands(),
           clausesVisitor.captureOperands(),
           clausesVisitor.inClauseOperands(),
@@ -1763,11 +1801,14 @@ genOSS(Fortran::lower::AbstractConverter &converter,
         clausesVisitor.priorityClauseOperand(),
         clausesVisitor.defaultClauseOperand(),
         clausesVisitor.privateClauseOperands(),
+        clausesVisitor.privateTypeClauseOperands(),
         clausesVisitor.firstprivateClauseOperands(),
+        clausesVisitor.firstprivateTypeClauseOperands(),
         clausesVisitor.copyClauseOperands(),
         clausesVisitor.initClauseOperands(),
         clausesVisitor.deinitClauseOperands(),
         clausesVisitor.sharedClauseOperands(),
+        clausesVisitor.sharedTypeClauseOperands(),
         clausesVisitor.vlaDimsOperands(),
         clausesVisitor.captureOperands(),
         clausesVisitor.inClauseOperands(),
@@ -1826,11 +1867,14 @@ genOSS(Fortran::lower::AbstractConverter &converter,
         clausesVisitor.priorityClauseOperand(),
         clausesVisitor.defaultClauseOperand(),
         clausesVisitor.privateClauseOperands(),
+        clausesVisitor.privateTypeClauseOperands(),
         clausesVisitor.firstprivateClauseOperands(),
+        clausesVisitor.firstprivateTypeClauseOperands(),
         clausesVisitor.copyClauseOperands(),
         clausesVisitor.initClauseOperands(),
         clausesVisitor.deinitClauseOperands(),
         clausesVisitor.sharedClauseOperands(),
+        clausesVisitor.sharedTypeClauseOperands(),
         clausesVisitor.vlaDimsOperands(),
         clausesVisitor.captureOperands(),
         clausesVisitor.inClauseOperands(),
@@ -1859,11 +1903,14 @@ genOSS(Fortran::lower::AbstractConverter &converter,
         clausesVisitor.priorityClauseOperand(),
         clausesVisitor.defaultClauseOperand(),
         clausesVisitor.privateClauseOperands(),
+        clausesVisitor.privateTypeClauseOperands(),
         clausesVisitor.firstprivateClauseOperands(),
+        clausesVisitor.firstprivateTypeClauseOperands(),
         clausesVisitor.copyClauseOperands(),
         clausesVisitor.initClauseOperands(),
         clausesVisitor.deinitClauseOperands(),
         clausesVisitor.sharedClauseOperands(),
+        clausesVisitor.sharedTypeClauseOperands(),
         clausesVisitor.vlaDimsOperands(),
         clausesVisitor.captureOperands(),
         clausesVisitor.inClauseOperands(),
@@ -1892,11 +1939,14 @@ genOSS(Fortran::lower::AbstractConverter &converter,
         clausesVisitor.priorityClauseOperand(),
         clausesVisitor.defaultClauseOperand(),
         clausesVisitor.privateClauseOperands(),
+        clausesVisitor.privateTypeClauseOperands(),
         clausesVisitor.firstprivateClauseOperands(),
+        clausesVisitor.firstprivateTypeClauseOperands(),
         clausesVisitor.copyClauseOperands(),
         clausesVisitor.initClauseOperands(),
         clausesVisitor.deinitClauseOperands(),
         clausesVisitor.sharedClauseOperands(),
+        clausesVisitor.sharedTypeClauseOperands(),
         clausesVisitor.vlaDimsOperands(),
         clausesVisitor.captureOperands(),
         clausesVisitor.inClauseOperands(),
@@ -2017,16 +2067,6 @@ void Fortran::lower::genOmpSsTaskSubroutine(
     converter.getLocalSymbols().symbolMapStack.emplace_back(localSymbols.symbolMapStack.back());
 
     Fortran::lower::ImplicitDSAs implicitDSAs;
-    const auto &dummies = caller.getInterfaceDetails()->dummyArgs();
-    for (const Fortran::lower::CallInterface<
-             Fortran::lower::CallerInterface>::PassedEntity &arg :
-         caller.getPassedArguments()) {
-      const Fortran::semantics::Symbol *sym = dummies[arg.firArgument];
-      // We don't care about the dsa processing in OSSClausesVisitor,
-      // we are manually handling this to fisrtprivate
-      implicitDSAs.firstprivateList.push_back(*sym);
-    }
-
     OSSClausesVisitor clausesVisitor(converter, context, eval, scope, stmtCtx, implicitDSAs);
     clausesVisitor.gatherClauseList(clauseList);
     
@@ -2036,10 +2076,17 @@ void Fortran::lower::genOmpSsTaskSubroutine(
     llvm::SetVector<mlir::Value> val_shared_set;
     llvm::SetVector<mlir::Value> val_firstprivate_set;
     llvm::SetVector<mlir::Value> val_capture_set;
+    llvm::SmallVector<mlir::Value> val_type_shared;
+    llvm::SmallVector<mlir::Value> val_type_firstprivate;
     val_capture_set.insert(clausesVisitor.captureOperands().begin(), clausesVisitor.captureOperands().end());
 
     fillCallDSAs(caller, converter, stmtCtx, val_shared_set, val_firstprivate_set, val_capture_set);
     fillCallAdditionalCaptures(copyOutTmps, val_shared_set, val_firstprivate_set, val_capture_set);
+
+    for (auto val : val_shared_set)
+      val_type_shared.push_back(firOpBuilder.create<fir::UndefOp>(loc, getLLVMIRLowerableType(val.getType())));
+    for (auto val : val_firstprivate_set)
+      val_type_firstprivate.push_back(firOpBuilder.create<fir::UndefOp>(loc, getLLVMIRLowerableType(val.getType())));
 
     converter.getLocalSymbols().popScope();
 
@@ -2051,11 +2098,14 @@ void Fortran::lower::genOmpSsTaskSubroutine(
       clausesVisitor.priorityClauseOperand(),
       clausesVisitor.defaultClauseOperand(),
       clausesVisitor.privateClauseOperands(),
+      clausesVisitor.privateTypeClauseOperands(),
       val_firstprivate_set.getArrayRef(),
+      val_type_firstprivate,
       clausesVisitor.copyClauseOperands(),
       clausesVisitor.initClauseOperands(),
       clausesVisitor.deinitClauseOperands(),
       val_shared_set.getArrayRef(),
+      val_type_shared,
       clausesVisitor.vlaDimsOperands(),
       val_capture_set.getArrayRef(),
       clausesVisitor.inClauseOperands(),

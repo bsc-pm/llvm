@@ -233,6 +233,31 @@ def fir_IntegerType : FIR_Type<"Integer", "int"> {
   }];
 }
 
+def fir_OmpSsType : FIR_Type<"OmpSs", "oss"> {
+  let summary = "FIR OmpSs-2 type";
+
+  let description = [{
+    This is just a type wrapper to allow us to
+    convert properly types to llvm dialect.
+
+    Used in data-sharing type specification.
+  }];
+
+  let parameters = (ins "mlir::Type":$eleTy);
+
+  let assemblyFormat = "`<` $eleTy `>`";
+
+  let builders = [
+    TypeBuilderWithInferredContext<(ins "mlir::Type":$elementType), [{
+      return Base::get(elementType.getContext(), elementType);
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    mlir::Type getElementType() const { return getEleTy(); }
+  }];
+}
+
 def fir_LenType : FIR_Type<"Len", "len"> {
   let summary = "A LEN parameter (in a RecordType) argument's type";
 

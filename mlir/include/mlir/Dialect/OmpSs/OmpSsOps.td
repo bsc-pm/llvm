@@ -93,11 +93,14 @@ class LoopOp<string mnemonic, dag extraArguments,
     Optional<AnyType>:$priority_expr_var,
     OptionalAttr<ClauseDefaultAttr>:$default_val,
     Variadic<AnyType>:$private_vars,
+    Variadic<AnyType>:$private_type_vars,
     Variadic<AnyType>:$firstprivate_vars,
+    Variadic<AnyType>:$firstprivate_type_vars,
     Variadic<AnyType>:$copy_vars,
     Variadic<AnyType>:$init_vars,
     Variadic<AnyType>:$deinit_vars,
     Variadic<AnyType>:$shared_vars,
+    Variadic<AnyType>:$shared_type_vars,
     Variadic<AnyType>:$vlaDims_vars,
     Variadic<AnyType>:$captures_vars,
     Variadic<AnyType>:$in_vars,
@@ -126,11 +129,14 @@ class LoopOp<string mnemonic, dag extraArguments,
     ( `cost` `(` $cost_expr_var^ `:` type($cost_expr_var) `)` )?
     ( `priority` `(` $priority_expr_var^ `:` type($priority_expr_var) `)` )?
     ( `private` `(` $private_vars^ `:` type($private_vars) `)` )?
+    ( `private_type` `(` $private_type_vars^ `:` type($private_type_vars) `)` )?
     ( `firstprivate` `(` $firstprivate_vars^ `:` type($firstprivate_vars) `)` )?
+    ( `firstprivate_type` `(` $firstprivate_type_vars^ `:` type($firstprivate_type_vars) `)` )?
     ( `copy` `(` $copy_vars^ `:` type($copy_vars) `)` )?
     ( `init` `(` $init_vars^ `:` type($init_vars) `)` )?
     ( `deinit` `(` $deinit_vars^ `:` type($deinit_vars) `)` )?
     ( `shared` `(` $shared_vars^ `:` type($shared_vars) `)` )?
+    ( `shared_type` `(` $shared_type_vars^ `:` type($shared_type_vars) `)` )?
     ( `vlaDims` `(` $vlaDims_vars^ `:` type($vlaDims_vars) `)` )?
     ( `captures` `(` $captures_vars^ `:` type($captures_vars) `)` )?
     ( `in` `(` $in_vars^ `:` type($in_vars) `)` )?
@@ -226,11 +232,14 @@ def TaskOp : OmpSs_Op<"task", [AttrSizedOperandSegments, NoFreeVariables,
     Optional<AnyType>:$priority_expr_var,
     OptionalAttr<ClauseDefaultAttr>:$default_val,
     Variadic<AnyType>:$private_vars,
+    Variadic<AnyType>:$private_type_vars,
     Variadic<AnyType>:$firstprivate_vars,
+    Variadic<AnyType>:$firstprivate_type_vars,
     Variadic<AnyType>:$copy_vars,
     Variadic<AnyType>:$init_vars,
     Variadic<AnyType>:$deinit_vars,
     Variadic<AnyType>:$shared_vars,
+    Variadic<AnyType>:$shared_type_vars,
     Variadic<AnyType>:$vlaDims_vars,
     Variadic<AnyType>:$captures_vars,
     Variadic<AnyType>:$in_vars,
@@ -252,11 +261,14 @@ def TaskOp : OmpSs_Op<"task", [AttrSizedOperandSegments, NoFreeVariables,
     ( `cost` `(` $cost_expr_var^ `:` type($cost_expr_var) `)` )?
     ( `priority` `(` $priority_expr_var^ `:` type($priority_expr_var) `)` )?
     ( `private` `(` $private_vars^ `:` type($private_vars) `)` )?
+    ( `private_type` `(` $private_type_vars^ `:` type($private_type_vars) `)` )?
     ( `firstprivate` `(` $firstprivate_vars^ `:` type($firstprivate_vars) `)` )?
+    ( `firstprivate_type` `(` $firstprivate_type_vars^ `:` type($firstprivate_type_vars) `)` )?
     ( `copy` `(` $copy_vars^ `:` type($copy_vars) `)` )?
     ( `init` `(` $init_vars^ `:` type($init_vars) `)` )?
     ( `deinit` `(` $deinit_vars^ `:` type($deinit_vars) `)` )?
     ( `shared` `(` $shared_vars^ `:` type($shared_vars) `)` )?
+    ( `shared_type` `(` $shared_type_vars^ `:` type($shared_type_vars) `)` )?
     ( `vlaDims` `(` $vlaDims_vars^ `:` type($vlaDims_vars) `)` )?
     ( `captures` `(` $captures_vars^ `:` type($captures_vars) `)` )?
     ( `in` `(` $in_vars^ `:` type($in_vars) `)` )?

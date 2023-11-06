@@ -20,13 +20,13 @@ void bar(int n) {
 
 // CHECK: OSSTaskLoopDirective 0x{{.*}} <line:{{.*}}:{{.*}}, <invalid sloc>> ompss-2
 // CHECK-NEXT: OSSGrainsizeClause 0x{{.*}} <col:{{.*}}, col:{{.*}}>
-// CHECK-NEXT: CallExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int':'int'
+// CHECK-NEXT: CallExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int'
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int (*)()' <FunctionToPointerDecay>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int ()' lvalue Function 0x{{.*}} 'foo' 'int ()' (FunctionTemplate 0x{{.*}} 'foo')
 
 // CHECK: OSSTaskLoopForDirective 0x{{.*}} <line:{{.*}}:{{.*}}, <invalid sloc>> ompss-2
 // CHECK-NEXT: OSSGrainsizeClause 0x{{.*}} <col:{{.*}}, col:{{.*}}>
-// CHECK-NEXT: CallExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int':'int'
+// CHECK-NEXT: CallExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int'
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int (*)()' <FunctionToPointerDecay>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int ()' lvalue Function 0x{{.*}} 'foo' 'int ()' (FunctionTemplate 0x{{.*}} 'foo')
 

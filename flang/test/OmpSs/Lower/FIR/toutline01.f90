@@ -24,11 +24,32 @@ end subroutine test3
 ! CHECK:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
 ! CHECK:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_2]](%[[VAL_4]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?xf32>>>
 ! CHECK:           fir.store %[[VAL_5]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>
-! CHECK:           oss.task shared(%[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>) {
+! CHECK:           %[[VAL_6:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<!fir.box<!fir.heap<!fir.array<?xf32>>>>
+! CHECK:           oss.task shared(%[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>) shared_type(%[[VAL_6]] : !fir.oss<!fir.box<!fir.heap<!fir.array<?xf32>>>>) {
 ! CHECK:             fir.call @_QPtest3b(%[[VAL_1]]) fastmath<contract> : (!fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>) -> ()
 ! CHECK:             oss.terminator
+! CHECK:           }
+! CHECK:           %[[VAL_7:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>
+! CHECK:           %[[VAL_8:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_7]] : (!fir.box<!fir.heap<!fir.array<?xf32>>>) -> !fir.heap<!fir.array<?xf32>>
+! CHECK:           %[[VAL_9:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_8]] : (!fir.heap<!fir.array<?xf32>>) -> i64
+! CHECK:           %[[VAL_10:[-0-9A-Za-z._]+]] = arith.constant 0 : i64
+! CHECK:           %[[VAL_11:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_9]], %[[VAL_10]] : i64
+! CHECK:           fir.if %[[VAL_11]] {
+! CHECK:             %[[VAL_12:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>
+! CHECK:             %[[VAL_13:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_12]] : (!fir.box<!fir.heap<!fir.array<?xf32>>>) -> !fir.heap<!fir.array<?xf32>>
+! CHECK:             fir.freemem %[[VAL_13]] : !fir.heap<!fir.array<?xf32>>
+! CHECK:             %[[VAL_14:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.heap<!fir.array<?xf32>>
+! CHECK:             %[[VAL_15:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! CHECK:             %[[VAL_16:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_15]] : (index) -> !fir.shape<1>
+! CHECK:             %[[VAL_17:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_14]](%[[VAL_16]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?xf32>>>
+! CHECK:             fir.store %[[VAL_17]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>
 ! CHECK:           }
 ! CHECK:           return
 ! CHECK:         }
 ! CHECK:         func.func private @_QPtest3b(!fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>)
+
+! CHECK-LABEL:   fir.global linkonce @_QQcl.6125f71105035bb03fb684e809dc5f8e constant : !fir.char<1,67> {
+! CHECK:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.string_lit "/home/rpenacob/llvm-mono/flang/test/OmpSs/Lower/FIR/toutline01.f90\00"(67) : !fir.char<1,67>
+! CHECK:           fir.has_value %[[VAL_0]] : !fir.char<1,67>
+! CHECK:         }
 
