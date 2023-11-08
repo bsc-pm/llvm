@@ -4542,14 +4542,15 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
         *this, DSAStack, CKind, TmpList, ScopeSpec, ReductionIds[i],
         ArrayRef<Expr *>(UnresolvedReductions_it, UnresolvedReductions_it + ReductionListSizes[i]),
         RD, /*Outline=*/true);
-      Reductions_it += ReductionListSizes[i];
-      UnresolvedReductions_it += ReductionListSizes[i];
     }
 
     for (Expr *RefExpr : TmpList)
       OSSClauseChecker.VisitClauseExpr(RefExpr, CKind);
 
     ReductionNSLoc.push_back(ReductionCXXScopeSpecs[i].getWithLocInContext(Context));
+    Reductions_it += ReductionListSizes[i];
+    if (!UnresolvedReductions.empty())
+      UnresolvedReductions_it += ReductionListSizes[i];
   }
   if (!Ndranges.empty()) {
     if (!(DevType == OSSTaskDeclAttr::DeviceType::Cuda
