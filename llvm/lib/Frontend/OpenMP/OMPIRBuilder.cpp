@@ -4713,6 +4713,23 @@ OpenMPIRBuilder::createForStaticInitFunction(unsigned IVSize, bool IVSigned,
   return getOrCreateRuntimeFunction(M, Name);
 }
 
+FunctionCallee
+OpenMPIRBuilder::createNosvForStaticInitFunction(unsigned IVSize, bool IVSigned,
+                                             bool IsGPUDistribute) {
+  assert((IVSize == 32 || IVSize == 64) &&
+         "IV size is not compatible with the omp runtime");
+  RuntimeFunction Name;
+  if (IsGPUDistribute)
+    llvm_unreachable("unexpected distributed nosv version");
+  else
+    Name = IVSize == 32 ? (IVSigned ? omp::OMPRTL___nosvc_for_static_init_4
+                                    : omp::OMPRTL___nosvc_for_static_init_4u)
+                        : (IVSigned ? omp::OMPRTL___nosvc_for_static_init_8
+                                    : omp::OMPRTL___nosvc_for_static_init_8u);
+
+  return getOrCreateRuntimeFunction(M, Name);
+}
+
 FunctionCallee OpenMPIRBuilder::createDispatchInitFunction(unsigned IVSize,
                                                            bool IVSigned) {
   assert((IVSize == 32 || IVSize == 64) &&
@@ -4726,6 +4743,19 @@ FunctionCallee OpenMPIRBuilder::createDispatchInitFunction(unsigned IVSize,
   return getOrCreateRuntimeFunction(M, Name);
 }
 
+FunctionCallee OpenMPIRBuilder::createNosvDispatchInitFunction(unsigned IVSize,
+                                                               bool IVSigned) {
+  assert((IVSize == 32 || IVSize == 64) &&
+         "IV size is not compatible with the omp runtime");
+  RuntimeFunction Name = IVSize == 32
+                             ? (IVSigned ? omp::OMPRTL___nosvc_dispatch_init_4
+                                         : omp::OMPRTL___nosvc_dispatch_init_4u)
+                             : (IVSigned ? omp::OMPRTL___nosvc_dispatch_init_8
+                                         : omp::OMPRTL___nosvc_dispatch_init_8u);
+
+  return getOrCreateRuntimeFunction(M, Name);
+}
+
 FunctionCallee OpenMPIRBuilder::createDispatchNextFunction(unsigned IVSize,
                                                            bool IVSigned) {
   assert((IVSize == 32 || IVSize == 64) &&
@@ -4735,6 +4765,19 @@ FunctionCallee OpenMPIRBuilder::createDispatchNextFunction(unsigned IVSize,
                                          : omp::OMPRTL___kmpc_dispatch_next_4u)
                              : (IVSigned ? omp::OMPRTL___kmpc_dispatch_next_8
                                          : omp::OMPRTL___kmpc_dispatch_next_8u);
+
+  return getOrCreateRuntimeFunction(M, Name);
+}
+
+FunctionCallee OpenMPIRBuilder::createNosvDispatchNextFunction(unsigned IVSize,
+                                                           bool IVSigned) {
+  assert((IVSize == 32 || IVSize == 64) &&
+         "IV size is not compatible with the omp runtime");
+  RuntimeFunction Name = IVSize == 32
+                             ? (IVSigned ? omp::OMPRTL___nosvc_dispatch_next_4
+                                         : omp::OMPRTL___nosvc_dispatch_next_4u)
+                             : (IVSigned ? omp::OMPRTL___nosvc_dispatch_next_8
+                                         : omp::OMPRTL___nosvc_dispatch_next_8u);
 
   return getOrCreateRuntimeFunction(M, Name);
 }

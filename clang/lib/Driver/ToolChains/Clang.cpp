@@ -6372,6 +6372,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     case Driver::OMPRT_IOMP5:
       // Clang can generate useful OpenMP code for these two runtime libraries.
       CmdArgs.push_back("-fopenmp");
+      Args.AddAllArgs(CmdArgs, options::OPT_fopenmp_nosv);
 
       // If no option regarding the use of TLS in OpenMP codegeneration is
       // given, decide a default based on the target. Otherwise rely on the

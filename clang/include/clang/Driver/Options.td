@@ -3308,6 +3308,10 @@ defm openmp_extensions: BoolFOption<"openmp-extensions",
   NegFlag<SetFalse, [NoArgumentUnused], [ClangOption, CC1Option],
           "Disable all Clang extensions for OpenMP directives and clauses">>;
 def fopenmp_EQ : Joined<["-"], "fopenmp=">, Group<f_Group>;
+def fopenmp_nosv : Flag<["-"], "fopenmp-nosv">, Group<f_Group>,
+  Flags<[NoArgumentUnused]>,
+  Visibility<[ClangOption, CC1Option, FlangOption, FC1Option]>,
+  MarshallingInfoFlag<LangOpts<"OpenMPNosv">>;
 def fopenmp_use_tls : Flag<["-"], "fopenmp-use-tls">, Group<f_Group>,
   Flags<[NoArgumentUnused, HelpHidden]>;
 def fnoopenmp_use_tls : Flag<["-"], "fnoopenmp-use-tls">, Group<f_Group>,

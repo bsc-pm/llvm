@@ -4590,7 +4590,7 @@ bool CompilerInvocation::CreateFromArgsImpl(
   }
 
   // OmpSs, force line debug info
-  if (LangOpts.OpenMP
+  if (LangOpts.OpenMP && LangOpts.OpenMPNosv
       && Res.getCodeGenOpts().getDebugInfo() == llvm::codegenoptions::NoDebugInfo) {
     Res.getCodeGenOpts().setDebugInfo(llvm::codegenoptions::LocTrackingOnly);
   }

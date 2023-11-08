@@ -2214,14 +2214,18 @@ public:
   /// __kmpc_distribute_static_init* if \a IsGPUDistribute is set.
   FunctionCallee createForStaticInitFunction(unsigned IVSize, bool IVSigned,
                                              bool IsGPUDistribute);
+  FunctionCallee createNosvForStaticInitFunction(unsigned IVSize, bool IVSigned,
+                                             bool IsGPUDistribute);
 
   /// Returns __kmpc_dispatch_init_* runtime function for the specified
   /// size \a IVSize and sign \a IVSigned.
   FunctionCallee createDispatchInitFunction(unsigned IVSize, bool IVSigned);
+  FunctionCallee createNosvDispatchInitFunction(unsigned IVSize, bool IVSigned);
 
   /// Returns __kmpc_dispatch_next_* runtime function for the specified
   /// size \a IVSize and sign \a IVSigned.
   FunctionCallee createDispatchNextFunction(unsigned IVSize, bool IVSigned);
+  FunctionCallee createNosvDispatchNextFunction(unsigned IVSize, bool IVSigned);
 
   /// Returns __kmpc_dispatch_fini_* runtime function for the specified
   /// size \a IVSize and sign \a IVSigned.

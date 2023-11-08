@@ -2220,14 +2220,21 @@ void CGOpenMPRuntime::emitSingleRegion(CodeGenFunction &CGF,
     CGF.Builder.CreateStore(CGF.Builder.getInt32(0), DidIt);
   }
   // Prepare arguments and build a call to __kmpc_single
-  llvm::Value *Args[] = {emitUpdateLocation(CGF, Loc), getThreadID(CGF, Loc), NosvTaskTypeGV};
+  RuntimeFunction RTLSingle = OMPRTL___kmpc_single;
+  RuntimeFunction RTLSingleEnd = OMPRTL___kmpc_end_single;
+  SmallVector<llvm::Value *, 2> Args = {emitUpdateLocation(CGF, Loc), getThreadID(CGF, Loc)};
+  if (CGM.getLangOpts().OpenMPNosv) {
+    assert(NosvTaskTypeGV && "task type is null");
+    Args.push_back(NosvTaskTypeGV);
+  }
   CommonActionTy Action(OMPBuilder.getOrCreateRuntimeFunction(
-                            CGM.getModule(), OMPRTL___kmpc_single),
+                            CGM.getModule(), RTLSingle),
                         Args,
                         OMPBuilder.getOrCreateRuntimeFunction(
-                            CGM.getModule(), OMPRTL___kmpc_end_single),
+                            CGM.getModule(), RTLSingleEnd),
                         Args,
                         /*Conditional=*/true);
+
   SingleOpGen.setAction(Action);
   emitInlinedDirective(CGF, OMPD_single, SingleOpGen);
   if (DidIt.isValid()) {
@@ -2533,7 +2540,7 @@ void CGOpenMPRuntime::emitForDispatchInit(
   // If the Chunk was not specified in the clause - use default value 1.
   llvm::Value *Chunk = DispatchValues.Chunk ? DispatchValues.Chunk
                                             : CGF.Builder.getIntN(IVSize, 1);
-  llvm::Value *Args[] = {
+  SmallVector<llvm::Value *, 7> Args = {
       emitUpdateLocation(CGF, Loc),
       getThreadID(CGF, Loc),
       CGF.Builder.getInt32(addMonoNonMonoModifier(
@@ -2542,10 +2549,16 @@ void CGOpenMPRuntime::emitForDispatchInit(
       DispatchValues.UB,                                     // Upper
       CGF.Builder.getIntN(IVSize, 1),                        // Stride
       Chunk,                                                 // Chunk
-      NosvTaskTypeGV                                         // "Task type" of the for
   };
-  CGF.EmitRuntimeCall(OMPBuilder.createDispatchInitFunction(IVSize, IVSigned),
-                      Args);
+  if (CGM.getLangOpts().OpenMPNosv) {
+    assert(NosvTaskTypeGV && "task type is null");
+    Args.push_back(NosvTaskTypeGV);
+    CGF.EmitRuntimeCall(OMPBuilder.createNosvDispatchInitFunction(IVSize, IVSigned),
+                        Args);
+  } else {
+    CGF.EmitRuntimeCall(OMPBuilder.createDispatchInitFunction(IVSize, IVSigned),
+                        Args);
+  }
 }
 
 static void emitForStaticInitCall(
@@ -2582,7 +2595,7 @@ static void emitForStaticInitCall(
             Schedule == OMP_dist_sch_static_chunked) &&
            "expected static chunked schedule");
   }
-  llvm::Value *Args[] = {
+  SmallVector<llvm::Value *, 9> Args = {
       UpdateLocation,
       ThreadId,
       CGF.Builder.getInt32(addMonoNonMonoModifier(CGF.CGM, Schedule, M1,
@@ -2593,8 +2606,11 @@ static void emitForStaticInitCall(
       Values.ST.getPointer(),                           // &Stride
       CGF.Builder.getIntN(Values.IVSize, 1),            // Incr
       Chunk,                                            // Chunk
-      NosvTaskTypeGV                                    // "Task type" of the for
   };
+  if (CGF.CGM.getLangOpts().OpenMPNosv) {
+    assert(NosvTaskTypeGV && "task type is null");
+    Args.push_back(NosvTaskTypeGV);
+  }
   CGF.EmitRuntimeCall(ForStaticInitFunction, Args);
 }
 
@@ -2604,7 +2620,6 @@ void CGOpenMPRuntime::emitForStaticInit(CodeGenFunction &CGF,
                                         const OpenMPScheduleTy &ScheduleKind,
                                         const StaticRTInput &Values,
                                         llvm::GlobalVariable *NosvTaskTypeGV) {
-  assert(NosvTaskTypeGV && "task type is null");
   OpenMPSchedType ScheduleNum = getRuntimeSchedule(
       ScheduleKind.Schedule, Values.Chunk != nullptr, Values.Ordered);
   assert((isOpenMPWorksharingDirective(DKind) || (DKind == OMPD_loop)) &&
@@ -2614,9 +2629,17 @@ void CGOpenMPRuntime::emitForStaticInit(CodeGenFunction &CGF,
                                                  ? OMP_IDENT_WORK_LOOP
                                                  : OMP_IDENT_WORK_SECTIONS);
   llvm::Value *ThreadId = getThreadID(CGF, Loc);
-  llvm::FunctionCallee StaticInitFunction =
+  llvm::FunctionCallee StaticInitFunction = nullptr;
+  if (CGM.getLangOpts().OpenMPNosv) {
+    assert(NosvTaskTypeGV && "task type is null");
+    StaticInitFunction =
+      OMPBuilder.createNosvForStaticInitFunction(Values.IVSize, Values.IVSigned,
+                                                 false);
+  } else {
+    StaticInitFunction =
       OMPBuilder.createForStaticInitFunction(Values.IVSize, Values.IVSigned,
                                              false);
+  }
   auto DL = ApplyDebugLocation::CreateDefaultArtificial(CGF, Loc);
 
   emitForStaticInitCall(CGF, Loc, UpdatedLocation, ThreadId, StaticInitFunction,
@@ -2637,8 +2660,15 @@ void CGOpenMPRuntime::emitDistributeStaticInit(
   bool isGPUDistribute =
       CGM.getLangOpts().OpenMPIsTargetDevice &&
       (CGM.getTriple().isAMDGCN() || CGM.getTriple().isNVPTX());
-  StaticInitFunction = OMPBuilder.createForStaticInitFunction(
-      Values.IVSize, Values.IVSigned, isGPUDistribute);
+  if (CGM.getLangOpts().OpenMPNosv) {
+    assert(NosvTaskTypeGV && "task type is null");
+    assert(!isGPUDistribute);
+    StaticInitFunction = OMPBuilder.createNosvForStaticInitFunction(
+        Values.IVSize, Values.IVSigned, isGPUDistribute);
+  } else {
+    StaticInitFunction = OMPBuilder.createForStaticInitFunction(
+        Values.IVSize, Values.IVSigned, isGPUDistribute);
+  }
 
   emitForStaticInitCall(CGF, Loc, UpdatedLocation, ThreadId, StaticInitFunction,
                         ScheduleNum, OMPC_SCHEDULE_MODIFIER_unknown,
@@ -2650,28 +2680,36 @@ void CGOpenMPRuntime::emitForStaticFinish(CodeGenFunction &CGF,
                                           OpenMPDirectiveKind DKind, llvm::GlobalVariable *NosvTaskTypeGV) {
   if (!CGF.HaveInsertPoint())
     return;
-  assert(NosvTaskTypeGV && "task type is null");
   // Call __kmpc_for_static_fini(ident_t *loc, kmp_int32 tid);
-  llvm::Value *Args[] = {
+  bool IsTarget = isOpenMPDistributeDirective(DKind) &&
+        CGM.getLangOpts().OpenMPIsTargetDevice &&
+        (CGM.getTriple().isAMDGCN() || CGM.getTriple().isNVPTX());
+  SmallVector<llvm::Value *, 2> Args = {
       emitUpdateLocation(CGF, Loc,
                          isOpenMPDistributeDirective(DKind)
                              ? OMP_IDENT_WORK_DISTRIBUTE
                              : isOpenMPLoopDirective(DKind)
                                    ? OMP_IDENT_WORK_LOOP
                                    : OMP_IDENT_WORK_SECTIONS),
-      getThreadID(CGF, Loc), NosvTaskTypeGV};
+      getThreadID(CGF, Loc)};
   auto DL = ApplyDebugLocation::CreateDefaultArtificial(CGF, Loc);
-  if (isOpenMPDistributeDirective(DKind) &&
-      CGM.getLangOpts().OpenMPIsTargetDevice &&
-      (CGM.getTriple().isAMDGCN() || CGM.getTriple().isNVPTX()))
+  if (CGM.getLangOpts().OpenMPNosv) {
+    assert(NosvTaskTypeGV && "task type is null");
+    assert(!IsTarget);
+    Args.push_back(NosvTaskTypeGV);
+    CGF.EmitRuntimeCall(OMPBuilder.getOrCreateRuntimeFunction(
+                            CGM.getModule(), OMPRTL___nosvc_for_static_fini),
+                        Args);
+  } else if (IsTarget) {
     CGF.EmitRuntimeCall(
         OMPBuilder.getOrCreateRuntimeFunction(
             CGM.getModule(), OMPRTL___kmpc_distribute_static_fini),
         Args);
-  else
+  } else {
     CGF.EmitRuntimeCall(OMPBuilder.getOrCreateRuntimeFunction(
                             CGM.getModule(), OMPRTL___kmpc_for_static_fini),
                         Args);
+  }
 }
 
 void CGOpenMPRuntime::emitForOrderedIterationEnd(CodeGenFunction &CGF,
@@ -2696,17 +2734,24 @@ llvm::Value *CGOpenMPRuntime::emitForNext(CodeGenFunction &CGF,
   //          ident_t *loc, kmp_int32 tid, kmp_int32 *p_lastiter,
   //          kmp_int[32|64] *p_lower, kmp_int[32|64] *p_upper,
   //          kmp_int[32|64] *p_stride);
-  llvm::Value *Args[] = {
+  SmallVector<llvm::Value *, 6> Args = {
       emitUpdateLocation(CGF, Loc),
       getThreadID(CGF, Loc),
       IL.getPointer(), // &isLastIter
       LB.getPointer(), // &Lower
       UB.getPointer(), // &Upper
-      ST.getPointer(), // &Stride
-      NosvTaskTypeGV
+      ST.getPointer()  // &Stride
   };
-  llvm::Value *Call = CGF.EmitRuntimeCall(
-      OMPBuilder.createDispatchNextFunction(IVSize, IVSigned), Args);
+  llvm::Value *Call = nullptr;
+  if (CGM.getLangOpts().OpenMPNosv) {
+    assert(NosvTaskTypeGV && "task type is null");
+    Args.push_back(NosvTaskTypeGV);
+    Call = CGF.EmitRuntimeCall(
+        OMPBuilder.createNosvDispatchNextFunction(IVSize, IVSigned), Args);
+  } else {
+    Call = CGF.EmitRuntimeCall(
+        OMPBuilder.createDispatchNextFunction(IVSize, IVSigned), Args);
+  }
   return CGF.EmitScalarConversion(
       Call, CGF.getContext().getIntTypeForBitwidth(32, /*Signed=*/1),
       CGF.getContext().BoolTy, Loc);
@@ -3618,6 +3663,8 @@ static void getKmpAffinityType(ASTContext &C, QualType &KmpTaskAffinityInfoTy) {
 
 llvm::GlobalVariable *
 CGOpenMPRuntime::emitNosvTaskTypeRegister(CodeGenFunction &CGF, SourceLocation Loc, const Expr *Label) {
+  if (!CGM.getLangOpts().OpenMPNosv)
+    return nullptr;
   if (!CtorRegister) {
     ASTContext &C = CGM.getContext();
     llvm::LLVMContext &Ctx = CGM.getLLVMContext();
@@ -3825,10 +3872,10 @@ CGOpenMPRuntime::emitTaskInit(CodeGenFunction &CGF, SourceLocation Loc,
   SmallVector<llvm::Value *, 8> AllocArgs = {emitUpdateLocation(CGF, Loc),
       getThreadID(CGF, Loc), TaskFlags, KmpTaskTWithPrivatesTySize,
       SharedsSize, CGF.Builder.CreatePointerBitCastOrAddrSpaceCast(
-          TaskEntry, KmpRoutineEntryPtrTy), NosvTaskTypeGV};
+          TaskEntry, KmpRoutineEntryPtrTy)};
   llvm::Value *NewTask;
   if (D.hasClausesOfKind<OMPNowaitClause>()) {
-    llvm_unreachable("");
+    assert(!NosvTaskTypeGV);
     // Check if we have any device clause associated with the directive.
     const Expr *Device = nullptr;
     if (auto *C = D.getSingleClause<OMPDeviceClause>())
@@ -3845,6 +3892,13 @@ CGOpenMPRuntime::emitTaskInit(CodeGenFunction &CGF, SourceLocation Loc,
         OMPBuilder.getOrCreateRuntimeFunction(
             CGM.getModule(), OMPRTL___kmpc_omp_target_task_alloc),
         AllocArgs);
+  } else if (CGM.getLangOpts().OpenMPNosv) {
+    assert(NosvTaskTypeGV);
+    AllocArgs.push_back(NosvTaskTypeGV);
+    NewTask =
+        CGF.EmitRuntimeCall(OMPBuilder.getOrCreateRuntimeFunction(
+                                CGM.getModule(), OMPRTL___nosvc_omp_task_alloc),
+                            AllocArgs);
   } else {
     NewTask =
         CGF.EmitRuntimeCall(OMPBuilder.getOrCreateRuntimeFunction(
