@@ -1853,19 +1853,8 @@ kmp_int32 __kmpc_barrier_master_nowait(ident_t *loc, kmp_int32 global_tid) {
   return (ret);
 }
 
-/* The BARRIER for a SINGLE process section is always explicit   */
-/*!
-@ingroup WORK_SHARING
-@param loc  source location information
-@param global_tid  global thread number
-@return One if this thread should execute the single construct, zero otherwise.
-
-Test whether to execute a <tt>single</tt> construct.
-There are no implicit barriers in the two "single" calls, rather the compiler
-should introduce an explicit barrier if it is required.
-*/
-
-kmp_int32 __kmpc_single(ident_t *loc, kmp_int32 global_tid, omp_task_type_t *omp_task_type) {
+kmp_int32 __nosvc_single(ident_t *loc, kmp_int32 global_tid, omp_task_type_t *omp_task_type) {
+  KMP_ASSERT(omp_task_type);
   __kmp_assert_valid_gtid(global_tid);
   kmp_int32 rc = __kmp_enter_single(global_tid, loc, TRUE, omp_task_type);
 
@@ -1909,16 +1898,26 @@ kmp_int32 __kmpc_single(ident_t *loc, kmp_int32 global_tid, omp_task_type_t *omp
   return rc;
 }
 
+/* The BARRIER for a SINGLE process section is always explicit   */
 /*!
 @ingroup WORK_SHARING
 @param loc  source location information
 @param global_tid  global thread number
+@return One if this thread should execute the single construct, zero otherwise.
 
-Mark the end of a <tt>single</tt> construct.  This function should
-only be called by the thread that executed the block of code protected
-by the `single` construct.
+Test whether to execute a <tt>single</tt> construct.
+There are no implicit barriers in the two "single" calls, rather the compiler
+should introduce an explicit barrier if it is required.
 */
-void __kmpc_end_single(ident_t *loc, kmp_int32 global_tid, omp_task_type_t *omp_task_type) {
+
+kmp_int32 __kmpc_single(ident_t *loc, kmp_int32 global_tid) {
+  // TODO: better error
+  fprintf(stderr, "Unsupported __kmpc_single\n");
+  exit(1);
+}
+
+void __nosvc_end_single(ident_t *loc, kmp_int32 global_tid, omp_task_type_t *omp_task_type) {
+  KMP_ASSERT(omp_task_type);
   __kmp_assert_valid_gtid(global_tid);
   __kmp_exit_single(global_tid, omp_task_type);
   KMP_POP_PARTITIONED_TIMER();
@@ -1940,14 +1939,30 @@ void __kmpc_end_single(ident_t *loc, kmp_int32 global_tid, omp_task_type_t *omp_
 
 /*!
 @ingroup WORK_SHARING
+@param loc  source location information
+@param global_tid  global thread number
+
+Mark the end of a <tt>single</tt> construct.  This function should
+only be called by the thread that executed the block of code protected
+by the `single` construct.
+*/
+void __kmpc_end_single(ident_t *loc, kmp_int32 global_tid) {
+  // TODO: better error
+  fprintf(stderr, "Unsupported __kmpc_end_single\n");
+  exit(1);
+}
+
+/*!
+@ingroup WORK_SHARING
 @param loc Source location
 @param global_tid Global thread id
 
 Mark the end of a statically scheduled loop.
 */
-void __kmpc_for_static_fini(ident_t *loc, kmp_int32 global_tid, omp_task_type_t *omp_task_type) {
+void __nosvc_for_static_fini(ident_t *loc, kmp_int32 global_tid, omp_task_type_t *omp_task_type) {
+  KMP_ASSERT(omp_task_type);
   KMP_POP_PARTITIONED_TIMER();
-  KE_TRACE(10, ("__kmpc_for_static_fini called T#%d\n", global_tid));
+  KE_TRACE(10, ("__nosvc_for_static_fini called T#%d\n", global_tid));
 
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   if (ompt_enabled.ompt_callback_work) {
@@ -1964,7 +1979,7 @@ void __kmpc_for_static_fini(ident_t *loc, kmp_int32 global_tid, omp_task_type_t 
         ompt_work_type = ompt_work_distribute;
       } else {
         // use default set above.
-        // a warning about this case is provided in __kmpc_for_static_init
+        // a warning about this case is provided in __nosvc_for_static_init
       }
       KMP_DEBUG_ASSERT(ompt_work_type);
     }
@@ -1978,6 +1993,12 @@ void __kmpc_for_static_fini(ident_t *loc, kmp_int32 global_tid, omp_task_type_t 
 
   instr_ws_end((*omp_task_type)->instrum_id);
   instr_for_static_exit();
+}
+
+void __kmpc_for_static_fini(ident_t *loc, kmp_int32 global_tid) {
+  // TODO: better error
+  fprintf(stderr, "Unsupported __kmpc_for_static_init_4\n");
+  exit(1);
 }
 
 // User routines which take C-style arguments (call by value)

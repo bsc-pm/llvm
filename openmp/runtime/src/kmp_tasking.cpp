@@ -1768,17 +1768,19 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
   return task;
 }
 
-kmp_task_t *__kmpc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
+kmp_task_t *__nosvc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
                                   kmp_int32 flags, size_t sizeof_kmp_task_t,
                                   size_t sizeof_shareds,
                                   kmp_routine_entry_t task_entry,
                                   omp_task_type_t *omp_task_type) {
+  KMP_ASSERT(omp_task_type);
+
   kmp_task_t *retval;
   kmp_tasking_flags_t *input_flags = (kmp_tasking_flags_t *)&flags;
   __kmp_assert_valid_gtid(gtid);
   input_flags->native = FALSE;
   // __kmp_task_alloc() sets up all other runtime flags
-  KA_TRACE(10, ("__kmpc_omp_task_alloc(enter): T#%d loc=%p, flags=(%s %s %s) "
+  KA_TRACE(10, ("__nosv_omp_task_alloc(enter): T#%d loc=%p, flags=(%s %s %s) "
                 "sizeof_task=%ld sizeof_shared=%ld entry=%p\n",
                 gtid, loc_ref, input_flags->tiedness ? "tied  " : "untied",
                 input_flags->proxy ? "proxy" : "",
@@ -1788,9 +1790,18 @@ kmp_task_t *__kmpc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
   retval = __kmp_task_alloc(loc_ref, gtid, input_flags, sizeof_kmp_task_t,
                             sizeof_shareds, task_entry, omp_task_type);
 
-  KA_TRACE(20, ("__kmpc_omp_task_alloc(exit): T#%d retval %p\n", gtid, retval));
+  KA_TRACE(20, ("__nosv_omp_task_alloc(exit): T#%d retval %p\n", gtid, retval));
 
   return retval;
+}
+
+kmp_task_t *__kmpc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
+                                  kmp_int32 flags, size_t sizeof_kmp_task_t,
+                                  size_t sizeof_shareds,
+                                  kmp_routine_entry_t task_entry) {
+  // TODO: better error
+  fprintf(stderr, "Unsupported __kmpc_omp_task_alloc\n");
+  exit(1);
 }
 
 kmp_task_t *__kmpc_omp_target_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
@@ -1807,7 +1818,7 @@ kmp_task_t *__kmpc_omp_target_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
     input_flags.hidden_helper = TRUE;
 
   return __kmpc_omp_task_alloc(loc_ref, gtid, flags, sizeof_kmp_task_t,
-                               sizeof_shareds, task_entry, nullptr);
+                               sizeof_shareds, task_entry);
 }
 
 /*!
@@ -5394,7 +5405,7 @@ void __kmp_taskloop_recur(ident_t *loc, int gtid, kmp_task_t *task,
   kmp_taskdata_t *current_task = thread->th.th_current_task;
   thread->th.th_current_task = taskdata->td_parent;
   kmp_task_t *new_task =
-      __kmpc_omp_task_alloc(loc, gtid, 1, 3 * sizeof(void *),
+      __nosvc_omp_task_alloc(loc, gtid, 1, 3 * sizeof(void *),
                             sizeof(__taskloop_params_t), &__kmp_taskloop_task, &taskdata->td_omp_task_type);
   // restore current task
   thread->th.th_current_task = current_task;

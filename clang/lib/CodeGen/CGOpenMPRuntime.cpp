@@ -2225,6 +2225,8 @@ void CGOpenMPRuntime::emitSingleRegion(CodeGenFunction &CGF,
   SmallVector<llvm::Value *, 2> Args = {emitUpdateLocation(CGF, Loc), getThreadID(CGF, Loc)};
   if (CGM.getLangOpts().OpenMPNosv) {
     assert(NosvTaskTypeGV && "task type is null");
+    RTLSingle = OMPRTL___nosvc_single;
+    RTLSingleEnd = OMPRTL___nosvc_end_single;
     Args.push_back(NosvTaskTypeGV);
   }
   CommonActionTy Action(OMPBuilder.getOrCreateRuntimeFunction(
@@ -3674,7 +3676,7 @@ CGOpenMPRuntime::emitNosvTaskTypeRegister(CodeGenFunction &CGF, SourceLocation L
       const auto &FnInfo =
           CGM.getTypes().arrangeBuiltinFunctionDeclaration(C.VoidTy, Args);
       llvm::FunctionType *FnTy = CGM.getTypes().GetFunctionType(FnInfo);
-      std::string Name = "__kmp_ctor_register_task_info";
+      std::string Name = "__nosv_ctor_register_task_info";
       CtorRegister = llvm::Function::Create(FnTy, llvm::GlobalValue::InternalLinkage,
                                         Name, &CGM.getModule());
       llvm::BasicBlock *EntryBB = llvm::BasicBlock::Create(Ctx, "entry", CtorRegister);
@@ -3694,7 +3696,7 @@ CGOpenMPRuntime::emitNosvTaskTypeRegister(CodeGenFunction &CGF, SourceLocation L
       const auto &FnInfo =
           CGM.getTypes().arrangeBuiltinFunctionDeclaration(C.VoidTy, Args);
       llvm::FunctionType *FnTy = CGM.getTypes().GetFunctionType(FnInfo);
-      std::string Name = "__kmpc_register_task_info";
+      std::string Name = "__nosvc_register_task_info";
       NosvRegister = llvm::Function::Create(FnTy, llvm::GlobalValue::ExternalLinkage,
                                         Name, &CGM.getModule());
     }

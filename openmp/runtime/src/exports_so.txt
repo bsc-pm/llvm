@@ -32,6 +32,7 @@ VERSION {
         kmp_*;     # Intel extensions.
         kmpc_*;    # Intel extensions.
         __kmpc_*;  # Functions called by compiler-generated code.
+        __nosvc_*; # Functions called by compiler-generated code.
         GOMP_*;    # GNU C compatibility functions.
 
         nanos6_*;  # TAMPI_API

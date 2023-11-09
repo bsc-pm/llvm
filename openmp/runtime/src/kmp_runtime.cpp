@@ -245,7 +245,7 @@ kmp_uint32 task_types_idx = 0;
 // Avoid initializing more than one time
 kmp_uint32 nosv_initialize_attempt = 0;
 
-void __kmpc_register_task_info(omp_task_type_t &omp_task_type, void *label) {
+void __nosvc_register_task_info(omp_task_type_t &omp_task_type, void *label) {
   kmp_uint32 cur_nosv_initialize_attempt = KMP_TEST_THEN_ADD32(&nosv_initialize_attempt, 1);
   if (!cur_nosv_initialize_attempt)
     nosv_init();

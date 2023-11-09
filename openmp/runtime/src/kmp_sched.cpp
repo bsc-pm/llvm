@@ -882,11 +882,12 @@ increment and chunk size.
 
 @{
 */
-void __kmpc_for_static_init_4(ident_t *loc, kmp_int32 gtid, kmp_int32 schedtype,
+void __nosvc_for_static_init_4(ident_t *loc, kmp_int32 gtid, kmp_int32 schedtype,
                               kmp_int32 *plastiter, kmp_int32 *plower,
                               kmp_int32 *pupper, kmp_int32 *pstride,
                               kmp_int32 incr, kmp_int32 chunk,
                               omp_task_type_t *omp_task_type) {
+  KMP_ASSERT(omp_task_type);
   __kmp_for_static_init<kmp_int32>(loc, gtid, schedtype, plastiter, plower,
                                    pupper, pstride, incr, chunk, omp_task_type
 #if OMPT_SUPPORT && OMPT_OPTIONAL
@@ -896,15 +897,22 @@ void __kmpc_for_static_init_4(ident_t *loc, kmp_int32 gtid, kmp_int32 schedtype,
   );
 }
 
-/*!
- See @ref __kmpc_for_static_init_4
- */
-void __kmpc_for_static_init_4u(ident_t *loc, kmp_int32 gtid,
+void __kmpc_for_static_init_4(ident_t *loc, kmp_int32 gtid, kmp_int32 schedtype,
+                              kmp_int32 *plastiter, kmp_int32 *plower,
+                              kmp_int32 *pupper, kmp_int32 *pstride,
+                              kmp_int32 incr, kmp_int32 chunk) {
+  // TODO: better error
+  fprintf(stderr, "Unsupported __kmpc_for_static_init_4\n");
+  exit(1);
+}
+
+void __nosvc_for_static_init_4u(ident_t *loc, kmp_int32 gtid,
                                kmp_int32 schedtype, kmp_int32 *plastiter,
                                kmp_uint32 *plower, kmp_uint32 *pupper,
                                kmp_int32 *pstride, kmp_int32 incr,
                                kmp_int32 chunk,
                                omp_task_type_t *omp_task_type) {
+  KMP_ASSERT(omp_task_type);
   __kmp_for_static_init<kmp_uint32>(loc, gtid, schedtype, plastiter, plower,
                                     pupper, pstride, incr, chunk, omp_task_type
 #if OMPT_SUPPORT && OMPT_OPTIONAL
@@ -917,11 +925,22 @@ void __kmpc_for_static_init_4u(ident_t *loc, kmp_int32 gtid,
 /*!
  See @ref __kmpc_for_static_init_4
  */
-void __kmpc_for_static_init_8(ident_t *loc, kmp_int32 gtid, kmp_int32 schedtype,
+void __kmpc_for_static_init_4u(ident_t *loc, kmp_int32 gtid,
+                               kmp_int32 schedtype, kmp_int32 *plastiter,
+                               kmp_uint32 *plower, kmp_uint32 *pupper,
+                               kmp_int32 *pstride, kmp_int32 incr,
+                               kmp_int32 chunk) {
+  // TODO: better error
+  fprintf(stderr, "Unsupported __kmpc_for_static_init_4u\n");
+  exit(1);
+}
+
+void __nosvc_for_static_init_8(ident_t *loc, kmp_int32 gtid, kmp_int32 schedtype,
                               kmp_int32 *plastiter, kmp_int64 *plower,
                               kmp_int64 *pupper, kmp_int64 *pstride,
                               kmp_int64 incr, kmp_int64 chunk,
                               omp_task_type_t *omp_task_type) {
+  KMP_ASSERT(omp_task_type);
   __kmp_for_static_init<kmp_int64>(loc, gtid, schedtype, plastiter, plower,
                                    pupper, pstride, incr, chunk, omp_task_type
 #if OMPT_SUPPORT && OMPT_OPTIONAL
@@ -934,12 +953,22 @@ void __kmpc_for_static_init_8(ident_t *loc, kmp_int32 gtid, kmp_int32 schedtype,
 /*!
  See @ref __kmpc_for_static_init_4
  */
-void __kmpc_for_static_init_8u(ident_t *loc, kmp_int32 gtid,
+void __kmpc_for_static_init_8(ident_t *loc, kmp_int32 gtid, kmp_int32 schedtype,
+                              kmp_int32 *plastiter, kmp_int64 *plower,
+                              kmp_int64 *pupper, kmp_int64 *pstride,
+                              kmp_int64 incr, kmp_int64 chunk) {
+  // TODO: better error
+  fprintf(stderr, "Unsupported __kmpc_for_static_init_8\n");
+  exit(1);
+}
+
+void __nosvc_for_static_init_8u(ident_t *loc, kmp_int32 gtid,
                                kmp_int32 schedtype, kmp_int32 *plastiter,
                                kmp_uint64 *plower, kmp_uint64 *pupper,
                                kmp_int64 *pstride, kmp_int64 incr,
                                kmp_int64 chunk,
                                omp_task_type_t *omp_task_type) {
+  KMP_ASSERT(omp_task_type);
   __kmp_for_static_init<kmp_uint64>(loc, gtid, schedtype, plastiter, plower,
                                     pupper, pstride, incr, chunk, omp_task_type
 #if OMPT_SUPPORT && OMPT_OPTIONAL
@@ -947,6 +976,19 @@ void __kmpc_for_static_init_8u(ident_t *loc, kmp_int32 gtid,
                                     OMPT_GET_RETURN_ADDRESS(0)
 #endif
   );
+}
+
+/*!
+ See @ref __kmpc_for_static_init_4
+ */
+void __kmpc_for_static_init_8u(ident_t *loc, kmp_int32 gtid,
+                               kmp_int32 schedtype, kmp_int32 *plastiter,
+                               kmp_uint64 *plower, kmp_uint64 *pupper,
+                               kmp_int64 *pstride, kmp_int64 incr,
+                               kmp_int64 chunk) {
+  // TODO: better error
+  fprintf(stderr, "Unsupported __kmpc_for_static_init_8u\n");
+  exit(1);
 }
 /*!
 @}

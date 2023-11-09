@@ -2841,8 +2841,17 @@ These functions are all identical apart from the types of the arguments.
 
 void __kmpc_dispatch_init_4(ident_t *loc, kmp_int32 gtid,
                             enum sched_type schedule, kmp_int32 lb,
+                            kmp_int32 ub, kmp_int32 st, kmp_int32 chunk) {
+  // TODO: better error
+  fprintf(stderr, "Unsupported __kmpc_dispatch_init_4\n");
+  exit(1);
+}
+
+void __nosvc_dispatch_init_4(ident_t *loc, kmp_int32 gtid,
+                            enum sched_type schedule, kmp_int32 lb,
                             kmp_int32 ub, kmp_int32 st, kmp_int32 chunk,
                             omp_task_type_t *omp_task_type) {
+  KMP_ASSERT(omp_task_type);
   KMP_DEBUG_ASSERT(__kmp_init_serial);
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   OMPT_STORE_RETURN_ADDRESS(gtid);
@@ -2854,8 +2863,17 @@ See @ref __kmpc_dispatch_init_4
 */
 void __kmpc_dispatch_init_4u(ident_t *loc, kmp_int32 gtid,
                              enum sched_type schedule, kmp_uint32 lb,
+                             kmp_uint32 ub, kmp_int32 st, kmp_int32 chunk) {
+  // TODO: better error
+  fprintf(stderr, "Unsupported __kmpc_dispatch_init_4u\n");
+  exit(1);
+}
+
+void __nosvc_dispatch_init_4u(ident_t *loc, kmp_int32 gtid,
+                             enum sched_type schedule, kmp_uint32 lb,
                              kmp_uint32 ub, kmp_int32 st, kmp_int32 chunk,
                              omp_task_type_t *omp_task_type) {
+  KMP_ASSERT(omp_task_type);
   KMP_DEBUG_ASSERT(__kmp_init_serial);
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   OMPT_STORE_RETURN_ADDRESS(gtid);
@@ -2868,8 +2886,17 @@ See @ref __kmpc_dispatch_init_4
 */
 void __kmpc_dispatch_init_8(ident_t *loc, kmp_int32 gtid,
                             enum sched_type schedule, kmp_int64 lb,
+                            kmp_int64 ub, kmp_int64 st, kmp_int64 chunk) {
+  // TODO: better error
+  fprintf(stderr, "Unsupported __kmpc_dispatch_init_8\n");
+  exit(1);
+}
+
+void __nosvc_dispatch_init_8(ident_t *loc, kmp_int32 gtid,
+                            enum sched_type schedule, kmp_int64 lb,
                             kmp_int64 ub, kmp_int64 st, kmp_int64 chunk,
                             omp_task_type_t *omp_task_type) {
+  KMP_ASSERT(omp_task_type);
   KMP_DEBUG_ASSERT(__kmp_init_serial);
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   OMPT_STORE_RETURN_ADDRESS(gtid);
@@ -2882,8 +2909,17 @@ See @ref __kmpc_dispatch_init_4
 */
 void __kmpc_dispatch_init_8u(ident_t *loc, kmp_int32 gtid,
                              enum sched_type schedule, kmp_uint64 lb,
+                             kmp_uint64 ub, kmp_int64 st, kmp_int64 chunk) {
+  // TODO: better error
+  fprintf(stderr, "Unsupported __kmpc_dispatch_init_8u\n");
+  exit(1);
+}
+
+void __nosvc_dispatch_init_8u(ident_t *loc, kmp_int32 gtid,
+                             enum sched_type schedule, kmp_uint64 lb,
                              kmp_uint64 ub, kmp_int64 st, kmp_int64 chunk,
                              omp_task_type_t *omp_task_type) {
+  KMP_ASSERT(omp_task_type);
   KMP_DEBUG_ASSERT(__kmp_init_serial);
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   OMPT_STORE_RETURN_ADDRESS(gtid);
@@ -2961,9 +2997,10 @@ otherwise
 Get the next dynamically allocated chunk of work for this thread.
 If there is no more work, then the lb,ub and stride need not be modified.
 */
-int __kmpc_dispatch_next_4(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
+int __nosvc_dispatch_next_4(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
                            kmp_int32 *p_lb, kmp_int32 *p_ub, kmp_int32 *p_st,
                            omp_task_type_t *omp_task_type) {
+  KMP_ASSERT(omp_task_type);
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   OMPT_STORE_RETURN_ADDRESS(gtid);
 #endif
@@ -2976,12 +3013,20 @@ int __kmpc_dispatch_next_4(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
   );
 }
 
+int __kmpc_dispatch_next_4(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
+                           kmp_int32 *p_lb, kmp_int32 *p_ub, kmp_int32 *p_st) {
+  // TODO: better error
+  fprintf(stderr, "Unsupported __kmpc_dispatch_next_4\n");
+  exit(1);
+}
+
 /*!
 See @ref __kmpc_dispatch_next_4
 */
-int __kmpc_dispatch_next_4u(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
+int __nosvc_dispatch_next_4u(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
                             kmp_uint32 *p_lb, kmp_uint32 *p_ub,
                             kmp_int32 *p_st, omp_task_type_t *omp_task_type) {
+  KMP_ASSERT(omp_task_type);
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   OMPT_STORE_RETURN_ADDRESS(gtid);
 #endif
@@ -2994,12 +3039,21 @@ int __kmpc_dispatch_next_4u(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
   );
 }
 
+int __kmpc_dispatch_next_4u(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
+                            kmp_uint32 *p_lb, kmp_uint32 *p_ub,
+                            kmp_int32 *p_st) {
+  // TODO: better error
+  fprintf(stderr, "Unsupported __kmpc_dispatch_next_4u\n");
+  exit(1);
+}
+
 /*!
 See @ref __kmpc_dispatch_next_4
 */
-int __kmpc_dispatch_next_8(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
+int __nosvc_dispatch_next_8(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
                            kmp_int64 *p_lb, kmp_int64 *p_ub, kmp_int64 *p_st,
                            omp_task_type_t *omp_task_type) {
+  KMP_ASSERT(omp_task_type);
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   OMPT_STORE_RETURN_ADDRESS(gtid);
 #endif
@@ -3012,12 +3066,20 @@ int __kmpc_dispatch_next_8(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
   );
 }
 
+int __kmpc_dispatch_next_8(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
+                           kmp_int64 *p_lb, kmp_int64 *p_ub, kmp_int64 *p_st) {
+  // TODO: better error
+  fprintf(stderr, "Unsupported __kmpc_dispatch_next_8\n");
+  exit(1);
+}
+
 /*!
 See @ref __kmpc_dispatch_next_4
 */
-int __kmpc_dispatch_next_8u(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
+int __nosvc_dispatch_next_8u(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
                             kmp_uint64 *p_lb, kmp_uint64 *p_ub,
                             kmp_int64 *p_st, omp_task_type_t *omp_task_type) {
+  KMP_ASSERT(omp_task_type);
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   OMPT_STORE_RETURN_ADDRESS(gtid);
 #endif
@@ -3028,6 +3090,14 @@ int __kmpc_dispatch_next_8u(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
                                          OMPT_LOAD_RETURN_ADDRESS(gtid)
 #endif
   );
+}
+
+int __kmpc_dispatch_next_8u(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
+                            kmp_uint64 *p_lb, kmp_uint64 *p_ub,
+                            kmp_int64 *p_st) {
+  // TODO: better error
+  fprintf(stderr, "Unsupported __kmpc_dispatch_next_8u\n");
+  exit(1);
 }
 
 /*!

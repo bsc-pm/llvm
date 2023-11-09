@@ -296,6 +296,30 @@ void __kmp_nosv_attach(nosv_task_t *nosv_impl_task, void *thr);
 void numaid_to_nosv_affinity(uint32_t id, nosv_affinity_t *nosv_affinity, nosv_affinity_type_t type);
 void cpuid_to_nosv_affinity(uint32_t id, nosv_affinity_t *nosv_affinity, nosv_affinity_type_t type);
 
+KMP_EXPORT void __nosvc_register_task_info(omp_task_type_t &omp_task_type, void *label);
+extern void __nosvc_for_static_init_4(ident_t *loc, kmp_int32 gtid, kmp_int32 schedtype,
+                              kmp_int32 *plastiter, kmp_int32 *plower,
+                              kmp_int32 *pupper, kmp_int32 *pstride,
+                              kmp_int32 incr, kmp_int32 chunk,
+                              omp_task_type_t *omp_task_type);
+extern void __nosvc_for_static_init_4u(ident_t *loc, kmp_int32 gtid,
+                               kmp_int32 schedtype, kmp_int32 *plastiter,
+                               kmp_uint32 *plower, kmp_uint32 *pupper,
+                               kmp_int32 *pstride, kmp_int32 incr,
+                               kmp_int32 chunk,
+                               omp_task_type_t *omp_task_type);
+extern void __nosvc_for_static_init_8(ident_t *loc, kmp_int32 gtid, kmp_int32 schedtype,
+                              kmp_int32 *plastiter, kmp_int64 *plower,
+                              kmp_int64 *pupper, kmp_int64 *pstride,
+                              kmp_int64 incr, kmp_int64 chunk,
+                              omp_task_type_t *omp_task_type);
+extern void __nosvc_for_static_init_8u(ident_t *loc, kmp_int32 gtid,
+                               kmp_int32 schedtype, kmp_int32 *plastiter,
+                               kmp_uint64 *plower, kmp_uint64 *pupper,
+                               kmp_int64 *pstride, kmp_int64 incr,
+                               kmp_int64 chunk,
+                               omp_task_type_t *omp_task_type);
+extern void __nosvc_for_static_fini(ident_t *loc, kmp_int32 global_tid, omp_task_type_t *omp_task_type);
 
 /* ------------------------------------------------------------------------ */
 
@@ -3812,45 +3836,72 @@ extern void __kmp_yield();
 
 extern void __kmpc_dispatch_init_4(ident_t *loc, kmp_int32 gtid,
                                    enum sched_type schedule, kmp_int32 lb,
-                                   kmp_int32 ub, kmp_int32 st, kmp_int32 chunk,
-                                   omp_task_type_t *omp_task_type);
+                                   kmp_int32 ub, kmp_int32 st, kmp_int32 chunk);
 extern void __kmpc_dispatch_init_4u(ident_t *loc, kmp_int32 gtid,
                                     enum sched_type schedule, kmp_uint32 lb,
                                     kmp_uint32 ub, kmp_int32 st,
-                                    kmp_int32 chunk,
-                                    omp_task_type_t *omp_task_type);
+                                    kmp_int32 chunk);
 extern void __kmpc_dispatch_init_8(ident_t *loc, kmp_int32 gtid,
                                    enum sched_type schedule, kmp_int64 lb,
-                                   kmp_int64 ub, kmp_int64 st, kmp_int64 chunk,
-                                   omp_task_type_t *omp_task_type);
+                                   kmp_int64 ub, kmp_int64 st, kmp_int64 chunk);
 extern void __kmpc_dispatch_init_8u(ident_t *loc, kmp_int32 gtid,
                                     enum sched_type schedule, kmp_uint64 lb,
                                     kmp_uint64 ub, kmp_int64 st,
-                                    kmp_int64 chunk,
-                                    omp_task_type_t *omp_task_type);
+                                    kmp_int64 chunk);
 
 extern int __kmpc_dispatch_next_4(ident_t *loc, kmp_int32 gtid,
                                   kmp_int32 *p_last, kmp_int32 *p_lb,
-                                  kmp_int32 *p_ub, kmp_int32 *p_st,
-                                  omp_task_type_t *omp_task_type);
+                                  kmp_int32 *p_ub, kmp_int32 *p_st);
 extern int __kmpc_dispatch_next_4u(ident_t *loc, kmp_int32 gtid,
                                    kmp_int32 *p_last, kmp_uint32 *p_lb,
-                                   kmp_uint32 *p_ub, kmp_int32 *p_st,
-                                   omp_task_type_t *omp_task_type);
+                                   kmp_uint32 *p_ub, kmp_int32 *p_st);
 extern int __kmpc_dispatch_next_8(ident_t *loc, kmp_int32 gtid,
                                   kmp_int32 *p_last, kmp_int64 *p_lb,
-                                  kmp_int64 *p_ub, kmp_int64 *p_st,
-                                  omp_task_type_t *omp_task_type);
+                                  kmp_int64 *p_ub, kmp_int64 *p_st);
 
 extern int __kmpc_dispatch_next_8u(ident_t *loc, kmp_int32 gtid,
                                    kmp_int32 *p_last, kmp_uint64 *p_lb,
-                                   kmp_uint64 *p_ub, kmp_int64 *p_st,
-                                   omp_task_type_t *omp_task_type);
+                                   kmp_uint64 *p_ub, kmp_int64 *p_st);
 
 extern void __kmpc_dispatch_fini_4(ident_t *loc, kmp_int32 gtid);
 extern void __kmpc_dispatch_fini_8(ident_t *loc, kmp_int32 gtid);
 extern void __kmpc_dispatch_fini_4u(ident_t *loc, kmp_int32 gtid);
 extern void __kmpc_dispatch_fini_8u(ident_t *loc, kmp_int32 gtid);
+
+extern void __nosvc_dispatch_init_4(ident_t *loc, kmp_int32 gtid,
+                                   enum sched_type schedule, kmp_int32 lb,
+                                   kmp_int32 ub, kmp_int32 st, kmp_int32 chunk,
+                                   omp_task_type_t *omp_task_type);
+extern void __nosvc_dispatch_init_4u(ident_t *loc, kmp_int32 gtid,
+                                    enum sched_type schedule, kmp_uint32 lb,
+                                    kmp_uint32 ub, kmp_int32 st,
+                                    kmp_int32 chunk,
+                                    omp_task_type_t *omp_task_type);
+extern void __nosvc_dispatch_init_8(ident_t *loc, kmp_int32 gtid,
+                                   enum sched_type schedule, kmp_int64 lb,
+                                   kmp_int64 ub, kmp_int64 st, kmp_int64 chunk,
+                                   omp_task_type_t *omp_task_type);
+extern void __nosvc_dispatch_init_8u(ident_t *loc, kmp_int32 gtid,
+                                    enum sched_type schedule, kmp_uint64 lb,
+                                    kmp_uint64 ub, kmp_int64 st,
+                                    kmp_int64 chunk,
+                                    omp_task_type_t *omp_task_type);
+extern int __nosvc_dispatch_next_4(ident_t *loc, kmp_int32 gtid,
+                                  kmp_int32 *p_last, kmp_int32 *p_lb,
+                                  kmp_int32 *p_ub, kmp_int32 *p_st,
+                                  omp_task_type_t *omp_task_type);
+extern int __nosvc_dispatch_next_4u(ident_t *loc, kmp_int32 gtid,
+                                   kmp_int32 *p_last, kmp_uint32 *p_lb,
+                                   kmp_uint32 *p_ub, kmp_int32 *p_st,
+                                   omp_task_type_t *omp_task_type);
+extern int __nosvc_dispatch_next_8(ident_t *loc, kmp_int32 gtid,
+                                  kmp_int32 *p_last, kmp_int64 *p_lb,
+                                  kmp_int64 *p_ub, kmp_int64 *p_st,
+                                  omp_task_type_t *omp_task_type);
+extern int __nosvc_dispatch_next_8u(ident_t *loc, kmp_int32 gtid,
+                                   kmp_int32 *p_last, kmp_uint64 *p_lb,
+                                   kmp_uint64 *p_ub, kmp_int64 *p_st,
+                                   omp_task_type_t *omp_task_type);
 
 #ifdef KMP_GOMP_COMPAT
 
@@ -4137,7 +4188,6 @@ extern kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
                                     size_t sizeof_kmp_task_t,
                                     size_t sizeof_shareds,
                                     kmp_routine_entry_t task_entry, omp_task_type_t *omp_task_type);
-extern void __kmpc_register_task_info(omp_task_type_t &omp_task_type, void *label);
 extern void __kmp_init_implicit_task(ident_t *loc_ref, kmp_info_t *this_thr,
                                      kmp_team_t *team, int tid,
                                      int set_curr_task);
@@ -4268,8 +4318,10 @@ KMP_EXPORT void __kmpc_end_barrier_master(ident_t *, kmp_int32 global_tid);
 KMP_EXPORT kmp_int32 __kmpc_barrier_master_nowait(ident_t *,
                                                   kmp_int32 global_tid);
 
-KMP_EXPORT kmp_int32 __kmpc_single(ident_t *, kmp_int32 global_tid, omp_task_type_t *omp_task_type);
-KMP_EXPORT void __kmpc_end_single(ident_t *, kmp_int32 global_tid, omp_task_type_t *omp_task_type);
+KMP_EXPORT kmp_int32 __kmpc_single(ident_t *, kmp_int32 global_tid);
+KMP_EXPORT kmp_int32 __nosvc_single(ident_t *, kmp_int32 global_tid, omp_task_type_t *omp_task_type);
+KMP_EXPORT void __kmpc_end_single(ident_t *, kmp_int32 global_tid);
+KMP_EXPORT void __nosvc_end_single(ident_t *, kmp_int32 global_tid, omp_task_type_t *omp_task_type);
 
 KMP_EXPORT kmp_int32 __kmpc_sections_init(ident_t *loc, kmp_int32 global_tid);
 KMP_EXPORT kmp_int32 __kmpc_next_section(ident_t *loc, kmp_int32 global_tid,
@@ -4282,7 +4334,7 @@ KMP_EXPORT void KMPC_FOR_STATIC_INIT(ident_t *loc, kmp_int32 global_tid,
                                      kmp_int *pstride, kmp_int incr,
                                      kmp_int chunk);
 
-KMP_EXPORT void __kmpc_for_static_fini(ident_t *loc, kmp_int32 global_tid, omp_task_type_t *omp_task_type);
+KMP_EXPORT void __kmpc_for_static_fini(ident_t *loc, kmp_int32 global_tid);
 
 KMP_EXPORT void __kmpc_copyprivate(ident_t *loc, kmp_int32 global_tid,
                                    size_t cpy_size, void *cpy_data,
@@ -4308,9 +4360,17 @@ KMP_EXPORT kmp_task_t *__kmpc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
                                              kmp_int32 flags,
                                              size_t sizeof_kmp_task_t,
                                              size_t sizeof_shareds,
+                                             kmp_routine_entry_t task_entry);
+KMP_EXPORT kmp_task_t *__nosvc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
+                                             kmp_int32 flags,
+                                             size_t sizeof_kmp_task_t,
+                                             size_t sizeof_shareds,
                                              kmp_routine_entry_t task_entry,
                                              omp_task_type_t *omp_task_type);
 KMP_EXPORT kmp_task_t *__kmpc_omp_target_task_alloc(
+    ident_t *loc_ref, kmp_int32 gtid, kmp_int32 flags, size_t sizeof_kmp_task_t,
+    size_t sizeof_shareds, kmp_routine_entry_t task_entry, kmp_int64 device_id);
+KMP_EXPORT kmp_task_t *__nosvc_omp_target_task_alloc(
     ident_t *loc_ref, kmp_int32 gtid, kmp_int32 flags, size_t sizeof_kmp_task_t,
     size_t sizeof_shareds, kmp_routine_entry_t task_entry, kmp_int64 device_id);
 KMP_EXPORT void __kmpc_omp_task_begin_if0(ident_t *loc_ref, kmp_int32 gtid,
