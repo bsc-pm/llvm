@@ -88,10 +88,10 @@ int main() {
 // CHECK-NEXT:    ret void, !dbg [[DBG19]]
 //
 //
-// CHECK-LABEL: define {{[^@]+}}@__kmp_ctor_register_task_info() {
+// CHECK-LABEL: define {{[^@]+}}@__nosv_ctor_register_task_info() {
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    call void @__kmpc_register_task_info(ptr @[[GLOB0]], ptr @.str)
-// CHECK-NEXT:    call void @__kmpc_register_task_info(ptr @[[GLOB8:[0-9]+]], ptr @_ZL4asdf)
+// CHECK-NEXT:    call void @__nosvc_register_task_info(ptr @[[GLOB0]], ptr @.str)
+// CHECK-NEXT:    call void @__nosvc_register_task_info(ptr @[[GLOB8:[0-9]+]], ptr @_ZL4asdf)
 // CHECK-NEXT:    ret void
 //
 //

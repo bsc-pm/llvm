@@ -1911,9 +1911,7 @@ should introduce an explicit barrier if it is required.
 */
 
 kmp_int32 __kmpc_single(ident_t *loc, kmp_int32 global_tid) {
-  // TODO: better error
-  fprintf(stderr, "Unsupported __kmpc_single\n");
-  exit(1);
+  KMP_FATAL(NosvUnsupportedAPI, "__kmpc_single");
 }
 
 void __nosvc_end_single(ident_t *loc, kmp_int32 global_tid, omp_task_type_t *omp_task_type) {
@@ -1947,9 +1945,7 @@ only be called by the thread that executed the block of code protected
 by the `single` construct.
 */
 void __kmpc_end_single(ident_t *loc, kmp_int32 global_tid) {
-  // TODO: better error
-  fprintf(stderr, "Unsupported __kmpc_end_single\n");
-  exit(1);
+  KMP_FATAL(NosvUnsupportedAPI, "__kmpc_end_single");
 }
 
 /*!
@@ -1996,9 +1992,7 @@ void __nosvc_for_static_fini(ident_t *loc, kmp_int32 global_tid, omp_task_type_t
 }
 
 void __kmpc_for_static_fini(ident_t *loc, kmp_int32 global_tid) {
-  // TODO: better error
-  fprintf(stderr, "Unsupported __kmpc_for_static_init_4\n");
-  exit(1);
+  KMP_FATAL(NosvUnsupportedAPI, "__kmpc_for_static_fini");
 }
 
 // User routines which take C-style arguments (call by value)

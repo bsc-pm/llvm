@@ -325,9 +325,8 @@ static void __kmp_nosv_init() {
    res = nosv_type_init(
      &nosv_omp_impl_task_ty, NULL, NULL, NULL, "openmp", NULL, NULL, NOSV_TYPE_INIT_EXTERNAL);
    KMP_ASSERT(res == 0);
-   // Attach first thread initializing the runtime
-   fprintf(stderr, "__kmp_nosv_init: initialized nosv, initializing openmp runtime, and nosv_attach this thread\n");
 
+   // Attach first thread initializing the runtime
    nosv_main_pid = getpid();
    nosv_is_extenally_attached = nosv_self();
    if (!nosv_is_extenally_attached) {
@@ -6276,8 +6275,6 @@ __attribute__((destructor)) void __kmp_internal_end_dtor(void) {
   // This means that sometimes we may not initialize nosv, so check
   // this
   if (nosv_main_pid == getpid()) {
-    fprintf(stderr, "(destructor) __kmp_internal_end_dtor: nosv shutdown and nosv_detach this thread %p\n", nosv_self());
-
     if (!nosv_is_extenally_attached) {
       instr_attached_exit();
       KMP_ASSERT(nosv_self());
@@ -9362,8 +9359,8 @@ kmp_info_t **__kmp_hidden_helper_threads;
 kmp_info_t *__kmp_hidden_helper_main_thread;
 std::atomic<kmp_int32> __kmp_unexecuted_hidden_helper_tasks;
 #if KMP_OS_LINUX
-kmp_int32 __kmp_hidden_helper_threads_num = 8;
-kmp_int32 __kmp_enable_hidden_helper = TRUE;
+kmp_int32 __kmp_hidden_helper_threads_num = 0;
+kmp_int32 __kmp_enable_hidden_helper = FALSE;
 #else
 kmp_int32 __kmp_hidden_helper_threads_num = 0;
 kmp_int32 __kmp_enable_hidden_helper = FALSE;

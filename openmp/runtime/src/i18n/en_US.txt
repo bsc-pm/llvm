@@ -159,6 +159,7 @@ Pragma                       "%1$s pragma (at %2$s:%3$s():%4$s)"
 #    Aff -- Affinity messages.
 #    Cns -- Consistency check failures (KMP_CONSISTENCY_CHECK).
 #    Itt -- ITT Notify-related messages.
+#    Nosv -- nOS-V checks.
 
 LibraryIsSerial              "Library is \"serial\"."
 CantOpenMessageCatalog       "Cannot open message catalog \"%1$s\":"
@@ -362,6 +363,8 @@ TopologyGeneric              "%1$s: %2$s (%3$d total cores)"
 AffGranularityBad            "%1$s: granularity setting: %2$s does not exist in topology.  Using granularity=%3$s instead."
 TopologyHybrid               "%1$s: hybrid core type detected: %2$d %3$s cores."
 TopologyHybridCoreEff        "%1$s:   %2$d with core efficiency %3$d."
+NosvUnsupportedAPI           "Unsupported %1$s API call."
+NosvEnvSupport               "%1$s env var is not supported. Default value is %2$d."
 
 # --- OpenMP errors detected at runtime ---
 #

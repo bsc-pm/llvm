@@ -941,10 +941,11 @@ bool tools::addOpenMPRuntime(ArgStringList &CmdArgs, const ToolChain &TC,
     // Already diagnosed.
     return false;
 
+  CmdArgs.push_back("-lnosv");
+
   if (ForceStaticHostRuntime)
     CmdArgs.push_back("-Bstatic");
 
-  CmdArgs.push_back("-lnosv");
   switch (RTKind) {
   case Driver::OMPRT_OMP:
     CmdArgs.push_back("-lomp");

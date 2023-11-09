@@ -1,5 +1,8 @@
 // RUN: %libomp-compile && env KMP_ENABLE_TASK_THROTTLING=0 %libomp-run
 // RUN: %libomp-compile && env KMP_ENABLE_TASK_THROTTLING=1 %libomp-run
+// Disabled because of task throttling is not allowed to be modified
+// Throttling may trigger inline execution and break the runtime
+// UNSUPPORTED: true
 
 #include<omp.h>
 #include<stdlib.h>

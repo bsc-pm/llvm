@@ -3877,7 +3877,6 @@ CGOpenMPRuntime::emitTaskInit(CodeGenFunction &CGF, SourceLocation Loc,
           TaskEntry, KmpRoutineEntryPtrTy)};
   llvm::Value *NewTask;
   if (D.hasClausesOfKind<OMPNowaitClause>()) {
-    assert(!NosvTaskTypeGV);
     // Check if we have any device clause associated with the directive.
     const Expr *Device = nullptr;
     if (auto *C = D.getSingleClause<OMPDeviceClause>())
@@ -3890,22 +3889,33 @@ CGOpenMPRuntime::emitTaskInit(CodeGenFunction &CGF, SourceLocation Loc,
     else
       DeviceID = CGF.Builder.getInt64(OMP_DEVICEID_UNDEF);
     AllocArgs.push_back(DeviceID);
-    NewTask = CGF.EmitRuntimeCall(
-        OMPBuilder.getOrCreateRuntimeFunction(
-            CGM.getModule(), OMPRTL___kmpc_omp_target_task_alloc),
-        AllocArgs);
-  } else if (CGM.getLangOpts().OpenMPNosv) {
-    assert(NosvTaskTypeGV);
-    AllocArgs.push_back(NosvTaskTypeGV);
-    NewTask =
-        CGF.EmitRuntimeCall(OMPBuilder.getOrCreateRuntimeFunction(
-                                CGM.getModule(), OMPRTL___nosvc_omp_task_alloc),
-                            AllocArgs);
+    if (CGM.getLangOpts().OpenMPNosv) {
+      assert(NosvTaskTypeGV && "task type is null");
+      AllocArgs.push_back(NosvTaskTypeGV);
+      NewTask = CGF.EmitRuntimeCall(
+          OMPBuilder.getOrCreateRuntimeFunction(
+              CGM.getModule(), OMPRTL___nosvc_omp_target_task_alloc),
+          AllocArgs);
+    } else {
+      NewTask = CGF.EmitRuntimeCall(
+          OMPBuilder.getOrCreateRuntimeFunction(
+              CGM.getModule(), OMPRTL___kmpc_omp_target_task_alloc),
+          AllocArgs);
+    }
   } else {
-    NewTask =
-        CGF.EmitRuntimeCall(OMPBuilder.getOrCreateRuntimeFunction(
-                                CGM.getModule(), OMPRTL___kmpc_omp_task_alloc),
-                            AllocArgs);
+    if (CGM.getLangOpts().OpenMPNosv) {
+      assert(NosvTaskTypeGV && "task type is null");
+      AllocArgs.push_back(NosvTaskTypeGV);
+      NewTask =
+          CGF.EmitRuntimeCall(OMPBuilder.getOrCreateRuntimeFunction(
+                                  CGM.getModule(), OMPRTL___nosvc_omp_task_alloc),
+                              AllocArgs);
+    } else {
+      NewTask =
+          CGF.EmitRuntimeCall(OMPBuilder.getOrCreateRuntimeFunction(
+                                  CGM.getModule(), OMPRTL___kmpc_omp_task_alloc),
+                              AllocArgs);
+    }
   }
   // Emit detach clause initialization.
   // evt = (typeof(evt))__kmpc_task_allow_completion_event(loc, tid,
