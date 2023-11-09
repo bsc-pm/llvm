@@ -71,7 +71,7 @@ extern "C" {
 #endif
 kmp_int32  __kmpc_global_thread_num  ( ident_t * );
 kmp_task_t*
-__kmpc_omp_task_alloc( ident_t *loc_ref, kmp_int32 gtid, kmp_int32 flags,
+__nosvc_omp_task_alloc( ident_t *loc_ref, kmp_int32 gtid, kmp_int32 flags,
                        size_t sizeof_kmp_task_t, size_t sizeof_shareds,
                        kmp_routine_entry_t task_entry );
 void __kmpc_proxy_task_completed_ooo ( kmp_task_t *ptask );
@@ -119,7 +119,7 @@ int main()
     dep_info.flags.out = 1;
 
     kmp_int32 gtid = __kmpc_global_thread_num(NULL);
-    kmp_task_t *proxy_task = __kmpc_omp_task_alloc(NULL,gtid,17,sizeof(kmp_task_t),0,&task_entry);
+    kmp_task_t *proxy_task = __nosvc_omp_task_alloc(NULL,gtid,17,sizeof(kmp_task_t),0,&task_entry);
     __kmpc_omp_task_with_deps(NULL,gtid,proxy_task,1,&dep_info,0,NULL);
 
     int first_task_finished = 0;

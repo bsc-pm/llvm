@@ -114,8 +114,8 @@ typedef void *omp_task_type_t;
 extern "C" {
 #endif
 int __kmpc_global_thread_num(id*);
-void __kmpc_register_task_info(omp_task_type_t *omp_task_type, void *label);
-task_t *__kmpc_omp_task_alloc(id *loc, int gtid, int flags,
+void __nosvc_register_task_info(omp_task_type_t *omp_task_type, void *label);
+task_t *__nosvc_omp_task_alloc(id *loc, int gtid, int flags,
                               size_t sz, size_t shar, entry_t rtn, omp_task_type_t*);
 int __kmpc_omp_task_with_deps(id *loc, int gtid, task_t *task, int ndeps,
                               dep *dep_lst, int nd_noalias, dep *noalias_lst);
@@ -185,8 +185,8 @@ int main()
 // compiler codegen start
       // task2
       omp_task_type_t omp_task_type1;
-      __kmpc_register_task_info(&omp_task_type1, NULL);
-      ptr = __kmpc_omp_task_alloc(&loc, gtid, TIED, sizeof(task_t), 0, thunk_s, &omp_task_type1);
+      __nosvc_register_task_info(&omp_task_type1, NULL);
+      ptr = __nosvc_omp_task_alloc(&loc, gtid, TIED, sizeof(task_t), 0, thunk_s, &omp_task_type1);
       sdep[0].addr = (size_t)&i1;
       sdep[0].len = 0;   // not used
       sdep[0].flags = 1; // IN
@@ -198,8 +198,8 @@ int main()
 
       // task3
       omp_task_type_t omp_task_type2;
-      __kmpc_register_task_info(&omp_task_type2, NULL);
-      ptr = __kmpc_omp_task_alloc(&loc, gtid, TIED, sizeof(task_t), 0, thunk_m, &omp_task_type2);
+      __nosvc_register_task_info(&omp_task_type2, NULL);
+      ptr = __nosvc_omp_task_alloc(&loc, gtid, TIED, sizeof(task_t), 0, thunk_m, &omp_task_type2);
       sdep[0].addr = (size_t)&i1; // to be ignored
       sdep[0].len = 0;   // not used
       sdep[0].flags = 1; // IN
@@ -254,8 +254,8 @@ int main()
 // compiler codegen start
       // task6
       omp_task_type_t omp_task_type6;
-      __kmpc_register_task_info(&omp_task_type6, NULL);
-      ptr = __kmpc_omp_task_alloc(&loc, gtid, TIED, sizeof(task_t), 0, thunk_m, &omp_task_type6);
+      __nosvc_register_task_info(&omp_task_type6, NULL);
+      ptr = __nosvc_omp_task_alloc(&loc, gtid, TIED, sizeof(task_t), 0, thunk_m, &omp_task_type6);
       sdep[0].addr = (size_t)(-1); // omp_all_memory
       sdep[0].len = 0;   // not used
       sdep[0].flags = 2; // OUT
@@ -264,8 +264,8 @@ int main()
 
       // task7
       omp_task_type_t omp_task_type7;
-      __kmpc_register_task_info(&omp_task_type7, NULL);
-      ptr = __kmpc_omp_task_alloc(&loc, gtid, TIED, sizeof(task_t), 0, thunk_m, &omp_task_type7);
+      __nosvc_register_task_info(&omp_task_type7, NULL);
+      ptr = __nosvc_omp_task_alloc(&loc, gtid, TIED, sizeof(task_t), 0, thunk_m, &omp_task_type7);
       sdep[0].addr = 0;
       sdep[0].len = 0;   // not used
       sdep[0].flags = DEP_ALL_MEM; // omp_all_memory

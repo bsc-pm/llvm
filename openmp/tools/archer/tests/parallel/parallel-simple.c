@@ -13,7 +13,7 @@
 
 
 // RUN: %libarcher-compile && env OMP_TOOL_VERBOSE_INIT=stderr %libarcher-run 2>&1 | FileCheck %s --check-prefixes CHECK,TSAN_ON
-// RUN: %clang-archer %openmp_flags %flags %s -o %t && env OMP_TOOL_VERBOSE_INIT=stderr %t 2>&1 | FileCheck %s --check-prefixes CHECK,TSAN_OFF
+// RUN: %clang-archer %openmp_flags -fopenmp-nosv %flags %s -o %t && env OMP_TOOL_VERBOSE_INIT=stderr %t 2>&1 | FileCheck %s --check-prefixes CHECK,TSAN_OFF
 // REQUIRES: tsan
 #include <omp.h>
 #include <stdio.h>

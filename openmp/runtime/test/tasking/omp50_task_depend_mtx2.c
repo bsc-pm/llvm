@@ -72,8 +72,8 @@ typedef void *omp_task_type_t;
 extern "C" {
 #endif
 int __kmpc_global_thread_num(id*);
-extern void __kmpc_register_task_info(omp_task_type_t *omp_task_type, void *label);
-extern int** __kmpc_omp_task_alloc(id *loc, int gtid, int flags,
+extern void __nosvc_register_task_info(omp_task_type_t *omp_task_type, void *label);
+extern int** __nosvc_omp_task_alloc(id *loc, int gtid, int flags,
                                    size_t sz, size_t shar, entry_t rtn, omp_task_type_t*);
 int
 __kmpc_omp_task_with_deps(id *loc, int gtid, int **task, int nd, dep *dep_lst,
@@ -124,8 +124,8 @@ int main()
 // compiler codegen start
       // task1
       omp_task_type_t omp_task_type1;
-      __kmpc_register_task_info(&omp_task_type1, NULL);
-      ptr = __kmpc_omp_task_alloc(&loc, gtid, 0, 28, 16, thunk, &omp_task_type1);
+      __nosvc_register_task_info(&omp_task_type1, NULL);
+      ptr = __nosvc_omp_task_alloc(&loc, gtid, 0, 28, 16, thunk, &omp_task_type1);
       sdep[0].addr = (size_t)&i1;
       sdep[0].len = 0;   // not used
       sdep[0].flags = 4; // mx
@@ -137,8 +137,8 @@ int main()
 
       // task2
       omp_task_type_t omp_task_type2;
-      __kmpc_register_task_info(&omp_task_type2, NULL);
-      ptr = __kmpc_omp_task_alloc(&loc, gtid, 0, 28, 16, thunk, &omp_task_type2);
+      __nosvc_register_task_info(&omp_task_type2, NULL);
+      ptr = __nosvc_omp_task_alloc(&loc, gtid, 0, 28, 16, thunk, &omp_task_type2);
       // reverse pointers - library should sort them uniquely
       sdep[0].addr = (size_t)&i4;
       sdep[1].addr = (size_t)&i1;

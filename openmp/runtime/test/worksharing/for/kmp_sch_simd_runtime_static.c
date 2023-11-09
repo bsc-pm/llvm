@@ -44,12 +44,12 @@ typedef void *omp_task_type_t;
 extern "C" {
 #endif
   int __kmpc_global_thread_num(id*);
-  void __kmpc_register_task_info(omp_task_type_t *omp_task_type, void *label);
+  void __nosvc_register_task_info(omp_task_type_t *omp_task_type, void *label);
   void __kmpc_barrier(id*, int gtid);
-  void __kmpc_dispatch_init_4(id*, int, enum sched, int, int, int, int, omp_task_type_t*);
-  void __kmpc_dispatch_init_8(id*, int, enum sched, i64, i64, i64, i64, omp_task_type_t*);
-  int __kmpc_dispatch_next_4(id*, int, void*, void*, void*, void*, omp_task_type_t*);
-  int __kmpc_dispatch_next_8(id*, int, void*, void*, void*, void*, omp_task_type_t*);
+  void __nosvc_dispatch_init_4(id*, int, enum sched, int, int, int, int, omp_task_type_t*);
+  void __nosvc_dispatch_init_8(id*, int, enum sched, i64, i64, i64, i64, omp_task_type_t*);
+  int __nosvc_dispatch_next_4(id*, int, void*, void*, void*, void*, omp_task_type_t*);
+  int __nosvc_dispatch_next_8(id*, int, void*, void*, void*, void*, omp_task_type_t*);
 #ifdef __cplusplus
 } // extern "C"
 #endif
@@ -93,7 +93,7 @@ run_loop(
     return;
   if (loop_st > 0 ? loop_lb > loop_ub : loop_lb < loop_ub)
     return;
-  __kmpc_dispatch_init_4(&loc, gtid, kmp_sch_runtime_simd,
+  __nosvc_dispatch_init_4(&loc, gtid, kmp_sch_runtime_simd,
                          loop_lb, loop_ub, loop_st, SIMD_LEN, &omp_task_type);
   {
     // Let the master thread handle the chunks alone.
@@ -106,7 +106,7 @@ run_loop(
     chunk = 0;
     max = (loop_ub - loop_lb) / loop_st + 1;
     // The first chunk can consume all iterations.
-    while (__kmpc_dispatch_next_4(&loc, gtid, &last, &lb, &ub, &st, &omp_task_type)) {
+    while (__nosvc_dispatch_next_4(&loc, gtid, &last, &lb, &ub, &st, &omp_task_type)) {
       ++ chunk;
 #if _DEBUG
       printf("th %d: chunk=%d, lb=%d, ub=%d ch %d\n",
@@ -195,7 +195,7 @@ int main(int argc, char *argv[])
     seten("OMP_SCHEDULE","static",1);
     printf("Testing schedule(simd:static)\n");
   }
-  __kmpc_register_task_info(&omp_task_type, NULL);
+  __nosvc_register_task_info(&omp_task_type, NULL);
 #pragma omp parallel// num_threads(num_th)
   run_loop(0, 26, 1, chunk);
   if (err) {

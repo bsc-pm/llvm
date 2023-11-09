@@ -57,8 +57,8 @@ typedef void *omp_task_type_t;
 extern "C" {
 #endif
 extern int  __kmpc_global_thread_num(void *id_ref);
-extern void __kmpc_register_task_info(omp_task_type_t *omp_task_type, void *label);
-extern int** __kmpc_omp_task_alloc(id *loc, int gtid, int flags,
+extern void __nosvc_register_task_info(omp_task_type_t *omp_task_type, void *label);
+extern int** __nosvc_omp_task_alloc(id *loc, int gtid, int flags,
                                    size_t sz, size_t shar, task_entry_t rtn, omp_task_type_t*);
 extern int __kmpc_omp_task(id *loc, int gtid, kmp_task_t *task);
 extern omp_event_handle_t __kmpc_task_allow_completion_event(
@@ -94,8 +94,8 @@ int main() {
       {}
 */
       omp_task_type_t omp_task_type;
-      __kmpc_register_task_info(&omp_task_type, NULL);
-      task = (ptask)__kmpc_omp_task_alloc(NULL,gtid,PTASK_FLAG_DETACHABLE,
+      __nosvc_register_task_info(&omp_task_type, NULL);
+      task = (ptask)__nosvc_omp_task_alloc(NULL,gtid,PTASK_FLAG_DETACHABLE,
                         sizeof(struct task),sizeof(struct shar),&task_entry, &omp_task_type);
       psh = task->shareds;
       evt = (omp_event_handle_t)__kmpc_task_allow_completion_event(NULL,gtid,task);
