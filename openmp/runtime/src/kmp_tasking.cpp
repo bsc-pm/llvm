@@ -1220,6 +1220,15 @@ static void __kmp_task_finish(kmp_int32 gtid, kmp_task_t *task,
 
   // Tasks with valid target async handles must be re-enqueued.
   if (taskdata->td_target_data.async_handle != NULL) {
+    // target nowait directives are untied tasks.
+    // In the vanilla openmp td_untied_count is broken but since
+    // the task free is managed by async_handle it works.
+    //
+    // In our case, need to avoid the free in the nosv_complete_task.
+    // We increment the td_untied_count here so the free is not done
+    // until async_handle == NULL. Basically we emulate an untied task
+    KMP_ASSERT(taskdata->td_flags.tiedness == TASK_UNTIED);
+    kmp_int32 counter = 1 + KMP_ATOMIC_INC(&taskdata->td_untied_count);
     // Note: no need to translate gtid to its shadow. If the current thread is a
     // hidden helper one, then the gtid is already correct. Otherwise, hidden
     // helper threads are disabled, and gtid refers to a OpenMP thread.

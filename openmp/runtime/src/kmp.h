@@ -2821,8 +2821,14 @@ struct kmp_taskdata { /* aligned during dynamic allocation       */
   // NOTE: used to pass the current_task from nosv_exec_task
   // to nosv_complete_task
   kmp_taskdata_t *td_resume_task;
-  // Flag to avoid two time execution gap
-  // in untied tasks
+  // Flag to avoid two time execution gap in untied tasks.
+  // This is a problem with nosv since it is assumed a task
+  // cannot be executed at the same time.
+  //
+  // nosv resets the event counter on every
+  // execution, so if we overlap executions
+  // we will potentially decrement the event counter
+  // just after the reset.
   bool td_complete_callback_done;
   // Instrumentation (Ovni) task id
   kmp_int32 td_instrum_task_id;
@@ -4372,7 +4378,8 @@ KMP_EXPORT kmp_task_t *__kmpc_omp_target_task_alloc(
     size_t sizeof_shareds, kmp_routine_entry_t task_entry, kmp_int64 device_id);
 KMP_EXPORT kmp_task_t *__nosvc_omp_target_task_alloc(
     ident_t *loc_ref, kmp_int32 gtid, kmp_int32 flags, size_t sizeof_kmp_task_t,
-    size_t sizeof_shareds, kmp_routine_entry_t task_entry, kmp_int64 device_id);
+    size_t sizeof_shareds, kmp_routine_entry_t task_entry, kmp_int64 device_id,
+    omp_task_type_t *omp_task_type);
 KMP_EXPORT void __kmpc_omp_task_begin_if0(ident_t *loc_ref, kmp_int32 gtid,
                                           kmp_task_t *task);
 KMP_EXPORT void __kmpc_omp_task_complete_if0(ident_t *loc_ref, kmp_int32 gtid,
