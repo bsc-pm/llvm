@@ -93,17 +93,17 @@ end subroutine
 ! LLVMIRDialect:           %[[VAL_22:[-0-9A-Za-z._]+]] = llvm.mul %[[VAL_21]], %[[VAL_20]]  : i64
 ! LLVMIRDialect:           %[[VAL_23:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_22]] x i32 {bindc_name = "array2"} : (i64) -> !llvm.ptr
 ! LLVMIRDialect:           %[[VAL_24:[-0-9A-Za-z._]+]] = oss.vlaDim pointer(%[[VAL_23]] : !llvm.ptr) sizes(%[[VAL_20]] : i64) lbs(%[[VAL_4]] : i64) -> i32
-! LLVMIRDialect:           %[[VAL_25:[-0-9A-Za-z._]+]] = llvm.mlir.undef : !llvm.ptr<i32>
+! LLVMIRDialect:           %[[VAL_25:[-0-9A-Za-z._]+]] = llvm.mlir.undef : !llvm.ptr
 ! LLVMIRDialect:           %[[VAL_26:[-0-9A-Za-z._]+]] = llvm.mlir.undef : i32
 ! LLVMIRDialect:           %[[VAL_27:[-0-9A-Za-z._]+]] = llvm.load %[[VAL_0]] : !llvm.ptr -> i32
 ! LLVMIRDialect:           %[[VAL_28:[-0-9A-Za-z._]+]] = llvm.add %[[VAL_27]], %[[VAL_9]]  : i32
 ! LLVMIRDialect:           %[[VAL_29:[-0-9A-Za-z._]+]] = llvm.sext %[[VAL_28]] : i32 to i64
 ! LLVMIRDialect:           %[[VAL_30:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_23]] : !llvm.ptr) function(@compute.dep0) arguments(%[[VAL_29]], %[[VAL_23]] : i64, !llvm.ptr) -> i32
-! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_7]] : i32) upper_bound(%[[VAL_6]] : i32) step(%[[VAL_7]] : i32) loop_type(%[[VAL_5]] : i64) ind_var(%[[VAL_14]] : !llvm.ptr) private(%[[VAL_14]] : !llvm.ptr) private_type(%[[VAL_26]] : i32) shared(%[[VAL_23]] : !llvm.ptr) shared_type(%[[VAL_25]] : !llvm.ptr<i32>) vlaDims(%[[VAL_24]] : i32) captures(%[[VAL_20]], %[[VAL_4]], %[[VAL_29]] : i64, i64, i64) out(%[[VAL_30]] : i32) {
+! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_7]] : i32) upper_bound(%[[VAL_6]] : i32) step(%[[VAL_7]] : i32) loop_type(%[[VAL_5]] : i64) ind_var(%[[VAL_14]] : !llvm.ptr) private(%[[VAL_14]] : !llvm.ptr) private_type(%[[VAL_26]] : i32) shared(%[[VAL_23]] : !llvm.ptr) shared_type(%[[VAL_25]] : !llvm.ptr) vlaDims(%[[VAL_24]] : i32) captures(%[[VAL_20]], %[[VAL_4]], %[[VAL_29]] : i64, i64, i64) out(%[[VAL_30]] : i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
 ! LLVMIRDialect:           %[[VAL_31:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_1]] : !llvm.ptr) function(@compute.dep1) arguments(%[[VAL_1]], %[[VAL_12]] : !llvm.ptr, !llvm.ptr) -> i32
-! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_7]] : i32) upper_bound(%[[VAL_6]] : i32) step(%[[VAL_7]] : i32) loop_type(%[[VAL_5]] : i64) ind_var(%[[VAL_14]] : !llvm.ptr) private(%[[VAL_14]] : !llvm.ptr) private_type(%[[VAL_26]] : i32) firstprivate(%[[VAL_12]] : !llvm.ptr) firstprivate_type(%[[VAL_26]] : i32) shared(%[[VAL_1]] : !llvm.ptr) shared_type(%[[VAL_25]] : !llvm.ptr<i32>) captures(%[[VAL_10]] : i64) out(%[[VAL_31]] : i32) {
+! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_7]] : i32) upper_bound(%[[VAL_6]] : i32) step(%[[VAL_7]] : i32) loop_type(%[[VAL_5]] : i64) ind_var(%[[VAL_14]] : !llvm.ptr) private(%[[VAL_14]] : !llvm.ptr) private_type(%[[VAL_26]] : i32) firstprivate(%[[VAL_12]] : !llvm.ptr) firstprivate_type(%[[VAL_26]] : i32) shared(%[[VAL_1]] : !llvm.ptr) shared_type(%[[VAL_25]] : !llvm.ptr) captures(%[[VAL_10]] : i64) out(%[[VAL_31]] : i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
 ! LLVMIRDialect:           %[[VAL_32:[-0-9A-Za-z._]+]] = oss.vlaDim pointer(%[[VAL_23]] : !llvm.ptr) sizes(%[[VAL_20]] : i64) lbs(%[[VAL_4]] : i64) -> i32
@@ -111,11 +111,11 @@ end subroutine
 ! LLVMIRDialect:           %[[VAL_34:[-0-9A-Za-z._]+]] = llvm.add %[[VAL_33]], %[[VAL_9]]  : i32
 ! LLVMIRDialect:           %[[VAL_35:[-0-9A-Za-z._]+]] = llvm.sext %[[VAL_34]] : i32 to i64
 ! LLVMIRDialect:           %[[VAL_36:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_23]] : !llvm.ptr) function(@compute.dep2) arguments(%[[VAL_35]], %[[VAL_23]], %[[VAL_12]] : i64, !llvm.ptr, !llvm.ptr) -> i32
-! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_7]] : i32) upper_bound(%[[VAL_6]] : i32) step(%[[VAL_7]] : i32) loop_type(%[[VAL_5]] : i64) ind_var(%[[VAL_14]] : !llvm.ptr) private(%[[VAL_14]] : !llvm.ptr) private_type(%[[VAL_26]] : i32) firstprivate(%[[VAL_12]] : !llvm.ptr) firstprivate_type(%[[VAL_26]] : i32) shared(%[[VAL_23]] : !llvm.ptr) shared_type(%[[VAL_25]] : !llvm.ptr<i32>) vlaDims(%[[VAL_32]] : i32) captures(%[[VAL_20]], %[[VAL_4]], %[[VAL_35]] : i64, i64, i64) out(%[[VAL_36]] : i32) {
+! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_7]] : i32) upper_bound(%[[VAL_6]] : i32) step(%[[VAL_7]] : i32) loop_type(%[[VAL_5]] : i64) ind_var(%[[VAL_14]] : !llvm.ptr) private(%[[VAL_14]] : !llvm.ptr) private_type(%[[VAL_26]] : i32) firstprivate(%[[VAL_12]] : !llvm.ptr) firstprivate_type(%[[VAL_26]] : i32) shared(%[[VAL_23]] : !llvm.ptr) shared_type(%[[VAL_25]] : !llvm.ptr) vlaDims(%[[VAL_32]] : i32) captures(%[[VAL_20]], %[[VAL_4]], %[[VAL_35]] : i64, i64, i64) out(%[[VAL_36]] : i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
 ! LLVMIRDialect:           %[[VAL_37:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_1]] : !llvm.ptr) function(@compute.dep3) arguments(%[[VAL_1]], %[[VAL_12]] : !llvm.ptr, !llvm.ptr) -> i32
-! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_7]] : i32) upper_bound(%[[VAL_6]] : i32) step(%[[VAL_7]] : i32) loop_type(%[[VAL_5]] : i64) ind_var(%[[VAL_14]] : !llvm.ptr) private(%[[VAL_14]] : !llvm.ptr) private_type(%[[VAL_26]] : i32) firstprivate(%[[VAL_12]] : !llvm.ptr) firstprivate_type(%[[VAL_26]] : i32) shared(%[[VAL_1]] : !llvm.ptr) shared_type(%[[VAL_25]] : !llvm.ptr<i32>) captures(%[[VAL_10]] : i64) out(%[[VAL_37]] : i32) {
+! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_7]] : i32) upper_bound(%[[VAL_6]] : i32) step(%[[VAL_7]] : i32) loop_type(%[[VAL_5]] : i64) ind_var(%[[VAL_14]] : !llvm.ptr) private(%[[VAL_14]] : !llvm.ptr) private_type(%[[VAL_26]] : i32) firstprivate(%[[VAL_12]] : !llvm.ptr) firstprivate_type(%[[VAL_26]] : i32) shared(%[[VAL_1]] : !llvm.ptr) shared_type(%[[VAL_25]] : !llvm.ptr) captures(%[[VAL_10]] : i64) out(%[[VAL_37]] : i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
 ! LLVMIRDialect:           %[[VAL_38:[-0-9A-Za-z._]+]] = oss.vlaDim pointer(%[[VAL_23]] : !llvm.ptr) sizes(%[[VAL_20]] : i64) lbs(%[[VAL_4]] : i64) -> i32
@@ -123,7 +123,7 @@ end subroutine
 ! LLVMIRDialect:           %[[VAL_40:[-0-9A-Za-z._]+]] = llvm.add %[[VAL_39]], %[[VAL_9]]  : i32
 ! LLVMIRDialect:           %[[VAL_41:[-0-9A-Za-z._]+]] = llvm.sext %[[VAL_40]] : i32 to i64
 ! LLVMIRDialect:           %[[VAL_42:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_23]] : !llvm.ptr) function(@compute.dep4) arguments(%[[VAL_41]], %[[VAL_23]] : i64, !llvm.ptr) -> i32
-! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_7]] : i32) upper_bound(%[[VAL_6]] : i32) step(%[[VAL_7]] : i32) loop_type(%[[VAL_5]] : i64) ind_var(%[[VAL_14]] : !llvm.ptr) private(%[[VAL_14]] : !llvm.ptr) private_type(%[[VAL_26]] : i32) shared(%[[VAL_23]] : !llvm.ptr) shared_type(%[[VAL_25]] : !llvm.ptr<i32>) vlaDims(%[[VAL_38]] : i32) captures(%[[VAL_20]], %[[VAL_4]], %[[VAL_41]] : i64, i64, i64) out(%[[VAL_42]] : i32) {
+! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_7]] : i32) upper_bound(%[[VAL_6]] : i32) step(%[[VAL_7]] : i32) loop_type(%[[VAL_5]] : i64) ind_var(%[[VAL_14]] : !llvm.ptr) private(%[[VAL_14]] : !llvm.ptr) private_type(%[[VAL_26]] : i32) shared(%[[VAL_23]] : !llvm.ptr) shared_type(%[[VAL_25]] : !llvm.ptr) vlaDims(%[[VAL_38]] : i32) captures(%[[VAL_20]], %[[VAL_4]], %[[VAL_41]] : i64, i64, i64) out(%[[VAL_42]] : i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
 ! LLVMIRDialect:           llvm.return
