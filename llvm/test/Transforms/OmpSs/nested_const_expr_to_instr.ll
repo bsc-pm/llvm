@@ -2,18 +2,10 @@
 ; RUN: opt %s -passes=ompss-2 -S | FileCheck %s
 ; ModuleID = 'nested_const_expr_to_instr.ll'
 source_filename = "nested_const_expr_to_instr.ll"
-target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
+target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
-; int array[10];
-; int main() {
-;     #pragma oss task
-;     {
-;         *(int *)((int)array) = 0;
-;     }
-; }
-
-@array = global [10 x i32] zeroinitializer, align 16
+@array = dso_local global [10 x i32] zeroinitializer, align 16
 
 ; Function Attrs: noinline nounwind optnone uwtable
 define dso_local i32 @main() #0 !dbg !7 {
@@ -32,65 +24,75 @@ declare token @llvm.directive.region.entry() #1
 ; Function Attrs: nounwind
 declare void @llvm.directive.region.exit(token) #1
 
-attributes #0 = { noinline nounwind optnone "frame-pointer"="none" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #0 = { noinline nounwind optnone uwtable "frame-pointer"="all" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cmov,+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
 attributes #1 = { nounwind }
 
 !llvm.dbg.cu = !{!0}
-!llvm.module.flags = !{!2, !3}
-!llvm.ident = !{!4}
+!llvm.module.flags = !{!2, !3, !4, !5}
+!llvm.ident = !{!6}
 
-!0 = distinct !DICompileUnit(language: DW_LANG_C99, file: !1, producer: "", isOptimized: false, runtimeVersion: 0, emissionKind: NoDebug, splitDebugInlining: false, nameTableKind: None)
-!1 = !DIFile(filename: "<stdin>", directory: "")
+!0 = distinct !DICompileUnit(language: DW_LANG_C11, file: !1, producer: "clang version 18.0.0 (git@bscpm03.bsc.es:llvm-ompss/llvm-mono.git 574aeaf59874f4805583d7c849a4ab013a843d22)", isOptimized: false, runtimeVersion: 0, emissionKind: NoDebug, splitDebugInlining: false, nameTableKind: None)
+!1 = !DIFile(filename: "t3.c", directory: "/home/rpenacob/llvm-mono-1/build")
 !2 = !{i32 2, !"Debug Info Version", i32 3}
 !3 = !{i32 1, !"wchar_size", i32 4}
-!4 = !{!""}
-!5 = distinct !DISubprogram(name: "main", scope: !6, file: !6, line: 2, type: !7, scopeLine: 2, spFlags: DISPFlagDefinition, unit: !0, retainedNodes: !8)
-!6 = !DIFile(filename: "nested_const_expr_to_instr.ll", directory: "")
-!7 = !DISubroutineType(types: !8)
-!8 = !{}
-!9 = !DILocation(line: 3, column: 13, scope: !5)
-!10 = !DILocation(line: 5, column: 30, scope: !5)
-!11 = !DILocation(line: 6, column: 5, scope: !5)
-!12 = !DILocation(line: 7, column: 1, scope: !5)
+!4 = !{i32 7, !"uwtable", i32 2}
+!5 = !{i32 7, !"frame-pointer", i32 2}
+!6 = !{!"clang version 18.0.0 (git@bscpm03.bsc.es:llvm-ompss/llvm-mono.git 574aeaf59874f4805583d7c849a4ab013a843d22)"}
+!7 = distinct !DISubprogram(name: "main", scope: !1, file: !1, line: 2, type: !8, scopeLine: 2, spFlags: DISPFlagDefinition, unit: !0)
+!8 = !DISubroutineType(types: !9)
+!9 = !{}
+!10 = !DILocation(line: 3, column: 11, scope: !7)
+!11 = !DILocation(line: 5, column: 6, scope: !7)
+!12 = !DILocation(line: 5, column: 26, scope: !7)
+!13 = !DILocation(line: 6, column: 3, scope: !7)
+!14 = !DILocation(line: 7, column: 1, scope: !7)
 ; CHECK-LABEL: define {{[^@]+}}@main
-; CHECK-SAME: () #[[ATTR0:[0-9]+]] !dbg [[DBG5:![0-9]+]] {
+; CHECK-SAME: () #[[ATTR0:[0-9]+]] !dbg [[DBG7:![0-9]+]] {
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[TMP0:%.*]] = alloca ptr, align 8, !dbg [[DBG9:![0-9]+]]
-; CHECK-NEXT:    [[TMP1:%.*]] = alloca ptr, align 8, !dbg [[DBG9]]
-; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG9]]
-; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg [[DBG9]]
+; CHECK-NEXT:    [[TMP0:%.*]] = alloca ptr, align 8, !dbg [[DBG10:![0-9]+]]
+; CHECK-NEXT:    [[TMP1:%.*]] = alloca ptr, align 8, !dbg [[DBG10]]
+; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG10]]
+; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg [[DBG10]]
 ; CHECK:       codeRepl:
-; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS]], align 8, !dbg [[DBG9]]
-; CHECK-NEXT:    [[TMP2:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG9]]
-; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_main, ptr @task_invocation_info_main, ptr null, i64 16, ptr [[TMP0]], ptr [[TMP1]], i64 0, i64 [[TMP2]]), !dbg [[DBG9]]
-; CHECK-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[TMP0]], align 8, !dbg [[DBG9]]
-; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP3]], i64 16, !dbg [[DBG9]]
-; CHECK-NEXT:    [[GEP_ARRAY:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN:%.*]], ptr [[TMP3]], i32 0, i32 0, !dbg [[DBG9]]
-; CHECK-NEXT:    store ptr @array, ptr [[GEP_ARRAY]], align 8, !dbg [[DBG9]]
-; CHECK-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[TMP1]], align 8, !dbg [[DBG9]]
-; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP4]]), !dbg [[DBG9]]
-; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG9]]
+; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS]], align 8, !dbg [[DBG10]]
+; CHECK-NEXT:    [[TMP2:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG10]]
+; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_main, ptr @task_invocation_info_main, ptr null, i64 16, ptr [[TMP0]], ptr [[TMP1]], i64 0, i64 [[TMP2]]), !dbg [[DBG10]]
+; CHECK-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[TMP0]], align 8, !dbg [[DBG10]]
+; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP3]], i64 16, !dbg [[DBG10]]
+; CHECK-NEXT:    [[GEP_ARRAY:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN:%.*]], ptr [[TMP3]], i32 0, i32 0, !dbg [[DBG10]]
+; CHECK-NEXT:    store ptr @array, ptr [[GEP_ARRAY]], align 8, !dbg [[DBG10]]
+; CHECK-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[TMP1]], align 8, !dbg [[DBG10]]
+; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP4]]), !dbg [[DBG10]]
+; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG10]]
 ; CHECK:       final.end:
-; CHECK-NEXT:    ret i32 0, !dbg [[DBG10:![0-9]+]]
+; CHECK-NEXT:    ret i32 0, !dbg [[DBG11:![0-9]+]]
 ; CHECK:       final.then:
-; CHECK-NEXT:    store i32 0, ptr inttoptr (i64 sext (i32 ptrtoint (ptr @array to i32) to i64) to ptr), align 4, !dbg [[DBG11:![0-9]+]]
-; CHECK-NEXT:    br label [[FINAL_END]], !dbg [[DBG10]]
+; CHECK-NEXT:    [[CONV_CLONE:%.*]] = sext i32 ptrtoint (ptr @array to i32) to i64, !dbg [[DBG12:![0-9]+]]
+; CHECK-NEXT:    [[TMP5:%.*]] = inttoptr i64 [[CONV_CLONE]] to ptr, !dbg [[DBG12]]
+; CHECK-NEXT:    store i32 0, ptr [[TMP5]], align 4, !dbg [[DBG13:![0-9]+]]
+; CHECK-NEXT:    br label [[FINAL_END]], !dbg [[DBG11]]
 ; CHECK:       final.cond:
-; CHECK-NEXT:    [[TMP5:%.*]] = call i32 @nanos6_in_final(), !dbg [[DBG9]]
-; CHECK-NEXT:    [[TMP6:%.*]] = icmp ne i32 [[TMP5]], 0, !dbg [[DBG9]]
-; CHECK-NEXT:    br i1 [[TMP6]], label [[FINAL_THEN:%.*]], label [[CODEREPL:%.*]], !dbg [[DBG9]]
+; CHECK-NEXT:    [[TMP6:%.*]] = call i32 @nanos6_in_final(), !dbg [[DBG10]]
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp ne i32 [[TMP6]], 0, !dbg [[DBG10]]
+; CHECK-NEXT:    br i1 [[TMP7]], label [[FINAL_THEN:%.*]], label [[CODEREPL:%.*]], !dbg [[DBG10]]
+;
+;
+; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_check_version() {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    call void @nanos6_check_version(i64 1, ptr @nanos6_versions, ptr @[[GLOB0:[0-9]+]])
+; CHECK-NEXT:    ret void
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_main
-; CHECK-SAME: (ptr [[ARRAY:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG12:![0-9]+]] {
+; CHECK-SAME: (ptr [[ARRAY:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG14:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
-; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG13:![0-9]+]]
+; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG15:![0-9]+]]
 ; CHECK:       0:
 ; CHECK-NEXT:    [[TMP1:%.*]] = ptrtoint ptr [[ARRAY]] to i32
-; CHECK-NEXT:    [[TMP2:%.*]] = sext i32 [[TMP1]] to i64
-; CHECK-NEXT:    [[TMP3:%.*]] = inttoptr i64 [[TMP2]] to ptr
-; CHECK-NEXT:    store i32 0, ptr [[TMP3]], align 4, !dbg [[DBG14:![0-9]+]]
-; CHECK-NEXT:    br label [[DOTEXITSTUB:%.*]], !dbg [[DBG15:![0-9]+]]
+; CHECK-NEXT:    [[CONV:%.*]] = sext i32 [[TMP1]] to i64, !dbg [[DBG16:![0-9]+]]
+; CHECK-NEXT:    [[TMP2:%.*]] = inttoptr i64 [[CONV]] to ptr, !dbg [[DBG16]]
+; CHECK-NEXT:    store i32 0, ptr [[TMP2]], align 4, !dbg [[DBG17:![0-9]+]]
+; CHECK-NEXT:    br label [[DOTEXITSTUB:%.*]], !dbg [[DBG18:![0-9]+]]
 ; CHECK:       .exitStub:
 ; CHECK-NEXT:    ret void
 ;

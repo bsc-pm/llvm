@@ -38,7 +38,7 @@ end subroutine
 ! FIRDialect:             %[[VAL_9:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_7]]#1 : (index) -> !fir.shape<1>
 ! FIRDialect:             %[[VAL_10:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_8]](%[[VAL_9]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.array<?xf32>>
 ! FIRDialect:             fir.store %[[VAL_10]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.array<?xf32>>>
-! FIRDialect:             %[[VAL_11:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl.{{.*}})
+! FIRDialect:             %[[VAL_11:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl{{.*}})
 ! FIRDialect:             %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 5 : i32
 ! FIRDialect:             %[[VAL_13:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_1]] : (!fir.ref<!fir.box<!fir.array<?xf32>>>) -> !fir.ref<!fir.box<none>>
 ! FIRDialect:             %[[VAL_14:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_0]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<none>
@@ -93,7 +93,7 @@ end subroutine
 ! FIRDialect:               %[[VAL_16:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_9]]#1 : (index) -> !fir.shape<1>
 ! FIRDialect:               %[[VAL_17:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_3]](%[[VAL_16]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.array<?xf32>>
 ! FIRDialect:               fir.store %[[VAL_0]] to %[[VAL_14]] : !fir.ref<!fir.box<!fir.array<?xf32>>>
-! FIRDialect:               %[[VAL_18:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl.{{.*}})
+! FIRDialect:               %[[VAL_18:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl{{.*}})
 ! FIRDialect:               %[[VAL_19:[-0-9A-Za-z._]+]] = arith.constant 16 : i32
 ! FIRDialect:               %[[VAL_20:[-0-9A-Za-z._]+]] = arith.constant true
 ! FIRDialect:               %[[VAL_21:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_14]] : (!fir.ref<!fir.box<!fir.array<?xf32>>>) -> !fir.ref<!fir.box<none>>

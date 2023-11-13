@@ -234,7 +234,7 @@ end module
 ! CHECK-LABEL:   func.func @_QMoptPintrinsic_scalar(
 ! CHECK-SAME:                                       %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<f32> {fir.bindc_name = "x", fir.optional}) {
 ! CHECK:           %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant -1 : i32
-! CHECK:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl.{{.*}})
+! CHECK:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl{{.*}})
 ! CHECK:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_2]]
 ! CHECK:           %[[VAL_4:[-0-9A-Za-z._]+]] = arith.constant 18 : i32
 ! CHECK:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.call @_FortranAioBeginExternalListOutput(%[[VAL_1]], %[[VAL_3]], %[[VAL_4]]) fastmath<contract> : (i32, !fir.ref<i8>, i32) -> !fir.ref<i8>
@@ -263,7 +263,7 @@ end module
 ! CHECK-LABEL:   func.func @_QMoptPintrinsic_f77_array(
 ! CHECK-SAME:                                          %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.array<100xf32>> {fir.bindc_name = "x", fir.optional}) {
 ! CHECK:           %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant -1 : i32
-! CHECK:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl.{{.*}})
+! CHECK:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl{{.*}})
 ! CHECK:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_2]]
 ! CHECK:           %[[VAL_4:[-0-9A-Za-z._]+]] = arith.constant 30 : i32
 ! CHECK:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.call @_FortranAioBeginExternalListOutput(%[[VAL_1]], %[[VAL_3]], %[[VAL_4]]) fastmath<contract> : (i32, !fir.ref<i8>, i32) -> !fir.ref<i8>
@@ -292,7 +292,7 @@ end module
 ! CHECK-LABEL:   func.func @_QMoptPassumed_shape(
 ! CHECK-SAME:                                    %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.box<!fir.array<?xf32>> {fir.bindc_name = "x", fir.optional}) {
 ! CHECK:           %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant -1 : i32
-! CHECK:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl.{{.*}})
+! CHECK:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl{{.*}})
 ! CHECK:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_2]]
 ! CHECK:           %[[VAL_4:[-0-9A-Za-z._]+]] = arith.constant 42 : i32
 ! CHECK:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.call @_FortranAioBeginExternalListOutput(%[[VAL_1]], %[[VAL_3]], %[[VAL_4]]) fastmath<contract> : (i32, !fir.ref<i8>, i32) -> !fir.ref<i8>
@@ -325,7 +325,7 @@ end module
 ! CHECK-LABEL:   func.func @_QMoptPallocatable_array(
 ! CHECK-SAME:                                        %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>> {fir.bindc_name = "x", fir.optional}) {
 ! CHECK:           %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant -1 : i32
-! CHECK:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl.{{.*}})
+! CHECK:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl{{.*}})
 ! CHECK:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_2]]
 ! CHECK:           %[[VAL_4:[-0-9A-Za-z._]+]] = arith.constant 54 : i32
 ! CHECK:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.call @_FortranAioBeginExternalListOutput(%[[VAL_1]], %[[VAL_3]], %[[VAL_4]]) fastmath<contract> : (i32, !fir.ref<i8>, i32) -> !fir.ref<i8>
