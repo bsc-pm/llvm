@@ -1182,11 +1182,6 @@ END PROGRAM
 ! FIRDialect:           return %[[VAL_6]] : i32
 ! FIRDialect:         }
 
-! FIRDialect-LABEL:   fir.global linkonce @_QQcl.c902aa44f16cc92d0b964f66b5687f78 constant : !fir.char<1,87> {
-! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.string_lit "/home/rpenacob/llvm-mono/flang/test/OmpSs/Lower/FIR/oss-deferred-assumed-shape-dsa.f90\00"(87) : !fir.char<1,87>
-! FIRDialect:           fir.has_value %[[VAL_0]] : !fir.char<1,87>
-! FIRDialect:         }
-
 ! FIRDialect-LABEL:   fir.global @_QQEnvironmentDefaults constant : !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>> {
 ! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>>
 ! FIRDialect:           fir.has_value %[[VAL_0]] : !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>>

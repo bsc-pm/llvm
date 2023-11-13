@@ -115,9 +115,5 @@ end subroutine
 ! FIRDialect:         func.func private @_FortranAIsContiguous(!fir.box<none>) -> i1 attributes {fir.runtime}
 ! FIRDialect:         func.func private @_FortranAAssignTemporary(!fir.ref<!fir.box<none>>, !fir.box<none>, !fir.ref<i8>, i32) -> none attributes {fir.runtime}
 
-! FIRDialect-LABEL:   fir.global linkonce @_QQcl.{{.*}} constant : !fir.char<1,66> {
-! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.string_lit "/home/rpenacob/llvm-mono/flang/test/OmpSs/Lower/FIR/copyinout.f90\00"(66) : !fir.char<1,66>
-! FIRDialect:           fir.has_value %[[VAL_0]] : !fir.char<1,66>
-! FIRDialect:         }
 ! FIRDialect:         func.func private @_FortranACopyOutAssign(!fir.ref<!fir.box<none>>, !fir.box<none>, i1, !fir.ref<i8>, i32) -> none attributes {fir.runtime}
 

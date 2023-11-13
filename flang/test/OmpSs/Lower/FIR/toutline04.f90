@@ -478,10 +478,6 @@ end module
 ! CHECK:         }
 ! CHECK:         func.func private @_FortranAioBeginExternalListOutput(i32, !fir.ref<i8>, i32) -> !fir.ref<i8> attributes {fir.io, fir.runtime}
 
-! CHECK-LABEL:   fir.global linkonce @_QQcl.{{.*}} constant : !fir.char<1,67> {
-! CHECK:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.string_lit "/home/rpenacob/llvm-mono/flang/test/OmpSs/Lower/FIR/toutline04.f90\00"(67) : !fir.char<1,67>
-! CHECK:           fir.has_value %[[VAL_0]] : !fir.char<1,67>
-! CHECK:         }
 ! CHECK:         func.func private @_FortranAioOutputLogical(!fir.ref<i8>, i1) -> i1 attributes {fir.io, fir.runtime}
 ! CHECK:         func.func private @_FortranAioEndIoStatement(!fir.ref<i8>) -> i32 attributes {fir.io, fir.runtime}
 ! CHECK:         func.func private @_QPifoo() -> i32

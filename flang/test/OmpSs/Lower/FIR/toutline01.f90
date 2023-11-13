@@ -48,8 +48,3 @@ end subroutine test3
 ! CHECK:         }
 ! CHECK:         func.func private @_QPtest3b(!fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>)
 
-! CHECK-LABEL:   fir.global linkonce @_QQcl.6125f71105035bb03fb684e809dc5f8e constant : !fir.char<1,67> {
-! CHECK:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.string_lit "/home/rpenacob/llvm-mono/flang/test/OmpSs/Lower/FIR/toutline01.f90\00"(67) : !fir.char<1,67>
-! CHECK:           fir.has_value %[[VAL_0]] : !fir.char<1,67>
-! CHECK:         }
-

@@ -82,9 +82,5 @@ end module
 ! CHECK:         func.func private @_FortranAIsContiguous(!fir.box<none>) -> i1 attributes {fir.runtime}
 ! CHECK:         func.func private @_FortranAAssignTemporary(!fir.ref<!fir.box<none>>, !fir.box<none>, !fir.ref<i8>, i32) -> none attributes {fir.runtime}
 
-! CHECK-LABEL:   fir.global linkonce @_QQcl.{{.*}} 
-! CHECK:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.string_lit "/home/rpenacob/llvm-mono/flang/test/OmpSs/Lower/FIR/toutline03.f90\00"(67) : !fir.char<1,67>
-! CHECK:           fir.has_value %[[VAL_0]] : !fir.char<1,67>
-! CHECK:         }
 ! CHECK:         func.func private @_FortranACopyOutAssign(!fir.ref<!fir.box<none>>, !fir.box<none>, i1, !fir.ref<i8>, i32) -> none attributes {fir.runtime}
 
