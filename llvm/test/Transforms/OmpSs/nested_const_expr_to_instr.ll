@@ -15,13 +15,15 @@ target triple = "x86_64-unknown-linux-gnu"
 
 @array = global [10 x i32] zeroinitializer, align 16
 
-; Function Attrs: noinline nounwind optnone
-define dso_local i32 @main() #0 !dbg !5 {
+; Function Attrs: noinline nounwind optnone uwtable
+define dso_local i32 @main() #0 !dbg !7 {
 entry:
-  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr @array, [10 x i32] undef) ], !dbg !9
-  store i32 0, ptr inttoptr (i64 sext (i32 ptrtoint (ptr @array to i32) to i64) to ptr), align 4, !dbg !10
-  call void @llvm.directive.region.exit(token %0), !dbg !11
-  ret i32 0, !dbg !12
+  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr @array, [10 x i32] undef) ], !dbg !10
+  %conv = sext i32 ptrtoint (ptr @array to i32) to i64, !dbg !11
+  %1 = inttoptr i64 %conv to ptr, !dbg !11
+  store i32 0, ptr %1, align 4, !dbg !12
+  call void @llvm.directive.region.exit(token %0), !dbg !13
+  ret i32 0, !dbg !14
 }
 
 ; Function Attrs: nounwind
