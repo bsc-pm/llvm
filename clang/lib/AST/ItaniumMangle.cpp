@@ -29,6 +29,7 @@
 #include "clang/AST/Mangle.h"
 #include "clang/AST/TypeLoc.h"
 #include "clang/Basic/ABI.h"
+#include "clang/Basic/DiagnosticAST.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/SourceManager.h"
 #include "clang/Basic/TargetInfo.h"
@@ -709,7 +710,7 @@ ItaniumMangleContextImpl::getEffectiveDeclContext(const Decl *D) {
 }
 
 bool ItaniumMangleContextImpl::isInternalLinkageDecl(const NamedDecl *ND) {
-  if (ND && ND->getFormalLinkage() == InternalLinkage &&
+  if (ND && ND->getFormalLinkage() == Linkage::Internal &&
       !ND->isExternallyVisible() &&
       getEffectiveDeclContext(ND)->isFileContext() &&
       !ND->isInAnonymousNamespace())
@@ -791,7 +792,7 @@ bool ItaniumMangleContextImpl::shouldMangleCXXName(const NamedDecl *D) {
     if (DC->isFunctionOrMethod() && D->hasLinkage())
       while (!DC->isFileContext())
         DC = getEffectiveParentContext(DC);
-    if (DC->isTranslationUnit() && D->getFormalLinkage() != InternalLinkage &&
+    if (DC->isTranslationUnit() && D->getFormalLinkage() != Linkage::Internal &&
         !CXXNameMangler::shouldHaveAbiTags(*this, VD) &&
         !isa<VarTemplateSpecializationDecl>(VD) &&
         !VD->getOwningModuleForLinkage())
@@ -4833,7 +4834,7 @@ recurse:
     Out << '_';
     mangleType(New->getAllocatedType());
     if (New->hasInitializer()) {
-      if (New->getInitializationStyle() == CXXNewExpr::ListInit)
+      if (New->getInitializationStyle() == CXXNewInitializationStyle::List)
         Out << "il";
       else
         Out << "pi";
@@ -4847,7 +4848,8 @@ recurse:
       } else if (const ParenListExpr *PLE = dyn_cast<ParenListExpr>(Init)) {
         for (unsigned i = 0, e = PLE->getNumExprs(); i != e; ++i)
           mangleExpression(PLE->getExpr(i));
-      } else if (New->getInitializationStyle() == CXXNewExpr::ListInit &&
+      } else if (New->getInitializationStyle() ==
+                     CXXNewInitializationStyle::List &&
                  isa<InitListExpr>(Init)) {
         // Only take InitListExprs apart for list-initialization.
         mangleInitListElements(cast<InitListExpr>(Init));
@@ -5074,6 +5076,14 @@ recurse:
       Out << 'a';
       MangleAlignofSizeofArg();
       break;
+    case UETT_DataSizeOf: {
+      DiagnosticsEngine &Diags = Context.getDiags();
+      unsigned DiagID =
+          Diags.getCustomDiagID(DiagnosticsEngine::Error,
+                                "cannot yet mangle __datasizeof expression");
+      Diags.Report(DiagID);
+      return;
+    }
     case UETT_VecStep: {
       DiagnosticsEngine &Diags = Context.getDiags();
       unsigned DiagID = Diags.getCustomDiagID(DiagnosticsEngine::Error,

@@ -898,9 +898,9 @@ void CGOmpSsRuntime::EmitCopyCtorFunc(
   FunctionArgList Args;
 
   QualType PQ = C.getPointerType(CopyD->getType());
-  ImplicitParamDecl SrcArg(C, PQ, ImplicitParamDecl::Other);
-  ImplicitParamDecl DstArg(C, PQ, ImplicitParamDecl::Other);
-  ImplicitParamDecl NelemsArg(C, C.getSizeType(), ImplicitParamDecl::Other);
+  ImplicitParamDecl SrcArg(C, PQ, ImplicitParamKind::Other);
+  ImplicitParamDecl DstArg(C, PQ, ImplicitParamKind::Other);
+  ImplicitParamDecl NelemsArg(C, C.getSizeType(), ImplicitParamKind::Other);
 
   Args.push_back(&SrcArg);
   Args.push_back(&DstArg);
@@ -1013,8 +1013,8 @@ void CGOmpSsRuntime::EmitCtorFunc(
 
   QualType Q = CopyD->getType();
   QualType PQ = C.getPointerType(Q);
-  ImplicitParamDecl DstArg(C, PQ, ImplicitParamDecl::Other);
-  ImplicitParamDecl NelemsArg(C, C.getSizeType(), ImplicitParamDecl::Other);
+  ImplicitParamDecl DstArg(C, PQ, ImplicitParamKind::Other);
+  ImplicitParamDecl NelemsArg(C, C.getSizeType(), ImplicitParamKind::Other);
 
   Args.push_back(&DstArg);
   Args.push_back(&NelemsArg);
@@ -1107,8 +1107,8 @@ void CGOmpSsRuntime::EmitDtorFunc(
   FunctionArgList Args;
 
   QualType PQ = C.getPointerType(Q);
-  ImplicitParamDecl DstArg(C, PQ, ImplicitParamDecl::Other);
-  ImplicitParamDecl NelemsArg(C, C.getSizeType(), ImplicitParamDecl::Other);
+  ImplicitParamDecl DstArg(C, PQ, ImplicitParamKind::Other);
+  ImplicitParamDecl NelemsArg(C, C.getSizeType(), ImplicitParamKind::Other);
 
   Args.push_back(&DstArg);
   Args.push_back(&NelemsArg);
@@ -1367,7 +1367,7 @@ llvm::Function *CGOmpSsRuntime::createCallWrapperFunc(
     QualType Q = C.getPointerType(p.first->getType());
     auto *Arg =
       ImplicitParamDecl::Create(
-        C, /*DC=*/nullptr, SourceLocation(), p.first->getIdentifier(), Q, ImplicitParamDecl::Other);
+        C, /*DC=*/nullptr, SourceLocation(), p.first->getIdentifier(), Q, ImplicitParamKind::Other);
     Args.push_back(Arg);
   }
   for (const auto &p : VLASizeInvolvedMap) {
@@ -1376,14 +1376,14 @@ llvm::Function *CGOmpSsRuntime::createCallWrapperFunc(
     QualType Q = C.getSizeType();
     auto *Arg =
       ImplicitParamDecl::Create(
-        C, Q, ImplicitParamDecl::Other);
+        C, Q, ImplicitParamKind::Other);
     Args.push_back(Arg);
   }
   for (const auto &p : CaptureInvolvedMap) {
     QualType Q = C.getPointerType(p.first->getType().getNonReferenceType());
     auto *Arg =
       ImplicitParamDecl::Create(
-        C, /*DC=*/nullptr, SourceLocation(), p.first->getIdentifier(), Q, ImplicitParamDecl::Other);
+        C, /*DC=*/nullptr, SourceLocation(), p.first->getIdentifier(), Q, ImplicitParamKind::Other);
     Args.push_back(Arg);
   }
   if (HasThis) {
@@ -1404,14 +1404,14 @@ llvm::Function *CGOmpSsRuntime::createCallWrapperFunc(
     QualType Q = C.getSizeType();
     auto *Arg =
       ImplicitParamDecl::Create(
-        C, Q, ImplicitParamDecl::Other);
+        C, Q, ImplicitParamKind::Other);
     Args.push_back(Arg);
   }
 
   QualType RetQ;
   assert(!RetTypes.empty());
   if (RetTypes.size() != 1) {
-    RecordDecl *RD = RecordDecl::Create(C, TTK_Struct,
+    RecordDecl *RD = RecordDecl::Create(C, TagTypeKind::Struct,
                                         C.getTranslationUnitDecl(),
                                         SourceLocation(), SourceLocation(),
                                         &C.Idents.get(RetName));
@@ -1990,9 +1990,9 @@ static llvm::Value *emitReduceInitFunction(CodeGenModule &CGM,
   QualType PQ = C.getPointerType(Q);
 
   FunctionArgList Args;
-  ImplicitParamDecl PrivArg(C, PQ, ImplicitParamDecl::Other);
-  ImplicitParamDecl OrigArg(C, PQ, ImplicitParamDecl::Other);
-  ImplicitParamDecl NBytesArg(C, C.getSizeType(), ImplicitParamDecl::Other);
+  ImplicitParamDecl PrivArg(C, PQ, ImplicitParamKind::Other);
+  ImplicitParamDecl OrigArg(C, PQ, ImplicitParamKind::Other);
+  ImplicitParamDecl NBytesArg(C, C.getSizeType(), ImplicitParamKind::Other);
 
   Args.emplace_back(&PrivArg);
   Args.emplace_back(&OrigArg);
@@ -2115,9 +2115,9 @@ static llvm::Value *emitReduceCombFunction(CodeGenModule &CGM,
   QualType PQ = C.getPointerType(Q);
 
   FunctionArgList Args;
-  ImplicitParamDecl OutArg(C, PQ, ImplicitParamDecl::Other);
-  ImplicitParamDecl InArg(C, PQ, ImplicitParamDecl::Other);
-  ImplicitParamDecl NBytesArg(C, C.getSizeType(), ImplicitParamDecl::Other);
+  ImplicitParamDecl OutArg(C, PQ, ImplicitParamKind::Other);
+  ImplicitParamDecl InArg(C, PQ, ImplicitParamKind::Other);
+  ImplicitParamDecl NBytesArg(C, C.getSizeType(), ImplicitParamKind::Other);
 
   Args.emplace_back(&OutArg);
   Args.emplace_back(&InArg);

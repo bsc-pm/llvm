@@ -74,7 +74,7 @@ LLVMTypeConverter::LLVMTypeConverter(mlir::ModuleOp module, bool applyTBAA,
       assert(!characterWithDynamicLen(seq.getEleTy()));
       if (!constRows) {
         auto baseTy = convertType(seq.getEleTy());
-        return mlir::LLVM::LLVMPointerType::get(baseTy);
+        return mlir::LLVM::LLVMPointerType::get(baseTy.getContext());
       }
     }
 

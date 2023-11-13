@@ -417,7 +417,7 @@ FunctionCallee registerCtorAssertFuncCallee(Module &M) {
 FunctionCallee registerAssertFuncCallee(Module &M) {
   return M.getOrInsertFunction("nanos6_config_assert",
     Type::getVoidTy(M.getContext()),
-    Type::getInt8PtrTy(M.getContext())
+    PointerType::getUnqual(M.getContext())
   );
 }
 

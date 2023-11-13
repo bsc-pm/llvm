@@ -238,10 +238,10 @@ public:
 
 private:
   CallDescriptionMap<FnDescription> FnDescriptions = {
-      {{{"fopen"}}, {nullptr, &StreamChecker::evalFopen, ArgNone}},
+      {{{"fopen"}, 2}, {nullptr, &StreamChecker::evalFopen, ArgNone}},
       {{{"freopen"}, 3},
        {&StreamChecker::preFreopen, &StreamChecker::evalFreopen, 2}},
-      {{{"tmpfile"}}, {nullptr, &StreamChecker::evalFopen, ArgNone}},
+      {{{"tmpfile"}, 0}, {nullptr, &StreamChecker::evalFopen, ArgNone}},
       {{{"fclose"}, 1},
        {&StreamChecker::preDefault, &StreamChecker::evalFclose, 0}},
       {{{"fread"}, 4},
@@ -1093,7 +1093,6 @@ ProgramStateRef StreamChecker::ensureStreamOpened(SVal StreamVal,
           N));
       return nullptr;
     }
-    return State;
   }
 
   return State;
