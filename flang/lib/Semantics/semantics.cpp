@@ -248,7 +248,8 @@ public:
           info.initialization = common;
         }
       }
-      if (common.size() != info.biggestSize->size() && !common.name().empty()) {
+      if (common.size() != info.biggestSize->size() && !common.name().empty() &&
+          context.ShouldWarn(common::LanguageFeature::DistinctCommonSizes)) {
         context
             .Say(common.name(),
                 "A named COMMON block should have the same size everywhere it appears (%zd bytes here)"_port_en_US,
@@ -317,7 +318,7 @@ SemanticsContext::SemanticsContext(
       globalScope_{*this}, intrinsicModulesScope_{globalScope_.MakeScope(
                                Scope::Kind::IntrinsicModules, nullptr)},
       foldingContext_{parser::ContextualMessages{&messages_}, defaultKinds_,
-          intrinsics_, targetCharacteristics_} {}
+          intrinsics_, targetCharacteristics_, languageFeatures_} {}
 
 SemanticsContext::~SemanticsContext() {}
 
