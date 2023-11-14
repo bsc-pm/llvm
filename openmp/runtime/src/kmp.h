@@ -276,14 +276,12 @@ extern "C" {
 #include <nosv.h>
 #include "nosv/affinity.h"
 extern int nosv_main_pid;
-extern bool nosv_is_extenally_attached;
 struct omp_task_type {
   nosv_task_type_t nosv_task_type;
   kmp_int32 instrum_id;
   const char *label;
 };
 typedef struct omp_task_type* omp_task_type_t;
-extern nosv_task_type_t nosv_omp_impl_task_ty;
 extern nosv_affinity_type_t nosv_default_affinity_type;
 extern nosv_affinity_level_t nosv_default_affinity_level;
 extern uint32_t nosv_default_numa_id;

@@ -227,8 +227,6 @@ int __kmp_mwait_hints = 0;
 #endif
 
 int nosv_main_pid;
-bool nosv_is_extenally_attached;
-nosv_task_type_t nosv_omp_impl_task_ty;
 nosv_affinity_type_t nosv_default_affinity_type = NOSV_AFFINITY_TYPE_STRICT;
 nosv_affinity_level_t nosv_default_affinity_level = NOSV_AFFINITY_LEVEL_CPU;
 int nosv_enable_ovni = 0;

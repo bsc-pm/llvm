@@ -320,24 +320,11 @@ static void __kmp_nosv_init() {
    if (!cur_nosv_initialize_attempt)
      nosv_init();
 
-   // Create nosv omp type once.
-   int res;
-   res = nosv_type_init(
-     &nosv_omp_impl_task_ty, NULL, NULL, NULL, "openmp", NULL, NULL, NOSV_TYPE_INIT_EXTERNAL);
-   KMP_ASSERT(res == 0);
-
    // Attach first thread initializing the runtime
    nosv_main_pid = getpid();
-   nosv_is_extenally_attached = nosv_self();
-   if (!nosv_is_extenally_attached) {
-     // Use case: OpenMP may run after other library ctor that uses
-     // nosv. This library could have attached the thread, so we do not
-     // have to attach it again.
-     nosv_task_t nosv_impl_task;
-     __kmp_nosv_attach(&nosv_impl_task, NULL);
-
-     instr_attached_enter();
-   }
+   nosv_task_t nosv_impl_task;
+   __kmp_nosv_attach(&nosv_impl_task, NULL);
+   instr_attached_enter();
 }
 
 __attribute__((constructor))
@@ -6275,13 +6262,9 @@ __attribute__((destructor)) void __kmp_internal_end_dtor(void) {
   // This means that sometimes we may not initialize nosv, so check
   // this
   if (nosv_main_pid == getpid()) {
-    if (!nosv_is_extenally_attached) {
-      instr_attached_exit();
-      KMP_ASSERT(nosv_self());
-      int res = nosv_detach(NOSV_DETACH_NONE);
-      KMP_ASSERT(res == 0);
-    }
-    nosv_type_destroy(nosv_omp_impl_task_ty, NOSV_TYPE_DESTROY_NONE);
+    instr_attached_exit();
+    int res = nosv_detach(NOSV_DETACH_NONE);
+    KMP_ASSERT(res == 0);
     for (auto &T : task_types) {
       if (T.nosv_task_type)
         nosv_type_destroy(T.nosv_task_type, NOSV_TYPE_DESTROY_NONE);

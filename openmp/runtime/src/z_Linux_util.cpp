@@ -516,7 +516,7 @@ void __kmp_nosv_attach(nosv_task_t *nosv_impl_task, void *thr)
     pnosv_affinity = NULL;
   }
 
-  res = nosv_attach(nosv_impl_task, nosv_omp_impl_task_ty, 0, pnosv_affinity, NOSV_ATTACH_NONE);
+  res = nosv_attach(nosv_impl_task, pnosv_affinity, "openmp", NOSV_ATTACH_NONE);
   KMP_ASSERT(res == 0);
 }
 
