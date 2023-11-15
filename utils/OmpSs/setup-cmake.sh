@@ -453,6 +453,10 @@ fi
 # OpenMP for installations
 ################################################################################
 
+# libomptarget is a bit flaky for testing, do not attempt to build it for now.
+# We could build it but try to disable its tests, alternatively.
+CMAKE_INVOCATION_EXTRA_FLAGS+=("-DOPENMP_ENABLE_LIBOMPTARGET=OFF")
+
 if [ -n "$TEST_OMPFLAGS" ];
 then
   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DOPENMP_TEST_FLAGS=$TEST_OMPFLAGS")
