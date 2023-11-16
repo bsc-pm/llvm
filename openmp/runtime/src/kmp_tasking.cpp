@@ -2087,7 +2087,7 @@ void nosv_complete_task(nosv_task_t task) {
   kmp_taskdata_t *taskdata = nosv_get_aligned_task_metadata(task);
   kmp_task_t *ptask = KMP_TASKDATA_TO_TASK(taskdata);
 
-  int gtid = __kmp_entry_gtid();
+  int gtid = __kmp_get_gtid();
 
   taskdata->td_complete_callback_done = 1;
 
@@ -2112,7 +2112,9 @@ void nosv_complete_task(nosv_task_t task) {
                   gtid, taskdata, current_task));
 
     return;
-  } else if (UNLIKELY(taskdata->td_flags.proxy == TASK_PROXY)) {
+  }
+
+  if (UNLIKELY(taskdata->td_flags.proxy == TASK_PROXY)) {
     // Detached task proxified
 #if OMPT_SUPPORT
     // We free ptask afterwards and know the task is finished,
@@ -2135,6 +2137,21 @@ void nosv_complete_task(nosv_task_t task) {
     return;
   }
 
+  if (gtid < 0) {
+    // ALPI path. An external thread is executing the complete
+    // callback
+    kmp_int32 counter = KMP_ATOMIC_LD_ACQ(&taskdata->td_untied_count);
+    KMP_ASSERT(counter == 0);
+    // task finished execution
+    KMP_DEBUG_ASSERT(taskdata->td_flags.executing == 1);
+    taskdata->td_flags.executing = 0; // suspend the finishing task
+    // proxify
+    taskdata->td_flags.proxy = TASK_PROXY;
+    __kmpc_proxy_task_completed_ooo(ptask);
+    return;
+  }
+
+  // Default path
   kmp_int32 counter = KMP_ATOMIC_LD_ACQ(&taskdata->td_untied_count);
   if (counter == 0)
     __kmp_task_finish_complete(gtid, ptask);

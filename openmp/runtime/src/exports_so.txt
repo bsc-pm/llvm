@@ -35,8 +35,6 @@ VERSION {
         __nosvc_*; # Functions called by compiler-generated code.
         GOMP_*;    # GNU C compatibility functions.
 
-        nanos6_*;  # TAMPI_API
-
         _You_must_link_with_*;     # Mutual detection/MS compatibility symbols.
 
         #

@@ -90,7 +90,6 @@ else()
     kmp_lock.cpp
     kmp_sched.cpp
     kmp_collapse.cpp
-    nanos_polling.cpp
   )
   if(WIN32)
     # Windows specific files
