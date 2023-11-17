@@ -304,6 +304,9 @@ void aix::Linker::ConstructJob(Compilation &C, const JobAction &JA,
         case Driver::OMPRT_GOMP:
           CmdArgs.push_back("-lgomp");
           break;
+        case Driver::OMPRT_NOSV:
+          llvm_unreachable("Unsupported libompv");
+          break;
         case Driver::OMPRT_Unknown:
           // Already diagnosed.
           break;

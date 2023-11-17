@@ -257,6 +257,9 @@ void visualstudio::Linker::ConstructJob(Compilation &C, const JobAction &JA,
       break;
     case Driver::OMPRT_GOMP:
       break;
+    case Driver::OMPRT_NOSV:
+      llvm_unreachable("Unsupported libompv");
+      break;
     case Driver::OMPRT_Unknown:
       // Already diagnosed.
       break;
