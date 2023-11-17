@@ -92,10 +92,11 @@ static inline void __kmp_dephash_free(kmp_info_t *thread, kmp_dephash_t *h) {
 extern void __kmpc_give_task(kmp_task_t *ptask, kmp_int32 start);
 
 static inline void __kmp_release_deps(kmp_int32 gtid, kmp_taskdata_t *task) {
+#if defined(KMP_OMPV_ENABLED)
   instr_release_deps_enter();
+#endif // KMP_OMPV_ENABLED
 #if OMPX_TASKGRAPH
   if (task->is_taskgraph && !(__kmp_tdg_is_recording(task->tdg->tdg_status))) {
-
     kmp_node_info_t *TaskInfo = &(task->tdg->record_map[task->td_task_id]);
 
     for (int i = 0; i < TaskInfo->nsuccessors; i++) {
@@ -107,7 +108,9 @@ static inline void __kmp_release_deps(kmp_int32 gtid, kmp_taskdata_t *task) {
       }
     }
 
+#if defined(KMP_OMPV_ENABLED)
     instr_release_deps_exit();
+#endif // KMP_OMPV_ENABLED
     return;
   }
 #endif
@@ -134,7 +137,9 @@ static inline void __kmp_release_deps(kmp_int32 gtid, kmp_taskdata_t *task) {
   }
 
   if (!node) {
+#if defined(KMP_OMPV_ENABLED)
     instr_release_deps_exit();
+#endif
     return;
   }
 
@@ -205,7 +210,9 @@ static inline void __kmp_release_deps(kmp_int32 gtid, kmp_taskdata_t *task) {
 
   __kmp_node_deref(thread, node);
 
+#if defined(KMP_OMPV_ENABLED)
   instr_release_deps_exit();
+#endif // KMP_OMPV_ENABLED
 
   KA_TRACE(
       20,

@@ -2225,8 +2225,8 @@ void CGOpenMPRuntime::emitSingleRegion(CodeGenFunction &CGF,
   SmallVector<llvm::Value *, 2> Args = {emitUpdateLocation(CGF, Loc), getThreadID(CGF, Loc)};
   if (CGM.getLangOpts().OpenMPNosv) {
     assert(NosvTaskTypeGV && "task type is null");
-    RTLSingle = OMPRTL___nosvc_single;
-    RTLSingleEnd = OMPRTL___nosvc_end_single;
+    RTLSingle = OMPVRTL___kmpc_single;
+    RTLSingleEnd = OMPVRTL___kmpc_end_single;
     Args.push_back(NosvTaskTypeGV);
   }
   CommonActionTy Action(OMPBuilder.getOrCreateRuntimeFunction(
@@ -2700,7 +2700,7 @@ void CGOpenMPRuntime::emitForStaticFinish(CodeGenFunction &CGF,
     assert(!IsTarget);
     Args.push_back(NosvTaskTypeGV);
     CGF.EmitRuntimeCall(OMPBuilder.getOrCreateRuntimeFunction(
-                            CGM.getModule(), OMPRTL___nosvc_for_static_fini),
+                            CGM.getModule(), OMPVRTL___kmpc_for_static_fini),
                         Args);
   } else if (IsTarget) {
     CGF.EmitRuntimeCall(
@@ -3894,7 +3894,7 @@ CGOpenMPRuntime::emitTaskInit(CodeGenFunction &CGF, SourceLocation Loc,
       AllocArgs.push_back(NosvTaskTypeGV);
       NewTask = CGF.EmitRuntimeCall(
           OMPBuilder.getOrCreateRuntimeFunction(
-              CGM.getModule(), OMPRTL___nosvc_omp_target_task_alloc),
+              CGM.getModule(), OMPVRTL___kmpc_omp_target_task_alloc),
           AllocArgs);
     } else {
       NewTask = CGF.EmitRuntimeCall(
@@ -3908,7 +3908,7 @@ CGOpenMPRuntime::emitTaskInit(CodeGenFunction &CGF, SourceLocation Loc,
       AllocArgs.push_back(NosvTaskTypeGV);
       NewTask =
           CGF.EmitRuntimeCall(OMPBuilder.getOrCreateRuntimeFunction(
-                                  CGM.getModule(), OMPRTL___nosvc_omp_task_alloc),
+                                  CGM.getModule(), OMPVRTL___kmpc_omp_task_alloc),
                               AllocArgs);
     } else {
       NewTask =

@@ -405,9 +405,14 @@ class KMPNativeAffinity : public KMPAffinity {
       KMP_ASSERT2(KMP_AFFINITY_CAPABLE(),
                   "Illegal get affinity operation when not capable");
 #if KMP_OS_LINUX
+#if defined(KMP_OMPV_ENABLED)
       int r = pthread_getaffinity_np(pthread_self(), __kmp_affin_mask_size,
                                      reinterpret_cast<cpu_set_t *>(mask));
       int retval = (r == 0 ? 0 : -1);
+#else
+      long retval =
+          syscall(__NR_sched_getaffinity, 0, __kmp_affin_mask_size, mask);
+#endif // KMP_OMPV_ENABLED
 #elif KMP_OS_FREEBSD
       int r = pthread_getaffinity_np(pthread_self(), __kmp_affin_mask_size,
                                      reinterpret_cast<cpuset_t *>(mask));
@@ -427,9 +432,14 @@ class KMPNativeAffinity : public KMPAffinity {
       KMP_ASSERT2(KMP_AFFINITY_CAPABLE(),
                   "Illegal set affinity operation when not capable");
 #if KMP_OS_LINUX
+#if defined(KMP_OMPV_ENABLED)
       int r = pthread_setaffinity_np(pthread_self(), __kmp_affin_mask_size,
                                      reinterpret_cast<cpu_set_t *>(mask));
       int retval = (r == 0 ? 0 : -1);
+#else
+      long retval =
+          syscall(__NR_sched_setaffinity, 0, __kmp_affin_mask_size, mask);
+#endif // KMP_OMPV_ENABLED
 #elif KMP_OS_FREEBSD
       int r = pthread_setaffinity_np(pthread_self(), __kmp_affin_mask_size,
                                      reinterpret_cast<cpuset_t *>(mask));

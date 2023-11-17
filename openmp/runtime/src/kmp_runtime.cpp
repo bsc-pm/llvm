@@ -56,7 +56,9 @@ static char *ProfileTraceFile = nullptr;
 #define SHM_SIZE 1024
 #endif
 
+#if defined(KMP_OMPV_ENABLED)
 #include "instrum.h"
+#endif // KMP_OMPV_ENABLED
 
 #if defined(KMP_GOMP_COMPAT)
 char const __kmp_version_alt_comp[] =
@@ -237,6 +239,7 @@ int __kmp_get_global_thread_id() {
   return i;
 }
 
+#if defined(KMP_OMPV_ENABLED)
 const kmp_uint32 TASK_TYPES_SIZE = 8*1024;
 struct omp_task_type task_types[TASK_TYPES_SIZE];
 kmp_uint32 task_types_idx = 0;
@@ -332,6 +335,8 @@ static void __kmp_construct_initialization() {
   __kmp_nosv_init();
 }
 
+#endif // KMP_OMPV_ENABLED
+
 int __kmp_get_global_thread_id_reg() {
   int gtid;
 
@@ -368,7 +373,9 @@ int __kmp_get_global_thread_id_reg() {
     __kmp_release_bootstrap_lock(&__kmp_initz_lock);
     /*__kmp_printf( "+++ %d\n", gtid ); */ /* GROO */
   }
+
   KMP_DEBUG_ASSERT(gtid >= 0);
+
   return gtid;
 }
 
@@ -774,7 +781,11 @@ void __kmp_parallel_dxo(int *gtid_ref, int *cid_ref, ident_t *loc_ref) {
 /* ------------------------------------------------------------------------ */
 /* The BARRIER for a SINGLE process section is always explicit   */
 
-int __kmp_enter_single(int gtid, ident_t *id_ref, int push_ws, omp_task_type_t *omp_task_type) {
+int __kmp_enter_single(int gtid, ident_t *id_ref, int push_ws
+#if defined(KMP_OMPV_ENABLED)
+                       , omp_task_type_t *omp_task_type
+#endif // KMP_OMPV_ENABLED
+                       ) {
   int status;
   kmp_info_t *th;
   kmp_team_t *team;
@@ -789,8 +800,10 @@ int __kmp_enter_single(int gtid, ident_t *id_ref, int push_ws, omp_task_type_t *
   //   user-code
   //   __kmpc_end_single
   // }
+#if defined(KMP_OMPV_ENABLED)
   instr_single_enter();
   instr_ws_execute((*omp_task_type)->instrum_id);
+#endif // KMP_OMPV_ENABLED
 
   if (!TCR_4(__kmp_init_parallel))
     __kmp_parallel_initialize();
@@ -840,15 +853,21 @@ int __kmp_enter_single(int gtid, ident_t *id_ref, int push_ws, omp_task_type_t *
 
   // status == 0 means that the thread does not run
   // the single code. Finish instrumentation here
+#if defined(KMP_OMPV_ENABLED)
   if (!status) {
     instr_ws_end((*omp_task_type)->instrum_id);
     instr_single_exit();
   }
+#endif // KMP_OMPV_ENABLED
 
   return status;
 }
 
-void __kmp_exit_single(int gtid, omp_task_type_t *omp_task_type) {
+void __kmp_exit_single(int gtid
+#if defined(KMP_OMPV_ENABLED)
+                       , omp_task_type_t *omp_task_type
+#endif // KMP_OMPV_ENABLED
+                       ) {
 #if USE_ITT_BUILD
   __kmp_itt_single_end(gtid);
 #endif /* USE_ITT_BUILD */
@@ -857,8 +876,10 @@ void __kmp_exit_single(int gtid, omp_task_type_t *omp_task_type) {
 
   // This function is run once the single user
   // code has beed executed.
+#if defined(KMP_OMPV_ENABLED)
   instr_ws_end((*omp_task_type)->instrum_id);
   instr_single_exit();
+#endif // KMP_OMPV_ENABLED
 }
 
 /* determine if we can go parallel or must use a serialized parallel region and
@@ -4173,6 +4194,7 @@ int __kmp_register_root(int initial_thread) {
   KMP_MB();
   __kmp_release_bootstrap_lock(&__kmp_forkjoin_lock);
 
+#if defined(KMP_OMPV_ENABLED)
   // main thread is already attached
   // but newer pthreads that start a parallel
   // are not
@@ -4186,6 +4208,7 @@ int __kmp_register_root(int initial_thread) {
   }
 
   __kmp_threads[gtid]->th.th_nosv_task = nosv_self();
+#endif // KMP_OMPV_ENABLED
   return gtid;
 }
 
@@ -6257,6 +6280,7 @@ void __kmp_internal_end_dest(void *specific_gtid) {
 
 __attribute__((destructor)) void __kmp_internal_end_dtor(void) {
   __kmp_internal_end_atexit();
+#if defined(KMP_OMPV_ENABLED)
   // OpenMP only worths setup nosv_init in the middle initialize,
   // used for serial task allocation and parallels.
   // This means that sometimes we may not initialize nosv, so check
@@ -6275,6 +6299,7 @@ __attribute__((destructor)) void __kmp_internal_end_dtor(void) {
   } else {
     fprintf(stderr, "WARNING: A thread that is not the main thread is executing the runtime dtor\n");
   }
+#endif // KMP_OMPV_ENABLED
 }
 
 #endif
@@ -9342,8 +9367,13 @@ kmp_info_t **__kmp_hidden_helper_threads;
 kmp_info_t *__kmp_hidden_helper_main_thread;
 std::atomic<kmp_int32> __kmp_unexecuted_hidden_helper_tasks;
 #if KMP_OS_LINUX
+#if defined(KMP_OMPV_ENABLED)
 kmp_int32 __kmp_hidden_helper_threads_num = 0;
 kmp_int32 __kmp_enable_hidden_helper = FALSE;
+#else
+kmp_int32 __kmp_hidden_helper_threads_num = 8;
+kmp_int32 __kmp_enable_hidden_helper = TRUE;
+#endif // KMP_OMPV_ENABLED
 #else
 kmp_int32 __kmp_hidden_helper_threads_num = 0;
 kmp_int32 __kmp_enable_hidden_helper = FALSE;

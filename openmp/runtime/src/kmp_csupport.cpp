@@ -20,7 +20,9 @@
 #include "kmp_stats.h"
 #include "ompt-specific.h"
 
+#if defined(KMP_OMPV_ENABLED)
 #include "instrum.h"
+#endif // KMP_OMPV_ENABLED
 
 #define MAX_MESSAGE 512
 
@@ -1853,10 +1855,29 @@ kmp_int32 __kmpc_barrier_master_nowait(ident_t *loc, kmp_int32 global_tid) {
   return (ret);
 }
 
-kmp_int32 __nosvc_single(ident_t *loc, kmp_int32 global_tid, omp_task_type_t *omp_task_type) {
-  KMP_ASSERT(omp_task_type);
+/* The BARRIER for a SINGLE process section is always explicit   */
+/*!
+@ingroup WORK_SHARING
+@param loc  source location information
+@param global_tid  global thread number
+@return One if this thread should execute the single construct, zero otherwise.
+
+Test whether to execute a <tt>single</tt> construct.
+There are no implicit barriers in the two "single" calls, rather the compiler
+should introduce an explicit barrier if it is required.
+*/
+
+kmp_int32 __kmpc_single(ident_t *loc, kmp_int32 global_tid
+#if defined(KMP_OMPV_ENABLED)
+                        , omp_task_type_t *omp_task_type
+#endif // KMP_OMPV_ENABLED
+                        ) {
   __kmp_assert_valid_gtid(global_tid);
+#if defined(KMP_OMPV_ENABLED)
   kmp_int32 rc = __kmp_enter_single(global_tid, loc, TRUE, omp_task_type);
+#else
+  kmp_int32 rc = __kmp_enter_single(global_tid, loc, TRUE);
+#endif // KMP_OMPV_ENABLED
 
   if (rc) {
     // We are going to execute the single statement, so we should count it.
@@ -1898,26 +1919,26 @@ kmp_int32 __nosvc_single(ident_t *loc, kmp_int32 global_tid, omp_task_type_t *om
   return rc;
 }
 
-/* The BARRIER for a SINGLE process section is always explicit   */
 /*!
 @ingroup WORK_SHARING
 @param loc  source location information
 @param global_tid  global thread number
-@return One if this thread should execute the single construct, zero otherwise.
 
-Test whether to execute a <tt>single</tt> construct.
-There are no implicit barriers in the two "single" calls, rather the compiler
-should introduce an explicit barrier if it is required.
+Mark the end of a <tt>single</tt> construct.  This function should
+only be called by the thread that executed the block of code protected
+by the `single` construct.
 */
-
-kmp_int32 __kmpc_single(ident_t *loc, kmp_int32 global_tid) {
-  KMP_FATAL(NosvUnsupportedAPI, "__kmpc_single");
-}
-
-void __nosvc_end_single(ident_t *loc, kmp_int32 global_tid, omp_task_type_t *omp_task_type) {
-  KMP_ASSERT(omp_task_type);
+void __kmpc_end_single(ident_t *loc, kmp_int32 global_tid
+#if defined(KMP_OMPV_ENABLED)
+                       , omp_task_type_t *omp_task_type
+#endif // KMP_OMPV_ENABLED
+                       ) {
   __kmp_assert_valid_gtid(global_tid);
+#if defined(KMP_OMPV_ENABLED)
   __kmp_exit_single(global_tid, omp_task_type);
+#else
+  __kmp_exit_single(global_tid);
+#endif // KMP_OMPV_ENABLED
   KMP_POP_PARTITIONED_TIMER();
 
 #if OMPT_SUPPORT && OMPT_OPTIONAL
@@ -1937,28 +1958,18 @@ void __nosvc_end_single(ident_t *loc, kmp_int32 global_tid, omp_task_type_t *omp
 
 /*!
 @ingroup WORK_SHARING
-@param loc  source location information
-@param global_tid  global thread number
-
-Mark the end of a <tt>single</tt> construct.  This function should
-only be called by the thread that executed the block of code protected
-by the `single` construct.
-*/
-void __kmpc_end_single(ident_t *loc, kmp_int32 global_tid) {
-  KMP_FATAL(NosvUnsupportedAPI, "__kmpc_end_single");
-}
-
-/*!
-@ingroup WORK_SHARING
 @param loc Source location
 @param global_tid Global thread id
 
 Mark the end of a statically scheduled loop.
 */
-void __nosvc_for_static_fini(ident_t *loc, kmp_int32 global_tid, omp_task_type_t *omp_task_type) {
-  KMP_ASSERT(omp_task_type);
+void __kmpc_for_static_fini(ident_t *loc, kmp_int32 global_tid
+#if defined(KMP_OMPV_ENABLED)
+                            , omp_task_type_t *omp_task_type
+#endif // KMP_OMPV_ENABLED
+                            ) {
   KMP_POP_PARTITIONED_TIMER();
-  KE_TRACE(10, ("__nosvc_for_static_fini called T#%d\n", global_tid));
+  KE_TRACE(10, ("__kmpc_for_static_fini called T#%d\n", global_tid));
 
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   if (ompt_enabled.ompt_callback_work) {
@@ -1975,7 +1986,7 @@ void __nosvc_for_static_fini(ident_t *loc, kmp_int32 global_tid, omp_task_type_t
         ompt_work_type = ompt_work_distribute;
       } else {
         // use default set above.
-        // a warning about this case is provided in __nosvc_for_static_init
+        // a warning about this case is provided in __kmpc_for_static_init
       }
       KMP_DEBUG_ASSERT(ompt_work_type);
     }
@@ -1987,12 +1998,10 @@ void __nosvc_for_static_fini(ident_t *loc, kmp_int32 global_tid, omp_task_type_t
   if (__kmp_env_consistency_check)
     __kmp_pop_workshare(global_tid, ct_pdo, loc);
 
+#if defined(KMP_OMPV_ENABLED)
   instr_ws_end((*omp_task_type)->instrum_id);
   instr_for_static_exit();
-}
-
-void __kmpc_for_static_fini(ident_t *loc, kmp_int32 global_tid) {
-  KMP_FATAL(NosvUnsupportedAPI, "__kmpc_for_static_fini");
+#endif // KMP_OMPV_ENABLED
 }
 
 // User routines which take C-style arguments (call by value)

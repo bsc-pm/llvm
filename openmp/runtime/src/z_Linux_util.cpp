@@ -68,7 +68,9 @@
 #include <dirent.h>
 #include <fcntl.h>
 
+#if defined(KMP_OMPV_ENABLED)
 #include "instrum.h"
+#endif // KMP_OMPV_ENABLED
 
 struct kmp_sys_timer {
   struct timespec start;
@@ -469,6 +471,7 @@ static kmp_int32 __kmp_set_stack_info(int gtid, kmp_info_t *th) {
   return FALSE;
 }
 
+#if defined(KMP_OMPV_ENABLED)
 void numaid_to_nosv_affinity(uint32_t id, nosv_affinity_t *nosv_affinity, nosv_affinity_type_t type)
 {
 	*nosv_affinity = (nosv_affinity_t) {
@@ -519,6 +522,7 @@ void __kmp_nosv_attach(nosv_task_t *nosv_impl_task, void *thr)
   res = nosv_attach(nosv_impl_task, pnosv_affinity, "openmp", NOSV_ATTACH_NONE);
   KMP_ASSERT(res == 0);
 }
+#endif // KMP_OMPV_ENABLED
 
 static void *__kmp_launch_worker(void *thr) {
   int status, old_type, old_state;
@@ -588,6 +592,7 @@ static void *__kmp_launch_worker(void *thr) {
 
   __kmp_check_stack_overlap((kmp_info_t *)thr);
 
+#if defined(KMP_OMPV_ENABLED)
   int res;
 
   instr_thread_init();
@@ -598,9 +603,11 @@ static void *__kmp_launch_worker(void *thr) {
   ((kmp_info_t *)thr)->th.th_nosv_task = nosv_impl_task;
 
   instr_attached_enter();
+#endif // KMP_OMPV_ENABLED
 
   exit_val = __kmp_launch_thread((kmp_info_t *)thr);
 
+#if defined(KMP_OMPV_ENABLED)
   instr_attached_exit();
 
   res = nosv_detach(NOSV_DETACH_NONE);
@@ -608,6 +615,7 @@ static void *__kmp_launch_worker(void *thr) {
   KMP_ASSERT(res == 0);
 
   instr_thread_end();
+#endif // KMP_OMPV_ENABLED
 
 #ifdef KMP_BLOCK_SIGNALS
   status = pthread_sigmask(SIG_SETMASK, &old_set, NULL);
@@ -1571,7 +1579,7 @@ static inline void __kmp_suspend_template(int th_gtid, C *flag) {
       KF_TRACE(15, ("__kmp_suspend_template: T#%d about to perform"
                     " pthread_cond_wait\n",
                     th_gtid));
-      // DTODO : Change this for nosv equivalent
+#if defined(KMP_OMPV_ENABLED)
       if (th->th.th_nosv_task != NULL) {
         __kmp_unlock_suspend_mx(th);
         KMP_ASSERT(nosv_self() == th->th.th_nosv_task);
@@ -1582,6 +1590,10 @@ static inline void __kmp_suspend_template(int th_gtid, C *flag) {
         status = pthread_cond_wait(&th->th.th_suspend_cv.c_cond,
                                  &th->th.th_suspend_mx.m_mutex);
       }
+#else
+      status = pthread_cond_wait(&th->th.th_suspend_cv.c_cond,
+                               &th->th.th_suspend_mx.m_mutex);
+#endif // KMP_OMPV_ENABLED
 #endif // USE_SUSPEND_TIMEOUT
 
       if ((status != 0) && (status != EINTR) && (status != ETIMEDOUT)) {
@@ -1745,6 +1757,7 @@ static inline void __kmp_resume_template(int target_gtid, C *flag) {
                  target_gtid, buffer);
   }
 #endif
+#if defined(KMP_OMPV_ENABLED)
   if (th->th.th_nosv_task != NULL) {
     __kmp_unlock_suspend_mx(th);
     status = nosv_submit(th->th.th_nosv_task, NOSV_SUBMIT_UNLOCKED);
@@ -1754,6 +1767,11 @@ static inline void __kmp_resume_template(int target_gtid, C *flag) {
     KMP_CHECK_SYSFAIL("pthread_cond_signal", status);
     __kmp_unlock_suspend_mx(th);
   }
+#else
+  status = pthread_cond_signal(&th->th.th_suspend_cv.c_cond);
+  KMP_CHECK_SYSFAIL("pthread_cond_signal", status);
+  __kmp_unlock_suspend_mx(th);
+#endif // KMP_OMPV_ENABLED
   KF_TRACE(30, ("__kmp_resume_template: T#%d exiting after signaling wake up"
                 " for T#%d\n",
                 gtid, target_gtid));
@@ -1812,16 +1830,20 @@ void __kmp_resume_monitor() {
 #endif // KMP_USE_MONITOR
 
 void __kmp_yield() {
-	if (nosv_default_yield_type == 0) {
-		nosv_yield(NOSV_YIELD_NONE);
-	} else if (nosv_default_yield_type == 1) {
-		nosv_schedpoint(NOSV_SCHEDPOINT_NONE);
-	} else if (nosv_default_yield_type == 2) {
-		nosv_waitfor(nosv_default_waitfor_time, NULL);
-	} else {
-		fprintf(stderr, "error: nosv_defalt_yield_type invalid\n");
-		exit(EXIT_FAILURE);
-	}
+#if defined(KMP_OMPV_ENABLED)
+  if (nosv_default_yield_type == 0) {
+    nosv_yield(NOSV_YIELD_NONE);
+  } else if (nosv_default_yield_type == 1) {
+    nosv_schedpoint(NOSV_SCHEDPOINT_NONE);
+  } else if (nosv_default_yield_type == 2) {
+    nosv_waitfor(nosv_default_waitfor_time, NULL);
+  } else {
+    fprintf(stderr, "error: nosv_defalt_yield_type invalid\n");
+    exit(EXIT_FAILURE);
+  }
+#else
+  sched_yield();
+#endif // KMP_OMPV_ENABLED
 }
 
 void __kmp_gtid_set_specific(int gtid) {

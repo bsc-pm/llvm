@@ -155,12 +155,15 @@ libomp_get_libflags(LIBOMP_CONFIGURED_LIBFLAGS)
 # Build libomp library. Add LLVMSupport dependency if building in-tree with libomptarget profiling enabled.
 if(OPENMP_STANDALONE_BUILD OR (NOT OPENMP_ENABLE_LIBOMP_PROFILING))
   add_library(omp ${LIBOMP_LIBRARY_KIND} ${LIBOMP_SOURCE_FILES})
-  # Linking command will include libraries in LIBOMP_CONFIGURED_LIBFLAGS
+  add_library(ompv ${LIBOMP_LIBRARY_KIND} ${LIBOMP_SOURCE_FILES})
+  target_compile_definitions(ompv PUBLIC -DKMP_OMPV_ENABLED)
 if (OVNI_PKG_FOUND)
-  target_link_libraries(omp ${LIBOMP_CONFIGURED_LIBFLAGS} ${CMAKE_DL_LIBS} PkgConfig::NOSV_PKG PkgConfig::OVNI_PKG)
+  target_link_libraries(ompv ${LIBOMP_CONFIGURED_LIBFLAGS} ${CMAKE_DL_LIBS} PkgConfig::NOSV_PKG PkgConfig::OVNI_PKG)
 else()
-  target_link_libraries(omp ${LIBOMP_CONFIGURED_LIBFLAGS} ${CMAKE_DL_LIBS} PkgConfig::NOSV_PKG)
+  target_link_libraries(ompv ${LIBOMP_CONFIGURED_LIBFLAGS} ${CMAKE_DL_LIBS} PkgConfig::NOSV_PKG)
 endif()
+  # Linking command will include libraries in LIBOMP_CONFIGURED_LIBFLAGS
+  target_link_libraries(omp ${LIBOMP_CONFIGURED_LIBFLAGS} ${LIBOMP_DL_LIBS})
 else()
   add_llvm_library(omp ${LIBOMP_LIBRARY_KIND} ${LIBOMP_SOURCE_FILES} PARTIAL_SOURCES_INTENDED
     LINK_LIBS ${LIBOMP_CONFIGURED_LIBFLAGS} ${LIBOMP_DL_LIBS}
@@ -203,11 +206,17 @@ else()
     LINK_FLAGS "${LIBOMP_CONFIGURED_LDFLAGS}"
     LINKER_LANGUAGE ${LIBOMP_LINKER_LANGUAGE}
   )
+  set_target_properties(ompv PROPERTIES
+    PREFIX "" SUFFIX "" OUTPUT_NAME "${LIBOMPV_LIB_FILE}"
+    LINK_FLAGS "${LIBOMP_CONFIGURED_LDFLAGS}"
+    LINKER_LANGUAGE ${LIBOMP_LINKER_LANGUAGE}
+  )
 endif()
 
 # Get the library's location within the build tree for the unit tester
 if(NOT WIN32)
   get_target_property(LIBOMP_LIBRARY_DIR omp LIBRARY_OUTPUT_DIRECTORY)
+  get_target_property(LIBOMP_LIBRARY_DIR ompv LIBRARY_OUTPUT_DIRECTORY)
 else()
   get_target_property(LIBOMP_LIBRARY_DIR omp RUNTIME_OUTPUT_DIRECTORY)
 endif()
@@ -235,6 +244,7 @@ set(LIBOMP_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR} PARENT_SCOPE)
 # objects depend on : .inc files
 add_custom_target(libomp-needed-headers DEPENDS kmp_i18n_id.inc kmp_i18n_default.inc)
 add_dependencies(omp libomp-needed-headers)
+add_dependencies(ompv libomp-needed-headers)
 
 # Windows specific build rules
 if(WIN32)
@@ -383,10 +393,11 @@ if(WIN32)
 else()
 
   install(TARGETS omp ${export_to_llvmexports} ${LIBOMP_INSTALL_KIND} DESTINATION "${OPENMP_INSTALL_LIBDIR}")
+  install(TARGETS ompv ${export_to_llvmexports} ${LIBOMP_INSTALL_KIND} DESTINATION "${OPENMP_INSTALL_LIBDIR}")
 
   if(${LIBOMP_INSTALL_ALIASES})
     # Create aliases (symlinks) of the library for backwards compatibility
-    # set(LIBOMP_ALIASES "libgomp;libiomp5")
+    set(LIBOMP_ALIASES "libgomp;libiomp5")
     foreach(alias IN LISTS LIBOMP_ALIASES)
       extend_path(outdir "${CMAKE_INSTALL_PREFIX}" "${OPENMP_INSTALL_LIBDIR}")
       install(CODE "execute_process(COMMAND \"\${CMAKE_COMMAND}\" -E create_symlink \"${LIBOMP_LIB_FILE}\"

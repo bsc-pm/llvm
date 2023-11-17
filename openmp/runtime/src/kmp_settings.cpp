@@ -1305,14 +1305,17 @@ static void __kmp_stg_print_num_hidden_helper_threads(kmp_str_buf_t *buffer,
 
 static void __kmp_stg_parse_use_hidden_helper(char const *name,
                                               char const *value, void *data) {
+#if defined(KMP_OMPV_ENABLED)
   KMP_WARNING(NosvEnvSupport, "LIBOMP_USE_HIDDEN_HELPER_TASK", __kmp_enable_hidden_helper);
-//   __kmp_stg_parse_bool(name, value, &__kmp_enable_hidden_helper);
-// #if !KMP_OS_LINUX
-//   __kmp_enable_hidden_helper = FALSE;
-//   K_DIAG(1,
-//          ("__kmp_stg_parse_use_hidden_helper: Disable hidden helper task on "
-//           "non-Linux platform although it is enabled by user explicitly.\n"));
-// #endif
+#else
+  __kmp_stg_parse_bool(name, value, &__kmp_enable_hidden_helper);
+#if !KMP_OS_LINUX
+  __kmp_enable_hidden_helper = FALSE;
+  K_DIAG(1,
+         ("__kmp_stg_parse_use_hidden_helper: Disable hidden helper task on "
+          "non-Linux platform although it is enabled by user explicitly.\n"));
+#endif
+#endif // KMP_OMPV_ENABLED
 } // __kmp_stg_parse_use_hidden_helper
 
 static void __kmp_stg_print_use_hidden_helper(kmp_str_buf_t *buffer,
@@ -5331,8 +5334,11 @@ static void __kmp_stg_print_forkjoin_frames_mode(kmp_str_buf_t *buffer,
 
 static void __kmp_stg_parse_task_throttling(char const *name, char const *value,
                                             void *data) {
+#if defined(KMP_OMPV_ENABLED)
   KMP_WARNING(NosvEnvSupport, "KMP_ENABLE_TASK_THROTTLING", __kmp_enable_task_throttling);
-  // __kmp_stg_parse_bool(name, value, &__kmp_enable_task_throttling);
+#else
+  __kmp_stg_parse_bool(name, value, &__kmp_enable_task_throttling);
+#endif // KMP_OMPV_ENABLED
 } // __kmp_stg_parse_task_throttling
 
 static void __kmp_stg_print_task_throttling(kmp_str_buf_t *buffer,

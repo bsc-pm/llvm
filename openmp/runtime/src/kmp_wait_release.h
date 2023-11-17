@@ -20,7 +20,9 @@
 #include "ompt-specific.h"
 #endif
 
+#if defined(KMP_OMPV_ENABLED)
 #include "instrum.h"
+#endif // KMP_OMPV_ENABLED
 
 /*!
 @defgroup WAIT_RELEASE Wait/Release operations
@@ -381,19 +383,25 @@ __kmp_wait_template(kmp_info_t *this_thr,
 #endif
   kmp_uint64 time;
 
+#if defined(KMP_OMPV_ENABLED)
   instr_spin_wait_enter();
+#endif // KMP_OMPV_ENABLED
 
   KMP_FSYNC_SPIN_INIT(spin, NULL);
   if (flag->done_check()) {
     KMP_FSYNC_SPIN_ACQUIRED(CCAST(void *, spin));
+#if defined(KMP_OMPV_ENABLED)
     instr_spin_wait_exit();
+#endif // KMP_OMPV_ENABLED
     return false;
   }
   th_gtid = this_thr->th.th_info.ds.ds_gtid;
   if (Cancellable) {
     kmp_team_t *team = this_thr->th.th_team;
     if (team && team->t.t_cancel_request == cancel_parallel) {
+#if defined(KMP_OMPV_ENABLED)
       instr_spin_wait_exit();
+#endif // KMP_OMPV_ENABLED
       return true;
     }
   }
@@ -703,11 +711,15 @@ final_spin=FALSE)
             &(task_team->tt.tt_unfinished_threads);
         KMP_ATOMIC_INC(unfinished_threads);
       }
+#if defined(KMP_OMPV_ENABLED)
       instr_spin_wait_exit();
+#endif // KMP_OMPV_ENABLED
       return true;
     }
   }
+#if defined(KMP_OMPV_ENABLED)
   instr_spin_wait_exit();
+#endif // KMP_OMPV_ENABLED
   return false;
 }
 

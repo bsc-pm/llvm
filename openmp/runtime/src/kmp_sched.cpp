@@ -27,7 +27,9 @@
 #include "ompt-specific.h"
 #endif
 
+#if defined(KMP_OMPV_ENABLED)
 #include "instrum.h"
+#endif // KMP_OMPV_ENABLED
 
 #ifdef KMP_DEBUG
 //-------------------------------------------------------------------------
@@ -77,8 +79,10 @@ static void __kmp_for_static_init(ident_t *loc, kmp_int32 global_tid,
                                   T *plower, T *pupper,
                                   typename traits_t<T>::signed_t *pstride,
                                   typename traits_t<T>::signed_t incr,
-                                  typename traits_t<T>::signed_t chunk,
-                                  omp_task_type_t *omp_task_type
+                                  typename traits_t<T>::signed_t chunk
+#if defined(KMP_OMPV_ENABLED)
+                                  , omp_task_type_t *omp_task_type
+#endif // KMP_OMPV_ENABLED
 #if OMPT_SUPPORT && OMPT_OPTIONAL
                                   ,
                                   void *codeptr
@@ -109,8 +113,10 @@ static void __kmp_for_static_init(ident_t *loc, kmp_int32 global_tid,
   // This is a hack that is almost equivalent since the compiler wraps
   // the user code with __kmpc_omp_static_init and
   // __kmpc_omp_static_fini
+#if defined(KMP_OMPV_ENABLED)
   instr_for_static_enter();
   instr_ws_execute((*omp_task_type)->instrum_id);
+#endif // KMP_OMPV_ENABLED
 
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   ompt_team_info_t *team_info = NULL;
@@ -882,40 +888,22 @@ increment and chunk size.
 
 @{
 */
-void __nosvc_for_static_init_4(ident_t *loc, kmp_int32 gtid, kmp_int32 schedtype,
-                              kmp_int32 *plastiter, kmp_int32 *plower,
-                              kmp_int32 *pupper, kmp_int32 *pstride,
-                              kmp_int32 incr, kmp_int32 chunk,
-                              omp_task_type_t *omp_task_type) {
-  KMP_ASSERT(omp_task_type);
-  __kmp_for_static_init<kmp_int32>(loc, gtid, schedtype, plastiter, plower,
-                                   pupper, pstride, incr, chunk, omp_task_type
-#if OMPT_SUPPORT && OMPT_OPTIONAL
-                                   ,
-                                   OMPT_GET_RETURN_ADDRESS(0)
-#endif
-  );
-}
-
 void __kmpc_for_static_init_4(ident_t *loc, kmp_int32 gtid, kmp_int32 schedtype,
                               kmp_int32 *plastiter, kmp_int32 *plower,
                               kmp_int32 *pupper, kmp_int32 *pstride,
-                              kmp_int32 incr, kmp_int32 chunk) {
-  KMP_FATAL(NosvUnsupportedAPI, "__kmpc_for_static_init_4");
-}
-
-void __nosvc_for_static_init_4u(ident_t *loc, kmp_int32 gtid,
-                               kmp_int32 schedtype, kmp_int32 *plastiter,
-                               kmp_uint32 *plower, kmp_uint32 *pupper,
-                               kmp_int32 *pstride, kmp_int32 incr,
-                               kmp_int32 chunk,
-                               omp_task_type_t *omp_task_type) {
-  KMP_ASSERT(omp_task_type);
-  __kmp_for_static_init<kmp_uint32>(loc, gtid, schedtype, plastiter, plower,
-                                    pupper, pstride, incr, chunk, omp_task_type
+                              kmp_int32 incr, kmp_int32 chunk
+#if defined(KMP_OMPV_ENABLED)
+                              , omp_task_type_t *omp_task_type
+#endif // KMP_OMPV_ENABLED
+                              ) {
+  __kmp_for_static_init<kmp_int32>(loc, gtid, schedtype, plastiter, plower,
+                                   pupper, pstride, incr, chunk
+#if defined(KMP_OMPV_ENABLED)
+                                   , omp_task_type
+#endif // KMP_OMPV_ENABLED
 #if OMPT_SUPPORT && OMPT_OPTIONAL
-                                    ,
-                                    OMPT_GET_RETURN_ADDRESS(0)
+                                   ,
+                                   OMPT_GET_RETURN_ADDRESS(0)
 #endif
   );
 }
@@ -927,21 +915,19 @@ void __kmpc_for_static_init_4u(ident_t *loc, kmp_int32 gtid,
                                kmp_int32 schedtype, kmp_int32 *plastiter,
                                kmp_uint32 *plower, kmp_uint32 *pupper,
                                kmp_int32 *pstride, kmp_int32 incr,
-                               kmp_int32 chunk) {
-  KMP_FATAL(NosvUnsupportedAPI, "__kmpc_for_static_init_4u");
-}
-
-void __nosvc_for_static_init_8(ident_t *loc, kmp_int32 gtid, kmp_int32 schedtype,
-                              kmp_int32 *plastiter, kmp_int64 *plower,
-                              kmp_int64 *pupper, kmp_int64 *pstride,
-                              kmp_int64 incr, kmp_int64 chunk,
-                              omp_task_type_t *omp_task_type) {
-  KMP_ASSERT(omp_task_type);
-  __kmp_for_static_init<kmp_int64>(loc, gtid, schedtype, plastiter, plower,
-                                   pupper, pstride, incr, chunk, omp_task_type
+                               kmp_int32 chunk
+#if defined(KMP_OMPV_ENABLED)
+                               , omp_task_type_t *omp_task_type
+#endif // KMP_OMPV_ENABLED
+                               ) {
+  __kmp_for_static_init<kmp_uint32>(loc, gtid, schedtype, plastiter, plower,
+                                    pupper, pstride, incr, chunk
+#if defined(KMP_OMPV_ENABLED)
+                                    , omp_task_type
+#endif // KMP_OMPV_ENABLED
 #if OMPT_SUPPORT && OMPT_OPTIONAL
-                                   ,
-                                   OMPT_GET_RETURN_ADDRESS(0)
+                                    ,
+                                    OMPT_GET_RETURN_ADDRESS(0)
 #endif
   );
 }
@@ -952,22 +938,19 @@ void __nosvc_for_static_init_8(ident_t *loc, kmp_int32 gtid, kmp_int32 schedtype
 void __kmpc_for_static_init_8(ident_t *loc, kmp_int32 gtid, kmp_int32 schedtype,
                               kmp_int32 *plastiter, kmp_int64 *plower,
                               kmp_int64 *pupper, kmp_int64 *pstride,
-                              kmp_int64 incr, kmp_int64 chunk) {
-  KMP_FATAL(NosvUnsupportedAPI, "__kmpc_for_static_init_8");
-}
-
-void __nosvc_for_static_init_8u(ident_t *loc, kmp_int32 gtid,
-                               kmp_int32 schedtype, kmp_int32 *plastiter,
-                               kmp_uint64 *plower, kmp_uint64 *pupper,
-                               kmp_int64 *pstride, kmp_int64 incr,
-                               kmp_int64 chunk,
-                               omp_task_type_t *omp_task_type) {
-  KMP_ASSERT(omp_task_type);
-  __kmp_for_static_init<kmp_uint64>(loc, gtid, schedtype, plastiter, plower,
-                                    pupper, pstride, incr, chunk, omp_task_type
+                              kmp_int64 incr, kmp_int64 chunk
+#if defined(KMP_OMPV_ENABLED)
+                              , omp_task_type_t *omp_task_type
+#endif // KMP_OMPV_ENABLED
+                              ) {
+  __kmp_for_static_init<kmp_int64>(loc, gtid, schedtype, plastiter, plower,
+                                   pupper, pstride, incr, chunk
+#if defined(KMP_OMPV_ENABLED)
+                                   , omp_task_type
+#endif // KMP_OMPV_ENABLED
 #if OMPT_SUPPORT && OMPT_OPTIONAL
-                                    ,
-                                    OMPT_GET_RETURN_ADDRESS(0)
+                                   ,
+                                   OMPT_GET_RETURN_ADDRESS(0)
 #endif
   );
 }
@@ -979,8 +962,21 @@ void __kmpc_for_static_init_8u(ident_t *loc, kmp_int32 gtid,
                                kmp_int32 schedtype, kmp_int32 *plastiter,
                                kmp_uint64 *plower, kmp_uint64 *pupper,
                                kmp_int64 *pstride, kmp_int64 incr,
-                               kmp_int64 chunk) {
-  KMP_FATAL(NosvUnsupportedAPI, "__kmpc_for_static_init_8u");
+                               kmp_int64 chunk
+#if defined(KMP_OMPV_ENABLED)
+                               , omp_task_type_t *omp_task_type
+#endif // KMP_OMPV_ENABLED
+                               ) {
+  __kmp_for_static_init<kmp_uint64>(loc, gtid, schedtype, plastiter, plower,
+                                    pupper, pstride, incr, chunk
+#if defined(KMP_OMPV_ENABLED)
+                                    , omp_task_type
+#endif // KMP_OMPV_ENABLED
+#if OMPT_SUPPORT && OMPT_OPTIONAL
+                                    ,
+                                    OMPT_GET_RETURN_ADDRESS(0)
+#endif
+  );
 }
 /*!
 @}

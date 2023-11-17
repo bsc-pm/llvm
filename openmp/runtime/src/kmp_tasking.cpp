@@ -785,8 +785,10 @@ static void __kmpc_omp_task_begin_if0_template(ident_t *loc_ref, kmp_int32 gtid,
   // This is a hack that is almost equivalent since the compiler wraps
   // the user code with __kmpc_omp_task_begin_if0_template and
   // __kmpc_omp_task_complete_if0_template
+#if defined(KMP_OMPV_ENABLED)
   instr_invoke_task_if0_enter();
   instr_task_execute(taskdata->td_instrum_task_id);
+#endif // KMP_OMPV_ENABLED
 
   KA_TRACE(10, ("__kmpc_omp_task_begin_if0(enter): T#%d loc=%p task=%p "
                 "current_task=%p\n",
@@ -889,9 +891,11 @@ void __kmpc_omp_task_begin(ident_t *loc_ref, kmp_int32 gtid, kmp_task_t *task) {
 }
 #endif // TASK_UNUSED
 
+#if defined(KMP_OMPV_ENABLED)
 static void __kmp_nosv_finish(kmp_taskdata_t *taskdata) {
   nosv_destroy(taskdata->td_nosv_task, NOSV_DESTROY_NONE);
 }
+#endif // KMP_OMPV_ENABLED
 
 // __kmp_free_task: free the current task space and the space for shareds
 //
@@ -922,7 +926,15 @@ static void __kmp_free_task(kmp_int32 gtid, kmp_taskdata_t *taskdata,
   if (!taskdata->is_taskgraph) {
 #endif
 // deallocate the taskdata and shared variable blocks associated with this task
+#if defined(KMP_OMPV_ENABLED)
   __kmp_nosv_finish(taskdata);
+#else
+#if USE_FAST_MEMORY
+  __kmp_fast_free(thread, taskdata);
+#else /* ! USE_FAST_MEMORY */
+  __kmp_thread_free(thread, taskdata);
+#endif
+#endif // KMP_OMPV_ENABLED
 #if OMPX_TASKGRAPH
   } else {
     taskdata->td_flags.complete = 0;
@@ -1034,6 +1046,7 @@ static bool __kmp_track_children_task(kmp_taskdata_t *taskdata) {
   return ret;
 }
 
+#if defined(KMP_OMPV_ENABLED)
 // Perform last completion stuff when finishing the task (release deps, free...)
 static void __kmp_task_finish_complete(kmp_int32 gtid, kmp_task_t *task) {
   kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(task);
@@ -1087,6 +1100,7 @@ static void __kmp_task_finish_complete(kmp_int32 gtid, kmp_task_t *task) {
 
    __kmp_free_task_and_ancestors(gtid, taskdata, thread);
 }
+#endif // KMP_OMPV_ENABLED
 
 // __kmp_task_finish: bookkeeping to do when a task finishes execution
 //
@@ -1098,7 +1112,11 @@ static void __kmp_task_finish_complete(kmp_int32 gtid, kmp_task_t *task) {
 // the version with ompt=false is inlined, allowing to optimize away all ompt
 // code in this case
 // template<in_nosv_task>: if we're executing inside a nosv_submit
+#if defined(KMP_OMPV_ENABLED)
 template <bool ompt, bool in_nosv_task = true>
+#else
+template <bool ompt>
+#endif
 static void __kmp_task_finish(kmp_int32 gtid, kmp_task_t *task,
                               kmp_taskdata_t *resumed_task) {
   kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(task);
@@ -1191,10 +1209,12 @@ static void __kmp_task_finish(kmp_int32 gtid, kmp_task_t *task,
       __kmp_acquire_tas_lock(&taskdata->td_allow_completion_event.lock, gtid);
       if (taskdata->td_allow_completion_event.type ==
           KMP_EVENT_ALLOW_COMPLETION) {
+#if defined(KMP_OMPV_ENABLED)
         // increase nosv event counter so the task will not execute nosv_complete_task
         // until the event has been fulfilled
         nosv_increase_event_counter(1);
         taskdata->td_allow_completion_event.type = KMP_EVENT_FINISHED;
+#endif // KMP_OMPV_ENABLED
 
         // task finished execution
         KMP_DEBUG_ASSERT(taskdata->td_flags.executing == 1);
@@ -1220,6 +1240,7 @@ static void __kmp_task_finish(kmp_int32 gtid, kmp_task_t *task,
 
   // Tasks with valid target async handles must be re-enqueued.
   if (taskdata->td_target_data.async_handle != NULL) {
+#if defined(KMP_OMPV_ENABLED)
     // target nowait directives are untied tasks.
     // In the vanilla openmp td_untied_count is broken but since
     // the task free is managed by async_handle it works.
@@ -1228,16 +1249,18 @@ static void __kmp_task_finish(kmp_int32 gtid, kmp_task_t *task,
     // We increment the td_untied_count here so the free is not done
     // until async_handle == NULL. Basically we emulate an untied task
     KMP_ASSERT(taskdata->td_flags.tiedness == TASK_UNTIED);
-    kmp_int32 counter = 1 + KMP_ATOMIC_INC(&taskdata->td_untied_count);
+    KMP_ATOMIC_INC(&taskdata->td_untied_count);
     // Note: no need to translate gtid to its shadow. If the current thread is a
     // hidden helper one, then the gtid is already correct. Otherwise, hidden
     // helper threads are disabled, and gtid refers to a OpenMP thread.
+#endif // KMP_OMPV_ENABLED
     __kmpc_give_task(task, __kmp_tid_from_gtid(gtid));
     if (KMP_HIDDEN_HELPER_THREAD(gtid))
       __kmp_hidden_helper_worker_thread_signal();
     completed = false;
   }
 
+#if defined(KMP_OMPV_ENABLED)
   if (completed) {
 #if OMPT_SUPPORT
     // This is not a detached task, we are done here
@@ -1246,8 +1269,58 @@ static void __kmp_task_finish(kmp_int32 gtid, kmp_task_t *task,
 #endif
   }
 
-  if (completed && !in_nosv_task)
-    __kmp_task_finish_complete(gtid, task);
+#else
+
+  kmp_task_team_t *task_team =
+      thread->th.th_task_team; // might be NULL for serial teams...
+  if (completed) {
+    taskdata->td_flags.complete = 1; // mark the task as completed
+#if OMPX_TASKGRAPH
+    taskdata->td_flags.onced = 1; // mark the task as ran once already
+#endif
+
+ #if OMPT_SUPPORT
+     // This is not a detached task, we are done here
+     if (ompt)
+       __ompt_task_finish(task, resumed_task, ompt_task_complete);
+ #endif
+    // TODO: What would be the balance between the conditions in the function
+    // and an atomic operation?
+    if (__kmp_track_children_task(taskdata)) {
+      __kmp_release_deps(gtid, taskdata);
+      // Predecrement simulated by "- 1" calculation
+#if KMP_DEBUG
+      children = -1 +
+#endif
+          KMP_ATOMIC_DEC(&taskdata->td_parent->td_incomplete_child_tasks);
+      KMP_DEBUG_ASSERT(children >= 0);
+#if OMPX_TASKGRAPH
+      if (taskdata->td_taskgroup && !taskdata->is_taskgraph)
+#else
+      if (taskdata->td_taskgroup)
+#endif
+        KMP_ATOMIC_DEC(&taskdata->td_taskgroup->count);
+    } else if (task_team && (task_team->tt.tt_found_proxy_tasks ||
+                             task_team->tt.tt_hidden_helper_task_encountered)) {
+      // if we found proxy or hidden helper tasks there could exist a dependency
+      // chain with the proxy task as origin
+      __kmp_release_deps(gtid, taskdata);
+    }
+    // td_flags.executing must be marked as 0 after __kmp_release_deps has been
+    // called. Othertwise, if a task is executed immediately from the
+    // release_deps code, the flag will be reset to 1 again by this same
+    // function
+    KMP_DEBUG_ASSERT(taskdata->td_flags.executing == 1);
+    taskdata->td_flags.executing = 0; // suspend the finishing task
+
+    // Decrement the counter of hidden helper tasks to be executed.
+    if (taskdata->td_flags.hidden_helper) {
+      // Hidden helper tasks can only be executed by hidden helper threads.
+      KMP_ASSERT(KMP_HIDDEN_HELPER_THREAD(gtid));
+      KMP_ATOMIC_DEC(&__kmp_unexecuted_hidden_helper_tasks);
+    }
+  }
+#endif // KMP_OMPV_ENABLED
 
   KA_TRACE(
       20, ("__kmp_task_finish: T#%d finished task %p, %d incomplete children\n",
@@ -1258,6 +1331,13 @@ static void __kmp_task_finish(kmp_int32 gtid, kmp_task_t *task,
   // johnmc: if an asynchronous inquiry peers into the runtime system
   // it doesn't see the freed task as the current task.
   thread->th.th_current_task = resumed_task;
+#if defined(KMP_OMPV_ENABLED)
+  if (completed && !in_nosv_task)
+    __kmp_task_finish_complete(gtid, task);
+#else
+  if (completed)
+    __kmp_free_task_and_ancestors(gtid, taskdata, thread);
+#endif // KMP_OMPV_ENABLED
 
   // TODO: GEH - make sure root team implicit task is initialized properly.
   // KMP_DEBUG_ASSERT( resumed_task->td_flags.executing == 0 );
@@ -1287,15 +1367,18 @@ template <bool ompt>
 static void __kmpc_omp_task_complete_if0_template(ident_t *loc_ref,
                                                   kmp_int32 gtid,
                                                   kmp_task_t *task) {
-  kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(task);
   KA_TRACE(10, ("__kmpc_omp_task_complete_if0(enter): T#%d loc=%p task=%p\n",
                 gtid, loc_ref, KMP_TASK_TO_TASKDATA(task)));
   KMP_DEBUG_ASSERT(gtid >= 0);
   // this routine will provide task to resume
+#if defined(KMP_OMPV_ENABLED)
   __kmp_task_finish<ompt, false>(gtid, task, NULL);
+#else
+  __kmp_task_finish<ompt>(gtid, task, NULL);
+#endif // KMP_OMPV_ENABLED
 
   KA_TRACE(10, ("__kmpc_omp_task_complete_if0(exit): T#%d loc=%p task=%p\n",
-                gtid, loc_ref, taskdata));
+                gtid, loc_ref, KMP_TASK_TO_TASKDATA(task)));
 
 #if OMPT_SUPPORT
   if (ompt) {
@@ -1307,8 +1390,10 @@ static void __kmpc_omp_task_complete_if0_template(ident_t *loc_ref,
   }
 #endif
 
-  instr_task_end(taskdata->td_instrum_task_id);
+#if defined(KMP_OMPV_ENABLED)
+  instr_task_end(KMP_TASK_TO_TASKDATA(task)->td_instrum_task_id);
   instr_invoke_task_if0_exit();
+#endif // KMP_OMPV_ENABLED
 
   return;
 }
@@ -1402,7 +1487,6 @@ void __kmp_init_implicit_task(ident_t *loc_ref, kmp_info_t *this_thr,
 
   task->td_depnode = NULL;
   task->td_last_tied = task;
-
   task->td_allow_completion_event.type = KMP_EVENT_UNINITIALIZED;
 
   if (set_curr_task) { // only do this init first time thread is created
@@ -1480,6 +1564,7 @@ static size_t __kmp_round_up_to_val(size_t size, size_t val) {
   return size;
 } // __kmp_round_up_to_va
 
+#if defined(KMP_OMPV_ENABLED)
 // __kmp_enable_tasking_in_serial_mode: This is used when a TASK_PROXY, TASK_DETACHABLE
 // or hidden_helper task is allocated to ensure we have tasking enabled.
 // Also is used by TAMPI to tell the runtime tasks (detachable) with events will be made
@@ -1554,6 +1639,7 @@ static kmp_taskdata_t *__kmp_nosv_create(omp_task_type_t omp_task_type, size_t s
   taskdata->td_omp_task_type = omp_task_type;
   return taskdata;
 }
+#endif // KMP_OMPV_ENABLED
 
 // __kmp_task_alloc: Allocate the taskdata and task data structures for a task
 //
@@ -1570,8 +1656,11 @@ static kmp_taskdata_t *__kmp_nosv_create(omp_task_type_t omp_task_type, size_t s
 kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
                              kmp_tasking_flags_t *flags,
                              size_t sizeof_kmp_task_t, size_t sizeof_shareds,
-                             kmp_routine_entry_t task_entry,
-                             omp_task_type_t *omp_task_type) {
+                             kmp_routine_entry_t task_entry
+#if defined(KMP_OMPV_ENABLED)
+                             , omp_task_type_t *omp_task_type
+#endif // KMP_OMPV_ENABLED
+                             ) {
   kmp_task_t *task;
   kmp_taskdata_t *taskdata;
   kmp_info_t *thread = __kmp_threads[gtid];
@@ -1579,7 +1668,9 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
   kmp_taskdata_t *parent_task = thread->th.th_current_task;
   size_t shareds_offset;
 
+#if defined(KMP_OMPV_ENABLED)
   instr_task_alloc_enter();
+#endif // KMP_OMPV_ENABLED
 
   if (UNLIKELY(!TCR_4(__kmp_init_middle)))
     __kmp_middle_initialize();
@@ -1613,10 +1704,12 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
     KMP_CHECK_UPDATE(thread->th.th_task_team->tt.tt_untied_task_encountered, 1);
   }
 
+#if defined(KMP_OMPV_ENABLED)
   // Enable tasking always
   __kmp_enable_tasking_in_serial_mode(
     NULL, gtid,
     /*proxy=*/false, /*detachable=*/true, /*hidden_helper=*/false);
+#endif // KMP_OMPV_ENABLED
 
   // Detachable tasks are not proxy tasks yet but could be in the future. Doing
   // the tasking setup
@@ -1627,10 +1720,41 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
       flags->tiedness = TASK_UNTIED;
       flags->merged_if0 = 1;
     }
-    __kmp_enable_tasking_in_serial_mode(
-      loc_ref, gtid,
-      flags->proxy == TASK_PROXY, flags->detachable == TASK_DETACHABLE,
-      flags->hidden_helper);
+    /* are we running in a sequential parallel or tskm_immediate_exec... we need
+       tasking support enabled */
+    if ((thread->th.th_task_team) == NULL) {
+      /* This should only happen if the team is serialized
+          setup a task team and propagate it to the thread */
+      KMP_DEBUG_ASSERT(team->t.t_serialized);
+      KA_TRACE(30,
+               ("T#%d creating task team in __kmp_task_alloc for proxy task\n",
+                gtid));
+      // 1 indicates setup the current team regardless of nthreads
+      __kmp_task_team_setup(thread, team, 1);
+      thread->th.th_task_team = team->t.t_task_team[thread->th.th_task_state];
+    }
+    kmp_task_team_t *task_team = thread->th.th_task_team;
+
+    /* tasking must be enabled now as the task might not be pushed */
+    if (!KMP_TASKING_ENABLED(task_team)) {
+      KA_TRACE(
+          30,
+          ("T#%d enabling tasking in __kmp_task_alloc for proxy task\n", gtid));
+      __kmp_enable_tasking(task_team, thread);
+      kmp_int32 tid = thread->th.th_info.ds.ds_tid;
+      kmp_thread_data_t *thread_data = &task_team->tt.tt_threads_data[tid];
+      // No lock needed since only owner can allocate
+      if (thread_data->td.td_deque == NULL) {
+        __kmp_alloc_task_deque(thread, thread_data);
+      }
+    }
+
+    if ((flags->proxy == TASK_PROXY || flags->detachable == TASK_DETACHABLE) &&
+        task_team->tt.tt_found_proxy_tasks == FALSE)
+      TCW_4(task_team->tt.tt_found_proxy_tasks, TRUE);
+    if (flags->hidden_helper &&
+        task_team->tt.tt_hidden_helper_task_encountered == FALSE)
+      TCW_4(task_team->tt.tt_hidden_helper_task_encountered, TRUE);
   }
 
   // Calculate shared structure offset including padding after kmp_task_t struct
@@ -1645,7 +1769,17 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
                 sizeof_shareds));
 
   // Avoid double allocation here by combining shareds with taskdata
+#if defined(KMP_OMPV_ENABLED)
   taskdata = __kmp_nosv_create(*omp_task_type, shareds_offset + sizeof_shareds);
+#else
+#if USE_FAST_MEMORY
+  taskdata = (kmp_taskdata_t *)__kmp_fast_allocate(thread, shareds_offset +
+                                                               sizeof_shareds);
+#else /* ! USE_FAST_MEMORY */
+  taskdata = (kmp_taskdata_t *)__kmp_thread_malloc(thread, shareds_offset +
+                                                               sizeof_shareds);
+#endif /* USE_FAST_MEMORY */
+#endif // KMP_OMPV_ENABLED
   task = KMP_TASKDATA_TO_TASK(taskdata);
 
 // Make sure task & taskdata are aligned appropriately
@@ -1729,9 +1863,11 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
   else
     taskdata->td_last_tied = taskdata;
 
+#if defined(KMP_OMPV_ENABLED)
   taskdata->td_resume_task = NULL;
   taskdata->td_complete_callback_done = 1;
   taskdata->td_instrum_task_id = KMP_GEN_INSTRUM_TASK_ID();
+#endif // KMP_OMPV_ENABLED
 
   taskdata->td_allow_completion_event.type = KMP_EVENT_UNINITIALIZED;
 
@@ -1741,9 +1877,13 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
 #endif
   // TODO: What would be the balance between the conditions in the function and
   // an atomic operation?
+#if defined(KMP_OMPV_ENABLED)
   kmp_task_team_t *task_team =
       thread->th.th_task_team; // might be NULL for serial teams...
   if (__kmp_track_children_task(taskdata) || (task_team && task_team->tt.tt_found_proxy_tasks)) {
+#else
+  if (__kmp_track_children_task(taskdata)) {
+#endif // KMP_OMPV_ENABLED
     KMP_ATOMIC_INC(&parent_task->td_incomplete_child_tasks);
     if (parent_task->td_taskgroup)
       KMP_ATOMIC_INC(&parent_task->td_taskgroup->count);
@@ -1771,25 +1911,28 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
   KA_TRACE(20, ("__kmp_task_alloc(exit): T#%d created task %p parent=%p\n",
                 gtid, taskdata, taskdata->td_parent));
 
+#if defined(KMP_OMPV_ENABLED)
   instr_task_alloc_exit();
   instr_task_create(taskdata->td_instrum_task_id, taskdata->td_omp_task_type->instrum_id);
+#endif // KMP_OMPV_ENABLED
 
   return task;
 }
 
-kmp_task_t *__nosvc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
+kmp_task_t *__kmpc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
                                   kmp_int32 flags, size_t sizeof_kmp_task_t,
                                   size_t sizeof_shareds,
-                                  kmp_routine_entry_t task_entry,
-                                  omp_task_type_t *omp_task_type) {
-  KMP_ASSERT(omp_task_type);
-
+                                  kmp_routine_entry_t task_entry
+#if defined(KMP_OMPV_ENABLED)
+                                  , omp_task_type_t *omp_task_type
+#endif // KMP_OMPV_ENABLED
+                                  ) {
   kmp_task_t *retval;
   kmp_tasking_flags_t *input_flags = (kmp_tasking_flags_t *)&flags;
   __kmp_assert_valid_gtid(gtid);
   input_flags->native = FALSE;
   // __kmp_task_alloc() sets up all other runtime flags
-  KA_TRACE(10, ("__nosv_omp_task_alloc(enter): T#%d loc=%p, flags=(%s %s %s) "
+  KA_TRACE(10, ("__kmpc_omp_task_alloc(enter): T#%d loc=%p, flags=(%s %s %s) "
                 "sizeof_task=%ld sizeof_shared=%ld entry=%p\n",
                 gtid, loc_ref, input_flags->tiedness ? "tied  " : "untied",
                 input_flags->proxy ? "proxy" : "",
@@ -1797,36 +1940,15 @@ kmp_task_t *__nosvc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
                 sizeof_shareds, task_entry));
 
   retval = __kmp_task_alloc(loc_ref, gtid, input_flags, sizeof_kmp_task_t,
-                            sizeof_shareds, task_entry, omp_task_type);
+                            sizeof_shareds, task_entry
+#if defined(KMP_OMPV_ENABLED)
+                            , omp_task_type
+#endif // KMP_OMPV_ENABLED
+                            );
 
-  KA_TRACE(20, ("__nosv_omp_task_alloc(exit): T#%d retval %p\n", gtid, retval));
+  KA_TRACE(20, ("__kmpc_omp_task_alloc(exit): T#%d retval %p\n", gtid, retval));
 
   return retval;
-}
-
-kmp_task_t *__kmpc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
-                                  kmp_int32 flags, size_t sizeof_kmp_task_t,
-                                  size_t sizeof_shareds,
-                                  kmp_routine_entry_t task_entry) {
-  KMP_FATAL(NosvUnsupportedAPI, "__kmpc_omp_task_alloc");
-}
-
-kmp_task_t *__nosvc_omp_target_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
-                                         kmp_int32 flags,
-                                         size_t sizeof_kmp_task_t,
-                                         size_t sizeof_shareds,
-                                         kmp_routine_entry_t task_entry,
-                                         kmp_int64 device_id,
-                                         omp_task_type_t *omp_task_type) {
-  auto &input_flags = reinterpret_cast<kmp_tasking_flags_t &>(flags);
-  // target task is untied defined in the specification
-  input_flags.tiedness = TASK_UNTIED;
-
-  if (__kmp_enable_hidden_helper)
-    input_flags.hidden_helper = TRUE;
-
-  return __nosvc_omp_task_alloc(loc_ref, gtid, flags, sizeof_kmp_task_t,
-                               sizeof_shareds, task_entry, omp_task_type);
 }
 
 kmp_task_t *__kmpc_omp_target_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
@@ -1834,8 +1956,24 @@ kmp_task_t *__kmpc_omp_target_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
                                          size_t sizeof_kmp_task_t,
                                          size_t sizeof_shareds,
                                          kmp_routine_entry_t task_entry,
-                                         kmp_int64 device_id) {
-  KMP_FATAL(NosvUnsupportedAPI, "__kmpc_omp_target_task_alloc");
+                                         kmp_int64 device_id
+#if defined(KMP_OMPV_ENABLED)
+                                         , omp_task_type_t *omp_task_type
+#endif // KMP_OMPV_ENABLED
+                                         ) {
+  auto &input_flags = reinterpret_cast<kmp_tasking_flags_t &>(flags);
+  // target task is untied defined in the specification
+  input_flags.tiedness = TASK_UNTIED;
+
+  if (__kmp_enable_hidden_helper)
+    input_flags.hidden_helper = TRUE;
+
+  return __kmpc_omp_task_alloc(loc_ref, gtid, flags, sizeof_kmp_task_t,
+                               sizeof_shareds, task_entry
+#if defined(KMP_OMPV_ENABLED)
+                               , omp_task_type
+#endif // KMP_OMPV_ENABLED
+                               );
 }
 
 /*!
@@ -1858,11 +1996,7 @@ __kmpc_omp_reg_task_with_affinity(ident_t *loc_ref, kmp_int32 gtid,
   return 0;
 }
 
-//  __kmp_invoke_task: invoke the specified task
-//
-// gtid: global thread ID of caller
-// task: the task to invoke
-// current_task: the task to resume after task invocation
+#if defined(KMP_OMPV_ENABLED)
 #ifdef __s390x__
 __attribute__((target("backchain")))
 #endif
@@ -2199,6 +2333,219 @@ void nosv_end_task(nosv_task_t task) {
        gtid, taskdata, current_task));
 }
 
+#else
+
+//  __kmp_invoke_task: invoke the specified task
+//
+// gtid: global thread ID of caller
+// task: the task to invoke
+// current_task: the task to resume after task invocation
+#ifdef __s390x__
+__attribute__((target("backchain")))
+#endif
+static void
+__kmp_invoke_task(kmp_int32 gtid, kmp_task_t *task,
+                  kmp_taskdata_t *current_task) {
+  kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(task);
+  kmp_info_t *thread;
+  int discard = 0 /* false */;
+  KA_TRACE(
+      30, ("__kmp_invoke_task(enter): T#%d invoking task %p, current_task=%p\n",
+           gtid, taskdata, current_task));
+  KMP_DEBUG_ASSERT(task);
+  if (UNLIKELY(taskdata->td_flags.proxy == TASK_PROXY &&
+               taskdata->td_flags.complete == 1)) {
+    // This is a proxy task that was already completed but it needs to run
+    // its bottom-half finish
+    KA_TRACE(
+        30,
+        ("__kmp_invoke_task: T#%d running bottom finish for proxy task %p\n",
+         gtid, taskdata));
+
+    __kmp_bottom_half_finish_proxy(gtid, task);
+
+    KA_TRACE(30, ("__kmp_invoke_task(exit): T#%d completed bottom finish for "
+                  "proxy task %p, resuming task %p\n",
+                  gtid, taskdata, current_task));
+
+    return;
+  }
+
+#if OMPT_SUPPORT
+  // For untied tasks, the first task executed only calls __kmpc_omp_task and
+  // does not execute code.
+  ompt_thread_info_t oldInfo;
+  if (UNLIKELY(ompt_enabled.enabled)) {
+    // Store the threads states and restore them after the task
+    thread = __kmp_threads[gtid];
+    oldInfo = thread->th.ompt_thread_info;
+    thread->th.ompt_thread_info.wait_id = 0;
+    thread->th.ompt_thread_info.state = (thread->th.th_team_serialized)
+                                            ? ompt_state_work_serial
+                                            : ompt_state_work_parallel;
+    taskdata->ompt_task_info.frame.exit_frame.ptr = OMPT_GET_FRAME_ADDRESS(0);
+  }
+#endif
+
+  // Proxy tasks are not handled by the runtime
+  if (taskdata->td_flags.proxy != TASK_PROXY) {
+    __kmp_task_start(gtid, task, current_task); // OMPT only if not discarded
+  }
+
+  // TODO: cancel tasks if the parallel region has also been cancelled
+  // TODO: check if this sequence can be hoisted above __kmp_task_start
+  // if cancellation has been enabled for this run ...
+  if (UNLIKELY(__kmp_omp_cancellation)) {
+    thread = __kmp_threads[gtid];
+    kmp_team_t *this_team = thread->th.th_team;
+    kmp_taskgroup_t *taskgroup = taskdata->td_taskgroup;
+    if ((taskgroup && taskgroup->cancel_request) ||
+        (this_team->t.t_cancel_request == cancel_parallel)) {
+#if OMPT_SUPPORT && OMPT_OPTIONAL
+      ompt_data_t *task_data;
+      if (UNLIKELY(ompt_enabled.ompt_callback_cancel)) {
+        __ompt_get_task_info_internal(0, NULL, &task_data, NULL, NULL, NULL);
+        ompt_callbacks.ompt_callback(ompt_callback_cancel)(
+            task_data,
+            ((taskgroup && taskgroup->cancel_request) ? ompt_cancel_taskgroup
+                                                      : ompt_cancel_parallel) |
+                ompt_cancel_discarded_task,
+            NULL);
+      }
+#endif
+      KMP_COUNT_BLOCK(TASK_cancelled);
+      // this task belongs to a task group and we need to cancel it
+      discard = 1 /* true */;
+    }
+  }
+
+  // Invoke the task routine and pass in relevant data.
+  // Thunks generated by gcc take a different argument list.
+  if (!discard) {
+    if (taskdata->td_flags.tiedness == TASK_UNTIED) {
+      taskdata->td_last_tied = current_task->td_last_tied;
+      KMP_DEBUG_ASSERT(taskdata->td_last_tied);
+    }
+#if KMP_STATS_ENABLED
+    KMP_COUNT_BLOCK(TASK_executed);
+    switch (KMP_GET_THREAD_STATE()) {
+    case FORK_JOIN_BARRIER:
+      KMP_PUSH_PARTITIONED_TIMER(OMP_task_join_bar);
+      break;
+    case PLAIN_BARRIER:
+      KMP_PUSH_PARTITIONED_TIMER(OMP_task_plain_bar);
+      break;
+    case TASKYIELD:
+      KMP_PUSH_PARTITIONED_TIMER(OMP_task_taskyield);
+      break;
+    case TASKWAIT:
+      KMP_PUSH_PARTITIONED_TIMER(OMP_task_taskwait);
+      break;
+    case TASKGROUP:
+      KMP_PUSH_PARTITIONED_TIMER(OMP_task_taskgroup);
+      break;
+    default:
+      KMP_PUSH_PARTITIONED_TIMER(OMP_task_immediate);
+      break;
+    }
+#endif // KMP_STATS_ENABLED
+
+// OMPT task begin
+#if OMPT_SUPPORT
+    if (UNLIKELY(ompt_enabled.enabled))
+      __ompt_task_start(task, current_task, gtid);
+#endif
+#if OMPT_SUPPORT && OMPT_OPTIONAL
+    if (UNLIKELY(ompt_enabled.ompt_callback_dispatch &&
+                 taskdata->ompt_task_info.dispatch_chunk.iterations > 0)) {
+      ompt_data_t instance = ompt_data_none;
+      instance.ptr = &(taskdata->ompt_task_info.dispatch_chunk);
+      ompt_team_info_t *team_info = __ompt_get_teaminfo(0, NULL);
+      ompt_callbacks.ompt_callback(ompt_callback_dispatch)(
+          &(team_info->parallel_data), &(taskdata->ompt_task_info.task_data),
+          ompt_dispatch_taskloop_chunk, instance);
+      taskdata->ompt_task_info.dispatch_chunk = {0, 0};
+    }
+#endif // OMPT_SUPPORT && OMPT_OPTIONAL
+
+#if OMPD_SUPPORT
+    if (ompd_state & OMPD_ENABLE_BP)
+      ompd_bp_task_begin();
+#endif
+
+#if USE_ITT_BUILD && USE_ITT_NOTIFY
+    kmp_uint64 cur_time;
+    kmp_int32 kmp_itt_count_task =
+        __kmp_forkjoin_frames_mode == 3 && !taskdata->td_flags.task_serial &&
+        current_task->td_flags.tasktype == TASK_IMPLICIT;
+    if (kmp_itt_count_task) {
+      thread = __kmp_threads[gtid];
+      // Time outer level explicit task on barrier for adjusting imbalance time
+      if (thread->th.th_bar_arrive_time)
+        cur_time = __itt_get_timestamp();
+      else
+        kmp_itt_count_task = 0; // thread is not on a barrier - skip timing
+    }
+    KMP_FSYNC_ACQUIRED(taskdata); // acquired self (new task)
+#endif
+
+#if ENABLE_LIBOMPTARGET
+    if (taskdata->td_target_data.async_handle != NULL) {
+      // If we have a valid target async handle, that means that we have already
+      // executed the task routine once. We must query for the handle completion
+      // instead of re-executing the routine.
+      KMP_ASSERT(tgt_target_nowait_query);
+      tgt_target_nowait_query(&taskdata->td_target_data.async_handle);
+    } else
+#endif
+    if (task->routine != NULL) {
+#ifdef KMP_GOMP_COMPAT
+      if (taskdata->td_flags.native) {
+        ((void (*)(void *))(*(task->routine)))(task->shareds);
+      } else
+#endif /* KMP_GOMP_COMPAT */
+      {
+        (*(task->routine))(gtid, task);
+      }
+    }
+    KMP_POP_PARTITIONED_TIMER();
+
+#if USE_ITT_BUILD && USE_ITT_NOTIFY
+    if (kmp_itt_count_task) {
+      // Barrier imbalance - adjust arrive time with the task duration
+      thread->th.th_bar_arrive_time += (__itt_get_timestamp() - cur_time);
+    }
+    KMP_FSYNC_CANCEL(taskdata); // destroy self (just executed)
+    KMP_FSYNC_RELEASING(taskdata->td_parent); // releasing parent
+#endif
+  }
+
+#if OMPD_SUPPORT
+  if (ompd_state & OMPD_ENABLE_BP)
+    ompd_bp_task_end();
+#endif
+
+  // Proxy tasks are not handled by the runtime
+  if (taskdata->td_flags.proxy != TASK_PROXY) {
+#if OMPT_SUPPORT
+    if (UNLIKELY(ompt_enabled.enabled)) {
+      thread->th.ompt_thread_info = oldInfo;
+      if (taskdata->td_flags.tiedness == TASK_TIED) {
+        taskdata->ompt_task_info.frame.exit_frame = ompt_data_none;
+      }
+      __kmp_task_finish<true>(gtid, task, current_task);
+    } else
+#endif
+      __kmp_task_finish<false>(gtid, task, current_task);
+  }
+
+  KA_TRACE(
+      30,
+      ("__kmp_invoke_task(exit): T#%d completed task %p, resuming task %p\n",
+       gtid, taskdata, current_task));
+  return;
+}
+#endif // KMP_OMPV_ENABLED
 
 // __kmpc_omp_task_parts: Schedule a thread-switchable task for execution
 //
@@ -2269,7 +2616,9 @@ kmp_int32 __kmp_omp_task(kmp_int32 gtid, kmp_task_t *new_task,
                          bool serialize_immediate) {
   kmp_taskdata_t *new_taskdata = KMP_TASK_TO_TASKDATA(new_task);
 
+#if defined(KMP_OMPV_ENABLED)
   instr_task_schedule_enter();
+#endif // KMP_OMPV_ENABLED
 
 #if OMPX_TASKGRAPH
   if (new_taskdata->is_taskgraph &&
@@ -2343,7 +2692,9 @@ kmp_int32 __kmp_omp_task(kmp_int32 gtid, kmp_task_t *new_task,
     }
   }
 
+#if defined(KMP_OMPV_ENABLED)
   instr_task_schedule_exit();
+#endif // KMP_OMPV_ENABLED
 
   return TASK_CURRENT_NOT_QUEUED;
 }
@@ -2464,7 +2815,6 @@ kmp_int32 __kmp_omp_taskloop_task(ident_t *loc_ref, kmp_int32 gtid,
     parent->ompt_task_info.frame.enter_frame = ompt_data_none;
   }
 #endif
-
   return res;
 }
 
@@ -2477,7 +2827,9 @@ static kmp_int32 __kmpc_omp_taskwait_template(ident_t *loc_ref, kmp_int32 gtid,
   int thread_finished = FALSE;
   KMP_SET_THREAD_STATE_BLOCK(TASKWAIT);
 
+#if defined(KMP_OMPV_ENABLED)
   instr_taskwait_enter();
+#endif // KMP_OMPV_ENABLED
 
   KA_TRACE(10, ("__kmpc_omp_taskwait(enter): T#%d loc=%p\n", gtid, loc_ref));
   KMP_DEBUG_ASSERT(gtid >= 0);
@@ -2578,7 +2930,9 @@ static kmp_int32 __kmpc_omp_taskwait_template(ident_t *loc_ref, kmp_int32 gtid,
                 "returning TASK_CURRENT_NOT_QUEUED\n",
                 gtid, taskdata));
 
+#if defined(KMP_OMPV_ENABLED)
   instr_taskwait_exit();
+#endif // KMP_OMPV_ENABLED
 
   return TASK_CURRENT_NOT_QUEUED;
 }
@@ -2612,7 +2966,9 @@ kmp_int32 __kmpc_omp_taskyield(ident_t *loc_ref, kmp_int32 gtid, int end_part) {
   kmp_info_t *thread;
   int thread_finished = FALSE;
 
+#if defined(KMP_OMPV_ENABLED)
   instr_taskyield_enter();
+#endif // KMP_OMPV_ENABLED
 
   KMP_COUNT_BLOCK(OMP_TASKYIELD);
   KMP_SET_THREAD_STATE_BLOCK(TASKYIELD);
@@ -2672,7 +3028,9 @@ kmp_int32 __kmpc_omp_taskyield(ident_t *loc_ref, kmp_int32 gtid, int end_part) {
                 "returning TASK_CURRENT_NOT_QUEUED\n",
                 gtid, taskdata));
 
+#if defined(KMP_OMPV_ENABLED)
   instr_taskyield_exit();
+#endif // KMP_OMPV_ENABLED
 
   return TASK_CURRENT_NOT_QUEUED;
 }
@@ -3139,7 +3497,9 @@ void __kmpc_taskgroup(ident_t *loc, int gtid) {
   // this violate the subsystem rules.
   // This is a hack that is almost equivalent since the compiler wraps
   // the user code with __kmpc_taskgroup and __kmpc_end_taskgroup
+#if defined(KMP_OMPV_ENABLED)
   instr_taskgroup_enter();
+#endif // KMP_OMPV_ENABLED
 
   __kmp_assert_valid_gtid(gtid);
   kmp_info_t *thread = __kmp_threads[gtid];
@@ -3308,7 +3668,9 @@ void __kmpc_end_taskgroup(ident_t *loc, int gtid) {
   KA_TRACE(10, ("__kmpc_end_taskgroup(exit): T#%d task %p finished waiting\n",
                 gtid, taskdata));
 
+#if defined(KMP_OMPV_ENABLED)
   instr_taskgroup_exit();
+#endif // KMP_OMPV_ENABLED
 
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   if (UNLIKELY(ompt_enabled.ompt_callback_sync_region)) {
@@ -3463,11 +3825,13 @@ static kmp_task_t *__kmp_remove_my_task(kmp_info_t *thread, kmp_int32 gtid,
          TASK_DEQUE_MASK(thread_data->td); // Wrap index.
   taskdata = thread_data->td.td_deque[tail];
 
+#if defined(KMP_OMPV_ENABLED)
   if (!taskdata->td_complete_callback_done) {
     // The task is already been executed by other thread.
     __kmp_release_bootstrap_lock(&thread_data->td.td_deque_lock);
     return NULL;
   }
+#endif // KMP_OMPV_ENABLED
 
   if (!__kmp_task_is_allowed(gtid, is_constrained, taskdata,
                              thread->th.th_current_task)) {
@@ -3550,11 +3914,13 @@ static kmp_task_t *__kmp_steal_task(kmp_info_t *victim_thr, kmp_int32 gtid,
   current = __kmp_threads[gtid]->th.th_current_task;
   taskdata = victim_td->td.td_deque[victim_td->td.td_deque_head];
 
+#if defined(KMP_OMPV_ENABLED)
   if (!taskdata->td_complete_callback_done) {
     // The task is already been executed by other thread.
     __kmp_release_bootstrap_lock(&victim_td->td.td_deque_lock);
     return NULL;
   }
+#endif // KMP_OMPV_ENABLED
 
   if (__kmp_task_is_allowed(gtid, is_constrained, taskdata, current)) {
     // Bump head pointer and Wrap.
@@ -3680,7 +4046,9 @@ static inline int __kmp_execute_tasks_template(
   while (1) { // Outer loop keeps trying to find tasks in case of single thread
     // getting tasks from target constructs
     while (1) { // Inner loop to find a task and execute it
+#if defined(KMP_OMPV_ENABLED)
       nosv_schedpoint(NOSV_SCHEDPOINT_NONE);
+#endif // KMP_OMPV_ENABLED
       task = NULL;
       if (task_team->tt.tt_num_task_pri) { // get priority task first
         task = __kmp_get_priority_task(gtid, task_team, is_constrained);
@@ -3790,7 +4158,11 @@ static inline int __kmp_execute_tasks_template(
       if (thread->th.th_task_team == NULL) {
         break;
       }
+#if defined(KMP_OMPV_ENABLED)
       NOSV_SCHEDPOINT(__kmp_library == library_throughput); // Yield before next task
+#else
+      KMP_YIELD(__kmp_library == library_throughput); // Yield before next task
+#endif // KMP_OMPV_ENABLED
       // If execution of a stolen task results in more tasks being placed on our
       // run queue, reset use_own_tasks
       if (!use_own_tasks && TCR_4(threads_data[tid].td.td_deque_ntasks) != 0) {
@@ -4614,7 +4986,9 @@ void __kmp_tasking_barrier(kmp_team_t *team, kmp_info_t *thread, int gtid) {
 #endif /* USE_ITT_BUILD */
   kmp_flag_32<false, false> spin_flag(spin, 0U);
 
+#if defined(KMP_OMPV_ENABLED)
   instr_tasking_barrier_enter();
+#endif // KMP_OMPV_ENABLED
 
   while (!spin_flag.execute_tasks(thread, gtid, TRUE,
                                   &flag USE_ITT_BUILD_ARG(NULL), 0)) {
@@ -4631,7 +5005,9 @@ void __kmp_tasking_barrier(kmp_team_t *team, kmp_info_t *thread, int gtid) {
     KMP_YIELD(TRUE);
   }
 
+#if defined(KMP_OMPV_ENABLED)
   instr_tasking_barrier_exit();
+#endif // KMP_OMPV_ENABLED
 
 #if USE_ITT_BUILD
   KMP_FSYNC_SPIN_ACQUIRED(RCAST(void *, spin));
@@ -4896,6 +5272,7 @@ kmp_event_t *__kmpc_task_allow_completion_event(ident_t *loc_ref, int gtid,
   return &td->td_allow_completion_event;
 }
 
+#if defined(KMP_OMPV_ENABLED)
 void __kmp_fulfill_event(kmp_event_t *event) {
   KMP_DEBUG_ASSERT(event->ed.task != nullptr);
 
@@ -4933,6 +5310,54 @@ void __kmp_fulfill_event(kmp_event_t *event) {
     nosv_decrease_event_counter(nosv_task, 1);
   }
 }
+#else
+void __kmp_fulfill_event(kmp_event_t *event) {
+  if (event->type == KMP_EVENT_ALLOW_COMPLETION) {
+    kmp_task_t *ptask = event->ed.task;
+    kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(ptask);
+    bool detached = false;
+    int gtid = __kmp_get_gtid();
+
+    // The associated task might have completed or could be completing at this
+    // point.
+    // We need to take the lock to avoid races
+    __kmp_acquire_tas_lock(&event->lock, gtid);
+    if (taskdata->td_flags.proxy == TASK_PROXY) {
+      detached = true;
+    } else {
+#if OMPT_SUPPORT
+      // The OMPT event must occur under mutual exclusion,
+      // otherwise the tool might access ptask after free
+      if (UNLIKELY(ompt_enabled.enabled))
+        __ompt_task_finish(ptask, NULL, ompt_task_early_fulfill);
+#endif
+    }
+    event->type = KMP_EVENT_UNINITIALIZED;
+    __kmp_release_tas_lock(&event->lock, gtid);
+
+    if (detached) {
+#if OMPT_SUPPORT
+      // We free ptask afterwards and know the task is finished,
+      // so locking is not necessary
+      if (UNLIKELY(ompt_enabled.enabled))
+        __ompt_task_finish(ptask, NULL, ompt_task_late_fulfill);
+#endif
+      // If the task detached complete the proxy task
+      if (gtid >= 0) {
+        kmp_team_t *team = taskdata->td_team;
+        kmp_info_t *thread = __kmp_get_thread();
+        if (thread->th.th_team == team) {
+          __kmpc_proxy_task_completed(gtid, ptask);
+          return;
+        }
+      }
+
+      // fallback
+      __kmpc_proxy_task_completed_ooo(ptask);
+    }
+  }
+}
+#endif // KMP_OMPV_ENABLED
 
 // __kmp_task_dup_alloc: Allocate the taskdata and make a copy of source task
 // for taskloop
@@ -4946,16 +5371,17 @@ kmp_task_t *__kmp_task_dup_alloc(kmp_info_t *thread, kmp_task_t *task_src
 #if OMPX_TASKGRAPH
                                  , int taskloop_recur
 #endif
-                                 ) {
+) {
   kmp_task_t *task;
   kmp_taskdata_t *taskdata;
   kmp_taskdata_t *taskdata_src = KMP_TASK_TO_TASKDATA(task_src);
-  omp_task_type_t omp_task_type = taskdata_src->td_omp_task_type;
   kmp_taskdata_t *parent_task = taskdata_src->td_parent; // same parent task
   size_t shareds_offset;
   size_t task_size;
 
+#if defined(KMP_OMPV_ENABLED)
   instr_task_dup_alloc_enter();
+#endif // KMP_OMPV_ENABLED
 
   KA_TRACE(10, ("__kmp_task_dup_alloc(enter): Th %p, source task %p\n", thread,
                 task_src));
@@ -4967,11 +5393,22 @@ kmp_task_t *__kmp_task_dup_alloc(kmp_info_t *thread, kmp_task_t *task_src
   // Allocate a kmp_taskdata_t block and a kmp_task_t block.
   KA_TRACE(30, ("__kmp_task_dup_alloc: Th %p, malloc size %ld\n", thread,
                 task_size));
+#if defined(KMP_OMPV_ENABLED)
+  omp_task_type_t omp_task_type = taskdata_src->td_omp_task_type;
   taskdata = __kmp_nosv_create(omp_task_type, task_size);
+
   // Keep the nosv_task after the memcpy
   nosv_task_t nosv_task = taskdata->td_nosv_task;;
   KMP_MEMCPY(taskdata, taskdata_src, task_size);
   taskdata->td_nosv_task = nosv_task;
+#else
+#if USE_FAST_MEMORY
+  taskdata = (kmp_taskdata_t *)__kmp_fast_allocate(thread, task_size);
+#else
+  taskdata = (kmp_taskdata_t *)__kmp_thread_malloc(thread, task_size);
+#endif /* USE_FAST_MEMORY */
+  KMP_MEMCPY(taskdata, taskdata_src, task_size);
+#endif // KMP_OMPV_ENABLED
 
   task = KMP_TASKDATA_TO_TASK(taskdata);
 
@@ -5012,9 +5449,11 @@ kmp_task_t *__kmp_task_dup_alloc(kmp_info_t *thread, kmp_task_t *task_src
       KMP_ATOMIC_INC(&taskdata->td_parent->td_allocated_child_tasks);
   }
 
+#if defined(KMP_OMPV_ENABLED)
   taskdata->td_resume_task = NULL;
   taskdata->td_complete_callback_done = 1;
   taskdata->td_instrum_task_id = KMP_GEN_INSTRUM_TASK_ID();
+#endif // KMP_OMPV_ENABLED
 
   KA_TRACE(20,
            ("__kmp_task_dup_alloc(exit): Th %p, created task %p, parent=%p\n",
@@ -5024,8 +5463,10 @@ kmp_task_t *__kmp_task_dup_alloc(kmp_info_t *thread, kmp_task_t *task_src
     __ompt_task_init(taskdata, thread->th.th_info.ds.ds_gtid);
 #endif
 
+#if defined(KMP_OMPV_ENABLED)
   instr_task_dup_alloc_exit();
   instr_task_create(taskdata->td_instrum_task_id, taskdata->td_omp_task_type->instrum_id);
+#endif // KMP_OMPV_ENABLED
 
   return task;
 }
@@ -5263,7 +5704,11 @@ void __kmp_taskloop_linear(ident_t *loc, int gtid, kmp_task_t *task,
   // free the pattern task and exit
   __kmp_task_start(gtid, task, current_task); // make internal bookkeeping
   // do not execute the pattern task, just do internal bookkeeping
+#if defined(KMP_OMPV_ENABLED)
   __kmp_task_finish<false, false>(gtid, task, current_task);
+#else
+  __kmp_task_finish<false>(gtid, task, current_task);
+#endif // KMP_OMPV_ENABLED
 }
 
 // Structure to keep taskloop parameters for auxiliary task
@@ -5439,8 +5884,12 @@ void __kmp_taskloop_recur(ident_t *loc, int gtid, kmp_task_t *task,
   kmp_taskdata_t *current_task = thread->th.th_current_task;
   thread->th.th_current_task = taskdata->td_parent;
   kmp_task_t *new_task =
-      __nosvc_omp_task_alloc(loc, gtid, 1, 3 * sizeof(void *),
-                            sizeof(__taskloop_params_t), &__kmp_taskloop_task, &taskdata->td_omp_task_type);
+      __kmpc_omp_task_alloc(loc, gtid, 1, 3 * sizeof(void *),
+                            sizeof(__taskloop_params_t), &__kmp_taskloop_task
+#if defined(KMP_OMPV_ENABLED)
+                             , &taskdata->td_omp_task_type
+#endif // KMP_OMPV_ENABLED
+                             );
   // restore current task
   thread->th.th_current_task = current_task;
   __taskloop_params_t *p = (__taskloop_params_t *)new_task->shareds;
@@ -5541,7 +5990,11 @@ static void __kmp_taskloop(ident_t *loc, int gtid, kmp_task_t *task, int if_val,
     // free the pattern task and exit
     __kmp_task_start(gtid, task, current_task);
     // do not execute anything for zero-trip loop
+#if defined(KMP_OMPV_ENABLED)
     __kmp_task_finish<false, false>(gtid, task, current_task);
+#else
+    __kmp_task_finish<false>(gtid, task, current_task);
+#endif // KMP_OMPV_ENABLED
     return;
   }
 

@@ -273,6 +273,9 @@ class kmp_flag_oncore;
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#if defined(KMP_OMPV_ENABLED)
+
 #include <nosv.h>
 #include "nosv/affinity.h"
 extern int nosv_main_pid;
@@ -295,29 +298,8 @@ void numaid_to_nosv_affinity(uint32_t id, nosv_affinity_t *nosv_affinity, nosv_a
 void cpuid_to_nosv_affinity(uint32_t id, nosv_affinity_t *nosv_affinity, nosv_affinity_type_t type);
 
 KMP_EXPORT void __nosvc_register_task_info(omp_task_type_t &omp_task_type, void *label);
-extern void __nosvc_for_static_init_4(ident_t *loc, kmp_int32 gtid, kmp_int32 schedtype,
-                              kmp_int32 *plastiter, kmp_int32 *plower,
-                              kmp_int32 *pupper, kmp_int32 *pstride,
-                              kmp_int32 incr, kmp_int32 chunk,
-                              omp_task_type_t *omp_task_type);
-extern void __nosvc_for_static_init_4u(ident_t *loc, kmp_int32 gtid,
-                               kmp_int32 schedtype, kmp_int32 *plastiter,
-                               kmp_uint32 *plower, kmp_uint32 *pupper,
-                               kmp_int32 *pstride, kmp_int32 incr,
-                               kmp_int32 chunk,
-                               omp_task_type_t *omp_task_type);
-extern void __nosvc_for_static_init_8(ident_t *loc, kmp_int32 gtid, kmp_int32 schedtype,
-                              kmp_int32 *plastiter, kmp_int64 *plower,
-                              kmp_int64 *pupper, kmp_int64 *pstride,
-                              kmp_int64 incr, kmp_int64 chunk,
-                              omp_task_type_t *omp_task_type);
-extern void __nosvc_for_static_init_8u(ident_t *loc, kmp_int32 gtid,
-                               kmp_int32 schedtype, kmp_int32 *plastiter,
-                               kmp_uint64 *plower, kmp_uint64 *pupper,
-                               kmp_int64 *pstride, kmp_int64 incr,
-                               kmp_int64 chunk,
-                               omp_task_type_t *omp_task_type);
-extern void __nosvc_for_static_fini(ident_t *loc, kmp_int32 global_tid, omp_task_type_t *omp_task_type);
+
+#endif // KMP_OMPV_ENABLED
 
 /* ------------------------------------------------------------------------ */
 
@@ -1604,12 +1586,14 @@ static inline void __kmp_x86_pause(void) { _mm_pause(); }
       __kmp_yield();                                                           \
   }
 
+#if defined(KMP_OMPV_ENABLED)
 #define NOSV_SCHEDPOINT(cond)                                                        \
   {                                                                            \
     KMP_CPU_PAUSE();                                                           \
     if ((cond) && (KMP_TRY_YIELD))                                             \
       nosv_schedpoint(NOSV_SCHEDPOINT_NONE);                                                           \
   }
+#endif // KMP_OMPV_ENABLED
 
 #define KMP_YIELD_OVERSUB()                                                    \
   {                                                                            \
@@ -2813,7 +2797,7 @@ struct kmp_taskdata { /* aligned during dynamic allocation       */
   kmp_tdg_info_t *tdg; // used to associate task with a TDG
 #endif
   kmp_target_data_t td_target_data;
-  // NOSV additional info
+#if defined(KMP_OMPV_ENABLED)
   omp_task_type_t td_omp_task_type;
   nosv_task_t td_nosv_task;
   // NOTE: used to pass the current_task from nosv_exec_task
@@ -2830,7 +2814,7 @@ struct kmp_taskdata { /* aligned during dynamic allocation       */
   bool td_complete_callback_done;
   // Instrumentation (Ovni) task id
   kmp_int32 td_instrum_task_id;
-  // END NOSV additional info
+#endif // KMP_OMPV_ENABLED
 }; // struct kmp_taskdata
 
 // Make sure padding above worked
@@ -3032,11 +3016,11 @@ typedef struct KMP_ALIGN_CACHE kmp_base_info {
 
 #if OMPT_SUPPORT
   ompt_thread_info_t ompt_thread_info;
-  // NOSV additional info
+#if defined(KMP_OMPV_ENABLED)
   // NOTE: used to pass the current_task from nosv_exec_task
   // to nosv_complete_task
   ompt_thread_info_t ompt_old_thread_info;
-  // END NOSV additional info
+#endif // KMP_OMPV_ENABLED
 #endif
 
   /* The following are also read by the primary thread during reinit */
@@ -3110,7 +3094,9 @@ typedef struct KMP_ALIGN_CACHE kmp_base_info {
   std::atomic<bool> th_blocking;
 #endif
   kmp_cg_root_t *th_cg_roots; // list of cg_roots associated with this thread
+#if defined(KMP_OMPV_ENABLED)
   nosv_task_t th_nosv_task;
+#endif // KMP_OMPV_ENABLED
 } kmp_base_info_t;
 
 typedef union KMP_ALIGN_CACHE kmp_info {
@@ -3710,8 +3696,10 @@ extern kmp_info_t __kmp_monitor;
 extern std::atomic<kmp_int32> __kmp_team_counter;
 // For Debugging Support Library
 extern std::atomic<kmp_int32> __kmp_task_counter;
+#if defined(KMP_OMPV_ENABLED)
 // Ovni
 extern std::atomic<kmp_int32> __kmp_instrum_task_counter;
+#endif // KMP_OMPV_ENABLED
 
 #if USE_DEBUGGER
 #define _KMP_GEN_ID(counter)                                                   \
@@ -3723,7 +3711,9 @@ extern std::atomic<kmp_int32> __kmp_instrum_task_counter;
 #define KMP_GEN_TASK_ID() _KMP_GEN_ID(__kmp_task_counter)
 #define KMP_GEN_TEAM_ID() _KMP_GEN_ID(__kmp_team_counter)
 
+#if defined(KMP_OMPV_ENABLED)
 #define KMP_GEN_INSTRUM_TASK_ID() (KMP_ATOMIC_INC(&__kmp_instrum_task_counter) + 1)
+#endif // KMP_OMPV_ENABLED
 
 /* ------------------------------------------------------------------------ */
 
@@ -3748,8 +3738,13 @@ extern void __kmp_unregister_library(void); // called by __kmp_internal_end()
 extern int __kmp_ignore_mppbeg(void);
 extern int __kmp_ignore_mppend(void);
 
+#if defined(KMP_OMPV_ENABLED)
 extern int __kmp_enter_single(int gtid, ident_t *id_ref, int push_ws, omp_task_type_t *omp_task_type);
 extern void __kmp_exit_single(int gtid, omp_task_type_t *omp_task_type);
+#else
+extern int __kmp_enter_single(int gtid, ident_t *id_ref, int push_ws);
+extern void __kmp_exit_single(int gtid);
+#endif // KMP_OMPV_ENABLED
 
 extern void __kmp_parallel_deo(int *gtid_ref, int *cid_ref, ident_t *loc_ref);
 extern void __kmp_parallel_dxo(int *gtid_ref, int *cid_ref, ident_t *loc_ref);
@@ -3838,6 +3833,42 @@ extern void __kmp_push_num_teams_51(ident_t *loc, int gtid, int num_teams_lb,
 
 extern void __kmp_yield();
 
+#if defined(KMP_OMPV_ENABLED)
+extern void __kmpc_dispatch_init_4(ident_t *loc, kmp_int32 gtid,
+                                   enum sched_type schedule, kmp_int32 lb,
+                                   kmp_int32 ub, kmp_int32 st, kmp_int32 chunk,
+                                   omp_task_type_t *omp_task_type);
+extern void __kmpc_dispatch_init_4u(ident_t *loc, kmp_int32 gtid,
+                                    enum sched_type schedule, kmp_uint32 lb,
+                                    kmp_uint32 ub, kmp_int32 st,
+                                    kmp_int32 chunk,
+                                    omp_task_type_t *omp_task_type);
+extern void __kmpc_dispatch_init_8(ident_t *loc, kmp_int32 gtid,
+                                   enum sched_type schedule, kmp_int64 lb,
+                                   kmp_int64 ub, kmp_int64 st, kmp_int64 chunk,
+                                   omp_task_type_t *omp_task_type);
+extern void __kmpc_dispatch_init_8u(ident_t *loc, kmp_int32 gtid,
+                                    enum sched_type schedule, kmp_uint64 lb,
+                                    kmp_uint64 ub, kmp_int64 st,
+                                    kmp_int64 chunk,
+                                    omp_task_type_t *omp_task_type);
+extern int __kmpc_dispatch_next_4(ident_t *loc, kmp_int32 gtid,
+                                  kmp_int32 *p_last, kmp_int32 *p_lb,
+                                  kmp_int32 *p_ub, kmp_int32 *p_st,
+                                  omp_task_type_t *omp_task_type);
+extern int __kmpc_dispatch_next_4u(ident_t *loc, kmp_int32 gtid,
+                                   kmp_int32 *p_last, kmp_uint32 *p_lb,
+                                   kmp_uint32 *p_ub, kmp_int32 *p_st,
+                                   omp_task_type_t *omp_task_type);
+extern int __kmpc_dispatch_next_8(ident_t *loc, kmp_int32 gtid,
+                                  kmp_int32 *p_last, kmp_int64 *p_lb,
+                                  kmp_int64 *p_ub, kmp_int64 *p_st,
+                                  omp_task_type_t *omp_task_type);
+extern int __kmpc_dispatch_next_8u(ident_t *loc, kmp_int32 gtid,
+                                   kmp_int32 *p_last, kmp_uint64 *p_lb,
+                                   kmp_uint64 *p_ub, kmp_int64 *p_st,
+                                   omp_task_type_t *omp_task_type);
+#else
 extern void __kmpc_dispatch_init_4(ident_t *loc, kmp_int32 gtid,
                                    enum sched_type schedule, kmp_int32 lb,
                                    kmp_int32 ub, kmp_int32 st, kmp_int32 chunk);
@@ -3866,46 +3897,12 @@ extern int __kmpc_dispatch_next_8(ident_t *loc, kmp_int32 gtid,
 extern int __kmpc_dispatch_next_8u(ident_t *loc, kmp_int32 gtid,
                                    kmp_int32 *p_last, kmp_uint64 *p_lb,
                                    kmp_uint64 *p_ub, kmp_int64 *p_st);
+#endif // KMP_OMPV_ENABLED
 
 extern void __kmpc_dispatch_fini_4(ident_t *loc, kmp_int32 gtid);
 extern void __kmpc_dispatch_fini_8(ident_t *loc, kmp_int32 gtid);
 extern void __kmpc_dispatch_fini_4u(ident_t *loc, kmp_int32 gtid);
 extern void __kmpc_dispatch_fini_8u(ident_t *loc, kmp_int32 gtid);
-
-extern void __nosvc_dispatch_init_4(ident_t *loc, kmp_int32 gtid,
-                                   enum sched_type schedule, kmp_int32 lb,
-                                   kmp_int32 ub, kmp_int32 st, kmp_int32 chunk,
-                                   omp_task_type_t *omp_task_type);
-extern void __nosvc_dispatch_init_4u(ident_t *loc, kmp_int32 gtid,
-                                    enum sched_type schedule, kmp_uint32 lb,
-                                    kmp_uint32 ub, kmp_int32 st,
-                                    kmp_int32 chunk,
-                                    omp_task_type_t *omp_task_type);
-extern void __nosvc_dispatch_init_8(ident_t *loc, kmp_int32 gtid,
-                                   enum sched_type schedule, kmp_int64 lb,
-                                   kmp_int64 ub, kmp_int64 st, kmp_int64 chunk,
-                                   omp_task_type_t *omp_task_type);
-extern void __nosvc_dispatch_init_8u(ident_t *loc, kmp_int32 gtid,
-                                    enum sched_type schedule, kmp_uint64 lb,
-                                    kmp_uint64 ub, kmp_int64 st,
-                                    kmp_int64 chunk,
-                                    omp_task_type_t *omp_task_type);
-extern int __nosvc_dispatch_next_4(ident_t *loc, kmp_int32 gtid,
-                                  kmp_int32 *p_last, kmp_int32 *p_lb,
-                                  kmp_int32 *p_ub, kmp_int32 *p_st,
-                                  omp_task_type_t *omp_task_type);
-extern int __nosvc_dispatch_next_4u(ident_t *loc, kmp_int32 gtid,
-                                   kmp_int32 *p_last, kmp_uint32 *p_lb,
-                                   kmp_uint32 *p_ub, kmp_int32 *p_st,
-                                   omp_task_type_t *omp_task_type);
-extern int __nosvc_dispatch_next_8(ident_t *loc, kmp_int32 gtid,
-                                  kmp_int32 *p_last, kmp_int64 *p_lb,
-                                  kmp_int64 *p_ub, kmp_int64 *p_st,
-                                  omp_task_type_t *omp_task_type);
-extern int __nosvc_dispatch_next_8u(ident_t *loc, kmp_int32 gtid,
-                                   kmp_int32 *p_last, kmp_uint64 *p_lb,
-                                   kmp_uint64 *p_ub, kmp_int64 *p_st,
-                                   omp_task_type_t *omp_task_type);
 
 #ifdef KMP_GOMP_COMPAT
 
@@ -4108,9 +4105,11 @@ extern void __kmp_free_team(kmp_root_t *,
                             kmp_team_t *USE_NESTED_HOT_ARG(kmp_info_t *));
 extern kmp_team_t *__kmp_reap_team(kmp_team_t *);
 
+#if defined(KMP_OMPV_ENABLED)
 extern void nosv_exec_task(nosv_task_t);
 extern void nosv_end_task(nosv_task_t);
 extern void nosv_complete_task(nosv_task_t);
+#endif // KMP_OMPV_ENABLED
 
 /* ------------------------------------------------------------------------ */
 
@@ -4187,11 +4186,19 @@ void ompc_set_num_threads(int arg);
 extern void __kmp_push_current_task_to_thread(kmp_info_t *this_thr,
                                               kmp_team_t *team, int tid);
 extern void __kmp_pop_current_task_from_thread(kmp_info_t *this_thr);
+#if defined(KMP_OMPV_ENABLED)
 extern kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
                                     kmp_tasking_flags_t *flags,
                                     size_t sizeof_kmp_task_t,
                                     size_t sizeof_shareds,
                                     kmp_routine_entry_t task_entry, omp_task_type_t *omp_task_type);
+#else
+extern kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
+                                    kmp_tasking_flags_t *flags,
+                                    size_t sizeof_kmp_task_t,
+                                    size_t sizeof_shareds,
+                                    kmp_routine_entry_t task_entry);
+#endif // KMP_OMPV_ENABLED
 extern void __kmp_init_implicit_task(ident_t *loc_ref, kmp_info_t *this_thr,
                                      kmp_team_t *team, int tid,
                                      int set_curr_task);
@@ -4241,35 +4248,6 @@ extern int __kmp_invoke_microtask(microtask_t pkfn, int gtid, int npr, int argc,
 );
 
 /* ------------------------------------------------------------------------ */
-//
-// Polling service API
-//
-typedef int (*nanos6_polling_service_t)(void *data);
-KMP_EXPORT void nanos6_register_polling_service(char const *name,
-                                                nanos6_polling_service_t service,
-                                                void *data);
-KMP_EXPORT void nanos6_unregister_polling_service(char const *name,
-                                                  nanos6_polling_service_t service,
-                                                  void *data);
-
-/* Events API */
-KMP_EXPORT void nanos6_spawn_function(void (*function)(void *),
-                                      void *args,
-                                      void (*completion_callback)(void *),
-                                      void *completion_args,
-                                      char const *label);
-KMP_EXPORT uint64_t nanos6_wait_for(uint64_t timeUs);
-KMP_EXPORT void *nanos6_get_current_event_counter();
-KMP_EXPORT void nanos6_increase_current_task_event_counter(void *event_counter,
-                                                           unsigned int increment);
-KMP_EXPORT void nanos6_decrease_task_event_counter(void *event_counter,
-                                                   unsigned int decrement);
-KMP_EXPORT void nanos6_notify_task_event_counter_api();
-
-/* ------------------------------------------------------------------------ */
-
-
-
 
 KMP_EXPORT void __kmpc_begin(ident_t *, kmp_int32 flags);
 KMP_EXPORT void __kmpc_end(ident_t *);
@@ -4322,10 +4300,13 @@ KMP_EXPORT void __kmpc_end_barrier_master(ident_t *, kmp_int32 global_tid);
 KMP_EXPORT kmp_int32 __kmpc_barrier_master_nowait(ident_t *,
                                                   kmp_int32 global_tid);
 
+#if defined(KMP_OMPV_ENABLED)
+KMP_EXPORT kmp_int32 __kmpc_single(ident_t *, kmp_int32 global_tid, omp_task_type_t *omp_task_type);
+KMP_EXPORT void __kmpc_end_single(ident_t *, kmp_int32 global_tid, omp_task_type_t *omp_task_type);
+#else
 KMP_EXPORT kmp_int32 __kmpc_single(ident_t *, kmp_int32 global_tid);
-KMP_EXPORT kmp_int32 __nosvc_single(ident_t *, kmp_int32 global_tid, omp_task_type_t *omp_task_type);
 KMP_EXPORT void __kmpc_end_single(ident_t *, kmp_int32 global_tid);
-KMP_EXPORT void __nosvc_end_single(ident_t *, kmp_int32 global_tid, omp_task_type_t *omp_task_type);
+#endif // KMP_OMPV_ENABLED
 
 KMP_EXPORT kmp_int32 __kmpc_sections_init(ident_t *loc, kmp_int32 global_tid);
 KMP_EXPORT kmp_int32 __kmpc_next_section(ident_t *loc, kmp_int32 global_tid,
@@ -4338,7 +4319,11 @@ KMP_EXPORT void KMPC_FOR_STATIC_INIT(ident_t *loc, kmp_int32 global_tid,
                                      kmp_int *pstride, kmp_int incr,
                                      kmp_int chunk);
 
+#if defined(KMP_OMPV_ENABLED)
+KMP_EXPORT void __kmpc_for_static_fini(ident_t *loc, kmp_int32 global_tid, omp_task_type_t *omp_task_type);
+#else
 KMP_EXPORT void __kmpc_for_static_fini(ident_t *loc, kmp_int32 global_tid);
+#endif // KMP_OMPV_ENABLED
 
 KMP_EXPORT void __kmpc_copyprivate(ident_t *loc, kmp_int32 global_tid,
                                    size_t cpy_size, void *cpy_data,
@@ -4348,10 +4333,11 @@ KMP_EXPORT void __kmpc_copyprivate(ident_t *loc, kmp_int32 global_tid,
 KMP_EXPORT void *__kmpc_copyprivate_light(ident_t *loc, kmp_int32 gtid,
                                           void *cpy_data);
 
-// TAMPI polling service checker
+#if defined(KMP_OMPV_ENABLED)
 KMP_EXPORT void __kmp_enable_tasking_in_serial_mode(
   ident_t *loc_ref, kmp_int32 gtid,
   bool proxy, bool detachable, bool hidden_helper);
+#endif // KMP_OMPV_ENABLED
 
 extern void KMPC_SET_NUM_THREADS(int arg);
 extern void KMPC_SET_DYNAMIC(int flag);
@@ -4360,12 +4346,8 @@ extern void KMPC_SET_NESTED(int flag);
 /* OMP 3.0 tasking interface routines */
 KMP_EXPORT kmp_int32 __kmpc_omp_task(ident_t *loc_ref, kmp_int32 gtid,
                                      kmp_task_t *new_task);
+#if defined(KMP_OMPV_ENABLED)
 KMP_EXPORT kmp_task_t *__kmpc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
-                                             kmp_int32 flags,
-                                             size_t sizeof_kmp_task_t,
-                                             size_t sizeof_shareds,
-                                             kmp_routine_entry_t task_entry);
-KMP_EXPORT kmp_task_t *__nosvc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
                                              kmp_int32 flags,
                                              size_t sizeof_kmp_task_t,
                                              size_t sizeof_shareds,
@@ -4373,11 +4355,18 @@ KMP_EXPORT kmp_task_t *__nosvc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
                                              omp_task_type_t *omp_task_type);
 KMP_EXPORT kmp_task_t *__kmpc_omp_target_task_alloc(
     ident_t *loc_ref, kmp_int32 gtid, kmp_int32 flags, size_t sizeof_kmp_task_t,
-    size_t sizeof_shareds, kmp_routine_entry_t task_entry, kmp_int64 device_id);
-KMP_EXPORT kmp_task_t *__nosvc_omp_target_task_alloc(
-    ident_t *loc_ref, kmp_int32 gtid, kmp_int32 flags, size_t sizeof_kmp_task_t,
     size_t sizeof_shareds, kmp_routine_entry_t task_entry, kmp_int64 device_id,
     omp_task_type_t *omp_task_type);
+#else
+KMP_EXPORT kmp_task_t *__kmpc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
+                                             kmp_int32 flags,
+                                             size_t sizeof_kmp_task_t,
+                                             size_t sizeof_shareds,
+                                             kmp_routine_entry_t task_entry);
+KMP_EXPORT kmp_task_t *__kmpc_omp_target_task_alloc(
+    ident_t *loc_ref, kmp_int32 gtid, kmp_int32 flags, size_t sizeof_kmp_task_t,
+    size_t sizeof_shareds, kmp_routine_entry_t task_entry, kmp_int64 device_id);
+#endif // KMP_OMPV_ENABLED
 KMP_EXPORT void __kmpc_omp_task_begin_if0(ident_t *loc_ref, kmp_int32 gtid,
                                           kmp_task_t *task);
 KMP_EXPORT void __kmpc_omp_task_complete_if0(ident_t *loc_ref, kmp_int32 gtid,

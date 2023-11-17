@@ -2702,4 +2702,3 @@ KMP_VERSION_SYMBOL(KMP_API_NAME_GOMP_FREE, 501, "GOMP_5.0.1");
 #ifdef __cplusplus
 } // extern "C"
 #endif // __cplusplus
-

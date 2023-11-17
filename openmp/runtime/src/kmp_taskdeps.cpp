@@ -568,7 +568,9 @@ static bool __kmp_check_deps(kmp_int32 gtid, kmp_depnode_t *node,
                 "dep_barrier=%d .\n",
                 gtid, taskdata, ndeps, ndeps_noalias, dep_barrier));
 
+#if defined(KMP_OMPV_ENABLED)
   instr_check_deps_enter();
+#endif // KMP_OMPV_ENABLED
 
   // Filter deps in dep_list
   // TODO: Different algorithm for large dep_list ( > 10 ? )
@@ -640,7 +642,9 @@ static bool __kmp_check_deps(kmp_int32 gtid, kmp_depnode_t *node,
   KA_TRACE(20, ("__kmp_check_deps: T#%d found %d predecessors for task %p \n",
                 gtid, npredecessors, taskdata));
 
+#if defined(KMP_OMPV_ENABLED)
   instr_check_deps_exit();
+#endif // KMP_OMPV_ENABLED
 
   // beyond this point the task could be queued (and executed) by a releasing
   // task...
@@ -892,7 +896,9 @@ void __kmpc_omp_taskwait_deps_51(ident_t *loc_ref, kmp_int32 gtid,
                                  kmp_depend_info_t *noalias_dep_list,
                                  kmp_int32 has_no_wait) {
 
+#if defined(KMP_OMPV_ENABLED)
   instr_taskwait_deps_enter();
+#endif // KMP_OMPV_ENABLED
 
   KA_TRACE(10, ("__kmpc_omp_taskwait_deps(enter): T#%d loc=%p nowait#%d\n",
                 gtid, loc_ref, has_no_wait));
@@ -900,7 +906,9 @@ void __kmpc_omp_taskwait_deps_51(ident_t *loc_ref, kmp_int32 gtid,
     KA_TRACE(10, ("__kmpc_omp_taskwait_deps(exit): T#%d has no dependences to "
                   "wait upon : loc=%p\n",
                   gtid, loc_ref));
+#if defined(KMP_OMPV_ENABLED)
     instr_taskwait_deps_exit();
+#endif // KMP_OMPV_ENABLED
     return;
   }
   __kmp_assert_valid_gtid(gtid);
@@ -997,7 +1005,9 @@ void __kmpc_omp_taskwait_deps_51(ident_t *loc_ref, kmp_int32 gtid,
     __ompt_taskwait_dep_finish(current_task, taskwait_task_data);
 #endif /* OMPT_SUPPORT */
 
+#if defined(KMP_OMPV_ENABLED)
     instr_taskwait_deps_exit();
+#endif // KMP_OMPV_ENABLED
     return;
   }
 
@@ -1013,14 +1023,15 @@ void __kmpc_omp_taskwait_deps_51(ident_t *loc_ref, kmp_int32 gtid,
 #if OMPT_SUPPORT
     __ompt_taskwait_dep_finish(current_task, taskwait_task_data);
 #endif /* OMPT_SUPPORT */
+#if defined(KMP_OMPV_ENABLED)
     instr_taskwait_deps_exit();
+#endif // KMP_OMPV_ENABLED
     return;
   }
 
   int thread_finished = FALSE;
   kmp_flag_32<false, false> flag(
       (std::atomic<kmp_uint32> *)&node.dn.npredecessors, 0U);
-
   while (node.dn.npredecessors > 0) {
     flag.execute_tasks(thread, gtid, FALSE,
                        &thread_finished USE_ITT_BUILD_ARG(NULL),
@@ -1031,7 +1042,9 @@ void __kmpc_omp_taskwait_deps_51(ident_t *loc_ref, kmp_int32 gtid,
   __ompt_taskwait_dep_finish(current_task, taskwait_task_data);
 #endif /* OMPT_SUPPORT */
 
+#if defined(KMP_OMPV_ENABLED)
   instr_taskwait_deps_exit();
+#endif // KMP_OMPV_ENABLED
 
   KA_TRACE(10, ("__kmpc_omp_taskwait_deps(exit): T#%d finished waiting : loc=%p\
                 \n",
