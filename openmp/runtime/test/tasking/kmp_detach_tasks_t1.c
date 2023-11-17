@@ -57,9 +57,14 @@ typedef void *omp_task_type_t;
 extern "C" {
 #endif
 extern int __kmpc_global_thread_num(void *id_ref);
+#if defined(_OPENMPV)
 extern void __nosvc_register_task_info(omp_task_type_t *omp_task_type, void *label);
-extern ptask __nosvc_omp_task_alloc(id *loc, int gtid, int flags,
+extern ptask __kmpc_omp_task_alloc(id *loc, int gtid, int flags,
                                    size_t sz, size_t shar, task_entry_t rtn, omp_task_type_t*);
+#else
+extern ptask __kmpc_omp_task_alloc(id *loc, int gtid, int flags,
+                                   size_t sz, size_t shar, task_entry_t rtn);
+#endif
 extern int __kmpc_omp_task(id *loc, int gtid, ptask task);
 extern omp_event_handle_t __kmpc_task_allow_completion_event(
                               ident_t *loc_ref, int gtid, ptask task);
@@ -92,9 +97,13 @@ int main() {
       #pragma omp task detach(evt)
       {}
 */
+#if defined(_OPENMPV)
       omp_task_type_t omp_task_type;
       __nosvc_register_task_info(&omp_task_type, NULL);
-      task = (ptask)__nosvc_omp_task_alloc(NULL,gtid,PTASK_FLAG_DETACHABLE,sizeof(struct task),sizeof(struct shar),&task_entry, &omp_task_type);
+      task = (ptask)__kmpc_omp_task_alloc(NULL,gtid,PTASK_FLAG_DETACHABLE,sizeof(struct task),sizeof(struct shar),&task_entry, &omp_task_type);
+#else
+      task = (ptask)__kmpc_omp_task_alloc(NULL,gtid,PTASK_FLAG_DETACHABLE,sizeof(struct task),sizeof(struct shar),&task_entry);
+#endif
       psh = task->shareds;
       evt = (omp_event_handle_t)__kmpc_task_allow_completion_event(NULL,gtid,task);
       task->evt = evt;

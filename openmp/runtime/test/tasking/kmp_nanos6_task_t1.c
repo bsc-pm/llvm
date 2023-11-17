@@ -2,6 +2,8 @@
 // The runtime currently does not get dependency information from GCC.
 // UNSUPPORTED: gcc
 
+#if defined(_OPENMPV)
+
 #include <stdio.h>
 #include <omp.h>
 #include "omp_my_sleep.h"
@@ -66,18 +68,16 @@ extern "C" {
 #endif
 extern int  __kmpc_global_thread_num(void *id_ref);
 extern void __nosvc_register_task_info(omp_task_type_t *omp_task_type, void *label);
-extern int** __nosvc_omp_task_alloc(id *loc, int gtid, int flags,
+extern int** __kmpc_omp_task_alloc(id *loc, int gtid, int flags,
                                    size_t sz, size_t shar, task_entry_t rtn, omp_task_type_t*);
 extern int __kmpc_omp_task_with_deps(id *loc, int gtid, ptask task, int nd,
                dep *dep_lst, int nd_noalias, dep *noalias_dep_lst);
 extern int __kmpc_omp_task(id *loc, int gtid, kmp_task_t *task);
 extern omp_event_handle_t __kmpc_task_allow_completion_event(
                               ident_t *loc_ref, int gtid, kmp_task_t *task);
-extern void *nanos6_get_current_event_counter();
-extern void nanos6_increase_current_task_event_counter(void *event_counter,
-                                                           unsigned int increment);
-extern void nanos6_decrease_task_event_counter(void *event_counter,
-                                                   unsigned int decrement);
+int alpi_task_self(void **task);
+int alpi_task_events_increase(void *task, uint64_t increment);
+int alpi_task_events_decrease(void *task, uint64_t increment);
 #ifdef __cplusplus
 }
 #endif
@@ -88,8 +88,8 @@ void *nanos6_event_counter = NULL;
 
 // User's code, outlined into task entry
 int task_entry(int gtid, ptask task) {
-  nanos6_event_counter = nanos6_get_current_event_counter();
-  nanos6_increase_current_task_event_counter(nanos6_event_counter, 1);
+  alpi_task_self(&nanos6_event_counter);
+  alpi_task_events_increase(nanos6_event_counter, 1);
 
   checker = 1;
   return 0;
@@ -119,7 +119,7 @@ int main() {
 */
       omp_task_type_t omp_task_type;
       __nosvc_register_task_info(&omp_task_type, NULL);
-      task = (ptask)__nosvc_omp_task_alloc(NULL,gtid,0,
+      task = (ptask)__kmpc_omp_task_alloc(NULL,gtid,0,
                         sizeof(struct task),sizeof(struct shar),&task_entry, &omp_task_type);
       psh = task->shareds;
 
@@ -139,7 +139,7 @@ int main() {
       if (checker == 1) {
         ++checker1;
       }
-      nanos6_decrease_task_event_counter(nanos6_event_counter, 1);
+      alpi_task_events_decrease(nanos6_event_counter, 1);
       #pragma omp taskwait
       if (checker == 2) {
         ++checker1;
@@ -155,3 +155,9 @@ int main() {
     return 1;
   }
 }
+
+#else
+
+int main() {}
+
+#endif

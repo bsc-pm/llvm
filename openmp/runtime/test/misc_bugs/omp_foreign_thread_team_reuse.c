@@ -44,7 +44,9 @@ void* thread_function(void* arg) {
   // that are not the main or workers.
   // For now let the test pass by adding a
   // detach manually
+#if defined(_OPENMPV)
   nosv_detach(0);
+#endif
   return NULL;
 }
 

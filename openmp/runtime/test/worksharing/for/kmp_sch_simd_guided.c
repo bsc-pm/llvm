@@ -41,12 +41,19 @@ typedef struct {
 
 typedef void *omp_task_type_t;
 extern int __kmpc_global_thread_num(id*);
+#if defined(_OPENMPV)
 extern void __nosvc_register_task_info(omp_task_type_t *omp_task_type, void *label);
+extern void __kmpc_dispatch_init_4(id*, int, enum sched, int, int, int, int, omp_task_type_t*);
+extern void __kmpc_dispatch_init_8(id*, int, enum sched, i64, i64, i64, i64, omp_task_type_t*);
+extern int __kmpc_dispatch_next_4(id*, int, void*, void*, void*, void*, omp_task_type_t*);
+extern int __kmpc_dispatch_next_8(id*, int, void*, void*, void*, void*, omp_task_type_t*);
+#else
+extern void __kmpc_dispatch_init_4(id*, int, enum sched, int, int, int, int);
+extern void __kmpc_dispatch_init_8(id*, int, enum sched, i64, i64, i64, i64);
+extern int __kmpc_dispatch_next_4(id*, int, void*, void*, void*, void*);
+extern int __kmpc_dispatch_next_8(id*, int, void*, void*, void*, void*);
+#endif
 extern void __kmpc_barrier(id*, int gtid);
-extern void __nosvc_dispatch_init_4(id*, int, enum sched, int, int, int, int, omp_task_type_t*);
-extern void __nosvc_dispatch_init_8(id*, int, enum sched, i64, i64, i64, i64, omp_task_type_t*);
-extern int __nosvc_dispatch_next_4(id*, int, void*, void*, void*, void*, omp_task_type_t*);
-extern int __nosvc_dispatch_next_8(id*, int, void*, void*, void*, void*, omp_task_type_t*);
 // End of definitions copied from OpenMP RTL.
 // ---------------------------------------------------------------------------
 static id loc = {0, 2, 0, 0, ";file;func;0;0;;"};
@@ -80,8 +87,12 @@ int run_loop_64(i64 loop_lb, i64 loop_ub, i64 loop_st, int loop_chunk) {
   if (loop_st > 0 ? loop_lb > loop_ub : loop_lb < loop_ub)
     return 0;
 
-  __nosvc_dispatch_init_8(&loc, gtid, kmp_sch_guided_simd,
-                         loop_lb, loop_ub, loop_st, loop_chunk, &omp_task_type);
+  __kmpc_dispatch_init_8(&loc, gtid, kmp_sch_guided_simd,
+                         loop_lb, loop_ub, loop_st, loop_chunk
+#if defined(_OPENMPV)
+                         , &omp_task_type
+#endif
+                         );
   if (tid == 0) {
     // Let the master thread handle the chunks alone
     int chunk;      // No of current chunk
@@ -95,7 +106,11 @@ int run_loop_64(i64 loop_lb, i64 loop_ub, i64 loop_st, int loop_chunk) {
     next_lb = loop_lb;
     max = (loop_ub - loop_lb) / loop_st + 1;
     // The first chunk can consume all iterations
-    while (__nosvc_dispatch_next_8(&loc, gtid, &last, &lb, &ub, &st, &omp_task_type)) {
+    while (__kmpc_dispatch_next_8(&loc, gtid, &last, &lb, &ub, &st
+#if defined(_OPENMPV)
+                                  , &omp_task_type
+#endif
+                                  )) {
       ++ chunk;
 #if DEBUG
       printf("chunk=%d, lb=%d, ub=%d\n", chunk, (int)lb, (int)ub);
@@ -192,7 +207,11 @@ int run_loop_64(i64 loop_lb, i64 loop_ub, i64 loop_st, int loop_chunk) {
     }; // while
     // At this moment we do not have any more chunks -- all the chunks already
     // processed by master thread
-    rc = __nosvc_dispatch_next_8(&loc, gtid, &last, &lb, &ub, &st, &omp_task_type);
+    rc = __kmpc_dispatch_next_8(&loc, gtid, &last, &lb, &ub, &st
+#if defined(_OPENMPV)
+                                , &omp_task_type
+#endif
+                                );
     if (rc) {
       printf("Error return value\n");
       err++;
@@ -235,8 +254,12 @@ int run_loop_32(int loop_lb, int loop_ub, int loop_st, int loop_chunk) {
   if (loop_st > 0 ? loop_lb > loop_ub : loop_lb < loop_ub)
     return 0;
 
-  __nosvc_dispatch_init_4(&loc, gtid, kmp_sch_guided_simd,
-                         loop_lb, loop_ub, loop_st, loop_chunk, &omp_task_type);
+  __kmpc_dispatch_init_4(&loc, gtid, kmp_sch_guided_simd,
+                         loop_lb, loop_ub, loop_st, loop_chunk
+#if defined(_OPENMPV)
+                         , &omp_task_type
+#endif
+                         );
   if (tid == 0) {
     // Let the master thread handle the chunks alone
     int chunk;      // No of current chunk
@@ -250,7 +273,11 @@ int run_loop_32(int loop_lb, int loop_ub, int loop_st, int loop_chunk) {
     next_lb = loop_lb;
     max = (loop_ub - loop_lb) / loop_st + 1;
     // The first chunk can consume all iterations
-    while (__nosvc_dispatch_next_4(&loc, gtid, &last, &lb, &ub, &st, &omp_task_type)) {
+    while (__kmpc_dispatch_next_4(&loc, gtid, &last, &lb, &ub, &st
+#if defined(_OPENMPV)
+                                  , &omp_task_type
+#endif
+                                  )) {
       ++ chunk;
 #if DEBUG
       printf("chunk=%d, lb=%d, ub=%d\n", chunk, (int)lb, (int)ub);
@@ -347,7 +374,11 @@ int run_loop_32(int loop_lb, int loop_ub, int loop_st, int loop_chunk) {
     }; // while
     // At this moment we do not have any more chunks -- all the chunks already
     // processed by the master thread
-    rc = __nosvc_dispatch_next_4(&loc, gtid, &last, &lb, &ub, &st, &omp_task_type);
+    rc = __kmpc_dispatch_next_4(&loc, gtid, &last, &lb, &ub, &st
+#if defined(_OPENMPV)
+                                , &omp_task_type
+#endif
+                                );
     if (rc) {
       printf("Error return value\n");
       err++;
@@ -417,7 +448,9 @@ int main()
     }
   }
 
+#if defined(_OPENMPV)
   __nosvc_register_task_info(&omp_task_type, NULL);
+#endif
 
   int n, err = 0;
   for (n = 1; n <= 4; ++ n) {

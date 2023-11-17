@@ -118,7 +118,9 @@ void* thread_func(void *arg) {
       fprintf(stderr, "error: place and affinity mask do not match for primary thread\n");
       exit (EXIT_FAILURE);
     }
+#if defined(_OPENMPV)
     nosv_detach(0);
+#endif
   } else { // If worker root thread
     // Worker root threads, register with OpenMP through omp_set_num_threads()
     // if designated to, signal their arrival and then wait for the main root
