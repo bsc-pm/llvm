@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if !defined(KMP_OMPV_ENABLED)
+
 #include "kmp.h"
 #include "kmp_atomic.h"
 
@@ -2702,3 +2704,5 @@ KMP_VERSION_SYMBOL(KMP_API_NAME_GOMP_FREE, 501, "GOMP_5.0.1");
 #ifdef __cplusplus
 } // extern "C"
 #endif // __cplusplus
+
+#endif // KMP_OMPV_ENABLED
