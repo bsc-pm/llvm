@@ -137,7 +137,10 @@ public:
     /// The legacy name for the LLVM OpenMP runtime from when it was the Intel
     /// OpenMP runtime. We support this mode for users with existing
     /// dependencies on this runtime library name.
-    OMPRT_IOMP5
+    OMPRT_IOMP5,
+
+    /// OpenMP modified to work with nOS-V
+    OMPRT_NOSV
   };
 
   enum OmpSsRuntimeKind {

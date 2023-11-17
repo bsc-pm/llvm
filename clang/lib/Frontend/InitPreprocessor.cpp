@@ -1293,6 +1293,9 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
       Builder.defineMacro("_OPENMP", "202011");
       break;
     }
+    if (LangOpts.OpenMPNosv) {
+      Builder.defineMacro("_OPENMPV", "1");
+    }
   }
 
   // OmpSs-2

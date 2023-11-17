@@ -6368,11 +6368,13 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
       (JA.isDeviceOffloading(Action::OFK_None) ||
        JA.isDeviceOffloading(Action::OFK_OpenMP))) {
     switch (D.getOpenMPRuntime(Args)) {
+    case Driver::OMPRT_NOSV:
+      CmdArgs.push_back("-fopenmp-nosv");
+      LLVM_FALLTHROUGH;
     case Driver::OMPRT_OMP:
     case Driver::OMPRT_IOMP5:
       // Clang can generate useful OpenMP code for these two runtime libraries.
       CmdArgs.push_back("-fopenmp");
-      Args.AddAllArgs(CmdArgs, options::OPT_fopenmp_nosv);
 
       // If no option regarding the use of TLS in OpenMP codegeneration is
       // given, decide a default based on the target. Otherwise rely on the

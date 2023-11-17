@@ -941,7 +941,8 @@ bool tools::addOpenMPRuntime(ArgStringList &CmdArgs, const ToolChain &TC,
     // Already diagnosed.
     return false;
 
-  CmdArgs.push_back("-lnosv");
+  if (RTKind == Driver::OMPRT_NOSV)
+    CmdArgs.push_back("-lnosv");
 
   if (ForceStaticHostRuntime)
     CmdArgs.push_back("-Bstatic");
@@ -955,6 +956,9 @@ bool tools::addOpenMPRuntime(ArgStringList &CmdArgs, const ToolChain &TC,
     break;
   case Driver::OMPRT_IOMP5:
     CmdArgs.push_back("-liomp5");
+    break;
+  case Driver::OMPRT_NOSV:
+    CmdArgs.push_back("-lompv");
     break;
   case Driver::OMPRT_Unknown:
     break;
@@ -977,7 +981,8 @@ bool tools::addOpenMPRuntime(ArgStringList &CmdArgs, const ToolChain &TC,
 
   addArchSpecificRPath(TC, Args, CmdArgs);
   addOpenMPRuntimeLibraryPath(TC, Args, CmdArgs);
-  addNosvRuntimeLib(TC, Args, CmdArgs);
+  if (RTKind == Driver::OMPRT_NOSV)
+    addNosvRuntimeLib(TC, Args, CmdArgs);
 
   return true;
 }

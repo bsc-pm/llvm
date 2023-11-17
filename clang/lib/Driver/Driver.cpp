@@ -736,6 +736,7 @@ Driver::OpenMPRuntimeKind Driver::getOpenMPRuntime(const ArgList &Args) const {
                 .Case("libomp", OMPRT_OMP)
                 .Case("libgomp", OMPRT_GOMP)
                 .Case("libiomp5", OMPRT_IOMP5)
+                .Case("libompv", OMPRT_NOSV)
                 .Default(OMPRT_Unknown);
 
   if (RT == OMPRT_Unknown) {
@@ -861,7 +862,8 @@ void Driver::CreateOffloadingDeviceToolChains(Compilation &C,
     // option -fopenmp specifying a valid runtime with offloading support, i.e.
     // libomp or libiomp.
     OpenMPRuntimeKind RuntimeKind = getOpenMPRuntime(C.getInputArgs());
-    if (RuntimeKind != OMPRT_OMP && RuntimeKind != OMPRT_IOMP5) {
+    if (RuntimeKind != OMPRT_OMP && RuntimeKind != OMPRT_IOMP5 &&
+        RuntimeKind != OMPRT_NOSV) {
       Diag(clang::diag::err_drv_expecting_fopenmp_with_fopenmp_targets);
       return;
     }

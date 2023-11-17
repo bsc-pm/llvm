@@ -3310,7 +3310,7 @@ defm openmp_extensions: BoolFOption<"openmp-extensions",
 def fopenmp_EQ : Joined<["-"], "fopenmp=">, Group<f_Group>;
 def fopenmp_nosv : Flag<["-"], "fopenmp-nosv">, Group<f_Group>,
   Flags<[NoArgumentUnused]>,
-  Visibility<[ClangOption, CC1Option, FlangOption, FC1Option]>,
+  Visibility<[CC1Option, FlangOption, FC1Option]>,
   MarshallingInfoFlag<LangOpts<"OpenMPNosv">>;
 def fopenmp_use_tls : Flag<["-"], "fopenmp-use-tls">, Group<f_Group>,
   Flags<[NoArgumentUnused, HelpHidden]>;
