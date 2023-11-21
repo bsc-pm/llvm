@@ -1,7 +1,7 @@
 ! This test Canonicalize does not perform optimizations between values
 ! that are defined outside the task and used inside.
 
-! RUN: bbc -fompss-2 %s -o - | \
+! RUN: bbc -hlfir=false -fompss-2 %s -o - | \
 ! RUN:   fir-opt --canonicalize 2>&1 | \
 ! RUN:   FileCheck %s --check-prefix=LLVMIRDialect
 

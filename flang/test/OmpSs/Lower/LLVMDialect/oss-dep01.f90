@@ -3,7 +3,7 @@
 
 ! Test for subroutine
 
-! RUN: bbc -fompss-2 %s -o - | fir-opt --cg-rewrite --fir-to-llvm-ir 2>&1 |  FileCheck %s --check-prefix=LLVMIRDialect
+! RUN: bbc -hlfir=false -fompss-2 %s -o - | fir-opt --cg-rewrite --fir-to-llvm-ir 2>&1 |  FileCheck %s --check-prefix=LLVMIRDialect
 
 ! Support list
 ! - [x] assumed-size array

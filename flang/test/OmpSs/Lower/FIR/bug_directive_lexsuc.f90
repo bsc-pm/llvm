@@ -3,7 +3,7 @@
 ! In this case STOP must have the OmpSsConstruct as a lexicalSuccessor
 ! to marks it as a start new block evaluation.
 
-! RUN: bbc -fompss-2 -emit-fir %s -o - | FileCheck %s --check-prefix=FIRDialect
+! RUN: bbc -hlfir=false -fompss-2 -emit-fir %s -o - | FileCheck %s --check-prefix=FIRDialect
 
 PROGRAM P
     IMPLICIT NONE

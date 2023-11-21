@@ -1,4 +1,4 @@
-! RUN: bbc -fompss-2 %s -o - | \
+! RUN: bbc -hlfir=false -fompss-2 %s -o - | \
 ! RUN:   fir-opt --cg-rewrite --fir-to-llvm-ir 2>&1 | \
 ! RUN:   FileCheck %s --check-prefix=LLVMIRDialect
 

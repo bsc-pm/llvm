@@ -1,4 +1,4 @@
-! RUN: bbc -fompss-2 -polymorphic-type -emit-fir %s -o - | FileCheck %s
+! RUN: bbc -hlfir=false -fompss-2 -polymorphic-type -emit-fir %s -o - | FileCheck %s
 ! XFAIL: true
 ! NOTE: Fow now let's wait until merge upstream to see what we can do to
 ! support this

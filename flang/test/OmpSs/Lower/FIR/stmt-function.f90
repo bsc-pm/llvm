@@ -5,7 +5,7 @@
 ! It seems that N and M are not in the SymMap and we cannot bind
 ! them with our task symbol
 
-! RUN: bbc -fompss-2 -emit-fir %s -o - | \
+! RUN: bbc -hlfir=false -fompss-2 -emit-fir %s -o - | \
 ! RUN:   FileCheck %s --check-prefix=FIRDialect
 SUBROUTINE FOO(N, M)
     IMPLICIT NONE

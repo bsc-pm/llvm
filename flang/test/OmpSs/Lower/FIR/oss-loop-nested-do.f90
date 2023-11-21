@@ -2,7 +2,7 @@
 ! This test checks lowering of OmpSs-2 loop Directives.
 ! All induction variables inside the construct are private
 
-! RUN: bbc -fompss-2 -emit-fir %s -o - | FileCheck %s --check-prefix=FIRDialect
+! RUN: bbc -hlfir=false -fompss-2 -emit-fir %s -o - | FileCheck %s --check-prefix=FIRDialect
 
 subroutine task()
     INTEGER :: I

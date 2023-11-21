@@ -2,7 +2,7 @@
 
 ! Test for subroutine
 
-! RUN: bbc -fompss-2 -emit-fir %s -o - | \
+! RUN: bbc -hlfir=false -fompss-2 -emit-fir %s -o - | \
 ! RUN:   tco | FileCheck %s --check-prefix=LLVMIR
 
 subroutine task(X)

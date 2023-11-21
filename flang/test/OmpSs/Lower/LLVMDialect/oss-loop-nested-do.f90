@@ -2,7 +2,7 @@
 ! This test checks lowering of OmpSs-2 loop Directives.
 ! All induction variables inside the construct are private
 
-! RUN: bbc -fompss-2 %s -o - | fir-opt --cg-rewrite --fir-to-llvm-ir 2>&1 |  FileCheck %s --check-prefix=LLVMIRDialect
+! RUN: bbc -hlfir=false -fompss-2 %s -o - | fir-opt --cg-rewrite --fir-to-llvm-ir 2>&1 |  FileCheck %s --check-prefix=LLVMIRDialect
 
 subroutine task()
     INTEGER :: I

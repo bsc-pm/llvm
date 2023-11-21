@@ -1,6 +1,6 @@
 ! This test checks lowering of OmpSs-2 task Directive.
 
-! RUN: bbc -fompss-2 -emit-fir %s -o - | \
+! RUN: bbc -hlfir=false -fompss-2 -emit-fir %s -o - | \
 ! RUN:   FileCheck %s --check-prefix=FIRDialect
 
 program task

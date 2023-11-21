@@ -1,4 +1,4 @@
-! RUN: bbc -pft-test -fompss-2 -o %t %s | FileCheck %s
+! RUN: bbc -hlfir=false -pft-test -fompss-2 -o %t %s | FileCheck %s
 
 ! Test Pre-FIR Tree captures OmpSs-2 related constructs
 

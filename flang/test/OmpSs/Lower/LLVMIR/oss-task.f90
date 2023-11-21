@@ -1,6 +1,6 @@
 ! This test checks lowering of OmpSs-2 task Directive.
 
-! RUN: bbc -fompss-2 -emit-fir %s -o - | \
+! RUN: bbc -hlfir=false -fompss-2 -emit-fir %s -o - | \
 ! RUN:   tco | FileCheck %s --check-prefix=LLVMIR
 
 program task
