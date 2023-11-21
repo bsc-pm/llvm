@@ -155,12 +155,14 @@ libomp_get_libflags(LIBOMP_CONFIGURED_LIBFLAGS)
 # Build libomp library. Add LLVMSupport dependency if building in-tree with libomptarget profiling enabled.
 if(OPENMP_STANDALONE_BUILD OR (NOT OPENMP_ENABLE_LIBOMP_PROFILING))
   add_library(omp ${LIBOMP_LIBRARY_KIND} ${LIBOMP_SOURCE_FILES})
+if (NOSV_PKG_FOUND)
   add_library(ompv ${LIBOMP_LIBRARY_KIND} ${LIBOMP_SOURCE_FILES})
   target_compile_definitions(ompv PUBLIC -DKMP_OMPV_ENABLED)
 if (OVNI_PKG_FOUND)
   target_link_libraries(ompv ${LIBOMP_CONFIGURED_LIBFLAGS} ${CMAKE_DL_LIBS} PkgConfig::NOSV_PKG PkgConfig::OVNI_PKG)
 else()
   target_link_libraries(ompv ${LIBOMP_CONFIGURED_LIBFLAGS} ${CMAKE_DL_LIBS} PkgConfig::NOSV_PKG)
+endif()
 endif()
   # Linking command will include libraries in LIBOMP_CONFIGURED_LIBFLAGS
   target_link_libraries(omp ${LIBOMP_CONFIGURED_LIBFLAGS} ${LIBOMP_DL_LIBS})
@@ -206,17 +208,21 @@ else()
     LINK_FLAGS "${LIBOMP_CONFIGURED_LDFLAGS}"
     LINKER_LANGUAGE ${LIBOMP_LINKER_LANGUAGE}
   )
+if (NOSV_PKG_FOUND)
   set_target_properties(ompv PROPERTIES
     PREFIX "" SUFFIX "" OUTPUT_NAME "${LIBOMPV_LIB_FILE}"
     LINK_FLAGS "${LIBOMP_CONFIGURED_LDFLAGS}"
     LINKER_LANGUAGE ${LIBOMP_LINKER_LANGUAGE}
   )
 endif()
+endif()
 
 # Get the library's location within the build tree for the unit tester
 if(NOT WIN32)
   get_target_property(LIBOMP_LIBRARY_DIR omp LIBRARY_OUTPUT_DIRECTORY)
+if (NOSV_PKG_FOUND)
   get_target_property(LIBOMP_LIBRARY_DIR ompv LIBRARY_OUTPUT_DIRECTORY)
+endif()
 else()
   get_target_property(LIBOMP_LIBRARY_DIR omp RUNTIME_OUTPUT_DIRECTORY)
 endif()
@@ -244,7 +250,9 @@ set(LIBOMP_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR} PARENT_SCOPE)
 # objects depend on : .inc files
 add_custom_target(libomp-needed-headers DEPENDS kmp_i18n_id.inc kmp_i18n_default.inc)
 add_dependencies(omp libomp-needed-headers)
+if (NOSV_PKG_FOUND)
 add_dependencies(ompv libomp-needed-headers)
+endif()
 
 # Windows specific build rules
 if(WIN32)
@@ -393,7 +401,9 @@ if(WIN32)
 else()
 
   install(TARGETS omp ${export_to_llvmexports} ${LIBOMP_INSTALL_KIND} DESTINATION "${OPENMP_INSTALL_LIBDIR}")
+if (NOSV_PKG_FOUND)
   install(TARGETS ompv ${export_to_llvmexports} ${LIBOMP_INSTALL_KIND} DESTINATION "${OPENMP_INSTALL_LIBDIR}")
+endif()
 
   if(${LIBOMP_INSTALL_ALIASES})
     # Create aliases (symlinks) of the library for backwards compatibility
