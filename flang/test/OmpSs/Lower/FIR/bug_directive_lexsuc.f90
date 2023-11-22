@@ -3,7 +3,7 @@
 ! In this case STOP must have the OmpSsConstruct as a lexicalSuccessor
 ! to marks it as a start new block evaluation.
 
-! RUN: bbc -hlfir=false -fompss-2 -emit-fir %s -o - | FileCheck %s --check-prefix=FIRDialect
+! RUN: bbc -fompss-2 -emit-fir %s -o - | FileCheck %s --check-prefix=FIRDialect
 
 PROGRAM P
     IMPLICIT NONE
@@ -24,28 +24,26 @@ PROGRAM P
 END PROGRAM P
 
 ! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "p"} {
-! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "x", uniq_name = "_QFEx"}
-! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           oss.task firstprivate(%[[VAL_0]] : !fir.ref<i32>) firstprivate_type(%[[VAL_1]] : !fir.oss<i32>) {
-! FIRDialect:             %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant 888 : i32
-! FIRDialect:             fir.store %[[VAL_2]] to %[[VAL_0]] : !fir.ref<i32>
+! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = arith.constant false
+! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "x", uniq_name = "_QFEx"}
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_2]] {uniq_name = "_QFEx"} : (!fir.ref<i32>) -> !fir.ref<i32>
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           oss.task firstprivate(%[[VAL_3]], %[[VAL_3]] : !fir.ref<i32>, !fir.ref<i32>) firstprivate_type(%[[VAL_4]], %[[VAL_4]] : !fir.oss<i32>, !fir.oss<i32>) {
+! FIRDialect:             %[[VAL_5:[-0-9A-Za-z._]+]] = arith.constant 888 : i32
+! FIRDialect:             fir.store %[[VAL_5]] to %[[VAL_3]] : !fir.ref<i32>
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
-! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<i32>
-! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_3]], %[[VAL_4]] : i32
-! FIRDialect:           cf.cond_br %[[VAL_5]], ^bb1, ^bb2
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = fir.load %[[VAL_3]] : !fir.ref<i32>
+! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_6]], %[[VAL_1]] : i32
+! FIRDialect:           cf.cond_br %[[VAL_7]], ^bb1, ^bb2
 ! FIRDialect:         ^bb1:
-! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = arith.constant false
-! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = arith.constant false
-! FIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = fir.call @_FortranAStopStatement(%[[VAL_6]], %[[VAL_7]], %[[VAL_8]]) fastmath<contract> : (i32, i1, i1) -> none
+! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = fir.call @_FortranAStopStatement(%[[VAL_1]], %[[VAL_0]], %[[VAL_0]]) fastmath<contract> : (i32, i1, i1) -> none
 ! FIRDialect:           fir.unreachable
 ! FIRDialect:         ^bb2:
-! FIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           oss.task firstprivate(%[[VAL_0]] : !fir.ref<i32>) firstprivate_type(%[[VAL_10]] : !fir.oss<i32>) {
-! FIRDialect:             %[[VAL_11:[-0-9A-Za-z._]+]] = arith.constant 777 : i32
-! FIRDialect:             fir.store %[[VAL_11]] to %[[VAL_0]] : !fir.ref<i32>
+! FIRDialect:           oss.task firstprivate(%[[VAL_3]], %[[VAL_3]] : !fir.ref<i32>, !fir.ref<i32>) firstprivate_type(%[[VAL_4]], %[[VAL_4]] : !fir.oss<i32>, !fir.oss<i32>) {
+! FIRDialect:             %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 777 : i32
+! FIRDialect:             fir.store %[[VAL_9]] to %[[VAL_3]] : !fir.ref<i32>
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
 ! FIRDialect:           return
