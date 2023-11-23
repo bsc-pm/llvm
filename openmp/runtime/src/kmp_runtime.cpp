@@ -6567,6 +6567,22 @@ static void __kmp_internal_end(void) {
     __kmp_reap_task_teams();
 
 #if KMP_OS_UNIX
+#if defined(KMP_OMPV_ENABLED)
+    kmp_info_t *current_thread = NULL;
+    int current_gtid = __kmp_get_gtid();
+    if (current_gtid != KMP_GTID_DNE)
+      current_thread = __kmp_thread_from_gtid(current_gtid);
+
+    // Reap threads created by openmp, exclude user-created threads
+    for (i = 0; i < __kmp_threads_capacity; i++) {
+      kmp_info_t *thr = __kmp_threads[i];
+      // thread might not exist, it might be the current thread, or it might be
+      // a thread created by a user. In any of these cases, do not reap.
+      if (!thr || current_thread == thr || KMP_UBER_GTID(i))
+        continue;
+      __kmp_reap_thread(thr, 0);
+    }
+#else
     // Threads that are not reaped should not access any resources since they
     // are going to be deallocated soon, so the shutdown sequence should wait
     // until all threads either exit the final spin-waiting loop or begin
@@ -6576,6 +6592,7 @@ static void __kmp_internal_end(void) {
       while (thr && KMP_ATOMIC_LD_ACQ(&thr->th.th_blocking))
         KMP_CPU_PAUSE();
     }
+#endif // KMP_OMPV_ENABLED
 #endif
 
     for (i = 0; i < __kmp_threads_capacity; ++i) {
