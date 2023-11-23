@@ -728,6 +728,11 @@ void Driver::setLTOMode(const llvm::opt::ArgList &Args) {
 Driver::OpenMPRuntimeKind Driver::getOpenMPRuntime(const ArgList &Args) const {
   StringRef RuntimeName(CLANG_DEFAULT_OPENMP_RUNTIME);
 
+  std::optional<std::string> OPENMPRuntime =
+      llvm::sys::Process::GetEnv("OPENMP_RUNTIME");
+  if (OPENMPRuntime && !OPENMPRuntime->empty())
+    RuntimeName = OPENMPRuntime.value();
+
   const Arg *A = Args.getLastArg(options::OPT_fopenmp_EQ);
   if (A)
     RuntimeName = A->getValue();
