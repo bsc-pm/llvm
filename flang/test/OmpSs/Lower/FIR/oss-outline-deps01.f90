@@ -1,6 +1,6 @@
 ! This test checks lowering of OmpSs-2 DepOp (outline task).
 
-! RUN: bbc -hlfir=false -fompss-2 -emit-fir %s -o - | \
+! RUN: flang-new -fc1 -emit-fir -fompss-2 -o - %s -flang-deprecated-no-hlfir | \
 ! RUN:   FileCheck %s --check-prefix=FIRDialect
 
 MODULE M

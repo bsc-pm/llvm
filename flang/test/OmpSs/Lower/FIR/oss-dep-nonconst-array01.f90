@@ -3,7 +3,7 @@
 
 ! explicit-shape non constant shape
 
-! RUN: bbc -hlfir=false -fompss-2 -emit-fir %s -o - | FileCheck %s --check-prefix=FIRDialect
+! RUN: flang-new -fc1 -emit-fir -fompss-2 -o - %s -flang-deprecated-no-hlfir | FileCheck %s --check-prefix=FIRDialect
 
 PROGRAM P
   IMPLICIT NONE

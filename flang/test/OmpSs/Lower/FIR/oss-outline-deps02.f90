@@ -2,7 +2,7 @@
 ! This test checks lowering of OmpSs-2 DepOp
 ! derived type (outline task).
 
-! RUN: bbc -hlfir=false -fompss-2 -emit-fir %s -o - | FileCheck %s --check-prefix=FIRDialect
+! RUN: flang-new -fc1 -emit-fir -fompss-2 -o - %s -flang-deprecated-no-hlfir | FileCheck %s --check-prefix=FIRDialect
 
 MODULE M
     TYPE TY
@@ -25,6 +25,8 @@ PROGRAM MAIN
     CALL ST(T)
     !$OSS TASKWAIT
 END PROGRAM MAIN
+
+
 
 
 ! FIRDialect-LABEL:   fir.global linkonce_odr @_QMmE.b.ty.a constant target : !fir.array<2x1x!fir.type<_QM__fortran_type_infoTvalue{genre:i8,__padding0:!fir.array<7xi8>,value:i64}>> {
