@@ -1,6 +1,4 @@
-! RUN: bbc -hlfir=false -fompss-2 %s -o - | \
-! RUN:   fir-opt --cg-rewrite --fir-to-llvm-ir 2>&1 | \
-! RUN:   FileCheck %s --check-prefix=LLVMIRDialect
+! RUN: flang-new -fc1 -fompss-2 -emit-llvm -flang-deprecated-no-hlfir -fdisable-ompss-2-pass -mmlir --mlir-print-ir-after-all %s -o /dev/null |& tail -n +$(flang-new -fc1 -fompss-2 -emit-llvm -flang-deprecated-no-hlfir -fdisable-ompss-2-pass -mmlir --mlir-print-ir-after-all %s -o /dev/null |& grep -n FIRToLLVMLowering | cut -f1 -d:) | FileCheck %s --check-prefix=LLVMIRDialect
 
 PROGRAM P
 INTEGER :: X

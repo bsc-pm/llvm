@@ -1,8 +1,7 @@
 ! This test checks lowering of OmpSs-2 loop Directives.
 ! All induction variables inside the construct are private
 
-! RUN: bbc -hlfir=false -fompss-2 -emit-fir %s -o - | \
-! RUN:   tco | FileCheck %s --check-prefix=LLVMIR
+! RUN: flang-new -fc1 -fompss-2 -emit-llvm -fdisable-ompss-2-pass %s -o - | FileCheck %s --check-prefix=LLVMIR
 
 subroutine task()
     INTEGER :: I

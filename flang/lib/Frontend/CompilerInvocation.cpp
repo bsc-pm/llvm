@@ -854,6 +854,9 @@ static bool parseDialectArgs(CompilerInvocation &res, llvm::opt::ArgList &args,
   if (args.hasArg(clang::driver::options::OPT_fompss)) {
     res.getFrontendOpts().features.Enable(
         Fortran::common::LanguageFeature::OmpSs);
+    if (args.hasArg(clang::driver::options::OPT_fdisable_ompss_pass)) {
+      res.getCodeGenOpts().DisableOmpSsPass = true;
+    }
   }
   if (args.hasArg(clang::driver::options::OPT_fopenacc)) {
     res.getFrontendOpts().features.Enable(

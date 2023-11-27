@@ -2,8 +2,7 @@
 
 ! Test for subroutine
 
-! RUN: bbc -hlfir=false -fompss-2 -emit-fir %s -o - | \
-! RUN:   tco | FileCheck %s --check-prefix=LLVMIR
+! RUN: flang-new -fc1 -fompss-2 -emit-llvm -fdisable-ompss-2-pass -flang-deprecated-no-hlfir %s -o - | FileCheck %s --check-prefix=LLVMIR
 
 ! Support list
 ! - [x] assumed-size array
@@ -66,7 +65,7 @@ subroutine task(X, ARRAY, ARRAY1)
 
 end subroutine
 
-!LLVMIR-LABEL: define void @_QPtask(ptr %0, ptr %1, ptr %2)
+!LLVMIR-LABEL: define void @task_(ptr %0, ptr %1, ptr %2)
 !LLVMIR:  %[[VAR_I:.*]] = alloca i32, i64 1, align 4
 !LLVMIR:  %[[VAR_J:.*]] = alloca i32, i64 1, align 4
 !LLVMIR:  %[[VLA_EXTENT:.*]] = select i1 %{{.*}}, i64 %{{.*}}, i64 0

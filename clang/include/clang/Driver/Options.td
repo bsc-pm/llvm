@@ -3291,6 +3291,10 @@ def fdo_not_use_ompss_runtime : Flag<["-"], "fdo-not-use-ompss-2-runtime">, Grou
   Flags<[NoArgumentUnused]>,
   Visibility<[ClangOption, CC1Option]>,
   HelpText<"When compiling with -fompss-2 do not include or link with the runtime.">;
+def fdisable_ompss_pass : Flag<["-"], "fdisable-ompss-2-pass">, Group<f_Group>,
+  Flags<[NoArgumentUnused]>,
+  Visibility<[FC1Option]>,
+  HelpText<"Emit LLVM IR code without the OmpSs-2 transformation pass.">;
 def fopenmp : Flag<["-"], "fopenmp">, Group<f_Group>,
   Flags<[NoArgumentUnused]>,
   Visibility<[ClangOption, CC1Option, FlangOption, FC1Option]>,

@@ -2,7 +2,7 @@
 ! This test checks lowering of OmpSs-2 loop Directives.
 ! All induction variables inside the construct are private
 
-! RUN: bbc -hlfir=false -fompss-2 %s -o - | fir-opt --cg-rewrite --fir-to-llvm-ir 2>&1 |  FileCheck %s --check-prefix=LLVMIRDialect
+! RUN: flang-new -fc1 -fompss-2 -emit-llvm -fdisable-ompss-2-pass -mmlir --mlir-print-ir-after-all %s -o /dev/null |& tail -n +$(flang-new -fc1 -fompss-2 -emit-llvm -fdisable-ompss-2-pass -mmlir --mlir-print-ir-after-all %s -o /dev/null |& grep -n FIRToLLVMLowering | cut -f1 -d:) | FileCheck %s --check-prefix=LLVMIRDialect
 
 subroutine task()
     INTEGER :: I
@@ -57,13 +57,15 @@ subroutine taskloopfor()
 end
 
 
-! LLVMIRDialect-LABEL:   llvm.func @_QPtask() {
+
+
+! LLVMIRDialect-LABEL:   llvm.func @task_() {
 ! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
 ! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_0]] x i32 {bindc_name = "i"} : (i64) -> !llvm.ptr
 ! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
 ! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_2]] x i32 {bindc_name = "j"} : (i64) -> !llvm.ptr
 ! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.mlir.undef : i32
-! LLVMIRDialect:           oss.task private(%[[VAL_1]], %[[VAL_3]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_4]], %[[VAL_4]] : i32, i32) {
+! LLVMIRDialect:           oss.task private(%[[VAL_1]], %[[VAL_1]], %[[VAL_3]], %[[VAL_3]] : !llvm.ptr, !llvm.ptr, !llvm.ptr, !llvm.ptr) private_type(%[[VAL_4]], %[[VAL_4]], %[[VAL_4]], %[[VAL_4]] : i32, i32, i32, i32) {
 ! LLVMIRDialect:             %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.mlir.constant(0 : index) : i64
 ! LLVMIRDialect:             %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : index) : i64
 ! LLVMIRDialect:             %[[VAL_7:[-0-9A-Za-z._]+]] = llvm.mlir.constant(10 : index) : i64
@@ -101,7 +103,7 @@ end
 ! LLVMIRDialect:           llvm.return
 ! LLVMIRDialect:         }
 
-! LLVMIRDialect-LABEL:   llvm.func @_QPtaskfor() {
+! LLVMIRDialect-LABEL:   llvm.func @taskfor_() {
 ! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
 ! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.mlir.constant(10 : i32) : i32
 ! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i32) : i32
@@ -110,7 +112,7 @@ end
 ! LLVMIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
 ! LLVMIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_5]] x i32 {bindc_name = "j"} : (i64) -> !llvm.ptr
 ! LLVMIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = llvm.mlir.undef : i32
-! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_2]] : i32) upper_bound(%[[VAL_1]] : i32) step(%[[VAL_2]] : i32) loop_type(%[[VAL_0]] : i64) ind_var(%[[VAL_4]] : !llvm.ptr) private(%[[VAL_4]], %[[VAL_6]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_7]], %[[VAL_7]] : i32, i32) {
+! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_2]] : i32) upper_bound(%[[VAL_1]] : i32) step(%[[VAL_2]] : i32) loop_type(%[[VAL_0]] : i64) ind_var(%[[VAL_4]] : !llvm.ptr) private(%[[VAL_4]], %[[VAL_4]], %[[VAL_6]], %[[VAL_6]] : !llvm.ptr, !llvm.ptr, !llvm.ptr, !llvm.ptr) private_type(%[[VAL_7]], %[[VAL_7]], %[[VAL_7]], %[[VAL_7]] : i32, i32, i32, i32) {
 ! LLVMIRDialect:             %[[VAL_8:[-0-9A-Za-z._]+]] = llvm.mlir.constant(0 : index) : i64
 ! LLVMIRDialect:             %[[VAL_9:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : index) : i64
 ! LLVMIRDialect:             %[[VAL_10:[-0-9A-Za-z._]+]] = llvm.mlir.constant(10 : index) : i64
@@ -134,7 +136,7 @@ end
 ! LLVMIRDialect:           llvm.return
 ! LLVMIRDialect:         }
 
-! LLVMIRDialect-LABEL:   llvm.func @_QPtaskloop() {
+! LLVMIRDialect-LABEL:   llvm.func @taskloop_() {
 ! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
 ! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.mlir.constant(10 : i32) : i32
 ! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i32) : i32
@@ -143,7 +145,7 @@ end
 ! LLVMIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
 ! LLVMIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_5]] x i32 {bindc_name = "j"} : (i64) -> !llvm.ptr
 ! LLVMIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = llvm.mlir.undef : i32
-! LLVMIRDialect:           oss.taskloop lower_bound(%[[VAL_2]] : i32) upper_bound(%[[VAL_1]] : i32) step(%[[VAL_2]] : i32) loop_type(%[[VAL_0]] : i64) ind_var(%[[VAL_4]] : !llvm.ptr) private(%[[VAL_4]], %[[VAL_6]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_7]], %[[VAL_7]] : i32, i32) {
+! LLVMIRDialect:           oss.taskloop lower_bound(%[[VAL_2]] : i32) upper_bound(%[[VAL_1]] : i32) step(%[[VAL_2]] : i32) loop_type(%[[VAL_0]] : i64) ind_var(%[[VAL_4]] : !llvm.ptr) private(%[[VAL_4]], %[[VAL_4]], %[[VAL_6]], %[[VAL_6]] : !llvm.ptr, !llvm.ptr, !llvm.ptr, !llvm.ptr) private_type(%[[VAL_7]], %[[VAL_7]], %[[VAL_7]], %[[VAL_7]] : i32, i32, i32, i32) {
 ! LLVMIRDialect:             %[[VAL_8:[-0-9A-Za-z._]+]] = llvm.mlir.constant(0 : index) : i64
 ! LLVMIRDialect:             %[[VAL_9:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : index) : i64
 ! LLVMIRDialect:             %[[VAL_10:[-0-9A-Za-z._]+]] = llvm.mlir.constant(10 : index) : i64
@@ -167,7 +169,7 @@ end
 ! LLVMIRDialect:           llvm.return
 ! LLVMIRDialect:         }
 
-! LLVMIRDialect-LABEL:   llvm.func @_QPtaskloopfor() {
+! LLVMIRDialect-LABEL:   llvm.func @taskloopfor_() {
 ! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
 ! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.mlir.constant(10 : i32) : i32
 ! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i32) : i32
@@ -176,7 +178,7 @@ end
 ! LLVMIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
 ! LLVMIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_5]] x i32 {bindc_name = "j"} : (i64) -> !llvm.ptr
 ! LLVMIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = llvm.mlir.undef : i32
-! LLVMIRDialect:           oss.taskloop_for lower_bound(%[[VAL_2]] : i32) upper_bound(%[[VAL_1]] : i32) step(%[[VAL_2]] : i32) loop_type(%[[VAL_0]] : i64) ind_var(%[[VAL_4]] : !llvm.ptr) private(%[[VAL_4]], %[[VAL_6]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_7]], %[[VAL_7]] : i32, i32) {
+! LLVMIRDialect:           oss.taskloop_for lower_bound(%[[VAL_2]] : i32) upper_bound(%[[VAL_1]] : i32) step(%[[VAL_2]] : i32) loop_type(%[[VAL_0]] : i64) ind_var(%[[VAL_4]] : !llvm.ptr) private(%[[VAL_4]], %[[VAL_4]], %[[VAL_6]], %[[VAL_6]] : !llvm.ptr, !llvm.ptr, !llvm.ptr, !llvm.ptr) private_type(%[[VAL_7]], %[[VAL_7]], %[[VAL_7]], %[[VAL_7]] : i32, i32, i32, i32) {
 ! LLVMIRDialect:             %[[VAL_8:[-0-9A-Za-z._]+]] = llvm.mlir.constant(0 : index) : i64
 ! LLVMIRDialect:             %[[VAL_9:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : index) : i64
 ! LLVMIRDialect:             %[[VAL_10:[-0-9A-Za-z._]+]] = llvm.mlir.constant(10 : index) : i64
@@ -199,4 +201,6 @@ end
 ! LLVMIRDialect:           }
 ! LLVMIRDialect:           llvm.return
 ! LLVMIRDialect:         }
+! LLVMIRDialect:         llvm.func @llvm.stacksave.p0() -> !llvm.ptr attributes {sym_visibility = "private"}
+! LLVMIRDialect:         llvm.func @llvm.stackrestore.p0(!llvm.ptr) attributes {sym_visibility = "private"}
 

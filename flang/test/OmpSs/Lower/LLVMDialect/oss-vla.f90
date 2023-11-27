@@ -2,9 +2,7 @@
 
 ! Test for subroutine
 
-! RUN: bbc -hlfir=false -fompss-2 %s -o - | \
-! RUN:   fir-opt --cg-rewrite --fir-to-llvm-ir 2>&1 | \
-! RUN:   FileCheck %s --check-prefix=LLVMIRDialect
+! RUN: flang-new -fc1 -fompss-2 -emit-llvm -flang-deprecated-no-hlfir -fdisable-ompss-2-pass -mmlir --mlir-print-ir-after-all %s -o /dev/null |& tail -n +$(flang-new -fc1 -fompss-2 -emit-llvm -flang-deprecated-no-hlfir -fdisable-ompss-2-pass -mmlir --mlir-print-ir-after-all %s -o /dev/null |& grep -n FIRToLLVMLowering | cut -f1 -d:) | FileCheck %s --check-prefix=LLVMIRDialect
 
 subroutine task(X)
     IMPLICIT NONE
@@ -52,7 +50,7 @@ subroutine task(X)
 
 end subroutine
 
-!LLVMIRDialect-LABEL: llvm.func @_QPtask(%arg0: !llvm.ptr {fir.bindc_name = "x"}) {
+!LLVMIRDialect-LABEL: llvm.func @task_(%arg0: !llvm.ptr {fir.bindc_name = "x"}) {
 !LLVMIRDialect: %[[CONS_3:.*]] = llvm.mlir.constant(3 : index) : i64
 !LLVMIRDialect: %[[CONS_2:.*]] = llvm.mlir.constant(2 : index) : i64
 !LLVMIRDialect: %[[CONS_1:.*]] = llvm.mlir.constant(1 : index) : i64

@@ -1007,7 +1007,8 @@ void CodeGenAction::runOptimizationPipeline(llvm::raw_pwrite_stream &os) {
 
   // OmpSs-2
   if (fortranOpts.features.IsEnabled(
-      Fortran::common::LanguageFeature::OmpSs)) {
+        Fortran::common::LanguageFeature::OmpSs)
+      && !opts.DisableOmpSsPass) {
 
     llvm::ModulePassManager earlympm;
     earlympm.addPass(llvm::OmpSsPass());

@@ -3,7 +3,7 @@
 
 ! Test for subroutine
 
-! RUN: bbc -hlfir=false -fompss-2 %s -o - | fir-opt --cg-rewrite --fir-to-llvm-ir 2>&1 |  FileCheck %s --check-prefix=LLVMIRDialect
+! RUN: flang-new -fc1 -fompss-2 -emit-llvm -flang-deprecated-no-hlfir -fdisable-ompss-2-pass -mmlir --mlir-print-ir-after-all %s -o /dev/null |& tail -n +$(flang-new -fc1 -fompss-2 -emit-llvm -flang-deprecated-no-hlfir -fdisable-ompss-2-pass -mmlir --mlir-print-ir-after-all %s -o /dev/null |& grep -n FIRToLLVMLowering | cut -f1 -d:) | FileCheck %s --check-prefix=LLVMIRDialect
 
 ! Support list
 ! - [x] assumed-size array
@@ -67,10 +67,11 @@ subroutine task(X, ARRAY, ARRAY1)
 end subroutine
 
 
-! LLVMIRDialect-LABEL:   llvm.func @_QPtask(
-! LLVMIRDialect-SAME:                       %[[VAL_0:[-0-9A-Za-z._]+]]: !llvm.ptr {fir.bindc_name = "x"},
-! LLVMIRDialect-SAME:                       %[[VAL_1:[-0-9A-Za-z._]+]]: !llvm.ptr {fir.bindc_name = "array"},
-! LLVMIRDialect-SAME:                       %[[VAL_2:[-0-9A-Za-z._]+]]: !llvm.ptr {fir.bindc_name = "array1"}) {
+
+! LLVMIRDialect-LABEL:   llvm.func @task_(
+! LLVMIRDialect-SAME:                     %[[VAL_0:[-0-9A-Za-z._]+]]: !llvm.ptr {fir.bindc_name = "x"},
+! LLVMIRDialect-SAME:                     %[[VAL_1:[-0-9A-Za-z._]+]]: !llvm.ptr {fir.bindc_name = "array"},
+! LLVMIRDialect-SAME:                     %[[VAL_2:[-0-9A-Za-z._]+]]: !llvm.ptr {fir.bindc_name = "array1"}) {
 ! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.mlir.constant(-3 : index) : i64
 ! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.mlir.constant(4 : index) : i64
 ! LLVMIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
@@ -233,4 +234,6 @@ end subroutine
 ! LLVMIRDialect:           %[[VAL_14:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_9]], %[[VAL_13]][3] : !llvm.struct<(ptr, i64, i64, i64)>
 ! LLVMIRDialect:           llvm.return %[[VAL_14]] : !llvm.struct<(ptr, i64, i64, i64)>
 ! LLVMIRDialect:         }
+! LLVMIRDialect:         llvm.func @llvm.stacksave.p0() -> !llvm.ptr attributes {sym_visibility = "private"}
+! LLVMIRDialect:         llvm.func @llvm.stackrestore.p0(!llvm.ptr) attributes {sym_visibility = "private"}
 
