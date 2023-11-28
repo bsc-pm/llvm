@@ -2173,11 +2173,8 @@ static void __kmp_nosv_submit(nosv_task_t nosv_task)
   int gtid = __kmp_entry_gtid();
   kmp_info_t *th = __kmp_threads[gtid];
   // Save current task and restore it after parallel
-  nosv_task_t nosv_task_prev = th->th.th_nosv_task;
-  th->th.th_nosv_task = nosv_task;
   int res = nosv_submit(nosv_task, NOSV_SUBMIT_INLINE);
   KMP_ASSERT(res == 0);
-  th->th.th_nosv_task = nosv_task_prev;
 }
 
 //  __kmp_invoke_task: invoke the specified task

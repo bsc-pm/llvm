@@ -600,7 +600,6 @@ static void *__kmp_launch_worker(void *thr) {
 
   nosv_task_t nosv_impl_task;
   __kmp_nosv_attach(&nosv_impl_task, (kmp_info_t *) thr);
-  ((kmp_info_t *)thr)->th.th_nosv_task = nosv_impl_task;
 
   instr_attached_enter();
 #endif // KMP_OMPV_ENABLED
@@ -611,7 +610,6 @@ static void *__kmp_launch_worker(void *thr) {
   instr_attached_exit();
 
   res = nosv_detach(NOSV_DETACH_NONE);
-  ((kmp_info_t *)thr)->th.th_nosv_task = NULL;
   KMP_ASSERT(res == 0);
 
   instr_thread_end();
@@ -1580,16 +1578,12 @@ static inline void __kmp_suspend_template(int th_gtid, C *flag) {
                     " pthread_cond_wait\n",
                     th_gtid));
 #if defined(KMP_OMPV_ENABLED)
-      if (th->th.th_nosv_task != NULL) {
-        __kmp_unlock_suspend_mx(th);
-        KMP_ASSERT(nosv_self() == th->th.th_nosv_task);
-        status = nosv_pause(0);
-        __kmp_lock_suspend_mx(th);
-      } else {
-        abort();
-        status = pthread_cond_wait(&th->th.th_suspend_cv.c_cond,
-                                 &th->th.th_suspend_mx.m_mutex);
-      }
+      KMP_ASSERT(nosv_self());
+      th->th.th_nosv_task = nosv_self();
+      __kmp_unlock_suspend_mx(th);
+      status = nosv_pause(0);
+      th->th.th_nosv_task = NULL;
+      __kmp_lock_suspend_mx(th);
 #else
       status = pthread_cond_wait(&th->th.th_suspend_cv.c_cond,
                                &th->th.th_suspend_mx.m_mutex);
@@ -1758,15 +1752,9 @@ static inline void __kmp_resume_template(int target_gtid, C *flag) {
   }
 #endif
 #if defined(KMP_OMPV_ENABLED)
-  if (th->th.th_nosv_task != NULL) {
-    __kmp_unlock_suspend_mx(th);
-    status = nosv_submit(th->th.th_nosv_task, NOSV_SUBMIT_UNLOCKED);
-  } else {
-    abort();
-    status = pthread_cond_signal(&th->th.th_suspend_cv.c_cond);
-    KMP_CHECK_SYSFAIL("pthread_cond_signal", status);
-    __kmp_unlock_suspend_mx(th);
-  }
+  KMP_ASSERT(th->th.th_nosv_task != NULL);
+  __kmp_unlock_suspend_mx(th);
+  status = nosv_submit(th->th.th_nosv_task, NOSV_SUBMIT_UNLOCKED);
 #else
   status = pthread_cond_signal(&th->th.th_suspend_cv.c_cond);
   KMP_CHECK_SYSFAIL("pthread_cond_signal", status);

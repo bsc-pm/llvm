@@ -4207,7 +4207,6 @@ int __kmp_register_root(int initial_thread) {
     instr_attached_enter();
   }
 
-  __kmp_threads[gtid]->th.th_nosv_task = nosv_self();
 #endif // KMP_OMPV_ENABLED
   return gtid;
 }
