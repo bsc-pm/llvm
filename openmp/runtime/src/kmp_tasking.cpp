@@ -2677,14 +2677,29 @@ kmp_int32 __kmp_omp_task(kmp_int32 gtid, kmp_task_t *new_task,
              __kmp_wpolicy_passive) {
     kmp_info_t *this_thr = __kmp_threads[gtid];
     kmp_team_t *team = this_thr->th.th_team;
+    kmp_task_team_t *task_team = this_thr->th.th_task_team;
     kmp_int32 nthreads = this_thr->th.th_team_nproc;
+    kmp_int32 tid = this_thr->th.th_info.ds.ds_tid;
+
+    if (KMP_ATOMIC_LD_RLX(&task_team->tt.tt_last_task_tid) != tid)
+      KMP_ATOMIC_ST_RLX(&task_team->tt.tt_last_task_tid, tid);
+
     for (int i = 0; i < nthreads; ++i) {
       kmp_info_t *thread = team->t.t_threads[i];
       if (thread == this_thr)
         continue;
       if (thread->th.th_sleep_loc != NULL) {
-        __kmp_null_resume_wrapper(thread);
-        break; // awake one thread at a time
+        if (__kmp_try_suspend_mx(thread)) {
+          // Got mutex
+          if (thread->th.th_sleep_loc != NULL) {
+            // thread is really sleeping
+            __kmp_unlock_suspend_mx(thread);
+            __kmp_null_resume_wrapper(thread);
+            break; // awake one thread at a time
+          } else {
+            __kmp_unlock_suspend_mx(thread);
+          }
+        }
       }
     }
   }
@@ -4019,6 +4034,11 @@ static inline int __kmp_execute_tasks_template(
   kmp_int32 nthreads, victim_tid = -2, use_own_tasks = 1, new_victim = 0,
                       tid = thread->th.th_info.ds.ds_tid;
 
+  if (__kmp_dflt_blocktime != KMP_MAX_BLOCKTIME &&
+      __kmp_wpolicy_passive) {
+    victim_tid = -3;
+  }
+
   KMP_DEBUG_ASSERT(__kmp_tasking_mode != tskm_immediate_exec);
   KMP_DEBUG_ASSERT(thread == __kmp_threads[gtid]);
 
@@ -4056,6 +4076,18 @@ static inline int __kmp_execute_tasks_template(
       if ((task == NULL) && (nthreads > 1)) { // Steal a task finally
         int asleep = 1;
         use_own_tasks = 0;
+        if (victim_tid == -3) {
+          // First time, try using the last thread
+          // that pushed a task
+          int last_task_tid = KMP_ATOMIC_LD_RLX(&task_team->tt.tt_last_task_tid);
+          if (last_task_tid != -1 && last_task_tid != tid) {
+            victim_tid = last_task_tid;
+            other_thread = threads_data[victim_tid].td.td_thr;
+          } else {
+            // Set original behavior
+            victim_tid = -2;
+          }
+        }
         // Try to steal from the last place I stole from successfully.
         if (victim_tid == -2) { // haven't stolen anything yet
           victim_tid = threads_data[tid].td.td_deque_last_stolen;
@@ -4088,6 +4120,7 @@ static inline int __kmp_execute_tasks_template(
             asleep = 0;
             if ((__kmp_tasking_mode == tskm_task_teams) &&
                 (__kmp_dflt_blocktime != KMP_MAX_BLOCKTIME) &&
+                (!__kmp_wpolicy_passive) &&
                 (TCR_PTR(CCAST(void *, other_thread->th.th_sleep_loc)) !=
                  NULL)) {
               asleep = 1;
@@ -4654,6 +4687,8 @@ static kmp_task_team_t *__kmp_allocate_task_team(kmp_info_t *thread,
   TCW_4(task_team->tt.tt_hidden_helper_task_encountered, FALSE);
   TCW_4(task_team->tt.tt_active, TRUE);
 
+  KMP_ATOMIC_ST_RLX(&task_team->tt.tt_last_task_tid, -1);
+
   KA_TRACE(20, ("__kmp_allocate_task_team: T#%d exiting; task_team = %p "
                 "unfinished_threads init'd to %d\n",
                 (thread ? __kmp_gtid_from_thread(thread) : -1), task_team,
@@ -4865,6 +4900,7 @@ void __kmp_task_team_setup(kmp_info_t *this_thr, kmp_team_t *team, int always) {
         KMP_ATOMIC_ST_REL(&task_team->tt.tt_unfinished_threads,
                           team->t.t_nproc);
         TCW_4(task_team->tt.tt_active, TRUE);
+        KMP_ATOMIC_ST_RLX(&task_team->tt.tt_last_task_tid, -1);
       }
       // if team size has changed, the first thread to enable tasking will
       // realloc threads_data if necessary

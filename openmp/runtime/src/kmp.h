@@ -2904,6 +2904,7 @@ typedef struct kmp_base_task_team {
   KMP_ALIGN_CACHE
   volatile kmp_uint32
       tt_active; /* is the team still actively executing tasks */
+  std::atomic<kmp_int32> tt_last_task_tid; /* Last worker pushing tasks */
 } kmp_base_task_team_t;
 
 union KMP_ALIGN_CACHE kmp_task_team {
