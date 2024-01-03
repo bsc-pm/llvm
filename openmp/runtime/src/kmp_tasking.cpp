@@ -1372,6 +1372,7 @@ static void __kmpc_omp_task_complete_if0_template(ident_t *loc_ref,
   KMP_DEBUG_ASSERT(gtid >= 0);
   // this routine will provide task to resume
 #if defined(KMP_OMPV_ENABLED)
+  int td_instrum_task_id = KMP_TASK_TO_TASKDATA(task)->td_instrum_task_id;
   __kmp_task_finish<ompt, false>(gtid, task, NULL);
 #else
   __kmp_task_finish<ompt>(gtid, task, NULL);
@@ -1391,7 +1392,9 @@ static void __kmpc_omp_task_complete_if0_template(ident_t *loc_ref,
 #endif
 
 #if defined(KMP_OMPV_ENABLED)
-  instr_task_end(KMP_TASK_TO_TASKDATA(task)->td_instrum_task_id);
+  // Once task finishes it could be freed.
+  // Rememenber the task id
+  instr_task_end(td_instrum_task_id);
   instr_invoke_task_if0_exit();
 #endif // KMP_OMPV_ENABLED
 
@@ -2191,11 +2194,14 @@ static void __kmp_invoke_task(kmp_int32 gtid, kmp_task_t *task,
   KA_TRACE(2, ("__kmp_invoke_task: nosv_submit INLINE\n"));
 
   instr_invoke_task_enter();
+  // Once task finishes it could be freed.
+  // Rememenber the task id
+  int td_instrum_task_id = taskdata->td_instrum_task_id;
   instr_task_execute(taskdata->td_instrum_task_id);
 
   __kmp_nosv_submit(nosv_task);
 
-  instr_task_end(taskdata->td_instrum_task_id);
+  instr_task_end(td_instrum_task_id);
   instr_invoke_task_exit();
 }
 
@@ -2673,6 +2679,7 @@ kmp_int32 __kmp_omp_task(kmp_int32 gtid, kmp_task_t *new_task,
     if (serialize_immediate)
       new_taskdata->td_flags.task_serial = 1;
     __kmp_invoke_task(gtid, new_task, current_task);
+    abort();
   } else if (__kmp_dflt_blocktime != KMP_MAX_BLOCKTIME &&
              __kmp_wpolicy_passive) {
     kmp_info_t *this_thr = __kmp_threads[gtid];

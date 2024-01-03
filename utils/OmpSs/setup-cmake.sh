@@ -524,7 +524,7 @@ fi
 ################################################################################
 
 info "Running cmake..."
-run cmake -G "${BUILD_SYSTEM}" ${SRCDIR}/llvm \
+run cmake --fresh -G "${BUILD_SYSTEM}" ${SRCDIR}/llvm \
    -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} \
    -DCLANG_DEFAULT_PIE_ON_LINUX=OFF \
    ${LLVM_ENABLE_PROJECTS} \

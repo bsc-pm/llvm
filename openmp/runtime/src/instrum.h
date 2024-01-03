@@ -71,6 +71,7 @@ static inline void instr_thread_init()
 		return;
 
 	ovni_thread_init(__kmp_gettid());
+	ovni_thread_require("openmp", "1.0.0");
 }
 
 static inline void instr_thread_end(void)
@@ -86,6 +87,7 @@ static inline void instr_thread_end(void)
 
 	// Flush the events to disk before killing the thread
 	ovni_flush();
+	ovni_thread_free();
 }
 
 // A jumbo event is needed to encode a large label
@@ -134,6 +136,19 @@ static inline void instr_type_create(uint32_t id, const char *label)
         ovni_ev_jumbo_emit(&ev, buf, bufsize);
 }
 
+static inline void instr_attached_enter(void)
+{
+        if (!nosv_enable_ovni)
+                return;
+
+        ovni_thread_require("openmp", "1.0.0");
+
+        struct ovni_ev ev = {};
+        ovni_ev_set_clock(&ev, ovni_clock_now());
+        ovni_ev_set_mcv(&ev, "PA[");
+        ovni_ev_emit(&ev);
+}
+
 #else // ENABLE_INSTRUMENTATION
 
 static inline void intrum_check_ovni() {
@@ -163,14 +178,12 @@ static inline void intrum_check_ovni() {
 
 static inline void instr_thread_init() {}
 static inline void instr_thread_end(void) {}
-static inline void instr_type_create(uint32_t id, const char *label)
-{
-}
+static inline void instr_type_create(uint32_t id, const char *label) { }
+static inline void instr_attached_enter(void) { }
 
 #endif // ENABLE_INSTRUMENTATION
 
 INSTR_3ARG(instr_thread_execute, "OHx", int32_t, cpu, int32_t, creator_tid, uint64_t, tag)
-INSTR_0ARG(instr_attached_enter, "PA[")
 INSTR_0ARG(instr_attached_exit, "PA]")
 
 INSTR_0ARG(instr_join_barrier_enter, "PBj")
