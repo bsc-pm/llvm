@@ -351,6 +351,8 @@ def fir_RealType : FIR_Type<"Real", "real"> {
 
   let extraClassDeclaration = [{
     using KindTy = unsigned;
+    // Get MLIR float type with same semantics.
+    mlir::Type getFloatType(const fir::KindMapping &kindMap) const;
   }];
 
   let genVerifyDecl = 1;
@@ -519,6 +521,14 @@ def fir_SequenceType : FIR_Type<"Sequence", "array"> {
     // The value `kDynamic` represents an unknown extent for a dimension
     static constexpr Extent getUnknownExtent() {
       return mlir::ShapedType::kDynamic;
+    }
+
+    std::uint64_t getConstantArraySize() {
+      assert(!hasDynamicExtents() && "array type must have constant shape");
+      std::uint64_t size = 1;
+      for (Extent extent : getShape())
+        size = size * static_cast<std::uint64_t>(extent);
+      return size;
     }
   }];
 }

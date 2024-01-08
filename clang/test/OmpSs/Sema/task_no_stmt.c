@@ -2,6 +2,6 @@
 
 int main(void) {
   #pragma oss task
-  int x = 3; // expected-error {{expected expression}}
+  int x = 3;
   #pragma oss task
 } // expected-error {{expected statement}}

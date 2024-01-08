@@ -289,6 +289,9 @@ public:
   /// nest would extend.
   SmallVector<llvm::CanonicalLoopInfo *, 4> OMPLoopNestStack;
 
+  /// Stack to track the Logical Operator recursion nest for MC/DC.
+  SmallVector<const BinaryOperator *, 16> MCDCLogOpStack;
+
   /// Number of nested loop to be consumed by the last surrounding
   /// loop-associated directive.
   int ExpectedOMPLoopDepth = 0;
@@ -1683,6 +1686,9 @@ private:
 
   CodeGenPGO PGO;
 
+  /// Bitmap used by MC/DC to track condition outcomes of a boolean expression.
+  Address MCDCCondBitmapAddr = Address::invalid();
+
   /// Calculate branch weights appropriate for PGO data
   llvm::MDNode *createProfileWeights(uint64_t TrueCount,
                                      uint64_t FalseCount) const;
@@ -1699,6 +1705,52 @@ public:
         !CurFn->hasFnAttribute(llvm::Attribute::SkipProfile))
       PGO.emitCounterIncrement(Builder, S, StepV);
     PGO.setCurrentStmt(S);
+  }
+
+  bool isMCDCCoverageEnabled() const {
+    return (CGM.getCodeGenOpts().hasProfileClangInstr() &&
+            CGM.getCodeGenOpts().MCDCCoverage &&
+            !CurFn->hasFnAttribute(llvm::Attribute::NoProfile));
+  }
+
+  /// Allocate a temp value on the stack that MCDC can use to track condition
+  /// results.
+  void maybeCreateMCDCCondBitmap() {
+    if (isMCDCCoverageEnabled()) {
+      PGO.emitMCDCParameters(Builder);
+      MCDCCondBitmapAddr =
+          CreateIRTemp(getContext().UnsignedIntTy, "mcdc.addr");
+    }
+  }
+
+  bool isBinaryLogicalOp(const Expr *E) const {
+    const BinaryOperator *BOp = dyn_cast<BinaryOperator>(E->IgnoreParens());
+    return (BOp && BOp->isLogicalOp());
+  }
+
+  /// Zero-init the MCDC temp value.
+  void maybeResetMCDCCondBitmap(const Expr *E) {
+    if (isMCDCCoverageEnabled() && isBinaryLogicalOp(E)) {
+      PGO.emitMCDCCondBitmapReset(Builder, E, MCDCCondBitmapAddr);
+      PGO.setCurrentStmt(E);
+    }
+  }
+
+  /// Increment the profiler's counter for the given expression by \p StepV.
+  /// If \p StepV is null, the default increment is 1.
+  void maybeUpdateMCDCTestVectorBitmap(const Expr *E) {
+    if (isMCDCCoverageEnabled() && isBinaryLogicalOp(E)) {
+      PGO.emitMCDCTestVectorBitmapUpdate(Builder, E, MCDCCondBitmapAddr);
+      PGO.setCurrentStmt(E);
+    }
+  }
+
+  /// Update the MCDC temp value with the condition's evaluated result.
+  void maybeUpdateMCDCCondBitmap(const Expr *E, llvm::Value *Val) {
+    if (isMCDCCoverageEnabled()) {
+      PGO.emitMCDCCondBitmapUpdate(Builder, E, MCDCCondBitmapAddr, Val);
+      PGO.setCurrentStmt(E);
+    }
   }
 
   /// Get the profiler's count for the given statement.
@@ -3197,19 +3249,6 @@ public:
   /// this expression is used as an lvalue, for instance in "&Arr[Idx]".
   void EmitBoundsCheck(const Expr *E, const Expr *Base, llvm::Value *Index,
                        QualType IndexType, bool Accessed);
-
-  // Find a struct's flexible array member. It may be embedded inside multiple
-  // sub-structs, but must still be the last field.
-  const ValueDecl *FindFlexibleArrayMemberField(ASTContext &Ctx,
-                                                const RecordDecl *RD);
-
-  /// Find the FieldDecl specified in a FAM's "counted_by" attribute. Returns
-  /// \p nullptr if either the attribute or the field doesn't exist.
-  const ValueDecl *FindCountedByField(const Expr *Base);
-
-  /// Build an expression accessing the "counted_by" field.
-  const Expr *BuildCountedByFieldExpr(const Expr *Base,
-                                      const ValueDecl *CountedByVD);
 
   llvm::Value *EmitScalarPrePostIncDec(const UnaryOperator *E, LValue LV,
                                        bool isInc, bool isPre);
@@ -4846,6 +4885,9 @@ public:
   bool ConstantFoldsToSimpleInteger(const Expr *Cond, llvm::APSInt &Result,
                                     bool AllowLabels = false);
 
+  /// Ignore parentheses and logical-NOT to track conditions consistently.
+  static const Expr *stripCond(const Expr *C);
+
   /// isInstrumentedCondition - Determine whether the given condition is an
   /// instrumentable condition (i.e. no "&&" or "||").
   static bool isInstrumentedCondition(const Expr *C);
@@ -4868,7 +4910,8 @@ public:
   /// evaluate to true based on PGO data.
   void EmitBranchOnBoolExpr(const Expr *Cond, llvm::BasicBlock *TrueBlock,
                             llvm::BasicBlock *FalseBlock, uint64_t TrueCount,
-                            Stmt::Likelihood LH = Stmt::LH_None);
+                            Stmt::Likelihood LH = Stmt::LH_None,
+                            const Expr *ConditionalOp = nullptr);
 
   /// Given an assignment `*LHS = RHS`, emit a test that checks if \p RHS is
   /// nonnull, if \p LHS is marked _Nonnull.

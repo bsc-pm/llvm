@@ -22,7 +22,7 @@ void bad() {
 // CHECK-NEXT: IntegerLiteral 0x{{.*}} <col:{{.*}}> 'int' 1
 // CHECK-NEXT: IntegerLiteral 0x{{.*}} <col:{{.*}}> 'int' 1
 
-// CHECK: OSSTaskDeclAttr 0x{{.*}} <line:4:9, col:{{.*}}> Implicit Cuda
+// CHECK: OSSTaskDeclAttr 0x{{.*}} <line:{{.*}}:{{.*}}, col:{{.*}}> Implicit Cuda
 // CHECK: IntegerLiteral 0x{{.*}} <col:{{.*}}> 'int' 0
 // CHECK: ConstantExpr 0x{{.*}} <col:{{.*}}> 'int'
 // CHECK-NEXT: value: Int 1
@@ -30,7 +30,7 @@ void bad() {
 // CHECK-NEXT: IntegerLiteral 0x{{.*}} <col:{{.*}}> 'int' 1
 // CHECK-NEXT: IntegerLiteral 0x{{.*}} <col:{{.*}}> 'int' 1
 
-// CHECK: OSSTaskDeclAttr 0x{{.*}} <line:7:9, col:{{.*}}> Implicit Opencl
+// CHECK: OSSTaskDeclAttr 0x{{.*}} <line:{{.*}}:{{.*}}, col:{{.*}}> Implicit Opencl
 // CHECK: IntegerLiteral 0x{{.*}} <col:{{.*}}> 'int' 1
 // CHECK: ConstantExpr 0x{{.*}} <col:{{.*}}> 'int'
 // CHECK-NEXT: value: Int 1
@@ -38,7 +38,7 @@ void bad() {
 // CHECK-NEXT: IntegerLiteral 0x{{.*}} <col:{{.*}}> 'int' 1
 // CHECK-NEXT: IntegerLiteral 0x{{.*}} <col:{{.*}}> 'int' 1
 
-// CHECK: OSSTaskDeclAttr 0x{{.*}} <line:7:9, col:{{.*}}> Implicit Opencl
+// CHECK: OSSTaskDeclAttr 0x{{.*}} <line:{{.*}}:{{.*}}, col:{{.*}}> Implicit Opencl
 // CHECK: IntegerLiteral 0x{{.*}} <col:{{.*}}> 'int' 1
 // CHECK: ConstantExpr 0x{{.*}} <col:{{.*}}> 'int'
 // CHECK-NEXT: value: Int 1

@@ -19,22 +19,22 @@ void bar()
   float j = foo(2.0f);
 }
 
-// CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:6:11, col:19>
-// CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:9:13, col:31>
-// CHECK-NEXT: OSSSharedClause {{[a-z0-9]+}} <col:22, col:30>
-// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:29> 'T' lvalue Var {{[a-z0-9]+}} 'x' 'T'
+// CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:{{.*}}:{{.*}}, col:{{.*}}>
+// CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:{{.*}}:{{.*}}, col:{{.*}}>
+// CHECK-NEXT: OSSSharedClause {{[a-z0-9]+}} <col:{{.*}}, col:{{.*}}>
+// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:{{.*}}> 'T' lvalue Var {{[a-z0-9]+}} 'x' 'T'
 
-// CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:6:11, col:19>
+// CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:{{.*}}:{{.*}}, col:{{.*}}>
 // CHECK-NEXT: OSSFirstprivateClause {{[a-z0-9]+}} <<invalid sloc>> <implicit>
-// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <line:8:11> 'int' lvalue ParmVar {{[a-z0-9]+}} 't' 'int'
-// CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:9:13, col:31>
-// CHECK-NEXT: OSSSharedClause {{[a-z0-9]+}} <col:22, col:30>
-// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:29> 'int' lvalue Var {{[a-z0-9]+}} 'x' 'int'
+// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <line:{{.*}}:{{.*}}> 'int' lvalue ParmVar {{[a-z0-9]+}} 't' 'int'
+// CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:{{.*}}:{{.*}}, col:{{.*}}>
+// CHECK-NEXT: OSSSharedClause {{[a-z0-9]+}} <col:{{.*}}, col:{{.*}}>
+// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:{{.*}}> 'int' lvalue Var {{[a-z0-9]+}} 'x' 'int'
 
-// CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:6:11, col:19>
+// CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:{{.*}}:{{.*}}, col:{{.*}}>
 // CHECK-NEXT: OSSFirstprivateClause {{[a-z0-9]+}} <<invalid sloc>> <implicit>
-// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <line:8:11> 'float' lvalue ParmVar {{[a-z0-9]+}} 't' 'float'
-// CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:9:13, col:31>
-// CHECK-NEXT: OSSSharedClause {{[a-z0-9]+}} <col:22, col:30>
+// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <line:{{.*}}:{{.*}}> 'float' lvalue ParmVar {{[a-z0-9]+}} 't' 'float'
+// CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:{{.*}}:{{.*}}, col:{{.*}}>
+// CHECK-NEXT: OSSSharedClause {{[a-z0-9]+}} <col:{{.*}}, col:{{.*}}>
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:29> 'float' lvalue Var {{[a-z0-9]+}} 'x' 'float'
 

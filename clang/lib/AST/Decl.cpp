@@ -1089,11 +1089,11 @@ bool NamedDecl::isPlaceholderVar(const LangOptions &LangOpts) const {
     return false;
   if (isa<FieldDecl>(this))
     return true;
-  if (auto *IFD = dyn_cast<IndirectFieldDecl>(this)) {
+  if (const auto *IFD = dyn_cast<IndirectFieldDecl>(this)) {
     if (!getDeclContext()->isFunctionOrMethod() &&
         !getDeclContext()->isRecord())
       return false;
-    VarDecl *VD = IFD->getVarDecl();
+    const VarDecl *VD = IFD->getVarDecl();
     return !VD || VD->getStorageDuration() == SD_Automatic;
   }
   // and it declares a variable with automatic storage duration
@@ -1106,7 +1106,7 @@ bool NamedDecl::isPlaceholderVar(const LangOptions &LangOpts) const {
   }
   if (const auto *BD = dyn_cast<BindingDecl>(this);
       BD && getDeclContext()->isFunctionOrMethod()) {
-    VarDecl *VD = BD->getHoldingVar();
+    const VarDecl *VD = BD->getHoldingVar();
     return !VD || VD->getStorageDuration() == StorageDuration::SD_Automatic;
   }
   return false;
@@ -1844,7 +1844,8 @@ static bool isRedeclarable(Decl::Kind K) {
   llvm_unreachable("unknown decl kind");
 }
 
-bool NamedDecl::declarationReplaces(NamedDecl *OldD, bool IsKnownNewer) const {
+bool NamedDecl::declarationReplaces(const NamedDecl *OldD,
+                                    bool IsKnownNewer) const {
   assert(getDeclName() == OldD->getDeclName() && "Declaration name mismatch");
 
   // Never replace one imported declaration with another; we need both results
@@ -1874,13 +1875,13 @@ bool NamedDecl::declarationReplaces(NamedDecl *OldD, bool IsKnownNewer) const {
 
   // Using declarations can be replaced if they import the same name from the
   // same context.
-  if (auto *UD = dyn_cast<UsingDecl>(this)) {
+  if (const auto *UD = dyn_cast<UsingDecl>(this)) {
     ASTContext &Context = getASTContext();
     return Context.getCanonicalNestedNameSpecifier(UD->getQualifier()) ==
            Context.getCanonicalNestedNameSpecifier(
                cast<UsingDecl>(OldD)->getQualifier());
   }
-  if (auto *UUVD = dyn_cast<UnresolvedUsingValueDecl>(this)) {
+  if (const auto *UUVD = dyn_cast<UnresolvedUsingValueDecl>(this)) {
     ASTContext &Context = getASTContext();
     return Context.getCanonicalNestedNameSpecifier(UUVD->getQualifier()) ==
            Context.getCanonicalNestedNameSpecifier(
@@ -1897,7 +1898,7 @@ bool NamedDecl::declarationReplaces(NamedDecl *OldD, bool IsKnownNewer) const {
     // Check whether this is actually newer than OldD. We want to keep the
     // newer declaration. This loop will usually only iterate once, because
     // OldD is usually the previous declaration.
-    for (auto *D : redecls()) {
+    for (const auto *D : redecls()) {
       if (D == OldD)
         break;
 
@@ -2200,8 +2201,7 @@ static LanguageLinkage getDeclLanguageLinkage(const T &D) {
 
   // Language linkage is a C++ concept, but saying that everything else in C has
   // C language linkage fits the implementation nicely.
-  ASTContext &Context = D.getASTContext();
-  if (!Context.getLangOpts().CPlusPlus)
+  if (!D.getASTContext().getLangOpts().CPlusPlus)
     return CLanguageLinkage;
 
   // C++ [dcl.link]p4: A C language linkage is ignored in determining the
@@ -2944,7 +2944,7 @@ bool ParmVarDecl::isDestroyedInCallee() const {
 
   // FIXME: isParamDestroyedInCallee() should probably imply
   // isDestructedType()
-  auto *RT = getType()->getAs<RecordType>();
+  const auto *RT = getType()->getAs<RecordType>();
   if (RT && RT->getDecl()->isParamDestroyedInCallee() &&
       getType().isDestructedType())
     return true;
@@ -3106,7 +3106,7 @@ FunctionDecl::getDefaultedFunctionInfo() const {
 }
 
 bool FunctionDecl::hasBody(const FunctionDecl *&Definition) const {
-  for (auto *I : redecls()) {
+  for (const auto *I : redecls()) {
     if (I->doesThisDeclarationHaveABody()) {
       Definition = I;
       return true;
@@ -3117,7 +3117,7 @@ bool FunctionDecl::hasBody(const FunctionDecl *&Definition) const {
 }
 
 bool FunctionDecl::hasTrivialBody() const {
-  Stmt *S = getBody();
+  const Stmt *S = getBody();
   if (!S) {
     // Since we don't have a body for this function, we don't know if it's
     // trivial or not.
@@ -3213,7 +3213,7 @@ void FunctionDecl::setPure(bool P) {
 
 template<std::size_t Len>
 static bool isNamed(const NamedDecl *ND, const char (&Str)[Len]) {
-  IdentifierInfo *II = ND->getIdentifier();
+  const IdentifierInfo *II = ND->getIdentifier();
   return II && II->isStr(Str);
 }
 
@@ -3306,9 +3306,9 @@ bool FunctionDecl::isReservedGlobalPlacementOperator() const {
   if (proto->getNumParams() != 2 || proto->isVariadic())
     return false;
 
-  ASTContext &Context =
-    cast<TranslationUnitDecl>(getDeclContext()->getRedeclContext())
-      ->getASTContext();
+  const ASTContext &Context =
+      cast<TranslationUnitDecl>(getDeclContext()->getRedeclContext())
+          ->getASTContext();
 
   // The result type and first argument type are constant across all
   // these operators.  The second argument must be exactly void*.
@@ -3343,7 +3343,7 @@ bool FunctionDecl::isReplaceableGlobalAllocationFunction(
 
   unsigned Params = 1;
   QualType Ty = FPT->getParamType(Params);
-  ASTContext &Ctx = getASTContext();
+  const ASTContext &Ctx = getASTContext();
 
   auto Consume = [&] {
     ++Params;
@@ -3389,7 +3389,8 @@ bool FunctionDecl::isReplaceableGlobalAllocationFunction(
     QualType T = Ty;
     while (const auto *TD = T->getAs<TypedefType>())
       T = TD->getDecl()->getUnderlyingType();
-    IdentifierInfo *II = T->castAs<EnumType>()->getDecl()->getIdentifier();
+    const IdentifierInfo *II =
+        T->castAs<EnumType>()->getDecl()->getIdentifier();
     if (II && II->isStr("__hot_cold_t"))
       Consume();
   }
@@ -3587,7 +3588,7 @@ unsigned FunctionDecl::getBuiltinID(bool ConsiderWrapperFunctions) const {
       (!hasAttr<ArmBuiltinAliasAttr>() && !hasAttr<BuiltinAliasAttr>()))
     return 0;
 
-  ASTContext &Context = getASTContext();
+  const ASTContext &Context = getASTContext();
   if (!Context.BuiltinInfo.isPredefinedLibFunction(BuiltinID))
     return BuiltinID;
 
@@ -3746,7 +3747,7 @@ bool FunctionDecl::doesDeclarationForceExternallyVisibleDefinition() const {
   assert(!doesThisDeclarationHaveABody() &&
          "Must have a declaration without a body.");
 
-  ASTContext &Context = getASTContext();
+  const ASTContext &Context = getASTContext();
 
   if (Context.getLangOpts().MSVCCompat) {
     const FunctionDecl *Definition;
@@ -4151,6 +4152,7 @@ FunctionDecl::setFunctionTemplateSpecialization(ASTContext &C,
   assert(TSK != TSK_Undeclared &&
          "Must specify the type of function template specialization");
   assert((TemplateOrSpecialization.isNull() ||
+          getFriendObjectKind() != FOK_None ||
           TSK == TSK_ExplicitSpecialization) &&
          "Member specialization must be an explicit specialization");
   FunctionTemplateSpecializationInfo *Info =

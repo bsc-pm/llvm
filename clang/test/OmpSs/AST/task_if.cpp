@@ -13,16 +13,16 @@ void bar() {
   float *j = foo(p);
 }
 
-// CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:6:11, col:26>
-// CHECK-NEXT: OSSIfClause {{[a-z0-9]+}} <col:20, col:25>
-// CHECK-NEXT: UnaryOperator {{[a-z0-9]+}} <col:23, col:24> '<dependent type>' prefix '*' cannot overflow
-// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:24> 'T *' lvalue ParmVar {{[a-z0-9]+}} 't' 'T *'
+// CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:{{.*}}:{{.*}}, col:{{.*}}>
+// CHECK-NEXT: OSSIfClause {{[a-z0-9]+}} <col:{{.*}}, col:{{.*}}>
+// CHECK-NEXT: UnaryOperator {{[a-z0-9]+}} <col:{{.*}}, col:{{.*}}> '<dependent type>' prefix '*' cannot overflow
+// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:{{.*}}> 'T *' lvalue ParmVar {{[a-z0-9]+}} 't' 'T *'
 
-// CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:6:11, col:26>
-// CHECK-NEXT: OSSIfClause {{[a-z0-9]+}} <col:20, col:25>
-// CHECK-NEXT: ImplicitCastExpr {{[a-z0-9]+}} <col:23, col:24> 'bool' <FloatingToBoolean>
-// CHECK-NEXT: ImplicitCastExpr {{[a-z0-9]+}} <col:23, col:24> 'float' <LValueToRValue>
-// CHECK-NEXT: UnaryOperator {{[a-z0-9]+}} <col:23, col:24> 'float' lvalue prefix '*' cannot overflow
-// CHECK-NEXT: ImplicitCastExpr {{[a-z0-9]+}} <col:24> 'float *' <LValueToRValue>
-// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:24> 'float *' lvalue ParmVar {{[a-z0-9]+}} 't' 'float *'
+// CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:{{.*}}:{{.*}}, col:{{.*}}>
+// CHECK-NEXT: OSSIfClause {{[a-z0-9]+}} <col:{{.*}}, col:{{.*}}>
+// CHECK-NEXT: ImplicitCastExpr {{[a-z0-9]+}} <col:{{.*}}, col:{{.*}}> 'bool' <FloatingToBoolean>
+// CHECK-NEXT: ImplicitCastExpr {{[a-z0-9]+}} <col:{{.*}}, col:{{.*}}> 'float' <LValueToRValue>
+// CHECK-NEXT: UnaryOperator {{[a-z0-9]+}} <col:{{.*}}, col:{{.*}}> 'float' lvalue prefix '*' cannot overflow
+// CHECK-NEXT: ImplicitCastExpr {{[a-z0-9]+}} <col:{{.*}}> 'float *' <LValueToRValue>
+// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:{{.*}}> 'float *' lvalue ParmVar {{[a-z0-9]+}} 't' 'float *'
 

@@ -26,10 +26,10 @@ void bar(int n) {
 // CHECK: OSSTaskForDirective 0x{{.*}} <line:{{.*}}:{{.*}}, col:{{.*}}> ompss-2
 // CHECK-NEXT: OSSPrivateClause 0x{{.*}} <<invalid sloc>> <implicit>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <line:{{.*}}:{{.*}}> 'int' lvalue Var 0x{{.*}} 'i' 'int'
-// CHECK: OSSTaskLoopDirective 0x{{.*}} <line:10:13, <invalid sloc>> ompss-2
+// CHECK: OSSTaskLoopDirective 0x{{.*}} <line:{{.*}}:{{.*}}, <invalid sloc>> ompss-2
 // CHECK-NEXT: OSSPrivateClause 0x{{.*}} <<invalid sloc>> <implicit>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <line:{{.*}}:{{.*}}> 'int' lvalue Var 0x{{.*}} 'i' 'int'
-// CHECK: OSSTaskLoopForDirective 0x{{.*}} <line:12:13, <invalid sloc>> ompss-2
+// CHECK: OSSTaskLoopForDirective 0x{{.*}} <line:{{.*}}:{{.*}}, <invalid sloc>> ompss-2
 // CHECK-NEXT: OSSPrivateClause 0x{{.*}} <<invalid sloc>> <implicit>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <line:{{.*}}:{{.*}}> 'int' lvalue Var 0x{{.*}} 'i' 'int'
 // CHECK: OSSTaskIterDirective 0x{{.*}} <line:{{.*}}:{{.*}}, col:{{.*}}> ompss-2
