@@ -1049,6 +1049,7 @@ void tools::addOpenMPRuntimeLibraryPath(const ToolChain &TC,
       llvm::sys::path::parent_path(TC.getDriver().Dir);
   llvm::sys::path::append(DefaultLibPath, CLANG_INSTALL_LIBDIR_BASENAME);
   CmdArgs.push_back(Args.MakeArgString("-L" + DefaultLibPath));
+  CmdArgs.push_back(Args.MakeArgString("-rpath" + DefaultLibPath));
 }
 
 void tools::addArchSpecificRPath(const ToolChain &TC, const ArgList &Args,
@@ -1080,8 +1081,10 @@ bool tools::addOpenMPRuntime(ArgStringList &CmdArgs, const ToolChain &TC,
     // Already diagnosed.
     return false;
 
-  if (RTKind == Driver::OMPRT_NOSV)
+  if (RTKind == Driver::OMPRT_NOSV) {
     CmdArgs.push_back("-lnosv");
+    addNosvRuntimeLib(TC, Args, CmdArgs);
+  }
 
   if (ForceStaticHostRuntime)
     CmdArgs.push_back("-Bstatic");
@@ -1120,9 +1123,6 @@ bool tools::addOpenMPRuntime(ArgStringList &CmdArgs, const ToolChain &TC,
 
   addArchSpecificRPath(TC, Args, CmdArgs);
   addOpenMPRuntimeLibraryPath(TC, Args, CmdArgs);
-  if (RTKind == Driver::OMPRT_NOSV)
-    addNosvRuntimeLib(TC, Args, CmdArgs);
-
   return true;
 }
 
