@@ -1049,7 +1049,8 @@ void tools::addOpenMPRuntimeLibraryPath(const ToolChain &TC,
       llvm::sys::path::parent_path(TC.getDriver().Dir);
   llvm::sys::path::append(DefaultLibPath, CLANG_INSTALL_LIBDIR_BASENAME);
   CmdArgs.push_back(Args.MakeArgString("-L" + DefaultLibPath));
-  CmdArgs.push_back(Args.MakeArgString("-rpath " + DefaultLibPath));
+  CmdArgs.push_back("-rpath");
+  CmdArgs.push_back(Args.MakeArgString(DefaultLibPath));
 }
 
 void tools::addArchSpecificRPath(const ToolChain &TC, const ArgList &Args,
