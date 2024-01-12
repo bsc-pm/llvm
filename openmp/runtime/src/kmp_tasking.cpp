@@ -2679,7 +2679,6 @@ kmp_int32 __kmp_omp_task(kmp_int32 gtid, kmp_task_t *new_task,
     if (serialize_immediate)
       new_taskdata->td_flags.task_serial = 1;
     __kmp_invoke_task(gtid, new_task, current_task);
-    abort();
   } else if (__kmp_dflt_blocktime != KMP_MAX_BLOCKTIME &&
              __kmp_wpolicy_passive) {
     kmp_info_t *this_thr = __kmp_threads[gtid];
