@@ -4213,8 +4213,9 @@ static inline int __kmp_execute_tasks_template(
     // The task source has been exhausted. If in final spin loop of barrier,
     // check if termination condition is satisfied. The work queue may be empty
     // but there might be proxy tasks still executing.
-    if (final_spin &&
-        KMP_ATOMIC_LD_ACQ(&current_task->td_incomplete_child_tasks) == 0) {
+    if (final_spin) {
+      if (KMP_ATOMIC_LD_ACQ(&current_task->td_incomplete_child_tasks) != 0)
+        continue;
       // First, decrement the #unfinished threads, if that has not already been
       // done.  This decrement might be to the spin location, and result in the
       // termination condition being satisfied.
