@@ -104,7 +104,11 @@ static inline void __kmp_release_deps(kmp_int32 gtid, kmp_taskdata_t *task) {
       kmp_node_info_t *successor = &(task->tdg->record_map[successorNumber]);
       kmp_int32 npredecessors = KMP_ATOMIC_DEC(&successor->npredecessors_counter) - 1;
       if (successor->task != nullptr && npredecessors == 0) {
+#if defined(KMP_OMPV_ENABLED)
+        abort();
+#else
         __kmp_omp_task(gtid, successor->task, false);
+#endif // KMP_OMPV_ENABLED
       }
     }
 
@@ -157,6 +161,7 @@ static inline void __kmp_release_deps(kmp_int32 gtid, kmp_taskdata_t *task) {
 
   kmp_depnode_list_t *next;
   kmp_taskdata_t *next_taskdata;
+  bool first = true;
   for (kmp_depnode_list_t *p = node->dn.successors; p; p = next) {
     kmp_depnode_t *successor = p->node;
 #if USE_ITT_BUILD && USE_ITT_NOTIFY
@@ -175,6 +180,14 @@ static inline void __kmp_release_deps(kmp_int32 gtid, kmp_taskdata_t *task) {
         KA_TRACE(20, ("__kmp_release_deps: T#%d successor %p of %p scheduled "
                       "for execution.\n",
                       gtid, successor->dn.task, task));
+#if defined(KMP_OMPV_ENABLED)
+        KMP_ASSERT(!KMP_HIDDEN_HELPER_THREAD(gtid));
+        if (first)
+          __kmp_omp_task(gtid, successor->dn.task, false, NOSV_SUBMIT_IMMEDIATE);
+        else
+          __kmp_omp_task(gtid, successor->dn.task, false, NOSV_SUBMIT_UNLOCKED);
+        first = false;
+#else
         // If a regular task depending on a hidden helper task, when the
         // hidden helper task is done, the regular task should be executed by
         // its encountering team.
@@ -196,6 +209,7 @@ static inline void __kmp_release_deps(kmp_int32 gtid, kmp_taskdata_t *task) {
         } else {
           __kmp_omp_task(gtid, successor->dn.task, false);
         }
+#endif // KMP_OMPV_ENABLED
       }
     }
 

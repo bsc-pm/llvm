@@ -2,7 +2,7 @@
 //
 // AIX runs out of resource in 32-bit with 4*omp_get_max_threads() threads.
 // XFAIL: aix && ppc
-// UNSUPPORTED: true
+// UNSUPPORTED: ompv, ompv-free-agents
 
 #include <omp.h>
 

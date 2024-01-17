@@ -2,7 +2,7 @@
 // REQUIRES: ompt
 // UNSUPPORTED: gcc-4, gcc-5, gcc-6, gcc-7
 // Unsupported until https://github.com/llvm/llvm-project/issues/69733 is fixed
-// UNSUPPORTED: true
+// UNSUPPORTED: ompv, ompv-free-agents
 #include "callback.h"
 
 int main()

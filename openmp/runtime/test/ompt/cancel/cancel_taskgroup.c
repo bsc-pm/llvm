@@ -1,6 +1,6 @@
 // RUN:  %libomp-compile && env OMP_CANCELLATION=true %libomp-run | %sort-threads | FileCheck %s
 // REQUIRES: ompt
-// UNSUPPORTED: clang-3, clang-4.0.0
+// UNSUPPORTED: clang-3, clang-4.0.0, ompv-free-agents
 // Current GOMP interface implementation does not support cancellation; icc 16 has a bug
 // XFAIL: gcc, icc-16
 

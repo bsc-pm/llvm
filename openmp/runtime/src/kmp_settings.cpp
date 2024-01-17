@@ -1093,6 +1093,52 @@ static void __kmp_stg_print_nesting_mode(kmp_str_buf_t *buffer,
 } // __kmp_stg_print_nesting_mode
 
 // -----------------------------------------------------------------------------
+// OMP_ENABLE_FREE_AGENTS
+
+static void __kmp_stg_parse_enable_free_agents(char const *name,
+                                               char const *value,
+                                               void *data) {
+#if defined(KMP_OMPV_ENABLED)
+  __kmp_stg_parse_bool(name, value, &__kmp_enable_free_agents);
+#else
+  KMP_WARNING(FreeAgentsSupport);
+#endif // KMP_OMPV_ENABLED
+}
+
+static void __kmp_stg_print_enable_free_agents(kmp_str_buf_t *buffer,
+                                               char const *name,
+                                               void *data) {
+#if defined(KMP_OMPV_ENABLED)
+  __kmp_stg_print_bool(buffer, name, __kmp_enable_free_agents);
+#else
+  KMP_WARNING(FreeAgentsSupport);
+#endif // KMP_OMPV_ENABLED
+}
+
+// -----------------------------------------------------------------------------
+// OMP_FREE_AGENT_TID_EMU
+
+static void __kmp_stg_parse_free_agent_tid_emu(char const *name,
+                                               char const *value,
+                                               void *data) {
+#if defined(KMP_OMPV_ENABLED)
+  __kmp_stg_parse_bool(name, value, &__kmp_free_agent_tid_emu);
+#else
+  KMP_WARNING(FreeAgentsSupport);
+#endif // KMP_OMPV_ENABLED
+}
+
+static void __kmp_stg_print_free_agent_tid_emu(kmp_str_buf_t *buffer,
+                                               char const *name,
+                                               void *data) {
+#if defined(KMP_OMPV_ENABLED)
+  __kmp_stg_print_bool(buffer, name, __kmp_free_agent_tid_emu);
+#else
+  KMP_WARNING(FreeAgentsSupport);
+#endif // KMP_OMPV_ENABLED
+}
+
+// -----------------------------------------------------------------------------
 // OMP_NESTED, OMP_NUM_THREADS
 
 static void __kmp_stg_parse_nested(char const *name, char const *value,
@@ -5555,6 +5601,10 @@ static kmp_setting_t __kmp_stg_table[] = {
     {"OMP_NESTED", __kmp_stg_parse_nested, __kmp_stg_print_nested, NULL, 0, 0},
     {"OMP_NUM_THREADS", __kmp_stg_parse_num_threads,
      __kmp_stg_print_num_threads, NULL, 0, 0},
+    {"OMP_ENABLE_FREE_AGENTS", __kmp_stg_parse_enable_free_agents,
+     __kmp_stg_print_enable_free_agents, NULL, 0, 0},
+    {"OMP_FREE_AGENT_TID_EMU", __kmp_stg_parse_free_agent_tid_emu,
+     __kmp_stg_print_free_agent_tid_emu, NULL, 0, 0},
     {"OMP_STACKSIZE", __kmp_stg_parse_stacksize, __kmp_stg_print_stacksize,
      NULL, 0, 0},
 

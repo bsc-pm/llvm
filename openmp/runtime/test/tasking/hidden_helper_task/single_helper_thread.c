@@ -1,5 +1,5 @@
 // RUN: %libomp-compile && env LIBOMP_NUM_HIDDEN_HELPER_THREADS=1 %libomp-run
-// UNSUPPORTED: true
+// UNSUPPORTED: ompv, ompv-free-agents
 
 // gcc/icc target offloading is incompatible with libomp
 // UNSUPPORTED: icc, gcc

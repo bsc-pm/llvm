@@ -365,6 +365,7 @@ TopologyHybrid               "%1$s: hybrid core type detected: %2$d %3$s cores."
 TopologyHybridCoreEff        "%1$s:   %2$d with core efficiency %3$d."
 NosvEnvSupport               "%1$s env var is not supported. Default value is %2$d."
 NosvEnvSupportStr            "%1$s env var is not supported. Default value is %2$s."
+FreeAgentsSupport            "Free agents support is only available in an OpenMP-V runtime."
 
 # --- OpenMP errors detected at runtime ---
 #

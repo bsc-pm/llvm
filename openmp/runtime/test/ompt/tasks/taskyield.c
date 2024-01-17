@@ -1,5 +1,6 @@
 // RUN: %libomp-compile-and-run | %sort-threads | FileCheck %s
 // REQUIRES: ompt
+// UNSUPPORTED: ompv-free-agents
 // Current GOMP interface implements taskyield as stub
 // XFAIL: gcc
 

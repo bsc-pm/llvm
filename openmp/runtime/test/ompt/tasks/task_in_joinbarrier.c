@@ -1,5 +1,6 @@
 // RUN: %libomp-compile-and-run | %sort-threads | FileCheck %s
 // REQUIRES: ompt
+// UNSUPPORTED: ompv-free-agents
 #define TEST_NEED_PRINT_FRAME_FROM_OUTLINED_FN
 #include "callback.h"
 #include <omp.h> 

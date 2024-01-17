@@ -48,6 +48,10 @@ volatile int __kmp_need_register_serial = TRUE;
 volatile int __kmp_init_middle = FALSE;
 volatile int __kmp_init_parallel = FALSE;
 volatile int __kmp_init_hidden_helper = FALSE;
+#if defined(KMP_OMPV_ENABLED)
+int __kmp_enable_free_agents = 0;
+int __kmp_free_agent_tid_emu = 0;
+#endif // KMP_OMPV_ENABLED
 volatile int __kmp_init_hidden_helper_threads = FALSE;
 volatile int __kmp_hidden_helper_team_done = FALSE;
 #if KMP_USE_MONITOR

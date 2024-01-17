@@ -301,7 +301,6 @@ extern int nosv_enable_ovni;
 extern int nosv_default_yield_type;
 extern uint64_t nosv_default_waitfor_time;
 
-
 void __kmp_nosv_attach(nosv_task_t *nosv_impl_task, void *thr);
 void numaid_to_nosv_affinity(uint32_t id, nosv_affinity_t *nosv_affinity, nosv_affinity_type_t type);
 void cpuid_to_nosv_affinity(uint32_t id, nosv_affinity_t *nosv_affinity, nosv_affinity_type_t type);
@@ -2846,7 +2845,7 @@ struct kmp_taskdata { /* aligned during dynamic allocation       */
   // execution, so if we overlap executions
   // we will potentially decrement the event counter
   // just after the reset.
-  bool td_complete_callback_done;
+  bool td_should_resubmit;
   // Instrumentation (Ovni) task id
   kmp_int32 td_instrum_task_id;
 #endif // KMP_OMPV_ENABLED
@@ -2925,7 +2924,10 @@ typedef struct kmp_base_task_team {
   KMP_ALIGN_CACHE
   volatile kmp_uint32
       tt_active; /* is the team still actively executing tasks */
+#if defined(KMP_OMPV_ENABLED)
   std::atomic<kmp_int32> tt_last_task_tid; /* Last worker pushing tasks */
+  std::atomic<kmp_int32> tt_unfinished_tasks;
+#endif // KMP_OMPV_ENABLED
 } kmp_base_task_team_t;
 
 union KMP_ALIGN_CACHE kmp_task_team {
@@ -3056,6 +3058,12 @@ typedef struct KMP_ALIGN_CACHE kmp_base_info {
   // NOTE: used to pass the current_task from nosv_exec_task
   // to nosv_complete_task
   ompt_thread_info_t ompt_old_thread_info;
+  // NOTE: Used to restore original team and task team
+  // of the free agent
+  kmp_team_t *th_free_agent_team;
+  kmp_task_team_t *th_free_agent_task_team;
+  // Used to identify a free agent
+  int th_is_free_agent;
 #endif // KMP_OMPV_ENABLED
 #endif
 
@@ -3132,6 +3140,7 @@ typedef struct KMP_ALIGN_CACHE kmp_base_info {
   kmp_cg_root_t *th_cg_roots; // list of cg_roots associated with this thread
 #if defined(KMP_OMPV_ENABLED)
   nosv_task_t th_nosv_task;
+  int th_suspend_status;
 #endif // KMP_OMPV_ENABLED
 } kmp_base_info_t;
 
@@ -4447,8 +4456,13 @@ KMP_EXPORT void __kmpc_omp_taskwait_deps_51(ident_t *loc_ref, kmp_int32 gtid,
                                             kmp_depend_info_t *noalias_dep_list,
                                             kmp_int32 has_no_wait);
 
+#if defined(KMP_OMPV_ENABLED)
+extern kmp_int32 __kmp_omp_task(kmp_int32 gtid, kmp_task_t *new_task,
+                                bool serialize_immediate, int nosv_submit_type);
+#else
 extern kmp_int32 __kmp_omp_task(kmp_int32 gtid, kmp_task_t *new_task,
                                 bool serialize_immediate);
+#endif // KMP_OMPV_ENABLED
 
 KMP_EXPORT kmp_int32 __kmpc_cancel(ident_t *loc_ref, kmp_int32 gtid,
                                    kmp_int32 cncl_kind);
@@ -4690,6 +4704,11 @@ static inline void __kmp_resume_if_hard_paused() {
 
 extern void __kmp_omp_display_env(int verbose);
 
+#if defined(KMP_OMPV_ENABLED)
+extern int __kmp_enable_free_agents;
+extern int __kmp_free_agent_tid_emu;
+#endif // KMP_OMPV_ENABLED
+
 // 1: it is initializing hidden helper team
 extern volatile int __kmp_init_hidden_helper;
 // 1: the hidden helper team is done
@@ -4757,6 +4776,68 @@ extern void __kmpc_error(ident_t *loc, int severity, const char *message);
 // Support for scope directive
 KMP_EXPORT void __kmpc_scope(ident_t *loc, kmp_int32 gtid, void *reserved);
 KMP_EXPORT void __kmpc_end_scope(ident_t *loc, kmp_int32 gtid, void *reserved);
+
+#if KMP_ARCH_X86 || KMP_ARCH_X86_64
+// Propagate any changes to the floating point control registers out to the team
+// We try to avoid unnecessary writes to the relevant cache line in the team
+// structure, so we don't make changes unless they are needed.
+inline static void propagateFPControl(kmp_team_t *team) {
+  if (__kmp_inherit_fp_control) {
+    kmp_int16 x87_fpu_control_word;
+    kmp_uint32 mxcsr;
+
+    // Get primary thread's values of FPU control flags (both X87 and vector)
+    __kmp_store_x87_fpu_control_word(&x87_fpu_control_word);
+    __kmp_store_mxcsr(&mxcsr);
+    mxcsr &= KMP_X86_MXCSR_MASK;
+
+    // There is no point looking at t_fp_control_saved here.
+    // If it is TRUE, we still have to update the values if they are different
+    // from those we now have. If it is FALSE we didn't save anything yet, but
+    // our objective is the same. We have to ensure that the values in the team
+    // are the same as those we have.
+    // So, this code achieves what we need whether or not t_fp_control_saved is
+    // true. By checking whether the value needs updating we avoid unnecessary
+    // writes that would put the cache-line into a written state, causing all
+    // threads in the team to have to read it again.
+    KMP_CHECK_UPDATE(team->t.t_x87_fpu_control_word, x87_fpu_control_word);
+    KMP_CHECK_UPDATE(team->t.t_mxcsr, mxcsr);
+    // Although we don't use this value, other code in the runtime wants to know
+    // whether it should restore them. So we must ensure it is correct.
+    KMP_CHECK_UPDATE(team->t.t_fp_control_saved, TRUE);
+  } else {
+    // Similarly here. Don't write to this cache-line in the team structure
+    // unless we have to.
+    KMP_CHECK_UPDATE(team->t.t_fp_control_saved, FALSE);
+  }
+}
+
+// Do the opposite, setting the hardware registers to the updated values from
+// the team.
+inline static void updateHWFPControl(kmp_team_t *team) {
+  if (__kmp_inherit_fp_control && team->t.t_fp_control_saved) {
+    // Only reset the fp control regs if they have been changed in the team.
+    // the parallel region that we are exiting.
+    kmp_int16 x87_fpu_control_word;
+    kmp_uint32 mxcsr;
+    __kmp_store_x87_fpu_control_word(&x87_fpu_control_word);
+    __kmp_store_mxcsr(&mxcsr);
+    mxcsr &= KMP_X86_MXCSR_MASK;
+
+    if (team->t.t_x87_fpu_control_word != x87_fpu_control_word) {
+      __kmp_clear_x87_fpu_status_word();
+      __kmp_load_x87_fpu_control_word(&team->t.t_x87_fpu_control_word);
+    }
+
+    if (team->t.t_mxcsr != mxcsr) {
+      __kmp_load_mxcsr(&team->t.t_mxcsr);
+    }
+  }
+}
+#else
+#define propagateFPControl(x) ((void)0)
+#define updateHWFPControl(x) ((void)0)
+#endif /* KMP_ARCH_X86 || KMP_ARCH_X86_64 */
 
 #ifdef __cplusplus
 }

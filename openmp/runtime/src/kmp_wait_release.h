@@ -580,9 +580,7 @@ final_spin=FALSE)
 
     // If we are oversubscribed, or have waited a bit (and
     // KMP_LIBRARY=throughput), then yield
-#if !defined(KMP_OMPV_ENABLED)
     KMP_YIELD_OVERSUB_ELSE_SPIN(spins, time);
-#endif // KMP_OMPV_ENABLED
 
 #if KMP_STATS_ENABLED
     // Check if thread has been signalled to idle state

@@ -1,4 +1,5 @@
-// RUN: %libomp-compile-and-run | %sort-threads | FileCheck %s
+// RUN: %if omp %{ %libomp-compile-and-run | %sort-threads | FileCheck %s %}
+// RUN: %if ompv || ompv-free-agents %{ %libomp-compile-and-run | %sort-threads | FileCheck %s --check-prefix=CHECK-OMPV %}
 // REQUIRES: ompt
 // UNSUPPORTED: gcc-4, gcc-5, gcc-6, gcc-7
 #include "callback.h"
@@ -40,8 +41,8 @@ int main()
   // master thread implicit barrier at parallel end
   // CHECK: {{^}}[[MASTER_ID]]: ompt_event_barrier_begin: parallel_id={{[0-9]+}}, task_id={{[0-9]+}}, codeptr_ra={{0x[0-f]+}}
   // CHECK: {{^}}[[MASTER_ID]]: ompt_event_wait_barrier_begin: parallel_id={{[0-9]+}}, task_id={{[0-9]+}}, codeptr_ra={{0x[0-f]+}}
-  // CHECK: {{^}}[[MASTER_ID]]: ompt_event_wait_barrier_end: parallel_id={{[0-9]+}}, task_id={{[0-9]+}}, codeptr_ra=(nil)
-  // CHECK: {{^}}[[MASTER_ID]]: ompt_event_barrier_end: parallel_id={{[0-9]+}}, task_id={{[0-9]+}}, codeptr_ra=(nil)
+  // CHECK: {{^}}[[MASTER_ID]]: ompt_event_wait_barrier_end: parallel_id={{[0-9]+}}, task_id={{[0-9]+}}, codeptr_ra={{0x[0-f]+}}
+  // CHECK: {{^}}[[MASTER_ID]]: ompt_event_barrier_end: parallel_id={{[0-9]+}}, task_id={{[0-9]+}}, codeptr_ra={{0x[0-f]+}}
 
 
   // worker thread implicit barrier at single end
@@ -56,6 +57,39 @@ int main()
   // CHECK: {{^}}[[THREAD_ID]]: ompt_event_wait_barrier_begin: parallel_id={{[0-9]+}}, task_id={{[0-9]+}}, codeptr_ra=[[NULL]]
   // CHECK: {{^}}[[THREAD_ID]]: ompt_event_wait_barrier_end: parallel_id={{[0-9]+}}, task_id={{[0-9]+}}, codeptr_ra=[[NULL]]
   // CHECK: {{^}}[[THREAD_ID]]: ompt_event_barrier_end: parallel_id={{[0-9]+}}, task_id={{[0-9]+}}, codeptr_ra=[[NULL]]
+
+  // Check if libomp supports the callbacks for this test.
+  // CHECK-OMPV-NOT: {{^}}0: Could not register callback 'ompt_callback_sync_region'
+  // CHECK-OMPV-NOT: {{^}}0: Could not register callback 'ompt_callback_sync_region_wait'
+
+  // CHECK-OMPV: 0: NULL_POINTER=[[NULL:.*$]]
+
+  // master thread implicit barrier at single end
+  // CHECK-OMPV: {{^}}[[MASTER_ID:[0-9]+]]: ompt_event_barrier_begin: parallel_id={{[0-9]+}}, task_id={{[0-9]+}}, codeptr_ra=[[RETURN_ADDRESS:0x[0-f]+]]{{[0-f][0-f]}}
+  // CHECK-OMPV: {{^}}[[MASTER_ID]]: ompt_event_wait_barrier_begin: parallel_id={{[0-9]+}}, task_id={{[0-9]+}}, codeptr_ra=[[RETURN_ADDRESS]]{{[0-f][0-f]}}
+  // CHECK-OMPV: {{^}}[[MASTER_ID]]: ompt_event_wait_barrier_end: parallel_id={{[0-9]+}}, task_id={{[0-9]+}}, codeptr_ra=[[RETURN_ADDRESS]]{{[0-f][0-f]}}
+  // CHECK-OMPV: {{^}}[[MASTER_ID]]: ompt_event_barrier_end: parallel_id={{[0-9]+}}, task_id={{[0-9]+}}, codeptr_ra=[[RETURN_ADDRESS]]{{[0-f][0-f]}}
+  // CHECK-OMPV: {{^}}[[MASTER_ID]]: fuzzy_address={{.*}}[[RETURN_ADDRESS]]
+
+  // master thread implicit barrier at parallel end
+  // CHECK-OMPV: {{^}}[[MASTER_ID]]: ompt_event_barrier_begin: parallel_id={{[0-9]+}}, task_id={{[0-9]+}}, codeptr_ra={{0x[0-f]+}}
+  // CHECK-OMPV: {{^}}[[MASTER_ID]]: ompt_event_wait_barrier_begin: parallel_id={{[0-9]+}}, task_id={{[0-9]+}}, codeptr_ra={{0x[0-f]+}}
+  // CHECK-OMPV: {{^}}[[MASTER_ID]]: ompt_event_wait_barrier_end: parallel_id={{[0-9]+}}, task_id={{[0-9]+}}, codeptr_ra=(nil)
+  // CHECK-OMPV: {{^}}[[MASTER_ID]]: ompt_event_barrier_end: parallel_id={{[0-9]+}}, task_id={{[0-9]+}}, codeptr_ra=(nil)
+
+
+  // worker thread implicit barrier at single end
+  // CHECK-OMPV: {{^}}[[THREAD_ID:[0-9]+]]: ompt_event_barrier_begin: parallel_id={{[0-9]+}}, task_id={{[0-9]+}}, codeptr_ra=[[RETURN_ADDRESS:0x[0-f]+]]{{[0-f][0-f]}}
+  // CHECK-OMPV: {{^}}[[THREAD_ID]]: ompt_event_wait_barrier_begin: parallel_id={{[0-9]+}}, task_id={{[0-9]+}}, codeptr_ra=[[RETURN_ADDRESS]]{{[0-f][0-f]}}
+  // CHECK-OMPV: {{^}}[[THREAD_ID]]: ompt_event_wait_barrier_end: parallel_id={{[0-9]+}}, task_id={{[0-9]+}}, codeptr_ra=[[RETURN_ADDRESS]]{{[0-f][0-f]}}
+  // CHECK-OMPV: {{^}}[[THREAD_ID]]: ompt_event_barrier_end: parallel_id={{[0-9]+}}, task_id={{[0-9]+}}, codeptr_ra=[[RETURN_ADDRESS]]{{[0-f][0-f]}}
+  // CHECK-OMPV: {{^}}[[THREAD_ID]]: fuzzy_address={{.*}}[[RETURN_ADDRESS]]
+
+  // worker thread implicit barrier at parallel end
+  // CHECK-OMPV: {{^}}[[THREAD_ID]]: ompt_event_barrier_begin: parallel_id={{[0-9]+}}, task_id={{[0-9]+}}, codeptr_ra=[[NULL]]
+  // CHECK-OMPV: {{^}}[[THREAD_ID]]: ompt_event_wait_barrier_begin: parallel_id={{[0-9]+}}, task_id={{[0-9]+}}, codeptr_ra=[[NULL]]
+  // CHECK-OMPV: {{^}}[[THREAD_ID]]: ompt_event_wait_barrier_end: parallel_id={{[0-9]+}}, task_id={{[0-9]+}}, codeptr_ra=[[NULL]]
+  // CHECK-OMPV: {{^}}[[THREAD_ID]]: ompt_event_barrier_end: parallel_id={{[0-9]+}}, task_id={{[0-9]+}}, codeptr_ra=[[NULL]]
 
   return 0;
 }

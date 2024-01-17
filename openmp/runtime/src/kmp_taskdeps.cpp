@@ -861,7 +861,11 @@ kmp_int32 __kmpc_omp_task_with_deps(ident_t *loc_ref, kmp_int32 gtid,
                 "loc=%p task=%p, transferring to __kmp_omp_task\n",
                 gtid, loc_ref, new_taskdata));
 
+#if defined(KMP_OMPV_ENABLED)
+  kmp_int32 ret = __kmp_omp_task(gtid, new_task, true, NOSV_SUBMIT_NONE);
+#else
   kmp_int32 ret = __kmp_omp_task(gtid, new_task, true);
+#endif // KMP_OMPV_ENABLED
 #if OMPT_SUPPORT
   if (ompt_enabled.enabled) {
     current_task->ompt_task_info.frame.enter_frame = ompt_data_none;
