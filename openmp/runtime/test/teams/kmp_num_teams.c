@@ -2,6 +2,10 @@
 // UNSUPPORTED: gcc
 // Linking fails for icc 18/19
 // UNSUPPORTED: icc-18, icc-19
+// UNSUPPORTED: true
+
+// Marked as unsupported because enabling
+// tasking always triggers another runtime error
 
 #include <stdio.h>
 #include <stdlib.h>

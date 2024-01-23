@@ -4936,6 +4936,20 @@ void __kmp_task_team_setup(kmp_info_t *this_thr, kmp_team_t *team, int always) {
         }
       }
     }
+  } else {
+    for (int i = 0; i < 2; ++i) {
+      kmp_task_team_t *task_team = team->t.t_task_team[i];
+      if (!task_team || KMP_TASKING_ENABLED(task_team)) {
+        continue;
+      }
+      __kmp_enable_tasking(task_team, this_thr);
+      for (int j = 0; j < task_team->tt.tt_nproc; ++j) {
+        kmp_thread_data_t *thread_data = &task_team->tt.tt_threads_data[j];
+        if (thread_data->td.td_deque == NULL) {
+          __kmp_alloc_task_deque(team->t.t_threads[j], thread_data);
+        }
+      }
+    }
   }
 }
 

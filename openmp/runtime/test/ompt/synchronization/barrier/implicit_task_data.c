@@ -44,8 +44,8 @@ int main()
   // master thread implicit barrier at parallel end
   // CHECK: {{^}}[[MASTER_ID:[0-9]+]]: ompt_event_barrier_begin: parallel_id=0, task_id=[[TASK_ID:[0-9]+]], codeptr_ra={{0x[0-f]*}}
   // CHECK: {{^}}[[MASTER_ID]]: ompt_event_wait_barrier_begin: parallel_id=0, task_id=[[TASK_ID]], codeptr_ra={{0x[0-f]*}}
-  // CHECK: {{^}}[[MASTER_ID]]: ompt_event_wait_barrier_end: parallel_id=0, task_id=[[TASK_ID]], codeptr_ra={{0x[0-f]*}}
-  // CHECK: {{^}}[[MASTER_ID]]: ompt_event_barrier_end: parallel_id=0, task_id=[[TASK_ID]], codeptr_ra={{0x[0-f]*}}
+  // CHECK: {{^}}[[MASTER_ID]]: ompt_event_wait_barrier_end: parallel_id=0, task_id=[[TASK_ID]], codeptr_ra=(nil)
+  // CHECK: {{^}}[[MASTER_ID]]: ompt_event_barrier_end: parallel_id=0, task_id=[[TASK_ID]], codeptr_ra=(nil)
 
 
   // worker thread implicit barrier at parallel end

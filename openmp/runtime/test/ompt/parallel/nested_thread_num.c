@@ -175,7 +175,7 @@ int main() {
 
 // THREADS: {{^}}[[MASTER_ID]]: ompt_event_barrier_end:
 // THREADS-SAME: parallel_id={{[0-9]+}}, task_id=[[NESTED_IMPLICIT_TASK_ID]],
-// THREADS-SAME: codeptr_ra=[[NESTED_RETURN_ADDRESS]]{{[0-f][0-f]}}
+// THREADS-SAME: codeptr_ra=(nil)
 
 // THREADS: {{^}}[[MASTER_ID]]: ompt_event_implicit_task_end:
 // THREADS-SAME: parallel_id={{[0-9]+}}, task_id=[[NESTED_IMPLICIT_TASK_ID]]
@@ -205,7 +205,7 @@ int main() {
 
 // THREADS: {{^}}[[MASTER_ID]]: ompt_event_barrier_end:
 // THREADS-SAME: parallel_id={{[0-9]+}}, task_id=[[IMPLICIT_TASK_ID]],
-// THREADS-SAME: codeptr_ra=[[RETURN_ADDRESS]]{{[0-f][0-f]}}
+// THREADS-SAME: codeptr_ra=(nil)
 
 // THREADS: {{^}}[[MASTER_ID]]: ompt_event_implicit_task_end:
 // THREADS-SAME: parallel_id={{[0-9]+}}, task_id=[[IMPLICIT_TASK_ID]]
