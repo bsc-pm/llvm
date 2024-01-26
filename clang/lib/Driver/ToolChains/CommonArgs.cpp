@@ -1083,7 +1083,7 @@ bool tools::addOpenMPRuntime(ArgStringList &CmdArgs, const ToolChain &TC,
     return false;
 
   if (RTKind == Driver::OMPRT_NOSV) {
-    CmdArgs.push_back("-lnosv");
+    CmdArgs.insert(CmdArgs.begin(), "-lnosv");
     addNosvRuntimeLib(TC, Args, CmdArgs);
   }
 
