@@ -305,7 +305,7 @@ static void __kmp_nosv_init() {
 
    env = getenv("OMP_OVNI");
    if (env) {
-      nosv_enable_ovni = atoi(env);
+      ompv_instr_level = atoi(env);
    }
    intrum_check_ovni();
 
