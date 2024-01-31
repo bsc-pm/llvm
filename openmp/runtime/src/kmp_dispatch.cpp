@@ -3209,7 +3209,7 @@ void __kmp_wait_4_ptr(void *spinner, kmp_uint32 checker,
     KMP_FSYNC_SPIN_PREPARE(obj);
     /* if we have waited a bit, or are noversubscribed, yield */
     /* pause is in the following code */
-#if defined(KMP_OMPV_ENABLED)
+#if !defined(KMP_OMPV_ENABLED)
     KMP_YIELD_OVERSUB_ELSE_SPIN(spins, time);
 #endif // KMP_OMPV_ENABLED
   }
