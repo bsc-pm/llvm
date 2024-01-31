@@ -23,6 +23,12 @@ int main(int argc, char** argv)
     usage();
     return 1;
   }
+#if defined(_OPENMPV)
+  // Ignore test for OpenMP-V
+  // TODO: add target ompv so we can set
+  // test as unsupported
+  return 0;
+#endif // _OPENMPV
 
   blocktime = kmp_get_blocktime();
 

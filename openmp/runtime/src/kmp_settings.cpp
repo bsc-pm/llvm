@@ -667,6 +667,9 @@ static void __kmp_stg_print_use_yield(kmp_str_buf_t *buffer, char const *name,
 
 static void __kmp_stg_parse_blocktime(char const *name, char const *value,
                                       void *data) {
+#if defined(KMP_OMPV_ENABLED)
+  KMP_WARNING(NosvEnvSupport, "KMP_BLOCKTIME", __kmp_dflt_blocktime);
+#else
   const char *buf = value;
   const char *next;
   const int ms_mult = 1000;
@@ -749,6 +752,7 @@ static void __kmp_stg_parse_blocktime(char const *name, char const *value,
   if (__kmp_env_blocktime) {
     K_DIAG(1, ("__kmp_dflt_blocktime == %d\n", __kmp_dflt_blocktime));
   }
+#endif // KMP_OMPV_ENABLED
 } // __kmp_stg_parse_blocktime
 
 static void __kmp_stg_print_blocktime(kmp_str_buf_t *buffer, char const *name,
@@ -808,7 +812,9 @@ static char const *blocktime_str = NULL;
 
 static void __kmp_stg_parse_wait_policy(char const *name, char const *value,
                                         void *data) {
-
+#if defined(KMP_OMPV_ENABLED)
+  KMP_WARNING(NosvEnvSupportStr, "OMP_WAIT_POLICY", __kmp_wpolicy_passive ? "'passive'" : "'active'");
+#else
   kmp_stg_wp_data_t *wait = (kmp_stg_wp_data_t *)data;
   int rc;
 
@@ -857,6 +863,7 @@ static void __kmp_stg_parse_wait_policy(char const *name, char const *value,
       KMP_WARNING(StgInvalidValue, name, value);
     }
   }
+#endif // KMP_OMPV_ENABLED
 } // __kmp_stg_parse_wait_policy
 
 static void __kmp_stg_print_wait_policy(kmp_str_buf_t *buffer, char const *name,

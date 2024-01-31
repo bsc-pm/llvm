@@ -7374,7 +7374,11 @@ static void __kmp_do_serial_initialize(void) {
 
   // Three vars below moved here from __kmp_env_initialize() "KMP_BLOCKTIME"
   // part
+#if defined(KMP_OMPV_ENABLED)
+  __kmp_dflt_blocktime = 0;
+#else
   __kmp_dflt_blocktime = KMP_DEFAULT_BLOCKTIME;
+#endif // KMP_OMPV_ENABLED
 #if KMP_USE_MONITOR
   __kmp_monitor_wakeups =
       KMP_WAKEUPS_FROM_BLOCKTIME(__kmp_dflt_blocktime, __kmp_monitor_wakeups);

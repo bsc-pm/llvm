@@ -161,7 +161,9 @@ int __kmp_release_tas_lock(kmp_tas_lock_t *lck, kmp_int32 gtid) {
   KMP_ATOMIC_ST_REL(&lck->lk.poll, KMP_LOCK_FREE(tas));
   KMP_MB(); /* Flush all pending memory write invalidates.  */
 
+#if !defined(KMP_OMPV_ENABLED)
   KMP_YIELD_OVERSUB();
+#endif // KMP_OMPV_ENABLED
   return KMP_LOCK_RELEASED;
 }
 
@@ -462,7 +464,9 @@ int __kmp_release_futex_lock(kmp_futex_lock_t *lck, kmp_int32 gtid) {
   KA_TRACE(1000, ("__kmp_release_futex_lock: lck:%p(0x%x), T#%d exiting\n", lck,
                   lck->lk.poll, gtid));
 
+#if !defined(KMP_OMPV_ENABLED)
   KMP_YIELD_OVERSUB();
+#endif // KMP_OMPV_ENABLED
   return KMP_LOCK_RELEASED;
 }
 
@@ -1264,7 +1268,9 @@ __kmp_acquire_queuing_lock_timed_template(kmp_queuing_lock_t *lck,
     /* Yield if number of threads > number of logical processors */
     /* ToDo: Not sure why this should only be in oversubscription case,
        maybe should be traditional YIELD_INIT/YIELD_WHEN loop */
+#if !defined(KMP_OMPV_ENABLED)
     KMP_YIELD_OVERSUB();
+#endif // KMP_OMPV_ENABLED
 
 #ifdef DEBUG_QUEUING_LOCKS
     TRACE_LOCK(gtid + 1, "acq retry");
