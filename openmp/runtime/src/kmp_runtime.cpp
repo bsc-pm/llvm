@@ -7936,6 +7936,10 @@ int __kmp_invoke_task_func(int gtid) {
   KMP_SET_THREAD_STATE(IMPLICIT_TASK);
 #endif
 
+#if defined(KMP_OMPV_ENABLED)
+  instr_microtask_enter();
+#endif
+
   rc = __kmp_invoke_microtask((microtask_t)TCR_SYNC_PTR(team->t.t_pkfn), gtid,
                               tid, (int)team->t.t_argc, (void **)team->t.t_argv
 #if OMPT_SUPPORT
@@ -7943,6 +7947,11 @@ int __kmp_invoke_task_func(int gtid) {
                               exit_frame_p
 #endif
   );
+
+#if defined(KMP_OMPV_ENABLED)
+  instr_microtask_exit();
+#endif
+
 #if OMPT_SUPPORT
   *exit_frame_p = NULL;
   this_thr->th.ompt_thread_info.parallel_flags |= ompt_parallel_team;

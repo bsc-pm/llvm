@@ -205,6 +205,8 @@ INSTR_0ARG(INSTR_SS, instr_single_enter, "PWi")
 INSTR_0ARG(INSTR_SS, instr_single_exit, "PWI")
 INSTR_0ARG(INSTR_SS, instr_fork_enter, "PWf")
 INSTR_0ARG(INSTR_SS, instr_fork_exit, "PWF")
+INSTR_0ARG(INSTR_SS, instr_microtask_enter, "PWm")
+INSTR_0ARG(INSTR_SS, instr_microtask_exit, "PWM")
 
 INSTR_0ARG(INSTR_SS, instr_release_deps_enter, "PTr")
 INSTR_0ARG(INSTR_SS, instr_release_deps_exit, "PTR")
