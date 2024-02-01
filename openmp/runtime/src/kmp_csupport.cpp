@@ -264,6 +264,9 @@ construct
 Do the actual fork and call the microtask in the relevant number of threads.
 */
 void __kmpc_fork_call(ident_t *loc, kmp_int32 argc, kmpc_micro microtask, ...) {
+#if defined(KMP_OMPV_ENABLED)
+  instr_fork_enter();
+#endif
   int gtid = __kmp_entry_gtid();
 
 #if (KMP_STATS_ENABLED)
@@ -332,6 +335,10 @@ void __kmpc_fork_call(ident_t *loc, kmp_int32 argc, kmpc_micro microtask, ...) {
     KMP_POP_PARTITIONED_TIMER();
   }
 #endif // KMP_STATS_ENABLED
+
+#if defined(KMP_OMPV_ENABLED)
+  instr_fork_exit();
+#endif
 }
 
 /*!

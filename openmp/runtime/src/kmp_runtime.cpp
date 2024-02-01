@@ -2038,10 +2038,6 @@ int __kmp_fork_call(ident_t *loc, int gtid,
     KMP_TIME_DEVELOPER_PARTITIONED_BLOCK(KMP_fork_call);
     KMP_COUNT_VALUE(OMP_PARALLEL_args, argc);
 
-#if defined(KMP_OMPV_ENABLED)
-    instr_fork_enter();
-#endif
-
     KA_TRACE(20, ("__kmp_fork_call: enter T#%d\n", gtid));
     if (__kmp_stkpadding > 0 && __kmp_root[gtid] != NULL) {
       /* Some systems prefer the stack for the root thread(s) to start with */
@@ -2128,7 +2124,7 @@ int __kmp_fork_call(ident_t *loc, int gtid,
 
     // Parallel closely nested in teams construct:
     if (__kmp_is_fork_in_teams(master_th, microtask, level, teams_level, ap)) {
-      int ret = __kmp_fork_in_teams(loc, gtid, parent_team, argc, master_th, root,
+      return __kmp_fork_in_teams(loc, gtid, parent_team, argc, master_th, root,
                                  call_context, microtask, invoker,
                                  master_set_numthreads, level,
 #if OMPT_SUPPORT
@@ -2136,10 +2132,6 @@ int __kmp_fork_call(ident_t *loc, int gtid,
 #endif
                                  ap);
 
-#if defined(KMP_OMPV_ENABLED)
-      instr_fork_exit();
-#endif
-      return ret;
     } // End parallel closely nested in teams construct
 
 #if KMP_DEBUG
@@ -2197,17 +2189,13 @@ int __kmp_fork_call(ident_t *loc, int gtid,
     master_th->th.th_set_nproc = 0;
 
     if (nthreads == 1) {
-      int ret = __kmp_serial_fork_call(loc, gtid, call_context, argc, microtask,
+      return __kmp_serial_fork_call(loc, gtid, call_context, argc, microtask,
                                     invoker, master_th, parent_team,
 #if OMPT_SUPPORT
                                     &ompt_parallel_data, &return_address,
                                     &parent_task_data,
 #endif
                                     ap);
-#if defined(KMP_OMPV_ENABLED)
-      instr_fork_exit();
-#endif
-      return ret;
     } // if (nthreads == 1)
 
     // GEH: only modify the executing flag in the case when not serialized
@@ -2506,9 +2494,6 @@ int __kmp_fork_call(ident_t *loc, int gtid,
 
     if (call_context == fork_context_gnu) {
       KA_TRACE(20, ("__kmp_fork_call: parallel exit T#%d\n", gtid));
-#if defined(KMP_OMPV_ENABLED)
-      instr_fork_exit();
-#endif
       return TRUE;
     }
 
@@ -2547,9 +2532,6 @@ int __kmp_fork_call(ident_t *loc, int gtid,
   }
 #endif
 
-#if defined(KMP_OMPV_ENABLED)
-  instr_fork_exit();
-#endif
   return TRUE;
 }
 
