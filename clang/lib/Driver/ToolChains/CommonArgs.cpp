@@ -1323,7 +1323,7 @@ void tools::addOmpSsRuntimeLibs(
 
   // Add nOS-V before NODES
   if (NODESUsed) {
-    CmdArgs.push_back("-lnosv");
+    CmdArgs.insert(CmdArgs.begin(), "-lnosv");
     addNosvRuntimeLib(TC, Args, CmdArgs);
   }
 
