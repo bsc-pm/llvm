@@ -1290,6 +1290,10 @@ This function blocks until the executing thread can enter the critical section.
 */
 void __kmpc_critical(ident_t *loc, kmp_int32 global_tid,
                      kmp_critical_name *crit) {
+#if defined(KMP_OMPV_ENABLED)
+  instr_critical_enter();
+#endif
+
 #if KMP_USE_DYNAMIC_LOCK
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   OMPT_STORE_RETURN_ADDRESS(global_tid);
@@ -1380,6 +1384,9 @@ void __kmpc_critical(ident_t *loc, kmp_int32 global_tid,
   KMP_PUSH_PARTITIONED_TIMER(OMP_critical);
   KA_TRACE(15, ("__kmpc_critical: done T#%d\n", global_tid));
 #endif // KMP_USE_DYNAMIC_LOCK
+#if defined(KMP_OMPV_ENABLED)
+  instr_critical_exit();
+#endif
 }
 
 #if KMP_USE_DYNAMIC_LOCK
@@ -1517,6 +1524,9 @@ speculative execution and the hardware supports it.
 */
 void __kmpc_critical_with_hint(ident_t *loc, kmp_int32 global_tid,
                                kmp_critical_name *crit, uint32_t hint) {
+#if defined(KMP_OMPV_ENABLED)
+  instr_critical_enter();
+#endif
   KMP_COUNT_BLOCK(OMP_CRITICAL);
   kmp_user_lock_p lck;
 #if OMPT_SUPPORT && OMPT_OPTIONAL
@@ -1634,6 +1644,9 @@ void __kmpc_critical_with_hint(ident_t *loc, kmp_int32 global_tid,
 
   KMP_PUSH_PARTITIONED_TIMER(OMP_critical);
   KA_TRACE(15, ("__kmpc_critical: done T#%d\n", global_tid));
+#if defined(KMP_OMPV_ENABLED)
+  instr_critical_exit();
+#endif
 } // __kmpc_critical_with_hint
 
 #endif // KMP_USE_DYNAMIC_LOCK
@@ -1649,6 +1662,10 @@ Leave a critical section, releasing any lock that was held during its execution.
 */
 void __kmpc_end_critical(ident_t *loc, kmp_int32 global_tid,
                          kmp_critical_name *crit) {
+#if defined(KMP_OMPV_ENABLED)
+  instr_end_critical_enter();
+#endif
+
   kmp_user_lock_p lck;
 
   KC_TRACE(10, ("__kmpc_end_critical: called T#%d\n", global_tid));
@@ -1733,6 +1750,9 @@ void __kmpc_end_critical(ident_t *loc, kmp_int32 global_tid,
 
   KMP_POP_PARTITIONED_TIMER();
   KA_TRACE(15, ("__kmpc_end_critical: done T#%d\n", global_tid));
+#if defined(KMP_OMPV_ENABLED)
+  instr_end_critical_exit();
+#endif
 }
 
 /*!
