@@ -2,6 +2,7 @@
 #define INSTRUM_H_
 
 #include <unistd.h>
+#include "kmp.h"
 #include "kmp_wrapper_getpid.h"
 
 enum instr_levels {
@@ -153,6 +154,43 @@ static inline void instr_attached_enter(void)
   ovni_ev_set_mcv(&ev, "PA[");
   ovni_ev_emit(&ev);
 }
+
+static inline void instr_work_enter(kmp_int32 flags)
+{
+  if (ompv_instr_level < INSTR_SS)
+    return;
+
+  struct ovni_ev ev = {};
+  ovni_ev_set_clock(&ev, ovni_clock_now());
+
+  if (flags & KMP_IDENT_WORK_SECTIONS)
+    ovni_ev_set_mcv(&ev, "Pws");
+  else if (flags & KMP_IDENT_WORK_DISTRIBUTE)
+    ovni_ev_set_mcv(&ev, "Pwd");
+  else
+    ovni_ev_set_mcv(&ev, "Pwl");
+
+  ovni_ev_emit(&ev);
+}
+
+static inline void instr_work_exit(kmp_int32 flags)
+{
+  if (ompv_instr_level < INSTR_SS)
+    return;
+
+  struct ovni_ev ev = {};
+  ovni_ev_set_clock(&ev, ovni_clock_now());
+
+  if (flags & KMP_IDENT_WORK_SECTIONS)
+    ovni_ev_set_mcv(&ev, "PwS");
+  else if (flags & KMP_IDENT_WORK_DISTRIBUTE)
+    ovni_ev_set_mcv(&ev, "PwD");
+  else
+    ovni_ev_set_mcv(&ev, "PwL");
+
+  ovni_ev_emit(&ev);
+}
+
 
 #else // ENABLE_INSTRUMENTATION
 

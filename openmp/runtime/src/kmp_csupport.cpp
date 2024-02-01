@@ -2027,7 +2027,7 @@ void __kmpc_for_static_fini(ident_t *loc, kmp_int32 global_tid
 
 #if defined(KMP_OMPV_ENABLED)
   instr_ws_end((*omp_task_type)->instrum_id);
-  instr_for_static_exit();
+  instr_work_exit(loc ? loc->flags : 0);
 #endif // KMP_OMPV_ENABLED
 }
 
