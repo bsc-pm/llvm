@@ -6141,6 +6141,9 @@ void __kmp_free_thread(kmp_info_t *this_th) {
 /* ------------------------------------------------------------------------ */
 
 void *__kmp_launch_thread(kmp_info_t *this_thr) {
+#if defined(KMP_OMPV_ENABLED)
+  instr_launch_thread_enter();
+#endif
 #if OMP_PROFILING_SUPPORT
   ProfileTraceFile = getenv("LIBOMPTARGET_PROFILE");
   // TODO: add a configuration option for time granularity
@@ -6260,6 +6263,9 @@ void *__kmp_launch_thread(kmp_info_t *this_thr) {
 
 #if OMP_PROFILING_SUPPORT
   llvm::timeTraceProfilerFinishThread();
+#endif
+#if defined(KMP_OMPV_ENABLED)
+  instr_launch_thread_exit();
 #endif
   return this_thr;
 }

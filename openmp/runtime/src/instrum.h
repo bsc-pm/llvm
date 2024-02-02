@@ -252,6 +252,10 @@ INSTR_0ARG(INSTR_SS, instr_critical_exit, "PCC")
 INSTR_0ARG(INSTR_SS, instr_end_critical_enter, "PCe")
 INSTR_0ARG(INSTR_SS, instr_end_critical_exit, "PCE")
 
+// "H" for threads
+INSTR_0ARG(INSTR_SS, instr_launch_thread_enter, "PH[")
+INSTR_0ARG(INSTR_SS, instr_launch_thread_exit, "PH]")
+
 INSTR_0ARG(INSTR_SS, instr_release_deps_enter, "PTr")
 INSTR_0ARG(INSTR_SS, instr_release_deps_exit, "PTR")
 INSTR_0ARG(INSTR_SS, instr_taskwait_deps_enter, "PTw")
