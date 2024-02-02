@@ -226,7 +226,7 @@ INSTR_0ARG(INSTR_SS, instr_attached_exit, "PA]")
 
 INSTR_0ARG(INSTR_SS, instr_join_barrier_enter, "PBj")
 INSTR_0ARG(INSTR_SS, instr_join_barrier_exit, "PBJ")
-INSTR_0ARG(INSTR_SS, instr_barrier_enter, "PBb")
+INSTR_0ARG(INSTR_SS, instr_barrier_enter, "PBb") // plain?
 INSTR_0ARG(INSTR_SS, instr_barrier_exit, "PBB")
 INSTR_0ARG(INSTR_SS, instr_tasking_barrier_enter, "PBt")
 INSTR_0ARG(INSTR_SS, instr_tasking_barrier_exit, "PBT")
@@ -234,6 +234,8 @@ INSTR_0ARG(INSTR_SS, instr_spin_wait_enter, "PBs")
 INSTR_0ARG(INSTR_SS, instr_spin_wait_exit, "PBS")
 INSTR_0ARG(INSTR_SS, instr_fork_barrier_enter, "PBf")
 INSTR_0ARG(INSTR_SS, instr_fork_barrier_exit, "PBF")
+INSTR_0ARG(INSTR_SS, instr_explicit_barrier_enter, "PBe")
+INSTR_0ARG(INSTR_SS, instr_explicit_barrier_exit, "PBE")
 
 INSTR_0ARG(INSTR_SS, instr_for_static_enter, "PWs")
 INSTR_0ARG(INSTR_SS, instr_for_static_exit, "PWS")
