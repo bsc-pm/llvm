@@ -2412,6 +2412,9 @@ void __kmp_join_barrier(int gtid) {
 // TODO release worker threads' fork barriers as we are ready instead of all at
 // once
 void __kmp_fork_barrier(int gtid, int tid) {
+#if defined(KMP_OMPV_ENABLED)
+  instr_fork_barrier_enter();
+#endif
   KMP_TIME_PARTITIONED_BLOCK(OMP_fork_barrier);
   KMP_SET_THREAD_STATE_BLOCK(FORK_JOIN_BARRIER);
   kmp_info_t *this_thr = __kmp_threads[gtid];
@@ -2555,6 +2558,9 @@ void __kmp_fork_barrier(int gtid, int tid) {
     }
 #endif /* USE_ITT_BUILD && USE_ITT_NOTIFY */
     KA_TRACE(10, ("__kmp_fork_barrier: T#%d is leaving early\n", gtid));
+#if defined(KMP_OMPV_ENABLED)
+    instr_fork_barrier_exit();
+#endif
     return;
   }
 
@@ -2638,6 +2644,9 @@ void __kmp_fork_barrier(int gtid, int tid) {
 #endif /* USE_ITT_BUILD && USE_ITT_NOTIFY */
   KA_TRACE(10, ("__kmp_fork_barrier: T#%d(%d:%d) is leaving\n", gtid,
                 team->t.t_id, tid));
+#if defined(KMP_OMPV_ENABLED)
+  instr_fork_barrier_exit();
+#endif
 }
 
 void __kmp_setup_icv_copy(kmp_team_t *team, int new_nproc,
