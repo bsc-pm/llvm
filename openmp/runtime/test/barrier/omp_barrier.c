@@ -36,7 +36,9 @@ int main()
   int i;
   int num_failed=0;
 
-#ifdef _OPENMP
+// Unsupported in OpenMP-V since there is some bug with
+// tasking, passive and dist barrier
+#if defined(_OPENMP) && !defined(_OPENMPV)
   omp_set_dynamic(0); // prevent runtime to change number of threads
   omp_set_num_threads(4); // the test expects at least 3 threads
   for(i = 0; i < REPETITIONS; i++) {
