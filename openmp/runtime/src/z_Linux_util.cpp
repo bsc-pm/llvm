@@ -1825,16 +1825,18 @@ void __kmp_resume_monitor() {
 
 void __kmp_yield() {
 #if defined(KMP_OMPV_ENABLED)
+  int res;
   if (nosv_default_yield_type == 0) {
-    nosv_yield(NOSV_YIELD_NONE);
+    res = nosv_yield(NOSV_YIELD_NONE);
   } else if (nosv_default_yield_type == 1) {
-    nosv_schedpoint(NOSV_SCHEDPOINT_NONE);
+    res = nosv_schedpoint(NOSV_SCHEDPOINT_NONE);
   } else if (nosv_default_yield_type == 2) {
-    nosv_waitfor(nosv_default_waitfor_time, NULL);
+    res = nosv_waitfor(nosv_default_waitfor_time, NULL);
   } else {
     fprintf(stderr, "error: nosv_defalt_yield_type invalid\n");
     exit(EXIT_FAILURE);
   }
+  KMP_ASSERT(res == 0);
 #else
   sched_yield();
 #endif // KMP_OMPV_ENABLED

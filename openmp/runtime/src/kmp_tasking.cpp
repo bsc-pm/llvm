@@ -4070,7 +4070,8 @@ static inline int __kmp_execute_tasks_template(
     // getting tasks from target constructs
     while (1) { // Inner loop to find a task and execute it
 #if defined(KMP_OMPV_ENABLED)
-      nosv_schedpoint(NOSV_SCHEDPOINT_NONE);
+      int res = nosv_schedpoint(NOSV_SCHEDPOINT_NONE);
+      KMP_ASSERT(res == 0);
 #endif // KMP_OMPV_ENABLED
       task = NULL;
       if (task_team->tt.tt_num_task_pri) { // get priority task first
