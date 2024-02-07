@@ -191,6 +191,43 @@ static inline void instr_work_exit(kmp_int32 flags)
   ovni_ev_emit(&ev);
 }
 
+static inline void instr_microtask_enter(microtask_t t)
+{
+  if (ompv_instr_level < INSTR_SS)
+    return;
+
+  struct ovni_ev ev = {};
+  ovni_ev_set_clock(&ev, ovni_clock_now());
+
+  if (t == (microtask_t)__kmp_teams_master) {
+    /* Internal microtask */
+    ovni_ev_set_mcv(&ev, "PMi");
+  } else {
+    /* "User" code */
+    ovni_ev_set_mcv(&ev, "PMu");
+  }
+
+  ovni_ev_emit(&ev);
+}
+
+static inline void instr_microtask_exit(microtask_t t)
+{
+  if (ompv_instr_level < INSTR_SS)
+    return;
+
+  struct ovni_ev ev = {};
+  ovni_ev_set_clock(&ev, ovni_clock_now());
+
+  if (t == (microtask_t)__kmp_teams_master) {
+    /* Internal microtask */
+    ovni_ev_set_mcv(&ev, "PMI");
+  } else {
+    /* "User" code */
+    ovni_ev_set_mcv(&ev, "PMU");
+  }
+
+  ovni_ev_emit(&ev);
+}
 
 #else // ENABLE_INSTRUMENTATION
 
@@ -247,14 +284,15 @@ INSTR_0ARG(INSTR_SS, instr_single_enter, "PWi")
 INSTR_0ARG(INSTR_SS, instr_single_exit, "PWI")
 
 // "C" for kmp_csupport, the C API
-INSTR_0ARG(INSTR_SS, instr_microtask_enter, "PCm")
-INSTR_0ARG(INSTR_SS, instr_microtask_exit, "PCM")
 INSTR_0ARG(INSTR_SS, instr_fork_enter, "PCf")
 INSTR_0ARG(INSTR_SS, instr_fork_exit, "PCF")
 INSTR_0ARG(INSTR_SS, instr_critical_enter, "PCc")
 INSTR_0ARG(INSTR_SS, instr_critical_exit, "PCC")
 INSTR_0ARG(INSTR_SS, instr_end_critical_enter, "PCe")
 INSTR_0ARG(INSTR_SS, instr_end_critical_exit, "PCE")
+
+// "M" for microtasks
+/* instr_microtask_enter and instr_microtask_exit */
 
 // "H" for threads
 INSTR_0ARG(INSTR_SS, instr_launch_thread_enter, "PH[")

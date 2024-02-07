@@ -7925,7 +7925,8 @@ int __kmp_invoke_task_func(int gtid) {
 #endif
 
 #if defined(KMP_OMPV_ENABLED)
-  instr_microtask_enter();
+  microtask_t instr_microtask = (microtask_t)TCR_SYNC_PTR(team->t.t_pkfn);
+  instr_microtask_enter(instr_microtask);
 #endif
 
   rc = __kmp_invoke_microtask((microtask_t)TCR_SYNC_PTR(team->t.t_pkfn), gtid,
@@ -7937,7 +7938,7 @@ int __kmp_invoke_task_func(int gtid) {
   );
 
 #if defined(KMP_OMPV_ENABLED)
-  instr_microtask_exit();
+  instr_microtask_exit(instr_microtask);
 #endif
 
 #if OMPT_SUPPORT
