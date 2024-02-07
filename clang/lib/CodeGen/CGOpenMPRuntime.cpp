@@ -2680,7 +2680,9 @@ void CGOpenMPRuntime::emitDistributeStaticInit(
 
 void CGOpenMPRuntime::emitForStaticFinish(CodeGenFunction &CGF,
                                           SourceLocation Loc,
-                                          OpenMPDirectiveKind DKind, llvm::GlobalVariable *NosvTaskTypeGV) {
+                                          OpenMPDirectiveKind DKind,
+                                          bool IsDist,
+                                          llvm::GlobalVariable *NosvTaskTypeGV) {
   if (!CGF.HaveInsertPoint())
     return;
   // Call __kmpc_for_static_fini(ident_t *loc, kmp_int32 tid);
@@ -2689,7 +2691,7 @@ void CGOpenMPRuntime::emitForStaticFinish(CodeGenFunction &CGF,
         (CGM.getTriple().isAMDGCN() || CGM.getTriple().isNVPTX());
   SmallVector<llvm::Value *, 2> Args = {
       emitUpdateLocation(CGF, Loc,
-                         isOpenMPDistributeDirective(DKind)
+                         IsDist && isOpenMPDistributeDirective(DKind)
                              ? OMP_IDENT_WORK_DISTRIBUTE
                              : isOpenMPLoopDirective(DKind)
                                    ? OMP_IDENT_WORK_LOOP
@@ -12188,6 +12190,7 @@ void CGOpenMPSIMDRuntime::emitForOrderedIterationEnd(CodeGenFunction &CGF,
 void CGOpenMPSIMDRuntime::emitForStaticFinish(CodeGenFunction &CGF,
                                               SourceLocation Loc,
                                               OpenMPDirectiveKind DKind,
+                                              bool IsDist,
                                               llvm::GlobalVariable *NosvTaskTypeGV) {
   llvm_unreachable("Not supported in SIMD-only mode");
 }
