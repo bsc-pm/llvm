@@ -765,9 +765,6 @@ void __kmpc_flush(ident_t *loc) {
 Execute a barrier.
 */
 void __kmpc_barrier(ident_t *loc, kmp_int32 global_tid) {
-#if defined(KMP_OMPV_ENABLED)
-  instr_explicit_barrier_enter();
-#endif
   KMP_COUNT_BLOCK(OMP_BARRIER);
   KC_TRACE(10, ("__kmpc_barrier: called T#%d\n", global_tid));
   __kmp_assert_valid_gtid(global_tid);
@@ -806,9 +803,6 @@ void __kmpc_barrier(ident_t *loc, kmp_int32 global_tid) {
   if (ompt_enabled.enabled) {
     ompt_frame->enter_frame = ompt_data_none;
   }
-#endif
-#if defined(KMP_OMPV_ENABLED)
-  instr_explicit_barrier_exit();
 #endif
 }
 

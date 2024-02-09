@@ -271,8 +271,6 @@ INSTR_0ARG(INSTR_SS, instr_spin_wait_enter, "PBs")
 INSTR_0ARG(INSTR_SS, instr_spin_wait_exit, "PBS")
 INSTR_0ARG(INSTR_SS, instr_fork_barrier_enter, "PBf")
 INSTR_0ARG(INSTR_SS, instr_fork_barrier_exit, "PBF")
-INSTR_0ARG(INSTR_SS, instr_explicit_barrier_enter, "PBe")
-INSTR_0ARG(INSTR_SS, instr_explicit_barrier_exit, "PBE")
 
 INSTR_0ARG(INSTR_SS, instr_for_static_enter, "PWs")
 INSTR_0ARG(INSTR_SS, instr_for_static_exit, "PWS")
