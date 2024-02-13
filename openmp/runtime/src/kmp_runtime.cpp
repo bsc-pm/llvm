@@ -7273,6 +7273,10 @@ static void __kmp_user_level_mwait_init() {
 #endif /* KMP_HAVE_UMWAIT */
 
 static void __kmp_do_serial_initialize(void) {
+#if defined(KMP_OMPV_ENABLED)
+  instr_init_enter();
+#endif
+
   int i, gtid;
   size_t size;
 
@@ -7579,6 +7583,9 @@ static void __kmp_do_serial_initialize(void) {
   KMP_MB();
 
   KA_TRACE(10, ("__kmp_do_serial_initialize: exit\n"));
+#if defined(KMP_OMPV_ENABLED)
+  instr_init_exit();
+#endif
 }
 
 void __kmp_serial_initialize(void) {

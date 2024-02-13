@@ -288,6 +288,8 @@ INSTR_0ARG(INSTR_SS, instr_critical_enter, "PCc")
 INSTR_0ARG(INSTR_SS, instr_critical_exit, "PCC")
 INSTR_0ARG(INSTR_SS, instr_end_critical_enter, "PCe")
 INSTR_0ARG(INSTR_SS, instr_end_critical_exit, "PCE")
+INSTR_0ARG(INSTR_SS, instr_init_enter, "PCi")
+INSTR_0ARG(INSTR_SS, instr_init_exit, "PCI")
 
 // "M" for microtasks
 /* instr_microtask_enter and instr_microtask_exit */
