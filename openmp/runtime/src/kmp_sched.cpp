@@ -114,7 +114,7 @@ static void __kmp_for_static_init(ident_t *loc, kmp_int32 global_tid,
   // the user code with __kmpc_omp_static_init and
   // __kmpc_omp_static_fini
 #if defined(KMP_OMPV_ENABLED)
-  instr_work_enter(loc ? loc->flags : 0);
+  instr_for_static_enter(loc ? loc->flags : 0);
   instr_ws_execute((*omp_task_type)->instrum_id);
 #endif // KMP_OMPV_ENABLED
 

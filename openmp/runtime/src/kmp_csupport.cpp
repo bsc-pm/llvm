@@ -1298,7 +1298,7 @@ This function blocks until the executing thread can enter the critical section.
 void __kmpc_critical(ident_t *loc, kmp_int32 global_tid,
                      kmp_critical_name *crit) {
 #if defined(KMP_OMPV_ENABLED)
-  instr_critical_enter();
+  instr_critical_acquire_enter();
 #endif
 
 #if KMP_USE_DYNAMIC_LOCK
@@ -1392,7 +1392,7 @@ void __kmpc_critical(ident_t *loc, kmp_int32 global_tid,
   KA_TRACE(15, ("__kmpc_critical: done T#%d\n", global_tid));
 #endif // KMP_USE_DYNAMIC_LOCK
 #if defined(KMP_OMPV_ENABLED)
-  instr_critical_exit();
+  instr_critical_acquire_exit();
 #endif
 }
 
@@ -1532,7 +1532,7 @@ speculative execution and the hardware supports it.
 void __kmpc_critical_with_hint(ident_t *loc, kmp_int32 global_tid,
                                kmp_critical_name *crit, uint32_t hint) {
 #if defined(KMP_OMPV_ENABLED)
-  instr_critical_enter();
+  instr_critical_acquire_enter();
 #endif
   KMP_COUNT_BLOCK(OMP_CRITICAL);
   kmp_user_lock_p lck;
@@ -1652,7 +1652,7 @@ void __kmpc_critical_with_hint(ident_t *loc, kmp_int32 global_tid,
   KMP_PUSH_PARTITIONED_TIMER(OMP_critical);
   KA_TRACE(15, ("__kmpc_critical: done T#%d\n", global_tid));
 #if defined(KMP_OMPV_ENABLED)
-  instr_critical_exit();
+  instr_critical_acquire_exit();
 #endif
 } // __kmpc_critical_with_hint
 
@@ -1670,7 +1670,7 @@ Leave a critical section, releasing any lock that was held during its execution.
 void __kmpc_end_critical(ident_t *loc, kmp_int32 global_tid,
                          kmp_critical_name *crit) {
 #if defined(KMP_OMPV_ENABLED)
-  instr_end_critical_enter();
+  instr_critical_release_enter();
 #endif
 
   kmp_user_lock_p lck;
@@ -1758,7 +1758,7 @@ void __kmpc_end_critical(ident_t *loc, kmp_int32 global_tid,
   KMP_POP_PARTITIONED_TIMER();
   KA_TRACE(15, ("__kmpc_end_critical: done T#%d\n", global_tid));
 #if defined(KMP_OMPV_ENABLED)
-  instr_end_critical_exit();
+  instr_critical_release_exit();
 #endif
 }
 
@@ -2027,7 +2027,7 @@ void __kmpc_for_static_fini(ident_t *loc, kmp_int32 global_tid
 
 #if defined(KMP_OMPV_ENABLED)
   instr_ws_end((*omp_task_type)->instrum_id);
-  instr_work_exit(loc ? loc->flags : 0);
+  instr_for_static_exit(loc ? loc->flags : 0);
 #endif // KMP_OMPV_ENABLED
 }
 

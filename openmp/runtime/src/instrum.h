@@ -6,10 +6,9 @@
 #include "kmp_wrapper_getpid.h"
 
 enum instr_levels {
-  INSTR_NONE  = 0,
-  INSTR_BASIC = 1,
-  INSTR_SS    = 2, /* Subsystems */
-  INSTR_WS    = 3, /* Worksharings */
+  INSTR_0 = 0, /* Disabled */
+  INSTR_1 = 1, /* Normal */
+  INSTR_2 = 2, /* Experimental (labels) */
 };
 
 #if ENABLE_INSTRUMENTATION
@@ -75,7 +74,7 @@ static inline void intrum_check_ovni() {
 
 static inline void instr_thread_init()
 {
-  if (ompv_instr_level < INSTR_BASIC)
+  if (ompv_instr_level < 1)
     return;
 
   ovni_thread_init(__kmp_gettid());
@@ -86,7 +85,7 @@ static inline void instr_thread_end(void)
 {
   struct ovni_ev ev = {};
 
-  if (ompv_instr_level < INSTR_BASIC)
+  if (ompv_instr_level < 1)
     return;
 
   ovni_ev_set_clock(&ev, ovni_clock_now());
@@ -104,7 +103,7 @@ static inline void instr_type_create(uint32_t id, const char *label)
   size_t bufsize, label_len, size_left;
   uint8_t buf[1024], *p;
 
-  if (ompv_instr_level < INSTR_WS)
+  if (ompv_instr_level < 2)
     return;
 
   p = buf;
@@ -144,7 +143,7 @@ static inline void instr_type_create(uint32_t id, const char *label)
 
 static inline void instr_attached_enter(void)
 {
-  if (ompv_instr_level < INSTR_SS)
+  if (ompv_instr_level < 1)
     return;
 
   ovni_thread_require("openmp", "1.0.0");
@@ -155,45 +154,45 @@ static inline void instr_attached_enter(void)
   ovni_ev_emit(&ev);
 }
 
-static inline void instr_work_enter(kmp_int32 flags)
+static inline void instr_for_static_enter(kmp_int32 flags)
 {
-  if (ompv_instr_level < INSTR_SS)
+  if (ompv_instr_level < 1)
     return;
 
   struct ovni_ev ev = {};
   ovni_ev_set_clock(&ev, ovni_clock_now());
 
   if (flags & KMP_IDENT_WORK_SECTIONS)
-    ovni_ev_set_mcv(&ev, "Pws");
+    ovni_ev_set_mcv(&ev, "PWe");
   else if (flags & KMP_IDENT_WORK_DISTRIBUTE)
-    ovni_ev_set_mcv(&ev, "Pwd");
-  else
-    ovni_ev_set_mcv(&ev, "Pwl");
+    ovni_ev_set_mcv(&ev, "PWd");
+  else /* static for */
+    ovni_ev_set_mcv(&ev, "PWs");
 
   ovni_ev_emit(&ev);
 }
 
-static inline void instr_work_exit(kmp_int32 flags)
+static inline void instr_for_static_exit(kmp_int32 flags)
 {
-  if (ompv_instr_level < INSTR_SS)
+  if (ompv_instr_level < 1)
     return;
 
   struct ovni_ev ev = {};
   ovni_ev_set_clock(&ev, ovni_clock_now());
 
   if (flags & KMP_IDENT_WORK_SECTIONS)
-    ovni_ev_set_mcv(&ev, "PwS");
+    ovni_ev_set_mcv(&ev, "PWE");
   else if (flags & KMP_IDENT_WORK_DISTRIBUTE)
-    ovni_ev_set_mcv(&ev, "PwD");
-  else
-    ovni_ev_set_mcv(&ev, "PwL");
+    ovni_ev_set_mcv(&ev, "PWD");
+  else /* static for */
+    ovni_ev_set_mcv(&ev, "PWS");
 
   ovni_ev_emit(&ev);
 }
 
 static inline void instr_microtask_enter(microtask_t t)
 {
-  if (ompv_instr_level < INSTR_SS)
+  if (ompv_instr_level < 1)
     return;
 
   struct ovni_ev ev = {};
@@ -212,7 +211,7 @@ static inline void instr_microtask_enter(microtask_t t)
 
 static inline void instr_microtask_exit(microtask_t t)
 {
-  if (ompv_instr_level < INSTR_SS)
+  if (ompv_instr_level < 1)
     return;
 
   struct ovni_ev ev = {};
@@ -232,7 +231,7 @@ static inline void instr_microtask_exit(microtask_t t)
 #else // ENABLE_INSTRUMENTATION
 
 static inline void intrum_check_ovni() {
-  if (ompv_instr_level != INSTR_NONE) {
+  if (ompv_instr_level != 0) {
     fprintf(stderr, "WARNING: attempting to enable ovni in a runtime built without intrumentation\n");
     abort();
   }
@@ -258,74 +257,79 @@ static inline void instr_attached_enter(void) {}
 
 #endif // ENABLE_INSTRUMENTATION
 
-INSTR_3ARG(INSTR_BASIC, instr_thread_execute, "OHx", int32_t, cpu, int32_t, creator_tid, uint64_t, tag)
-INSTR_0ARG(INSTR_SS, instr_attached_exit, "PA]")
+INSTR_3ARG(1, instr_thread_execute, "OHx", int32_t, cpu, int32_t, creator_tid, uint64_t, tag)
+INSTR_0ARG(1, instr_attached_exit, "PA]")
 
-INSTR_0ARG(INSTR_SS, instr_join_barrier_enter, "PBj")
-INSTR_0ARG(INSTR_SS, instr_join_barrier_exit, "PBJ")
-INSTR_0ARG(INSTR_SS, instr_barrier_enter, "PBb") // plain?
-INSTR_0ARG(INSTR_SS, instr_barrier_exit, "PBB")
-INSTR_0ARG(INSTR_SS, instr_tasking_barrier_enter, "PBt")
-INSTR_0ARG(INSTR_SS, instr_tasking_barrier_exit, "PBT")
-INSTR_0ARG(INSTR_SS, instr_spin_wait_enter, "PBs")
-INSTR_0ARG(INSTR_SS, instr_spin_wait_exit, "PBS")
-INSTR_0ARG(INSTR_SS, instr_fork_barrier_enter, "PBf")
-INSTR_0ARG(INSTR_SS, instr_fork_barrier_exit, "PBF")
+// "B" for barrier
+INSTR_0ARG(1, instr_barrier_enter, "PBb") // plain
+INSTR_0ARG(1, instr_barrier_exit, "PBB")
+INSTR_0ARG(1, instr_join_barrier_enter, "PBj")
+INSTR_0ARG(1, instr_join_barrier_exit, "PBJ")
+INSTR_0ARG(1, instr_fork_barrier_enter, "PBf")
+INSTR_0ARG(1, instr_fork_barrier_exit, "PBF")
+INSTR_0ARG(1, instr_tasking_barrier_enter, "PBt")
+INSTR_0ARG(1, instr_tasking_barrier_exit, "PBT")
+INSTR_0ARG(1, instr_spin_wait_enter, "PBs") // disabled in emulation
+INSTR_0ARG(1, instr_spin_wait_exit, "PBS")
 
-INSTR_0ARG(INSTR_SS, instr_for_static_enter, "PWs")
-INSTR_0ARG(INSTR_SS, instr_for_static_exit, "PWS")
-INSTR_0ARG(INSTR_SS, instr_for_dynamic_init_enter, "PWd")
-INSTR_0ARG(INSTR_SS, instr_for_dynamic_init_exit, "PWD")
-INSTR_0ARG(INSTR_SS, instr_for_dynamic_chunk_enter, "PWc")
-INSTR_0ARG(INSTR_SS, instr_for_dynamic_chunk_exit, "PWC")
-INSTR_0ARG(INSTR_SS, instr_single_enter, "PWi")
-INSTR_0ARG(INSTR_SS, instr_single_exit, "PWI")
+// "W" for work-distribution
+INSTR_0ARG(1, instr_single_enter, "PWi")
+INSTR_0ARG(1, instr_single_exit, "PWI")
+INSTR_0ARG(1, instr_for_dynamic_init_enter, "PWy")
+INSTR_0ARG(1, instr_for_dynamic_init_exit, "PWY")
+INSTR_0ARG(1, instr_for_dynamic_chunk_enter, "PWc")
+INSTR_0ARG(1, instr_for_dynamic_chunk_exit, "PWC")
+/* instr_for_static_enter may emit PWe PWd and PWs depending on the
+ * work-distribute type: section, distribute or for loop. Then
+ * instr_for_static_exit will emit the correspoding PWE PWD and PWS. */
 
-// "C" for kmp_csupport, the C API
-INSTR_0ARG(INSTR_SS, instr_fork_enter, "PCf")
-INSTR_0ARG(INSTR_SS, instr_fork_exit, "PCF")
-INSTR_0ARG(INSTR_SS, instr_critical_enter, "PCc")
-INSTR_0ARG(INSTR_SS, instr_critical_exit, "PCC")
-INSTR_0ARG(INSTR_SS, instr_end_critical_enter, "PCe")
-INSTR_0ARG(INSTR_SS, instr_end_critical_exit, "PCE")
-INSTR_0ARG(INSTR_SS, instr_init_enter, "PCi")
-INSTR_0ARG(INSTR_SS, instr_init_exit, "PCI")
+// "C" for kmp_csupport.cpp, the C API
+INSTR_0ARG(1, instr_fork_enter, "PCf")
+INSTR_0ARG(1, instr_fork_exit, "PCF")
+INSTR_0ARG(1, instr_init_enter, "PCi")
+INSTR_0ARG(1, instr_init_exit, "PCI")
+
+// "I" for critical
+INSTR_0ARG(1, instr_critical_acquire_enter, "PIa")
+INSTR_0ARG(1, instr_critical_acquire_exit,  "PIA")
+INSTR_0ARG(1, instr_critical_release_enter, "PIr")
+INSTR_0ARG(1, instr_critical_release_exit,  "PIR")
 
 // "M" for microtasks
 /* instr_microtask_enter and instr_microtask_exit */
 
 // "H" for threads
-INSTR_0ARG(INSTR_SS, instr_launch_thread_enter, "PH[")
-INSTR_0ARG(INSTR_SS, instr_launch_thread_exit, "PH]")
+INSTR_0ARG(1, instr_launch_thread_enter, "PH[")
+INSTR_0ARG(1, instr_launch_thread_exit, "PH]")
 
-INSTR_0ARG(INSTR_SS, instr_release_deps_enter, "PTr")
-INSTR_0ARG(INSTR_SS, instr_release_deps_exit, "PTR")
-INSTR_0ARG(INSTR_SS, instr_taskwait_deps_enter, "PTw")
-INSTR_0ARG(INSTR_SS, instr_taskwait_deps_exit, "PTW")
-INSTR_0ARG(INSTR_SS, instr_invoke_task_enter, "PT[")
-INSTR_0ARG(INSTR_SS, instr_invoke_task_exit, "PT]")
-INSTR_0ARG(INSTR_SS, instr_invoke_task_if0_enter, "PTi")
-INSTR_0ARG(INSTR_SS, instr_invoke_task_if0_exit, "PTI")
-INSTR_0ARG(INSTR_SS, instr_task_alloc_enter, "PTa")
-INSTR_0ARG(INSTR_SS, instr_task_alloc_exit, "PTA")
-INSTR_0ARG(INSTR_SS, instr_task_schedule_enter, "PTs")
-INSTR_0ARG(INSTR_SS, instr_task_schedule_exit, "PTS")
-INSTR_0ARG(INSTR_SS, instr_taskwait_enter, "PTt")
-INSTR_0ARG(INSTR_SS, instr_taskwait_exit, "PTT")
-INSTR_0ARG(INSTR_SS, instr_taskyield_enter, "PTy")
-INSTR_0ARG(INSTR_SS, instr_taskyield_exit, "PTY")
-INSTR_0ARG(INSTR_SS, instr_task_dup_alloc_enter, "PTd")
-INSTR_0ARG(INSTR_SS, instr_task_dup_alloc_exit, "PTD")
-INSTR_0ARG(INSTR_SS, instr_check_deps_enter, "PTc")
-INSTR_0ARG(INSTR_SS, instr_check_deps_exit, "PTC")
-INSTR_0ARG(INSTR_SS, instr_taskgroup_enter, "PTg")
-INSTR_0ARG(INSTR_SS, instr_taskgroup_exit, "PTG")
+INSTR_0ARG(1, instr_release_deps_enter, "PTr")
+INSTR_0ARG(1, instr_release_deps_exit, "PTR")
+INSTR_0ARG(1, instr_taskwait_deps_enter, "PTw")
+INSTR_0ARG(1, instr_taskwait_deps_exit, "PTW")
+INSTR_0ARG(1, instr_invoke_task_enter, "PT[")
+INSTR_0ARG(1, instr_invoke_task_exit, "PT]")
+INSTR_0ARG(1, instr_invoke_task_if0_enter, "PTi")
+INSTR_0ARG(1, instr_invoke_task_if0_exit, "PTI")
+INSTR_0ARG(1, instr_task_alloc_enter, "PTa")
+INSTR_0ARG(1, instr_task_alloc_exit, "PTA")
+INSTR_0ARG(1, instr_task_schedule_enter, "PTs")
+INSTR_0ARG(1, instr_task_schedule_exit, "PTS")
+INSTR_0ARG(1, instr_taskwait_enter, "PTt")
+INSTR_0ARG(1, instr_taskwait_exit, "PTT")
+INSTR_0ARG(1, instr_taskyield_enter, "PTy")
+INSTR_0ARG(1, instr_taskyield_exit, "PTY")
+INSTR_0ARG(1, instr_task_dup_alloc_enter, "PTd")
+INSTR_0ARG(1, instr_task_dup_alloc_exit, "PTD")
+INSTR_0ARG(1, instr_check_deps_enter, "PTc")
+INSTR_0ARG(1, instr_check_deps_exit, "PTC")
+INSTR_0ARG(1, instr_taskgroup_enter, "PTg")
+INSTR_0ARG(1, instr_taskgroup_exit, "PTG")
 
-INSTR_2ARG(INSTR_WS, instr_task_create, "PPc", uint32_t, task_id, uint32_t, type_id)
-INSTR_1ARG(INSTR_WS, instr_task_execute, "PPx", uint32_t, task_id)
-INSTR_1ARG(INSTR_WS, instr_task_end, "PPe", uint32_t, task_id)
+INSTR_2ARG(2, instr_task_create, "PPc", uint32_t, task_id, uint32_t, type_id)
+INSTR_1ARG(2, instr_task_execute, "PPx", uint32_t, task_id)
+INSTR_1ARG(2, instr_task_end, "PPe", uint32_t, task_id)
 
-INSTR_1ARG(INSTR_WS, instr_ws_execute, "PQx", uint32_t, type_id)
-INSTR_1ARG(INSTR_WS, instr_ws_end, "PQe", uint32_t, type_id)
+INSTR_1ARG(2, instr_ws_execute, "PQx", uint32_t, type_id)
+INSTR_1ARG(2, instr_ws_end, "PQe", uint32_t, type_id)
 
 #endif // INSTRUM_H_
