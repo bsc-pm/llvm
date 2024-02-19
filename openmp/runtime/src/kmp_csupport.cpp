@@ -1297,9 +1297,6 @@ This function blocks until the executing thread can enter the critical section.
 */
 void __kmpc_critical(ident_t *loc, kmp_int32 global_tid,
                      kmp_critical_name *crit) {
-#if defined(KMP_OMPV_ENABLED)
-  instr_critical_acquire_enter();
-#endif
 
 #if KMP_USE_DYNAMIC_LOCK
 #if OMPT_SUPPORT && OMPT_OPTIONAL
@@ -1307,6 +1304,9 @@ void __kmpc_critical(ident_t *loc, kmp_int32 global_tid,
 #endif // OMPT_SUPPORT
   __kmpc_critical_with_hint(loc, global_tid, crit, omp_lock_hint_none);
 #else
+#if defined(KMP_OMPV_ENABLED)
+  instr_critical_acquire_enter();
+#endif
   KMP_COUNT_BLOCK(OMP_CRITICAL);
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   ompt_state_t prev_state = ompt_state_undefined;
@@ -1390,11 +1390,11 @@ void __kmpc_critical(ident_t *loc, kmp_int32 global_tid,
 
   KMP_PUSH_PARTITIONED_TIMER(OMP_critical);
   KA_TRACE(15, ("__kmpc_critical: done T#%d\n", global_tid));
-#endif // KMP_USE_DYNAMIC_LOCK
 #if defined(KMP_OMPV_ENABLED)
   instr_critical_acquire_exit();
   instr_critical_region_enter();
 #endif
+#endif // KMP_USE_DYNAMIC_LOCK
 }
 
 #if KMP_USE_DYNAMIC_LOCK
