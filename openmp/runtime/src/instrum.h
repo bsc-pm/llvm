@@ -294,6 +294,8 @@ INSTR_0ARG(1, instr_critical_acquire_enter, "PIa")
 INSTR_0ARG(1, instr_critical_acquire_exit,  "PIA")
 INSTR_0ARG(1, instr_critical_release_enter, "PIr")
 INSTR_0ARG(1, instr_critical_release_exit,  "PIR")
+INSTR_0ARG(1, instr_critical_region_enter,  "PI[")
+INSTR_0ARG(1, instr_critical_region_exit,   "PI]")
 
 // "M" for microtasks
 /* instr_microtask_enter and instr_microtask_exit */

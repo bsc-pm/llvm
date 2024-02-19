@@ -1393,6 +1393,7 @@ void __kmpc_critical(ident_t *loc, kmp_int32 global_tid,
 #endif // KMP_USE_DYNAMIC_LOCK
 #if defined(KMP_OMPV_ENABLED)
   instr_critical_acquire_exit();
+  instr_critical_region_enter();
 #endif
 }
 
@@ -1653,6 +1654,7 @@ void __kmpc_critical_with_hint(ident_t *loc, kmp_int32 global_tid,
   KA_TRACE(15, ("__kmpc_critical: done T#%d\n", global_tid));
 #if defined(KMP_OMPV_ENABLED)
   instr_critical_acquire_exit();
+  instr_critical_region_enter();
 #endif
 } // __kmpc_critical_with_hint
 
@@ -1670,6 +1672,7 @@ Leave a critical section, releasing any lock that was held during its execution.
 void __kmpc_end_critical(ident_t *loc, kmp_int32 global_tid,
                          kmp_critical_name *crit) {
 #if defined(KMP_OMPV_ENABLED)
+  instr_critical_region_exit();
   instr_critical_release_enter();
 #endif
 
