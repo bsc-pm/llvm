@@ -78,7 +78,7 @@ static inline void instr_thread_init()
     return;
 
   ovni_thread_init(__kmp_gettid());
-  ovni_thread_require("openmp", "1.0.0");
+  ovni_thread_require("openmp", "1.1.0");
 }
 
 static inline void instr_thread_end(void)
@@ -146,7 +146,7 @@ static inline void instr_attached_enter(void)
   if (ompv_instr_level < 1)
     return;
 
-  ovni_thread_require("openmp", "1.0.0");
+  ovni_thread_require("openmp", "1.1.0");
 
   struct ovni_ev ev = {};
   ovni_ev_set_clock(&ev, ovni_clock_now());
