@@ -11,11 +11,11 @@ enum instr_levels {
   INSTR_2 = 2, /* Experimental (labels) */
 };
 
+extern int ompv_instr_level;
+
 #if ENABLE_INSTRUMENTATION
 
 #include <ovni.h>
-
-extern int ompv_instr_level;
 
 static inline void intrum_check_ovni() {
   if (ompv_instr_level > 0)
