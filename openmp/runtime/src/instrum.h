@@ -17,7 +17,7 @@ extern int ompv_instr_level;
 
 #include <ovni.h>
 
-static inline void intrum_check_ovni() {
+static inline void instr_check_ovni() {
   if (ompv_instr_level > 0)
     ovni_version_check();
 }
@@ -230,7 +230,7 @@ static inline void instr_microtask_exit(microtask_t t)
 
 #else // ENABLE_INSTRUMENTATION
 
-static inline void intrum_check_ovni() {
+static inline void instr_check_ovni() {
   if (ompv_instr_level != 0) {
     fprintf(stderr, "ERROR: attempting to enable ovni in a runtime built without intrumentation\n");
     abort();

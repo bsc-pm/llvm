@@ -307,7 +307,7 @@ static void __kmp_nosv_init() {
    if (env) {
       ompv_instr_level = atoi(env);
    }
-   intrum_check_ovni();
+   instr_check_ovni();
 
    //env = getenv("OMP_AFFINITY_LEVEL");
    //if (env) {
