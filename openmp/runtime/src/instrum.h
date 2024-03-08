@@ -232,7 +232,7 @@ static inline void instr_microtask_exit(microtask_t t)
 
 static inline void intrum_check_ovni() {
   if (ompv_instr_level != 0) {
-    fprintf(stderr, "WARNING: attempting to enable ovni in a runtime built without intrumentation\n");
+    fprintf(stderr, "ERROR: attempting to enable ovni in a runtime built without intrumentation\n");
     abort();
   }
 }
