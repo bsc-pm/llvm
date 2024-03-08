@@ -2216,6 +2216,9 @@ static int __kmp_dispatch_next(ident_t *loc, int gtid, kmp_int32 *p_last,
   // this violate the subsystem rules.
   // This is a hack that is almost equivalent since the compiler wraps
   // the user code with while(__kmp_dispatch_next)
+#if defined(KMP_OMPV_ENABLED)
+  instr_for_dynamic_chunk_exit();
+#endif // KMP_OMPV_ENABLED
 
   typedef typename traits_t<T>::unsigned_t UT;
   typedef typename traits_t<T>::signed_t ST;
@@ -2354,7 +2357,6 @@ static int __kmp_dispatch_next(ident_t *loc, int gtid, kmp_int32 *p_last,
 
     // status == 0 means there is no work to be done
 #if defined(KMP_OMPV_ENABLED)
-    instr_for_dynamic_chunk_exit();
     if (status)
       instr_for_dynamic_chunk_enter();
     else
@@ -2488,7 +2490,6 @@ static int __kmp_dispatch_next(ident_t *loc, int gtid, kmp_int32 *p_last,
 
   // status == 0 means there is no work to be done
 #if defined(KMP_OMPV_ENABLED)
-  instr_for_dynamic_chunk_exit();
   if (status)
     instr_for_dynamic_chunk_enter();
   else
