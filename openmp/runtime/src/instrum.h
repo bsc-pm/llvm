@@ -254,6 +254,10 @@ static inline void instr_thread_init() {}
 static inline void instr_thread_end(void) {}
 static inline void instr_type_create(uint32_t id, const char *label) {}
 static inline void instr_attached_enter(void) {}
+static inline void instr_for_static_enter(kmp_int32 flags) {}
+static inline void instr_for_static_exit(kmp_int32 flags) {}
+static inline void instr_microtask_enter(microtask_t t) {}
+static inline void instr_microtask_exit(microtask_t t) {}
 
 #endif // ENABLE_INSTRUMENTATION
 
