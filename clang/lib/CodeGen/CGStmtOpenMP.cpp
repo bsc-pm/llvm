@@ -2808,7 +2808,6 @@ void CodeGenFunction::EmitOMPOuterLoop(
     const CodeGenFunction::OMPLoopArguments &LoopArgs,
     const CodeGenFunction::CodeGenLoopTy &CodeGenLoop,
     const CodeGenFunction::CodeGenOrderedTy &CodeGenOrdered,
-    bool IsDist,
     llvm::GlobalVariable *NosvTaskTypeGV) {
   CGOpenMPRuntime &RT = CGM.getOpenMPRuntime();
 
@@ -2912,11 +2911,10 @@ void CodeGenFunction::EmitOMPOuterLoop(
   EmitBlock(LoopExit.getBlock());
 
   // Tell the runtime we are done.
-  auto &&CodeGen = [DynamicOrOrdered, &S, IsDist, NosvTaskTypeGV](CodeGenFunction &CGF) {
+  auto &&CodeGen = [DynamicOrOrdered, &S, NosvTaskTypeGV](CodeGenFunction &CGF) {
     if (!DynamicOrOrdered)
       CGF.CGM.getOpenMPRuntime().emitForStaticFinish(CGF, S.getEndLoc(),
-                                                     S.getDirectiveKind(), IsDist,
-                                                     NosvTaskTypeGV);
+                                                     S.getDirectiveKind(), NosvTaskTypeGV);
   };
   OMPCancelStack.emitExit(*this, S.getDirectiveKind(), CodeGen);
 }
@@ -3030,8 +3028,7 @@ void CodeGenFunction::EmitOMPForOuterLoop(
   OuterLoopArgs.NextLB = S.getNextLowerBound();
   OuterLoopArgs.NextUB = S.getNextUpperBound();
   EmitOMPOuterLoop(DynamicOrOrdered, IsMonotonic, S, LoopScope, OuterLoopArgs,
-                   emitOMPLoopBodyWithStopPoint, CodeGenOrdered, /*IsDist=*/false,
-                   NosvTaskTypeGV);
+                   emitOMPLoopBodyWithStopPoint, CodeGenOrdered, NosvTaskTypeGV);
 }
 
 static void emitEmptyOrdered(CodeGenFunction &, SourceLocation Loc,
@@ -3102,7 +3099,7 @@ void CodeGenFunction::EmitOMPDistributeOuterLoop(
 
   EmitOMPOuterLoop(/* DynamicOrOrdered = */ false, /* IsMonotonic = */ false, S,
                    LoopScope, OuterLoopArgs, CodeGenLoopContent,
-                   emitEmptyOrdered, /*IsDist=*/true, NosvTaskTypeGV);
+                   emitEmptyOrdered, NosvTaskTypeGV);
 }
 
 static std::pair<LValue, LValue>
@@ -3481,9 +3478,7 @@ bool CodeGenFunction::EmitOMPWorksharingLoop(
         // Tell the runtime we are done.
         auto &&CodeGen = [&S, NosvTaskTypeGV](CodeGenFunction &CGF) {
           CGF.CGM.getOpenMPRuntime().emitForStaticFinish(CGF, S.getEndLoc(),
-                                                         S.getDirectiveKind(),
-                                                         /*IsDist=*/false,
-                                                         NosvTaskTypeGV);
+                                                         S.getDirectiveKind(), NosvTaskTypeGV);
         };
         OMPCancelStack.emitExit(*this, S.getDirectiveKind(), CodeGen);
       } else {
@@ -4114,9 +4109,7 @@ void CodeGenFunction::EmitSections(const OMPExecutableDirective &S) {
     // Tell the runtime we are done.
     auto &&CodeGen = [&S, NosvTaskTypeGV](CodeGenFunction &CGF) {
       CGF.CGM.getOpenMPRuntime().emitForStaticFinish(CGF, S.getEndLoc(),
-                                                     S.getDirectiveKind(),
-                                                     /*IsDist=*/false,
-                                                     NosvTaskTypeGV);
+                                                     S.getDirectiveKind(), NosvTaskTypeGV);
     };
     CGF.OMPCancelStack.emitExit(CGF, S.getDirectiveKind(), CodeGen);
     CGF.EmitOMPReductionClauseFinal(S, /*ReductionKind=*/OMPD_parallel);
@@ -5838,7 +5831,7 @@ void CodeGenFunction::EmitOMPDistributeLoop(const OMPLoopDirective &S,
             });
         EmitBlock(LoopExit.getBlock());
         // Tell the runtime we are done.
-        RT.emitForStaticFinish(*this, S.getEndLoc(), S.getDirectiveKind(), /*IsDist=*/true, NosvTaskTypeGV);
+        RT.emitForStaticFinish(*this, S.getEndLoc(), S.getDirectiveKind(), NosvTaskTypeGV);
       } else {
         // Emit the outer loop, which requests its work chunk [LB..UB] from
         // runtime and runs the inner loop to process it.

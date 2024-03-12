@@ -4008,7 +4008,6 @@ private:
                         const OMPLoopArguments &LoopArgs,
                         const CodeGenLoopTy &CodeGenLoop,
                         const CodeGenOrderedTy &CodeGenOrdered,
-                        bool IsDist,
                         llvm::GlobalVariable *NosvTaskTypeGV);
   void EmitOMPForOuterLoop(const OpenMPScheduleTy &ScheduleKind,
                            bool IsMonotonic, const OMPLoopDirective &S,

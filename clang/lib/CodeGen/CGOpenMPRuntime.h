@@ -1037,8 +1037,7 @@ public:
   /// \param DKind Kind of the directive for which the static finish is emitted.
   ///
   virtual void emitForStaticFinish(CodeGenFunction &CGF, SourceLocation Loc,
-                                   OpenMPDirectiveKind DKind, bool IsDist,
-                                   llvm::GlobalVariable *NosvTaskTypeGV);
+                                   OpenMPDirectiveKind DKind, llvm::GlobalVariable *NosvTaskTypeGV);
 
   /// Call __kmpc_dispatch_next(
   ///          ident_t *loc, kmp_int32 tid, kmp_int32 *p_lastiter,
@@ -1900,8 +1899,7 @@ public:
   /// \param DKind Kind of the directive for which the static finish is emitted.
   ///
   void emitForStaticFinish(CodeGenFunction &CGF, SourceLocation Loc,
-                           OpenMPDirectiveKind DKind, bool IsDist,
-                           llvm::GlobalVariable *NosvTaskTypeGV) override;
+                           OpenMPDirectiveKind DKind, llvm::GlobalVariable *NosvTaskTypeGV) override;
 
   /// Call __kmpc_dispatch_next(
   ///          ident_t *loc, kmp_int32 tid, kmp_int32 *p_lastiter,
