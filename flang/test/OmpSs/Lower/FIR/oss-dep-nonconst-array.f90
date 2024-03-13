@@ -37,9 +37,9 @@ END
 ! FIRDialect:           return
 ! FIRDialect:         }
 
-! FIRDialect-LABEL:   func.func @_QFPs(
-! FIRDialect-SAME:                     %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<i32> {fir.bindc_name = "n"},
-! FIRDialect-SAME:                     %[[VAL_1:[-0-9A-Za-z._]+]]: !fir.box<!fir.array<?xi32>> {fir.bindc_name = "array"}) {
+! FIRDialect-LABEL:   func.func private @_QFPs(
+! FIRDialect-SAME:                             %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<i32> {fir.bindc_name = "n"},
+! FIRDialect-SAME:                             %[[VAL_1:[-0-9A-Za-z._]+]]: !fir.box<!fir.array<?xi32>> {fir.bindc_name = "array"})
 ! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<!fir.box<!fir.array<?xi32>>>
 ! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<i32>
 ! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_3]] : (i32) -> i64

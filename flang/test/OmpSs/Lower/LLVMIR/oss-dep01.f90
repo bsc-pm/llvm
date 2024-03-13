@@ -82,7 +82,7 @@ end subroutine
 !LLVMIR: %{{.*}} = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00")
 !LLVMIR-SAME: "QUAL.OSS.SHARED"(ptr %1, ptr undef)
 !LLVMIR-SAME: "QUAL.OSS.FIRSTPRIVATE"(ptr %[[VAR_I]], i32 undef)
-!LLVMIR-SAME: "QUAL.OSS.DEP.OUT"(ptr %1, [11 x i8] c"dep string\00", ptr @compute.dep1, ptr %1, ptr %[[VAR_I]]), "QUAL.OSS.CAPTURED"(i64 undef, i32 1, i32 10, i32 1) ]
+!LLVMIR-SAME: "QUAL.OSS.DEP.OUT"(ptr %1, [11 x i8] c"dep string\00", ptr @compute.dep1, ptr %1, ptr %[[VAR_I]]), "QUAL.OSS.CAPTURED"(i64 -1, i32 1, i32 10, i32 1) ]
 
 !LLVMIR: %[[VAR_X_LOAD_0:.*]] = load i32, ptr %0, align 4
 !LLVMIR: %[[X_PLUS_6_0:.*]] = add i32 %[[VAR_X_LOAD_0]], 6
@@ -95,7 +95,7 @@ end subroutine
 !LLVMIR: %{{.*}} = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00")
 !LLVMIR-SAME: "QUAL.OSS.SHARED"(ptr %1, ptr undef)
 !LLVMIR-SAME: "QUAL.OSS.FIRSTPRIVATE"(ptr %[[VAR_I]], i32 undef)
-!LLVMIR-SAME: "QUAL.OSS.DEP.OUT"(ptr %1, [11 x i8] c"dep string\00", ptr @compute.dep3, ptr %1, ptr %[[VAR_I]]), "QUAL.OSS.CAPTURED"(i64 undef, i32 1, i32 10, i32 1) ]
+!LLVMIR-SAME: "QUAL.OSS.DEP.OUT"(ptr %1, [11 x i8] c"dep string\00", ptr @compute.dep3, ptr %1, ptr %[[VAR_I]]), "QUAL.OSS.CAPTURED"(i64 -1, i32 1, i32 10, i32 1) ]
 
 !LLVMIR: %[[VAR_X_LOAD_1:.*]] = load i32, ptr %0, align 4
 !LLVMIR: %[[X_PLUS_6_1:.*]] = add i32 %[[VAR_X_LOAD_1]], 6

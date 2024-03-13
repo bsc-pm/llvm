@@ -28,6 +28,7 @@ add_clang_library(clangSema
   Sema.cpp
   SemaAccess.cpp
   SemaAttr.cpp
+  SemaAPINotes.cpp
   SemaAvailability.cpp
   SemaCXXScopeSpec.cpp
   SemaCast.cpp
@@ -53,6 +54,7 @@ add_clang_library(clangSema
   SemaLookup.cpp
   SemaModule.cpp
   SemaObjCProperty.cpp
+  SemaOpenACC.cpp
   SemaOpenMP.cpp
   SemaOmpSs.cpp
   SemaOverload.cpp

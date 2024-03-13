@@ -6,7 +6,7 @@ if [[ $# -ne 1 ]] ; then
     exit 0
 fi
 
-update_mlir_test=/home/rpenacob/llvm-mono-2/mlir/utils/generate-test-checks.py
+update_mlir_test=/home/rpenacob/llvm-mono/mlir/utils/generate-test-checks.py
 
 ret=$(head -n 1 $1)
 

@@ -130,19 +130,19 @@ end subroutine
 !FIRDialect-NEXT:   return %arg1, %11, %12, %13 : !fir.ref<!fir.array<?xi32>>, i64, i64, i64
 
 !FIRDialect-LABEL: func.func @compute.dep1(%arg0: !fir.ref<!fir.array<?xi32>>, %arg1: !fir.ref<i32>) -> (!fir.ref<!fir.array<?xi32>>, i64, i64, i64)
-!FIRDialect:   %0 = fir.undefined index
+!FIRDialect:   %c-1 = arith.constant -1 : index
 !FIRDialect-NEXT:   %c1_i64 = arith.constant 1 : i64
-!FIRDialect-NEXT:   %1 = fir.load %arg1 : !fir.ref<i32>
-!FIRDialect-NEXT:   %2 = fir.convert %1 : (i32) -> i64
+!FIRDialect-NEXT:   %0 = fir.load %arg1 : !fir.ref<i32>
+!FIRDialect-NEXT:   %1 = fir.convert %0 : (i32) -> i64
 !FIRDialect-NEXT:   %c1_i64_0 = arith.constant 1 : i64
 !FIRDialect-NEXT:   %c4_i64 = arith.constant 4 : i64
-!FIRDialect-NEXT:   %3 = arith.subi %2, %c1_i64 : i64
-!FIRDialect-NEXT:   %4 = arith.subi %2, %c1_i64 : i64
-!FIRDialect-NEXT:   %5 = arith.addi %4, %c1_i64_0 : i64
-!FIRDialect-NEXT:   %6 = arith.muli %c1_i64, %c4_i64 : i64
-!FIRDialect-NEXT:   %7 = arith.muli %3, %c4_i64 : i64
-!FIRDialect-NEXT:   %8 = arith.muli %5, %c4_i64 : i64
-!FIRDialect-NEXT:   return %arg0, %6, %7, %8 : !fir.ref<!fir.array<?xi32>>, i64, i64, i64
+!FIRDialect-NEXT:   %2 = arith.subi %1, %c1_i64 : i64
+!FIRDialect-NEXT:   %3 = arith.subi %1, %c1_i64 : i64
+!FIRDialect-NEXT:   %4 = arith.addi %3, %c1_i64_0 : i64
+!FIRDialect-NEXT:   %5 = arith.muli %c1_i64, %c4_i64 : i64
+!FIRDialect-NEXT:   %6 = arith.muli %2, %c4_i64 : i64
+!FIRDialect-NEXT:   %7 = arith.muli %4, %c4_i64 : i64
+!FIRDialect-NEXT:   return %arg0, %5, %6, %7 : !fir.ref<!fir.array<?xi32>>, i64, i64, i64
 
 !FIRDialect-LABEL: func.func @compute.dep2(%arg0: i64, %arg1: !fir.ref<!fir.array<?xi32>>, %arg2: !fir.ref<i32>) -> (!fir.ref<!fir.array<?xi32>>, i64, i64, i64)
 !FIRDialect:   %c4_i64 = arith.constant 4 : i64
@@ -174,29 +174,29 @@ end subroutine
 !FIRDialect-NEXT:   return %arg1, %15, %16, %17 : !fir.ref<!fir.array<?xi32>>, i64, i64, i64
 
 !FIRDialect-LABEL: func.func @compute.dep3(%arg0: !fir.ref<!fir.array<?xi32>>, %arg1: !fir.ref<i32>) -> (!fir.ref<!fir.array<?xi32>>, i64, i64, i64)
-!FIRDialect:   %0 = fir.undefined index
+!FIRDialect:   %c-1 = arith.constant -1 : index
 !FIRDialect-NEXT:   %c1_i64 = arith.constant 1 : i64
-!FIRDialect-NEXT:   %1 = fir.load %arg1 : !fir.ref<i32>
-!FIRDialect-NEXT:   %2 = fir.convert %1 : (i32) -> i64
-!FIRDialect-NEXT:   %3 = fir.load %arg1 : !fir.ref<i32>
+!FIRDialect-NEXT:   %0 = fir.load %arg1 : !fir.ref<i32>
+!FIRDialect-NEXT:   %1 = fir.convert %0 : (i32) -> i64
+!FIRDialect-NEXT:   %2 = fir.load %arg1 : !fir.ref<i32>
 !FIRDialect-NEXT:   %c10_i32 = arith.constant 10 : i32
-!FIRDialect-NEXT:   %4 = arith.addi %3, %c10_i32 : i32
-!FIRDialect-NEXT:   %5 = fir.convert %4 : (i32) -> i64
-!FIRDialect-NEXT:   %6 = arith.subi %5, %2 : i64
+!FIRDialect-NEXT:   %3 = arith.addi %2, %c10_i32 : i32
+!FIRDialect-NEXT:   %4 = fir.convert %3 : (i32) -> i64
+!FIRDialect-NEXT:   %5 = arith.subi %4, %1 : i64
 !FIRDialect-NEXT:   %c1_i64_0 = arith.constant 1 : i64
-!FIRDialect-NEXT:   %7 = arith.addi %6, %c1_i64_0 : i64
+!FIRDialect-NEXT:   %6 = arith.addi %5, %c1_i64_0 : i64
 !FIRDialect-NEXT:   %c0_i64 = arith.constant 0 : i64
-!FIRDialect-NEXT:   %8 = arith.cmpi sgt, %7, %c0_i64 : i64
-!FIRDialect-NEXT:   %9 = arith.select %8, %7, %c0_i64 : i64
+!FIRDialect-NEXT:   %7 = arith.cmpi sgt, %6, %c0_i64 : i64
+!FIRDialect-NEXT:   %8 = arith.select %7, %6, %c0_i64 : i64
 !FIRDialect-NEXT:   %c1_i64_1 = arith.constant 1 : i64
 !FIRDialect-NEXT:   %c4_i64 = arith.constant 4 : i64
-!FIRDialect-NEXT:   %10 = arith.subi %2, %c1_i64 : i64
-!FIRDialect-NEXT:   %11 = arith.subi %5, %c1_i64 : i64
-!FIRDialect-NEXT:   %12 = arith.addi %11, %c1_i64_1 : i64
+!FIRDialect-NEXT:   %9 = arith.subi %1, %c1_i64 : i64
+!FIRDialect-NEXT:   %10 = arith.subi %4, %c1_i64 : i64
+!FIRDialect-NEXT:   %11 = arith.addi %10, %c1_i64_1 : i64
+!FIRDialect-NEXT:   %12 = arith.muli %8, %c4_i64 : i64
 !FIRDialect-NEXT:   %13 = arith.muli %9, %c4_i64 : i64
-!FIRDialect-NEXT:   %14 = arith.muli %10, %c4_i64 : i64
-!FIRDialect-NEXT:   %15 = arith.muli %12, %c4_i64 : i64
-!FIRDialect-NEXT:   return %arg0, %13, %14, %15 : !fir.ref<!fir.array<?xi32>>, i64, i64, i64
+!FIRDialect-NEXT:   %14 = arith.muli %11, %c4_i64 : i64
+!FIRDialect-NEXT:   return %arg0, %12, %13, %14 : !fir.ref<!fir.array<?xi32>>, i64, i64, i64
 
 !FIRDialect-LABEL: func.func @compute.dep4(%arg0: i64, %arg1: !fir.ref<!fir.array<?xi32>>) -> (!fir.ref<!fir.array<?xi32>>, i64, i64, i64)
 !FIRDialect:   %c4_i64 = arith.constant 4 : i64

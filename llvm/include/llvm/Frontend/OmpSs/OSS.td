@@ -212,6 +212,7 @@ def OSS_Task : Directive<"task"> {
     VersionedClause<OSSC_Onready>,
     VersionedClause<OSSC_Device>,
   ];
+  let association = AS_Block;
 }
 def OSS_DeclareTask : Directive<"declare task"> {
   let allowedClauses = [
@@ -240,8 +241,11 @@ def OSS_DeclareTask : Directive<"declare task"> {
     VersionedClause<OSSC_Device>,
     VersionedClause<OSSC_Ndrange>,
   ];
+  let association = AS_Declaration;
 }
-def OSS_DeclareReduction : Directive<"declare reduction"> {}
+def OSS_DeclareReduction : Directive<"declare reduction"> {
+  let association = AS_None;
+}
 def OSS_TaskWait : Directive<"taskwait"> {
   let allowedClauses = [
     VersionedClause<OSSC_Depend>,
@@ -250,6 +254,7 @@ def OSS_TaskWait : Directive<"taskwait"> {
     VersionedClause<OSSC_Out>,
     VersionedClause<OSSC_Inout>,
   ];
+  let association = AS_None;
 }
 
 def OSS_Release : Directive<"release"> {
@@ -262,6 +267,7 @@ def OSS_Release : Directive<"release"> {
     VersionedClause<OSSC_WeakOut>,
     VersionedClause<OSSC_WeakInout>,
   ];
+  let association = AS_None;
 }
 def OSS_TaskLoop : Directive<"taskloop"> {
   let allowedClauses = [
@@ -292,6 +298,7 @@ def OSS_TaskLoop : Directive<"taskloop"> {
     VersionedClause<OSSC_GrainSize>,
     VersionedClause<OSSC_Collapse>,
   ];
+  let association = AS_Loop;
 }
 def OSS_TaskFor : Directive<"task for"> {
   let allowedClauses = [
@@ -322,6 +329,7 @@ def OSS_TaskFor : Directive<"task for"> {
     VersionedClause<OSSC_ChunkSize>,
     VersionedClause<OSSC_Collapse>,
   ];
+  let association = AS_Loop;
 }
 def OSS_TaskLoopFor : Directive<"taskloop for"> {
   let allowedClauses = [
@@ -353,9 +361,12 @@ def OSS_TaskLoopFor : Directive<"taskloop for"> {
     VersionedClause<OSSC_GrainSize>,
     VersionedClause<OSSC_Collapse>,
   ];
+  let association = AS_Loop;
 }
 
-def OSS_TaskIterWhile : Directive<"taskiter while"> {}
+def OSS_TaskIterWhile : Directive<"taskiter while"> {
+  let association = AS_Loop;
+}
 def OSS_TaskIter : Directive<"taskiter"> {
   let allowedClauses = [
     VersionedClause<OSSC_Private>,
@@ -386,8 +397,11 @@ def OSS_TaskIter : Directive<"taskiter"> {
     VersionedClause<OSSC_Update>,
     VersionedClause<OSSC_Unroll>,
   ];
+  let association = AS_Loop;
 }
-def OSS_Critical : Directive<"critical"> {}
+def OSS_Critical : Directive<"critical"> {
+  let association = AS_Block;
+}
 def OSS_Atomic : Directive<"atomic"> {
   let allowedClauses = [
     VersionedClause<OSSC_Read>,
@@ -403,8 +417,12 @@ def OSS_Atomic : Directive<"atomic"> {
     VersionedClause<OSSC_Release>,
     VersionedClause<OSSC_Relaxed>,
   ];
+  let association = AS_Block;
 }
-def OSS_Assert : Directive<"assert"> {}
+def OSS_Assert : Directive<"assert"> {
+  let association = AS_None;
+}
 def OSS_Unknown : Directive<"unknown"> {
   let isDefault = true;
+  let association = AS_None;
 }

@@ -1288,9 +1288,7 @@ namespace {
           // assumed-size arrays have a first fir.underfined operation
           // as extent. We use this to indentify them to avoid
           // vlaOp creation, but emit captures
-          bool IsPtr =
-            !box->getExtents().empty() &&
-            mlir::isa<fir::UndefOp>(box->getExtents().back().getDefiningOp());
+          bool IsPtr = Fortran::semantics::IsAssumedSizeArray(ultimate);
           for (auto extent : box->getExtents()) {
             capturesOperands_.insert(extent);
             if (!sba.isStaticArray() && !IsPtr)

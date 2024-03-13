@@ -169,10 +169,10 @@ END PROGRAM
 ! FIRDialect:           return
 ! FIRDialect:         }
 
-! FIRDialect-LABEL:   func.func @_QFPfoo(
-! FIRDialect-SAME:                       %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>> {fir.bindc_name = "dummy_alloc"},
-! FIRDialect-SAME:                       %[[VAL_1:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>> {fir.bindc_name = "dummy_ptr"},
-! FIRDialect-SAME:                       %[[VAL_2:[-0-9A-Za-z._]+]]: !fir.box<!fir.array<?xi32>> {fir.bindc_name = "dummy_array"}) {
+! FIRDialect-LABEL:   func.func private @_QFPfoo(
+! FIRDialect-SAME:                               %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>> {fir.bindc_name = "dummy_alloc"},
+! FIRDialect-SAME:                               %[[VAL_1:[-0-9A-Za-z._]+]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>> {fir.bindc_name = "dummy_ptr"},
+! FIRDialect-SAME:                               %[[VAL_2:[-0-9A-Za-z._]+]]: !fir.box<!fir.array<?xi32>> {fir.bindc_name = "dummy_array"})
 ! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.heap<!fir.array<?xi32>>> {bindc_name = "local_alloc", uniq_name = "_QFFfooElocal_alloc"}
 ! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.heap<!fir.array<?xi32>>
 ! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = arith.constant 0 : index

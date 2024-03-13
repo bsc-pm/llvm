@@ -464,13 +464,11 @@ end module
 ! CHECK:           %[[VAL_7:[-0-9A-Za-z._]+]] = arith.cmpi ne, %[[VAL_5]], %[[VAL_6]] : i64
 ! CHECK:           %[[VAL_8:[-0-9A-Za-z._]+]] = fir.absent !fir.box<!fir.array<?xf32>>
 ! CHECK:           %[[VAL_9:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<none>>>
-! CHECK:           %[[VAL_10:[-0-9A-Za-z._]+]] = fir.box_addr %[[VAL_9]] : (!fir.box<!fir.ptr<none>>) -> !fir.ptr<none>
-! CHECK:           %[[VAL_11:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_10]] : (!fir.ptr<none>) -> !fir.box<none>
-! CHECK:           %[[VAL_12:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_11]] : (!fir.box<none>) -> !fir.box<!fir.array<?xf32>>
-! CHECK:           %[[VAL_13:[-0-9A-Za-z._]+]] = arith.select %[[VAL_7]], %[[VAL_12]], %[[VAL_8]] : !fir.box<!fir.array<?xf32>>
-! CHECK:           %[[VAL_14:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<!fir.box<!fir.array<?xf32>>>
-! CHECK:           oss.task firstprivate(%[[VAL_13]] : !fir.box<!fir.array<?xf32>>) firstprivate_type(%[[VAL_14]] : !fir.oss<!fir.box<!fir.array<?xf32>>>) {
-! CHECK:             fir.call @_QMoptPassumed_shape(%[[VAL_13]]) fastmath<contract> : (!fir.box<!fir.array<?xf32>>) -> ()
+! CHECK:           %[[VAL_10:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_9]] : (!fir.box<!fir.ptr<none>>) -> !fir.box<!fir.array<?xf32>>
+! CHECK:           %[[VAL_11:[-0-9A-Za-z._]+]] = arith.select %[[VAL_7]], %[[VAL_10]], %[[VAL_8]] : !fir.box<!fir.array<?xf32>>
+! CHECK:           %[[VAL_12:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<!fir.box<!fir.array<?xf32>>>
+! CHECK:           oss.task firstprivate(%[[VAL_11]] : !fir.box<!fir.array<?xf32>>) firstprivate_type(%[[VAL_12]] : !fir.oss<!fir.box<!fir.array<?xf32>>>) {
+! CHECK:             fir.call @_QMoptPassumed_shape(%[[VAL_11]]) fastmath<contract> : (!fir.box<!fir.array<?xf32>>) -> ()
 ! CHECK:             oss.terminator
 ! CHECK:           }
 ! CHECK:           return

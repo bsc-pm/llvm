@@ -32,8 +32,8 @@ END
 ! FIRDialect:           return
 ! FIRDialect:         }
 
-! FIRDialect-LABEL:   func.func @_QFPs(
-! FIRDialect-SAME:                     %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<i32> {fir.bindc_name = "n"}) {
+! FIRDialect-LABEL:   func.func private @_QFPs(
+! FIRDialect-SAME:                             %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<i32> {fir.bindc_name = "n"})
 ! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.load %[[VAL_0]] : !fir.ref<i32>
 ! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_1]] : (i32) -> i64
 ! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_2]] : (i64) -> index

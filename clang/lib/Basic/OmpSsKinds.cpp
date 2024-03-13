@@ -220,8 +220,7 @@ bool clang::isOmpSsTaskingDirective(OmpSsDirectiveKind Kind) {
 }
 
 bool clang::isOmpSsLoopDirective(OmpSsDirectiveKind Kind) {
-  return Kind == OSSD_taskloop || Kind == OSSD_taskloop_for ||
-         Kind == OSSD_task_for || Kind == OSSD_taskiter;
+  return getDirectiveAssociation(Kind) == Association::Loop;
 }
 
 bool clang::isOmpSsTaskLoopDirective(OmpSsDirectiveKind Kind) {
