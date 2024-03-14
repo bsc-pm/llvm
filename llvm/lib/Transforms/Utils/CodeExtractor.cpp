@@ -1637,6 +1637,14 @@ static void fixupDebugInfoPostExtraction(Function &OldFunc, Function &NewFunc,
       if (any_of(DPV.location_ops(), IsInvalidLocation)) {
         DPVsToDelete.push_back(&DPV);
         continue;
+      } else if (valueInUnpackParams) {
+        // Intrinsic is valid, replace all location referencing
+        // original code to outlined arguments
+        for (Value *Location : DPV.location_ops()) {
+          int Res = valueInUnpackParams(Location);
+          if (Res != -1)
+            DPV.replaceVariableLocationOp(Location, NewFunc.getArg(Res));
+        }
       }
       if (DPV.isDbgAssign() && IsInvalidLocation(DPV.getAddress())) {
         DPVsToDelete.push_back(&DPV);
@@ -1666,14 +1674,6 @@ static void fixupDebugInfoPostExtraction(Function &OldFunc, Function &NewFunc,
     if (any_of(DVI->location_ops(), IsInvalidLocation)) {
       DebugIntrinsicsToDelete.push_back(DVI);
       continue;
-    } else if (valueInUnpackParams) {
-      // Intrinsic is valid, replace all location referencing
-      // original code to outlined arguments
-      for (Value *Location : DVI->location_ops()) {
-        int Res = valueInUnpackParams(Location);
-        if (Res != -1)
-          DVI->replaceVariableLocationOp(Location, NewFunc.getArg(Res));
-      }
     }
     // DbgAssign intrinsics have an extra Value argument:
     if (auto *DAI = dyn_cast<DbgAssignIntrinsic>(DVI);
