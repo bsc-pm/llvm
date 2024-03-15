@@ -365,7 +365,7 @@ def OSS_TaskLoopFor : Directive<"taskloop for"> {
 }
 
 def OSS_TaskIterWhile : Directive<"taskiter while"> {
-  let association = AS_Loop;
+  let association = AS_None;
 }
 def OSS_TaskIter : Directive<"taskiter"> {
   let allowedClauses = [
