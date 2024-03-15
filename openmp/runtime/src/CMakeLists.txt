@@ -437,6 +437,12 @@ endif()
         \"../${OPENMP_INSTALL_LIBDIR}/${LIBOMP_LIB_FILE}\"
         \"${LIBOMP_LIB_FILE}\"
         WORKING_DIRECTORY \$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${OMPSS_2_OMP_CUSTOM_DIR})")
+    if (NOSV_PKG_FOUND)
+      install(CODE "execute_process(COMMAND \"\${CMAKE_COMMAND}\" -E create_symlink
+          \"../${OPENMP_INSTALL_LIBDIR}/${LIBOMP_LIB_FILE}\"
+          \"${LIBOMPV_LIB_FILE}\"
+          WORKING_DIRECTORY \$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${OMPSS_2_OMP_CUSTOM_DIR})")
+    endif()
   endif()
 endif()
 install(
