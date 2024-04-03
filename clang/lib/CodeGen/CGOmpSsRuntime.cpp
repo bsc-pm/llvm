@@ -2666,12 +2666,13 @@ static void emitMultiDepIterDecls(CodeGenFunction &CGF, const OSSTaskDataTy &Dat
 // and
 // OmpSsDeviceClauseKind
 static int convertDeviceTypeToInt(int Device) {
-  const int NumDevAttrTypes = 4;
+  const int NumDevAttrTypes = 5;
   const int DevAttrToNanos6Map[NumDevAttrTypes] = {
     0, // nanos6_host_device
     1, // nanos6_cuda_device
     4, // nanos6_opencl_device
     5, // nanos6_fpga_device
+    6, // nanos6_broadcaster_device
   };
   return DevAttrToNanos6Map[Device];
 }

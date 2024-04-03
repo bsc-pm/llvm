@@ -4433,6 +4433,9 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   case OSSC_DEVICE_fpga:
     DevType = OSSTaskDeclAttr::DeviceType::Fpga;
     break;
+  case OSSC_DEVICE_broadcaster:
+    DevType = OSSTaskDeclAttr::DeviceType::Broadcaster;
+    break;
   case OSSC_DEVICE_unknown:
     Diag(DeviceLoc, diag::err_oss_unexpected_clause_value)
         << getListOfPossibleValues(OSSC_device, /*First=*/0,
@@ -4767,6 +4770,7 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   case OSSTaskDeclAttr::Smp:
   case OSSTaskDeclAttr::Cuda:
   case OSSTaskDeclAttr::Opencl:
+  case OSSTaskDeclAttr::Broadcaster:
   case OSSTaskDeclAttr::Unknown:
     break;
   }
@@ -5869,6 +5873,7 @@ OSSClause *Sema::ActOnOmpSsDeviceClause(OmpSsDeviceClauseKind Kind,
   case OSSC_DEVICE_opencl:
   case OSSC_DEVICE_cuda:
     break;
+  case OSSC_DEVICE_broadcaster:
   case OSSC_DEVICE_fpga:
     Diag(KindKwLoc, diag::err_oss_inline_device_not_supported)
       << getOmpSsSimpleClauseTypeName(OSSC_device, Kind);
