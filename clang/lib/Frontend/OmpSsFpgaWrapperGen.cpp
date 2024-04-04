@@ -689,7 +689,7 @@ OMPIF_COMM_WORLD
     }
 
     if (CI.getFrontendOpts().OmpSsFpgaInstrumentation) {
-      Output << "#pragma HLS interface ap_hs port=" STR_INSTRPORT "\n";
+      Output << "#pragma HLS interface axis port=" STR_INSTRPORT "\n";
     }
   }
 
