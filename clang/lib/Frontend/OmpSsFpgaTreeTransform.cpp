@@ -61,8 +61,8 @@ class OmpSsFpgaTreeTransformVisitor
 
   using Inherited = RecursiveASTVisitor<OmpSsFpgaTreeTransformVisitor>;
   ASTContext &Ctx;
-  IdentifierTable &IdentifierTable;
-  WrapperPortMap &WrapperPortMap;
+  IdentifierTable &IdTable;
+  WrapperPortMap &WrapPortMap;
   PrintingPolicy PrintPol;
 
   bool CreatesTasks;
@@ -127,7 +127,7 @@ class OmpSsFpgaTreeTransformVisitor
   QualType getTypeStr(StringRef str) {
     auto *decl = RecordDecl::Create(Ctx, TagTypeKind::TTK_Struct,
                                     Ctx.getTranslationUnitDecl(), {}, {},
-                                    &IdentifierTable.get(str));
+                                    &IdTable.get(str));
     return Ctx.getRecordType(decl);
   }
 
@@ -198,7 +198,7 @@ class OmpSsFpgaTreeTransformVisitor
   }
 
   MemberExpr *makeAccessExpr(Expr *Base, StringRef AccessMemberName) {
-    auto *identifier = &IdentifierTable.get(AccessMemberName);
+    auto *identifier = &IdTable.get(AccessMemberName);
 
     auto declName = DeclarationName(identifier);
     FieldDecl *member =
@@ -219,7 +219,7 @@ class OmpSsFpgaTreeTransformVisitor
 
   VarDecl *makeVarDecl(QualType type, StringRef name) {
     auto *varDecl = VarDecl::Create(Ctx, Ctx.getTranslationUnitDecl(), {}, {},
-                                    &IdentifierTable.get(name), type, nullptr,
+                                    &IdTable.get(name), type, nullptr,
                                     StorageClass::SC_None);
     assert(
         varDecl
@@ -268,8 +268,8 @@ public:
                                 ::WrapperPortMap &WrapperPortMap,
                                 uint64_t FpgaPortWidth, bool CreatesTasks,
                                 bool instrumented)
-      : Inherited(), Ctx(Ctx), IdentifierTable(IdentifierTable),
-        WrapperPortMap(WrapperPortMap), PrintPol(Ctx.getLangOpts()),
+      : Inherited(), Ctx(Ctx), IdTable(IdentifierTable),
+        WrapPortMap(WrapperPortMap), PrintPol(Ctx.getLangOpts()),
         CreatesTasks(CreatesTasks), instrumented(instrumented) {
     OmpIfRankType = Ctx.UnsignedCharTy;
     OmpIfRankIdentifier = &IdentifierTable.get("__ompif_rank");
@@ -705,7 +705,7 @@ public:
     }
 
     llvm::SmallVector<Expr *, 4> arguments(callExpr->arguments());
-    auto mapping = WrapperPortMap[callExpr->getCalleeDecl()];
+    auto mapping = WrapPortMap[callExpr->getCalleeDecl()];
 
     bool needsReplacement = false;
     if (mapping[(int)WrapperPort::OMPIF_RANK]) {
@@ -765,7 +765,7 @@ public:
       return param;
     };
 
-    auto &wrapperMap = WrapperPortMap[funcDecl->getCanonicalDecl()];
+    auto &wrapperMap = WrapPortMap[funcDecl->getCanonicalDecl()];
 
     OmpIfRank = (wrapperMap[(int)WrapperPort::OMPIF_RANK])
                     ? addNewParamInfo(OmpIfRankIdentifier, OmpIfRankType)

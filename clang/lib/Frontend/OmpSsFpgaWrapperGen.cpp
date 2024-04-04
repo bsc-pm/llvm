@@ -252,7 +252,7 @@ template <typename Callable> class WrapperGenerator {
 
   Preprocessor &PP;
   CompilerInstance &CI;
-  ReplacementMap ReplacementMap;
+  ReplacementMap RepMap;
   PrintingPolicy printPol;
 
   FunctionDecl *OriginalFD;
@@ -275,7 +275,7 @@ template <typename Callable> class WrapperGenerator {
   bool MemcpyWideport = false;
   bool UsesLock = false;
   bool NeedsDeps = false;
-  WrapperPortMap WrapperPortMap;
+  WrapperPortMap WrapPortMap;
 
   llvm::SmallDenseMap<const ParmVarDecl *, LocalmemInfo> Localmems;
 
@@ -453,7 +453,7 @@ struct __mcxx_ptr_t {
       Output << "void mcxx_unset_lock(" STR_OUTPORT_DECL ");\n";
     }
 
-    if (WrapperPortMap[ToFD][size_t(WrapperPort::MEMORY_PORT)]) {
+    if (WrapPortMap[ToFD][size_t(WrapperPort::MEMORY_PORT)]) {
       generateMemcpyWideportFunction(true);
       generateMemcpyWideportFunction(false);
     }
@@ -561,11 +561,11 @@ OMPIF_COMM_WORLD
     }
 
     auto [needsDeps, replacementMap] = OmpssFpgaTreeTransform(
-        ToContext, ToIdentifierTable, WrapperPortMap,
+        ToContext, ToIdentifierTable, WrapPortMap,
         CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth, CreatesTasks,
         CI.getFrontendOpts().OmpSsFpgaInstrumentation);
     NeedsDeps = needsDeps;
-    ReplacementMap = std::move(replacementMap);
+    RepMap = std::move(replacementMap);
     for (Decl *otherDecl : ToContext.getTranslationUnitDecl()->decls()) {
       if (isDeclInSameFileAsMainDeclOrBodyDecl(ToSourceManager, otherDecl,
                                                ToFD)) {
@@ -624,8 +624,8 @@ OMPIF_COMM_WORLD
     }
 
     bool forceMemport = [&] {
-      auto *it = WrapperPortMap.find(ToFD);
-      return it != WrapperPortMap.end() &&
+      auto *it = WrapPortMap.find(ToFD);
+      return it != WrapPortMap.end() &&
              it->second[(int)WrapperPort::MEMORY_PORT];
     }();
 
@@ -943,8 +943,8 @@ OMPIF_COMM_WORLD
       printSeparator();
       outs << param->getName();
     }
-    auto *it = WrapperPortMap.find(ToFD);
-    if (it != WrapperPortMap.end()) {
+    auto *it = WrapPortMap.find(ToFD);
+    if (it != WrapPortMap.end()) {
       if (it->second[(int)WrapperPort::OMPIF_RANK]) {
         printSeparator();
         outs << "ompif_rank";
@@ -1257,7 +1257,7 @@ public:
         ToContext(ToLangOpts, ToSourceManager, ToIdentifierTable,
                   ToSelectorTable, PP.getBuiltinInfo(), TU_Incremental) {
     printPol.adjustForCPlusPlus();
-    printPol.Replacements = &ReplacementMap;
+    printPol.Replacements = &RepMap;
     ToContext.InitBuiltinTypes(OriginalContext.getTargetInfo());
     ToContext.getDiagnostics();
   }
@@ -1281,7 +1281,7 @@ public:
       return false;
     }
 
-    FPGAFunctionTreeVisitor visitor(ToFD, WrapperPortMap);
+    FPGAFunctionTreeVisitor visitor(ToFD, WrapPortMap);
     visitor.TraverseStmt(ToFD->getBody());
 
     MemcpyWideport = visitor.MemcpyWideport;
