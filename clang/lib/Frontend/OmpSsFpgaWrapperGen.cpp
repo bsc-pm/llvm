@@ -553,7 +553,7 @@ OMPIF_COMM_WORLD
                  !funcDecl->hasAttr<OSSTaskDeclAttr>()) {
         auto origName = funcDecl->getDeclName();
         auto &id =
-            PP.getIdentifierTable().get(origName.getAsString() + "_moved");
+            PP.getIdentifierTable().get(origName.getAsString());
 
         DeclarationName name(&id);
         funcDecl->setDeclName(name);
@@ -1245,7 +1245,7 @@ public:
                    Preprocessor &PP, CompilerInstance &CI)
       : Diag(std::forward<Callable>(Diag)), OutputHeaders(OutputStrHeaders),
         Output(OutputStr), OutputFinalFile(OutputFile), OrigFuncName(FuncName),
-        TaskFuncName(std::string(FuncName) + "_moved"), PP(PP), CI(CI),
+        TaskFuncName(std::string(FuncName)), PP(PP), CI(CI),
         printPol(SourceContext.getLangOpts()), OriginalFD(FD),
         OriginalContext(SourceContext), OriginalSourceMgr(SourceMgr),
         ToDiagnosticsEngine(new DiagnosticIDs(), new DiagnosticOptions(),
