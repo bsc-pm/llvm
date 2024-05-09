@@ -813,9 +813,6 @@ static char const *blocktime_str = NULL;
 
 static void __kmp_stg_parse_wait_policy(char const *name, char const *value,
                                         void *data) {
-// #if defined(KMP_OMPV_ENABLED)
-//   KMP_WARNING(NosvEnvSupportStr, "OMP_WAIT_POLICY", __kmp_wpolicy_passive ? "'passive'" : "'active'");
-// #else
   kmp_stg_wp_data_t *wait = (kmp_stg_wp_data_t *)data;
   int rc;
 
@@ -826,6 +823,7 @@ static void __kmp_stg_parse_wait_policy(char const *name, char const *value,
 
   if (wait->omp) {
     if (__kmp_str_match("ACTIVE", 1, value)) {
+      __kmp_wpolicy_passive = false; /* don't allow sleep while active tasking */
       __kmp_library = library_turnaround;
       if (blocktime_str == NULL) {
         // KMP_BLOCKTIME not specified, so set default to "infinite".
@@ -864,7 +862,6 @@ static void __kmp_stg_parse_wait_policy(char const *name, char const *value,
       KMP_WARNING(StgInvalidValue, name, value);
     }
   }
-// #endif // KMP_OMPV_ENABLED
 } // __kmp_stg_parse_wait_policy
 
 static void __kmp_stg_print_wait_policy(kmp_str_buf_t *buffer, char const *name,

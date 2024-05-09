@@ -302,6 +302,15 @@ extern int nosv_default_yield_type;
 extern uint64_t nosv_default_waitfor_time;
 
 void __kmp_nosv_attach(nosv_task_t *nosv_impl_task, void *thr);
+void free_agents_wait_childs(kmp_taskdata_t *taskdata);
+void free_agents_wakeup_childs(kmp_taskdata_t *taskdata);
+// forward declarations
+typedef union kmp_depnode kmp_depnode_t;
+typedef struct kmp_taskgroup kmp_taskgroup_t;
+void free_agents_wait_deps(kmp_depnode_t *node);
+void free_agents_wakeup_deps(kmp_depnode_t *successor);
+void free_agents_wait_taskgroup(kmp_taskgroup_t *taskgroup);
+void free_agents_wakeup_taskgroup(kmp_taskdata_t *taskdata);
 void numaid_to_nosv_affinity(uint32_t id, nosv_affinity_t *nosv_affinity, nosv_affinity_type_t type);
 void cpuid_to_nosv_affinity(uint32_t id, nosv_affinity_t *nosv_affinity, nosv_affinity_type_t type);
 
@@ -2520,6 +2529,10 @@ typedef struct kmp_task { /* GEH: Shouldn't this be aligned somehow? */
 
 typedef struct kmp_taskgroup {
   std::atomic<kmp_int32> count; // number of allocated and incomplete tasks
+#if defined(KMP_OMPV_ENABLED)
+  nosv_task_t nosv_task; // Sync with the associated task
+  std::atomic<kmp_int32> count_free_agent;
+#endif // KMP_OMPV_ENABLED
   std::atomic<kmp_int32>
       cancel_request; // request for cancellation of this taskgroup
   struct kmp_taskgroup *parent; // parent taskgroup
@@ -2588,6 +2601,10 @@ typedef struct kmp_base_depnode {
   kmp_uint32 id;
 #endif
   std::atomic<kmp_int32> npredecessors;
+#if defined(KMP_OMPV_ENABLED)
+  nosv_task_t nosv_task; // Sync with the associated task
+  std::atomic<kmp_int32> npredecessors_free_agent;
+#endif // KMP_OMPV_ENABLED
   std::atomic<kmp_int32> nrefs;
 } kmp_base_depnode_t;
 
@@ -2805,6 +2822,10 @@ struct kmp_taskdata { /* aligned during dynamic allocation       */
                                    deallocated */
   std::atomic<kmp_int32>
       td_incomplete_child_tasks; /* Child tasks not yet complete */
+#if defined(KMP_OMPV_ENABLED)
+  std::atomic<kmp_int32>
+      td_incomplete_child_tasks_free_agent; /* Free agent counter to pause or not */
+#endif // KMP_OMPV_ENABLED
   kmp_taskgroup_t
       *td_taskgroup; // Each task keeps pointer to its current taskgroup
   kmp_dephash_t

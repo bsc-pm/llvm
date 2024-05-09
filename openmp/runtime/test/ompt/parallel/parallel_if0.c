@@ -1,6 +1,7 @@
 // RUN: %libomp-compile-and-run | FileCheck %s
 // REQUIRES: ompt
-// UNSUPPORTED: gcc-4, gcc-5, gcc-6, gcc-7
+// UNSUPPORTED: gcc-4, gcc-5, gcc-6, gcc-7, ompv-free-agents 
+// Free agents change the ompt output because of the new thread registration.
 #include "callback.h"
 
 int main()

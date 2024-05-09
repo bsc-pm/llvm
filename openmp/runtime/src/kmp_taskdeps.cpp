@@ -648,6 +648,11 @@ static bool __kmp_check_deps(kmp_int32 gtid, kmp_depnode_t *node,
   // Account for our initial fake value
   npredecessors++;
 
+#if defined(KMP_OMPV_ENABLED)
+  int npredecessors_free_agent = node->dn.npredecessors_free_agent.fetch_add(npredecessors - 1) + npredecessors;
+  KMP_ASSERT(npredecessors_free_agent >= 0);
+#endif // KMP_OMPV_ENABLED
+
   // Update predecessors and obtain current value to check if there are still
   // any outstanding dependences (some tasks may have finished while we
   // processed the dependences)
@@ -835,6 +840,10 @@ kmp_int32 __kmpc_omp_task_with_deps(ident_t *loc_ref, kmp_int32 gtid,
 
     __kmp_init_node(node);
     new_taskdata->td_depnode = node;
+#if defined(KMP_OMPV_ENABLED)
+    KMP_ATOMIC_ST_RLX(&node->dn.npredecessors_free_agent, 1);
+    node->dn.nosv_task = NULL; // Regular tasks do not use the pause mechanism
+#endif // KMP_OMPV_ENABLED
 
     if (__kmp_check_deps(gtid, node, new_task, &current_task->td_dephash,
                          NO_DEP_BARRIER, ndeps, dep_list, ndeps_noalias,
@@ -1032,6 +1041,10 @@ void __kmpc_omp_taskwait_deps_51(ident_t *loc_ref, kmp_int32 gtid,
 
   kmp_depnode_t node = {0};
   __kmp_init_node(&node);
+#if defined(KMP_OMPV_ENABLED)
+  KMP_ATOMIC_ST_RLX(&node.dn.npredecessors_free_agent, 1);
+  node.dn.nosv_task = current_task->td_nosv_task;
+#endif // KMP_OMPV_ENABLED
 
   if (!__kmp_check_deps(gtid, &node, NULL, &current_task->td_dephash,
                         DEP_BARRIER, ndeps, dep_list, ndeps_noalias,
@@ -1047,6 +1060,10 @@ void __kmpc_omp_taskwait_deps_51(ident_t *loc_ref, kmp_int32 gtid,
 #endif // KMP_OMPV_ENABLED
     return;
   }
+
+#if defined(KMP_OMPV_ENABLED)
+  free_agents_wait_deps(&node);
+#endif // KMP_OMPV_ENABLED
 
   int thread_finished = FALSE;
   kmp_flag_32<false, false> flag(

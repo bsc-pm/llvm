@@ -1813,6 +1813,10 @@ static int __kmp_barrier_template(enum barrier_type bt, int gtid, int is_split,
   }
 #endif
 
+#if defined(KMP_OMPV_ENABLED)
+  free_agents_wait_childs(this_thr->th.th_current_task);
+#endif // KMP_OMPV_ENABLED
+
   if (!team->t.t_serialized) {
 #if USE_ITT_BUILD
     // This value will be used in itt notify events below.
@@ -1906,7 +1910,8 @@ static int __kmp_barrier_template(enum barrier_type bt, int gtid, int is_split,
 #if defined(KMP_OMPV_ENABLED)
     kmp_task_team_t *task_team = this_thr->th.th_task_team;
     KMP_ASSERT(task_team);
-    KMP_ATOMIC_DEC(&task_team->tt.tt_unfinished_tasks);
+    kmp_int32 children = -1 + KMP_ATOMIC_DEC(&task_team->tt.tt_unfinished_tasks);
+    KMP_ASSERT(children >= 0);
 #endif // KMP_OMPV_ENABLED
     if (KMP_MASTER_TID(tid)) {
       status = 0;
@@ -2054,7 +2059,8 @@ static int __kmp_barrier_template(enum barrier_type bt, int gtid, int is_split,
 #if defined(KMP_OMPV_ENABLED)
         kmp_task_team_t *task_team = this_thr->th.th_task_team;
         KMP_ASSERT(task_team);
-        KMP_ATOMIC_DEC(&task_team->tt.tt_unfinished_tasks);
+        kmp_int32 children = -1 + KMP_ATOMIC_DEC(&task_team->tt.tt_unfinished_tasks);
+        KMP_ASSERT(children >= 0);
 #endif // KMP_OMPV_ENABLED
 
         __kmp_task_team_wait(this_thr, team USE_ITT_BUILD_ARG(itt_sync_obj));
@@ -2331,7 +2337,8 @@ void __kmp_join_barrier(int gtid) {
 #if defined(KMP_OMPV_ENABLED)
   kmp_task_team_t *task_team = this_thr->th.th_task_team;
   KMP_ASSERT(task_team);
-  KMP_ATOMIC_DEC(&task_team->tt.tt_unfinished_tasks);
+  kmp_int32 children = -1 + KMP_ATOMIC_DEC(&task_team->tt.tt_unfinished_tasks);
+  KMP_ASSERT(children >= 0);
 #endif // KMP_OMPV_ENABLED
 
   if (KMP_MASTER_TID(tid)) {
@@ -2665,6 +2672,11 @@ void __kmp_fork_barrier(int gtid, int tid) {
                 team->t.t_id, tid));
 #if defined(KMP_OMPV_ENABLED)
   instr_fork_barrier_exit();
+
+  // Record before running the parallel region the nosv_task for implicits tasks
+  // So in a taskwait the worker can pause (free_agents)
+  kmp_taskdata_t *task = &team->t.t_implicit_task_taskdata[__kmp_tid_from_gtid(gtid)];
+  task->td_nosv_task = nosv_self();
 #endif
 }
 

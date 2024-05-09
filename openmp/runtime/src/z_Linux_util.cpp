@@ -1796,9 +1796,9 @@ static inline void __kmp_resume_template(int target_gtid, C *flag) {
   status = nosv_submit(th->th.th_nosv_task, NOSV_SUBMIT_UNLOCKED);
 #else
   status = pthread_cond_signal(&th->th.th_suspend_cv.c_cond);
-  KMP_CHECK_SYSFAIL("pthread_cond_signal", status);
   __kmp_unlock_suspend_mx(th);
 #endif // KMP_OMPV_ENABLED
+  KMP_CHECK_SYSFAIL("pthread_cond_signal", status);
   KF_TRACE(30, ("__kmp_resume_template: T#%d exiting after signaling wake up"
                 " for T#%d\n",
                 gtid, target_gtid));

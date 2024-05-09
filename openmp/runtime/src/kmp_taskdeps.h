@@ -160,14 +160,20 @@ static inline void __kmp_release_deps(kmp_int32 gtid, kmp_taskdata_t *task) {
   KMP_RELEASE_DEPNODE(gtid, node);
 
   kmp_depnode_list_t *next;
-  kmp_taskdata_t *next_taskdata;
+#if defined(KMP_OMPV_ENABLED)
   bool first = true;
+#else
+  kmp_taskdata_t *next_taskdata;
+#endif // KMP_OMPV_ENABLED
   for (kmp_depnode_list_t *p = node->dn.successors; p; p = next) {
     kmp_depnode_t *successor = p->node;
 #if USE_ITT_BUILD && USE_ITT_NOTIFY
     __itt_sync_releasing(successor);
 #endif
     kmp_int32 npredecessors = KMP_ATOMIC_DEC(&successor->dn.npredecessors) - 1;
+#if defined(KMP_OMPV_ENABLED)
+    free_agents_wakeup_deps(successor);
+#endif // KMP_OMPV_ENABLED
 
     // successor task can be NULL for wait_depends or because deps are still
     // being processed
