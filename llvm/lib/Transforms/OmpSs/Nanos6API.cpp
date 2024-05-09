@@ -6,6 +6,12 @@
 namespace llvm {
 namespace nanos6Api {
 
+Type *getIntArchTy(Module &M) {
+  // Return an integer type the size of target architecture pointer size
+  // Useful for size_t and long types
+  return Type::getIntNTy(M.getContext(), M.getDataLayout().getPointerSizeInBits());
+}
+
 Nanos6LoopBounds& Nanos6LoopBounds::getInstance(Module &M) {
   static auto instance = std::unique_ptr<Nanos6LoopBounds>(nullptr);
   if (!instance) {
@@ -18,10 +24,10 @@ Nanos6LoopBounds& Nanos6LoopBounds::getInstance(Module &M) {
     // size_t grainsize;
     // size_t chunksize;
 
-    instance->LBoundTy = Type::getInt64Ty(M.getContext());
-    instance->UBoundTy = Type::getInt64Ty(M.getContext());
-    instance->GrainsizeTy = Type::getInt64Ty(M.getContext());
-    instance->ChunksizeTy = Type::getInt64Ty(M.getContext());
+    instance->LBoundTy = getIntArchTy(M);
+    instance->UBoundTy = getIntArchTy(M);
+    instance->GrainsizeTy = getIntArchTy(M);
+    instance->ChunksizeTy = getIntArchTy(M);
 
     instance->Ty->setBody({
       instance->LBoundTy,
@@ -42,8 +48,8 @@ Nanos6TaskAddrTranslationEntry& Nanos6TaskAddrTranslationEntry::getInstance(Modu
 
     // size_t local_address
     // size_t device_address
-    instance->LocalAddrTy = Type::getInt64Ty(M.getContext());
-    instance->DeviceAddrTy = Type::getInt64Ty(M.getContext());
+    instance->LocalAddrTy = getIntArchTy(M);
+    instance->DeviceAddrTy = getIntArchTy(M);
 
     instance->Ty->setBody({
       instance->LocalAddrTy,
@@ -61,7 +67,7 @@ Nanos6TaskConstraints& Nanos6TaskConstraints::getInstance(Module &M) {
       "nanos6_task_constraints_t");
 
     // size_t cost
-    instance->CostTy = Type::getInt64Ty(M.getContext());
+    instance->CostTy = getIntArchTy(M);
 
     instance->Ty->setBody(instance->CostTy);
   }
@@ -234,11 +240,11 @@ FunctionType *Nanos6MultidepFactory::BuildDepFuncType(
   });
   for (size_t i = 0; i < Ndims; ++i) {
     // long dimsize
-    Params.push_back(Type::getInt64Ty(M.getContext()));
+    Params.push_back(getIntArchTy(M));
     // long dimstart
-    Params.push_back(Type::getInt64Ty(M.getContext()));
+    Params.push_back(getIntArchTy(M));
     // long dimend
-    Params.push_back(Type::getInt64Ty(M.getContext()));
+    Params.push_back(getIntArchTy(M));
   }
   return FunctionType::get(Type::getVoidTy(M.getContext()),
                            Params, /*IsVarArgs=*/false);
@@ -255,11 +261,11 @@ FunctionType *Nanos6MultidepFactory::BuildReleaseDepFuncType(
   Params.push_back(PointerType::getUnqual(M.getContext()));
   for (size_t i = 0; i < Ndims; ++i) {
     // long dimsize
-    Params.push_back(Type::getInt64Ty(M.getContext()));
+    Params.push_back(getIntArchTy(M));
     // long dimstart
-    Params.push_back(Type::getInt64Ty(M.getContext()));
+    Params.push_back(getIntArchTy(M));
     // long dimend
-    Params.push_back(Type::getInt64Ty(M.getContext()));
+    Params.push_back(getIntArchTy(M));
   }
   return FunctionType::get(Type::getVoidTy(M.getContext()),
                            Params, /*IsVarArgs=*/false);
@@ -305,11 +311,11 @@ FunctionCallee createTaskFuncCallee(Module &M) {
     PointerType::getUnqual(M.getContext()),
     PointerType::getUnqual(M.getContext()),
     PointerType::getUnqual(M.getContext()),
-    Type::getInt64Ty(M.getContext()),
+    getIntArchTy(M), // size_t
     PointerType::getUnqual(M.getContext()),
     PointerType::getUnqual(M.getContext()),
-    Type::getInt64Ty(M.getContext()),
-    Type::getInt64Ty(M.getContext())
+    getIntArchTy(M), // size_t
+    getIntArchTy(M) // size_t
   );
 }
 
@@ -326,15 +332,15 @@ FunctionCallee createLoopFuncCallee(Module &M) {
     PointerType::getUnqual(M.getContext()),
     PointerType::getUnqual(M.getContext()),
     PointerType::getUnqual(M.getContext()),
-    Type::getInt64Ty(M.getContext()),
+    getIntArchTy(M), // size_t
     PointerType::getUnqual(M.getContext()),
     PointerType::getUnqual(M.getContext()),
-    Type::getInt64Ty(M.getContext()),
-    Type::getInt64Ty(M.getContext()),
-    Type::getInt64Ty(M.getContext()),
-    Type::getInt64Ty(M.getContext()),
-    Type::getInt64Ty(M.getContext()),
-    Type::getInt64Ty(M.getContext())
+    getIntArchTy(M), // size_t
+    getIntArchTy(M), // size_t
+    getIntArchTy(M), // size_t
+    getIntArchTy(M), // size_t
+    getIntArchTy(M), // size_t
+    getIntArchTy(M) // size_t
   );
 }
 
@@ -344,20 +350,20 @@ FunctionCallee createIterFuncCallee(Module &M) {
     PointerType::getUnqual(M.getContext()),
     PointerType::getUnqual(M.getContext()),
     PointerType::getUnqual(M.getContext()),
-    Type::getInt64Ty(M.getContext()),
+    getIntArchTy(M), // size_t
     PointerType::getUnqual(M.getContext()),
     PointerType::getUnqual(M.getContext()),
-    Type::getInt64Ty(M.getContext()),
-    Type::getInt64Ty(M.getContext()),
-    Type::getInt64Ty(M.getContext()),
-    Type::getInt64Ty(M.getContext()),
-    Type::getInt64Ty(M.getContext())
+    getIntArchTy(M), // size_t
+    getIntArchTy(M), // size_t
+    getIntArchTy(M), // size_t
+    getIntArchTy(M), // size_t
+    getIntArchTy(M) // size_t
   );
 }
 
 FunctionCallee taskInFinalFuncCallee(Module &M) {
   return M.getOrInsertFunction("nanos6_in_final",
-    Type::getInt32Ty(M.getContext())
+    Type::getInt32Ty(M.getContext()) // int
   );
 }
 

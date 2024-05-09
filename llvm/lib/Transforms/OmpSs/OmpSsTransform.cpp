@@ -67,6 +67,7 @@ struct OmpSsDirective {
   Type *Int32Ty;
   Type *Int8Ty;
   Type *Int64Ty;
+  Type *IntArchTy;
   PointerType *PtrTy;
   // 6 for ndrange and 1 for shm_size
   const size_t DeviceArgsSize = 7;
@@ -97,7 +98,8 @@ struct OmpSsDirective {
         WhileInfo(DirEnv.WhileInfo),
         FinalInfo(FinalInfo),
         Int32Ty(Type::getInt32Ty(Ctx)), Int8Ty(Type::getInt8Ty(Ctx)),
-        Int64Ty(Type::getInt64Ty(Ctx)), PtrTy(PointerType::getUnqual(Ctx)),
+        Int64Ty(Type::getInt64Ty(Ctx)), IntArchTy(Type::getIntNTy(Ctx, DL.getPointerSizeInBits())),
+        PtrTy(PointerType::getUnqual(Ctx)),
         PostMoveInstructions(PostMoveInstructions)
         {}
 
@@ -1068,16 +1070,18 @@ struct OmpSsDirective {
     Value *Idx[2];
     Idx[0] = ConstantInt::get(Int32Ty, SymbolIndex);
     Idx[1] = Constant::getNullValue(Int32Ty);
+    Type *LocalAddrTy = nanos6Api::Nanos6TaskAddrTranslationEntry::getInstance(M).getLocalAddrType();
     Value *LocalAddr = IRBTranslate.CreateGEP(
         TaskAddrTranslationEntryTy,
         AddrTranslationTable, Idx, "local_lookup_" + DSA->getName());
-    LocalAddr = IRBTranslate.CreateLoad(Int64Ty, LocalAddr);
+    LocalAddr = IRBTranslate.CreateLoad(LocalAddrTy, LocalAddr);
 
     Idx[1] = ConstantInt::get(Int32Ty, 1);
+    Type *DeviceAddrTy = nanos6Api::Nanos6TaskAddrTranslationEntry::getInstance(M).getDeviceAddrType();
     Value *DeviceAddr = IRBTranslate.CreateGEP(
         TaskAddrTranslationEntryTy,
         AddrTranslationTable, Idx, "device_lookup_" + DSA->getName());
-    DeviceAddr = IRBTranslate.CreateLoad(Int64Ty, DeviceAddr);
+    DeviceAddr = IRBTranslate.CreateLoad(DeviceAddrTy, DeviceAddr);
 
     // Res = device_addr + (DSA_addr - local_addr)
     Value *Translation =
@@ -1293,17 +1297,17 @@ struct OmpSsDirective {
     SmallVector<VLAAlign, 2> VLAAlignsInfo;
     computeVLAsAlignOrder(VLAAlignsInfo);
 
-    Value *TaskArgsStructSizeOf = ConstantInt::get(Int64Ty, DL.getTypeAllocSize(TaskArgsTy));
+    Value *TaskArgsStructSizeOf = ConstantInt::get(IntArchTy, DL.getTypeAllocSize(TaskArgsTy));
 
     // TODO: this forces an alignment of 16 for VLAs
     {
       const int ALIGN = 16;
       TaskArgsStructSizeOf =
         IRB.CreateNUWAdd(TaskArgsStructSizeOf,
-                         ConstantInt::get(Int64Ty, ALIGN - 1));
+                         ConstantInt::get(IntArchTy, ALIGN - 1));
       TaskArgsStructSizeOf =
         IRB.CreateAnd(TaskArgsStructSizeOf,
-                      IRB.CreateNot(ConstantInt::get(Int64Ty, ALIGN - 1)));
+                      IRB.CreateNot(ConstantInt::get(IntArchTy, ALIGN - 1)));
     }
 
     Value *TaskArgsDstLi8IdxGEP =
@@ -1478,14 +1482,14 @@ struct OmpSsDirective {
   }
 
   Value *computeTaskArgsVLAsExtraSizeOf(IRBuilder<> &IRB) {
-    Value *Sum = ConstantInt::get(Int64Ty, 0);
+    Value *Sum = ConstantInt::get(IntArchTy, 0);
     for (const auto &VLAWithDimsMap : VLADimsInfo) {
       // Skip shareds because they don't need space in task_args
       if (DSAInfo.Shared.count(VLAWithDimsMap.first))
         continue;
       Type *Ty = DirEnv.getDSAType(VLAWithDimsMap.first);
       unsigned SizeB = DL.getTypeAllocSize(Ty);
-      Value *ArraySize = ConstantInt::get(Int64Ty, SizeB);
+      Value *ArraySize = ConstantInt::get(IntArchTy, SizeB);
       for (auto *V : VLAWithDimsMap.second) {
         ArraySize = IRB.CreateNUWMul(ArraySize, V);
       }
@@ -1511,11 +1515,11 @@ struct OmpSsDirective {
       // size_t local_sizeN-1;
       const size_t FullNdrangeLength = 6;
       for (size_t i = 0; i < FullNdrangeLength; ++i) {
-        TaskArgsMemberTy.push_back(Int64Ty);
+        TaskArgsMemberTy.push_back(IntArchTy);
         TaskArgsIdx++;
       }
       // size_t shm_size;
-      TaskArgsMemberTy.push_back(Int64Ty);
+      TaskArgsMemberTy.push_back(IntArchTy);
       TaskArgsIdx++;
     }
 
@@ -1591,7 +1595,7 @@ struct OmpSsDirective {
         ConstantArray::get(ArrayType::get(Int32Ty, TaskTypeList.size()),
           TaskSizeofList),
         ("sizeof_table_var_" + F.getName()).str());
-    SizeofTableVar->setAlignment(Align(64));
+    SizeofTableVar->setAlignment(Align(DL.getPointerSizeInBits()));
 
     // int *offset_table;
     // Type *OffsetTableTy = nanos6Api::Nanos6TaskInfo::getInstance(M).getOffsetTableDataType();
@@ -2018,13 +2022,13 @@ struct OmpSsDirective {
   //         nanos6_update_task = (1 << 8)
   // } nanos6_task_flag_t;
   Value *computeTaskFlags(IRBuilder<> &IRB) {
-    Value *TaskFlagsVar = ConstantInt::get(Int64Ty, 0);
+    Value *TaskFlagsVar = ConstantInt::get(IntArchTy, 0);
     if (DirEnv.Final) {
       TaskFlagsVar =
         IRB.CreateOr(
           TaskFlagsVar,
           IRB.CreateZExt(DirEnv.Final,
-                         Int64Ty));
+                         IntArchTy));
     }
     if (DirEnv.If) {
       TaskFlagsVar =
@@ -2033,7 +2037,7 @@ struct OmpSsDirective {
           IRB.CreateShl(
             IRB.CreateZExt(
               IRB.CreateICmpEQ(DirEnv.If, IRB.getFalse()),
-              Int64Ty),
+              IntArchTy),
               1));
     }
     if (DirEnv.isOmpSsTaskLoopDirective()) {
@@ -2041,7 +2045,7 @@ struct OmpSsDirective {
         IRB.CreateOr(
           TaskFlagsVar,
           IRB.CreateShl(
-              ConstantInt::get(Int64Ty, 1),
+              ConstantInt::get(IntArchTy, 1),
               2));
     }
     if (DirEnv.isOmpSsTaskForDirective()) {
@@ -2049,7 +2053,7 @@ struct OmpSsDirective {
         IRB.CreateOr(
           TaskFlagsVar,
           IRB.CreateShl(
-              ConstantInt::get(Int64Ty, 1),
+              ConstantInt::get(IntArchTy, 1),
               3));
     }
     if (DirEnv.Wait) {
@@ -2059,7 +2063,7 @@ struct OmpSsDirective {
           IRB.CreateShl(
             IRB.CreateZExt(
               DirEnv.Wait,
-              Int64Ty),
+              IntArchTy),
               4));
     }
     if (DirEnv.isOmpSsTaskIterDirective()) {
@@ -2067,7 +2071,7 @@ struct OmpSsDirective {
         IRB.CreateOr(
           TaskFlagsVar,
           IRB.CreateShl(
-              ConstantInt::get(Int64Ty, 1),
+              ConstantInt::get(IntArchTy, 1),
               7));
     }
     if (LoopInfo.Update) {
@@ -2077,7 +2081,7 @@ struct OmpSsDirective {
           IRB.CreateShl(
             IRB.CreateZExt(
               LoopInfo.Update,
-              Int64Ty),
+              IntArchTy),
               8));
     }
     return TaskFlagsVar;
@@ -2329,34 +2333,33 @@ struct OmpSsDirective {
     AllocaInst *TaskPtrVar = IRB.CreateAlloca(PtrTy);
     PostMoveInstructions.push_back(TaskPtrVar);
 
-    Value *TaskArgsStructSizeOf = IRB.getInt64(DL.getTypeAllocSize(TaskArgsTy));
+    Value *TaskArgsStructSizeOf = ConstantInt::get(IntArchTy, DL.getTypeAllocSize(TaskArgsTy));
 
     // TODO: this forces an alignment of 16 for VLAs
     {
       const int ALIGN = 16;
       TaskArgsStructSizeOf =
-        IRB.CreateNUWAdd(TaskArgsStructSizeOf, IRB.getInt64(ALIGN - 1));
+        IRB.CreateNUWAdd(TaskArgsStructSizeOf, ConstantInt::get(IntArchTy, ALIGN - 1));
       TaskArgsStructSizeOf =
-        IRB.CreateAnd(TaskArgsStructSizeOf, IRB.CreateNot(IRB.getInt64(ALIGN - 1)));
+        IRB.CreateAnd(TaskArgsStructSizeOf, IRB.CreateNot(ConstantInt::get(IntArchTy, ALIGN - 1)));
     }
 
     Value *TaskArgsVLAsExtraSizeOf = computeTaskArgsVLAsExtraSizeOf(IRB);
     Value *TaskArgsSizeOf = IRB.CreateNUWAdd(TaskArgsStructSizeOf, TaskArgsVLAsExtraSizeOf);
 
-    Type *NumDependenciesTy = Int64Ty;
-    Instruction *NumDependencies = IRB.CreateAlloca(NumDependenciesTy, nullptr, "num.deps");
+    Instruction *NumDependencies = IRB.CreateAlloca(IntArchTy, nullptr, "num.deps");
     PostMoveInstructions.push_back(NumDependencies);
 
     if (DirEnv.isOmpSsTaskLoopDirective() && hasMultidepUsingLoopIter()) {
       // If taskloop has a multidep using the loop iterator
       // NumDeps = -1
-      IRB.CreateStore(IRB.getInt64(-1), NumDependencies);
+      IRB.CreateStore(ConstantInt::get(IntArchTy, -1), NumDependencies);
     } else {
-      IRB.CreateStore(IRB.getInt64(0), NumDependencies);
+      IRB.CreateStore(ConstantInt::get(IntArchTy, 0), NumDependencies);
       for (auto &DepInfo : DependsInfo.List) {
         Instruction *NumDependenciesLoad = IRB.CreateLoad(
-            NumDependenciesTy, NumDependencies);
-        Value *NumDependenciesIncr = IRB.CreateAdd(NumDependenciesLoad, IRB.getInt64(1));
+            IntArchTy, NumDependencies);
+        Value *NumDependenciesIncr = IRB.CreateAdd(NumDependenciesLoad, ConstantInt::get(IntArchTy, 1));
         Instruction *NumDependenciesStore = IRB.CreateStore(NumDependenciesIncr, NumDependencies);
         if (const auto *MultiDepInfo = dyn_cast<MultiDependInfo>(DepInfo.get())) {
 
@@ -2385,7 +2388,7 @@ struct OmpSsDirective {
         TaskArgsVar,
         TaskPtrVar,
         TaskFlagsVar,
-        IRB.CreateLoad(NumDependenciesTy, NumDependencies)
+        IRB.CreateLoad(IntArchTy, NumDependencies)
     };
 
     if (DirEnv.isOmpSsLoopDirective()) {
@@ -2481,11 +2484,11 @@ struct OmpSsDirective {
           GEP = IRB.CreateGEP(
               TaskArgsTy,
               TaskArgsVarL, Idx, ("gep_dev_ndrange" + Twine(i)).str());
-          Value *V = ConstantInt::get(Int64Ty, -1);
+          Value *V = ConstantInt::get(IntArchTy, -1);
           if (j <= DeviceInfo.HasLocalSize && i < NdrangeLength)
             V = createZSExtOrTrunc(
               IRB, DeviceInfo.Ndrange[NdrangeLength*j + i],
-              Int64Ty, /*Signed=*/false);
+              IntArchTy, /*Signed=*/false);
 
           IRB.CreateStore(V, GEP);
         }
@@ -2497,7 +2500,7 @@ struct OmpSsDirective {
           TaskArgsTy,
           TaskArgsVarL, Idx, "gep_dev_shm");
       IRB.CreateStore(
-        ConstantInt::get(Int64Ty, 0), GEP);
+        ConstantInt::get(IntArchTy, 0), GEP);
     }
 
     // First point VLAs to its according space in task args
@@ -2726,7 +2729,7 @@ struct OmpSsDirective {
         ConstantStruct::get(nanos6Api::Nanos6TaskInvInfo::getInstance(M).getType(),
           Nanos6TaskLocStr),
         ("task_invocation_info_" + F.getName()).str());
-    TaskInvInfoVar->setAlignment(Align(64));
+    TaskInvInfoVar->setAlignment(Align(DL.getPointerSizeInBits()));
 
     GlobalVariable *TaskImplInfoVar =
       new GlobalVariable(M, ArrayType::get(nanos6Api::Nanos6TaskImplInfo::getInstance(M).getType(), 1),
@@ -2746,7 +2749,7 @@ struct OmpSsDirective {
           ? Nanos6TaskDevFuncStr
           : ConstantPointerNull::get(PtrTy))),
         ("implementations_var_" + F.getName()).str());
-    TaskImplInfoVar->setAlignment(Align(64));
+    TaskImplInfoVar->setAlignment(Align(DL.getPointerSizeInBits()));
 
     SmallVector<Constant *, 4> Inits;
     for (auto &p : DirEnv.ReductionsInitCombInfo)
@@ -2758,7 +2761,7 @@ struct OmpSsDirective {
         ConstantArray::get(ArrayType::get(
           PtrTy, DirEnv.ReductionsInitCombInfo.size()), Inits),
         ("nanos6_reduction_initializers_" + F.getName()).str());
-    TaskRedInitsVar->setAlignment(Align(64));
+    TaskRedInitsVar->setAlignment(Align(DL.getPointerSizeInBits()));
 
     SmallVector<Constant *, 4> Combs;
     for (auto &p : DirEnv.ReductionsInitCombInfo)
@@ -2793,7 +2796,7 @@ struct OmpSsDirective {
           OffsetTableVar,
           ArgIdxTableVar),
         ("task_info_var_" + F.getName()).str());
-    TaskInfoVar->setAlignment(Align(64));
+    TaskInfoVar->setAlignment(Align(DL.getPointerSizeInBits()));
 
     registerTaskInfo(TaskInfoVar);
 

@@ -10,6 +10,8 @@ class Type;
 class StructType;
 namespace nanos6Api {
 
+Type *getIntArchTy(Module &M);
+
 class Nanos6LoopBounds {
 private:
   StructType *Ty;
