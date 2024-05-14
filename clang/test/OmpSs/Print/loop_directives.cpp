@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -verify -fompss-2 -ast-print %s | FileCheck %s
+// RUN: %clang_cc1 -verify -fompss-2 -fompss-2=libnodes -ast-print %s | FileCheck %s
 // expected-no-diagnostics
 template<typename T> T foo() { return T(); }
 

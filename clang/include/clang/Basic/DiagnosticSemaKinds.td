@@ -12107,6 +12107,8 @@ def warn_oss_task_redeclaration :
           "task function, any calls prior this point may create different tasks}0">, InGroup<OmpSs>;
 def warn_oss_temporary_task : Warning<
   "the temporary %0 in this task call will be destroyed at the end of the expression">, InGroup<OmpSs>;
+def err_oss_runtime_unsupported : Error<
+  "'#pragma oss %1' is not supported in %0">;
 } // end of OmpSs component.
 
 def err_objc_type_arg_not_id_compatible : Error<

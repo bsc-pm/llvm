@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -verify -fompss-2 -ast-dump -ferror-limit 100 %s | FileCheck %s
+// RUN: %clang_cc1 -verify -fompss-2 -fompss-2=libnodes -ast-dump -ferror-limit 100 %s | FileCheck %s
 // expected-no-diagnostics
 
 int main() {

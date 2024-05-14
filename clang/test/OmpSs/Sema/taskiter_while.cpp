@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -verify -x c++ -fompss-2 -ferror-limit 100 -o - -std=c++11 %s
+// RUN: %clang_cc1 -verify -x c++ -fompss-2 -fompss-2=libnodes -ferror-limit 100 -o - -std=c++11 %s
 
 template<typename T>
 void bar(T p) {
