@@ -165,13 +165,13 @@ int __kmp_hier_threads_per[kmp_hier_layer_e::LAYER_LAST + 1];
 kmp_hier_sched_env_t __kmp_hier_scheds = {0, 0, NULL, NULL, NULL};
 #endif
 #if defined(KMP_OMPV_ENABLED)
-int __kmp_dflt_blocktime = 0; // in microseconds
+int __kmp_dflt_blocktime = KMP_DEFAULT_BLOCKTIME; // in microseconds
 #else
 int __kmp_dflt_blocktime = KMP_DEFAULT_BLOCKTIME; // in microseconds
 #endif // KMP_OMPV_ENABLED
 char __kmp_blocktime_units = 'm'; // Units specified in KMP_BLOCKTIME
 #if defined(KMP_OMPV_ENABLED)
-bool __kmp_wpolicy_passive = true;
+bool __kmp_wpolicy_passive = false;
 #else
 bool __kmp_wpolicy_passive = false;
 #endif // KMP_OMPV_ENABLED

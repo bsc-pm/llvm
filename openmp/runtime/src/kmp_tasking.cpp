@@ -543,9 +543,7 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task
   KMP_DEBUG_ASSERT(TCR_PTR(task_team->tt.tt_threads_data) != NULL);
 
 #if defined(KMP_OMPV_ENABLED)
-  if (__kmp_dflt_blocktime != KMP_MAX_BLOCKTIME &&
-      __kmp_wpolicy_passive &&
-      __kmp_enable_free_agents) {
+  if (__kmp_enable_free_agents) {
     nosv_task_t nosv_task = taskdata->td_nosv_task;
     if (taskdata->td_flags.priority_specified && task->data2.priority > 0 &&
         __kmp_max_task_priority > 0) {
