@@ -4269,6 +4269,9 @@ static int __kmp_reset_root(int gtid, kmp_root_t *root) {
 }
 
 void __kmp_unregister_root_current_thread(int gtid) {
+#if defined(KMP_OMPV_ENABLED)
+  free_agents_wait_childs(__kmp_threads[gtid]->th.th_current_task);
+#endif // KMP_OMPV_ENABLED
   KA_TRACE(1, ("__kmp_unregister_root_current_thread: enter T#%d\n", gtid));
   /* this lock should be ok, since unregister_root_current_thread is never
      called during an abort, only during a normal close. furthermore, if you
