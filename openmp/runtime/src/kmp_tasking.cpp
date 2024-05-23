@@ -5327,14 +5327,14 @@ void __kmp_task_team_wait(
       // still be executing tasks. Wait here for tasks to complete. To avoid
       // memory contention, only primary thread checks termination condition.
 #if defined(KMP_OMPV_ENABLED)
+      kmp_flag_32<false, false> flag_unfinished(
+          RCAST(std::atomic<kmp_uint32> *,
+                &task_team->tt.tt_unfinished_tasks),
+          0U);
+      flag_unfinished.wait(this_thr, FALSE USE_ITT_BUILD_ARG(itt_sync_obj));
+
       if (__kmp_dflt_blocktime != KMP_MAX_BLOCKTIME &&
           __kmp_wpolicy_passive) {
-        kmp_flag_32<false, false> flag(
-            RCAST(std::atomic<kmp_uint32> *,
-                  &task_team->tt.tt_unfinished_tasks),
-            0U);
-        flag.wait(this_thr, FALSE USE_ITT_BUILD_ARG(itt_sync_obj));
-
         kmp_int32 nthreads = this_thr->th.th_team_nproc;
         // Wakeup all sleeping threads to ensure they do
         // the last decrement of tt_unfinished_threads
