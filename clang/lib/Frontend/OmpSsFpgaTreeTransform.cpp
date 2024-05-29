@@ -53,6 +53,8 @@
 #include <sstream>
 #include <string>
 #include <type_traits>
+#include <set>
+#include <map>
 
 using namespace clang;
 namespace {
@@ -362,7 +364,7 @@ public:
   }
 
   llvm::SmallVector<Stmt *, 1> copyParamTaskCall(
-      llvm::SmallDenseMap<const ParmVarDecl *, LocalmemInfo> &copies,
+      std::map<const ParmVarDecl *, LocalmemInfo> &copies,
       VarDecl *copiesDecl, ParmVarDecl *param, int &copId, int paramId,
       Expr *accessedMember, QualType typeMember, bool isSmpTask,
       FunctionDecl *declFunctionTask, CallExpr *callExpr) {
@@ -371,7 +373,7 @@ public:
 
     auto copIt = copies.find(param);
     if (copIt != copies.end()) {
-      auto copy = *copIt;
+      auto &copy = *copIt;
       Expr *copyIdExpr = makeIntegerLiteral(copId);
 
       auto *copiesSubscript = new (Ctx) ArraySubscriptExpr(
@@ -443,7 +445,7 @@ public:
       stmts.push_back(makeDeclStmt(argsDecl));
     }
 
-    llvm::SmallDenseMap<const ParmVarDecl *, LocalmemInfo> copies;
+    std::map<const ParmVarDecl *, LocalmemInfo> copies;
     if (attr->getDevice() == OSSTaskDeclAttr::Fpga)
       copies =
           ComputeLocalmems(dyn_cast<FunctionDecl>(callExpr->getCalleeDecl()));
@@ -975,7 +977,7 @@ ParamDependencyMap computeDependencyMap(OSSTaskDeclAttr *taskAttr,
   return currentAssignationsOfArrays;
 }
 
-llvm::SmallDenseMap<const clang::ParmVarDecl *, LocalmemInfo>
+std::map<const clang::ParmVarDecl *, LocalmemInfo>
 ComputeLocalmems(FunctionDecl *FD) {
   auto *taskAttr = FD->getAttr<OSSTaskDeclAttr>();
   // First, compute the direction tags of the parameters. Do note that not
@@ -983,9 +985,12 @@ ComputeLocalmems(FunctionDecl *FD) {
   ParamDependencyMap currentAssignationsOfArrays =
       computeDependencyMap(taskAttr);
 
-  // Then compute the list of localmem parameters
-  llvm::SmallDenseSet<const ParmVarDecl *> parametersToLocalmem;
+  // Use a std::set as it guarantees ordered iteration
+  // this is needed for reproducible builds
+  // otherwise, a SmallDenseSet could be used
+  std::set<const ParmVarDecl *> parametersToLocalmem;
 
+  // Then compute the list of localmem parameters
   // If copy_deps
   if (taskAttr->getCopyDeps()) {
     for (auto *param : FD->parameters()) {
@@ -1021,7 +1026,7 @@ ComputeLocalmems(FunctionDecl *FD) {
   explicitCopy(taskAttr->copyInOut(), LocalmemInfo::INOUT);
 
   // Compute the localmem list
-  llvm::SmallDenseMap<const ParmVarDecl *, LocalmemInfo> localmemList;
+  std::map<const ParmVarDecl *, LocalmemInfo> localmemList;
   for (auto *param : parametersToLocalmem) {
     auto data = currentAssignationsOfArrays.find(param);
     localmemList.insert(

@@ -76,6 +76,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <map>
 
 #define STR_COMPONENTS_COUNT "__mcxx_taskComponents"
 #define STR_OUTPORT "mcxx_outPort"
@@ -277,7 +278,10 @@ template <typename Callable> class WrapperGenerator {
   bool NeedsDeps = false;
   WrapperPortMap WrapPortMap;
 
-  llvm::SmallDenseMap<const ParmVarDecl *, LocalmemInfo> Localmems;
+  // Use a std::map as it guarantees ordered iteration
+  // this is needed for reproducible builds
+  // otherwise, a SmallDenseMap could be used
+  std::map<const ParmVarDecl *, LocalmemInfo> Localmems;
 
   std::optional<uint64_t> getNumInstances() {
     uint64_t value = 1; // Default is 1 instance

@@ -22,6 +22,8 @@
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/SmallSet.h"
 
+#include <map>
+
 namespace clang {
 
 static constexpr uint8_t InstrumentationEventBurstBegin = 0b0000'0000;
@@ -115,7 +117,7 @@ using ParamDependencyMap =
 ParamDependencyMap computeDependencyMap(OSSTaskDeclAttr *taskAttr,
                                         bool includeNonArrays = false);
 
-llvm::SmallDenseMap<const clang::ParmVarDecl *, LocalmemInfo>
+std::map<const clang::ParmVarDecl *, LocalmemInfo>
 ComputeLocalmems(FunctionDecl *FD);
 
 QualType DerefOnceTypePointerTo(QualType type);
