@@ -364,14 +364,16 @@ public:
   }
 
   llvm::SmallVector<Stmt *, 1> copyParamTaskCall(
-      std::map<const ParmVarDecl *, LocalmemInfo> &copies,
+      llvm::SmallVector<std::pair<const ParmVarDecl *, LocalmemInfo>, MaxLocalmem > &copies,
       VarDecl *copiesDecl, ParmVarDecl *param, int &copId, int paramId,
       Expr *accessedMember, QualType typeMember, bool isSmpTask,
       FunctionDecl *declFunctionTask, CallExpr *callExpr) {
 
     llvm::SmallVector<Stmt *, 1> stmts;
 
-    auto copIt = copies.find(param);
+    auto copIt = std::find_if(copies.begin(), copies.end(),
+            [param](std::pair<const ParmVarDecl *, LocalmemInfo> &elem){
+            return elem.first == param; });
     if (copIt != copies.end()) {
       auto &copy = *copIt;
       Expr *copyIdExpr = makeIntegerLiteral(copId);
@@ -445,17 +447,17 @@ public:
       stmts.push_back(makeDeclStmt(argsDecl));
     }
 
-    std::map<const ParmVarDecl *, LocalmemInfo> copies;
+    llvm::SmallVector<std::pair<const ParmVarDecl *, LocalmemInfo>, MaxLocalmem > copies;
     if (attr->getDevice() == OSSTaskDeclAttr::Fpga)
       copies =
           ComputeLocalmems(dyn_cast<FunctionDecl>(callExpr->getCalleeDecl()));
     else {
       for (auto &&[param, dependency] : dependencyMap) {
         if (auto *arrExpr = dyn_cast<OSSArrayShapingExpr>(dependency.first)) {
-          copies.insert(std::pair<const ParmVarDecl *, LocalmemInfo>(
+          copies.push_back(std::pair<const ParmVarDecl *, LocalmemInfo>(
               param, LocalmemInfo{-1, arrExpr, dependency.second}));
         } else {
-          copies.insert(std::pair<const ParmVarDecl *, LocalmemInfo>(
+          copies.push_back(std::pair<const ParmVarDecl *, LocalmemInfo>(
               param, LocalmemInfo{-1, nullptr, dependency.second}));
         }
       }
@@ -977,7 +979,7 @@ ParamDependencyMap computeDependencyMap(OSSTaskDeclAttr *taskAttr,
   return currentAssignationsOfArrays;
 }
 
-std::map<const clang::ParmVarDecl *, LocalmemInfo>
+llvm::SmallVector< std::pair<const ParmVarDecl *, LocalmemInfo> >
 ComputeLocalmems(FunctionDecl *FD) {
   auto *taskAttr = FD->getAttr<OSSTaskDeclAttr>();
   // First, compute the direction tags of the parameters. Do note that not
@@ -985,10 +987,10 @@ ComputeLocalmems(FunctionDecl *FD) {
   ParamDependencyMap currentAssignationsOfArrays =
       computeDependencyMap(taskAttr);
 
-  // Use a std::set as it guarantees ordered iteration
+  // Use a SmallVector as we need ordered iteration
   // this is needed for reproducible builds
   // otherwise, a SmallDenseSet could be used
-  std::set<const ParmVarDecl *> parametersToLocalmem;
+  llvm::SmallVector<const ParmVarDecl *> parametersToLocalmem;
 
   // Then compute the list of localmem parameters
   // If copy_deps
@@ -996,12 +998,16 @@ ComputeLocalmems(FunctionDecl *FD) {
     for (auto *param : FD->parameters()) {
       if (currentAssignationsOfArrays.find(param) !=
           currentAssignationsOfArrays.end()) {
-        parametersToLocalmem.insert(param);
+        parametersToLocalmem.push_back(param);
       }
     }
   }
   // If we have an explicit list of localmem (copy_in, copy_out, copy_inout),
   // use that
+  // If copies need to appear in the same order as arguments,
+  // we should iterate through args and search for each arg in the copy list
+  // Right now we only try to produce the same order each time
+  // for a given input
   auto explicitCopy = [&](auto &&list, LocalmemInfo::Dir dir) {
     for (auto *localmem : list) {
       auto *arrShapingExpr = dyn_cast<OSSArrayShapingExpr>(localmem);
@@ -1015,7 +1021,12 @@ ComputeLocalmems(FunctionDecl *FD) {
       assert(arrExprBase);
       auto *decl = dyn_cast<ParmVarDecl>(arrExprBase->getDecl());
       assert(decl);
-      parametersToLocalmem.insert(decl);
+      //avoid duplicates if copy_deps & copies are specified
+      if (std::find(parametersToLocalmem.begin(),
+                  parametersToLocalmem.end(),
+                  decl) == parametersToLocalmem.end()) {
+          parametersToLocalmem.push_back(decl);
+      }
       auto &def = currentAssignationsOfArrays[decl];
       def.first = arrShapingExpr;
       def.second = LocalmemInfo::Dir(def.second | dir);
@@ -1026,10 +1037,10 @@ ComputeLocalmems(FunctionDecl *FD) {
   explicitCopy(taskAttr->copyInOut(), LocalmemInfo::INOUT);
 
   // Compute the localmem list
-  std::map<const ParmVarDecl *, LocalmemInfo> localmemList;
+  llvm::SmallVector< std::pair<const ParmVarDecl *, LocalmemInfo>, MaxLocalmem > localmemList;
   for (auto *param : parametersToLocalmem) {
     auto data = currentAssignationsOfArrays.find(param);
-    localmemList.insert(
+    localmemList.push_back(
         {param,
          LocalmemInfo{-1, dyn_cast<OSSArrayShapingExpr>(data->second.first),
                       data->second.second}});

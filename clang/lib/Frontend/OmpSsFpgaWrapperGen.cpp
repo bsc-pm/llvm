@@ -278,10 +278,25 @@ template <typename Callable> class WrapperGenerator {
   bool NeedsDeps = false;
   WrapperPortMap WrapPortMap;
 
-  // Use a std::map as it guarantees ordered iteration
-  // this is needed for reproducible builds
+  // Use a SmallArray since order is important.
+  // This is needed for reproducible builds
   // otherwise, a SmallDenseMap could be used
-  std::map<const ParmVarDecl *, LocalmemInfo> Localmems;
+  // This is not very efficient, but since size will be < 16
+  // this should not be too bad
+  llvm::SmallVector<std::pair<const ParmVarDecl *, LocalmemInfo> > Localmems;
+
+  llvm::SmallVector<std::pair<const ParmVarDecl *, LocalmemInfo> >::iterator
+  findLocalmemInfo(
+          llvm::SmallVector<std::pair<const ParmVarDecl *, LocalmemInfo> > &localmems,
+          const ParmVarDecl *param) {
+
+    auto copIt = std::find_if(localmems.begin(), localmems.end(), 
+            [param](std::pair<const ParmVarDecl *, LocalmemInfo> &elem){
+            return elem.first == param; });
+    return copIt;
+  }
+
+
 
   std::optional<uint64_t> getNumInstances() {
     uint64_t value = 1; // Default is 1 instance
@@ -641,7 +656,7 @@ OMPIF_COMM_WORLD
     }
 
     for (auto *param : OriginalFD->parameters()) {
-      auto it = Localmems.find(param);
+      auto it = findLocalmemInfo(Localmems, param);
       if (CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth > 0 &&
           it != Localmems.end())
         continue;
@@ -680,7 +695,7 @@ OMPIF_COMM_WORLD
       Output << "#pragma HLS interface m_axi port=mcxx_memport\n";
     }
     for (auto *param : OriginalFD->parameters()) {
-      auto it = Localmems.find(param);
+      auto it = findLocalmemInfo(Localmems, param);
       if (CI.getFrontendOpts().OmpSsFpgaMemoryPortWidth > 0 &&
           it != Localmems.end())
         continue;
@@ -723,7 +738,7 @@ OMPIF_COMM_WORLD
         paramType->getPointeeType().print(Output, printPol);
         Output << "> " << symbolName << ";\n";
       } else {
-        auto it = Localmems.find(param);
+        auto it = findLocalmemInfo(Localmems, param);
         if (it == Localmems.end()) {
           if (paramType->isArrayType()) {
             paramType = OriginalContext.getPointerType(
@@ -747,7 +762,7 @@ OMPIF_COMM_WORLD
       auto [paramType, usesMemoryPort] = getType(param);
 
       auto symbolName = param->getName();
-      auto it = Localmems.find(param);
+      auto it = findLocalmemInfo(Localmems, param);
       Output << "    {\n";
       if (!usesMemoryPort || (CreatesTasks && paramType->isPointerType()) ||
           it == Localmems.end()) {

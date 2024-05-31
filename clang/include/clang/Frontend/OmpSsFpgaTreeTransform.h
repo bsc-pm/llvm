@@ -28,6 +28,7 @@ namespace clang {
 
 static constexpr uint8_t InstrumentationEventBurstBegin = 0b0000'0000;
 static constexpr uint8_t InstrumentationEventBurstEnd = 0b1000'0000;
+static constexpr int MaxLocalmem = 15;
 
 #define BURST(name, val)                                                       \
   name##Begin = InstrumentationEventBurstBegin | val,                          \
@@ -117,7 +118,7 @@ using ParamDependencyMap =
 ParamDependencyMap computeDependencyMap(OSSTaskDeclAttr *taskAttr,
                                         bool includeNonArrays = false);
 
-std::map<const clang::ParmVarDecl *, LocalmemInfo>
+llvm::SmallVector< std::pair<const ParmVarDecl *, LocalmemInfo> >
 ComputeLocalmems(FunctionDecl *FD);
 
 QualType DerefOnceTypePointerTo(QualType type);
