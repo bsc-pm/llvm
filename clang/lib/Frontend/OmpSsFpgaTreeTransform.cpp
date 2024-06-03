@@ -979,7 +979,7 @@ ParamDependencyMap computeDependencyMap(OSSTaskDeclAttr *taskAttr,
   return currentAssignationsOfArrays;
 }
 
-llvm::SmallVector< std::pair<const ParmVarDecl *, LocalmemInfo> >
+llvm::SmallVector< std::pair<const ParmVarDecl *, LocalmemInfo>, MaxLocalmem >
 ComputeLocalmems(FunctionDecl *FD) {
   auto *taskAttr = FD->getAttr<OSSTaskDeclAttr>();
   // First, compute the direction tags of the parameters. Do note that not
