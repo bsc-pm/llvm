@@ -95,6 +95,10 @@ void Scope::setFlags(Scope *parent, unsigned flags) {
 void Scope::Init(Scope *parent, unsigned flags) {
   setFlags(parent, flags);
 
+  // TODO: OmpSs-2 workaround for OmpSsLoopDirectiveScope
+  // since the enum underlying type is full
+  IsOmpSsLoopDirectiveScope = false;
+
   DeclsInScope.clear();
   UsingDirectives.clear();
   Entity = nullptr;
@@ -219,6 +223,7 @@ void Scope::dumpImpl(raw_ostream &OS) const {
       {TryScope, "TryScope"},
       {FnTryCatchScope, "FnTryCatchScope"},
       {OmpSsDirectiveScope, "OmpSsDirectiveScope"}, // Be able to dump the scope
+      {OmpSsLoopDirectiveScope, "OmpSsLoopDirectiveScope"}, // Be able to dump the scope
       {OpenMPDirectiveScope, "OpenMPDirectiveScope"},
       {OpenMPLoopDirectiveScope, "OpenMPLoopDirectiveScope"},
       {OpenMPSimdDirectiveScope, "OpenMPSimdDirectiveScope"},
@@ -230,6 +235,7 @@ void Scope::dumpImpl(raw_ostream &OS) const {
       {ClassInheritanceScope, "ClassInheritanceScope"},
       {CatchScope, "CatchScope"},
       {OpenACCComputeConstructScope, "OpenACCComputeConstructScope"},
+      {FriendScope, "FriendScope"},
   };
 
   for (auto Info : FlagInfo) {

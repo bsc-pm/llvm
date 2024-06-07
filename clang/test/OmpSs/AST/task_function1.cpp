@@ -23,7 +23,8 @@ int main() {
 }
 
 // CHECK: OSSTaskDeclAttr 0x{{.*}} <line:{{.*}}:{{.*}}, col:{{.*}}> Implicit Unknown
-// CHECK: UnaryOperator 0x{{.*}} <col:{{.*}}, col:{{.*}}> '<dependent type>' prefix '*' cannot overflow
+// CHECK: UnaryOperator 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'T' lvalue prefix '*' cannot overflow
+// CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'T *' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'T *' lvalue ParmVar 0x{{.*}} 'y' 'T *'
 
 // CHECK: OSSTaskDeclAttr 0x{{.*}} <line:{{.*}}:{{.*}}, col:{{.*}}> Implicit Unknown
@@ -36,9 +37,11 @@ int main() {
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int' NonTypeTemplateParm 0x{{.*}} 'N' 'int'
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int' NonTypeTemplateParm 0x{{.*}} 'N' 'int'
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int' NonTypeTemplateParm 0x{{.*}} 'N' 'int'
-// CHECK: UnaryOperator 0x{{.*}} <col:{{.*}}, col:{{.*}}> '<dependent type>' prefix '*' cannot overflow
+// CHECK: UnaryOperator 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'T' lvalue prefix '*' cannot overflow
+// CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'T *' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'T *' lvalue ParmVar 0x{{.*}} 'x' 'T *'
-// CHECK-NEXT: UnaryOperator 0x{{.*}} <col:{{.*}}, col:{{.*}}> '<dependent type>' prefix '*' cannot overflow
+// CHECK-NEXT: UnaryOperator 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'T' lvalue prefix '*' cannot overflow
+// CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'T *' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'T *' lvalue ParmVar 0x{{.*}} 'x' 'T *'
 
 // CHECK: OSSTaskDeclAttr 0x{{.*}} <line:{{.*}}:{{.*}}, col:{{.*}}> Implicit Unknown

@@ -1182,8 +1182,3 @@ END PROGRAM
 ! FIRDialect:           return %[[VAL_6]] : i32
 ! FIRDialect:         }
 
-! FIRDialect-LABEL:   fir.global @_QQEnvironmentDefaults constant : !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>> {
-! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>>
-! FIRDialect:           fir.has_value %[[VAL_0]] : !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>>
-! FIRDialect:         }
-

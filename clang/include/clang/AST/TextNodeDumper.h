@@ -192,6 +192,8 @@ public:
   // OmpSs
   void Visit(const OSSClause *C);
 
+  void Visit(const OpenACCClause *C);
+
   void Visit(const BlockDecl::Capture &C);
 
   void Visit(const GenericSelectionExpr::ConstAssociation &A);
@@ -355,6 +357,7 @@ public:
   void VisitEnumConstantDecl(const EnumConstantDecl *D);
   void VisitIndirectFieldDecl(const IndirectFieldDecl *D);
   void VisitFunctionDecl(const FunctionDecl *D);
+  void VisitCXXDeductionGuideDecl(const CXXDeductionGuideDecl *D);
   void VisitFieldDecl(const FieldDecl *D);
   void VisitVarDecl(const VarDecl *D);
   void VisitBindingDecl(const BindingDecl *D);

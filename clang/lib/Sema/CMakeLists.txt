@@ -1,5 +1,6 @@
 set(LLVM_LINK_COMPONENTS
   Core
+  Demangle
   FrontendHLSL
   FrontendOmpSs
   FrontendOpenMP
@@ -30,6 +31,7 @@ add_clang_library(clangSema
   SemaAttr.cpp
   SemaAPINotes.cpp
   SemaAvailability.cpp
+  SemaBase.cpp
   SemaCXXScopeSpec.cpp
   SemaCast.cpp
   SemaChecking.cpp
@@ -53,13 +55,14 @@ add_clang_library(clangSema
   SemaLambda.cpp
   SemaLookup.cpp
   SemaModule.cpp
+  SemaObjC.cpp
   SemaObjCProperty.cpp
   SemaOpenACC.cpp
   SemaOpenMP.cpp
   SemaOmpSs.cpp
   SemaOverload.cpp
   SemaPseudoObject.cpp
-  SemaRISCVVectorLookup.cpp
+  SemaRISCV.cpp
   SemaStmt.cpp
   SemaStmtAsm.cpp
   SemaStmtAttr.cpp
@@ -70,6 +73,7 @@ add_clang_library(clangSema
   SemaTemplateInstantiateDecl.cpp
   SemaTemplateVariadic.cpp
   SemaType.cpp
+  SemaX86.cpp
   TypeLocBuilder.cpp
 
   DEPENDS

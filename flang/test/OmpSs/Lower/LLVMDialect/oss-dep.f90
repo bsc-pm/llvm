@@ -1917,10 +1917,3 @@ end program
 ! LLVMIRDialect:           llvm.return %[[VAL_165]] : !llvm.array<1 x struct<"_QM__fortran_type_infoTcomponent", (struct<(ptr, i64, i32, i8, i8, i8, i8)>, i8, i8, i8, i8, array<4 x i8>, i64, struct<"_QM__fortran_type_infoTvalue", (i8, array<7 x i8>, i64)>, struct<(ptr, i64, i32, i8, i8, i8, i8, ptr, array<1 x i64>)>, struct<(ptr, i64, i32, i8, i8, i8, i8, array<1 x array<3 x i64>>, ptr, array<1 x i64>)>, struct<(ptr, i64, i32, i8, i8, i8, i8, array<2 x array<3 x i64>>, ptr, array<1 x i64>)>, struct<"_QM__fortran_builtinsT__builtin_c_ptr", (i64)>)>>
 ! LLVMIRDialect:         }
 
-! LLVMIRDialect-LABEL:   llvm.mlir.global external constant @_QQEnvironmentDefaults() {addr_space = 0 : i32} : !llvm.ptr {
-! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.zero : !llvm.ptr
-! LLVMIRDialect:           llvm.return %[[VAL_0]] : !llvm.ptr
-! LLVMIRDialect:         }
-! LLVMIRDialect:         llvm.func @llvm.stacksave.p0() -> !llvm.ptr attributes {sym_visibility = "private"}
-! LLVMIRDialect:         llvm.func @llvm.stackrestore.p0(!llvm.ptr) attributes {sym_visibility = "private"}
-

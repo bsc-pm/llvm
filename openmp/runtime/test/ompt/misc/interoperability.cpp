@@ -14,6 +14,12 @@
 
 int condition = 0;
 
+#if defined(_OPENMPV)
+extern "C" {
+int nosv_detach(uint64_t);
+}
+#endif // _OPENMPV
+
 void f() {
   // Call OpenMP API function to force initialization of OMPT.
   // (omp_get_thread_num() does not work because it just returns 0 if the
@@ -34,6 +40,9 @@ void f() {
     OMPT_SIGNAL(condition);
     OMPT_WAIT(condition, 6);
   }
+#if defined(_OPENMPV)
+  nosv_detach(0);
+#endif // _OPENMPV
 }
 
 int main() {

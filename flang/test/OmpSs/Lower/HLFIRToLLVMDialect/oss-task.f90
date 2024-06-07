@@ -21,8 +21,3 @@ END
 ! HLFIRToLLVMDialect:           llvm.return
 ! HLFIRToLLVMDialect:         }
 
-! HLFIRToLLVMDialect-LABEL:   llvm.mlir.global external constant @_QQEnvironmentDefaults() {addr_space = 0 : i32} : !llvm.ptr {
-! HLFIRToLLVMDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.zero : !llvm.ptr
-! HLFIRToLLVMDialect:           llvm.return %[[VAL_0]] : !llvm.ptr
-! HLFIRToLLVMDialect:         }
-

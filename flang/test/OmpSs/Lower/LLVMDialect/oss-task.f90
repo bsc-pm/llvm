@@ -101,8 +101,3 @@ end program
 ! LLVMIRDialect:           llvm.return
 ! LLVMIRDialect:         }
 
-! LLVMIRDialect-LABEL:   llvm.mlir.global external constant @_QQEnvironmentDefaults() {addr_space = 0 : i32} : !llvm.ptr {
-! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.zero : !llvm.ptr
-! LLVMIRDialect:           llvm.return %[[VAL_0]] : !llvm.ptr
-! LLVMIRDialect:         }
-

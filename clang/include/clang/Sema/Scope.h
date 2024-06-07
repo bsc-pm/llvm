@@ -159,11 +159,17 @@ public:
     /// jumping into/out of it.
     OpenACCComputeConstructScope = 0x10000000,
 
+    /// This is a scope of type alias declaration.
+    TypeAliasScope = 0x20000000,
+
+    /// This is a scope of friend declaration.
+    FriendScope = 0x40000000,
+
     /// This is the scope of OmpSs executable directive.
-    OmpSsDirectiveScope = 0x20000000,
+    OmpSsDirectiveScope = 0x80000000,
 
     /// This is the scope of some OmpSs loop directive.
-    OmpSsLoopDirectiveScope = 0x40000000,
+    OmpSsLoopDirectiveScope = 0x100000000,
   };
 
 private:
@@ -174,6 +180,10 @@ private:
   /// Flags - This contains a set of ScopeFlags, which indicates how the scope
   /// interrelates with other control flow statements.
   unsigned Flags;
+
+  // TODO: OmpSs-2 workaround for OmpSsLoopDirectiveScope
+  // since the enum underlying type is full
+  bool IsOmpSsLoopDirectiveScope;
 
   /// Depth - This is the depth of this scope.  The translation-unit scope has
   /// depth 0.
@@ -522,7 +532,8 @@ public:
   /// Determine whether this scope is some OmpSs loop directive scope
   /// (for example, 'oss task for', 'oss taskloop').
   bool isOmpSsLoopDirectiveScope() const {
-    if (getFlags() & Scope::OmpSsLoopDirectiveScope) {
+    if (IsOmpSsLoopDirectiveScope) {
+    // if (getFlags() & Scope::OmpSsLoopDirectiveScope) {
       assert(isOmpSsDirectiveScope() &&
              "OmpSs loop directive scope is not a directive scope");
       return true;
@@ -581,6 +592,12 @@ public:
     return getFlags() & ScopeFlags::ContinueScope;
   }
 
+  // TODO: OmpSs-2 workaround for OmpSsLoopDirectiveScope
+  // since the enum underlying type is full
+  void setOmpSsLoopDirectiveScope() {
+    IsOmpSsLoopDirectiveScope = true;
+  }
+
   /// Determine whether this scope is a loop having OmpSs loop
   /// directive attached.
   bool isOmpSsLoopScope() const {
@@ -610,6 +627,12 @@ public:
   /// Determine whether this scope is a controlling scope in a
   /// if/switch/while/for statement.
   bool isControlScope() const { return getFlags() & Scope::ControlScope; }
+
+  /// Determine whether this scope is a type alias scope.
+  bool isTypeAliasScope() const { return getFlags() & Scope::TypeAliasScope; }
+
+  /// Determine whether this scope is a friend scope.
+  bool isFriendScope() const { return getFlags() & Scope::FriendScope; }
 
   /// Returns if rhs has a higher scope depth than this.
   ///

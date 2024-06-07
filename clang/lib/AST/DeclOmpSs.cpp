@@ -41,7 +41,7 @@ OSSDeclareReductionDecl *OSSDeclareReductionDecl::Create(
 }
 
 OSSDeclareReductionDecl *
-OSSDeclareReductionDecl::CreateDeserialized(ASTContext &C, unsigned ID) {
+OSSDeclareReductionDecl::CreateDeserialized(ASTContext &C, GlobalDeclID ID) {
   return new (C, ID) OSSDeclareReductionDecl(
       OSSDeclareReduction, /*DC=*/nullptr, SourceLocation(), DeclarationName(),
       QualType(), /*PrevDeclInScope=*/nullptr);
@@ -74,7 +74,7 @@ OSSAssertDecl *OSSAssertDecl::Create(
 }
 
 OSSAssertDecl *OSSAssertDecl::CreateDeserialized(
-    ASTContext &C, unsigned ID, unsigned N) {
+    ASTContext &C, GlobalDeclID ID, unsigned N) {
   OSSAssertDecl *D = new (C, ID, additionalSizeToAlloc<Expr *>(N))
       OSSAssertDecl(OSSAssert, nullptr, SourceLocation());
   D->NumVars = N;

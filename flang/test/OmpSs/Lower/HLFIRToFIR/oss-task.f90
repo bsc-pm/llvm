@@ -21,8 +21,3 @@ END
 ! HLFIRToFIR:           return
 ! HLFIRToFIR:         }
 
-! HLFIRToFIR-LABEL:   fir.global @_QQEnvironmentDefaults constant : !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>> {
-! HLFIRToFIR:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>>
-! HLFIRToFIR:           fir.has_value %[[VAL_0]] : !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>>
-! HLFIRToFIR:         }
-

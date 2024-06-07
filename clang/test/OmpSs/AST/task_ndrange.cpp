@@ -32,7 +32,8 @@ void bad() {
 // CHECK: ConstantExpr 0x{{.*}} <col:{{.*}}> 'int'
 // CHECK-NEXT: value: Int 1
 // CHECK-NEXT: IntegerLiteral 0x{{.*}} <col:{{.*}}> 'int' 1
-// CHECK-NEXT: UnaryOperator 0x{{.*}} <col:{{.*}}, col:{{.*}}> '<dependent type>' prefix '*' cannot overflow
+// CHECK-NEXT: UnaryOperator 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'T' lvalue prefix '*' cannot overflow
+// CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'T *' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'T *' lvalue ParmVar 0x{{.*}} 'x' 'T *'
 // CHECK-NEXT: IntegerLiteral 0x{{.*}} <col:{{.*}}> 'int' 1
 

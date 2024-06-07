@@ -35,10 +35,3 @@ end
 ! LLVMIRDialect:           llvm.return %[[VAL_7]] : !llvm.struct<(ptr, i64, i64, i64)>
 ! LLVMIRDialect:         }
 
-! LLVMIRDialect-LABEL:   llvm.mlir.global external constant @_QQEnvironmentDefaults() {addr_space = 0 : i32} : !llvm.ptr {
-! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.zero : !llvm.ptr
-! LLVMIRDialect:           llvm.return %[[VAL_0]] : !llvm.ptr
-! LLVMIRDialect:         }
-! LLVMIRDialect:         llvm.func @llvm.stacksave.p0() -> !llvm.ptr attributes {sym_visibility = "private"}
-! LLVMIRDialect:         llvm.func @llvm.stackrestore.p0(!llvm.ptr) attributes {sym_visibility = "private"}
-

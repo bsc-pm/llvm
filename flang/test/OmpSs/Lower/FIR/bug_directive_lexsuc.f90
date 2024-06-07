@@ -54,8 +54,3 @@ END PROGRAM P
 ! FIRDialect:         }
 ! FIRDialect:         func.func private @_FortranAStopStatement(i32, i1, i1) -> none attributes {fir.runtime}
 
-! FIRDialect-LABEL:   fir.global @_QQEnvironmentDefaults constant : !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>> {
-! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>>
-! FIRDialect:           fir.has_value %[[VAL_0]] : !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>>
-! FIRDialect:         }
-

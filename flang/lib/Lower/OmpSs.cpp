@@ -39,7 +39,7 @@
 mlir::Type getLLVMIRLowerableType(mlir::Type t) {
   // Heap and Pointer types are already lowered to
   // llvm.ptr which is fine
-  if (t.isa<fir::HeapType, fir::PointerType>())
+  if (mlir::isa<fir::HeapType, fir::PointerType>(t))
     return fir::OmpSsType::get(t);
   return fir::OmpSsType::get(fir::unwrapRefType(t));
 }
@@ -250,11 +250,11 @@ namespace {
     private:
       mlir::Type unwrapBoxAndBoxRefType(mlir::Type type) {
         // Dummy parameters in a task outline
-        if (auto refType = type.dyn_cast<fir::ReferenceType>()) {
-          if (auto boxTy = refType.getEleTy().dyn_cast<fir::BaseBoxType>()) {
+        if (auto refType = mlir::dyn_cast<fir::ReferenceType>(type)) {
+          if (auto boxTy = mlir::dyn_cast<fir::BaseBoxType>(refType.getEleTy())) {
             return boxTy.getEleTy();
           }
-        } else if (auto boxTy = type.dyn_cast<fir::BaseBoxType>()) {
+        } else if (auto boxTy = mlir::dyn_cast<fir::BaseBoxType>(type)) {
           // Assumed-shape case fir.box<fir.array<>> -> fir.ref<fir.array<>>
           if (!(fir::isAllocatableType(boxTy) || fir::isPointerType(boxTy)))
             return fir::ReferenceType::get(fir::dyn_cast_ptrOrBoxEleTy(boxTy));
@@ -345,7 +345,7 @@ namespace {
         unsigned ndims = 1;
         if (auto baseType = fir::dyn_cast_ptrOrBoxEleTy(type))
           type = baseType;
-        if (auto arrayType = type.dyn_cast<fir::SequenceType>())
+        if (auto arrayType = mlir::dyn_cast<fir::SequenceType>(type))
           ndims = arrayType.getDimension();
         return ndims;
       }
@@ -1255,11 +1255,11 @@ namespace {
       for (auto [_, fieldType] : recordType.getTypeList()) {
         // Derived type component may have user assignment (so far, we cannot tell
         // in FIR, so assume it is always the case, TODO: get the actual info).
-        if (fir::unwrapSequenceType(fieldType).isa<fir::RecordType>())
+        if (mlir::isa<fir::RecordType>(fir::unwrapSequenceType(fieldType)))
           return false;
         // Allocatable components need deep copy.
-        if (auto boxType = fieldType.dyn_cast<fir::BoxType>())
-          if (boxType.getEleTy().isa<fir::HeapType>())
+        if (auto boxType = mlir::dyn_cast<fir::BoxType>(fieldType))
+          if (mlir::isa<fir::HeapType>(boxType.getEleTy()))
             return false;
       }
       // Constant size components without user defined assignment and pointers can
@@ -1340,7 +1340,7 @@ namespace {
         if (expr.GetType()->category() == Fortran::common::TypeCategory::Derived) {
           auto baseTy = fir::dyn_cast_ptrOrBoxEleTy(fir::getBase(exv).getType());
           assert(baseTy && "must be a memory type");
-          auto recTy = baseTy.dyn_cast<fir::RecordType>();
+          auto recTy = mlir::dyn_cast<fir::RecordType>(baseTy);
           if (recordTypeCanBeMemCopied(recTy))
             return;
           if (InitNeeded) {

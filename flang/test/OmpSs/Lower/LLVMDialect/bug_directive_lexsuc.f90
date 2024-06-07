@@ -46,10 +46,3 @@ END PROGRAM P
 ! LLVMIRDialect:         }
 ! LLVMIRDialect:         llvm.func @_FortranAStopStatement(i32, i1 {llvm.zeroext}, i1 {llvm.zeroext}) -> !llvm.struct<()> attributes {fir.runtime, sym_visibility = "private"}
 
-! LLVMIRDialect-LABEL:   llvm.mlir.global external constant @_QQEnvironmentDefaults() {addr_space = 0 : i32} : !llvm.ptr {
-! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.zero : !llvm.ptr
-! LLVMIRDialect:           llvm.return %[[VAL_0]] : !llvm.ptr
-! LLVMIRDialect:         }
-! LLVMIRDialect:         llvm.func @llvm.stacksave.p0() -> !llvm.ptr attributes {sym_visibility = "private"}
-! LLVMIRDialect:         llvm.func @llvm.stackrestore.p0(!llvm.ptr) attributes {sym_visibility = "private"}
-

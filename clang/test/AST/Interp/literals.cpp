@@ -910,6 +910,18 @@ namespace TypeTraits {
   struct U {};
   static_assert(S3<U>{}.foo(), "");
   static_assert(!S3<T>{}.foo(), "");
+
+  typedef int Int;
+  typedef Int IntAr[10];
+  typedef const IntAr ConstIntAr;
+  typedef ConstIntAr ConstIntArAr[4];
+
+  static_assert(__array_rank(IntAr) == 1, "");
+  static_assert(__array_rank(ConstIntArAr) == 2, "");
+
+  static_assert(__array_extent(IntAr, 0) == 10, "");
+  static_assert(__array_extent(ConstIntArAr, 0) == 4, "");
+  static_assert(__array_extent(ConstIntArAr, 1) == 10, "");
 }
 
 #if __cplusplus >= 201402L
@@ -972,6 +984,8 @@ namespace DiscardExprs {
     (signed)4u;
     __uuidof(GuidType);
     __uuidof(number); // both-error {{cannot call operator __uuidof on a type with no GUID}}
+
+    requires{false;};
 
     return 0;
   }
@@ -1197,4 +1211,16 @@ constexpr int externvar1() { // both-error {{never produces a constant expressio
 namespace Extern {
   constexpr extern char Oops = 1;
   static_assert(Oops == 1, "");
+
+#if __cplusplus >= 201402L
+  struct NonLiteral {
+    NonLiteral() {}
+  };
+  NonLiteral nl;
+  constexpr NonLiteral &ExternNonLiteralVarDecl() {
+    extern NonLiteral nl;
+    return nl;
+  }
+  static_assert(&ExternNonLiteralVarDecl() == &nl, "");
+#endif
 }

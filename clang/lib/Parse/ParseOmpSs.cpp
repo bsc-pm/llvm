@@ -17,6 +17,7 @@
 #include "clang/Parse/Parser.h"
 #include "clang/Parse/RAIIObjectsForParser.h"
 #include "clang/Sema/Scope.h"
+#include "clang/Sema/SemaCodeCompletion.h"
 #include "llvm/ADT/PointerIntPair.h"
 
 using namespace clang;
@@ -291,13 +292,13 @@ bool Parser::ParseDeclareTaskClauses(
     case OSSC_depend: {
       ConsumeToken();
 
-      Sema::AllowShapingsRAII AllowShapings(getActions(), []() { return true; });
+      SemaOmpSs::AllowShapingsRAII AllowShapings(getActions().OmpSs(), []() { return true; });
 
       SmallVector<Expr *, 4> TmpList;
       SmallVector<OmpSsDependClauseKind, 2> DepKindsOrdered;
       if (ParseOmpSsVarList(OSSD_task, CKind, TmpList, VarListData))
         IsError = true;
-      if (!getActions().ActOnOmpSsDependKinds(VarListData.DepKinds, DepKindsOrdered, VarListData.DepLoc))
+      if (!getActions().OmpSs().ActOnOmpSsDependKinds(VarListData.DepKinds, DepKindsOrdered, VarListData.DepLoc))
         IsError = true;
 
       if (!IsError) {
@@ -315,7 +316,7 @@ bool Parser::ParseDeclareTaskClauses(
     case OSSC_weakreduction: {
       ConsumeToken();
 
-      Sema::AllowShapingsRAII AllowShapings(getActions(), []() { return true; });
+      SemaOmpSs::AllowShapingsRAII AllowShapings(getActions().OmpSs(), []() { return true; });
 
       SmallVector<Expr *, 4> TmpList;
       if (ParseOmpSsVarList(OSSD_task, CKind, TmpList, VarListData))
@@ -352,7 +353,7 @@ bool Parser::ParseDeclareTaskClauses(
     case OSSC_weakcommutative: {
       ConsumeToken();
 
-      Sema::AllowShapingsRAII AllowShapings(getActions(), []() { return true; });
+      SemaOmpSs::AllowShapingsRAII AllowShapings(getActions().OmpSs(), []() { return true; });
       if (ParseOmpSsVarList(OSSD_task, CKind, *Vars, VarListData))
         IsError = true;
       break;
@@ -391,7 +392,7 @@ bool Parser::ParseDeclareTaskClauses(
     case OSSC_firstprivate: {
       ConsumeToken();
 
-      Sema::AllowShapingsRAII AllowShapings(getActions(), []() { return true; });
+      SemaOmpSs::AllowShapingsRAII AllowShapings(getActions().OmpSs(), []() { return true; });
 
       SmallVector<Expr *, 4> TmpList;
       ParseOmpSsVarList(OSSD_task, CKind, TmpList, VarListData);
@@ -499,7 +500,7 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
   SourceLocation EndLoc = ConsumeAnnotationToken();
   if (IsError)
     return Ptr;
-  return Actions.ActOnOmpSsDeclareTaskDirective(
+  return Actions.OmpSs().ActOnOmpSsDeclareTaskDirective(
       Ptr,
       IfRes.get(), FinalRes.get(),
       CostRes.get(), PriorityRes.get(),
@@ -582,7 +583,7 @@ Parser::DeclGroupPtrTy Parser::ParseOmpSsDeclarativeDirectiveWithExtDecl(
     // { #pragma oss task }
     // <function-declaration-or-definition>
     //
-    Actions.StartOmpSsDSABlock(DKind, Actions.getCurScope(), Loc);
+    Actions.OmpSs().StartOmpSsDSABlock(DKind, Actions.getCurScope(), Loc);
 
     CachedTokens Toks;
     Toks.push_back(Tok);
@@ -633,7 +634,7 @@ Parser::DeclGroupPtrTy Parser::ParseOmpSsDeclarativeDirectiveWithExtDecl(
       getCurrentClass().OmpSsLateParsedToks.DirLocs.push_back(Loc);
     }
 
-    Actions.EndOmpSsDSABlock(nullptr);
+    Actions.OmpSs().EndOmpSsDSABlock(nullptr);
     return Ret;
   }
   case OSSD_assert: {
@@ -666,7 +667,7 @@ Parser::DeclGroupPtrTy Parser::ParseOmpSsDeclarativeDirectiveWithExtDecl(
       }
       // Skip the last annot_pragma_ompss_end.
       ConsumeAnnotationToken();
-      return Actions.ActOnOmpSsAssertDirective(Loc, Res.get());
+      return Actions.OmpSs().ActOnOmpSsAssertDirective(Loc, Res.get());
     }
     break;
   }
@@ -734,7 +735,7 @@ void Parser::PreParseCollapse() {
 
     ExprResult Val = ParseOmpSsParensExpr(getOmpSsClauseName(CKind), RLoc);
     if (!Val.isInvalid())
-      Actions.VerifyPositiveIntegerConstant(Val.get(), OSSC_collapse, /*StrictlyPositive=*/true);
+      Actions.OmpSs().VerifyPositiveIntegerConstant(Val.get(), OSSC_collapse, /*StrictlyPositive=*/true);
 
     Diags.setSuppressAllDiagnostics(false);
 
@@ -789,7 +790,12 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
 
     ParseScope OSSDirectiveScope(this, ScopeFlags);
 
-    Actions.StartOmpSsDSABlock(DKind, Actions.getCurScope(), Loc);
+    // TODO: OmpSs-2 workaround for OmpSsLoopDirectiveScope
+    // since the enum underlying type is full
+    if (isOmpSsLoopDirective(DKind))
+      OSSDirectiveScope.setOmpSsLoopDirectiveScope();
+
+    Actions.OmpSs().StartOmpSsDSABlock(DKind, Actions.getCurScope(), Loc);
 
     if (isOmpSsTaskLoopDirective(DKind)) {
       // User may write this:
@@ -840,23 +846,23 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
 
     // Determine which taskiter is
     if (DKind == OSSD_taskiter && Tok.is(tok::kw_while))
-      Actions.SetTaskiterKind(OSSD_taskiter_while);
+      Actions.OmpSs().SetTaskiterKind(OSSD_taskiter_while);
 
     StmtResult AssociatedStmt;
     if (HasAssociatedStatement) {
-      Actions.ActOnOmpSsExecutableDirectiveStart();
+      Actions.OmpSs().ActOnOmpSsExecutableDirectiveStart();
       AssociatedStmt = (Sema::CompoundScopeRAII(Actions), ParseStatement());
-      Actions.ActOnOmpSsExecutableDirectiveEnd();
+      Actions.OmpSs().ActOnOmpSsExecutableDirectiveEnd();
     }
 
     Clauses = StackClauses.back();
     StackClauses.pop_back();
 
-    Directive = Actions.ActOnOmpSsExecutableDirective(
+    Directive = Actions.OmpSs().ActOnOmpSsExecutableDirective(
       Clauses, DirName, DKind, AssociatedStmt.get(), Loc, EndLoc);
 
     // Exit scope.
-    Actions.EndOmpSsDSABlock(Directive.get());
+    Actions.OmpSs().EndOmpSsDSABlock(Directive.get());
     OSSDirectiveScope.Exit();
     break;
 
@@ -926,7 +932,7 @@ Parser::OSSClauseList Parser::ParseOmpSsClauses(OmpSsDirectiveKind DKind, Source
   // 'release' does not need clause analysis
   if (DKind != OSSD_release &&
       DKind != OSSD_critical && DKind != OSSD_atomic)
-    Actions.ActOnOmpSsAfterClauseGathering(Clauses);
+    Actions.OmpSs().ActOnOmpSsAfterClauseGathering(Clauses);
 
   return Clauses;
 }
@@ -1192,7 +1198,7 @@ Parser::ParseOmpSsDeclareReductionDirective(AccessSpecifier AS) {
         ParseTypeName(&Range, DeclaratorContext::Prototype, AS);
     if (TR.isUsable()) {
       QualType ReductionType =
-          Actions.ActOnOmpSsDeclareReductionType(Range.getBegin(), TR);
+          Actions.OmpSs().ActOnOmpSsDeclareReductionType(Range.getBegin(), TR);
       if (!ReductionType.isNull()) {
         ReductionTypes.push_back(
             std::make_pair(ReductionType, Range.getBegin()));
@@ -1236,7 +1242,7 @@ Parser::ParseOmpSsDeclareReductionDirective(AccessSpecifier AS) {
     return DeclGroupPtrTy();
   }
 
-  DeclGroupPtrTy DRD = Actions.ActOnOmpSsDeclareReductionDirectiveStart(
+  DeclGroupPtrTy DRD = Actions.OmpSs().ActOnOmpSsDeclareReductionDirectiveStart(
       getCurScope(), Actions.getCurLexicalContext(), Name, ReductionTypes, AS);
 
   // Parse <combiner> expression and then parse initializer if any for each
@@ -1250,10 +1256,10 @@ Parser::ParseOmpSsDeclareReductionDirective(AccessSpecifier AS) {
         Scope::FnScope | Scope::DeclScope | Scope::CompoundStmtScope
         | Scope::OmpSsDirectiveScope);
       // Parse <combiner> expression.
-      Actions.ActOnOmpSsDeclareReductionCombinerStart(getCurScope(), D);
+      Actions.OmpSs().ActOnOmpSsDeclareReductionCombinerStart(getCurScope(), D);
       CombinerResult = Actions.ActOnFinishFullExpr(
           ParseExpression().get(), D->getLocation(), /*DiscardedValue*/ false);
-      Actions.ActOnOmpSsDeclareReductionCombinerEnd(D, CombinerResult.get());
+      Actions.OmpSs().ActOnOmpSsDeclareReductionCombinerEnd(D, CombinerResult.get());
     }
 
     if (CombinerResult.isInvalid() && Tok.isNot(tok::r_paren) &&
@@ -1287,7 +1293,7 @@ Parser::ParseOmpSsDeclareReductionDirective(AccessSpecifier AS) {
           | Scope::OmpSsDirectiveScope);
         // Parse expression.
         VarDecl *OmpPrivParm =
-            Actions.ActOnOmpSsDeclareReductionInitializerStart(getCurScope(),
+            Actions.OmpSs().ActOnOmpSsDeclareReductionInitializerStart(getCurScope(),
                                                                D);
         // Check if initializer is omp_priv <init_expr> or something else.
         if (Tok.is(tok::identifier) &&
@@ -1299,7 +1305,7 @@ Parser::ParseOmpSsDeclareReductionDirective(AccessSpecifier AS) {
               ParseAssignmentExpression().get(), D->getLocation(),
               /*DiscardedValue*/ false);
         }
-        Actions.ActOnOmpSsDeclareReductionInitializerEnd(
+        Actions.OmpSs().ActOnOmpSsDeclareReductionInitializerEnd(
             D, InitializerResult.get(), OmpPrivParm);
         if (InitializerResult.isInvalid() && Tok.isNot(tok::r_paren) &&
             Tok.isNot(tok::annot_pragma_ompss_end)) {
@@ -1320,7 +1326,7 @@ Parser::ParseOmpSsDeclareReductionDirective(AccessSpecifier AS) {
     else
       TPA.Commit();
   }
-  return Actions.ActOnOmpSsDeclareReductionDirectiveEnd(getCurScope(), DRD,
+  return Actions.OmpSs().ActOnOmpSsDeclareReductionDirectiveEnd(getCurScope(), DRD,
                                                         IsCorrect);
 }
 
@@ -1331,7 +1337,7 @@ void Parser::ParseOmpSsReductionInitializerForDecl(VarDecl *OmpPrivParm) {
     ConsumeToken();
 
     if (Tok.is(tok::code_completion)) {
-      Actions.CodeCompleteInitializer(getCurScope(), OmpPrivParm);
+      Actions.CodeCompletion().CodeCompleteInitializer(getCurScope(), OmpPrivParm);
       Actions.FinalizeDeclaration(OmpPrivParm);
       cutOffParsing();
       return;
@@ -1356,7 +1362,7 @@ void Parser::ParseOmpSsReductionInitializerForDecl(VarDecl *OmpPrivParm) {
 
     SourceLocation LParLoc = T.getOpenLocation();
     auto RunSignatureHelp = [this, OmpPrivParm, LParLoc, &Exprs]() {
-      QualType PreferredType = Actions.ProduceConstructorSignatureHelp(
+      QualType PreferredType = Actions.CodeCompletion().ProduceConstructorSignatureHelp(
           OmpPrivParm->getType()->getCanonicalTypeInternal(),
           OmpPrivParm->getLocation(), Exprs, LParLoc, /*Braced=*/false);
       CalledSignatureHelp = true;
@@ -1606,7 +1612,7 @@ OSSClause *Parser::ParseOmpSsFixedListClause(
   if (ParseOnly) {
     return nullptr;
   }
-  return Actions.ActOnOmpSsFixedListClause(
+  return Actions.OmpSs().ActOnOmpSsFixedListClause(
       Kind, Vars, Loc, LOpen, RLoc);
   return nullptr;
 }
@@ -1647,7 +1653,7 @@ OSSClause *Parser::ParseOmpSsVarListClause(OmpSsDirectiveKind DKind,
   SmallVector<Expr *, 4> Vars;
   OmpSsVarListDataTy Data;
 
-  Sema::AllowShapingsRAII AllowShapings(Actions, [&Kind]() {
+  SemaOmpSs::AllowShapingsRAII AllowShapings(Actions.OmpSs(), [&Kind]() {
     return Kind == OSSC_depend || Kind == OSSC_reduction
      || Kind == OSSC_in || Kind == OSSC_out || Kind == OSSC_inout
      || Kind == OSSC_concurrent || Kind == OSSC_commutative
@@ -1664,7 +1670,7 @@ OSSClause *Parser::ParseOmpSsVarListClause(OmpSsDirectiveKind DKind,
   if (ParseOnly) {
     return nullptr;
   }
-  return Actions.ActOnOmpSsVarListClause(
+  return Actions.OmpSs().ActOnOmpSsVarListClause(
       Kind, Vars, Loc, LOpen, Data.ColonLoc, Data.RLoc,
       Data.DepKinds, Data.DepLoc, Data.ReductionIdScopeSpec,
       Data.ReductionId);
@@ -1718,7 +1724,7 @@ OSSClause *Parser::ParseOmpSsSingleExprClause(OmpSsClauseKind Kind,
 
   if (ParseOnly)
     return nullptr;
-  return Actions.ActOnOmpSsSingleExprClause(Kind, Val.get(), Loc, LLoc, RLoc);
+  return Actions.OmpSs().ActOnOmpSsSingleExprClause(Kind, Val.get(), Loc, LLoc, RLoc);
 }
 
 bool Parser::ParseOmpSsSimpleClauseImpl(OmpSsClauseKind Kind,
@@ -1762,7 +1768,7 @@ OSSClause *Parser::ParseOmpSsSimpleClause(OmpSsClauseKind Kind,
 
   if (ParseOnly)
     return nullptr;
-  return Actions.ActOnOmpSsSimpleClause(Kind, Data.Type, Data.TypeLoc, Data.LOpen, Data.Loc, Data.RLoc);
+  return Actions.OmpSs().ActOnOmpSsSimpleClause(Kind, Data.Type, Data.TypeLoc, Data.LOpen, Data.Loc, Data.RLoc);
 }
 
 /// Parsing of OmpSs clauses like 'wait'.
@@ -1796,5 +1802,5 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsClauseKind Kind, bool ParseOnly) {
 
   if (ParseOnly)
     return nullptr;
-  return Actions.ActOnOmpSsClause(Kind, Loc, Tok.getLocation());
+  return Actions.OmpSs().ActOnOmpSsClause(Kind, Loc, Tok.getLocation());
 }

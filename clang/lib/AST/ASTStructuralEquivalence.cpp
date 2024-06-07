@@ -843,6 +843,7 @@ static bool IsStructurallyEquivalent(StructuralEquivalenceContext &Context,
 
   case Type::Adjusted:
   case Type::Decayed:
+  case Type::ArrayParameter:
     if (!IsStructurallyEquivalent(Context,
                                   cast<AdjustedType>(T1)->getOriginalType(),
                                   cast<AdjustedType>(T2)->getOriginalType()))
@@ -1069,6 +1070,13 @@ static bool IsStructurallyEquivalent(StructuralEquivalenceContext &Context,
     if (!IsStructurallyEquivalent(
             Context, cast<AttributedType>(T1)->getEquivalentType(),
             cast<AttributedType>(T2)->getEquivalentType()))
+      return false;
+    break;
+
+  case Type::CountAttributed:
+    if (!IsStructurallyEquivalent(Context,
+                                  cast<CountAttributedType>(T1)->desugar(),
+                                  cast<CountAttributedType>(T2)->desugar()))
       return false;
     break;
 

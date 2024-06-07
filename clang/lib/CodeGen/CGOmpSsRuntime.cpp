@@ -411,8 +411,8 @@ public:
           || E->refersToEnclosingVariableOrCapture()) {
         // Reuse the ref addr. got in DSA
         LValue LV = CGF.EmitDeclRefLValue(E);
-        PossibleBase = LV.getPointer(CGF);
-        CaptureInvolvedMap.try_emplace(VD, LV.getAddress(CGF));
+        PossibleBase = LV.emitRawPointer(CGF);
+        CaptureInvolvedMap.try_emplace(VD, LV.getAddress());
       } else if (VD->hasLinkage() || VD->isStaticDataMember()) {
         PossibleBase = CGF.CGM.GetAddrOfGlobalVar(VD);
         CharUnits Alignment = CGF.getContext().getDeclAlign(VD);
@@ -420,7 +420,7 @@ public:
         CaptureInvolvedMap.try_emplace(VD, Addr);
       } else {
         LValue LV = CGF.EmitDeclRefLValue(E);
-        PossibleBase = LV.getPointer(CGF);
+        PossibleBase = LV.emitRawPointer(CGF);
         ExprInvolvedVarList[VD] = LV;
       }
       // Since we prioritize visiting the base of the expression
@@ -440,7 +440,7 @@ public:
     HasThis = true;
     Address CXXThisAddress = CGF.LoadCXXThisAddress();
     if (!Base)
-      Base = CXXThisAddress.getPointer();
+      Base = CXXThisAddress.emitRawPointer(CGF);
   }
 
   void VisitOSSArraySectionExpr(const OSSArraySectionExpr *E) {
@@ -651,7 +651,7 @@ public:
 
   void VisitOSSArrayShapingExpr(const OSSArrayShapingExpr *E) {
     BaseElementTy = GetInnermostElementType(E->getType());
-    Ptr = CGF.EmitLValue(E).getPointer(CGF);
+    Ptr = CGF.EmitLValue(E).emitRawPointer(CGF);
     if (E->getType()->isVariablyModifiedType()) {
       CGF.EmitVariablyModifiedType(E->getType());
     }
@@ -664,7 +664,7 @@ public:
 
   // l-values.
   void VisitDeclRefExpr(const DeclRefExpr *E) {
-    Ptr = CGF.EmitDeclRefLValue(E).getPointer(CGF);
+    Ptr = CGF.EmitDeclRefLValue(E).emitRawPointer(CGF);
     FillBaseExprDimsAndType(E);
   }
 
@@ -815,12 +815,12 @@ public:
   }
 
   void VisitMemberExpr(const MemberExpr *E) {
-    Ptr = CGF.EmitMemberExpr(E).getPointer(CGF);
+    Ptr = CGF.EmitMemberExpr(E).emitRawPointer(CGF);
     FillBaseExprDimsAndType(E);
   }
 
   void VisitUnaryDeref(const UnaryOperator *E) {
-    Ptr = CGF.EmitUnaryOpLValue(E).getPointer(CGF);
+    Ptr = CGF.EmitUnaryOpLValue(E).emitRawPointer(CGF);
     FillBaseExprDimsAndType(E);
   }
 
@@ -927,7 +927,7 @@ void CGOmpSsRuntime::EmitCopyCtorFunc(
 
   LValue SrcLV = CGF.EmitLoadOfPointerLValue(CGF.GetAddrOfLocalVar(&SrcArg),
                                              PQ->castAs<PointerType>());
-  Address SrcAddr = SrcLV.getAddress(CGF);
+  Address SrcAddr = SrcLV.getAddress();
   LValue DstLV = CGF.EmitLoadOfPointerLValue(CGF.GetAddrOfLocalVar(&DstArg),
                                              PQ->castAs<PointerType>());
   llvm::Value *NelemsValue =
@@ -936,7 +936,7 @@ void CGOmpSsRuntime::EmitCopyCtorFunc(
 
   // Find the end of the array.
   llvm::Value *SrcBegin = SrcLV.getPointer(CGF);
-  llvm::Value *DstBegin = DstLV.getPointer(CGF);
+  llvm::Value *DstBegin = DstLV.emitRawPointer(CGF);
   llvm::Value *DstEnd = CGF.Builder.CreateInBoundsGEP(
       CGF.ConvertType(Q), DstBegin, NelemsValue,
       "arrayctor.dst.end");
@@ -1042,7 +1042,7 @@ void CGOmpSsRuntime::EmitCtorFunc(
                        NelemsArg.getType(), NelemsArg.getLocation());
 
   // Find the end of the array.
-  llvm::Value *DstBegin = DstLV.getPointer(CGF);
+  llvm::Value *DstBegin = DstLV.emitRawPointer(CGF);
   llvm::Value *DstEnd = CGF.Builder.CreateInBoundsGEP(
       CGF.ConvertType(Q), DstBegin, NelemsValue,
       "arrayctor.dst.end");
@@ -1136,7 +1136,7 @@ void CGOmpSsRuntime::EmitDtorFunc(
                        NelemsArg.getType(), NelemsArg.getLocation());
 
   // Find the end of the array.
-  llvm::Value *DstBegin = DstLV.getPointer(CGF);
+  llvm::Value *DstBegin = DstLV.emitRawPointer(CGF);
   llvm::Value *DstEnd = CGF.Builder.CreateInBoundsGEP(
       CGF.ConvertType(Q), DstBegin, NelemsValue,
       "arraydtor.dst.end");
@@ -1151,7 +1151,7 @@ void CGOmpSsRuntime::EmitDtorFunc(
 
   CGF.EmitCXXDestructorCall(
     DtorD, Dtor_Complete, /*ForVirtualBase=*/false, /*Delegating=*/false,
-    Address(DstCur, DstLV.getAddress(CGF).getElementType(), DstLV.getAddress(CGF).getAlignment()),
+    Address(DstCur, DstLV.getAddress().getElementType(), DstLV.getAddress().getAlignment()),
     Q);
 
   // Go to the next element
@@ -1191,11 +1191,11 @@ void CGOmpSsRuntime::EmitDSAShared(
       // 2. Record Addr of lambda captured variables to be reused in task body and
       //    other clauses.
       LValue LV = CGF.EmitDeclRefLValue(DRE);
-      CaptureMapStack.back().try_emplace(VD, LV.getAddress(CGF));
-      DSAValue = LV.getPointer(CGF);
+      CaptureMapStack.back().try_emplace(VD, LV.getAddress());
+      DSAValue = LV.emitRawPointer(CGF);
       DSABundleList.push_back(DSAValue);
     } else {
-      DSAValue = CGF.EmitDeclRefLValue(DRE).getPointer(CGF);
+      DSAValue = CGF.EmitDeclRefLValue(DRE).emitRawPointer(CGF);
       DSABundleList.push_back(DSAValue);
     }
     QualType Q = VD->getType();
@@ -1243,11 +1243,11 @@ void CGOmpSsRuntime::EmitDSAPrivate(
     // 2. Record Addr of lambda captured variables to be reused in task body and
     //    other clauses.
     LValue LV = CGF.EmitDeclRefLValue(DRE);
-    CaptureMapStack.back().try_emplace(VD, LV.getAddress(CGF));
-    DSAValue = LV.getPointer(CGF);
+    CaptureMapStack.back().try_emplace(VD, LV.getAddress());
+    DSAValue = LV.emitRawPointer(CGF);
     DSABundleList.push_back(DSAValue);
   } else {
-    DSAValue = CGF.EmitDeclRefLValue(DRE).getPointer(CGF);
+    DSAValue = CGF.EmitDeclRefLValue(DRE).emitRawPointer(CGF);
     DSABundleList.push_back(DSAValue);
   }
   QualType Q = VD->getType();
@@ -1300,11 +1300,11 @@ void CGOmpSsRuntime::EmitDSAFirstprivate(
     // 2. Record Addr of lambda captured variables to be reused in task body and
     //    other clauses.
     LValue LV = CGF.EmitDeclRefLValue(DRE);
-    CaptureMapStack.back().try_emplace(VD, LV.getAddress(CGF));
-    DSAValue = LV.getPointer(CGF);
+    CaptureMapStack.back().try_emplace(VD, LV.getAddress());
+    DSAValue = LV.emitRawPointer(CGF);
     DSABundleList.push_back(DSAValue);
   } else {
-    DSAValue = CGF.EmitDeclRefLValue(DRE).getPointer(CGF);
+    DSAValue = CGF.EmitDeclRefLValue(DRE).emitRawPointer(CGF);
     DSABundleList.push_back(DSAValue);
   }
   QualType Q = VD->getType();
@@ -1470,7 +1470,7 @@ llvm::Function *CGOmpSsRuntime::createCallWrapperFunc(
     for (const auto &p : ExprInvolvedVarList) {
       const VarDecl *VD = p.first;
       LValue LV = p.second;
-      Address Addr = LV.getAddress(NewCGF);
+      Address Addr = LV.getAddress();
       InitScope.addPrivate(VD, [&ArgI, &Addr]() -> Address {
         return Address(
             ArgI, Addr.getElementType(), Addr.getAlignment());
@@ -1522,12 +1522,12 @@ static llvm::Value *emitDiscreteArray(
     llvm::Value *Idx[2];
     Idx[0] = llvm::Constant::getNullValue(CGF.ConvertType(CGF.getContext().IntTy));
     Idx[1] = CGF.EmitScalarExpr(IterExpr);
-    llvm::Value *Ptr = DiscreteArrLV.getPointer(CGF);
+    llvm::Value *Ptr = DiscreteArrLV.emitRawPointer(CGF);
     llvm::Value *GEP = CGF.Builder.CreateGEP(
         CGF.ConvertType(VD->getType()), Ptr, Idx, "discreteidx");
     llvm::Value *LoadGEP = CGF.Builder.CreateLoad(
         Address(GEP, CGF.ConvertType(CGF.getContext().getBaseElementType(VD->getType())),
-                DiscreteArrLV.getAddress(CGF).getAlignment()));
+                DiscreteArrLV.getAddress().getAlignment()));
     return LoadGEP;
   }
   return nullptr;
@@ -1644,13 +1644,13 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
 
   // Fill the bundle
   for (auto *E : MDExpr->getDepIterators()) {
-    List.push_back(CGF.EmitLValue(E).getPointer(CGF));
+    List.push_back(CGF.EmitLValue(E).emitRawPointer(CGF));
   }
   List.push_back(ComputeMultiDepFun);
 
   for (const auto &p : MultiDepInfoGathering.getInvolvedVarList()) {
     LValue LV = p.second;
-    List.push_back(LV.getPointer(CGF));
+    List.push_back(LV.emitRawPointer(CGF));
   }
   for (const auto &p : MultiDepInfoGathering.getVLASizeInvolvedMap()) {
     llvm::Value *VLASizeValue = p.second;
@@ -1658,11 +1658,11 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
   }
   for (const auto &p : MultiDepInfoGathering.getCaptureInvolvedMap()) {
     Address Addr = p.second;
-    llvm::Value *V = Addr.getPointer();
+    llvm::Value *V = Addr.emitRawPointer(CGF);
     List.push_back(V);
   }
   if (MultiDepInfoGathering.hasThis()) {
-    List.push_back(CGF.LoadCXXThisAddress().getPointer());
+    List.push_back(CGF.LoadCXXThisAddress().emitRawPointer(CGF));
   }
 }
 
@@ -1695,7 +1695,7 @@ void CGOmpSsRuntime::BuildWrapperCallBundleList(
   List.push_back(Func);
   for (const auto &p : CallVisitor.getInvolvedVarList()) {
     LValue LV = p.second;
-    List.push_back(LV.getPointer(CGF));
+    List.push_back(LV.emitRawPointer(CGF));
   }
   for (const auto &p : CallVisitor.getVLASizeInvolvedMap()) {
     llvm::Value *VLASizeValue = p.second;
@@ -1703,11 +1703,11 @@ void CGOmpSsRuntime::BuildWrapperCallBundleList(
   }
   for (const auto &p : CallVisitor.getCaptureInvolvedMap()) {
     Address Addr = p.second;
-    llvm::Value *V = Addr.getPointer();
+    llvm::Value *V = Addr.emitRawPointer(CGF);
     List.push_back(V);
   }
   if (CallVisitor.hasThis()) {
-    List.push_back(CGF.LoadCXXThisAddress().getPointer());
+    List.push_back(CGF.LoadCXXThisAddress().emitRawPointer(CGF));
   }
 }
 
@@ -1906,7 +1906,7 @@ void CGOmpSsRuntime::EmitDependencyList(
 
   for (const auto &p : DependInfoGathering.getInvolvedVarList()) {
     LValue LV = p.second;
-    List.push_back(LV.getPointer(CGF));
+    List.push_back(LV.emitRawPointer(CGF));
   }
   for (const auto &p : DependInfoGathering.getVLASizeInvolvedMap()) {
     llvm::Value *VLASizeValue = p.second;
@@ -1914,11 +1914,11 @@ void CGOmpSsRuntime::EmitDependencyList(
   }
   for (const auto &p : DependInfoGathering.getCaptureInvolvedMap()) {
     Address Addr = p.second;
-    llvm::Value *V = Addr.getPointer();
+    llvm::Value *V = Addr.emitRawPointer(CGF);
     List.push_back(V);
   }
   if (DependInfoGathering.hasThis()) {
-    List.push_back(CGF.LoadCXXThisAddress().getPointer());
+    List.push_back(CGF.LoadCXXThisAddress().emitRawPointer(CGF));
   }
 }
 
@@ -2011,10 +2011,10 @@ static llvm::Value *emitReduceInitFunction(CodeGenModule &CGM,
 
   LValue PrivLV = CGF.EmitLoadOfPointerLValue(CGF.GetAddrOfLocalVar(&PrivArg),
                                               PQ->castAs<PointerType>());
-  Address PrivAddr = PrivLV.getAddress(CGF);
+  Address PrivAddr = PrivLV.getAddress();
   LValue OrigLV = CGF.EmitLoadOfPointerLValue(CGF.GetAddrOfLocalVar(&OrigArg),
                                               PQ->castAs<PointerType>());
-  Address OrigAddr = OrigLV.getAddress(CGF);
+  Address OrigAddr = OrigLV.getAddress();
   llvm::Value *NBytesValue =
       CGF.EmitLoadOfScalar(CGF.GetAddrOfLocalVar(&NBytesArg), /*Volatile=*/false,
                        NBytesArg.getType(), NBytesArg.getLocation());
@@ -2030,8 +2030,8 @@ static llvm::Value *emitReduceInitFunction(CodeGenModule &CGM,
                                                          BaseElementSize));
 
   // Find the end of the array.
-  llvm::Value *OrigBegin = OrigLV.getPointer(CGF);
-  llvm::Value *PrivBegin = PrivLV.getPointer(CGF);
+  llvm::Value *OrigBegin = OrigLV.emitRawPointer(CGF);
+  llvm::Value *PrivBegin = PrivLV.emitRawPointer(CGF);
   llvm::Value *PrivEnd = CGF.Builder.CreateInBoundsGEP(
       CGF.ConvertType(Q), PrivBegin, NelemsValue,
       "arrayctor.dst.end");
@@ -2136,10 +2136,10 @@ static llvm::Value *emitReduceCombFunction(CodeGenModule &CGM,
 
   LValue OutLV = CGF.EmitLoadOfPointerLValue(CGF.GetAddrOfLocalVar(&OutArg),
                                               PQ->castAs<PointerType>());
-  Address OutAddr = OutLV.getAddress(CGF);
+  Address OutAddr = OutLV.getAddress();
   LValue InLV = CGF.EmitLoadOfPointerLValue(CGF.GetAddrOfLocalVar(&InArg),
                                               PQ->castAs<PointerType>());
-  Address InAddr = InLV.getAddress(CGF);
+  Address InAddr = InLV.getAddress();
   llvm::Value *NBytesValue =
       CGF.EmitLoadOfScalar(CGF.GetAddrOfLocalVar(&NBytesArg), /*Volatile=*/false,
                        NBytesArg.getType(), NBytesArg.getLocation());
@@ -2155,8 +2155,8 @@ static llvm::Value *emitReduceCombFunction(CodeGenModule &CGM,
                                                          BaseElementSize));
 
   // Find the end of the array.
-  llvm::Value *InBegin = InLV.getPointer(CGF);
-  llvm::Value *OutBegin = OutLV.getPointer(CGF);
+  llvm::Value *InBegin = InLV.emitRawPointer(CGF);
+  llvm::Value *OutBegin = OutLV.emitRawPointer(CGF);
   llvm::Value *OutEnd = CGF.Builder.CreateInBoundsGEP(
       CGF.ConvertType(Q), OutBegin, NelemsValue,
       "arrayctor.dst.end");
@@ -2614,7 +2614,7 @@ static void emitOutlineMultiDepIterDecls(
 
         LValue NewIterLV = CGF.EmitLValue(NewIterE);
 
-        Scope.addPrivate(IterVD, [&CGF, &NewIterLV]() -> Address { return NewIterLV.getAddress(CGF); });
+        Scope.addPrivate(IterVD, [&NewIterLV]() -> Address { return NewIterLV.getAddress(); });
         (void)Scope.Privatize();
       }
     }
@@ -2742,7 +2742,7 @@ void CGOmpSsRuntime::EmitDirectiveData(
     SmallVector<llvm::Value *> StepList;
     SmallVector<llvm::Value *> LTypeList;
     for (unsigned i = 0; i < LoopData.NumCollapses; ++i) {
-      IndVarList.push_back(CGF.EmitLValue(LoopData.IndVar[i]).getPointer(CGF));
+      IndVarList.push_back(CGF.EmitLValue(LoopData.IndVar[i]).emitRawPointer(CGF));
       auto Body = [](CodeGenFunction &NewCGF, const Expr *E, std::optional<llvm::Value *>) {
         llvm::Value *V = NewCGF.EmitScalarExpr(E);
 
@@ -2848,10 +2848,10 @@ static void EmitDbgInfo(CodeGenFunction &CGF, CGDebugInfo *DI, const Expr *E) {
       const VarDecl *ImplVD = createImplicitVarDecl(
         CGF, VD->getName(), E->getType(), VD->getLocation(), VD->getDeclContext());
       (void)DI->EmitDeclareOfAutoVariable(
-        ImplVD, CGF.EmitLValue(DRE).getPointer(CGF), CGF.Builder, /*UsePointerValue=*/false);
+        ImplVD, CGF.EmitLValue(DRE).emitRawPointer(CGF), CGF.Builder, /*UsePointerValue=*/false);
     } else {
       (void)DI->EmitDeclareOfAutoVariable(
-        VD, CGF.EmitLValue(DRE).getPointer(CGF), CGF.Builder, /*UsePointerValue=*/false);
+        VD, CGF.EmitLValue(DRE).emitRawPointer(CGF), CGF.Builder, /*UsePointerValue=*/false);
     }
   } else if (isa<CXXThisExpr>(E)) {
     const VarDecl *ImplVD = createImplicitVarDecl(
@@ -2945,9 +2945,9 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       LValue ParmLV = CGF.EmitLValue(ParmRef);
 
       // Annotate the call argument
-      CallValues.push_back(ParmLV.getPointer(CGF));
+      CallValues.push_back(ParmLV.emitRawPointer(CGF));
 
-      InitScope.addPrivate(*ParI, [&CGF, &ParmLV]() -> Address { return ParmLV.getAddress(CGF); });
+      InitScope.addPrivate(*ParI, [&ParmLV]() -> Address { return ParmLV.getAddress(); });
       // We do need to do this every time because the next param may use the previous one
       (void)InitScope.Privatize();
     } else {
@@ -2960,10 +2960,10 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       LValue ParmLV = CGF.EmitLValue(ParmRef);
 
       // Annotate the call argument
-      CallValues.push_back(ParmLV.getPointer(CGF));
+      CallValues.push_back(ParmLV.emitRawPointer(CGF));
 
-      CaptureMapStack.back().try_emplace(*ParI, ParmLV.getAddress(CGF));
-      CaptureMapStack.back().try_emplace(cast<VarDecl>(cast<DeclRefExpr>(ParmRef)->getDecl()), ParmLV.getAddress(CGF));
+      CaptureMapStack.back().try_emplace(*ParI, ParmLV.getAddress());
+      CaptureMapStack.back().try_emplace(cast<VarDecl>(cast<DeclRefExpr>(ParmRef)->getDecl()), ParmLV.getAddress());
 
     }
 
@@ -3023,11 +3023,11 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
 
     LValue This = CGF.EmitLValue(MEBase);
 
-    InitScope.setThis(This.getPointer(CGF), This.getAlignment());
+    InitScope.setThis(This.emitRawPointer(CGF), This.getAlignment());
 
-    CaptureMapStack.back().try_emplace(cast<VarDecl>(cast<DeclRefExpr>(MEBase)->getDecl()), This.getAddress(CGF));
+    CaptureMapStack.back().try_emplace(cast<VarDecl>(cast<DeclRefExpr>(MEBase)->getDecl()), This.getAddress());
     SmallVector<llvm::Value *> DSABundleList;
-    DSABundleList.push_back(This.getPointer(CGF));
+    DSABundleList.push_back(This.emitRawPointer(CGF));
     DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(MEBase->getType())));
     TaskInfo.emplace_back(getBundleStr(OSSB_shared), DSABundleList);
   }
@@ -3249,9 +3249,9 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
         const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
         SmallVector<llvm::Value *> DSABundleList;
         LValue LV = CGF.EmitLValue(DRE);
-        llvm::Value *DSAValue = LV.getPointer(CGF);
+        llvm::Value *DSAValue = LV.emitRawPointer(CGF);
         if (VD->getType()->isReferenceType() && !getTaskCaptureAddr(VD).isValid())
-          CaptureMapStack.back().try_emplace(VD, LV.getAddress(CGF));
+          CaptureMapStack.back().try_emplace(VD, LV.getAddress());
         DSABundleList.push_back(DSAValue);
         DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(DRE->getType())));
         TaskInfo.emplace_back(getBundleStr(OSSB_shared), DSABundleList);

@@ -81,7 +81,7 @@ public:
          QualType T, OSSDeclareReductionDecl *PrevDeclInScope);
   /// Create deserialized declare reduction node.
   static OSSDeclareReductionDecl *CreateDeserialized(ASTContext &C,
-                                                     unsigned ID);
+                                                     GlobalDeclID ID);
 
   /// Get combiner expression of the declare reduction construct.
   Expr *getCombiner() { return Combiner; }
@@ -175,7 +175,7 @@ public:
     ASTContext &C, DeclContext *DC, SourceLocation L, ArrayRef<Expr *> VL);
 
   static OSSAssertDecl *CreateDeserialized(
-    ASTContext &C, unsigned ID, unsigned N);
+    ASTContext &C, GlobalDeclID ID, unsigned N);
 
   typedef MutableArrayRef<Expr *>::iterator varlist_iterator;
   typedef ArrayRef<const Expr *>::iterator varlist_const_iterator;

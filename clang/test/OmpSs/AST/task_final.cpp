@@ -15,7 +15,8 @@ void bar() {
 
 // CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:{{.*}}:{{.*}}, col:{{.*}}>
 // CHECK-NEXT: OSSFinalClause {{[a-z0-9]+}} <col:{{.*}}, col:{{.*}}>
-// CHECK-NEXT: UnaryOperator {{[a-z0-9]+}} <col:{{.*}}, col:{{.*}}> '<dependent type>' prefix '*' cannot overflow
+// CHECK-NEXT: UnaryOperator {{[a-z0-9]+}} <col:{{.*}}, col:{{.*}}> 'T' lvalue prefix '*' cannot overflow
+// CHECK-NEXT: ImplicitCastExpr {{[a-z0-9]+}} <col:{{.*}}> 'T *' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:{{.*}}> 'T *' lvalue ParmVar {{[a-z0-9]+}} 't' 'T *'
 
 // CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:{{.*}}:{{.*}}, col:{{.*}}>

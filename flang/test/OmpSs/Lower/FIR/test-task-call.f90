@@ -26,10 +26,11 @@ END PROGRAM MAIN
 ! FIRDialect-LABEL:   func.func @_QMmooPs1(
 ! FIRDialect-SAME:                         %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<i32> {fir.bindc_name = "x"}) {
 ! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_0]] {uniq_name = "_QMmooFs1Ex"} : (!fir.ref<i32>) -> !fir.ref<i32>
-! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.load %[[VAL_2]] : !fir.ref<i32>
-! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_3]], %[[VAL_1]] : i32
-! FIRDialect:           fir.store %[[VAL_4]] to %[[VAL_2]] : !fir.ref<i32>
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.dummy_scope : !fir.dscope
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_0]] dummy_scope %[[VAL_2]] {uniq_name = "_QMmooFs1Ex"} : (!fir.ref<i32>, !fir.dscope) -> !fir.ref<i32>
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.load %[[VAL_3]] : !fir.ref<i32>
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_4]], %[[VAL_1]] : i32
+! FIRDialect:           fir.store %[[VAL_5]] to %[[VAL_3]] : !fir.ref<i32>
 ! FIRDialect:           return
 ! FIRDialect:         }
 
@@ -46,10 +47,5 @@ END PROGRAM MAIN
 ! FIRDialect:           }
 ! FIRDialect:           oss.taskwait
 ! FIRDialect:           return
-! FIRDialect:         }
-
-! FIRDialect-LABEL:   fir.global @_QQEnvironmentDefaults constant : !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>> {
-! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>>
-! FIRDialect:           fir.has_value %[[VAL_0]] : !fir.ref<tuple<i32, !fir.ref<!fir.array<0xtuple<!fir.ref<i8>, !fir.ref<i8>>>>>>
 ! FIRDialect:         }
 

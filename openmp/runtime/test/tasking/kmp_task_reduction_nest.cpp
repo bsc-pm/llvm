@@ -2,6 +2,9 @@
 // RUN: %libomp-cxx-compile -DFLG=1 && %libomp-run
 // GCC-5 is needed for OpenMP 4.0 support (taskgroup)
 // XFAIL: gcc-4
+// UNSUPPORTED: ompv-free-agents
+// Disabled in free agents because the gtid is used to index
+// an array
 #include <cstdio>
 #include <cmath>
 #include <cassert>
