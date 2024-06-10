@@ -1334,7 +1334,10 @@ void CGOmpSsRuntime::EmitDSAFirstprivate(
     const DeclRefExpr *InitE = cast<DeclRefExpr>(FpDataTy.Init);
     const VarDecl *InitD = cast<VarDecl>(InitE->getDecl());
 
-    if (!CopyD->getType().isPODType(CGF.getContext())) {
+    // Atomic types defined in stdatomic.h don't have
+    // copy ctor and are non-POD
+    if (!CopyD->getType().isPODType(CGF.getContext()) &&
+        !CopyD->getType()->isAtomicType()) {
       const CXXConstructExpr *CtorE = cast<CXXConstructExpr>(CopyD->getAnyInitializer());
 
       InDirectiveEmission = false;
