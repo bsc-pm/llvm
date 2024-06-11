@@ -23,9 +23,10 @@ configure_file(${LIBOMP_INC_DIR}/ompx.h.var ${LIBOMP_HEADERS_INTDIR}/ompx.h @ONL
 configure_file(kmp_config.h.cmake kmp_config.h @ONLY)
 if(${LIBOMP_OMPT_SUPPORT})
   configure_file(${LIBOMP_INC_DIR}/omp-tools.h.var ${LIBOMP_HEADERS_INTDIR}/omp-tools.h @ONLY)
-  # Workaround to prioritize omp-tools.h from the build instead of
+  # Workaround to prioritize omp-tools.h and omp.h from the build instead of
   # a potential file placed in NOSV_HOME/include
   configure_file(${LIBOMP_INC_DIR}/omp-tools.h.var omp-tools.h @ONLY)
+  configure_file(${LIBOMP_INC_DIR}/omp.h.var omp.h @ONLY)
 endif()
 
 # Generate message catalog files: kmp_i18n_id.inc and kmp_i18n_default.inc
