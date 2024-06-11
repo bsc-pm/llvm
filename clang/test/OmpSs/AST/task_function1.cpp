@@ -33,7 +33,7 @@ int main() {
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int *' lvalue ParmVar 0x{{.*}} 'y' 'int *'
 
 // CHECK: OSSTaskDeclAttr 0x{{.*}} <line:{{.*}}:{{.*}}, col:{{.*}}> Implicit Unknown
-// CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int' NonTypeTemplateParm 0x{{.*}} 'N' 'int'
+// CHECK: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int' NonTypeTemplateParm 0x{{.*}} 'N' 'int'
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int' NonTypeTemplateParm 0x{{.*}} 'N' 'int'
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int' NonTypeTemplateParm 0x{{.*}} 'N' 'int'
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int' NonTypeTemplateParm 0x{{.*}} 'N' 'int'
@@ -45,7 +45,7 @@ int main() {
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'T *' lvalue ParmVar 0x{{.*}} 'x' 'T *'
 
 // CHECK: OSSTaskDeclAttr 0x{{.*}} <line:{{.*}}:{{.*}}, col:{{.*}}> Implicit Unknown
-// CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'bool' <IntegralToBoolean>
+// CHECK: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'bool' <IntegralToBoolean>
 // CHECK-NEXT: SubstNonTypeTemplateParmExpr 0x{{.*}} <col:{{.*}}> 'int'
 // CHECK-NEXT: NonTypeTemplateParmDecl 0x{{.*}} <line:{{.*}}:{{.*}}, col:{{.*}}> col:{{.*}} referenced 'int' depth 0 index 0 N
 // CHECK-NEXT: IntegerLiteral 0x{{.*}} <line:{{.*}}:{{.*}}> 'int' 1

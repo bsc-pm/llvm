@@ -100,6 +100,8 @@ struct OmpSsDirective {
   const DirectiveNonPODsInfo &NonPODsInfo;
   const DirectiveLoopInfo &LoopInfo;
   const DirectiveWhileInfo &WhileInfo;
+  const DirectiveCoroInfo &CoroInfo;
+
   DirectiveFinalInfo &FinalInfo;
   Type *Int32Ty;
   Type *Int8Ty;
@@ -141,6 +143,8 @@ struct OmpSsDirective {
   };
   bool InFinalCtx = false;
 
+  int CoroHandleIdx = -1;
+
   OmpSsDirective(Module &M, Function &F, DirectiveInfo &DirInfo,
                  DirectiveFinalInfo &FinalInfo,
                  SmallVectorImpl<Instruction *> &PostMoveInstructions)
@@ -159,6 +163,7 @@ struct OmpSsDirective {
         NonPODsInfo(DirEnv.NonPODsInfo),
         LoopInfo(DirEnv.LoopInfo),
         WhileInfo(DirEnv.WhileInfo),
+        CoroInfo(DirEnv.CoroInfo),
         FinalInfo(FinalInfo),
         Int32Ty(Type::getInt32Ty(Ctx)), Int8Ty(Type::getInt8Ty(Ctx)),
         Int64Ty(Type::getInt64Ty(Ctx)), PtrTy(PointerType::getUnqual(Ctx)),
@@ -1195,12 +1200,12 @@ struct OmpSsDirective {
   // DSAInfo and VLADimsInfo, it unpacks task args in Outline and fills UnpackedList
   // and UnpackedToTypeMap with those Values and Types, used to call Unpack Functions
   void unpackDSAsWithVLADims(
-      Type *TaskArgsTy, Function *OlFunc, const MapVector<Value *, size_t> &StructToIdxMap,
+      Type *TaskArgsTy, Function *OlFunc, BasicBlock *EntryBB, const MapVector<Value *, size_t> &StructToIdxMap,
       SmallVectorImpl<Value *> &UnpackedList, MapVector<Value *, Type *> &UnpackedToTypeMap) {
     UnpackedList.clear();
     UnpackedList.resize(StructToIdxMap.size());
 
-    IRBuilder<> BBBuilder(&OlFunc->getEntryBlock());
+    IRBuilder<> BBBuilder(EntryBB);
     Function::arg_iterator AI = OlFunc->arg_begin();
     Value *OlDepsFuncTaskArgs = &*AI++;
     for (const auto &Pair : DSAInfo.Shared) {
@@ -1311,76 +1316,87 @@ struct OmpSsDirective {
     }
   }
 
+  void buildTranslationCode(Function *OlFunc,
+      BasicBlock *EntryBB,
+      BasicBlock *EndBB,
+      BasicBlock *IfThenBB,
+      BasicBlock *IfEndBB,
+      const MapVector<Value *, size_t> &StructToIdxMap,
+      SmallVector<Value *, 4> &UnpackParams,
+      const MapVector<Value *, Type *> &UnpackParamsToTypesMap) {
+    IRBuilder<> IRBIfThen(IfThenBB);
+    IRBIfThen.CreateBr(IfEndBB);
+
+    IRBuilder<> IRBIfEnd(IfEndBB);
+    IRBIfEnd.CreateBr(EndBB);
+
+    Instruction *EntryBBTerminator = EntryBB->getTerminator();
+    IRBuilder<> IRBEntry(EntryBBTerminator);
+    Value *AddrTranslationTable = &*(OlFunc->arg_end() - 1);
+    Value *Cmp = IRBEntry.CreateICmpNE(
+      AddrTranslationTable, Constant::getNullValue(AddrTranslationTable->getType()));
+    IRBEntry.CreateCondBr(Cmp, IfThenBB, IfEndBB);
+    EntryBBTerminator->eraseFromParent();
+
+    // Reset insert points.
+    IRBEntry.SetInsertPoint(cast<Instruction>(Cmp));
+    IRBIfThen.SetInsertPoint(IfThenBB->getTerminator());
+    IRBIfEnd.SetInsertPoint(IfEndBB->getTerminator());
+
+    // Preserve the params to still take profit of UnpackParamsToTypesMap
+    // NOTE: this assumes UnpackParams can be indexed with StructToIdxMap
+    SmallVector<Value *, 4> UnpackParamsCopy(UnpackParams);
+
+    dupTranlationNeededArgs(
+        IRBEntry, DirInfo.DirEnv.DepSymToIdx, StructToIdxMap, UnpackParams, UnpackParamsToTypesMap);
+
+    for (const auto &p : DirInfo.DirEnv.DepSymToIdx) {
+      Value *DepBaseDSA = p.first;
+      int SymbolIndex = p.second;
+
+      bool IsShared = DirInfo.DirEnv.DSAInfo.Shared.count(DepBaseDSA);
+
+      size_t Idx = StructToIdxMap.lookup(DepBaseDSA);
+      if (HasDevice)
+        Idx -= DeviceArgsSize;
+
+      translateDep(
+        IRBIfThen, IRBIfEnd, DepBaseDSA,
+        IsShared, UnpackParams[Idx], UnpackParamsToTypesMap.lookup(UnpackParamsCopy[Idx]),
+        AddrTranslationTable, SymbolIndex);
+    }
+  }
+
   // Given an Outline and Unpack Functions it unpacks DSAs in Outline
   // and builds a call to Unpack
   void olCallToUnpack(
       Type *TaskArgsTy, const MapVector<Value *, size_t> &StructToIdxMap,
       Function *OlFunc, Function *UnpackFunc, bool IsTaskFunc=false) {
-    BasicBlock::Create(Ctx, "entry", OlFunc);
+    BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", OlFunc);
+    BasicBlock *EndBB = BasicBlock::Create(Ctx, "end", OlFunc);
+    BasicBlock *TlateIfBB = nullptr;
+    BasicBlock *TlateEndBB = nullptr;
+    if (IsTaskFunc) {
+      TlateIfBB = BasicBlock::Create(Ctx, "tlate.if", OlFunc);
+      TlateEndBB = BasicBlock::Create(Ctx, "tlate.end", OlFunc);
+    }
 
     // First arg is the nanos_task_args
     Function::arg_iterator AI = OlFunc->arg_begin();
     AI++;
     SmallVector<Value *, 4> UnpackParams;
     MapVector<Value *, Type *> UnpackParamsToTypesMap;
-    unpackDSAsWithVLADims(TaskArgsTy, OlFunc, StructToIdxMap, UnpackParams, UnpackParamsToTypesMap);
+    unpackDSAsWithVLADims(TaskArgsTy, OlFunc, EntryBB, StructToIdxMap, UnpackParams, UnpackParamsToTypesMap);
     while (AI != OlFunc->arg_end()) {
       UnpackParams.push_back(&*AI++);
     }
 
-    if (IsTaskFunc) {
-      BasicBlock *IfThenBB = BasicBlock::Create(Ctx, "", OlFunc);
-      BasicBlock *IfEndBB = BasicBlock::Create(Ctx, "", OlFunc);
+    IRBuilder<>(EntryBB).CreateBr(EndBB);
+    IRBuilder<>(EndBB).CreateRetVoid();
 
-      // Builders
-      IRBuilder<> IRBEntry(&OlFunc->getEntryBlock());
-      IRBuilder<> IRBIfThen(IfThenBB);
-      IRBuilder<> IRBIfEnd(IfEndBB);
-
-      // Build the skeleton
-      Value *AddrTranslationTable = &*(OlFunc->arg_end() - 1);
-      Value *Cmp = IRBEntry.CreateICmpNE(
-        AddrTranslationTable, Constant::getNullValue(AddrTranslationTable->getType()));
-      IRBEntry.CreateCondBr(Cmp, IfThenBB, IfEndBB);
-
-      IRBIfThen.CreateBr(IfEndBB);
-      IRBIfEnd.CreateRetVoid();
-
-      // Reset insert points.
-      IRBEntry.SetInsertPoint(cast<Instruction>(Cmp));
-      IRBIfThen.SetInsertPoint(IfThenBB->getTerminator());
-      IRBIfEnd.SetInsertPoint(IfEndBB->getTerminator());
-
-      // Preserve the params to still take profit of UnpackParamsToTypesMap
-      // NOTE: this assumes UnpackParams can be indexed with StructToIdxMap
-      SmallVector<Value *, 4> UnpackParamsCopy(UnpackParams);
-
-      dupTranlationNeededArgs(
-          IRBEntry, DirInfo.DirEnv.DepSymToIdx, StructToIdxMap, UnpackParams, UnpackParamsToTypesMap);
-
-      for (const auto &p : DirInfo.DirEnv.DepSymToIdx) {
-        Value *DepBaseDSA = p.first;
-        int SymbolIndex = p.second;
-
-        bool IsShared = DirInfo.DirEnv.DSAInfo.Shared.count(DepBaseDSA);
-
-        size_t Idx = StructToIdxMap.lookup(DepBaseDSA);
-        if (HasDevice)
-          Idx -= DeviceArgsSize;
-
-        translateDep(
-          IRBIfThen, IRBIfEnd, DepBaseDSA,
-          IsShared, UnpackParams[Idx], UnpackParamsToTypesMap.lookup(UnpackParamsCopy[Idx]),
-          AddrTranslationTable, SymbolIndex);
-      }
-      // Build TaskUnpackCall with the translated values
-      IRBIfEnd.CreateCall(UnpackFunc, UnpackParams);
-    } else {
-      // Build TaskUnpackCall
-      IRBuilder<> IRBEntry(&OlFunc->getEntryBlock());
-      IRBEntry.CreateCall(UnpackFunc, UnpackParams);
-      IRBEntry.CreateRetVoid();
-    }
+    if (IsTaskFunc)
+      buildTranslationCode(OlFunc, EntryBB, EndBB, TlateIfBB, TlateEndBB, StructToIdxMap, UnpackParams, UnpackParamsToTypesMap);
+    IRBuilder<>(EndBB->getTerminator()).CreateCall(UnpackFunc, UnpackParams);
   }
 
   // Copy task_args from src to dst, calling copyctors or ctors if
@@ -1400,16 +1416,8 @@ struct OmpSsDirective {
 
     Value *TaskArgsStructSizeOf = ConstantInt::get(Int64Ty, DL.getTypeAllocSize(TaskArgsTy));
 
-    // TODO: this forces an alignment of 16 for VLAs
-    {
-      const int ALIGN = 16;
-      TaskArgsStructSizeOf =
-        IRB.CreateNUWAdd(TaskArgsStructSizeOf,
-                         ConstantInt::get(Int64Ty, ALIGN - 1));
-      TaskArgsStructSizeOf =
-        IRB.CreateAnd(TaskArgsStructSizeOf,
-                      IRB.CreateNot(ConstantInt::get(Int64Ty, ALIGN - 1)));
-    }
+    // Force an alignment of 16 for VLAs
+    TaskArgsStructSizeOf = alignValueTo(IRB, TaskArgsStructSizeOf, 16);
 
     Value *TaskArgsDstLi8IdxGEP =
       IRB.CreateGEP(Int8Ty, TaskArgsDstL, TaskArgsStructSizeOf, "args_end");
@@ -2157,7 +2165,11 @@ struct OmpSsDirective {
   //         //! Specifies that the task has been verified by the user, hence it doesn't need runtime linting
   //         nanos6_verified_task = (1 << 7)
   //         //! Specifies that the task has the "update" clause
-  //         nanos6_update_task = (1 << 8)
+  //         nanos6_update_task = (1 << 8),
+  //         //! Specifies that the task has to be submitted as an Immediate Successor
+  //         nanos6_immediate_task = (1 << 9),
+  //         //! Specifies that the task is a micro-task
+  //         nanos6_micro_task = (1 << 10)
   // } nanos6_task_flag_t;
   Value *computeTaskFlags(IRBuilder<> &IRB) {
     Value *TaskFlagsVar = ConstantInt::get(Int64Ty, 0);
@@ -2231,6 +2243,26 @@ struct OmpSsDirective {
               LoopInfo.Update,
               Int64Ty),
               8));
+    }
+    if (DirEnv.Immediate) {
+      TaskFlagsVar =
+        IRB.CreateOr(
+          TaskFlagsVar,
+          IRB.CreateShl(
+            IRB.CreateZExt(
+              DirEnv.Immediate,
+              Int64Ty),
+              9));
+    }
+    if (DirEnv.Microtask) {
+      TaskFlagsVar =
+        IRB.CreateOr(
+          TaskFlagsVar,
+          IRB.CreateShl(
+            IRB.CreateZExt(
+              DirEnv.Microtask,
+              Int64Ty),
+              10));
     }
     return TaskFlagsVar;
   }
@@ -2427,6 +2459,12 @@ struct OmpSsDirective {
     return UnpackTaskFuncVar;
   };
 
+  Value *alignValueTo(IRBuilder<> &IRB, Value *V, size_t Align) {
+    V = IRB.CreateNUWAdd(V, IRB.getInt64(Align - 1));
+    V = IRB.CreateAnd(V, IRB.CreateNot(IRB.getInt64(Align - 1)));
+    return V;
+  }
+
   CallInst *emitOmpSsCaptureAndSubmitTask(
       DebugLoc &DLoc, Type *TaskArgsTy,
       MapVector<Value *, size_t> &TaskArgsToStructIdxMap,
@@ -2470,19 +2508,25 @@ struct OmpSsDirective {
     AllocaInst *TaskPtrVar = IRB.CreateAlloca(PtrTy);
     PostMoveInstructions.push_back(TaskPtrVar);
 
+    IRB.CreateLifetimeStart(TaskArgsVar, IRB.getInt64(DL.getTypeAllocSize(PtrTy)));
+    IRB.CreateLifetimeStart(TaskPtrVar, IRB.getInt64(DL.getTypeAllocSize(PtrTy)));
+
     Value *TaskArgsStructSizeOf = IRB.getInt64(DL.getTypeAllocSize(TaskArgsTy));
 
-    // TODO: this forces an alignment of 16 for VLAs
-    {
-      const int ALIGN = 16;
-      TaskArgsStructSizeOf =
-        IRB.CreateNUWAdd(TaskArgsStructSizeOf, IRB.getInt64(ALIGN - 1));
-      TaskArgsStructSizeOf =
-        IRB.CreateAnd(TaskArgsStructSizeOf, IRB.CreateNot(IRB.getInt64(ALIGN - 1)));
-    }
+    // Force an alignment of 16 for VLAs
+    TaskArgsStructSizeOf = alignValueTo(IRB, TaskArgsStructSizeOf, 16);
 
     Value *TaskArgsVLAsExtraSizeOf = computeTaskArgsVLAsExtraSizeOf(IRB);
     Value *TaskArgsSizeOf = IRB.CreateNUWAdd(TaskArgsStructSizeOf, TaskArgsVLAsExtraSizeOf);
+
+    Value *CoroSize = IRB.getInt64(0);
+    if (CoroInfo.SizeStore) {
+      // Force an alignment of 16 in the task args so coroutine state starts
+      // there
+      TaskArgsSizeOf = alignValueTo(IRB, TaskArgsSizeOf, 16);
+      CoroSize = IRB.CreateLoad(Int64Ty, CoroInfo.SizeStore);
+      TaskArgsSizeOf = IRB.CreateNUWAdd(TaskArgsSizeOf, CoroSize);
+    }
 
     Type *NumDependenciesTy = Int64Ty;
     Instruction *NumDependencies = IRB.CreateAlloca(NumDependenciesTy, nullptr, "num.deps");
@@ -2770,6 +2814,10 @@ struct OmpSsDirective {
     Value *TaskPtrVarL = IRB.CreateLoad(PtrTy, TaskPtrVar);
 
     CallInst *TaskSubmitFuncCall = IRB.CreateCall(nanos6Api::taskSubmitFuncCallee(M), TaskPtrVarL);
+
+    IRB.CreateLifetimeEnd(TaskArgsVar, IRB.getInt64(DL.getTypeAllocSize(PtrTy)));
+    IRB.CreateLifetimeEnd(TaskPtrVar, IRB.getInt64(DL.getTypeAllocSize(PtrTy)));
+
     return TaskSubmitFuncCall;
   };
 
@@ -2813,6 +2861,9 @@ struct OmpSsDirective {
     StructType *TaskArgsTy = createTaskArgsType(
       TaskArgsToStructIdxMap, ("nanos6_task_args_" + F.getName()).str());
     // Create nanos6_task_args_* END
+
+    if (TaskArgsToStructIdxMap.count(CoroInfo.Handle))
+      CoroHandleIdx = TaskArgsToStructIdxMap.lookup(CoroInfo.Handle);
 
     SmallVector<Type *, 4> TaskTypeList;
     SmallVector<StringRef, 4> TaskNameList;
@@ -2940,7 +2991,8 @@ struct OmpSsDirective {
           ConstantInt::get(nanos6Api::Nanos6TaskInfo::getInstance(M).getNumArgsType(), TaskTypeList.size()),
           SizeofTableVar,
           OffsetTableVar,
-          ArgIdxTableVar),
+          ArgIdxTableVar,
+          ConstantInt::get(nanos6Api::Nanos6TaskInfo::getInstance(M).getCoroHandleIdxDataType(), CoroHandleIdx)),
         ("task_info_var_" + F.getName()).str());
     TaskInfoVar->setAlignment(Align(64));
 

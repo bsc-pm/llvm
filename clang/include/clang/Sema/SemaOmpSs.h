@@ -226,6 +226,7 @@ public:
   /// the associated method/function.
   DeclGroupPtrTy ActOnOmpSsDeclareTaskDirective(
       DeclGroupPtrTy DG,
+      Expr *Immediate, Expr *Microtask,
       Expr *If, Expr *Final, Expr *Cost, Expr *Priority,
       Expr *Shmem, Expr *Onready, bool Wait,
       unsigned Device, SourceLocation DeviceLoc,
@@ -341,6 +342,14 @@ public:
                                         SourceLocation LParenLoc,
                                         SourceLocation EndLoc);
 
+  /// Called on well-formed 'immediate' clause.
+  OSSClause *ActOnOmpSsImmediateClause(Expr *Condition, SourceLocation StartLoc,
+                                SourceLocation LParenLoc,
+                                SourceLocation EndLoc);
+  /// Called on well-formed 'microtask' clause.
+  OSSClause *ActOnOmpSsMicrotaskClause(Expr *Condition, SourceLocation StartLoc,
+                                SourceLocation LParenLoc,
+                                SourceLocation EndLoc);
   /// Called on well-formed 'if' clause.
   OSSClause *ActOnOmpSsIfClause(Expr *Condition, SourceLocation StartLoc,
                                 SourceLocation LParenLoc,

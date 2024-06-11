@@ -983,7 +983,19 @@ RValue CodeGenFunction::EmitCoroutineIntrinsic(const CallExpr *E,
     CanQualType SizeTy = Context.getSizeType();
     llvm::IntegerType *T = Builder.getIntNTy(Context.getTypeSize(SizeTy));
     llvm::Function *F = CGM.getIntrinsic(llvm::Intrinsic::coro_size, T);
-    return RValue::get(Builder.CreateCall(F));
+
+    llvm::Instruction *Call = Builder.CreateCall(F);
+
+    // Create a sentinel that will be replaced by another constant.
+    // Useful to get the coro size in other places than the coroutine
+    // function
+    llvm::GlobalVariable *CoroSizeGV = new llvm::GlobalVariable(
+      CGM.getModule(), Int64Ty, /*isConstant=*/false, llvm::GlobalVariable::ExternalLinkage,
+      nullptr);
+    Builder.CreateCall(CGM.getIntrinsic(llvm::Intrinsic::coro_size_storage, {T, T}), {Call, CoroSizeGV});
+    CGM.registerCoroSize(CurGD.getDecl(), CoroSizeGV);
+
+    return RValue::get(Call);
   }
   case llvm::Intrinsic::coro_align: {
     auto &Context = getContext();

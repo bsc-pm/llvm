@@ -88,6 +88,8 @@ unsigned clang::getOmpSsSimpleClauseType(OmpSsClauseKind Kind,
 #include "clang/Basic/OmpSsKinds.def"
         .Default(OSSC_DEVICE_unknown);
   case OSSC_unknown:
+  case OSSC_immediate:
+  case OSSC_microtask:
   case OSSC_if:
   case OSSC_final:
   case OSSC_cost:
@@ -164,6 +166,8 @@ const char *clang::getOmpSsSimpleClauseTypeName(OmpSsClauseKind Kind,
     }
     llvm_unreachable("Invalid OmpSs 'device' clause type");
   case OSSC_unknown:
+  case OSSC_immediate:
+  case OSSC_microtask:
   case OSSC_if:
   case OSSC_final:
   case OSSC_cost:

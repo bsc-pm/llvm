@@ -36,6 +36,54 @@ void foo(), bar();
 // expected-error@+2 {{non-void tasks are not supported}}
 #pragma oss task
 int kk() {}
+// expected-error@+2 {{non-void tasks are not supported except for oss_coroutine return type}}
+#pragma oss task
+S kk1();
+
+namespace v1 {
+
+template <class Promise = void>
+struct coroutine_handle {
+};
+
+struct oss_coroutine {
+  coroutine_handle<> handle;
+};
+
+// expected-error@+2 {{task outline coroutines must define a coroutine}}
+#pragma oss task
+oss_coroutine kk2();
+
+} // namespace v1
+
+namespace v2 {
+
+struct oss_coroutine {
+};
+
+// expected-error@+2 {{oss_coroutine must have a coroutine_handle field}}
+#pragma oss task
+v2::oss_coroutine kk2();
+
+} // namespace v2
+
+namespace v3 {
+
+template <class Promise = void>
+struct coroutine_handle {
+};
+
+struct oss_coroutine {
+  coroutine_handle<> handle;
+};
+
+// expected-error@+2 {{task outline coroutines must define a coroutine}}
+#pragma oss task
+oss_coroutine kk2() {
+  return {};
+}
+
+} // namespace v3
 
 struct Q {
     int *x;

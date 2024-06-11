@@ -49,13 +49,19 @@ attributes #1 = { nounwind }
 !17 = !DILocation(line: 10, column: 1, scope: !5)
 ; CHECK-LABEL: @main(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    call void @nanos6_user_lock(ptr @nanos6_critical_default, ptr @[[GLOB0:[0-9]+]]), !dbg [[DBG9:![0-9]+]]
+; CHECK-NEXT:    call void @nanos6_user_lock(ptr @nanos6_critical_default, ptr @[[GLOB1:[0-9]+]]), !dbg [[DBG9:![0-9]+]]
 ; CHECK-NEXT:    call void @nanos6_user_unlock(ptr @nanos6_critical_default), !dbg [[DBG10:![0-9]+]]
-; CHECK-NEXT:    call void @nanos6_user_lock(ptr @nanos6_critical_default, ptr @[[GLOB2:[0-9]+]]), !dbg [[DBG11:![0-9]+]]
+; CHECK-NEXT:    call void @nanos6_user_lock(ptr @nanos6_critical_default, ptr @[[GLOB3:[0-9]+]]), !dbg [[DBG11:![0-9]+]]
 ; CHECK-NEXT:    call void @nanos6_user_unlock(ptr @nanos6_critical_default), !dbg [[DBG12:![0-9]+]]
-; CHECK-NEXT:    call void @nanos6_user_lock(ptr @nanos6_critical_asdf, ptr @[[GLOB4:[0-9]+]]), !dbg [[DBG13:![0-9]+]]
+; CHECK-NEXT:    call void @nanos6_user_lock(ptr @nanos6_critical_asdf, ptr @[[GLOB5:[0-9]+]]), !dbg [[DBG13:![0-9]+]]
 ; CHECK-NEXT:    call void @nanos6_user_unlock(ptr @nanos6_critical_asdf), !dbg [[DBG14:![0-9]+]]
-; CHECK-NEXT:    call void @nanos6_user_lock(ptr @nanos6_critical_asdf, ptr @[[GLOB6:[0-9]+]]), !dbg [[DBG15:![0-9]+]]
+; CHECK-NEXT:    call void @nanos6_user_lock(ptr @nanos6_critical_asdf, ptr @[[GLOB7:[0-9]+]]), !dbg [[DBG15:![0-9]+]]
 ; CHECK-NEXT:    call void @nanos6_user_unlock(ptr @nanos6_critical_asdf), !dbg [[DBG16:![0-9]+]]
 ; CHECK-NEXT:    ret i32 0, !dbg [[DBG17:![0-9]+]]
+;
+;
+; CHECK-LABEL: @nanos6_constructor_check_version(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    call void @nanos6_check_version(i64 1, ptr @nanos6_versions, ptr @[[GLOB0:[0-9]+]])
+; CHECK-NEXT:    ret void
 ;

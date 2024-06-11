@@ -108,6 +108,10 @@ enum OmpSsBundleKind {
   OSSB_loop_upperbound,
   OSSB_loop_step,
   OSSB_decl_source,
+  OSSB_coro_handle,
+  OSSB_coro_size_store,
+  OSSB_immediate,
+  OSSB_microtask,
   OSSB_unknown
 };
 
@@ -245,6 +249,14 @@ const char *getBundleStr(OmpSsBundleKind Kind) {
     return "QUAL.OSS.LOOP.STEP";
   case OSSB_decl_source:
     return "QUAL.OSS.DECL.SOURCE";
+  case OSSB_coro_handle:
+    return "QUAL.OSS.CORO.HANDLE";
+  case OSSB_coro_size_store:
+    return "QUAL.OSS.CORO.SIZE.STORE";
+  case OSSB_immediate:
+    return "QUAL.OSS.INMEDIATE";
+  case OSSB_microtask:
+    return "QUAL.OSS.MICROTASK";
   default:
     llvm_unreachable("Invalid OmpSs bundle kind");
   }
@@ -2557,13 +2569,13 @@ static void EmitLoopType(const OSSLoopDataTy &LoopData, CodeGenFunction &CGF,
 
 static VarDecl *createImplicitVarDecl(
     CodeGenFunction &CGF, StringRef Name, QualType Q, SourceLocation Loc,
-    const DeclContext *DC) {
+    const DeclContext *DC, StorageClass SC) {
   ASTContext &Ctx = CGF.getContext();
   auto *VD =
     VarDecl::Create(
       Ctx, const_cast<DeclContext *>(DC),
       Loc, Loc, &Ctx.Idents.get(Name),
-      Q, Ctx.getTrivialTypeSourceInfo(Q, Loc), SC_Auto);
+      Q, Ctx.getTrivialTypeSourceInfo(Q, Loc), SC);
   VD->setImplicit();
   return VD;
 }
@@ -2578,7 +2590,7 @@ static DeclRefExpr *emitTaskCallArg(
   if (Q->isArrayType())
     Q = Ctx.getBaseElementType(Q).getCanonicalType();
 
-  auto *VD = createImplicitVarDecl(CGF, Name, Q, Loc, cast<DeclContext>(CGF.CurCodeDecl));
+  auto *VD = createImplicitVarDecl(CGF, Name, Q, Loc, cast<DeclContext>(CGF.CurCodeDecl), SC_Auto);
 
   VD->setReferenced();
   VD->markUsed(Ctx);
@@ -2832,6 +2844,10 @@ void CGOmpSsRuntime::EmitDirectiveData(
                   CGF, FunContext, Red, TaskInfo);
   }
 
+  if (Data.Immediate)
+    TaskInfo.emplace_back(getBundleStr(OSSB_immediate), CGF.EvaluateExprAsBool(Data.Immediate));
+  if (Data.Microtask)
+    TaskInfo.emplace_back(getBundleStr(OSSB_microtask), CGF.EvaluateExprAsBool(Data.Microtask));
   if (Data.If)
     TaskInfo.emplace_back(getBundleStr(OSSB_if), CGF.EvaluateExprAsBool(Data.If));
   if (Data.Final)
@@ -2849,7 +2865,7 @@ static void EmitDbgInfo(CodeGenFunction &CGF, CGDebugInfo *DI, const Expr *E) {
     const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
     if (VD->getType()->isReferenceType()) {
       const VarDecl *ImplVD = createImplicitVarDecl(
-        CGF, VD->getName(), E->getType(), VD->getLocation(), VD->getDeclContext());
+        CGF, VD->getName(), E->getType(), VD->getLocation(), VD->getDeclContext(), SC_Auto);
       (void)DI->EmitDeclareOfAutoVariable(
         ImplVD, CGF.EmitLValue(DRE).emitRawPointer(CGF), CGF.Builder, /*UsePointerValue=*/false);
     } else {
@@ -2858,7 +2874,7 @@ static void EmitDbgInfo(CodeGenFunction &CGF, CGDebugInfo *DI, const Expr *E) {
     }
   } else if (isa<CXXThisExpr>(E)) {
     const VarDecl *ImplVD = createImplicitVarDecl(
-      CGF, "this", E->getType()->getPointeeType(), E->getExprLoc(), cast<DeclContext>(CGF.CurCodeDecl));
+      CGF, "this", E->getType()->getPointeeType(), E->getExprLoc(), cast<DeclContext>(CGF.CurCodeDecl), SC_Auto);
 
     (void)DI->EmitDeclareOfAutoVariable(
       ImplVD, CGF.EmitScalarExpr(E), CGF.Builder, /*UsePointerValue=*/false);
@@ -2981,6 +2997,12 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   for (const auto *Attr : FD->specific_attrs<OSSTaskDeclAttr>()) {
     emitOutlineMultiDepIterDecls(CGF, Attr, PrivateCopies, InitScope);
   }
+
+  // Coroutine
+  Expr *HandleRefE = nullptr;
+  QualType RetType = FD->getReturnType().getCanonicalType();
+  if (auto* R = RetType->getAsCXXRecordDecl())
+    HandleRefE = emitTaskCallArg(CGF, "handle", RetType, FD->getDefaultLoc());
 
   llvm::Function *EntryCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_entry);
   llvm::Function *ExitCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_exit);
@@ -3140,6 +3162,12 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       EmitDSAFirstprivate(CGF, FpDataTy, TaskInfo, CapturedList);
     }
 
+    if (const Expr *E = Attr->getImmediateExpr()) {
+      TaskInfo.emplace_back(getBundleStr(OSSB_immediate), CGF.EvaluateExprAsBool(E));
+    }
+    if (const Expr *E = Attr->getMicrotaskExpr()) {
+      TaskInfo.emplace_back(getBundleStr(OSSB_microtask), CGF.EvaluateExprAsBool(E));
+    }
     if (const Expr *E = Attr->getIfExpr()) {
       TaskInfo.emplace_back(getBundleStr(OSSB_if), CGF.EvaluateExprAsBool(E));
     }
@@ -3417,6 +3445,24 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
         (Name + ":" + Twine(DbgLoc.getLine()) + ":" + Twine(DbgLoc.getCol())).str()));
   }
   InDirectiveEmission = false;
+
+  if (HandleRefE) {
+    Address HandleAddr = CGF.EmitLValue(HandleRefE).getAddress();
+    // FIXME: this assumes the handle is a POD
+    CGF.Builder.CreateStore(llvm::ConstantPointerNull::get(CGF.Int8PtrTy), HandleAddr);
+    ReturnValue = ReturnValueSlot(HandleAddr, /*IsVolatile=*/false);
+    TaskInfo.emplace_back(
+        getBundleStr(OSSB_coro_handle), HandleAddr.emitRawPointer(CGF));
+
+    TaskInfo.emplace_back(
+        getBundleStr(OSSB_coro_size_store), CGM.getCoroSize(FD));
+
+    llvm::SmallVector<llvm::Value *> DSABundleList;
+    DSABundleList.push_back(HandleAddr.emitRawPointer(CGF));
+    DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(RetType)));
+    TaskInfo.emplace_back(
+        getBundleStr(OSSB_firstprivate), DSABundleList);
+  }
 
   llvm::Instruction *Result =
     CGF.Builder.CreateCall(EntryCallee, {}, llvm::ArrayRef(TaskInfo));

@@ -27,4 +27,5 @@ resumable f1(void *) {
 
 // CHECK: coro.alloc:
 // CHECK-NEXT: [[SIZE:%.+]] = call [[BITWIDTH:.+]] @llvm.coro.size.[[BITWIDTH]]()
+// CHECK-NEXT: call [[BITWIDTH:.+]] @llvm.coro.size.storage.[[BITWIDTH]].[[BITWIDTH]]([[BITWIDTH]] [[SIZE]]
 // CHECK-NEXT: call {{.*}} ptr @_Znwm([[BITWIDTH]] noundef [[SIZE]])

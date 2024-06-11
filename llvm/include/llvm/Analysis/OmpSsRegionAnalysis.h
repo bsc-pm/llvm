@@ -217,6 +217,14 @@ struct DirectiveWhileInfo {
   bool empty() const { return !Fun && Args.empty(); };
 };
 
+struct DirectiveCoroInfo {
+  Value *Handle = nullptr;
+  Value *SizeStore = nullptr;
+  bool empty() const {
+    return !Handle &&
+    !SizeStore; };
+};
+
 struct DirectiveEnvironment {
   enum OmpSsDirectiveKind {
     OSSD_task = 0,
@@ -241,6 +249,8 @@ struct DirectiveEnvironment {
   DirectiveCostInfo CostInfo;
   DirectivePriorityInfo PriorityInfo;
   DirectiveOnreadyInfo OnreadyInfo;
+  Value *Immediate = nullptr;
+  Value *Microtask = nullptr;
   Value *Final = nullptr;
   Value *If = nullptr;
   Value *Label = nullptr;
@@ -253,6 +263,7 @@ struct DirectiveEnvironment {
   // Used in taskiter (while)
   DirectiveWhileInfo WhileInfo;
   StringRef DeclSourceStringRef;
+  DirectiveCoroInfo CoroInfo;
   DirectiveEnvironment(const Instruction *I);
   // Different reductions may have same init/comb, assign the same ReductionIndex
   DenseMap<Value *, int> SeenInits;
@@ -326,6 +337,10 @@ private:
   void gatherWhileCondInfo(OperandBundleDef &OBDef);
   void gatherMultiDependInfo(OperandBundleDef &OBDef, uint64_t Id);
   void gatherDeclSource(OperandBundleDef &OBDef);
+  void gatherCoroHandle(OperandBundleDef &OBDef);
+  void gatherCoroSizeStore(OperandBundleDef &OBDef);
+  void gatherImmediateInfo(OperandBundleDef &OBDef);
+  void gatherMicrotaskInfo(OperandBundleDef &OBDef);
 
   void verifyVLADimsInfo();
   void verifyDependInfo();
@@ -339,6 +354,7 @@ private:
   void verifyWhileInfo();
   void verifyMultiDependInfo();
   void verifyLabelInfo();
+  void verifyCoroInfo();
 
 public:
   void verify();

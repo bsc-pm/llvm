@@ -116,6 +116,24 @@ static void AddDepData(const OSSExecutableDirective &S, OSSTaskDepDataTy &Deps) 
   }
 }
 
+static void AddImmediateData(const OSSExecutableDirective &S, const Expr *&ImmediateExpr) {
+  bool Found = false;
+  for (const auto *C : S.getClausesOfKind<OSSImmediateClause>()) {
+    assert(!Found);
+    Found = true;
+    ImmediateExpr = C->getCondition();
+  }
+}
+
+static void AddMicrotaskData(const OSSExecutableDirective &S, const Expr *&MicrotaskExpr) {
+  bool Found = false;
+  for (const auto *C : S.getClausesOfKind<OSSMicrotaskClause>()) {
+    assert(!Found);
+    Found = true;
+    MicrotaskExpr = C->getCondition();
+  }
+}
+
 static void AddIfData(const OSSExecutableDirective &S, const Expr *&IfExpr) {
   bool Found = false;
   for (const auto *C : S.getClausesOfKind<OSSIfClause>()) {
@@ -218,6 +236,8 @@ static void AddDeviceData(const OSSExecutableDirective &S, OSSTaskDeviceDataTy &
 static void AddTaskData(const OSSExecutableDirective &S, OSSTaskDataTy &TaskData) {
   AddDSAData(S, TaskData.DSAs);
   AddDepData(S, TaskData.Deps);
+  AddImmediateData(S, TaskData.Immediate);
+  AddMicrotaskData(S, TaskData.Microtask);
   AddIfData(S, TaskData.If);
   AddFinalData(S, TaskData.Final);
   AddCostData(S, TaskData.Cost);

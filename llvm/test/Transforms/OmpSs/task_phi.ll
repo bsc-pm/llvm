@@ -124,6 +124,8 @@ attributes #1 = { nounwind }
 ; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG9]]
 ; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg [[DBG9]]
 ; CHECK:       codeRepl:
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP0]]), !dbg [[DBG9]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP1]]), !dbg [[DBG9]]
 ; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS]], align 8, !dbg [[DBG9]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG9]]
 ; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_fold_if, ptr @task_invocation_info_fold_if, ptr null, i64 16, ptr [[TMP0]], ptr [[TMP1]], i64 1, i64 [[TMP2]]), !dbg [[DBG9]]
@@ -135,6 +137,8 @@ attributes #1 = { nounwind }
 ; CHECK-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 4 [[GEP_B_ADDR]], ptr align 4 [[B_ADDR]], i64 4, i1 false), !dbg [[DBG9]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[TMP1]], align 8, !dbg [[DBG9]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP4]]), !dbg [[DBG9]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP0]]), !dbg [[DBG9]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP1]]), !dbg [[DBG9]]
 ; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG9]]
 ; CHECK:       final.end:
 ; CHECK-NEXT:    call void @nanos6_taskwait(ptr @[[GLOB2:[0-9]+]]), !dbg [[DBG10:![0-9]+]]
@@ -227,12 +231,14 @@ attributes #1 = { nounwind }
 ; CHECK-NEXT:    [[GEP_A_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOLD_IF:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
 ; CHECK-NEXT:    [[GEP_B_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOLD_IF]], ptr [[TASK_ARGS]], i32 0, i32 1
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
-; CHECK-NEXT:    br i1 [[TMP0]], label [[TMP1:%.*]], label [[TMP2:%.*]]
-; CHECK:       1:
-; CHECK-NEXT:    br label [[TMP2]]
-; CHECK:       2:
+; CHECK-NEXT:    br i1 [[TMP0]], label [[TLATE_IF:%.*]], label [[TLATE_END:%.*]]
+; CHECK:       end:
 ; CHECK-NEXT:    call void @nanos6_unpacked_task_region_fold_if(ptr [[GEP_A_ADDR]], ptr [[GEP_B_ADDR]], ptr [[DEVICE_ENV]], ptr [[ADDRESS_TRANSLATION_TABLE]])
 ; CHECK-NEXT:    ret void
+; CHECK:       tlate.if:
+; CHECK-NEXT:    br label [[TLATE_END]]
+; CHECK:       tlate.end:
+; CHECK-NEXT:    br label [[END:%.*]]
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_register_task_info() {

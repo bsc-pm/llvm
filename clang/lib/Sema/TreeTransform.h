@@ -1707,6 +1707,28 @@ public:
          DirName, Kind, AStmt, StartLoc, EndLoc);
   }
 
+  /// Build a new OmpSs 'immediate' clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSImmediateClause(Expr *Condition, SourceLocation StartLoc,
+                                SourceLocation LParenLoc,
+                                SourceLocation EndLoc) {
+    return getSema().OmpSs().ActOnOmpSsImmediateClause(Condition, StartLoc, LParenLoc,
+                                        EndLoc);
+  }
+
+  /// Build a new OmpSs 'microtask' clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSMicrotaskClause(Expr *Condition, SourceLocation StartLoc,
+                                SourceLocation LParenLoc,
+                                SourceLocation EndLoc) {
+    return getSema().OmpSs().ActOnOmpSsMicrotaskClause(Condition, StartLoc, LParenLoc,
+                                        EndLoc);
+  }
+
   /// Build a new OmpSs 'if' clause.
   ///
   /// By default, performs semantic analysis to build the new OmpSs clause.
@@ -12325,6 +12347,10 @@ TreeTransform<Derived>::TransformOSSTaskLoopForDirective(OSSTaskLoopForDirective
   return Res;
 }
 
+//===----------------------------------------------------------------------===//
+// OmpSs clause transformation
+//===----------------------------------------------------------------------===//
+
 template <typename Derived>
 StmtResult
 TreeTransform<Derived>::TransformOSSAtomicDirective(OSSAtomicDirective *D) {
@@ -12336,10 +12362,23 @@ TreeTransform<Derived>::TransformOSSAtomicDirective(OSSAtomicDirective *D) {
   return Res;
 }
 
-//===----------------------------------------------------------------------===//
-// OmpSs clause transformation
-//===----------------------------------------------------------------------===//
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSImmediateClause(OSSImmediateClause *C) {
+  ExprResult Cond = getDerived().TransformExpr(C->getCondition());
+  if (Cond.isInvalid())
+    return nullptr;
+  return getDerived().RebuildOSSImmediateClause(Cond.get(), C->getBeginLoc(),
+                                         C->getLParenLoc(), C->getEndLoc());
+}
 
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSMicrotaskClause(OSSMicrotaskClause *C) {
+  ExprResult Cond = getDerived().TransformExpr(C->getCondition());
+  if (Cond.isInvalid())
+    return nullptr;
+  return getDerived().RebuildOSSMicrotaskClause(Cond.get(), C->getBeginLoc(),
+                                         C->getLParenLoc(), C->getEndLoc());
+}
 
 template <typename Derived>
 OSSClause *TreeTransform<Derived>::TransformOSSIfClause(OSSIfClause *C) {

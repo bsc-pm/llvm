@@ -4369,6 +4369,16 @@ bool RecursiveASTVisitor<Derived>::VisitOSSRelaxedClause(OSSRelaxedClause *) {
   return true;
 }
 
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSImmediateClause(OSSImmediateClause *) {
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSMicrotaskClause(OSSMicrotaskClause *) {
+  return true;
+}
+
 #undef DEF_TRAVERSE_STMT
 #undef TRAVERSE_STMT
 #undef TRAVERSE_STMT_BASE

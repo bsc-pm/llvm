@@ -12177,7 +12177,11 @@ def err_oss_member_device_no_smp : Error<
 def err_oss_function_expected : Error<
   "'#pragma oss task' can only be applied to functions">;
 def err_oss_non_void_task : Error<
-  "non-void tasks are not supported">;
+  "non-void tasks are not supported%select{| except for oss_coroutine return type}0">;
+def err_oss_coro_handle : Error<
+  "oss_coroutine must have a coroutine_handle field">;
+def err_oss_coro_cstmt : Error<
+  "task outline coroutines must define a coroutine">;
 def err_oss_rvalue_param_task : Error<
   "r-values are not allowed in task outline">;
 def err_oss_non_pod_parm_task : Error<

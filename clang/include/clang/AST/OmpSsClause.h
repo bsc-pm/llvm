@@ -255,6 +255,108 @@ public:
   }
 };
 
+/// This represents 'immediate' clause in the '#pragma oss ...' directive.
+///
+/// \code
+/// #pragma oss task immediate(a > 5)
+/// \endcode
+/// In this example directive '#pragma oss task' has simple 'immediate'
+/// clause with condition 'a > 5'.
+class OSSImmediateClause : public OSSClause {
+  friend class OSSClauseReader;
+
+  /// Location of '('.
+  SourceLocation LParenLoc;
+
+  /// Condition of the 'immediate' clause.
+  Stmt *Condition = nullptr;
+
+  /// Set condition.
+  void setCondition(Expr *Cond) { Condition = Cond; }
+
+public:
+  /// Build 'immediate' clause with condition \a Cond.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param Cond Condition of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSImmediateClause(Expr *Cond, SourceLocation StartLoc, SourceLocation LParenLoc,
+                 SourceLocation EndLoc)
+      : OSSClause(llvm::oss::OSSC_immediate, StartLoc, EndLoc), LParenLoc(LParenLoc),
+        Condition(Cond) {}
+
+  /// Build an empty clause.
+  OSSImmediateClause()
+      : OSSClause(llvm::oss::OSSC_immediate, SourceLocation(), SourceLocation()) {}
+
+  /// Sets the location of '('.
+  void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
+
+  /// Returns the location of '('.
+  SourceLocation getLParenLoc() const { return LParenLoc; }
+
+  /// Returns condition.
+  Expr *getCondition() const { return cast_or_null<Expr>(Condition); }
+
+  child_range children() { return child_range(&Condition, &Condition + 1); }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == llvm::oss::OSSC_immediate;
+  }
+};
+
+/// This represents 'microtask' clause in the '#pragma oss ...' directive.
+///
+/// \code
+/// #pragma oss task microtask(a > 5)
+/// \endcode
+/// In this example directive '#pragma oss task' has simple 'microtask'
+/// clause with condition 'a > 5'.
+class OSSMicrotaskClause : public OSSClause {
+  friend class OSSClauseReader;
+
+  /// Location of '('.
+  SourceLocation LParenLoc;
+
+  /// Condition of the 'microtask' clause.
+  Stmt *Condition = nullptr;
+
+  /// Set condition.
+  void setCondition(Expr *Cond) { Condition = Cond; }
+
+public:
+  /// Build 'microtask' clause with condition \a Cond.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param Cond Condition of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSMicrotaskClause(Expr *Cond, SourceLocation StartLoc, SourceLocation LParenLoc,
+                 SourceLocation EndLoc)
+      : OSSClause(llvm::oss::OSSC_microtask, StartLoc, EndLoc), LParenLoc(LParenLoc),
+        Condition(Cond) {}
+
+  /// Build an empty clause.
+  OSSMicrotaskClause()
+      : OSSClause(llvm::oss::OSSC_microtask, SourceLocation(), SourceLocation()) {}
+
+  /// Sets the location of '('.
+  void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
+
+  /// Returns the location of '('.
+  SourceLocation getLParenLoc() const { return LParenLoc; }
+
+  /// Returns condition.
+  Expr *getCondition() const { return cast_or_null<Expr>(Condition); }
+
+  child_range children() { return child_range(&Condition, &Condition + 1); }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == llvm::oss::OSSC_microtask;
+  }
+};
+
 /// This represents 'if' clause in the '#pragma oss ...' directive.
 ///
 /// \code

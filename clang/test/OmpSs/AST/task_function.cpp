@@ -15,7 +15,7 @@ void foo1(int &rx) {}
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int *' lvalue ParmVar 0x{{.*}} 'y' 'int *'
 
 // CHECK: OSSTaskDeclAttr 0x{{.*}} <line:{{.*}}:{{.*}}, col:{{.*}}> Implicit
-// CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'bool' <IntegralToBoolean>
+// CHECK: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'bool' <IntegralToBoolean>
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'int' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int' lvalue ParmVar 0x{{.*}} 'rx' 'int &'
 

@@ -339,6 +339,18 @@ private:
   InstrProfStats PGOStats;
   std::unique_ptr<llvm::SanitizerStatReport> SanStats;
 
+  // TODO
+  llvm::Function *CoroSizeRegister = nullptr;
+  llvm::DenseMap<const FunctionDecl *, llvm::GlobalVariable *> CoroFToGV;
+public:
+  void registerCoroSize(const Decl *CoroFD, llvm::GlobalVariable *CoroSizeGV) {
+    CoroFToGV[cast<FunctionDecl>(CoroFD)] = CoroSizeGV;
+  }
+
+  llvm::GlobalVariable *getCoroSize(const Decl *FD) {
+    return CoroFToGV.lookup(cast<FunctionDecl>(FD));
+  }
+
   // A set of references that have only been seen via a weakref so far. This is
   // used to remove the weak of the reference if we ever see a direct reference
   // or a definition.

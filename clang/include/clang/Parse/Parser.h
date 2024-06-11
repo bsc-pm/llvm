@@ -3546,6 +3546,7 @@ private:
                               OmpSsClauseKind CKind, bool FirstClause);
 
   bool ParseDeclareTaskClauses(
+      ExprResult &ImmediateRes, ExprResult &MicrotaskRes,
       ExprResult &IfRes, ExprResult &FinalRes,
       ExprResult &CostRes, ExprResult &PriorityRes,
       ExprResult &ShmemRes, ExprResult &OnreadyRes, bool &Wait,

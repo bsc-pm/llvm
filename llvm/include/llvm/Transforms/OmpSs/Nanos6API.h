@@ -122,6 +122,7 @@ private:
   Type *SizeofTableDataTy;
   Type *OffsetTableDataTy;
   Type *ArgIdxTableDataTy;
+  Type *CoroHandleIdxDataTy;
 
   Nanos6TaskInfo(){};
   Nanos6TaskInfo(const Nanos6TaskInfo&){};
@@ -146,6 +147,7 @@ public:
   Type *getSizeofTableDataType() const { return SizeofTableDataTy; }
   Type *getOffsetTableDataType() const { return OffsetTableDataTy; }
   Type *getArgIdxTableDataType() const { return ArgIdxTableDataTy; }
+  Type *getCoroHandleIdxDataType() const { return CoroHandleIdxDataTy; }
 };
 
 class Nanos6Version {
@@ -257,6 +259,9 @@ FunctionCallee registerCtorCheckVersionFuncCallee(Module &M);
 
 // void nanos6_check_version(uint64_t size, nanos6_version_t *arr, const char *source);
 FunctionCallee checkVersionFuncCallee(Module &M);
+
+// void nanos6_suspend();
+FunctionCallee suspendFuncCallee(Module &M);
 
 }
 }

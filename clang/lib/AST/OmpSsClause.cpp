@@ -234,6 +234,18 @@ void OSSClausePrinter::VisitOSSClauseList(T *Node, char StartSym) {
   }
 }
 
+void OSSClausePrinter::VisitOSSImmediateClause(OSSImmediateClause *Node) {
+  OS << "immediate(";
+  Node->getCondition()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
+void OSSClausePrinter::VisitOSSMicrotaskClause(OSSMicrotaskClause *Node) {
+  OS << "microtask(";
+  Node->getCondition()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
 void OSSClausePrinter::VisitOSSIfClause(OSSIfClause *Node) {
   OS << "if(";
   Node->getCondition()->printPretty(OS, nullptr, Policy, 0);

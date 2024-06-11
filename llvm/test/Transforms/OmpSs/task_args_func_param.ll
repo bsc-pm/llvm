@@ -175,6 +175,8 @@ attributes #3 = { noinline norecurse nounwind "frame-pointer"="none" "min-legal-
 ; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG9]]
 ; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg [[DBG9]]
 ; CHECK:       codeRepl:
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP1]]), !dbg [[DBG9]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP2]]), !dbg [[DBG9]]
 ; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS]], align 8, !dbg [[DBG9]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG9]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[TMP3]], 1, !dbg [[DBG9]]
@@ -189,6 +191,8 @@ attributes #3 = { noinline norecurse nounwind "frame-pointer"="none" "min-legal-
 ; CHECK-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 4 [[GEP_X_ADDR]], ptr align 4 [[X_ADDR]], i64 4, i1 false), !dbg [[DBG9]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = load ptr, ptr [[TMP2]], align 8, !dbg [[DBG9]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP7]]), !dbg [[DBG9]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP1]]), !dbg [[DBG9]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP2]]), !dbg [[DBG9]]
 ; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG9]]
 ; CHECK:       final.end:
 ; CHECK-NEXT:    ret void, !dbg [[DBG10:![0-9]+]]
@@ -293,6 +297,12 @@ attributes #3 = { noinline norecurse nounwind "frame-pointer"="none" "min-legal-
 ; CHECK-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T]] [[TMP4]]
 ;
 ;
+; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_check_version() {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    call void @nanos6_check_version(i64 1, ptr @nanos6_versions, ptr @[[GLOB0:[0-9]+]])
+; CHECK-NEXT:    ret void
+;
+;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region__Z3fooiRi
 ; CHECK-SAME: (ptr [[TMP0:%.*]], ptr [[X_ADDR:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG25:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
@@ -313,33 +323,35 @@ attributes #3 = { noinline norecurse nounwind "frame-pointer"="none" "min-legal-
 ; CHECK-NEXT:    store ptr [[LOAD_GEP_]], ptr [[TLATE_LOAD_GEP_]], align 8
 ; CHECK-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[TLATE_LOAD_GEP_]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
-; CHECK-NEXT:    br i1 [[TMP1]], label [[TMP2:%.*]], label [[TMP8:%.*]]
-; CHECK:       2:
-; CHECK-NEXT:    [[LOCAL_LOOKUP_:%.*]] = getelementptr [[NANOS6_ADDRESS_TRANSLATION_ENTRY_T:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE]], i32 0, i32 0
-; CHECK-NEXT:    [[TMP3:%.*]] = load i64, ptr [[LOCAL_LOOKUP_]], align 8
-; CHECK-NEXT:    [[DEVICE_LOOKUP_:%.*]] = getelementptr [[NANOS6_ADDRESS_TRANSLATION_ENTRY_T]], ptr [[ADDRESS_TRANSLATION_TABLE]], i32 0, i32 1
-; CHECK-NEXT:    [[TMP4:%.*]] = load i64, ptr [[DEVICE_LOOKUP_]], align 8
-; CHECK-NEXT:    [[TMP5:%.*]] = sub i64 0, [[TMP3]]
-; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr [[TMP0]], i64 [[TMP5]]
-; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr [[TMP6]], i64 [[TMP4]]
-; CHECK-NEXT:    store ptr [[TMP7]], ptr [[TLATE_LOAD_GEP_]], align 8
-; CHECK-NEXT:    br label [[TMP8]]
-; CHECK:       8:
-; CHECK-NEXT:    [[TMP9:%.*]] = load ptr, ptr [[TLATE_LOAD_GEP_]], align 8
-; CHECK-NEXT:    call void @nanos6_unpacked_task_region__Z3fooiRi(ptr [[TMP9]], ptr [[GEP_X_ADDR]], ptr [[DEVICE_ENV]], ptr [[ADDRESS_TRANSLATION_TABLE]])
+; CHECK-NEXT:    br i1 [[TMP1]], label [[TLATE_IF:%.*]], label [[TLATE_END:%.*]]
+; CHECK:       end:
+; CHECK-NEXT:    call void @nanos6_unpacked_task_region__Z3fooiRi(ptr [[TMP7:%.*]], ptr [[GEP_X_ADDR]], ptr [[DEVICE_ENV]], ptr [[ADDRESS_TRANSLATION_TABLE]])
 ; CHECK-NEXT:    ret void
+; CHECK:       tlate.if:
+; CHECK-NEXT:    [[LOCAL_LOOKUP_:%.*]] = getelementptr [[NANOS6_ADDRESS_TRANSLATION_ENTRY_T:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE]], i32 0, i32 0
+; CHECK-NEXT:    [[TMP2:%.*]] = load i64, ptr [[LOCAL_LOOKUP_]], align 8
+; CHECK-NEXT:    [[DEVICE_LOOKUP_:%.*]] = getelementptr [[NANOS6_ADDRESS_TRANSLATION_ENTRY_T]], ptr [[ADDRESS_TRANSLATION_TABLE]], i32 0, i32 1
+; CHECK-NEXT:    [[TMP3:%.*]] = load i64, ptr [[DEVICE_LOOKUP_]], align 8
+; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 0, [[TMP2]]
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr [[TMP0]], i64 [[TMP4]]
+; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr [[TMP5]], i64 [[TMP3]]
+; CHECK-NEXT:    store ptr [[TMP6]], ptr [[TLATE_LOAD_GEP_]], align 8
+; CHECK-NEXT:    br label [[TLATE_END]]
+; CHECK:       tlate.end:
+; CHECK-NEXT:    [[TMP7]] = load ptr, ptr [[TLATE_LOAD_GEP_]], align 8
+; CHECK-NEXT:    br label [[END:%.*]]
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_deps__Z3fooiRi
 ; CHECK-SAME: (ptr [[TMP0:%.*]], ptr [[X_ADDR:%.*]], ptr [[LOOP_BOUNDS:%.*]], ptr [[HANDLER:%.*]]) {
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[TMP1:%.*]] = call [[STRUCT__DEPEND_UNPACK_T:%.*]] @compute_dep(ptr [[TMP0]])
-; CHECK-NEXT:    [[TMP2:%.*]] = call [[STRUCT__DEPEND_UNPACK_T]] @compute_dep(ptr [[TMP0]])
+; CHECK-NEXT:    [[TMP1:%.*]] = call [[STRUCT__DEPEND_UNPACK_T:%.*]] @[[COMPUTE_DEP:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[TMP0]])
+; CHECK-NEXT:    [[TMP2:%.*]] = call [[STRUCT__DEPEND_UNPACK_T]] @[[COMPUTE_DEP]](ptr [[TMP0]])
 ; CHECK-NEXT:    [[TMP3:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T]] [[TMP1]], 0
 ; CHECK-NEXT:    [[TMP4:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T]] [[TMP1]], 1
 ; CHECK-NEXT:    [[TMP5:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T]] [[TMP1]], 2
 ; CHECK-NEXT:    [[TMP6:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T]] [[TMP2]], 3
-; CHECK-NEXT:    call void @nanos6_register_region_reduction_depinfo1(i32 6000, i32 0, ptr [[HANDLER]], i32 0, ptr @[[GLOB1:[0-9]+]], ptr [[TMP3]], i64 [[TMP4]], i64 [[TMP5]], i64 [[TMP6]])
+; CHECK-NEXT:    call void @nanos6_register_region_reduction_depinfo1(i32 6000, i32 0, ptr [[HANDLER]], i32 0, ptr @[[GLOB2:[0-9]+]], ptr [[TMP3]], i64 [[TMP4]], i64 [[TMP5]], i64 [[TMP6]])
 ; CHECK-NEXT:    ret void
 ;
 ;
@@ -349,6 +361,8 @@ attributes #3 = { noinline norecurse nounwind "frame-pointer"="none" "min-legal-
 ; CHECK-NEXT:    [[GEP_:%.*]] = getelementptr [[NANOS6_TASK_ARGS__Z3FOOIRI:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
 ; CHECK-NEXT:    [[LOAD_GEP_:%.*]] = load ptr, ptr [[GEP_]], align 8
 ; CHECK-NEXT:    [[GEP_X_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS__Z3FOOIRI]], ptr [[TASK_ARGS]], i32 0, i32 1
+; CHECK-NEXT:    br label [[END:%.*]]
+; CHECK:       end:
 ; CHECK-NEXT:    call void @nanos6_unpacked_deps__Z3fooiRi(ptr [[LOAD_GEP_]], ptr [[GEP_X_ADDR]], ptr [[LOOP_BOUNDS]], ptr [[HANDLER]])
 ; CHECK-NEXT:    ret void
 ;
@@ -369,6 +383,8 @@ attributes #3 = { noinline norecurse nounwind "frame-pointer"="none" "min-legal-
 ; CHECK-NEXT:    [[GEP_:%.*]] = getelementptr [[NANOS6_TASK_ARGS__Z3FOOIRI:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
 ; CHECK-NEXT:    [[LOAD_GEP_:%.*]] = load ptr, ptr [[GEP_]], align 8
 ; CHECK-NEXT:    [[GEP_X_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS__Z3FOOIRI]], ptr [[TASK_ARGS]], i32 0, i32 1
+; CHECK-NEXT:    br label [[END:%.*]]
+; CHECK:       end:
 ; CHECK-NEXT:    call void @nanos6_unpacked_constraints__Z3fooiRi(ptr [[LOAD_GEP_]], ptr [[GEP_X_ADDR]], ptr [[CONSTRAINTS]])
 ; CHECK-NEXT:    ret void
 ;
@@ -388,6 +404,8 @@ attributes #3 = { noinline norecurse nounwind "frame-pointer"="none" "min-legal-
 ; CHECK-NEXT:    [[GEP_:%.*]] = getelementptr [[NANOS6_TASK_ARGS__Z3FOOIRI:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
 ; CHECK-NEXT:    [[LOAD_GEP_:%.*]] = load ptr, ptr [[GEP_]], align 8
 ; CHECK-NEXT:    [[GEP_X_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS__Z3FOOIRI]], ptr [[TASK_ARGS]], i32 0, i32 1
+; CHECK-NEXT:    br label [[END:%.*]]
+; CHECK:       end:
 ; CHECK-NEXT:    call void @nanos6_unpacked_priority__Z3fooiRi(ptr [[LOAD_GEP_]], ptr [[GEP_X_ADDR]], ptr [[PRIORITY]])
 ; CHECK-NEXT:    ret void
 ;

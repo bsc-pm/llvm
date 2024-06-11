@@ -31,6 +31,14 @@ def OmpSs : DirectiveLanguage {
 // Definition of OmpSs clauses
 //===----------------------------------------------------------------------===//
 
+def OSSC_Immediate : Clause<"immediate"> {
+  let clangClass = "OSSImmediateClause";
+  let flangClass = "ScalarLogicalExpr";
+}
+def OSSC_Microtask : Clause<"microtask"> {
+  let clangClass = "OSSMicrotaskClause";
+  let flangClass = "ScalarLogicalExpr";
+}
 def OSSC_If : Clause<"if"> {
   let clangClass = "OSSIfClause";
   let flangClass = "ScalarLogicalExpr";

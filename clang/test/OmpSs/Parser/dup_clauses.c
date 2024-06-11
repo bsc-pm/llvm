@@ -18,6 +18,11 @@ void task_label();
 void task_label();
 #pragma oss task shmem(1) shmem(1) // expected-error {{directive '#pragma oss task' cannot contain more than one 'shmem' clause}}
 void task_label();
+// TODO: Once these clauses are allowed reenable this
+// #pragma oss task immediate immediate // {{directive '#pragma oss task' cannot contain more than one 'immediate' clause}}
+// void task_label();
+// #pragma oss task microtask microtask // {{directive '#pragma oss task' cannot contain more than one 'microtask' clause}}
+// void task_label();
 
 void bar() {
   #pragma oss task if(1) if(0) // expected-error {{directive '#pragma oss task' cannot contain more than one 'if' clause}}

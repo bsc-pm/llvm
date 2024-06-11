@@ -111,10 +111,13 @@ static OmpSsDirectiveKind parseOmpSsDirectiveKind(Parser &P) {
 
 static ExprResult *getSingleClause(
     OmpSsClauseKind CKind,
+    ExprResult &ImmediateRes, ExprResult &MicrotaskRes,
     ExprResult &IfRes, ExprResult &FinalRes,
     ExprResult &CostRes, ExprResult &PriorityRes,
     ExprResult &ShmemRes, ExprResult &OnreadyRes) {
 
+    if (CKind == OSSC_immediate) return &ImmediateRes;
+    if (CKind == OSSC_microtask) return &MicrotaskRes;
     if (CKind == OSSC_if) return &IfRes;
     if (CKind == OSSC_final) return &FinalRes;
     if (CKind == OSSC_cost) return &CostRes;
@@ -186,6 +189,7 @@ static OmpSsClauseKind getOmpSsClauseFromDependKinds(ArrayRef<OmpSsDependClauseK
 ///       | weakin-clause | weakout-clause | weakinout-clause
 ///       | weakconcurrent-clause | weakcommutative-clause
 bool Parser::ParseDeclareTaskClauses(
+    ExprResult &ImmediateRes, ExprResult &MicrotaskRes,
     ExprResult &IfRes, ExprResult &FinalRes,
     ExprResult &CostRes, ExprResult &PriorityRes,
     ExprResult &ShmemRes, ExprResult &OnreadyRes, bool &Wait,
@@ -241,6 +245,8 @@ bool Parser::ParseDeclareTaskClauses(
     }
 
     switch (CKind) {
+    case OSSC_immediate:
+    case OSSC_microtask:
     case OSSC_if:
     case OSSC_final:
     case OSSC_cost:
@@ -255,7 +261,8 @@ bool Parser::ParseDeclareTaskClauses(
       }
       SourceLocation RLoc;
       SingleClause = getSingleClause(
-        CKind, IfRes, FinalRes, CostRes, PriorityRes, ShmemRes, OnreadyRes);
+        CKind, ImmediateRes, MicrotaskRes, IfRes, FinalRes,
+        CostRes, PriorityRes, ShmemRes, OnreadyRes);
       *SingleClause = ParseOmpSsParensExpr(getOmpSsClauseName(CKind), RLoc);
 
       if (SingleClause->isInvalid())
@@ -432,6 +439,8 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
 
   OSSFNContextRAII FnContext(*this, Ptr);
 
+  ExprResult ImmediateRes;
+  ExprResult MicrotaskRes;
   ExprResult IfRes;
   ExprResult FinalRes;
   ExprResult CostRes;
@@ -473,7 +482,8 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
   SmallVector<Expr *, 4> Ndranges;
 
   bool IsError =
-      ParseDeclareTaskClauses(IfRes, FinalRes,
+      ParseDeclareTaskClauses(ImmediateRes, MicrotaskRes,
+                              IfRes, FinalRes,
                               CostRes, PriorityRes,
                               ShmemRes, OnreadyRes, Wait,
                               Device, DeviceLoc,
@@ -502,6 +512,7 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
     return Ptr;
   return Actions.OmpSs().ActOnOmpSsDeclareTaskDirective(
       Ptr,
+      ImmediateRes.get(), MicrotaskRes.get(),
       IfRes.get(), FinalRes.get(),
       CostRes.get(), PriorityRes.get(),
       ShmemRes.get(), OnreadyRes.get(), Wait,
@@ -962,6 +973,8 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
   }
 
   switch (CKind) {
+  case OSSC_immediate:
+  case OSSC_microtask:
   case OSSC_if:
   case OSSC_final:
   case OSSC_cost:

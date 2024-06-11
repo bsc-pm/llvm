@@ -84,13 +84,13 @@ attributes #5 = { noreturn nounwind }
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00") ], !dbg [[DBG10:![0-9]+]]
 ; CHECK-NEXT:    invoke void @_Z3barv() #[[ATTR4:[0-9]+]]
-; CHECK-NEXT:    to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG11:![0-9]+]]
+; CHECK-NEXT:            to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG11:![0-9]+]]
 ; CHECK:       invoke.cont:
 ; CHECK-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG11]]
 ; CHECK-NEXT:    ret void, !dbg [[DBG12:![0-9]+]]
 ; CHECK:       terminate.lpad:
 ; CHECK-NEXT:    [[TMP1:%.*]] = landingpad { ptr, i32 }
-; CHECK-NEXT:    catch ptr null, !dbg [[DBG11]]
+; CHECK-NEXT:            catch ptr null, !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = extractvalue { ptr, i32 } [[TMP1]], 0, !dbg [[DBG11]]
 ; CHECK-NEXT:    call void @__clang_call_terminate(ptr [[TMP2]]) #[[ATTR5:[0-9]+]], !dbg [[DBG11]]
 ; CHECK-NEXT:    unreachable, !dbg [[DBG11]]

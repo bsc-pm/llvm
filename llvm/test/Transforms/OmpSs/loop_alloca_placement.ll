@@ -128,6 +128,8 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[NUM_DEPS15:%.*]] = alloca i64, align 8, !dbg [[DBG10]]
 ; CHECK-NEXT:    br label [[FINAL_COND8:%.*]], !dbg [[DBG10]]
 ; CHECK:       codeRepl14:
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP0]]), !dbg [[DBG10]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP1]]), !dbg [[DBG10]]
 ; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS15]], align 8, !dbg [[DBG10]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = load i64, ptr [[NUM_DEPS15]], align 8, !dbg [[DBG10]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = call i32 @compute_lb(), !dbg [[DBG10]]
@@ -144,6 +146,8 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[ARGS_END16:%.*]] = getelementptr i8, ptr [[TMP12]], i64 16, !dbg [[DBG10]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = load ptr, ptr [[TMP1]], align 8, !dbg [[DBG10]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP13]]), !dbg [[DBG10]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP0]]), !dbg [[DBG10]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP1]]), !dbg [[DBG10]]
 ; CHECK-NEXT:    br label [[FOR_END12:%.*]], !dbg [[DBG10]]
 ; CHECK:       final.end7:
 ; CHECK-NEXT:    [[TMP14:%.*]] = load i32, ptr [[RETVAL]], align 4, !dbg [[DBG11:![0-9]+]]
@@ -242,12 +246,14 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[GEP_I:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
 ; CHECK-NEXT:    [[GEP_ARRAY:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN]], ptr [[TASK_ARGS]], i32 0, i32 1
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
-; CHECK-NEXT:    br i1 [[TMP0]], label [[TMP1:%.*]], label [[TMP2:%.*]]
-; CHECK:       1:
-; CHECK-NEXT:    br label [[TMP2]]
-; CHECK:       2:
+; CHECK-NEXT:    br i1 [[TMP0]], label [[TLATE_IF:%.*]], label [[TLATE_END:%.*]]
+; CHECK:       end:
 ; CHECK-NEXT:    call void @nanos6_unpacked_task_region_main(ptr [[GEP_I]], ptr [[GEP_ARRAY]], ptr [[DEVICE_ENV]], ptr [[ADDRESS_TRANSLATION_TABLE]])
 ; CHECK-NEXT:    ret void
+; CHECK:       tlate.if:
+; CHECK-NEXT:    br label [[TLATE_END]]
+; CHECK:       tlate.end:
+; CHECK-NEXT:    br label [[END:%.*]]
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_register_task_info() {
@@ -313,6 +319,8 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[CMP_CLONE:%.*]] = icmp sgt i32 [[TMP29]], 78, !dbg [[DBG40:![0-9]+]]
 ; CHECK-NEXT:    br i1 [[CMP_CLONE]], label [[IF_THEN_CLONE:%.*]], label [[IF_END_CLONE:%.*]], !dbg [[DBG39]]
 ; CHECK:       codeRepl:
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP0]]), !dbg [[DBG37]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP1]]), !dbg [[DBG37]]
 ; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS]], align 8, !dbg [[DBG37]]
 ; CHECK-NEXT:    [[TMP30:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG37]]
 ; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_main, ptr @task_invocation_info_main, ptr null, i64 48, ptr [[TMP0]], ptr [[TMP1]], i64 0, i64 [[TMP30]]), !dbg [[DBG37]]
@@ -324,6 +332,8 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 4 [[GEP_ARRAY]], ptr align 4 [[ARRAY]], i64 40, i1 false), !dbg [[DBG37]]
 ; CHECK-NEXT:    [[TMP32:%.*]] = load ptr, ptr [[TMP1]], align 8, !dbg [[DBG37]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP32]]), !dbg [[DBG37]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP0]]), !dbg [[DBG37]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP1]]), !dbg [[DBG37]]
 ; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG37]]
 ; CHECK:       if.then.clone:
 ; CHECK-NEXT:    br label [[IF_END_CLONE]], !dbg [[DBG41:![0-9]+]]
@@ -349,10 +359,12 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[GEP_I:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN_0:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
-; CHECK-NEXT:    br i1 [[TMP0]], label [[TMP1:%.*]], label [[TMP2:%.*]]
-; CHECK:       1:
-; CHECK-NEXT:    br label [[TMP2]]
-; CHECK:       2:
+; CHECK-NEXT:    br i1 [[TMP0]], label [[TLATE_IF:%.*]], label [[TLATE_END:%.*]]
+; CHECK:       end:
 ; CHECK-NEXT:    call void @nanos6_unpacked_task_region_main.4(ptr [[GEP_I]], ptr [[LOOP_BOUNDS]], ptr [[ADDRESS_TRANSLATION_TABLE]])
 ; CHECK-NEXT:    ret void
+; CHECK:       tlate.if:
+; CHECK-NEXT:    br label [[TLATE_END]]
+; CHECK:       tlate.end:
+; CHECK-NEXT:    br label [[END:%.*]]
 ;

@@ -153,6 +153,10 @@ public:
     OB_oss_device_dev_func = 63,                  // "OB_oss_device_dev_func"
     OB_oss_device_call_order = 64,                // "OB_oss_device_call_order"
     OB_oss_device_shmem = 65,                     // "OB_oss_device_shmem"
+    OB_oss_coro_handle = 66,                      // "OB_oss_coro_handle"
+    OB_oss_coro_size_store = 67,                  // "OB_oss_coro_size_store"
+    OB_oss_immediate = 68,                        // "OB_oss_immediate"
+    OB_oss_microtask = 69,                        // "OB_oss_microtask"
   };
 
   /// getMDKindID - Return a unique non-zero ID for the specified metadata kind.

@@ -63,31 +63,31 @@ attributes #1 = { nounwind }
 !14 = !DILocation(line: 4, column: 5, scope: !10)
 !15 = !DILocation(line: 5, column: 1, scope: !10)
 ;.
-; CHECK: @[[NANOS6_VERSIONS:[a-zA-Z0-9_$"\\.-]+]] = internal constant [3 x i64] [i64 0, i64 1, i64 0]
+; CHECK: @nanos6_versions = internal constant [3 x i64] [i64 0, i64 1, i64 0]
 ; CHECK: @[[GLOB0:[0-9]+]] = private unnamed_addr constant [16 x i8] c"task_devices.ll\00", align 1
 ; CHECK: @[[GLOB1:[0-9]+]] = private unnamed_addr constant [20 x i8] c"task_devices.ll:4:5\00", align 1
 ; CHECK: @[[GLOB2:[0-9]+]] = private unnamed_addr constant [8 x i8] c"foo:1:9\00", align 1
 ; CHECK: @[[GLOB3:[0-9]+]] = private unnamed_addr constant [4 x i8] c"foo\00", align 1
-; CHECK: @[[SIZEOF_TABLE_VAR_MAIN:[a-zA-Z0-9_$"\\.-]+]] = internal constant [3 x i32] [i32 1, i32 2, i32 4], align 64
-; CHECK: @[[OFFSET_TABLE_VAR_MAIN:[a-zA-Z0-9_$"\\.-]+]] = internal constant [3 x i32] [i32 56, i32 58, i32 60]
-; CHECK: @[[ARG_IDX_TABLE_VAR_MAIN:[a-zA-Z0-9_$"\\.-]+]] = internal constant [0 x i32] zeroinitializer
-; CHECK: @[[TASK_INVOCATION_INFO_MAIN:[a-zA-Z0-9_$"\\.-]+]] = internal constant [[NANOS6_TASK_INVOCATION_INFO_T:%.*]] { ptr @[[GLOB1]] }, align 64
-; CHECK: @[[IMPLEMENTATIONS_VAR_MAIN:[a-zA-Z0-9_$"\\.-]+]] = internal constant [1 x %nanos6_task_implementation_info_t] [[[NANOS6_TASK_IMPLEMENTATION_INFO_T:%.*]] { i32 1, ptr @nanos6_ol_task_region_main, ptr null, ptr null, ptr @[[GLOB2]], ptr @[[GLOB3]] }], align 64
-; CHECK: @[[NANOS6_REDUCTION_INITIALIZERS_MAIN:[a-zA-Z0-9_$"\\.-]+]] = internal constant [0 x ptr] zeroinitializer, align 64
-; CHECK: @[[NANOS6_REDUCTION_COMBINERS_MAIN:[a-zA-Z0-9_$"\\.-]+]] = internal constant [0 x ptr] zeroinitializer
-; CHECK: @[[TASK_INFO_VAR_MAIN:[a-zA-Z0-9_$"\\.-]+]] = internal global [[NANOS6_TASK_INFO_T:%.*]] { i32 0, ptr null, ptr null, ptr null, i32 1, ptr @implementations_var_main, ptr null, ptr null, ptr @nanos6_reduction_initializers_main, ptr @nanos6_reduction_combiners_main, ptr null, ptr null, i32 3, ptr @sizeof_table_var_main, ptr @offset_table_var_main, ptr @arg_idx_table_var_main }, align 64
-; CHECK: @[[LLVM_GLOBAL_CTORS:[a-zA-Z0-9_$"\\.-]+]] = appending global [2 x { i32, ptr, ptr }] [{ i32, ptr, ptr } { i32 65535, ptr @nanos6_constructor_check_version, ptr null }, { i32, ptr, ptr } { i32 65535, ptr @nanos6_constructor_register_task_info, ptr null }]
+; CHECK: @sizeof_table_var_main = internal constant [3 x i32] [i32 1, i32 2, i32 4], align 64
+; CHECK: @offset_table_var_main = internal constant [3 x i32] [i32 56, i32 58, i32 60]
+; CHECK: @arg_idx_table_var_main = internal constant [0 x i32] zeroinitializer
+; CHECK: @task_invocation_info_main = internal constant %nanos6_task_invocation_info_t { ptr @[[GLOB1]] }, align 64
+; CHECK: @implementations_var_main = internal constant [1 x %nanos6_task_implementation_info_t] [%nanos6_task_implementation_info_t { i32 1, ptr @nanos6_ol_task_region_main, ptr null, ptr null, ptr @[[GLOB2]], ptr @[[GLOB3]] }], align 64
+; CHECK: @nanos6_reduction_initializers_main = internal constant [0 x ptr] zeroinitializer, align 64
+; CHECK: @nanos6_reduction_combiners_main = internal constant [0 x ptr] zeroinitializer
+; CHECK: @task_info_var_main = internal global %nanos6_task_info_t { i32 0, ptr null, ptr null, ptr null, i32 1, ptr @implementations_var_main, ptr null, ptr null, ptr @nanos6_reduction_initializers_main, ptr @nanos6_reduction_combiners_main, ptr null, ptr null, i32 3, ptr @sizeof_table_var_main, ptr @offset_table_var_main, ptr @arg_idx_table_var_main, i32 -1 }, align 64
+; CHECK: @llvm.global_ctors = appending global [2 x { i32, ptr, ptr }] [{ i32, ptr, ptr } { i32 65535, ptr @nanos6_constructor_check_version, ptr null }, { i32, ptr, ptr } { i32 65535, ptr @nanos6_constructor_register_task_info, ptr null }]
 ; CHECK: @[[GLOB4:[0-9]+]] = private unnamed_addr constant [20 x i8] c"task_devices.ll:4:5\00", align 1
 ; CHECK: @[[GLOB5:[0-9]+]] = private unnamed_addr constant [8 x i8] c"foo:1:9\00", align 1
 ; CHECK: @[[GLOB6:[0-9]+]] = private unnamed_addr constant [4 x i8] c"foo\00", align 1
-; CHECK: @[[SIZEOF_TABLE_VAR_MAIN_1:[a-zA-Z0-9_$"\\.-]+]] = internal constant [3 x i32] [i32 1, i32 2, i32 4], align 64
-; CHECK: @[[OFFSET_TABLE_VAR_MAIN_2:[a-zA-Z0-9_$"\\.-]+]] = internal constant [3 x i32] [i32 56, i32 58, i32 60]
-; CHECK: @[[ARG_IDX_TABLE_VAR_MAIN_3:[a-zA-Z0-9_$"\\.-]+]] = internal constant [0 x i32] zeroinitializer
-; CHECK: @[[TASK_INVOCATION_INFO_MAIN_6:[a-zA-Z0-9_$"\\.-]+]] = internal constant [[NANOS6_TASK_INVOCATION_INFO_T:%.*]] { ptr @[[GLOB4]] }, align 64
-; CHECK: @[[IMPLEMENTATIONS_VAR_MAIN_7:[a-zA-Z0-9_$"\\.-]+]] = internal constant [1 x %nanos6_task_implementation_info_t] [[[NANOS6_TASK_IMPLEMENTATION_INFO_T:%.*]] { i32 1, ptr @nanos6_ol_task_region_main.5, ptr null, ptr null, ptr @[[GLOB5]], ptr @[[GLOB6]] }], align 64
-; CHECK: @[[NANOS6_REDUCTION_INITIALIZERS_MAIN_8:[a-zA-Z0-9_$"\\.-]+]] = internal constant [0 x ptr] zeroinitializer, align 64
-; CHECK: @[[NANOS6_REDUCTION_COMBINERS_MAIN_9:[a-zA-Z0-9_$"\\.-]+]] = internal constant [0 x ptr] zeroinitializer
-; CHECK: @[[TASK_INFO_VAR_MAIN_10:[a-zA-Z0-9_$"\\.-]+]] = internal global [[NANOS6_TASK_INFO_T:%.*]] { i32 0, ptr null, ptr null, ptr null, i32 1, ptr @implementations_var_main.7, ptr null, ptr null, ptr @nanos6_reduction_initializers_main.8, ptr @nanos6_reduction_combiners_main.9, ptr null, ptr null, i32 3, ptr @sizeof_table_var_main.1, ptr @offset_table_var_main.2, ptr @arg_idx_table_var_main.3 }, align 64
+; CHECK: @sizeof_table_var_main.1 = internal constant [3 x i32] [i32 1, i32 2, i32 4], align 64
+; CHECK: @offset_table_var_main.2 = internal constant [3 x i32] [i32 56, i32 58, i32 60]
+; CHECK: @arg_idx_table_var_main.3 = internal constant [0 x i32] zeroinitializer
+; CHECK: @task_invocation_info_main.6 = internal constant %nanos6_task_invocation_info_t { ptr @[[GLOB4]] }, align 64
+; CHECK: @implementations_var_main.7 = internal constant [1 x %nanos6_task_implementation_info_t] [%nanos6_task_implementation_info_t { i32 1, ptr @nanos6_ol_task_region_main.5, ptr null, ptr null, ptr @[[GLOB5]], ptr @[[GLOB6]] }], align 64
+; CHECK: @nanos6_reduction_initializers_main.8 = internal constant [0 x ptr] zeroinitializer, align 64
+; CHECK: @nanos6_reduction_combiners_main.9 = internal constant [0 x ptr] zeroinitializer
+; CHECK: @task_info_var_main.10 = internal global %nanos6_task_info_t { i32 0, ptr null, ptr null, ptr null, i32 1, ptr @implementations_var_main.7, ptr null, ptr null, ptr @nanos6_reduction_initializers_main.8, ptr @nanos6_reduction_combiners_main.9, ptr null, ptr null, i32 3, ptr @sizeof_table_var_main.1, ptr @offset_table_var_main.2, ptr @arg_idx_table_var_main.3, i32 -1 }, align 64
 ;.
 ; CHECK-LABEL: define {{[^@]+}}@foo
 ; CHECK-SAME: (i8 noundef signext [[A:%.*]], i16 noundef signext [[S:%.*]], i32 noundef [[I:%.*]]) #[[ATTR0:[0-9]+]] !dbg [[DBG5:![0-9]+]] {
@@ -118,6 +118,8 @@ attributes #1 = { nounwind }
 ; CHECK-NEXT:    [[NUM_DEPS5:%.*]] = alloca i64, align 8, !dbg [[DBG14]]
 ; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg [[DBG14]]
 ; CHECK:       codeRepl4:
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP2]]), !dbg [[DBG14]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP3]]), !dbg [[DBG14]]
 ; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS5]], align 8, !dbg [[DBG14]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = load i64, ptr [[NUM_DEPS5]], align 8, !dbg [[DBG14]]
 ; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_main.10, ptr @task_invocation_info_main.6, ptr null, i64 64, ptr [[TMP2]], ptr [[TMP3]], i64 0, i64 [[TMP4]]), !dbg [[DBG14]]
@@ -145,10 +147,14 @@ attributes #1 = { nounwind }
 ; CHECK-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 4 [[GEP_CALL_ARG216]], ptr align 4 [[CALL_ARG2]], i64 4, i1 false), !dbg [[DBG14]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = load ptr, ptr [[TMP3]], align 8, !dbg [[DBG14]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP6]]), !dbg [[DBG14]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP2]]), !dbg [[DBG14]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP3]]), !dbg [[DBG14]]
 ; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG14]]
 ; CHECK:       final.end:
 ; CHECK-NEXT:    ret i32 0, !dbg [[DBG15:![0-9]+]]
 ; CHECK:       codeRepl:
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP0]]), !dbg [[DBG14]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP1]]), !dbg [[DBG14]]
 ; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS]], align 8, !dbg [[DBG14]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG14]]
 ; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_main, ptr @task_invocation_info_main, ptr null, i64 64, ptr [[TMP0]], ptr [[TMP1]], i64 2, i64 [[TMP7]]), !dbg [[DBG14]]
@@ -176,6 +182,8 @@ attributes #1 = { nounwind }
 ; CHECK-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 4 [[GEP_CALL_ARG2]], ptr align 4 [[CALL_ARG2]], i64 4, i1 false), !dbg [[DBG14]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = load ptr, ptr [[TMP1]], align 8, !dbg [[DBG14]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP9]]), !dbg [[DBG14]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP0]]), !dbg [[DBG14]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP1]]), !dbg [[DBG14]]
 ; CHECK-NEXT:    br label [[FINAL_END]], !dbg [[DBG14]]
 ; CHECK:       final.cond:
 ; CHECK-NEXT:    [[TMP10:%.*]] = call i32 @nanos6_in_final(), !dbg [[DBG14]]
@@ -206,12 +214,14 @@ attributes #1 = { nounwind }
 ; CHECK-NEXT:    [[GEP_CALL_ARG1:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN]], ptr [[TASK_ARGS]], i32 0, i32 8
 ; CHECK-NEXT:    [[GEP_CALL_ARG2:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN]], ptr [[TASK_ARGS]], i32 0, i32 9
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
-; CHECK-NEXT:    br i1 [[TMP0]], label [[TMP1:%.*]], label [[TMP2:%.*]]
-; CHECK:       1:
-; CHECK-NEXT:    br label [[TMP2]]
-; CHECK:       2:
+; CHECK-NEXT:    br i1 [[TMP0]], label [[TLATE_IF:%.*]], label [[TLATE_END:%.*]]
+; CHECK:       end:
 ; CHECK-NEXT:    call void @nanos6_unpacked_task_region_main(ptr [[GEP_CALL_ARG]], ptr [[GEP_CALL_ARG1]], ptr [[GEP_CALL_ARG2]], ptr [[DEVICE_ENV]], ptr [[ADDRESS_TRANSLATION_TABLE]])
 ; CHECK-NEXT:    ret void
+; CHECK:       tlate.if:
+; CHECK-NEXT:    br label [[TLATE_END]]
+; CHECK:       tlate.end:
+; CHECK-NEXT:    br label [[END:%.*]]
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_register_task_info() {
@@ -238,38 +248,41 @@ attributes #1 = { nounwind }
 ; CHECK-NEXT:    [[GEP_CALL_ARG1:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN_0]], ptr [[TASK_ARGS]], i32 0, i32 8
 ; CHECK-NEXT:    [[GEP_CALL_ARG2:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN_0]], ptr [[TASK_ARGS]], i32 0, i32 9
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
-; CHECK-NEXT:    br i1 [[TMP0]], label [[TMP1:%.*]], label [[TMP2:%.*]]
-; CHECK:       1:
-; CHECK-NEXT:    br label [[TMP2]]
-; CHECK:       2:
+; CHECK-NEXT:    br i1 [[TMP0]], label [[TLATE_IF:%.*]], label [[TLATE_END:%.*]]
+; CHECK:       end:
 ; CHECK-NEXT:    call void @nanos6_unpacked_task_region_main.4(ptr [[GEP_CALL_ARG]], ptr [[GEP_CALL_ARG1]], ptr [[GEP_CALL_ARG2]], ptr [[DEVICE_ENV]], ptr [[ADDRESS_TRANSLATION_TABLE]])
 ; CHECK-NEXT:    ret void
+; CHECK:       tlate.if:
+; CHECK-NEXT:    br label [[TLATE_END]]
+; CHECK:       tlate.end:
+; CHECK-NEXT:    br label [[END:%.*]]
 ;
 ;.
 ; CHECK: attributes #[[ATTR0]] = { noinline nounwind optnone "frame-pointer"="none" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 ; CHECK: attributes #[[ATTR1:[0-9]+]] = { nounwind }
-; CHECK: attributes #[[ATTR2:[0-9]+]] = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
+; CHECK: attributes #[[ATTR2:[0-9]+]] = { nocallback nofree nosync nounwind willreturn memory(argmem: readwrite) }
+; CHECK: attributes #[[ATTR3:[0-9]+]] = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 ;.
-; CHECK: [[META0:![0-9]+]] = distinct !DICompileUnit(language: DW_LANG_C99, file: !1, isOptimized: false, runtimeVersion: 0, emissionKind: NoDebug, splitDebugInlining: false, nameTableKind: None)
-; CHECK: [[META1:![0-9]+]] = !DIFile(filename: "<stdin>", directory: "")
+; CHECK: [[META0:![0-9]+]] = distinct !DICompileUnit(language: DW_LANG_C99, file: [[META1:![0-9]+]], isOptimized: false, runtimeVersion: 0, emissionKind: NoDebug, splitDebugInlining: false, nameTableKind: None)
+; CHECK: [[META1]] = !DIFile(filename: "<stdin>", directory: "")
 ; CHECK: [[META2:![0-9]+]] = !{i32 2, !"Debug Info Version", i32 3}
 ; CHECK: [[META3:![0-9]+]] = !{i32 1, !"wchar_size", i32 4}
 ; CHECK: [[META4:![0-9]+]] = !{!""}
-; CHECK: [[DBG5]] = distinct !DISubprogram(name: "foo", scope: !6, file: !6, line: 2, type: !7, scopeLine: 2, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0, retainedNodes: !8)
-; CHECK: [[META6:![0-9]+]] = !DIFile(filename: "task_device.ll", directory: "")
-; CHECK: [[META7:![0-9]+]] = !DISubroutineType(types: !8)
-; CHECK: [[META8:![0-9]+]] = !{}
-; CHECK: [[DBG9]] = !DILocation(line: 2, column: 35, scope: !5)
-; CHECK: [[DBG10]] = distinct !DISubprogram(name: "main", scope: !6, file: !6, line: 3, type: !7, scopeLine: 3, spFlags: DISPFlagDefinition, unit: !0, retainedNodes: !8)
-; CHECK: [[DBG11]] = !DILocation(line: 4, column: 9, scope: !10)
-; CHECK: [[DBG12]] = !DILocation(line: 4, column: 12, scope: !10)
-; CHECK: [[DBG13]] = !DILocation(line: 4, column: 15, scope: !10)
-; CHECK: [[DBG14]] = !DILocation(line: 4, column: 5, scope: !10)
-; CHECK: [[DBG15]] = !DILocation(line: 5, column: 1, scope: !10)
-; CHECK: [[DBG16]] = distinct !DISubprogram(name: "nanos6_unpacked_task_region_main", linkageName: "nanos6_unpacked_task_region_main", scope: null, file: !6, type: !7, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition | DISPFlagOptimized, unit: !0)
-; CHECK: [[DBG17]] = !DILocation(line: 4, column: 5, scope: !16)
-; CHECK: [[DBG18]] = !DILocation(line: 5, column: 1, scope: !16)
-; CHECK: [[DBG19]] = distinct !DISubprogram(name: "nanos6_unpacked_task_region_main.4", linkageName: "nanos6_unpacked_task_region_main.4", scope: null, file: !6, type: !7, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition | DISPFlagOptimized, unit: !0)
-; CHECK: [[DBG20]] = !DILocation(line: 4, column: 5, scope: !19)
-; CHECK: [[DBG21]] = !DILocation(line: 5, column: 1, scope: !19)
+; CHECK: [[DBG5]] = distinct !DISubprogram(name: "foo", scope: [[META6:![0-9]+]], file: [[META6]], line: 2, type: [[META7:![0-9]+]], scopeLine: 2, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: [[META0]], retainedNodes: [[META8:![0-9]+]])
+; CHECK: [[META6]] = !DIFile(filename: "task_device.ll", directory: "")
+; CHECK: [[META7]] = !DISubroutineType(types: [[META8]])
+; CHECK: [[META8]] = !{}
+; CHECK: [[DBG9]] = !DILocation(line: 2, column: 35, scope: [[DBG5]])
+; CHECK: [[DBG10]] = distinct !DISubprogram(name: "main", scope: [[META6]], file: [[META6]], line: 3, type: [[META7]], scopeLine: 3, spFlags: DISPFlagDefinition, unit: [[META0]], retainedNodes: [[META8]])
+; CHECK: [[DBG11]] = !DILocation(line: 4, column: 9, scope: [[DBG10]])
+; CHECK: [[DBG12]] = !DILocation(line: 4, column: 12, scope: [[DBG10]])
+; CHECK: [[DBG13]] = !DILocation(line: 4, column: 15, scope: [[DBG10]])
+; CHECK: [[DBG14]] = !DILocation(line: 4, column: 5, scope: [[DBG10]])
+; CHECK: [[DBG15]] = !DILocation(line: 5, column: 1, scope: [[DBG10]])
+; CHECK: [[DBG16]] = distinct !DISubprogram(name: "nanos6_unpacked_task_region_main", linkageName: "nanos6_unpacked_task_region_main", scope: null, file: [[META6]], type: [[META7]], spFlags: DISPFlagLocalToUnit | DISPFlagDefinition | DISPFlagOptimized, unit: [[META0]])
+; CHECK: [[DBG17]] = !DILocation(line: 4, column: 5, scope: [[DBG16]])
+; CHECK: [[DBG18]] = !DILocation(line: 5, column: 1, scope: [[DBG16]])
+; CHECK: [[DBG19]] = distinct !DISubprogram(name: "nanos6_unpacked_task_region_main.4", linkageName: "nanos6_unpacked_task_region_main.4", scope: null, file: [[META6]], type: [[META7]], spFlags: DISPFlagLocalToUnit | DISPFlagDefinition | DISPFlagOptimized, unit: [[META0]])
+; CHECK: [[DBG20]] = !DILocation(line: 4, column: 5, scope: [[DBG19]])
+; CHECK: [[DBG21]] = !DILocation(line: 5, column: 1, scope: [[DBG19]])
 ;.

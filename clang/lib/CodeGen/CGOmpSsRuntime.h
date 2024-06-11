@@ -108,6 +108,8 @@ struct OSSTaskDataTy final {
   OSSTaskDepDataTy Deps;
   OSSTaskReductionDataTy Reductions;
   OSSTaskDeviceDataTy Devices;
+  const Expr *Immediate = nullptr;
+  const Expr *Microtask = nullptr;
   const Expr *If = nullptr;
   const Expr *Final = nullptr;
   const Expr *Cost = nullptr;

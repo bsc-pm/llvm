@@ -94,6 +94,8 @@ attributes #3 = { "frame-pointer"="none" "no-trapping-math"="true" "stack-protec
 ; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG10]]
 ; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg [[DBG10]]
 ; CHECK:       codeRepl:
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP0]]), !dbg [[DBG10]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP1]]), !dbg [[DBG10]]
 ; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS]], align 8, !dbg [[DBG10]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG10]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = call i32 @compute_lb(), !dbg [[DBG10]]
@@ -111,9 +113,11 @@ attributes #3 = { "frame-pointer"="none" "no-trapping-math"="true" "stack-protec
 ; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP13]], i64 16, !dbg [[DBG10]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = load ptr, ptr [[TMP1]], align 8, !dbg [[DBG10]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP14]]), !dbg [[DBG10]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP0]]), !dbg [[DBG10]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP1]]), !dbg [[DBG10]]
 ; CHECK-NEXT:    br label [[FOR_END3:%.*]], !dbg [[DBG10]]
 ; CHECK:       final.end:
-; CHECK-NEXT:    call void @nanos6_taskwait(ptr @[[GLOB1:[0-9]+]]), !dbg [[DBG11:![0-9]+]]
+; CHECK-NEXT:    call void @nanos6_taskwait(ptr @[[GLOB2:[0-9]+]]), !dbg [[DBG11:![0-9]+]]
 ; CHECK-NEXT:    ret i32 0, !dbg [[DBG12:![0-9]+]]
 ; CHECK:       final.then:
 ; CHECK-NEXT:    [[TMP15:%.*]] = call i32 @compute_lb(), !dbg [[DBG10]]
@@ -162,6 +166,12 @@ attributes #3 = { "frame-pointer"="none" "no-trapping-math"="true" "stack-protec
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[CALL:%.*]] = call signext i16 (...) @step(), !dbg [[DBG20:![0-9]+]]
 ; CHECK-NEXT:    ret i16 [[CALL]], !dbg [[DBG20]]
+;
+;
+; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_check_version() {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    call void @nanos6_check_version(i64 1, ptr @nanos6_versions, ptr @[[GLOB0:[0-9]+]])
+; CHECK-NEXT:    ret void
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_main
@@ -221,12 +231,14 @@ attributes #3 = { "frame-pointer"="none" "no-trapping-math"="true" "stack-protec
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[GEP_I:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
-; CHECK-NEXT:    br i1 [[TMP0]], label [[TMP1:%.*]], label [[TMP2:%.*]]
-; CHECK:       1:
-; CHECK-NEXT:    br label [[TMP2]]
-; CHECK:       2:
+; CHECK-NEXT:    br i1 [[TMP0]], label [[TLATE_IF:%.*]], label [[TLATE_END:%.*]]
+; CHECK:       end:
 ; CHECK-NEXT:    call void @nanos6_unpacked_task_region_main(ptr [[GEP_I]], ptr [[LOOP_BOUNDS]], ptr [[ADDRESS_TRANSLATION_TABLE]])
 ; CHECK-NEXT:    ret void
+; CHECK:       tlate.if:
+; CHECK-NEXT:    br label [[TLATE_END]]
+; CHECK:       tlate.end:
+; CHECK-NEXT:    br label [[END:%.*]]
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_register_task_info() {

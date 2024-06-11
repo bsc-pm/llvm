@@ -485,6 +485,30 @@ void DirectiveEnvironment::gatherDeclSource(OperandBundleDef &OB) {
   DeclSourceStringRef = DeclSourceDataArray->getAsCString();
 }
 
+void DirectiveEnvironment::gatherCoroHandle(OperandBundleDef &OB) {
+  assert(!CoroInfo.Handle && "Only allowed one OperandBundle with this Id");
+  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  CoroInfo.Handle = OB.inputs()[0];
+}
+
+void DirectiveEnvironment::gatherCoroSizeStore(OperandBundleDef &OB) {
+  assert(!CoroInfo.SizeStore && "Only allowed one OperandBundle with this Id");
+  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  CoroInfo.SizeStore = OB.inputs()[0];
+}
+
+void DirectiveEnvironment::gatherImmediateInfo(OperandBundleDef &OB) {
+  assert(!Immediate && "Only allowed one OperandBundle with this Id");
+  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  Immediate = OB.inputs()[0];
+}
+
+void DirectiveEnvironment::gatherMicrotaskInfo(OperandBundleDef &OB) {
+  assert(!Microtask && "Only allowed one OperandBundle with this Id");
+  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  Microtask = OB.inputs()[0];
+}
+
 void DirectiveEnvironment::verifyVLADimsInfo() {
   for (const auto &VLAWithDimsMap : VLADimsInfo) {
     if (!valueInDSABundles(VLAWithDimsMap.first))
@@ -648,6 +672,16 @@ void DirectiveEnvironment::verifyLabelInfo() {
     llvm_unreachable("Expected a constant as a label");
 }
 
+void DirectiveEnvironment::verifyCoroInfo() {
+  if (!CoroInfo.empty()) {
+    if (!CoroInfo.Handle)
+      llvm_unreachable("Missing coroutine handle");
+    if (!CoroInfo.SizeStore)
+      llvm_unreachable("Missing coroutine handle");
+    // TODO: check coro handle is firstprivate
+  }
+}
+
 void DirectiveEnvironment::verify() {
   verifyVLADimsInfo();
 
@@ -664,6 +698,8 @@ void DirectiveEnvironment::verify() {
   verifyLoopInfo();
   verifyWhileInfo();
   verifyMultiDependInfo();
+  verifyLabelInfo();
+  verifyCoroInfo();
 }
 
 DirectiveEnvironment::DirectiveEnvironment(const Instruction *I) {
@@ -800,6 +836,18 @@ DirectiveEnvironment::DirectiveEnvironment(const Instruction *I) {
       break;
     case LLVMContext::OB_oss_decl_source:
       gatherDeclSource(OBDef);
+      break;
+    case LLVMContext::OB_oss_coro_handle:
+      gatherCoroHandle(OBDef);
+      break;
+    case LLVMContext::OB_oss_coro_size_store:
+      gatherCoroSizeStore(OBDef);
+      break;
+    case LLVMContext::OB_oss_immediate:
+      gatherImmediateInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_microtask:
+      gatherMicrotaskInfo(OBDef);
       break;
     default:
       llvm_unreachable("unknown ompss-2 bundle id");

@@ -18,6 +18,7 @@ void f(int n) {
   __builtin_coro_noop();
 
   // CHECK-NEXT: %[[SIZE:.+]] = call i64 @llvm.coro.size.i64()
+  // CHECK-NEXT: call i64 @llvm.coro.size.storage.i64.i64(i64 %[[SIZE]]
   // CHECK-NEXT: %[[MEM:.+]] = call ptr @myAlloc(i64 noundef %[[SIZE]])
   // CHECK-NEXT: %[[FRAME:.+]] = call ptr @llvm.coro.begin(token %[[COROID]], ptr %[[MEM]])
   __builtin_coro_begin(myAlloc(__builtin_coro_size()));

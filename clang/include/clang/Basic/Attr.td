@@ -4246,6 +4246,7 @@ def OSSTaskDecl : Attr {
   // let HasCustomParsing = 1;
   let Documentation = [Undocumented];
   let Args = [
+    ExprArgument<"ImmediateExpr">, ExprArgument<"MicrotaskExpr">,
     ExprArgument<"IfExpr">, ExprArgument<"FinalExpr">,
     ExprArgument<"CostExpr">, ExprArgument<"PriorityExpr">,
     ExprArgument<"ShmemExpr">,

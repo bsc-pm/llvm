@@ -134,6 +134,9 @@ void OSSStructureChecker::Enter(const parser::OSSClause &x) {
   SetContextClause(x);
 }
 
+CHECK_SIMPLE_CLAUSE(Immediate, OSSC_immediate)
+
+CHECK_SIMPLE_CLAUSE(Microtask, OSSC_microtask)
 
 CHECK_SIMPLE_CLAUSE(If, OSSC_if)
 

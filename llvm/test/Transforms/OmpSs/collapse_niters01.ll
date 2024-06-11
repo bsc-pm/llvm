@@ -339,6 +339,8 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[NUM_DEPS61:%.*]] = alloca i64, align 8, !dbg [[DBG14]]
 ; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg [[DBG11]]
 ; CHECK:       codeRepl:
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP0]]), !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP1]]), !dbg [[DBG11]]
 ; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS]], align 8, !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG11]]
 ; CHECK-NEXT:    call fastcc void @compute_lb(), !dbg [[DBG11]]
@@ -360,6 +362,8 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP16]], i64 16, !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP17:%.*]] = load ptr, ptr [[TMP1]], align 8, !dbg [[DBG11]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP17]]), !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP0]]), !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP1]]), !dbg [[DBG11]]
 ; CHECK-NEXT:    br label [[FOR_END7:%.*]], !dbg [[DBG11]]
 ; CHECK:       final.end:
 ; CHECK-NEXT:    store i32 0, ptr [[I1]], align 4, !dbg [[DBG15:![0-9]+]]
@@ -367,6 +371,8 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    store i32 [[TMP18]], ptr [[J2]], align 4, !dbg [[DBG17:![0-9]+]]
 ; CHECK-NEXT:    br label [[FINAL_COND18:%.*]], !dbg [[DBG12]]
 ; CHECK:       codeRepl24:
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP2]]), !dbg [[DBG12]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP3]]), !dbg [[DBG12]]
 ; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS25]], align 8, !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP19:%.*]] = load i64, ptr [[NUM_DEPS25]], align 8, !dbg [[DBG12]]
 ; CHECK-NEXT:    call fastcc void @compute_lb.4(), !dbg [[DBG12]]
@@ -388,12 +394,16 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[ARGS_END26:%.*]] = getelementptr i8, ptr [[TMP27]], i64 16, !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP28:%.*]] = load ptr, ptr [[TMP3]], align 8, !dbg [[DBG12]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP28]]), !dbg [[DBG12]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP2]]), !dbg [[DBG12]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP3]]), !dbg [[DBG12]]
 ; CHECK-NEXT:    br label [[FOR_END22:%.*]], !dbg [[DBG12]]
 ; CHECK:       final.end17:
 ; CHECK-NEXT:    store i32 0, ptr [[I3]], align 4, !dbg [[DBG18:![0-9]+]]
 ; CHECK-NEXT:    store i32 0, ptr [[J4]], align 4, !dbg [[DBG19:![0-9]+]]
 ; CHECK-NEXT:    br label [[FINAL_COND36:%.*]], !dbg [[DBG13]]
 ; CHECK:       codeRepl42:
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP4]]), !dbg [[DBG13]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP5]]), !dbg [[DBG13]]
 ; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS43]], align 8, !dbg [[DBG13]]
 ; CHECK-NEXT:    [[TMP29:%.*]] = load i64, ptr [[NUM_DEPS43]], align 8, !dbg [[DBG13]]
 ; CHECK-NEXT:    call fastcc void @compute_lb.10(), !dbg [[DBG13]]
@@ -415,6 +425,8 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[ARGS_END44:%.*]] = getelementptr i8, ptr [[TMP37]], i64 16, !dbg [[DBG13]]
 ; CHECK-NEXT:    [[TMP38:%.*]] = load ptr, ptr [[TMP5]], align 8, !dbg [[DBG13]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP38]]), !dbg [[DBG13]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP4]]), !dbg [[DBG13]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP5]]), !dbg [[DBG13]]
 ; CHECK-NEXT:    br label [[FOR_END40:%.*]], !dbg [[DBG13]]
 ; CHECK:       final.end35:
 ; CHECK-NEXT:    store i32 0, ptr [[I5]], align 4, !dbg [[DBG20:![0-9]+]]
@@ -422,6 +434,8 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    store i32 [[TMP39]], ptr [[J6]], align 4, !dbg [[DBG22:![0-9]+]]
 ; CHECK-NEXT:    br label [[FINAL_COND54:%.*]], !dbg [[DBG14]]
 ; CHECK:       codeRepl60:
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP6]]), !dbg [[DBG14]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP7]]), !dbg [[DBG14]]
 ; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS61]], align 8, !dbg [[DBG14]]
 ; CHECK-NEXT:    [[TMP40:%.*]] = load i64, ptr [[NUM_DEPS61]], align 8, !dbg [[DBG14]]
 ; CHECK-NEXT:    call fastcc void @compute_lb.16(), !dbg [[DBG14]]
@@ -443,6 +457,8 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    [[ARGS_END62:%.*]] = getelementptr i8, ptr [[TMP48]], i64 16, !dbg [[DBG14]]
 ; CHECK-NEXT:    [[TMP49:%.*]] = load ptr, ptr [[TMP7]], align 8, !dbg [[DBG14]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP49]]), !dbg [[DBG14]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP6]]), !dbg [[DBG14]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP7]]), !dbg [[DBG14]]
 ; CHECK-NEXT:    br label [[FOR_END58:%.*]], !dbg [[DBG14]]
 ; CHECK:       final.end53:
 ; CHECK-NEXT:    call void @nanos6_taskwait(ptr @[[GLOB5:[0-9]+]]), !dbg [[DBG23:![0-9]+]]

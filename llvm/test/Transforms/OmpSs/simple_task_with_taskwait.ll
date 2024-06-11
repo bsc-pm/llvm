@@ -73,6 +73,8 @@ declare i1 @llvm.directive.marker()
 ; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG6]]
 ; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg [[DBG6]]
 ; CHECK:       codeRepl:
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP3]]), !dbg [[DBG6]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP4]]), !dbg [[DBG6]]
 ; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS]], align 8, !dbg [[DBG6]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG6]]
 ; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_foo, ptr @task_invocation_info_foo, ptr null, i64 16, ptr [[TMP3]], ptr [[TMP4]], i64 0, i64 [[TMP5]]), !dbg [[DBG6]]
@@ -84,9 +86,11 @@ declare i1 @llvm.directive.marker()
 ; CHECK-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 4 [[GEP_Y_ADDR]], ptr align 4 [[Y_ADDR]], i64 4, i1 false), !dbg [[DBG6]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = load ptr, ptr [[TMP4]], align 8, !dbg [[DBG6]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP7]]), !dbg [[DBG6]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP3]]), !dbg [[DBG6]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP4]]), !dbg [[DBG6]]
 ; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG6]]
 ; CHECK:       final.end:
-; CHECK-NEXT:    call void @nanos6_taskwait(ptr @[[GLOB1:[0-9]+]]), !dbg [[DBG6]]
+; CHECK-NEXT:    call void @nanos6_taskwait(ptr @[[GLOB2:[0-9]+]]), !dbg [[DBG6]]
 ; CHECK-NEXT:    ret void
 ; CHECK:       final.then:
 ; CHECK-NEXT:    [[TMP8:%.*]] = load i32, ptr [[X_ADDR]], align 4
@@ -103,6 +107,12 @@ declare i1 @llvm.directive.marker()
 ; CHECK-NEXT:    [[TMP11:%.*]] = call i32 @nanos6_in_final(), !dbg [[DBG6]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp ne i32 [[TMP11]], 0, !dbg [[DBG6]]
 ; CHECK-NEXT:    br i1 [[TMP12]], label [[FINAL_THEN:%.*]], label [[CODEREPL:%.*]], !dbg [[DBG6]]
+;
+;
+; CHECK-LABEL: @nanos6_constructor_check_version(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    call void @nanos6_check_version(i64 1, ptr @nanos6_versions, ptr @[[GLOB0:[0-9]+]])
+; CHECK-NEXT:    ret void
 ;
 ;
 ; CHECK-LABEL: @nanos6_unpacked_task_region_foo(
@@ -130,12 +140,14 @@ declare i1 @llvm.directive.marker()
 ; CHECK-NEXT:    [[GEP_Z:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO]], ptr [[TASK_ARGS]], i32 0, i32 1
 ; CHECK-NEXT:    [[GEP_Y_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO]], ptr [[TASK_ARGS]], i32 0, i32 2
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE:%.*]], null
-; CHECK-NEXT:    br i1 [[TMP0]], label [[TMP1:%.*]], label [[TMP2:%.*]]
-; CHECK:       1:
-; CHECK-NEXT:    br label [[TMP2]]
-; CHECK:       2:
+; CHECK-NEXT:    br i1 [[TMP0]], label [[TLATE_IF:%.*]], label [[TLATE_END:%.*]]
+; CHECK:       end:
 ; CHECK-NEXT:    call void @nanos6_unpacked_task_region_foo(ptr [[LOAD_GEP_X_ADDR]], ptr [[GEP_Z]], ptr [[GEP_Y_ADDR]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE]])
 ; CHECK-NEXT:    ret void
+; CHECK:       tlate.if:
+; CHECK-NEXT:    br label [[TLATE_END]]
+; CHECK:       tlate.end:
+; CHECK-NEXT:    br label [[END:%.*]]
 ;
 ;
 ; CHECK-LABEL: @nanos6_constructor_register_task_info(

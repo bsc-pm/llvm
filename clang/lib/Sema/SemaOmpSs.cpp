@@ -2483,6 +2483,8 @@ StmtResult SemaOmpSs::ActOnOmpSsTaskLoopDirective(
       if (OSSLoopIterUse.isErrorFound())
         return StmtError();
     } else if (isa<OSSIfClause>(Clause) ||
+               isa<OSSImmediateClause>(Clause) ||
+               isa<OSSMicrotaskClause>(Clause) ||
                isa<OSSFinalClause>(Clause) ||
                isa<OSSCostClause>(Clause) ||
                isa<OSSPriorityClause>(Clause) ||
@@ -2519,6 +2521,8 @@ StmtResult SemaOmpSs::ActOnOmpSsTaskLoopForDirective(
       if (OSSLoopIterUse.isErrorFound())
         return StmtError();
     } else if (isa<OSSIfClause>(Clause) ||
+               isa<OSSImmediateClause>(Clause) ||
+               isa<OSSMicrotaskClause>(Clause) ||
                isa<OSSFinalClause>(Clause) ||
                isa<OSSCostClause>(Clause) ||
                isa<OSSPriorityClause>(Clause) ||
@@ -4437,8 +4441,53 @@ static bool actOnOSSReductionKindClause(
     const DeclarationNameInfo &ReductionId, ArrayRef<Expr *> UnresolvedReductions,
     ReductionData &RD, bool Outline);
 
+static bool verifyOmpSsDeclareTaskReturnType(Sema &S, FunctionDecl *FD) {
+  ASTContext &Context = S.getASTContext();
+  bool IsCpp = S.getLangOpts().CPlusPlus;
+  if (FD->getReturnType() != Context.VoidTy) {
+    QualType RetType = FD->getReturnType().getCanonicalType();
+    auto* R = RetType->getAsCXXRecordDecl();
+    if (!R) {
+      S.Diag(FD->getLocation(), diag::err_oss_non_void_task) << IsCpp;
+      return true;
+    }
+    std::string RName = R->getName().lower();
+    if (RName != "oss_coroutine") {
+      S.Diag(FD->getLocation(), diag::err_oss_non_void_task) << IsCpp;
+      return true;
+    }
+    bool HasHandle = false;
+    for (const auto *Field : R->fields()) {
+      QualType FieldQ = Field->getType().getCanonicalType();
+      if (auto *F = FieldQ->getAsRecordDecl()) {
+        if (F->getDeclName().isIdentifier()) {
+          std::string FName = F->getName().lower();
+          if (FName == "coroutine_handle") {
+            HasHandle = true;
+            break;
+          }
+        }
+      }
+    }
+    if (!HasHandle) {
+      S.Diag(FD->getLocation(), diag::err_oss_coro_handle);
+      return true;
+    }
+    if (!FD->getBody()) {
+      S.Diag(FD->getLocation(), diag::err_oss_coro_cstmt);
+      return true;
+    }
+    if (!isa<CoroutineBodyStmt>(FD->getBody())) {
+      S.Diag(FD->getLocation(), diag::err_oss_coro_cstmt);
+      return true;
+    }
+  }
+  return false;
+}
+
 SemaOmpSs::DeclGroupPtrTy SemaOmpSs::ActOnOmpSsDeclareTaskDirective(
     DeclGroupPtrTy DG,
+    Expr *Immediate, Expr *Microtask,
     Expr *If, Expr *Final, Expr *Cost, Expr *Priority,
     Expr *Shmem, Expr *Onready, bool Wait,
     unsigned Device, SourceLocation DeviceLoc,
@@ -4494,10 +4543,9 @@ SemaOmpSs::DeclGroupPtrTy SemaOmpSs::ActOnOmpSsDeclareTaskDirective(
       return DeclGroupPtrTy();
     }
   }
-  if (FD->getReturnType() != SemaRef.Context.VoidTy) {
-    Diag(ADecl->getLocation(), diag::err_oss_non_void_task);
+
+  if (verifyOmpSsDeclareTaskReturnType(SemaRef, FD))
     return DeclGroupPtrTy();
-  }
 
   FunctionDecl *PrevFD = FD->getPreviousDecl();
   if (PrevFD && PrevFD != FD) {
@@ -4524,10 +4572,17 @@ SemaOmpSs::DeclGroupPtrTy SemaOmpSs::ActOnOmpSsDeclareTaskDirective(
   // or our associated function
   ADecl->addAttr(OSSTaskDeclSentinelAttr::CreateImplicit(SemaRef.Context, SR));
 
+  ExprResult ImmediateRes, MicrotaskRes;
   ExprResult IfRes, FinalRes, CostRes, PriorityRes, ShmemRes, OnreadyRes;
   SmallVector<Expr *, 2> LabelsRes;
   SmallVector<Expr *, 4> NdrangesRes;
   OSSTaskDeclAttr::DeviceType DevType = OSSTaskDeclAttr::DeviceType::Unknown;
+  if (Immediate) {
+    ImmediateRes = VerifyBooleanConditionWithCleanups(Immediate, Immediate->getExprLoc());
+  }
+  if (Microtask) {
+    MicrotaskRes = VerifyBooleanConditionWithCleanups(Microtask, Microtask->getExprLoc());
+  }
   if (If) {
     IfRes = VerifyBooleanConditionWithCleanups(If, If->getExprLoc());
   }
@@ -4707,6 +4762,7 @@ SemaOmpSs::DeclGroupPtrTy SemaOmpSs::ActOnOmpSsDeclareTaskDirective(
 
   auto *NewAttr = OSSTaskDeclAttr::CreateImplicit(
     SemaRef.Context,
+    ImmediateRes.get(), MicrotaskRes.get(),
     IfRes.get(), FinalRes.get(), CostRes.get(), PriorityRes.get(),
     ShmemRes.get(), Wait, DevType,
     OnreadyRes.get(),
@@ -6210,6 +6266,28 @@ ExprResult SemaOmpSs::VerifyPositiveIntegerConstant(
   return ICE;
 }
 
+OSSClause *SemaOmpSs::ActOnOmpSsImmediateClause(Expr *Condition,
+                                    SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc) {
+  ExprResult Res = VerifyBooleanConditionWithCleanups(Condition, StartLoc);
+  if (Res.isInvalid())
+    return nullptr;
+
+  return new (SemaRef.Context) OSSImmediateClause(Res.get(), StartLoc, LParenLoc, EndLoc);
+}
+
+OSSClause *SemaOmpSs::ActOnOmpSsMicrotaskClause(Expr *Condition,
+                                    SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc) {
+  ExprResult Res = VerifyBooleanConditionWithCleanups(Condition, StartLoc);
+  if (Res.isInvalid())
+    return nullptr;
+
+  return new (SemaRef.Context) OSSMicrotaskClause(Res.get(), StartLoc, LParenLoc, EndLoc);
+}
+
 OSSClause *SemaOmpSs::ActOnOmpSsIfClause(Expr *Condition,
                                     SourceLocation StartLoc,
                                     SourceLocation LParenLoc,
@@ -6385,6 +6463,12 @@ OSSClause *SemaOmpSs::ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind, Expr *Exp
                                             SourceLocation EndLoc) {
   OSSClause *Res = nullptr;
   switch (Kind) {
+  case OSSC_immediate:
+    Res = ActOnOmpSsImmediateClause(Expr, StartLoc, LParenLoc, EndLoc);
+    break;
+  case OSSC_microtask:
+    Res = ActOnOmpSsMicrotaskClause(Expr, StartLoc, LParenLoc, EndLoc);
+    break;
   case OSSC_if:
     Res = ActOnOmpSsIfClause(Expr, StartLoc, LParenLoc, EndLoc);
     break;
@@ -6985,6 +7069,8 @@ void SemaOmpSs::InstantiateOSSDeclareTaskAttr(
       /*ForDefinition*/ false);
   SemaRef.addInstantiatedParametersToScope(FD, Pattern, Local, TemplateArgs);
 
+  ExprResult ImmediateRes;
+  ExprResult MicrotaskRes;
   ExprResult IfRes;
   ExprResult FinalRes;
   ExprResult CostRes;
@@ -7076,6 +7162,12 @@ void SemaOmpSs::InstantiateOSSDeclareTaskAttr(
   l(Attr.labelExprs_size(), Attr.labelExprs_begin(), Attr.labelExprs_end(), Labels);
   l(Attr.ndranges_size(), Attr.ndranges_begin(), Attr.ndranges_end(), Ndranges);
 
+  if (auto *E = Attr.getImmediateExpr())
+    ImmediateRes = Subst(E);
+
+  if (auto *E = Attr.getMicrotaskExpr())
+    MicrotaskRes = Subst(E);
+
   if (auto *E = Attr.getIfExpr())
     IfRes = Subst(E);
 
@@ -7144,6 +7236,7 @@ void SemaOmpSs::InstantiateOSSDeclareTaskAttr(
 
   (void)ActOnOmpSsDeclareTaskDirective(
     SemaRef.ConvertDeclToDeclGroup(New),
+    ImmediateRes.get(), MicrotaskRes.get(),
     IfRes.get(), FinalRes.get(),
     CostRes.get(), PriorityRes.get(),
     ShmemRes.get(), OnreadyRes.get(), Wait,

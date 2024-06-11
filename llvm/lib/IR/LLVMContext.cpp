@@ -377,6 +377,26 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
   assert(OSSDeviceShmemEntry->second == LLVMContext::OB_oss_device_shmem &&
          "oss_device_shmem operand bundle id drifted!");
   (void)OSSDeviceShmemEntry;
+
+  auto *OSSCoroHandleEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.CORO.HANDLE");
+  assert(OSSCoroHandleEntry->second == LLVMContext::OB_oss_coro_handle &&
+         "oss_coro_handle operand bundle id drifted!");
+  (void)OSSCoroHandleEntry;
+
+  auto *OSSCoroSizeStoreEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.CORO.SIZE.STORE");
+  assert(OSSCoroSizeStoreEntry->second == LLVMContext::OB_oss_coro_size_store &&
+         "oss_coro_size_store operand bundle id drifted!");
+  (void)OSSCoroSizeStoreEntry;
+
+  auto *OSSImmediateEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.INMEDIATE");
+  assert(OSSImmediateEntry->second == LLVMContext::OB_oss_immediate &&
+         "oss_immediate operand bundle id drifted!");
+  (void)OSSImmediateEntry;
+
+  auto *OSSMicrotaskEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.MICROTASK");
+  assert(OSSMicrotaskEntry->second == LLVMContext::OB_oss_microtask &&
+         "oss_microtask operand bundle id drifted!");
+  (void)OSSMicrotaskEntry;
   // END OmpSs IDs
 
   SyncScope::ID SingleThreadSSID =

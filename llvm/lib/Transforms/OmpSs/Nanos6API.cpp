@@ -151,6 +151,8 @@ Nanos6TaskInfo& Nanos6TaskInfo::getInstance(Module &M) {
     instance->OffsetTableDataTy = PointerType::getUnqual(M.getContext());
     // int *arg_idx_table;
     instance->ArgIdxTableDataTy = PointerType::getUnqual(M.getContext());
+    // int coro_handle_idx;
+    instance->CoroHandleIdxDataTy = Type::getInt32Ty(M.getContext());
 
     instance->Ty->setBody({
       instance->NumSymbolsTy, instance->RegisterInfoFuncTy, instance->OnreadyActionFuncTy, instance->GetPriorityFuncTy,
@@ -165,7 +167,8 @@ Nanos6TaskInfo& Nanos6TaskInfo::getInstance(Module &M) {
       instance->NumArgsTy,
       instance->SizeofTableDataTy,
       instance->OffsetTableDataTy,
-      instance->ArgIdxTableDataTy
+      instance->ArgIdxTableDataTy,
+      instance->CoroHandleIdxDataTy
     });
   }
   return *instance.get();
@@ -433,6 +436,12 @@ FunctionCallee checkVersionFuncCallee(Module &M) {
     Type::getInt64Ty(M.getContext()),
     PointerType::getUnqual(M.getContext()),
     PointerType::getUnqual(M.getContext())
+  );
+}
+
+FunctionCallee suspendFuncCallee(Module &M) {
+  return M.getOrInsertFunction("nanos6_suspend",
+    Type::getVoidTy(M.getContext())
   );
 }
 
