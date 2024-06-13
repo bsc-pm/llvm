@@ -2890,8 +2890,6 @@ struct OmpSsDirective {
         OlConstraintsFuncVar ? cast<Constant>(OlConstraintsFuncVar) : ConstantPointerNull::get(PtrTy),
         DirEnv.Label ? cast<Constant>(DirEnv.Label) : ConstantPointerNull::get(PtrTy),
         Nanos6TaskDeclSourceStr ? Nanos6TaskDeclSourceStr : Nanos6TaskLocStr,
-        // Set device_function_name only in case of task pure device
-        // in order to let nanos6 identify them
         Nanos6TaskDevFuncStr
           ? Nanos6TaskDevFuncStr
           : ConstantPointerNull::get(PtrTy))),

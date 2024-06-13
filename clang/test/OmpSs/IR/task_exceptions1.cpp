@@ -18,26 +18,26 @@ void foo() {
 
 // CHECK-LABEL: @main(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DECL.SOURCE"([25 x i8] c"task_exceptions1.cpp:5:1\00") ], !dbg [[DBG12:![0-9]+]]
+// CHECK-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE.DEVFUNC"([8 x i8] c"_Z3foov\00"), "QUAL.OSS.DECL.SOURCE"([25 x i8] c"task_exceptions1.cpp:5:1\00") ], !dbg [[DBG12:![0-9]+]]
 // CHECK-NEXT:    invoke void @_Z3foov()
-// CHECK-NEXT:    to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG12]]
+// CHECK-NEXT:            to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG12]]
 // CHECK:       invoke.cont:
 // CHECK-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG12]]
-// CHECK-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DECL.SOURCE"([25 x i8] c"task_exceptions1.cpp:5:1\00") ], !dbg [[DBG13:![0-9]+]]
+// CHECK-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE.DEVFUNC"([8 x i8] c"_Z3foov\00"), "QUAL.OSS.DECL.SOURCE"([25 x i8] c"task_exceptions1.cpp:5:1\00") ], !dbg [[DBG13:![0-9]+]]
 // CHECK-NEXT:    invoke void @_Z3foov()
-// CHECK-NEXT:    to label [[INVOKE_CONT1:%.*]] unwind label [[TERMINATE_LPAD2:%.*]], !dbg [[DBG13]]
+// CHECK-NEXT:            to label [[INVOKE_CONT1:%.*]] unwind label [[TERMINATE_LPAD2:%.*]], !dbg [[DBG13]]
 // CHECK:       invoke.cont1:
 // CHECK-NEXT:    call void @llvm.directive.region.exit(token [[TMP1]]), !dbg [[DBG13]]
 // CHECK-NEXT:    ret i32 0, !dbg [[DBG14:![0-9]+]]
 // CHECK:       terminate.lpad:
 // CHECK-NEXT:    [[TMP2:%.*]] = landingpad { ptr, i32 }
-// CHECK-NEXT:    catch ptr null, !dbg [[DBG12]]
+// CHECK-NEXT:            catch ptr null, !dbg [[DBG12]]
 // CHECK-NEXT:    [[TMP3:%.*]] = extractvalue { ptr, i32 } [[TMP2]], 0, !dbg [[DBG12]]
 // CHECK-NEXT:    call void @__clang_call_terminate(ptr [[TMP3]]) #[[ATTR4:[0-9]+]], !dbg [[DBG12]]
 // CHECK-NEXT:    unreachable, !dbg [[DBG12]]
 // CHECK:       terminate.lpad2:
 // CHECK-NEXT:    [[TMP4:%.*]] = landingpad { ptr, i32 }
-// CHECK-NEXT:    catch ptr null, !dbg [[DBG13]]
+// CHECK-NEXT:            catch ptr null, !dbg [[DBG13]]
 // CHECK-NEXT:    [[TMP5:%.*]] = extractvalue { ptr, i32 } [[TMP4]], 0, !dbg [[DBG13]]
 // CHECK-NEXT:    call void @__clang_call_terminate(ptr [[TMP5]]) #[[ATTR4]], !dbg [[DBG13]]
 // CHECK-NEXT:    unreachable, !dbg [[DBG13]]

@@ -18,7 +18,7 @@ int main(){
 // LIN64-SAME: () #[[ATTR0:[0-9]+]] !dbg [[DBG5:![0-9]+]] {
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    [[TMP0:%.*]] = load ptr, ptr @rx, align 8, !dbg [[DBG9:![0-9]+]]
-// LIN64-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[TMP0]], i32 undef), "QUAL.OSS.SHARED"(ptr [[TMP0]], i32 undef), "QUAL.OSS.DEP.IN"(ptr [[TMP0]], [3 x i8] c"rx\00", ptr @compute_dep, ptr [[TMP0]]), "QUAL.OSS.DEP.IN"(ptr [[TMP0]], [3 x i8] c"rx\00", ptr @compute_dep.1, ptr [[TMP0]]), "QUAL.OSS.DECL.SOURCE"([24 x i8] c"task_function6.cpp:10:1\00") ], !dbg [[DBG10:![0-9]+]]
+// LIN64-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE.DEVFUNC"([8 x i8] c"_Z3foov\00"), "QUAL.OSS.SHARED"(ptr [[TMP0]], i32 undef), "QUAL.OSS.SHARED"(ptr [[TMP0]], i32 undef), "QUAL.OSS.DEP.IN"(ptr [[TMP0]], [3 x i8] c"rx\00", ptr @compute_dep, ptr [[TMP0]]), "QUAL.OSS.DEP.IN"(ptr [[TMP0]], [3 x i8] c"rx\00", ptr @compute_dep.1, ptr [[TMP0]]), "QUAL.OSS.DECL.SOURCE"([24 x i8] c"task_function6.cpp:10:1\00") ], !dbg [[DBG10:![0-9]+]]
 // LIN64-NEXT:    call void @_Z3foov(), !dbg [[DBG10]]
 // LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP1]]), !dbg [[DBG10]]
 // LIN64-NEXT:    [[TMP2:%.*]] = call i1 @llvm.directive.marker() [ "DIR.OSS"([9 x i8] c"TASKWAIT\00") ], !dbg [[DBG11:![0-9]+]]
@@ -44,7 +44,7 @@ int main(){
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@compute_dep.1
-// LIN64-SAME: (ptr [[RX:%.*]]) #[[ATTR2]] !dbg [[DBG14:![0-9]+]] {
+// LIN64-SAME: (ptr [[RX:%.*]]) #[[ATTR2]] !dbg [[DBG15:![0-9]+]] {
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T_0:%.*]], align 8
 // LIN64-NEXT:    [[RX_ADDR:%.*]] = alloca ptr, align 8
@@ -65,7 +65,7 @@ int main(){
 // PPC64-SAME: () #[[ATTR0:[0-9]+]] !dbg [[DBG5:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[TMP0:%.*]] = load ptr, ptr @rx, align 8, !dbg [[DBG9:![0-9]+]]
-// PPC64-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[TMP0]], i32 undef), "QUAL.OSS.SHARED"(ptr [[TMP0]], i32 undef), "QUAL.OSS.DEP.IN"(ptr [[TMP0]], [3 x i8] c"rx\00", ptr @compute_dep, ptr [[TMP0]]), "QUAL.OSS.DEP.IN"(ptr [[TMP0]], [3 x i8] c"rx\00", ptr @compute_dep.1, ptr [[TMP0]]), "QUAL.OSS.DECL.SOURCE"([24 x i8] c"task_function6.cpp:10:1\00") ], !dbg [[DBG10:![0-9]+]]
+// PPC64-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE.DEVFUNC"([8 x i8] c"_Z3foov\00"), "QUAL.OSS.SHARED"(ptr [[TMP0]], i32 undef), "QUAL.OSS.SHARED"(ptr [[TMP0]], i32 undef), "QUAL.OSS.DEP.IN"(ptr [[TMP0]], [3 x i8] c"rx\00", ptr @compute_dep, ptr [[TMP0]]), "QUAL.OSS.DEP.IN"(ptr [[TMP0]], [3 x i8] c"rx\00", ptr @compute_dep.1, ptr [[TMP0]]), "QUAL.OSS.DECL.SOURCE"([24 x i8] c"task_function6.cpp:10:1\00") ], !dbg [[DBG10:![0-9]+]]
 // PPC64-NEXT:    call void @_Z3foov(), !dbg [[DBG10]]
 // PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP1]]), !dbg [[DBG10]]
 // PPC64-NEXT:    [[TMP2:%.*]] = call i1 @llvm.directive.marker() [ "DIR.OSS"([9 x i8] c"TASKWAIT\00") ], !dbg [[DBG11:![0-9]+]]
@@ -91,7 +91,7 @@ int main(){
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@compute_dep.1
-// PPC64-SAME: (ptr [[RX:%.*]]) !dbg [[DBG14:![0-9]+]] {
+// PPC64-SAME: (ptr [[RX:%.*]]) !dbg [[DBG15:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T_0:%.*]], align 8
 // PPC64-NEXT:    [[RX_ADDR:%.*]] = alloca ptr, align 8
@@ -112,7 +112,7 @@ int main(){
 // AARCH64-SAME: () #[[ATTR0:[0-9]+]] !dbg [[DBG5:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[TMP0:%.*]] = load ptr, ptr @rx, align 8, !dbg [[DBG9:![0-9]+]]
-// AARCH64-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[TMP0]], i32 undef), "QUAL.OSS.SHARED"(ptr [[TMP0]], i32 undef), "QUAL.OSS.DEP.IN"(ptr [[TMP0]], [3 x i8] c"rx\00", ptr @compute_dep, ptr [[TMP0]]), "QUAL.OSS.DEP.IN"(ptr [[TMP0]], [3 x i8] c"rx\00", ptr @compute_dep.1, ptr [[TMP0]]), "QUAL.OSS.DECL.SOURCE"([24 x i8] c"task_function6.cpp:10:1\00") ], !dbg [[DBG10:![0-9]+]]
+// AARCH64-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE.DEVFUNC"([8 x i8] c"_Z3foov\00"), "QUAL.OSS.SHARED"(ptr [[TMP0]], i32 undef), "QUAL.OSS.SHARED"(ptr [[TMP0]], i32 undef), "QUAL.OSS.DEP.IN"(ptr [[TMP0]], [3 x i8] c"rx\00", ptr @compute_dep, ptr [[TMP0]]), "QUAL.OSS.DEP.IN"(ptr [[TMP0]], [3 x i8] c"rx\00", ptr @compute_dep.1, ptr [[TMP0]]), "QUAL.OSS.DECL.SOURCE"([24 x i8] c"task_function6.cpp:10:1\00") ], !dbg [[DBG10:![0-9]+]]
 // AARCH64-NEXT:    call void @_Z3foov(), !dbg [[DBG10]]
 // AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP1]]), !dbg [[DBG10]]
 // AARCH64-NEXT:    [[TMP2:%.*]] = call i1 @llvm.directive.marker() [ "DIR.OSS"([9 x i8] c"TASKWAIT\00") ], !dbg [[DBG11:![0-9]+]]
@@ -138,7 +138,7 @@ int main(){
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@compute_dep.1
-// AARCH64-SAME: (ptr [[RX:%.*]]) !dbg [[DBG14:![0-9]+]] {
+// AARCH64-SAME: (ptr [[RX:%.*]]) !dbg [[DBG15:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T_0:%.*]], align 8
 // AARCH64-NEXT:    [[RX_ADDR:%.*]] = alloca ptr, align 8
