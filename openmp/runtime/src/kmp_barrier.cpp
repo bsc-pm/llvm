@@ -1910,12 +1910,6 @@ static int __kmp_barrier_template(enum barrier_type bt, int gtid, int is_split,
 
     KMP_MB();
 
-#if defined(KMP_OMPV_ENABLED)
-    kmp_task_team_t *task_team = this_thr->th.th_task_team;
-    KMP_ASSERT(task_team);
-    kmp_int32 children = -1 + KMP_ATOMIC_DEC(&task_team->tt.tt_unfinished_tasks);
-    KMP_ASSERT(children >= 0);
-#endif // KMP_OMPV_ENABLED
     if (KMP_MASTER_TID(tid)) {
       status = 0;
       if (__kmp_tasking_mode != tskm_immediate_exec && !cancelled) {
@@ -2058,13 +2052,6 @@ static int __kmp_barrier_template(enum barrier_type bt, int gtid, int is_split,
             this_thr->th.th_task_team->tt.tt_found_proxy_tasks == TRUE ||
             this_thr->th.th_task_team->tt.tt_hidden_helper_task_encountered ==
                 TRUE);
-
-#if defined(KMP_OMPV_ENABLED)
-        kmp_task_team_t *task_team = this_thr->th.th_task_team;
-        KMP_ASSERT(task_team);
-        kmp_int32 children = -1 + KMP_ATOMIC_DEC(&task_team->tt.tt_unfinished_tasks);
-        KMP_ASSERT(children >= 0);
-#endif // KMP_OMPV_ENABLED
 
         __kmp_task_team_wait(this_thr, team USE_ITT_BUILD_ARG(itt_sync_obj));
         __kmp_task_team_setup(this_thr, team);
@@ -2334,13 +2321,6 @@ void __kmp_join_barrier(int gtid) {
      by the primary thread - it is unsafe to reference it in any of the worker
      threads. Any per-team data items that need to be referenced before the
      end of the barrier should be moved to the kmp_task_team_t structs.  */
-
-#if defined(KMP_OMPV_ENABLED)
-  kmp_task_team_t *task_team = this_thr->th.th_task_team;
-  KMP_ASSERT(task_team);
-  kmp_int32 children = -1 + KMP_ATOMIC_DEC(&task_team->tt.tt_unfinished_tasks);
-  KMP_ASSERT(children >= 0);
-#endif // KMP_OMPV_ENABLED
 
   if (KMP_MASTER_TID(tid)) {
     if (__kmp_tasking_mode != tskm_immediate_exec) {

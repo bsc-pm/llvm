@@ -2941,38 +2941,6 @@ kmp_int32 __kmp_omp_task(kmp_int32 gtid, kmp_task_t *new_task,
     kmp_info_t *this_thr = __kmp_threads[gtid];
     kmp_team_t *team = this_thr->th.th_team;
     kmp_int32 nthreads = this_thr->th.th_team_nproc;
-
-#if defined(KMP_OMPV_ENABLED)
-    kmp_task_team_t *task_team = this_thr->th.th_task_team;
-    kmp_int32 tid = this_thr->th.th_info.ds.ds_tid;
-    if (KMP_ATOMIC_LD_RLX(&task_team->tt.tt_last_task_tid) != tid)
-      KMP_ATOMIC_ST_RLX(&task_team->tt.tt_last_task_tid, tid);
-
-    bool found = false;
-    // Try to Wakeup a thread of the team first
-    for (int i = 0; i < nthreads; ++i) {
-      kmp_info_t *thread = team->t.t_threads[i];
-      if (thread == this_thr)
-        continue;
-      __kmp_suspend_initialize_thread(thread);
-      if (__kmp_try_suspend_mx(thread)) {
-        // Got mutex
-        if (thread->th.th_sleep_loc != NULL) {
-          // thread is really sleeping
-          __kmp_unlock_suspend_mx(thread);
-          if (!found)
-            __kmp_null_resume_wrapper(thread);
-          found = true;
-        } else {
-          // thread running, leave a note that it will not
-          // go to sleep one time.
-          // In the worst case it will go to sleep later
-          thread->th.th_suspend_status = 1;
-          __kmp_unlock_suspend_mx(thread);
-        }
-      }
-    }
-#else
     for (int i = 0; i < nthreads; ++i) {
       kmp_info_t *thread = team->t.t_threads[i];
       if (thread == this_thr)
@@ -2982,7 +2950,6 @@ kmp_int32 __kmp_omp_task(kmp_int32 gtid, kmp_task_t *new_task,
         break; // awake one thread at a time
       }
     }
-#endif // KMP_OMPV_ENABLED
   }
 
 #if defined(KMP_OMPV_ENABLED)
@@ -4356,13 +4323,6 @@ static inline int __kmp_execute_tasks_template(
   kmp_int32 nthreads, victim_tid = -2, use_own_tasks = 1, new_victim = 0,
                       tid = thread->th.th_info.ds.ds_tid;
 
-#if defined(KMP_OMPV_ENABLED)
-  if (__kmp_dflt_blocktime != KMP_MAX_BLOCKTIME &&
-      __kmp_wpolicy_passive) {
-    victim_tid = -3;
-  }
-#endif // KMP_OMPV_ENABLED
-
   KMP_DEBUG_ASSERT(__kmp_tasking_mode != tskm_immediate_exec);
   KMP_DEBUG_ASSERT(thread == __kmp_threads[gtid]);
 
@@ -4399,20 +4359,6 @@ static inline int __kmp_execute_tasks_template(
       if ((task == NULL) && (nthreads > 1)) { // Steal a task finally
         int asleep = 1;
         use_own_tasks = 0;
-#if defined(KMP_OMPV_ENABLED)
-        if (victim_tid == -3) {
-          // First time, try using the last thread
-          // that pushed a task
-          int last_task_tid = KMP_ATOMIC_LD_RLX(&task_team->tt.tt_last_task_tid);
-          if (last_task_tid != -1 && last_task_tid != tid) {
-            victim_tid = last_task_tid;
-            other_thread = threads_data[victim_tid].td.td_thr;
-          } else {
-            // Set original behavior
-            victim_tid = -2;
-          }
-        }
-#endif // KMP_OMPV_ENABLED
         // Try to steal from the last place I stole from successfully.
         if (victim_tid == -2) { // haven't stolen anything yet
           victim_tid = threads_data[tid].td.td_deque_last_stolen;
@@ -4445,9 +4391,6 @@ static inline int __kmp_execute_tasks_template(
             asleep = 0;
             if ((__kmp_tasking_mode == tskm_task_teams) &&
                 (__kmp_dflt_blocktime != KMP_MAX_BLOCKTIME) &&
-#if defined(KMP_OMPV_ENABLED)
-                (!__kmp_wpolicy_passive) &&
-#endif // KMP_OMPV_ENABLED
                 (TCR_PTR(CCAST(void *, other_thread->th.th_sleep_loc)) !=
                  NULL)) {
               asleep = 1;
@@ -4968,7 +4911,6 @@ static inline void __kmp_task_team_init(kmp_task_team_t *task_team,
     KMP_ATOMIC_ST_REL(&task_team->tt.tt_unfinished_threads, team_nth);
     TCW_4(task_team->tt.tt_active, TRUE);
 #if defined(KMP_OMPV_ENABLED)
-    KMP_ATOMIC_ST_RLX(&task_team->tt.tt_last_task_tid, -1);
     KMP_ATOMIC_ST_RLX(&task_team->tt.tt_unfinished_tasks, team_nth);
 #endif // KMP_OMPV_ENABLED
   }
@@ -5256,23 +5198,6 @@ void __kmp_task_team_setup(kmp_info_t *this_thr, kmp_team_t *team) {
       }
     }
   }
-#if defined(KMP_OMPV_ENABLED)
-  else {
-    for (int i = 0; i < 2; ++i) {
-      kmp_task_team_t *task_team = team->t.t_task_team[i];
-      if (!task_team || KMP_TASKING_ENABLED(task_team)) {
-        continue;
-      }
-      __kmp_enable_tasking(task_team, this_thr);
-      for (int j = 0; j < task_team->tt.tt_nproc; ++j) {
-        kmp_thread_data_t *thread_data = &task_team->tt.tt_threads_data[j];
-        if (thread_data->td.td_deque == NULL) {
-          __kmp_alloc_task_deque(team->t.t_threads[j], thread_data);
-        }
-      }
-    }
-  }
-#endif // KMP_OMPV_ENABLED
 }
 
 // __kmp_task_team_sync: Propagation of task team data from team to threads
@@ -5321,37 +5246,16 @@ void __kmp_task_team_wait(
       // still be executing tasks. Wait here for tasks to complete. To avoid
       // memory contention, only primary thread checks termination condition.
 #if defined(KMP_OMPV_ENABLED)
+      // At this point all the workers have finished its parallel region
+      // decrement the counter
+      kmp_int32 children = -task_team->tt.tt_nproc + KMP_ATOMIC_SUB(&task_team->tt.tt_unfinished_tasks, task_team->tt.tt_nproc);
+      KMP_ASSERT(children >= 0);
+
       kmp_flag_32<false, false> flag_unfinished(
           RCAST(std::atomic<kmp_uint32> *,
                 &task_team->tt.tt_unfinished_tasks),
           0U);
       flag_unfinished.wait(this_thr, FALSE USE_ITT_BUILD_ARG(itt_sync_obj));
-
-      if (__kmp_dflt_blocktime != KMP_MAX_BLOCKTIME &&
-          __kmp_wpolicy_passive) {
-        kmp_int32 nthreads = this_thr->th.th_team_nproc;
-        // Wakeup all sleeping threads to ensure they do
-        // the last decrement of tt_unfinished_threads
-        for (int i = 0; i < nthreads; ++i) {
-          kmp_info_t *thread = team->t.t_threads[i];
-          if (thread == this_thr)
-            continue;
-          __kmp_suspend_initialize_thread(thread);
-          __kmp_lock_suspend_mx(thread);
-          // Got mutex
-          if (thread->th.th_sleep_loc != NULL) {
-            // thread is really sleeping
-            __kmp_unlock_suspend_mx(thread);
-            __kmp_null_resume_wrapper(thread);
-          } else {
-            // thread running, leave a note that it will not
-            // go to sleep one time.
-            // In the worst case it will go to sleep later
-            thread->th.th_suspend_status = 1;
-            __kmp_unlock_suspend_mx(thread);
-          }
-        }
-      }
 
       kmp_flag_32<false, false> flag(
           RCAST(std::atomic<kmp_uint32> *,
@@ -5639,9 +5543,6 @@ void __kmpc_give_task(kmp_task_t *ptask, kmp_int32 start = 0) {
   // Enqueue task to complete bottom half completion from a thread within the
   // corresponding team
   kmp_team_t *team = taskdata->td_team;
-#if defined(KMP_OMPV_ENABLED)
-  kmp_task_team_t *task_team = taskdata->td_task_team;
-#endif // KMP_OMPV_ENABLED
   kmp_int32 nthreads = team->t.t_nproc;
   kmp_info_t *thread;
 
@@ -5663,48 +5564,6 @@ void __kmpc_give_task(kmp_task_t *ptask, kmp_int32 start = 0) {
   } while (!__kmp_give_task(thread, k, ptask, pass));
 
   if (__kmp_dflt_blocktime != KMP_MAX_BLOCKTIME && __kmp_wpolicy_passive) {
-#if defined(KMP_OMPV_ENABLED)
-    kmp_int32 tid = thread->th.th_info.ds.ds_tid;
-    KMP_ATOMIC_ST_RLX(&task_team->tt.tt_last_task_tid, tid);
-    __kmp_suspend_initialize_thread(thread);
-    __kmp_lock_suspend_mx(thread);
-    if (thread->th.th_sleep_loc != NULL) {
-      // thread is really sleeping
-      __kmp_unlock_suspend_mx(thread);
-      __kmp_null_resume_wrapper(thread);
-    } else {
-      // thread running, leave a note that it will not
-      // go to sleep one time.
-      // In the worst case it will go to sleep later
-      thread->th.th_suspend_status = 1;
-      __kmp_unlock_suspend_mx(thread);
-    }
-
-    bool found = false;
-    // Try to Wakeup a thread of the team first
-    for (int i = 0; i < nthreads; ++i) {
-      if (i == tid)
-          continue;
-      kmp_info_t *thread = team->t.t_threads[i];
-      __kmp_suspend_initialize_thread(thread);
-      if (__kmp_try_suspend_mx(thread)) {
-        // Got mutex
-        if (thread->th.th_sleep_loc != NULL) {
-          // thread is really sleeping
-          __kmp_unlock_suspend_mx(thread);
-          if (!found)
-            __kmp_null_resume_wrapper(thread);
-          found = true;
-        } else {
-          // thread running, leave a note that it will not
-          // go to sleep one time.
-          // In the worst case it will go to sleep later
-          thread->th.th_suspend_status = 1;
-          __kmp_unlock_suspend_mx(thread);
-        }
-      }
-    }
-#else
     // awake at least one thread to execute given task
     for (int i = 0; i < nthreads; ++i) {
       thread = team->t.t_threads[i];
@@ -5713,7 +5572,6 @@ void __kmpc_give_task(kmp_task_t *ptask, kmp_int32 start = 0) {
         break;
       }
     }
-#endif // KMP_OMPV_ENABLED
   }
 }
 

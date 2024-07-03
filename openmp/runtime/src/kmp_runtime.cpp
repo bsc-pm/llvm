@@ -4277,12 +4277,6 @@ void __kmp_unregister_root_current_thread(int gtid) {
     // the runtime is shutting down so we won't report any events
     thread->th.ompt_thread_info.state = ompt_state_undefined;
 #endif
-#if defined(KMP_OMPV_ENABLED)
-    KMP_ASSERT(task_team);
-    kmp_int32 counter = -1 +
-      KMP_ATOMIC_DEC(&task_team->tt.tt_unfinished_tasks);
-    KMP_DEBUG_ASSERT(counter >= 0);
-#endif // KMP_OMPV_ENABLED
     __kmp_task_team_wait(thread, team USE_ITT_BUILD_ARG(NULL));
   }
 
@@ -4729,7 +4723,6 @@ kmp_info_t *__kmp_allocate_thread(kmp_root_t *root, kmp_team_t *team,
   new_thr->th.th_free_agent_team = NULL;
   new_thr->th.th_free_agent_task_team = NULL;
   new_thr->th.th_is_free_agent = 0;
-  new_thr->th.th_suspend_status = 0;
 #endif // KMP_OMPV_ENABLED
 
   /* adjust the global counters */

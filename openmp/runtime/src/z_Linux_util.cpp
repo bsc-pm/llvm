@@ -1562,14 +1562,6 @@ static inline void __kmp_suspend_template(int th_gtid, C *flag) {
   KF_TRACE(10, ("__kmp_suspend_template: T#%d setting sleep bit for spin(%p)\n",
                 th_gtid, flag->get()));
 
-#if defined(KMP_OMPV_ENABLED)
-  if (th->th.th_suspend_status == 1) {
-    th->th.th_suspend_status = 0;
-    __kmp_unlock_suspend_mx(th);
-    return;
-  }
-#endif // KMP_OMPV_ENABLED
-
   /* TODO: shouldn't this use release semantics to ensure that
      __kmp_suspend_initialize_thread gets called first? */
   old_spin = flag->set_sleeping();

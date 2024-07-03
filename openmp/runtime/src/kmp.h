@@ -2938,7 +2938,6 @@ typedef struct kmp_base_task_team {
   volatile kmp_uint32
       tt_active; /* is the team still actively executing tasks */
 #if defined(KMP_OMPV_ENABLED)
-  std::atomic<kmp_int32> tt_last_task_tid; /* Last worker pushing tasks */
   std::atomic<kmp_int32> tt_unfinished_tasks;
 #endif // KMP_OMPV_ENABLED
 } kmp_base_task_team_t;
@@ -3154,7 +3153,6 @@ typedef struct KMP_ALIGN_CACHE kmp_base_info {
   kmp_cg_root_t *th_cg_roots; // list of cg_roots associated with this thread
 #if defined(KMP_OMPV_ENABLED)
   nosv_task_t th_nosv_task;
-  int th_suspend_status;
 #endif // KMP_OMPV_ENABLED
 } kmp_base_info_t;
 
