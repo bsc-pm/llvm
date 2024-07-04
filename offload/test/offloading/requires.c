@@ -68,7 +68,7 @@ void run_reg_requires() {
 
   // clang-format off
   // GOOD: SUCCESS
-  // BAD: omptarget fatal error 2: '#pragma omp requires reverse_offload' not used consistently!
+  // BAD: omp{{v?}}target fatal error 2: '#pragma omp requires reverse_offload' not used consistently!
   // clang-format on
 }
 

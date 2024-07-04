@@ -124,6 +124,7 @@ include(LibomptargetGetDependencies)
 
 # Set up testing infrastructure.
 include(OpenMPTesting)
+include(LibnosvFinding)
 
 check_cxx_compiler_flag(-Werror=global-constructors OFFLOAD_HAVE_WERROR_CTOR)
 
@@ -279,6 +280,15 @@ if(OPENMP_STANDALONE_BUILD)
       ${CMAKE_INSTALL_PREFIX}/lib
       ${LLVM_LIBRARY_DIRS}
     REQUIRED
+  )
+
+  find_library (
+    LIBOMPV_STANDALONE
+    NAMES
+      ompv
+    HINTS
+      ${CMAKE_INSTALL_PREFIX}/lib
+      ${LLVM_LIBRARY_DIRS}
   )
 
   macro(pythonize_bool var)

@@ -1121,6 +1121,12 @@ void tools::addOpenMPRuntimeLibraryPath(const ToolChain &TC,
   CmdArgs.push_back(Args.MakeArgString("-L" + DefaultLibPath));
   CmdArgs.push_back("-rpath");
   CmdArgs.push_back(Args.MakeArgString(DefaultLibPath));
+  // Add the path where runtimes are installed. This is
+  // our case for OpenMP since we're building it as a runtime
+  if (std::optional<std::string> Path = TC.getStdlibPath()) {
+    CmdArgs.push_back("-rpath");
+    CmdArgs.push_back(Args.MakeArgString(*Path));
+  }
 }
 
 void tools::addArchSpecificRPath(const ToolChain &TC, const ArgList &Args,
@@ -1188,8 +1194,12 @@ bool tools::addOpenMPRuntime(const Compilation &C, ArgStringList &CmdArgs,
   if (RTKind == Driver::OMPRT_GOMP && GompNeedsRT)
       CmdArgs.push_back("-lrt");
 
-  if (IsOffloadingHost)
-    CmdArgs.push_back("-lomptarget");
+  if (IsOffloadingHost) {
+    if (RTKind == Driver::OMPRT_NOSV)
+      CmdArgs.push_back("-lompvtarget");
+    else
+      CmdArgs.push_back("-lomptarget");
+  }
 
   if (IsOffloadingHost && !Args.hasArg(options::OPT_nogpulib))
     CmdArgs.push_back("-lomptarget.devicertl");

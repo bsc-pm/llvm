@@ -58,7 +58,11 @@ void llvm::omp::target::ompt::finalizeLibrary(ompt_data_t *tool_data) {
 void llvm::omp::target::ompt::connectLibrary() {
   DP("OMPT: Entering connectLibrary (libomptarget)\n");
   /// Connect plugin instance with libomptarget
+#if defined(KMP_OMPV_ENABLED)
+  OmptLibraryConnectorTy LibomptargetConnector("libompvtarget");
+#else
   OmptLibraryConnectorTy LibomptargetConnector("libomptarget");
+#endif
   ompt_start_tool_result_t OmptResult;
 
   // Initialize OmptResult with the init and fini functions that will be

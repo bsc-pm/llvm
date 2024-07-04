@@ -453,7 +453,11 @@ void llvm::omp::target::ompt::finalizeLibrary(ompt_data_t *data) {
 void llvm::omp::target::ompt::connectLibrary() {
   DP("Entering connectLibrary (libomp)\n");
   // Connect with libomp
+#if defined(KMP_OMPV_ENABLED)
+  static OmptLibraryConnectorTy LibompConnector("libompv");
+#else
   static OmptLibraryConnectorTy LibompConnector("libomp");
+#endif
   static ompt_start_tool_result_t OmptResult;
 
   // Initialize OmptResult with the init and fini functions that will be
