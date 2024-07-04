@@ -205,8 +205,8 @@ function(add_offload_testsuite target comment)
   # EXCLUDE_FROM_CHECK_ALL excludes the test ${target} out of check-offload.
   if (NOT ARG_EXCLUDE_FROM_CHECK_ALL)
     # Register the testsuites and depends for the check-offload rule.
-    set_property(GLOBAL APPEND PROPERTY OPENMP_LIT_TESTSUITES ${ARG_UNPARSED_ARGUMENTS})
-    set_property(GLOBAL APPEND PROPERTY OPENMP_LIT_DEPENDS ${ARG_DEPENDS})
+    set_property(GLOBAL APPEND PROPERTY LIBOMPTARGET_LIT_TESTSUITES ${ARG_UNPARSED_ARGUMENTS})
+    set_property(GLOBAL APPEND PROPERTY LIBOMPTARGET_LIT_DEPENDS ${ARG_DEPENDS})
   endif()
 
   if (${OPENMP_STANDALONE_BUILD})
@@ -235,4 +235,12 @@ function(add_offload_testsuite target comment)
       )
     endif()
   endif()
+endfunction()
+
+function(construct_check_offload_target)
+  get_property(LIBOMPTARGET_LIT_TESTSUITES GLOBAL PROPERTY LIBOMPTARGET_LIT_TESTSUITES)
+  get_property(LIBOMPTARGET_LIT_DEPENDS GLOBAL PROPERTY LIBOMPTARGET_LIT_DEPENDS)
+
+  # We already added the testsuites themselves, no need to do that again.
+  add_offload_testsuite(check-offload "Running offload tests" ${LIBOMPTARGET_LIT_TESTSUITES} EXCLUDE_FROM_CHECK_ALL DEPENDS ${LIBOMPTARGET_LIT_DEPENDS})
 endfunction()

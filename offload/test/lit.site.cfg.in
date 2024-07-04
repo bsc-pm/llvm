@@ -28,4 +28,4 @@ config.has_libomptarget_ompt = @LIBOMPTARGET_OMPT_SUPPORT@
 config.libomptarget_has_libc = @LIBOMPTARGET_GPU_LIBC_SUPPORT@
 
 # Let the main config do the real work.
-lit_config.load_config(config, "@CMAKE_CURRENT_SOURCE_DIR@/lit.cfg")
+lit_config.load_config(config, "@CMAKE_CURRENT_SOURCE_DIR@/../lit.cfg")

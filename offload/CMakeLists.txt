@@ -367,3 +367,6 @@ if (EXISTS ${LLVM_THIRD_PARTY_DIR}/unittest)
   endif()
   add_subdirectory(unittests)
 endif()
+
+# Now that we have seen all testsuites, create the check-offload target.
+construct_check_offload_target()

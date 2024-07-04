@@ -471,10 +471,6 @@ fi
 # OpenMP for installations
 ################################################################################
 
-# libomptarget is a bit flaky for testing, do not attempt to build it for now.
-# We could build it but try to disable its tests, alternatively.
-CMAKE_INVOCATION_EXTRA_FLAGS+=("-DOPENMP_ENABLE_LIBOMPTARGET=OFF")
-
 if [ -n "$TEST_OMPFLAGS" ];
 then
   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DOPENMP_TEST_FLAGS=$TEST_OMPFLAGS")
@@ -483,7 +479,6 @@ fi
 ################################################################################
 # Compiler-rt for installations
 ################################################################################
-
 
 if [ "${ENABLE_COMPILER_RT}" = 1 ];
 then
@@ -495,6 +490,15 @@ then
   # On x86_64 compiler-rt also attempts to build i386 libraries. Avoid that
   # because more often than not we lack support for 32-bit.
   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON")
+fi
+
+################################################################################
+# Offload (omptarget) for installations
+################################################################################
+
+if [ "${ENABLE_OFFLOAD}" = 1 ];
+then
+  EXTRA_RUNTIMES+=";offload"
 fi
 
 ################################################################################

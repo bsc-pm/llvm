@@ -1,0 +1,5 @@
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(NOSV_PKG IMPORTED_TARGET nos-v)
+if (NOT NOSV_PKG_FOUND)
+  message(WARNING "Libompvtarget disabled: nOS-V not found")
+endif()
