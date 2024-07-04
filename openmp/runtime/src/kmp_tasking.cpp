@@ -2396,6 +2396,8 @@ static void free_agent_set_team(int gtid, kmp_taskdata_t *taskdata) {
     kmp_info_t *thread = __kmp_threads[gtid];
     thread->th.th_team = taskdata->td_team;
     thread->th.th_task_team = taskdata->td_task_team;
+    // Fix for target_depend_nowait.cpp
+    thread->th.th_task_state = taskdata->td_alloc_thread->th.th_task_state;
   }
   if (gtid != KMP_GTID_DNE) {
     kmp_info_t *thread = __kmp_threads[gtid];
@@ -3421,8 +3423,16 @@ void *__kmp_task_reduction_init(int gtid, int num, T *data) {
 #if defined(KMP_OMPV_ENABLED)
   // Arrange as many private copies as all available cores
   if (__kmp_enable_free_agents) {
-    KMP_ASSERT(__kmp_avail_proc == nosv_get_num_cpus());
-    nth = __kmp_avail_proc;
+    // When no parallel region, or any other mechanism
+    // that inits middle we can't use __kmp_avail_proc.
+    //
+    // In this situations trust nOS-V
+    if (__kmp_init_middle) {
+      KMP_ASSERT(__kmp_avail_proc == nosv_get_num_cpus());
+      nth = __kmp_avail_proc;
+    } else {
+      nth = nosv_get_num_cpus();
+    }
   }
 #endif // KMP_OMPV_ENABLED
   kmp_taskred_data_t *arr;
