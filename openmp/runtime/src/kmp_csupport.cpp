@@ -1910,17 +1910,17 @@ There are no implicit barriers in the two "single" calls, rather the compiler
 should introduce an explicit barrier if it is required.
 */
 
-kmp_int32 __kmpc_single(ident_t *loc, kmp_int32 global_tid
+static kmp_int32 __kmp_single(ident_t *loc, kmp_int32 global_tid
 #if defined(KMP_OMPV_ENABLED)
-                        , omp_task_type_t *omp_task_type
+                              , omp_task_type_t *omp_task_type
 #endif // KMP_OMPV_ENABLED
-                        ) {
+                              ) {
   __kmp_assert_valid_gtid(global_tid);
+  kmp_int32 rc = __kmp_enter_single(global_tid, loc, TRUE
 #if defined(KMP_OMPV_ENABLED)
-  kmp_int32 rc = __kmp_enter_single(global_tid, loc, TRUE, omp_task_type);
-#else
-  kmp_int32 rc = __kmp_enter_single(global_tid, loc, TRUE);
+                                    , omp_task_type
 #endif // KMP_OMPV_ENABLED
+                                    );
 
   if (rc) {
     // We are going to execute the single statement, so we should count it.
@@ -1962,6 +1962,22 @@ kmp_int32 __kmpc_single(ident_t *loc, kmp_int32 global_tid
   return rc;
 }
 
+#if defined(KMP_OMPV_ENABLED)
+kmp_int32 __nosvc_single(ident_t *loc, kmp_int32 global_tid,
+                        omp_task_type_t *omp_task_type) {
+  return __kmp_single(loc, global_tid, omp_task_type);
+}
+#endif // KMP_OMPV_ENABLED
+
+kmp_int32 __kmpc_single(ident_t *loc, kmp_int32 global_tid) {
+#if defined(KMP_OMPV_ENABLED)
+  omp_task_type_t *omp_task_type = __nosv_compat_register_task_info((char *)loc->psource);
+  return __kmp_single(loc, global_tid, omp_task_type);
+#else
+  return __kmp_single(loc, global_tid);
+#endif // KMP_OMPV_ENABLED
+}
+
 /*!
 @ingroup WORK_SHARING
 @param loc  source location information
@@ -1971,17 +1987,18 @@ Mark the end of a <tt>single</tt> construct.  This function should
 only be called by the thread that executed the block of code protected
 by the `single` construct.
 */
-void __kmpc_end_single(ident_t *loc, kmp_int32 global_tid
+
+static void __kmp_end_single(ident_t *loc, kmp_int32 global_tid
 #if defined(KMP_OMPV_ENABLED)
-                       , omp_task_type_t *omp_task_type
+                             , omp_task_type_t *omp_task_type
 #endif // KMP_OMPV_ENABLED
-                       ) {
+                             ) {
   __kmp_assert_valid_gtid(global_tid);
+  __kmp_exit_single(global_tid
 #if defined(KMP_OMPV_ENABLED)
-  __kmp_exit_single(global_tid, omp_task_type);
-#else
-  __kmp_exit_single(global_tid);
+                    , omp_task_type
 #endif // KMP_OMPV_ENABLED
+                    );
   KMP_POP_PARTITIONED_TIMER();
 
 #if OMPT_SUPPORT && OMPT_OPTIONAL
@@ -1999,6 +2016,22 @@ void __kmpc_end_single(ident_t *loc, kmp_int32 global_tid
 #endif
 }
 
+#if defined(KMP_OMPV_ENABLED)
+void __nosvc_end_single(ident_t *loc, kmp_int32 global_tid,
+                        omp_task_type_t *omp_task_type) {
+  __kmp_end_single(loc, global_tid, omp_task_type);
+}
+#endif // KMP_OMPV_ENABLED
+
+void __kmpc_end_single(ident_t *loc, kmp_int32 global_tid) {
+#if defined(KMP_OMPV_ENABLED)
+  omp_task_type_t *omp_task_type = __nosv_compat_register_task_info((char *)loc->psource);
+  __kmp_end_single(loc, global_tid, omp_task_type);
+#else
+  __kmp_end_single(loc, global_tid);
+#endif // KMP_OMPV_ENABLED
+}
+
 /*!
 @ingroup WORK_SHARING
 @param loc Source location
@@ -2006,11 +2039,48 @@ void __kmpc_end_single(ident_t *loc, kmp_int32 global_tid
 
 Mark the end of a statically scheduled loop.
 */
-void __kmpc_for_static_fini(ident_t *loc, kmp_int32 global_tid
 #if defined(KMP_OMPV_ENABLED)
-                            , omp_task_type_t *omp_task_type
+void __nosvc_for_static_fini(ident_t *loc, kmp_int32 global_tid,
+                             omp_task_type_t *omp_task_type) {
+  KMP_POP_PARTITIONED_TIMER();
+  KE_TRACE(10, ("__kmpc_for_static_fini called T#%d\n", global_tid));
+
+#if OMPT_SUPPORT && OMPT_OPTIONAL
+  if (ompt_enabled.ompt_callback_work) {
+    ompt_work_t ompt_work_type = ompt_work_loop;
+    ompt_team_info_t *team_info = __ompt_get_teaminfo(0, NULL);
+    ompt_task_info_t *task_info = __ompt_get_task_info_object(0);
+    // Determine workshare type
+    if (loc != NULL) {
+      if ((loc->flags & KMP_IDENT_WORK_LOOP) != 0) {
+        ompt_work_type = ompt_work_loop;
+      } else if ((loc->flags & KMP_IDENT_WORK_SECTIONS) != 0) {
+        ompt_work_type = ompt_work_sections;
+      } else if ((loc->flags & KMP_IDENT_WORK_DISTRIBUTE) != 0) {
+        ompt_work_type = ompt_work_distribute;
+      } else {
+        // use default set above.
+        // a warning about this case is provided in __kmpc_for_static_init
+      }
+      KMP_DEBUG_ASSERT(ompt_work_type);
+    }
+    ompt_callbacks.ompt_callback(ompt_callback_work)(
+        ompt_work_type, ompt_scope_end, &(team_info->parallel_data),
+        &(task_info->task_data), 0, OMPT_GET_RETURN_ADDRESS(0));
+  }
+#endif
+  if (__kmp_env_consistency_check)
+    __kmp_pop_workshare(global_tid, ct_pdo, loc);
+
+  instr_ws_end(omp_task_type->instrum_id);
+  instr_for_static_exit(loc ? loc->flags : 0);
+}
 #endif // KMP_OMPV_ENABLED
-                            ) {
+
+void __kmpc_for_static_fini(ident_t *loc, kmp_int32 global_tid) {
+#if defined(KMP_OMPV_ENABLED)
+  omp_task_type_t *omp_task_type = __nosv_compat_register_task_info((char *)loc->psource);
+#endif // KMP_OMPV_ENABLED
   KMP_POP_PARTITIONED_TIMER();
   KE_TRACE(10, ("__kmpc_for_static_fini called T#%d\n", global_tid));
 
@@ -2042,7 +2112,7 @@ void __kmpc_for_static_fini(ident_t *loc, kmp_int32 global_tid
     __kmp_pop_workshare(global_tid, ct_pdo, loc);
 
 #if defined(KMP_OMPV_ENABLED)
-  instr_ws_end((*omp_task_type)->instrum_id);
+  instr_ws_end(omp_task_type->instrum_id);
   instr_for_static_exit(loc ? loc->flags : 0);
 #endif // KMP_OMPV_ENABLED
 }

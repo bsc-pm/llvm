@@ -1763,7 +1763,7 @@ static kmp_taskdata_t *nosv_get_aligned_task_metadata(nosv_task_t nosv_task) {
   return taskdata;
 }
 
-static kmp_taskdata_t *__kmp_nosv_create(omp_task_type_t omp_task_type, size_t size) {
+static kmp_taskdata_t *__kmp_nosv_create(omp_task_type_t *omp_task_type, size_t size) {
   int res;
   nosv_task_t nosv_task;
   // Create nosv task descriptor
@@ -1908,7 +1908,7 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
 
   // Avoid double allocation here by combining shareds with taskdata
 #if defined(KMP_OMPV_ENABLED)
-  taskdata = __kmp_nosv_create(*omp_task_type, shareds_offset + sizeof_shareds);
+  taskdata = __kmp_nosv_create(omp_task_type, shareds_offset + sizeof_shareds);
 #else
 #if USE_FAST_MEMORY
   taskdata = (kmp_taskdata_t *)__kmp_fast_allocate(thread, shareds_offset +
@@ -2082,14 +2082,41 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
   return task;
 }
 
+#if defined(KMP_OMPV_ENABLED)
+kmp_task_t *__nosvc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
+                                  kmp_int32 flags, size_t sizeof_kmp_task_t,
+                                  size_t sizeof_shareds,
+                                  kmp_routine_entry_t task_entry,
+                                  omp_task_type_t *&omp_task_type) {
+  kmp_task_t *retval;
+  kmp_tasking_flags_t *input_flags = (kmp_tasking_flags_t *)&flags;
+  __kmp_assert_valid_gtid(gtid);
+  input_flags->native = FALSE;
+  // __kmp_task_alloc() sets up all other runtime flags
+  KA_TRACE(10, ("__nosvc_omp_task_alloc(enter): T#%d loc=%p, flags=(%s %s %s) "
+                "sizeof_task=%ld sizeof_shared=%ld entry=%p\n",
+                gtid, loc_ref, input_flags->tiedness ? "tied  " : "untied",
+                input_flags->proxy ? "proxy" : "",
+                input_flags->detachable ? "detachable" : "", sizeof_kmp_task_t,
+                sizeof_shareds, task_entry));
+
+  retval = __kmp_task_alloc(loc_ref, gtid, input_flags, sizeof_kmp_task_t,
+                            sizeof_shareds, task_entry, omp_task_type);
+
+  KA_TRACE(20, ("__nosvc_omp_task_alloc(exit): T#%d retval %p\n", gtid, retval));
+
+  return retval;
+}
+#endif // KMP_OMPV_ENABLED
+
 kmp_task_t *__kmpc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
                                   kmp_int32 flags, size_t sizeof_kmp_task_t,
                                   size_t sizeof_shareds,
-                                  kmp_routine_entry_t task_entry
+                                  kmp_routine_entry_t task_entry) {
 #if defined(KMP_OMPV_ENABLED)
-                                  , omp_task_type_t *omp_task_type
+  omp_task_type_t *omp_task_type = __nosv_compat_register_task_info((char *)loc_ref->psource);
 #endif // KMP_OMPV_ENABLED
-                                  ) {
+
   kmp_task_t *retval;
   kmp_tasking_flags_t *input_flags = (kmp_tasking_flags_t *)&flags;
   __kmp_assert_valid_gtid(gtid);
@@ -2114,16 +2141,14 @@ kmp_task_t *__kmpc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
   return retval;
 }
 
-kmp_task_t *__kmpc_omp_target_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
+#if defined(KMP_OMPV_ENABLED)
+kmp_task_t *__nosvc_omp_target_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
                                          kmp_int32 flags,
                                          size_t sizeof_kmp_task_t,
                                          size_t sizeof_shareds,
                                          kmp_routine_entry_t task_entry,
-                                         kmp_int64 device_id
-#if defined(KMP_OMPV_ENABLED)
-                                         , omp_task_type_t *omp_task_type
-#endif // KMP_OMPV_ENABLED
-                                         ) {
+                                         kmp_int64 device_id,
+                                         omp_task_type_t *&omp_task_type) {
   auto &input_flags = reinterpret_cast<kmp_tasking_flags_t &>(flags);
   // target task is untied defined in the specification
   input_flags.tiedness = TASK_UNTIED;
@@ -2131,12 +2156,32 @@ kmp_task_t *__kmpc_omp_target_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
   if (__kmp_enable_hidden_helper)
     input_flags.hidden_helper = TRUE;
 
-  return __kmpc_omp_task_alloc(loc_ref, gtid, flags, sizeof_kmp_task_t,
-                               sizeof_shareds, task_entry
-#if defined(KMP_OMPV_ENABLED)
-                               , omp_task_type
+  return __nosvc_omp_task_alloc(loc_ref, gtid, flags, sizeof_kmp_task_t,
+                               sizeof_shareds, task_entry, omp_task_type);
+}
 #endif // KMP_OMPV_ENABLED
-                               );
+
+kmp_task_t *__kmpc_omp_target_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
+                                         kmp_int32 flags,
+                                         size_t sizeof_kmp_task_t,
+                                         size_t sizeof_shareds,
+                                         kmp_routine_entry_t task_entry,
+                                         kmp_int64 device_id) {
+  auto &input_flags = reinterpret_cast<kmp_tasking_flags_t &>(flags);
+  // target task is untied defined in the specification
+  input_flags.tiedness = TASK_UNTIED;
+
+  if (__kmp_enable_hidden_helper)
+    input_flags.hidden_helper = TRUE;
+
+#if defined(KMP_OMPV_ENABLED)
+  omp_task_type_t *omp_task_type = __nosv_compat_register_task_info((char *)loc_ref->psource);
+  return __nosvc_omp_task_alloc(loc_ref, gtid, flags, sizeof_kmp_task_t,
+                               sizeof_shareds, task_entry, omp_task_type);
+#else
+  return __kmpc_omp_task_alloc(loc_ref, gtid, flags, sizeof_kmp_task_t,
+                               sizeof_shareds, task_entry);
+#endif // KMP_OMPV_ENABLED
 }
 
 /*!
@@ -5758,7 +5803,7 @@ kmp_task_t *__kmp_task_dup_alloc(kmp_info_t *thread, kmp_task_t *task_src
   KA_TRACE(30, ("__kmp_task_dup_alloc: Th %p, malloc size %ld\n", thread,
                 task_size));
 #if defined(KMP_OMPV_ENABLED)
-  omp_task_type_t omp_task_type = taskdata_src->td_omp_task_type;
+  omp_task_type_t *omp_task_type = taskdata_src->td_omp_task_type;
   taskdata = __kmp_nosv_create(omp_task_type, task_size);
 
   // Keep the nosv_task after the memcpy
@@ -6276,13 +6321,16 @@ void __kmp_taskloop_recur(ident_t *loc, int gtid, kmp_task_t *task,
   // make sure new task has same parent task as the pattern task
   kmp_taskdata_t *current_task = thread->th.th_current_task;
   thread->th.th_current_task = taskdata->td_parent;
+#if defined(KMP_OMPV_ENABLED)
+  kmp_task_t *new_task =
+      __nosvc_omp_task_alloc(loc, gtid, 1, 3 * sizeof(void *),
+                            sizeof(__taskloop_params_t), &__kmp_taskloop_task,
+                            taskdata->td_omp_task_type);
+#else
   kmp_task_t *new_task =
       __kmpc_omp_task_alloc(loc, gtid, 1, 3 * sizeof(void *),
-                            sizeof(__taskloop_params_t), &__kmp_taskloop_task
-#if defined(KMP_OMPV_ENABLED)
-                             , &taskdata->td_omp_task_type
+                            sizeof(__taskloop_params_t), &__kmp_taskloop_task);
 #endif // KMP_OMPV_ENABLED
-                             );
   // restore current task
   thread->th.th_current_task = current_task;
   __taskloop_params_t *p = (__taskloop_params_t *)new_task->shareds;

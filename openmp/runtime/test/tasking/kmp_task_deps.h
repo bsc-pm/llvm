@@ -47,7 +47,7 @@ static id loc = {0, 2, 0, 0, ";file;func;0;0;;"};
 #if defined(_OPENMPV)
 typedef void *omp_task_type_t;
 extern void __nosvc_register_task_info(omp_task_type_t *omp_task_type, void *label);
-kmp_task_t *__kmpc_omp_task_alloc(id *loc, int gtid, int flags, size_t sz,
+kmp_task_t *__nosvc_omp_task_alloc(id *loc, int gtid, int flags, size_t sz,
                                   size_t shar, entry_t rtn, omp_task_type_t*);
 #else
 kmp_task_t *__kmpc_omp_task_alloc(id *loc, int gtid, int flags, size_t sz,

@@ -243,14 +243,14 @@ int __kmp_get_global_thread_id() {
 
 #if defined(KMP_OMPV_ENABLED)
 const kmp_uint32 TASK_TYPES_SIZE = 8*1024;
-struct omp_task_type task_types[TASK_TYPES_SIZE];
+static omp_task_type_t task_types[TASK_TYPES_SIZE];
 kmp_uint32 task_types_idx = 0;
 // NOSV instrumentation instruments the thread every
 // nosv_init. This makes ovniemu to fail
 // Avoid initializing more than one time
 kmp_uint32 nosv_initialize_attempt = 0;
 
-void __nosvc_register_task_info(omp_task_type_t &omp_task_type, void *label) {
+void __nosvc_register_task_info(omp_task_type_t *&omp_task_type, void *label) {
   kmp_uint32 cur_nosv_initialize_attempt = KMP_TEST_THEN_ADD32(&nosv_initialize_attempt, 1);
   if (!cur_nosv_initialize_attempt)
     nosv_init();
@@ -267,6 +267,24 @@ void __nosvc_register_task_info(omp_task_type_t &omp_task_type, void *label) {
   omp_task_type->label = (const char *)label;
 
   instr_type_create(omp_task_type->instrum_id, omp_task_type->label);
+}
+
+omp_task_type_t *__nosv_compat_register_task_info(char *label) {
+  if (!__kmp_enable_compat)
+    KMP_FATAL(LibompApiCall);
+
+  __kmp_acquire_bootstrap_lock(&label_to_task_type_lock);
+  if (htab_value *v = htab_find(label_to_task_type_map, label)) {
+    __kmp_release_bootstrap_lock(&label_to_task_type_lock);
+    return static_cast<omp_task_type_t *>(v->p);
+  }
+
+  omp_task_type_t *tmp;
+  __nosvc_register_task_info(tmp, (void *)label);
+  KMP_ASSERT(htab_insert(label_to_task_type_map, label, HTV_P(tmp)));
+
+  __kmp_release_bootstrap_lock(&label_to_task_type_lock);
+  return tmp;
 }
 
 static void __kmp_nosv_init() {
@@ -320,6 +338,9 @@ static void __kmp_nosv_init() {
    //     exit(EXIT_FAILURE);
    //   }
    //}
+
+   __kmp_init_bootstrap_lock(&label_to_task_type_lock);
+   label_to_task_type_map = htab_create(16);
 
    kmp_uint32 cur_nosv_initialize_attempt = KMP_TEST_THEN_ADD32(&nosv_initialize_attempt, 1);
    if (!cur_nosv_initialize_attempt)
@@ -818,7 +839,7 @@ int __kmp_enter_single(int gtid, ident_t *id_ref, int push_ws
   // }
 #if defined(KMP_OMPV_ENABLED)
   instr_single_enter();
-  instr_ws_execute((*omp_task_type)->instrum_id);
+  instr_ws_execute(omp_task_type->instrum_id);
 #endif // KMP_OMPV_ENABLED
 
   if (!TCR_4(__kmp_init_parallel))
@@ -871,7 +892,7 @@ int __kmp_enter_single(int gtid, ident_t *id_ref, int push_ws
   // the single code. Finish instrumentation here
 #if defined(KMP_OMPV_ENABLED)
   if (!status) {
-    instr_ws_end((*omp_task_type)->instrum_id);
+    instr_ws_end(omp_task_type->instrum_id);
     instr_single_exit();
   }
 #endif // KMP_OMPV_ENABLED
@@ -893,7 +914,7 @@ void __kmp_exit_single(int gtid
   // This function is run once the single user
   // code has beed executed.
 #if defined(KMP_OMPV_ENABLED)
-  instr_ws_end((*omp_task_type)->instrum_id);
+  instr_ws_end(omp_task_type->instrum_id);
   instr_single_exit();
 #endif // KMP_OMPV_ENABLED
 }
@@ -6209,6 +6230,8 @@ __attribute__((destructor)) void __kmp_internal_end_dtor(void) {
       if (T.nosv_task_type)
         nosv_type_destroy(T.nosv_task_type, NOSV_TYPE_DESTROY_NONE);
     }
+
+    htab_destroy(label_to_task_type_map);
 
     // There is only nosv_init, shutdown one time
     nosv_shutdown();

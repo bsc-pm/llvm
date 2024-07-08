@@ -1086,6 +1086,29 @@ static void __kmp_stg_print_nesting_mode(kmp_str_buf_t *buffer,
 } // __kmp_stg_print_nesting_mode
 
 // -----------------------------------------------------------------------------
+// OMP_ENABLE_COMPAT
+
+static void __kmp_stg_parse_enable_compat(char const *name,
+                                          char const *value,
+                                          void *data) {
+#if defined(KMP_OMPV_ENABLED)
+  __kmp_stg_parse_bool(name, value, &__kmp_enable_compat);
+#else
+  KMP_WARNING(CompatSupport);
+#endif // KMP_OMPV_ENABLED
+}
+
+static void __kmp_stg_print_enable_compat(kmp_str_buf_t *buffer,
+                                          char const *name,
+                                          void *data) {
+#if defined(KMP_OMPV_ENABLED)
+  __kmp_stg_print_bool(buffer, name, __kmp_enable_compat);
+#else
+  KMP_WARNING(CompatSupport);
+#endif // KMP_OMPV_ENABLED
+}
+
+// -----------------------------------------------------------------------------
 // OMP_ENABLE_FREE_AGENTS
 
 static void __kmp_stg_parse_enable_free_agents(char const *name,
@@ -5594,6 +5617,8 @@ static kmp_setting_t __kmp_stg_table[] = {
     {"OMP_NESTED", __kmp_stg_parse_nested, __kmp_stg_print_nested, NULL, 0, 0},
     {"OMP_NUM_THREADS", __kmp_stg_parse_num_threads,
      __kmp_stg_print_num_threads, NULL, 0, 0},
+    {"OMP_ENABLE_COMPAT", __kmp_stg_parse_enable_compat,
+     __kmp_stg_print_enable_compat, NULL, 0, 0},
     {"OMP_ENABLE_FREE_AGENTS", __kmp_stg_parse_enable_free_agents,
      __kmp_stg_print_enable_free_agents, NULL, 0, 0},
     {"OMP_FREE_AGENT_TID_EMU", __kmp_stg_parse_free_agent_tid_emu,

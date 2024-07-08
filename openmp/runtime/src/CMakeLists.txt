@@ -101,6 +101,7 @@ else()
     kmp_lock.cpp
     kmp_sched.cpp
     kmp_collapse.cpp
+    hsearch.cpp
   )
   if(WIN32)
     # Windows specific files

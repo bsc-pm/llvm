@@ -53,7 +53,7 @@ int __kmpc_get_target_offload(void) __attribute__((weak));
 #if defined(KMP_OMPV_ENABLED)
 typedef void *omp_task_type_t;
 void __nosvc_register_task_info(omp_task_type_t *omp_task_type, void *label);
-kmp_task_t *__kmpc_omp_task_alloc(ident_t *loc_ref, int32_t gtid, int32_t flags,
+kmp_task_t *__nosvc_omp_task_alloc(ident_t *loc_ref, int32_t gtid, int32_t flags,
                                   size_t sizeof_kmp_task_t,
                                   size_t sizeof_shareds,
                                   kmp_routine_entry_t task_entry,
@@ -61,12 +61,12 @@ kmp_task_t *__kmpc_omp_task_alloc(ident_t *loc_ref, int32_t gtid, int32_t flags,
     __attribute__((weak));
 
 kmp_task_t *
-__kmpc_omp_target_task_alloc(ident_t *loc_ref, int32_t gtid, int32_t flags,
+__nosvc_omp_target_task_alloc(ident_t *loc_ref, int32_t gtid, int32_t flags,
                              size_t sizeof_kmp_task_t, size_t sizeof_shareds,
                              kmp_routine_entry_t task_entry, int64_t device_id,
                              omp_task_type_t *omp_task_type)
     __attribute__((weak));
-#else
+#endif // KMP_OMPV_ENABLED
 kmp_task_t *__kmpc_omp_task_alloc(ident_t *loc_ref, int32_t gtid, int32_t flags,
                                   size_t sizeof_kmp_task_t,
                                   size_t sizeof_shareds,
@@ -79,7 +79,6 @@ __kmpc_omp_target_task_alloc(ident_t *loc_ref, int32_t gtid, int32_t flags,
                              kmp_routine_entry_t task_entry, int64_t device_id)
     __attribute__((weak));
 
-#endif // KMP_OMPV_ENABLED
 int32_t __kmpc_omp_task_with_deps(ident_t *loc_ref, int32_t gtid,
                                   kmp_task_t *new_task, int32_t ndeps,
                                   kmp_depend_info_t *dep_list,
@@ -375,7 +374,7 @@ libomp_helper_task_creation(T *Args, int (*Fn)(int32_t, kmp_task_t *),
 #if defined(KMP_OMPV_ENABLED)
   omp_task_type_t omp_task_type;
   __nosvc_register_task_info(&omp_task_type, NULL);
-  kmp_task_t *Task = __kmpc_omp_target_task_alloc(
+  kmp_task_t *Task = __nosvc_omp_target_task_alloc(
       nullptr, Gtid, Flags, sizeof(kmp_task_t), 0, Fn, -1,
       &omp_task_type);
 #else

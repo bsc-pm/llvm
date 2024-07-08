@@ -38,7 +38,7 @@ extern "C" {
 extern int __kmpc_global_thread_num(_id*);
 #if defined(_OPENMPV)
 void __nosvc_register_task_info(omp_task_type_t *omp_task_type, void *label);
-task_t *__kmpc_omp_task_alloc(_id *loc, int gtid, int flags,
+task_t *__nosvc_omp_task_alloc(_id *loc, int gtid, int flags,
                               size_t sz, size_t shar, entry_t rtn, omp_task_type_t*);
 #else
 task_t *__kmpc_omp_task_alloc(_id *loc, int gtid, int flags,
@@ -80,7 +80,7 @@ int main()
 #if defined(_OPENMPV)
         omp_task_type_t omp_task_type;
         __nosvc_register_task_info(&omp_task_type, NULL);
-        task_t *ptr = __kmpc_omp_task_alloc(&loc, gtid, TIED,
+        task_t *ptr = __nosvc_omp_task_alloc(&loc, gtid, TIED,
                                             sizeof(task_t), 0, NULL, &omp_task_type);
 #else
         task_t *ptr = __kmpc_omp_task_alloc(&loc, gtid, TIED,

@@ -47,7 +47,7 @@ int main() {
 // CHECK-NEXT:    store i32 0, ptr [[DOTOMP_IS_LAST]], align 4, !dbg [[DBG13]]
 // CHECK-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[DOTGLOBAL_TID__ADDR]], align 8, !dbg [[DBG14:![0-9]+]]
 // CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr [[TMP0]], align 4, !dbg [[DBG14]]
-// CHECK-NEXT:    call void @__kmpc_for_static_init_4(ptr @[[GLOB2:[0-9]+]], i32 [[TMP1]], i32 34, ptr [[DOTOMP_IS_LAST]], ptr [[DOTOMP_LB]], ptr [[DOTOMP_UB]], ptr [[DOTOMP_STRIDE]], i32 1, i32 1, ptr @[[GLOB0:[0-9]+]]), !dbg [[DBG14]]
+// CHECK-NEXT:    call void @__nosvc_for_static_init_4(ptr @[[GLOB2:[0-9]+]], i32 [[TMP1]], i32 34, ptr [[DOTOMP_IS_LAST]], ptr [[DOTOMP_LB]], ptr [[DOTOMP_UB]], ptr [[DOTOMP_STRIDE]], i32 1, i32 1, ptr @[[GLOB0:[0-9]+]]), !dbg [[DBG14]]
 // CHECK-NEXT:    [[TMP2:%.*]] = load i32, ptr [[DOTOMP_UB]], align 4, !dbg [[DBG13]]
 // CHECK-NEXT:    [[CMP:%.*]] = icmp sgt i32 [[TMP2]], 99, !dbg [[DBG13]]
 // CHECK-NEXT:    br i1 [[CMP]], label [[COND_TRUE:%.*]], label [[COND_FALSE:%.*]], !dbg [[DBG13]]
@@ -83,7 +83,7 @@ int main() {
 // CHECK:       omp.inner.for.end:
 // CHECK-NEXT:    br label [[OMP_LOOP_EXIT:%.*]], !dbg [[DBG14]]
 // CHECK:       omp.loop.exit:
-// CHECK-NEXT:    call void @__kmpc_for_static_fini(ptr @[[GLOB4:[0-9]+]], i32 [[TMP1]], ptr @[[GLOB0]]), !dbg [[DBG19:![0-9]+]]
+// CHECK-NEXT:    call void @__nosvc_for_static_fini(ptr @[[GLOB4:[0-9]+]], i32 [[TMP1]], ptr @[[GLOB0]]), !dbg [[DBG19:![0-9]+]]
 // CHECK-NEXT:    call void @__kmpc_barrier(ptr @[[GLOB5:[0-9]+]], i32 [[TMP1]]), !dbg [[DBG19]]
 // CHECK-NEXT:    ret void, !dbg [[DBG19]]
 //
@@ -129,7 +129,7 @@ int main() {
 // CHECK-NEXT:    store i32 0, ptr [[DOTOMP_IS_LAST]], align 4, !dbg [[DBG29]]
 // CHECK-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[DOTGLOBAL_TID__ADDR]], align 8, !dbg [[DBG30:![0-9]+]]
 // CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr [[TMP0]], align 4, !dbg [[DBG30]]
-// CHECK-NEXT:    call void @__kmpc_for_static_init_4(ptr @[[GLOB10:[0-9]+]], i32 [[TMP1]], i32 34, ptr [[DOTOMP_IS_LAST]], ptr [[DOTOMP_LB]], ptr [[DOTOMP_UB]], ptr [[DOTOMP_STRIDE]], i32 1, i32 1, ptr @[[GLOB8]]), !dbg [[DBG30]]
+// CHECK-NEXT:    call void @__nosvc_for_static_init_4(ptr @[[GLOB10:[0-9]+]], i32 [[TMP1]], i32 34, ptr [[DOTOMP_IS_LAST]], ptr [[DOTOMP_LB]], ptr [[DOTOMP_UB]], ptr [[DOTOMP_STRIDE]], i32 1, i32 1, ptr @[[GLOB8]]), !dbg [[DBG30]]
 // CHECK-NEXT:    [[TMP2:%.*]] = load i32, ptr [[DOTOMP_UB]], align 4, !dbg [[DBG29]]
 // CHECK-NEXT:    [[CMP:%.*]] = icmp sgt i32 [[TMP2]], 99, !dbg [[DBG29]]
 // CHECK-NEXT:    br i1 [[CMP]], label [[COND_TRUE:%.*]], label [[COND_FALSE:%.*]], !dbg [[DBG29]]
@@ -165,7 +165,7 @@ int main() {
 // CHECK:       omp.inner.for.end:
 // CHECK-NEXT:    br label [[OMP_LOOP_EXIT:%.*]], !dbg [[DBG30]]
 // CHECK:       omp.loop.exit:
-// CHECK-NEXT:    call void @__kmpc_for_static_fini(ptr @[[GLOB12:[0-9]+]], i32 [[TMP1]], ptr @[[GLOB8]]), !dbg [[DBG35:![0-9]+]]
+// CHECK-NEXT:    call void @__nosvc_for_static_fini(ptr @[[GLOB12:[0-9]+]], i32 [[TMP1]], ptr @[[GLOB8]]), !dbg [[DBG35:![0-9]+]]
 // CHECK-NEXT:    call void @__kmpc_barrier(ptr @[[GLOB13:[0-9]+]], i32 [[TMP1]]), !dbg [[DBG35]]
 // CHECK-NEXT:    ret void, !dbg [[DBG35]]
 //

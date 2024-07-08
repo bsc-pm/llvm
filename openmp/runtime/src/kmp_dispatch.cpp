@@ -987,7 +987,7 @@ __kmp_dispatch_init(ident_t *loc, int gtid, enum sched_type schedule, T lb,
 
 #if defined(KMP_OMPV_ENABLED)
   instr_for_dynamic_init_enter();
-  instr_ws_execute((*omp_task_type)->instrum_id);
+  instr_ws_execute(omp_task_type->instrum_id);
 #endif
 
   if (!TCR_4(__kmp_init_parallel))
@@ -2360,7 +2360,7 @@ static int __kmp_dispatch_next(ident_t *loc, int gtid, kmp_int32 *p_last,
     if (status)
       instr_for_dynamic_chunk_enter();
     else
-      instr_ws_end((*omp_task_type)->instrum_id);
+      instr_ws_end(omp_task_type->instrum_id);
 #endif // KMP_OMPV_ENABLED
 
     return status;
@@ -2495,7 +2495,7 @@ static int __kmp_dispatch_next(ident_t *loc, int gtid, kmp_int32 *p_last,
   if (status)
     instr_for_dynamic_chunk_enter();
   else
-    instr_ws_end((*omp_task_type)->instrum_id);
+    instr_ws_end(omp_task_type->instrum_id);
 #endif // KMP_OMPV_ENABLED
 
   return status;
@@ -2851,14 +2851,27 @@ saving the loop arguments.
 These functions are all identical apart from the types of the arguments.
 */
 
+#if defined(KMP_OMPV_ENABLED)
+void __nosvc_dispatch_init_4(ident_t *loc, kmp_int32 gtid,
+                            enum sched_type schedule, kmp_int32 lb,
+                            kmp_int32 ub, kmp_int32 st, kmp_int32 chunk,
+                            omp_task_type_t *omp_task_type) {
+  KMP_DEBUG_ASSERT(__kmp_init_serial);
+#if OMPT_SUPPORT && OMPT_OPTIONAL
+  OMPT_STORE_RETURN_ADDRESS(gtid);
+#endif
+  __kmp_dispatch_init<kmp_int32>(loc, gtid, schedule, lb, ub, st, chunk, true, omp_task_type);
+}
+#endif // KMP_OMPV_ENABLED
+
 void __kmpc_dispatch_init_4(ident_t *loc, kmp_int32 gtid,
                             enum sched_type schedule, kmp_int32 lb,
-                            kmp_int32 ub, kmp_int32 st, kmp_int32 chunk
-#if defined(KMP_OMPV_ENABLED)
-                            , omp_task_type_t *omp_task_type
-#endif // KMP_OMPV_ENABLED
-                            ) {
+                            kmp_int32 ub, kmp_int32 st, kmp_int32 chunk) {
   KMP_DEBUG_ASSERT(__kmp_init_serial);
+#if defined(KMP_OMPV_ENABLED)
+  omp_task_type_t *omp_task_type = __nosv_compat_register_task_info((char *)loc->psource);
+#endif // KMP_OMPV_ENABLED
+
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   OMPT_STORE_RETURN_ADDRESS(gtid);
 #endif
@@ -2872,14 +2885,27 @@ void __kmpc_dispatch_init_4(ident_t *loc, kmp_int32 gtid,
 /*!
 See @ref __kmpc_dispatch_init_4
 */
+#if defined(KMP_OMPV_ENABLED)
+void __nosvc_dispatch_init_4u(ident_t *loc, kmp_int32 gtid,
+                             enum sched_type schedule, kmp_uint32 lb,
+                             kmp_uint32 ub, kmp_int32 st, kmp_int32 chunk,
+                             omp_task_type_t *omp_task_type) {
+  KMP_DEBUG_ASSERT(__kmp_init_serial);
+#if OMPT_SUPPORT && OMPT_OPTIONAL
+  OMPT_STORE_RETURN_ADDRESS(gtid);
+#endif
+  __kmp_dispatch_init<kmp_uint32>(loc, gtid, schedule, lb, ub, st, chunk, true, omp_task_type);
+}
+#endif // KMP_OMPV_ENABLED
+
 void __kmpc_dispatch_init_4u(ident_t *loc, kmp_int32 gtid,
                              enum sched_type schedule, kmp_uint32 lb,
-                             kmp_uint32 ub, kmp_int32 st, kmp_int32 chunk
-#if defined(KMP_OMPV_ENABLED)
-                             , omp_task_type_t *omp_task_type
-#endif // KMP_OMPV_ENABLED
-                             ) {
+                             kmp_uint32 ub, kmp_int32 st, kmp_int32 chunk) {
   KMP_DEBUG_ASSERT(__kmp_init_serial);
+#if defined(KMP_OMPV_ENABLED)
+  omp_task_type_t *omp_task_type = __nosv_compat_register_task_info((char *)loc->psource);
+#endif // KMP_OMPV_ENABLED
+
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   OMPT_STORE_RETURN_ADDRESS(gtid);
 #endif
@@ -2893,17 +2919,31 @@ void __kmpc_dispatch_init_4u(ident_t *loc, kmp_int32 gtid,
 /*!
 See @ref __kmpc_dispatch_init_4
 */
-void __kmpc_dispatch_init_8(ident_t *loc, kmp_int32 gtid,
-                            enum sched_type schedule, kmp_int64 lb,
-                            kmp_int64 ub, kmp_int64 st, kmp_int64 chunk
 #if defined(KMP_OMPV_ENABLED)
-                            , omp_task_type_t *omp_task_type
-#endif // KMP_OMPV_ENABLED
-                            ) {
+void __nosvc_dispatch_init_8(ident_t *loc, kmp_int32 gtid,
+                            enum sched_type schedule, kmp_int64 lb,
+                            kmp_int64 ub, kmp_int64 st, kmp_int64 chunk,
+                            omp_task_type_t *omp_task_type) {
   KMP_DEBUG_ASSERT(__kmp_init_serial);
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   OMPT_STORE_RETURN_ADDRESS(gtid);
 #endif
+  __kmp_dispatch_init<kmp_int64>(loc, gtid, schedule, lb, ub, st, chunk, true, omp_task_type);
+}
+#endif // KMP_OMPV_ENABLED
+
+void __kmpc_dispatch_init_8(ident_t *loc, kmp_int32 gtid,
+                            enum sched_type schedule, kmp_int64 lb,
+                            kmp_int64 ub, kmp_int64 st, kmp_int64 chunk) {
+  KMP_DEBUG_ASSERT(__kmp_init_serial);
+#if defined(KMP_OMPV_ENABLED)
+  omp_task_type_t *omp_task_type = __nosv_compat_register_task_info((char *)loc->psource);
+#endif // KMP_OMPV_ENABLED
+
+#if OMPT_SUPPORT && OMPT_OPTIONAL
+  OMPT_STORE_RETURN_ADDRESS(gtid);
+#endif
+
 #if defined(KMP_OMPV_ENABLED)
   __kmp_dispatch_init<kmp_int64>(loc, gtid, schedule, lb, ub, st, chunk, true, omp_task_type);
 #else
@@ -2914,14 +2954,27 @@ void __kmpc_dispatch_init_8(ident_t *loc, kmp_int32 gtid,
 /*!
 See @ref __kmpc_dispatch_init_4
 */
+#if defined(KMP_OMPV_ENABLED)
+void __nosvc_dispatch_init_8u(ident_t *loc, kmp_int32 gtid,
+                             enum sched_type schedule, kmp_uint64 lb,
+                             kmp_uint64 ub, kmp_int64 st, kmp_int64 chunk,
+                             omp_task_type_t *omp_task_type) {
+  KMP_DEBUG_ASSERT(__kmp_init_serial);
+#if OMPT_SUPPORT && OMPT_OPTIONAL
+  OMPT_STORE_RETURN_ADDRESS(gtid);
+#endif
+  __kmp_dispatch_init<kmp_uint64>(loc, gtid, schedule, lb, ub, st, chunk, true, omp_task_type);
+}
+#endif // KMP_OMPV_ENABLED
+
 void __kmpc_dispatch_init_8u(ident_t *loc, kmp_int32 gtid,
                              enum sched_type schedule, kmp_uint64 lb,
-                             kmp_uint64 ub, kmp_int64 st, kmp_int64 chunk
-#if defined(KMP_OMPV_ENABLED)
-                             , omp_task_type_t *omp_task_type
-#endif // KMP_OMPV_ENABLED
-                             ) {
+                             kmp_uint64 ub, kmp_int64 st, kmp_int64 chunk) {
   KMP_DEBUG_ASSERT(__kmp_init_serial);
+#if defined(KMP_OMPV_ENABLED)
+  omp_task_type_t *omp_task_type = __nosv_compat_register_task_info((char *)loc->psource);
+#endif // KMP_OMPV_ENABLED
+
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   OMPT_STORE_RETURN_ADDRESS(gtid);
 #endif
@@ -3018,12 +3071,28 @@ otherwise
 Get the next dynamically allocated chunk of work for this thread.
 If there is no more work, then the lb,ub and stride need not be modified.
 */
-int __kmpc_dispatch_next_4(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
-                           kmp_int32 *p_lb, kmp_int32 *p_ub, kmp_int32 *p_st
 #if defined(KMP_OMPV_ENABLED)
-                           , omp_task_type_t *omp_task_type
+int __nosvc_dispatch_next_4(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
+                           kmp_int32 *p_lb, kmp_int32 *p_ub, kmp_int32 *p_st,
+                           omp_task_type_t *omp_task_type) {
+#if OMPT_SUPPORT && OMPT_OPTIONAL
+  OMPT_STORE_RETURN_ADDRESS(gtid);
+#endif
+  return __kmp_dispatch_next<kmp_int32>(loc, gtid, p_last, p_lb, p_ub, p_st, omp_task_type
+#if OMPT_SUPPORT && OMPT_OPTIONAL
+                                        ,
+                                        OMPT_LOAD_RETURN_ADDRESS(gtid)
+#endif
+  );
+}
 #endif // KMP_OMPV_ENABLED
-                           ) {
+
+int __kmpc_dispatch_next_4(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
+                           kmp_int32 *p_lb, kmp_int32 *p_ub, kmp_int32 *p_st) {
+#if defined(KMP_OMPV_ENABLED)
+  omp_task_type_t *omp_task_type = __nosv_compat_register_task_info((char *)loc->psource);
+#endif // KMP_OMPV_ENABLED
+
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   OMPT_STORE_RETURN_ADDRESS(gtid);
 #endif
@@ -3041,13 +3110,29 @@ int __kmpc_dispatch_next_4(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
 /*!
 See @ref __kmpc_dispatch_next_4
 */
+#if defined(KMP_OMPV_ENABLED)
+int __nosvc_dispatch_next_4u(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
+                            kmp_uint32 *p_lb, kmp_uint32 *p_ub,
+                            kmp_int32 *p_st, omp_task_type_t *omp_task_type) {
+#if OMPT_SUPPORT && OMPT_OPTIONAL
+  OMPT_STORE_RETURN_ADDRESS(gtid);
+#endif
+  return __kmp_dispatch_next<kmp_uint32>(loc, gtid, p_last, p_lb, p_ub, p_st, omp_task_type
+#if OMPT_SUPPORT && OMPT_OPTIONAL
+                                         ,
+                                         OMPT_LOAD_RETURN_ADDRESS(gtid)
+#endif
+  );
+}
+#endif // KMP_OMPV_ENABLED
+
 int __kmpc_dispatch_next_4u(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
                             kmp_uint32 *p_lb, kmp_uint32 *p_ub,
-                            kmp_int32 *p_st
+                            kmp_int32 *p_st) {
 #if defined(KMP_OMPV_ENABLED)
-                            , omp_task_type_t *omp_task_type
+  omp_task_type_t *omp_task_type = __nosv_compat_register_task_info((char *)loc->psource);
 #endif // KMP_OMPV_ENABLED
-                            ) {
+
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   OMPT_STORE_RETURN_ADDRESS(gtid);
 #endif
@@ -3065,12 +3150,29 @@ int __kmpc_dispatch_next_4u(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
 /*!
 See @ref __kmpc_dispatch_next_4
 */
+#if defined(KMP_OMPV_ENABLED)
+int __nosvc_dispatch_next_8(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
+                           kmp_int64 *p_lb, kmp_int64 *p_ub, kmp_int64 *p_st,
+                           omp_task_type_t *omp_task_type) {
+#if OMPT_SUPPORT && OMPT_OPTIONAL
+  OMPT_STORE_RETURN_ADDRESS(gtid);
+#endif
+  return __kmp_dispatch_next<kmp_int64>(loc, gtid, p_last, p_lb, p_ub, p_st
+                                        , omp_task_type
+#if OMPT_SUPPORT && OMPT_OPTIONAL
+                                        ,
+                                        OMPT_LOAD_RETURN_ADDRESS(gtid)
+#endif
+  );
+}
+#endif
+
 int __kmpc_dispatch_next_8(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
                            kmp_int64 *p_lb, kmp_int64 *p_ub, kmp_int64 *p_st
-#if defined(KMP_OMPV_ENABLED)
-                           , omp_task_type_t *omp_task_type
-#endif // KMP_OMPV_ENABLED
                            ) {
+#if defined(KMP_OMPV_ENABLED)
+  omp_task_type_t *omp_task_type = __nosv_compat_register_task_info((char *)loc->psource);
+#endif // KMP_OMPV_ENABLED
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   OMPT_STORE_RETURN_ADDRESS(gtid);
 #endif
@@ -3088,13 +3190,31 @@ int __kmpc_dispatch_next_8(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
 /*!
 See @ref __kmpc_dispatch_next_4
 */
+#if defined(KMP_OMPV_ENABLED)
+int __nosvc_dispatch_next_8u(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
+                            kmp_uint64 *p_lb, kmp_uint64 *p_ub,
+                            kmp_int64 *p_st, omp_task_type_t *omp_task_type) {
+#if OMPT_SUPPORT && OMPT_OPTIONAL
+  OMPT_STORE_RETURN_ADDRESS(gtid);
+#endif
+  return __kmp_dispatch_next<kmp_uint64>(loc, gtid, p_last, p_lb, p_ub, p_st
+                                         , omp_task_type
+#if OMPT_SUPPORT && OMPT_OPTIONAL
+                                         ,
+                                         OMPT_LOAD_RETURN_ADDRESS(gtid)
+#endif
+  );
+}
+#endif
+
 int __kmpc_dispatch_next_8u(ident_t *loc, kmp_int32 gtid, kmp_int32 *p_last,
                             kmp_uint64 *p_lb, kmp_uint64 *p_ub,
                             kmp_int64 *p_st
-#if defined(KMP_OMPV_ENABLED)
-                            , omp_task_type_t *omp_task_type
-#endif // KMP_OMPV_ENABLED
                             ) {
+#if defined(KMP_OMPV_ENABLED)
+  omp_task_type_t *omp_task_type = __nosv_compat_register_task_info((char *)loc->psource);
+#endif // KMP_OMPV_ENABLED
+
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   OMPT_STORE_RETURN_ADDRESS(gtid);
 #endif

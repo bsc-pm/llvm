@@ -49,6 +49,7 @@ volatile int __kmp_init_middle = FALSE;
 volatile int __kmp_init_parallel = FALSE;
 volatile int __kmp_init_hidden_helper = FALSE;
 #if defined(KMP_OMPV_ENABLED)
+int __kmp_enable_compat = 0;
 int __kmp_enable_free_agents = 0;
 int __kmp_free_agent_tid_emu = 0;
 #endif // KMP_OMPV_ENABLED
@@ -249,6 +250,10 @@ nosv_affinity_level_t nosv_default_affinity_level = NOSV_AFFINITY_LEVEL_CPU;
 uint32_t nosv_default_numa_id = -1;
 int nosv_default_yield_type = 0;
 uint64_t nosv_default_waitfor_time;
+struct htab *label_to_task_type_map = nullptr;
+kmp_bootstrap_lock_t label_to_task_type_lock;
+
+
 #endif // KMP_OMPV_ENABLED
 
 #if KMP_HAVE_UMWAIT

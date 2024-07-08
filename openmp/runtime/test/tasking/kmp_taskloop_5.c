@@ -59,7 +59,7 @@ extern "C" {
 #if defined(_OPENMPV)
 void __nosvc_register_task_info(omp_task_type_t *omp_task_type, void *label);
 ptask
-__kmpc_omp_task_alloc(ident_t *loc, int gtid, int flags,
+__nosvc_omp_task_alloc(ident_t *loc, int gtid, int flags,
                       size_t sizeof_kmp_task_t, size_t sizeof_shareds,
                       task_entry_t task_entry, omp_task_type_t*);
 #else
@@ -113,7 +113,7 @@ void task_loop(int sched_type, int sched_val, int modifier)
 #if defined(_OPENMPV)
       omp_task_type_t omp_task_type;
       __nosvc_register_task_info(&omp_task_type, NULL);
-      task = __kmpc_omp_task_alloc(NULL, gtid, 1, sizeof(struct task),
+      task = __nosvc_omp_task_alloc(NULL, gtid, 1, sizeof(struct task),
                                    sizeof(struct shar), &task_entry, &omp_task_type);
 #else
       task = __kmpc_omp_task_alloc(NULL, gtid, 1, sizeof(struct task),

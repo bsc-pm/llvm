@@ -5058,10 +5058,10 @@ OpenMPIRBuilder::createNosvForStaticInitFunction(unsigned IVSize, bool IVSigned,
   if (IsGPUDistribute)
     llvm_unreachable("unexpected distributed nosv version");
   else
-    Name = IVSize == 32 ? (IVSigned ? omp::OMPVRTL___kmpc_for_static_init_4
-                                    : omp::OMPVRTL___kmpc_for_static_init_4u)
-                        : (IVSigned ? omp::OMPVRTL___kmpc_for_static_init_8
-                                    : omp::OMPVRTL___kmpc_for_static_init_8u);
+    Name = IVSize == 32 ? (IVSigned ? omp::OMPVRTL___nosvc_for_static_init_4
+                                    : omp::OMPVRTL___nosvc_for_static_init_4u)
+                        : (IVSigned ? omp::OMPVRTL___nosvc_for_static_init_8
+                                    : omp::OMPVRTL___nosvc_for_static_init_8u);
 
   return getOrCreateRuntimeFunction(M, Name);
 }
@@ -5084,10 +5084,10 @@ FunctionCallee OpenMPIRBuilder::createNosvDispatchInitFunction(unsigned IVSize,
   assert((IVSize == 32 || IVSize == 64) &&
          "IV size is not compatible with the omp runtime");
   RuntimeFunction Name = IVSize == 32
-                             ? (IVSigned ? omp::OMPVRTL___kmpc_dispatch_init_4
-                                         : omp::OMPVRTL___kmpc_dispatch_init_4u)
-                             : (IVSigned ? omp::OMPVRTL___kmpc_dispatch_init_8
-                                         : omp::OMPVRTL___kmpc_dispatch_init_8u);
+                             ? (IVSigned ? omp::OMPVRTL___nosvc_dispatch_init_4
+                                         : omp::OMPVRTL___nosvc_dispatch_init_4u)
+                             : (IVSigned ? omp::OMPVRTL___nosvc_dispatch_init_8
+                                         : omp::OMPVRTL___nosvc_dispatch_init_8u);
 
   return getOrCreateRuntimeFunction(M, Name);
 }
@@ -5110,10 +5110,10 @@ FunctionCallee OpenMPIRBuilder::createNosvDispatchNextFunction(unsigned IVSize,
   assert((IVSize == 32 || IVSize == 64) &&
          "IV size is not compatible with the omp runtime");
   RuntimeFunction Name = IVSize == 32
-                             ? (IVSigned ? omp::OMPVRTL___kmpc_dispatch_next_4
-                                         : omp::OMPVRTL___kmpc_dispatch_next_4u)
-                             : (IVSigned ? omp::OMPVRTL___kmpc_dispatch_next_8
-                                         : omp::OMPVRTL___kmpc_dispatch_next_8u);
+                             ? (IVSigned ? omp::OMPVRTL___nosvc_dispatch_next_4
+                                         : omp::OMPVRTL___nosvc_dispatch_next_4u)
+                             : (IVSigned ? omp::OMPVRTL___nosvc_dispatch_next_8
+                                         : omp::OMPVRTL___nosvc_dispatch_next_8u);
 
   return getOrCreateRuntimeFunction(M, Name);
 }

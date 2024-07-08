@@ -106,7 +106,7 @@ extern "C" {
 int __kmpc_global_thread_num(id*);
 #if defined(_OPENMPV)
 extern void __nosvc_register_task_info(omp_task_type_t *omp_task_type, void *label);
-extern task_t* __kmpc_omp_task_alloc(id *loc, int gtid, int flags,
+extern task_t* __nosvc_omp_task_alloc(id *loc, int gtid, int flags,
                                      size_t sz, size_t shar, entry_t rtn, omp_task_type_t*);
 #else
 extern task_t* __kmpc_omp_task_alloc(id *loc, int gtid, int flags,
@@ -174,7 +174,7 @@ int main()
 #if defined(_OPENMPV)
       omp_task_type_t omp_task_type2;
       __nosvc_register_task_info(&omp_task_type2, NULL);
-      ptr = __kmpc_omp_task_alloc(&loc, gtid, TIED, sizeof(task_t), 0, thunk_s, &omp_task_type2);
+      ptr = __nosvc_omp_task_alloc(&loc, gtid, TIED, sizeof(task_t), 0, thunk_s, &omp_task_type2);
 #else
       ptr = __kmpc_omp_task_alloc(&loc, gtid, TIED, sizeof(task_t), 0, thunk_s);
 #endif
@@ -191,7 +191,7 @@ int main()
 #if defined(_OPENMPV)
       omp_task_type_t omp_task_type3;
       __nosvc_register_task_info(&omp_task_type3, NULL);
-      ptr = __kmpc_omp_task_alloc(&loc, gtid, TIED, sizeof(task_t), 0, thunk_s, &omp_task_type3);
+      ptr = __nosvc_omp_task_alloc(&loc, gtid, TIED, sizeof(task_t), 0, thunk_s, &omp_task_type3);
 #else
       ptr = __kmpc_omp_task_alloc(&loc, gtid, TIED, sizeof(task_t), 0, thunk_s);
 #endif
@@ -238,7 +238,7 @@ int main()
 #if defined(_OPENMPV)
       omp_task_type_t omp_task_type6;
       __nosvc_register_task_info(&omp_task_type6, NULL);
-      ptr = __kmpc_omp_task_alloc(&loc, gtid, TIED, sizeof(task_t), 0, thunk_m, &omp_task_type6);
+      ptr = __nosvc_omp_task_alloc(&loc, gtid, TIED, sizeof(task_t), 0, thunk_m, &omp_task_type6);
 #else
       ptr = __kmpc_omp_task_alloc(&loc, gtid, TIED, sizeof(task_t), 0, thunk_m);
 #endif
@@ -255,7 +255,7 @@ int main()
 #if defined(_OPENMPV)
       omp_task_type_t omp_task_type7;
       __nosvc_register_task_info(&omp_task_type7, NULL);
-      ptr = __kmpc_omp_task_alloc(&loc, gtid, TIED, sizeof(task_t), 0, thunk_m, &omp_task_type7);
+      ptr = __nosvc_omp_task_alloc(&loc, gtid, TIED, sizeof(task_t), 0, thunk_m, &omp_task_type7);
 #else
       ptr = __kmpc_omp_task_alloc(&loc, gtid, TIED, sizeof(task_t), 0, thunk_m);
 #endif

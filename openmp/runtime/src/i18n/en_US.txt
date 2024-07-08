@@ -365,6 +365,8 @@ TopologyHybrid               "%1$s: hybrid core type detected: %2$d %3$s cores."
 TopologyHybridCoreEff        "%1$s:   %2$d with core efficiency %3$d."
 NosvEnvSupport               "%1$s env var is not supported. Default value is %2$d."
 FreeAgentsSupport            "Free agents support is only available in an OpenMP-V runtime."
+CompatSupport                "Compatibility mode is only available in an OpenMP-V runtime."
+LibompApiCall                "Unexpected call to __kmpc_* function. If it is expected, enable compatibility mode with OMP_ENABLE_COMPAT=1."
 
 # --- OpenMP errors detected at runtime ---
 #

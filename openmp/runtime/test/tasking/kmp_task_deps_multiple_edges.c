@@ -30,7 +30,7 @@ int main(void) {
 #if defined(_OPENMPV)
       omp_task_type_t omp_task_typeA;
       __nosvc_register_task_info(&omp_task_typeA, NULL);
-      A = __kmpc_omp_task_alloc(&loc, gtid, TIED, sizeof(kmp_task_t), 0, NULL, &omp_task_typeA);
+      A = __nosvc_omp_task_alloc(&loc, gtid, TIED, sizeof(kmp_task_t), 0, NULL, &omp_task_typeA);
 #else
       A = __kmpc_omp_task_alloc(&loc, gtid, TIED, sizeof(kmp_task_t), 0, NULL);
 #endif
@@ -48,7 +48,7 @@ int main(void) {
 #if defined(_OPENMPV)
       omp_task_type_t omp_task_typeB;
       __nosvc_register_task_info(&omp_task_typeB, NULL);
-      B = __kmpc_omp_task_alloc(&loc, gtid, TIED, sizeof(kmp_task_t), 0, NULL, &omp_task_typeB);
+      B = __nosvc_omp_task_alloc(&loc, gtid, TIED, sizeof(kmp_task_t), 0, NULL, &omp_task_typeB);
 #else
       B = __kmpc_omp_task_alloc(&loc, gtid, TIED, sizeof(kmp_task_t), 0, NULL);
 #endif
