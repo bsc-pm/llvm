@@ -342,20 +342,6 @@ static void __kmp_construct_initialization() {
 int __kmp_get_global_thread_id_reg() {
   int gtid;
 
-#if defined(KMP_OMPV_ENABLED)
-  // main thread is already attached
-  // but newer pthreads that start a parallel
-  // are not
-  if (!nosv_self()) {
-    fprintf(stderr, "WARNING: %d thread is not the main thread nor a worker thread. "
-                    "May you consider adding a nosv_detach at the end of the thread code?\n", gtid);
-    nosv_task_t nosv_impl_task;
-    __kmp_nosv_attach(&nosv_impl_task, NULL);
-
-    instr_attached_enter();
-  }
-#endif // KMP_OMPV_ENABLED
-
   if (!__kmp_init_serial) {
     gtid = KMP_GTID_DNE;
   } else
@@ -373,6 +359,20 @@ int __kmp_get_global_thread_id_reg() {
              ("*** __kmp_get_global_thread_id_reg: using internal alg.\n"));
     gtid = __kmp_get_global_thread_id();
   }
+
+#if defined(KMP_OMPV_ENABLED)
+  // main thread is already attached
+  // but newer pthreads that start a parallel
+  // are not
+  if (!nosv_self()) {
+    fprintf(stderr, "WARNING: %d thread is not the main thread nor a worker thread. "
+                    "May you consider adding a nosv_detach at the end of the thread code?\n", gtid);
+    nosv_task_t nosv_impl_task;
+    __kmp_nosv_attach(&nosv_impl_task, NULL);
+
+    instr_attached_enter();
+  }
+#endif // KMP_OMPV_ENABLED
 
   /* we must be a new uber master sibling thread */
   if (gtid == KMP_GTID_DNE) {
