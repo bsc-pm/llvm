@@ -1964,7 +1964,7 @@ static kmp_int32 __kmp_single(ident_t *loc, kmp_int32 global_tid
 
 #if defined(KMP_OMPV_ENABLED)
 kmp_int32 __nosvc_single(ident_t *loc, kmp_int32 global_tid,
-                        omp_task_type_t *omp_task_type) {
+                        omp_task_type_t *&omp_task_type) {
   return __kmp_single(loc, global_tid, omp_task_type);
 }
 #endif // KMP_OMPV_ENABLED
@@ -2018,7 +2018,7 @@ static void __kmp_end_single(ident_t *loc, kmp_int32 global_tid
 
 #if defined(KMP_OMPV_ENABLED)
 void __nosvc_end_single(ident_t *loc, kmp_int32 global_tid,
-                        omp_task_type_t *omp_task_type) {
+                        omp_task_type_t *&omp_task_type) {
   __kmp_end_single(loc, global_tid, omp_task_type);
 }
 #endif // KMP_OMPV_ENABLED
@@ -2041,7 +2041,7 @@ Mark the end of a statically scheduled loop.
 */
 #if defined(KMP_OMPV_ENABLED)
 void __nosvc_for_static_fini(ident_t *loc, kmp_int32 global_tid,
-                             omp_task_type_t *omp_task_type) {
+                             omp_task_type_t *&omp_task_type) {
   KMP_POP_PARTITIONED_TIMER();
   KE_TRACE(10, ("__kmpc_for_static_fini called T#%d\n", global_tid));
 
