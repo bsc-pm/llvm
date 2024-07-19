@@ -513,6 +513,12 @@ private:
   // OmpSs
   bool TraverseOSSExecutableDirective(OSSExecutableDirective *S);
   bool TraverseOSSLoopDirective(OSSLoopDirective *S);
+  bool TraverseOSSClause(OSSClause *C);
+#define GEN_CLANG_CLAUSE_CLASS
+#define CLAUSE_CLASS(Enum, Str, Class) bool Visit##Class(Class *C);
+#include "llvm/Frontend/OmpSs/OSS.inc"
+  /// Process clauses with list of variables.
+  template <typename T> bool VisitOSSClauseList(T *Node);
 
   bool PostVisitStmt(Stmt *S);
   bool TraverseOpenACCConstructStmt(OpenACCConstructStmt *S);
@@ -3290,7 +3296,7 @@ bool RecursiveASTVisitor<Derived>::VisitOMPClauseWithPostUpdate(
 template <typename Derived>
 bool RecursiveASTVisitor<Derived>::VisitOMPLabelClause(
     OMPLabelClause *C) {
-  llvm_unreachable("TODO");
+  TRY_TO(VisitOMPClauseList(C));
   return true;
 }
 
@@ -4052,7 +4058,9 @@ DEF_TRAVERSE_STMT(OpenACCComputeConstruct,
 template <typename Derived>
 bool RecursiveASTVisitor<Derived>::TraverseOSSExecutableDirective(
     OSSExecutableDirective *S) {
-  llvm_unreachable("");
+  for (auto *C : S->clauses()) {
+    TRY_TO(TraverseOSSClause(C));
+  }
   return true;
 }
 
@@ -4088,6 +4096,220 @@ DEF_TRAVERSE_STMT(OSSTaskLoopForDirective,
 
 DEF_TRAVERSE_STMT(OSSAtomicDirective,
                   { TRY_TO(TraverseOSSExecutableDirective(S)); })
+
+// OmpSs-2 clauses.
+template <typename Derived>
+template <typename T>
+bool RecursiveASTVisitor<Derived>::VisitOSSClauseList(T *Node) {
+  for (auto *E : Node->varlists()) {
+    TRY_TO(TraverseStmt(E));
+  }
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::TraverseOSSClause(OSSClause *C) {
+  if (!C)
+    return true;
+  switch (C->getClauseKind()) {
+#define GEN_CLANG_CLAUSE_CLASS
+#define CLAUSE_CLASS(Enum, Str, Class)                                         \
+  case llvm::oss::Clause::Enum:                                                \
+    TRY_TO(Visit##Class(static_cast<Class *>(C)));                             \
+    break;
+#define CLAUSE_NO_CLASS(Enum, Str)                                             \
+  case llvm::oss::Clause::Enum:                                                \
+    break;
+#include "llvm/Frontend/OmpSs/OSS.inc"
+  }
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSIfClause(OSSIfClause *C) {
+  TRY_TO(TraverseStmt(C->getCondition()));
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSFinalClause(OSSFinalClause *C) {
+  TRY_TO(TraverseStmt(C->getCondition()));
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSCostClause(OSSCostClause *C) {
+  TRY_TO(TraverseStmt(C->getExpression()));
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSPriorityClause(OSSPriorityClause *C) {
+  TRY_TO(TraverseStmt(C->getExpression()));
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSLabelClause(OSSLabelClause *C) {
+  TRY_TO(VisitOSSClauseList(C));
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSWaitClause(OSSWaitClause *) {
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSUpdateClause(OSSUpdateClause *) {
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSShmemClause(OSSShmemClause *C) {
+  TRY_TO(TraverseStmt(C->getExpression()));
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSOnreadyClause(OSSOnreadyClause *C) {
+  TRY_TO(TraverseStmt(C->getExpression()));
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSDefaultClause(OSSDefaultClause *) {
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSDeviceClause(OSSDeviceClause *) {
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSPrivateClause(OSSPrivateClause *C) {
+  TRY_TO(VisitOSSClauseList(C));
+  for (auto *E : C->private_copies()) {
+    TRY_TO(TraverseStmt(E));
+  }
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSFirstprivateClause(OSSFirstprivateClause *C) {
+  TRY_TO(VisitOSSClauseList(C));
+  for (auto *E : C->private_copies()) {
+    TRY_TO(TraverseStmt(E));
+  }
+  for (auto *E : C->inits()) {
+    TRY_TO(TraverseStmt(E));
+  }
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSSharedClause(OSSSharedClause *C) {
+  TRY_TO(VisitOSSClauseList(C));
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSDependClause(OSSDependClause *C) {
+  TRY_TO(VisitOSSClauseList(C));
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSReductionClause(OSSReductionClause *C) {
+  TRY_TO(TraverseNestedNameSpecifierLoc(C->getQualifierLoc()));
+  TRY_TO(TraverseDeclarationNameInfo(C->getNameInfo()));
+  TRY_TO(VisitOSSClauseList(C));
+  for (auto *E : C->lhs_exprs()) {
+    TRY_TO(TraverseStmt(E));
+  }
+  for (auto *E : C->rhs_exprs()) {
+    TRY_TO(TraverseStmt(E));
+  }
+  for (auto *E : C->reduction_ops()) {
+    TRY_TO(TraverseStmt(E));
+  }
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSGrainsizeClause(OSSGrainsizeClause *C) {
+  TRY_TO(TraverseStmt(C->getExpression()));
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSChunksizeClause(OSSChunksizeClause *C) {
+  TRY_TO(TraverseStmt(C->getExpression()));
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSUnrollClause(OSSUnrollClause *) {
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSCollapseClause(OSSCollapseClause *C) {
+  TRY_TO(TraverseStmt(C->getNumForLoops()));
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSNdrangeClause(OSSNdrangeClause *C) {
+  TRY_TO(VisitOSSClauseList(C));
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSReadClause(OSSReadClause *) {
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSWriteClause(OSSWriteClause *) {
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSCaptureClause(OSSCaptureClause *) {
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSCompareClause(OSSCompareClause *) {
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSSeqCstClause(OSSSeqCstClause *) {
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSAcqRelClause(OSSAcqRelClause *) {
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSAcquireClause(OSSAcquireClause *) {
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSReleaseClause(OSSReleaseClause *) {
+  return true;
+}
+
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSRelaxedClause(OSSRelaxedClause *) {
+  return true;
+}
 
 #undef DEF_TRAVERSE_STMT
 #undef TRAVERSE_STMT
