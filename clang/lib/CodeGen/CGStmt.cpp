@@ -1041,7 +1041,9 @@ void CodeGenFunction::EmitWhileStmt(const WhileStmt &S,
 
   // Disable optimization of while(1) by storing the value in
   // a temporal
-  if (CGM.getOmpSsRuntime().inTaskBody() && !EmitBoolCondBranch) {
+  if (getLangOpts().OmpSs &&
+      CGM.getOmpSsRuntime().inTaskBody() &&
+      !EmitBoolCondBranch) {
     EmitBoolCondBranch = true;
     llvm::AllocaInst *Alloca = CreateTempAlloca(BoolCondVal->getType());
     Builder.CreateFlagStore(BoolCondVal, Alloca);
