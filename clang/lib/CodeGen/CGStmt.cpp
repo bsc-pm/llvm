@@ -1038,6 +1038,16 @@ void CodeGenFunction::EmitWhileStmt(const WhileStmt &S,
   // to correctly handle break/continue though.
   llvm::ConstantInt *C = dyn_cast<llvm::ConstantInt>(BoolCondVal);
   bool EmitBoolCondBranch = !C || !C->isOne();
+
+  // Disable optimization of while(1) by storing the value in
+  // a temporal
+  if (CGM.getOmpSsRuntime().inTaskBody() && !EmitBoolCondBranch) {
+    EmitBoolCondBranch = true;
+    llvm::AllocaInst *Alloca = CreateTempAlloca(BoolCondVal->getType());
+    Builder.CreateFlagStore(BoolCondVal, Alloca);
+    BoolCondVal = Builder.CreateFlagLoad(Alloca);
+  }
+
   const SourceRange &R = S.getSourceRange();
   LoopStack.push(LoopHeader.getBlock(), CGM.getContext(), CGM.getCodeGenOpts(),
                  WhileAttrs, SourceLocToDebugLoc(R.getBegin()),
