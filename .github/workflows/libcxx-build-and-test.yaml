@@ -68,14 +68,14 @@ jobs:
             cxx: 'g++-13'
             clang_tidy: 'OFF'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.1.7
       - name: ${{ matrix.config }}.${{ matrix.cxx }}
         run: libcxx/utils/ci/run-buildbot ${{ matrix.config }}
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
           ENABLE_CLANG_TIDY: ${{ matrix.clang_tidy }}
-      - uses: actions/upload-artifact@26f96dfa697d77e81fd5907df203aa23a56210a8 # v4.3.0
+      - uses: actions/upload-artifact@0b2256b8c012f0828dc542b3febcab082c67f72b # v4.3.4
         if: always()
         with:
           name: ${{ matrix.config }}-${{ matrix.cxx }}-results
@@ -117,14 +117,14 @@ jobs:
             cxx: 'clang++-17'
             clang_tidy: 'OFF'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.1.7
       - name: ${{ matrix.config }}
         run: libcxx/utils/ci/run-buildbot ${{ matrix.config }}
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
           ENABLE_CLANG_TIDY: ${{ matrix.clang_tidy }}
-      - uses: actions/upload-artifact@26f96dfa697d77e81fd5907df203aa23a56210a8 # v4.3.0
+      - uses: actions/upload-artifact@0b2256b8c012f0828dc542b3febcab082c67f72b # v4.3.4
         if: always()  # Upload artifacts even if the build or test suite fails
         with:
           name: ${{ matrix.config }}-${{ matrix.cxx }}-results
@@ -182,14 +182,14 @@ jobs:
           machine: libcxx-runners-8-set
     runs-on: ${{ matrix.machine }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.1.7
       - name: ${{ matrix.config }}
         run: libcxx/utils/ci/run-buildbot ${{ matrix.config }}
         env:
           CC: clang-18
           CXX: clang++-18
           ENABLE_CLANG_TIDY: "OFF"
-      - uses: actions/upload-artifact@26f96dfa697d77e81fd5907df203aa23a56210a8 # v4.3.0
+      - uses: actions/upload-artifact@0b2256b8c012f0828dc542b3febcab082c67f72b # v4.3.4
         if: always()
         with:
           name: ${{ matrix.config }}-results
@@ -215,7 +215,7 @@ jobs:
         - { config: mingw-static, mingw: true }
         - { config: mingw-dll-i686, mingw: true }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.1.7
       - name: Install dependencies
         run: |
           choco install -y ninja wget
