@@ -864,7 +864,7 @@ static void TranslateOptArg(Arg *A, llvm::opt::DerivedArgList &DAL,
           DAL.AddJoinedArg(A, Opts.getOption(options::OPT_O), "s");
         } else if (OptChar == '2' || OptChar == 'x') {
           DAL.AddFlagArg(A, Opts.getOption(options::OPT_fbuiltin));
-          DAL.AddJoinedArg(A, Opts.getOption(options::OPT_O), "2");
+          DAL.AddJoinedArg(A, Opts.getOption(options::OPT_O), "3");
         }
         if (SupportsForcingFramePointer &&
             !DAL.hasArgNoClaim(options::OPT_fno_omit_frame_pointer))
@@ -883,6 +883,7 @@ static void TranslateOptArg(Arg *A, llvm::opt::DerivedArgList &DAL,
           DAL.AddFlagArg(A, Opts.getOption(options::OPT_finline_hint_functions));
           break;
         case '2':
+        case '3':
           DAL.AddFlagArg(A, Opts.getOption(options::OPT_finline_functions));
           break;
         }
@@ -904,7 +905,7 @@ static void TranslateOptArg(Arg *A, llvm::opt::DerivedArgList &DAL,
       DAL.AddJoinedArg(A, Opts.getOption(options::OPT_O), "s");
       break;
     case 't':
-      DAL.AddJoinedArg(A, Opts.getOption(options::OPT_O), "2");
+      DAL.AddJoinedArg(A, Opts.getOption(options::OPT_O), "3");
       break;
     case 'y': {
       bool OmitFramePointer = true;

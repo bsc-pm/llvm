@@ -9,6 +9,7 @@
 #include "flang/Semantics/semantics.h"
 #include "assignment.h"
 #include "canonicalize-acc.h"
+#include "canonicalize-directives.h"
 #include "canonicalize-do.h"
 #include "canonicalize-omp.h"
 #include "canonicalize-oss.h"
@@ -161,6 +162,41 @@ private:
   SemanticsContext &context_;
 };
 
+static void WarnUndefinedFunctionResult(
+    SemanticsContext &context, const Scope &scope) {
+  auto WasDefined{[&context](const Symbol &symbol) {
+    return context.IsSymbolDefined(symbol) ||
+        IsInitialized(symbol, /*ignoreDataStatements=*/true,
+            /*ignoreAllocatable=*/true, /*ignorePointer=*/true);
+  }};
+  if (const Symbol * symbol{scope.symbol()}) {
+    if (const auto *subp{symbol->detailsIf<SubprogramDetails>()}) {
+      if (subp->isFunction() && !subp->isInterface() && !subp->stmtFunction()) {
+        bool wasDefined{WasDefined(subp->result())};
+        if (!wasDefined) {
+          // Definitions of ENTRY result variables also count.
+          for (const auto &pair : scope) {
+            const Symbol &local{*pair.second};
+            if (IsFunctionResult(local) && WasDefined(local)) {
+              wasDefined = true;
+              break;
+            }
+          }
+          if (!wasDefined) {
+            context.Say(
+                symbol->name(), "Function result is never defined"_warn_en_US);
+          }
+        }
+      }
+    }
+  }
+  if (!scope.IsModuleFile()) {
+    for (const Scope &child : scope.children()) {
+      WarnUndefinedFunctionResult(context, child);
+    }
+  }
+}
+
 using StatementSemanticsPass1 = ExprChecker;
 using StatementSemanticsPass2 = SemanticsVisitor<AllocateChecker,
     ArithmeticIfStmtChecker, AssignmentChecker, CaseChecker, CoarrayChecker,
@@ -189,6 +225,12 @@ static bool PerformStatementSemantics(
   }
   if (context.languageFeatures().IsEnabled(common::LanguageFeature::CUDA)) {
     SemanticsVisitor<CUDAChecker>{context}.Walk(program);
+  }
+  if (!context.messages().AnyFatalError()) {
+    // Do this if all messages are only warnings
+    if (context.ShouldWarn(common::UsageWarning::UndefinedFunctionResult)) {
+      WarnUndefinedFunctionResult(context, context.globalScope());
+    }
   }
   if (!context.AnyFatalError()) {
     pass2.CompileDataInitializationsIntoInitializers();
@@ -605,8 +647,11 @@ bool Semantics::Perform() {
       CanonicalizeOmp(context_.messages(), program_) &&
       CanonicalizeOSS(context_.messages(), program_) &&
       CanonicalizeCUDA(program_) &&
+      CanonicalizeDirectives(context_.messages(), program_) &&
       PerformStatementSemantics(context_, program_) &&
-      ModFileWriter{context_}.WriteAll();
+      ModFileWriter{context_}
+          .set_hermeticModuleFileOutput(hermeticModuleFileOutput_)
+          .WriteAll();
 }
 
 void Semantics::EmitMessages(llvm::raw_ostream &os) {
@@ -712,6 +757,14 @@ CommonBlockList SemanticsContext::GetCommonBlocks() const {
     return commonBlockMap_->GetCommonBlocks();
   }
   return {};
+}
+
+void SemanticsContext::NoteDefinedSymbol(const Symbol &symbol) {
+  isDefined_.insert(symbol);
+}
+
+bool SemanticsContext::IsSymbolDefined(const Symbol &symbol) const {
+  return isDefined_.find(symbol) != isDefined_.end();
 }
 
 } // namespace Fortran::semantics

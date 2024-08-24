@@ -167,7 +167,7 @@ void bar(int n) {
 // LIN64-NEXT:    [[N_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    [[AGG_TMP_ENSURED:%.*]] = alloca [[CLASS_ANON:%.*]], align 8
 // LIN64-NEXT:    store ptr [[N]], ptr [[N_ADDR]], align 8
-// LIN64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[CLASS_ANON]], ptr [[AGG_TMP_ENSURED]], i32 0, i32 0, !dbg [[DBG58:![0-9]+]]
+// LIN64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[CLASS_ANON]], ptr [[AGG_TMP_ENSURED]], i32 0, i32 0, !dbg [[DBG58:![0-9]+]]
 // LIN64-NEXT:    store ptr [[N]], ptr [[TMP0]], align 8, !dbg [[DBG58]]
 // LIN64-NEXT:    ret void, !dbg [[DBG60:![0-9]+]]
 //
@@ -201,7 +201,7 @@ void bar(int n) {
 // LIN64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
 // LIN64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// LIN64-NEXT:    [[X:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG71:![0-9]+]]
+// LIN64-NEXT:    [[X:%.*]] = getelementptr inbounds nuw [[STRUCT_S:%.*]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG71:![0-9]+]]
 // LIN64-NEXT:    ret void, !dbg [[DBG71]]
 //
 //
@@ -331,7 +331,7 @@ void bar(int n) {
 // PPC64-NEXT:    [[N_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    [[AGG_TMP_ENSURED:%.*]] = alloca [[CLASS_ANON:%.*]], align 8
 // PPC64-NEXT:    store ptr [[N]], ptr [[N_ADDR]], align 8
-// PPC64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[CLASS_ANON]], ptr [[AGG_TMP_ENSURED]], i32 0, i32 0, !dbg [[DBG58:![0-9]+]]
+// PPC64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[CLASS_ANON]], ptr [[AGG_TMP_ENSURED]], i32 0, i32 0, !dbg [[DBG58:![0-9]+]]
 // PPC64-NEXT:    store ptr [[N]], ptr [[TMP0]], align 8, !dbg [[DBG58]]
 // PPC64-NEXT:    ret void, !dbg [[DBG60:![0-9]+]]
 //
@@ -365,7 +365,7 @@ void bar(int n) {
 // PPC64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
 // PPC64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// PPC64-NEXT:    [[X:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG71:![0-9]+]]
+// PPC64-NEXT:    [[X:%.*]] = getelementptr inbounds nuw [[STRUCT_S:%.*]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG71:![0-9]+]]
 // PPC64-NEXT:    ret void, !dbg [[DBG71]]
 //
 //
@@ -495,7 +495,7 @@ void bar(int n) {
 // AARCH64-NEXT:    [[N_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    [[AGG_TMP_ENSURED:%.*]] = alloca [[CLASS_ANON:%.*]], align 8
 // AARCH64-NEXT:    store ptr [[N]], ptr [[N_ADDR]], align 8
-// AARCH64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[CLASS_ANON]], ptr [[AGG_TMP_ENSURED]], i32 0, i32 0, !dbg [[DBG58:![0-9]+]]
+// AARCH64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[CLASS_ANON]], ptr [[AGG_TMP_ENSURED]], i32 0, i32 0, !dbg [[DBG58:![0-9]+]]
 // AARCH64-NEXT:    store ptr [[N]], ptr [[TMP0]], align 8, !dbg [[DBG58]]
 // AARCH64-NEXT:    ret void, !dbg [[DBG60:![0-9]+]]
 //
@@ -529,6 +529,6 @@ void bar(int n) {
 // AARCH64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
 // AARCH64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// AARCH64-NEXT:    [[X:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG71:![0-9]+]]
+// AARCH64-NEXT:    [[X:%.*]] = getelementptr inbounds nuw [[STRUCT_S:%.*]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG71:![0-9]+]]
 // AARCH64-NEXT:    ret void, !dbg [[DBG71]]
 //

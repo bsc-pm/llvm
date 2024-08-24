@@ -89,50 +89,49 @@ program task
 end program
 
 
-
 ! LLVMIRDialect-LABEL:   llvm.func @_QQmain() attributes {fir.bindc_name = "task"} {
-! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.constant(3 : i32) : i32
-! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
-! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.constant(10 : i32) : i32
-! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i32) : i32
-! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.mlir.constant(60 : i32) : i32
+! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
+! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_0]] x i32 {bindc_name = "j"} : (i64) -> !llvm.ptr
+! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
+! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_2]] x i32 {bindc_name = "i"} : (i64) -> !llvm.ptr
+! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.mlir.constant(3 : i32) : i32
 ! LLVMIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
-! LLVMIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_5]] x i32 {bindc_name = "i"} : (i64) -> !llvm.ptr
-! LLVMIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
-! LLVMIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_7]] x i32 {bindc_name = "j"} : (i64) -> !llvm.ptr
+! LLVMIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.mlir.constant(10 : i32) : i32
+! LLVMIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i32) : i32
+! LLVMIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = llvm.mlir.constant(60 : i32) : i32
 ! LLVMIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = llvm.mlir.undef : i32
-! LLVMIRDialect:           oss.taskloop lower_bound(%[[VAL_3]] : i32) upper_bound(%[[VAL_2]] : i32) step(%[[VAL_3]] : i32) loop_type(%[[VAL_1]] : i64) ind_var(%[[VAL_8]] : !llvm.ptr) private(%[[VAL_8]], %[[VAL_8]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_9]], %[[VAL_9]] : i32, i32) grainsize(%[[VAL_4]] : i32) {
+! LLVMIRDialect:           oss.taskloop lower_bound(%[[VAL_7]] : i32) upper_bound(%[[VAL_6]] : i32) step(%[[VAL_7]] : i32) loop_type(%[[VAL_5]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) private(%[[VAL_1]], %[[VAL_1]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_9]], %[[VAL_9]] : i32, i32) grainsize(%[[VAL_8]] : i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           oss.taskloop lower_bound(%[[VAL_3]] : i32) upper_bound(%[[VAL_2]] : i32) step(%[[VAL_3]] : i32) loop_type(%[[VAL_1]] : i64) ind_var(%[[VAL_8]] : !llvm.ptr) private(%[[VAL_8]], %[[VAL_8]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_9]], %[[VAL_9]] : i32, i32) {
+! LLVMIRDialect:           oss.taskloop lower_bound(%[[VAL_7]] : i32) upper_bound(%[[VAL_6]] : i32) step(%[[VAL_7]] : i32) loop_type(%[[VAL_5]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) private(%[[VAL_1]], %[[VAL_1]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_9]], %[[VAL_9]] : i32, i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]] = llvm.load %[[VAL_6]] : !llvm.ptr -> i32
-! LLVMIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = llvm.icmp "eq" %[[VAL_10]], %[[VAL_0]] : i32
-! LLVMIRDialect:           oss.taskloop lower_bound(%[[VAL_3]] : i32) upper_bound(%[[VAL_2]] : i32) step(%[[VAL_3]] : i32) loop_type(%[[VAL_1]] : i64) ind_var(%[[VAL_8]] : !llvm.ptr) if(%[[VAL_11]] : i1) private(%[[VAL_8]], %[[VAL_8]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_9]], %[[VAL_9]] : i32, i32) {
+! LLVMIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]] = llvm.load %[[VAL_3]] : !llvm.ptr -> i32
+! LLVMIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = llvm.icmp "eq" %[[VAL_10]], %[[VAL_4]] : i32
+! LLVMIRDialect:           oss.taskloop lower_bound(%[[VAL_7]] : i32) upper_bound(%[[VAL_6]] : i32) step(%[[VAL_7]] : i32) loop_type(%[[VAL_5]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) if(%[[VAL_11]] : i1) private(%[[VAL_1]], %[[VAL_1]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_9]], %[[VAL_9]] : i32, i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = llvm.load %[[VAL_6]] : !llvm.ptr -> i32
-! LLVMIRDialect:           %[[VAL_13:[-0-9A-Za-z._]+]] = llvm.icmp "eq" %[[VAL_12]], %[[VAL_0]] : i32
-! LLVMIRDialect:           oss.taskloop lower_bound(%[[VAL_3]] : i32) upper_bound(%[[VAL_2]] : i32) step(%[[VAL_3]] : i32) loop_type(%[[VAL_1]] : i64) ind_var(%[[VAL_8]] : !llvm.ptr) final(%[[VAL_13]] : i1) private(%[[VAL_8]], %[[VAL_8]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_9]], %[[VAL_9]] : i32, i32) {
+! LLVMIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = llvm.load %[[VAL_3]] : !llvm.ptr -> i32
+! LLVMIRDialect:           %[[VAL_13:[-0-9A-Za-z._]+]] = llvm.icmp "eq" %[[VAL_12]], %[[VAL_4]] : i32
+! LLVMIRDialect:           oss.taskloop lower_bound(%[[VAL_7]] : i32) upper_bound(%[[VAL_6]] : i32) step(%[[VAL_7]] : i32) loop_type(%[[VAL_5]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) final(%[[VAL_13]] : i1) private(%[[VAL_1]], %[[VAL_1]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_9]], %[[VAL_9]] : i32, i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           oss.taskloop lower_bound(%[[VAL_3]] : i32) upper_bound(%[[VAL_2]] : i32) step(%[[VAL_3]] : i32) loop_type(%[[VAL_1]] : i64) ind_var(%[[VAL_8]] : !llvm.ptr) cost(%[[VAL_0]] : i32) private(%[[VAL_8]], %[[VAL_8]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_9]], %[[VAL_9]] : i32, i32) {
+! LLVMIRDialect:           oss.taskloop lower_bound(%[[VAL_7]] : i32) upper_bound(%[[VAL_6]] : i32) step(%[[VAL_7]] : i32) loop_type(%[[VAL_5]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) cost(%[[VAL_4]] : i32) private(%[[VAL_1]], %[[VAL_1]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_9]], %[[VAL_9]] : i32, i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           oss.taskloop lower_bound(%[[VAL_3]] : i32) upper_bound(%[[VAL_2]] : i32) step(%[[VAL_3]] : i32) loop_type(%[[VAL_1]] : i64) ind_var(%[[VAL_8]] : !llvm.ptr) priority(%[[VAL_0]] : i32) private(%[[VAL_8]], %[[VAL_8]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_9]], %[[VAL_9]] : i32, i32) {
+! LLVMIRDialect:           oss.taskloop lower_bound(%[[VAL_7]] : i32) upper_bound(%[[VAL_6]] : i32) step(%[[VAL_7]] : i32) loop_type(%[[VAL_5]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) priority(%[[VAL_4]] : i32) private(%[[VAL_1]], %[[VAL_1]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_9]], %[[VAL_9]] : i32, i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           oss.taskloop lower_bound(%[[VAL_3]] : i32) upper_bound(%[[VAL_2]] : i32) step(%[[VAL_3]] : i32) loop_type(%[[VAL_1]] : i64) ind_var(%[[VAL_8]] : !llvm.ptr) private(%[[VAL_8]], %[[VAL_8]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_9]], %[[VAL_9]] : i32, i32) default( defshared) {
+! LLVMIRDialect:           oss.taskloop lower_bound(%[[VAL_7]] : i32) upper_bound(%[[VAL_6]] : i32) step(%[[VAL_7]] : i32) loop_type(%[[VAL_5]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) private(%[[VAL_1]], %[[VAL_1]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_9]], %[[VAL_9]] : i32, i32) default( defshared) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           oss.taskloop lower_bound(%[[VAL_3]] : i32) upper_bound(%[[VAL_2]] : i32) step(%[[VAL_3]] : i32) loop_type(%[[VAL_1]] : i64) ind_var(%[[VAL_8]] : !llvm.ptr) private(%[[VAL_6]], %[[VAL_6]], %[[VAL_8]], %[[VAL_8]] : !llvm.ptr, !llvm.ptr, !llvm.ptr, !llvm.ptr) private_type(%[[VAL_9]], %[[VAL_9]], %[[VAL_9]], %[[VAL_9]] : i32, i32, i32, i32) {
+! LLVMIRDialect:           oss.taskloop lower_bound(%[[VAL_7]] : i32) upper_bound(%[[VAL_6]] : i32) step(%[[VAL_7]] : i32) loop_type(%[[VAL_5]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) private(%[[VAL_3]], %[[VAL_3]], %[[VAL_1]], %[[VAL_1]] : !llvm.ptr, !llvm.ptr, !llvm.ptr, !llvm.ptr) private_type(%[[VAL_9]], %[[VAL_9]], %[[VAL_9]], %[[VAL_9]] : i32, i32, i32, i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           oss.taskloop lower_bound(%[[VAL_3]] : i32) upper_bound(%[[VAL_2]] : i32) step(%[[VAL_3]] : i32) loop_type(%[[VAL_1]] : i64) ind_var(%[[VAL_8]] : !llvm.ptr) private(%[[VAL_8]], %[[VAL_8]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_9]], %[[VAL_9]] : i32, i32) firstprivate(%[[VAL_6]], %[[VAL_6]] : !llvm.ptr, !llvm.ptr) firstprivate_type(%[[VAL_9]], %[[VAL_9]] : i32, i32) {
+! LLVMIRDialect:           oss.taskloop lower_bound(%[[VAL_7]] : i32) upper_bound(%[[VAL_6]] : i32) step(%[[VAL_7]] : i32) loop_type(%[[VAL_5]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) private(%[[VAL_1]], %[[VAL_1]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_9]], %[[VAL_9]] : i32, i32) firstprivate(%[[VAL_3]], %[[VAL_3]] : !llvm.ptr, !llvm.ptr) firstprivate_type(%[[VAL_9]], %[[VAL_9]] : i32, i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           oss.taskloop lower_bound(%[[VAL_3]] : i32) upper_bound(%[[VAL_2]] : i32) step(%[[VAL_3]] : i32) loop_type(%[[VAL_1]] : i64) ind_var(%[[VAL_8]] : !llvm.ptr) private(%[[VAL_8]], %[[VAL_8]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_9]], %[[VAL_9]] : i32, i32) shared(%[[VAL_6]], %[[VAL_6]] : !llvm.ptr, !llvm.ptr) shared_type(%[[VAL_9]], %[[VAL_9]] : i32, i32) {
+! LLVMIRDialect:           oss.taskloop lower_bound(%[[VAL_7]] : i32) upper_bound(%[[VAL_6]] : i32) step(%[[VAL_7]] : i32) loop_type(%[[VAL_5]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) private(%[[VAL_1]], %[[VAL_1]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_9]], %[[VAL_9]] : i32, i32) shared(%[[VAL_3]], %[[VAL_3]] : !llvm.ptr, !llvm.ptr) shared_type(%[[VAL_9]], %[[VAL_9]] : i32, i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
 ! LLVMIRDialect:           llvm.return

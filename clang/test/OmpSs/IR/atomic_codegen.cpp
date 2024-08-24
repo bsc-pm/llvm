@@ -97,7 +97,7 @@ void parallel_atomic() {
 // LIN64-NEXT:    br i1 [[TMP7]], label [[ATOMIC_EXIT:%.*]], label [[ATOMIC_CONT]], !dbg [[DBG19]]
 // LIN64:       atomic_exit:
 // LIN64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP6]]) #[[ATTR1]], !dbg [[DBG23:![0-9]+]]
-// LIN64-NEXT:    [[FIELD:%.*]] = getelementptr inbounds [[STRUCT_ST]], ptr [[S]], i32 0, i32 0, !dbg [[DBG24:![0-9]+]]
+// LIN64-NEXT:    [[FIELD:%.*]] = getelementptr inbounds nuw [[STRUCT_ST]], ptr [[S]], i32 0, i32 0, !dbg [[DBG24:![0-9]+]]
 // LIN64-NEXT:    [[TMP8:%.*]] = atomicrmw add ptr [[FIELD]], i64 1 monotonic, align 8, !dbg [[DBG25:![0-9]+]]
 // LIN64-NEXT:    invoke void @_ZN2StC1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP11]])
 // LIN64-NEXT:            to label [[INVOKE_CONT12:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG26:![0-9]+]]
@@ -277,7 +277,7 @@ void parallel_atomic() {
 // PPC64-NEXT:    br i1 [[TMP7]], label [[ATOMIC_EXIT:%.*]], label [[ATOMIC_CONT]], !dbg [[DBG19]]
 // PPC64:       atomic_exit:
 // PPC64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP6]]) #[[ATTR1]], !dbg [[DBG23:![0-9]+]]
-// PPC64-NEXT:    [[FIELD:%.*]] = getelementptr inbounds [[STRUCT_ST]], ptr [[S]], i32 0, i32 0, !dbg [[DBG24:![0-9]+]]
+// PPC64-NEXT:    [[FIELD:%.*]] = getelementptr inbounds nuw [[STRUCT_ST]], ptr [[S]], i32 0, i32 0, !dbg [[DBG24:![0-9]+]]
 // PPC64-NEXT:    [[TMP8:%.*]] = atomicrmw add ptr [[FIELD]], i64 1 monotonic, align 8, !dbg [[DBG25:![0-9]+]]
 // PPC64-NEXT:    invoke void @_ZN2StC1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP11]])
 // PPC64-NEXT:            to label [[INVOKE_CONT12:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG26:![0-9]+]]
@@ -457,7 +457,7 @@ void parallel_atomic() {
 // AARCH64-NEXT:    br i1 [[TMP7]], label [[ATOMIC_EXIT:%.*]], label [[ATOMIC_CONT]], !dbg [[DBG19]]
 // AARCH64:       atomic_exit:
 // AARCH64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP6]]) #[[ATTR1]], !dbg [[DBG23:![0-9]+]]
-// AARCH64-NEXT:    [[FIELD:%.*]] = getelementptr inbounds [[STRUCT_ST]], ptr [[S]], i32 0, i32 0, !dbg [[DBG24:![0-9]+]]
+// AARCH64-NEXT:    [[FIELD:%.*]] = getelementptr inbounds nuw [[STRUCT_ST]], ptr [[S]], i32 0, i32 0, !dbg [[DBG24:![0-9]+]]
 // AARCH64-NEXT:    [[TMP8:%.*]] = atomicrmw add ptr [[FIELD]], i64 1 monotonic, align 8, !dbg [[DBG25:![0-9]+]]
 // AARCH64-NEXT:    invoke void @_ZN2StC1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP11]])
 // AARCH64-NEXT:            to label [[INVOKE_CONT12:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG26:![0-9]+]]

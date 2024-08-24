@@ -23,7 +23,6 @@
 #include "llvm/Analysis/BlockFrequencyInfo.h"
 #include "llvm/Analysis/BlockFrequencyInfoImpl.h"
 #include "llvm/Analysis/BranchProbabilityInfo.h"
-#include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/Argument.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/BasicBlock.h"
@@ -264,7 +263,8 @@ CodeExtractor::CodeExtractor(ArrayRef<BasicBlock *> BBs,
                                                      const SetVector<BasicBlock *> &Blocks)> emitOmpSsCaptureAndSubmitTask,
                              std::function<int(Value *const V)> valueInUnpackParams)
     : DT(nullptr), AggregateArgs(false), BFI(nullptr),
-      BPI(nullptr), AC(nullptr), AllowVarArgs(false),
+      BPI(nullptr), AC(nullptr), AllocationBlock(nullptr), AllowVarArgs(false),
+      Suffix(""), ArgsInZeroAddressSpace(false), 
       // Blocks(buildExtractionBlockSet(BBs, DT, AllowVarArgs, /* AllowAlloca */ true)),
       rewriteUsesBrAndGetOmpSsUnpackFunc(rewriteUsesBrAndGetOmpSsUnpackFunc),
       emitOmpSsCaptureAndSubmitTask(emitOmpSsCaptureAndSubmitTask),
@@ -272,17 +272,6 @@ CodeExtractor::CodeExtractor(ArrayRef<BasicBlock *> BBs,
       {
         Blocks.insert(BBs.begin(), BBs.end());
       }
-
-CodeExtractor::CodeExtractor(DominatorTree &DT, Loop &L, bool AggregateArgs,
-                             BlockFrequencyInfo *BFI,
-                             BranchProbabilityInfo *BPI, AssumptionCache *AC,
-                             std::string Suffix)
-    : DT(&DT), AggregateArgs(AggregateArgs || AggregateArgsOpt), BFI(BFI),
-      BPI(BPI), AC(AC), AllocationBlock(nullptr), AllowVarArgs(false),
-      Blocks(buildExtractionBlockSet(L.getBlocks(), &DT,
-                                     /* AllowVarArgs */ false,
-                                     /* AllowAlloca */ false)),
-      Suffix(Suffix) {}
 
 /// definedInRegion - Return true if the specified value is defined in the
 /// extracted region.
@@ -952,6 +941,7 @@ Function *CodeExtractor::constructFunction(const ValueSet &inputs,
       case Attribute::DisableSanitizerInstrumentation:
       case Attribute::FnRetThunkExtern:
       case Attribute::Hot:
+      case Attribute::HybridPatchable:
       case Attribute::NoRecurse:
       case Attribute::InlineHint:
       case Attribute::MinSize:
@@ -974,9 +964,11 @@ Function *CodeExtractor::constructFunction(const ValueSet &inputs,
       case Attribute::ShadowCallStack:
       case Attribute::SanitizeAddress:
       case Attribute::SanitizeMemory:
+      case Attribute::SanitizeNumericalStability:
       case Attribute::SanitizeThread:
       case Attribute::SanitizeHWAddress:
       case Attribute::SanitizeMemTag:
+      case Attribute::SanitizeRealtime:
       case Attribute::SpeculativeLoadHardening:
       case Attribute::StackProtect:
       case Attribute::StackProtectReq:
@@ -1020,6 +1012,7 @@ Function *CodeExtractor::constructFunction(const ValueSet &inputs,
       case Attribute::Writable:
       case Attribute::DeadOnUnwind:
       case Attribute::Range:
+      case Attribute::Initializes:
       //  These are not really attributes.
       case Attribute::None:
       case Attribute::EndAttrKinds:

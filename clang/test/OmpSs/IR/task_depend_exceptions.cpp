@@ -47,30 +47,30 @@ void class_convertible() {
 // LIN64-NEXT:    [[REF_TMP:%.*]] = alloca [[STRUCT_S:%.*]], align 1
 // LIN64-NEXT:    store ptr [[V]], ptr [[V_ADDR]], align 8
 // LIN64-NEXT:    invoke void @_ZN1SC1Ei(ptr noundef nonnull align 1 dereferenceable(1) [[REF_TMP]], i32 noundef 0)
-// LIN64-NEXT:    to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG16:![0-9]+]]
+// LIN64-NEXT:            to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG16:![0-9]+]]
 // LIN64:       invoke.cont:
 // LIN64-NEXT:    [[CALL:%.*]] = invoke noundef i32 @_ZN1ScviEv(ptr noundef nonnull align 1 dereferenceable(1) [[REF_TMP]])
-// LIN64-NEXT:    to label [[INVOKE_CONT1:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG16]]
+// LIN64-NEXT:            to label [[INVOKE_CONT1:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG16]]
 // LIN64:       invoke.cont1:
 // LIN64-NEXT:    [[TMP0:%.*]] = sext i32 [[CALL]] to i64
 // LIN64-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], 1
 // LIN64-NEXT:    [[ARRAYDECAY:%.*]] = getelementptr inbounds [10 x i32], ptr [[V]], i64 0, i64 0, !dbg [[DBG18:![0-9]+]]
 // LIN64-NEXT:    [[TMP2:%.*]] = mul i64 [[TMP0]], 4
 // LIN64-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP1]], 4
-// LIN64-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
+// LIN64-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
 // LIN64-NEXT:    store ptr [[ARRAYDECAY]], ptr [[TMP4]], align 8
-// LIN64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
+// LIN64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
 // LIN64-NEXT:    store i64 40, ptr [[TMP5]], align 8
-// LIN64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
+// LIN64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
 // LIN64-NEXT:    store i64 [[TMP2]], ptr [[TMP6]], align 8
-// LIN64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
+// LIN64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
 // LIN64-NEXT:    store i64 [[TMP3]], ptr [[TMP7]], align 8
 // LIN64-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 1 dereferenceable(1) [[REF_TMP]]) #[[ATTR3]]
 // LIN64-NEXT:    [[TMP8:%.*]] = load [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], align 8, !dbg [[DBG18]]
 // LIN64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T]] [[TMP8]], !dbg [[DBG18]]
 // LIN64:       terminate.lpad:
 // LIN64-NEXT:    [[TMP9:%.*]] = landingpad { ptr, i32 }
-// LIN64-NEXT:    catch ptr null, !dbg [[DBG16]]
+// LIN64-NEXT:            catch ptr null, !dbg [[DBG16]]
 // LIN64-NEXT:    [[TMP10:%.*]] = extractvalue { ptr, i32 } [[TMP9]], 0, !dbg [[DBG16]]
 // LIN64-NEXT:    call void @__clang_call_terminate(ptr [[TMP10]]) #[[ATTR8:[0-9]+]], !dbg [[DBG16]]
 // LIN64-NEXT:    unreachable, !dbg [[DBG16]]
@@ -90,26 +90,26 @@ void class_convertible() {
 // LIN64-NEXT:    [[V_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    store ptr [[V]], ptr [[V_ADDR]], align 8
 // LIN64-NEXT:    [[CALL:%.*]] = invoke noundef i32 @_Z3foov()
-// LIN64-NEXT:    to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG20:![0-9]+]]
+// LIN64-NEXT:            to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG20:![0-9]+]]
 // LIN64:       invoke.cont:
 // LIN64-NEXT:    [[TMP0:%.*]] = sext i32 [[CALL]] to i64
 // LIN64-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], 1
 // LIN64-NEXT:    [[ARRAYDECAY:%.*]] = getelementptr inbounds [10 x i32], ptr [[V]], i64 0, i64 0, !dbg [[DBG22:![0-9]+]]
 // LIN64-NEXT:    [[TMP2:%.*]] = mul i64 [[TMP0]], 4
 // LIN64-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP1]], 4
-// LIN64-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 0
+// LIN64-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 0
 // LIN64-NEXT:    store ptr [[ARRAYDECAY]], ptr [[TMP4]], align 8
-// LIN64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 1
+// LIN64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 1
 // LIN64-NEXT:    store i64 40, ptr [[TMP5]], align 8
-// LIN64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 2
+// LIN64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 2
 // LIN64-NEXT:    store i64 [[TMP2]], ptr [[TMP6]], align 8
-// LIN64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 3
+// LIN64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 3
 // LIN64-NEXT:    store i64 [[TMP3]], ptr [[TMP7]], align 8
 // LIN64-NEXT:    [[TMP8:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], align 8, !dbg [[DBG22]]
 // LIN64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_0]] [[TMP8]], !dbg [[DBG22]]
 // LIN64:       terminate.lpad:
 // LIN64-NEXT:    [[TMP9:%.*]] = landingpad { ptr, i32 }
-// LIN64-NEXT:    catch ptr null, !dbg [[DBG20]]
+// LIN64-NEXT:            catch ptr null, !dbg [[DBG20]]
 // LIN64-NEXT:    [[TMP10:%.*]] = extractvalue { ptr, i32 } [[TMP9]], 0, !dbg [[DBG20]]
 // LIN64-NEXT:    call void @__clang_call_terminate(ptr [[TMP10]]) #[[ATTR8]], !dbg [[DBG20]]
 // LIN64-NEXT:    unreachable, !dbg [[DBG20]]
@@ -143,30 +143,30 @@ void class_convertible() {
 // PPC64-NEXT:    [[REF_TMP:%.*]] = alloca [[STRUCT_S:%.*]], align 1
 // PPC64-NEXT:    store ptr [[V]], ptr [[V_ADDR]], align 8
 // PPC64-NEXT:    invoke void @_ZN1SC1Ei(ptr noundef nonnull align 1 dereferenceable(1) [[REF_TMP]], i32 noundef signext 0)
-// PPC64-NEXT:    to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG16:![0-9]+]]
+// PPC64-NEXT:            to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG16:![0-9]+]]
 // PPC64:       invoke.cont:
 // PPC64-NEXT:    [[CALL:%.*]] = invoke noundef signext i32 @_ZN1ScviEv(ptr noundef nonnull align 1 dereferenceable(1) [[REF_TMP]])
-// PPC64-NEXT:    to label [[INVOKE_CONT1:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG16]]
+// PPC64-NEXT:            to label [[INVOKE_CONT1:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG16]]
 // PPC64:       invoke.cont1:
 // PPC64-NEXT:    [[TMP0:%.*]] = sext i32 [[CALL]] to i64
 // PPC64-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], 1
 // PPC64-NEXT:    [[ARRAYDECAY:%.*]] = getelementptr inbounds [10 x i32], ptr [[V]], i64 0, i64 0, !dbg [[DBG18:![0-9]+]]
 // PPC64-NEXT:    [[TMP2:%.*]] = mul i64 [[TMP0]], 4
 // PPC64-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP1]], 4
-// PPC64-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
+// PPC64-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
 // PPC64-NEXT:    store ptr [[ARRAYDECAY]], ptr [[TMP4]], align 8
-// PPC64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
+// PPC64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
 // PPC64-NEXT:    store i64 40, ptr [[TMP5]], align 8
-// PPC64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
+// PPC64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
 // PPC64-NEXT:    store i64 [[TMP2]], ptr [[TMP6]], align 8
-// PPC64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
+// PPC64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
 // PPC64-NEXT:    store i64 [[TMP3]], ptr [[TMP7]], align 8
 // PPC64-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 1 dereferenceable(1) [[REF_TMP]]) #[[ATTR3]]
 // PPC64-NEXT:    [[TMP8:%.*]] = load [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], align 8, !dbg [[DBG18]]
 // PPC64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T]] [[TMP8]], !dbg [[DBG18]]
 // PPC64:       terminate.lpad:
 // PPC64-NEXT:    [[TMP9:%.*]] = landingpad { ptr, i32 }
-// PPC64-NEXT:    catch ptr null, !dbg [[DBG16]]
+// PPC64-NEXT:            catch ptr null, !dbg [[DBG16]]
 // PPC64-NEXT:    [[TMP10:%.*]] = extractvalue { ptr, i32 } [[TMP9]], 0, !dbg [[DBG16]]
 // PPC64-NEXT:    call void @__clang_call_terminate(ptr [[TMP10]]) #[[ATTR7:[0-9]+]], !dbg [[DBG16]]
 // PPC64-NEXT:    unreachable, !dbg [[DBG16]]
@@ -186,26 +186,26 @@ void class_convertible() {
 // PPC64-NEXT:    [[V_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store ptr [[V]], ptr [[V_ADDR]], align 8
 // PPC64-NEXT:    [[CALL:%.*]] = invoke noundef signext i32 @_Z3foov()
-// PPC64-NEXT:    to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG20:![0-9]+]]
+// PPC64-NEXT:            to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG20:![0-9]+]]
 // PPC64:       invoke.cont:
 // PPC64-NEXT:    [[TMP0:%.*]] = sext i32 [[CALL]] to i64
 // PPC64-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], 1
 // PPC64-NEXT:    [[ARRAYDECAY:%.*]] = getelementptr inbounds [10 x i32], ptr [[V]], i64 0, i64 0, !dbg [[DBG22:![0-9]+]]
 // PPC64-NEXT:    [[TMP2:%.*]] = mul i64 [[TMP0]], 4
 // PPC64-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP1]], 4
-// PPC64-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 0
+// PPC64-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 0
 // PPC64-NEXT:    store ptr [[ARRAYDECAY]], ptr [[TMP4]], align 8
-// PPC64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 1
+// PPC64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 1
 // PPC64-NEXT:    store i64 40, ptr [[TMP5]], align 8
-// PPC64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 2
+// PPC64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 2
 // PPC64-NEXT:    store i64 [[TMP2]], ptr [[TMP6]], align 8
-// PPC64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 3
+// PPC64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 3
 // PPC64-NEXT:    store i64 [[TMP3]], ptr [[TMP7]], align 8
 // PPC64-NEXT:    [[TMP8:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], align 8, !dbg [[DBG22]]
 // PPC64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_0]] [[TMP8]], !dbg [[DBG22]]
 // PPC64:       terminate.lpad:
 // PPC64-NEXT:    [[TMP9:%.*]] = landingpad { ptr, i32 }
-// PPC64-NEXT:    catch ptr null, !dbg [[DBG20]]
+// PPC64-NEXT:            catch ptr null, !dbg [[DBG20]]
 // PPC64-NEXT:    [[TMP10:%.*]] = extractvalue { ptr, i32 } [[TMP9]], 0, !dbg [[DBG20]]
 // PPC64-NEXT:    call void @__clang_call_terminate(ptr [[TMP10]]) #[[ATTR7]], !dbg [[DBG20]]
 // PPC64-NEXT:    unreachable, !dbg [[DBG20]]
@@ -239,30 +239,30 @@ void class_convertible() {
 // AARCH64-NEXT:    [[REF_TMP:%.*]] = alloca [[STRUCT_S:%.*]], align 1
 // AARCH64-NEXT:    store ptr [[V]], ptr [[V_ADDR]], align 8
 // AARCH64-NEXT:    invoke void @_ZN1SC1Ei(ptr noundef nonnull align 1 dereferenceable(1) [[REF_TMP]], i32 noundef 0)
-// AARCH64-NEXT:    to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG16:![0-9]+]]
+// AARCH64-NEXT:            to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG16:![0-9]+]]
 // AARCH64:       invoke.cont:
 // AARCH64-NEXT:    [[CALL:%.*]] = invoke noundef i32 @_ZN1ScviEv(ptr noundef nonnull align 1 dereferenceable(1) [[REF_TMP]])
-// AARCH64-NEXT:    to label [[INVOKE_CONT1:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG16]]
+// AARCH64-NEXT:            to label [[INVOKE_CONT1:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG16]]
 // AARCH64:       invoke.cont1:
 // AARCH64-NEXT:    [[TMP0:%.*]] = sext i32 [[CALL]] to i64
 // AARCH64-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], 1
 // AARCH64-NEXT:    [[ARRAYDECAY:%.*]] = getelementptr inbounds [10 x i32], ptr [[V]], i64 0, i64 0, !dbg [[DBG18:![0-9]+]]
 // AARCH64-NEXT:    [[TMP2:%.*]] = mul i64 [[TMP0]], 4
 // AARCH64-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP1]], 4
-// AARCH64-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
+// AARCH64-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
 // AARCH64-NEXT:    store ptr [[ARRAYDECAY]], ptr [[TMP4]], align 8
-// AARCH64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
+// AARCH64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
 // AARCH64-NEXT:    store i64 40, ptr [[TMP5]], align 8
-// AARCH64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
+// AARCH64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
 // AARCH64-NEXT:    store i64 [[TMP2]], ptr [[TMP6]], align 8
-// AARCH64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
+// AARCH64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
 // AARCH64-NEXT:    store i64 [[TMP3]], ptr [[TMP7]], align 8
 // AARCH64-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 1 dereferenceable(1) [[REF_TMP]]) #[[ATTR3]]
 // AARCH64-NEXT:    [[TMP8:%.*]] = load [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], align 8, !dbg [[DBG18]]
 // AARCH64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T]] [[TMP8]], !dbg [[DBG18]]
 // AARCH64:       terminate.lpad:
 // AARCH64-NEXT:    [[TMP9:%.*]] = landingpad { ptr, i32 }
-// AARCH64-NEXT:    catch ptr null, !dbg [[DBG16]]
+// AARCH64-NEXT:            catch ptr null, !dbg [[DBG16]]
 // AARCH64-NEXT:    [[TMP10:%.*]] = extractvalue { ptr, i32 } [[TMP9]], 0, !dbg [[DBG16]]
 // AARCH64-NEXT:    call void @__clang_call_terminate(ptr [[TMP10]]) #[[ATTR7:[0-9]+]], !dbg [[DBG16]]
 // AARCH64-NEXT:    unreachable, !dbg [[DBG16]]
@@ -282,26 +282,26 @@ void class_convertible() {
 // AARCH64-NEXT:    [[V_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    store ptr [[V]], ptr [[V_ADDR]], align 8
 // AARCH64-NEXT:    [[CALL:%.*]] = invoke noundef i32 @_Z3foov()
-// AARCH64-NEXT:    to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG20:![0-9]+]]
+// AARCH64-NEXT:            to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG20:![0-9]+]]
 // AARCH64:       invoke.cont:
 // AARCH64-NEXT:    [[TMP0:%.*]] = sext i32 [[CALL]] to i64
 // AARCH64-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], 1
 // AARCH64-NEXT:    [[ARRAYDECAY:%.*]] = getelementptr inbounds [10 x i32], ptr [[V]], i64 0, i64 0, !dbg [[DBG22:![0-9]+]]
 // AARCH64-NEXT:    [[TMP2:%.*]] = mul i64 [[TMP0]], 4
 // AARCH64-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP1]], 4
-// AARCH64-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 0
+// AARCH64-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 0
 // AARCH64-NEXT:    store ptr [[ARRAYDECAY]], ptr [[TMP4]], align 8
-// AARCH64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 1
+// AARCH64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 1
 // AARCH64-NEXT:    store i64 40, ptr [[TMP5]], align 8
-// AARCH64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 2
+// AARCH64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 2
 // AARCH64-NEXT:    store i64 [[TMP2]], ptr [[TMP6]], align 8
-// AARCH64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 3
+// AARCH64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 3
 // AARCH64-NEXT:    store i64 [[TMP3]], ptr [[TMP7]], align 8
 // AARCH64-NEXT:    [[TMP8:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], align 8, !dbg [[DBG22]]
 // AARCH64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_0]] [[TMP8]], !dbg [[DBG22]]
 // AARCH64:       terminate.lpad:
 // AARCH64-NEXT:    [[TMP9:%.*]] = landingpad { ptr, i32 }
-// AARCH64-NEXT:    catch ptr null, !dbg [[DBG20]]
+// AARCH64-NEXT:            catch ptr null, !dbg [[DBG20]]
 // AARCH64-NEXT:    [[TMP10:%.*]] = extractvalue { ptr, i32 } [[TMP9]], 0, !dbg [[DBG20]]
 // AARCH64-NEXT:    call void @__clang_call_terminate(ptr [[TMP10]]) #[[ATTR7]], !dbg [[DBG20]]
 // AARCH64-NEXT:    unreachable, !dbg [[DBG20]]

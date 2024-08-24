@@ -208,6 +208,7 @@ def OpaqueValueExpr : StmtNode<Expr>;
 def TypoExpr : StmtNode<Expr>;
 def RecoveryExpr : StmtNode<Expr>;
 def BuiltinBitCastExpr : StmtNode<ExplicitCastExpr>;
+def EmbedExpr : StmtNode<Expr>;
 
 // Microsoft Extensions.
 def MSPropertyRefExpr : StmtNode<Expr>;
@@ -233,6 +234,8 @@ def OMPSimdDirective : StmtNode<OMPLoopDirective>;
 def OMPLoopTransformationDirective : StmtNode<OMPLoopBasedDirective, 1>;
 def OMPTileDirective : StmtNode<OMPLoopTransformationDirective>;
 def OMPUnrollDirective : StmtNode<OMPLoopTransformationDirective>;
+def OMPReverseDirective : StmtNode<OMPLoopTransformationDirective>;
+def OMPInterchangeDirective : StmtNode<OMPLoopTransformationDirective>;
 def OMPForDirective : StmtNode<OMPLoopDirective>;
 def OMPForSimdDirective : StmtNode<OMPLoopDirective>;
 def OMPSectionsDirective : StmtNode<OMPExecutableDirective>;
@@ -299,6 +302,7 @@ def OMPTeamsGenericLoopDirective : StmtNode<OMPLoopDirective>;
 def OMPTargetTeamsGenericLoopDirective : StmtNode<OMPLoopDirective>;
 def OMPParallelGenericLoopDirective : StmtNode<OMPLoopDirective>;
 def OMPTargetParallelGenericLoopDirective : StmtNode<OMPLoopDirective>;
+def OMPAssumeDirective : StmtNode<OMPExecutableDirective>;
 def OMPErrorDirective : StmtNode<OMPExecutableDirective>;
 
 // OpenACC Constructs.
@@ -306,6 +310,7 @@ def OpenACCConstructStmt : StmtNode<Stmt, /*abstract=*/1>;
 def OpenACCAssociatedStmtConstruct
     : StmtNode<OpenACCConstructStmt, /*abstract=*/1>;
 def OpenACCComputeConstruct : StmtNode<OpenACCAssociatedStmtConstruct>;
+def OpenACCLoopConstruct : StmtNode<OpenACCAssociatedStmtConstruct>;
 // OmpSs Directives
 def OSSExecutableDirective : StmtNode<Stmt, 1>;
 def OSSLoopDirective : StmtNode<OSSExecutableDirective, 1>;

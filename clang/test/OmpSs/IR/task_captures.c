@@ -78,25 +78,25 @@ void vla_senction_dep(int n, int k, int j) {
 // LIN64-NEXT:    store i64 [[TMP2:%.*]], ptr [[DOTADDR2]], align 8
 // LIN64-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 4
 // LIN64-NEXT:    [[TMP4:%.*]] = mul i64 [[TMP2]], 4
-// LIN64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
+// LIN64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
 // LIN64-NEXT:    store ptr [[ARRAY]], ptr [[TMP5]], align 8
-// LIN64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
+// LIN64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
 // LIN64-NEXT:    store i64 [[TMP3]], ptr [[TMP6]], align 8
-// LIN64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
+// LIN64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
 // LIN64-NEXT:    store i64 0, ptr [[TMP7]], align 8
-// LIN64-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
+// LIN64-NEXT:    [[TMP8:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
 // LIN64-NEXT:    store i64 [[TMP4]], ptr [[TMP8]], align 8
-// LIN64-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 4
+// LIN64-NEXT:    [[TMP9:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 4
 // LIN64-NEXT:    store i64 [[TMP1]], ptr [[TMP9]], align 8
-// LIN64-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 5
+// LIN64-NEXT:    [[TMP10:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 5
 // LIN64-NEXT:    store i64 0, ptr [[TMP10]], align 8
-// LIN64-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 6
+// LIN64-NEXT:    [[TMP11:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 6
 // LIN64-NEXT:    store i64 [[TMP1]], ptr [[TMP11]], align 8
-// LIN64-NEXT:    [[TMP12:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 7
+// LIN64-NEXT:    [[TMP12:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 7
 // LIN64-NEXT:    store i64 [[TMP0]], ptr [[TMP12]], align 8
-// LIN64-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 8
+// LIN64-NEXT:    [[TMP13:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 8
 // LIN64-NEXT:    store i64 0, ptr [[TMP13]], align 8
-// LIN64-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 9
+// LIN64-NEXT:    [[TMP14:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 9
 // LIN64-NEXT:    store i64 [[TMP0]], ptr [[TMP14]], align 8
 // LIN64-NEXT:    [[TMP15:%.*]] = load [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], align 8
 // LIN64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T]] [[TMP15]]
@@ -115,25 +115,25 @@ void vla_senction_dep(int n, int k, int j) {
 // LIN64-NEXT:    store i64 [[TMP2:%.*]], ptr [[DOTADDR2]], align 8
 // LIN64-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 4
 // LIN64-NEXT:    [[TMP4:%.*]] = mul i64 [[TMP2]], 4
-// LIN64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 0
+// LIN64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 0
 // LIN64-NEXT:    store ptr [[ARRAY2]], ptr [[TMP5]], align 8
-// LIN64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 1
+// LIN64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 1
 // LIN64-NEXT:    store i64 [[TMP3]], ptr [[TMP6]], align 8
-// LIN64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 2
+// LIN64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 2
 // LIN64-NEXT:    store i64 0, ptr [[TMP7]], align 8
-// LIN64-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 3
+// LIN64-NEXT:    [[TMP8:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 3
 // LIN64-NEXT:    store i64 [[TMP4]], ptr [[TMP8]], align 8
-// LIN64-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 4
+// LIN64-NEXT:    [[TMP9:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 4
 // LIN64-NEXT:    store i64 [[TMP1]], ptr [[TMP9]], align 8
-// LIN64-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 5
+// LIN64-NEXT:    [[TMP10:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 5
 // LIN64-NEXT:    store i64 0, ptr [[TMP10]], align 8
-// LIN64-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 6
+// LIN64-NEXT:    [[TMP11:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 6
 // LIN64-NEXT:    store i64 [[TMP1]], ptr [[TMP11]], align 8
-// LIN64-NEXT:    [[TMP12:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 7
+// LIN64-NEXT:    [[TMP12:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 7
 // LIN64-NEXT:    store i64 [[TMP0]], ptr [[TMP12]], align 8
-// LIN64-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 8
+// LIN64-NEXT:    [[TMP13:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 8
 // LIN64-NEXT:    store i64 0, ptr [[TMP13]], align 8
-// LIN64-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 9
+// LIN64-NEXT:    [[TMP14:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 9
 // LIN64-NEXT:    store i64 [[TMP0]], ptr [[TMP14]], align 8
 // LIN64-NEXT:    [[TMP15:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], align 8
 // LIN64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_0]] [[TMP15]]
@@ -152,28 +152,28 @@ void vla_senction_dep(int n, int k, int j) {
 // LIN64-NEXT:    store i64 [[TMP2:%.*]], ptr [[DOTADDR2]], align 8
 // LIN64-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 4
 // LIN64-NEXT:    [[TMP4:%.*]] = mul i64 [[TMP2]], 4
-// LIN64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 0
+// LIN64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 0
 // LIN64-NEXT:    store ptr [[ARRAY]], ptr [[TMP5]], align 8
-// LIN64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 1
+// LIN64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 1
 // LIN64-NEXT:    store i64 [[TMP3]], ptr [[TMP6]], align 8
-// LIN64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 2
+// LIN64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 2
 // LIN64-NEXT:    store i64 0, ptr [[TMP7]], align 8
-// LIN64-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 3
+// LIN64-NEXT:    [[TMP8:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 3
 // LIN64-NEXT:    store i64 [[TMP4]], ptr [[TMP8]], align 8
-// LIN64-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 4
+// LIN64-NEXT:    [[TMP9:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 4
 // LIN64-NEXT:    store i64 [[TMP1]], ptr [[TMP9]], align 8
-// LIN64-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 5
+// LIN64-NEXT:    [[TMP10:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 5
 // LIN64-NEXT:    store i64 0, ptr [[TMP10]], align 8
-// LIN64-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 6
+// LIN64-NEXT:    [[TMP11:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 6
 // LIN64-NEXT:    store i64 [[TMP1]], ptr [[TMP11]], align 8
-// LIN64-NEXT:    [[TMP12:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 7
+// LIN64-NEXT:    [[TMP12:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 7
 // LIN64-NEXT:    store i64 [[TMP0]], ptr [[TMP12]], align 8
-// LIN64-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 8
+// LIN64-NEXT:    [[TMP13:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 8
 // LIN64-NEXT:    store i64 0, ptr [[TMP13]], align 8
-// LIN64-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 9
+// LIN64-NEXT:    [[TMP14:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 9
 // LIN64-NEXT:    store i64 6, ptr [[TMP14]], align 8
-// LIN64-NEXT:    [[TMP15:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], align 8, !dbg [[DBG29:![0-9]+]]
-// LIN64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_1]] [[TMP15]], !dbg [[DBG29]]
+// LIN64-NEXT:    [[TMP15:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], align 8, !dbg [[DBG30:![0-9]+]]
+// LIN64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_1]] [[TMP15]], !dbg [[DBG30]]
 //
 //
 // PPC64-LABEL: @vla_senction_dep(
@@ -243,25 +243,25 @@ void vla_senction_dep(int n, int k, int j) {
 // PPC64-NEXT:    store i64 [[TMP2:%.*]], ptr [[DOTADDR2]], align 8
 // PPC64-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 4
 // PPC64-NEXT:    [[TMP4:%.*]] = mul i64 [[TMP2]], 4
-// PPC64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
+// PPC64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
 // PPC64-NEXT:    store ptr [[ARRAY]], ptr [[TMP5]], align 8
-// PPC64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
+// PPC64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
 // PPC64-NEXT:    store i64 [[TMP3]], ptr [[TMP6]], align 8
-// PPC64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
+// PPC64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
 // PPC64-NEXT:    store i64 0, ptr [[TMP7]], align 8
-// PPC64-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
+// PPC64-NEXT:    [[TMP8:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
 // PPC64-NEXT:    store i64 [[TMP4]], ptr [[TMP8]], align 8
-// PPC64-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 4
+// PPC64-NEXT:    [[TMP9:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 4
 // PPC64-NEXT:    store i64 [[TMP1]], ptr [[TMP9]], align 8
-// PPC64-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 5
+// PPC64-NEXT:    [[TMP10:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 5
 // PPC64-NEXT:    store i64 0, ptr [[TMP10]], align 8
-// PPC64-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 6
+// PPC64-NEXT:    [[TMP11:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 6
 // PPC64-NEXT:    store i64 [[TMP1]], ptr [[TMP11]], align 8
-// PPC64-NEXT:    [[TMP12:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 7
+// PPC64-NEXT:    [[TMP12:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 7
 // PPC64-NEXT:    store i64 [[TMP0]], ptr [[TMP12]], align 8
-// PPC64-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 8
+// PPC64-NEXT:    [[TMP13:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 8
 // PPC64-NEXT:    store i64 0, ptr [[TMP13]], align 8
-// PPC64-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 9
+// PPC64-NEXT:    [[TMP14:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 9
 // PPC64-NEXT:    store i64 [[TMP0]], ptr [[TMP14]], align 8
 // PPC64-NEXT:    [[TMP15:%.*]] = load [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], align 8
 // PPC64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T]] [[TMP15]]
@@ -280,25 +280,25 @@ void vla_senction_dep(int n, int k, int j) {
 // PPC64-NEXT:    store i64 [[TMP2:%.*]], ptr [[DOTADDR2]], align 8
 // PPC64-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 4
 // PPC64-NEXT:    [[TMP4:%.*]] = mul i64 [[TMP2]], 4
-// PPC64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 0
+// PPC64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 0
 // PPC64-NEXT:    store ptr [[ARRAY2]], ptr [[TMP5]], align 8
-// PPC64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 1
+// PPC64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 1
 // PPC64-NEXT:    store i64 [[TMP3]], ptr [[TMP6]], align 8
-// PPC64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 2
+// PPC64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 2
 // PPC64-NEXT:    store i64 0, ptr [[TMP7]], align 8
-// PPC64-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 3
+// PPC64-NEXT:    [[TMP8:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 3
 // PPC64-NEXT:    store i64 [[TMP4]], ptr [[TMP8]], align 8
-// PPC64-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 4
+// PPC64-NEXT:    [[TMP9:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 4
 // PPC64-NEXT:    store i64 [[TMP1]], ptr [[TMP9]], align 8
-// PPC64-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 5
+// PPC64-NEXT:    [[TMP10:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 5
 // PPC64-NEXT:    store i64 0, ptr [[TMP10]], align 8
-// PPC64-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 6
+// PPC64-NEXT:    [[TMP11:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 6
 // PPC64-NEXT:    store i64 [[TMP1]], ptr [[TMP11]], align 8
-// PPC64-NEXT:    [[TMP12:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 7
+// PPC64-NEXT:    [[TMP12:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 7
 // PPC64-NEXT:    store i64 [[TMP0]], ptr [[TMP12]], align 8
-// PPC64-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 8
+// PPC64-NEXT:    [[TMP13:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 8
 // PPC64-NEXT:    store i64 0, ptr [[TMP13]], align 8
-// PPC64-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 9
+// PPC64-NEXT:    [[TMP14:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 9
 // PPC64-NEXT:    store i64 [[TMP0]], ptr [[TMP14]], align 8
 // PPC64-NEXT:    [[TMP15:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], align 8
 // PPC64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_0]] [[TMP15]]
@@ -317,28 +317,28 @@ void vla_senction_dep(int n, int k, int j) {
 // PPC64-NEXT:    store i64 [[TMP2:%.*]], ptr [[DOTADDR2]], align 8
 // PPC64-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 4
 // PPC64-NEXT:    [[TMP4:%.*]] = mul i64 [[TMP2]], 4
-// PPC64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 0
+// PPC64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 0
 // PPC64-NEXT:    store ptr [[ARRAY]], ptr [[TMP5]], align 8
-// PPC64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 1
+// PPC64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 1
 // PPC64-NEXT:    store i64 [[TMP3]], ptr [[TMP6]], align 8
-// PPC64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 2
+// PPC64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 2
 // PPC64-NEXT:    store i64 0, ptr [[TMP7]], align 8
-// PPC64-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 3
+// PPC64-NEXT:    [[TMP8:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 3
 // PPC64-NEXT:    store i64 [[TMP4]], ptr [[TMP8]], align 8
-// PPC64-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 4
+// PPC64-NEXT:    [[TMP9:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 4
 // PPC64-NEXT:    store i64 [[TMP1]], ptr [[TMP9]], align 8
-// PPC64-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 5
+// PPC64-NEXT:    [[TMP10:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 5
 // PPC64-NEXT:    store i64 0, ptr [[TMP10]], align 8
-// PPC64-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 6
+// PPC64-NEXT:    [[TMP11:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 6
 // PPC64-NEXT:    store i64 [[TMP1]], ptr [[TMP11]], align 8
-// PPC64-NEXT:    [[TMP12:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 7
+// PPC64-NEXT:    [[TMP12:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 7
 // PPC64-NEXT:    store i64 [[TMP0]], ptr [[TMP12]], align 8
-// PPC64-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 8
+// PPC64-NEXT:    [[TMP13:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 8
 // PPC64-NEXT:    store i64 0, ptr [[TMP13]], align 8
-// PPC64-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 9
+// PPC64-NEXT:    [[TMP14:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 9
 // PPC64-NEXT:    store i64 6, ptr [[TMP14]], align 8
-// PPC64-NEXT:    [[TMP15:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], align 8, !dbg [[DBG29:![0-9]+]]
-// PPC64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_1]] [[TMP15]], !dbg [[DBG29]]
+// PPC64-NEXT:    [[TMP15:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], align 8, !dbg [[DBG30:![0-9]+]]
+// PPC64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_1]] [[TMP15]], !dbg [[DBG30]]
 //
 //
 // AARCH64-LABEL: @vla_senction_dep(
@@ -408,25 +408,25 @@ void vla_senction_dep(int n, int k, int j) {
 // AARCH64-NEXT:    store i64 [[TMP2:%.*]], ptr [[DOTADDR2]], align 8
 // AARCH64-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 4
 // AARCH64-NEXT:    [[TMP4:%.*]] = mul i64 [[TMP2]], 4
-// AARCH64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
+// AARCH64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
 // AARCH64-NEXT:    store ptr [[ARRAY]], ptr [[TMP5]], align 8
-// AARCH64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
+// AARCH64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
 // AARCH64-NEXT:    store i64 [[TMP3]], ptr [[TMP6]], align 8
-// AARCH64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
+// AARCH64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
 // AARCH64-NEXT:    store i64 0, ptr [[TMP7]], align 8
-// AARCH64-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
+// AARCH64-NEXT:    [[TMP8:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
 // AARCH64-NEXT:    store i64 [[TMP4]], ptr [[TMP8]], align 8
-// AARCH64-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 4
+// AARCH64-NEXT:    [[TMP9:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 4
 // AARCH64-NEXT:    store i64 [[TMP1]], ptr [[TMP9]], align 8
-// AARCH64-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 5
+// AARCH64-NEXT:    [[TMP10:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 5
 // AARCH64-NEXT:    store i64 0, ptr [[TMP10]], align 8
-// AARCH64-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 6
+// AARCH64-NEXT:    [[TMP11:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 6
 // AARCH64-NEXT:    store i64 [[TMP1]], ptr [[TMP11]], align 8
-// AARCH64-NEXT:    [[TMP12:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 7
+// AARCH64-NEXT:    [[TMP12:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 7
 // AARCH64-NEXT:    store i64 [[TMP0]], ptr [[TMP12]], align 8
-// AARCH64-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 8
+// AARCH64-NEXT:    [[TMP13:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 8
 // AARCH64-NEXT:    store i64 0, ptr [[TMP13]], align 8
-// AARCH64-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 9
+// AARCH64-NEXT:    [[TMP14:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 9
 // AARCH64-NEXT:    store i64 [[TMP0]], ptr [[TMP14]], align 8
 // AARCH64-NEXT:    [[TMP15:%.*]] = load [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], align 8
 // AARCH64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T]] [[TMP15]]
@@ -445,25 +445,25 @@ void vla_senction_dep(int n, int k, int j) {
 // AARCH64-NEXT:    store i64 [[TMP2:%.*]], ptr [[DOTADDR2]], align 8
 // AARCH64-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 4
 // AARCH64-NEXT:    [[TMP4:%.*]] = mul i64 [[TMP2]], 4
-// AARCH64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 0
+// AARCH64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 0
 // AARCH64-NEXT:    store ptr [[ARRAY2]], ptr [[TMP5]], align 8
-// AARCH64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 1
+// AARCH64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 1
 // AARCH64-NEXT:    store i64 [[TMP3]], ptr [[TMP6]], align 8
-// AARCH64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 2
+// AARCH64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 2
 // AARCH64-NEXT:    store i64 0, ptr [[TMP7]], align 8
-// AARCH64-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 3
+// AARCH64-NEXT:    [[TMP8:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 3
 // AARCH64-NEXT:    store i64 [[TMP4]], ptr [[TMP8]], align 8
-// AARCH64-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 4
+// AARCH64-NEXT:    [[TMP9:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 4
 // AARCH64-NEXT:    store i64 [[TMP1]], ptr [[TMP9]], align 8
-// AARCH64-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 5
+// AARCH64-NEXT:    [[TMP10:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 5
 // AARCH64-NEXT:    store i64 0, ptr [[TMP10]], align 8
-// AARCH64-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 6
+// AARCH64-NEXT:    [[TMP11:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 6
 // AARCH64-NEXT:    store i64 [[TMP1]], ptr [[TMP11]], align 8
-// AARCH64-NEXT:    [[TMP12:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 7
+// AARCH64-NEXT:    [[TMP12:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 7
 // AARCH64-NEXT:    store i64 [[TMP0]], ptr [[TMP12]], align 8
-// AARCH64-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 8
+// AARCH64-NEXT:    [[TMP13:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 8
 // AARCH64-NEXT:    store i64 0, ptr [[TMP13]], align 8
-// AARCH64-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 9
+// AARCH64-NEXT:    [[TMP14:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 9
 // AARCH64-NEXT:    store i64 [[TMP0]], ptr [[TMP14]], align 8
 // AARCH64-NEXT:    [[TMP15:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], align 8
 // AARCH64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_0]] [[TMP15]]
@@ -482,26 +482,26 @@ void vla_senction_dep(int n, int k, int j) {
 // AARCH64-NEXT:    store i64 [[TMP2:%.*]], ptr [[DOTADDR2]], align 8
 // AARCH64-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 4
 // AARCH64-NEXT:    [[TMP4:%.*]] = mul i64 [[TMP2]], 4
-// AARCH64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 0
+// AARCH64-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 0
 // AARCH64-NEXT:    store ptr [[ARRAY]], ptr [[TMP5]], align 8
-// AARCH64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 1
+// AARCH64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 1
 // AARCH64-NEXT:    store i64 [[TMP3]], ptr [[TMP6]], align 8
-// AARCH64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 2
+// AARCH64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 2
 // AARCH64-NEXT:    store i64 0, ptr [[TMP7]], align 8
-// AARCH64-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 3
+// AARCH64-NEXT:    [[TMP8:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 3
 // AARCH64-NEXT:    store i64 [[TMP4]], ptr [[TMP8]], align 8
-// AARCH64-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 4
+// AARCH64-NEXT:    [[TMP9:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 4
 // AARCH64-NEXT:    store i64 [[TMP1]], ptr [[TMP9]], align 8
-// AARCH64-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 5
+// AARCH64-NEXT:    [[TMP10:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 5
 // AARCH64-NEXT:    store i64 0, ptr [[TMP10]], align 8
-// AARCH64-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 6
+// AARCH64-NEXT:    [[TMP11:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 6
 // AARCH64-NEXT:    store i64 [[TMP1]], ptr [[TMP11]], align 8
-// AARCH64-NEXT:    [[TMP12:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 7
+// AARCH64-NEXT:    [[TMP12:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 7
 // AARCH64-NEXT:    store i64 [[TMP0]], ptr [[TMP12]], align 8
-// AARCH64-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 8
+// AARCH64-NEXT:    [[TMP13:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 8
 // AARCH64-NEXT:    store i64 0, ptr [[TMP13]], align 8
-// AARCH64-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 9
+// AARCH64-NEXT:    [[TMP14:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 9
 // AARCH64-NEXT:    store i64 6, ptr [[TMP14]], align 8
-// AARCH64-NEXT:    [[TMP15:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], align 8, !dbg [[DBG29:![0-9]+]]
-// AARCH64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_1]] [[TMP15]], !dbg [[DBG29]]
+// AARCH64-NEXT:    [[TMP15:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], align 8, !dbg [[DBG30:![0-9]+]]
+// AARCH64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_1]] [[TMP15]], !dbg [[DBG30]]
 //

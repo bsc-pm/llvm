@@ -74,8 +74,9 @@ program task
 end program
 
 !LLVMIR-LABEL: define void @_QQmain()
-!LLVMIR:  %[[VAR_ARRAY1:.*]] = alloca [6 x i32], i64 1, align 4
+!LLVMIR:  %[[IND_VAR:.*]] = alloca i32, i64 1, align 4
 !LLVMIR:  %[[VAR_I:.*]] = alloca i32, i64 1, align 4
+!LLVMIR:  %[[VAR_ARRAY1:.*]] = alloca [6 x i32], i64 1, align 4
 
 !LLVMIR: %{{.*}} = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00")
 !LLVMIR-SAME: "QUAL.OSS.SHARED"(ptr %[[VAR_I]], i32 undef)

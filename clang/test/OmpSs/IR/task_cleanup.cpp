@@ -28,11 +28,14 @@ l:      n++; // to put something in the label
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00") ], !dbg [[DBG9:![0-9]+]]
 // LIN64-NEXT:    [[N:%.*]] = alloca i32, align 4
+// LIN64-NEXT:    [[TMP:%.*]] = alloca i1, align 1
 // LIN64-NEXT:    [[F:%.*]] = alloca [[STRUCT_FOO:%.*]], align 1
 // LIN64-NEXT:    [[CLEANUP_DEST_SLOT:%.*]] = alloca i32, align 4
 // LIN64-NEXT:    br label [[WHILE_COND:%.*]], !dbg [[DBG10:![0-9]+]]
 // LIN64:       while.cond:
-// LIN64-NEXT:    br label [[WHILE_BODY:%.*]], !dbg [[DBG10]]
+// LIN64-NEXT:    store i1 true, ptr [[TMP]], align 1, !dbg [[DBG10]]
+// LIN64-NEXT:    [[TMP1:%.*]] = load i1, ptr [[TMP]], align 1, !dbg [[DBG10]]
+// LIN64-NEXT:    br i1 [[TMP1]], label [[WHILE_BODY:%.*]], label [[WHILE_END:%.*]], !dbg [[DBG10]]
 // LIN64:       while.body:
 // LIN64-NEXT:    store i32 4, ptr [[CLEANUP_DEST_SLOT]], align 4
 // LIN64-NEXT:    call void @_ZN3FooD1Ev(ptr noundef nonnull align 1 dereferenceable(1) [[F]]) #[[ATTR1:[0-9]+]], !dbg [[DBG11:![0-9]+]]
@@ -40,12 +43,14 @@ l:      n++; // to put something in the label
 // LIN64-NEXT:    switch i32 [[CLEANUP_DEST]], label [[UNREACHABLE:%.*]] [
 // LIN64-NEXT:      i32 4, label [[L:%.*]]
 // LIN64-NEXT:    ]
+// LIN64:       while.end:
+// LIN64-NEXT:    br label [[L]], !dbg [[DBG10]]
 // LIN64:       l:
-// LIN64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG12:![0-9]+]]
-// LIN64-NEXT:    [[INC:%.*]] = add nsw i32 [[TMP1]], 1, !dbg [[DBG12]]
+// LIN64-NEXT:    [[TMP2:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG12:![0-9]+]]
+// LIN64-NEXT:    [[INC:%.*]] = add nsw i32 [[TMP2]], 1, !dbg [[DBG12]]
 // LIN64-NEXT:    store i32 [[INC]], ptr [[N]], align 4, !dbg [[DBG12]]
 // LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG13:![0-9]+]]
-// LIN64-NEXT:    [[TMP2:%.*]] = call i1 @llvm.directive.marker() [ "DIR.OSS"([9 x i8] c"TASKWAIT\00") ], !dbg [[DBG14:![0-9]+]]
+// LIN64-NEXT:    [[TMP3:%.*]] = call i1 @llvm.directive.marker() [ "DIR.OSS"([9 x i8] c"TASKWAIT\00") ], !dbg [[DBG14:![0-9]+]]
 // LIN64-NEXT:    ret void, !dbg [[DBG15:![0-9]+]]
 // LIN64:       unreachable:
 // LIN64-NEXT:    unreachable
@@ -75,11 +80,14 @@ l:      n++; // to put something in the label
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00") ], !dbg [[DBG9:![0-9]+]]
 // PPC64-NEXT:    [[N:%.*]] = alloca i32, align 4
+// PPC64-NEXT:    [[TMP:%.*]] = alloca i1, align 1
 // PPC64-NEXT:    [[F:%.*]] = alloca [[STRUCT_FOO:%.*]], align 1
 // PPC64-NEXT:    [[CLEANUP_DEST_SLOT:%.*]] = alloca i32, align 4
 // PPC64-NEXT:    br label [[WHILE_COND:%.*]], !dbg [[DBG10:![0-9]+]]
 // PPC64:       while.cond:
-// PPC64-NEXT:    br label [[WHILE_BODY:%.*]], !dbg [[DBG10]]
+// PPC64-NEXT:    store i1 true, ptr [[TMP]], align 1, !dbg [[DBG10]]
+// PPC64-NEXT:    [[TMP1:%.*]] = load i1, ptr [[TMP]], align 1, !dbg [[DBG10]]
+// PPC64-NEXT:    br i1 [[TMP1]], label [[WHILE_BODY:%.*]], label [[WHILE_END:%.*]], !dbg [[DBG10]]
 // PPC64:       while.body:
 // PPC64-NEXT:    store i32 4, ptr [[CLEANUP_DEST_SLOT]], align 4
 // PPC64-NEXT:    call void @_ZN3FooD1Ev(ptr noundef nonnull align 1 dereferenceable(1) [[F]]) #[[ATTR1:[0-9]+]], !dbg [[DBG11:![0-9]+]]
@@ -87,12 +95,14 @@ l:      n++; // to put something in the label
 // PPC64-NEXT:    switch i32 [[CLEANUP_DEST]], label [[UNREACHABLE:%.*]] [
 // PPC64-NEXT:      i32 4, label [[L:%.*]]
 // PPC64-NEXT:    ]
+// PPC64:       while.end:
+// PPC64-NEXT:    br label [[L]], !dbg [[DBG10]]
 // PPC64:       l:
-// PPC64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG12:![0-9]+]]
-// PPC64-NEXT:    [[INC:%.*]] = add nsw i32 [[TMP1]], 1, !dbg [[DBG12]]
+// PPC64-NEXT:    [[TMP2:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG12:![0-9]+]]
+// PPC64-NEXT:    [[INC:%.*]] = add nsw i32 [[TMP2]], 1, !dbg [[DBG12]]
 // PPC64-NEXT:    store i32 [[INC]], ptr [[N]], align 4, !dbg [[DBG12]]
 // PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG13:![0-9]+]]
-// PPC64-NEXT:    [[TMP2:%.*]] = call i1 @llvm.directive.marker() [ "DIR.OSS"([9 x i8] c"TASKWAIT\00") ], !dbg [[DBG14:![0-9]+]]
+// PPC64-NEXT:    [[TMP3:%.*]] = call i1 @llvm.directive.marker() [ "DIR.OSS"([9 x i8] c"TASKWAIT\00") ], !dbg [[DBG14:![0-9]+]]
 // PPC64-NEXT:    ret void, !dbg [[DBG15:![0-9]+]]
 // PPC64:       unreachable:
 // PPC64-NEXT:    unreachable
@@ -122,11 +132,14 @@ l:      n++; // to put something in the label
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00") ], !dbg [[DBG9:![0-9]+]]
 // AARCH64-NEXT:    [[N:%.*]] = alloca i32, align 4
+// AARCH64-NEXT:    [[TMP:%.*]] = alloca i1, align 1
 // AARCH64-NEXT:    [[F:%.*]] = alloca [[STRUCT_FOO:%.*]], align 1
 // AARCH64-NEXT:    [[CLEANUP_DEST_SLOT:%.*]] = alloca i32, align 4
 // AARCH64-NEXT:    br label [[WHILE_COND:%.*]], !dbg [[DBG10:![0-9]+]]
 // AARCH64:       while.cond:
-// AARCH64-NEXT:    br label [[WHILE_BODY:%.*]], !dbg [[DBG10]]
+// AARCH64-NEXT:    store i1 true, ptr [[TMP]], align 1, !dbg [[DBG10]]
+// AARCH64-NEXT:    [[TMP1:%.*]] = load i1, ptr [[TMP]], align 1, !dbg [[DBG10]]
+// AARCH64-NEXT:    br i1 [[TMP1]], label [[WHILE_BODY:%.*]], label [[WHILE_END:%.*]], !dbg [[DBG10]]
 // AARCH64:       while.body:
 // AARCH64-NEXT:    store i32 4, ptr [[CLEANUP_DEST_SLOT]], align 4
 // AARCH64-NEXT:    call void @_ZN3FooD1Ev(ptr noundef nonnull align 1 dereferenceable(1) [[F]]) #[[ATTR1:[0-9]+]], !dbg [[DBG11:![0-9]+]]
@@ -134,12 +147,14 @@ l:      n++; // to put something in the label
 // AARCH64-NEXT:    switch i32 [[CLEANUP_DEST]], label [[UNREACHABLE:%.*]] [
 // AARCH64-NEXT:      i32 4, label [[L:%.*]]
 // AARCH64-NEXT:    ]
+// AARCH64:       while.end:
+// AARCH64-NEXT:    br label [[L]], !dbg [[DBG10]]
 // AARCH64:       l:
-// AARCH64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG12:![0-9]+]]
-// AARCH64-NEXT:    [[INC:%.*]] = add nsw i32 [[TMP1]], 1, !dbg [[DBG12]]
+// AARCH64-NEXT:    [[TMP2:%.*]] = load i32, ptr [[N]], align 4, !dbg [[DBG12:![0-9]+]]
+// AARCH64-NEXT:    [[INC:%.*]] = add nsw i32 [[TMP2]], 1, !dbg [[DBG12]]
 // AARCH64-NEXT:    store i32 [[INC]], ptr [[N]], align 4, !dbg [[DBG12]]
 // AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG13:![0-9]+]]
-// AARCH64-NEXT:    [[TMP2:%.*]] = call i1 @llvm.directive.marker() [ "DIR.OSS"([9 x i8] c"TASKWAIT\00") ], !dbg [[DBG14:![0-9]+]]
+// AARCH64-NEXT:    [[TMP3:%.*]] = call i1 @llvm.directive.marker() [ "DIR.OSS"([9 x i8] c"TASKWAIT\00") ], !dbg [[DBG14:![0-9]+]]
 // AARCH64-NEXT:    ret void, !dbg [[DBG15:![0-9]+]]
 // AARCH64:       unreachable:
 // AARCH64-NEXT:    unreachable

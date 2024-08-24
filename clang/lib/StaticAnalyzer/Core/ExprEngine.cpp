@@ -1776,6 +1776,7 @@ void ExprEngine::Visit(const Stmt *S, ExplodedNode *Pred,
     case Stmt::OMPScanDirectiveClass:
     case Stmt::OMPOrderedDirectiveClass:
     case Stmt::OMPAtomicDirectiveClass:
+    case Stmt::OMPAssumeDirectiveClass:
     case Stmt::OMPTargetDirectiveClass:
     case Stmt::OMPTargetDataDirectiveClass:
     case Stmt::OMPTargetEnterDataDirectiveClass:
@@ -1811,7 +1812,9 @@ void ExprEngine::Visit(const Stmt *S, ExplodedNode *Pred,
     case Stmt::OMPTargetTeamsDistributeParallelForDirectiveClass:
     case Stmt::OMPTargetTeamsDistributeParallelForSimdDirectiveClass:
     case Stmt::OMPTargetTeamsDistributeSimdDirectiveClass:
+    case Stmt::OMPReverseDirectiveClass:
     case Stmt::OMPTileDirectiveClass:
+    case Stmt::OMPInterchangeDirectiveClass:
     case Stmt::OMPInteropDirectiveClass:
     case Stmt::OMPDispatchDirectiveClass:
     case Stmt::OMPMaskedDirectiveClass:
@@ -1833,6 +1836,7 @@ void ExprEngine::Visit(const Stmt *S, ExplodedNode *Pred,
     case Stmt::OSSMultiDepExprClass:
     case Stmt::CapturedStmtClass:
     case Stmt::OpenACCComputeConstructClass:
+    case Stmt::OpenACCLoopConstructClass:
     case Stmt::OMPUnrollDirectiveClass:
     case Stmt::OMPMetaDirectiveClass: {
       const ExplodedNode *node = Bldr.generateSink(S, Pred, Pred->getState());
@@ -1984,45 +1988,33 @@ void ExprEngine::Visit(const Stmt *S, ExplodedNode *Pred,
       ExplodedNodeSet Tmp;
       StmtNodeBuilder Bldr2(PreVisit, Tmp, *currBldrCtx);
 
-      bool HasRewrittenInit = false;
-      const Expr *ArgE = nullptr;
-      if (const auto *DefE = dyn_cast<CXXDefaultArgExpr>(S)) {
+      const Expr *ArgE;
+      if (const auto *DefE = dyn_cast<CXXDefaultArgExpr>(S))
         ArgE = DefE->getExpr();
-        HasRewrittenInit = DefE->hasRewrittenInit();
-      } else if (const auto *DefE = dyn_cast<CXXDefaultInitExpr>(S)) {
+      else if (const auto *DefE = dyn_cast<CXXDefaultInitExpr>(S))
         ArgE = DefE->getExpr();
-        HasRewrittenInit = DefE->hasRewrittenInit();
-      } else
+      else
         llvm_unreachable("unknown constant wrapper kind");
 
-      if (HasRewrittenInit) {
-        for (auto *N : PreVisit) {
-          ProgramStateRef state = N->getState();
-          const LocationContext *LCtx = N->getLocationContext();
-          state = state->BindExpr(S, LCtx, state->getSVal(ArgE, LCtx));
-          Bldr2.generateNode(S, N, state);
-        }
-      } else {
-        // If it's not rewritten, the contents of these expressions are not
-        // actually part of the current function, so we fall back to constant
-        // evaluation.
-        bool IsTemporary = false;
-        if (const auto *MTE = dyn_cast<MaterializeTemporaryExpr>(ArgE)) {
-          ArgE = MTE->getSubExpr();
-          IsTemporary = true;
-        }
+      bool IsTemporary = false;
+      if (const auto *MTE = dyn_cast<MaterializeTemporaryExpr>(ArgE)) {
+        ArgE = MTE->getSubExpr();
+        IsTemporary = true;
+      }
 
-        std::optional<SVal> ConstantVal = svalBuilder.getConstantVal(ArgE);
-        const LocationContext *LCtx = Pred->getLocationContext();
-        for (auto *I : PreVisit) {
-          ProgramStateRef State = I->getState();
-          State = State->BindExpr(S, LCtx, ConstantVal.value_or(UnknownVal()));
-          if (IsTemporary)
-            State = createTemporaryRegionIfNeeded(State, LCtx, cast<Expr>(S),
-                                                  cast<Expr>(S));
+      std::optional<SVal> ConstantVal = svalBuilder.getConstantVal(ArgE);
+      if (!ConstantVal)
+        ConstantVal = UnknownVal();
 
-          Bldr2.generateNode(S, I, State);
-        }
+      const LocationContext *LCtx = Pred->getLocationContext();
+      for (const auto I : PreVisit) {
+        ProgramStateRef State = I->getState();
+        State = State->BindExpr(S, LCtx, *ConstantVal);
+        if (IsTemporary)
+          State = createTemporaryRegionIfNeeded(State, LCtx,
+                                                cast<Expr>(S),
+                                                cast<Expr>(S));
+        Bldr2.generateNode(S, I, State);
       }
 
       getCheckerManager().runCheckersForPostStmt(Dst, Tmp, S, *this);
@@ -2082,11 +2074,17 @@ void ExprEngine::Visit(const Stmt *S, ExplodedNode *Pred,
       llvm_unreachable("Support for MatrixSubscriptExpr is not implemented.");
       break;
 
-    case Stmt::GCCAsmStmtClass:
+    case Stmt::GCCAsmStmtClass: {
       Bldr.takeNodes(Pred);
-      VisitGCCAsmStmt(cast<GCCAsmStmt>(S), Pred, Dst);
+      ExplodedNodeSet PreVisit;
+      getCheckerManager().runCheckersForPreStmt(PreVisit, Pred, S, *this);
+      ExplodedNodeSet PostVisit;
+      for (ExplodedNode *const N : PreVisit)
+        VisitGCCAsmStmt(cast<GCCAsmStmt>(S), N, PostVisit);
+      getCheckerManager().runCheckersForPostStmt(Dst, PostVisit, S, *this);
       Bldr.addNodes(Dst);
       break;
+    }
 
     case Stmt::MSAsmStmtClass:
       Bldr.takeNodes(Pred);
@@ -2447,6 +2445,10 @@ void ExprEngine::Visit(const Stmt *S, ExplodedNode *Pred,
       Bldr.addNodes(Dst);
       break;
     }
+
+    case Stmt::EmbedExprClass:
+      llvm::report_fatal_error("Support for EmbedExpr is not implemented.");
+      break;
   }
 }
 
@@ -3819,6 +3821,14 @@ void ExprEngine::VisitGCCAsmStmt(const GCCAsmStmt *A, ExplodedNode *Pred,
       state = state->bindLoc(*LV, UnknownVal(), Pred->getLocationContext());
   }
 
+  // Do not reason about locations passed inside inline assembly.
+  for (const Expr *I : A->inputs()) {
+    SVal X = state->getSVal(I, Pred->getLocationContext());
+
+    if (std::optional<Loc> LV = X.getAs<Loc>())
+      state = state->bindLoc(*LV, UnknownVal(), Pred->getLocationContext());
+  }
+
   Bldr.generateNode(A, Pred, state);
 }
 
@@ -3921,7 +3931,7 @@ struct DOTGraphTraits<ExplodedGraph*> : public DefaultDOTGraphTraits {
     State->printDOT(Out, N->getLocationContext(), Space);
 
     Out << "\\l}\\l";
-    return Out.str();
+    return Buf;
   }
 };
 

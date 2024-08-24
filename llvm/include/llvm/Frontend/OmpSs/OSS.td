@@ -213,6 +213,7 @@ def OSS_Task : Directive<"task"> {
     VersionedClause<OSSC_Device>,
   ];
   let association = AS_Block;
+  let category = CA_Executable;
 }
 def OSS_DeclareTask : Directive<"declare task"> {
   let allowedClauses = [
@@ -242,9 +243,11 @@ def OSS_DeclareTask : Directive<"declare task"> {
     VersionedClause<OSSC_Ndrange>,
   ];
   let association = AS_Declaration;
+  let category = CA_Declarative;
 }
 def OSS_DeclareReduction : Directive<"declare reduction"> {
   let association = AS_None;
+  let category = CA_Declarative;
 }
 def OSS_TaskWait : Directive<"taskwait"> {
   let allowedClauses = [
@@ -255,6 +258,7 @@ def OSS_TaskWait : Directive<"taskwait"> {
     VersionedClause<OSSC_Inout>,
   ];
   let association = AS_None;
+  let category = CA_Executable;
 }
 
 def OSS_Release : Directive<"release"> {
@@ -268,6 +272,7 @@ def OSS_Release : Directive<"release"> {
     VersionedClause<OSSC_WeakInout>,
   ];
   let association = AS_None;
+  let category = CA_Executable;
 }
 def OSS_TaskLoop : Directive<"taskloop"> {
   let allowedClauses = [
@@ -299,6 +304,7 @@ def OSS_TaskLoop : Directive<"taskloop"> {
     VersionedClause<OSSC_Collapse>,
   ];
   let association = AS_Loop;
+  let category = CA_Executable;
 }
 def OSS_TaskFor : Directive<"task for"> {
   let allowedClauses = [
@@ -330,6 +336,7 @@ def OSS_TaskFor : Directive<"task for"> {
     VersionedClause<OSSC_Collapse>,
   ];
   let association = AS_Loop;
+  let category = CA_Executable;
 }
 def OSS_TaskLoopFor : Directive<"taskloop for"> {
   let allowedClauses = [
@@ -362,10 +369,12 @@ def OSS_TaskLoopFor : Directive<"taskloop for"> {
     VersionedClause<OSSC_Collapse>,
   ];
   let association = AS_Loop;
+  let category = CA_Executable;
 }
 
 def OSS_TaskIterWhile : Directive<"taskiter while"> {
   let association = AS_None;
+  let category = CA_Executable;
 }
 def OSS_TaskIter : Directive<"taskiter"> {
   let allowedClauses = [
@@ -398,9 +407,11 @@ def OSS_TaskIter : Directive<"taskiter"> {
     VersionedClause<OSSC_Unroll>,
   ];
   let association = AS_Loop;
+  let category = CA_Executable;
 }
 def OSS_Critical : Directive<"critical"> {
   let association = AS_Block;
+  let category = CA_Executable;
 }
 def OSS_Atomic : Directive<"atomic"> {
   let allowedClauses = [
@@ -418,11 +429,14 @@ def OSS_Atomic : Directive<"atomic"> {
     VersionedClause<OSSC_Relaxed>,
   ];
   let association = AS_Block;
+  let category = CA_Executable;
 }
 def OSS_Assert : Directive<"assert"> {
   let association = AS_None;
+  let category = CA_Informational;
 }
 def OSS_Unknown : Directive<"unknown"> {
   let isDefault = true;
   let association = AS_None;
+  let category = CA_Utility;
 }

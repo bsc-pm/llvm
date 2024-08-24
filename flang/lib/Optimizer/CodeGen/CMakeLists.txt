@@ -28,6 +28,7 @@ add_flang_library(FIRCodeGen
   MLIRMathToLibm
   MLIROmpSsToLLVM
   MLIROpenMPToLLVM
+  MLIROpenACCDialect
   MLIRBuiltinToLLVMIRTranslation
   MLIRLLVMToLLVMIRTranslation
   MLIRTargetLLVMIRExport

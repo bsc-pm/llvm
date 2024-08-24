@@ -16,6 +16,7 @@ subroutine test_assumed_shape_to_array(x)
 end subroutine
 
 
+
 ! CHECK-LABEL:   func.func @_QPtest_assumed_shape_to_array(
 ! CHECK-SAME:                                              %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.box<!fir.array<?xf32>> {fir.bindc_name = "x"}) {
 ! CHECK:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.array<?xf32>>
@@ -31,7 +32,7 @@ end subroutine
 ! CHECK:             %[[VAL_9:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_7]]#1 : (index) -> !fir.shape<1>
 ! CHECK:             %[[VAL_10:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_8]](%[[VAL_9]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.array<?xf32>>
 ! CHECK:             fir.store %[[VAL_10]] to %[[VAL_1]] : !fir.ref<!fir.box<!fir.array<?xf32>>>
-! CHECK:             %[[VAL_11:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl{{.*}})
+! CHECK:             %[[VAL_11:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl{{.*}}) : !fir.ref<!fir.char<1,67>>
 ! CHECK:             %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 15 : i32
 ! CHECK:             %[[VAL_13:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_1]] : (!fir.ref<!fir.box<!fir.array<?xf32>>>) -> !fir.ref<!fir.box<none>>
 ! CHECK:             %[[VAL_14:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_0]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<none>
@@ -39,14 +40,28 @@ end subroutine
 ! CHECK:             %[[VAL_16:[-0-9A-Za-z._]+]] = fir.call @_FortranAAssignTemporary(%[[VAL_13]], %[[VAL_14]], %[[VAL_15]], %[[VAL_12]]) fastmath<contract> : (!fir.ref<!fir.box<none>>, !fir.box<none>, !fir.ref<i8>, i32) -> none
 ! CHECK:             fir.result %[[VAL_8]] : !fir.heap<!fir.array<?xf32>>
 ! CHECK:           }
-! CHECK:           %[[VAL_17:[-0-9A-Za-z._]+]] = arith.constant false
-! CHECK:           %[[VAL_18:[-0-9A-Za-z._]+]] = arith.cmpi eq, %[[VAL_3]], %[[VAL_17]] : i1
-! CHECK:           %[[VAL_19:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<!fir.heap<!fir.array<?xf32>>>
-! CHECK:           oss.task shared(%[[VAL_4]] : !fir.heap<!fir.array<?xf32>>) shared_type(%[[VAL_19]] : !fir.oss<!fir.heap<!fir.array<?xf32>>>) captures(%[[VAL_18]] : i1) {
-! CHECK:             %[[VAL_20:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_4]] : (!fir.heap<!fir.array<?xf32>>) -> !fir.ref<!fir.array<10xf32>>
-! CHECK:             fir.call @_QPbar(%[[VAL_20]]) fastmath<contract> : (!fir.ref<!fir.array<10xf32>>) -> ()
-! CHECK:             fir.if %[[VAL_18]] {
-! CHECK:               fir.freemem %[[VAL_4]] : !fir.heap<!fir.array<?xf32>>
+! CHECK:           %[[VAL_17:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! CHECK:           %[[VAL_18:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_0]], %[[VAL_17]] : (!fir.box<!fir.array<?xf32>>, index) -> (index, index, index)
+! CHECK:           %[[VAL_19:[-0-9A-Za-z._]+]] = arith.constant false
+! CHECK:           %[[VAL_20:[-0-9A-Za-z._]+]] = arith.cmpi eq, %[[VAL_3]], %[[VAL_19]] : i1
+! CHECK:           %[[VAL_21:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<!fir.heap<!fir.array<?xf32>>>
+! CHECK:           %[[VAL_22:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<!fir.box<!fir.array<?xf32>>>
+! CHECK:           oss.task firstprivate(%[[VAL_0]] : !fir.box<!fir.array<?xf32>>) firstprivate_type(%[[VAL_22]] : !fir.oss<!fir.box<!fir.array<?xf32>>>) shared(%[[VAL_4]] : !fir.heap<!fir.array<?xf32>>) shared_type(%[[VAL_21]] : !fir.oss<!fir.heap<!fir.array<?xf32>>>) captures(%[[VAL_18]]#1, %[[VAL_20]] : index, i1) {
+! CHECK:             %[[VAL_23:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.heap<!fir.array<?xf32>>> {pinned}
+! CHECK:             %[[VAL_24:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_4]] : (!fir.heap<!fir.array<?xf32>>) -> !fir.ref<!fir.array<10xf32>>
+! CHECK:             fir.call @_QPbar(%[[VAL_24]]) fastmath<contract> : (!fir.ref<!fir.array<10xf32>>) -> ()
+! CHECK:             fir.if %[[VAL_20]] {
+! CHECK:               %[[VAL_25:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_18]]#1 : (index) -> !fir.shape<1>
+! CHECK:               %[[VAL_26:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_4]](%[[VAL_25]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.array<?xf32>>
+! CHECK:               %[[VAL_27:[-0-9A-Za-z._]+]] = fir.rebox %[[VAL_26]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<!fir.heap<!fir.array<?xf32>>>
+! CHECK:               fir.store %[[VAL_27]] to %[[VAL_23]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>
+! CHECK:               %[[VAL_28:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>
+! CHECK:               %[[VAL_29:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl{{.*}}) : !fir.ref<!fir.char<1,67>>
+! CHECK:               %[[VAL_30:[-0-9A-Za-z._]+]] = arith.constant 15 : i32
+! CHECK:               %[[VAL_31:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_28]] : (!fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>) -> !fir.ref<!fir.box<none>>
+! CHECK:               %[[VAL_32:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_23]] : (!fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>) -> !fir.ref<!fir.box<none>>
+! CHECK:               %[[VAL_33:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_29]]
+! CHECK:               %[[VAL_34:[-0-9A-Za-z._]+]] = fir.call @_FortranACopyOutAssign(%[[VAL_31]], %[[VAL_32]], %[[VAL_33]], %[[VAL_30]]) fastmath<contract> : (!fir.ref<!fir.box<none>>, !fir.ref<!fir.box<none>>, !fir.ref<i8>, i32) -> none
 ! CHECK:             }
 ! CHECK:             oss.terminator
 ! CHECK:           }
@@ -55,4 +70,5 @@ end subroutine
 ! CHECK:         func.func private @_QPbar(!fir.ref<!fir.array<10xf32>>)
 ! CHECK:         func.func private @_FortranAIsContiguous(!fir.box<none>) -> i1 attributes {fir.runtime}
 ! CHECK:         func.func private @_FortranAAssignTemporary(!fir.ref<!fir.box<none>>, !fir.box<none>, !fir.ref<i8>, i32) -> none attributes {fir.runtime}
+! CHECK:         func.func private @_FortranACopyOutAssign(!fir.ref<!fir.box<none>>, !fir.ref<!fir.box<none>>, !fir.ref<i8>, i32) -> none attributes {fir.runtime}
 

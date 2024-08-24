@@ -32,244 +32,244 @@ int main() {
 // This test checks we reemit debug intrinsics again
 
 // LIN64-LABEL: define {{[^@]+}}@main
-// LIN64-SAME: () #[[ATTR0:[0-9]+]] !dbg [[DBG17:![0-9]+]] {
+// LIN64-SAME: () #[[ATTR0:[0-9]+]] !dbg [[DBG18:![0-9]+]] {
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    [[X:%.*]] = alloca i32, align 4
 // LIN64-NEXT:    [[SAVED_STACK:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    [[__VLA_EXPR0:%.*]] = alloca i64, align 8
 // LIN64-NEXT:    [[ARRAY:%.*]] = alloca [10 x i32], align 16
 // LIN64-NEXT:    [[S:%.*]] = alloca [[STRUCT_S:%.*]], align 4
-// LIN64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[X]], metadata [[META21:![0-9]+]], metadata !DIExpression()), !dbg [[DBG22:![0-9]+]]
-// LIN64-NEXT:    store i32 10, ptr [[X]], align 4, !dbg [[DBG22]]
-// LIN64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[X]], align 4, !dbg [[DBG23:![0-9]+]]
-// LIN64-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64, !dbg [[DBG24:![0-9]+]]
-// LIN64-NEXT:    [[TMP2:%.*]] = call ptr @llvm.stacksave.p0(), !dbg [[DBG24]]
-// LIN64-NEXT:    store ptr [[TMP2]], ptr [[SAVED_STACK]], align 8, !dbg [[DBG24]]
-// LIN64-NEXT:    [[VLA:%.*]] = alloca i32, i64 [[TMP1]], align 16, !dbg [[DBG24]]
-// LIN64-NEXT:    store i64 [[TMP1]], ptr [[__VLA_EXPR0]], align 8, !dbg [[DBG24]]
-// LIN64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[__VLA_EXPR0]], metadata [[META25:![0-9]+]], metadata !DIExpression()), !dbg [[DBG27:![0-9]+]]
-// LIN64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[VLA]], metadata [[META28:![0-9]+]], metadata !DIExpression()), !dbg [[DBG32:![0-9]+]]
-// LIN64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[ARRAY]], metadata [[META33:![0-9]+]], metadata !DIExpression()), !dbg [[DBG37:![0-9]+]]
-// LIN64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[S]], metadata [[META38:![0-9]+]], metadata !DIExpression()), !dbg [[DBG39:![0-9]+]]
-// LIN64-NEXT:    call void @_ZN1SC2Ev(ptr noundef nonnull align 4 dereferenceable(4) [[S]]) #[[ATTR4:[0-9]+]], !dbg [[DBG39]]
-// LIN64-NEXT:    call void @_ZN1S3fooEv(ptr noundef nonnull align 4 dereferenceable(4) [[S]]), !dbg [[DBG40:![0-9]+]]
-// LIN64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds [10 x i32], ptr [[ARRAY]], i64 0, i64 0, !dbg [[DBG41:![0-9]+]]
-// LIN64-NEXT:    store i32 43, ptr [[ARRAYIDX]], align 16, !dbg [[DBG42:![0-9]+]]
-// LIN64-NEXT:    [[ARRAYIDX1:%.*]] = getelementptr inbounds i32, ptr [[VLA]], i64 0, !dbg [[DBG43:![0-9]+]]
-// LIN64-NEXT:    store i32 43, ptr [[ARRAYIDX1]], align 16, !dbg [[DBG44:![0-9]+]]
-// LIN64-NEXT:    store i32 43, ptr [[X]], align 4, !dbg [[DBG45:![0-9]+]]
-// LIN64-NEXT:    [[TMP3:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[X]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[VLA]], i32 undef), "QUAL.OSS.VLA.DIMS"(ptr [[VLA]], i64 [[TMP1]]), "QUAL.OSS.FIRSTPRIVATE"(ptr [[ARRAY]], [10 x i32] undef), "QUAL.OSS.CAPTURED"(i64 [[TMP1]]) ], !dbg [[DBG46:![0-9]+]]
-// LIN64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[X]], metadata [[META21]], metadata !DIExpression()), !dbg [[DBG22]]
-// LIN64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[VLA]], metadata [[META47:![0-9]+]], metadata !DIExpression()), !dbg [[DBG32]]
-// LIN64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[ARRAY]], metadata [[META33]], metadata !DIExpression()), !dbg [[DBG37]]
-// LIN64-NEXT:    [[TMP4:%.*]] = load i32, ptr [[X]], align 4, !dbg [[DBG51:![0-9]+]]
-// LIN64-NEXT:    [[INC:%.*]] = add nsw i32 [[TMP4]], 1, !dbg [[DBG51]]
-// LIN64-NEXT:    store i32 [[INC]], ptr [[X]], align 4, !dbg [[DBG51]]
-// LIN64-NEXT:    [[ARRAYIDX2:%.*]] = getelementptr inbounds i32, ptr [[VLA]], i64 0, !dbg [[DBG53:![0-9]+]]
-// LIN64-NEXT:    [[TMP5:%.*]] = load i32, ptr [[ARRAYIDX2]], align 16, !dbg [[DBG54:![0-9]+]]
-// LIN64-NEXT:    [[INC3:%.*]] = add nsw i32 [[TMP5]], 1, !dbg [[DBG54]]
-// LIN64-NEXT:    store i32 [[INC3]], ptr [[ARRAYIDX2]], align 16, !dbg [[DBG54]]
-// LIN64-NEXT:    [[ARRAYIDX4:%.*]] = getelementptr inbounds [10 x i32], ptr [[ARRAY]], i64 0, i64 0, !dbg [[DBG55:![0-9]+]]
-// LIN64-NEXT:    [[TMP6:%.*]] = load i32, ptr [[ARRAYIDX4]], align 16, !dbg [[DBG56:![0-9]+]]
-// LIN64-NEXT:    [[INC5:%.*]] = add nsw i32 [[TMP6]], 1, !dbg [[DBG56]]
-// LIN64-NEXT:    store i32 [[INC5]], ptr [[ARRAYIDX4]], align 16, !dbg [[DBG56]]
-// LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP3]]), !dbg [[DBG57:![0-9]+]]
-// LIN64-NEXT:    [[TMP7:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG58:![0-9]+]]
-// LIN64-NEXT:    call void @llvm.stackrestore.p0(ptr [[TMP7]]), !dbg [[DBG58]]
-// LIN64-NEXT:    ret i32 0, !dbg [[DBG58]]
+// LIN64-NEXT:      #dbg_declare(ptr [[X]], [[META22:![0-9]+]], !DIExpression(), [[META23:![0-9]+]])
+// LIN64-NEXT:    store i32 10, ptr [[X]], align 4, !dbg [[META23]]
+// LIN64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[X]], align 4, !dbg [[DBG24:![0-9]+]]
+// LIN64-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64, !dbg [[DBG25:![0-9]+]]
+// LIN64-NEXT:    [[TMP2:%.*]] = call ptr @llvm.stacksave.p0(), !dbg [[DBG25]]
+// LIN64-NEXT:    store ptr [[TMP2]], ptr [[SAVED_STACK]], align 8, !dbg [[DBG25]]
+// LIN64-NEXT:    [[VLA:%.*]] = alloca i32, i64 [[TMP1]], align 16, !dbg [[DBG25]]
+// LIN64-NEXT:    store i64 [[TMP1]], ptr [[__VLA_EXPR0]], align 8, !dbg [[DBG25]]
+// LIN64-NEXT:      #dbg_declare(ptr [[__VLA_EXPR0]], [[META26:![0-9]+]], !DIExpression(), [[META28:![0-9]+]])
+// LIN64-NEXT:      #dbg_declare(ptr [[VLA]], [[META29:![0-9]+]], !DIExpression(), [[META33:![0-9]+]])
+// LIN64-NEXT:      #dbg_declare(ptr [[ARRAY]], [[META34:![0-9]+]], !DIExpression(), [[META38:![0-9]+]])
+// LIN64-NEXT:      #dbg_declare(ptr [[S]], [[META39:![0-9]+]], !DIExpression(), [[META40:![0-9]+]])
+// LIN64-NEXT:    call void @_ZN1SC2Ev(ptr noundef nonnull align 4 dereferenceable(4) [[S]]) #[[ATTR3:[0-9]+]], !dbg [[META40]]
+// LIN64-NEXT:    call void @_ZN1S3fooEv(ptr noundef nonnull align 4 dereferenceable(4) [[S]]), !dbg [[DBG41:![0-9]+]]
+// LIN64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds [10 x i32], ptr [[ARRAY]], i64 0, i64 0, !dbg [[DBG42:![0-9]+]]
+// LIN64-NEXT:    store i32 43, ptr [[ARRAYIDX]], align 16, !dbg [[DBG43:![0-9]+]]
+// LIN64-NEXT:    [[ARRAYIDX1:%.*]] = getelementptr inbounds i32, ptr [[VLA]], i64 0, !dbg [[DBG44:![0-9]+]]
+// LIN64-NEXT:    store i32 43, ptr [[ARRAYIDX1]], align 16, !dbg [[DBG45:![0-9]+]]
+// LIN64-NEXT:    store i32 43, ptr [[X]], align 4, !dbg [[DBG46:![0-9]+]]
+// LIN64-NEXT:    [[TMP3:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[X]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[VLA]], i32 undef), "QUAL.OSS.VLA.DIMS"(ptr [[VLA]], i64 [[TMP1]]), "QUAL.OSS.FIRSTPRIVATE"(ptr [[ARRAY]], [10 x i32] undef), "QUAL.OSS.CAPTURED"(i64 [[TMP1]]) ], !dbg [[DBG47:![0-9]+]]
+// LIN64-NEXT:      #dbg_declare(ptr [[X]], [[META22]], !DIExpression(), [[META23]])
+// LIN64-NEXT:      #dbg_declare(ptr [[VLA]], [[META48:![0-9]+]], !DIExpression(), [[META33]])
+// LIN64-NEXT:      #dbg_declare(ptr [[ARRAY]], [[META34]], !DIExpression(), [[META38]])
+// LIN64-NEXT:    [[TMP4:%.*]] = load i32, ptr [[X]], align 4, !dbg [[DBG52:![0-9]+]]
+// LIN64-NEXT:    [[INC:%.*]] = add nsw i32 [[TMP4]], 1, !dbg [[DBG52]]
+// LIN64-NEXT:    store i32 [[INC]], ptr [[X]], align 4, !dbg [[DBG52]]
+// LIN64-NEXT:    [[ARRAYIDX2:%.*]] = getelementptr inbounds i32, ptr [[VLA]], i64 0, !dbg [[DBG54:![0-9]+]]
+// LIN64-NEXT:    [[TMP5:%.*]] = load i32, ptr [[ARRAYIDX2]], align 16, !dbg [[DBG55:![0-9]+]]
+// LIN64-NEXT:    [[INC3:%.*]] = add nsw i32 [[TMP5]], 1, !dbg [[DBG55]]
+// LIN64-NEXT:    store i32 [[INC3]], ptr [[ARRAYIDX2]], align 16, !dbg [[DBG55]]
+// LIN64-NEXT:    [[ARRAYIDX4:%.*]] = getelementptr inbounds [10 x i32], ptr [[ARRAY]], i64 0, i64 0, !dbg [[DBG56:![0-9]+]]
+// LIN64-NEXT:    [[TMP6:%.*]] = load i32, ptr [[ARRAYIDX4]], align 16, !dbg [[DBG57:![0-9]+]]
+// LIN64-NEXT:    [[INC5:%.*]] = add nsw i32 [[TMP6]], 1, !dbg [[DBG57]]
+// LIN64-NEXT:    store i32 [[INC5]], ptr [[ARRAYIDX4]], align 16, !dbg [[DBG57]]
+// LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP3]]), !dbg [[DBG58:![0-9]+]]
+// LIN64-NEXT:    [[TMP7:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG59:![0-9]+]]
+// LIN64-NEXT:    call void @llvm.stackrestore.p0(ptr [[TMP7]]), !dbg [[DBG59]]
+// LIN64-NEXT:    ret i32 0, !dbg [[DBG59]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@_ZN1SC2Ev
-// LIN64-SAME: (ptr noundef nonnull align 4 dereferenceable(4) [[THIS:%.*]]) unnamed_addr #[[ATTR3:[0-9]+]] comdat align 2 !dbg [[DBG59:![0-9]+]] {
+// LIN64-SAME: (ptr noundef nonnull align 4 dereferenceable(4) [[THIS:%.*]]) unnamed_addr #[[ATTR2:[0-9]+]] comdat align 2 !dbg [[DBG60:![0-9]+]] {
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
-// LIN64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[THIS_ADDR]], metadata [[META61:![0-9]+]], metadata !DIExpression()), !dbg [[DBG63:![0-9]+]]
+// LIN64-NEXT:      #dbg_declare(ptr [[THIS_ADDR]], [[META62:![0-9]+]], !DIExpression(), [[META64:![0-9]+]])
 // LIN64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// LIN64-NEXT:    [[X:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG64:![0-9]+]]
-// LIN64-NEXT:    store i32 4, ptr [[X]], align 4, !dbg [[DBG64]]
-// LIN64-NEXT:    ret void, !dbg [[DBG65:![0-9]+]]
+// LIN64-NEXT:    [[X:%.*]] = getelementptr inbounds nuw [[STRUCT_S:%.*]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG65:![0-9]+]]
+// LIN64-NEXT:    store i32 4, ptr [[X]], align 4, !dbg [[DBG65]]
+// LIN64-NEXT:    ret void, !dbg [[DBG66:![0-9]+]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@_ZN1S3fooEv
-// LIN64-SAME: (ptr noundef nonnull align 4 dereferenceable(4) [[THIS:%.*]]) #[[ATTR3]] comdat align 2 !dbg [[DBG66:![0-9]+]] {
+// LIN64-SAME: (ptr noundef nonnull align 4 dereferenceable(4) [[THIS:%.*]]) #[[ATTR2]] comdat align 2 !dbg [[DBG67:![0-9]+]] {
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
-// LIN64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[THIS_ADDR]], metadata [[META67:![0-9]+]], metadata !DIExpression()), !dbg [[DBG68:![0-9]+]]
+// LIN64-NEXT:      #dbg_declare(ptr [[THIS_ADDR]], [[META68:![0-9]+]], !DIExpression(), [[META69:![0-9]+]])
 // LIN64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// LIN64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[THIS1]], [[STRUCT_S:%.*]] undef) ], !dbg [[DBG69:![0-9]+]]
-// LIN64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[THIS1]], metadata [[META70:![0-9]+]], metadata !DIExpression()), !dbg [[DBG68]]
-// LIN64-NEXT:    [[X:%.*]] = getelementptr inbounds [[STRUCT_S]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG71:![0-9]+]]
-// LIN64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[X]], align 4, !dbg [[DBG73:![0-9]+]]
-// LIN64-NEXT:    [[INC:%.*]] = add nsw i32 [[TMP1]], 1, !dbg [[DBG73]]
-// LIN64-NEXT:    store i32 [[INC]], ptr [[X]], align 4, !dbg [[DBG73]]
-// LIN64-NEXT:    [[X2:%.*]] = getelementptr inbounds [[STRUCT_S]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG74:![0-9]+]]
-// LIN64-NEXT:    [[TMP2:%.*]] = load i32, ptr [[X2]], align 4, !dbg [[DBG75:![0-9]+]]
-// LIN64-NEXT:    [[INC3:%.*]] = add nsw i32 [[TMP2]], 1, !dbg [[DBG75]]
-// LIN64-NEXT:    store i32 [[INC3]], ptr [[X2]], align 4, !dbg [[DBG75]]
-// LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG76:![0-9]+]]
-// LIN64-NEXT:    ret void, !dbg [[DBG77:![0-9]+]]
+// LIN64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[THIS1]], [[STRUCT_S:%.*]] undef) ], !dbg [[DBG70:![0-9]+]]
+// LIN64-NEXT:      #dbg_declare(ptr [[THIS1]], [[META71:![0-9]+]], !DIExpression(), [[META69]])
+// LIN64-NEXT:    [[X:%.*]] = getelementptr inbounds nuw [[STRUCT_S]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG72:![0-9]+]]
+// LIN64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[X]], align 4, !dbg [[DBG74:![0-9]+]]
+// LIN64-NEXT:    [[INC:%.*]] = add nsw i32 [[TMP1]], 1, !dbg [[DBG74]]
+// LIN64-NEXT:    store i32 [[INC]], ptr [[X]], align 4, !dbg [[DBG74]]
+// LIN64-NEXT:    [[X2:%.*]] = getelementptr inbounds nuw [[STRUCT_S]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG75:![0-9]+]]
+// LIN64-NEXT:    [[TMP2:%.*]] = load i32, ptr [[X2]], align 4, !dbg [[DBG76:![0-9]+]]
+// LIN64-NEXT:    [[INC3:%.*]] = add nsw i32 [[TMP2]], 1, !dbg [[DBG76]]
+// LIN64-NEXT:    store i32 [[INC3]], ptr [[X2]], align 4, !dbg [[DBG76]]
+// LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG77:![0-9]+]]
+// LIN64-NEXT:    ret void, !dbg [[DBG78:![0-9]+]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@main
-// PPC64-SAME: () #[[ATTR0:[0-9]+]] !dbg [[DBG17:![0-9]+]] {
+// PPC64-SAME: () #[[ATTR0:[0-9]+]] !dbg [[DBG18:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[X:%.*]] = alloca i32, align 4
 // PPC64-NEXT:    [[SAVED_STACK:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    [[__VLA_EXPR0:%.*]] = alloca i64, align 8
 // PPC64-NEXT:    [[ARRAY:%.*]] = alloca [10 x i32], align 4
 // PPC64-NEXT:    [[S:%.*]] = alloca [[STRUCT_S:%.*]], align 4
-// PPC64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[X]], metadata [[META21:![0-9]+]], metadata !DIExpression()), !dbg [[DBG22:![0-9]+]]
-// PPC64-NEXT:    store i32 10, ptr [[X]], align 4, !dbg [[DBG22]]
-// PPC64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[X]], align 4, !dbg [[DBG23:![0-9]+]]
-// PPC64-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64, !dbg [[DBG24:![0-9]+]]
-// PPC64-NEXT:    [[TMP2:%.*]] = call ptr @llvm.stacksave.p0(), !dbg [[DBG24]]
-// PPC64-NEXT:    store ptr [[TMP2]], ptr [[SAVED_STACK]], align 8, !dbg [[DBG24]]
-// PPC64-NEXT:    [[VLA:%.*]] = alloca i32, i64 [[TMP1]], align 4, !dbg [[DBG24]]
-// PPC64-NEXT:    store i64 [[TMP1]], ptr [[__VLA_EXPR0]], align 8, !dbg [[DBG24]]
-// PPC64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[__VLA_EXPR0]], metadata [[META25:![0-9]+]], metadata !DIExpression()), !dbg [[DBG27:![0-9]+]]
-// PPC64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[VLA]], metadata [[META28:![0-9]+]], metadata !DIExpression()), !dbg [[DBG32:![0-9]+]]
-// PPC64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[ARRAY]], metadata [[META33:![0-9]+]], metadata !DIExpression()), !dbg [[DBG37:![0-9]+]]
-// PPC64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[S]], metadata [[META38:![0-9]+]], metadata !DIExpression()), !dbg [[DBG39:![0-9]+]]
-// PPC64-NEXT:    call void @_ZN1SC2Ev(ptr noundef nonnull align 4 dereferenceable(4) [[S]]) #[[ATTR4:[0-9]+]], !dbg [[DBG39]]
-// PPC64-NEXT:    call void @_ZN1S3fooEv(ptr noundef nonnull align 4 dereferenceable(4) [[S]]), !dbg [[DBG40:![0-9]+]]
-// PPC64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds [10 x i32], ptr [[ARRAY]], i64 0, i64 0, !dbg [[DBG41:![0-9]+]]
-// PPC64-NEXT:    store i32 43, ptr [[ARRAYIDX]], align 4, !dbg [[DBG42:![0-9]+]]
-// PPC64-NEXT:    [[ARRAYIDX1:%.*]] = getelementptr inbounds i32, ptr [[VLA]], i64 0, !dbg [[DBG43:![0-9]+]]
-// PPC64-NEXT:    store i32 43, ptr [[ARRAYIDX1]], align 4, !dbg [[DBG44:![0-9]+]]
-// PPC64-NEXT:    store i32 43, ptr [[X]], align 4, !dbg [[DBG45:![0-9]+]]
-// PPC64-NEXT:    [[TMP3:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[X]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[VLA]], i32 undef), "QUAL.OSS.VLA.DIMS"(ptr [[VLA]], i64 [[TMP1]]), "QUAL.OSS.FIRSTPRIVATE"(ptr [[ARRAY]], [10 x i32] undef), "QUAL.OSS.CAPTURED"(i64 [[TMP1]]) ], !dbg [[DBG46:![0-9]+]]
-// PPC64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[X]], metadata [[META21]], metadata !DIExpression()), !dbg [[DBG22]]
-// PPC64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[VLA]], metadata [[META47:![0-9]+]], metadata !DIExpression()), !dbg [[DBG32]]
-// PPC64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[ARRAY]], metadata [[META33]], metadata !DIExpression()), !dbg [[DBG37]]
-// PPC64-NEXT:    [[TMP4:%.*]] = load i32, ptr [[X]], align 4, !dbg [[DBG51:![0-9]+]]
-// PPC64-NEXT:    [[INC:%.*]] = add nsw i32 [[TMP4]], 1, !dbg [[DBG51]]
-// PPC64-NEXT:    store i32 [[INC]], ptr [[X]], align 4, !dbg [[DBG51]]
-// PPC64-NEXT:    [[ARRAYIDX2:%.*]] = getelementptr inbounds i32, ptr [[VLA]], i64 0, !dbg [[DBG53:![0-9]+]]
-// PPC64-NEXT:    [[TMP5:%.*]] = load i32, ptr [[ARRAYIDX2]], align 4, !dbg [[DBG54:![0-9]+]]
-// PPC64-NEXT:    [[INC3:%.*]] = add nsw i32 [[TMP5]], 1, !dbg [[DBG54]]
-// PPC64-NEXT:    store i32 [[INC3]], ptr [[ARRAYIDX2]], align 4, !dbg [[DBG54]]
-// PPC64-NEXT:    [[ARRAYIDX4:%.*]] = getelementptr inbounds [10 x i32], ptr [[ARRAY]], i64 0, i64 0, !dbg [[DBG55:![0-9]+]]
-// PPC64-NEXT:    [[TMP6:%.*]] = load i32, ptr [[ARRAYIDX4]], align 4, !dbg [[DBG56:![0-9]+]]
-// PPC64-NEXT:    [[INC5:%.*]] = add nsw i32 [[TMP6]], 1, !dbg [[DBG56]]
-// PPC64-NEXT:    store i32 [[INC5]], ptr [[ARRAYIDX4]], align 4, !dbg [[DBG56]]
-// PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP3]]), !dbg [[DBG57:![0-9]+]]
-// PPC64-NEXT:    [[TMP7:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG58:![0-9]+]]
-// PPC64-NEXT:    call void @llvm.stackrestore.p0(ptr [[TMP7]]), !dbg [[DBG58]]
-// PPC64-NEXT:    ret i32 0, !dbg [[DBG58]]
+// PPC64-NEXT:      #dbg_declare(ptr [[X]], [[META22:![0-9]+]], !DIExpression(), [[META23:![0-9]+]])
+// PPC64-NEXT:    store i32 10, ptr [[X]], align 4, !dbg [[META23]]
+// PPC64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[X]], align 4, !dbg [[DBG24:![0-9]+]]
+// PPC64-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64, !dbg [[DBG25:![0-9]+]]
+// PPC64-NEXT:    [[TMP2:%.*]] = call ptr @llvm.stacksave.p0(), !dbg [[DBG25]]
+// PPC64-NEXT:    store ptr [[TMP2]], ptr [[SAVED_STACK]], align 8, !dbg [[DBG25]]
+// PPC64-NEXT:    [[VLA:%.*]] = alloca i32, i64 [[TMP1]], align 4, !dbg [[DBG25]]
+// PPC64-NEXT:    store i64 [[TMP1]], ptr [[__VLA_EXPR0]], align 8, !dbg [[DBG25]]
+// PPC64-NEXT:      #dbg_declare(ptr [[__VLA_EXPR0]], [[META26:![0-9]+]], !DIExpression(), [[META28:![0-9]+]])
+// PPC64-NEXT:      #dbg_declare(ptr [[VLA]], [[META29:![0-9]+]], !DIExpression(), [[META33:![0-9]+]])
+// PPC64-NEXT:      #dbg_declare(ptr [[ARRAY]], [[META34:![0-9]+]], !DIExpression(), [[META38:![0-9]+]])
+// PPC64-NEXT:      #dbg_declare(ptr [[S]], [[META39:![0-9]+]], !DIExpression(), [[META40:![0-9]+]])
+// PPC64-NEXT:    call void @_ZN1SC2Ev(ptr noundef nonnull align 4 dereferenceable(4) [[S]]) #[[ATTR3:[0-9]+]], !dbg [[META40]]
+// PPC64-NEXT:    call void @_ZN1S3fooEv(ptr noundef nonnull align 4 dereferenceable(4) [[S]]), !dbg [[DBG41:![0-9]+]]
+// PPC64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds [10 x i32], ptr [[ARRAY]], i64 0, i64 0, !dbg [[DBG42:![0-9]+]]
+// PPC64-NEXT:    store i32 43, ptr [[ARRAYIDX]], align 4, !dbg [[DBG43:![0-9]+]]
+// PPC64-NEXT:    [[ARRAYIDX1:%.*]] = getelementptr inbounds i32, ptr [[VLA]], i64 0, !dbg [[DBG44:![0-9]+]]
+// PPC64-NEXT:    store i32 43, ptr [[ARRAYIDX1]], align 4, !dbg [[DBG45:![0-9]+]]
+// PPC64-NEXT:    store i32 43, ptr [[X]], align 4, !dbg [[DBG46:![0-9]+]]
+// PPC64-NEXT:    [[TMP3:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[X]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[VLA]], i32 undef), "QUAL.OSS.VLA.DIMS"(ptr [[VLA]], i64 [[TMP1]]), "QUAL.OSS.FIRSTPRIVATE"(ptr [[ARRAY]], [10 x i32] undef), "QUAL.OSS.CAPTURED"(i64 [[TMP1]]) ], !dbg [[DBG47:![0-9]+]]
+// PPC64-NEXT:      #dbg_declare(ptr [[X]], [[META22]], !DIExpression(), [[META23]])
+// PPC64-NEXT:      #dbg_declare(ptr [[VLA]], [[META48:![0-9]+]], !DIExpression(), [[META33]])
+// PPC64-NEXT:      #dbg_declare(ptr [[ARRAY]], [[META34]], !DIExpression(), [[META38]])
+// PPC64-NEXT:    [[TMP4:%.*]] = load i32, ptr [[X]], align 4, !dbg [[DBG52:![0-9]+]]
+// PPC64-NEXT:    [[INC:%.*]] = add nsw i32 [[TMP4]], 1, !dbg [[DBG52]]
+// PPC64-NEXT:    store i32 [[INC]], ptr [[X]], align 4, !dbg [[DBG52]]
+// PPC64-NEXT:    [[ARRAYIDX2:%.*]] = getelementptr inbounds i32, ptr [[VLA]], i64 0, !dbg [[DBG54:![0-9]+]]
+// PPC64-NEXT:    [[TMP5:%.*]] = load i32, ptr [[ARRAYIDX2]], align 4, !dbg [[DBG55:![0-9]+]]
+// PPC64-NEXT:    [[INC3:%.*]] = add nsw i32 [[TMP5]], 1, !dbg [[DBG55]]
+// PPC64-NEXT:    store i32 [[INC3]], ptr [[ARRAYIDX2]], align 4, !dbg [[DBG55]]
+// PPC64-NEXT:    [[ARRAYIDX4:%.*]] = getelementptr inbounds [10 x i32], ptr [[ARRAY]], i64 0, i64 0, !dbg [[DBG56:![0-9]+]]
+// PPC64-NEXT:    [[TMP6:%.*]] = load i32, ptr [[ARRAYIDX4]], align 4, !dbg [[DBG57:![0-9]+]]
+// PPC64-NEXT:    [[INC5:%.*]] = add nsw i32 [[TMP6]], 1, !dbg [[DBG57]]
+// PPC64-NEXT:    store i32 [[INC5]], ptr [[ARRAYIDX4]], align 4, !dbg [[DBG57]]
+// PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP3]]), !dbg [[DBG58:![0-9]+]]
+// PPC64-NEXT:    [[TMP7:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG59:![0-9]+]]
+// PPC64-NEXT:    call void @llvm.stackrestore.p0(ptr [[TMP7]]), !dbg [[DBG59]]
+// PPC64-NEXT:    ret i32 0, !dbg [[DBG59]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@_ZN1SC2Ev
-// PPC64-SAME: (ptr noundef nonnull align 4 dereferenceable(4) [[THIS:%.*]]) unnamed_addr #[[ATTR3:[0-9]+]] comdat !dbg [[DBG59:![0-9]+]] {
+// PPC64-SAME: (ptr noundef nonnull align 4 dereferenceable(4) [[THIS:%.*]]) unnamed_addr #[[ATTR2:[0-9]+]] comdat !dbg [[DBG60:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
-// PPC64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[THIS_ADDR]], metadata [[META61:![0-9]+]], metadata !DIExpression()), !dbg [[DBG63:![0-9]+]]
+// PPC64-NEXT:      #dbg_declare(ptr [[THIS_ADDR]], [[META62:![0-9]+]], !DIExpression(), [[META64:![0-9]+]])
 // PPC64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// PPC64-NEXT:    [[X:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG64:![0-9]+]]
-// PPC64-NEXT:    store i32 4, ptr [[X]], align 4, !dbg [[DBG64]]
-// PPC64-NEXT:    ret void, !dbg [[DBG65:![0-9]+]]
+// PPC64-NEXT:    [[X:%.*]] = getelementptr inbounds nuw [[STRUCT_S:%.*]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG65:![0-9]+]]
+// PPC64-NEXT:    store i32 4, ptr [[X]], align 4, !dbg [[DBG65]]
+// PPC64-NEXT:    ret void, !dbg [[DBG66:![0-9]+]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@_ZN1S3fooEv
-// PPC64-SAME: (ptr noundef nonnull align 4 dereferenceable(4) [[THIS:%.*]]) #[[ATTR3]] comdat !dbg [[DBG66:![0-9]+]] {
+// PPC64-SAME: (ptr noundef nonnull align 4 dereferenceable(4) [[THIS:%.*]]) #[[ATTR2]] comdat !dbg [[DBG67:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
-// PPC64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[THIS_ADDR]], metadata [[META67:![0-9]+]], metadata !DIExpression()), !dbg [[DBG68:![0-9]+]]
+// PPC64-NEXT:      #dbg_declare(ptr [[THIS_ADDR]], [[META68:![0-9]+]], !DIExpression(), [[META69:![0-9]+]])
 // PPC64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// PPC64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[THIS1]], [[STRUCT_S:%.*]] undef) ], !dbg [[DBG69:![0-9]+]]
-// PPC64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[THIS1]], metadata [[META70:![0-9]+]], metadata !DIExpression()), !dbg [[DBG68]]
-// PPC64-NEXT:    [[X:%.*]] = getelementptr inbounds [[STRUCT_S]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG71:![0-9]+]]
-// PPC64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[X]], align 4, !dbg [[DBG73:![0-9]+]]
-// PPC64-NEXT:    [[INC:%.*]] = add nsw i32 [[TMP1]], 1, !dbg [[DBG73]]
-// PPC64-NEXT:    store i32 [[INC]], ptr [[X]], align 4, !dbg [[DBG73]]
-// PPC64-NEXT:    [[X2:%.*]] = getelementptr inbounds [[STRUCT_S]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG74:![0-9]+]]
-// PPC64-NEXT:    [[TMP2:%.*]] = load i32, ptr [[X2]], align 4, !dbg [[DBG75:![0-9]+]]
-// PPC64-NEXT:    [[INC3:%.*]] = add nsw i32 [[TMP2]], 1, !dbg [[DBG75]]
-// PPC64-NEXT:    store i32 [[INC3]], ptr [[X2]], align 4, !dbg [[DBG75]]
-// PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG76:![0-9]+]]
-// PPC64-NEXT:    ret void, !dbg [[DBG77:![0-9]+]]
+// PPC64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[THIS1]], [[STRUCT_S:%.*]] undef) ], !dbg [[DBG70:![0-9]+]]
+// PPC64-NEXT:      #dbg_declare(ptr [[THIS1]], [[META71:![0-9]+]], !DIExpression(), [[META69]])
+// PPC64-NEXT:    [[X:%.*]] = getelementptr inbounds nuw [[STRUCT_S]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG72:![0-9]+]]
+// PPC64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[X]], align 4, !dbg [[DBG74:![0-9]+]]
+// PPC64-NEXT:    [[INC:%.*]] = add nsw i32 [[TMP1]], 1, !dbg [[DBG74]]
+// PPC64-NEXT:    store i32 [[INC]], ptr [[X]], align 4, !dbg [[DBG74]]
+// PPC64-NEXT:    [[X2:%.*]] = getelementptr inbounds nuw [[STRUCT_S]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG75:![0-9]+]]
+// PPC64-NEXT:    [[TMP2:%.*]] = load i32, ptr [[X2]], align 4, !dbg [[DBG76:![0-9]+]]
+// PPC64-NEXT:    [[INC3:%.*]] = add nsw i32 [[TMP2]], 1, !dbg [[DBG76]]
+// PPC64-NEXT:    store i32 [[INC3]], ptr [[X2]], align 4, !dbg [[DBG76]]
+// PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG77:![0-9]+]]
+// PPC64-NEXT:    ret void, !dbg [[DBG78:![0-9]+]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@main
-// AARCH64-SAME: () #[[ATTR0:[0-9]+]] !dbg [[DBG17:![0-9]+]] {
+// AARCH64-SAME: () #[[ATTR0:[0-9]+]] !dbg [[DBG18:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[X:%.*]] = alloca i32, align 4
 // AARCH64-NEXT:    [[SAVED_STACK:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    [[__VLA_EXPR0:%.*]] = alloca i64, align 8
 // AARCH64-NEXT:    [[ARRAY:%.*]] = alloca [10 x i32], align 4
 // AARCH64-NEXT:    [[S:%.*]] = alloca [[STRUCT_S:%.*]], align 4
-// AARCH64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[X]], metadata [[META21:![0-9]+]], metadata !DIExpression()), !dbg [[DBG22:![0-9]+]]
-// AARCH64-NEXT:    store i32 10, ptr [[X]], align 4, !dbg [[DBG22]]
-// AARCH64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[X]], align 4, !dbg [[DBG23:![0-9]+]]
-// AARCH64-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64, !dbg [[DBG24:![0-9]+]]
-// AARCH64-NEXT:    [[TMP2:%.*]] = call ptr @llvm.stacksave.p0(), !dbg [[DBG24]]
-// AARCH64-NEXT:    store ptr [[TMP2]], ptr [[SAVED_STACK]], align 8, !dbg [[DBG24]]
-// AARCH64-NEXT:    [[VLA:%.*]] = alloca i32, i64 [[TMP1]], align 4, !dbg [[DBG24]]
-// AARCH64-NEXT:    store i64 [[TMP1]], ptr [[__VLA_EXPR0]], align 8, !dbg [[DBG24]]
-// AARCH64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[__VLA_EXPR0]], metadata [[META25:![0-9]+]], metadata !DIExpression()), !dbg [[DBG27:![0-9]+]]
-// AARCH64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[VLA]], metadata [[META28:![0-9]+]], metadata !DIExpression()), !dbg [[DBG32:![0-9]+]]
-// AARCH64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[ARRAY]], metadata [[META33:![0-9]+]], metadata !DIExpression()), !dbg [[DBG37:![0-9]+]]
-// AARCH64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[S]], metadata [[META38:![0-9]+]], metadata !DIExpression()), !dbg [[DBG39:![0-9]+]]
-// AARCH64-NEXT:    call void @_ZN1SC2Ev(ptr noundef nonnull align 4 dereferenceable(4) [[S]]) #[[ATTR4:[0-9]+]], !dbg [[DBG39]]
-// AARCH64-NEXT:    call void @_ZN1S3fooEv(ptr noundef nonnull align 4 dereferenceable(4) [[S]]), !dbg [[DBG40:![0-9]+]]
-// AARCH64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds [10 x i32], ptr [[ARRAY]], i64 0, i64 0, !dbg [[DBG41:![0-9]+]]
-// AARCH64-NEXT:    store i32 43, ptr [[ARRAYIDX]], align 4, !dbg [[DBG42:![0-9]+]]
-// AARCH64-NEXT:    [[ARRAYIDX1:%.*]] = getelementptr inbounds i32, ptr [[VLA]], i64 0, !dbg [[DBG43:![0-9]+]]
-// AARCH64-NEXT:    store i32 43, ptr [[ARRAYIDX1]], align 4, !dbg [[DBG44:![0-9]+]]
-// AARCH64-NEXT:    store i32 43, ptr [[X]], align 4, !dbg [[DBG45:![0-9]+]]
-// AARCH64-NEXT:    [[TMP3:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[X]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[VLA]], i32 undef), "QUAL.OSS.VLA.DIMS"(ptr [[VLA]], i64 [[TMP1]]), "QUAL.OSS.FIRSTPRIVATE"(ptr [[ARRAY]], [10 x i32] undef), "QUAL.OSS.CAPTURED"(i64 [[TMP1]]) ], !dbg [[DBG46:![0-9]+]]
-// AARCH64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[X]], metadata [[META21]], metadata !DIExpression()), !dbg [[DBG22]]
-// AARCH64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[VLA]], metadata [[META47:![0-9]+]], metadata !DIExpression()), !dbg [[DBG32]]
-// AARCH64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[ARRAY]], metadata [[META33]], metadata !DIExpression()), !dbg [[DBG37]]
-// AARCH64-NEXT:    [[TMP4:%.*]] = load i32, ptr [[X]], align 4, !dbg [[DBG51:![0-9]+]]
-// AARCH64-NEXT:    [[INC:%.*]] = add nsw i32 [[TMP4]], 1, !dbg [[DBG51]]
-// AARCH64-NEXT:    store i32 [[INC]], ptr [[X]], align 4, !dbg [[DBG51]]
-// AARCH64-NEXT:    [[ARRAYIDX2:%.*]] = getelementptr inbounds i32, ptr [[VLA]], i64 0, !dbg [[DBG53:![0-9]+]]
-// AARCH64-NEXT:    [[TMP5:%.*]] = load i32, ptr [[ARRAYIDX2]], align 4, !dbg [[DBG54:![0-9]+]]
-// AARCH64-NEXT:    [[INC3:%.*]] = add nsw i32 [[TMP5]], 1, !dbg [[DBG54]]
-// AARCH64-NEXT:    store i32 [[INC3]], ptr [[ARRAYIDX2]], align 4, !dbg [[DBG54]]
-// AARCH64-NEXT:    [[ARRAYIDX4:%.*]] = getelementptr inbounds [10 x i32], ptr [[ARRAY]], i64 0, i64 0, !dbg [[DBG55:![0-9]+]]
-// AARCH64-NEXT:    [[TMP6:%.*]] = load i32, ptr [[ARRAYIDX4]], align 4, !dbg [[DBG56:![0-9]+]]
-// AARCH64-NEXT:    [[INC5:%.*]] = add nsw i32 [[TMP6]], 1, !dbg [[DBG56]]
-// AARCH64-NEXT:    store i32 [[INC5]], ptr [[ARRAYIDX4]], align 4, !dbg [[DBG56]]
-// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP3]]), !dbg [[DBG57:![0-9]+]]
-// AARCH64-NEXT:    [[TMP7:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG58:![0-9]+]]
-// AARCH64-NEXT:    call void @llvm.stackrestore.p0(ptr [[TMP7]]), !dbg [[DBG58]]
-// AARCH64-NEXT:    ret i32 0, !dbg [[DBG58]]
+// AARCH64-NEXT:      #dbg_declare(ptr [[X]], [[META22:![0-9]+]], !DIExpression(), [[META23:![0-9]+]])
+// AARCH64-NEXT:    store i32 10, ptr [[X]], align 4, !dbg [[META23]]
+// AARCH64-NEXT:    [[TMP0:%.*]] = load i32, ptr [[X]], align 4, !dbg [[DBG24:![0-9]+]]
+// AARCH64-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64, !dbg [[DBG25:![0-9]+]]
+// AARCH64-NEXT:    [[TMP2:%.*]] = call ptr @llvm.stacksave.p0(), !dbg [[DBG25]]
+// AARCH64-NEXT:    store ptr [[TMP2]], ptr [[SAVED_STACK]], align 8, !dbg [[DBG25]]
+// AARCH64-NEXT:    [[VLA:%.*]] = alloca i32, i64 [[TMP1]], align 4, !dbg [[DBG25]]
+// AARCH64-NEXT:    store i64 [[TMP1]], ptr [[__VLA_EXPR0]], align 8, !dbg [[DBG25]]
+// AARCH64-NEXT:      #dbg_declare(ptr [[__VLA_EXPR0]], [[META26:![0-9]+]], !DIExpression(), [[META28:![0-9]+]])
+// AARCH64-NEXT:      #dbg_declare(ptr [[VLA]], [[META29:![0-9]+]], !DIExpression(), [[META33:![0-9]+]])
+// AARCH64-NEXT:      #dbg_declare(ptr [[ARRAY]], [[META34:![0-9]+]], !DIExpression(), [[META38:![0-9]+]])
+// AARCH64-NEXT:      #dbg_declare(ptr [[S]], [[META39:![0-9]+]], !DIExpression(), [[META40:![0-9]+]])
+// AARCH64-NEXT:    call void @_ZN1SC2Ev(ptr noundef nonnull align 4 dereferenceable(4) [[S]]) #[[ATTR3:[0-9]+]], !dbg [[META40]]
+// AARCH64-NEXT:    call void @_ZN1S3fooEv(ptr noundef nonnull align 4 dereferenceable(4) [[S]]), !dbg [[DBG41:![0-9]+]]
+// AARCH64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds [10 x i32], ptr [[ARRAY]], i64 0, i64 0, !dbg [[DBG42:![0-9]+]]
+// AARCH64-NEXT:    store i32 43, ptr [[ARRAYIDX]], align 4, !dbg [[DBG43:![0-9]+]]
+// AARCH64-NEXT:    [[ARRAYIDX1:%.*]] = getelementptr inbounds i32, ptr [[VLA]], i64 0, !dbg [[DBG44:![0-9]+]]
+// AARCH64-NEXT:    store i32 43, ptr [[ARRAYIDX1]], align 4, !dbg [[DBG45:![0-9]+]]
+// AARCH64-NEXT:    store i32 43, ptr [[X]], align 4, !dbg [[DBG46:![0-9]+]]
+// AARCH64-NEXT:    [[TMP3:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[X]], i32 undef), "QUAL.OSS.FIRSTPRIVATE"(ptr [[VLA]], i32 undef), "QUAL.OSS.VLA.DIMS"(ptr [[VLA]], i64 [[TMP1]]), "QUAL.OSS.FIRSTPRIVATE"(ptr [[ARRAY]], [10 x i32] undef), "QUAL.OSS.CAPTURED"(i64 [[TMP1]]) ], !dbg [[DBG47:![0-9]+]]
+// AARCH64-NEXT:      #dbg_declare(ptr [[X]], [[META22]], !DIExpression(), [[META23]])
+// AARCH64-NEXT:      #dbg_declare(ptr [[VLA]], [[META48:![0-9]+]], !DIExpression(), [[META33]])
+// AARCH64-NEXT:      #dbg_declare(ptr [[ARRAY]], [[META34]], !DIExpression(), [[META38]])
+// AARCH64-NEXT:    [[TMP4:%.*]] = load i32, ptr [[X]], align 4, !dbg [[DBG52:![0-9]+]]
+// AARCH64-NEXT:    [[INC:%.*]] = add nsw i32 [[TMP4]], 1, !dbg [[DBG52]]
+// AARCH64-NEXT:    store i32 [[INC]], ptr [[X]], align 4, !dbg [[DBG52]]
+// AARCH64-NEXT:    [[ARRAYIDX2:%.*]] = getelementptr inbounds i32, ptr [[VLA]], i64 0, !dbg [[DBG54:![0-9]+]]
+// AARCH64-NEXT:    [[TMP5:%.*]] = load i32, ptr [[ARRAYIDX2]], align 4, !dbg [[DBG55:![0-9]+]]
+// AARCH64-NEXT:    [[INC3:%.*]] = add nsw i32 [[TMP5]], 1, !dbg [[DBG55]]
+// AARCH64-NEXT:    store i32 [[INC3]], ptr [[ARRAYIDX2]], align 4, !dbg [[DBG55]]
+// AARCH64-NEXT:    [[ARRAYIDX4:%.*]] = getelementptr inbounds [10 x i32], ptr [[ARRAY]], i64 0, i64 0, !dbg [[DBG56:![0-9]+]]
+// AARCH64-NEXT:    [[TMP6:%.*]] = load i32, ptr [[ARRAYIDX4]], align 4, !dbg [[DBG57:![0-9]+]]
+// AARCH64-NEXT:    [[INC5:%.*]] = add nsw i32 [[TMP6]], 1, !dbg [[DBG57]]
+// AARCH64-NEXT:    store i32 [[INC5]], ptr [[ARRAYIDX4]], align 4, !dbg [[DBG57]]
+// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP3]]), !dbg [[DBG58:![0-9]+]]
+// AARCH64-NEXT:    [[TMP7:%.*]] = load ptr, ptr [[SAVED_STACK]], align 8, !dbg [[DBG59:![0-9]+]]
+// AARCH64-NEXT:    call void @llvm.stackrestore.p0(ptr [[TMP7]]), !dbg [[DBG59]]
+// AARCH64-NEXT:    ret i32 0, !dbg [[DBG59]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@_ZN1SC2Ev
-// AARCH64-SAME: (ptr noundef nonnull align 4 dereferenceable(4) [[THIS:%.*]]) unnamed_addr #[[ATTR3:[0-9]+]] comdat !dbg [[DBG59:![0-9]+]] {
+// AARCH64-SAME: (ptr noundef nonnull align 4 dereferenceable(4) [[THIS:%.*]]) unnamed_addr #[[ATTR2:[0-9]+]] comdat !dbg [[DBG60:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
-// AARCH64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[THIS_ADDR]], metadata [[META61:![0-9]+]], metadata !DIExpression()), !dbg [[DBG63:![0-9]+]]
+// AARCH64-NEXT:      #dbg_declare(ptr [[THIS_ADDR]], [[META62:![0-9]+]], !DIExpression(), [[META64:![0-9]+]])
 // AARCH64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// AARCH64-NEXT:    [[X:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG64:![0-9]+]]
-// AARCH64-NEXT:    store i32 4, ptr [[X]], align 4, !dbg [[DBG64]]
-// AARCH64-NEXT:    ret void, !dbg [[DBG65:![0-9]+]]
+// AARCH64-NEXT:    [[X:%.*]] = getelementptr inbounds nuw [[STRUCT_S:%.*]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG65:![0-9]+]]
+// AARCH64-NEXT:    store i32 4, ptr [[X]], align 4, !dbg [[DBG65]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG66:![0-9]+]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@_ZN1S3fooEv
-// AARCH64-SAME: (ptr noundef nonnull align 4 dereferenceable(4) [[THIS:%.*]]) #[[ATTR3]] comdat !dbg [[DBG66:![0-9]+]] {
+// AARCH64-SAME: (ptr noundef nonnull align 4 dereferenceable(4) [[THIS:%.*]]) #[[ATTR2]] comdat !dbg [[DBG67:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
-// AARCH64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[THIS_ADDR]], metadata [[META67:![0-9]+]], metadata !DIExpression()), !dbg [[DBG68:![0-9]+]]
+// AARCH64-NEXT:      #dbg_declare(ptr [[THIS_ADDR]], [[META68:![0-9]+]], !DIExpression(), [[META69:![0-9]+]])
 // AARCH64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// AARCH64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[THIS1]], [[STRUCT_S:%.*]] undef) ], !dbg [[DBG69:![0-9]+]]
-// AARCH64-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[THIS1]], metadata [[META70:![0-9]+]], metadata !DIExpression()), !dbg [[DBG68]]
-// AARCH64-NEXT:    [[X:%.*]] = getelementptr inbounds [[STRUCT_S]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG71:![0-9]+]]
-// AARCH64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[X]], align 4, !dbg [[DBG73:![0-9]+]]
-// AARCH64-NEXT:    [[INC:%.*]] = add nsw i32 [[TMP1]], 1, !dbg [[DBG73]]
-// AARCH64-NEXT:    store i32 [[INC]], ptr [[X]], align 4, !dbg [[DBG73]]
-// AARCH64-NEXT:    [[X2:%.*]] = getelementptr inbounds [[STRUCT_S]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG74:![0-9]+]]
-// AARCH64-NEXT:    [[TMP2:%.*]] = load i32, ptr [[X2]], align 4, !dbg [[DBG75:![0-9]+]]
-// AARCH64-NEXT:    [[INC3:%.*]] = add nsw i32 [[TMP2]], 1, !dbg [[DBG75]]
-// AARCH64-NEXT:    store i32 [[INC3]], ptr [[X2]], align 4, !dbg [[DBG75]]
-// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG76:![0-9]+]]
-// AARCH64-NEXT:    ret void, !dbg [[DBG77:![0-9]+]]
+// AARCH64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[THIS1]], [[STRUCT_S:%.*]] undef) ], !dbg [[DBG70:![0-9]+]]
+// AARCH64-NEXT:      #dbg_declare(ptr [[THIS1]], [[META71:![0-9]+]], !DIExpression(), [[META69]])
+// AARCH64-NEXT:    [[X:%.*]] = getelementptr inbounds nuw [[STRUCT_S]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG72:![0-9]+]]
+// AARCH64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[X]], align 4, !dbg [[DBG74:![0-9]+]]
+// AARCH64-NEXT:    [[INC:%.*]] = add nsw i32 [[TMP1]], 1, !dbg [[DBG74]]
+// AARCH64-NEXT:    store i32 [[INC]], ptr [[X]], align 4, !dbg [[DBG74]]
+// AARCH64-NEXT:    [[X2:%.*]] = getelementptr inbounds nuw [[STRUCT_S]], ptr [[THIS1]], i32 0, i32 0, !dbg [[DBG75:![0-9]+]]
+// AARCH64-NEXT:    [[TMP2:%.*]] = load i32, ptr [[X2]], align 4, !dbg [[DBG76:![0-9]+]]
+// AARCH64-NEXT:    [[INC3:%.*]] = add nsw i32 [[TMP2]], 1, !dbg [[DBG76]]
+// AARCH64-NEXT:    store i32 [[INC3]], ptr [[X2]], align 4, !dbg [[DBG76]]
+// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG77:![0-9]+]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG78:![0-9]+]]
 //

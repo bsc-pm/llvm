@@ -5067,7 +5067,8 @@ buildDeclareReductionRef(Sema &SemaRef, SourceLocation Loc, SourceRange Range,
     return UnresolvedLookupExpr::Create(
         SemaRef.Context, /*NamingClass=*/nullptr,
         ReductionIdScopeSpec.getWithLocInContext(SemaRef.Context), ReductionId,
-        /*ADL=*/true, ResSet.begin(), ResSet.end(), /*KnownDependent=*/false);
+        /*ADL=*/true, ResSet.begin(), ResSet.end(), /*KnownDependent=*/false,
+        /*KnownInstantiationDependent=*/true);
   }
   // Lookup inside the classes.
   // C++ [over.match.oper]p3:
@@ -7044,7 +7045,7 @@ void SemaOmpSs::InstantiateOSSDeclareTaskAttr(
             SemaRef.Context, /*NamingClass=*/nullptr,
             S,
             NameInfo, /*ADL=*/true, Decls.begin(), Decls.end(),
-            /*KnownDependent=*/false));
+            /*KnownDependent=*/false, /*KnownInstantiationDependent=*/true));
       } else
         UnresolvedReductions.push_back(nullptr);
     }

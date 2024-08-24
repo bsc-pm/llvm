@@ -2885,12 +2885,12 @@ llvm::AllocaInst *CGOmpSsRuntime::createTaskAwareAlloca(
     CodeGenFunction &CGF, llvm::Type *Ty, const Twine &Name, llvm::Value *ArraySize) {
   if (InDirectiveEmission && TaskStack.size() > 1)
     return new llvm::AllocaInst(Ty, CGM.getDataLayout().getAllocaAddrSpace(),
-                                ArraySize, Name, TaskStack[TaskStack.size() - 2].InsertPt);
+                                ArraySize, Name, TaskStack[TaskStack.size() - 2].InsertPt->getIterator());
   if (inTaskBody())
     return new llvm::AllocaInst(Ty, CGM.getDataLayout().getAllocaAddrSpace(),
-                                ArraySize, Name, TaskStack[TaskStack.size() - 1].InsertPt);
+                                ArraySize, Name, TaskStack[TaskStack.size() - 1].InsertPt->getIterator());
   return new llvm::AllocaInst(Ty, CGM.getDataLayout().getAllocaAddrSpace(),
-                              ArraySize, Name, CGF.AllocaInsertPt);
+                              ArraySize, Name, CGF.AllocaInsertPt->getIterator());
 }
 
 RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,

@@ -16,7 +16,7 @@ target triple = "x86_64-unknown-linux-gnu"
 define dso_local i32 @main() #0 !dbg !8 {
 entry:
   %x = alloca i32, align 4
-  tail call void @llvm.dbg.declare(metadata ptr %x, metadata !13, metadata !DIExpression()), !dbg !14
+  #dbg_declare(ptr %x, !13, !DIExpression(), !14)
   %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00") ], !dbg !15
   call void @llvm.directive.region.exit(token %0), !dbg !16
   ret i32 0, !dbg !18
@@ -61,7 +61,7 @@ attributes #2 = { nounwind }
 ; CHECK-LABEL: @main(
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[X:%.*]] = alloca i32, align 4
-; CHECK-NEXT:    tail call void @llvm.dbg.declare(metadata ptr [[X]], metadata [[META13:![0-9]+]], metadata !DIExpression()), !dbg [[DBG14:![0-9]+]]
+; CHECK-NEXT:      #dbg_declare(ptr [[X]], [[META13:![0-9]+]], !DIExpression(), [[META14:![0-9]+]])
 ; CHECK-NEXT:    [[TMP0:%.*]] = alloca ptr, align 8, !dbg [[DBG15:![0-9]+]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = alloca ptr, align 8, !dbg [[DBG15]]
 ; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG15]]

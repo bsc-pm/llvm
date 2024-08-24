@@ -26,6 +26,7 @@ end subroutine
 end module
 
 
+
 ! CHECK-LABEL:   func.func @_QMtestsPtest_assumed_shape_to_contiguous(
 ! CHECK-SAME:                                                         %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.box<!fir.array<?xf32>> {fir.bindc_name = "x"}) {
 ! CHECK:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.array<?xf32>>
@@ -60,19 +61,20 @@ end module
 ! CHECK:           %[[VAL_25:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<!fir.box<!fir.array<?xf32>>>
 ! CHECK:           oss.task firstprivate(%[[VAL_22]], %[[VAL_0]] : !fir.box<!fir.array<?xf32>>, !fir.box<!fir.array<?xf32>>) firstprivate_type(%[[VAL_24]], %[[VAL_25]] : !fir.oss<!fir.box<!fir.array<?xf32>>>, !fir.oss<!fir.box<!fir.array<?xf32>>>) shared(%[[VAL_4]] : !fir.heap<!fir.array<?xf32>>) shared_type(%[[VAL_23]] : !fir.oss<!fir.heap<!fir.array<?xf32>>>) captures(%[[VAL_18]]#1, %[[VAL_20]] : index, i1) {
 ! CHECK:             %[[VAL_26:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.array<?xf32>> {pinned}
+! CHECK:             %[[VAL_27:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.heap<!fir.array<?xf32>>> {pinned}
 ! CHECK:             fir.call @_QPtakes_contiguous(%[[VAL_22]]) fastmath<contract> : (!fir.box<!fir.array<?xf32>>) -> ()
 ! CHECK:             fir.if %[[VAL_20]] {
-! CHECK:               %[[VAL_27:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_18]]#1 : (index) -> !fir.shape<1>
-! CHECK:               %[[VAL_28:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_4]](%[[VAL_27]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.array<?xf32>>
+! CHECK:               %[[VAL_28:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_18]]#1 : (index) -> !fir.shape<1>
+! CHECK:               %[[VAL_29:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_4]](%[[VAL_28]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.array<?xf32>>
+! CHECK:               %[[VAL_30:[-0-9A-Za-z._]+]] = fir.rebox %[[VAL_29]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<!fir.heap<!fir.array<?xf32>>>
+! CHECK:               fir.store %[[VAL_30]] to %[[VAL_27]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>
 ! CHECK:               fir.store %[[VAL_0]] to %[[VAL_26]] : !fir.ref<!fir.box<!fir.array<?xf32>>>
-! CHECK:               %[[VAL_29:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl{{.*}})
-! CHECK:               %[[VAL_30:[-0-9A-Za-z._]+]] = arith.constant 23 : i32
-! CHECK:               %[[VAL_31:[-0-9A-Za-z._]+]] = arith.constant true
-! CHECK:               %[[VAL_32:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_26]] : (!fir.ref<!fir.box<!fir.array<?xf32>>>) -> !fir.ref<!fir.box<none>>
-! CHECK:               %[[VAL_33:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_28]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<none>
-! CHECK:               %[[VAL_34:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_29]]
-! CHECK:               %[[VAL_35:[-0-9A-Za-z._]+]] = fir.call @_FortranACopyOutAssign(%[[VAL_32]], %[[VAL_33]], %[[VAL_31]], %[[VAL_34]], %[[VAL_30]]) fastmath<contract> : (!fir.ref<!fir.box<none>>, !fir.box<none>, i1, !fir.ref<i8>, i32) -> none
-! CHECK:               fir.freemem %[[VAL_4]] : !fir.heap<!fir.array<?xf32>>
+! CHECK:               %[[VAL_31:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl{{.*}})
+! CHECK:               %[[VAL_32:[-0-9A-Za-z._]+]] = arith.constant 23 : i32
+! CHECK:               %[[VAL_33:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_26]] : (!fir.ref<!fir.box<!fir.array<?xf32>>>) -> !fir.ref<!fir.box<none>>
+! CHECK:               %[[VAL_34:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_27]] : (!fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>) -> !fir.ref<!fir.box<none>>
+! CHECK:               %[[VAL_35:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_31]]
+! CHECK:               %[[VAL_36:[-0-9A-Za-z._]+]] = fir.call @_FortranACopyOutAssign(%[[VAL_33]], %[[VAL_34]], %[[VAL_35]], %[[VAL_32]]) fastmath<contract> : (!fir.ref<!fir.box<none>>, !fir.ref<!fir.box<none>>, !fir.ref<i8>, i32) -> none
 ! CHECK:             }
 ! CHECK:             oss.terminator
 ! CHECK:           }
@@ -81,6 +83,4 @@ end module
 ! CHECK:         func.func private @_QPtakes_contiguous(!fir.box<!fir.array<?xf32>> {fir.contiguous})
 ! CHECK:         func.func private @_FortranAIsContiguous(!fir.box<none>) -> i1 attributes {fir.runtime}
 ! CHECK:         func.func private @_FortranAAssignTemporary(!fir.ref<!fir.box<none>>, !fir.box<none>, !fir.ref<i8>, i32) -> none attributes {fir.runtime}
-
-! CHECK:         func.func private @_FortranACopyOutAssign(!fir.ref<!fir.box<none>>, !fir.box<none>, i1, !fir.ref<i8>, i32) -> none attributes {fir.runtime}
 

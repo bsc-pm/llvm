@@ -16,6 +16,12 @@ endif()
 # char into the lit command.
 string(REPLACE " " ";" LIBOMPTARGET_LIT_ARG_LIST "${LIBOMPTARGET_LIT_ARGS}")
 
+find_package(CUDAToolkit QUIET)
+if(CUDAToolkit_FOUND)
+  get_filename_component(CUDA_ROOT "${CUDAToolkit_BIN_DIR}" DIRECTORY ABSOLUTE)
+  get_filename_component(CUDA_LIBDIR "${CUDA_cudart_static_LIBRARY}" DIRECTORY)
+endif()
+
 string(REGEX MATCHALL "([^\ ]+\ |[^\ ]+$)" SYSTEM_TARGETS "${LIBOMPTARGET_SYSTEM_TARGETS}")
 foreach(CURRENT_TARGET IN LISTS SYSTEM_TARGETS)
   string(STRIP "${CURRENT_TARGET}" CURRENT_TARGET)
@@ -34,6 +40,7 @@ foreach(CURRENT_TARGET IN LISTS SYSTEM_TARGETS)
   # Override the detected openmp flag to libompv
   set(OPENMP_TEST_OPENMP_FLAGS "${OPENMP_TEST_OPENMP_FLAGS} -fopenmp=libompv")
 
+  get_filename_component(CUDA_LIBDIR "${CUDA_cudart_static_LIBRARY}" DIRECTORY)
   configure_file(../lit.site.cfg.in ${CURRENT_TARGET}/lit.site.cfg @ONLY)
 endforeach()
 

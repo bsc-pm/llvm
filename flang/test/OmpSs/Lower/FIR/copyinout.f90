@@ -46,14 +46,28 @@ end subroutine
 ! FIRDialect:             %[[VAL_16:[-0-9A-Za-z._]+]] = fir.call @_FortranAAssignTemporary(%[[VAL_13]], %[[VAL_14]], %[[VAL_15]], %[[VAL_12]]) fastmath<contract> : (!fir.ref<!fir.box<none>>, !fir.box<none>, !fir.ref<i8>, i32) -> none
 ! FIRDialect:             fir.result %[[VAL_8]] : !fir.heap<!fir.array<?xf32>>
 ! FIRDialect:           }
-! FIRDialect:           %[[VAL_17:[-0-9A-Za-z._]+]] = arith.constant false
-! FIRDialect:           %[[VAL_18:[-0-9A-Za-z._]+]] = arith.cmpi eq, %[[VAL_3]], %[[VAL_17]] : i1
-! FIRDialect:           %[[VAL_19:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<!fir.heap<!fir.array<?xf32>>>
-! FIRDialect:           oss.task shared(%[[VAL_4]] : !fir.heap<!fir.array<?xf32>>) shared_type(%[[VAL_19]] : !fir.oss<!fir.heap<!fir.array<?xf32>>>) captures(%[[VAL_18]] : i1) {
-! FIRDialect:             %[[VAL_20:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_4]] : (!fir.heap<!fir.array<?xf32>>) -> !fir.ref<!fir.array<5xf32>>
-! FIRDialect:             fir.call @_QPbar_intent_in(%[[VAL_20]]) fastmath<contract> : (!fir.ref<!fir.array<5xf32>>) -> ()
-! FIRDialect:             fir.if %[[VAL_18]] {
-! FIRDialect:               fir.freemem %[[VAL_4]] : !fir.heap<!fir.array<?xf32>>
+! FIRDialect:           %[[VAL_17:[-0-9A-Za-z._]+]] = arith.constant 0 : index
+! FIRDialect:           %[[VAL_18:[-0-9A-Za-z._]+]]:3 = fir.box_dims %[[VAL_0]], %[[VAL_17]] : (!fir.box<!fir.array<?xf32>>, index) -> (index, index, index)
+! FIRDialect:           %[[VAL_19:[-0-9A-Za-z._]+]] = arith.constant false
+! FIRDialect:           %[[VAL_20:[-0-9A-Za-z._]+]] = arith.cmpi eq, %[[VAL_3]], %[[VAL_19]] : i1
+! FIRDialect:           %[[VAL_21:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<!fir.heap<!fir.array<?xf32>>>
+! FIRDialect:           %[[VAL_22:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<!fir.box<!fir.array<?xf32>>>
+! FIRDialect:           oss.task firstprivate(%[[VAL_0]] : !fir.box<!fir.array<?xf32>>) firstprivate_type(%[[VAL_22]] : !fir.oss<!fir.box<!fir.array<?xf32>>>) shared(%[[VAL_4]] : !fir.heap<!fir.array<?xf32>>) shared_type(%[[VAL_21]] : !fir.oss<!fir.heap<!fir.array<?xf32>>>) captures(%[[VAL_18]]#1, %[[VAL_20]] : index, i1) {
+! FIRDialect:             %[[VAL_23:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.heap<!fir.array<?xf32>>> {pinned}
+! FIRDialect:             %[[VAL_24:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_4]] : (!fir.heap<!fir.array<?xf32>>) -> !fir.ref<!fir.array<5xf32>>
+! FIRDialect:             fir.call @_QPbar_intent_in(%[[VAL_24]]) fastmath<contract> : (!fir.ref<!fir.array<5xf32>>) -> ()
+! FIRDialect:             fir.if %[[VAL_20]] {
+! FIRDialect:               %[[VAL_25:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_18]]#1 : (index) -> !fir.shape<1>
+! FIRDialect:               %[[VAL_26:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_4]](%[[VAL_25]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.array<?xf32>>
+! FIRDialect:               %[[VAL_27:[-0-9A-Za-z._]+]] = fir.rebox %[[VAL_26]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<!fir.heap<!fir.array<?xf32>>>
+! FIRDialect:               fir.store %[[VAL_27]] to %[[VAL_23]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>
+! FIRDialect:               %[[VAL_28:[-0-9A-Za-z._]+]] = fir.zero_bits !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>
+! FIRDialect:               %[[VAL_29:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl{{.*}}) : !fir.ref<!fir.char<1,66>>
+! FIRDialect:               %[[VAL_30:[-0-9A-Za-z._]+]] = arith.constant 5 : i32
+! FIRDialect:               %[[VAL_31:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_28]] : (!fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>) -> !fir.ref<!fir.box<none>>
+! FIRDialect:               %[[VAL_32:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_23]] : (!fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>) -> !fir.ref<!fir.box<none>>
+! FIRDialect:               %[[VAL_33:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_29]]
+! FIRDialect:               %[[VAL_34:[-0-9A-Za-z._]+]] = fir.call @_FortranACopyOutAssign(%[[VAL_31]], %[[VAL_32]], %[[VAL_33]], %[[VAL_30]]) fastmath<contract> : (!fir.ref<!fir.box<none>>, !fir.ref<!fir.box<none>>, !fir.ref<i8>, i32) -> none
 ! FIRDialect:             }
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
@@ -87,20 +101,21 @@ end subroutine
 ! FIRDialect:           %[[VAL_13:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<!fir.box<!fir.array<?xf32>>>
 ! FIRDialect:           oss.task firstprivate(%[[VAL_0]] : !fir.box<!fir.array<?xf32>>) firstprivate_type(%[[VAL_13]] : !fir.oss<!fir.box<!fir.array<?xf32>>>) shared(%[[VAL_3]] : !fir.heap<!fir.array<?xf32>>) shared_type(%[[VAL_12]] : !fir.oss<!fir.heap<!fir.array<?xf32>>>) captures(%[[VAL_9]]#1, %[[VAL_11]] : index, i1) {
 ! FIRDialect:             %[[VAL_14:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.array<?xf32>> {pinned}
-! FIRDialect:             %[[VAL_15:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_3]] : (!fir.heap<!fir.array<?xf32>>) -> !fir.ref<!fir.array<5xf32>>
-! FIRDialect:             fir.call @_QPbar_intent_out(%[[VAL_15]]) fastmath<contract> : (!fir.ref<!fir.array<5xf32>>) -> ()
+! FIRDialect:             %[[VAL_15:[-0-9A-Za-z._]+]] = fir.alloca !fir.box<!fir.heap<!fir.array<?xf32>>> {pinned}
+! FIRDialect:             %[[VAL_16:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_3]] : (!fir.heap<!fir.array<?xf32>>) -> !fir.ref<!fir.array<5xf32>>
+! FIRDialect:             fir.call @_QPbar_intent_out(%[[VAL_16]]) fastmath<contract> : (!fir.ref<!fir.array<5xf32>>) -> ()
 ! FIRDialect:             fir.if %[[VAL_11]] {
-! FIRDialect:               %[[VAL_16:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_9]]#1 : (index) -> !fir.shape<1>
-! FIRDialect:               %[[VAL_17:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_3]](%[[VAL_16]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.array<?xf32>>
+! FIRDialect:               %[[VAL_17:[-0-9A-Za-z._]+]] = fir.shape %[[VAL_9]]#1 : (index) -> !fir.shape<1>
+! FIRDialect:               %[[VAL_18:[-0-9A-Za-z._]+]] = fir.embox %[[VAL_3]](%[[VAL_17]]) : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.array<?xf32>>
+! FIRDialect:               %[[VAL_19:[-0-9A-Za-z._]+]] = fir.rebox %[[VAL_18]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<!fir.heap<!fir.array<?xf32>>>
+! FIRDialect:               fir.store %[[VAL_19]] to %[[VAL_15]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>
 ! FIRDialect:               fir.store %[[VAL_0]] to %[[VAL_14]] : !fir.ref<!fir.box<!fir.array<?xf32>>>
-! FIRDialect:               %[[VAL_18:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl{{.*}})
-! FIRDialect:               %[[VAL_19:[-0-9A-Za-z._]+]] = arith.constant 16 : i32
-! FIRDialect:               %[[VAL_20:[-0-9A-Za-z._]+]] = arith.constant true
-! FIRDialect:               %[[VAL_21:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_14]] : (!fir.ref<!fir.box<!fir.array<?xf32>>>) -> !fir.ref<!fir.box<none>>
-! FIRDialect:               %[[VAL_22:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_17]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<none>
-! FIRDialect:               %[[VAL_23:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_18]]
-! FIRDialect:               %[[VAL_24:[-0-9A-Za-z._]+]] = fir.call @_FortranACopyOutAssign(%[[VAL_21]], %[[VAL_22]], %[[VAL_20]], %[[VAL_23]], %[[VAL_19]]) fastmath<contract> : (!fir.ref<!fir.box<none>>, !fir.box<none>, i1, !fir.ref<i8>, i32) -> none
-! FIRDialect:               fir.freemem %[[VAL_3]] : !fir.heap<!fir.array<?xf32>>
+! FIRDialect:               %[[VAL_20:[-0-9A-Za-z._]+]] = fir.address_of(@_QQcl{{.*}})
+! FIRDialect:               %[[VAL_21:[-0-9A-Za-z._]+]] = arith.constant 16 : i32
+! FIRDialect:               %[[VAL_22:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_14]] : (!fir.ref<!fir.box<!fir.array<?xf32>>>) -> !fir.ref<!fir.box<none>>
+! FIRDialect:               %[[VAL_23:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_15]] : (!fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>) -> !fir.ref<!fir.box<none>>
+! FIRDialect:               %[[VAL_24:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_20]]
+! FIRDialect:               %[[VAL_25:[-0-9A-Za-z._]+]] = fir.call @_FortranACopyOutAssign(%[[VAL_22]], %[[VAL_23]], %[[VAL_24]], %[[VAL_21]]) fastmath<contract> : (!fir.ref<!fir.box<none>>, !fir.ref<!fir.box<none>>, !fir.ref<i8>, i32) -> none
 ! FIRDialect:             }
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
@@ -114,6 +129,5 @@ end subroutine
 ! FIRDialect:         }
 ! FIRDialect:         func.func private @_FortranAIsContiguous(!fir.box<none>) -> i1 attributes {fir.runtime}
 ! FIRDialect:         func.func private @_FortranAAssignTemporary(!fir.ref<!fir.box<none>>, !fir.box<none>, !fir.ref<i8>, i32) -> none attributes {fir.runtime}
-
-! FIRDialect:         func.func private @_FortranACopyOutAssign(!fir.ref<!fir.box<none>>, !fir.box<none>, i1, !fir.ref<i8>, i32) -> none attributes {fir.runtime}
+! FIRDialect:         func.func private @_FortranACopyOutAssign(!fir.ref<!fir.box<none>>, !fir.ref<!fir.box<none>>, !fir.ref<i8>, i32) -> none attributes {fir.runtime}
 

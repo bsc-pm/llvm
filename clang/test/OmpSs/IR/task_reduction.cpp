@@ -44,7 +44,7 @@ void foo(int &rx) {
 // CHECK-NEXT:    [[ARRAYCTOR_DONE:%.*]] = icmp eq ptr [[ARRAYCTOR_DST_NEXT]], [[ARRAYCTOR_DST_END]]
 // CHECK-NEXT:    br i1 [[ARRAYCTOR_DONE]], label [[ARRAYCTOR_CONT:%.*]], label [[ARRAYCTOR_LOOP]]
 // CHECK:       arrayctor.cont:
-// CHECK-NEXT:    ret void, !dbg [[DBG13:![0-9]+]]
+// CHECK-NEXT:    ret void, !dbg [[DBG14:![0-9]+]]
 //
 //
 // CHECK-LABEL: @red_comb(
@@ -64,16 +64,16 @@ void foo(int &rx) {
 // CHECK:       arrayctor.loop:
 // CHECK-NEXT:    [[ARRAYCTOR_DST_CUR:%.*]] = phi ptr [ [[TMP3]], [[ENTRY:%.*]] ], [ [[ARRAYCTOR_DST_NEXT:%.*]], [[ARRAYCTOR_LOOP]] ]
 // CHECK-NEXT:    [[ARRAYCTOR_SRC_CUR:%.*]] = phi ptr [ [[TMP4]], [[ENTRY]] ], [ [[ARRAYCTOR_SRC_NEXT:%.*]], [[ARRAYCTOR_LOOP]] ]
-// CHECK-NEXT:    [[TMP7:%.*]] = load i32, ptr [[ARRAYCTOR_DST_CUR]], align 4, !dbg [[DBG16:![0-9]+]]
-// CHECK-NEXT:    [[TMP8:%.*]] = load i32, ptr [[ARRAYCTOR_SRC_CUR]], align 4, !dbg [[DBG16]]
-// CHECK-NEXT:    [[ADD:%.*]] = add nsw i32 [[TMP7]], [[TMP8]], !dbg [[DBG18:![0-9]+]]
-// CHECK-NEXT:    store i32 [[ADD]], ptr [[ARRAYCTOR_DST_CUR]], align 4, !dbg [[DBG18]]
+// CHECK-NEXT:    [[TMP7:%.*]] = load i32, ptr [[ARRAYCTOR_DST_CUR]], align 4, !dbg [[DBG17:![0-9]+]]
+// CHECK-NEXT:    [[TMP8:%.*]] = load i32, ptr [[ARRAYCTOR_SRC_CUR]], align 4, !dbg [[DBG17]]
+// CHECK-NEXT:    [[ADD:%.*]] = add nsw i32 [[TMP7]], [[TMP8]], !dbg [[DBG19:![0-9]+]]
+// CHECK-NEXT:    store i32 [[ADD]], ptr [[ARRAYCTOR_DST_CUR]], align 4, !dbg [[DBG19]]
 // CHECK-NEXT:    [[ARRAYCTOR_DST_NEXT]] = getelementptr inbounds i32, ptr [[ARRAYCTOR_DST_CUR]], i64 1
 // CHECK-NEXT:    [[ARRAYCTOR_SRC_NEXT]] = getelementptr inbounds i32, ptr [[ARRAYCTOR_SRC_CUR]], i64 1
 // CHECK-NEXT:    [[ARRAYCTOR_DONE:%.*]] = icmp eq ptr [[ARRAYCTOR_DST_NEXT]], [[ARRAYCTOR_DST_END]]
 // CHECK-NEXT:    br i1 [[ARRAYCTOR_DONE]], label [[ARRAYCTOR_CONT:%.*]], label [[ARRAYCTOR_LOOP]]
 // CHECK:       arrayctor.cont:
-// CHECK-NEXT:    ret void, !dbg [[DBG16]]
+// CHECK-NEXT:    ret void, !dbg [[DBG17]]
 //
 //
 // CHECK-LABEL: @compute_dep(
@@ -81,13 +81,13 @@ void foo(int &rx) {
 // CHECK-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T:%.*]], align 8
 // CHECK-NEXT:    [[RX_ADDR:%.*]] = alloca ptr, align 8
 // CHECK-NEXT:    store ptr [[RX:%.*]], ptr [[RX_ADDR]], align 8
-// CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
+// CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
 // CHECK-NEXT:    store ptr [[RX]], ptr [[TMP0]], align 8
-// CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
+// CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
 // CHECK-NEXT:    store i64 4, ptr [[TMP1]], align 8
-// CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
+// CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
 // CHECK-NEXT:    store i64 0, ptr [[TMP2]], align 8
-// CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
+// CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
 // CHECK-NEXT:    store i64 4, ptr [[TMP3]], align 8
 // CHECK-NEXT:    [[TMP4:%.*]] = load [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], align 8
 // CHECK-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T]] [[TMP4]]

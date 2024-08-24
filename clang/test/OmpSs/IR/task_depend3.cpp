@@ -99,13 +99,13 @@ void foo3(bool b) {
 // CHECK-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T:%.*]], align 8
 // CHECK-NEXT:    [[X_ADDR:%.*]] = alloca ptr, align 8
 // CHECK-NEXT:    store ptr [[X:%.*]], ptr [[X_ADDR]], align 8
-// CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
+// CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
 // CHECK-NEXT:    store ptr [[X]], ptr [[TMP0]], align 8
-// CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
+// CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
 // CHECK-NEXT:    store i64 4, ptr [[TMP1]], align 8
-// CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
+// CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
 // CHECK-NEXT:    store i64 0, ptr [[TMP2]], align 8
-// CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
+// CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
 // CHECK-NEXT:    store i64 4, ptr [[TMP3]], align 8
 // CHECK-NEXT:    [[TMP4:%.*]] = load [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], align 8
 // CHECK-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T]] [[TMP4]]
@@ -116,13 +116,13 @@ void foo3(bool b) {
 // CHECK-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T_0:%.*]], align 8
 // CHECK-NEXT:    [[RX_ADDR:%.*]] = alloca ptr, align 8
 // CHECK-NEXT:    store ptr [[RX:%.*]], ptr [[RX_ADDR]], align 8
-// CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 0
+// CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 0
 // CHECK-NEXT:    store ptr [[RX]], ptr [[TMP0]], align 8
-// CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 1
+// CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 1
 // CHECK-NEXT:    store i64 4, ptr [[TMP1]], align 8
-// CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 2
+// CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 2
 // CHECK-NEXT:    store i64 0, ptr [[TMP2]], align 8
-// CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 3
+// CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 3
 // CHECK-NEXT:    store i64 4, ptr [[TMP3]], align 8
 // CHECK-NEXT:    [[TMP4:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], align 8
 // CHECK-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_0]] [[TMP4]]
@@ -133,13 +133,13 @@ void foo3(bool b) {
 // CHECK-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T_1:%.*]], align 8
 // CHECK-NEXT:    [[Y_ADDR:%.*]] = alloca ptr, align 8
 // CHECK-NEXT:    store ptr [[Y:%.*]], ptr [[Y_ADDR]], align 8
-// CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 0
+// CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 0
 // CHECK-NEXT:    store ptr [[Y]], ptr [[TMP0]], align 8
-// CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 1
+// CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 1
 // CHECK-NEXT:    store i64 4, ptr [[TMP1]], align 8
-// CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 2
+// CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 2
 // CHECK-NEXT:    store i64 0, ptr [[TMP2]], align 8
-// CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 3
+// CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], i32 0, i32 3
 // CHECK-NEXT:    store i64 4, ptr [[TMP3]], align 8
 // CHECK-NEXT:    [[TMP4:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_1]], ptr [[RETVAL]], align 8
 // CHECK-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_1]] [[TMP4]]
@@ -150,13 +150,13 @@ void foo3(bool b) {
 // CHECK-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T_2:%.*]], align 8
 // CHECK-NEXT:    [[RY_ADDR:%.*]] = alloca ptr, align 8
 // CHECK-NEXT:    store ptr [[RY:%.*]], ptr [[RY_ADDR]], align 8
-// CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_2]], ptr [[RETVAL]], i32 0, i32 0
+// CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_2]], ptr [[RETVAL]], i32 0, i32 0
 // CHECK-NEXT:    store ptr [[RY]], ptr [[TMP0]], align 8
-// CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_2]], ptr [[RETVAL]], i32 0, i32 1
+// CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_2]], ptr [[RETVAL]], i32 0, i32 1
 // CHECK-NEXT:    store i64 4, ptr [[TMP1]], align 8
-// CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_2]], ptr [[RETVAL]], i32 0, i32 2
+// CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_2]], ptr [[RETVAL]], i32 0, i32 2
 // CHECK-NEXT:    store i64 0, ptr [[TMP2]], align 8
-// CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_2]], ptr [[RETVAL]], i32 0, i32 3
+// CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_2]], ptr [[RETVAL]], i32 0, i32 3
 // CHECK-NEXT:    store i64 4, ptr [[TMP3]], align 8
 // CHECK-NEXT:    [[TMP4:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_2]], ptr [[RETVAL]], align 8
 // CHECK-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_2]] [[TMP4]]
@@ -167,13 +167,13 @@ void foo3(bool b) {
 // CHECK-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T_3:%.*]], align 8
 // CHECK-NEXT:    [[RZ_ADDR:%.*]] = alloca ptr, align 8
 // CHECK-NEXT:    store ptr [[RZ:%.*]], ptr [[RZ_ADDR]], align 8
-// CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_3]], ptr [[RETVAL]], i32 0, i32 0
+// CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_3]], ptr [[RETVAL]], i32 0, i32 0
 // CHECK-NEXT:    store ptr [[RZ]], ptr [[TMP0]], align 8
-// CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_3]], ptr [[RETVAL]], i32 0, i32 1
+// CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_3]], ptr [[RETVAL]], i32 0, i32 1
 // CHECK-NEXT:    store i64 4, ptr [[TMP1]], align 8
-// CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_3]], ptr [[RETVAL]], i32 0, i32 2
+// CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_3]], ptr [[RETVAL]], i32 0, i32 2
 // CHECK-NEXT:    store i64 0, ptr [[TMP2]], align 8
-// CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_3]], ptr [[RETVAL]], i32 0, i32 3
+// CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_3]], ptr [[RETVAL]], i32 0, i32 3
 // CHECK-NEXT:    store i64 4, ptr [[TMP3]], align 8
 // CHECK-NEXT:    [[TMP4:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_3]], ptr [[RETVAL]], align 8
 // CHECK-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_3]] [[TMP4]]
@@ -183,13 +183,13 @@ void foo3(bool b) {
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    [[RI_ADDR:%.*]] = alloca ptr, align 8
 // CHECK-NEXT:    store ptr [[RI:%.*]], ptr [[RI_ADDR]], align 8
-// CHECK-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[RI_ADDR]], align 8, !dbg [[DBG29:![0-9]+]]
-// CHECK-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[TMP0]], i32 undef), "QUAL.OSS.DEP.IN"(ptr [[TMP0]], [3 x i8] c"ri\00", ptr @compute_dep.5, ptr [[TMP0]]) ], !dbg [[DBG29]]
-// CHECK-NEXT:    [[TMP2:%.*]] = load i32, ptr [[TMP0]], align 4, !dbg [[DBG30:![0-9]+]]
-// CHECK-NEXT:    [[INC:%.*]] = add nsw i32 [[TMP2]], 1, !dbg [[DBG30]]
-// CHECK-NEXT:    store i32 [[INC]], ptr [[TMP0]], align 4, !dbg [[DBG30]]
-// CHECK-NEXT:    call void @llvm.directive.region.exit(token [[TMP1]]), !dbg [[DBG31:![0-9]+]]
-// CHECK-NEXT:    ret void, !dbg [[DBG32:![0-9]+]]
+// CHECK-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[RI_ADDR]], align 8, !dbg [[DBG30:![0-9]+]]
+// CHECK-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[TMP0]], i32 undef), "QUAL.OSS.DEP.IN"(ptr [[TMP0]], [3 x i8] c"ri\00", ptr @compute_dep.5, ptr [[TMP0]]) ], !dbg [[DBG30]]
+// CHECK-NEXT:    [[TMP2:%.*]] = load i32, ptr [[TMP0]], align 4, !dbg [[DBG31:![0-9]+]]
+// CHECK-NEXT:    [[INC:%.*]] = add nsw i32 [[TMP2]], 1, !dbg [[DBG31]]
+// CHECK-NEXT:    store i32 [[INC]], ptr [[TMP0]], align 4, !dbg [[DBG31]]
+// CHECK-NEXT:    call void @llvm.directive.region.exit(token [[TMP1]]), !dbg [[DBG32:![0-9]+]]
+// CHECK-NEXT:    ret void, !dbg [[DBG33:![0-9]+]]
 //
 //
 // CHECK-LABEL: @compute_dep.5(
@@ -197,13 +197,13 @@ void foo3(bool b) {
 // CHECK-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T_4:%.*]], align 8
 // CHECK-NEXT:    [[RI_ADDR:%.*]] = alloca ptr, align 8
 // CHECK-NEXT:    store ptr [[RI:%.*]], ptr [[RI_ADDR]], align 8
-// CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_4]], ptr [[RETVAL]], i32 0, i32 0
+// CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_4]], ptr [[RETVAL]], i32 0, i32 0
 // CHECK-NEXT:    store ptr [[RI]], ptr [[TMP0]], align 8
-// CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_4]], ptr [[RETVAL]], i32 0, i32 1
+// CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_4]], ptr [[RETVAL]], i32 0, i32 1
 // CHECK-NEXT:    store i64 4, ptr [[TMP1]], align 8
-// CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_4]], ptr [[RETVAL]], i32 0, i32 2
+// CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_4]], ptr [[RETVAL]], i32 0, i32 2
 // CHECK-NEXT:    store i64 0, ptr [[TMP2]], align 8
-// CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_4]], ptr [[RETVAL]], i32 0, i32 3
+// CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_4]], ptr [[RETVAL]], i32 0, i32 3
 // CHECK-NEXT:    store i64 4, ptr [[TMP3]], align 8
 // CHECK-NEXT:    [[TMP4:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_4]], ptr [[RETVAL]], align 8
 // CHECK-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_4]] [[TMP4]]
@@ -211,34 +211,34 @@ void foo3(bool b) {
 //
 // CHECK-LABEL: @_Z4foo2v(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load ptr, ptr @_ZN1S3srxE, align 8, !dbg [[DBG35:![0-9]+]]
-// CHECK-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[TMP0]], i32 undef), "QUAL.OSS.DEP.IN"(ptr [[TMP0]], [7 x i8] c"S::srx\00", ptr @compute_dep.6, ptr [[TMP0]]) ], !dbg [[DBG35]]
-// CHECK-NEXT:    store i32 3, ptr [[TMP0]], align 4, !dbg [[DBG36:![0-9]+]]
-// CHECK-NEXT:    call void @llvm.directive.region.exit(token [[TMP1]]), !dbg [[DBG37:![0-9]+]]
-// CHECK-NEXT:    [[TMP2:%.*]] = load ptr, ptr @_ZZ4foo2vE2rx, align 8, !dbg [[DBG38:![0-9]+]]
-// CHECK-NEXT:    [[TMP3:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[TMP2]], i32 undef), "QUAL.OSS.DEP.IN"(ptr [[TMP2]], [3 x i8] c"rx\00", ptr @compute_dep.7, ptr [[TMP2]]) ], !dbg [[DBG38]]
-// CHECK-NEXT:    store i32 3, ptr [[TMP2]], align 4, !dbg [[DBG39:![0-9]+]]
-// CHECK-NEXT:    call void @llvm.directive.region.exit(token [[TMP3]]), !dbg [[DBG40:![0-9]+]]
-// CHECK-NEXT:    [[TMP4:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00") ], !dbg [[DBG41:![0-9]+]]
+// CHECK-NEXT:    [[TMP0:%.*]] = load ptr, ptr @_ZN1S3srxE, align 8, !dbg [[DBG36:![0-9]+]]
+// CHECK-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[TMP0]], i32 undef), "QUAL.OSS.DEP.IN"(ptr [[TMP0]], [7 x i8] c"S::srx\00", ptr @compute_dep.6, ptr [[TMP0]]) ], !dbg [[DBG36]]
+// CHECK-NEXT:    store i32 3, ptr [[TMP0]], align 4, !dbg [[DBG37:![0-9]+]]
+// CHECK-NEXT:    call void @llvm.directive.region.exit(token [[TMP1]]), !dbg [[DBG38:![0-9]+]]
+// CHECK-NEXT:    [[TMP2:%.*]] = load ptr, ptr @_ZZ4foo2vE2rx, align 8, !dbg [[DBG39:![0-9]+]]
+// CHECK-NEXT:    [[TMP3:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[TMP2]], i32 undef), "QUAL.OSS.DEP.IN"(ptr [[TMP2]], [3 x i8] c"rx\00", ptr @compute_dep.7, ptr [[TMP2]]) ], !dbg [[DBG39]]
+// CHECK-NEXT:    store i32 3, ptr [[TMP2]], align 4, !dbg [[DBG40:![0-9]+]]
+// CHECK-NEXT:    call void @llvm.directive.region.exit(token [[TMP3]]), !dbg [[DBG41:![0-9]+]]
+// CHECK-NEXT:    [[TMP4:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00") ], !dbg [[DBG42:![0-9]+]]
 // CHECK-NEXT:    [[X:%.*]] = alloca i32, align 4
-// CHECK-NEXT:    [[TMP5:%.*]] = load atomic i8, ptr @_ZGVZ4foo2vE3rsx acquire, align 8, !dbg [[DBG42:![0-9]+]]
-// CHECK-NEXT:    [[GUARD_UNINITIALIZED:%.*]] = icmp eq i8 [[TMP5]], 0, !dbg [[DBG42]]
-// CHECK-NEXT:    br i1 [[GUARD_UNINITIALIZED]], label [[INIT_CHECK:%.*]], label [[INIT_END:%.*]], !dbg [[DBG42]], !prof [[PROF43:![0-9]+]]
+// CHECK-NEXT:    [[TMP5:%.*]] = load atomic i8, ptr @_ZGVZ4foo2vE3rsx acquire, align 8, !dbg [[DBG43:![0-9]+]]
+// CHECK-NEXT:    [[GUARD_UNINITIALIZED:%.*]] = icmp eq i8 [[TMP5]], 0, !dbg [[DBG43]]
+// CHECK-NEXT:    br i1 [[GUARD_UNINITIALIZED]], label [[INIT_CHECK:%.*]], label [[INIT_END:%.*]], !dbg [[DBG43]], !prof [[PROF44:![0-9]+]]
 // CHECK:       init.check:
-// CHECK-NEXT:    [[TMP6:%.*]] = call i32 @__cxa_guard_acquire(ptr @_ZGVZ4foo2vE3rsx) #[[ATTR1:[0-9]+]], !dbg [[DBG42]]
-// CHECK-NEXT:    [[TOBOOL:%.*]] = icmp ne i32 [[TMP6]], 0, !dbg [[DBG42]]
-// CHECK-NEXT:    br i1 [[TOBOOL]], label [[INIT:%.*]], label [[INIT_END]], !dbg [[DBG42]]
+// CHECK-NEXT:    [[TMP6:%.*]] = call i32 @__cxa_guard_acquire(ptr @_ZGVZ4foo2vE3rsx) #[[ATTR1:[0-9]+]], !dbg [[DBG43]]
+// CHECK-NEXT:    [[TOBOOL:%.*]] = icmp ne i32 [[TMP6]], 0, !dbg [[DBG43]]
+// CHECK-NEXT:    br i1 [[TOBOOL]], label [[INIT:%.*]], label [[INIT_END]], !dbg [[DBG43]]
 // CHECK:       init:
-// CHECK-NEXT:    store ptr [[X]], ptr @_ZZ4foo2vE3rsx, align 8, !dbg [[DBG42]]
-// CHECK-NEXT:    call void @__cxa_guard_release(ptr @_ZGVZ4foo2vE3rsx) #[[ATTR1]], !dbg [[DBG42]]
-// CHECK-NEXT:    br label [[INIT_END]], !dbg [[DBG42]]
+// CHECK-NEXT:    store ptr [[X]], ptr @_ZZ4foo2vE3rsx, align 8, !dbg [[DBG43]]
+// CHECK-NEXT:    call void @__cxa_guard_release(ptr @_ZGVZ4foo2vE3rsx) #[[ATTR1]], !dbg [[DBG43]]
+// CHECK-NEXT:    br label [[INIT_END]], !dbg [[DBG43]]
 // CHECK:       init.end:
-// CHECK-NEXT:    [[TMP7:%.*]] = load ptr, ptr @_ZZ4foo2vE3rsx, align 8, !dbg [[DBG44:![0-9]+]]
-// CHECK-NEXT:    [[TMP8:%.*]] = load i32, ptr [[TMP7]], align 4, !dbg [[DBG44]]
-// CHECK-NEXT:    [[TMP9:%.*]] = load ptr, ptr @rex, align 8, !dbg [[DBG45:![0-9]+]]
-// CHECK-NEXT:    store i32 [[TMP8]], ptr [[TMP9]], align 4, !dbg [[DBG46:![0-9]+]]
-// CHECK-NEXT:    call void @llvm.directive.region.exit(token [[TMP4]]), !dbg [[DBG47:![0-9]+]]
-// CHECK-NEXT:    ret void, !dbg [[DBG48:![0-9]+]]
+// CHECK-NEXT:    [[TMP7:%.*]] = load ptr, ptr @_ZZ4foo2vE3rsx, align 8, !dbg [[DBG45:![0-9]+]]
+// CHECK-NEXT:    [[TMP8:%.*]] = load i32, ptr [[TMP7]], align 4, !dbg [[DBG45]]
+// CHECK-NEXT:    [[TMP9:%.*]] = load ptr, ptr @rex, align 8, !dbg [[DBG46:![0-9]+]]
+// CHECK-NEXT:    store i32 [[TMP8]], ptr [[TMP9]], align 4, !dbg [[DBG47:![0-9]+]]
+// CHECK-NEXT:    call void @llvm.directive.region.exit(token [[TMP4]]), !dbg [[DBG48:![0-9]+]]
+// CHECK-NEXT:    ret void, !dbg [[DBG49:![0-9]+]]
 //
 //
 // CHECK-LABEL: @compute_dep.6(
@@ -246,13 +246,13 @@ void foo3(bool b) {
 // CHECK-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T_5:%.*]], align 8
 // CHECK-NEXT:    [[SRX_ADDR:%.*]] = alloca ptr, align 8
 // CHECK-NEXT:    store ptr [[SRX:%.*]], ptr [[SRX_ADDR]], align 8
-// CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_5]], ptr [[RETVAL]], i32 0, i32 0
+// CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_5]], ptr [[RETVAL]], i32 0, i32 0
 // CHECK-NEXT:    store ptr [[SRX]], ptr [[TMP0]], align 8
-// CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_5]], ptr [[RETVAL]], i32 0, i32 1
+// CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_5]], ptr [[RETVAL]], i32 0, i32 1
 // CHECK-NEXT:    store i64 4, ptr [[TMP1]], align 8
-// CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_5]], ptr [[RETVAL]], i32 0, i32 2
+// CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_5]], ptr [[RETVAL]], i32 0, i32 2
 // CHECK-NEXT:    store i64 0, ptr [[TMP2]], align 8
-// CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_5]], ptr [[RETVAL]], i32 0, i32 3
+// CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_5]], ptr [[RETVAL]], i32 0, i32 3
 // CHECK-NEXT:    store i64 4, ptr [[TMP3]], align 8
 // CHECK-NEXT:    [[TMP4:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_5]], ptr [[RETVAL]], align 8
 // CHECK-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_5]] [[TMP4]]
@@ -263,13 +263,13 @@ void foo3(bool b) {
 // CHECK-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T_6:%.*]], align 8
 // CHECK-NEXT:    [[RX_ADDR:%.*]] = alloca ptr, align 8
 // CHECK-NEXT:    store ptr [[RX:%.*]], ptr [[RX_ADDR]], align 8
-// CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_6]], ptr [[RETVAL]], i32 0, i32 0
+// CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_6]], ptr [[RETVAL]], i32 0, i32 0
 // CHECK-NEXT:    store ptr [[RX]], ptr [[TMP0]], align 8
-// CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_6]], ptr [[RETVAL]], i32 0, i32 1
+// CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_6]], ptr [[RETVAL]], i32 0, i32 1
 // CHECK-NEXT:    store i64 4, ptr [[TMP1]], align 8
-// CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_6]], ptr [[RETVAL]], i32 0, i32 2
+// CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_6]], ptr [[RETVAL]], i32 0, i32 2
 // CHECK-NEXT:    store i64 0, ptr [[TMP2]], align 8
-// CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_6]], ptr [[RETVAL]], i32 0, i32 3
+// CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_6]], ptr [[RETVAL]], i32 0, i32 3
 // CHECK-NEXT:    store i64 4, ptr [[TMP3]], align 8
 // CHECK-NEXT:    [[TMP4:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_6]], ptr [[RETVAL]], align 8
 // CHECK-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_6]] [[TMP4]]
@@ -278,11 +278,11 @@ void foo3(bool b) {
 // CHECK-LABEL: @_Z4foo3b(
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    [[B_ADDR:%.*]] = alloca i8, align 1
-// CHECK-NEXT:    [[FROMBOOL:%.*]] = zext i1 [[B:%.*]] to i8
-// CHECK-NEXT:    store i8 [[FROMBOOL]], ptr [[B_ADDR]], align 1
-// CHECK-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[B_ADDR]], i1 undef), "QUAL.OSS.DEP.IN"(ptr [[B_ADDR]], [2 x i8] c"b\00", ptr @compute_dep.8, ptr [[B_ADDR]]) ], !dbg [[DBG52:![0-9]+]]
-// CHECK-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG53:![0-9]+]]
-// CHECK-NEXT:    ret void, !dbg [[DBG54:![0-9]+]]
+// CHECK-NEXT:    [[STOREDV:%.*]] = zext i1 [[B:%.*]] to i8
+// CHECK-NEXT:    store i8 [[STOREDV]], ptr [[B_ADDR]], align 1
+// CHECK-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[B_ADDR]], i1 undef), "QUAL.OSS.DEP.IN"(ptr [[B_ADDR]], [2 x i8] c"b\00", ptr @compute_dep.8, ptr [[B_ADDR]]) ], !dbg [[DBG53:![0-9]+]]
+// CHECK-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG54:![0-9]+]]
+// CHECK-NEXT:    ret void, !dbg [[DBG55:![0-9]+]]
 //
 //
 // CHECK-LABEL: @compute_dep.8(
@@ -290,13 +290,13 @@ void foo3(bool b) {
 // CHECK-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T_7:%.*]], align 8
 // CHECK-NEXT:    [[B_ADDR:%.*]] = alloca ptr, align 8
 // CHECK-NEXT:    store ptr [[B:%.*]], ptr [[B_ADDR]], align 8
-// CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_7]], ptr [[RETVAL]], i32 0, i32 0
+// CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_7]], ptr [[RETVAL]], i32 0, i32 0
 // CHECK-NEXT:    store ptr [[B]], ptr [[TMP0]], align 8
-// CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_7]], ptr [[RETVAL]], i32 0, i32 1
+// CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_7]], ptr [[RETVAL]], i32 0, i32 1
 // CHECK-NEXT:    store i64 1, ptr [[TMP1]], align 8
-// CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_7]], ptr [[RETVAL]], i32 0, i32 2
+// CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_7]], ptr [[RETVAL]], i32 0, i32 2
 // CHECK-NEXT:    store i64 0, ptr [[TMP2]], align 8
-// CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_7]], ptr [[RETVAL]], i32 0, i32 3
+// CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_7]], ptr [[RETVAL]], i32 0, i32 3
 // CHECK-NEXT:    store i64 1, ptr [[TMP3]], align 8
 // CHECK-NEXT:    [[TMP4:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_7]], ptr [[RETVAL]], align 8
 // CHECK-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_7]] [[TMP4]]

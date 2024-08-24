@@ -17,21 +17,22 @@ END PROGRAM
 
 ! LLVMIRDialect-LABEL:   llvm.func @_QQmain() attributes {fir.bindc_name = "s"} {
 ! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
-! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_0]] x i32 {bindc_name = "i"} : (i64) -> !llvm.ptr
+! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_0]] x i32 {bindc_name = "j"} : (i64) -> !llvm.ptr
 ! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
-! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_2]] x i32 {bindc_name = "j"} : (i64) -> !llvm.ptr
+! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_2]] x i32 {bindc_name = "i"} : (i64) -> !llvm.ptr
 ! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.mlir.undef : i32
-! LLVMIRDialect:           oss.task firstprivate(%[[VAL_1]], %[[VAL_1]], %[[VAL_3]], %[[VAL_3]] : !llvm.ptr, !llvm.ptr, !llvm.ptr, !llvm.ptr) firstprivate_type(%[[VAL_4]], %[[VAL_4]], %[[VAL_4]], %[[VAL_4]] : i32, i32, i32, i32) {
-! LLVMIRDialect:             %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.mlir.constant(4 : i32) : i32
-! LLVMIRDialect:             %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
-! LLVMIRDialect:             %[[VAL_7:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_6]] x i32 {pinned} : (i64) -> !llvm.ptr
-! LLVMIRDialect:             %[[VAL_8:[-0-9A-Za-z._]+]] = llvm.load %[[VAL_1]] : !llvm.ptr -> i32
-! LLVMIRDialect:             %[[VAL_9:[-0-9A-Za-z._]+]] = llvm.add %[[VAL_8]], %[[VAL_5]]  : i32
-! LLVMIRDialect:             llvm.store %[[VAL_9]], %[[VAL_7]] : i32, !llvm.ptr
-! LLVMIRDialect:             %[[VAL_10:[-0-9A-Za-z._]+]] = llvm.load %[[VAL_7]] : !llvm.ptr -> i32
-! LLVMIRDialect:             llvm.store %[[VAL_10]], %[[VAL_3]] : i32, !llvm.ptr
+! LLVMIRDialect:           oss.task firstprivate(%[[VAL_3]], %[[VAL_3]], %[[VAL_1]], %[[VAL_1]] : !llvm.ptr, !llvm.ptr, !llvm.ptr, !llvm.ptr) firstprivate_type(%[[VAL_4]], %[[VAL_4]], %[[VAL_4]], %[[VAL_4]] : i32, i32, i32, i32) {
+! LLVMIRDialect:             %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
+! LLVMIRDialect:             %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_5]] x i32 {pinned} : (i64) -> !llvm.ptr
+! LLVMIRDialect:             %[[VAL_7:[-0-9A-Za-z._]+]] = llvm.mlir.constant(4 : i32) : i32
+! LLVMIRDialect:             %[[VAL_8:[-0-9A-Za-z._]+]] = llvm.load %[[VAL_3]] : !llvm.ptr -> i32
+! LLVMIRDialect:             %[[VAL_9:[-0-9A-Za-z._]+]] = llvm.add %[[VAL_8]], %[[VAL_7]] : i32
+! LLVMIRDialect:             llvm.store %[[VAL_9]], %[[VAL_6]] : i32, !llvm.ptr
+! LLVMIRDialect:             %[[VAL_10:[-0-9A-Za-z._]+]] = llvm.load %[[VAL_6]] : !llvm.ptr -> i32
+! LLVMIRDialect:             llvm.store %[[VAL_10]], %[[VAL_1]] : i32, !llvm.ptr
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
 ! LLVMIRDialect:           llvm.return
 ! LLVMIRDialect:         }
+
 

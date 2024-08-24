@@ -114,21 +114,21 @@ void global_ref() {
 // LIN64-NEXT:    store ptr [[TMP0:%.*]], ptr [[DOTADDR]], align 8
 // LIN64-NEXT:    store ptr [[TMP1:%.*]], ptr [[DOTADDR1]], align 8
 // LIN64-NEXT:    store i64 [[TMP2:%.*]], ptr [[DOTADDR2]], align 8
-// LIN64-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[DOTADDR]], align 8, !dbg [[DBG19:![0-9]+]]
-// LIN64-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[DOTADDR1]], align 8, !dbg [[DBG19]]
-// LIN64-NEXT:    [[TMP5:%.*]] = load i64, ptr [[DOTADDR2]], align 8, !dbg [[DBG19]]
-// LIN64-NEXT:    [[ARRAYCTOR_DST_END:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[TMP4]], i64 [[TMP5]], !dbg [[DBG19]]
-// LIN64-NEXT:    br label [[ARRAYCTOR_LOOP:%.*]], !dbg [[DBG19]]
+// LIN64-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[DOTADDR]], align 8, !dbg [[DBG20:![0-9]+]]
+// LIN64-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[DOTADDR1]], align 8, !dbg [[DBG20]]
+// LIN64-NEXT:    [[TMP5:%.*]] = load i64, ptr [[DOTADDR2]], align 8, !dbg [[DBG20]]
+// LIN64-NEXT:    [[ARRAYCTOR_DST_END:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[TMP4]], i64 [[TMP5]], !dbg [[DBG20]]
+// LIN64-NEXT:    br label [[ARRAYCTOR_LOOP:%.*]], !dbg [[DBG20]]
 // LIN64:       arrayctor.loop:
-// LIN64-NEXT:    [[ARRAYCTOR_DST_CUR:%.*]] = phi ptr [ [[TMP4]], [[ENTRY:%.*]] ], [ [[ARRAYCTOR_DST_NEXT:%.*]], [[ARRAYCTOR_LOOP]] ], !dbg [[DBG19]]
-// LIN64-NEXT:    [[ARRAYCTOR_SRC_CUR:%.*]] = phi ptr [ [[TMP3]], [[ENTRY]] ], [ [[ARRAYCTOR_SRC_NEXT:%.*]], [[ARRAYCTOR_LOOP]] ], !dbg [[DBG19]]
-// LIN64-NEXT:    call void @_ZN1SC1ERS_i(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYCTOR_DST_CUR]], ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYCTOR_SRC_CUR]], i32 noundef 0), !dbg [[DBG20:![0-9]+]]
-// LIN64-NEXT:    [[ARRAYCTOR_DST_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYCTOR_DST_CUR]], i64 1, !dbg [[DBG19]]
-// LIN64-NEXT:    [[ARRAYCTOR_SRC_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYCTOR_SRC_CUR]], i64 1, !dbg [[DBG19]]
-// LIN64-NEXT:    [[ARRAYCTOR_DONE:%.*]] = icmp eq ptr [[ARRAYCTOR_DST_NEXT]], [[ARRAYCTOR_DST_END]], !dbg [[DBG19]]
-// LIN64-NEXT:    br i1 [[ARRAYCTOR_DONE]], label [[ARRAYCTOR_CONT:%.*]], label [[ARRAYCTOR_LOOP]], !dbg [[DBG19]]
+// LIN64-NEXT:    [[ARRAYCTOR_DST_CUR:%.*]] = phi ptr [ [[TMP4]], [[ENTRY:%.*]] ], [ [[ARRAYCTOR_DST_NEXT:%.*]], [[ARRAYCTOR_LOOP]] ], !dbg [[DBG20]]
+// LIN64-NEXT:    [[ARRAYCTOR_SRC_CUR:%.*]] = phi ptr [ [[TMP3]], [[ENTRY]] ], [ [[ARRAYCTOR_SRC_NEXT:%.*]], [[ARRAYCTOR_LOOP]] ], !dbg [[DBG20]]
+// LIN64-NEXT:    call void @_ZN1SC1ERS_i(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYCTOR_DST_CUR]], ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYCTOR_SRC_CUR]], i32 noundef 0), !dbg [[DBG21:![0-9]+]]
+// LIN64-NEXT:    [[ARRAYCTOR_DST_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYCTOR_DST_CUR]], i64 1, !dbg [[DBG20]]
+// LIN64-NEXT:    [[ARRAYCTOR_SRC_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYCTOR_SRC_CUR]], i64 1, !dbg [[DBG20]]
+// LIN64-NEXT:    [[ARRAYCTOR_DONE:%.*]] = icmp eq ptr [[ARRAYCTOR_DST_NEXT]], [[ARRAYCTOR_DST_END]], !dbg [[DBG20]]
+// LIN64-NEXT:    br i1 [[ARRAYCTOR_DONE]], label [[ARRAYCTOR_CONT:%.*]], label [[ARRAYCTOR_LOOP]], !dbg [[DBG20]]
 // LIN64:       arrayctor.cont:
-// LIN64-NEXT:    ret void, !dbg [[DBG20]]
+// LIN64-NEXT:    ret void, !dbg [[DBG21]]
 //
 //
 // LIN64-LABEL: @oss_dtor_ZN1SD1Ev(
@@ -137,18 +137,18 @@ void global_ref() {
 // LIN64-NEXT:    [[DOTADDR1:%.*]] = alloca i64, align 8
 // LIN64-NEXT:    store ptr [[TMP0:%.*]], ptr [[DOTADDR]], align 8
 // LIN64-NEXT:    store i64 [[TMP1:%.*]], ptr [[DOTADDR1]], align 8
-// LIN64-NEXT:    [[TMP2:%.*]] = load ptr, ptr [[DOTADDR]], align 8, !dbg [[DBG23:![0-9]+]]
-// LIN64-NEXT:    [[TMP3:%.*]] = load i64, ptr [[DOTADDR1]], align 8, !dbg [[DBG23]]
-// LIN64-NEXT:    [[ARRAYDTOR_DST_END:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[TMP2]], i64 [[TMP3]], !dbg [[DBG23]]
-// LIN64-NEXT:    br label [[ARRAYDTOR_LOOP:%.*]], !dbg [[DBG23]]
+// LIN64-NEXT:    [[TMP2:%.*]] = load ptr, ptr [[DOTADDR]], align 8, !dbg [[DBG24:![0-9]+]]
+// LIN64-NEXT:    [[TMP3:%.*]] = load i64, ptr [[DOTADDR1]], align 8, !dbg [[DBG24]]
+// LIN64-NEXT:    [[ARRAYDTOR_DST_END:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[TMP2]], i64 [[TMP3]], !dbg [[DBG24]]
+// LIN64-NEXT:    br label [[ARRAYDTOR_LOOP:%.*]], !dbg [[DBG24]]
 // LIN64:       arraydtor.loop:
-// LIN64-NEXT:    [[ARRAYDTOR_DST_CUR:%.*]] = phi ptr [ [[TMP2]], [[ENTRY:%.*]] ], [ [[ARRAYDTOR_DST_NEXT:%.*]], [[ARRAYDTOR_LOOP]] ], !dbg [[DBG23]]
-// LIN64-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYDTOR_DST_CUR]]) #[[ATTR2]], !dbg [[DBG23]]
-// LIN64-NEXT:    [[ARRAYDTOR_DST_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYDTOR_DST_CUR]], i64 1, !dbg [[DBG23]]
-// LIN64-NEXT:    [[ARRAYDTOR_DONE:%.*]] = icmp eq ptr [[ARRAYDTOR_DST_NEXT]], [[ARRAYDTOR_DST_END]], !dbg [[DBG23]]
-// LIN64-NEXT:    br i1 [[ARRAYDTOR_DONE]], label [[ARRAYDTOR_CONT:%.*]], label [[ARRAYDTOR_LOOP]], !dbg [[DBG23]]
+// LIN64-NEXT:    [[ARRAYDTOR_DST_CUR:%.*]] = phi ptr [ [[TMP2]], [[ENTRY:%.*]] ], [ [[ARRAYDTOR_DST_NEXT:%.*]], [[ARRAYDTOR_LOOP]] ], !dbg [[DBG24]]
+// LIN64-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYDTOR_DST_CUR]]) #[[ATTR2]], !dbg [[DBG24]]
+// LIN64-NEXT:    [[ARRAYDTOR_DST_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYDTOR_DST_CUR]], i64 1, !dbg [[DBG24]]
+// LIN64-NEXT:    [[ARRAYDTOR_DONE:%.*]] = icmp eq ptr [[ARRAYDTOR_DST_NEXT]], [[ARRAYDTOR_DST_END]], !dbg [[DBG24]]
+// LIN64-NEXT:    br i1 [[ARRAYDTOR_DONE]], label [[ARRAYDTOR_CONT:%.*]], label [[ARRAYDTOR_LOOP]], !dbg [[DBG24]]
 // LIN64:       arraydtor.cont:
-// LIN64-NEXT:    ret void, !dbg [[DBG23]]
+// LIN64-NEXT:    ret void, !dbg [[DBG24]]
 //
 //
 // LIN64-LABEL: @oss_ctor_ZN1SC1Ev(
@@ -157,18 +157,18 @@ void global_ref() {
 // LIN64-NEXT:    [[DOTADDR1:%.*]] = alloca i64, align 8
 // LIN64-NEXT:    store ptr [[TMP0:%.*]], ptr [[DOTADDR]], align 8
 // LIN64-NEXT:    store i64 [[TMP1:%.*]], ptr [[DOTADDR1]], align 8
-// LIN64-NEXT:    [[TMP2:%.*]] = load ptr, ptr [[DOTADDR]], align 8, !dbg [[DBG25:![0-9]+]]
-// LIN64-NEXT:    [[TMP3:%.*]] = load i64, ptr [[DOTADDR1]], align 8, !dbg [[DBG25]]
-// LIN64-NEXT:    [[ARRAYCTOR_DST_END:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[TMP2]], i64 [[TMP3]], !dbg [[DBG25]]
-// LIN64-NEXT:    br label [[ARRAYCTOR_LOOP:%.*]], !dbg [[DBG25]]
+// LIN64-NEXT:    [[TMP2:%.*]] = load ptr, ptr [[DOTADDR]], align 8, !dbg [[DBG26:![0-9]+]]
+// LIN64-NEXT:    [[TMP3:%.*]] = load i64, ptr [[DOTADDR1]], align 8, !dbg [[DBG26]]
+// LIN64-NEXT:    [[ARRAYCTOR_DST_END:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[TMP2]], i64 [[TMP3]], !dbg [[DBG26]]
+// LIN64-NEXT:    br label [[ARRAYCTOR_LOOP:%.*]], !dbg [[DBG26]]
 // LIN64:       arrayctor.loop:
-// LIN64-NEXT:    [[ARRAYCTOR_DST_CUR:%.*]] = phi ptr [ [[TMP2]], [[ENTRY:%.*]] ], [ [[ARRAYCTOR_DST_NEXT:%.*]], [[ARRAYCTOR_LOOP]] ], !dbg [[DBG25]]
-// LIN64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYCTOR_DST_CUR]]), !dbg [[DBG26:![0-9]+]]
-// LIN64-NEXT:    [[ARRAYCTOR_DST_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYCTOR_DST_CUR]], i64 1, !dbg [[DBG25]]
-// LIN64-NEXT:    [[ARRAYCTOR_DONE:%.*]] = icmp eq ptr [[ARRAYCTOR_DST_NEXT]], [[ARRAYCTOR_DST_END]], !dbg [[DBG25]]
-// LIN64-NEXT:    br i1 [[ARRAYCTOR_DONE]], label [[ARRAYCTOR_CONT:%.*]], label [[ARRAYCTOR_LOOP]], !dbg [[DBG25]]
+// LIN64-NEXT:    [[ARRAYCTOR_DST_CUR:%.*]] = phi ptr [ [[TMP2]], [[ENTRY:%.*]] ], [ [[ARRAYCTOR_DST_NEXT:%.*]], [[ARRAYCTOR_LOOP]] ], !dbg [[DBG26]]
+// LIN64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYCTOR_DST_CUR]]), !dbg [[DBG27:![0-9]+]]
+// LIN64-NEXT:    [[ARRAYCTOR_DST_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYCTOR_DST_CUR]], i64 1, !dbg [[DBG26]]
+// LIN64-NEXT:    [[ARRAYCTOR_DONE:%.*]] = icmp eq ptr [[ARRAYCTOR_DST_NEXT]], [[ARRAYCTOR_DST_END]], !dbg [[DBG26]]
+// LIN64-NEXT:    br i1 [[ARRAYCTOR_DONE]], label [[ARRAYCTOR_CONT:%.*]], label [[ARRAYCTOR_LOOP]], !dbg [[DBG26]]
 // LIN64:       arrayctor.cont:
-// LIN64-NEXT:    ret void, !dbg [[DBG26]]
+// LIN64-NEXT:    ret void, !dbg [[DBG27]]
 //
 //
 // LIN64-LABEL: @main(
@@ -179,39 +179,39 @@ void global_ref() {
 // LIN64-NEXT:    [[X1:%.*]] = alloca [[STRUCT_S]], align 4
 // LIN64-NEXT:    [[RX1:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    store i32 0, ptr [[RETVAL]], align 4
-// LIN64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[X]]), !dbg [[DBG29:![0-9]+]]
-// LIN64-NEXT:    store ptr [[X]], ptr [[RX]], align 8, !dbg [[DBG30:![0-9]+]]
-// LIN64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[X1]]), !dbg [[DBG31:![0-9]+]]
-// LIN64-NEXT:    store ptr [[X1]], ptr [[RX1]], align 8, !dbg [[DBG32:![0-9]+]]
-// LIN64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[RX]], align 8, !dbg [[DBG33:![0-9]+]]
-// LIN64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[RX1]], align 8, !dbg [[DBG33]]
-// LIN64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[TMP0]], [[STRUCT_S]] undef), "QUAL.OSS.COPY"(ptr [[TMP0]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[TMP0]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.FIRSTPRIVATE"(ptr [[TMP1]], [[STRUCT_S]] undef), "QUAL.OSS.COPY"(ptr [[TMP1]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[TMP1]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.FIRSTPRIVATE"(ptr [[X]], [[STRUCT_S]] undef), "QUAL.OSS.COPY"(ptr [[X]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[X]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.FIRSTPRIVATE"(ptr [[X1]], [[STRUCT_S]] undef), "QUAL.OSS.COPY"(ptr [[X1]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[X1]], ptr @oss_dtor_ZN1SD1Ev) ], !dbg [[DBG33]]
-// LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP2]]), !dbg [[DBG34:![0-9]+]]
-// LIN64-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[RX]], align 8, !dbg [[DBG35:![0-9]+]]
-// LIN64-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[RX1]], align 8, !dbg [[DBG35]]
-// LIN64-NEXT:    [[TMP5:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.PRIVATE"(ptr [[TMP3]], [[STRUCT_S]] undef), "QUAL.OSS.INIT"(ptr [[TMP3]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[TMP3]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"(ptr [[TMP4]], [[STRUCT_S]] undef), "QUAL.OSS.INIT"(ptr [[TMP4]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[TMP4]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"(ptr [[X]], [[STRUCT_S]] undef), "QUAL.OSS.INIT"(ptr [[X]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[X]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"(ptr [[X1]], [[STRUCT_S]] undef), "QUAL.OSS.INIT"(ptr [[X1]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[X1]], ptr @oss_dtor_ZN1SD1Ev) ], !dbg [[DBG35]]
-// LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP5]]), !dbg [[DBG36:![0-9]+]]
-// LIN64-NEXT:    store i32 0, ptr [[RETVAL]], align 4, !dbg [[DBG37:![0-9]+]]
-// LIN64-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[X1]]) #[[ATTR2]], !dbg [[DBG38:![0-9]+]]
-// LIN64-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[X]]) #[[ATTR2]], !dbg [[DBG38]]
-// LIN64-NEXT:    [[TMP6:%.*]] = load i32, ptr [[RETVAL]], align 4, !dbg [[DBG38]]
-// LIN64-NEXT:    ret i32 [[TMP6]], !dbg [[DBG38]]
+// LIN64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[X]]), !dbg [[DBG30:![0-9]+]]
+// LIN64-NEXT:    store ptr [[X]], ptr [[RX]], align 8, !dbg [[DBG31:![0-9]+]]
+// LIN64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[X1]]), !dbg [[DBG32:![0-9]+]]
+// LIN64-NEXT:    store ptr [[X1]], ptr [[RX1]], align 8, !dbg [[DBG33:![0-9]+]]
+// LIN64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[RX]], align 8, !dbg [[DBG34:![0-9]+]]
+// LIN64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[RX1]], align 8, !dbg [[DBG34]]
+// LIN64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[TMP0]], [[STRUCT_S]] undef), "QUAL.OSS.COPY"(ptr [[TMP0]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[TMP0]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.FIRSTPRIVATE"(ptr [[TMP1]], [[STRUCT_S]] undef), "QUAL.OSS.COPY"(ptr [[TMP1]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[TMP1]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.FIRSTPRIVATE"(ptr [[X]], [[STRUCT_S]] undef), "QUAL.OSS.COPY"(ptr [[X]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[X]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.FIRSTPRIVATE"(ptr [[X1]], [[STRUCT_S]] undef), "QUAL.OSS.COPY"(ptr [[X1]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[X1]], ptr @oss_dtor_ZN1SD1Ev) ], !dbg [[DBG34]]
+// LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP2]]), !dbg [[DBG35:![0-9]+]]
+// LIN64-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[RX]], align 8, !dbg [[DBG36:![0-9]+]]
+// LIN64-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[RX1]], align 8, !dbg [[DBG36]]
+// LIN64-NEXT:    [[TMP5:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.PRIVATE"(ptr [[TMP3]], [[STRUCT_S]] undef), "QUAL.OSS.INIT"(ptr [[TMP3]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[TMP3]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"(ptr [[TMP4]], [[STRUCT_S]] undef), "QUAL.OSS.INIT"(ptr [[TMP4]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[TMP4]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"(ptr [[X]], [[STRUCT_S]] undef), "QUAL.OSS.INIT"(ptr [[X]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[X]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"(ptr [[X1]], [[STRUCT_S]] undef), "QUAL.OSS.INIT"(ptr [[X1]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[X1]], ptr @oss_dtor_ZN1SD1Ev) ], !dbg [[DBG36]]
+// LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP5]]), !dbg [[DBG37:![0-9]+]]
+// LIN64-NEXT:    store i32 0, ptr [[RETVAL]], align 4, !dbg [[DBG38:![0-9]+]]
+// LIN64-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[X1]]) #[[ATTR2]], !dbg [[DBG39:![0-9]+]]
+// LIN64-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[X]]) #[[ATTR2]], !dbg [[DBG39]]
+// LIN64-NEXT:    [[TMP6:%.*]] = load i32, ptr [[RETVAL]], align 4, !dbg [[DBG39]]
+// LIN64-NEXT:    ret i32 [[TMP6]], !dbg [[DBG39]]
 //
 //
 // LIN64-LABEL: @__cxx_global_var_init(
 // LIN64-NEXT:  entry:
-// LIN64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) @s), !dbg [[DBG40:![0-9]+]]
-// LIN64-NEXT:    [[TMP0:%.*]] = call i32 @__cxa_atexit(ptr @_ZN1SD1Ev, ptr @s, ptr @__dso_handle) #[[ATTR2]], !dbg [[DBG42:![0-9]+]]
-// LIN64-NEXT:    ret void, !dbg [[DBG40]]
+// LIN64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) @s), !dbg [[DBG41:![0-9]+]]
+// LIN64-NEXT:    [[TMP0:%.*]] = call i32 @__cxa_atexit(ptr @_ZN1SD1Ev, ptr @s, ptr @__dso_handle) #[[ATTR2]], !dbg [[DBG43:![0-9]+]]
+// LIN64-NEXT:    ret void, !dbg [[DBG41]]
 //
 //
 // LIN64-LABEL: @_Z10global_refv(
 // LIN64-NEXT:  entry:
-// LIN64-NEXT:    [[TMP0:%.*]] = load ptr, ptr @res, align 8, !dbg [[DBG44:![0-9]+]]
-// LIN64-NEXT:    [[TMP1:%.*]] = load ptr, ptr @rs, align 8, !dbg [[DBG44]]
-// LIN64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[TMP0]], [[STRUCT_S:%.*]] undef), "QUAL.OSS.SHARED"(ptr [[TMP1]], [[STRUCT_S]] undef), "QUAL.OSS.DEP.IN"(ptr [[TMP0]], [6 x i8] c"res.x\00", ptr @compute_dep, ptr [[TMP0]]), "QUAL.OSS.DEP.IN"(ptr [[TMP1]], [5 x i8] c"rs.x\00", ptr @compute_dep.1, ptr [[TMP1]]) ], !dbg [[DBG44]]
-// LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP2]]), !dbg [[DBG45:![0-9]+]]
-// LIN64-NEXT:    ret void, !dbg [[DBG46:![0-9]+]]
+// LIN64-NEXT:    [[TMP0:%.*]] = load ptr, ptr @res, align 8, !dbg [[DBG45:![0-9]+]]
+// LIN64-NEXT:    [[TMP1:%.*]] = load ptr, ptr @rs, align 8, !dbg [[DBG45]]
+// LIN64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[TMP0]], [[STRUCT_S:%.*]] undef), "QUAL.OSS.SHARED"(ptr [[TMP1]], [[STRUCT_S]] undef), "QUAL.OSS.DEP.IN"(ptr [[TMP0]], [6 x i8] c"res.x\00", ptr @compute_dep, ptr [[TMP0]]), "QUAL.OSS.DEP.IN"(ptr [[TMP1]], [5 x i8] c"rs.x\00", ptr @compute_dep.1, ptr [[TMP1]]) ], !dbg [[DBG45]]
+// LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP2]]), !dbg [[DBG46:![0-9]+]]
+// LIN64-NEXT:    ret void, !dbg [[DBG47:![0-9]+]]
 //
 //
 // LIN64-LABEL: @compute_dep(
@@ -219,17 +219,17 @@ void global_ref() {
 // LIN64-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T:%.*]], align 8
 // LIN64-NEXT:    [[RES_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    store ptr [[RES:%.*]], ptr [[RES_ADDR]], align 8
-// LIN64-NEXT:    [[X:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[RES]], i32 0, i32 0
-// LIN64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
+// LIN64-NEXT:    [[X:%.*]] = getelementptr inbounds nuw [[STRUCT_S:%.*]], ptr [[RES]], i32 0, i32 0
+// LIN64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
 // LIN64-NEXT:    store ptr [[X]], ptr [[TMP0]], align 8
-// LIN64-NEXT:    [[TMP1:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
+// LIN64-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
 // LIN64-NEXT:    store i64 4, ptr [[TMP1]], align 8
-// LIN64-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
+// LIN64-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
 // LIN64-NEXT:    store i64 0, ptr [[TMP2]], align 8
-// LIN64-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
+// LIN64-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
 // LIN64-NEXT:    store i64 4, ptr [[TMP3]], align 8
-// LIN64-NEXT:    [[TMP4:%.*]] = load [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], align 8, !dbg [[DBG48:![0-9]+]]
-// LIN64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T]] [[TMP4]], !dbg [[DBG48]]
+// LIN64-NEXT:    [[TMP4:%.*]] = load [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], align 8, !dbg [[DBG49:![0-9]+]]
+// LIN64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T]] [[TMP4]], !dbg [[DBG49]]
 //
 //
 // LIN64-LABEL: @compute_dep.1(
@@ -237,22 +237,22 @@ void global_ref() {
 // LIN64-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T_0:%.*]], align 8
 // LIN64-NEXT:    [[RS_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    store ptr [[RS:%.*]], ptr [[RS_ADDR]], align 8
-// LIN64-NEXT:    [[X:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[RS]], i32 0, i32 0
-// LIN64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 0
+// LIN64-NEXT:    [[X:%.*]] = getelementptr inbounds nuw [[STRUCT_S:%.*]], ptr [[RS]], i32 0, i32 0
+// LIN64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 0
 // LIN64-NEXT:    store ptr [[X]], ptr [[TMP0]], align 8
-// LIN64-NEXT:    [[TMP1:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 1
+// LIN64-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 1
 // LIN64-NEXT:    store i64 4, ptr [[TMP1]], align 8
-// LIN64-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 2
+// LIN64-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 2
 // LIN64-NEXT:    store i64 0, ptr [[TMP2]], align 8
-// LIN64-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 3
+// LIN64-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 3
 // LIN64-NEXT:    store i64 4, ptr [[TMP3]], align 8
-// LIN64-NEXT:    [[TMP4:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], align 8, !dbg [[DBG51:![0-9]+]]
-// LIN64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_0]] [[TMP4]], !dbg [[DBG51]]
+// LIN64-NEXT:    [[TMP4:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], align 8, !dbg [[DBG52:![0-9]+]]
+// LIN64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_0]] [[TMP4]], !dbg [[DBG52]]
 //
 //
 // LIN64-LABEL: @_GLOBAL__sub_I_task_non_pod.cpp(
 // LIN64-NEXT:  entry:
-// LIN64-NEXT:    call void @__cxx_global_var_init(), !dbg [[DBG54:![0-9]+]]
+// LIN64-NEXT:    call void @__cxx_global_var_init(), !dbg [[DBG55:![0-9]+]]
 // LIN64-NEXT:    ret void
 //
 //
@@ -323,21 +323,21 @@ void global_ref() {
 // PPC64-NEXT:    store ptr [[TMP0:%.*]], ptr [[DOTADDR]], align 8
 // PPC64-NEXT:    store ptr [[TMP1:%.*]], ptr [[DOTADDR1]], align 8
 // PPC64-NEXT:    store i64 [[TMP2:%.*]], ptr [[DOTADDR2]], align 8
-// PPC64-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[DOTADDR]], align 8, !dbg [[DBG19:![0-9]+]]
-// PPC64-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[DOTADDR1]], align 8, !dbg [[DBG19]]
-// PPC64-NEXT:    [[TMP5:%.*]] = load i64, ptr [[DOTADDR2]], align 8, !dbg [[DBG19]]
-// PPC64-NEXT:    [[ARRAYCTOR_DST_END:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[TMP4]], i64 [[TMP5]], !dbg [[DBG19]]
-// PPC64-NEXT:    br label [[ARRAYCTOR_LOOP:%.*]], !dbg [[DBG19]]
+// PPC64-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[DOTADDR]], align 8, !dbg [[DBG20:![0-9]+]]
+// PPC64-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[DOTADDR1]], align 8, !dbg [[DBG20]]
+// PPC64-NEXT:    [[TMP5:%.*]] = load i64, ptr [[DOTADDR2]], align 8, !dbg [[DBG20]]
+// PPC64-NEXT:    [[ARRAYCTOR_DST_END:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[TMP4]], i64 [[TMP5]], !dbg [[DBG20]]
+// PPC64-NEXT:    br label [[ARRAYCTOR_LOOP:%.*]], !dbg [[DBG20]]
 // PPC64:       arrayctor.loop:
-// PPC64-NEXT:    [[ARRAYCTOR_DST_CUR:%.*]] = phi ptr [ [[TMP4]], [[ENTRY:%.*]] ], [ [[ARRAYCTOR_DST_NEXT:%.*]], [[ARRAYCTOR_LOOP]] ], !dbg [[DBG19]]
-// PPC64-NEXT:    [[ARRAYCTOR_SRC_CUR:%.*]] = phi ptr [ [[TMP3]], [[ENTRY]] ], [ [[ARRAYCTOR_SRC_NEXT:%.*]], [[ARRAYCTOR_LOOP]] ], !dbg [[DBG19]]
-// PPC64-NEXT:    call void @_ZN1SC1ERS_i(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYCTOR_DST_CUR]], ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYCTOR_SRC_CUR]], i32 noundef signext 0), !dbg [[DBG20:![0-9]+]]
-// PPC64-NEXT:    [[ARRAYCTOR_DST_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYCTOR_DST_CUR]], i64 1, !dbg [[DBG19]]
-// PPC64-NEXT:    [[ARRAYCTOR_SRC_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYCTOR_SRC_CUR]], i64 1, !dbg [[DBG19]]
-// PPC64-NEXT:    [[ARRAYCTOR_DONE:%.*]] = icmp eq ptr [[ARRAYCTOR_DST_NEXT]], [[ARRAYCTOR_DST_END]], !dbg [[DBG19]]
-// PPC64-NEXT:    br i1 [[ARRAYCTOR_DONE]], label [[ARRAYCTOR_CONT:%.*]], label [[ARRAYCTOR_LOOP]], !dbg [[DBG19]]
+// PPC64-NEXT:    [[ARRAYCTOR_DST_CUR:%.*]] = phi ptr [ [[TMP4]], [[ENTRY:%.*]] ], [ [[ARRAYCTOR_DST_NEXT:%.*]], [[ARRAYCTOR_LOOP]] ], !dbg [[DBG20]]
+// PPC64-NEXT:    [[ARRAYCTOR_SRC_CUR:%.*]] = phi ptr [ [[TMP3]], [[ENTRY]] ], [ [[ARRAYCTOR_SRC_NEXT:%.*]], [[ARRAYCTOR_LOOP]] ], !dbg [[DBG20]]
+// PPC64-NEXT:    call void @_ZN1SC1ERS_i(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYCTOR_DST_CUR]], ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYCTOR_SRC_CUR]], i32 noundef signext 0), !dbg [[DBG21:![0-9]+]]
+// PPC64-NEXT:    [[ARRAYCTOR_DST_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYCTOR_DST_CUR]], i64 1, !dbg [[DBG20]]
+// PPC64-NEXT:    [[ARRAYCTOR_SRC_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYCTOR_SRC_CUR]], i64 1, !dbg [[DBG20]]
+// PPC64-NEXT:    [[ARRAYCTOR_DONE:%.*]] = icmp eq ptr [[ARRAYCTOR_DST_NEXT]], [[ARRAYCTOR_DST_END]], !dbg [[DBG20]]
+// PPC64-NEXT:    br i1 [[ARRAYCTOR_DONE]], label [[ARRAYCTOR_CONT:%.*]], label [[ARRAYCTOR_LOOP]], !dbg [[DBG20]]
 // PPC64:       arrayctor.cont:
-// PPC64-NEXT:    ret void, !dbg [[DBG20]]
+// PPC64-NEXT:    ret void, !dbg [[DBG21]]
 //
 //
 // PPC64-LABEL: @oss_dtor_ZN1SD1Ev(
@@ -346,18 +346,18 @@ void global_ref() {
 // PPC64-NEXT:    [[DOTADDR1:%.*]] = alloca i64, align 8
 // PPC64-NEXT:    store ptr [[TMP0:%.*]], ptr [[DOTADDR]], align 8
 // PPC64-NEXT:    store i64 [[TMP1:%.*]], ptr [[DOTADDR1]], align 8
-// PPC64-NEXT:    [[TMP2:%.*]] = load ptr, ptr [[DOTADDR]], align 8, !dbg [[DBG23:![0-9]+]]
-// PPC64-NEXT:    [[TMP3:%.*]] = load i64, ptr [[DOTADDR1]], align 8, !dbg [[DBG23]]
-// PPC64-NEXT:    [[ARRAYDTOR_DST_END:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[TMP2]], i64 [[TMP3]], !dbg [[DBG23]]
-// PPC64-NEXT:    br label [[ARRAYDTOR_LOOP:%.*]], !dbg [[DBG23]]
+// PPC64-NEXT:    [[TMP2:%.*]] = load ptr, ptr [[DOTADDR]], align 8, !dbg [[DBG24:![0-9]+]]
+// PPC64-NEXT:    [[TMP3:%.*]] = load i64, ptr [[DOTADDR1]], align 8, !dbg [[DBG24]]
+// PPC64-NEXT:    [[ARRAYDTOR_DST_END:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[TMP2]], i64 [[TMP3]], !dbg [[DBG24]]
+// PPC64-NEXT:    br label [[ARRAYDTOR_LOOP:%.*]], !dbg [[DBG24]]
 // PPC64:       arraydtor.loop:
-// PPC64-NEXT:    [[ARRAYDTOR_DST_CUR:%.*]] = phi ptr [ [[TMP2]], [[ENTRY:%.*]] ], [ [[ARRAYDTOR_DST_NEXT:%.*]], [[ARRAYDTOR_LOOP]] ], !dbg [[DBG23]]
-// PPC64-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYDTOR_DST_CUR]]) #[[ATTR2]], !dbg [[DBG23]]
-// PPC64-NEXT:    [[ARRAYDTOR_DST_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYDTOR_DST_CUR]], i64 1, !dbg [[DBG23]]
-// PPC64-NEXT:    [[ARRAYDTOR_DONE:%.*]] = icmp eq ptr [[ARRAYDTOR_DST_NEXT]], [[ARRAYDTOR_DST_END]], !dbg [[DBG23]]
-// PPC64-NEXT:    br i1 [[ARRAYDTOR_DONE]], label [[ARRAYDTOR_CONT:%.*]], label [[ARRAYDTOR_LOOP]], !dbg [[DBG23]]
+// PPC64-NEXT:    [[ARRAYDTOR_DST_CUR:%.*]] = phi ptr [ [[TMP2]], [[ENTRY:%.*]] ], [ [[ARRAYDTOR_DST_NEXT:%.*]], [[ARRAYDTOR_LOOP]] ], !dbg [[DBG24]]
+// PPC64-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYDTOR_DST_CUR]]) #[[ATTR2]], !dbg [[DBG24]]
+// PPC64-NEXT:    [[ARRAYDTOR_DST_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYDTOR_DST_CUR]], i64 1, !dbg [[DBG24]]
+// PPC64-NEXT:    [[ARRAYDTOR_DONE:%.*]] = icmp eq ptr [[ARRAYDTOR_DST_NEXT]], [[ARRAYDTOR_DST_END]], !dbg [[DBG24]]
+// PPC64-NEXT:    br i1 [[ARRAYDTOR_DONE]], label [[ARRAYDTOR_CONT:%.*]], label [[ARRAYDTOR_LOOP]], !dbg [[DBG24]]
 // PPC64:       arraydtor.cont:
-// PPC64-NEXT:    ret void, !dbg [[DBG23]]
+// PPC64-NEXT:    ret void, !dbg [[DBG24]]
 //
 //
 // PPC64-LABEL: @oss_ctor_ZN1SC1Ev(
@@ -366,18 +366,18 @@ void global_ref() {
 // PPC64-NEXT:    [[DOTADDR1:%.*]] = alloca i64, align 8
 // PPC64-NEXT:    store ptr [[TMP0:%.*]], ptr [[DOTADDR]], align 8
 // PPC64-NEXT:    store i64 [[TMP1:%.*]], ptr [[DOTADDR1]], align 8
-// PPC64-NEXT:    [[TMP2:%.*]] = load ptr, ptr [[DOTADDR]], align 8, !dbg [[DBG25:![0-9]+]]
-// PPC64-NEXT:    [[TMP3:%.*]] = load i64, ptr [[DOTADDR1]], align 8, !dbg [[DBG25]]
-// PPC64-NEXT:    [[ARRAYCTOR_DST_END:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[TMP2]], i64 [[TMP3]], !dbg [[DBG25]]
-// PPC64-NEXT:    br label [[ARRAYCTOR_LOOP:%.*]], !dbg [[DBG25]]
+// PPC64-NEXT:    [[TMP2:%.*]] = load ptr, ptr [[DOTADDR]], align 8, !dbg [[DBG26:![0-9]+]]
+// PPC64-NEXT:    [[TMP3:%.*]] = load i64, ptr [[DOTADDR1]], align 8, !dbg [[DBG26]]
+// PPC64-NEXT:    [[ARRAYCTOR_DST_END:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[TMP2]], i64 [[TMP3]], !dbg [[DBG26]]
+// PPC64-NEXT:    br label [[ARRAYCTOR_LOOP:%.*]], !dbg [[DBG26]]
 // PPC64:       arrayctor.loop:
-// PPC64-NEXT:    [[ARRAYCTOR_DST_CUR:%.*]] = phi ptr [ [[TMP2]], [[ENTRY:%.*]] ], [ [[ARRAYCTOR_DST_NEXT:%.*]], [[ARRAYCTOR_LOOP]] ], !dbg [[DBG25]]
-// PPC64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYCTOR_DST_CUR]]), !dbg [[DBG26:![0-9]+]]
-// PPC64-NEXT:    [[ARRAYCTOR_DST_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYCTOR_DST_CUR]], i64 1, !dbg [[DBG25]]
-// PPC64-NEXT:    [[ARRAYCTOR_DONE:%.*]] = icmp eq ptr [[ARRAYCTOR_DST_NEXT]], [[ARRAYCTOR_DST_END]], !dbg [[DBG25]]
-// PPC64-NEXT:    br i1 [[ARRAYCTOR_DONE]], label [[ARRAYCTOR_CONT:%.*]], label [[ARRAYCTOR_LOOP]], !dbg [[DBG25]]
+// PPC64-NEXT:    [[ARRAYCTOR_DST_CUR:%.*]] = phi ptr [ [[TMP2]], [[ENTRY:%.*]] ], [ [[ARRAYCTOR_DST_NEXT:%.*]], [[ARRAYCTOR_LOOP]] ], !dbg [[DBG26]]
+// PPC64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYCTOR_DST_CUR]]), !dbg [[DBG27:![0-9]+]]
+// PPC64-NEXT:    [[ARRAYCTOR_DST_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYCTOR_DST_CUR]], i64 1, !dbg [[DBG26]]
+// PPC64-NEXT:    [[ARRAYCTOR_DONE:%.*]] = icmp eq ptr [[ARRAYCTOR_DST_NEXT]], [[ARRAYCTOR_DST_END]], !dbg [[DBG26]]
+// PPC64-NEXT:    br i1 [[ARRAYCTOR_DONE]], label [[ARRAYCTOR_CONT:%.*]], label [[ARRAYCTOR_LOOP]], !dbg [[DBG26]]
 // PPC64:       arrayctor.cont:
-// PPC64-NEXT:    ret void, !dbg [[DBG26]]
+// PPC64-NEXT:    ret void, !dbg [[DBG27]]
 //
 //
 // PPC64-LABEL: @main(
@@ -388,39 +388,39 @@ void global_ref() {
 // PPC64-NEXT:    [[X1:%.*]] = alloca [[STRUCT_S]], align 4
 // PPC64-NEXT:    [[RX1:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store i32 0, ptr [[RETVAL]], align 4
-// PPC64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[X]]), !dbg [[DBG29:![0-9]+]]
-// PPC64-NEXT:    store ptr [[X]], ptr [[RX]], align 8, !dbg [[DBG30:![0-9]+]]
-// PPC64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[X1]]), !dbg [[DBG31:![0-9]+]]
-// PPC64-NEXT:    store ptr [[X1]], ptr [[RX1]], align 8, !dbg [[DBG32:![0-9]+]]
-// PPC64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[RX]], align 8, !dbg [[DBG33:![0-9]+]]
-// PPC64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[RX1]], align 8, !dbg [[DBG33]]
-// PPC64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[TMP0]], [[STRUCT_S]] undef), "QUAL.OSS.COPY"(ptr [[TMP0]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[TMP0]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.FIRSTPRIVATE"(ptr [[TMP1]], [[STRUCT_S]] undef), "QUAL.OSS.COPY"(ptr [[TMP1]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[TMP1]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.FIRSTPRIVATE"(ptr [[X]], [[STRUCT_S]] undef), "QUAL.OSS.COPY"(ptr [[X]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[X]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.FIRSTPRIVATE"(ptr [[X1]], [[STRUCT_S]] undef), "QUAL.OSS.COPY"(ptr [[X1]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[X1]], ptr @oss_dtor_ZN1SD1Ev) ], !dbg [[DBG33]]
-// PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP2]]), !dbg [[DBG34:![0-9]+]]
-// PPC64-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[RX]], align 8, !dbg [[DBG35:![0-9]+]]
-// PPC64-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[RX1]], align 8, !dbg [[DBG35]]
-// PPC64-NEXT:    [[TMP5:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.PRIVATE"(ptr [[TMP3]], [[STRUCT_S]] undef), "QUAL.OSS.INIT"(ptr [[TMP3]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[TMP3]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"(ptr [[TMP4]], [[STRUCT_S]] undef), "QUAL.OSS.INIT"(ptr [[TMP4]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[TMP4]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"(ptr [[X]], [[STRUCT_S]] undef), "QUAL.OSS.INIT"(ptr [[X]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[X]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"(ptr [[X1]], [[STRUCT_S]] undef), "QUAL.OSS.INIT"(ptr [[X1]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[X1]], ptr @oss_dtor_ZN1SD1Ev) ], !dbg [[DBG35]]
-// PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP5]]), !dbg [[DBG36:![0-9]+]]
-// PPC64-NEXT:    store i32 0, ptr [[RETVAL]], align 4, !dbg [[DBG37:![0-9]+]]
-// PPC64-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[X1]]) #[[ATTR2]], !dbg [[DBG38:![0-9]+]]
-// PPC64-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[X]]) #[[ATTR2]], !dbg [[DBG38]]
-// PPC64-NEXT:    [[TMP6:%.*]] = load i32, ptr [[RETVAL]], align 4, !dbg [[DBG38]]
-// PPC64-NEXT:    ret i32 [[TMP6]], !dbg [[DBG38]]
+// PPC64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[X]]), !dbg [[DBG30:![0-9]+]]
+// PPC64-NEXT:    store ptr [[X]], ptr [[RX]], align 8, !dbg [[DBG31:![0-9]+]]
+// PPC64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[X1]]), !dbg [[DBG32:![0-9]+]]
+// PPC64-NEXT:    store ptr [[X1]], ptr [[RX1]], align 8, !dbg [[DBG33:![0-9]+]]
+// PPC64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[RX]], align 8, !dbg [[DBG34:![0-9]+]]
+// PPC64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[RX1]], align 8, !dbg [[DBG34]]
+// PPC64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[TMP0]], [[STRUCT_S]] undef), "QUAL.OSS.COPY"(ptr [[TMP0]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[TMP0]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.FIRSTPRIVATE"(ptr [[TMP1]], [[STRUCT_S]] undef), "QUAL.OSS.COPY"(ptr [[TMP1]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[TMP1]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.FIRSTPRIVATE"(ptr [[X]], [[STRUCT_S]] undef), "QUAL.OSS.COPY"(ptr [[X]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[X]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.FIRSTPRIVATE"(ptr [[X1]], [[STRUCT_S]] undef), "QUAL.OSS.COPY"(ptr [[X1]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[X1]], ptr @oss_dtor_ZN1SD1Ev) ], !dbg [[DBG34]]
+// PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP2]]), !dbg [[DBG35:![0-9]+]]
+// PPC64-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[RX]], align 8, !dbg [[DBG36:![0-9]+]]
+// PPC64-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[RX1]], align 8, !dbg [[DBG36]]
+// PPC64-NEXT:    [[TMP5:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.PRIVATE"(ptr [[TMP3]], [[STRUCT_S]] undef), "QUAL.OSS.INIT"(ptr [[TMP3]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[TMP3]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"(ptr [[TMP4]], [[STRUCT_S]] undef), "QUAL.OSS.INIT"(ptr [[TMP4]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[TMP4]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"(ptr [[X]], [[STRUCT_S]] undef), "QUAL.OSS.INIT"(ptr [[X]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[X]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"(ptr [[X1]], [[STRUCT_S]] undef), "QUAL.OSS.INIT"(ptr [[X1]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[X1]], ptr @oss_dtor_ZN1SD1Ev) ], !dbg [[DBG36]]
+// PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP5]]), !dbg [[DBG37:![0-9]+]]
+// PPC64-NEXT:    store i32 0, ptr [[RETVAL]], align 4, !dbg [[DBG38:![0-9]+]]
+// PPC64-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[X1]]) #[[ATTR2]], !dbg [[DBG39:![0-9]+]]
+// PPC64-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[X]]) #[[ATTR2]], !dbg [[DBG39]]
+// PPC64-NEXT:    [[TMP6:%.*]] = load i32, ptr [[RETVAL]], align 4, !dbg [[DBG39]]
+// PPC64-NEXT:    ret i32 [[TMP6]], !dbg [[DBG39]]
 //
 //
 // PPC64-LABEL: @__cxx_global_var_init(
 // PPC64-NEXT:  entry:
-// PPC64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) @s), !dbg [[DBG40:![0-9]+]]
-// PPC64-NEXT:    [[TMP0:%.*]] = call i32 @__cxa_atexit(ptr @_ZN1SD1Ev, ptr @s, ptr @__dso_handle) #[[ATTR2]], !dbg [[DBG42:![0-9]+]]
-// PPC64-NEXT:    ret void, !dbg [[DBG40]]
+// PPC64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) @s), !dbg [[DBG41:![0-9]+]]
+// PPC64-NEXT:    [[TMP0:%.*]] = call i32 @__cxa_atexit(ptr @_ZN1SD1Ev, ptr @s, ptr @__dso_handle) #[[ATTR2]], !dbg [[DBG43:![0-9]+]]
+// PPC64-NEXT:    ret void, !dbg [[DBG41]]
 //
 //
 // PPC64-LABEL: @_Z10global_refv(
 // PPC64-NEXT:  entry:
-// PPC64-NEXT:    [[TMP0:%.*]] = load ptr, ptr @res, align 8, !dbg [[DBG44:![0-9]+]]
-// PPC64-NEXT:    [[TMP1:%.*]] = load ptr, ptr @rs, align 8, !dbg [[DBG44]]
-// PPC64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[TMP0]], [[STRUCT_S:%.*]] undef), "QUAL.OSS.SHARED"(ptr [[TMP1]], [[STRUCT_S]] undef), "QUAL.OSS.DEP.IN"(ptr [[TMP0]], [6 x i8] c"res.x\00", ptr @compute_dep, ptr [[TMP0]]), "QUAL.OSS.DEP.IN"(ptr [[TMP1]], [5 x i8] c"rs.x\00", ptr @compute_dep.1, ptr [[TMP1]]) ], !dbg [[DBG44]]
-// PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP2]]), !dbg [[DBG45:![0-9]+]]
-// PPC64-NEXT:    ret void, !dbg [[DBG46:![0-9]+]]
+// PPC64-NEXT:    [[TMP0:%.*]] = load ptr, ptr @res, align 8, !dbg [[DBG45:![0-9]+]]
+// PPC64-NEXT:    [[TMP1:%.*]] = load ptr, ptr @rs, align 8, !dbg [[DBG45]]
+// PPC64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[TMP0]], [[STRUCT_S:%.*]] undef), "QUAL.OSS.SHARED"(ptr [[TMP1]], [[STRUCT_S]] undef), "QUAL.OSS.DEP.IN"(ptr [[TMP0]], [6 x i8] c"res.x\00", ptr @compute_dep, ptr [[TMP0]]), "QUAL.OSS.DEP.IN"(ptr [[TMP1]], [5 x i8] c"rs.x\00", ptr @compute_dep.1, ptr [[TMP1]]) ], !dbg [[DBG45]]
+// PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP2]]), !dbg [[DBG46:![0-9]+]]
+// PPC64-NEXT:    ret void, !dbg [[DBG47:![0-9]+]]
 //
 //
 // PPC64-LABEL: @compute_dep(
@@ -428,17 +428,17 @@ void global_ref() {
 // PPC64-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T:%.*]], align 8
 // PPC64-NEXT:    [[RES_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store ptr [[RES:%.*]], ptr [[RES_ADDR]], align 8
-// PPC64-NEXT:    [[X:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[RES]], i32 0, i32 0
-// PPC64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
+// PPC64-NEXT:    [[X:%.*]] = getelementptr inbounds nuw [[STRUCT_S:%.*]], ptr [[RES]], i32 0, i32 0
+// PPC64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
 // PPC64-NEXT:    store ptr [[X]], ptr [[TMP0]], align 8
-// PPC64-NEXT:    [[TMP1:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
+// PPC64-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
 // PPC64-NEXT:    store i64 4, ptr [[TMP1]], align 8
-// PPC64-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
+// PPC64-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
 // PPC64-NEXT:    store i64 0, ptr [[TMP2]], align 8
-// PPC64-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
+// PPC64-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
 // PPC64-NEXT:    store i64 4, ptr [[TMP3]], align 8
-// PPC64-NEXT:    [[TMP4:%.*]] = load [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], align 8, !dbg [[DBG48:![0-9]+]]
-// PPC64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T]] [[TMP4]], !dbg [[DBG48]]
+// PPC64-NEXT:    [[TMP4:%.*]] = load [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], align 8, !dbg [[DBG49:![0-9]+]]
+// PPC64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T]] [[TMP4]], !dbg [[DBG49]]
 //
 //
 // PPC64-LABEL: @compute_dep.1(
@@ -446,22 +446,22 @@ void global_ref() {
 // PPC64-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T_0:%.*]], align 8
 // PPC64-NEXT:    [[RS_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store ptr [[RS:%.*]], ptr [[RS_ADDR]], align 8
-// PPC64-NEXT:    [[X:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[RS]], i32 0, i32 0
-// PPC64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 0
+// PPC64-NEXT:    [[X:%.*]] = getelementptr inbounds nuw [[STRUCT_S:%.*]], ptr [[RS]], i32 0, i32 0
+// PPC64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 0
 // PPC64-NEXT:    store ptr [[X]], ptr [[TMP0]], align 8
-// PPC64-NEXT:    [[TMP1:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 1
+// PPC64-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 1
 // PPC64-NEXT:    store i64 4, ptr [[TMP1]], align 8
-// PPC64-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 2
+// PPC64-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 2
 // PPC64-NEXT:    store i64 0, ptr [[TMP2]], align 8
-// PPC64-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 3
+// PPC64-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 3
 // PPC64-NEXT:    store i64 4, ptr [[TMP3]], align 8
-// PPC64-NEXT:    [[TMP4:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], align 8, !dbg [[DBG51:![0-9]+]]
-// PPC64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_0]] [[TMP4]], !dbg [[DBG51]]
+// PPC64-NEXT:    [[TMP4:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], align 8, !dbg [[DBG52:![0-9]+]]
+// PPC64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_0]] [[TMP4]], !dbg [[DBG52]]
 //
 //
 // PPC64-LABEL: @_GLOBAL__sub_I_task_non_pod.cpp(
 // PPC64-NEXT:  entry:
-// PPC64-NEXT:    call void @__cxx_global_var_init(), !dbg [[DBG54:![0-9]+]]
+// PPC64-NEXT:    call void @__cxx_global_var_init(), !dbg [[DBG55:![0-9]+]]
 // PPC64-NEXT:    ret void
 //
 //
@@ -471,57 +471,57 @@ void global_ref() {
 // AARCH64-NEXT:    [[RS:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    [[S1:%.*]] = alloca [10 x [20 x %struct.S]], align 4
 // AARCH64-NEXT:    [[RS1:%.*]] = alloca ptr, align 8
-// AARCH64-NEXT:    [[ARRAY_BEGIN:%.*]] = getelementptr inbounds [10 x [20 x %struct.S]], ptr [[S]], i32 0, i32 0, i32 0, !dbg [[DBG13:![0-9]+]]
-// AARCH64-NEXT:    [[ARRAYCTOR_END:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[ARRAY_BEGIN]], i64 200, !dbg [[DBG13]]
-// AARCH64-NEXT:    br label [[ARRAYCTOR_LOOP:%.*]], !dbg [[DBG13]]
+// AARCH64-NEXT:    [[ARRAY_BEGIN:%.*]] = getelementptr inbounds [10 x [20 x %struct.S]], ptr [[S]], i32 0, i32 0, i32 0, !dbg [[DBG9:![0-9]+]]
+// AARCH64-NEXT:    [[ARRAYCTOR_END:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[ARRAY_BEGIN]], i64 200, !dbg [[DBG9]]
+// AARCH64-NEXT:    br label [[ARRAYCTOR_LOOP:%.*]], !dbg [[DBG9]]
 // AARCH64:       arrayctor.loop:
-// AARCH64-NEXT:    [[ARRAYCTOR_CUR:%.*]] = phi ptr [ [[ARRAY_BEGIN]], [[ENTRY:%.*]] ], [ [[ARRAYCTOR_NEXT:%.*]], [[ARRAYCTOR_LOOP]] ], !dbg [[DBG13]]
-// AARCH64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYCTOR_CUR]]), !dbg [[DBG13]]
-// AARCH64-NEXT:    [[ARRAYCTOR_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYCTOR_CUR]], i64 1, !dbg [[DBG13]]
-// AARCH64-NEXT:    [[ARRAYCTOR_DONE:%.*]] = icmp eq ptr [[ARRAYCTOR_NEXT]], [[ARRAYCTOR_END]], !dbg [[DBG13]]
-// AARCH64-NEXT:    br i1 [[ARRAYCTOR_DONE]], label [[ARRAYCTOR_CONT:%.*]], label [[ARRAYCTOR_LOOP]], !dbg [[DBG13]]
+// AARCH64-NEXT:    [[ARRAYCTOR_CUR:%.*]] = phi ptr [ [[ARRAY_BEGIN]], [[ENTRY:%.*]] ], [ [[ARRAYCTOR_NEXT:%.*]], [[ARRAYCTOR_LOOP]] ], !dbg [[DBG9]]
+// AARCH64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYCTOR_CUR]]), !dbg [[DBG9]]
+// AARCH64-NEXT:    [[ARRAYCTOR_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYCTOR_CUR]], i64 1, !dbg [[DBG9]]
+// AARCH64-NEXT:    [[ARRAYCTOR_DONE:%.*]] = icmp eq ptr [[ARRAYCTOR_NEXT]], [[ARRAYCTOR_END]], !dbg [[DBG9]]
+// AARCH64-NEXT:    br i1 [[ARRAYCTOR_DONE]], label [[ARRAYCTOR_CONT:%.*]], label [[ARRAYCTOR_LOOP]], !dbg [[DBG9]]
 // AARCH64:       arrayctor.cont:
-// AARCH64-NEXT:    store ptr [[S]], ptr [[RS]], align 8, !dbg [[DBG14:![0-9]+]]
-// AARCH64-NEXT:    [[ARRAY_BEGIN1:%.*]] = getelementptr inbounds [10 x [20 x %struct.S]], ptr [[S1]], i32 0, i32 0, i32 0, !dbg [[DBG15:![0-9]+]]
-// AARCH64-NEXT:    [[ARRAYCTOR_END2:%.*]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAY_BEGIN1]], i64 200, !dbg [[DBG15]]
-// AARCH64-NEXT:    br label [[ARRAYCTOR_LOOP3:%.*]], !dbg [[DBG15]]
+// AARCH64-NEXT:    store ptr [[S]], ptr [[RS]], align 8, !dbg [[DBG10:![0-9]+]]
+// AARCH64-NEXT:    [[ARRAY_BEGIN1:%.*]] = getelementptr inbounds [10 x [20 x %struct.S]], ptr [[S1]], i32 0, i32 0, i32 0, !dbg [[DBG11:![0-9]+]]
+// AARCH64-NEXT:    [[ARRAYCTOR_END2:%.*]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAY_BEGIN1]], i64 200, !dbg [[DBG11]]
+// AARCH64-NEXT:    br label [[ARRAYCTOR_LOOP3:%.*]], !dbg [[DBG11]]
 // AARCH64:       arrayctor.loop3:
-// AARCH64-NEXT:    [[ARRAYCTOR_CUR4:%.*]] = phi ptr [ [[ARRAY_BEGIN1]], [[ARRAYCTOR_CONT]] ], [ [[ARRAYCTOR_NEXT5:%.*]], [[ARRAYCTOR_LOOP3]] ], !dbg [[DBG15]]
-// AARCH64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYCTOR_CUR4]]), !dbg [[DBG15]]
-// AARCH64-NEXT:    [[ARRAYCTOR_NEXT5]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYCTOR_CUR4]], i64 1, !dbg [[DBG15]]
-// AARCH64-NEXT:    [[ARRAYCTOR_DONE6:%.*]] = icmp eq ptr [[ARRAYCTOR_NEXT5]], [[ARRAYCTOR_END2]], !dbg [[DBG15]]
-// AARCH64-NEXT:    br i1 [[ARRAYCTOR_DONE6]], label [[ARRAYCTOR_CONT7:%.*]], label [[ARRAYCTOR_LOOP3]], !dbg [[DBG15]]
+// AARCH64-NEXT:    [[ARRAYCTOR_CUR4:%.*]] = phi ptr [ [[ARRAY_BEGIN1]], [[ARRAYCTOR_CONT]] ], [ [[ARRAYCTOR_NEXT5:%.*]], [[ARRAYCTOR_LOOP3]] ], !dbg [[DBG11]]
+// AARCH64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYCTOR_CUR4]]), !dbg [[DBG11]]
+// AARCH64-NEXT:    [[ARRAYCTOR_NEXT5]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYCTOR_CUR4]], i64 1, !dbg [[DBG11]]
+// AARCH64-NEXT:    [[ARRAYCTOR_DONE6:%.*]] = icmp eq ptr [[ARRAYCTOR_NEXT5]], [[ARRAYCTOR_END2]], !dbg [[DBG11]]
+// AARCH64-NEXT:    br i1 [[ARRAYCTOR_DONE6]], label [[ARRAYCTOR_CONT7:%.*]], label [[ARRAYCTOR_LOOP3]], !dbg [[DBG11]]
 // AARCH64:       arrayctor.cont7:
-// AARCH64-NEXT:    store ptr [[S1]], ptr [[RS1]], align 8, !dbg [[DBG16:![0-9]+]]
-// AARCH64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[RS]], align 8, !dbg [[DBG17:![0-9]+]]
-// AARCH64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[RS1]], align 8, !dbg [[DBG17]]
-// AARCH64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[TMP0]], [10 x [20 x %struct.S]] undef), "QUAL.OSS.COPY"(ptr [[TMP0]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[TMP0]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.FIRSTPRIVATE"(ptr [[TMP1]], [10 x [20 x %struct.S]] undef), "QUAL.OSS.COPY"(ptr [[TMP1]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[TMP1]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.FIRSTPRIVATE"(ptr [[S]], [10 x [20 x %struct.S]] undef), "QUAL.OSS.COPY"(ptr [[S]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[S]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.FIRSTPRIVATE"(ptr [[S1]], [10 x [20 x %struct.S]] undef), "QUAL.OSS.COPY"(ptr [[S1]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[S1]], ptr @oss_dtor_ZN1SD1Ev) ], !dbg [[DBG17]]
-// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP2]]), !dbg [[DBG18:![0-9]+]]
-// AARCH64-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[RS]], align 8, !dbg [[DBG19:![0-9]+]]
-// AARCH64-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[RS1]], align 8, !dbg [[DBG19]]
-// AARCH64-NEXT:    [[TMP5:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.PRIVATE"(ptr [[TMP3]], [10 x [20 x %struct.S]] undef), "QUAL.OSS.INIT"(ptr [[TMP3]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[TMP3]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"(ptr [[TMP4]], [10 x [20 x %struct.S]] undef), "QUAL.OSS.INIT"(ptr [[TMP4]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[TMP4]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"(ptr [[S]], [10 x [20 x %struct.S]] undef), "QUAL.OSS.INIT"(ptr [[S]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[S]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"(ptr [[S1]], [10 x [20 x %struct.S]] undef), "QUAL.OSS.INIT"(ptr [[S1]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[S1]], ptr @oss_dtor_ZN1SD1Ev) ], !dbg [[DBG19]]
-// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP5]]), !dbg [[DBG20:![0-9]+]]
-// AARCH64-NEXT:    [[ARRAY_BEGIN8:%.*]] = getelementptr inbounds [10 x [20 x %struct.S]], ptr [[S1]], i32 0, i32 0, i32 0, !dbg [[DBG21:![0-9]+]]
-// AARCH64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAY_BEGIN8]], i64 200, !dbg [[DBG21]]
-// AARCH64-NEXT:    br label [[ARRAYDESTROY_BODY:%.*]], !dbg [[DBG21]]
+// AARCH64-NEXT:    store ptr [[S1]], ptr [[RS1]], align 8, !dbg [[DBG12:![0-9]+]]
+// AARCH64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[RS]], align 8, !dbg [[DBG13:![0-9]+]]
+// AARCH64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[RS1]], align 8, !dbg [[DBG13]]
+// AARCH64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[TMP0]], [10 x [20 x %struct.S]] undef), "QUAL.OSS.COPY"(ptr [[TMP0]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[TMP0]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.FIRSTPRIVATE"(ptr [[TMP1]], [10 x [20 x %struct.S]] undef), "QUAL.OSS.COPY"(ptr [[TMP1]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[TMP1]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.FIRSTPRIVATE"(ptr [[S]], [10 x [20 x %struct.S]] undef), "QUAL.OSS.COPY"(ptr [[S]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[S]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.FIRSTPRIVATE"(ptr [[S1]], [10 x [20 x %struct.S]] undef), "QUAL.OSS.COPY"(ptr [[S1]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[S1]], ptr @oss_dtor_ZN1SD1Ev) ], !dbg [[DBG13]]
+// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP2]]), !dbg [[DBG14:![0-9]+]]
+// AARCH64-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[RS]], align 8, !dbg [[DBG15:![0-9]+]]
+// AARCH64-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[RS1]], align 8, !dbg [[DBG15]]
+// AARCH64-NEXT:    [[TMP5:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.PRIVATE"(ptr [[TMP3]], [10 x [20 x %struct.S]] undef), "QUAL.OSS.INIT"(ptr [[TMP3]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[TMP3]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"(ptr [[TMP4]], [10 x [20 x %struct.S]] undef), "QUAL.OSS.INIT"(ptr [[TMP4]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[TMP4]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"(ptr [[S]], [10 x [20 x %struct.S]] undef), "QUAL.OSS.INIT"(ptr [[S]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[S]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"(ptr [[S1]], [10 x [20 x %struct.S]] undef), "QUAL.OSS.INIT"(ptr [[S1]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[S1]], ptr @oss_dtor_ZN1SD1Ev) ], !dbg [[DBG15]]
+// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP5]]), !dbg [[DBG16:![0-9]+]]
+// AARCH64-NEXT:    [[ARRAY_BEGIN8:%.*]] = getelementptr inbounds [10 x [20 x %struct.S]], ptr [[S1]], i32 0, i32 0, i32 0, !dbg [[DBG17:![0-9]+]]
+// AARCH64-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAY_BEGIN8]], i64 200, !dbg [[DBG17]]
+// AARCH64-NEXT:    br label [[ARRAYDESTROY_BODY:%.*]], !dbg [[DBG17]]
 // AARCH64:       arraydestroy.body:
-// AARCH64-NEXT:    [[ARRAYDESTROY_ELEMENTPAST:%.*]] = phi ptr [ [[TMP6]], [[ARRAYCTOR_CONT7]] ], [ [[ARRAYDESTROY_ELEMENT:%.*]], [[ARRAYDESTROY_BODY]] ], !dbg [[DBG21]]
-// AARCH64-NEXT:    [[ARRAYDESTROY_ELEMENT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYDESTROY_ELEMENTPAST]], i64 -1, !dbg [[DBG21]]
-// AARCH64-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYDESTROY_ELEMENT]]) #[[ATTR2:[0-9]+]], !dbg [[DBG21]]
-// AARCH64-NEXT:    [[ARRAYDESTROY_DONE:%.*]] = icmp eq ptr [[ARRAYDESTROY_ELEMENT]], [[ARRAY_BEGIN8]], !dbg [[DBG21]]
-// AARCH64-NEXT:    br i1 [[ARRAYDESTROY_DONE]], label [[ARRAYDESTROY_DONE9:%.*]], label [[ARRAYDESTROY_BODY]], !dbg [[DBG21]]
+// AARCH64-NEXT:    [[ARRAYDESTROY_ELEMENTPAST:%.*]] = phi ptr [ [[TMP6]], [[ARRAYCTOR_CONT7]] ], [ [[ARRAYDESTROY_ELEMENT:%.*]], [[ARRAYDESTROY_BODY]] ], !dbg [[DBG17]]
+// AARCH64-NEXT:    [[ARRAYDESTROY_ELEMENT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYDESTROY_ELEMENTPAST]], i64 -1, !dbg [[DBG17]]
+// AARCH64-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYDESTROY_ELEMENT]]) #[[ATTR2:[0-9]+]], !dbg [[DBG17]]
+// AARCH64-NEXT:    [[ARRAYDESTROY_DONE:%.*]] = icmp eq ptr [[ARRAYDESTROY_ELEMENT]], [[ARRAY_BEGIN8]], !dbg [[DBG17]]
+// AARCH64-NEXT:    br i1 [[ARRAYDESTROY_DONE]], label [[ARRAYDESTROY_DONE9:%.*]], label [[ARRAYDESTROY_BODY]], !dbg [[DBG17]]
 // AARCH64:       arraydestroy.done9:
-// AARCH64-NEXT:    [[ARRAY_BEGIN10:%.*]] = getelementptr inbounds [10 x [20 x %struct.S]], ptr [[S]], i32 0, i32 0, i32 0, !dbg [[DBG21]]
-// AARCH64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAY_BEGIN10]], i64 200, !dbg [[DBG21]]
-// AARCH64-NEXT:    br label [[ARRAYDESTROY_BODY11:%.*]], !dbg [[DBG21]]
+// AARCH64-NEXT:    [[ARRAY_BEGIN10:%.*]] = getelementptr inbounds [10 x [20 x %struct.S]], ptr [[S]], i32 0, i32 0, i32 0, !dbg [[DBG17]]
+// AARCH64-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAY_BEGIN10]], i64 200, !dbg [[DBG17]]
+// AARCH64-NEXT:    br label [[ARRAYDESTROY_BODY11:%.*]], !dbg [[DBG17]]
 // AARCH64:       arraydestroy.body11:
-// AARCH64-NEXT:    [[ARRAYDESTROY_ELEMENTPAST12:%.*]] = phi ptr [ [[TMP7]], [[ARRAYDESTROY_DONE9]] ], [ [[ARRAYDESTROY_ELEMENT13:%.*]], [[ARRAYDESTROY_BODY11]] ], !dbg [[DBG21]]
-// AARCH64-NEXT:    [[ARRAYDESTROY_ELEMENT13]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYDESTROY_ELEMENTPAST12]], i64 -1, !dbg [[DBG21]]
-// AARCH64-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYDESTROY_ELEMENT13]]) #[[ATTR2]], !dbg [[DBG21]]
-// AARCH64-NEXT:    [[ARRAYDESTROY_DONE14:%.*]] = icmp eq ptr [[ARRAYDESTROY_ELEMENT13]], [[ARRAY_BEGIN10]], !dbg [[DBG21]]
-// AARCH64-NEXT:    br i1 [[ARRAYDESTROY_DONE14]], label [[ARRAYDESTROY_DONE15:%.*]], label [[ARRAYDESTROY_BODY11]], !dbg [[DBG21]]
+// AARCH64-NEXT:    [[ARRAYDESTROY_ELEMENTPAST12:%.*]] = phi ptr [ [[TMP7]], [[ARRAYDESTROY_DONE9]] ], [ [[ARRAYDESTROY_ELEMENT13:%.*]], [[ARRAYDESTROY_BODY11]] ], !dbg [[DBG17]]
+// AARCH64-NEXT:    [[ARRAYDESTROY_ELEMENT13]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYDESTROY_ELEMENTPAST12]], i64 -1, !dbg [[DBG17]]
+// AARCH64-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYDESTROY_ELEMENT13]]) #[[ATTR2]], !dbg [[DBG17]]
+// AARCH64-NEXT:    [[ARRAYDESTROY_DONE14:%.*]] = icmp eq ptr [[ARRAYDESTROY_ELEMENT13]], [[ARRAY_BEGIN10]], !dbg [[DBG17]]
+// AARCH64-NEXT:    br i1 [[ARRAYDESTROY_DONE14]], label [[ARRAYDESTROY_DONE15:%.*]], label [[ARRAYDESTROY_BODY11]], !dbg [[DBG17]]
 // AARCH64:       arraydestroy.done15:
-// AARCH64-NEXT:    ret void, !dbg [[DBG21]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG17]]
 //
 //
 // AARCH64-LABEL: @oss_copy_ctor_ZN1SC1ERS_i(
@@ -532,21 +532,21 @@ void global_ref() {
 // AARCH64-NEXT:    store ptr [[TMP0:%.*]], ptr [[DOTADDR]], align 8
 // AARCH64-NEXT:    store ptr [[TMP1:%.*]], ptr [[DOTADDR1]], align 8
 // AARCH64-NEXT:    store i64 [[TMP2:%.*]], ptr [[DOTADDR2]], align 8
-// AARCH64-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[DOTADDR]], align 8, !dbg [[DBG23:![0-9]+]]
-// AARCH64-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[DOTADDR1]], align 8, !dbg [[DBG23]]
-// AARCH64-NEXT:    [[TMP5:%.*]] = load i64, ptr [[DOTADDR2]], align 8, !dbg [[DBG23]]
-// AARCH64-NEXT:    [[ARRAYCTOR_DST_END:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[TMP4]], i64 [[TMP5]], !dbg [[DBG23]]
-// AARCH64-NEXT:    br label [[ARRAYCTOR_LOOP:%.*]], !dbg [[DBG23]]
+// AARCH64-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[DOTADDR]], align 8, !dbg [[DBG20:![0-9]+]]
+// AARCH64-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[DOTADDR1]], align 8, !dbg [[DBG20]]
+// AARCH64-NEXT:    [[TMP5:%.*]] = load i64, ptr [[DOTADDR2]], align 8, !dbg [[DBG20]]
+// AARCH64-NEXT:    [[ARRAYCTOR_DST_END:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[TMP4]], i64 [[TMP5]], !dbg [[DBG20]]
+// AARCH64-NEXT:    br label [[ARRAYCTOR_LOOP:%.*]], !dbg [[DBG20]]
 // AARCH64:       arrayctor.loop:
-// AARCH64-NEXT:    [[ARRAYCTOR_DST_CUR:%.*]] = phi ptr [ [[TMP4]], [[ENTRY:%.*]] ], [ [[ARRAYCTOR_DST_NEXT:%.*]], [[ARRAYCTOR_LOOP]] ], !dbg [[DBG23]]
-// AARCH64-NEXT:    [[ARRAYCTOR_SRC_CUR:%.*]] = phi ptr [ [[TMP3]], [[ENTRY]] ], [ [[ARRAYCTOR_SRC_NEXT:%.*]], [[ARRAYCTOR_LOOP]] ], !dbg [[DBG23]]
-// AARCH64-NEXT:    call void @_ZN1SC1ERS_i(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYCTOR_DST_CUR]], ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYCTOR_SRC_CUR]], i32 noundef 0), !dbg [[DBG24:![0-9]+]]
-// AARCH64-NEXT:    [[ARRAYCTOR_DST_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYCTOR_DST_CUR]], i64 1, !dbg [[DBG23]]
-// AARCH64-NEXT:    [[ARRAYCTOR_SRC_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYCTOR_SRC_CUR]], i64 1, !dbg [[DBG23]]
-// AARCH64-NEXT:    [[ARRAYCTOR_DONE:%.*]] = icmp eq ptr [[ARRAYCTOR_DST_NEXT]], [[ARRAYCTOR_DST_END]], !dbg [[DBG23]]
-// AARCH64-NEXT:    br i1 [[ARRAYCTOR_DONE]], label [[ARRAYCTOR_CONT:%.*]], label [[ARRAYCTOR_LOOP]], !dbg [[DBG23]]
+// AARCH64-NEXT:    [[ARRAYCTOR_DST_CUR:%.*]] = phi ptr [ [[TMP4]], [[ENTRY:%.*]] ], [ [[ARRAYCTOR_DST_NEXT:%.*]], [[ARRAYCTOR_LOOP]] ], !dbg [[DBG20]]
+// AARCH64-NEXT:    [[ARRAYCTOR_SRC_CUR:%.*]] = phi ptr [ [[TMP3]], [[ENTRY]] ], [ [[ARRAYCTOR_SRC_NEXT:%.*]], [[ARRAYCTOR_LOOP]] ], !dbg [[DBG20]]
+// AARCH64-NEXT:    call void @_ZN1SC1ERS_i(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYCTOR_DST_CUR]], ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYCTOR_SRC_CUR]], i32 noundef 0), !dbg [[DBG21:![0-9]+]]
+// AARCH64-NEXT:    [[ARRAYCTOR_DST_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYCTOR_DST_CUR]], i64 1, !dbg [[DBG20]]
+// AARCH64-NEXT:    [[ARRAYCTOR_SRC_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYCTOR_SRC_CUR]], i64 1, !dbg [[DBG20]]
+// AARCH64-NEXT:    [[ARRAYCTOR_DONE:%.*]] = icmp eq ptr [[ARRAYCTOR_DST_NEXT]], [[ARRAYCTOR_DST_END]], !dbg [[DBG20]]
+// AARCH64-NEXT:    br i1 [[ARRAYCTOR_DONE]], label [[ARRAYCTOR_CONT:%.*]], label [[ARRAYCTOR_LOOP]], !dbg [[DBG20]]
 // AARCH64:       arrayctor.cont:
-// AARCH64-NEXT:    ret void, !dbg [[DBG24]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG21]]
 //
 //
 // AARCH64-LABEL: @oss_dtor_ZN1SD1Ev(
@@ -555,18 +555,18 @@ void global_ref() {
 // AARCH64-NEXT:    [[DOTADDR1:%.*]] = alloca i64, align 8
 // AARCH64-NEXT:    store ptr [[TMP0:%.*]], ptr [[DOTADDR]], align 8
 // AARCH64-NEXT:    store i64 [[TMP1:%.*]], ptr [[DOTADDR1]], align 8
-// AARCH64-NEXT:    [[TMP2:%.*]] = load ptr, ptr [[DOTADDR]], align 8, !dbg [[DBG27:![0-9]+]]
-// AARCH64-NEXT:    [[TMP3:%.*]] = load i64, ptr [[DOTADDR1]], align 8, !dbg [[DBG27]]
-// AARCH64-NEXT:    [[ARRAYDTOR_DST_END:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[TMP2]], i64 [[TMP3]], !dbg [[DBG27]]
-// AARCH64-NEXT:    br label [[ARRAYDTOR_LOOP:%.*]], !dbg [[DBG27]]
+// AARCH64-NEXT:    [[TMP2:%.*]] = load ptr, ptr [[DOTADDR]], align 8, !dbg [[DBG24:![0-9]+]]
+// AARCH64-NEXT:    [[TMP3:%.*]] = load i64, ptr [[DOTADDR1]], align 8, !dbg [[DBG24]]
+// AARCH64-NEXT:    [[ARRAYDTOR_DST_END:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[TMP2]], i64 [[TMP3]], !dbg [[DBG24]]
+// AARCH64-NEXT:    br label [[ARRAYDTOR_LOOP:%.*]], !dbg [[DBG24]]
 // AARCH64:       arraydtor.loop:
-// AARCH64-NEXT:    [[ARRAYDTOR_DST_CUR:%.*]] = phi ptr [ [[TMP2]], [[ENTRY:%.*]] ], [ [[ARRAYDTOR_DST_NEXT:%.*]], [[ARRAYDTOR_LOOP]] ], !dbg [[DBG27]]
-// AARCH64-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYDTOR_DST_CUR]]) #[[ATTR2]], !dbg [[DBG27]]
-// AARCH64-NEXT:    [[ARRAYDTOR_DST_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYDTOR_DST_CUR]], i64 1, !dbg [[DBG27]]
-// AARCH64-NEXT:    [[ARRAYDTOR_DONE:%.*]] = icmp eq ptr [[ARRAYDTOR_DST_NEXT]], [[ARRAYDTOR_DST_END]], !dbg [[DBG27]]
-// AARCH64-NEXT:    br i1 [[ARRAYDTOR_DONE]], label [[ARRAYDTOR_CONT:%.*]], label [[ARRAYDTOR_LOOP]], !dbg [[DBG27]]
+// AARCH64-NEXT:    [[ARRAYDTOR_DST_CUR:%.*]] = phi ptr [ [[TMP2]], [[ENTRY:%.*]] ], [ [[ARRAYDTOR_DST_NEXT:%.*]], [[ARRAYDTOR_LOOP]] ], !dbg [[DBG24]]
+// AARCH64-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYDTOR_DST_CUR]]) #[[ATTR2]], !dbg [[DBG24]]
+// AARCH64-NEXT:    [[ARRAYDTOR_DST_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYDTOR_DST_CUR]], i64 1, !dbg [[DBG24]]
+// AARCH64-NEXT:    [[ARRAYDTOR_DONE:%.*]] = icmp eq ptr [[ARRAYDTOR_DST_NEXT]], [[ARRAYDTOR_DST_END]], !dbg [[DBG24]]
+// AARCH64-NEXT:    br i1 [[ARRAYDTOR_DONE]], label [[ARRAYDTOR_CONT:%.*]], label [[ARRAYDTOR_LOOP]], !dbg [[DBG24]]
 // AARCH64:       arraydtor.cont:
-// AARCH64-NEXT:    ret void, !dbg [[DBG27]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG24]]
 //
 //
 // AARCH64-LABEL: @oss_ctor_ZN1SC1Ev(
@@ -575,18 +575,18 @@ void global_ref() {
 // AARCH64-NEXT:    [[DOTADDR1:%.*]] = alloca i64, align 8
 // AARCH64-NEXT:    store ptr [[TMP0:%.*]], ptr [[DOTADDR]], align 8
 // AARCH64-NEXT:    store i64 [[TMP1:%.*]], ptr [[DOTADDR1]], align 8
-// AARCH64-NEXT:    [[TMP2:%.*]] = load ptr, ptr [[DOTADDR]], align 8, !dbg [[DBG29:![0-9]+]]
-// AARCH64-NEXT:    [[TMP3:%.*]] = load i64, ptr [[DOTADDR1]], align 8, !dbg [[DBG29]]
-// AARCH64-NEXT:    [[ARRAYCTOR_DST_END:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[TMP2]], i64 [[TMP3]], !dbg [[DBG29]]
-// AARCH64-NEXT:    br label [[ARRAYCTOR_LOOP:%.*]], !dbg [[DBG29]]
+// AARCH64-NEXT:    [[TMP2:%.*]] = load ptr, ptr [[DOTADDR]], align 8, !dbg [[DBG26:![0-9]+]]
+// AARCH64-NEXT:    [[TMP3:%.*]] = load i64, ptr [[DOTADDR1]], align 8, !dbg [[DBG26]]
+// AARCH64-NEXT:    [[ARRAYCTOR_DST_END:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[TMP2]], i64 [[TMP3]], !dbg [[DBG26]]
+// AARCH64-NEXT:    br label [[ARRAYCTOR_LOOP:%.*]], !dbg [[DBG26]]
 // AARCH64:       arrayctor.loop:
-// AARCH64-NEXT:    [[ARRAYCTOR_DST_CUR:%.*]] = phi ptr [ [[TMP2]], [[ENTRY:%.*]] ], [ [[ARRAYCTOR_DST_NEXT:%.*]], [[ARRAYCTOR_LOOP]] ], !dbg [[DBG29]]
-// AARCH64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYCTOR_DST_CUR]]), !dbg [[DBG30:![0-9]+]]
-// AARCH64-NEXT:    [[ARRAYCTOR_DST_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYCTOR_DST_CUR]], i64 1, !dbg [[DBG29]]
-// AARCH64-NEXT:    [[ARRAYCTOR_DONE:%.*]] = icmp eq ptr [[ARRAYCTOR_DST_NEXT]], [[ARRAYCTOR_DST_END]], !dbg [[DBG29]]
-// AARCH64-NEXT:    br i1 [[ARRAYCTOR_DONE]], label [[ARRAYCTOR_CONT:%.*]], label [[ARRAYCTOR_LOOP]], !dbg [[DBG29]]
+// AARCH64-NEXT:    [[ARRAYCTOR_DST_CUR:%.*]] = phi ptr [ [[TMP2]], [[ENTRY:%.*]] ], [ [[ARRAYCTOR_DST_NEXT:%.*]], [[ARRAYCTOR_LOOP]] ], !dbg [[DBG26]]
+// AARCH64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[ARRAYCTOR_DST_CUR]]), !dbg [[DBG27:![0-9]+]]
+// AARCH64-NEXT:    [[ARRAYCTOR_DST_NEXT]] = getelementptr inbounds [[STRUCT_S]], ptr [[ARRAYCTOR_DST_CUR]], i64 1, !dbg [[DBG26]]
+// AARCH64-NEXT:    [[ARRAYCTOR_DONE:%.*]] = icmp eq ptr [[ARRAYCTOR_DST_NEXT]], [[ARRAYCTOR_DST_END]], !dbg [[DBG26]]
+// AARCH64-NEXT:    br i1 [[ARRAYCTOR_DONE]], label [[ARRAYCTOR_CONT:%.*]], label [[ARRAYCTOR_LOOP]], !dbg [[DBG26]]
 // AARCH64:       arrayctor.cont:
-// AARCH64-NEXT:    ret void, !dbg [[DBG30]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG27]]
 //
 //
 // AARCH64-LABEL: @main(
@@ -597,39 +597,39 @@ void global_ref() {
 // AARCH64-NEXT:    [[X1:%.*]] = alloca [[STRUCT_S]], align 4
 // AARCH64-NEXT:    [[RX1:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    store i32 0, ptr [[RETVAL]], align 4
-// AARCH64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[X]]), !dbg [[DBG33:![0-9]+]]
-// AARCH64-NEXT:    store ptr [[X]], ptr [[RX]], align 8, !dbg [[DBG34:![0-9]+]]
-// AARCH64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[X1]]), !dbg [[DBG35:![0-9]+]]
-// AARCH64-NEXT:    store ptr [[X1]], ptr [[RX1]], align 8, !dbg [[DBG36:![0-9]+]]
-// AARCH64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[RX]], align 8, !dbg [[DBG37:![0-9]+]]
-// AARCH64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[RX1]], align 8, !dbg [[DBG37]]
-// AARCH64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[TMP0]], [[STRUCT_S]] undef), "QUAL.OSS.COPY"(ptr [[TMP0]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[TMP0]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.FIRSTPRIVATE"(ptr [[TMP1]], [[STRUCT_S]] undef), "QUAL.OSS.COPY"(ptr [[TMP1]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[TMP1]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.FIRSTPRIVATE"(ptr [[X]], [[STRUCT_S]] undef), "QUAL.OSS.COPY"(ptr [[X]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[X]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.FIRSTPRIVATE"(ptr [[X1]], [[STRUCT_S]] undef), "QUAL.OSS.COPY"(ptr [[X1]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[X1]], ptr @oss_dtor_ZN1SD1Ev) ], !dbg [[DBG37]]
-// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP2]]), !dbg [[DBG38:![0-9]+]]
-// AARCH64-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[RX]], align 8, !dbg [[DBG39:![0-9]+]]
-// AARCH64-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[RX1]], align 8, !dbg [[DBG39]]
-// AARCH64-NEXT:    [[TMP5:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.PRIVATE"(ptr [[TMP3]], [[STRUCT_S]] undef), "QUAL.OSS.INIT"(ptr [[TMP3]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[TMP3]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"(ptr [[TMP4]], [[STRUCT_S]] undef), "QUAL.OSS.INIT"(ptr [[TMP4]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[TMP4]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"(ptr [[X]], [[STRUCT_S]] undef), "QUAL.OSS.INIT"(ptr [[X]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[X]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"(ptr [[X1]], [[STRUCT_S]] undef), "QUAL.OSS.INIT"(ptr [[X1]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[X1]], ptr @oss_dtor_ZN1SD1Ev) ], !dbg [[DBG39]]
-// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP5]]), !dbg [[DBG40:![0-9]+]]
-// AARCH64-NEXT:    store i32 0, ptr [[RETVAL]], align 4, !dbg [[DBG41:![0-9]+]]
-// AARCH64-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[X1]]) #[[ATTR2]], !dbg [[DBG42:![0-9]+]]
-// AARCH64-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[X]]) #[[ATTR2]], !dbg [[DBG42]]
-// AARCH64-NEXT:    [[TMP6:%.*]] = load i32, ptr [[RETVAL]], align 4, !dbg [[DBG42]]
-// AARCH64-NEXT:    ret i32 [[TMP6]], !dbg [[DBG42]]
+// AARCH64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[X]]), !dbg [[DBG30:![0-9]+]]
+// AARCH64-NEXT:    store ptr [[X]], ptr [[RX]], align 8, !dbg [[DBG31:![0-9]+]]
+// AARCH64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[X1]]), !dbg [[DBG32:![0-9]+]]
+// AARCH64-NEXT:    store ptr [[X1]], ptr [[RX1]], align 8, !dbg [[DBG33:![0-9]+]]
+// AARCH64-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[RX]], align 8, !dbg [[DBG34:![0-9]+]]
+// AARCH64-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[RX1]], align 8, !dbg [[DBG34]]
+// AARCH64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[TMP0]], [[STRUCT_S]] undef), "QUAL.OSS.COPY"(ptr [[TMP0]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[TMP0]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.FIRSTPRIVATE"(ptr [[TMP1]], [[STRUCT_S]] undef), "QUAL.OSS.COPY"(ptr [[TMP1]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[TMP1]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.FIRSTPRIVATE"(ptr [[X]], [[STRUCT_S]] undef), "QUAL.OSS.COPY"(ptr [[X]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[X]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.FIRSTPRIVATE"(ptr [[X1]], [[STRUCT_S]] undef), "QUAL.OSS.COPY"(ptr [[X1]], ptr @oss_copy_ctor_ZN1SC1ERS_i), "QUAL.OSS.DEINIT"(ptr [[X1]], ptr @oss_dtor_ZN1SD1Ev) ], !dbg [[DBG34]]
+// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP2]]), !dbg [[DBG35:![0-9]+]]
+// AARCH64-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[RX]], align 8, !dbg [[DBG36:![0-9]+]]
+// AARCH64-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[RX1]], align 8, !dbg [[DBG36]]
+// AARCH64-NEXT:    [[TMP5:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.PRIVATE"(ptr [[TMP3]], [[STRUCT_S]] undef), "QUAL.OSS.INIT"(ptr [[TMP3]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[TMP3]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"(ptr [[TMP4]], [[STRUCT_S]] undef), "QUAL.OSS.INIT"(ptr [[TMP4]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[TMP4]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"(ptr [[X]], [[STRUCT_S]] undef), "QUAL.OSS.INIT"(ptr [[X]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[X]], ptr @oss_dtor_ZN1SD1Ev), "QUAL.OSS.PRIVATE"(ptr [[X1]], [[STRUCT_S]] undef), "QUAL.OSS.INIT"(ptr [[X1]], ptr @oss_ctor_ZN1SC1Ev), "QUAL.OSS.DEINIT"(ptr [[X1]], ptr @oss_dtor_ZN1SD1Ev) ], !dbg [[DBG36]]
+// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP5]]), !dbg [[DBG37:![0-9]+]]
+// AARCH64-NEXT:    store i32 0, ptr [[RETVAL]], align 4, !dbg [[DBG38:![0-9]+]]
+// AARCH64-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[X1]]) #[[ATTR2]], !dbg [[DBG39:![0-9]+]]
+// AARCH64-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[X]]) #[[ATTR2]], !dbg [[DBG39]]
+// AARCH64-NEXT:    [[TMP6:%.*]] = load i32, ptr [[RETVAL]], align 4, !dbg [[DBG39]]
+// AARCH64-NEXT:    ret i32 [[TMP6]], !dbg [[DBG39]]
 //
 //
 // AARCH64-LABEL: @__cxx_global_var_init(
 // AARCH64-NEXT:  entry:
-// AARCH64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) @s), !dbg [[DBG44:![0-9]+]]
-// AARCH64-NEXT:    [[TMP0:%.*]] = call i32 @__cxa_atexit(ptr @_ZN1SD1Ev, ptr @s, ptr @__dso_handle) #[[ATTR2]], !dbg [[DBG46:![0-9]+]]
-// AARCH64-NEXT:    ret void, !dbg [[DBG44]]
+// AARCH64-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) @s), !dbg [[DBG41:![0-9]+]]
+// AARCH64-NEXT:    [[TMP0:%.*]] = call i32 @__cxa_atexit(ptr @_ZN1SD1Ev, ptr @s, ptr @__dso_handle) #[[ATTR2]], !dbg [[DBG43:![0-9]+]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG41]]
 //
 //
 // AARCH64-LABEL: @_Z10global_refv(
 // AARCH64-NEXT:  entry:
-// AARCH64-NEXT:    [[TMP0:%.*]] = load ptr, ptr @res, align 8, !dbg [[DBG48:![0-9]+]]
-// AARCH64-NEXT:    [[TMP1:%.*]] = load ptr, ptr @rs, align 8, !dbg [[DBG48]]
-// AARCH64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[TMP0]], [[STRUCT_S:%.*]] undef), "QUAL.OSS.SHARED"(ptr [[TMP1]], [[STRUCT_S]] undef), "QUAL.OSS.DEP.IN"(ptr [[TMP0]], [6 x i8] c"res.x\00", ptr @compute_dep, ptr [[TMP0]]), "QUAL.OSS.DEP.IN"(ptr [[TMP1]], [5 x i8] c"rs.x\00", ptr @compute_dep.1, ptr [[TMP1]]) ], !dbg [[DBG48]]
-// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP2]]), !dbg [[DBG49:![0-9]+]]
-// AARCH64-NEXT:    ret void, !dbg [[DBG50:![0-9]+]]
+// AARCH64-NEXT:    [[TMP0:%.*]] = load ptr, ptr @res, align 8, !dbg [[DBG45:![0-9]+]]
+// AARCH64-NEXT:    [[TMP1:%.*]] = load ptr, ptr @rs, align 8, !dbg [[DBG45]]
+// AARCH64-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[TMP0]], [[STRUCT_S:%.*]] undef), "QUAL.OSS.SHARED"(ptr [[TMP1]], [[STRUCT_S]] undef), "QUAL.OSS.DEP.IN"(ptr [[TMP0]], [6 x i8] c"res.x\00", ptr @compute_dep, ptr [[TMP0]]), "QUAL.OSS.DEP.IN"(ptr [[TMP1]], [5 x i8] c"rs.x\00", ptr @compute_dep.1, ptr [[TMP1]]) ], !dbg [[DBG45]]
+// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP2]]), !dbg [[DBG46:![0-9]+]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG47:![0-9]+]]
 //
 //
 // AARCH64-LABEL: @compute_dep(
@@ -637,17 +637,17 @@ void global_ref() {
 // AARCH64-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T:%.*]], align 8
 // AARCH64-NEXT:    [[RES_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    store ptr [[RES:%.*]], ptr [[RES_ADDR]], align 8
-// AARCH64-NEXT:    [[X:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[RES]], i32 0, i32 0
-// AARCH64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
+// AARCH64-NEXT:    [[X:%.*]] = getelementptr inbounds nuw [[STRUCT_S:%.*]], ptr [[RES]], i32 0, i32 0
+// AARCH64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
 // AARCH64-NEXT:    store ptr [[X]], ptr [[TMP0]], align 8
-// AARCH64-NEXT:    [[TMP1:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
+// AARCH64-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
 // AARCH64-NEXT:    store i64 4, ptr [[TMP1]], align 8
-// AARCH64-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
+// AARCH64-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
 // AARCH64-NEXT:    store i64 0, ptr [[TMP2]], align 8
-// AARCH64-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
+// AARCH64-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
 // AARCH64-NEXT:    store i64 4, ptr [[TMP3]], align 8
-// AARCH64-NEXT:    [[TMP4:%.*]] = load [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], align 8, !dbg [[DBG52:![0-9]+]]
-// AARCH64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T]] [[TMP4]], !dbg [[DBG52]]
+// AARCH64-NEXT:    [[TMP4:%.*]] = load [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], align 8, !dbg [[DBG49:![0-9]+]]
+// AARCH64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T]] [[TMP4]], !dbg [[DBG49]]
 //
 //
 // AARCH64-LABEL: @compute_dep.1(
@@ -655,21 +655,21 @@ void global_ref() {
 // AARCH64-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T_0:%.*]], align 8
 // AARCH64-NEXT:    [[RS_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    store ptr [[RS:%.*]], ptr [[RS_ADDR]], align 8
-// AARCH64-NEXT:    [[X:%.*]] = getelementptr inbounds [[STRUCT_S:%.*]], ptr [[RS]], i32 0, i32 0
-// AARCH64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 0
+// AARCH64-NEXT:    [[X:%.*]] = getelementptr inbounds nuw [[STRUCT_S:%.*]], ptr [[RS]], i32 0, i32 0
+// AARCH64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 0
 // AARCH64-NEXT:    store ptr [[X]], ptr [[TMP0]], align 8
-// AARCH64-NEXT:    [[TMP1:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 1
+// AARCH64-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 1
 // AARCH64-NEXT:    store i64 4, ptr [[TMP1]], align 8
-// AARCH64-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 2
+// AARCH64-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 2
 // AARCH64-NEXT:    store i64 0, ptr [[TMP2]], align 8
-// AARCH64-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 3
+// AARCH64-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], i32 0, i32 3
 // AARCH64-NEXT:    store i64 4, ptr [[TMP3]], align 8
-// AARCH64-NEXT:    [[TMP4:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], align 8, !dbg [[DBG55:![0-9]+]]
-// AARCH64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_0]] [[TMP4]], !dbg [[DBG55]]
+// AARCH64-NEXT:    [[TMP4:%.*]] = load [[STRUCT__DEPEND_UNPACK_T_0]], ptr [[RETVAL]], align 8, !dbg [[DBG52:![0-9]+]]
+// AARCH64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T_0]] [[TMP4]], !dbg [[DBG52]]
 //
 //
 // AARCH64-LABEL: @_GLOBAL__sub_I_task_non_pod.cpp(
 // AARCH64-NEXT:  entry:
-// AARCH64-NEXT:    call void @__cxx_global_var_init(), !dbg [[DBG58:![0-9]+]]
+// AARCH64-NEXT:    call void @__cxx_global_var_init(), !dbg [[DBG55:![0-9]+]]
 // AARCH64-NEXT:    ret void
 //

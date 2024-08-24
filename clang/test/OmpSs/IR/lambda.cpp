@@ -19,7 +19,7 @@ void bar(int x) {
 // LIN64-NEXT:    [[X_ADDR:%.*]] = alloca i32, align 4
 // LIN64-NEXT:    [[FOO:%.*]] = alloca [[CLASS_ANON:%.*]], align 8
 // LIN64-NEXT:    store i32 [[X:%.*]], ptr [[X_ADDR]], align 4
-// LIN64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[CLASS_ANON]], ptr [[FOO]], i32 0, i32 0, !dbg [[DBG9:![0-9]+]]
+// LIN64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[CLASS_ANON]], ptr [[FOO]], i32 0, i32 0, !dbg [[DBG9:![0-9]+]]
 // LIN64-NEXT:    store ptr [[X_ADDR]], ptr [[TMP0]], align 8, !dbg [[DBG9]]
 // LIN64-NEXT:    call void @"_ZZ3bariENK3$_0clEv"(ptr noundef nonnull align 8 dereferenceable(8) [[FOO]]), !dbg [[DBG10:![0-9]+]]
 // LIN64-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[X_ADDR]], i32 undef), "QUAL.OSS.COST"(ptr @compute_cost, ptr [[X_ADDR]]) ], !dbg [[DBG11:![0-9]+]]
@@ -32,10 +32,10 @@ void bar(int x) {
 // LIN64-NEXT:    [[X_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    [[REF_TMP:%.*]] = alloca [[CLASS_ANON_0:%.*]], align 8
 // LIN64-NEXT:    store ptr [[X:%.*]], ptr [[X_ADDR]], align 8
-// LIN64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[CLASS_ANON_0]], ptr [[REF_TMP]], i32 0, i32 0, !dbg [[DBG20:![0-9]+]]
-// LIN64-NEXT:    store ptr [[X]], ptr [[TMP0]], align 8, !dbg [[DBG20]]
-// LIN64-NEXT:    [[CALL:%.*]] = call noundef i32 @"_ZZ3bariENK3$_1clEv"(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP]]), !dbg [[DBG20]]
-// LIN64-NEXT:    ret i32 [[CALL]], !dbg [[DBG22:![0-9]+]]
+// LIN64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[CLASS_ANON_0]], ptr [[REF_TMP]], i32 0, i32 0, !dbg [[DBG21:![0-9]+]]
+// LIN64-NEXT:    store ptr [[X]], ptr [[TMP0]], align 8, !dbg [[DBG21]]
+// LIN64-NEXT:    [[CALL:%.*]] = call noundef i32 @"_ZZ3bariENK3$_1clEv"(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP]]), !dbg [[DBG21]]
+// LIN64-NEXT:    ret i32 [[CALL]], !dbg [[DBG23:![0-9]+]]
 //
 //
 // LIN64-LABEL: @compute_dep(
@@ -43,13 +43,13 @@ void bar(int x) {
 // LIN64-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T:%.*]], align 8
 // LIN64-NEXT:    [[X_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    store ptr [[X:%.*]], ptr [[X_ADDR]], align 8
-// LIN64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
+// LIN64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
 // LIN64-NEXT:    store ptr [[X]], ptr [[TMP0]], align 8
-// LIN64-NEXT:    [[TMP1:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
+// LIN64-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
 // LIN64-NEXT:    store i64 4, ptr [[TMP1]], align 8
-// LIN64-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
+// LIN64-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
 // LIN64-NEXT:    store i64 0, ptr [[TMP2]], align 8
-// LIN64-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
+// LIN64-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
 // LIN64-NEXT:    store i64 4, ptr [[TMP3]], align 8
 // LIN64-NEXT:    [[TMP4:%.*]] = load [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], align 8
 // LIN64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T]] [[TMP4]]
@@ -60,7 +60,7 @@ void bar(int x) {
 // PPC64-NEXT:    [[X_ADDR:%.*]] = alloca i32, align 4
 // PPC64-NEXT:    [[FOO:%.*]] = alloca [[CLASS_ANON:%.*]], align 8
 // PPC64-NEXT:    store i32 [[X:%.*]], ptr [[X_ADDR]], align 4
-// PPC64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[CLASS_ANON]], ptr [[FOO]], i32 0, i32 0, !dbg [[DBG9:![0-9]+]]
+// PPC64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[CLASS_ANON]], ptr [[FOO]], i32 0, i32 0, !dbg [[DBG9:![0-9]+]]
 // PPC64-NEXT:    store ptr [[X_ADDR]], ptr [[TMP0]], align 8, !dbg [[DBG9]]
 // PPC64-NEXT:    call void @"_ZZ3bariENK3$_0clEv"(ptr noundef nonnull align 8 dereferenceable(8) [[FOO]]), !dbg [[DBG10:![0-9]+]]
 // PPC64-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[X_ADDR]], i32 undef), "QUAL.OSS.COST"(ptr @compute_cost, ptr [[X_ADDR]]) ], !dbg [[DBG11:![0-9]+]]
@@ -73,10 +73,10 @@ void bar(int x) {
 // PPC64-NEXT:    [[X_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    [[REF_TMP:%.*]] = alloca [[CLASS_ANON_0:%.*]], align 8
 // PPC64-NEXT:    store ptr [[X:%.*]], ptr [[X_ADDR]], align 8
-// PPC64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[CLASS_ANON_0]], ptr [[REF_TMP]], i32 0, i32 0, !dbg [[DBG20:![0-9]+]]
-// PPC64-NEXT:    store ptr [[X]], ptr [[TMP0]], align 8, !dbg [[DBG20]]
-// PPC64-NEXT:    [[CALL:%.*]] = call noundef signext i32 @"_ZZ3bariENK3$_1clEv"(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP]]), !dbg [[DBG20]]
-// PPC64-NEXT:    ret i32 [[CALL]], !dbg [[DBG22:![0-9]+]]
+// PPC64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[CLASS_ANON_0]], ptr [[REF_TMP]], i32 0, i32 0, !dbg [[DBG21:![0-9]+]]
+// PPC64-NEXT:    store ptr [[X]], ptr [[TMP0]], align 8, !dbg [[DBG21]]
+// PPC64-NEXT:    [[CALL:%.*]] = call noundef signext i32 @"_ZZ3bariENK3$_1clEv"(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP]]), !dbg [[DBG21]]
+// PPC64-NEXT:    ret i32 [[CALL]], !dbg [[DBG23:![0-9]+]]
 //
 //
 // PPC64-LABEL: @compute_dep(
@@ -84,13 +84,13 @@ void bar(int x) {
 // PPC64-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T:%.*]], align 8
 // PPC64-NEXT:    [[X_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store ptr [[X:%.*]], ptr [[X_ADDR]], align 8
-// PPC64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
+// PPC64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
 // PPC64-NEXT:    store ptr [[X]], ptr [[TMP0]], align 8
-// PPC64-NEXT:    [[TMP1:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
+// PPC64-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
 // PPC64-NEXT:    store i64 4, ptr [[TMP1]], align 8
-// PPC64-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
+// PPC64-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
 // PPC64-NEXT:    store i64 0, ptr [[TMP2]], align 8
-// PPC64-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
+// PPC64-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
 // PPC64-NEXT:    store i64 4, ptr [[TMP3]], align 8
 // PPC64-NEXT:    [[TMP4:%.*]] = load [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], align 8
 // PPC64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T]] [[TMP4]]
@@ -101,12 +101,12 @@ void bar(int x) {
 // AARCH64-NEXT:    [[X_ADDR:%.*]] = alloca i32, align 4
 // AARCH64-NEXT:    [[FOO:%.*]] = alloca [[CLASS_ANON:%.*]], align 8
 // AARCH64-NEXT:    store i32 [[X:%.*]], ptr [[X_ADDR]], align 4
-// AARCH64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[CLASS_ANON]], ptr [[FOO]], i32 0, i32 0, !dbg [[DBG13:![0-9]+]]
-// AARCH64-NEXT:    store ptr [[X_ADDR]], ptr [[TMP0]], align 8, !dbg [[DBG13]]
-// AARCH64-NEXT:    call void @"_ZZ3bariENK3$_0clEv"(ptr noundef nonnull align 8 dereferenceable(8) [[FOO]]), !dbg [[DBG14:![0-9]+]]
-// AARCH64-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[X_ADDR]], i32 undef), "QUAL.OSS.COST"(ptr @compute_cost, ptr [[X_ADDR]]) ], !dbg [[DBG15:![0-9]+]]
-// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP1]]), !dbg [[DBG16:![0-9]+]]
-// AARCH64-NEXT:    ret void, !dbg [[DBG17:![0-9]+]]
+// AARCH64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[CLASS_ANON]], ptr [[FOO]], i32 0, i32 0, !dbg [[DBG9:![0-9]+]]
+// AARCH64-NEXT:    store ptr [[X_ADDR]], ptr [[TMP0]], align 8, !dbg [[DBG9]]
+// AARCH64-NEXT:    call void @"_ZZ3bariENK3$_0clEv"(ptr noundef nonnull align 8 dereferenceable(8) [[FOO]]), !dbg [[DBG10:![0-9]+]]
+// AARCH64-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr [[X_ADDR]], i32 undef), "QUAL.OSS.COST"(ptr @compute_cost, ptr [[X_ADDR]]) ], !dbg [[DBG11:![0-9]+]]
+// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP1]]), !dbg [[DBG12:![0-9]+]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG13:![0-9]+]]
 //
 //
 // AARCH64-LABEL: @compute_cost(
@@ -114,10 +114,10 @@ void bar(int x) {
 // AARCH64-NEXT:    [[X_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    [[REF_TMP:%.*]] = alloca [[CLASS_ANON_0:%.*]], align 8
 // AARCH64-NEXT:    store ptr [[X:%.*]], ptr [[X_ADDR]], align 8
-// AARCH64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[CLASS_ANON_0]], ptr [[REF_TMP]], i32 0, i32 0, !dbg [[DBG24:![0-9]+]]
-// AARCH64-NEXT:    store ptr [[X]], ptr [[TMP0]], align 8, !dbg [[DBG24]]
-// AARCH64-NEXT:    [[CALL:%.*]] = call noundef i32 @"_ZZ3bariENK3$_1clEv"(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP]]), !dbg [[DBG24]]
-// AARCH64-NEXT:    ret i32 [[CALL]], !dbg [[DBG26:![0-9]+]]
+// AARCH64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[CLASS_ANON_0]], ptr [[REF_TMP]], i32 0, i32 0, !dbg [[DBG21:![0-9]+]]
+// AARCH64-NEXT:    store ptr [[X]], ptr [[TMP0]], align 8, !dbg [[DBG21]]
+// AARCH64-NEXT:    [[CALL:%.*]] = call noundef i32 @"_ZZ3bariENK3$_1clEv"(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP]]), !dbg [[DBG21]]
+// AARCH64-NEXT:    ret i32 [[CALL]], !dbg [[DBG23:![0-9]+]]
 //
 //
 // AARCH64-LABEL: @compute_dep(
@@ -125,13 +125,13 @@ void bar(int x) {
 // AARCH64-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT__DEPEND_UNPACK_T:%.*]], align 8
 // AARCH64-NEXT:    [[X_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    store ptr [[X:%.*]], ptr [[X_ADDR]], align 8
-// AARCH64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
+// AARCH64-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 0
 // AARCH64-NEXT:    store ptr [[X]], ptr [[TMP0]], align 8
-// AARCH64-NEXT:    [[TMP1:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
+// AARCH64-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 1
 // AARCH64-NEXT:    store i64 4, ptr [[TMP1]], align 8
-// AARCH64-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
+// AARCH64-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 2
 // AARCH64-NEXT:    store i64 0, ptr [[TMP2]], align 8
-// AARCH64-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
+// AARCH64-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], i32 0, i32 3
 // AARCH64-NEXT:    store i64 4, ptr [[TMP3]], align 8
 // AARCH64-NEXT:    [[TMP4:%.*]] = load [[STRUCT__DEPEND_UNPACK_T]], ptr [[RETVAL]], align 8
 // AARCH64-NEXT:    ret [[STRUCT__DEPEND_UNPACK_T]] [[TMP4]]

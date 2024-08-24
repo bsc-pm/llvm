@@ -66,8 +66,8 @@ subroutine task(X, ARRAY, ARRAY1)
 end subroutine
 
 !LLVMIR-LABEL: define void @task_(ptr %0, ptr %1, ptr %2)
-!LLVMIR:  %[[VAR_I:.*]] = alloca i32, i64 1, align 4
 !LLVMIR:  %[[VAR_J:.*]] = alloca i32, i64 1, align 4
+!LLVMIR:  %[[VAR_I:.*]] = alloca i32, i64 1, align 4
 !LLVMIR:  %[[VLA_EXTENT:.*]] = select i1 %{{.*}}, i64 %{{.*}}, i64 0
 !LLVMIR:  %[[VAR_ARRAY2:.*]] = alloca i32, i64 %{{.*}}, align 4
 
