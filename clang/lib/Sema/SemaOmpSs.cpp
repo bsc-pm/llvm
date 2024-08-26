@@ -4221,6 +4221,13 @@ static bool checkDependency(Sema &S, Expr *RefExpr, bool OSSSyntax, bool Outline
     bool VisitCallExpr(const CallExpr *E) {
       return true;
     }
+    bool VisitStmt(const Stmt *S) {
+      for (const Stmt *C : S->children()) {
+        if (C && Visit(C))
+          return true;
+      }
+      return false;
+    }
   };
   CheckCallExpr CCE;
   if (CCE.Visit(RefExpr)) {
