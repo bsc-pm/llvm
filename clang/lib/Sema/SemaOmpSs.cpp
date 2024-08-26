@@ -4136,6 +4136,85 @@ public:
 
   bool isErrorFound() const { return ErrorFound; }
 };
+
+// This Visitor checks the base of the
+// dependency is over a CallExpr, which is error.
+// int *get();
+// auto l = []() -> int * {...};
+// #pragma oss task in(get()[1], l()[3])
+//
+// and if it is Outline it checks dependencies are
+// made over a lvalue references, global variables
+// or pointer deref expressions like UnaryOperator
+// and ArraySubscript
+class OutlineDepChecker
+    : public ConstStmtVisitor<OutlineDepChecker, void> {
+  bool IsPlainDeclRef = true;
+  bool ErrorFound = false;
+  Sema &S;
+  bool Outline;
+  bool IsReduction = false;
+public:
+  OutlineDepChecker(Sema &S, bool Outline, bool IsReduction)
+    : S(S), Outline(Outline), IsReduction(IsReduction)
+    {}
+
+  void VisitOSSMultiDepExpr(const OSSMultiDepExpr *E) {
+    IsPlainDeclRef = false;
+    Visit(E->getDepExpr());
+  }
+
+  void VisitOSSArrayShapingExpr(const OSSArrayShapingExpr *E) {
+    IsPlainDeclRef = false;
+    Visit(E->getBase());
+  }
+
+  void VisitOSSArraySectionExpr(const OSSArraySectionExpr *E) {
+    IsPlainDeclRef = false;
+    Visit(E->getBase());
+  }
+
+  void VisitArraySubscriptExpr(const ArraySubscriptExpr *E) {
+    IsPlainDeclRef = false;
+    Visit(E->getBase());
+  }
+
+  void VisitUnaryOperator(const UnaryOperator *E) {
+    IsPlainDeclRef = false;
+    Visit(E->getSubExpr());
+  }
+
+  void VisitMemberExpr(const MemberExpr *E) {
+    IsPlainDeclRef = false;
+    Visit(E->getBase());
+  }
+
+  void VisitCallExpr(const CallExpr *E) {
+    S.Diag(E->getExprLoc(), diag::err_oss_call_expr_support)
+        << E->getSourceRange();
+    ErrorFound = true;
+  }
+
+  void VisitDeclRefExpr(const DeclRefExpr *E) {
+    if (const VarDecl *VD = dyn_cast<VarDecl>(E->getDecl())) {
+      if (Outline &&
+          !(VD->getType()->isReferenceType() ||
+            VD->hasGlobalStorage() ||
+            (VD->getType()->isPointerType() && !IsPlainDeclRef))) {
+        S.Diag(E->getExprLoc(), diag::err_oss_expected_lvalue_reference_or_global_or_dereference_or_array_item)
+            << IsReduction << E->getSourceRange();
+        ErrorFound = true;
+      }
+    }
+  }
+  void VisitStmt(const Stmt *S) {
+    for (const Stmt *C : S->children()) {
+      if (C)
+        Visit(C);
+    }
+  }
+  bool isErrorFound() const { return ErrorFound; }
+};
 } // end namespace
 
 static bool checkDependency(Sema &S, Expr *RefExpr, bool OSSSyntax, bool Outline) {
@@ -4174,67 +4253,10 @@ static bool checkDependency(Sema &S, Expr *RefExpr, bool OSSSyntax, bool Outline
     return false;
   }
 
-  if (Outline) {
-    if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(RefExpr->IgnoreParenImpCasts())) {
-      if (const VarDecl *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
-        if (!(VD->getType()->isReferenceType() || VD->hasGlobalStorage())) {
-          S.Diag(ELoc, diag::err_oss_expected_lvalue_reference_or_global_or_dereference_or_array_item)
-              << 0 << DRE->getSourceRange();
-          return false;
-        }
-      }
-    }
-  }
-
-  class CheckCallExpr
-      : public ConstStmtVisitor<CheckCallExpr, bool> {
-  // This Visitor checks the base of the
-  // dependency is over a CallExpr, which is error.
-  // int *get();
-  // auto l = []() -> int * {...};
-  // #pragma oss task in(get()[1], l()[3])
-  public:
-    bool VisitOSSMultiDepExpr(const OSSMultiDepExpr *E) {
-      return Visit(E->getDepExpr());
-    }
-
-    bool VisitOSSArrayShapingExpr(const OSSArrayShapingExpr *E) {
-      return Visit(E->getBase());
-    }
-
-    bool VisitOSSArraySectionExpr(const OSSArraySectionExpr *E) {
-      return Visit(E->getBase());
-    }
-
-    bool VisitArraySubscriptExpr(const ArraySubscriptExpr *E) {
-      return Visit(E->getBase());
-    }
-
-    bool VisitUnaryOperator(const UnaryOperator *E) {
-      return Visit(E->getSubExpr());
-    }
-
-    bool VisitMemberExpr(const MemberExpr *E) {
-      return Visit(E->getBase());
-    }
-
-    bool VisitCallExpr(const CallExpr *E) {
-      return true;
-    }
-    bool VisitStmt(const Stmt *S) {
-      for (const Stmt *C : S->children()) {
-        if (C && Visit(C))
-          return true;
-      }
-      return false;
-    }
-  };
-  CheckCallExpr CCE;
-  if (CCE.Visit(RefExpr)) {
-    S.Diag(ELoc, diag::err_oss_call_expr_support)
-        << RefExpr->getSourceRange();
+  OutlineDepChecker ODC(S, Outline, /*isReduction=*/false);
+  ODC.Visit(RefExpr);
+  if (ODC.isErrorFound())
     return false;
-  }
 
   bool InvalidArraySection = false;
   while (auto *OASE = dyn_cast<OSSArraySectionExpr>(SimpleExpr)) {
@@ -5310,17 +5332,10 @@ static bool actOnOSSReductionKindClause(
       continue;
     }
 
-    if (Outline) {
-      if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(RefExpr->IgnoreParenImpCasts())) {
-        if (const VarDecl *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
-          if (VD->hasGlobalStorage() || !VD->getType()->isReferenceType()) {
-            S.Diag(ELoc, diag::err_oss_expected_lvalue_reference_or_global_or_dereference_or_array_item)
-              << 1 << DRE->getSourceRange();
-            return false;
-          }
-        }
-      }
-    }
+    OutlineDepChecker ODC(S, Outline, /*isReduction=*/true);
+    ODC.Visit(RefExpr);
+    if (ODC.isErrorFound())
+      return false;
 
     // Try to find 'declare reduction' corresponding construct before using
     // builtin/overloaded operators.
