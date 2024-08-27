@@ -12123,8 +12123,9 @@ def err_oss_declare_reduction_redefinition : Error<"redefinition of user-defined
 
 def err_oss_global_variable : Error<
   "global variables are not allowed here">;
-def err_oss_non_const_variable : Error<
-  "this variable cannot be used here">;
+def err_oss_const_string : Error<
+  "expected C-style string literal, global 'const char *const' initialized variable or a constant ConditionalOperator expression resulting in "
+  " a C-style string literal or a global 'const char *const' initialized variable">;
 def err_oss_const_variable : Error<
   "const-qualified variable cannot be %0">;
 def err_oss_const_not_mutable_variable : Error<

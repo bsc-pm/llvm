@@ -6092,23 +6092,61 @@ ExprResult SemaOmpSs::CheckIsConstCharPtrConvertibleExpr(Expr *E, bool ConstCons
         buildVarDecl(SemaRef, E->getExprLoc(), ConstCharPtrTy, ".tmp.label");
     SemaRef.AddInitializerToDecl(LabelVD, E,
                          /*DirectInit=*/false);
-    if (!LabelVD->hasInit())
+    if (LabelVD->isInvalidDecl() ||
+        (LabelVD->getInit() && LabelVD->getInit()->containsErrors()))
       return ExprError();
 
     if (ConstConstraint) {
+      auto checkVD = [this](const VarDecl *VD) {
+        bool IsClassType;
+        // Only allow these cases
+        // const char* const k1 = "hola";
+        // const char k2[] = "hola";
+        return !(VD->hasGlobalStorage()
+            && isConstNotMutableType(SemaRef, VD->getType(), /*AcceptIfMutable*/ false, &IsClassType))
+            || !VD->hasInit() || !isa<StringLiteral>(VD->getInit()->IgnoreParenImpCasts());
+      };
+      auto checkCOBranch = [this, checkVD](const Expr *BranchE) {
+        BranchE = BranchE->IgnoreParenImpCasts();
+        if (auto *DRE = dyn_cast<DeclRefExpr>(BranchE)) {
+          if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+            if (checkVD(VD)) {
+              Diag(BranchE->getExprLoc(), diag::err_oss_const_string);
+              return true;
+            }
+          }
+        } else if (!isa<StringLiteral>(BranchE)) {
+          Diag(BranchE->getExprLoc(), diag::err_oss_const_string);
+          return true;
+        }
+        return false;
+      };
+
+      E = E->IgnoreParenImpCasts();
       if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
         if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
-          bool IsClassType;
-          // Only allow these cases
-          // const char* const k1 = "hola";
-          // const char k2[] = "hola";
-          if (!(VD->hasGlobalStorage()
-              && isConstNotMutableType(SemaRef, VD->getType(), /*AcceptIfMutable*/ false, &IsClassType))
-              || !VD->hasInit() || !isa<StringLiteral>(VD->getInit()->IgnoreParenImpCasts())) {
-            Diag(E->getExprLoc(), diag::err_oss_non_const_variable);
+          if (checkVD(VD)) {
+            Diag(E->getExprLoc(), diag::err_oss_const_string);
             return ExprError();
           }
         }
+      } else if (auto *CO = dyn_cast<ConditionalOperator>(E)) {
+        std::optional<llvm::APSInt> Result =
+            CO->getCond()->getIntegerConstantExpr(SemaRef.Context);
+        if (!Result) {
+          Diag(E->getExprLoc(), diag::err_oss_const_string);
+          return ExprError();
+        }
+        if (Result->isZero()) {
+          if (checkCOBranch(CO->getTrueExpr()))
+            return ExprError();
+        } else {
+          if (checkCOBranch(CO->getFalseExpr()))
+            return ExprError();
+        }
+      } else if (!isa<StringLiteral>(E)) {
+        Diag(E->getExprLoc(), diag::err_oss_const_string);
+        return ExprError();
       }
     }
 

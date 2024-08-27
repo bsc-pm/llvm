@@ -16033,7 +16033,7 @@ OMPClause *SemaOpenMP::ActOnOpenMPLabelClause(Expr *ME, SourceLocation StartLoc,
         if (!(VD->hasGlobalStorage()
             && isConstNotMutableType(SemaRef, VD->getType(), /*AcceptIfMutable*/ false, &IsClassType))
             || !VD->hasInit() || !isa<StringLiteral>(VD->getInit()->IgnoreParenImpCasts())) {
-          Diag(ME->getExprLoc(), diag::err_oss_non_const_variable);
+          Diag(ME->getExprLoc(), diag::err_oss_const_string);
           return nullptr;
         }
       }
