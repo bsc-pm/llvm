@@ -1203,7 +1203,9 @@ struct EmboxCommonConversion : public fir::FIROpConversion<OP> {
                                 mlir::Location loc,
                                 fir::RecordType recType) const {
     std::string name =
-        fir::NameUniquer::getTypeDescriptorName(recType.getName());
+        this->options.typeDescriptorsRenamedForAssembly
+            ? fir::NameUniquer::getTypeDescriptorAssemblyName(recType.getName())
+            : fir::NameUniquer::getTypeDescriptorName(recType.getName());
     mlir::Type llvmPtrTy = ::getLlvmPtrType(mod.getContext());
     if (auto global = mod.template lookupSymbol<fir::GlobalOp>(name)) {
       return rewriter.create<mlir::LLVM::AddressOfOp>(loc, llvmPtrTy,
@@ -2706,7 +2708,10 @@ struct TypeDescOpConversion : public fir::FIROpConversion<fir::TypeDescOp> {
     auto recordType = mlir::dyn_cast<fir::RecordType>(inTy);
     auto module = typeDescOp.getOperation()->getParentOfType<mlir::ModuleOp>();
     std::string typeDescName =
-        fir::NameUniquer::getTypeDescriptorName(recordType.getName());
+        this->options.typeDescriptorsRenamedForAssembly
+            ? fir::NameUniquer::getTypeDescriptorAssemblyName(
+                  recordType.getName())
+            : fir::NameUniquer::getTypeDescriptorName(recordType.getName());
     auto llvmPtrTy = ::getLlvmPtrType(typeDescOp.getContext());
     if (auto global = module.lookupSymbol<mlir::LLVM::GlobalOp>(typeDescName)) {
       rewriter.replaceOpWithNewOp<mlir::LLVM::AddressOfOp>(
@@ -3654,6 +3659,10 @@ public:
 
     if (!forcedTargetFeatures.empty())
       fir::setTargetFeatures(mod, forcedTargetFeatures);
+
+    if (typeDescriptorsRenamedForAssembly)
+      options.typeDescriptorsRenamedForAssembly =
+          typeDescriptorsRenamedForAssembly;
 
     // Run dynamic pass pipeline for converting Math dialect
     // operations into other dialects (llvm, func, etc.).

@@ -1635,7 +1635,7 @@ static void emitDiagArrays(std::map<std::string, GroupInfo> &DiagsInGroup,
 ///     \000\020#pragma-messages\t#warnings\020CFString-literal"
 ///   };
 /// \endcode
-static void emitDiagGroupNames(StringToOffsetTable &GroupNames,
+static void emitDiagGroupNames(const StringToOffsetTable &GroupNames,
                                raw_ostream &OS) {
   OS << "static const char DiagGroupNames[] = {\n";
   GroupNames.EmitString(OS);
@@ -1657,7 +1657,7 @@ static void emitDiagGroupNames(StringToOffsetTable &GroupNames,
 static void emitAllDiagArrays(std::map<std::string, GroupInfo> &DiagsInGroup,
                               RecordVec &DiagsInPedantic,
                               RecordVec &GroupsInPedantic,
-                              StringToOffsetTable &GroupNames,
+                              const StringToOffsetTable &GroupNames,
                               raw_ostream &OS) {
   OS << "\n#ifdef GET_DIAG_ARRAYS\n";
   emitDiagArrays(DiagsInGroup, DiagsInPedantic, OS);
@@ -1684,7 +1684,8 @@ static void emitAllDiagArrays(std::map<std::string, GroupInfo> &DiagsInGroup,
 static void emitDiagTable(std::map<std::string, GroupInfo> &DiagsInGroup,
                           RecordVec &DiagsInPedantic,
                           RecordVec &GroupsInPedantic,
-                          StringToOffsetTable &GroupNames, raw_ostream &OS) {
+                          const StringToOffsetTable &GroupNames,
+                          raw_ostream &OS) {
   unsigned MaxLen = 0;
 
   for (auto const &I: DiagsInGroup)
@@ -1706,7 +1707,7 @@ static void emitDiagTable(std::map<std::string, GroupInfo> &DiagsInGroup,
     OS << I.first << " */, ";
     // Store a pascal-style length byte at the beginning of the string.
     std::string Name = char(I.first.size()) + I.first;
-    OS << GroupNames.GetOrAddStringOffset(Name, false) << ", ";
+    OS << *GroupNames.GetStringOffset(Name) << ", ";
 
     // Special handling for 'pedantic'.
     const bool IsPedantic = I.first == "pedantic";

@@ -372,7 +372,7 @@ std::pair<fir::ExtendedValue, bool> Fortran::lower::genCallOpAndResult(
       auto stackSaveSymbol = bldr->getSymbolRefAttr(stackSaveFn.getName());
       mlir::Value sp;
       fir::CallOp call = bldr->create<fir::CallOp>(
-          loc, stackSaveFn.getFunctionType().getResults(), stackSaveSymbol,
+          loc, stackSaveSymbol, stackSaveFn.getFunctionType().getResults(),
           mlir::ValueRange{});
       if (call.getNumResults() != 0)
         sp = call.getResult(0);
@@ -380,9 +380,9 @@ std::pair<fir::ExtendedValue, bool> Fortran::lower::genCallOpAndResult(
         auto stackRestoreFn = fir::factory::getLlvmStackRestore(*bldr);
         auto stackRestoreSymbol =
             bldr->getSymbolRefAttr(stackRestoreFn.getName());
-        bldr->create<fir::CallOp>(loc,
+        bldr->create<fir::CallOp>(loc, stackRestoreSymbol,
                                   stackRestoreFn.getFunctionType().getResults(),
-                                  stackRestoreSymbol, mlir::ValueRange{sp});
+                                  mlir::ValueRange{sp});
       });
     }
     mlir::Value temp =
@@ -640,11 +640,15 @@ std::pair<fir::ExtendedValue, bool> Fortran::lower::genCallOpAndResult(
     if (callNumResults != 0)
       callResult = dispatch.getResult(0);
   } else {
-    // Standard procedure call with fir.call.
-    auto call = builder.create<fir::CallOp>(loc, funcType.getResults(),
-                                            funcSymbolAttr, operands);
+    // TODO: gather other procedure attributes.
+    fir::FortranProcedureFlagsEnumAttr procAttrs;
     if (caller.characterize().IsBindC())
-      call.setIsBindC(true);
+      procAttrs = fir::FortranProcedureFlagsEnumAttr::get(
+          builder.getContext(), fir::FortranProcedureFlagsEnum::bind_c);
+
+    // Standard procedure call with fir.call.
+    auto call = builder.create<fir::CallOp>(
+        loc, funcType.getResults(), funcSymbolAttr, operands, procAttrs);
 
     callNumResults = call.getNumResults();
     if (callNumResults != 0)
@@ -805,13 +809,18 @@ fir::ExtendedValue Fortran::lower::genOmpSsCallOpAndResult(
       if (fir::isa_builtin_cptr_type(fromTy) &&
           Fortran::lower::isCPtrArgByValueType(snd)) {
         cast = genRecordCPtrValueArg(builder, loc, fst, fromTy);
-      } else if (fir::isa_derived(snd)) {
-        // FIXME: This seems like a serious bug elsewhere in lowering. Paper
-        // over the problem for now.
+      } else if (fir::isa_derived(snd) && !fir::isa_derived(fst.getType())) {
+        // TODO: remove this TODO once the old lowering is gone.
         TODO(loc, "derived type argument passed by value");
       } else {
+        // With the lowering to HLFIR, box arguments have already been built
+        // according to the attributes, rank, bounds, and type they should have.
+        // Do not attempt any reboxing here that could break this.
+        bool legacyLowering =
+            !converter.getLoweringOptions().getLowerToHighLevelFIR();
         cast = builder.convertWithSemantics(loc, snd, fst,
-                                            callingImplicitInterface);
+                                            callingImplicitInterface,
+                                            /*allowRebox=*/legacyLowering);
       }
     }
     operands.push_back(cast);
@@ -821,9 +830,15 @@ fir::ExtendedValue Fortran::lower::genOmpSsCallOpAndResult(
   if (addHostAssociations)
     operands.push_back(converter.hostAssocTupleValue());
 
+  // TODO: gather other procedure attributes.
+  fir::FortranProcedureFlagsEnumAttr procAttrs;
+  if (caller.characterize().IsBindC())
+    procAttrs = fir::FortranProcedureFlagsEnumAttr::get(
+        builder.getContext(), fir::FortranProcedureFlagsEnum::bind_c);
+
   // Standard procedure call with fir.call.
-  builder.create<fir::CallOp>(loc, funcType.getResults(),
-                                          funcSymbolAttr, operands);
+  builder.create<fir::CallOp>(
+      loc, funcType.getResults(), funcSymbolAttr, operands, procAttrs);
   return mlir::Value{}; // subroutine call
 }
 
