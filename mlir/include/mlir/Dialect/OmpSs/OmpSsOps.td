@@ -394,17 +394,25 @@ def ReleaseOp : OmpSs_Op<"release", [AttrSizedOperandSegments]> {
   let arguments = (ins Variadic<AnyType>:$in_vars,
     Variadic<AnyType>:$out_vars,
     Variadic<AnyType>:$inout_vars,
+    Variadic<AnyType>:$concurrent_vars,
+    Variadic<AnyType>:$commutative_vars,
     Variadic<AnyType>:$weakin_vars,
     Variadic<AnyType>:$weakout_vars,
-    Variadic<AnyType>:$weakinout_vars);
+    Variadic<AnyType>:$weakinout_vars,
+    Variadic<AnyType>:$weakconcurrent_vars,
+    Variadic<AnyType>:$weakcommutative_vars);
 
   let assemblyFormat = [{
     ( `in` `(` $in_vars^ `:` type($in_vars) `)` )?
     ( `out` `(` $out_vars^ `:` type($out_vars) `)` )?
     ( `inout` `(` $inout_vars^ `:` type($inout_vars) `)` )?
+    ( `concurrent` `(` $concurrent_vars^ `:` type($concurrent_vars) `)` )?
+    ( `commutative` `(` $commutative_vars^ `:` type($commutative_vars) `)` )?
     ( `weakin` `(` $weakin_vars^ `:` type($weakin_vars) `)` )?
     ( `weakout` `(` $weakout_vars^ `:` type($weakout_vars) `)` )?
     ( `weakinout` `(` $weakinout_vars^ `:` type($weakinout_vars) `)` )?
+    ( `weakconcurrent` `(` $weakconcurrent_vars^ `:` type($weakconcurrent_vars) `)` )?
+    ( `weakcommutative` `(` $weakcommutative_vars^ `:` type($weakcommutative_vars) `)` )?
     attr-dict-with-keyword
   }];
 
@@ -422,13 +430,13 @@ def ReleaseOp : OmpSs_Op<"release", [AttrSizedOperandSegments]> {
     static constexpr bool allowsIn() { return true; }
     static constexpr bool allowsOut() { return true; }
     static constexpr bool allowsInout() { return true; }
-    static constexpr bool allowsConcurrent() { return false; }
-    static constexpr bool allowsCommutative() { return false; }
+    static constexpr bool allowsConcurrent() { return true; }
+    static constexpr bool allowsCommutative() { return true; }
     static constexpr bool allowsWeakIn() { return true; }
     static constexpr bool allowsWeakOut() { return true; }
     static constexpr bool allowsWeakInout() { return true; }
-    static constexpr bool allowsWeakConcurrent() { return false; }
-    static constexpr bool allowsWeakCommutative() { return false; }
+    static constexpr bool allowsWeakConcurrent() { return true; }
+    static constexpr bool allowsWeakCommutative() { return true; }
     static constexpr bool allowsChunksize() { return false; }
     static constexpr bool allowsGrainsize() { return false; }
   }];

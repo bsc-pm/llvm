@@ -1742,9 +1742,13 @@ static void genOSS(Fortran::lower::AbstractConverter &converter,
         clausesVisitor.inClauseOperands(),
         clausesVisitor.outClauseOperands(),
         clausesVisitor.inoutClauseOperands(),
+        clausesVisitor.concurrentClauseOperands(),
+        clausesVisitor.commutativeClauseOperands(),
         clausesVisitor.weakinClauseOperands(),
         clausesVisitor.weakoutClauseOperands(),
-        clausesVisitor.weakinoutClauseOperands());
+        clausesVisitor.weakinoutClauseOperands(),
+        clausesVisitor.weakconcurrentClauseOperands(),
+        clausesVisitor.weakcommutativeClauseOperands());
     break;
   }
 }
