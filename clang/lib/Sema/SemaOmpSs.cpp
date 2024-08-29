@@ -4762,7 +4762,8 @@ bool SemaOmpSs::ActOnOmpSsDependKinds(ArrayRef<OmpSsDependClauseKind> DepKinds,
     InOutInoutCnt = InOutInoutCnt + (DepKinds[1] == OSSC_DEPEND_inout);
   }
 
-  if (isOmpSsTaskingDirective(DSAStack->getCurrentDirective())) {
+  if (isOmpSsTaskingDirective(DSAStack->getCurrentDirective())
+      || DSAStack->getCurrentDirective() == OSSD_release) {
     if (HasTwoKinds) {
       if (HasConcurrent) {
         // concurrent (inoutset) cannot be combined with other modifiers
@@ -4819,46 +4820,6 @@ bool SemaOmpSs::ActOnOmpSsDependKinds(ArrayRef<OmpSsDependClauseKind> DepKinds,
                                      /*Last=*/OSSC_DEPEND_unknown, Except)
           << getOmpSsClauseName(OSSC_depend);
       return false;
-    }
-  } else if (DSAStack->getCurrentDirective() == OSSD_release) {
-    // Release
-    if (HasTwoKinds) {
-      if ((WeakCnt == 1 && InOutInoutCnt != 1) || (WeakCnt == 2)) {
-        // depend(weak, asdf:
-        // depend(weak, weak:
-        unsigned Except[] = {OSSC_DEPEND_weak, OSSC_DEPEND_inoutset, OSSC_DEPEND_mutexinoutset};
-        Diag(DepLoc, diag::err_oss_unexpected_clause_value)
-            << getListOfPossibleValues(OSSC_depend, /*First=*/0,
-                                       /*Last=*/OSSC_DEPEND_unknown, Except)
-            << getOmpSsClauseName(OSSC_depend);
-        return false;
-      }
-      if (WeakCnt == 0 && InOutInoutCnt >= 1) {
-        // depend(in, in:
-        // depend(in, asdf:
-        Diag(DepLoc, diag::err_oss_depend_weak_required);
-        return false;
-      }
-      if (InOutInoutCnt == 0) {
-        // depend(asdf, asdf:
-        unsigned Except[] = {OSSC_DEPEND_inoutset, OSSC_DEPEND_mutexinoutset};
-        Diag(DepLoc, diag::err_oss_unexpected_clause_value)
-            << getListOfPossibleValues(OSSC_depend, /*First=*/0,
-                                       /*Last=*/OSSC_DEPEND_unknown, Except)
-            << getOmpSsClauseName(OSSC_depend);
-        return false;
-      }
-    } else {
-      if (WeakCnt == 1 || InOutInoutCnt == 0) {
-        // depend(weak:
-        // depend(asdf:
-        unsigned Except[] = {OSSC_DEPEND_weak, OSSC_DEPEND_inoutset, OSSC_DEPEND_mutexinoutset};
-        Diag(DepLoc, diag::err_oss_unexpected_clause_value)
-            << getListOfPossibleValues(OSSC_depend, /*First=*/0,
-                                       /*Last=*/OSSC_DEPEND_unknown, Except)
-            << getOmpSsClauseName(OSSC_depend);
-        return false;
-      }
     }
   }
   // Here we have three cases:

@@ -267,9 +267,12 @@ def OSS_Release : Directive<"release"> {
     VersionedClause<OSSC_In>,
     VersionedClause<OSSC_Out>,
     VersionedClause<OSSC_Inout>,
+    VersionedClause<OSSC_Concurrent>,
+    VersionedClause<OSSC_Commutative>,
     VersionedClause<OSSC_WeakIn>,
     VersionedClause<OSSC_WeakOut>,
     VersionedClause<OSSC_WeakInout>,
+    VersionedClause<OSSC_WeakCommutative>,
   ];
   let association = AS_None;
   let category = CA_Executable;

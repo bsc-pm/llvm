@@ -28,9 +28,9 @@ int main(int argc, char **argv, char *env[]) {
   int array[10][20];
 
   #pragma oss release depend // expected-error {{expected '(' after 'depend'}}
-  #pragma oss release depend ( // expected-error {{expected 'in', 'out' or 'inout' in OmpSs-2 clause 'depend'}} expected-error {{expected ')'}} expected-note {{to match this '('}} expected-warning {{missing ':' after dependency type - ignoring}}
-  #pragma oss release depend () // expected-error {{expected 'in', 'out' or 'inout' in OmpSs-2 clause 'depend'}} expected-warning {{missing ':' after dependency type - ignoring}}
-  #pragma oss release depend (argc // expected-error {{expected 'in', 'out' or 'inout' in OmpSs-2 clause 'depend'}} expected-warning {{missing ':' after dependency type - ignoring}} expected-error {{expected ')'}} expected-note {{to match this '('}}
+  #pragma oss release depend ( // expected-error {{expected 'in', 'out', 'inout', 'inoutset' or 'mutexinoutset' in OmpSs-2 clause 'depend'}} expected-error {{expected ')'}} expected-note {{to match this '('}} expected-warning {{missing ':' after dependency type - ignoring}}
+  #pragma oss release depend () // expected-error {{expected 'in', 'out', 'inout', 'inoutset' or 'mutexinoutset' in OmpSs-2 clause 'depend'}} expected-warning {{missing ':' after dependency type - ignoring}}
+  #pragma oss release depend (argc // expected-error {{expected 'in', 'out', 'inout', 'inoutset' or 'mutexinoutset' in OmpSs-2 clause 'depend'}} expected-warning {{missing ':' after dependency type - ignoring}} expected-error {{expected ')'}} expected-note {{to match this '('}}
   #pragma oss release depend (in : argc)) // expected-warning {{extra tokens at the end of '#pragma oss release' are ignored}}
   #pragma oss release depend (out: ) // expected-error {{expected expression}}
   #pragma oss release depend (out :S1) // expected-error {{'S1' does not refer to a value}}
@@ -77,21 +77,21 @@ int main(int argc, char **argv, char *env[]) {
   #pragma oss release inoutset(argc) // expected-warning {{extra tokens at the end of '#pragma oss release' are ignored}}
 
   #pragma oss release depend(in : arr[0])
-  #pragma oss release depend(, // expected-error {{expected 'in', 'out', 'inout' or 'weak' in OmpSs-2 clause 'depend'}} expected-error {{expected ')'}} expected-note {{to match this '('}} expected-warning {{missing ':' after dependency type - ignoring}}
-  #pragma oss release depend(, : // expected-error {{expected 'in', 'out', 'inout' or 'weak' in OmpSs-2 clause 'depend'}} expected-error {{expected ')'}} expected-note {{to match this '('}}
-  #pragma oss release depend(, : ) // expected-error {{expected 'in', 'out', 'inout' or 'weak' in OmpSs-2 clause 'depend'}}
+  #pragma oss release depend(, // expected-error {{expected 'in', 'out', 'inout', 'inoutset', 'mutexinoutset' or 'weak' in OmpSs-2 clause 'depend'}} expected-error {{expected ')'}} expected-note {{to match this '('}} expected-warning {{missing ':' after dependency type - ignoring}}
+  #pragma oss release depend(, : // expected-error {{expected 'in', 'out', 'inout', 'inoutset', 'mutexinoutset' or 'weak' in OmpSs-2 clause 'depend'}} expected-error {{expected ')'}} expected-note {{to match this '('}}
+  #pragma oss release depend(, : ) // expected-error {{expected 'in', 'out', 'inout', 'inoutset', 'mutexinoutset' or 'weak' in OmpSs-2 clause 'depend'}}
   #pragma oss release depend(in, weak: ) // expected-error {{expected expression}}
   #pragma oss release depend(weak, in: ) // expected-error {{expected expression}}
-  #pragma oss release depend(, weak: argc) // expected-error {{expected 'in', 'out' or 'inout' in OmpSs-2 clause 'depend'}}
-  #pragma oss release depend(weak, : argc) // expected-error {{expected 'in', 'out' or 'inout' in OmpSs-2 clause 'depend'}}
-  #pragma oss release depend(weak, weak: argc) // expected-error {{expected 'in', 'out' or 'inout' in OmpSs-2 clause 'depend'}}
+  #pragma oss release depend(, weak: argc) // expected-error {{expected 'in', 'out', 'inout' or 'mutexinoutset' in OmpSs-2 clause 'depend'}}
+  #pragma oss release depend(weak, : argc) // expected-error {{expected 'in', 'out', 'inout' or 'mutexinoutset' in OmpSs-2 clause 'depend'}}
+  #pragma oss release depend(weak, weak: argc) // expected-error {{expected 'in', 'out', 'inout' or 'mutexinoutset' in OmpSs-2 clause 'depend'}}
   #pragma oss release depend(in, in: argc) // expected-error {{expected 'weak' dependency type}}
   #pragma oss release depend(out, in: argc) // expected-error {{expected 'weak' dependency type}}
   #pragma oss release depend(weak, in: 1) // expected-error {{expected addressable lvalue expression, array element, array shape or array section}}
   #pragma oss release depend(weak, in: S2::s2)
-  #pragma oss release depend(weak, mutexinoutset: argc) // expected-error {{expected 'in', 'out' or 'inout' in OmpSs-2 clause 'depend'}}
-  #pragma oss release depend(kk, inoutset: argc) // expected-error {{expected 'in', 'out', 'inout' or 'weak' in OmpSs-2 clause 'depend'}}
-  #pragma oss release depend(kk: argc) // expected-error {{expected 'in', 'out' or 'inout' in OmpSs-2 clause 'depend'}}
+  #pragma oss release depend(weak, mutexinoutset: argc)
+  #pragma oss release depend(kk, inoutset: argc) // expected-error {{dependency type 'inoutset' cannot be combined with others}}
+  #pragma oss release depend(kk: argc) // expected-error {{expected 'in', 'out', 'inout', 'inoutset' or 'mutexinoutset' in OmpSs-2 clause 'depend'}}
 
   return 0;
 }
