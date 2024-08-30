@@ -4352,15 +4352,37 @@ private:
     bool lhsIsDevice = Fortran::evaluate::HasCUDADeviceAttrs(assign.lhs);
     bool rhsIsDevice = Fortran::evaluate::HasCUDADeviceAttrs(assign.rhs);
 
-    auto getRefIfLoaded = [](mlir::Value val) -> mlir::Value {
+    auto getRefFromValue = [](mlir::Value val) -> mlir::Value {
       if (auto loadOp =
               mlir::dyn_cast_or_null<fir::LoadOp>(val.getDefiningOp()))
         return loadOp.getMemref();
+      if (!mlir::isa<fir::BaseBoxType>(val.getType()))
+        return val;
+      if (auto declOp =
+              mlir::dyn_cast_or_null<hlfir::DeclareOp>(val.getDefiningOp())) {
+        if (!declOp.getShape())
+          return val;
+        if (mlir::isa<fir::ReferenceType>(declOp.getMemref().getType()))
+          return declOp.getResults()[1];
+      }
       return val;
     };
 
-    mlir::Value rhsVal = getRefIfLoaded(rhs.getBase());
-    mlir::Value lhsVal = getRefIfLoaded(lhs.getBase());
+    auto getShapeFromDecl = [](mlir::Value val) -> mlir::Value {
+      if (!mlir::isa<fir::BaseBoxType>(val.getType()))
+        return {};
+      if (auto declOp =
+              mlir::dyn_cast_or_null<hlfir::DeclareOp>(val.getDefiningOp()))
+        return declOp.getShape();
+      return {};
+    };
+
+    mlir::Value rhsVal = getRefFromValue(rhs.getBase());
+    mlir::Value lhsVal = getRefFromValue(lhs.getBase());
+    // Get shape from the rhs if available otherwise get it from lhs.
+    mlir::Value shape = getShapeFromDecl(rhs.getBase());
+    if (!shape)
+      shape = getShapeFromDecl(lhs.getBase());
 
     // device = host
     if (lhsIsDevice && !rhsIsDevice) {
@@ -4373,19 +4395,18 @@ private:
           base = convertOp.getValue();
         // Special case if the rhs is a constant.
         if (matchPattern(base.getDefiningOp(), mlir::m_Constant())) {
-          builder.create<cuf::DataTransferOp>(
-              loc, base, lhsVal, /*shape=*/mlir::Value{}, transferKindAttr);
+          builder.create<cuf::DataTransferOp>(loc, base, lhsVal, shape,
+                                              transferKindAttr);
         } else {
           auto associate = hlfir::genAssociateExpr(
               loc, builder, rhs, rhs.getType(), ".cuf_host_tmp");
           builder.create<cuf::DataTransferOp>(loc, associate.getBase(), lhsVal,
-                                              /*shape=*/mlir::Value{},
-                                              transferKindAttr);
+                                              shape, transferKindAttr);
           builder.create<hlfir::EndAssociateOp>(loc, associate);
         }
       } else {
-        builder.create<cuf::DataTransferOp>(
-            loc, rhsVal, lhsVal, /*shape=*/mlir::Value{}, transferKindAttr);
+        builder.create<cuf::DataTransferOp>(loc, rhsVal, lhsVal, shape,
+                                            transferKindAttr);
       }
       return;
     }
@@ -4394,8 +4415,7 @@ private:
     if (!lhsIsDevice && rhsIsDevice) {
       auto transferKindAttr = cuf::DataTransferKindAttr::get(
           builder.getContext(), cuf::DataTransferKind::DeviceHost);
-      builder.create<cuf::DataTransferOp>(loc, rhsVal, lhsVal,
-                                          /*shape=*/mlir::Value{},
+      builder.create<cuf::DataTransferOp>(loc, rhsVal, lhsVal, shape,
                                           transferKindAttr);
       return;
     }
@@ -4405,8 +4425,7 @@ private:
       assert(rhs.isVariable() && "CUDA Fortran assignment rhs is not legal");
       auto transferKindAttr = cuf::DataTransferKindAttr::get(
           builder.getContext(), cuf::DataTransferKind::DeviceDevice);
-      builder.create<cuf::DataTransferOp>(loc, rhsVal, lhsVal,
-                                          /*shape=*/mlir::Value{},
+      builder.create<cuf::DataTransferOp>(loc, rhsVal, lhsVal, shape,
                                           transferKindAttr);
       return;
     }
@@ -4462,8 +4481,13 @@ private:
   // Check if the insertion point is currently in a device context. HostDevice
   // subprogram are not considered fully device context so it will return false
   // for it.
-  static bool isDeviceContext(fir::FirOpBuilder &builder) {
+  // If the insertion point is inside an OpenACC region op, it is considered
+  // device context.
+  static bool isCudaDeviceContext(fir::FirOpBuilder &builder) {
     if (builder.getRegion().getParentOfType<cuf::KernelOp>())
+      return true;
+    if (builder.getRegion()
+            .getParentOfType<mlir::acc::ComputeRegionOpInterface>())
       return true;
     if (auto funcOp =
             builder.getRegion().getParentOfType<mlir::func::FuncOp>()) {
@@ -4483,7 +4507,8 @@ private:
     mlir::Location loc = getCurrentLocation();
     fir::FirOpBuilder &builder = getFirOpBuilder();
 
-    bool isInDeviceContext = isDeviceContext(builder);
+    bool isInDeviceContext = isCudaDeviceContext(builder);
+
     bool isCUDATransfer = (Fortran::evaluate::HasCUDADeviceAttrs(assign.lhs) ||
                            Fortran::evaluate::HasCUDADeviceAttrs(assign.rhs)) &&
                           !isInDeviceContext;

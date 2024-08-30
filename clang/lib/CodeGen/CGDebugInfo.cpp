@@ -3871,6 +3871,7 @@ llvm::DIType *CGDebugInfo::CreateTypeNode(QualType Ty, llvm::DIFile *Unit) {
   case Type::Auto:
   case Type::Attributed:
   case Type::BTFTagAttributed:
+  case Type::HLSLAttributedResource:
   case Type::Adjusted:
   case Type::Decayed:
   case Type::DeducedTemplateSpecialization:
