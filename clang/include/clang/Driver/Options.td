@@ -3548,7 +3548,7 @@ def fompss : Flag<["-"], "fompss-2">, Group<f_Group>,
 def fompss_EQ : Joined<["-"], "fompss-2=">, Group<f_Group>,
   Flags<[NoArgumentUnused]>,
   Visibility<[ClangOption, CC1Option]>,
-  MarshallingInfoString<LangOpts<"OmpSsRuntimeName">>;
+  MarshallingInfoString<LangOpts<"OmpSsRuntimeName">, "CLANG_DEFAULT_OMPSS2_RUNTIME">;
 def fno_ompss : Flag<["-"], "fno-ompss-2">, Group<f_Group>, Flags<[NoArgumentUnused]>;
 def fdo_not_use_ompss_runtime : Flag<["-"], "fdo-not-use-ompss-2-runtime">, Group<f_Group>,
   Flags<[NoArgumentUnused]>,

@@ -117,12 +117,46 @@ private:
   /// Stack of used declaration and their data-sharing attributes.
   StackTy Stack;
 
-  using iterator = StackTy::const_reverse_iterator;
+  /// Iterators over the stack iterate in order from innermost to outermost
+  /// directive.
+  using const_iterator = StackTy::const_reverse_iterator;
+  const_iterator begin() const {
+    return Stack.empty() ? const_iterator() : Stack.rbegin();
+  }
+  const_iterator end() const {
+    return Stack.empty() ? const_iterator() : Stack.rend();
+  }
+  using iterator = StackTy::reverse_iterator;
+  iterator begin() {
+    return Stack.empty() ? iterator() : Stack.rbegin();
+  }
+  iterator end() {
+    return Stack.empty() ? iterator() : Stack.rend();
+  }
 
-  DSAVarData getDSA(iterator &Iter, ValueDecl *D) const;
+  DSAVarData getDSA(const_iterator &Iter, ValueDecl *D) const;
 
+  // Convenience operations to get at the elements of the stack.
   bool isStackEmpty() const {
     return Stack.empty();
+  }
+  size_t getStackSize() const {
+    return Stack.size();
+  }
+  SharingMapTy *getTopOfStackOrNull() {
+    if (isStackEmpty())
+      return nullptr;
+    return &Stack.back();
+  }
+  const SharingMapTy *getTopOfStackOrNull() const {
+    return const_cast<DSAStackTy&>(*this).getTopOfStackOrNull();
+  }
+  SharingMapTy &getTopOfStack() {
+    assert(!isStackEmpty() && "no current directive");
+    return *getTopOfStackOrNull();
+  }
+  const SharingMapTy &getTopOfStack() const {
+    return const_cast<DSAStackTy&>(*this).getTopOfStack();
   }
 
 public:
@@ -160,75 +194,84 @@ public:
          bool FromParent) const;
   /// Set default data sharing attribute to none.
   void setDefaultDSANone(SourceLocation Loc) {
-    assert(!isStackEmpty());
-    Stack.back().DefaultAttr = DSA_none;
-    Stack.back().DefaultAttrLoc = Loc;
+    getTopOfStack().DefaultAttr = DSA_none;
+    getTopOfStack().DefaultAttrLoc = Loc;
   }
   /// Set default data sharing attribute to shared.
   void setDefault(
       DefaultDataSharingAttributes DefaultAttr, SourceLocation Loc) {
-    assert(!isStackEmpty());
-    Stack.back().DefaultAttr = DefaultAttr;
-    Stack.back().DefaultAttrLoc = Loc;
+    getTopOfStack().DefaultAttr = DefaultAttr;
+    getTopOfStack().DefaultAttrLoc = Loc;
   }
   void setThisExpr(CXXThisExpr *ThisE) {
-    Stack.back().ThisExpr = ThisE;
+    getTopOfStack().ThisExpr = ThisE;
   }
+  /// Finds a directive which matches specified \a DPred predicate.
+  bool hasDirective(
+      const llvm::function_ref<bool(
+          OmpSsDirectiveKind, SourceLocation)>
+          DPred,
+      bool FromParent) const;
   /// Returns currently analyzed directive.
   OmpSsDirectiveKind getCurrentDirective() const {
-    return isStackEmpty() ? OSSD_unknown : Stack.back().Directive;
+    const SharingMapTy *Top = getTopOfStackOrNull();
+    return Top ? Top->Directive : OSSD_unknown;
   }
   DefaultDataSharingAttributes getCurrentDefaultDataSharingAttributtes() const {
-    return isStackEmpty() ? DSA_unspecified : Stack.back().DefaultAttr;
+    const SharingMapTy *Top = getTopOfStackOrNull();
+    return Top ? Top->DefaultAttr : DSA_unspecified;
   }
   CXXThisExpr *getThisExpr() const {
-    return isStackEmpty() ? nullptr : Stack.back().ThisExpr;
+    const SharingMapTy *Top = getTopOfStackOrNull();
+    return Top ? Top->ThisExpr : nullptr;
   }
   ArrayRef<const ValueDecl *> getCurrentLoopICVDecls() const {
     ArrayRef<const ValueDecl *> Ret;
-    if (!isStackEmpty())
-      Ret = Stack.back().LoopICVDecls;
+    if (const SharingMapTy *Top = getTopOfStackOrNull())
+      Ret = Top->LoopICVDecls;
     return Ret;
   }
 
   ArrayRef<const Expr *> getCurrentLoopICVExprs() const {
     ArrayRef<const Expr *> Ret;
-    if (!isStackEmpty())
-      Ret = Stack.back().LoopICVExprs;
+    if (const SharingMapTy *Top = getTopOfStackOrNull())
+      Ret = Top->LoopICVExprs;
     return Ret;
   }
 
   void setCurrentDirective(OmpSsDirectiveKind DKind) {
-    Stack.back().Directive = DKind;
+    getTopOfStack().Directive = DKind;
   }
 
   /// Set collapse value for the region.
   void setAssociatedLoops(unsigned Val) {
-    Stack.back().AssociatedLoops = Val;
+    getTopOfStack().AssociatedLoops = Val;
   }
   /// Return collapse value for region.
   unsigned getAssociatedLoops() const {
-    return isStackEmpty() ? 0 : Stack.back().AssociatedLoops;
+    const SharingMapTy *Top = getTopOfStackOrNull();
+    return Top ? Top->AssociatedLoops : 0;
   }
 
   /// Set collapse value for the region.
   void setSeenAssociatedLoops(unsigned Val) {
-    Stack.back().SeenAssociatedLoops = Val;
+    getTopOfStack().SeenAssociatedLoops = Val;
   }
   /// Return collapse value for region.
   unsigned getSeenAssociatedLoops() const {
-    return isStackEmpty() ? 0 : Stack.back().SeenAssociatedLoops;
+    const SharingMapTy *Top = getTopOfStackOrNull();
+    return Top ? Top->SeenAssociatedLoops : 0;
   }
 
   // Get the current scope. This is null when instantiating templates
   // Used for Reductions
   Scope *getCurScope() const {
-    return isStackEmpty() ? nullptr : Stack.back().CurScope;
+    const SharingMapTy *Top = getTopOfStackOrNull();
+    return Top ? Top->CurScope : nullptr;
   }
   ImplicitDSAs getCurImplDSAs() const {
-    assert(!isStackEmpty());
     ImplicitDSAs IDSAs;
-    for (const auto &p : Stack.back().SharingMap) {
+    for (const auto &p : getTopOfStack().SharingMap) {
       if (!p.second.Implicit)
         continue;
       switch (p.second.Attributes) {
@@ -295,7 +338,7 @@ static ValueDecl *getCanonicalDecl(ValueDecl *D) {
       getCanonicalDecl(const_cast<const ValueDecl *>(D)));
 }
 
-DSAStackTy::DSAVarData DSAStackTy::getDSA(iterator &Iter,
+DSAStackTy::DSAVarData DSAStackTy::getDSA(const_iterator &Iter,
                                           ValueDecl *D) const {
   D = getCanonicalDecl(D);
   DSAVarData DVar;
@@ -316,8 +359,7 @@ DSAStackTy::DSAVarData DSAStackTy::getDSA(iterator &Iter,
 void DSAStackTy::addDSA(const ValueDecl *D, const Expr *E, OmpSsClauseKind A,
                         bool Ignore, bool IsBase, bool Implicit) {
   D = getCanonicalDecl(D);
-  assert(!isStackEmpty() && "Data-sharing attributes stack is empty");
-  DSAInfo &Data = Stack.back().SharingMap[D];
+  DSAInfo &Data = getTopOfStack().SharingMap[D];
   Data.Attributes = A;
   Data.RefExpr = E;
   Data.Ignore = Ignore;
@@ -327,9 +369,8 @@ void DSAStackTy::addDSA(const ValueDecl *D, const Expr *E, OmpSsClauseKind A,
 
 void DSAStackTy::addLoopControlVariable(const ValueDecl *D, const Expr *E) {
   D = getCanonicalDecl(D);
-  assert(!isStackEmpty() && "Data-sharing attributes stack is empty");
-  Stack.back().LoopICVDecls.push_back(D);
-  Stack.back().LoopICVExprs.push_back(E);
+  getTopOfStack().LoopICVDecls.push_back(D);
+  getTopOfStack().LoopICVExprs.push_back(E);
 }
 
 const DSAStackTy::DSAVarData DSAStackTy::getTopDSA(ValueDecl *D,
@@ -358,8 +399,8 @@ const DSAStackTy::DSAVarData DSAStackTy::getCurrentDSA(ValueDecl *D) {
 
   auto &&IsTaskDir = [](OmpSsDirectiveKind Dir) { return true; };
   auto &&AnyClause = [](OmpSsClauseKind Clause) { return true; };
-  iterator I = Stack.rbegin();
-  iterator EndI = Stack.rend();
+  const_iterator I = begin();
+  const_iterator EndI = end();
   if (VD){
     if (I != EndI) {
       if (IsTaskDir(I->Directive)) {
@@ -378,8 +419,8 @@ DSAStackTy::hasDSA(ValueDecl *D,
                    const llvm::function_ref<bool(OmpSsDirectiveKind)> DPred,
                    bool FromParent) const {
   D = getCanonicalDecl(D);
-  iterator I = Stack.rbegin();
-  iterator EndI = Stack.rend();
+  const_iterator I = begin();
+  const_iterator EndI = end();
   if (FromParent && I != EndI)
     std::advance(I, 1);
   for (; I != EndI; std::advance(I, 1)) {
@@ -391,6 +432,21 @@ DSAStackTy::hasDSA(ValueDecl *D,
   }
   return {};
 }
+
+bool DSAStackTy::hasDirective(
+    const llvm::function_ref<bool(OmpSsDirectiveKind, SourceLocation)>
+        DPred,
+    bool FromParent) const {
+  // We look only in the enclosing region.
+  size_t Skip = FromParent ? 2 : 1;
+  for (const_iterator I = begin() + std::min(Skip, getStackSize()), E = end();
+       I != E; ++I) {
+    if (DPred(I->Directive, I->ConstructLoc))
+      return true;
+  }
+  return false;
+}
+
 
 namespace {
 class DSAAttrChecker final : public StmtVisitor<DSAAttrChecker, void> {
@@ -1084,7 +1140,7 @@ ExprResult SemaOmpSs::ActOnOSSMultiDepExpression(
           MultiDepSizeOrSection[i] ? MultidepIterUseChecker::Type::Size
             : MultidepIterUseChecker::Type::UBound).Visit(SizeExpr))
         IsError = true;
-      ExprResult Res = SemaRef.PerformImplicitConversion(SizeExpr, Context.IntTy, Sema::AA_Converting);
+      ExprResult Res = SemaRef.PerformImplicitConversion(SizeExpr, Context.IntTy, AssignmentAction::Converting);
       if (Res.isInvalid()) {
         IsError = true;
       } else {
@@ -1098,7 +1154,7 @@ ExprResult SemaOmpSs::ActOnOSSMultiDepExpression(
       if (MultidepIterUseChecker(
           SemaRef, ItVD, MultidepIterUseChecker::Type::Step).Visit(StepExpr))
         IsError = true;
-      ExprResult Res = SemaRef.PerformImplicitConversion(StepExpr, Context.IntTy, Sema::AA_Converting);
+      ExprResult Res = SemaRef.PerformImplicitConversion(StepExpr, Context.IntTy, AssignmentAction::Converting);
       if (Res.isInvalid()) {
         IsError = true;
       } else {
@@ -1542,6 +1598,20 @@ StmtResult SemaOmpSs::ActOnOmpSsTaskwaitDirective(ArrayRef<OSSClause *> Clauses,
 StmtResult SemaOmpSs::ActOnOmpSsReleaseDirective(ArrayRef<OSSClause *> Clauses,
                                             SourceLocation StartLoc,
                                             SourceLocation EndLoc) {
+  SourceLocation ReleaseLoc;
+  bool ReleaseFound = DSAStack->hasDirective(
+      [&ReleaseLoc](OmpSsDirectiveKind K, SourceLocation Loc) {
+        if (K == OSSD_taskiter || K == OSSD_taskiter_while) {
+          ReleaseLoc = Loc;
+          return true;
+        }
+        return false;
+      },
+      false /* skip top directive */);
+  if (ReleaseFound)
+    SemaRef.Diag(StartLoc, diag::err_oss_nested_directive)
+      << getOmpSsDirectiveName(OSSD_release)
+      << getOmpSsDirectiveName(OSSD_taskiter);
   ASTContext &Context = getASTContext();
   return OSSReleaseDirective::Create(Context, StartLoc, EndLoc, Clauses);
 }
@@ -2698,7 +2768,7 @@ bool OmpSsAtomicUpdateChecker::checkStatement(Stmt *S, unsigned DiagId,
     if (Update.isInvalid())
       return true;
     Update = SemaRef.PerformImplicitConversion(Update.get(), X->getType(),
-                                               Sema::AA_Casting);
+                                               AssignmentAction::Casting);
     if (Update.isInvalid())
       return true;
     UpdateExpr = Update.get();
