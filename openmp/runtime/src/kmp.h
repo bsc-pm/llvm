@@ -287,6 +287,7 @@ extern "C" {
 
 #include <nosv.h>
 #include "nosv/affinity.h"
+#include "nosv/hwinfo.h"
 #include "hsearch.h"
 extern int nosv_main_pid;
 typedef struct omp_task_type_t {
