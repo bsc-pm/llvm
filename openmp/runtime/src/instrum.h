@@ -7,8 +7,7 @@
 
 enum instr_levels {
   INSTR_0 = 0, /* Disabled */
-  INSTR_1 = 1, /* Normal */
-  INSTR_2 = 2, /* Experimental (labels) */
+  INSTR_1 = 1, /* Enabled */
 };
 
 extern int ompv_instr_level;
@@ -78,7 +77,7 @@ static inline void instr_thread_init()
     return;
 
   ovni_thread_init(__kmp_gettid());
-  ovni_thread_require("openmp", "1.1.0");
+  ovni_thread_require("openmp", "1.2.0");
 }
 
 static inline void instr_thread_end(void)
@@ -103,7 +102,7 @@ static inline void instr_type_create(uint32_t id, const char *label)
   size_t bufsize, label_len, size_left;
   uint8_t buf[1024], *p;
 
-  if (ompv_instr_level < 2)
+  if (ompv_instr_level < 1)
     return;
 
   p = buf;
@@ -331,11 +330,11 @@ INSTR_0ARG(1, instr_check_deps_exit, "PTC")
 INSTR_0ARG(1, instr_taskgroup_enter, "PTg")
 INSTR_0ARG(1, instr_taskgroup_exit, "PTG")
 
-INSTR_2ARG(2, instr_task_create, "PPc", uint32_t, task_id, uint32_t, type_id)
-INSTR_1ARG(2, instr_task_execute, "PPx", uint32_t, task_id)
-INSTR_1ARG(2, instr_task_end, "PPe", uint32_t, task_id)
+INSTR_2ARG(1, instr_task_create, "PPc", uint32_t, task_id, uint32_t, type_id)
+INSTR_1ARG(1, instr_task_execute, "PPx", uint32_t, task_id)
+INSTR_1ARG(1, instr_task_end, "PPe", uint32_t, task_id)
 
-INSTR_1ARG(2, instr_ws_execute, "PQx", uint32_t, type_id)
-INSTR_1ARG(2, instr_ws_end, "PQe", uint32_t, type_id)
+INSTR_1ARG(1, instr_ws_execute, "PQx", uint32_t, type_id)
+INSTR_1ARG(1, instr_ws_end, "PQe", uint32_t, type_id)
 
 #endif // INSTRUM_H_
