@@ -273,7 +273,7 @@ set(CLANG_DEFAULT_OBJCOPY "objcopy" CACHE STRING
 set(CLANG_DEFAULT_OPENMP_RUNTIME "libomp" CACHE STRING
   "Default OpenMP runtime used by -fopenmp.")
 
-set(CLANG_DEFAULT_OMPSS2_RUNTIME "libnanos6" CACHE STRING
+set(CLANG_DEFAULT_OMPSS2_RUNTIME "libnodes" CACHE STRING
   "Default OmpSs-2 runtime used by -fompss-2.")
 
 set(CLANG_DEFAULT_NANOS6_HOME "" CACHE STRING
