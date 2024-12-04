@@ -901,9 +901,13 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
     SkipUntil(tok::annot_pragma_ompss_end);
     break;
   case OSSD_declare_task:
-  case OSSD_assert:
     Diag(Tok, diag::err_oss_unexpected_directive)
         << 1 << getOmpSsDirectiveName(DKind);
+    SkipUntil(tok::annot_pragma_ompss_end);
+    break;
+  case OSSD_assert:
+    Diag(Tok, diag::err_oss_invalid_scope) <<
+        getOmpSsDirectiveName(DKind);
     SkipUntil(tok::annot_pragma_ompss_end);
     break;
   }

@@ -21,7 +21,7 @@ namespace A {
 }
 
 template <typename T> T foo() {
-  #pragma oss assert("") // expected-error {{unexpected OmpSs-2 directive '#pragma oss assert'}}
+  #pragma oss assert("") // expected-error {{'#pragma oss assert' directive must appear only in file scope}}
 }
 
 class C {
@@ -29,5 +29,5 @@ class C {
 };
 
 int main() {
-  #pragma oss assert("") // expected-error {{unexpected OmpSs-2 directive '#pragma oss assert'}}
+  #pragma oss assert("") // expected-error {{'#pragma oss assert' directive must appear only in file scope}}
 }
