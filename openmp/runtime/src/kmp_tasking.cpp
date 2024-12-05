@@ -5535,11 +5535,13 @@ static void __kmp_second_top_half_finish_proxy(kmp_taskdata_t *taskdata) {
       KMP_ATOMIC_DEC(&taskdata->td_parent->td_incomplete_child_tasks);
   KMP_DEBUG_ASSERT(children >= 0);
 
-  // Remove the imaginary children
-  KMP_ATOMIC_AND(&taskdata->td_incomplete_child_tasks, ~PROXY_TASK_FLAG);
 #if defined(KMP_OMPV_ENABLED)
   free_agents_wakeup_childs(taskdata);
 #endif // KMP_OMPV_ENABLED
+
+  // Remove the imaginary children
+  KMP_ATOMIC_AND(&taskdata->td_incomplete_child_tasks, ~PROXY_TASK_FLAG);
+
 }
 
 static void __kmp_bottom_half_finish_proxy(kmp_int32 gtid, kmp_task_t *ptask) {
