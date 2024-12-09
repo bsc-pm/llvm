@@ -222,17 +222,25 @@ struct OmpSsDirective {
       if (LoopInfo.LoopType[i] == DirectiveLoopInfo::GT
           || LoopInfo.LoopType[i] == DirectiveLoopInfo::GE) {
         for (size_t j = 0; j < i; ++j)
-          IRB.CreateStore(PessimistUB[j], LoopInfo.IndVar[j]);
+          IRB.CreateStore(
+            createZSExtOrTrunc(IRB, PessimistUB[j],
+                               DirEnv.getDSAType(LoopInfo.IndVar[j]), LoopInfo.IndVarSigned[j]), LoopInfo.IndVar[j]);
         LoopInfo.LBound[i].Result = IRB.CreateCall(LoopInfo.LBound[i].Fun, LoopInfo.LBound[i].Args);
         for (size_t j = 0; j < i; ++j)
-          IRB.CreateStore(PessimistLB[j], LoopInfo.IndVar[j]);
+          IRB.CreateStore(
+            createZSExtOrTrunc(IRB, PessimistLB[j],
+                               DirEnv.getDSAType(LoopInfo.IndVar[j]), LoopInfo.IndVarSigned[j]), LoopInfo.IndVar[j]);
         LoopInfo.UBound[i].Result = IRB.CreateCall(LoopInfo.UBound[i].Fun, LoopInfo.UBound[i].Args);
       } else {
         for (size_t j = 0; j < i; ++j)
-          IRB.CreateStore(PessimistLB[j], LoopInfo.IndVar[j]);
+          IRB.CreateStore(
+            createZSExtOrTrunc(IRB, PessimistLB[j],
+                               DirEnv.getDSAType(LoopInfo.IndVar[j]), LoopInfo.IndVarSigned[j]), LoopInfo.IndVar[j]);
         LoopInfo.LBound[i].Result = IRB.CreateCall(LoopInfo.LBound[i].Fun, LoopInfo.LBound[i].Args);
         for (size_t j = 0; j < i; ++j)
-          IRB.CreateStore(PessimistUB[j], LoopInfo.IndVar[j]);
+          IRB.CreateStore(
+            createZSExtOrTrunc(IRB, PessimistUB[j],
+                               DirEnv.getDSAType(LoopInfo.IndVar[j]), LoopInfo.IndVarSigned[j]), LoopInfo.IndVar[j]);
         LoopInfo.UBound[i].Result = IRB.CreateCall(LoopInfo.UBound[i].Fun, LoopInfo.UBound[i].Args);
       }
 
@@ -3145,11 +3153,11 @@ struct OmpSsDirective {
 
     Instruction *NewCloneEntryI = CloneEntryI;
     if (IsLoop) {
-      DirectiveLoopInfo FinalLoopInfo = DirInfo.DirEnv.LoopInfo;
+      DirectiveLoopInfo FinalLoopInfo = LoopInfo;
       rewriteDirInfoForFinal(FinalLoopInfo, FinalInfo.VMap);
-      NewCloneEntryI = buildLoopForTask(DirInfo.DirEnv, CloneEntryI, CloneExitI, FinalLoopInfo);
+      NewCloneEntryI = buildLoopForTask(DirEnv, CloneEntryI, CloneExitI, FinalLoopInfo);
     } else if (IsWhile) {
-      DirectiveWhileInfo FinalWhileInfo = DirInfo.DirEnv.WhileInfo;
+      DirectiveWhileInfo FinalWhileInfo = WhileInfo;
       rewriteDirInfoForFinal(FinalWhileInfo, FinalInfo.VMap);
       NewCloneEntryI = buildWhileForTask(CloneEntryI, CloneExitI, FinalWhileInfo);
     }
