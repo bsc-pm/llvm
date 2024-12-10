@@ -1192,7 +1192,13 @@ void __kmp_reap_worker(kmp_info_t *th) {
   KA_TRACE(
       10, ("__kmp_reap_worker: try to reap T#%d\n", th->th.th_info.ds.ds_gtid));
 
+#if defined(KMP_OMPV_ENABLED)
+  while ((status = pthread_tryjoin_np(th->th.th_info.ds.ds_thread, &exit_val))) {
+    nosv_yield(NOSV_YIELD_NONE);
+  }
+#else
   status = pthread_join(th->th.th_info.ds.ds_thread, &exit_val);
+#endif // KMP_OMPV_ENABLED
 #ifdef KMP_DEBUG
   /* Don't expose these to the user until we understand when they trigger */
   if (status != 0) {
