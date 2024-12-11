@@ -3496,7 +3496,7 @@ private:
         if (D->isFunctionOrFunctionTemplate()) {
           HasFunScope = true;
           Scopes.Enter(Scope::FnScope | Scope::DeclScope |
-                       Scope::CompoundStmtScope);
+                       Scope::CompoundStmtScope | Scope::OmpSsDirectiveScope);
           Actions.ActOnReenterFunctionContext(Actions.getCurScope(), D);
         }
       }

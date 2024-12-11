@@ -2,6 +2,9 @@
 // RUN: %clang_cc1 -verify=omp -fopenmp -ferror-limit 100 -o - %s
 // RUN: %clang_cc1 -verify=omp  -fompss-2 -fopenmp -ferror-limit 100 -o - %s
 
+#pragma oss task in(p[0;1])
+void bar(int *p);
+
 // This test checks that we parse the right section
 // depending on the parsing context
 void foo() {
