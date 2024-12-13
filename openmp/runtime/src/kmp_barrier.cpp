@@ -1832,13 +1832,9 @@ static int __kmp_barrier_template(enum barrier_type bt, int gtid, int is_split,
   }
 #endif
 
-// #if defined(KMP_OMPV_ENABLED)
-//   // TODO: this appears to work partially because implicit tasks
-//   // can be reused in different task_teams. My guess is that this happens
-//   // in task_teams_stress_test.cpp
-//   // Let's disable it for now 
-//   // free_agents_wait_childs(this_thr->th.th_current_task);
-// #endif // KMP_OMPV_ENABLED
+#if defined(KMP_OMPV_ENABLED)
+  free_agents_wait_childs(this_thr->th.th_current_task);
+#endif // KMP_OMPV_ENABLED
 
   if (!team->t.t_serialized) {
 #if USE_ITT_BUILD

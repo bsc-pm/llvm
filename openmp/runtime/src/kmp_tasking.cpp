@@ -757,6 +757,9 @@ void __kmp_push_current_task_to_thread(kmp_info_t *this_thr, kmp_team_t *team,
         team->t.t_implicit_task_taskdata[0].td_parent;
     this_thr->th.th_current_task = &team->t.t_implicit_task_taskdata[tid];
   }
+#if defined(KMP_OMPV_ENABLED)
+  this_thr->th.th_current_task->td_nosv_task = nosv_self();
+#endif // KMP_OMPV_ENABLED
 
   KF_TRACE(10, ("__kmp_push_current_task_to_thread(exit): T#%d this_thread=%p "
                 "curtask=%p "
@@ -1620,7 +1623,6 @@ void __kmp_init_implicit_task(ident_t *loc_ref, kmp_info_t *this_thr,
   task->td_allow_completion_event.type = KMP_EVENT_UNINITIALIZED;
 
 #if defined(KMP_OMPV_ENABLED)
-  task->td_nosv_task = nosv_self();
   // FIXME: My guess was to put this in the if (set_curr_task)
   // but the assert in the else is triggered
   KMP_ATOMIC_ST_REL(&task->td_incomplete_child_tasks_free_agent, 1);
