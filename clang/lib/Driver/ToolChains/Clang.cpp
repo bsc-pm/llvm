@@ -6699,6 +6699,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     case Driver::OSSRT_NANOS6:
     case Driver::OSSRT_NODES:
       CmdArgs.push_back("-fompss-2");
+      CmdArgs.push_back("-Wsource-uses-openmp");
       Args.AddAllArgs(CmdArgs, options::OPT_fompss_EQ);
       break;
     default:
@@ -6717,6 +6718,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     switch (D.getOpenMPRuntime(Args)) {
     case Driver::OMPRT_NOSV:
       CmdArgs.push_back("-fopenmp-nosv");
+      CmdArgs.push_back("-Wsource-uses-ompss-2");
       LLVM_FALLTHROUGH;
     case Driver::OMPRT_OMP:
     case Driver::OMPRT_IOMP5:
