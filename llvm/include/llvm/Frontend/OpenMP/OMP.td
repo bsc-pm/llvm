@@ -1571,6 +1571,9 @@ def OMP_ParallelFor : Directive<"parallel for"> {
     VersionedClause<OMPC_Schedule>,
     VersionedClause<OMPC_Shared>,
   ];
+  let allowedOnceClauses = [
+    VersionedClause<OMPC_Label>
+  ];
   let leafConstructs = [OMP_Parallel, OMP_For];
   let category = CA_Executable;
 }
