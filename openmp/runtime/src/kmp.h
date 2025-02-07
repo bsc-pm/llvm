@@ -2337,7 +2337,11 @@ typedef struct kmp_win32_cond {
 union KMP_ALIGN_CACHE kmp_cond_union {
   double c_align;
   char c_pad[CACHE_LINE];
+#if defined(KMP_OMPV_ENABLED)
+  nosv_cond_t c_cond;
+#else
   pthread_cond_t c_cond;
+#endif // KMP_OMPV_ENABLED
 };
 
 typedef union kmp_cond_union kmp_cond_align_t;
@@ -3172,9 +3176,7 @@ typedef struct KMP_ALIGN_CACHE kmp_base_info {
   std::atomic<bool> th_blocking;
 #endif
   kmp_cg_root_t *th_cg_roots; // list of cg_roots associated with this thread
-#if defined(KMP_OMPV_ENABLED)
-  nosv_task_t th_nosv_task;
-#endif // KMP_OMPV_ENABLED
+
 } kmp_base_info_t;
 
 typedef union KMP_ALIGN_CACHE kmp_info {
