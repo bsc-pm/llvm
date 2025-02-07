@@ -3484,9 +3484,11 @@ void *__kmp_task_reduction_init(int gtid, int num, T *data) {
     // that inits middle we can't use __kmp_avail_proc.
     //
     // In this situations trust nOS-V
+    // FIX: In the end if we are coexecuting
+    // we need to use nosv cpus
     if (__kmp_init_middle) {
-      KMP_ASSERT(__kmp_avail_proc == nosv_get_num_cpus());
-      nth = __kmp_avail_proc;
+      KMP_ASSERT(__kmp_avail_proc <= nosv_get_num_cpus());
+      nth = nosv_get_num_cpus();
     } else {
       nth = nosv_get_num_cpus();
     }
@@ -3632,8 +3634,8 @@ void *__kmpc_task_reduction_get_th_data(int gtid, void *tskgrp, void *data) {
 #if defined(KMP_OMPV_ENABLED)
   // Arrange as many private copies as all available cores
   if (__kmp_enable_free_agents) {
-    KMP_ASSERT(__kmp_avail_proc == nosv_get_num_cpus());
-    nth = __kmp_avail_proc;
+    KMP_ASSERT(__kmp_avail_proc <= nosv_get_num_cpus());
+    nth = nosv_get_num_cpus();
   }
 #endif // KMP_OMPV_ENABLED
   if (nth == 1)
@@ -3715,8 +3717,8 @@ static void __kmp_task_reduction_fini(kmp_info_t *th, kmp_taskgroup_t *tg) {
 #if defined(KMP_OMPV_ENABLED)
   // Arrange as many private copies as all available cores
   if (__kmp_enable_free_agents) {
-    KMP_ASSERT(__kmp_avail_proc == nosv_get_num_cpus());
-    nth = __kmp_avail_proc;
+    KMP_ASSERT(__kmp_avail_proc <= nosv_get_num_cpus());
+    nth = nosv_get_num_cpus();
   }
 #endif // KMP_OMPV_ENABLED
   KMP_DEBUG_ASSERT(
