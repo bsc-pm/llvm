@@ -4323,7 +4323,19 @@ static int __kmp_reset_root(int gtid, kmp_root_t *root) {
 
 void __kmp_unregister_root_current_thread(int gtid) {
 #if defined(KMP_OMPV_ENABLED)
-  free_agents_wait_childs(__kmp_threads[gtid]->th.th_current_task);
+  // At this point all the workers have finished its parallel region
+  // decrement the counter
+  {
+    kmp_info_t *thread = __kmp_threads[gtid];
+    kmp_task_team_t *task_team = thread->th.th_task_team;
+    if (task_team) {
+      kmp_int32 children = -task_team->tt.tt_nproc + KMP_ATOMIC_SUB(&task_team->tt.tt_unfinished_tasks, task_team->tt.tt_nproc);
+      KMP_ASSERT(children >= 0);
+      free_agents_wait_unfinished(children);
+      // Readd to bypass __kmp_task_team_wait
+      KMP_ATOMIC_ADD(&task_team->tt.tt_unfinished_tasks, task_team->tt.tt_nproc);
+    }
+  }
 #endif // KMP_OMPV_ENABLED
   KA_TRACE(1, ("__kmp_unregister_root_current_thread: enter T#%d\n", gtid));
   /* this lock should be ok, since unregister_root_current_thread is never

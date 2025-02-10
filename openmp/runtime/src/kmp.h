@@ -305,6 +305,8 @@ extern struct htab *label_to_task_type_map;
 extern kmp_bootstrap_lock_t label_to_task_type_lock;
 
 void __kmp_nosv_attach(nosv_task_t *nosv_impl_task, void *thr);
+void free_agents_wait_unfinished(kmp_int32 counter);
+void free_agents_wakeup_unfinished(kmp_int32 counter);
 void free_agents_wait_childs(kmp_taskdata_t *taskdata);
 void free_agents_wakeup_childs(kmp_taskdata_t *taskdata);
 // forward declarations

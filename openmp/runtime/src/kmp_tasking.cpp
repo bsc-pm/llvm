@@ -30,6 +30,22 @@ void __kmp_init_target_task() {
 #endif
 
 #if defined(KMP_OMPV_ENABLED)
+void free_agents_wait_unfinished(kmp_int32 counter) {
+  if (__kmp_enable_free_agents) {
+    if (counter != 0)
+      nosv_pause(0);
+  }
+}
+void free_agents_wakeup_unfinished(kmp_int32 counter) {
+  if (__kmp_enable_free_agents) {
+    if (counter == 0) {
+      kmp_team_t *team = __kmp_get_thread()->th.th_team;
+      kmp_info_t *master_th = team->t.t_threads[0];
+      int status = nosv_submit(master_th->th.th_current_task->td_nosv_task, NOSV_SUBMIT_UNLOCKED);
+      KMP_ASSERT(status == 0);
+    }
+  }
+}
 void free_agents_wait_childs(kmp_taskdata_t *taskdata) {
   if (__kmp_enable_free_agents) {
     kmp_int32 children_free_agent = -1 + KMP_ATOMIC_DEC(&taskdata->td_incomplete_child_tasks_free_agent);
@@ -1223,7 +1239,9 @@ static void __kmp_task_finish_complete(kmp_int32 gtid, kmp_task_t *task) {
 
   kmp_int32 counter = -1 +
     KMP_ATOMIC_DEC(&task_team->tt.tt_unfinished_tasks);
-  KMP_DEBUG_ASSERT(counter >= 0);
+  KMP_ASSERT(counter >= 0);
+
+  free_agents_wakeup_unfinished(counter);
 }
 #endif // KMP_OMPV_ENABLED
 
@@ -1659,9 +1677,6 @@ void __kmp_init_implicit_task(ident_t *loc_ref, kmp_info_t *this_thr,
 // thread:  thread data structure corresponding to implicit task
 void __kmp_finish_implicit_task(kmp_info_t *thread) {
   kmp_taskdata_t *task = thread->th.th_current_task;
-#if defined(KMP_OMPV_ENABLED)
-  free_agents_wait_childs(task);
-#endif // KMP_OMPV_ENABLED
   if (task->td_dephash) {
     int children;
     task->td_flags.complete = 1;
@@ -5320,6 +5335,8 @@ void __kmp_task_team_wait(
       kmp_int32 children = -task_team->tt.tt_nproc + KMP_ATOMIC_SUB(&task_team->tt.tt_unfinished_tasks, task_team->tt.tt_nproc);
       KMP_ASSERT(children >= 0);
 
+      free_agents_wait_unfinished(children);
+
       kmp_flag_32<false, false> flag_unfinished(
           RCAST(std::atomic<kmp_uint32> *,
                 &task_team->tt.tt_unfinished_tasks),
@@ -5576,7 +5593,9 @@ static void __kmp_bottom_half_finish_proxy(kmp_int32 gtid, kmp_task_t *ptask) {
       thread->th.th_task_team; // might be NULL for serial teams...
   kmp_int32 counter = -1 +
     KMP_ATOMIC_DEC(&task_team->tt.tt_unfinished_tasks);
-  KMP_DEBUG_ASSERT(counter >= 0);
+  KMP_ASSERT(counter >= 0);
+
+  free_agents_wakeup_unfinished(counter);
 #endif // KMP_OMPV_ENABLED
 
 }

@@ -1832,10 +1832,6 @@ static int __kmp_barrier_template(enum barrier_type bt, int gtid, int is_split,
   }
 #endif
 
-#if defined(KMP_OMPV_ENABLED)
-  free_agents_wait_childs(this_thr->th.th_current_task);
-#endif // KMP_OMPV_ENABLED
-
   if (!team->t.t_serialized) {
 #if USE_ITT_BUILD
     // This value will be used in itt notify events below.
