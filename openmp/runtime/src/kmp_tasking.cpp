@@ -30,6 +30,26 @@ void __kmp_init_target_task() {
 #endif
 
 #if defined(KMP_OMPV_ENABLED)
+void free_agents_wait_barrier(kmp_info_t *this_thr, int tid) {
+  if (__kmp_enable_free_agents) {
+    // First barrier
+    int res = nosv_barrier_wait(this_thr->th.th_team->t.nosv_bar);
+    KMP_ASSERT(res == 0);
+    // Now we know if there are tasks or not
+    kmp_task_team_t *task_team = this_thr->th.th_task_team;
+
+    KMP_DEBUG_ASSERT(__kmp_tasking_mode != tskm_immediate_exec);
+
+    if ((task_team != NULL) && KMP_TASKING_ENABLED(task_team)) {
+      if (!KMP_MASTER_TID(tid)) {
+        // Pause workers here until master gets the signal all tasks
+        // have been executed
+        int res = nosv_barrier_wait(this_thr->th.th_team->t.nosv_bar);
+        KMP_ASSERT(res == 0);
+      }
+    }
+  }
+}
 void free_agents_wait_unfinished(kmp_int32 counter) {
   if (__kmp_enable_free_agents) {
     if (counter != 0)
@@ -5342,6 +5362,11 @@ void __kmp_task_team_wait(
                 &task_team->tt.tt_unfinished_tasks),
           0U);
       flag_unfinished.wait(this_thr, FALSE USE_ITT_BUILD_ARG(itt_sync_obj));
+
+      if (__kmp_enable_free_agents) {
+        int res = nosv_barrier_wait(this_thr->th.th_team->t.nosv_bar);
+        KMP_ASSERT(res == 0);
+      }
 
       kmp_flag_32<false, false> flag(
           RCAST(std::atomic<kmp_uint32> *,

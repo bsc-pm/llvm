@@ -305,6 +305,8 @@ extern struct htab *label_to_task_type_map;
 extern kmp_bootstrap_lock_t label_to_task_type_lock;
 
 void __kmp_nosv_attach(nosv_task_t *nosv_impl_task, void *thr);
+typedef union kmp_info kmp_info_t;
+void free_agents_wait_barrier(kmp_info_t *this_thr, int tid);
 void free_agents_wait_unfinished(kmp_int32 counter);
 void free_agents_wakeup_unfinished(kmp_int32 counter);
 void free_agents_wait_childs(kmp_taskdata_t *taskdata);
@@ -3321,6 +3323,9 @@ typedef struct KMP_ALIGN_CACHE kmp_base_team {
 #endif /* USE_ITT_BUILD */
   distributedBarrier *b; // Distributed barrier data associated with team
   kmp_nested_nthreads_t *t_nested_nth;
+#if defined(KMP_OMPV_ENABLED)
+  nosv_barrier_t nosv_bar;
+#endif // KMP_OMPV_ENABLED
 } kmp_base_team_t;
 
 // Assert that the list structure fits and aligns within

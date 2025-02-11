@@ -1921,6 +1921,10 @@ static int __kmp_barrier_template(enum barrier_type bt, int gtid, int is_split,
 
     KMP_MB();
 
+#if defined(KMP_OMPV_ENABLED)
+    free_agents_wait_barrier(this_thr, tid);
+#endif // KMP_OMPV_ENABLED
+
     if (KMP_MASTER_TID(tid)) {
       status = 0;
       if (__kmp_tasking_mode != tskm_immediate_exec && !cancelled) {
@@ -2336,6 +2340,10 @@ void __kmp_join_barrier(int gtid) {
      by the primary thread - it is unsafe to reference it in any of the worker
      threads. Any per-team data items that need to be referenced before the
      end of the barrier should be moved to the kmp_task_team_t structs.  */
+
+#if defined(KMP_OMPV_ENABLED)
+  free_agents_wait_barrier(this_thr, tid);
+#endif // KMP_OMPV_ENABLED
 
   if (KMP_MASTER_TID(tid)) {
     if (__kmp_tasking_mode != tskm_immediate_exec) {

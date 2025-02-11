@@ -1715,6 +1715,12 @@ __kmp_fork_in_teams(ident_t *loc, int gtid, kmp_team_t *parent_team,
         __kmp_add_threads_to_team(parent_team, master_set_numthreads);
       }
       parent_team->t.t_nproc = master_set_numthreads;
+#if defined(KMP_OMPV_ENABLED)
+      int res = nosv_barrier_destroy(parent_team->t.nosv_bar);
+      KMP_ASSERT(res == 0);
+      res = nosv_barrier_init(&parent_team->t.nosv_bar, NOSV_BARRIER_NONE, parent_team->t.t_nproc);
+      KMP_ASSERT(res == 0);
+#endif // KMP_OMPV_ENABLED
       for (i = 0; i < master_set_numthreads; ++i) {
         other_threads[i]->th.th_team_nproc = master_set_numthreads;
       }
@@ -4891,6 +4897,13 @@ static void __kmp_reinitialize_team(kmp_team_t *team,
   __kmp_init_implicit_task(loc, team->t.t_threads[0], team, 0, FALSE);
   copy_icvs(&team->t.t_implicit_task_taskdata[0].td_icvs, new_icvs);
 
+#if defined(KMP_OMPV_ENABLED)
+  int res = nosv_barrier_destroy(team->t.nosv_bar);
+  KMP_ASSERT(res == 0);
+  res = nosv_barrier_init(&team->t.nosv_bar, NOSV_BARRIER_NONE, team->t.t_nproc);
+  KMP_ASSERT(res == 0);
+#endif // KMP_OMPV_ENABLED
+
   KF_TRACE(10, ("__kmp_reinitialize_team: exit this_thread=%p team=%p\n",
                 team->t.t_threads[0], team));
 }
@@ -4944,6 +4957,11 @@ static void __kmp_initialize_team(kmp_team_t *team, int new_nproc,
 #endif
 
   team->t.t_control_stack_top = NULL;
+
+#if defined(KMP_OMPV_ENABLED)
+  int res = nosv_barrier_init(&team->t.nosv_bar, NOSV_BARRIER_NONE, team->t.t_nproc);
+  KMP_ASSERT(res == 0);
+#endif // KMP_OMPV_ENABLED
 
   __kmp_reinitialize_team(team, new_icvs, loc);
 
@@ -6003,6 +6021,11 @@ kmp_team_t *__kmp_reap_team(kmp_team_t *team) {
   KMP_DEBUG_ASSERT(team->t.t_argv);
 
   /* TODO clean the threads that are a part of this? */
+
+#if defined(KMP_OMPV_ENABLED)
+  int res = nosv_barrier_destroy(team->t.nosv_bar);
+  KMP_ASSERT(res == 0);
+#endif // KMP_OMPV_ENABLED
 
   /* free stuff */
   __kmp_free_team_arrays(team);
