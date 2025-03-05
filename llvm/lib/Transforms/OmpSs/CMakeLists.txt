@@ -14,4 +14,5 @@ add_llvm_component_library(LLVMOmpSs
   Analysis
   Core
   Support
+  TransformUtils
   )

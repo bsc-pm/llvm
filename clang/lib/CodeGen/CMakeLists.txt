@@ -25,6 +25,7 @@ set(LLVM_LINK_COMPONENTS
   MC
   ObjCARCOpts
   Object
+  OmpSs
   Passes
   ProfileData
   ScalarOpts
