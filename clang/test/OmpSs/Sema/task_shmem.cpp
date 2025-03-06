@@ -1,6 +1,6 @@
 // RUN: %clang_cc1 -verify -fompss-2 -ferror-limit 100 -o - -std=c++11 %s
 
-#pragma oss task device(cuda) shmem(1) // expected-error {{shmem clause requires ndrange clause to be specified}}
+#pragma oss task device(cuda) shmem(1) // expected-error {{shmem clause requires ndrange or grid clause to be specified}}
 void foo0();
 #pragma oss task device(cuda) ndrange(1, 1, 1) shmem() // expected-error {{expected expression}}
 void foo1();

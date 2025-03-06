@@ -4378,7 +4378,8 @@ static bool checkNdrangeOrGrid(
   }
   if (NumDims + 1 != ClauseVars.size() &&
       NumDims*2 + 1 != ClauseVars.size()) {
-    S.Diag(Loc, diag::err_oss_ndrange_expect_nelems)  // TODO(oss/grid): mention grid
+    S.Diag(Loc, diag::err_oss_ndrange_or_grid_expect_nelems)
+      << getOmpSsClauseName(CKind)
       << NumDims << NumDims << NumDims*2 << ClauseVars.size() - 1;
     return false;
   }
@@ -4749,8 +4750,9 @@ SemaOmpSs::DeclGroupPtrTy SemaOmpSs::ActOnOmpSsDeclareTaskDirective(
   }
 
   if (!Grids.empty()) {
-    if (DevType != OSSTaskDeclAttr::DeviceType::Cuda)
-      {}//TODO(oss/grid): Diag(DeviceLoc, diag::err_oss_grid_incompatible_device);
+    if (!(DevType == OSSTaskDeclAttr::DeviceType::Cuda
+        || DevType == OSSTaskDeclAttr::DeviceType::Opencl))
+      Diag(DeviceLoc, diag::err_oss_ndrange_or_grid_incompatible_device) << getOmpSsClauseName(OSSC_grid);
 
     checkNdrangeOrGrid(OSSC_grid, SemaRef, GridLoc, Grids, GridsRes, /*Outline=*/true);
   }
@@ -4759,12 +4761,14 @@ SemaOmpSs::DeclGroupPtrTy SemaOmpSs::ActOnOmpSsDeclareTaskDirective(
   if (!Ndranges.empty()) {
     if (!(DevType == OSSTaskDeclAttr::DeviceType::Cuda
         || DevType == OSSTaskDeclAttr::DeviceType::Opencl))
-      Diag(DeviceLoc, diag::err_oss_ndrange_incompatible_device);
+      Diag(DeviceLoc, diag::err_oss_ndrange_or_grid_incompatible_device) << getOmpSsClauseName(OSSC_ndrange);
 
     checkNdrangeOrGrid(OSSC_ndrange, SemaRef, NdrangeLoc, Ndranges, NdrangesRes, /*Outline=*/true);
-  } else if (Shmem) {
-    // It is an error to specify shmem without ndrange
-    Diag(Shmem->getExprLoc(), diag::err_oss_shmem_without_ndrange); // TODO(oss/grid): mention grid
+  }
+  
+  if (Shmem && Grids.empty() && Ndranges.empty()) {
+    // It is an error to specify shmem without ndrange or grid
+    Diag(Shmem->getExprLoc(), diag::err_oss_shmem_without_ndrange_or_grid);
   }
 
   // FIXME: the specs says the underlying type of a enum

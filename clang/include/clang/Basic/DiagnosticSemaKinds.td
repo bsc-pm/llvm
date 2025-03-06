@@ -12093,14 +12093,14 @@ def err_oss_reduction_depend_conflict : Error<
   "variable %0 conflicts between dependency and reduction clause">;
 def err_oss_clause_expect_constant_between : Error<
   "expected value between %0 and %1, but got %2 in '%3' clause">;
-def err_oss_ndrange_expect_nelems : Error<
-  "'ndrange(%0, argument-list)' clause requires %1 or %2 arguments in argument-list, but got %3">;
-def err_oss_ndrange_incompatible_device : Error<
-  "ndrange cannot be used with other devices than cuda and opencl">;
+def err_oss_ndrange_or_grid_expect_nelems : Error<
+  "'%0(%1, argument-list)' clause requires %2 or %3 arguments in argument-list, but got %4">;
+def err_oss_ndrange_or_grid_incompatible_device : Error<
+  "%0 cannot be used with other devices than cuda and opencl">;
 def err_oss_inline_device_not_supported : Error<
   "device(%0) is not supported in inline directives">;
-def err_oss_shmem_without_ndrange : Error<
-  "shmem clause requires ndrange clause to be specified">;
+def err_oss_shmem_without_ndrange_or_grid : Error<
+  "shmem clause requires ndrange or grid clause to be specified">;
 
 def err_oss_call_expr_support : Error<
   "call expressions are not supported">;

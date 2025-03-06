@@ -84,8 +84,10 @@ attributes #1 = { nounwind }
 ; CHECK-NEXT:    [[GEP_DEV_SHM13:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN_0]], ptr [[TMP6]], i32 0, i32 6, !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = zext i32 [[TMP0]] to i64, !dbg [[DBG11]]
 ; CHECK-NEXT:    store i64 [[TMP7]], ptr [[GEP_DEV_SHM13]], align 8, !dbg [[DBG11]]
-; CHECK-NEXT:    [[GEP_CALL_ARG14:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN_0]], ptr [[TMP6]], i32 0, i32 7, !dbg [[DBG11]]
-; CHECK-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 4 [[GEP_CALL_ARG14]], ptr align 4 [[CALL_ARG]], i64 4, i1 false), !dbg [[DBG11]]
+; CHECK-NEXT:    [[GEP_DEV_IS_GRID14:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN_0]], ptr [[TMP6]], i32 0, i32 7, !dbg [[DBG11]]
+; CHECK-NEXT:    store i32 0, ptr [[GEP_DEV_IS_GRID14]], align 4, !dbg [[DBG11]]
+; CHECK-NEXT:    [[GEP_CALL_ARG15:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN_0]], ptr [[TMP6]], i32 0, i32 8, !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 4 [[GEP_CALL_ARG15]], ptr align 4 [[CALL_ARG]], i64 4, i1 false), !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = load ptr, ptr [[TMP4]], align 8, !dbg [[DBG11]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP8]]), !dbg [[DBG11]]
 ; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP3]]), !dbg [[DBG11]]
@@ -116,7 +118,9 @@ attributes #1 = { nounwind }
 ; CHECK-NEXT:    [[GEP_DEV_SHM:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN]], ptr [[TMP10]], i32 0, i32 6, !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = zext i32 [[TMP0]] to i64, !dbg [[DBG11]]
 ; CHECK-NEXT:    store i64 [[TMP11]], ptr [[GEP_DEV_SHM]], align 8, !dbg [[DBG11]]
-; CHECK-NEXT:    [[GEP_CALL_ARG:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN]], ptr [[TMP10]], i32 0, i32 7, !dbg [[DBG11]]
+; CHECK-NEXT:    [[GEP_DEV_IS_GRID:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN]], ptr [[TMP10]], i32 0, i32 7, !dbg [[DBG11]]
+; CHECK-NEXT:    store i32 0, ptr [[GEP_DEV_IS_GRID]], align 4, !dbg [[DBG11]]
+; CHECK-NEXT:    [[GEP_CALL_ARG:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN]], ptr [[TMP10]], i32 0, i32 8, !dbg [[DBG11]]
 ; CHECK-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 4 [[GEP_CALL_ARG]], ptr align 4 [[CALL_ARG]], i64 4, i1 false), !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = load ptr, ptr [[TMP2]], align 8, !dbg [[DBG11]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP12]]), !dbg [[DBG11]]
@@ -148,7 +152,7 @@ attributes #1 = { nounwind }
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_main
 ; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) {
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[GEP_CALL_ARG:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN:%.*]], ptr [[TASK_ARGS]], i32 0, i32 7
+; CHECK-NEXT:    [[GEP_CALL_ARG:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN:%.*]], ptr [[TASK_ARGS]], i32 0, i32 8
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
 ; CHECK-NEXT:    br i1 [[TMP0]], label [[TLATE_IF:%.*]], label [[TLATE_END:%.*]]
 ; CHECK:       end:
@@ -180,7 +184,7 @@ attributes #1 = { nounwind }
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_main.5
 ; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) {
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[GEP_CALL_ARG:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN_0:%.*]], ptr [[TASK_ARGS]], i32 0, i32 7
+; CHECK-NEXT:    [[GEP_CALL_ARG:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN_0:%.*]], ptr [[TASK_ARGS]], i32 0, i32 8
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
 ; CHECK-NEXT:    br i1 [[TMP0]], label [[TLATE_IF:%.*]], label [[TLATE_END:%.*]]
 ; CHECK:       end:
