@@ -4603,7 +4603,7 @@ SemaOmpSs::DeclGroupPtrTy SemaOmpSs::ActOnOmpSsDeclareTaskDirective(
   ExprResult IfRes, FinalRes, CostRes, PriorityRes, ShmemRes, OnreadyRes;
   SmallVector<Expr *, 2> LabelsRes;
   SmallVector<Expr *, 4> NdrangesRes;
-  SmallVector<Expr *, 4> GridsRes;
+  SmallVector<Expr *, 6> GridsRes;
   OSSTaskDeclAttr::DeviceType DevType = OSSTaskDeclAttr::DeviceType::Unknown;
   if (Immediate) {
     ImmediateRes = VerifyBooleanConditionWithCleanups(Immediate, Immediate->getExprLoc());
@@ -5744,6 +5744,9 @@ SemaOmpSs::ActOnOmpSsVarListClause(
   case OSSC_ndrange:
     Res = ActOnOmpSsNdrangeClause(Vars, StartLoc, LParenLoc, EndLoc);
     break;
+  case OSSC_grid:
+    Res = ActOnOmpSsGridClause(Vars, StartLoc, LParenLoc, EndLoc);
+    break;
   case OSSC_depend:
     Res = ActOnOmpSsDependClause(DepKinds, DepLoc, ColonLoc, Vars,
                                  StartLoc, LParenLoc, EndLoc);
@@ -6153,7 +6156,7 @@ SemaOmpSs::ActOnOmpSsNdrangeClause(ArrayRef<Expr *> Vars,
                        SourceLocation StartLoc,
                        SourceLocation LParenLoc,
                        SourceLocation EndLoc) {
-  SmallVector<Expr *, 4> ClauseVars;
+  SmallVector<Expr *, 6> ClauseVars;
   if (!checkNdrange(SemaRef, StartLoc, Vars, ClauseVars, /*Outline=*/false))
     return nullptr;
 
@@ -6167,9 +6170,8 @@ SemaOmpSs::ActOnOmpSsGridClause(ArrayRef<Expr *> Vars,
                        SourceLocation LParenLoc,
                        SourceLocation EndLoc) {
   SmallVector<Expr *, 4> ClauseVars;
-  // TODO(oss/grid): grid sema
-  //if (!checkNdrange(SemaRef, StartLoc, Vars, ClauseVars, /*Outline=*/false))
-  //  return nullptr;
+  if (!checkGrid(SemaRef, StartLoc, Vars, ClauseVars, /*Outline=*/false))
+    return nullptr;
 
   return OSSGridClause::Create(
       SemaRef.Context, StartLoc, LParenLoc, EndLoc, ClauseVars);

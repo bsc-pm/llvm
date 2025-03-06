@@ -109,8 +109,8 @@ struct OmpSsDirective {
   PointerType *PtrTy;
   bool HasDevice;
 
-  // 6 for ndrange and 1 for shm_size
-  const size_t DeviceArgsSize = 7;
+  // 6 for ndrange/grid, 1 for shm_size and 1 for is_grid
+  const size_t DeviceArgsSize = 8;
   nanos6Api::Nanos6MultidepFactory MultidepFactory;
   // This is a hack to move some instructions to its corresponding functions
   // at the end of the pass.
@@ -1639,6 +1639,9 @@ struct OmpSsDirective {
       // size_t shm_size;
       TaskArgsMemberTy.push_back(Int64Ty);
       TaskArgsIdx++;
+      // int is_grid;
+      TaskArgsMemberTy.push_back(Int32Ty);
+      TaskArgsIdx++;
 
       // Give priority to the device all arguments
       for (Value *V : DeviceInfo.CallOrder) {
@@ -2696,6 +2699,13 @@ struct OmpSsDirective {
         IRB.CreateStore(
           ConstantInt::get(Int64Ty, 0), GEP);
       }
+      // int is_grid;
+      Idx[0] = Constant::getNullValue(Int32Ty);
+      Idx[1] = ConstantInt::get(Int32Ty, DevGEPIdx++);
+      GEP = IRB.CreateGEP(
+          TaskArgsTy,
+          TaskArgsVarL, Idx, "gep_dev_is_grid");
+      IRB.CreateStore(ConstantInt::get(Int32Ty, DeviceInfo.IsGrid ? 1 : 0), GEP);
     }
 
     // First point VLAs to its according space in task args

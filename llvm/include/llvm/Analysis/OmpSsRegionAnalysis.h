@@ -156,6 +156,7 @@ struct DirectiveDeviceInfo {
   size_t NumDims = 0;
   SmallVector<Value *, 4> Ndrange;
   bool HasLocalSize = true;
+  bool IsGrid = false;
   // Call order args must be first in the task args
   SmallVector<Value *, 4> CallOrder;
   Value *Shmem = nullptr;
@@ -318,6 +319,7 @@ private:
   void gatherWaitInfo(OperandBundleDef &OBDef);
   void gatherDeviceInfo(OperandBundleDef &OBDef);
   void gatherDeviceNdrangeInfo(OperandBundleDef &OBDef);
+  void gatherDeviceGridInfo(OperandBundleDef &OBDef);
   void gatherDeviceDevFuncInfo(OperandBundleDef &OBDef);
   void gatherDeviceCallOrderInfo(OperandBundleDef &OBDef);
   void gatherDeviceShmemInfo(OperandBundleDef &OBDef);

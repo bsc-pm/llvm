@@ -68,6 +68,7 @@ enum OmpSsBundleKind {
   OSSB_update,
   OSSB_device,
   OSSB_device_ndrange,
+  OSSB_device_grid,
   OSSB_device_dev_func,
   OSSB_device_call_order,
   OSSB_device_shmem,
@@ -3017,6 +3018,7 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
 
   bool IsMethodCall = false;
   bool HasNdrange = false;
+  bool HasGrid = false;
   if (const auto *CXXE = dyn_cast<CXXMemberCallExpr>(CE)) {
     IsMethodCall = true;
     const Expr *callee = CXXE->getCallee()->IgnoreParens();
@@ -3216,8 +3218,18 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       TaskInfo.emplace_back(
           getBundleStr(OSSB_device_ndrange), Result);
     }
+    if (Attr->grids_size() > 0) {
+      HasGrid = true;
+      SmallVector<llvm::Value *, 6> Result;
+      for (const Expr *E : Attr->grids()) {
+        llvm::Value *V = CGF.EmitScalarExpr(E);
+        Result.push_back(V);
+      }
+      TaskInfo.emplace_back(
+          getBundleStr(OSSB_device_grid), Result);
+    }
     if (Attr->getShmemExpr()) {
-      assert(HasNdrange && "shmem clause requires ndrange too");
+      assert((HasNdrange || HasGrid) && "shmem clause requires ndrange or grid too");
       llvm::Value *V = CGF.EmitScalarExpr(Attr->getShmemExpr());
       TaskInfo.emplace_back(getBundleStr(OSSB_device_shmem), V);
     }
@@ -3227,7 +3239,7 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
     }
 
     // Annotate device call arguments order.
-    if (HasNdrange)
+    if (HasNdrange || HasGrid)
       TaskInfo.emplace_back(
           getBundleStr(OSSB_device_call_order), CallValues);
 
@@ -3483,7 +3495,7 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   // Pure task outlines (with ndrange) do not have a defined function
   // so do not emit a call to it to avoid linking issues.
   RValue RV = RValue::get(nullptr);
-  if (!HasNdrange) {
+  if (!HasNdrange && !HasGrid) {
     // From EmitCallExpr
     if (IsMethodCall) {
       assert(NewME && "Expected a call_arg MemberExpr");

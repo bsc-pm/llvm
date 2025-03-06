@@ -1053,6 +1053,7 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
   case OSSC_private:
   case OSSC_firstprivate:
   case OSSC_ndrange:
+  case OSSC_grid:
   case OSSC_depend:
   case OSSC_reduction:
   case OSSC_in:

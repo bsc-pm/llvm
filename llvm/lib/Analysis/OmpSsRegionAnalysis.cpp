@@ -305,6 +305,15 @@ void DirectiveEnvironment::gatherDeviceNdrangeInfo(OperandBundleDef &OB) {
   DeviceInfo.NumDims = cast<ConstantInt>(OB.inputs()[0])->getZExtValue();
   for (size_t i = 1; i < OB.input_size(); i++)
     DeviceInfo.Ndrange.push_back(OB.inputs()[i]);
+  DeviceInfo.IsGrid = false;
+}
+
+void DirectiveEnvironment::gatherDeviceGridInfo(OperandBundleDef &OB) {
+  assert(DeviceInfo.Ndrange.empty() && "Only allowed one OperandBundle with this Id");
+  DeviceInfo.NumDims = 3;
+  for (size_t i = 0; i < OB.input_size(); i++)
+    DeviceInfo.Ndrange.push_back(OB.inputs()[i]);
+  DeviceInfo.IsGrid = true;
 }
 
 void DirectiveEnvironment::gatherDeviceDevFuncInfo(OperandBundleDef &OB) {
@@ -770,6 +779,9 @@ DirectiveEnvironment::DirectiveEnvironment(const Instruction *I) {
       break;
     case LLVMContext::OB_oss_device_ndrange:
       gatherDeviceNdrangeInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_device_grid:
+      gatherDeviceGridInfo(OBDef);
       break;
     case LLVMContext::OB_oss_device_dev_func:
       gatherDeviceDevFuncInfo(OBDef);

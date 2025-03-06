@@ -363,6 +363,11 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
          "oss_device_ndrange operand bundle id drifted!");
   (void)OSSDeviceNdrangeEntry;
 
+  auto *OSSDeviceGridEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEVICE.GRID");
+  assert(OSSDeviceGridEntry->second == LLVMContext::OB_oss_device_grid &&
+         "oss_device_grid operand bundle id drifted!");
+  (void)OSSDeviceGridEntry;
+
   auto *OSSDeviceDevFuncEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEVICE.DEVFUNC");
   assert(OSSDeviceDevFuncEntry->second == LLVMContext::OB_oss_device_dev_func &&
          "oss_device_dev_func operand bundle id drifted!");
