@@ -4279,7 +4279,8 @@ def OSSTaskDecl : Attr {
     VariadicUnsignedArgument<"ReductionClauseType">,
     VariadicNestedNameSpecifierLocArgument<"NameSpecifierLocs">,
     VariadicDeclarationNameInfoArgument<"DeclNameInfos">,
-    VariadicExprArgument<"Ndranges">
+    VariadicExprArgument<"Ndranges">,
+    VariadicExprArgument<"Grids">
   ];
   let AdditionalMembers = [{
     void printPrettyPragma(raw_ostream & OS, const PrintingPolicy &Policy)

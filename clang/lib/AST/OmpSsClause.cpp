@@ -216,6 +216,24 @@ OSSNdrangeClause *OSSNdrangeClause::CreateEmpty(const ASTContext &C, unsigned N)
   return new (Mem) OSSNdrangeClause(N);
 }
 
+OSSGridClause *OSSGridClause::Create(const ASTContext &C,
+                                     SourceLocation StartLoc,
+                                     SourceLocation LParenLoc,
+                                     SourceLocation EndLoc,
+                                     ArrayRef<Expr *> VL) {
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(VL.size()));
+  OSSGridClause *Clause =
+      new (Mem) OSSGridClause(StartLoc, LParenLoc, EndLoc, VL.size());
+  Clause->setVarRefs(VL);
+  return Clause;
+}
+
+OSSGridClause *OSSGridClause::CreateEmpty(const ASTContext &C,
+                                                unsigned N) {
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(N));
+  return new (Mem) OSSGridClause(N);
+}
+
 //===----------------------------------------------------------------------===//
 //  OmpSs clauses printing methods
 //===----------------------------------------------------------------------===//
@@ -408,6 +426,14 @@ void OSSClausePrinter::VisitOSSDeviceClause(OSSDeviceClause *Node) {
 void OSSClausePrinter::VisitOSSNdrangeClause(OSSNdrangeClause *Node) {
   if (!Node->varlist_empty()) {
     OS << "ndrange";
+    VisitOSSClauseList(Node, '(');
+    OS << ")";
+  }
+}
+
+void OSSClausePrinter::VisitOSSGridClause(OSSGridClause *Node) {
+  if (!Node->varlist_empty()) {
+    OS << "grid";
     VisitOSSClauseList(Node, '(');
     OS << ")";
   }

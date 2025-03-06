@@ -1928,6 +1928,17 @@ public:
     return getSema().OmpSs().ActOnOmpSsNdrangeClause(VarList, StartLoc, LParenLoc, EndLoc);
   }
 
+  /// Build a new OmpSs 'grid' clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSGridClause(ArrayRef<Expr *> VarList,
+                                     SourceLocation StartLoc,
+                                     SourceLocation LParenLoc,
+                                     SourceLocation EndLoc) {
+    return getSema().OmpSs().ActOnOmpSsGridClause(VarList, StartLoc, LParenLoc, EndLoc);
+  }
+
   /// Build a new OpenMP executable directive.
   ///
   /// By default, performs semantic analysis to build the new statement.
@@ -12645,6 +12656,21 @@ OSSClause *TreeTransform<Derived>::TransformOSSNdrangeClause(
     Vars.push_back(EVar.get());
   }
   return getDerived().RebuildOSSNdrangeClause(
+      Vars, C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSGridClause(
+    OSSGridClause *C) {
+  llvm::SmallVector<Expr *, 16> Vars;
+  Vars.reserve(C->varlist_size());
+  for (auto *VE : C->varlists()) {
+    ExprResult EVar = getDerived().TransformExpr(cast<Expr>(VE));
+    if (EVar.isInvalid())
+      return nullptr;
+    Vars.push_back(EVar.get());
+  }
+  return getDerived().RebuildOSSGridClause(
       Vars, C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
 }
 

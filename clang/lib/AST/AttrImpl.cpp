@@ -172,6 +172,7 @@ void OSSTaskDeclAttr::printPrettyPragma(
   l("depend(weak, inoutset", ":", depWeakConcurrents_size(), depWeakConcurrents_begin(), depWeakConcurrents_end(), OS, Policy);
   l("depend(weak, mutexinoutset", ":", depWeakCommutatives_size(), depWeakCommutatives_begin(), depWeakCommutatives_end(), OS, Policy);
   l("ndrange", "(", ndranges_size(), ndranges_begin(), ndranges_end(), OS, Policy);
+  l("grid", "(", grids_size(), grids_begin(), grids_end(), OS, Policy);
   if (auto *E = getIfExpr()) {
     OS << " if(";
     E->printPretty(OS, nullptr, Policy);

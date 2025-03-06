@@ -210,7 +210,8 @@ bool Parser::ParseDeclareTaskClauses(
     SmallVectorImpl<unsigned> &ReductionClauseType,
     SmallVectorImpl<CXXScopeSpec> &ReductionCXXScopeSpecs,
     SmallVectorImpl<DeclarationNameInfo> &ReductionIds,
-    SmallVectorImpl<Expr *> &Ndrange, SourceLocation &NdrangeLoc) {
+    SmallVectorImpl<Expr *> &Ndrange, SourceLocation &NdrangeLoc,
+    SmallVectorImpl<Expr *> &Grid, SourceLocation &GridLoc) {
   const Token &Tok = getCurToken();
   bool IsError = false;
 
@@ -349,6 +350,18 @@ bool Parser::ParseDeclareTaskClauses(
         IsError = true;
       FirstClauses[unsigned(CKind)] = true;
       break;
+    case OSSC_grid:
+      GridLoc = Tok.getLocation();
+      ConsumeToken();
+      if (FirstClauses[unsigned(CKind)]) {
+        Diag(Tok, diag::err_oss_more_one_clause)
+            << getOmpSsDirectiveName(OSSD_task) << getOmpSsClauseName(CKind) << 0;
+        IsError = true;
+      }
+      if (ParseOmpSsVarList(OSSD_task, CKind, Grid, VarListData))
+        IsError = true;
+      FirstClauses[unsigned(CKind)] = true;
+      break;
     case OSSC_in:
     case OSSC_out:
     case OSSC_inout:
@@ -452,6 +465,7 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
   unsigned Device = OSSC_DEVICE_unknown + 1;
   SourceLocation DeviceLoc;
   SourceLocation NdrangeLoc;
+  SourceLocation GridLoc;
 
   SmallVector<Expr *, 2> Labels;
   SmallVector<Expr *, 4> Ins;
@@ -480,6 +494,7 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
   SmallVector<CXXScopeSpec, 4> ReductionCXXScopeSpecs;
   SmallVector<DeclarationNameInfo, 4> ReductionIds;
   SmallVector<Expr *, 4> Ndranges;
+  SmallVector<Expr *, 4> Grids;
 
   bool IsError =
       ParseDeclareTaskClauses(ImmediateRes, MicrotaskRes,
@@ -498,7 +513,8 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
                               DepWeakConcurrents, DepWeakCommutatives,
                               ReductionListSizes, Reductions,
                               ReductionClauseType, ReductionCXXScopeSpecs,
-                              ReductionIds, Ndranges, NdrangeLoc);
+                              ReductionIds, Ndranges, NdrangeLoc,
+                              Grids, GridLoc);
   // Need to check for extra tokens.
   if (Tok.isNot(tok::annot_pragma_ompss_end)) {
     Diag(Tok, diag::warn_oss_extra_tokens_at_eol)
@@ -529,6 +545,7 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
       ReductionListSizes, Reductions,
       ReductionClauseType, ReductionCXXScopeSpecs,
       ReductionIds, Ndranges, NdrangeLoc,
+      Grids, GridLoc,
       SourceRange(Loc, EndLoc));
   return Ptr;
 }

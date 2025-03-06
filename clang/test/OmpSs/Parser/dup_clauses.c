@@ -16,6 +16,8 @@ void task_label();
 void task_label();
 #pragma oss task ndrange(1,1,1) ndrange(1,1,1) // expected-error {{directive '#pragma oss task' cannot contain more than one 'ndrange' clause}}
 void task_label();
+#pragma oss task grid(1,1,1,1,1,1) grid(1,1,1,1,1,1) // expected-error {{directive '#pragma oss task' cannot contain more than one 'grid' clause}}
+void task_label();
 #pragma oss task shmem(1) shmem(1) // expected-error {{directive '#pragma oss task' cannot contain more than one 'shmem' clause}}
 void task_label();
 // TODO: Once these clauses are allowed reenable this

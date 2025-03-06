@@ -28,6 +28,7 @@
 #include "clang/Basic/DiagnosticSema.h"
 #include "clang/Basic/OmpSsKinds.h"
 #include "clang/Basic/PartialDiagnostic.h"
+#include "clang/Basic/SourceLocation.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Sema/EnterExpressionEvaluationContext.h"
 #include "clang/Sema/Initialization.h"
@@ -4391,6 +4392,31 @@ static bool checkNdrange(
   return !ErrorFound;
 }
 
+static bool checkGrid(
+    Sema &S, SourceLocation Loc, ArrayRef<Expr *> VL,
+    SmallVectorImpl<Expr *> &ClauseVars, bool Outline) {
+
+  ClauseVars.append(VL.begin(), VL.end());
+
+  if (ClauseVars.size() != 6) {
+    // TODO(oss/grid): err_oss_grid_expect_nelems
+    //S.Diag(Loc, diag::err_oss_grid_expect_nelems)
+    //  << ClauseVars.size();
+    return false;
+  }
+
+  // TODO(oss/grid): more grid dim and block dim checks?
+  bool ErrorFound = false;
+  for (size_t i = 1; i < ClauseVars.size(); ++i) {
+    ExprResult Res = S.OmpSs().CheckNonNegativeIntegerValue(
+      ClauseVars[i], OSSC_grid, /*StrictlyPositive=*/true, Outline);
+    if (Res.isInvalid())
+      ErrorFound = true;
+    ClauseVars[i] = Res.get();
+  }
+  return !ErrorFound;
+}
+
 namespace {
 /// Data for the reduction-based clauses.
 struct ReductionData {
@@ -4508,6 +4534,7 @@ SemaOmpSs::DeclGroupPtrTy SemaOmpSs::ActOnOmpSsDeclareTaskDirective(
     ArrayRef<CXXScopeSpec> ReductionCXXScopeSpecs,
     ArrayRef<DeclarationNameInfo> ReductionIds,
     ArrayRef<Expr *> Ndranges, SourceLocation NdrangeLoc,
+    ArrayRef<Expr *> Grids, SourceLocation GridLoc,
     SourceRange SR,
     ArrayRef<Expr *> UnresolvedReductions) {
   if (!DG || DG.get().isNull())
@@ -4576,6 +4603,7 @@ SemaOmpSs::DeclGroupPtrTy SemaOmpSs::ActOnOmpSsDeclareTaskDirective(
   ExprResult IfRes, FinalRes, CostRes, PriorityRes, ShmemRes, OnreadyRes;
   SmallVector<Expr *, 2> LabelsRes;
   SmallVector<Expr *, 4> NdrangesRes;
+  SmallVector<Expr *, 4> GridsRes;
   OSSTaskDeclAttr::DeviceType DevType = OSSTaskDeclAttr::DeviceType::Unknown;
   if (Immediate) {
     ImmediateRes = VerifyBooleanConditionWithCleanups(Immediate, Immediate->getExprLoc());
@@ -4741,6 +4769,15 @@ SemaOmpSs::DeclGroupPtrTy SemaOmpSs::ActOnOmpSsDeclareTaskDirective(
     if (!UnresolvedReductions.empty())
       UnresolvedReductions_it += ReductionListSizes[i];
   }
+
+  if (!Grids.empty()) {
+    if (DevType != OSSTaskDeclAttr::DeviceType::Cuda)
+      {}//TODO(oss/grid): Diag(DeviceLoc, diag::err_oss_grid_incompatible_device);
+
+    checkGrid(SemaRef, GridLoc, Grids, GridsRes, /*Outline=*/true);
+  }
+
+  // TODO(oss/grid): ndranges and grid are incompatible
   if (!Ndranges.empty()) {
     if (!(DevType == OSSTaskDeclAttr::DeviceType::Cuda
         || DevType == OSSTaskDeclAttr::DeviceType::Opencl))
@@ -4797,6 +4834,7 @@ SemaOmpSs::DeclGroupPtrTy SemaOmpSs::ActOnOmpSsDeclareTaskDirective(
     const_cast<NestedNameSpecifierLoc *>(ReductionNSLoc.data()), ReductionNSLoc.size(),
     const_cast<DeclarationNameInfo *>(ReductionIds.data()), ReductionIds.size(),
     const_cast<Expr **>(NdrangesRes.data()), NdrangesRes.size(),
+    const_cast<Expr **>(GridsRes.data()), GridsRes.size(),
     SR);
   ADecl->dropAttr<OSSTaskDeclSentinelAttr>();
   ADecl->addAttr(NewAttr);
@@ -6123,6 +6161,20 @@ SemaOmpSs::ActOnOmpSsNdrangeClause(ArrayRef<Expr *> Vars,
       SemaRef.Context, StartLoc, LParenLoc, EndLoc, ClauseVars);
 }
 
+OSSClause *
+SemaOmpSs::ActOnOmpSsGridClause(ArrayRef<Expr *> Vars,
+                       SourceLocation StartLoc,
+                       SourceLocation LParenLoc,
+                       SourceLocation EndLoc) {
+  SmallVector<Expr *, 4> ClauseVars;
+  // TODO(oss/grid): grid sema
+  //if (!checkNdrange(SemaRef, StartLoc, Vars, ClauseVars, /*Outline=*/false))
+  //  return nullptr;
+
+  return OSSGridClause::Create(
+      SemaRef.Context, StartLoc, LParenLoc, EndLoc, ClauseVars);
+}
+
 ExprResult SemaOmpSs::CheckNonNegativeIntegerValue(Expr *ValExpr,
                                       OmpSsClauseKind CKind,
                                       bool StrictlyPositive,
@@ -7104,6 +7156,7 @@ void SemaOmpSs::InstantiateOSSDeclareTaskAttr(
   SmallVector<Expr *, 4> Reductions;
   SmallVector<Expr *, 4> Labels;
   SmallVector<Expr *, 4> Ndranges;
+  SmallVector<Expr *, 4> Grids;
 
   // Substitute a single OmpSs clause, which is a potentially-evaluated
   // full-expression.
@@ -7255,6 +7308,7 @@ void SemaOmpSs::InstantiateOSSDeclareTaskAttr(
     ArrayRef<unsigned>(Attr.reductionClauseType_begin(), Attr.reductionClauseType_end()),
     ReductionCXXScopeSpecs, ReductionIds,
     Ndranges, SourceLocation(), // TODO
+    Grids, SourceLocation(),
     Attr.getRange(),
     UnresolvedReductions);
 }

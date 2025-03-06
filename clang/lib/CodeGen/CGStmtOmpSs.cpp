@@ -228,6 +228,8 @@ static void AddDeviceData(const OSSExecutableDirective &S, OSSTaskDeviceDataTy &
   }
   if (!S.getClausesOfKind<OSSNdrangeClause>().empty())
     llvm_unreachable("Ndrange is not supported in inline constructs");
+  if (!S.getClausesOfKind<OSSGridClause>().empty())
+    llvm_unreachable("Grid is not supported in inline constructs");
   if (!S.getClausesOfKind<OSSShmemClause>().empty())
     llvm_unreachable("Shmem is not supported in inline constructs");
 }

@@ -155,6 +155,9 @@ def OSSC_Collapse : Clause<"collapse"> {
 def OSSC_Ndrange : Clause<"ndrange"> {
   let clangClass = "OSSNdrangeClause";
 }
+def OSSC_Grid : Clause<"grid"> {
+  let clangClass = "OSSGridClause";
+}
 def OSSC_Read : Clause<"read"> {
   let clangClass = "OSSReadClause";
 }
@@ -249,6 +252,7 @@ def OSS_DeclareTask : Directive<"declare task"> {
     VersionedClause<OSSC_Onready>,
     VersionedClause<OSSC_Device>,
     VersionedClause<OSSC_Ndrange>,
+    VersionedClause<OSSC_Grid>,
   ];
   let association = AS_Declaration;
   let category = CA_Declarative;

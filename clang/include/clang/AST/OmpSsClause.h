@@ -1801,6 +1801,71 @@ public:
   }
 };
 
+
+/// This represents 'grid' clause in the
+/// '#pragma oss task' directive.
+///
+/// \code
+/// #pragma oss task grid(100, 1, 1, 512, 1, 1)
+/// \endcode
+///
+/// The syntax of grid is
+/// \code
+///   grid(gridDimX, gridDimY, gridDimZ, blockDimX, blockDimY, blockDimZ)
+/// \endcode
+class OSSGridClause final
+    : public OSSVarListClause<OSSGridClause>,
+      private llvm::TrailingObjects<OSSGridClause, Expr *> {
+  friend OSSVarListClause;
+  friend TrailingObjects;
+
+  /// Build clause with number of variables \a N.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param EndLoc Ending location of the clause.
+  /// \param N Number of the variables in the clause.
+  OSSGridClause(SourceLocation StartLoc, SourceLocation LParenLoc,
+                  SourceLocation EndLoc, unsigned N)
+      : OSSVarListClause<OSSGridClause>(llvm::oss::OSSC_grid, StartLoc, LParenLoc,
+                                          EndLoc, N) {}
+
+  /// Build an empty clause.
+  ///
+  /// \param N Number of variables.
+  explicit OSSGridClause(unsigned N)
+      : OSSVarListClause<OSSGridClause>(llvm::oss::OSSC_grid, SourceLocation(),
+                                          SourceLocation(), SourceLocation(),
+                                          N) {}
+
+public:
+  /// Creates clause with a list of variables \a VL.
+  ///
+  /// \param C AST context.
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param EndLoc Ending location of the clause.
+  /// \param VL List of references to the variables.
+  static OSSGridClause *Create(const ASTContext &C, SourceLocation StartLoc,
+                                 SourceLocation LParenLoc,
+                                 SourceLocation EndLoc, ArrayRef<Expr *> VL);
+
+  /// Creates an empty clause with \a N variables.
+  ///
+  /// \param C AST context.
+  /// \param N The number of variables.
+  static OSSGridClause *CreateEmpty(const ASTContext &C, unsigned N);
+
+  child_range children() {
+    return child_range(reinterpret_cast<Stmt **>(varlist_begin()),
+                       reinterpret_cast<Stmt **>(varlist_end()));
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == llvm::oss::OSSC_grid;
+  }
+};
+
 /// This represents 'shmem' clause in the
 /// '#pragma oss task directive.
 ///

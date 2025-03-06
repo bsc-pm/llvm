@@ -4325,6 +4325,12 @@ bool RecursiveASTVisitor<Derived>::VisitOSSNdrangeClause(OSSNdrangeClause *C) {
 }
 
 template <typename Derived>
+bool RecursiveASTVisitor<Derived>::VisitOSSGridClause(OSSGridClause *C) {
+  TRY_TO(VisitOSSClauseList(C));
+  return true;
+}
+
+template <typename Derived>
 bool RecursiveASTVisitor<Derived>::VisitOSSReadClause(OSSReadClause *) {
   return true;
 }

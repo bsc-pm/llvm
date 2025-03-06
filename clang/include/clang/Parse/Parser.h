@@ -3567,7 +3567,8 @@ private:
       SmallVectorImpl<unsigned> &ReductionClauseType,
       SmallVectorImpl<CXXScopeSpec> &ReductionCXXScopeSpecs,
       SmallVectorImpl<DeclarationNameInfo> &ReductionIds,
-      SmallVectorImpl<Expr *> &Ndrange, SourceLocation &NdrangeLoc);
+      SmallVectorImpl<Expr *> &Ndrange, SourceLocation &NdrangeLoc,
+      SmallVectorImpl<Expr *> &Grid, SourceLocation &GridLoc);
 
   /// Parses clause with the list of variables of a kind \a Kind with a
   /// max limit of N

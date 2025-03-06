@@ -247,6 +247,7 @@ public:
       ArrayRef<CXXScopeSpec> ReductionCXXScopeSpecs,
       ArrayRef<DeclarationNameInfo> ReductionIds,
       ArrayRef<Expr *> Ndranges, SourceLocation NdrangeLoc,
+      ArrayRef<Expr *> Grids, SourceLocation GridLoc,
       SourceRange SR,
       ArrayRef<Expr *> UnresolvedReductions = std::nullopt);
 
@@ -310,6 +311,12 @@ public:
                                      SourceLocation StartLoc,
                                      SourceLocation LParenLoc,
                                      SourceLocation EndLoc);
+
+  /// Called on well-formed 'grid' clause.
+  OSSClause *ActOnOmpSsGridClause(ArrayRef<Expr *> Vars,
+                                  SourceLocation StartLoc,
+                                  SourceLocation LParenLoc,
+                                  SourceLocation EndLoc);
 
   // Checks depend kinds for errors
   // if no errors DepKindsOrdered is like

@@ -169,6 +169,8 @@ const char *getBundleStr(OmpSsBundleKind Kind) {
     return "QUAL.OSS.DEVICE";
   case OSSB_device_ndrange:
     return "QUAL.OSS.DEVICE.NDRANGE";
+  case OSSB_device_grid:
+    return "QUAL.OSS.DEVICE.GRID";
   case OSSB_device_dev_func:
     return "QUAL.OSS.DEVICE.DEVFUNC";
   case OSSB_device_call_order:
