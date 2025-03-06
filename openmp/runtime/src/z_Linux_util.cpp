@@ -1759,7 +1759,11 @@ __kmp_atomic_suspend_64<true, false>(int, kmp_atomic_flag_64<true, false> *);
    after setting the sleep bit indicated by the flag argument to FALSE.
    The target thread must already have called __kmp_suspend_template() */
 template <class C>
-static inline void __kmp_resume_template(int target_gtid, C *flag) {
+static inline void __kmp_resume_template(int target_gtid, C *flag
+#if defined(KMP_OMPV_ENABLED)
+                                         , bool nullw
+#endif // KMP_OMPV_ENABLED
+                                         ) {
   KMP_TIME_DEVELOPER_PARTITIONED_BLOCK(USER_resume);
   kmp_info_t *th = __kmp_threads[target_gtid];
   int status;
@@ -1812,6 +1816,32 @@ static inline void __kmp_resume_template(int target_gtid, C *flag) {
       return;
     }
   }
+
+#if defined(KMP_OMPV_ENABLED)
+  kmp_task_team_t *task_team = th->th.th_task_team;
+  if (KMP_PASSIVE_ENABLED() && nullw && task_team && TCR_SYNC_4(task_team->tt.tt_active) && KMP_TASKING_ENABLED(task_team)) {
+    kmp_int32 count = 1 + KMP_ATOMIC_INC(&task_team->tt.tt_unfinished_passives);
+    kmp_int32 tcount = KMP_ATOMIC_LD_RLX(&task_team->tt.tt_unfinished_ready);
+    if (tcount > task_team->tt.tt_max_threads)
+      tcount = task_team->tt.tt_max_threads;
+    if (count <= tcount + 2) {
+      KMP_DEBUG_ASSERT(flag);
+      flag->unset_sleeping();
+      TCW_PTR(th->th.th_sleep_loc, NULL);
+      th->th.th_sleep_loc_type = flag_unset;
+
+      th->th.passive_awakened = true;
+      status = nosv_cond_signal(th->th.th_suspend_cv.c_cond);
+      KMP_CHECK_SYSFAIL("pthread_cond_signal", status);
+    } else {
+      kmp_int32 count = -1 + KMP_ATOMIC_DEC(&task_team->tt.tt_unfinished_passives);
+      KMP_ASSERT(count >= 0);
+    }
+    __kmp_unlock_suspend_mx(th);
+    return;
+  }
+#endif // KMP_OMPV_ENABLED
+
   KMP_DEBUG_ASSERT(flag);
   flag->unset_sleeping();
   TCW_PTR(th->th.th_sleep_loc, NULL);
@@ -1830,6 +1860,7 @@ static inline void __kmp_resume_template(int target_gtid, C *flag) {
   }
 #endif
 #if defined(KMP_OMPV_ENABLED)
+  th->th.passive_awakened = false;
   status = nosv_cond_signal(th->th.th_suspend_cv.c_cond);
 #else
   status = pthread_cond_signal(&th->th.th_suspend_cv.c_cond);
@@ -1842,26 +1873,67 @@ static inline void __kmp_resume_template(int target_gtid, C *flag) {
 }
 
 template <bool C, bool S>
-void __kmp_resume_32(int target_gtid, kmp_flag_32<C, S> *flag) {
-  __kmp_resume_template(target_gtid, flag);
+void __kmp_resume_32(int target_gtid, kmp_flag_32<C, S> *flag
+#if defined(KMP_OMPV_ENABLED)
+                     , bool nullw
+#endif // KMP_OMPV_ENABLED
+                     ) {
+  __kmp_resume_template(target_gtid, flag
+#if defined(KMP_OMPV_ENABLED)
+                        , nullw
+#endif // KMP_OMPV_ENABLED
+                        );
 }
 template <bool C, bool S>
-void __kmp_resume_64(int target_gtid, kmp_flag_64<C, S> *flag) {
-  __kmp_resume_template(target_gtid, flag);
+void __kmp_resume_64(int target_gtid, kmp_flag_64<C, S> *flag
+#if defined(KMP_OMPV_ENABLED)
+                     , bool nullw
+#endif // KMP_OMPV_ENABLED
+                     ) {
+  __kmp_resume_template(target_gtid, flag
+#if defined(KMP_OMPV_ENABLED)
+                        , nullw
+#endif // KMP_OMPV_ENABLED
+                        );
 }
 template <bool C, bool S>
-void __kmp_atomic_resume_64(int target_gtid, kmp_atomic_flag_64<C, S> *flag) {
-  __kmp_resume_template(target_gtid, flag);
+void __kmp_atomic_resume_64(int target_gtid, kmp_atomic_flag_64<C, S> *flag
+#if defined(KMP_OMPV_ENABLED)
+                     , bool nullw
+#endif // KMP_OMPV_ENABLED
+                     ) {
+  __kmp_resume_template(target_gtid, flag
+#if defined(KMP_OMPV_ENABLED)
+                        , nullw
+#endif // KMP_OMPV_ENABLED
+                        );
 }
-void __kmp_resume_oncore(int target_gtid, kmp_flag_oncore *flag) {
-  __kmp_resume_template(target_gtid, flag);
+void __kmp_resume_oncore(int target_gtid, kmp_flag_oncore *flag
+#if defined(KMP_OMPV_ENABLED)
+                     , bool nullw
+#endif // KMP_OMPV_ENABLED
+                     ) {
+  __kmp_resume_template(target_gtid, flag
+#if defined(KMP_OMPV_ENABLED)
+                        , nullw
+#endif // KMP_OMPV_ENABLED
+                        );
 }
 
+
+#if defined(KMP_OMPV_ENABLED)
+template void __kmp_resume_32<false, true>(int, kmp_flag_32<false, true> *, bool);
+template void __kmp_resume_32<false, false>(int, kmp_flag_32<false, false> *, bool);
+template void __kmp_resume_64<false, true>(int, kmp_flag_64<false, true> *, bool);
+template void
+__kmp_atomic_resume_64<false, true>(int, kmp_atomic_flag_64<false, true> *, bool);
+#else
 template void __kmp_resume_32<false, true>(int, kmp_flag_32<false, true> *);
 template void __kmp_resume_32<false, false>(int, kmp_flag_32<false, false> *);
 template void __kmp_resume_64<false, true>(int, kmp_flag_64<false, true> *);
 template void
 __kmp_atomic_resume_64<false, true>(int, kmp_atomic_flag_64<false, true> *);
+#endif
 
 #if KMP_USE_MONITOR
 void __kmp_resume_monitor() {

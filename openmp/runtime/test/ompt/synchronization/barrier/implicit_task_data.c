@@ -1,5 +1,6 @@
 // RUN: %libomp-compile-and-run | %sort-threads | FileCheck %s
 // REQUIRES: ompt
+// UNSUPPORTED: ompv-passive
 
 // This test checks that values stored in task_data in a barrier_begin event
 // are still present in the corresponding barrier_end event.

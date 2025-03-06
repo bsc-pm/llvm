@@ -2,6 +2,7 @@
 // RUN: %libomp-compile-and-run | %sort-threads \
 // RUN:                         | FileCheck --check-prefix=THREADS %s
 // REQUIRES: ompt
+// UNSUPPORTED: ompv-passive
 #include "callback.h"
 
 int main() {

@@ -1,5 +1,5 @@
 // REQUIRES: hidden-helper
-// UNSUPPORTED: ompv, ompv-free-agents
+// UNSUPPORTED: ompv, ompv-free-agents, ompv-passive
 // RUN: %libomp-cxx-compile
 // RUN: env LIBOMP_USE_HIDDEN_HELPER_TASK=1 LIBOMP_NUM_HIDDEN_HELPER_THREADS=8 \
 // RUN:     KMP_HIDDEN_HELPER_AFFINITY=verbose,granularity=socket,compact %libomp-run 2>&1 | FileCheck --check-prefix=SOCKET %s

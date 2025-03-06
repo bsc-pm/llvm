@@ -1,5 +1,6 @@
 add_subdirectory(omp)
 if (NOSV_PKG_FOUND)
 add_subdirectory(ompv)
+add_subdirectory(ompv_passive)
 add_subdirectory(ompv_free_agents)
 endif()

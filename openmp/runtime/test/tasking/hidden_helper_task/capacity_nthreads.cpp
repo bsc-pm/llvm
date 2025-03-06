@@ -1,5 +1,5 @@
 // RUN: %libomp-cxx-compile-and-run
-// UNSUPPORTED: ompv, ompv-free-agents
+// UNSUPPORTED: ompv, ompv-free-agents, ompv-passive
 
 #include <omp.h>
 

@@ -635,6 +635,11 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task
 
   // The first check avoids building task_team thread data if serialized
   if (UNLIKELY(taskdata->td_flags.task_serial)) {
+#if defined(KMP_OMPV_ENABLED)
+    // serial tasks (like final tasks) are not pushed but directly executed
+    if (KMP_PASSIVE_ENABLED())
+      KMP_ATOMIC_INC(&task_team->tt.tt_unfinished_ready);
+#endif // KMP_OMPV_ENABLED
     KA_TRACE(20, ("__kmp_push_task: T#%d team serialized; returning "
                   "TASK_NOT_PUSHED for task %p\n",
                   gtid, taskdata));
@@ -667,6 +672,10 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task
 
   if (taskdata->td_flags.priority_specified && task->data2.priority > 0 &&
       __kmp_max_task_priority > 0) {
+#if defined(KMP_OMPV_ENABLED)
+    if (KMP_PASSIVE_ENABLED())
+      KMP_ATOMIC_INC(&task_team->tt.tt_unfinished_ready);
+#endif // KMP_OMPV_ENABLED
     int pri = KMP_MIN(task->data2.priority, __kmp_max_task_priority);
     return __kmp_push_priority_task(gtid, thread, taskdata, task_team, pri);
   }
@@ -738,6 +747,11 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task
                 "task=%p ntasks=%d head=%u tail=%u\n",
                 gtid, taskdata, thread_data->td.td_deque_ntasks,
                 thread_data->td.td_deque_head, thread_data->td.td_deque_tail));
+
+#if defined(KMP_OMPV_ENABLED)
+  if (KMP_PASSIVE_ENABLED())
+    KMP_ATOMIC_INC(&task_team->tt.tt_unfinished_ready);
+#endif // KMP_OMPV_ENABLED
 
   __kmp_release_bootstrap_lock(&thread_data->td.td_deque_lock);
 
@@ -947,6 +961,11 @@ static void __kmpc_omp_task_begin_if0_template(ident_t *loc_ref, kmp_int32 gtid,
                   gtid, counter, taskdata));
   }
 
+#if defined(KMP_OMPV_ENABLED)
+  // if0 task is not pushed to queues but counter is decreased once finished
+  if (KMP_PASSIVE_ENABLED())
+    KMP_ATOMIC_INC(&__kmp_threads[gtid]->th.th_task_team->tt.tt_unfinished_ready);
+#endif // KMP_OMPV_ENABLED
   taskdata->td_flags.task_serial =
       1; // Execute this task immediately, not deferred.
   __kmp_task_start(gtid, task, current_task);
@@ -1260,6 +1279,11 @@ static void __kmp_task_finish_complete(kmp_int32 gtid, kmp_task_t *task) {
   kmp_int32 counter = -1 +
     KMP_ATOMIC_DEC(&task_team->tt.tt_unfinished_tasks);
   KMP_ASSERT(counter >= 0);
+
+  if (KMP_PASSIVE_ENABLED()) {
+    kmp_int32 count = -1 + KMP_ATOMIC_DEC(&task_team->tt.tt_unfinished_ready);
+    KMP_ASSERT(count >= 0);
+  }
 
   free_agents_wakeup_unfinished(counter);
 }
@@ -3027,12 +3051,9 @@ kmp_int32 __kmp_omp_task(kmp_int32 gtid, kmp_task_t *new_task,
     if (serialize_immediate)
       new_taskdata->td_flags.task_serial = 1;
     __kmp_invoke_task(gtid, new_task, current_task);
+#if !defined(KMP_OMPV_ENABLED)
   } else if (__kmp_dflt_blocktime != KMP_MAX_BLOCKTIME &&
-             __kmp_wpolicy_passive
-#if defined(KMP_OMPV_ENABLED)
-             && !__kmp_enable_free_agents
-#endif // KMP_OMPV_ENABLED
-             ) {
+             __kmp_wpolicy_passive) {
     kmp_info_t *this_thr = __kmp_threads[gtid];
     kmp_team_t *team = this_thr->th.th_team;
     kmp_int32 nthreads = this_thr->th.th_team_nproc;
@@ -3045,6 +3066,7 @@ kmp_int32 __kmp_omp_task(kmp_int32 gtid, kmp_task_t *new_task,
         break; // awake one thread at a time
       }
     }
+#endif // KMP_OMPV_ENABLED
   }
 
 #if defined(KMP_OMPV_ENABLED)
@@ -4450,9 +4472,33 @@ static inline int __kmp_execute_tasks_template(
     // getting tasks from target constructs
     while (1) { // Inner loop to find a task and execute it
 #if defined(KMP_OMPV_ENABLED)
-      int res = nosv_schedpoint(NOSV_SCHEDPOINT_NONE);
-      KMP_ASSERT(res == 0);
+      if (KMP_PASSIVE_ENABLED()) {
+        for (int j = 0; j < 2; ++j) {
+          kmp_int32 count = KMP_ATOMIC_LD_RLX(&task_team->tt.tt_unfinished_passives);
+          kmp_int32 tcount = KMP_ATOMIC_LD_RLX(&task_team->tt.tt_unfinished_ready);
+          if (tcount > task_team->tt.tt_max_threads)
+            tcount = task_team->tt.tt_max_threads;
+          if (count <= tcount + 1) {
+            thread_local int prev_i = 0;
+            for (int i = 0; i < nthreads; ++i) {
+              prev_i = prev_i%nthreads;
+              kmp_info_t *tmp_th = threads_data[prev_i].td.td_thr;
+              if (tmp_th == thread) {
+                prev_i++;
+                continue;
+              }
+              if (tmp_th->th.th_sleep_loc != NULL) {
+                __kmp_null_resume_wrapper(tmp_th);
+                prev_i++;
+                break; // awake one thread at a time
+              }
+              prev_i++;
+            }
+          }
+        }
+      }
 #endif // KMP_OMPV_ENABLED
+
       task = NULL;
       if (task_team->tt.tt_num_task_pri) { // get priority task first
         task = __kmp_get_priority_task(gtid, task_team, is_constrained);
@@ -4495,6 +4541,9 @@ static inline int __kmp_execute_tasks_template(
             asleep = 0;
             if ((__kmp_tasking_mode == tskm_task_teams) &&
                 (__kmp_dflt_blocktime != KMP_MAX_BLOCKTIME) &&
+#if defined(KMP_OMPV_ENABLED)
+                !KMP_PASSIVE_ENABLED() &&
+#endif // KMP_OMPV_ENABLED
                 (TCR_PTR(CCAST(void *, other_thread->th.th_sleep_loc)) !=
                  NULL)) {
               asleep = 1;
@@ -4582,7 +4631,12 @@ static inline int __kmp_execute_tasks_template(
     // check if termination condition is satisfied. The work queue may be empty
     // but there might be proxy tasks still executing.
     if (final_spin &&
+#if defined(KMP_OMPV_ENABLED)
+        (KMP_PASSIVE_ENABLED() || KMP_ATOMIC_LD_ACQ(&current_task->td_incomplete_child_tasks) == 0)) {
+#else
         KMP_ATOMIC_LD_ACQ(&current_task->td_incomplete_child_tasks) == 0) {
+#endif // KMP_OMPV_ENABLED
+
       // First, decrement the #unfinished threads, if that has not already been
       // done.  This decrement might be to the spin location, and result in the
       // termination condition being satisfied.
@@ -5015,7 +5069,9 @@ static inline void __kmp_task_team_init(kmp_task_team_t *task_team,
     KMP_ATOMIC_ST_REL(&task_team->tt.tt_unfinished_threads, team_nth);
     TCW_4(task_team->tt.tt_active, TRUE);
 #if defined(KMP_OMPV_ENABLED)
+    KMP_ATOMIC_ST_REL(&task_team->tt.tt_unfinished_passives, team_nth);
     KMP_ATOMIC_ST_RLX(&task_team->tt.tt_unfinished_tasks, team_nth);
+    KMP_ATOMIC_ST_RLX(&task_team->tt.tt_unfinished_ready, 0);
 #endif // KMP_OMPV_ENABLED
   }
 }
@@ -5222,7 +5278,11 @@ void __kmp_wait_to_unref_task_teams(void) {
 
 // __kmp_task_team_setup:  Create a task_team for the current team, but use
 // an already created, unused one if it already exists.
-void __kmp_task_team_setup(kmp_info_t *this_thr, kmp_team_t *team) {
+void __kmp_task_team_setup(kmp_info_t *this_thr, kmp_team_t *team
+#if defined(KMP_OMPV_ENABLED)
+                           , bool force
+#endif
+                           ) {
   KMP_DEBUG_ASSERT(__kmp_tasking_mode != tskm_immediate_exec);
 
   // For the serial and root teams, setup the first task team pointer to point
@@ -5282,6 +5342,12 @@ void __kmp_task_team_setup(kmp_info_t *this_thr, kmp_team_t *team) {
                   __kmp_gtid_from_thread(this_thr),
                   team->t.t_task_team[other_team], team->t.t_id, other_team));
   }
+
+
+#if defined(KMP_OMPV_ENABLED)
+  if (force)
+    __kmp_enable_tasking(team->t.t_task_team[other_team], this_thr);
+#endif // KMP_OMPV_ENABLED
 
   // For regular thread, task enabling should be called when the task is going
   // to be pushed to a dequeue. However, for the hidden helper thread, we need
@@ -5366,6 +5432,11 @@ void __kmp_task_team_wait(
       if (__kmp_enable_free_agents) {
         int res = nosv_barrier_wait(this_thr->th.th_team->t.nosv_bar);
         KMP_ASSERT(res == 0);
+      }
+
+      if (KMP_PASSIVE_ENABLED()) {
+        kmp_int32 count = -1 + KMP_ATOMIC_DEC(&task_team->tt.tt_unfinished_passives);
+        KMP_ASSERT(count >= 0);
       }
 
       kmp_flag_32<false, false> flag(
@@ -5619,6 +5690,11 @@ static void __kmp_bottom_half_finish_proxy(kmp_int32 gtid, kmp_task_t *ptask) {
   kmp_int32 counter = -1 +
     KMP_ATOMIC_DEC(&task_team->tt.tt_unfinished_tasks);
   KMP_ASSERT(counter >= 0);
+  if (KMP_PASSIVE_ENABLED()) {
+    counter = -1 +
+      KMP_ATOMIC_DEC(&task_team->tt.tt_unfinished_ready);
+    KMP_ASSERT(counter >= 0);
+  }
 
   free_agents_wakeup_unfinished(counter);
 #endif // KMP_OMPV_ENABLED
@@ -6203,6 +6279,9 @@ void __kmp_taskloop_linear(ident_t *loc, int gtid, kmp_task_t *task,
   __kmp_task_start(gtid, task, current_task); // make internal bookkeeping
   // do not execute the pattern task, just do internal bookkeeping
 #if defined(KMP_OMPV_ENABLED)
+  // pattern task is not pushed to queues but counter is decreased once finished
+  if (KMP_PASSIVE_ENABLED())
+    KMP_ATOMIC_INC(&thread->th.th_task_team->tt.tt_unfinished_ready);
   __kmp_task_finish<false, false>(gtid, task, current_task);
 #else
   __kmp_task_finish<false>(gtid, task, current_task);

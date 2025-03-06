@@ -1,6 +1,6 @@
 // RUN: %libomp-compile-and-run | FileCheck %s
 // REQUIRES: ompt
-// UNSUPPORTED: ompv, ompv-free-agents
+// UNSUPPORTED: ompv, ompv-free-agents, ompv-passive
 
 // Untied tasks and serialized parallels
 // are not supported.

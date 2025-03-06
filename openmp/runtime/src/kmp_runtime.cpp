@@ -4809,6 +4809,10 @@ kmp_info_t *__kmp_allocate_thread(kmp_root_t *root, kmp_team_t *team,
   new_thr->th.th_blocking = false;
 #endif
 
+#if defined(KMP_OMPV_ENABLED)
+  new_thr->th.passive_awakened = false;
+#endif // KMP_OMPV_ENABLED
+
 #if KMP_AFFINITY_SUPPORTED
   new_thr->th.th_current_place = KMP_PLACE_UNDEFINED;
   new_thr->th.th_new_place = KMP_PLACE_UNDEFINED;

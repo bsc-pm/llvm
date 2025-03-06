@@ -657,7 +657,46 @@ final_spin=FALSE)
       if (final_spin)
         KMP_ATOMIC_ST_REL(&this_thr->th.th_blocking, false);
 #endif
+#if defined(KMP_OMPV_ENABLED)
+      if (KMP_PASSIVE_ENABLED()) {
+        if (task_team && TCR_SYNC_4(task_team->tt.tt_active) && KMP_TASKING_ENABLED(task_team)) {
+          kmp_int32 count = -1 + KMP_ATOMIC_DEC(&task_team->tt.tt_unfinished_passives);
+          KMP_ASSERT(count >= 0);
+          kmp_int32 tcount = KMP_ATOMIC_LD_RLX(&task_team->tt.tt_unfinished_ready);
+          KMP_ASSERT(tcount >= 0);
+          if (count > tcount + 1) {
+            flag->suspend(th_gtid);
+
+            // If I've been woken up because a barrier condition then
+            // no one has increased the passive counter for me. Do it myself
+            if (!this_thr->th.passive_awakened) {
+              KMP_ATOMIC_INC(&task_team->tt.tt_unfinished_passives);
+            }
+            this_thr->th.passive_awakened = false;
+
+            if (__kmp_dflt_blocktime != KMP_MAX_BLOCKTIME &&
+                __kmp_pause_status != kmp_soft_paused) {
+              hibernate_goal = KMP_NOW() + this_thr->th.th_team_bt_intervals;
+            }
+
+          } else {
+            KMP_ATOMIC_INC(&task_team->tt.tt_unfinished_passives);
+          }
+        } else {
+          flag->suspend(th_gtid);
+          // Got a wakeup of a worker that has not already seen
+          // the task_team is not active. Ignore it
+          if (this_thr->th.passive_awakened) {
+            KMP_ATOMIC_DEC(&task_team->tt.tt_unfinished_passives);
+          }
+          this_thr->th.passive_awakened = false;
+        }
+      } else {
+        flag->suspend(th_gtid);
+      }
+#else
       flag->suspend(th_gtid);
+#endif
 #if KMP_OS_UNIX
       if (final_spin)
         KMP_ATOMIC_ST_REL(&this_thr->th.th_blocking, true);
@@ -1054,16 +1093,32 @@ static inline void __kmp_null_resume_wrapper(kmp_info_t *thr) {
   // Attempt to wake up a thread: examine its type and call appropriate template
   switch (type) {
   case flag32:
-    __kmp_resume_32(gtid, RCAST(kmp_flag_32<> *, flag));
+    __kmp_resume_32(gtid, RCAST(kmp_flag_32<> *, flag)
+#if defined(KMP_OMPV_ENABLED)
+                    , /*nullw=*/true
+#endif // KMP_OMPV_ENABLED
+                    );
     break;
   case flag64:
-    __kmp_resume_64(gtid, RCAST(kmp_flag_64<> *, flag));
+    __kmp_resume_64(gtid, RCAST(kmp_flag_64<> *, flag)
+#if defined(KMP_OMPV_ENABLED)
+                    , /*nullw=*/true
+#endif // KMP_OMPV_ENABLED
+                    );
     break;
   case atomic_flag64:
-    __kmp_atomic_resume_64(gtid, RCAST(kmp_atomic_flag_64<> *, flag));
+    __kmp_atomic_resume_64(gtid, RCAST(kmp_atomic_flag_64<> *, flag)
+#if defined(KMP_OMPV_ENABLED)
+                    , /*nullw=*/true
+#endif // KMP_OMPV_ENABLED
+                    );
     break;
   case flag_oncore:
-    __kmp_resume_oncore(gtid, RCAST(kmp_flag_oncore *, flag));
+    __kmp_resume_oncore(gtid, RCAST(kmp_flag_oncore *, flag)
+#if defined(KMP_OMPV_ENABLED)
+                    , /*nullw=*/true
+#endif // KMP_OMPV_ENABLED
+                    );
     break;
   case flag_unset:
     KF_TRACE(100, ("__kmp_null_resume_wrapper: flag type %d is unset\n", type));

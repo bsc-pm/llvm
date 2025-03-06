@@ -2962,6 +2962,8 @@ typedef struct kmp_base_task_team {
       tt_active; /* is the team still actively executing tasks */
 #if defined(KMP_OMPV_ENABLED)
   std::atomic<kmp_int32> tt_unfinished_tasks;
+  std::atomic<kmp_int32> tt_unfinished_ready;
+  std::atomic<kmp_int32> tt_unfinished_passives;
 #endif // KMP_OMPV_ENABLED
 } kmp_base_task_team_t;
 
@@ -3180,6 +3182,9 @@ typedef struct KMP_ALIGN_CACHE kmp_base_info {
   std::atomic<bool> th_blocking;
 #endif
   kmp_cg_root_t *th_cg_roots; // list of cg_roots associated with this thread
+#if defined(KMP_OMPV_ENABLED)
+  bool passive_awakened;
+#endif // KMP_OMPV_ENABLED
 
 } kmp_base_info_t;
 
@@ -4309,7 +4314,11 @@ extern void __kmp_reap_task_teams(void);
 extern void __kmp_push_task_team_node(kmp_info_t *thread, kmp_team_t *team);
 extern void __kmp_pop_task_team_node(kmp_info_t *thread, kmp_team_t *team);
 extern void __kmp_wait_to_unref_task_teams(void);
+#if defined(KMP_OMPV_ENABLED)
+extern void __kmp_task_team_setup(kmp_info_t *this_thr, kmp_team_t *team, bool force=false);
+#else
 extern void __kmp_task_team_setup(kmp_info_t *this_thr, kmp_team_t *team);
+#endif // KMP_OMPV_ENABLED
 extern void __kmp_task_team_sync(kmp_info_t *this_thr, kmp_team_t *team);
 extern void __kmp_task_team_wait(kmp_info_t *this_thr, kmp_team_t *team
 #if USE_ITT_BUILD
@@ -4775,6 +4784,7 @@ extern void __kmp_omp_display_env(int verbose);
 extern int __kmp_enable_compat;
 extern int __kmp_enable_free_agents;
 extern int __kmp_free_agent_tid_emu;
+#define KMP_PASSIVE_ENABLED() (!__kmp_enable_free_agents && __kmp_wpolicy_passive)
 #endif // KMP_OMPV_ENABLED
 
 // 1: it is initializing hidden helper team
@@ -4928,6 +4938,16 @@ template <bool C, bool S>
 extern void __kmp_atomic_mwait_64(int th_gtid, kmp_atomic_flag_64<C, S> *flag);
 extern void __kmp_mwait_oncore(int th_gtid, kmp_flag_oncore *flag);
 #endif
+#if defined(KMP_OMPV_ENABLED)
+template <bool C, bool S>
+extern void __kmp_resume_32(int target_gtid, kmp_flag_32<C, S> *flag, bool nullw=false);
+template <bool C, bool S>
+extern void __kmp_resume_64(int target_gtid, kmp_flag_64<C, S> *flag, bool nullw=false);
+template <bool C, bool S>
+extern void __kmp_atomic_resume_64(int target_gtid,
+                                   kmp_atomic_flag_64<C, S> *flag, bool nullw=false);
+extern void __kmp_resume_oncore(int target_gtid, kmp_flag_oncore *flag, bool nullw=false);
+#else
 template <bool C, bool S>
 extern void __kmp_resume_32(int target_gtid, kmp_flag_32<C, S> *flag);
 template <bool C, bool S>
@@ -4936,6 +4956,7 @@ template <bool C, bool S>
 extern void __kmp_atomic_resume_64(int target_gtid,
                                    kmp_atomic_flag_64<C, S> *flag);
 extern void __kmp_resume_oncore(int target_gtid, kmp_flag_oncore *flag);
+#endif
 
 template <bool C, bool S>
 int __kmp_execute_tasks_32(kmp_info_t *thread, kmp_int32 gtid,

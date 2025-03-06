@@ -1881,7 +1881,11 @@ static int __kmp_barrier_template(enum barrier_type bt, int gtid, int is_split,
     }
 
     if (KMP_MASTER_TID(tid) && __kmp_tasking_mode != tskm_immediate_exec)
-      __kmp_task_team_setup(this_thr, team);
+      __kmp_task_team_setup(this_thr, team
+#if defined(KMP_OMPV_ENABLED)
+                            , /*force=*/KMP_PASSIVE_ENABLED()
+#endif // KMP_OMPV_ENABLED
+                            );
 
     if (cancellable) {
       cancelled = __kmp_linear_barrier_gather_cancellable(
@@ -2042,6 +2046,11 @@ static int __kmp_barrier_template(enum barrier_type bt, int gtid, int is_split,
       if (__kmp_tasking_mode != tskm_immediate_exec && !cancelled) {
         __kmp_task_team_sync(this_thr, team);
       }
+#if defined(KMP_OMPV_ENABLED)
+      if (KMP_PASSIVE_ENABLED() && !cancelled) {
+        KMP_ASSERT(KMP_TASKING_ENABLED(this_thr->th.th_task_team));
+      }
+#endif // KMP_OMPV_ENABLED
     }
 
 #if USE_ITT_BUILD
@@ -2438,7 +2447,6 @@ void __kmp_join_barrier(int gtid) {
            ("__kmp_join_barrier: T#%d(%d:%d) leaving\n", gtid, team_id, tid));
 
 }
-
 // TODO release worker threads' fork barriers as we are ready instead of all at
 // once
 void __kmp_fork_barrier(int gtid, int tid) {
@@ -2490,7 +2498,11 @@ void __kmp_fork_barrier(int gtid, int tid) {
 #endif
 
     if (__kmp_tasking_mode != tskm_immediate_exec)
-      __kmp_task_team_setup(this_thr, team);
+      __kmp_task_team_setup(this_thr, team
+#if defined(KMP_OMPV_ENABLED)
+                            , /*force=*/KMP_PASSIVE_ENABLED()
+#endif // KMP_OMPV_ENABLED
+                            );
 
     /* The primary thread may have changed its blocktime between join barrier
        and fork barrier. Copy the blocktime info to the thread, where
@@ -2630,6 +2642,12 @@ void __kmp_fork_barrier(int gtid, int tid) {
   if (__kmp_tasking_mode != tskm_immediate_exec) {
     __kmp_task_team_sync(this_thr, team);
   }
+
+#if defined(KMP_OMPV_ENABLED)
+  if (KMP_PASSIVE_ENABLED()) {
+    KMP_ASSERT(KMP_TASKING_ENABLED(this_thr->th.th_task_team));
+  }
+#endif // KMP_OMPV_ENABLED
 
 #if KMP_AFFINITY_SUPPORTED
   kmp_proc_bind_t proc_bind = team->t.t_proc_bind;
