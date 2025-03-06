@@ -318,7 +318,7 @@ private:
   void gatherOnreadyInfo(OperandBundleDef &OBDef);
   void gatherWaitInfo(OperandBundleDef &OBDef);
   void gatherDeviceInfo(OperandBundleDef &OBDef);
-  void gatherDeviceNdrangeInfo(OperandBundleDef &OBDef);
+  void gatherDeviceNdrangeOrGridInfo(OperandBundleDef &OBDef, bool IsGrid);
   void gatherDeviceGridInfo(OperandBundleDef &OBDef);
   void gatherDeviceDevFuncInfo(OperandBundleDef &OBDef);
   void gatherDeviceCallOrderInfo(OperandBundleDef &OBDef);

@@ -44,6 +44,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Frontend/OmpSs/OSS.h.inc"
 #include <optional>
 #include <set>
 
@@ -4349,9 +4350,11 @@ static bool checkDependency(Sema &S, Expr *RefExpr, bool OSSSyntax, bool Outline
   return true;
 }
 
-static bool checkNdrange(
+static bool checkNdrangeOrGrid(
+    llvm::oss::Clause CKind,
     Sema &S, SourceLocation Loc, ArrayRef<Expr *> VL,
     SmallVectorImpl<Expr *> &ClauseVars, bool Outline) {
+  assert((CKind == OSSC_ndrange || CKind == OSSC_grid) && "Unsupported clause");
 
   ClauseVars.append(VL.begin(), VL.end());
 
@@ -4359,7 +4362,7 @@ static bool checkNdrange(
   // The parameter of the collapse clause must be a constant
   // positive integer expression.
   ExprResult NumDimsResult =
-      S.OmpSs().VerifyPositiveIntegerConstant(NumDimsE, OSSC_ndrange, /*StrictlyPositive=*/true);
+      S.OmpSs().VerifyPositiveIntegerConstant(NumDimsE, CKind, /*StrictlyPositive=*/true);
   if (NumDimsResult.isInvalid())
     return false;
   NumDimsE = NumDimsResult.get();
@@ -4369,13 +4372,13 @@ static bool checkNdrange(
   uint64_t NumDims = cast<ConstantExpr>(NumDimsE)->getResultAsAPSInt().getExtValue();
   if (!(NumDims >= 1 && NumDims <= 3)) {
     S.Diag(NumDimsE->getExprLoc(), diag::err_oss_clause_expect_constant_between)
-        << 1 << 3 << getOmpSsClauseName(OSSC_ndrange)
+        << 1 << 3 << getOmpSsClauseName(CKind)
         << NumDimsE->getSourceRange();
     return false;
   }
   if (NumDims + 1 != ClauseVars.size() &&
       NumDims*2 + 1 != ClauseVars.size()) {
-    S.Diag(Loc, diag::err_oss_ndrange_expect_nelems)
+    S.Diag(Loc, diag::err_oss_ndrange_expect_nelems)  // TODO(oss/grid): mention grid
       << NumDims << NumDims << NumDims*2 << ClauseVars.size() - 1;
     return false;
   }
@@ -4384,32 +4387,7 @@ static bool checkNdrange(
   for (size_t i = 1; i < ClauseVars.size(); ++i) {
     // TODO: check global[i] >= local[i]
     ExprResult Res = S.OmpSs().CheckNonNegativeIntegerValue(
-      ClauseVars[i], OSSC_ndrange, /*StrictlyPositive=*/true, Outline);
-    if (Res.isInvalid())
-      ErrorFound = true;
-    ClauseVars[i] = Res.get();
-  }
-  return !ErrorFound;
-}
-
-static bool checkGrid(
-    Sema &S, SourceLocation Loc, ArrayRef<Expr *> VL,
-    SmallVectorImpl<Expr *> &ClauseVars, bool Outline) {
-
-  ClauseVars.append(VL.begin(), VL.end());
-
-  if (ClauseVars.size() != 6) {
-    // TODO(oss/grid): err_oss_grid_expect_nelems
-    //S.Diag(Loc, diag::err_oss_grid_expect_nelems)
-    //  << ClauseVars.size();
-    return false;
-  }
-
-  // TODO(oss/grid): more grid dim and block dim checks?
-  bool ErrorFound = false;
-  for (size_t i = 1; i < ClauseVars.size(); ++i) {
-    ExprResult Res = S.OmpSs().CheckNonNegativeIntegerValue(
-      ClauseVars[i], OSSC_grid, /*StrictlyPositive=*/true, Outline);
+      ClauseVars[i], CKind, /*StrictlyPositive=*/true, Outline);
     if (Res.isInvalid())
       ErrorFound = true;
     ClauseVars[i] = Res.get();
@@ -4603,7 +4581,7 @@ SemaOmpSs::DeclGroupPtrTy SemaOmpSs::ActOnOmpSsDeclareTaskDirective(
   ExprResult IfRes, FinalRes, CostRes, PriorityRes, ShmemRes, OnreadyRes;
   SmallVector<Expr *, 2> LabelsRes;
   SmallVector<Expr *, 4> NdrangesRes;
-  SmallVector<Expr *, 6> GridsRes;
+  SmallVector<Expr *, 4> GridsRes;
   OSSTaskDeclAttr::DeviceType DevType = OSSTaskDeclAttr::DeviceType::Unknown;
   if (Immediate) {
     ImmediateRes = VerifyBooleanConditionWithCleanups(Immediate, Immediate->getExprLoc());
@@ -4774,7 +4752,7 @@ SemaOmpSs::DeclGroupPtrTy SemaOmpSs::ActOnOmpSsDeclareTaskDirective(
     if (DevType != OSSTaskDeclAttr::DeviceType::Cuda)
       {}//TODO(oss/grid): Diag(DeviceLoc, diag::err_oss_grid_incompatible_device);
 
-    checkGrid(SemaRef, GridLoc, Grids, GridsRes, /*Outline=*/true);
+    checkNdrangeOrGrid(OSSC_grid, SemaRef, GridLoc, Grids, GridsRes, /*Outline=*/true);
   }
 
   // TODO(oss/grid): ndranges and grid are incompatible
@@ -4783,10 +4761,10 @@ SemaOmpSs::DeclGroupPtrTy SemaOmpSs::ActOnOmpSsDeclareTaskDirective(
         || DevType == OSSTaskDeclAttr::DeviceType::Opencl))
       Diag(DeviceLoc, diag::err_oss_ndrange_incompatible_device);
 
-    checkNdrange(SemaRef, NdrangeLoc, Ndranges, NdrangesRes, /*Outline=*/true);
+    checkNdrangeOrGrid(OSSC_ndrange, SemaRef, NdrangeLoc, Ndranges, NdrangesRes, /*Outline=*/true);
   } else if (Shmem) {
     // It is an error to specify shmem without ndrange
-    Diag(Shmem->getExprLoc(), diag::err_oss_shmem_without_ndrange);
+    Diag(Shmem->getExprLoc(), diag::err_oss_shmem_without_ndrange); // TODO(oss/grid): mention grid
   }
 
   // FIXME: the specs says the underlying type of a enum
@@ -6156,8 +6134,8 @@ SemaOmpSs::ActOnOmpSsNdrangeClause(ArrayRef<Expr *> Vars,
                        SourceLocation StartLoc,
                        SourceLocation LParenLoc,
                        SourceLocation EndLoc) {
-  SmallVector<Expr *, 6> ClauseVars;
-  if (!checkNdrange(SemaRef, StartLoc, Vars, ClauseVars, /*Outline=*/false))
+  SmallVector<Expr *, 4> ClauseVars;
+  if (!checkNdrangeOrGrid(OSSC_ndrange, SemaRef, StartLoc, Vars, ClauseVars, /*Outline=*/false))
     return nullptr;
 
   return OSSNdrangeClause::Create(
@@ -6170,7 +6148,7 @@ SemaOmpSs::ActOnOmpSsGridClause(ArrayRef<Expr *> Vars,
                        SourceLocation LParenLoc,
                        SourceLocation EndLoc) {
   SmallVector<Expr *, 4> ClauseVars;
-  if (!checkGrid(SemaRef, StartLoc, Vars, ClauseVars, /*Outline=*/false))
+  if (!checkNdrangeOrGrid(OSSC_grid, SemaRef, StartLoc, Vars, ClauseVars, /*Outline=*/false))
     return nullptr;
 
   return OSSGridClause::Create(
@@ -7216,6 +7194,7 @@ void SemaOmpSs::InstantiateOSSDeclareTaskAttr(
 
   l(Attr.labelExprs_size(), Attr.labelExprs_begin(), Attr.labelExprs_end(), Labels);
   l(Attr.ndranges_size(), Attr.ndranges_begin(), Attr.ndranges_end(), Ndranges);
+  l(Attr.grids_size(), Attr.grids_begin(), Attr.grids_end(), Grids);
 
   if (auto *E = Attr.getImmediateExpr())
     ImmediateRes = Subst(E);

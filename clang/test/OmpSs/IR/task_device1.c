@@ -15,6 +15,9 @@ void foo2() {
 
 }
 
+#pragma oss task device(cuda) grid(1, 1, 1)
+void foo3();
+
 // CHECK-LABEL: define {{[^@]+}}@bar
 // CHECK-SAME: () #[[ATTR0]] !dbg [[DBG10:![0-9]+]] {
 // CHECK-NEXT:  entry:
@@ -23,11 +26,14 @@ void foo2() {
 // CHECK-NEXT:    [[TMP1:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 1), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo2\00"), "QUAL.OSS.DECL.SOURCE"([19 x i8] c"task_device1.c:8:1\00") ], !dbg [[DBG12:![0-9]+]]
 // CHECK-NEXT:    call void @foo2(), !dbg [[DBG12]]
 // CHECK-NEXT:    call void @llvm.directive.region.exit(token [[TMP1]]), !dbg [[DBG12]]
-// CHECK-NEXT:    ret void, !dbg [[DBG13:![0-9]+]]
+// CHECK-NEXT:    [[TMP2:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE"(i32 1), "QUAL.OSS.DEVICE.DEVFUNC"([5 x i8] c"foo3\00"), "QUAL.OSS.DEVICE.GRID"(i32 1, i32 1, i32 1), "QUAL.OSS.DEVICE.CALL.ORDER"(), "QUAL.OSS.DECL.SOURCE"([20 x i8] c"task_device1.c:18:1\00") ], !dbg [[DBG13:![0-9]+]]
+// CHECK-NEXT:    call void @llvm.directive.region.exit(token [[TMP2]]), !dbg [[DBG13]]
+// CHECK-NEXT:    ret void, !dbg [[DBG14:![0-9]+]]
 //
 void bar() {
     foo1();
     foo2();
+    foo3();
 }
 
 // Only impure task emit a call

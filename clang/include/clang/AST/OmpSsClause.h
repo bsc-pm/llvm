@@ -1806,13 +1806,17 @@ public:
 /// '#pragma oss task' directive.
 ///
 /// \code
-/// #pragma oss task grid(100, 1, 1, 512, 1, 1)
+/// #pragma oss task grid(1, N, 128)
 /// \endcode
 ///
 /// The syntax of grid is
 /// \code
-///   grid(gridDimX, gridDimY, gridDimZ, blockDimX, blockDimY, blockDimZ)
+///   grid(N, grid-dim-list, block-dim-list)
 /// \endcode
+/// Each X-list has as much as N elements
+///
+/// In this example directive '#pragma oss task' has simple 'grid'
+/// clause with grid dimensions N×1×1 and block dimensions 128×1×1.
 class OSSGridClause final
     : public OSSVarListClause<OSSGridClause>,
       private llvm::TrailingObjects<OSSGridClause, Expr *> {
