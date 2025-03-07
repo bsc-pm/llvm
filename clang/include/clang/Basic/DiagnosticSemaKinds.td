@@ -12097,6 +12097,8 @@ def err_oss_ndrange_or_grid_expect_nelems : Error<
   "'%0(%1, argument-list)' clause requires %2 or %3 arguments in argument-list, but got %4">;
 def err_oss_ndrange_or_grid_incompatible_device : Error<
   "%0 cannot be used with other devices than cuda and opencl">;
+def err_oss_ndrange_and_grid_incompatible : Error<
+  "ndrange and grid clauses are incomptabile">;
 def err_oss_inline_device_not_supported : Error<
   "device(%0) is not supported in inline directives">;
 def err_oss_shmem_without_ndrange_or_grid : Error<

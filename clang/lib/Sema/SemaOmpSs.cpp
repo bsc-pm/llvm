@@ -4757,13 +4757,17 @@ SemaOmpSs::DeclGroupPtrTy SemaOmpSs::ActOnOmpSsDeclareTaskDirective(
     checkNdrangeOrGrid(OSSC_grid, SemaRef, GridLoc, Grids, GridsRes, /*Outline=*/true);
   }
 
-  // TODO(oss/grid): ndranges and grid are incompatible
   if (!Ndranges.empty()) {
     if (!(DevType == OSSTaskDeclAttr::DeviceType::Cuda
         || DevType == OSSTaskDeclAttr::DeviceType::Opencl))
       Diag(DeviceLoc, diag::err_oss_ndrange_or_grid_incompatible_device) << getOmpSsClauseName(OSSC_ndrange);
 
     checkNdrangeOrGrid(OSSC_ndrange, SemaRef, NdrangeLoc, Ndranges, NdrangesRes, /*Outline=*/true);
+  }
+
+  if (!Grids.empty() && !Ndranges.empty()) {
+    // Cannot use ndrange and grid clauses at the same time
+    Diag(SR.getBegin(), diag::err_oss_ndrange_and_grid_incompatible);
   }
   
   if (Shmem && Grids.empty() && Ndranges.empty()) {

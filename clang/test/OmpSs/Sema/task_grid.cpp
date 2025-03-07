@@ -16,6 +16,8 @@ void foo6();
 #pragma oss task device(cuda) grid(1, N, N) // expected-error 4 {{argument to 'grid' clause must be a strictly positive integer value}}
 template<int N>
 void foo7();
+#pragma oss task device(cuda) grid(1, 1, 1) ndrange(1, 1, 1) // expected-error {{ndrange and grid clauses are incomptabile}}
+void foo8();
 
 
 void bar() {
