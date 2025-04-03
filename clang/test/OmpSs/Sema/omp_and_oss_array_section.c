@@ -17,4 +17,7 @@ void foo() {
   {}
   #pragma oss task in({ array[array[0]; array[1]], i=0;10 })
   {}
+  #pragma oss taskloop in(array[0:1], array[0;1])
+  for (int i = 0; i < 10; ++i)
+  {}
 }

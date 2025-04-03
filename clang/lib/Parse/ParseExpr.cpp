@@ -2149,10 +2149,14 @@ Parser::ParsePostfixExpressionSuffix(ExprResult LHS) {
         }
       };
 
+      // Since we inject taskloop tokens after parsing
+      // the for loop the OmpSs scope is the parent
       bool IsOssSection =
         (getLangOpts().OmpSs
            && (!(getLangOpts().OpenMP || AllowOpenACCArraySections)
-               || getCurScope()->isOmpSsDirectiveScope()));
+               || getCurScope()->isOmpSsDirectiveScope()
+               || (isOmpSsTaskLoopDirective(Actions.OmpSs().GetCurrentOmpSsDirective())
+                   && getCurScope()->getParent()->isOmpSsDirectiveScope())));
 
       if (!IsOssSection)
         ParseOmpAccSection();
