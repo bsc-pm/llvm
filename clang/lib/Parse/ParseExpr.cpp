@@ -2149,14 +2149,22 @@ Parser::ParsePostfixExpressionSuffix(ExprResult LHS) {
         }
       };
 
-      // Since we inject taskloop tokens after parsing
-      // the for loop the OmpSs scope is the parent
+
+      // Adjust Scope based in case of a taskloop (collapsed)
+      // Each nested loop in a collapse includes for scope and compountstmt scope
+      Scope *DirScope = getCurScope();
+      if (isOmpSsTaskLoopDirective(Actions.OmpSs().GetCurrentOmpSsDirective())) {
+        DirScope = DirScope->getParent();
+        for (int i = 2; i <= Actions.OmpSs().GetAssociatedLoops(); ++i) {
+          DirScope = DirScope->getParent();
+          DirScope = DirScope->getParent();
+        }
+      }
+
       bool IsOssSection =
         (getLangOpts().OmpSs
            && (!(getLangOpts().OpenMP || AllowOpenACCArraySections)
-               || getCurScope()->isOmpSsDirectiveScope()
-               || (isOmpSsTaskLoopDirective(Actions.OmpSs().GetCurrentOmpSsDirective())
-                   && getCurScope()->getParent()->isOmpSsDirectiveScope())));
+               || DirScope->isOmpSsDirectiveScope()));
 
       if (!IsOssSection)
         ParseOmpAccSection();

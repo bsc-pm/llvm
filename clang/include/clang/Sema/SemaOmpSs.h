@@ -105,6 +105,7 @@ public:
   // Used to distinguish between for and while taskiter
   void SetTaskiterKind(OmpSsDirectiveKind);
   bool IsEndOfTaskloop() const;
+  int GetAssociatedLoops() const;
   ExprResult PerformOmpSsImplicitIntegerConversion(SourceLocation OpLoc,
                                                    Expr *Op);
   /// Called on start of new data sharing attribute block.

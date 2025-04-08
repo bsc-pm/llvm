@@ -904,6 +904,10 @@ bool SemaOmpSs::IsEndOfTaskloop() const {
   return AssociatedLoops == SeenAssociatedLoops;
 }
 
+int SemaOmpSs::GetAssociatedLoops() const {
+  return DSAStack->getAssociatedLoops();
+}
+
 void SemaOmpSs::StartOmpSsDSABlock(OmpSsDirectiveKind DKind,
                               Scope *CurScope, SourceLocation Loc) {
   DSAStack->push(DKind, CurScope, Loc);
