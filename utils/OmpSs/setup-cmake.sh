@@ -416,7 +416,7 @@ fi
 LIT_ARGS="-DLLVM_LIT_ARGS=-sv --xunit-xml-output=xunit.xml"
 # This flag has stopped working due to psutil module missing in some machines.
 # We could enable it depending on the maching though 
-# LIT_ARGS+=" --timeout=300"
+LIT_ARGS+=" --timeout=300"
 
 if [ -n "${LLVM_LIT_THREADS}" ];
 then
