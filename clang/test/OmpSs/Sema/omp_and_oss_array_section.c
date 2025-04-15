@@ -17,18 +17,18 @@ void foo() {
   {}
   #pragma oss task in({ array[array[0]; array[1]], i=0;10 })
   {}
-  #pragma oss taskloop in(array[0:1], array[0;1])
+  #pragma oss taskloop in(array[0:1], array[0;1]) in({array[0:1],k=0;10}, {array[0;1],k=0;10})
   for (int i = 0; i < 10; ++i)
   {}
-  #pragma oss taskloop collapse(1) out(array[1 ;3])
+  #pragma oss taskloop collapse(1) out(array[1 ;3]) out({array[0:1],t=0;10}, {array[0;1],t=0;10})
   for (int i = 0; i < 10; ++i) {
   }
-  #pragma oss taskloop collapse(2) out(array[1 ;3])
+  #pragma oss taskloop collapse(2) out(array[1 ;3]) out({array[0:1],t=0;10}, {array[0;1],t=0;10})
   for (int i = 0; i < 10; ++i) {
     for (int j = 0; j < 10; ++j) {
     }
   }
-  #pragma oss taskloop collapse(3) out(array[1 ;3])
+  #pragma oss taskloop collapse(3) out(array[1 ;3]) out({array[0:1],t=0;10}, {array[0;1],t=0;10})
   for (int i = 0; i < 10; ++i) {
     for (int j = 0; j < 10; ++j) {
       for (int k = 0; k < 10; ++k) {
