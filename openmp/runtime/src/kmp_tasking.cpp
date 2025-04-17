@@ -5345,8 +5345,15 @@ void __kmp_task_team_setup(kmp_info_t *this_thr, kmp_team_t *team
 
 
 #if defined(KMP_OMPV_ENABLED)
-  if (force)
+  if (force) {
     __kmp_enable_tasking(team->t.t_task_team[other_team], this_thr);
+    for (int j = 0; j < team->t.t_task_team[other_team]->tt.tt_nproc; ++j) {
+      kmp_thread_data_t *thread_data = &team->t.t_task_team[other_team]->tt.tt_threads_data[j];
+      if (thread_data->td.td_deque == NULL) {
+        __kmp_alloc_task_deque(team->t.t_threads[j], thread_data);
+      }
+    }
+  }
 #endif // KMP_OMPV_ENABLED
 
   // For regular thread, task enabling should be called when the task is going
