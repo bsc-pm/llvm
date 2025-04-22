@@ -660,27 +660,32 @@ final_spin=FALSE)
 #if defined(KMP_OMPV_ENABLED)
       if (KMP_PASSIVE_ENABLED()) {
         if (task_team && TCR_SYNC_4(task_team->tt.tt_active) && KMP_TASKING_ENABLED(task_team)) {
-          kmp_int32 count = -1 + KMP_ATOMIC_DEC(&task_team->tt.tt_unfinished_passives);
+          kmp_int32 count = KMP_ATOMIC_LD_RLX(&task_team->tt.tt_unfinished_passives);
           KMP_ASSERT(count >= 0);
           kmp_int32 tcount = KMP_ATOMIC_LD_RLX(&task_team->tt.tt_unfinished_ready);
           KMP_ASSERT(tcount >= 0);
           if (count > tcount + 1) {
-            flag->suspend(th_gtid);
+            count = -1 + KMP_ATOMIC_DEC(&task_team->tt.tt_unfinished_passives);
+            KMP_ASSERT(count >= 0);
+            tcount = KMP_ATOMIC_LD_RLX(&task_team->tt.tt_unfinished_ready);
+            KMP_ASSERT(tcount >= 0);
+            if (count > tcount) {
+              flag->suspend(th_gtid);
 
-            // If I've been woken up because a barrier condition then
-            // no one has increased the passive counter for me. Do it myself
-            if (!this_thr->th.passive_awakened) {
+              // If I've been woken up because a barrier condition then
+              // no one has increased the passive counter for me. Do it myself
+              if (!this_thr->th.passive_awakened) {
+                KMP_ATOMIC_INC(&task_team->tt.tt_unfinished_passives);
+              }
+              this_thr->th.passive_awakened = false;
+
+              if (__kmp_dflt_blocktime != KMP_MAX_BLOCKTIME &&
+                  __kmp_pause_status != kmp_soft_paused) {
+                hibernate_goal = KMP_NOW() + this_thr->th.th_team_bt_intervals;
+              }
+            } else {
               KMP_ATOMIC_INC(&task_team->tt.tt_unfinished_passives);
             }
-            this_thr->th.passive_awakened = false;
-
-            if (__kmp_dflt_blocktime != KMP_MAX_BLOCKTIME &&
-                __kmp_pause_status != kmp_soft_paused) {
-              hibernate_goal = KMP_NOW() + this_thr->th.th_team_bt_intervals;
-            }
-
-          } else {
-            KMP_ATOMIC_INC(&task_team->tt.tt_unfinished_passives);
           }
         } else {
           flag->suspend(th_gtid);
