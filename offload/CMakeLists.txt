@@ -360,7 +360,9 @@ add_subdirectory(tools)
 add_subdirectory(src)
 
 # Add tests.
-add_subdirectory(test)
+if(${LIBOMPTARGET_ENABLE_TESTS})
+  add_subdirectory(test)
+endif()
 
 # Add unit tests if GMock/GTest is present
 if (EXISTS ${LLVM_THIRD_PARTY_DIR}/unittest)

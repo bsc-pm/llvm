@@ -499,6 +499,10 @@ fi
 if [ "${ENABLE_OFFLOAD}" = 1 ];
 then
   EXTRA_RUNTIMES+=";offload"
+  if [ "${ENABLE_OFFLOAD_TESTS}" = 1 ];
+  then
+    CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLIBOMPTARGET_ENABLE_TESTS=ON")
+  fi
 fi
 
 ################################################################################
