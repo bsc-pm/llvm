@@ -664,12 +664,12 @@ final_spin=FALSE)
           KMP_ASSERT(count >= 0);
           kmp_int32 tcount = KMP_ATOMIC_LD_RLX(&task_team->tt.tt_unfinished_ready);
           KMP_ASSERT(tcount >= 0);
-          if (count > tcount + 1) {
+          if (count > tcount + 2) {
             count = -1 + KMP_ATOMIC_DEC(&task_team->tt.tt_unfinished_passives);
             KMP_ASSERT(count >= 0);
             tcount = KMP_ATOMIC_LD_RLX(&task_team->tt.tt_unfinished_ready);
             KMP_ASSERT(tcount >= 0);
-            if (count > tcount) {
+            if (count > tcount + 1) {
               flag->suspend(th_gtid);
 
               // If I've been woken up because a barrier condition then
