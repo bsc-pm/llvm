@@ -2629,9 +2629,15 @@ static void emitForStaticInitCall(
       CGF.Builder.getIntN(Values.IVSize, 1),            // Incr
       Chunk,                                            // Chunk
   };
-  if (CGF.CGM.getLangOpts().OpenMPNosv) {
+  // From emitDistributeStaticInit
+  bool isGPUDistribute =
+      CGF.CGM.getLangOpts().OpenMPIsTargetDevice &&
+      (CGF.CGM.getTriple().isAMDGCN() || CGF.CGM.getTriple().isNVPTX());
+  if (!isGPUDistribute && CGF.CGM.getLangOpts().OpenMPNosv) {
     assert(NosvTaskTypeGV && "task type is null");
     Args.push_back(NosvTaskTypeGV);
+  } else {
+    assert(!NosvTaskTypeGV && "task type is not null");
   }
   CGF.EmitRuntimeCall(ForStaticInitFunction, Args);
 }
@@ -2653,10 +2659,20 @@ void CGOpenMPRuntime::emitForStaticInit(CodeGenFunction &CGF,
   llvm::Value *ThreadId = getThreadID(CGF, Loc);
   llvm::FunctionCallee StaticInitFunction = nullptr;
   if (CGM.getLangOpts().OpenMPNosv) {
-    assert(NosvTaskTypeGV && "task type is null");
-    StaticInitFunction =
-      OMPBuilder.createNosvForStaticInitFunction(Values.IVSize, Values.IVSigned,
-                                                 false);
+    bool isGPUDistribute =
+        CGF.CGM.getLangOpts().OpenMPIsTargetDevice &&
+        (CGF.CGM.getTriple().isAMDGCN() || CGF.CGM.getTriple().isNVPTX());
+    if (isGPUDistribute) {
+      assert(!NosvTaskTypeGV && "task type is not null");
+      StaticInitFunction =
+        OMPBuilder.createForStaticInitFunction(Values.IVSize, Values.IVSigned,
+                                               false);
+    } else {
+      assert(NosvTaskTypeGV && "task type is null");
+      StaticInitFunction =
+        OMPBuilder.createNosvForStaticInitFunction(Values.IVSize, Values.IVSigned,
+                                                   false);
+    }
   } else {
     StaticInitFunction =
       OMPBuilder.createForStaticInitFunction(Values.IVSize, Values.IVSigned,
@@ -2683,10 +2699,15 @@ void CGOpenMPRuntime::emitDistributeStaticInit(
       CGM.getLangOpts().OpenMPIsTargetDevice &&
       (CGM.getTriple().isAMDGCN() || CGM.getTriple().isNVPTX());
   if (CGM.getLangOpts().OpenMPNosv) {
-    assert(NosvTaskTypeGV && "task type is null");
-    assert(!isGPUDistribute);
-    StaticInitFunction = OMPBuilder.createNosvForStaticInitFunction(
-        Values.IVSize, Values.IVSigned, isGPUDistribute);
+    if (isGPUDistribute) {
+      assert(!NosvTaskTypeGV && "task type is not null");
+      StaticInitFunction = OMPBuilder.createForStaticInitFunction(
+          Values.IVSize, Values.IVSigned, isGPUDistribute);
+    } else {
+      assert(NosvTaskTypeGV && "task type is null");
+      StaticInitFunction = OMPBuilder.createNosvForStaticInitFunction(
+          Values.IVSize, Values.IVSigned, isGPUDistribute);
+    }
   } else {
     StaticInitFunction = OMPBuilder.createForStaticInitFunction(
         Values.IVSize, Values.IVSigned, isGPUDistribute);
@@ -2706,9 +2727,10 @@ void CGOpenMPRuntime::emitForStaticFinish(CodeGenFunction &CGF,
   if (!CGF.HaveInsertPoint())
     return;
   // Call __kmpc_for_static_fini(ident_t *loc, kmp_int32 tid);
-  bool IsTarget = isOpenMPDistributeDirective(DKind) &&
-        CGM.getLangOpts().OpenMPIsTargetDevice &&
-        (CGM.getTriple().isAMDGCN() || CGM.getTriple().isNVPTX());
+  bool isGPUDistribute =
+      CGM.getLangOpts().OpenMPIsTargetDevice &&
+      (CGM.getTriple().isAMDGCN() || CGM.getTriple().isNVPTX());
+  bool IsTarget = isOpenMPDistributeDirective(DKind) && isGPUDistribute;
   SmallVector<llvm::Value *, 2> Args = {
       emitUpdateLocation(CGF, Loc,
                          isOpenMPDistributeDirective(DKind) ||
@@ -2720,12 +2742,24 @@ void CGOpenMPRuntime::emitForStaticFinish(CodeGenFunction &CGF,
       getThreadID(CGF, Loc)};
   auto DL = ApplyDebugLocation::CreateDefaultArtificial(CGF, Loc);
   if (CGM.getLangOpts().OpenMPNosv) {
-    assert(NosvTaskTypeGV && "task type is null");
-    assert(!IsTarget);
-    Args.push_back(NosvTaskTypeGV);
-    CGF.EmitRuntimeCall(OMPBuilder.getOrCreateRuntimeFunction(
-                            CGM.getModule(), OMPVRTL___nosvc_for_static_fini),
-                        Args);
+    if (IsTarget) {
+      assert(!NosvTaskTypeGV && "task type is not null");
+      CGF.EmitRuntimeCall(
+          OMPBuilder.getOrCreateRuntimeFunction(
+              CGM.getModule(), OMPRTL___kmpc_distribute_static_fini),
+          Args);
+    } else if (isGPUDistribute) {
+      assert(!NosvTaskTypeGV && "task type is not null");
+      CGF.EmitRuntimeCall(OMPBuilder.getOrCreateRuntimeFunction(
+                              CGM.getModule(), OMPRTL___kmpc_for_static_fini),
+                          Args);
+    } else {
+      assert(NosvTaskTypeGV && "task type is null");
+      Args.push_back(NosvTaskTypeGV);
+      CGF.EmitRuntimeCall(OMPBuilder.getOrCreateRuntimeFunction(
+                              CGM.getModule(), OMPVRTL___nosvc_for_static_fini),
+                          Args);
+    }
   } else if (IsTarget) {
     CGF.EmitRuntimeCall(
         OMPBuilder.getOrCreateRuntimeFunction(
@@ -3683,6 +3717,12 @@ static void getKmpAffinityType(ASTContext &C, QualType &KmpTaskAffinityInfoTy) {
 llvm::GlobalVariable *
 CGOpenMPRuntime::emitNosvTaskTypeRegister(CodeGenFunction &CGF, SourceLocation Loc, const Expr *Label) {
   if (!CGM.getLangOpts().OpenMPNosv)
+    return nullptr;
+  // From emitDistributeStaticInit
+  bool isGPUDistribute =
+      CGM.getLangOpts().OpenMPIsTargetDevice &&
+      (CGM.getTriple().isAMDGCN() || CGM.getTriple().isNVPTX());
+  if (isGPUDistribute)
     return nullptr;
   if (!CtorRegister) {
     ASTContext &C = CGM.getContext();
