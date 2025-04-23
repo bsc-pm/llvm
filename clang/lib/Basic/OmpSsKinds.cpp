@@ -120,6 +120,7 @@ unsigned clang::getOmpSsSimpleClauseType(OmpSsClauseKind Kind,
   case OSSC_unroll:
   case OSSC_collapse:
   case OSSC_ndrange:
+  case OSSC_grid:
   case OSSC_read:
   case OSSC_write:
   case OSSC_capture:
@@ -198,6 +199,7 @@ const char *clang::getOmpSsSimpleClauseTypeName(OmpSsClauseKind Kind,
   case OSSC_unroll:
   case OSSC_collapse:
   case OSSC_ndrange:
+  case OSSC_grid:
   case OSSC_read:
   case OSSC_write:
   case OSSC_capture:
