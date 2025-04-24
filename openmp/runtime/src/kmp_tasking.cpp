@@ -2463,14 +2463,9 @@ static void __kmp_invoke_task(kmp_int32 gtid, kmp_task_t *task,
   KA_TRACE(2, ("__kmp_invoke_task: nosv_submit INLINE\n"));
 
   instr_invoke_task_enter();
-  // Once task finishes it could be freed.
-  // Rememenber the task id
-  int td_instrum_task_id = taskdata->td_instrum_task_id;
-  instr_task_execute(taskdata->td_instrum_task_id);
 
   __kmp_nosv_submit(nosv_task);
 
-  instr_task_end(td_instrum_task_id);
   instr_invoke_task_exit();
 }
 
@@ -2546,7 +2541,14 @@ void nosv_exec_task(nosv_task_t task) {
 
   updateHWFPControl(thread->th.th_team);
 
+  // Once task finishes it could be freed.
+  // Rememenber the task id
+  int td_instrum_task_id = taskdata->td_instrum_task_id;
+  instr_task_execute(taskdata->td_instrum_task_id);
+
   __kmp_invoke_task_impl(gtid, omp_task, current_task);
+
+  instr_task_end(td_instrum_task_id);
 
   free_agent_restore_team(gtid);
 }
