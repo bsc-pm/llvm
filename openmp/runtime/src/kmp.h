@@ -2964,6 +2964,7 @@ typedef struct kmp_base_task_team {
   std::atomic<kmp_int32> tt_unfinished_tasks;
   std::atomic<kmp_int32> tt_unfinished_ready;
   std::atomic<kmp_int32> tt_unfinished_passives;
+  std::atomic<kmp_int32> tt_is_manager;
 #endif // KMP_OMPV_ENABLED
 } kmp_base_task_team_t;
 

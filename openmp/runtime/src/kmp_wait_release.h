@@ -646,6 +646,16 @@ final_spin=FALSE)
     if (!Sleepable)
       continue;
 
+#if defined(KMP_OMPV_ENABLED)
+    if (KMP_PASSIVE_ENABLED()) {
+      if (task_team && TCR_SYNC_4(task_team->tt.tt_active) && KMP_TASKING_ENABLED(task_team)) {
+        kmp_int32 expected = 0;
+        if (task_team->tt.tt_is_manager.compare_exchange_strong(expected, th_gtid))
+          continue;
+      }
+    }
+#endif
+
 #if KMP_HAVE_MWAIT || KMP_HAVE_UMWAIT
     if (__kmp_mwait_enabled || __kmp_umwait_enabled) {
       KF_TRACE(50, ("__kmp_wait_sleep: T#%d using monitor/mwait\n", th_gtid));

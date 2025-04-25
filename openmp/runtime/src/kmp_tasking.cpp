@@ -5072,6 +5072,7 @@ static inline void __kmp_task_team_init(kmp_task_team_t *task_team,
     KMP_ATOMIC_ST_REL(&task_team->tt.tt_unfinished_passives, team_nth);
     KMP_ATOMIC_ST_RLX(&task_team->tt.tt_unfinished_tasks, team_nth);
     KMP_ATOMIC_ST_RLX(&task_team->tt.tt_unfinished_ready, 0);
+    KMP_ATOMIC_ST_RLX(&task_team->tt.tt_is_manager, 0);
 #endif // KMP_OMPV_ENABLED
   }
 }
