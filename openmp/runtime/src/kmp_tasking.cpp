@@ -4471,34 +4471,6 @@ static inline int __kmp_execute_tasks_template(
   while (1) { // Outer loop keeps trying to find tasks in case of single thread
     // getting tasks from target constructs
     while (1) { // Inner loop to find a task and execute it
-#if defined(KMP_OMPV_ENABLED)
-      if (KMP_PASSIVE_ENABLED()) {
-        for (int j = 0; j < 2; ++j) {
-          kmp_int32 count = KMP_ATOMIC_LD_RLX(&task_team->tt.tt_unfinished_passives);
-          kmp_int32 tcount = KMP_ATOMIC_LD_RLX(&task_team->tt.tt_unfinished_ready);
-          if (tcount > task_team->tt.tt_max_threads)
-            tcount = task_team->tt.tt_max_threads;
-          if (count <= tcount + 1) {
-            thread_local int prev_i = 0;
-            for (int i = 0; i < nthreads; ++i) {
-              prev_i = prev_i%nthreads;
-              kmp_info_t *tmp_th = threads_data[prev_i].td.td_thr;
-              if (tmp_th == thread) {
-                prev_i++;
-                continue;
-              }
-              if (tmp_th->th.th_sleep_loc != NULL) {
-                __kmp_null_resume_wrapper(tmp_th);
-                prev_i++;
-                break; // awake one thread at a time
-              }
-              prev_i++;
-            }
-          }
-        }
-      }
-#endif // KMP_OMPV_ENABLED
-
       task = NULL;
       if (task_team->tt.tt_num_task_pri) { // get priority task first
         task = __kmp_get_priority_task(gtid, task_team, is_constrained);
@@ -4577,6 +4549,34 @@ static inline int __kmp_execute_tasks_template(
           victim_tid = -2; // no successful victim found
         }
       }
+
+#if defined(KMP_OMPV_ENABLED)
+      if (KMP_PASSIVE_ENABLED()) {
+        for (int j = 0; j < 2; ++j) {
+          kmp_int32 count = KMP_ATOMIC_LD_RLX(&task_team->tt.tt_unfinished_passives);
+          kmp_int32 tcount = KMP_ATOMIC_LD_RLX(&task_team->tt.tt_unfinished_ready);
+          if (tcount > task_team->tt.tt_max_threads)
+            tcount = task_team->tt.tt_max_threads;
+          if (count <= tcount + 1) {
+            thread_local int prev_i = 0;
+            for (int i = 0; i < nthreads; ++i) {
+              prev_i = prev_i%nthreads;
+              kmp_info_t *tmp_th = threads_data[prev_i].td.td_thr;
+              if (tmp_th == thread) {
+                prev_i++;
+                continue;
+              }
+              if (tmp_th->th.th_sleep_loc != NULL) {
+                __kmp_null_resume_wrapper(tmp_th);
+                prev_i++;
+                break; // awake one thread at a time
+              }
+              prev_i++;
+            }
+          }
+        }
+      }
+#endif // KMP_OMPV_ENABLED
 
       if (task == NULL)
         break; // break out of tasking loop
