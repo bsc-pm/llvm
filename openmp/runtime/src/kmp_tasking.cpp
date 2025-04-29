@@ -4575,6 +4575,13 @@ static inline int __kmp_execute_tasks_template(
             }
           }
         }
+      } else {
+        // Schedpoint after a task exec is not enough
+        // specially in active policy when workers don't leave
+        // the cpu even when no tasks are executed.
+        // Leave this in all policies except passive
+        int res = nosv_schedpoint(NOSV_SCHEDPOINT_NONE);
+        KMP_ASSERT(res == 0);
       }
 #endif // KMP_OMPV_ENABLED
 
