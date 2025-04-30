@@ -649,9 +649,14 @@ final_spin=FALSE)
 #if defined(KMP_OMPV_ENABLED)
     if (KMP_PASSIVE_ENABLED()) {
       if (task_team && TCR_SYNC_4(task_team->tt.tt_active) && KMP_TASKING_ENABLED(task_team)) {
-        kmp_int32 expected = 0;
-        if (task_team->tt.tt_is_manager.compare_exchange_strong(expected, th_gtid))
+        kmp_int32 is_manager = KMP_ATOMIC_LD_RLX(&task_team->tt.tt_is_manager);
+        if (is_manager == 0) {
+          kmp_int32 expected = 0;
+          if (task_team->tt.tt_is_manager.compare_exchange_strong(expected, th_gtid))
+            continue;
+        } else if (is_manager == th_gtid) {
           continue;
+        }
       }
     }
 #endif
