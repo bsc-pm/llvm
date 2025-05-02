@@ -14,6 +14,8 @@ extern int ompv_instr_level;
 
 #if ENABLE_INSTRUMENTATION
 
+#define OMP_OVNI_MODEL_VERSION "1.2.1"
+
 #include <ovni.h>
 
 static inline void instr_check_ovni() {
@@ -77,7 +79,7 @@ static inline void instr_thread_init()
     return;
 
   ovni_thread_init(__kmp_gettid());
-  ovni_thread_require("openmp", "1.2.0");
+  ovni_thread_require("openmp", OMP_OVNI_MODEL_VERSION);
 }
 
 static inline void instr_thread_end(void)
@@ -145,7 +147,7 @@ static inline void instr_attached_enter(void)
   if (ompv_instr_level < 1)
     return;
 
-  ovni_thread_require("openmp", "1.1.0");
+  ovni_thread_require("openmp", OMP_OVNI_MODEL_VERSION);
 
   struct ovni_ev ev = {};
   ovni_ev_set_clock(&ev, ovni_clock_now());
