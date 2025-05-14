@@ -159,6 +159,7 @@ const OMPClauseWithPreInit *OMPClauseWithPreInit::get(const OMPClause *C) {
   case OMPC_at:
   case OMPC_severity:
   case OMPC_message:
+  case OMPC_label:
   case OMPC_device_type:
   case OMPC_match:
   case OMPC_nontemporal:
@@ -263,6 +264,7 @@ const OMPClauseWithPostUpdate *OMPClauseWithPostUpdate::get(const OMPClause *C) 
   case OMPC_at:
   case OMPC_severity:
   case OMPC_message:
+  case OMPC_label:
   case OMPC_device_type:
   case OMPC_match:
   case OMPC_nontemporal:

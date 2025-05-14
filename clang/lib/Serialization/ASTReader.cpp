@@ -10703,6 +10703,9 @@ OMPClause *OMPClauseReader::readClause() {
   case llvm::omp::OMPC_message:
     C = new (Context) OMPMessageClause();
     break;
+  case llvm::omp::OMPC_label:
+    llvm_unreachable("TODO");
+    break;
   case llvm::omp::OMPC_private:
     C = OMPPrivateClause::CreateEmpty(Context, Record.readInt());
     break;

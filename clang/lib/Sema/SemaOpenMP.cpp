@@ -6606,6 +6606,7 @@ StmtResult SemaOpenMP::ActOnOpenMPExecutableDirective(
       case OMPC_affinity:
       case OMPC_bind:
       case OMPC_filter:
+      case OMPC_label:
         continue;
       case OMPC_allocator:
       case OMPC_flush:
@@ -15861,6 +15862,7 @@ OMPClause *SemaOpenMP::ActOnOpenMPSimpleClause(
   case OMPC_affinity:
   case OMPC_when:
   case OMPC_message:
+  case OMPC_label:
   default:
     llvm_unreachable("Clause is not allowed.");
   }
@@ -16331,6 +16333,7 @@ OMPClause *SemaOpenMP::ActOnOpenMPSingleExprWithArgClause(
   case OMPC_at:
   case OMPC_severity:
   case OMPC_message:
+  case OMPC_label:
   case OMPC_destroy:
   case OMPC_novariants:
   case OMPC_nocontext:
@@ -16599,6 +16602,7 @@ OMPClause *SemaOpenMP::ActOnOpenMPClause(OpenMPClauseKind Kind,
   case OMPC_at:
   case OMPC_severity:
   case OMPC_message:
+  case OMPC_label:
   case OMPC_novariants:
   case OMPC_nocontext:
   case OMPC_detach:
@@ -17204,6 +17208,7 @@ OMPClause *SemaOpenMP::ActOnOpenMPVarListClause(OpenMPClauseKind Kind,
   case OMPC_at:
   case OMPC_severity:
   case OMPC_message:
+  case OMPC_label:
   case OMPC_destroy:
   case OMPC_novariants:
   case OMPC_nocontext:
