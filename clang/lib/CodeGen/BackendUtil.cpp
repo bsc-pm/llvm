@@ -940,7 +940,7 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
   ModulePassManager EarlyMPM;
-  if (LangOpts.OmpSs) {
+  if (LangOpts.OmpSs || CodeGenOpts.OmpSs) {
     if (!CodeGenOpts.DisableLLVMPasses) {
       // Add a verifier pass, before any other passes, to catch CodeGen issues.
       if (CodeGenOpts.VerifyModule)

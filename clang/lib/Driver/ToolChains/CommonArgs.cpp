@@ -1307,6 +1307,8 @@ void tools::addOpenMPHostOffloadingArgs(const Compilation &C,
                  [](auto TC) { return TC.second->getTripleString(); });
   CmdArgs.push_back(
       Args.MakeArgString(Twine(Targets) + llvm::join(Triples, ",")));
+  // Add OmpSs-2 flag to transform OmpSs-2 code if the user passes -fompss-2
+  CmdArgs.push_back("-fompss-2-target");
 }
 
 /// Add Fortran runtime libs

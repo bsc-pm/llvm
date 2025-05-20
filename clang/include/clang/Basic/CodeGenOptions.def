@@ -102,6 +102,7 @@ CODEGENOPT(FunctionSections  , 1, 0) ///< Set when -ffunction-sections is enable
 CODEGENOPT(BBAddrMap  , 1, 0) ///< Set when -fbasic-block-address-map is enabled.
 CODEGENOPT(InstrumentFunctions , 1, 0) ///< Set when -finstrument-functions is
                                        ///< enabled.
+CODEGENOPT(OmpSs, 1, 0)
 CODEGENOPT(InstrumentFunctionsAfterInlining , 1, 0) ///< Set when
                           ///< -finstrument-functions-after-inlining is enabled.
 CODEGENOPT(InstrumentFunctionEntryBare , 1, 0) ///< Set when

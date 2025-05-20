@@ -3545,6 +3545,11 @@ def fompss : Flag<["-"], "fompss-2">, Group<f_Group>,
   Visibility<[ClangOption, CC1Option, FlangOption, FC1Option]>,
   HelpText<"Parse OmpSs-2 pragmas and generate parallel code.">,
   MarshallingInfoFlag<LangOpts<"OmpSs">>;
+def fompss_target : Flag<["-"], "fompss-2-target">, Group<f_Group>,
+  Flags<[NoArgumentUnused]>,
+  Visibility<[ClangOption, CC1Option, FlangOption, FC1Option]>,
+  HelpText<"Parse OmpSs-2 pragmas and generate parallel code.">,
+  MarshallingInfoFlag<CodeGenOpts<"OmpSs">>;
 def fompss_EQ : Joined<["-"], "fompss-2=">, Group<f_Group>,
   Flags<[NoArgumentUnused]>,
   Visibility<[ClangOption, CC1Option]>,
