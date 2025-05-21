@@ -294,11 +294,10 @@ omp_task_type_t *__nosv_compat_register_task_info(char *label) {
     return static_cast<omp_task_type_t *>(v->p);
   }
 
-  kmp_str_loc_t loc = __kmp_str_loc_init(label, false);
-  // use loc.file, loc.func, loc.line, loc.col.
+  kmp_str_loc_t loc = __kmp_str_loc_init(label, true);
   kmp_str_buf_t buffer;
   __kmp_str_buf_init(&buffer);
-  __kmp_str_buf_print(&buffer, "%s:%d:%d", loc.file, loc.line, loc.col);
+  __kmp_str_buf_print(&buffer, "%s:%d:%d", loc.fname.base, loc.line, loc.col);
 
   omp_task_type_t *tmp;
   __nosvc_register_task_info(tmp, (void *)buffer.str);
