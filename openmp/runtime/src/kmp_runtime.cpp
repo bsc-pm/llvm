@@ -294,9 +294,18 @@ omp_task_type_t *__nosv_compat_register_task_info(char *label) {
     return static_cast<omp_task_type_t *>(v->p);
   }
 
+  kmp_str_loc_t loc = __kmp_str_loc_init(label, false);
+  // use loc.file, loc.func, loc.line, loc.col.
+  kmp_str_buf_t buffer;
+  __kmp_str_buf_init(&buffer);
+  __kmp_str_buf_print(&buffer, "%s:%d:%d", loc.file, loc.line, loc.col);
+
   omp_task_type_t *tmp;
-  __nosvc_register_task_info(tmp, (void *)label);
+  __nosvc_register_task_info(tmp, (void *)buffer.str);
   KMP_ASSERT(htab_insert(label_to_task_type_map, label, HTV_P(tmp)));
+
+  __kmp_str_buf_free(&buffer);
+  __kmp_str_loc_free(&loc);
 
   __kmp_release_bootstrap_lock(&label_to_task_type_lock);
   return tmp;
