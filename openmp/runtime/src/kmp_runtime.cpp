@@ -288,6 +288,10 @@ omp_task_type_t *__nosv_compat_register_task_info(char *label) {
   if (!__kmp_enable_compat)
     KMP_FATAL(LibompApiCall);
 
+  // If already registered it is not necessary to get the lock
+  if (htab_value *v = htab_find(label_to_task_type_map, label))
+    return static_cast<omp_task_type_t *>(v->p);
+
   __kmp_acquire_bootstrap_lock(&label_to_task_type_lock);
   if (htab_value *v = htab_find(label_to_task_type_map, label)) {
     __kmp_release_bootstrap_lock(&label_to_task_type_lock);
