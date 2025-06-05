@@ -367,7 +367,7 @@ static void __kmp_nosv_init() {
    //}
 
    __kmp_init_bootstrap_lock(&label_to_task_type_lock);
-   label_to_task_type_map = htab_create(16);
+   label_to_task_type_map = htab_create(TASK_TYPES_SIZE);
 
    kmp_uint32 cur_nosv_initialize_attempt = KMP_TEST_THEN_ADD32(&nosv_initialize_attempt, 1);
    if (!cur_nosv_initialize_attempt)

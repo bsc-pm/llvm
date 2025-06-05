@@ -27,6 +27,9 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <string.h>
 #include "hsearch.h"
 
+#include "kmp_config.h"
+#include "kmp_debug.h"
+
 /*
 open addressing hash table with 2^n table size
 quadratic probing is used in case of hash collision
@@ -87,6 +90,8 @@ static int resize(struct htab *htab, size_t nel)
 	htab->mask = newsize - 1;
 	if (!oldtab)
 		return 1;
+
+	KMP_ASSERT2(0, "hash table resize unsupported.");
 
 	oldend = oldtab + oldmask + 1;
 	for (e = oldtab; e < oldend; e++)
