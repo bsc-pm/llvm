@@ -32,9 +32,9 @@ void foo() {
     // expected-error@+2 {{variable must be of integer type}}
     #pragma oss task for
     for (S s = S(); s < s1; s += 1) {}
-    // expected-error@+1 {{use of undeclared identifier 'i'}}
-    #pragma oss task for in(i)
-    for (int i = 0; i < 10; ++i) {}
+    // expected-error@+1 {{use of undeclared identifier 'j'}}
+    #pragma oss task for in(j)
+    for (int j = 0; j < 10; ++j) {}
     // expected-error@+2 {{statement after '#pragma oss task for' must be a for loop}}
     #pragma oss task for
     if (true) {}

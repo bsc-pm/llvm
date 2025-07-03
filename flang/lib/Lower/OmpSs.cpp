@@ -73,6 +73,13 @@ static mlir::Value addHLFIROperands(
   Fortran::lower::StatementContext stmtCtx;
   hlfir::Entity rhs = Fortran::lower::convertExprToHLFIR(
       loc, converter, Fortran::evaluate::AsGenericExpr(sym).value(), converter.getLocalSymbols(), stmtCtx);
+  if (auto declareOp = rhs.getBase().getDefiningOp<hlfir::DeclareOp>()) {
+    return declareOp.getOriginalBase();
+  }
+  else {
+    llvm_unreachable("Unexpected operation");
+  }
+
   return rhs;
 }
 

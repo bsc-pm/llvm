@@ -75,7 +75,6 @@ program task
 end program
 
 
-
 ! LLVMIRDialect-LABEL:   llvm.func @_QQmain() attributes {fir.bindc_name = "task"} {
 ! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
 ! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_0]] x i32 {bindc_name = "j"} : (i64) -> !llvm.ptr
@@ -90,160 +89,161 @@ end program
 ! LLVMIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]] = llvm.mlir.constant(5 : index) : i64
 ! LLVMIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = llvm.mlir.constant(10 : index) : i64
 ! LLVMIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = llvm.mlir.addressof @_QFEarray : !llvm.ptr
-! LLVMIRDialect:           %[[VAL_13:[-0-9A-Za-z._]+]] = llvm.mlir.addressof @_QFEt : !llvm.ptr
-! LLVMIRDialect:           %[[VAL_14:[-0-9A-Za-z._]+]] = llvm.mlir.undef : i32
-! LLVMIRDialect:           %[[VAL_15:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_3]] : !llvm.ptr) function(@compute.dep0) arguments(%[[VAL_3]] : !llvm.ptr) -> i32
-! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_8]] : i32) upper_bound(%[[VAL_7]] : i32) step(%[[VAL_8]] : i32) loop_type(%[[VAL_6]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) private(%[[VAL_1]] : !llvm.ptr) private_type(%[[VAL_14]] : i32) shared(%[[VAL_3]] : !llvm.ptr) shared_type(%[[VAL_14]] : i32) out(%[[VAL_15]] : i32) {
+! LLVMIRDialect:           %[[VAL_13:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
+! LLVMIRDialect:           %[[VAL_14:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
+! LLVMIRDialect:           %[[VAL_15:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
+! LLVMIRDialect:           %[[VAL_16:[-0-9A-Za-z._]+]] = llvm.mlir.addressof @_QFEt : !llvm.ptr
+! LLVMIRDialect:           %[[VAL_17:[-0-9A-Za-z._]+]] = llvm.mlir.undef : i32
+! LLVMIRDialect:           %[[VAL_18:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_3]] : !llvm.ptr) function(@compute.dep0) arguments(%[[VAL_3]] : !llvm.ptr) -> i32
+! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_8]] : i32) upper_bound(%[[VAL_7]] : i32) step(%[[VAL_8]] : i32) loop_type(%[[VAL_6]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) private(%[[VAL_1]] : !llvm.ptr) private_type(%[[VAL_17]] : i32) shared(%[[VAL_3]] : !llvm.ptr) shared_type(%[[VAL_17]] : i32) out(%[[VAL_18]] : i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           %[[VAL_16:[-0-9A-Za-z._]+]] = llvm.mlir.undef : !llvm.array<10 x i32>
-! LLVMIRDialect:           %[[VAL_17:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_12]] : !llvm.ptr) function(@compute.dep1) arguments(%[[VAL_12]] : !llvm.ptr) -> i32
-! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_8]] : i32) upper_bound(%[[VAL_7]] : i32) step(%[[VAL_8]] : i32) loop_type(%[[VAL_6]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) private(%[[VAL_1]] : !llvm.ptr) private_type(%[[VAL_14]] : i32) shared(%[[VAL_12]] : !llvm.ptr) shared_type(%[[VAL_16]] : !llvm.array<10 x i32>) captures(%[[VAL_11]] : i64) out(%[[VAL_17]] : i32) {
+! LLVMIRDialect:           %[[VAL_19:[-0-9A-Za-z._]+]] = llvm.mlir.undef : !llvm.array<10 x i32>
+! LLVMIRDialect:           %[[VAL_20:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_12]] : !llvm.ptr) function(@compute.dep1) arguments(%[[VAL_12]] : !llvm.ptr) -> i32
+! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_8]] : i32) upper_bound(%[[VAL_7]] : i32) step(%[[VAL_8]] : i32) loop_type(%[[VAL_6]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) private(%[[VAL_1]] : !llvm.ptr) private_type(%[[VAL_17]] : i32) shared(%[[VAL_12]] : !llvm.ptr) shared_type(%[[VAL_19]] : !llvm.array<10 x i32>) captures(%[[VAL_11]] : i64) out(%[[VAL_20]] : i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           %[[VAL_18:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_12]] : !llvm.ptr) function(@compute.dep2) arguments(%[[VAL_12]], %[[VAL_3]] : !llvm.ptr, !llvm.ptr) -> i32
-! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_8]] : i32) upper_bound(%[[VAL_7]] : i32) step(%[[VAL_8]] : i32) loop_type(%[[VAL_6]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) private(%[[VAL_1]] : !llvm.ptr) private_type(%[[VAL_14]] : i32) firstprivate(%[[VAL_3]] : !llvm.ptr) firstprivate_type(%[[VAL_14]] : i32) shared(%[[VAL_12]] : !llvm.ptr) shared_type(%[[VAL_16]] : !llvm.array<10 x i32>) captures(%[[VAL_11]] : i64) out(%[[VAL_18]] : i32) {
+! LLVMIRDialect:           %[[VAL_21:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_12]] : !llvm.ptr) function(@compute.dep2) arguments(%[[VAL_12]], %[[VAL_3]] : !llvm.ptr, !llvm.ptr) -> i32
+! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_8]] : i32) upper_bound(%[[VAL_7]] : i32) step(%[[VAL_8]] : i32) loop_type(%[[VAL_6]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) private(%[[VAL_1]] : !llvm.ptr) private_type(%[[VAL_17]] : i32) firstprivate(%[[VAL_3]] : !llvm.ptr) firstprivate_type(%[[VAL_17]] : i32) shared(%[[VAL_12]] : !llvm.ptr) shared_type(%[[VAL_19]] : !llvm.array<10 x i32>) captures(%[[VAL_11]] : i64) out(%[[VAL_21]] : i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           %[[VAL_19:[-0-9A-Za-z._]+]] = llvm.mlir.undef : !llvm.struct<"_QFTty", (i32, array<10 x i32>)>
-! LLVMIRDialect:           %[[VAL_20:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_13]] : !llvm.ptr) function(@compute.dep3) arguments(%[[VAL_13]] : !llvm.ptr) -> i32
-! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_8]] : i32) upper_bound(%[[VAL_7]] : i32) step(%[[VAL_8]] : i32) loop_type(%[[VAL_6]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) private(%[[VAL_1]] : !llvm.ptr) private_type(%[[VAL_14]] : i32) shared(%[[VAL_13]] : !llvm.ptr) shared_type(%[[VAL_19]] : !llvm.struct<"_QFTty", (i32, array<10 x i32>)>) out(%[[VAL_20]] : i32) {
+! LLVMIRDialect:           %[[VAL_22:[-0-9A-Za-z._]+]] = llvm.mlir.undef : !llvm.struct<"_QFTty", (i32, array<10 x i32>)>
+! LLVMIRDialect:           %[[VAL_23:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_16]] : !llvm.ptr) function(@compute.dep3) arguments(%[[VAL_16]] : !llvm.ptr) -> i32
+! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_8]] : i32) upper_bound(%[[VAL_7]] : i32) step(%[[VAL_8]] : i32) loop_type(%[[VAL_6]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) private(%[[VAL_1]] : !llvm.ptr) private_type(%[[VAL_17]] : i32) shared(%[[VAL_16]] : !llvm.ptr) shared_type(%[[VAL_22]] : !llvm.struct<"_QFTty", (i32, array<10 x i32>)>) out(%[[VAL_23]] : i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           %[[VAL_21:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_13]] : !llvm.ptr) function(@compute.dep4) arguments(%[[VAL_13]] : !llvm.ptr) -> i32
-! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_8]] : i32) upper_bound(%[[VAL_7]] : i32) step(%[[VAL_8]] : i32) loop_type(%[[VAL_6]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) private(%[[VAL_1]] : !llvm.ptr) private_type(%[[VAL_14]] : i32) shared(%[[VAL_13]] : !llvm.ptr) shared_type(%[[VAL_19]] : !llvm.struct<"_QFTty", (i32, array<10 x i32>)>) out(%[[VAL_21]] : i32) {
+! LLVMIRDialect:           %[[VAL_24:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_16]] : !llvm.ptr) function(@compute.dep4) arguments(%[[VAL_16]] : !llvm.ptr) -> i32
+! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_8]] : i32) upper_bound(%[[VAL_7]] : i32) step(%[[VAL_8]] : i32) loop_type(%[[VAL_6]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) private(%[[VAL_1]] : !llvm.ptr) private_type(%[[VAL_17]] : i32) shared(%[[VAL_16]] : !llvm.ptr) shared_type(%[[VAL_22]] : !llvm.struct<"_QFTty", (i32, array<10 x i32>)>) out(%[[VAL_24]] : i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           %[[VAL_22:[-0-9A-Za-z._]+]] = llvm.mlir.undef : !llvm.array<6 x i32>
-! LLVMIRDialect:           %[[VAL_23:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_5]] : !llvm.ptr) function(@compute.dep5) arguments(%[[VAL_5]] : !llvm.ptr) -> i32
-! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_8]] : i32) upper_bound(%[[VAL_7]] : i32) step(%[[VAL_8]] : i32) loop_type(%[[VAL_6]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) private(%[[VAL_1]] : !llvm.ptr) private_type(%[[VAL_14]] : i32) shared(%[[VAL_5]] : !llvm.ptr) shared_type(%[[VAL_22]] : !llvm.array<6 x i32>) captures(%[[VAL_9]], %[[VAL_10]] : i64, i64) out(%[[VAL_23]] : i32) {
+! LLVMIRDialect:           %[[VAL_25:[-0-9A-Za-z._]+]] = llvm.mlir.undef : !llvm.array<6 x i32>
+! LLVMIRDialect:           %[[VAL_26:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_5]] : !llvm.ptr) function(@compute.dep5) arguments(%[[VAL_5]] : !llvm.ptr) -> i32
+! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_8]] : i32) upper_bound(%[[VAL_7]] : i32) step(%[[VAL_8]] : i32) loop_type(%[[VAL_6]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) private(%[[VAL_1]] : !llvm.ptr) private_type(%[[VAL_17]] : i32) shared(%[[VAL_5]] : !llvm.ptr) shared_type(%[[VAL_25]] : !llvm.array<6 x i32>) captures(%[[VAL_9]], %[[VAL_10]] : i64, i64) out(%[[VAL_26]] : i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           %[[VAL_24:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_12]] : !llvm.ptr) function(@compute.dep6) arguments(%[[VAL_12]], %[[VAL_3]] : !llvm.ptr, !llvm.ptr) -> i32
-! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_8]] : i32) upper_bound(%[[VAL_7]] : i32) step(%[[VAL_8]] : i32) loop_type(%[[VAL_6]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) private(%[[VAL_1]] : !llvm.ptr) private_type(%[[VAL_14]] : i32) firstprivate(%[[VAL_3]] : !llvm.ptr) firstprivate_type(%[[VAL_14]] : i32) shared(%[[VAL_12]] : !llvm.ptr) shared_type(%[[VAL_16]] : !llvm.array<10 x i32>) captures(%[[VAL_11]] : i64) out(%[[VAL_24]] : i32) {
+! LLVMIRDialect:           %[[VAL_27:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_12]] : !llvm.ptr) function(@compute.dep6) arguments(%[[VAL_12]], %[[VAL_3]] : !llvm.ptr, !llvm.ptr) -> i32
+! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_8]] : i32) upper_bound(%[[VAL_7]] : i32) step(%[[VAL_8]] : i32) loop_type(%[[VAL_6]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) private(%[[VAL_1]] : !llvm.ptr) private_type(%[[VAL_17]] : i32) firstprivate(%[[VAL_3]] : !llvm.ptr) firstprivate_type(%[[VAL_17]] : i32) shared(%[[VAL_12]] : !llvm.ptr) shared_type(%[[VAL_19]] : !llvm.array<10 x i32>) captures(%[[VAL_11]] : i64) out(%[[VAL_27]] : i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           %[[VAL_25:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_12]] : !llvm.ptr) function(@compute.dep7) arguments(%[[VAL_12]] : !llvm.ptr) -> i32
-! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_8]] : i32) upper_bound(%[[VAL_7]] : i32) step(%[[VAL_8]] : i32) loop_type(%[[VAL_6]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) private(%[[VAL_1]] : !llvm.ptr) private_type(%[[VAL_14]] : i32) shared(%[[VAL_12]] : !llvm.ptr) shared_type(%[[VAL_16]] : !llvm.array<10 x i32>) captures(%[[VAL_11]] : i64) out(%[[VAL_25]] : i32) {
+! LLVMIRDialect:           %[[VAL_28:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_12]] : !llvm.ptr) function(@compute.dep7) arguments(%[[VAL_12]] : !llvm.ptr) -> i32
+! LLVMIRDialect:           oss.task_for lower_bound(%[[VAL_8]] : i32) upper_bound(%[[VAL_7]] : i32) step(%[[VAL_8]] : i32) loop_type(%[[VAL_6]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) private(%[[VAL_1]] : !llvm.ptr) private_type(%[[VAL_17]] : i32) shared(%[[VAL_12]] : !llvm.ptr) shared_type(%[[VAL_19]] : !llvm.array<10 x i32>) captures(%[[VAL_11]] : i64) out(%[[VAL_28]] : i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
 ! LLVMIRDialect:           llvm.return
 ! LLVMIRDialect:         }
 
 ! LLVMIRDialect-LABEL:   llvm.func @compute.dep0(
-! LLVMIRDialect-SAME:                            %[[VAL_0:[-0-9A-Za-z._]+]]: !llvm.ptr) -> !llvm.struct<(ptr, i64, i64, i64)> {
-! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.mlir.constant(4 : i64) : i64
-! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.constant(0 : i64) : i64
-! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.mlir.undef : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_0]], %[[VAL_3]][0] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_1]], %[[VAL_4]][1] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_2]], %[[VAL_5]][2] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_1]], %[[VAL_6]][3] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           llvm.return %[[VAL_7]] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect-SAME:      %[[ARG0:[-0-9A-Za-z._]+]]: !llvm.ptr) -> !llvm.struct<(ptr, i64, i64, i64)> {
+! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.constant(4 : i64) : i64
+! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.mlir.constant(0 : i64) : i64
+! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.poison : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[ARG0]], %[[VAL_2]][0] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_0]], %[[VAL_3]][1] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_1]], %[[VAL_4]][2] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_0]], %[[VAL_5]][3] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           llvm.return %[[VAL_6]] : !llvm.struct<(ptr, i64, i64, i64)>
 ! LLVMIRDialect:         }
 
 ! LLVMIRDialect-LABEL:   llvm.func @compute.dep1(
-! LLVMIRDialect-SAME:                            %[[VAL_0:[-0-9A-Za-z._]+]]: !llvm.ptr) -> !llvm.struct<(ptr, i64, i64, i64)> {
-! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.mlir.constant(40 : i64) : i64
-! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.constant(0 : i64) : i64
-! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.mlir.undef : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_0]], %[[VAL_3]][0] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_1]], %[[VAL_4]][1] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_2]], %[[VAL_5]][2] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_1]], %[[VAL_6]][3] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           llvm.return %[[VAL_7]] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect-SAME:      %[[ARG0:[-0-9A-Za-z._]+]]: !llvm.ptr) -> !llvm.struct<(ptr, i64, i64, i64)> {
+! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.constant(40 : i64) : i64
+! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.mlir.constant(0 : i64) : i64
+! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.poison : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[ARG0]], %[[VAL_2]][0] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_0]], %[[VAL_3]][1] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_1]], %[[VAL_4]][2] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_0]], %[[VAL_5]][3] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           llvm.return %[[VAL_6]] : !llvm.struct<(ptr, i64, i64, i64)>
 ! LLVMIRDialect:         }
 
 ! LLVMIRDialect-LABEL:   llvm.func @compute.dep2(
-! LLVMIRDialect-SAME:                            %[[VAL_0:[-0-9A-Za-z._]+]]: !llvm.ptr,
-! LLVMIRDialect-SAME:                            %[[VAL_1:[-0-9A-Za-z._]+]]: !llvm.ptr) -> !llvm.struct<(ptr, i64, i64, i64)> {
-! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.constant(40 : i64) : i64
-! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.mlir.constant(4 : i64) : i64
-! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
-! LLVMIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.load %[[VAL_1]] : !llvm.ptr -> i32
-! LLVMIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.sext %[[VAL_5]] : i32 to i64
-! LLVMIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = llvm.sub %[[VAL_6]], %[[VAL_4]] : i64
-! LLVMIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = llvm.mul %[[VAL_7]], %[[VAL_3]] : i64
-! LLVMIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = llvm.mul %[[VAL_6]], %[[VAL_3]] : i64
-! LLVMIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]] = llvm.mlir.undef : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_0]], %[[VAL_10]][0] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_2]], %[[VAL_11]][1] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_13:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_8]], %[[VAL_12]][2] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_14:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_9]], %[[VAL_13]][3] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           llvm.return %[[VAL_14]] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect-SAME:      %[[ARG0:[-0-9A-Za-z._]+]]: !llvm.ptr,
+! LLVMIRDialect-SAME:      %[[ARG1:[-0-9A-Za-z._]+]]: !llvm.ptr) -> !llvm.struct<(ptr, i64, i64, i64)> {
+! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.constant(40 : i64) : i64
+! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.mlir.constant(4 : i64) : i64
+! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
+! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.load %[[ARG1]] : !llvm.ptr -> i32
+! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.sext %[[VAL_3]] : i32 to i64
+! LLVMIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.sub %[[VAL_4]], %[[VAL_2]] : i64
+! LLVMIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.mul %[[VAL_5]], %[[VAL_1]] : i64
+! LLVMIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = llvm.mul %[[VAL_4]], %[[VAL_1]] : i64
+! LLVMIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = llvm.mlir.poison : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[ARG0]], %[[VAL_8]][0] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_0]], %[[VAL_9]][1] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_6]], %[[VAL_10]][2] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_7]], %[[VAL_11]][3] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           llvm.return %[[VAL_12]] : !llvm.struct<(ptr, i64, i64, i64)>
 ! LLVMIRDialect:         }
 
 ! LLVMIRDialect-LABEL:   llvm.func @compute.dep3(
-! LLVMIRDialect-SAME:                            %[[VAL_0:[-0-9A-Za-z._]+]]: !llvm.ptr) -> !llvm.struct<(ptr, i64, i64, i64)> {
-! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.mlir.constant(0 : i64) : i64
-! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.constant(4 : i64) : i64
-! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.mlir.constant(0 : i32) : i32
-! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.getelementptr %[[VAL_0]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<"_QFTty", (i32, array<10 x i32>)>
-! LLVMIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.mlir.undef : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_4]], %[[VAL_5]][0] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_2]], %[[VAL_6]][1] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_1]], %[[VAL_7]][2] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_2]], %[[VAL_8]][3] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           llvm.return %[[VAL_9]] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect-SAME:      %[[ARG0:[-0-9A-Za-z._]+]]: !llvm.ptr) -> !llvm.struct<(ptr, i64, i64, i64)> {
+! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.constant(0 : i64) : i64
+! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.mlir.constant(4 : i64) : i64
+! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.getelementptr %[[ARG0]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<"_QFTty", (i32, array<10 x i32>)>
+! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.mlir.poison : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_2]], %[[VAL_3]][0] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_1]], %[[VAL_4]][1] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_0]], %[[VAL_5]][2] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_1]], %[[VAL_6]][3] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           llvm.return %[[VAL_7]] : !llvm.struct<(ptr, i64, i64, i64)>
 ! LLVMIRDialect:         }
 
 ! LLVMIRDialect-LABEL:   llvm.func @compute.dep4(
-! LLVMIRDialect-SAME:                            %[[VAL_0:[-0-9A-Za-z._]+]]: !llvm.ptr) -> !llvm.struct<(ptr, i64, i64, i64)> {
-! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.mlir.constant(0 : i64) : i64
-! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.constant(40 : i64) : i64
-! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i32) : i32
-! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.getelementptr %[[VAL_0]][0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<"_QFTty", (i32, array<10 x i32>)>
-! LLVMIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.mlir.undef : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_4]], %[[VAL_5]][0] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_2]], %[[VAL_6]][1] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_1]], %[[VAL_7]][2] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_2]], %[[VAL_8]][3] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           llvm.return %[[VAL_9]] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect-SAME:      %[[ARG0:[-0-9A-Za-z._]+]]: !llvm.ptr) -> !llvm.struct<(ptr, i64, i64, i64)> {
+! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.constant(0 : i64) : i64
+! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.mlir.constant(40 : i64) : i64
+! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.getelementptr %[[ARG0]][0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<"_QFTty", (i32, array<10 x i32>)>
+! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.mlir.poison : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_2]], %[[VAL_3]][0] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_1]], %[[VAL_4]][1] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_0]], %[[VAL_5]][2] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_1]], %[[VAL_6]][3] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           llvm.return %[[VAL_7]] : !llvm.struct<(ptr, i64, i64, i64)>
 ! LLVMIRDialect:         }
 
 ! LLVMIRDialect-LABEL:   llvm.func @compute.dep5(
-! LLVMIRDialect-SAME:                            %[[VAL_0:[-0-9A-Za-z._]+]]: !llvm.ptr) -> !llvm.struct<(ptr, i64, i64, i64)> {
-! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.mlir.constant(24 : i64) : i64
-! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.constant(0 : i64) : i64
-! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.mlir.undef : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_0]], %[[VAL_3]][0] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_1]], %[[VAL_4]][1] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_2]], %[[VAL_5]][2] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_1]], %[[VAL_6]][3] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           llvm.return %[[VAL_7]] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect-SAME:      %[[ARG0:[-0-9A-Za-z._]+]]: !llvm.ptr) -> !llvm.struct<(ptr, i64, i64, i64)> {
+! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.constant(24 : i64) : i64
+! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.mlir.constant(0 : i64) : i64
+! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.poison : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[ARG0]], %[[VAL_2]][0] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_0]], %[[VAL_3]][1] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_1]], %[[VAL_4]][2] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_0]], %[[VAL_5]][3] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           llvm.return %[[VAL_6]] : !llvm.struct<(ptr, i64, i64, i64)>
 ! LLVMIRDialect:         }
 
 ! LLVMIRDialect-LABEL:   llvm.func @compute.dep6(
-! LLVMIRDialect-SAME:                            %[[VAL_0:[-0-9A-Za-z._]+]]: !llvm.ptr,
-! LLVMIRDialect-SAME:                            %[[VAL_1:[-0-9A-Za-z._]+]]: !llvm.ptr) -> !llvm.struct<(ptr, i64, i64, i64)> {
-! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.constant(40 : i64) : i64
-! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.mlir.constant(4 : i64) : i64
-! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.mlir.constant(10 : i32) : i32
-! LLVMIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
-! LLVMIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.load %[[VAL_1]] : !llvm.ptr -> i32
+! LLVMIRDialect-SAME:      %[[ARG0:[-0-9A-Za-z._]+]]: !llvm.ptr,
+! LLVMIRDialect-SAME:      %[[ARG1:[-0-9A-Za-z._]+]]: !llvm.ptr) -> !llvm.struct<(ptr, i64, i64, i64)> {
+! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.constant(40 : i64) : i64
+! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.mlir.constant(4 : i64) : i64
+! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.constant(10 : i32) : i32
+! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
+! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.load %[[ARG1]] : !llvm.ptr -> i32
+! LLVMIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.sext %[[VAL_4]] : i32 to i64
+! LLVMIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.add %[[VAL_4]], %[[VAL_2]] : i32
 ! LLVMIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = llvm.sext %[[VAL_6]] : i32 to i64
-! LLVMIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = llvm.add %[[VAL_6]], %[[VAL_4]] : i32
-! LLVMIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = llvm.sext %[[VAL_8]] : i32 to i64
-! LLVMIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]] = llvm.sub %[[VAL_7]], %[[VAL_5]] : i64
-! LLVMIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = llvm.mul %[[VAL_10]], %[[VAL_3]] : i64
-! LLVMIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = llvm.mul %[[VAL_9]], %[[VAL_3]] : i64
-! LLVMIRDialect:           %[[VAL_13:[-0-9A-Za-z._]+]] = llvm.mlir.undef : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_14:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_0]], %[[VAL_13]][0] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_15:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_2]], %[[VAL_14]][1] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_16:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_11]], %[[VAL_15]][2] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_17:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_12]], %[[VAL_16]][3] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           llvm.return %[[VAL_17]] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = llvm.sub %[[VAL_5]], %[[VAL_3]] : i64
+! LLVMIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = llvm.mul %[[VAL_8]], %[[VAL_1]] : i64
+! LLVMIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]] = llvm.mul %[[VAL_7]], %[[VAL_1]] : i64
+! LLVMIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = llvm.mlir.poison : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[ARG0]], %[[VAL_11]][0] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_13:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_0]], %[[VAL_12]][1] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_14:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_9]], %[[VAL_13]][2] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_15:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_10]], %[[VAL_14]][3] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           llvm.return %[[VAL_15]] : !llvm.struct<(ptr, i64, i64, i64)>
 ! LLVMIRDialect:         }
 
 ! LLVMIRDialect-LABEL:   llvm.func @compute.dep7(
-! LLVMIRDialect-SAME:                            %[[VAL_0:[-0-9A-Za-z._]+]]: !llvm.ptr) -> !llvm.struct<(ptr, i64, i64, i64)> {
-! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.mlir.constant(40 : i64) : i64
-! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.constant(0 : i64) : i64
-! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.mlir.undef : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_0]], %[[VAL_3]][0] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_1]], %[[VAL_4]][1] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_2]], %[[VAL_5]][2] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_1]], %[[VAL_6]][3] : !llvm.struct<(ptr, i64, i64, i64)>
-! LLVMIRDialect:           llvm.return %[[VAL_7]] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect-SAME:      %[[ARG0:[-0-9A-Za-z._]+]]: !llvm.ptr) -> !llvm.struct<(ptr, i64, i64, i64)> {
+! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.constant(40 : i64) : i64
+! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.mlir.constant(0 : i64) : i64
+! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.poison : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[ARG0]], %[[VAL_2]][0] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_0]], %[[VAL_3]][1] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_1]], %[[VAL_4]][2] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_0]], %[[VAL_5]][3] : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           llvm.return %[[VAL_6]] : !llvm.struct<(ptr, i64, i64, i64)>
 ! LLVMIRDialect:         }
 

@@ -16,7 +16,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
-#include "llvm/Transforms/Utils/CodeExtractor.h"
+#include "llvm/Transforms/Utils/OldCodeExtractor.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
@@ -75,7 +75,7 @@ static void registerCheckVersion(Module &M) {
           Versions), "nanos6_versions");
 
     IRBuilder<> BBBuilder(&Entry.back());
-    Constant *SourceFilenameGV = BBBuilder.CreateGlobalStringPtr(M.getSourceFileName());
+    Constant *SourceFilenameGV = BBBuilder.CreateGlobalString(M.getSourceFileName());
     BBBuilder.CreateCall(
       nanos6Api::checkVersionFuncCallee(M), {NumVersionsValue, VersionListValue, SourceFilenameGV});
   }
@@ -420,14 +420,14 @@ struct OmpSsDirective {
           if (Blocks.count(UI->getParent())) {
             if (ConstantExpr *CE = dyn_cast<ConstantExpr>(U)) {
               Instruction *NewU = CE->getAsInstruction();
-              NewU->insertBefore(UI);
+              NewU->insertBefore(UI->getIterator());
               UI->replaceUsesOfWith(U, NewU);
             } else if (ConstantAggregate *CE = dyn_cast<ConstantAggregate>(U)) {
               // Convert the whole constant to a set of InsertValueInst
               Value *NewU = UndefValue::get(CE->getType());
               unsigned Idx = 0;
               while (auto Elt = CE->getAggregateElement(Idx)) {
-                NewU = InsertValueInst::Create(NewU, Elt, Idx, "", UI);
+                NewU = InsertValueInst::Create(NewU, Elt, Idx, "", UI->getIterator());
                 ++Idx;
               }
               UI->replaceUsesOfWith(U, NewU);
@@ -766,7 +766,7 @@ struct OmpSsDirective {
       TaskDepAPICall.push_back(ConstantInt::get(Int32Ty, ReductionsInitCombInfo.lookup(Base).ReductionIndex));
     }
 
-    Constant *RegionTextGV = BBBuilder.CreateGlobalStringPtr(DepInfo->RegionText);
+    Constant *RegionTextGV = BBBuilder.CreateGlobalString(DepInfo->RegionText);
 
     Value *Handler = &*(UnpackFunc->arg_end() - 1);
     TaskDepAPICall.push_back(Handler);
@@ -1831,7 +1831,7 @@ struct OmpSsDirective {
     std::string FileNamePlusLoc = (M.getSourceFileName()
                                    + ":" + Twine(Line)
                                    + ":" + Twine(Col)).str();
-    Constant *Nanos6TaskwaitLocStr = IRB.CreateGlobalStringPtr(FileNamePlusLoc);
+    Constant *Nanos6TaskwaitLocStr = IRB.CreateGlobalString(FileNamePlusLoc);
 
     // 3. Insert the call
     IRB.CreateCall(Func, {Nanos6TaskwaitLocStr});
@@ -2861,13 +2861,13 @@ struct OmpSsDirective {
                                    + ":" + Twine(Line)
                                    + ":" + Twine(Col)).str();
 
-    Constant *Nanos6TaskLocStr = IRBuilder<>(Entry).CreateGlobalStringPtr(FileNamePlusLoc);
+    Constant *Nanos6TaskLocStr = IRBuilder<>(Entry).CreateGlobalString(FileNamePlusLoc);
     Constant *Nanos6TaskDeclSourceStr = nullptr;
     if (!DirEnv.DeclSourceStringRef.empty())
-      Nanos6TaskDeclSourceStr = IRBuilder<>(Entry).CreateGlobalStringPtr(DirEnv.DeclSourceStringRef);
+      Nanos6TaskDeclSourceStr = IRBuilder<>(Entry).CreateGlobalString(DirEnv.DeclSourceStringRef);
     Constant *Nanos6TaskDevFuncStr = nullptr;
     if (!DirEnv.DeviceInfo.DevFuncStringRef.empty())
-      Nanos6TaskDevFuncStr = IRBuilder<>(Entry).CreateGlobalStringPtr(DirEnv.DeviceInfo.DevFuncStringRef);
+      Nanos6TaskDevFuncStr = IRBuilder<>(Entry).CreateGlobalString(DirEnv.DeviceInfo.DevFuncStringRef);
 
     // In loop constructs this will be the starting loop BB
     Instruction *NewEntryI = Entry;
@@ -3026,7 +3026,7 @@ struct OmpSsDirective {
     };
 
     // 4. Extract region the way we want
-    CodeExtractorAnalysisCache CEAC(F);
+    OldCodeExtractorAnalysisCache CEAC(F);
     SmallVector<BasicBlock *> TaskBBs1;
     for (auto *I : TaskBBs)
       TaskBBs1.push_back(I->getParent());
@@ -3040,7 +3040,7 @@ struct OmpSsDirective {
       &OmpSsDirective::emitOmpSsCaptureAndSubmitTask, this, DLoc, TaskArgsTy,
       TaskArgsToStructIdxMap, TaskInfoVar, TaskInvInfoVar,
       std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
-    CodeExtractor CE(TaskBBs1, fwdRewriteUsesBrAndGetOmpSsUnpackFunc, fwdEmitOmpSsCaptureAndSubmitTask, valueInUnpackParams);
+    OldCodeExtractor CE(TaskBBs1, fwdRewriteUsesBrAndGetOmpSsUnpackFunc, fwdEmitOmpSsCaptureAndSubmitTask, valueInUnpackParams);
     CE.extractCodeRegion(CEAC);
   }
 
@@ -3063,7 +3063,7 @@ struct OmpSsDirective {
     std::string FileNamePlusLoc = (M.getSourceFileName()
                                    + ":" + Twine(Line)
                                    + ":" + Twine(Col)).str();
-    Constant *Nanos6CriticalLocStr = IRB.CreateGlobalStringPtr(FileNamePlusLoc);
+    Constant *Nanos6CriticalLocStr = IRB.CreateGlobalString(FileNamePlusLoc);
 
     GlobalVariable *GLock = cast<GlobalVariable>(
       M.getOrInsertGlobal(DirEnv.CriticalNameStringRef, PtrTy));
@@ -3240,7 +3240,7 @@ struct OmpSsFunction {
     for (auto *I : PostMoveInstructions) {
       Function *DstF = cast<Function>(I->getParent()->getParent());
       Instruction *TI = DstF->getEntryBlock().getTerminator();
-      I->moveBefore(TI);
+      I->moveBefore(TI->getIterator());
     }
   }
 
@@ -3371,7 +3371,7 @@ struct OmpSsModule {
     BasicBlock &Entry = Func->getEntryBlock();
 
     IRBuilder<> BBBuilder(&Entry.back());
-    Constant *StringPtr = BBBuilder.CreateGlobalStringPtr(Str);
+    Constant *StringPtr = BBBuilder.CreateGlobalString(Str);
     BBBuilder.CreateCall(nanos6Api::registerAssertFuncCallee(M), StringPtr);
   }
 

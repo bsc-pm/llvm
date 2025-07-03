@@ -45,7 +45,7 @@ void foo() {
 
     // Check we cleanup late parsed tokens even if init-stmt is not well-formed
     #pragma oss taskloop
-    for ( = ; i < 10; ++i) { // expected-error 2 {{expected expression}} expected-error 2 {{use of undeclared identifier 'i'}} expected-error {{initialization clause of OmpSs-2 for loop is not in canonical form ('var = init' or 'T var = init')}}
+    for ( = ; k < 10; ++k) { // expected-error 2 {{expected expression}} expected-error 2 {{use of undeclared identifier 'k'}} expected-error {{initialization clause of OmpSs-2 for loop is not in canonical form ('var = init' or 'T var = init')}}
         #pragma oss taskloop
         for (int j = 0; j < 10; ++j)
         ;

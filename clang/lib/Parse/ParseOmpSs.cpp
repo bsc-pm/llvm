@@ -13,7 +13,6 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/StmtOmpSs.h"
 #include "clang/Basic/OmpSsKinds.h"
-#include "clang/Parse/ParseDiagnostic.h"
 #include "clang/Parse/Parser.h"
 #include "clang/Parse/RAIIObjectsForParser.h"
 #include "clang/Sema/Scope.h"
@@ -1470,8 +1469,7 @@ bool Parser::ParseOmpSsFixedList(
     if (i == 0 && Kind == OSSC_label)
       Diags.setSuppressAllDiagnostics(true);
 
-    ExprResult Val =
-        Actions.CorrectDelayedTyposInExpr(ParseAssignmentExpression());
+    ExprResult Val = ParseAssignmentExpression();
 
     // See 1.
     if (i == 0 && Kind == OSSC_label) {
@@ -1598,8 +1596,7 @@ bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
   while (IsComma || (Tok.isNot(tok::r_paren) && Tok.isNot(tok::colon) &&
                      Tok.isNot(tok::annot_pragma_ompss_end))) {
     // Parse variable
-    ExprResult VarExpr =
-        Actions.CorrectDelayedTyposInExpr(ParseOSSAssignmentExpression(DKind, Kind));
+    ExprResult VarExpr = ParseOSSAssignmentExpression(DKind, Kind);
     if (VarExpr.isUsable()) {
       Vars.push_back(VarExpr.get());
     } else {
@@ -1723,7 +1720,7 @@ ExprResult Parser::ParseOmpSsParensExpr(StringRef ClauseName,
   SourceLocation ELoc = Tok.getLocation();
 
   ExprResult LHS(ParseCastExpression(
-      AnyCastExpr, /*isAddressOfOperand=*/false, NotTypeCast));
+      CastParseKind::AnyCastExpr, /*isAddressOfOperand=*/false, TypeCastState::NotTypeCast));
   ExprResult Val(ParseRHSOfBinaryExpression(LHS, prec::Conditional));
   Val = Actions.ActOnFinishFullExpr(Val.get(), ELoc, /*DiscardedValue*/ false);
 

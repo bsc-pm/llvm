@@ -108,7 +108,7 @@ end subroutine
 !LLVMIR-LABEL: define { ptr, i64, i64, i64 } @compute.dep0(i64 %0, ptr %1)
 !LLVMIR:   %3 = add i64 %0, -3
 !LLVMIR-NEXT:   %4 = mul i64 %3, 4
-!LLVMIR-NEXT:   %5 = insertvalue { ptr, i64, i64, i64 } undef, ptr %1, 0
+!LLVMIR-NEXT:   %5 = insertvalue { ptr, i64, i64, i64 } poison, ptr %1, 0
 !LLVMIR-NEXT:   %6 = insertvalue { ptr, i64, i64, i64 } %5, i64 %4, 1
 !LLVMIR-NEXT:   %7 = insertvalue { ptr, i64, i64, i64 } %6, i64 0, 2
 !LLVMIR-NEXT:   %8 = insertvalue { ptr, i64, i64, i64 } %7, i64 %4, 3
@@ -120,7 +120,7 @@ end subroutine
 !LLVMIR-NEXT:   %5 = sub i64 %4, 1
 !LLVMIR-NEXT:   %6 = mul i64 %5, 4
 !LLVMIR-NEXT:   %7 = mul i64 %4, 4
-!LLVMIR-NEXT:   %8 = insertvalue { ptr, i64, i64, i64 } undef, ptr %0, 0
+!LLVMIR-NEXT:   %8 = insertvalue { ptr, i64, i64, i64 } poison, ptr %0, 0
 !LLVMIR-NEXT:   %9 = insertvalue { ptr, i64, i64, i64 } %8, i64 4, 1
 !LLVMIR-NEXT:   %10 = insertvalue { ptr, i64, i64, i64 } %9, i64 %6, 2
 !LLVMIR-NEXT:   %11 = insertvalue { ptr, i64, i64, i64 } %10, i64 %7, 3
@@ -137,7 +137,7 @@ end subroutine
 !LLVMIR-NEXT:   %11 = mul i64 %6, 4
 !LLVMIR-NEXT:   %12 = mul i64 %9, 4
 !LLVMIR-NEXT:   %13 = mul i64 %10, 4
-!LLVMIR-NEXT:   %14 = insertvalue { ptr, i64, i64, i64 } undef, ptr %1, 0
+!LLVMIR-NEXT:   %14 = insertvalue { ptr, i64, i64, i64 } poison, ptr %1, 0
 !LLVMIR-NEXT:   %15 = insertvalue { ptr, i64, i64, i64 } %14, i64 %11, 1
 !LLVMIR-NEXT:   %16 = insertvalue { ptr, i64, i64, i64 } %15, i64 %12, 2
 !LLVMIR-NEXT:   %17 = insertvalue { ptr, i64, i64, i64 } %16, i64 %13, 3
@@ -156,7 +156,7 @@ end subroutine
 !LLVMIR-NEXT:   %12 = mul i64 %10, 4
 !LLVMIR-NEXT:   %13 = mul i64 %11, 4
 !LLVMIR-NEXT:   %14 = mul i64 %6, 4
-!LLVMIR-NEXT:   %15 = insertvalue { ptr, i64, i64, i64 } undef, ptr %0, 0
+!LLVMIR-NEXT:   %15 = insertvalue { ptr, i64, i64, i64 } poison, ptr %0, 0
 !LLVMIR-NEXT:   %16 = insertvalue { ptr, i64, i64, i64 } %15, i64 %12, 1
 !LLVMIR-NEXT:   %17 = insertvalue { ptr, i64, i64, i64 } %16, i64 %13, 2
 !LLVMIR-NEXT:   %18 = insertvalue { ptr, i64, i64, i64 } %17, i64 %14, 3
@@ -168,7 +168,7 @@ end subroutine
 !LLVMIR-NEXT:   %5 = select i1 %4, i64 %3, i64 0
 !LLVMIR-NEXT:   %6 = mul i64 %5, 4
 !LLVMIR-NEXT:   %7 = mul i64 %3, 4
-!LLVMIR-NEXT:   %8 = insertvalue { ptr, i64, i64, i64 } undef, ptr %1, 0
+!LLVMIR-NEXT:   %8 = insertvalue { ptr, i64, i64, i64 } poison, ptr %1, 0
 !LLVMIR-NEXT:   %9 = insertvalue { ptr, i64, i64, i64 } %8, i64 %6, 1
 !LLVMIR-NEXT:   %10 = insertvalue { ptr, i64, i64, i64 } %9, i64 0, 2
 !LLVMIR-NEXT:   %11 = insertvalue { ptr, i64, i64, i64 } %10, i64 %7, 3

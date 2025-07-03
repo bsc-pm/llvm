@@ -185,10 +185,10 @@ llvm::OmpSsIRBuilder::InsertPointTy OmpSsIRBuilder::createLoop(
   emitDirectiveData(TaskInfo, DirClauses);
 
   // Create entry/exit intrinsics
-  Function *EntryFn = llvm::Intrinsic::getDeclaration(&M, llvm::Intrinsic::directive_region_entry);
+  Function *EntryFn = llvm::Intrinsic::getOrInsertDeclaration(&M, llvm::Intrinsic::directive_region_entry);
   llvm::Instruction *EntryCall = Builder.CreateCall(EntryFn, {}, TaskInfo);
 
-  Function *ExitFn = llvm::Intrinsic::getDeclaration(&M, llvm::Intrinsic::directive_region_exit);
+  Function *ExitFn = llvm::Intrinsic::getOrInsertDeclaration(&M, llvm::Intrinsic::directive_region_exit);
   llvm::Instruction *ExitCall = Builder.CreateCall(ExitFn, EntryCall);
 
   // Create an artificial insertion point that will also ensure the blocks we
@@ -225,10 +225,10 @@ llvm::OmpSsIRBuilder::InsertPointTy OmpSsIRBuilder::createTask(
   emitDirectiveData(TaskInfo, DirClauses);
 
   // Create entry/exit intrinsics
-  Function *EntryFn = llvm::Intrinsic::getDeclaration(&M, llvm::Intrinsic::directive_region_entry);
+  Function *EntryFn = llvm::Intrinsic::getOrInsertDeclaration(&M, llvm::Intrinsic::directive_region_entry);
   llvm::Instruction *EntryCall = Builder.CreateCall(EntryFn, {}, TaskInfo);
 
-  Function *ExitFn = llvm::Intrinsic::getDeclaration(&M, llvm::Intrinsic::directive_region_exit);
+  Function *ExitFn = llvm::Intrinsic::getOrInsertDeclaration(&M, llvm::Intrinsic::directive_region_exit);
   llvm::Instruction *ExitCall = Builder.CreateCall(ExitFn, EntryCall);
 
   // Create an artificial insertion point that will also ensure the blocks we
@@ -249,7 +249,7 @@ llvm::OmpSsIRBuilder::InsertPointTy OmpSsIRBuilder::createTask(
 }
 
 void OmpSsIRBuilder::emitTaskwaitImpl(const LocationDescription &Loc) {
-  Function *Fn = llvm::Intrinsic::getDeclaration(&M, llvm::Intrinsic::directive_marker);
+  Function *Fn = llvm::Intrinsic::getOrInsertDeclaration(&M, llvm::Intrinsic::directive_marker);
 
   Builder.CreateCall(
     Fn, {},
@@ -271,7 +271,7 @@ void OmpSsIRBuilder::createRelease(
   if (!updateToLocation(Loc))
     return;
 
-  Function *Fn = llvm::Intrinsic::getDeclaration(&M, llvm::Intrinsic::directive_marker);
+  Function *Fn = llvm::Intrinsic::getOrInsertDeclaration(&M, llvm::Intrinsic::directive_marker);
 
   SmallVector<llvm::OperandBundleDef, 8> TaskInfo;
   TaskInfo.emplace_back(

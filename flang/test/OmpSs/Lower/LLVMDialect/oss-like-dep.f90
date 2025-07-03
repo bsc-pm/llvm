@@ -27,7 +27,7 @@ end
 ! LLVMIRDialect-SAME:                            %[[VAL_0:[-0-9A-Za-z._]+]]: !llvm.ptr) -> !llvm.struct<(ptr, i64, i64, i64)> {
 ! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.mlir.constant(4 : i64) : i64
 ! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.constant(0 : i64) : i64
-! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.mlir.undef : !llvm.struct<(ptr, i64, i64, i64)>
+! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.mlir.poison : !llvm.struct<(ptr, i64, i64, i64)>
 ! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_0]], %[[VAL_3]][0] : !llvm.struct<(ptr, i64, i64, i64)>
 ! LLVMIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_1]], %[[VAL_4]][1] : !llvm.struct<(ptr, i64, i64, i64)>
 ! LLVMIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.insertvalue %[[VAL_2]], %[[VAL_5]][2] : !llvm.struct<(ptr, i64, i64, i64)>

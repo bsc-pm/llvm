@@ -334,6 +334,16 @@ public:
   llvm::SmallVector<std::pair<AcDoVar, mlir::Value>> impliedDoStack;
 };
 
+/// RAII wrapper for SymMap.
+class SymMapScope {
+public:
+  explicit SymMapScope(SymMap &map) : map(map) { map.pushScope(); }
+  ~SymMapScope() { map.popScope(); }
+
+private:
+  SymMap &map;
+};
+
 } // namespace Fortran::lower
 
 #endif // FORTRAN_LOWER_SYMBOLMAP_H

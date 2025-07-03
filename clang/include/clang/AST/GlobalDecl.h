@@ -18,6 +18,7 @@
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/DeclOmpSs.h"
+#include "clang/AST/DeclOpenACC.h"
 #include "clang/AST/DeclOpenMP.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/Basic/ABI.h"
@@ -71,15 +72,15 @@ public:
   GlobalDecl(const VarDecl *D) { Init(D);}
   GlobalDecl(const FunctionDecl *D, unsigned MVIndex = 0)
       : MultiVersionIndex(MVIndex) {
-    if (!D->hasAttr<CUDAGlobalAttr>()) {
-      Init(D);
+    if (D->isReferenceableKernel()) {
+      Value.setPointerAndInt(D, unsigned(getDefaultKernelReference(D)));
       return;
     }
-    Value.setPointerAndInt(D, unsigned(getDefaultKernelReference(D)));
+    Init(D);
   }
   GlobalDecl(const FunctionDecl *D, KernelReferenceKind Kind)
       : Value(D, unsigned(Kind)) {
-    assert(D->hasAttr<CUDAGlobalAttr>() && "Decl is not a GPU kernel!");
+    assert(D->isReferenceableKernel() && "Decl is not a GPU kernel!");
   }
   GlobalDecl(const NamedDecl *D) { Init(D); }
   GlobalDecl(const BlockDecl *D) { Init(D); }
@@ -87,6 +88,8 @@ public:
   GlobalDecl(const ObjCMethodDecl *D) { Init(D); }
   GlobalDecl(const OMPDeclareReductionDecl *D) { Init(D); }
   GlobalDecl(const OMPDeclareMapperDecl *D) { Init(D); }
+  GlobalDecl(const OpenACCRoutineDecl *D) { Init(D); }
+  GlobalDecl(const OpenACCDeclareDecl *D) { Init(D); }
   GlobalDecl(const CXXConstructorDecl *D, CXXCtorType Type) : Value(D, Type) {}
   GlobalDecl(const CXXDestructorDecl *D, CXXDtorType Type) : Value(D, Type) {}
   GlobalDecl(const VarDecl *D, DynamicInitKind StubKind)
@@ -132,12 +135,13 @@ public:
 
   KernelReferenceKind getKernelReferenceKind() const {
     assert(((isa<FunctionDecl>(getDecl()) &&
-             cast<FunctionDecl>(getDecl())->hasAttr<CUDAGlobalAttr>()) ||
+             cast<FunctionDecl>(getDecl())->isReferenceableKernel()) ||
             (isa<FunctionTemplateDecl>(getDecl()) &&
              cast<FunctionTemplateDecl>(getDecl())
                  ->getTemplatedDecl()
                  ->hasAttr<CUDAGlobalAttr>())) &&
            "Decl is not a GPU kernel!");
+
     return static_cast<KernelReferenceKind>(Value.getInt());
   }
 
@@ -161,8 +165,9 @@ public:
   }
 
   static KernelReferenceKind getDefaultKernelReference(const FunctionDecl *D) {
-    return D->getLangOpts().CUDAIsDevice ? KernelReferenceKind::Kernel
-                                         : KernelReferenceKind::Stub;
+    return (D->hasAttr<DeviceKernelAttr>() || D->getLangOpts().CUDAIsDevice)
+               ? KernelReferenceKind::Kernel
+               : KernelReferenceKind::Stub;
   }
 
   GlobalDecl getWithDecl(const Decl *D) {
@@ -198,7 +203,7 @@ public:
 
   GlobalDecl getWithKernelReferenceKind(KernelReferenceKind Kind) {
     assert(isa<FunctionDecl>(getDecl()) &&
-           cast<FunctionDecl>(getDecl())->hasAttr<CUDAGlobalAttr>() &&
+           cast<FunctionDecl>(getDecl())->isReferenceableKernel() &&
            "Decl is not a GPU kernel!");
     GlobalDecl Result(*this);
     Result.Value.setInt(unsigned(Kind));

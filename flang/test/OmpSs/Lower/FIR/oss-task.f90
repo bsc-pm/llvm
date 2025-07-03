@@ -45,21 +45,23 @@ program task
 end program
 
 
+
 ! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "task"} {
 ! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = arith.constant 3 : i32
-! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "i", uniq_name = "_QFEi"}
-! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_1]] {uniq_name = "_QFEi"} : (!fir.ref<i32>) -> !fir.ref<i32>
+! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.dummy_scope : !fir.dscope
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "i", uniq_name = "_QFEi"}
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_2]] {uniq_name = "_QFEi"} : (!fir.ref<i32>) -> !fir.ref<i32>
 ! FIRDialect:           oss.task {
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
-! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.load %[[VAL_2]] : !fir.ref<i32>
-! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = arith.cmpi eq, %[[VAL_3]], %[[VAL_0]] : i32
-! FIRDialect:           oss.task if(%[[VAL_4]] : i1) {
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.load %[[VAL_3]] : !fir.ref<i32>
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = arith.cmpi eq, %[[VAL_4]], %[[VAL_0]] : i32
+! FIRDialect:           oss.task if(%[[VAL_5]] : i1) {
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
-! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.load %[[VAL_2]] : !fir.ref<i32>
-! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = arith.cmpi eq, %[[VAL_5]], %[[VAL_0]] : i32
-! FIRDialect:           oss.task final(%[[VAL_6]] : i1) {
+! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = fir.load %[[VAL_3]] : !fir.ref<i32>
+! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = arith.cmpi eq, %[[VAL_6]], %[[VAL_0]] : i32
+! FIRDialect:           oss.task final(%[[VAL_7]] : i1) {
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
 ! FIRDialect:           oss.task cost(%[[VAL_0]] : i32) {
@@ -71,21 +73,20 @@ end program
 ! FIRDialect:           oss.task default( defshared) {
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
-! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
 ! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           oss.task private(%[[VAL_2]], %[[VAL_2]] : !fir.ref<i32>, !fir.ref<i32>) private_type(%[[VAL_7]], %[[VAL_8]] : !fir.oss<i32>, !fir.oss<i32>) {
-! FIRDialect:             oss.terminator
-! FIRDialect:           }
 ! FIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           oss.task firstprivate(%[[VAL_2]], %[[VAL_2]] : !fir.ref<i32>, !fir.ref<i32>) firstprivate_type(%[[VAL_9]], %[[VAL_10]] : !fir.oss<i32>, !fir.oss<i32>) {
+! FIRDialect:           oss.task private(%[[VAL_3]], %[[VAL_3]] : !fir.ref<i32>, !fir.ref<i32>) private_type(%[[VAL_8]], %[[VAL_9]] : !fir.oss<i32>, !fir.oss<i32>) {
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
+! FIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
 ! FIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           oss.task firstprivate(%[[VAL_3]], %[[VAL_3]] : !fir.ref<i32>, !fir.ref<i32>) firstprivate_type(%[[VAL_10]], %[[VAL_11]] : !fir.oss<i32>, !fir.oss<i32>) {
+! FIRDialect:             oss.terminator
+! FIRDialect:           }
 ! FIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           oss.task shared(%[[VAL_2]], %[[VAL_2]] : !fir.ref<i32>, !fir.ref<i32>) shared_type(%[[VAL_11]], %[[VAL_12]] : !fir.oss<i32>, !fir.oss<i32>) {
+! FIRDialect:           %[[VAL_13:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           oss.task shared(%[[VAL_3]], %[[VAL_3]] : !fir.ref<i32>, !fir.ref<i32>) shared_type(%[[VAL_12]], %[[VAL_13]] : !fir.oss<i32>, !fir.oss<i32>) {
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
 ! FIRDialect:           return
 ! FIRDialect:         }
-

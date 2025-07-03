@@ -31,161 +31,161 @@ def OmpSs : DirectiveLanguage {
 // Definition of OmpSs clauses
 //===----------------------------------------------------------------------===//
 
-def OSSC_Immediate : Clause<"immediate"> {
+def OSSC_Immediate : Clause<[Spelling<"immediate">]> {
   let clangClass = "OSSImmediateClause";
   let flangClass = "ScalarLogicalExpr";
 }
-def OSSC_Microtask : Clause<"microtask"> {
+def OSSC_Microtask : Clause<[Spelling<"microtask">]> {
   let clangClass = "OSSMicrotaskClause";
   let flangClass = "ScalarLogicalExpr";
 }
-def OSSC_If : Clause<"if"> {
+def OSSC_If : Clause<[Spelling<"if">]> {
   let clangClass = "OSSIfClause";
   let flangClass = "ScalarLogicalExpr";
 }
-def OSSC_Final : Clause<"final"> {
+def OSSC_Final : Clause<[Spelling<"final">]> {
   let clangClass = "OSSFinalClause";
   let flangClass = "ScalarLogicalExpr";
 }
-def OSSC_Cost : Clause<"cost"> {
+def OSSC_Cost : Clause<[Spelling<"cost">]> {
   let clangClass = "OSSCostClause";
   let flangClass = "ScalarIntExpr";
 }
-def OSSC_Priority : Clause<"priority"> {
+def OSSC_Priority : Clause<[Spelling<"priority">]> {
   let clangClass = "OSSPriorityClause";
   let flangClass = "ScalarIntExpr";
 }
-def OSSC_Label : Clause<"label"> {
+def OSSC_Label : Clause<[Spelling<"label">]> {
   let clangClass = "OSSLabelClause";
   let flangClass = "ScalarDefaultCharExpr";
 }
-def OSSC_Wait : Clause<"wait"> {
+def OSSC_Wait : Clause<[Spelling<"wait">]> {
   let clangClass = "OSSWaitClause";
 }
-def OSSC_Update : Clause<"update"> {
+def OSSC_Update : Clause<[Spelling<"update">]> {
   let clangClass = "OSSUpdateClause";
 }
-def OSSC_Shmem : Clause<"shmem"> {
+def OSSC_Shmem : Clause<[Spelling<"shmem">]> {
   let clangClass = "OSSShmemClause";
   let flangClass = "ScalarIntExpr";
 }
-def OSSC_Onready : Clause<"onready"> {
+def OSSC_Onready : Clause<[Spelling<"onready">]> {
   let clangClass = "OSSOnreadyClause";
   let flangClass = "Expr";
 }
-def OSSC_Default : Clause<"default"> {
+def OSSC_Default : Clause<[Spelling<"default">]> {
   let clangClass = "OSSDefaultClause";
   let flangClass = "OSSDefaultClause";
 }
-def OSSC_Device : Clause<"device"> {
+def OSSC_Device : Clause<[Spelling<"device">]> {
   let clangClass = "OSSDeviceClause";
   let flangClass = "OSSDeviceClause";
 }
-def OSSC_Private : Clause<"private"> {
+def OSSC_Private : Clause<[Spelling<"private">]> {
   let clangClass = "OSSPrivateClause";
   let flangClass = "OSSObjectList";
 }
-def OSSC_FirstPrivate : Clause<"firstprivate"> {
+def OSSC_FirstPrivate : Clause<[Spelling<"firstprivate">]> {
   let clangClass = "OSSFirstprivateClause";
   let flangClass = "OSSObjectList";
 }
-def OSSC_Shared : Clause<"shared"> {
+def OSSC_Shared : Clause<[Spelling<"shared">]> {
   let clangClass = "OSSSharedClause";
   let flangClass = "OSSObjectList";
 }
-def OSSC_Depend : Clause<"depend"> {
+def OSSC_Depend : Clause<[Spelling<"depend">]> {
   let clangClass = "OSSDependClause";
   let flangClass = "OSSDependClause";
 }
-def OSSC_In : Clause<"in"> {
+def OSSC_In : Clause<[Spelling<"in">]> {
   let flangClass = "OSSObjectList";
 }
-def OSSC_Out : Clause<"out"> {
+def OSSC_Out : Clause<[Spelling<"out">]> {
   let flangClass = "OSSObjectList";
 }
-def OSSC_Inout : Clause<"inout"> {
+def OSSC_Inout : Clause<[Spelling<"inout">]> {
   let flangClass = "OSSObjectList";
 }
-def OSSC_On : Clause<"on"> {
+def OSSC_On : Clause<[Spelling<"on">]> {
   let flangClass = "OSSObjectList";
 }
-def OSSC_Concurrent : Clause<"concurrent"> {
+def OSSC_Concurrent : Clause<[Spelling<"concurrent">]> {
   let flangClass = "OSSObjectList";
 }
-def OSSC_Commutative : Clause<"commutative"> {
+def OSSC_Commutative : Clause<[Spelling<"commutative">]> {
   let flangClass = "OSSObjectList";
 }
-def OSSC_WeakIn : Clause<"weakin"> {
+def OSSC_WeakIn : Clause<[Spelling<"weakin">]> {
   let flangClass = "OSSObjectList";
 }
-def OSSC_WeakOut : Clause<"weakout"> {
+def OSSC_WeakOut : Clause<[Spelling<"weakout">]> {
   let flangClass = "OSSObjectList";
 }
-def OSSC_WeakInout : Clause<"weakinout"> {
+def OSSC_WeakInout : Clause<[Spelling<"weakinout">]> {
   let flangClass = "OSSObjectList";
 }
-def OSSC_WeakConcurrent : Clause<"weakconcurrent"> {
+def OSSC_WeakConcurrent : Clause<[Spelling<"weakconcurrent">]> {
   let flangClass = "OSSObjectList";
 }
-def OSSC_WeakCommutative : Clause<"weakcommutative"> {
+def OSSC_WeakCommutative : Clause<[Spelling<"weakcommutative">]> {
   let flangClass = "OSSObjectList";
 }
-def OSSC_Reduction : Clause<"reduction"> {
+def OSSC_Reduction : Clause<[Spelling<"reduction">]> {
   let clangClass = "OSSReductionClause";
   let flangClass = "OSSReductionClause";
 }
-def OSSC_WeakReduction : Clause<"weakreduction"> {
+def OSSC_WeakReduction : Clause<[Spelling<"weakreduction">]> {
 }
-def OSSC_GrainSize : Clause<"grainsize"> {
+def OSSC_GrainSize : Clause<[Spelling<"grainsize">]> {
   let clangClass = "OSSGrainsizeClause";
   let flangClass = "ScalarIntExpr";
 }
-def OSSC_ChunkSize : Clause<"chunksize"> {
+def OSSC_ChunkSize : Clause<[Spelling<"chunksize">]> {
   let clangClass = "OSSChunksizeClause";
   let flangClass = "ScalarIntExpr";
 }
-def OSSC_Unroll : Clause<"unroll"> {
+def OSSC_Unroll : Clause<[Spelling<"unroll">]> {
   let clangClass = "OSSUnrollClause";
   let flangClass = "ScalarIntExpr";
 }
-def OSSC_Collapse : Clause<"collapse"> {
+def OSSC_Collapse : Clause<[Spelling<"collapse">]> {
   let clangClass = "OSSCollapseClause";
   let flangClass = "ScalarIntConstantExpr";
 }
-def OSSC_Ndrange : Clause<"ndrange"> {
+def OSSC_Ndrange : Clause<[Spelling<"ndrange">]> {
   let clangClass = "OSSNdrangeClause";
 }
-def OSSC_Grid : Clause<"grid"> {
+def OSSC_Grid : Clause<[Spelling<"grid">]> {
   let clangClass = "OSSGridClause";
 }
-def OSSC_Read : Clause<"read"> {
+def OSSC_Read : Clause<[Spelling<"read">]> {
   let clangClass = "OSSReadClause";
 }
-def OSSC_Write : Clause<"write"> {
+def OSSC_Write : Clause<[Spelling<"write">]> {
   let clangClass = "OSSWriteClause";
 }
-def OSSC_Capture : Clause<"capture"> {
+def OSSC_Capture : Clause<[Spelling<"capture">]> {
   let clangClass = "OSSCaptureClause";
 }
-def OSSC_Compare : Clause<"compare"> {
+def OSSC_Compare : Clause<[Spelling<"compare">]> {
   let clangClass = "OSSCompareClause";
 }
-def OSSC_SeqCst : Clause<"seq_cst"> {
+def OSSC_SeqCst : Clause<[Spelling<"seq_cst">]> {
   let clangClass = "OSSSeqCstClause";
 }
-def OSSC_AcqRel : Clause<"acq_rel"> {
+def OSSC_AcqRel : Clause<[Spelling<"acq_rel">]> {
   let clangClass = "OSSAcqRelClause";
 }
-def OSSC_Acquire : Clause<"acquire"> {
+def OSSC_Acquire : Clause<[Spelling<"acquire">]> {
   let clangClass = "OSSAcquireClause";
 }
-def OSSC_Release : Clause<"release"> {
+def OSSC_Release : Clause<[Spelling<"release">]> {
   let clangClass = "OSSReleaseClause";
 }
-def OSSC_Relaxed : Clause<"relaxed"> {
+def OSSC_Relaxed : Clause<[Spelling<"relaxed">]> {
   let clangClass = "OSSRelaxedClause";
 }
-def OSSC_Unknown : Clause<"unknown"> {
+def OSSC_Unknown : Clause<[Spelling<"unknown">]> {
   let isImplicit = true;
   let isDefault = true;
 }
@@ -194,7 +194,7 @@ def OSSC_Unknown : Clause<"unknown"> {
 // Definition of OmpSs directives
 //===----------------------------------------------------------------------===//
 
-def OSS_Task : Directive<"task"> {
+def OSS_Task : Directive<[Spelling<"task">]> {
   let allowedClauses = [
     VersionedClause<OSSC_Private>,
     VersionedClause<OSSC_FirstPrivate>,
@@ -226,7 +226,7 @@ def OSS_Task : Directive<"task"> {
   let association = AS_Block;
   let category = CA_Executable;
 }
-def OSS_DeclareTask : Directive<"declare task"> {
+def OSS_DeclareTask : Directive<[Spelling<"declare task">]> {
   let allowedClauses = [
     VersionedClause<OSSC_Depend>,
     VersionedClause<OSSC_In>,
@@ -257,11 +257,11 @@ def OSS_DeclareTask : Directive<"declare task"> {
   let association = AS_Declaration;
   let category = CA_Declarative;
 }
-def OSS_DeclareReduction : Directive<"declare reduction"> {
+def OSS_DeclareReduction : Directive<[Spelling<"declare reduction">]> {
   let association = AS_None;
   let category = CA_Declarative;
 }
-def OSS_TaskWait : Directive<"taskwait"> {
+def OSS_TaskWait : Directive<[Spelling<"taskwait">]> {
   let allowedClauses = [
     VersionedClause<OSSC_Depend>,
     VersionedClause<OSSC_On>,
@@ -273,7 +273,7 @@ def OSS_TaskWait : Directive<"taskwait"> {
   let category = CA_Executable;
 }
 
-def OSS_Release : Directive<"release"> {
+def OSS_Release : Directive<[Spelling<"release">]> {
   let allowedClauses = [
     VersionedClause<OSSC_Depend>,
     VersionedClause<OSSC_In>,
@@ -289,7 +289,7 @@ def OSS_Release : Directive<"release"> {
   let association = AS_None;
   let category = CA_Executable;
 }
-def OSS_TaskLoop : Directive<"taskloop"> {
+def OSS_TaskLoop : Directive<[Spelling<"taskloop">]> {
   let allowedClauses = [
     VersionedClause<OSSC_Private>,
     VersionedClause<OSSC_FirstPrivate>,
@@ -321,7 +321,7 @@ def OSS_TaskLoop : Directive<"taskloop"> {
   let association = AS_Loop;
   let category = CA_Executable;
 }
-def OSS_TaskFor : Directive<"task for"> {
+def OSS_TaskFor : Directive<[Spelling<"task for">]> {
   let allowedClauses = [
     VersionedClause<OSSC_Private>,
     VersionedClause<OSSC_FirstPrivate>,
@@ -353,7 +353,7 @@ def OSS_TaskFor : Directive<"task for"> {
   let association = AS_Loop;
   let category = CA_Executable;
 }
-def OSS_TaskLoopFor : Directive<"taskloop for"> {
+def OSS_TaskLoopFor : Directive<[Spelling<"taskloop for">]> {
   let allowedClauses = [
     VersionedClause<OSSC_Private>,
     VersionedClause<OSSC_FirstPrivate>,
@@ -387,11 +387,11 @@ def OSS_TaskLoopFor : Directive<"taskloop for"> {
   let category = CA_Executable;
 }
 
-def OSS_TaskIterWhile : Directive<"taskiter while"> {
+def OSS_TaskIterWhile : Directive<[Spelling<"taskiter while">]> {
   let association = AS_None;
   let category = CA_Executable;
 }
-def OSS_TaskIter : Directive<"taskiter"> {
+def OSS_TaskIter : Directive<[Spelling<"taskiter">]> {
   let allowedClauses = [
     VersionedClause<OSSC_Private>,
     VersionedClause<OSSC_FirstPrivate>,
@@ -424,11 +424,11 @@ def OSS_TaskIter : Directive<"taskiter"> {
   let association = AS_Loop;
   let category = CA_Executable;
 }
-def OSS_Critical : Directive<"critical"> {
+def OSS_Critical : Directive<[Spelling<"critical">]> {
   let association = AS_Block;
   let category = CA_Executable;
 }
-def OSS_Atomic : Directive<"atomic"> {
+def OSS_Atomic : Directive<[Spelling<"atomic">]> {
   let allowedClauses = [
     VersionedClause<OSSC_Read>,
     VersionedClause<OSSC_Write>,
@@ -446,11 +446,11 @@ def OSS_Atomic : Directive<"atomic"> {
   let association = AS_Block;
   let category = CA_Executable;
 }
-def OSS_Assert : Directive<"assert"> {
+def OSS_Assert : Directive<[Spelling<"assert">]> {
   let association = AS_None;
   let category = CA_Informational;
 }
-def OSS_Unknown : Directive<"unknown"> {
+def OSS_Unknown : Directive<[Spelling<"unknown">]> {
   let isDefault = true;
   let association = AS_None;
   let category = CA_Utility;

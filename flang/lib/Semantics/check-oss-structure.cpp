@@ -197,6 +197,8 @@ EMIT_UNSUPPORTED(Collapse, OSSC_collapse)
 
 EMIT_UNSUPPORTED(Ndrange, OSSC_ndrange)
 
+EMIT_UNSUPPORTED(Grid, OSSC_grid)
+
 EMIT_UNSUPPORTED(Read, OSSC_read)
 
 EMIT_UNSUPPORTED(Write, OSSC_write)

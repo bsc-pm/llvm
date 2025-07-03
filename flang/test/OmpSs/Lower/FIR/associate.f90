@@ -16,26 +16,25 @@ END PROGRAM
 
 
 ! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "s"} {
-! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "i", uniq_name = "_QFEi"}
-! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_0]] {uniq_name = "_QFEi"} : (!fir.ref<i32>) -> !fir.ref<i32>
-! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "j", uniq_name = "_QFEj"}
-! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_2]] {uniq_name = "_QFEj"} : (!fir.ref<i32>) -> !fir.ref<i32>
-! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.dummy_scope : !fir.dscope
+! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "i", uniq_name = "_QFEi"}
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_1]] {uniq_name = "_QFEi"} : (!fir.ref<i32>) -> !fir.ref<i32>
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "j", uniq_name = "_QFEj"}
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_3]] {uniq_name = "_QFEj"} : (!fir.ref<i32>) -> !fir.ref<i32>
 ! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
 ! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
 ! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           oss.task firstprivate(%[[VAL_1]], %[[VAL_1]], %[[VAL_3]], %[[VAL_3]] : !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>) firstprivate_type(%[[VAL_4]], %[[VAL_5]], %[[VAL_6]], %[[VAL_7]] : !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>) {
-! FIRDialect:             %[[VAL_8:[-0-9A-Za-z._]+]] = arith.constant 4 : i32
-! FIRDialect:             %[[VAL_9:[-0-9A-Za-z._]+]] = fir.alloca i32 {pinned}
-! FIRDialect:             %[[VAL_10:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<i32>
-! FIRDialect:             %[[VAL_11:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_10]], %[[VAL_8]] : i32
-! FIRDialect:             fir.store %[[VAL_11]] to %[[VAL_9]] : !fir.ref<i32>
-! FIRDialect:             %[[VAL_12:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_9]] {uniq_name = "_QFEz"} : (!fir.ref<i32>) -> !fir.ref<i32>
-! FIRDialect:             %[[VAL_13:[-0-9A-Za-z._]+]] = fir.load %[[VAL_12]] : !fir.ref<i32>
-! FIRDialect:             fir.store %[[VAL_13]] to %[[VAL_3]] : !fir.ref<i32>
+! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           oss.task firstprivate(%[[VAL_2]], %[[VAL_2]], %[[VAL_4]], %[[VAL_4]] : !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>) firstprivate_type(%[[VAL_5]], %[[VAL_6]], %[[VAL_7]], %[[VAL_8]] : !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>) {
+! FIRDialect:             %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 4 : i32
+! FIRDialect:             %[[VAL_10:[-0-9A-Za-z._]+]] = fir.alloca i32 {pinned}
+! FIRDialect:             %[[VAL_11:[-0-9A-Za-z._]+]] = fir.load %[[VAL_2]] : !fir.ref<i32>
+! FIRDialect:             %[[VAL_12:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_11]], %[[VAL_9]] : i32
+! FIRDialect:             fir.store %[[VAL_12]] to %[[VAL_10]] : !fir.ref<i32>
+! FIRDialect:             %[[VAL_13:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_10]] {uniq_name = "_QFEz"} : (!fir.ref<i32>) -> !fir.ref<i32>
+! FIRDialect:             %[[VAL_14:[-0-9A-Za-z._]+]] = fir.load %[[VAL_13]] : !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_14]] to %[[VAL_4]] : !fir.ref<i32>
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
 ! FIRDialect:           return
 ! FIRDialect:         }
-
-

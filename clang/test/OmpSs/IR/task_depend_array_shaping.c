@@ -533,7 +533,7 @@ void foo4(int x, int y, int z) {
 // LIN64-NEXT:    [[TMP5:%.*]] = mul nuw i64 4, [[TMP4]], !dbg [[DBG107]]
 // LIN64-NEXT:    [[TMP6:%.*]] = mul nuw i64 [[TMP1]], [[TMP2]], !dbg [[DBG109:![0-9]+]]
 // LIN64-NEXT:    [[TMP7:%.*]] = mul nsw i64 [[TMP5]], [[TMP6]], !dbg [[DBG109]]
-// LIN64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i32, ptr [[VLA]], i64 [[TMP7]], !dbg [[DBG109]]
+// LIN64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds nuw i32, ptr [[VLA]], i64 [[TMP7]], !dbg [[DBG109]]
 // LIN64-NEXT:    [[TMP8:%.*]] = load i32, ptr [[C]], align 4, !dbg [[DBG110:![0-9]+]]
 // LIN64-NEXT:    [[TMP9:%.*]] = zext i32 [[TMP8]] to i64
 // LIN64-NEXT:    [[TMP10:%.*]] = load i32, ptr [[B]], align 4, !dbg [[DBG111:![0-9]+]]
@@ -1054,7 +1054,7 @@ void foo4(int x, int y, int z) {
 // PPC64-NEXT:    [[TMP5:%.*]] = mul nuw i64 4, [[TMP4]], !dbg [[DBG107]]
 // PPC64-NEXT:    [[TMP6:%.*]] = mul nuw i64 [[TMP1]], [[TMP2]], !dbg [[DBG109:![0-9]+]]
 // PPC64-NEXT:    [[TMP7:%.*]] = mul nsw i64 [[TMP5]], [[TMP6]], !dbg [[DBG109]]
-// PPC64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i32, ptr [[VLA]], i64 [[TMP7]], !dbg [[DBG109]]
+// PPC64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds nuw i32, ptr [[VLA]], i64 [[TMP7]], !dbg [[DBG109]]
 // PPC64-NEXT:    [[TMP8:%.*]] = load i32, ptr [[C]], align 4, !dbg [[DBG110:![0-9]+]]
 // PPC64-NEXT:    [[TMP9:%.*]] = zext i32 [[TMP8]] to i64
 // PPC64-NEXT:    [[TMP10:%.*]] = load i32, ptr [[B]], align 4, !dbg [[DBG111:![0-9]+]]
@@ -1575,7 +1575,7 @@ void foo4(int x, int y, int z) {
 // AARCH64-NEXT:    [[TMP5:%.*]] = mul nuw i64 4, [[TMP4]], !dbg [[DBG107]]
 // AARCH64-NEXT:    [[TMP6:%.*]] = mul nuw i64 [[TMP1]], [[TMP2]], !dbg [[DBG109:![0-9]+]]
 // AARCH64-NEXT:    [[TMP7:%.*]] = mul nsw i64 [[TMP5]], [[TMP6]], !dbg [[DBG109]]
-// AARCH64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i32, ptr [[VLA]], i64 [[TMP7]], !dbg [[DBG109]]
+// AARCH64-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds nuw i32, ptr [[VLA]], i64 [[TMP7]], !dbg [[DBG109]]
 // AARCH64-NEXT:    [[TMP8:%.*]] = load i32, ptr [[C]], align 4, !dbg [[DBG110:![0-9]+]]
 // AARCH64-NEXT:    [[TMP9:%.*]] = zext i32 [[TMP8]] to i64
 // AARCH64-NEXT:    [[TMP10:%.*]] = load i32, ptr [[B]], align 4, !dbg [[DBG111:![0-9]+]]

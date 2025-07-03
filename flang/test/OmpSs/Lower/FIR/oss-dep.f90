@@ -165,7 +165,7 @@ end program
 
 !FIRDialect-LABEL: func @compute.dep3(%arg0: !fir.ref<!fir.type<_QFTty{x:i32,array:!fir.array<10xi32>}>>) -> (!fir.ref<i32>, i64, i64, i64)
 !FIRDialect:  %0 = fir.field_index x, !fir.type<_QFTty{x:i32,array:!fir.array<10xi32>}>
-!FIRDialect-NEXT:  %1 = fir.coordinate_of %arg0, %0 : (!fir.ref<!fir.type<_QFTty{x:i32,array:!fir.array<10xi32>}>>, !fir.field) -> !fir.ref<i32>
+!FIRDialect-NEXT:  %1 = fir.coordinate_of %arg0, x : (!fir.ref<!fir.type<_QFTty{x:i32,array:!fir.array<10xi32>}>>) -> !fir.ref<i32>
 !FIRDialect-NEXT:  %c1_i64 = arith.constant 1 : i64
 !FIRDialect-NEXT:  %c1_i64_0 = arith.constant 1 : i64
 !FIRDialect-NEXT:  %c4_i64 = arith.constant 4 : i64
@@ -179,7 +179,7 @@ end program
 
 !FIRDialect-LABEL: func.func @compute.dep4(%arg0: !fir.ref<!fir.type<_QFTty{x:i32,array:!fir.array<10xi32>}>>) -> (!fir.ref<!fir.array<10xi32>>, i64, i64, i64)
 !FIRDialect:   %0 = fir.field_index array, !fir.type<_QFTty{x:i32,array:!fir.array<10xi32>}>
-!FIRDialect-NEXT:   %1 = fir.coordinate_of %arg0, %0 : (!fir.ref<!fir.type<_QFTty{x:i32,array:!fir.array<10xi32>}>>, !fir.field) -> !fir.ref<!fir.array<10xi32>>
+!FIRDialect-NEXT:   %1 = fir.coordinate_of %arg0, array : (!fir.ref<!fir.type<_QFTty{x:i32,array:!fir.array<10xi32>}>>) -> !fir.ref<!fir.array<10xi32>>
 !FIRDialect-NEXT:   %c10 = arith.constant 10 : index
 !FIRDialect-NEXT:   %c10_i64 = arith.constant 10 : i64
 !FIRDialect-NEXT:   %c1_i64 = arith.constant 1 : i64

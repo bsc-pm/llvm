@@ -13,6 +13,7 @@ add_llvm_component_library(LLVMTransformUtils
   CanonicalizeFreezeInLoops.cpp
   CloneFunction.cpp
   CloneModule.cpp
+  OldCodeExtractor.cpp
   CodeExtractor.cpp
   CodeLayout.cpp
   CodeMoverUtils.cpp
@@ -35,7 +36,9 @@ add_llvm_component_library(LLVMTransformUtils
   InlineFunction.cpp
   InjectTLIMappings.cpp
   InstructionNamer.cpp
+  Instrumentation.cpp
   IntegerDivision.cpp
+  IRNormalizer.cpp
   LCSSA.cpp
   LibCallsShrinkWrap.cpp
   Local.cpp
@@ -54,6 +57,7 @@ add_llvm_component_library(LLVMTransformUtils
   LowerInvoke.cpp
   LowerMemIntrinsics.cpp
   LowerSwitch.cpp
+  LowerVectorIntrinsics.cpp
   MatrixUtils.cpp
   MemoryOpRemark.cpp
   MemoryTaggingSupport.cpp

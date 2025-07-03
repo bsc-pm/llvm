@@ -16,23 +16,24 @@ PROGRAM P
 END
 
 
+
 ! FIRDialect-LABEL:   fir.global @_QMmodEx : i32 {
 ! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.zero_bits i32
 ! FIRDialect:           fir.has_value %[[VAL_0]] : i32
 ! FIRDialect:         }
 
 ! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "p"} {
-! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.address_of(@_QMmodEx) : !fir.ref<i32>
-! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_0]] {uniq_name = "_QMmodEx"} : (!fir.ref<i32>) -> !fir.ref<i32>
-! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.dummy_scope : !fir.dscope
+! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.address_of(@_QMmodEx) : !fir.ref<i32>
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_1]] {uniq_name = "_QMmodEx"} : (!fir.ref<i32>) -> !fir.ref<i32>
 ! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           oss.task firstprivate(%[[VAL_1]], %[[VAL_1]] : !fir.ref<i32>, !fir.ref<i32>) firstprivate_type(%[[VAL_2]], %[[VAL_3]] : !fir.oss<i32>, !fir.oss<i32>) {
-! FIRDialect:             %[[VAL_4:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:             %[[VAL_5:[-0-9A-Za-z._]+]] = fir.load %[[VAL_1]] : !fir.ref<i32>
-! FIRDialect:             %[[VAL_6:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_5]], %[[VAL_4]] : i32
-! FIRDialect:             fir.store %[[VAL_6]] to %[[VAL_1]] : !fir.ref<i32>
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           oss.task firstprivate(%[[VAL_2]], %[[VAL_2]] : !fir.ref<i32>, !fir.ref<i32>) firstprivate_type(%[[VAL_3]], %[[VAL_4]] : !fir.oss<i32>, !fir.oss<i32>) {
+! FIRDialect:             %[[VAL_5:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:             %[[VAL_6:[-0-9A-Za-z._]+]] = fir.load %[[VAL_2]] : !fir.ref<i32>
+! FIRDialect:             %[[VAL_7:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_6]], %[[VAL_5]] : i32
+! FIRDialect:             fir.store %[[VAL_7]] to %[[VAL_2]] : !fir.ref<i32>
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
 ! FIRDialect:           return
 ! FIRDialect:         }
-

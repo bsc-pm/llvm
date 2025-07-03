@@ -692,7 +692,7 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@compute_ub.2
-; CHECK-SAME: (ptr nocapture readonly [[I:%.*]]) unnamed_addr #[[ATTR2:[0-9]+]] !dbg [[DBG38:![0-9]+]] {
+; CHECK-SAME: (ptr readonly captures(none) [[I:%.*]]) unnamed_addr #[[ATTR2:[0-9]+]] !dbg [[DBG38:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr [[I]], align 4, !dbg [[DBG39:![0-9]+]]
 ; CHECK-NEXT:    ret i32 [[TMP0]], !dbg [[DBG39]]
@@ -723,7 +723,7 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@compute_lb.7
-; CHECK-SAME: (ptr nocapture readonly [[I:%.*]]) unnamed_addr #[[ATTR2]] !dbg [[DBG53:![0-9]+]] {
+; CHECK-SAME: (ptr readonly captures(none) [[I:%.*]]) unnamed_addr #[[ATTR2]] !dbg [[DBG53:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr [[I]], align 4, !dbg [[DBG54:![0-9]+]]
 ; CHECK-NEXT:    ret i32 [[TMP0]], !dbg [[DBG54]]
@@ -766,7 +766,7 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@compute_ub.14
-; CHECK-SAME: (ptr nocapture readonly [[I:%.*]]) unnamed_addr #[[ATTR2]] !dbg [[DBG74:![0-9]+]] {
+; CHECK-SAME: (ptr readonly captures(none) [[I:%.*]]) unnamed_addr #[[ATTR2]] !dbg [[DBG74:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr [[I]], align 4, !dbg [[DBG75:![0-9]+]]
 ; CHECK-NEXT:    ret i32 [[TMP0]], !dbg [[DBG75]]
@@ -797,7 +797,7 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@compute_lb.19
-; CHECK-SAME: (ptr nocapture readonly [[I:%.*]]) unnamed_addr #[[ATTR2]] !dbg [[DBG89:![0-9]+]] {
+; CHECK-SAME: (ptr readonly captures(none) [[I:%.*]]) unnamed_addr #[[ATTR2]] !dbg [[DBG89:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr [[I]], align 4, !dbg [[DBG90:![0-9]+]]
 ; CHECK-NEXT:    ret i32 [[TMP0]], !dbg [[DBG90]]
@@ -822,7 +822,7 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_main
-; CHECK-SAME: (ptr nocapture writeonly [[TASK_ARGS:%.*]], ptr nocapture readonly [[LOOP_BOUNDS:%.*]], ptr nocapture readnone [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR3:[0-9]+]] {
+; CHECK-SAME: (ptr writeonly captures(none) initializes((0, 4)) [[TASK_ARGS:%.*]], ptr readonly captures(none) [[LOOP_BOUNDS:%.*]], ptr readnone captures(none) [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR3:[0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[LOOP_BOUNDS_VAL:%.*]] = load i64, ptr [[LOOP_BOUNDS]], align 8
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr i8, ptr [[LOOP_BOUNDS]], i64 8
@@ -857,7 +857,7 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_main.5
-; CHECK-SAME: (ptr nocapture writeonly [[TASK_ARGS:%.*]], ptr nocapture readonly [[LOOP_BOUNDS:%.*]], ptr nocapture readnone [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR3]] {
+; CHECK-SAME: (ptr writeonly captures(none) initializes((0, 4)) [[TASK_ARGS:%.*]], ptr readonly captures(none) [[LOOP_BOUNDS:%.*]], ptr readnone captures(none) [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR3]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[LOOP_BOUNDS_VAL:%.*]] = load i64, ptr [[LOOP_BOUNDS]], align 8
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr i8, ptr [[LOOP_BOUNDS]], i64 8
@@ -883,7 +883,7 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_main.15
-; CHECK-SAME: (ptr nocapture writeonly [[TASK_ARGS:%.*]], ptr nocapture readonly [[LOOP_BOUNDS:%.*]], ptr nocapture readnone [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR3]] {
+; CHECK-SAME: (ptr writeonly captures(none) initializes((0, 4)) [[TASK_ARGS:%.*]], ptr readonly captures(none) [[LOOP_BOUNDS:%.*]], ptr readnone captures(none) [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR3]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[LOOP_BOUNDS_VAL:%.*]] = load i64, ptr [[LOOP_BOUNDS]], align 8
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr i8, ptr [[LOOP_BOUNDS]], i64 8
@@ -908,7 +908,7 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_main.25
-; CHECK-SAME: (ptr nocapture writeonly [[TASK_ARGS:%.*]], ptr nocapture readonly [[LOOP_BOUNDS:%.*]], ptr nocapture readnone [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR3]] {
+; CHECK-SAME: (ptr writeonly captures(none) initializes((0, 4)) [[TASK_ARGS:%.*]], ptr readonly captures(none) [[LOOP_BOUNDS:%.*]], ptr readnone captures(none) [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR3]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[LOOP_BOUNDS_VAL:%.*]] = load i64, ptr [[LOOP_BOUNDS]], align 8
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr i8, ptr [[LOOP_BOUNDS]], i64 8

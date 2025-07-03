@@ -63,41 +63,41 @@ end program
 
 
 ! LLVMIRDialect-LABEL:   llvm.func @_QQmain() attributes {fir.bindc_name = "task"} {
-! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.constant(3 : i32) : i32
-! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
-! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_1]] x i32 {bindc_name = "i"} : (i64) -> !llvm.ptr
+! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
+! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_0]] x i32 {bindc_name = "i"} : (i64) -> !llvm.ptr
+! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.constant(3 : i32) : i32
+! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
 ! LLVMIRDialect:           oss.task {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.load %[[VAL_2]] : !llvm.ptr -> i32
-! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.icmp "eq" %[[VAL_3]], %[[VAL_0]] : i32
-! LLVMIRDialect:           oss.task if(%[[VAL_4]] : i1) {
+! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.load %[[VAL_1]] : !llvm.ptr -> i32
+! LLVMIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.icmp "eq" %[[VAL_4]], %[[VAL_2]] : i32
+! LLVMIRDialect:           oss.task if(%[[VAL_5]] : i1) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.load %[[VAL_2]] : !llvm.ptr -> i32
-! LLVMIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.icmp "eq" %[[VAL_5]], %[[VAL_0]] : i32
-! LLVMIRDialect:           oss.task final(%[[VAL_6]] : i1) {
+! LLVMIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.load %[[VAL_1]] : !llvm.ptr -> i32
+! LLVMIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = llvm.icmp "eq" %[[VAL_6]], %[[VAL_2]] : i32
+! LLVMIRDialect:           oss.task final(%[[VAL_7]] : i1) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           oss.task cost(%[[VAL_0]] : i32) {
+! LLVMIRDialect:           oss.task cost(%[[VAL_2]] : i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           oss.task priority(%[[VAL_0]] : i32) {
+! LLVMIRDialect:           oss.task priority(%[[VAL_2]] : i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
 ! LLVMIRDialect:           oss.task default( defshared) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = llvm.mlir.undef : i32
-! LLVMIRDialect:           oss.task private(%[[VAL_2]], %[[VAL_2]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_7]], %[[VAL_7]] : i32, i32) {
+! LLVMIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = llvm.mlir.undef : i32
+! LLVMIRDialect:           oss.task private(%[[VAL_1]], %[[VAL_1]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_8]], %[[VAL_8]] : i32, i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           oss.task firstprivate(%[[VAL_2]], %[[VAL_2]] : !llvm.ptr, !llvm.ptr) firstprivate_type(%[[VAL_7]], %[[VAL_7]] : i32, i32) {
+! LLVMIRDialect:           oss.task firstprivate(%[[VAL_1]], %[[VAL_1]] : !llvm.ptr, !llvm.ptr) firstprivate_type(%[[VAL_8]], %[[VAL_8]] : i32, i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           oss.task shared(%[[VAL_2]], %[[VAL_2]] : !llvm.ptr, !llvm.ptr) shared_type(%[[VAL_7]], %[[VAL_7]] : i32, i32) {
+! LLVMIRDialect:           oss.task shared(%[[VAL_1]], %[[VAL_1]] : !llvm.ptr, !llvm.ptr) shared_type(%[[VAL_8]], %[[VAL_8]] : i32, i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
 ! LLVMIRDialect:           llvm.return
 ! LLVMIRDialect:         }
-

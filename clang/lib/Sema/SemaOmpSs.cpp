@@ -5263,7 +5263,7 @@ buildDeclareReductionRef(Sema &SemaRef, SourceLocation Loc, SourceRange Range,
             Lookups, [&SemaRef, Ty, Loc](ValueDecl *D) -> ValueDecl * {
               if (!D->isInvalidDecl() &&
                   SemaRef.IsDerivedFrom(Loc, Ty, D->getType()) &&
-                  !Ty.isMoreQualifiedThan(D->getType()))
+                  !Ty.isMoreQualifiedThan(D->getType(), SemaRef.getASTContext()))
                 return D;
               return nullptr;
             })) {
@@ -6295,7 +6295,7 @@ ExprResult SemaOmpSs::VerifyPositiveIntegerConstant(
     return E;
   llvm::APSInt Result;
   ExprResult ICE =
-      SemaRef.VerifyIntegerConstantExpression(E, &Result, /*FIXME*/ Sema::AllowFold);
+      SemaRef.VerifyIntegerConstantExpression(E, &Result, /*FIXME*/ AllowFoldKind::Allow);
   if (ICE.isInvalid())
     return ExprError();
   if ((StrictlyPositive && !Result.isStrictlyPositive()) ||
@@ -7086,7 +7086,7 @@ void SemaOmpSs::OSSCheckShadow(Scope *S, VarDecl *D) {
     return;
 
   // Only diagnose if we're shadowing an unambiguous field or variable.
-  if (R.getResultKind() != LookupResult::Found)
+  if (R.getResultKind() != LookupResultKind::Found)
     return;
 
   NamedDecl *ShadowedDecl = R.getFoundDecl();

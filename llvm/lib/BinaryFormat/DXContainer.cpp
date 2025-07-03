@@ -60,6 +60,26 @@ ArrayRef<EnumEntry<SigComponentType>> dxbc::getSigComponentTypes() {
   return ArrayRef(SigComponentTypes);
 }
 
+#define SHADER_VISIBILITY(Val, Enum) {#Enum, ShaderVisibility::Enum},
+
+static const EnumEntry<ShaderVisibility> ShaderVisibilityValues[] = {
+#include "llvm/BinaryFormat/DXContainerConstants.def"
+};
+
+ArrayRef<EnumEntry<ShaderVisibility>> dxbc::getShaderVisibility() {
+  return ArrayRef(ShaderVisibilityValues);
+}
+
+#define ROOT_PARAMETER(Val, Enum) {#Enum, RootParameterType::Enum},
+
+static const EnumEntry<RootParameterType> RootParameterTypes[] = {
+#include "llvm/BinaryFormat/DXContainerConstants.def"
+};
+
+ArrayRef<EnumEntry<RootParameterType>> dxbc::getRootParameterTypes() {
+  return ArrayRef(RootParameterTypes);
+}
+
 #define SEMANTIC_KIND(Val, Enum) {#Enum, PSV::SemanticKind::Enum},
 
 static const EnumEntry<PSV::SemanticKind> SemanticKindNames[] = {
@@ -108,14 +128,4 @@ static const EnumEntry<PSV::ResourceKind> ResourceKindNames[] = {
 
 ArrayRef<EnumEntry<PSV::ResourceKind>> PSV::getResourceKinds() {
   return ArrayRef(ResourceKindNames);
-}
-
-#define RESOURCE_FLAG(Val, Enum) {#Enum, PSV::ResourceFlag::Enum},
-
-static const EnumEntry<PSV::ResourceFlag> ResourceFlagNames[] = {
-#include "llvm/BinaryFormat/DXContainerConstants.def"
-};
-
-ArrayRef<EnumEntry<PSV::ResourceFlag>> PSV::getResourceFlags() {
-  return ArrayRef(ResourceFlagNames);
 }

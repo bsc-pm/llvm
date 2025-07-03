@@ -8,16 +8,17 @@ PROGRAM P
   !$OSS END TASK
 END
 
+
 ! HLFIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "p"} {
-! HLFIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "x", uniq_name = "_QFEx"}
-! HLFIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]]:2 = hlfir.declare %[[VAL_0]] {uniq_name = "_QFEx"} : (!fir.ref<i32>) -> (!fir.ref<i32>, !fir.ref<i32>)
-! HLFIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! HLFIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.dummy_scope : !fir.dscope
+! HLFIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "x", uniq_name = "_QFEx"}
+! HLFIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]]:2 = hlfir.declare %[[VAL_1]] {uniq_name = "_QFEx"} : (!fir.ref<i32>) -> (!fir.ref<i32>, !fir.ref<i32>)
 ! HLFIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! HLFIRDialect:           oss.task firstprivate(%[[VAL_1]]#1, %[[VAL_1]]#0 : !fir.ref<i32>, !fir.ref<i32>) firstprivate_type(%[[VAL_2]], %[[VAL_3]] : !fir.oss<i32>, !fir.oss<i32>) {
-! HLFIRDialect:             %[[VAL_4:[-0-9A-Za-z._]+]] = arith.constant 777 : i32
-! HLFIRDialect:             hlfir.assign %[[VAL_4]] to %[[VAL_1]]#0 : i32, !fir.ref<i32>
+! HLFIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! HLFIRDialect:           oss.task firstprivate(%[[VAL_2]]#0, %[[VAL_2]]#1 : !fir.ref<i32>, !fir.ref<i32>) firstprivate_type(%[[VAL_3]], %[[VAL_4]] : !fir.oss<i32>, !fir.oss<i32>) {
+! HLFIRDialect:             %[[VAL_5:[-0-9A-Za-z._]+]] = arith.constant 777 : i32
+! HLFIRDialect:             hlfir.assign %[[VAL_5]] to %[[VAL_2]]#0 : i32, !fir.ref<i32>
 ! HLFIRDialect:             oss.terminator
 ! HLFIRDialect:           }
 ! HLFIRDialect:           return
 ! HLFIRDialect:         }
-

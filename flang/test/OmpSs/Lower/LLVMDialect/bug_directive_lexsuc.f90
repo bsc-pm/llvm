@@ -19,30 +19,30 @@ PROGRAM P
 
 END PROGRAM P
 
+
 ! LLVMIRDialect-LABEL:   llvm.func @_QQmain() attributes {fir.bindc_name = "p"} {
-! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.constant(false) : i1
-! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i32) : i32
-! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
-! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_2]] x i32 {bindc_name = "x"} : (i64) -> !llvm.ptr
-! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.mlir.undef : i32
-! LLVMIRDialect:           oss.task firstprivate(%[[VAL_3]], %[[VAL_3]] : !llvm.ptr, !llvm.ptr) firstprivate_type(%[[VAL_4]], %[[VAL_4]] : i32, i32) {
-! LLVMIRDialect:             %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.mlir.constant(888 : i32) : i32
-! LLVMIRDialect:             llvm.store %[[VAL_5]], %[[VAL_3]] : i32, !llvm.ptr
+! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
+! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_0]] x i32 {bindc_name = "x"} : (i64) -> !llvm.ptr
+! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.constant(false) : i1
+! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i32) : i32
+! LLVMIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
+! LLVMIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = llvm.mlir.undef : i32
+! LLVMIRDialect:           oss.task firstprivate(%[[VAL_1]], %[[VAL_1]] : !llvm.ptr, !llvm.ptr) firstprivate_type(%[[VAL_5]], %[[VAL_5]] : i32, i32) {
+! LLVMIRDialect:             %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.mlir.constant(888 : i32) : i32
+! LLVMIRDialect:             llvm.store %[[VAL_6]], %[[VAL_1]] : i32, !llvm.ptr
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = llvm.load %[[VAL_3]] : !llvm.ptr -> i32
-! LLVMIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = llvm.icmp "ne" %[[VAL_6]], %[[VAL_1]] : i32
-! LLVMIRDialect:           llvm.cond_br %[[VAL_7]], ^bb1, ^bb2
+! LLVMIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = llvm.load %[[VAL_1]] : !llvm.ptr -> i32
+! LLVMIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = llvm.icmp "ne" %[[VAL_7]], %[[VAL_3]] : i32
+! LLVMIRDialect:           llvm.cond_br %[[VAL_8]], ^bb1, ^bb2
 ! LLVMIRDialect:         ^bb1:
-! LLVMIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = llvm.call @_FortranAStopStatement(%[[VAL_1]], %[[VAL_0]], %[[VAL_0]])
+! LLVMIRDialect:           llvm.call @_FortranAStopStatement(%[[VAL_3]], %[[VAL_2]], %[[VAL_2]]) {fastmathFlags = #llvm.fastmath<contract>} : (i32, i1, i1) -> ()
 ! LLVMIRDialect:           llvm.unreachable
 ! LLVMIRDialect:         ^bb2:
-! LLVMIRDialect:           oss.task firstprivate(%[[VAL_3]], %[[VAL_3]] : !llvm.ptr, !llvm.ptr) firstprivate_type(%[[VAL_4]], %[[VAL_4]] : i32, i32) {
+! LLVMIRDialect:           oss.task firstprivate(%[[VAL_1]], %[[VAL_1]] : !llvm.ptr, !llvm.ptr) firstprivate_type(%[[VAL_5]], %[[VAL_5]] : i32, i32) {
 ! LLVMIRDialect:             %[[VAL_9:[-0-9A-Za-z._]+]] = llvm.mlir.constant(777 : i32) : i32
-! LLVMIRDialect:             llvm.store %[[VAL_9]], %[[VAL_3]] : i32, !llvm.ptr
+! LLVMIRDialect:             llvm.store %[[VAL_9]], %[[VAL_1]] : i32, !llvm.ptr
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
 ! LLVMIRDialect:           llvm.return
 ! LLVMIRDialect:         }
-! LLVMIRDialect:         llvm.func @_FortranAStopStatement(i32, i1 {llvm.zeroext}, i1 {llvm.zeroext}) -> !llvm.struct<()> attributes {fir.runtime, sym_visibility = "private"}
-

@@ -26,7 +26,7 @@ END PROGRAM MAIN
 
 !FIRDialect-LABEL: func.func @compute.dep0(%arg0: !fir.ref<!fir.type<_QMmTty{x:!fir.array<10xi32>}>>) -> (!fir.ref<!fir.array<10xi32>>, i64, i64, i64)
 !FIRDialect:   %0 = fir.field_index x, !fir.type<_QMmTty{x:!fir.array<10xi32>}>
-!FIRDialect-NEXT:   %1 = fir.coordinate_of %arg0, %0 : (!fir.ref<!fir.type<_QMmTty{x:!fir.array<10xi32>}>>, !fir.field) -> !fir.ref<!fir.array<10xi32>>
+!FIRDialect-NEXT:   %1 = fir.coordinate_of %arg0, x : (!fir.ref<!fir.type<_QMmTty{x:!fir.array<10xi32>}>>) -> !fir.ref<!fir.array<10xi32>> 
 !FIRDialect-NEXT:   %c10 = arith.constant 10 : index
 !FIRDialect-NEXT:   %c1_i64 = arith.constant 1 : i64
 !FIRDialect-NEXT:   %c10_i64 = arith.constant 10 : i64

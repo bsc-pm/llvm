@@ -23,29 +23,30 @@ PROGRAM MAIN
 END PROGRAM MAIN
 
 
+
 ! FIRDialect-LABEL:   func.func @_QMmooPs1(
-! FIRDialect-SAME:                         %[[VAL_0:[-0-9A-Za-z._]+]]: !fir.ref<i32> {fir.bindc_name = "x"}) {
-! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.dummy_scope : !fir.dscope
-! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_0]] dummy_scope %[[VAL_2]] {uniq_name = "_QMmooFs1Ex"} : (!fir.ref<i32>, !fir.dscope) -> !fir.ref<i32>
-! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.load %[[VAL_3]] : !fir.ref<i32>
-! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_4]], %[[VAL_1]] : i32
-! FIRDialect:           fir.store %[[VAL_5]] to %[[VAL_3]] : !fir.ref<i32>
+! FIRDialect-SAME:      %[[ARG0:[-0-9A-Za-z._]+]]: !fir.ref<i32> {fir.bindc_name = "x"}) {
+! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.dummy_scope : !fir.dscope
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.declare %[[ARG0]] dummy_scope %[[VAL_1]] {uniq_name = "_QMmooFs1Ex"} : (!fir.ref<i32>, !fir.dscope) -> !fir.ref<i32>
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.load %[[VAL_2]] : !fir.ref<i32>
+! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_3]], %[[VAL_0]] : i32
+! FIRDialect:           fir.store %[[VAL_4]] to %[[VAL_2]] : !fir.ref<i32>
 ! FIRDialect:           return
 ! FIRDialect:         }
 
 ! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "main"} {
 ! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "x", uniq_name = "_QFEx"}
-! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_1]] {uniq_name = "_QFEx"} : (!fir.ref<i32>) -> !fir.ref<i32>
-! FIRDialect:           fir.store %[[VAL_0]] to %[[VAL_2]] : !fir.ref<i32>
-! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.dummy_scope : !fir.dscope
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "x", uniq_name = "_QFEx"}
+! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_2]] {uniq_name = "_QFEx"} : (!fir.ref<i32>) -> !fir.ref<i32>
+! FIRDialect:           fir.store %[[VAL_0]] to %[[VAL_3]] : !fir.ref<i32>
 ! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           oss.task firstprivate(%[[VAL_2]], %[[VAL_2]] : !fir.ref<i32>, !fir.ref<i32>) firstprivate_type(%[[VAL_3]], %[[VAL_4]] : !fir.oss<i32>, !fir.oss<i32>) {
-! FIRDialect:             fir.call @_QMmooPs1(%[[VAL_2]]) fastmath<contract> : (!fir.ref<i32>) -> ()
+! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           oss.task firstprivate(%[[VAL_3]], %[[VAL_3]] : !fir.ref<i32>, !fir.ref<i32>) firstprivate_type(%[[VAL_4]], %[[VAL_5]] : !fir.oss<i32>, !fir.oss<i32>) {
+! FIRDialect:             fir.call @_QMmooPs1(%[[VAL_3]]) fastmath<contract> : (!fir.ref<i32>) -> ()
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
 ! FIRDialect:           oss.taskwait
 ! FIRDialect:           return
 ! FIRDialect:         }
-

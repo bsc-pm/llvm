@@ -22,7 +22,7 @@ int main() {
         for (int j = 0; j < 10; ++j) ;
     }
     #pragma oss taskloop collapse(1)
-    for (int = ; i < 5; ++i) { // expected-error {{expected identifier or '('}} expected-error {{expected ';' in 'for' statement specifier}} expected-error 2 {{use of undeclared identifier 'i'}} expected-error {{initialization clause of OmpSs-2 for loop is not in canonical form ('var = init' or 'T var = init')}}
+    for (int = ; i < 5; ++i) { // expected-error {{expected identifier or '('}} expected-error {{expected ';' in 'for' statement specifier}} expected-error 2 {{use of undeclared identifier 'i'}}
         #pragma oss taskloop
         for (int j = 0; j < 10; ++j) ;
     }

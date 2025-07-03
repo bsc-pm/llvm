@@ -58,7 +58,7 @@ ABIArgInfo TrivialABIInfo::classifyReturnType(QualType RetTy) const {
         getContext().getTypeSize(getContext().getTargetInfo().hasInt128Type()
                                      ? getContext().Int128Ty
                                      : getContext().LongLongTy))
-      return getNaturalAlignIndirect(RetTy);
+      return getNaturalAlignIndirect(RetTy, getDataLayout().getAllocaAddrSpace());
 
   return (isPromotableIntegerTypeForABI(RetTy) ? ABIArgInfo::getExtend(RetTy)
                                                : ABIArgInfo::getDirect());

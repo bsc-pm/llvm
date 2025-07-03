@@ -65,7 +65,7 @@ static constexpr auto programUnit{
     construct<ProgramUnit>(indirect(subroutineSubprogram)) ||
     construct<ProgramUnit>(indirect(Parser<Submodule>{})) ||
     construct<ProgramUnit>(indirect(Parser<BlockData>{})) ||
-    lookAhead(validFunctionStmt) >>
+    lookAhead(maybe(label) >> validFunctionStmt) >>
         construct<ProgramUnit>(indirect(functionSubprogram)) ||
     construct<ProgramUnit>(indirect(Parser<MainProgram>{}))};
 static constexpr auto normalProgramUnit{StartNewSubprogram{} >> programUnit /
@@ -252,8 +252,9 @@ TYPE_CONTEXT_PARSER("PROGRAM statement"_en_US,
 
 // R1403 end-program-stmt -> END [PROGRAM [program-name]]
 TYPE_CONTEXT_PARSER("END PROGRAM statement"_en_US,
-    construct<EndProgramStmt>(recovery(
-        "END PROGRAM" >> maybe(name) || bareEnd, progUnitEndStmtErrorRecovery)))
+    construct<EndProgramStmt>(
+        recovery("END" >> defaulted("PROGRAM" >> maybe(name)) / atEndOfStmt,
+            progUnitEndStmtErrorRecovery)))
 
 // R1404 module ->
 //         module-stmt [specification-part] [module-subprogram-part]
@@ -269,8 +270,9 @@ TYPE_CONTEXT_PARSER(
 
 // R1406 end-module-stmt -> END [MODULE [module-name]]
 TYPE_CONTEXT_PARSER("END MODULE statement"_en_US,
-    construct<EndModuleStmt>(recovery(
-        "END MODULE" >> maybe(name) || bareEnd, progUnitEndStmtErrorRecovery)))
+    construct<EndModuleStmt>(
+        recovery("END" >> defaulted("MODULE" >> maybe(name)) / atEndOfStmt,
+            progUnitEndStmtErrorRecovery)))
 
 // R1407 module-subprogram-part -> contains-stmt [module-subprogram]...
 TYPE_CONTEXT_PARSER("module subprogram part"_en_US,
@@ -338,7 +340,7 @@ TYPE_PARSER(construct<ParentIdentifier>(name, maybe(":" >> name)))
 // R1419 end-submodule-stmt -> END [SUBMODULE [submodule-name]]
 TYPE_CONTEXT_PARSER("END SUBMODULE statement"_en_US,
     construct<EndSubmoduleStmt>(
-        recovery("END SUBMODULE" >> maybe(name) || bareEnd,
+        recovery("END" >> defaulted("SUBMODULE" >> maybe(name)) / atEndOfStmt,
             progUnitEndStmtErrorRecovery)))
 
 // R1420 block-data -> block-data-stmt [specification-part] end-block-data-stmt
@@ -354,7 +356,7 @@ TYPE_CONTEXT_PARSER("BLOCK DATA statement"_en_US,
 // R1422 end-block-data-stmt -> END [BLOCK DATA [block-data-name]]
 TYPE_CONTEXT_PARSER("END BLOCK DATA statement"_en_US,
     construct<EndBlockDataStmt>(
-        recovery("END BLOCK DATA" >> maybe(name) || bareEnd,
+        recovery("END" >> defaulted("BLOCK DATA" >> maybe(name)) / atEndOfStmt,
             progUnitEndStmtErrorRecovery)))
 
 // R1501 interface-block ->
@@ -479,10 +481,13 @@ TYPE_CONTEXT_PARSER("function reference"_en_US,
 
 // R1521 call-stmt -> CALL procedure-designator [chevrons]
 ///                          [( [actual-arg-spec-list] )]
-// (CUDA) chevrons -> <<< scalar-expr, scalar-expr [, scalar-int-expr
+// (CUDA) chevrons -> <<< * | scalar-expr, scalar-expr [, scalar-int-expr
 //                      [, scalar-int-expr ] ] >>>
+constexpr auto starOrExpr{
+    construct<CallStmt::StarOrExpr>("*" >> pure<std::optional<ScalarExpr>>() ||
+        applyFunction(presentOptional<ScalarExpr>, scalarExpr))};
 TYPE_PARSER(extension<LanguageFeature::CUDA>(
-    "<<<" >> construct<CallStmt::Chevrons>(scalarExpr, "," >> scalarExpr,
+    "<<<" >> construct<CallStmt::Chevrons>(starOrExpr, ", " >> scalarExpr,
                  maybe("," >> scalarIntExpr), maybe("," >> scalarIntExpr)) /
         ">>>"))
 constexpr auto actualArgSpecList{optionalList(actualArgSpec)};
@@ -571,8 +576,9 @@ TYPE_PARSER(construct<Suffix>(
         "RESULT" >> parenthesized(name), maybe(languageBindingSpec)))
 
 // R1533 end-function-stmt -> END [FUNCTION [function-name]]
-TYPE_PARSER(construct<EndFunctionStmt>(recovery(
-    "END FUNCTION" >> maybe(name) || bareEnd, progUnitEndStmtErrorRecovery)))
+TYPE_PARSER(construct<EndFunctionStmt>(
+    recovery("END" >> defaulted("FUNCTION" >> maybe(name)) / atEndOfStmt,
+        progUnitEndStmtErrorRecovery)))
 
 // R1534 subroutine-subprogram ->
 //         subroutine-stmt [specification-part] [execution-part]
@@ -598,8 +604,9 @@ TYPE_PARSER(
 TYPE_PARSER(construct<DummyArg>(name) || construct<DummyArg>(star))
 
 // R1537 end-subroutine-stmt -> END [SUBROUTINE [subroutine-name]]
-TYPE_PARSER(construct<EndSubroutineStmt>(recovery(
-    "END SUBROUTINE" >> maybe(name) || bareEnd, progUnitEndStmtErrorRecovery)))
+TYPE_PARSER(construct<EndSubroutineStmt>(
+    recovery("END" >> defaulted("SUBROUTINE" >> maybe(name)) / atEndOfStmt,
+        progUnitEndStmtErrorRecovery)))
 
 // R1538 separate-module-subprogram ->
 //         mp-subprogram-stmt [specification-part] [execution-part]
@@ -616,7 +623,7 @@ TYPE_CONTEXT_PARSER("MODULE PROCEDURE statement"_en_US,
 // R1540 end-mp-subprogram-stmt -> END [PROCEDURE [procedure-name]]
 TYPE_CONTEXT_PARSER("END PROCEDURE statement"_en_US,
     construct<EndMpSubprogramStmt>(
-        recovery("END PROCEDURE" >> maybe(name) || bareEnd,
+        recovery("END" >> defaulted("PROCEDURE" >> maybe(name)) / atEndOfStmt,
             progUnitEndStmtErrorRecovery)))
 
 // R1541 entry-stmt -> ENTRY entry-name [( [dummy-arg-list] ) [suffix]]

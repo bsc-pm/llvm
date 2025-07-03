@@ -29,32 +29,18 @@ END PROGRAM P
 ! LLVMIR:         %[[VAL_4:[-0-9A-Za-z._]+]] = icmp ne i32 %[[VAL_3]], 1
 ! LLVMIR:         br i1 %[[VAL_4]], label %[[VAL_5:[-0-9A-Za-z._]+]], label %[[VAL_6:[-0-9A-Za-z._]+]]
 ! LLVMIR:       5:                                                ; preds = %[[VAL_7:[-0-9A-Za-z._]+]]
-! LLVMIR:         %[[VAL_8:[-0-9A-Za-z._]+]] = call {} @_FortranAStopStatement(i32 1, i1 false, i1 false)
+! LLVMIR:         call void @_FortranAStopStatement(i32 1, i1 false, i1 false)
 ! LLVMIR:         unreachable
-! LLVMIR:       7:                                                ; preds = %[[VAL_7]]
-! LLVMIR:         %[[VAL_9:[-0-9A-Za-z._]+]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr %[[VAL_0]], i32 undef) ]
-! LLVMIR:         br label %[[VAL_10:[-0-9A-Za-z._]+]]
-! LLVMIR:       oss.end1:                                         ; preds = %[[VAL_10]]
-! LLVMIR:         call void @llvm.directive.region.exit(token %[[VAL_9]])
+! LLVMIR:       6:                                                ; preds = %[[VAL_7]]
+! LLVMIR:         %[[VAL_8:[-0-9A-Za-z._]+]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr %[[VAL_0]], i32 undef) ]
+! LLVMIR:         br label %[[VAL_9:[-0-9A-Za-z._]+]]
+! LLVMIR:       oss.end1:                                         ; preds = %[[VAL_9]]
+! LLVMIR:         call void @llvm.directive.region.exit(token %[[VAL_8]])
 ! LLVMIR:         ret void
-! LLVMIR:       oss.task.region:                                  ; preds = %[[VAL_11:[-0-9A-Za-z._]+]]
+! LLVMIR:       oss.task.region:                                  ; preds = %[[VAL_10:[-0-9A-Za-z._]+]]
 ! LLVMIR:         store i32 888, ptr %[[VAL_0]], align 4
 ! LLVMIR:         br label %[[VAL_7]]
 ! LLVMIR:       oss.task.region2:                                 ; preds = %[[VAL_6]]
 ! LLVMIR:         store i32 777, ptr %[[VAL_0]], align 4
-! LLVMIR:         br label %[[VAL_12:[-0-9A-Za-z._]+]]
+! LLVMIR:         br label %[[VAL_11:[-0-9A-Za-z._]+]]
 ! LLVMIR:       }
-! LLVMIR:       declare {} @_FortranAStopStatement(i32, i1 zeroext, i1 zeroext)
-! LLVMIR:       ; Function Attrs: nocallback nofree nosync nounwind willreturn
-! LLVMIR:       declare ptr @llvm.stacksave.p0() #0
-! LLVMIR:       ; Function Attrs: nocallback nofree nosync nounwind willreturn
-! LLVMIR:       declare void @llvm.stackrestore.p0(ptr) #0
-! LLVMIR:       ; Function Attrs: nounwind
-! LLVMIR:       declare token @llvm.directive.region.entry() #1
-! LLVMIR:       ; Function Attrs: nounwind
-! LLVMIR:       declare void @llvm.directive.region.exit(token) #1
-! LLVMIR:       attributes #0 = { nocallback nofree nosync nounwind willreturn }
-! LLVMIR:       attributes #1 = { nounwind }
-! LLVMIR:       !llvm.module.flags = !{!0}
-! LLVMIR:       !0 = !{i32 2, !"Debug Info Version", i32 3}
-
