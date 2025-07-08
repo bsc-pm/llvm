@@ -4315,8 +4315,8 @@ Decl *TemplateDeclInstantiator::VisitOSSDeclareReductionDecl(
   auto *PrevDeclInScope = D->getPrevDeclInScope();
   if (PrevDeclInScope && !PrevDeclInScope->isInvalidDecl()) {
     PrevDeclInScope = cast<OSSDeclareReductionDecl>(
-        SemaRef.CurrentInstantiationScope->findInstantiationOf(PrevDeclInScope)
-            ->get<Decl *>());
+        cast<Decl *>(*SemaRef.CurrentInstantiationScope->findInstantiationOf(
+            PrevDeclInScope)));
   }
   auto DRD = SemaRef.OmpSs().ActOnOmpSsDeclareReductionDirectiveStart(
       /*S=*/nullptr, Owner, D->getDeclName(), ReductionTypes, D->getAccess(),

@@ -3754,7 +3754,7 @@ void CGOmpSsRuntime::emitLoopCall(CodeGenFunction &CGF,
 void CGOmpSsRuntime::emitFlush(CodeGenFunction &CGF, llvm::AtomicOrdering AO) {
   llvm::Function *Callee = CGM.getIntrinsic(llvm::Intrinsic::directive_marker);
   llvm::Instruction *Call = CGF.Builder.CreateCall(Callee);
-  new llvm::FenceInst(CGF.CGM.getLLVMContext(), AO, llvm::SyncScope::System, Call);
+  new llvm::FenceInst(CGF.CGM.getLLVMContext(), AO, llvm::SyncScope::System, Call->getIterator());
   Call->eraseFromParent();
 }
 

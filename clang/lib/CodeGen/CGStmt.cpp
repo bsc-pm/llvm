@@ -498,6 +498,7 @@ void CodeGenFunction::EmitStmt(const Stmt *S, ArrayRef<const Attr *> Attrs) {
     break;
   case Stmt::OpenACCCacheConstructClass:
     EmitOpenACCCacheConstruct(cast<OpenACCCacheConstruct>(*S));
+    break;
   // OmpSs directives
   case Stmt::OSSTaskwaitDirectiveClass:
     EmitOSSTaskwaitDirective(cast<OSSTaskwaitDirective>(*S));
