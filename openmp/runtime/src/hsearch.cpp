@@ -25,6 +25,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <stdlib.h>
 #include <string.h>
+#include <atomic>
 #include "hsearch.h"
 
 #include "kmp_config.h"
@@ -44,7 +45,7 @@ typedef struct htab_entry {
 
 struct elem {
 	htab_entry item;
-	size_t hash;
+	std::atomic<size_t> hash;
 };
 
 struct htab {
@@ -69,42 +70,24 @@ static size_t keyhash(char *k)
 
 static int resize(struct htab *htab, size_t nel)
 {
-	size_t newsize, oldmask;
-	size_t i, j;
-	struct elem *e, *newe;
-	struct elem *oldtab = htab->elems;
-	struct elem *oldend;
-#ifdef HTAB_OOM_TEST
-	if(oldtab) return 0;
-#endif
+    size_t newsize;
 
-	if (nel > MAXSIZE)
-		nel = MAXSIZE;
-	for (newsize = MINSIZE; newsize < nel; newsize *= 2);
-	htab->elems = (struct elem *)calloc(newsize, sizeof *htab->elems);
-	if (!htab->elems) {
-		htab->elems = oldtab;
-		return 0;
-	}
-	oldmask = htab->mask;
-	htab->mask = newsize - 1;
-	if (!oldtab)
-		return 1;
+    if (htab->elems != NULL) {
+        return 0;
+    }
 
-	KMP_ASSERT2(0, "hash table resize unsupported.");
+    if (nel > MAXSIZE)
+        nel = MAXSIZE;
 
-	oldend = oldtab + oldmask + 1;
-	for (e = oldtab; e < oldend; e++)
-		if (e->item.key) {
-			for (i=e->hash,j=1; ; i+=j++) {
-				newe = htab->elems + (i & htab->mask);
-				if (!newe->item.key)
-					break;
-			}
-			*newe = *e;
-		}
-	free(oldtab);
-	return 1;
+    for (newsize = MINSIZE; newsize < nel; newsize *= 2)
+        ;
+
+    htab->elems = (struct elem *)calloc(newsize, sizeof *htab->elems);
+    if (!htab->elems)
+        return 0;
+
+    htab->mask = newsize - 1;
+    return 1;
 }
 
 static struct elem *lookup(struct htab *htab, char *key, size_t hash, size_t dead)
@@ -114,9 +97,13 @@ static struct elem *lookup(struct htab *htab, char *key, size_t hash, size_t dea
 
 	for (i=hash,j=1; ; i+=j++) {
 		e = htab->elems + (i & htab->mask);
-		if ((!e->item.key && (!e->hash || e->hash == dead)) ||
-		    (e->hash==hash && strcmp(e->item.key, key)==0))
-			break;
+
+	       size_t eh = std::atomic_load_explicit(&e->hash, std::memory_order_acquire);
+
+	       if ((!e->item.key && (!eh || eh == dead)) ||
+	           (eh == hash && strcmp(e->item.key, key) == 0))
+	           break;
+
 	}
 	return e;
 }
@@ -168,7 +155,7 @@ int htab_delete(struct htab *htab, char* key)
 	struct elem *e = htab_find_elem(htab, key);
 	if(!e) return 0;
 	e->item.key = 0;
-	e->hash = 0xdeadc0de;
+	std::atomic_store_explicit(&e->hash, 0xdeadc0de, std::memory_order_release);
 	--htab->used;
 	++htab->dead;
 	return 1;
@@ -176,6 +163,9 @@ int htab_delete(struct htab *htab, char* key)
 
 int htab_insert(struct htab *htab, char* key, htab_value value)
 {
+	if (htab->used >= htab->mask + 1) {
+		return 0; /* hash table is full */
+	}
 	size_t hash = keyhash(key), oh;
 	struct elem *e = lookup(htab, key, hash, 0xdeadc0de);
 	if(e->item.key) {
@@ -183,19 +173,14 @@ int htab_insert(struct htab *htab, char* key, htab_value value)
 		return 0;
 	}
 
-	oh = e->hash; /* save old hash in case it's tombstone marker */
+        oh = std::atomic_load_explicit(&e->hash, std::memory_order_relaxed); /* save old hash in case it's tombstone marker */
 	e->item.key = key;
 	e->item.data = value;
-	e->hash = hash;
-	if (++htab->used + htab->dead > htab->mask - htab->mask/4) {
-		if (!resize(htab, 2*htab->used)) {
-			htab->used--;
-			e->item.key = 0;
-			e->hash = oh;
-			return 0;
-		}
-		htab->dead = 0;
-	} else if (oh == 0xdeadc0de) {
+	std::atomic_store_explicit(&e->hash, hash, std::memory_order_release);
+
+	++htab->used;
+
+	if (oh == 0xdeadc0de) {
 		/* re-used tomb */
 		--htab->dead;
 	}
@@ -215,4 +200,3 @@ size_t htab_next(struct htab *htab, size_t iterator, char** key, htab_value **v)
 	}
 	return 0;
 }
-
