@@ -5917,6 +5917,10 @@ void __kmp_free_team(kmp_root_t *root,
           if (th->th.th_sleep_loc)
             __kmp_null_resume_wrapper(th);
           KMP_CPU_PAUSE();
+#if defined(KMP_OMPV_ENABLED)
+          int res = nosv_yield(NOSV_YIELD_NONE);
+          KMP_ASSERT(res == 0);
+#endif // KMP_OMPV_ENABLED
         }
       }
 

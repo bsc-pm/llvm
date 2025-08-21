@@ -1204,7 +1204,8 @@ void __kmp_reap_worker(kmp_info_t *th) {
 
 #if defined(KMP_OMPV_ENABLED)
   while ((status = pthread_tryjoin_np(th->th.th_info.ds.ds_thread, &exit_val))) {
-    nosv_yield(NOSV_YIELD_NONE);
+    int res = nosv_yield(NOSV_YIELD_NONE);
+    KMP_ASSERT(res == 0);
   }
 #else
   status = pthread_join(th->th.th_info.ds.ds_thread, &exit_val);
