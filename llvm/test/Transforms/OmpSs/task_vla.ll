@@ -534,17 +534,17 @@ attributes #5 = { nounwind "frame-pointer"="none" "no-trapping-math"="true" "sta
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region__Z9pod_arrayi
-; CHECK-SAME: (ptr [[VLA:%.*]], i64 [[TMP0:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG31:![0-9]+]] {
+; CHECK-SAME: (ptr [[VLA:%.*]], i64 [[TMP0:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR0]] !dbg [[DBG31:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
 ; CHECK-NEXT:    br label [[TMP1:%.*]], !dbg [[DBG32:![0-9]+]]
 ; CHECK:       1:
-; CHECK-NEXT:    br label [[DOTEXITSTUB:%.*]], !dbg [[DBG33:![0-9]+]]
-; CHECK:       .exitStub:
+; CHECK-NEXT:    br label [[FINAL_END_EXITSTUB:%.*]], !dbg [[DBG33:![0-9]+]]
+; CHECK:       final.end.exitStub:
 ; CHECK-NEXT:    ret void
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region__Z9pod_arrayi
-; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) {
+; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR6:[0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[GEP_VLA:%.*]] = getelementptr [[NANOS6_TASK_ARGS__Z9POD_ARRAYI:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
 ; CHECK-NEXT:    [[LOAD_GEP_VLA:%.*]] = load ptr, ptr [[GEP_VLA]], align 8
@@ -598,17 +598,17 @@ attributes #5 = { nounwind "frame-pointer"="none" "no-trapping-math"="true" "sta
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region__Z9pod_arrayi.5
-; CHECK-SAME: (ptr [[VLA:%.*]], i64 [[TMP0:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG34:![0-9]+]] {
+; CHECK-SAME: (ptr [[VLA:%.*]], i64 [[TMP0:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR0]] !dbg [[DBG34:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
 ; CHECK-NEXT:    br label [[TMP1:%.*]], !dbg [[DBG35:![0-9]+]]
 ; CHECK:       1:
-; CHECK-NEXT:    br label [[DOTEXITSTUB:%.*]], !dbg [[DBG36:![0-9]+]]
-; CHECK:       .exitStub:
+; CHECK-NEXT:    br label [[FINAL_END1_EXITSTUB:%.*]], !dbg [[DBG36:![0-9]+]]
+; CHECK:       final.end1.exitStub:
 ; CHECK-NEXT:    ret void
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region__Z9pod_arrayi.6
-; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) {
+; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR6]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[GEP_VLA:%.*]] = getelementptr [[NANOS6_TASK_ARGS__Z9POD_ARRAYI_0:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
 ; CHECK-NEXT:    [[LOAD_GEP_VLA:%.*]] = load ptr, ptr [[GEP_VLA]], align 8
@@ -671,17 +671,17 @@ attributes #5 = { nounwind "frame-pointer"="none" "no-trapping-math"="true" "sta
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region__Z13non_pod_arrayi
-; CHECK-SAME: (ptr [[VLA:%.*]], i64 [[TMP0:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG37:![0-9]+]] {
+; CHECK-SAME: (ptr [[VLA:%.*]], i64 [[TMP0:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR0]] !dbg [[DBG37:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
 ; CHECK-NEXT:    br label [[TMP1:%.*]], !dbg [[DBG38:![0-9]+]]
 ; CHECK:       1:
-; CHECK-NEXT:    br label [[DOTEXITSTUB:%.*]], !dbg [[DBG39:![0-9]+]]
-; CHECK:       .exitStub:
+; CHECK-NEXT:    br label [[FINAL_END_EXITSTUB:%.*]], !dbg [[DBG39:![0-9]+]]
+; CHECK:       final.end.exitStub:
 ; CHECK-NEXT:    ret void
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region__Z13non_pod_arrayi
-; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) {
+; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR6]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[GEP_VLA:%.*]] = getelementptr [[NANOS6_TASK_ARGS__Z13NON_POD_ARRAYI:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
 ; CHECK-NEXT:    [[LOAD_GEP_VLA:%.*]] = load ptr, ptr [[GEP_VLA]], align 8
@@ -746,17 +746,17 @@ attributes #5 = { nounwind "frame-pointer"="none" "no-trapping-math"="true" "sta
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region__Z13non_pod_arrayi.18
-; CHECK-SAME: (ptr [[VLA:%.*]], i64 [[TMP0:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG40:![0-9]+]] {
+; CHECK-SAME: (ptr [[VLA:%.*]], i64 [[TMP0:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR0]] !dbg [[DBG40:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
 ; CHECK-NEXT:    br label [[TMP1:%.*]], !dbg [[DBG41:![0-9]+]]
 ; CHECK:       1:
-; CHECK-NEXT:    br label [[DOTEXITSTUB:%.*]], !dbg [[DBG42:![0-9]+]]
-; CHECK:       .exitStub:
+; CHECK-NEXT:    br label [[FINAL_END2_EXITSTUB:%.*]], !dbg [[DBG42:![0-9]+]]
+; CHECK:       final.end2.exitStub:
 ; CHECK-NEXT:    ret void
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region__Z13non_pod_arrayi.19
-; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) {
+; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR6]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[GEP_VLA:%.*]] = getelementptr [[NANOS6_TASK_ARGS__Z13NON_POD_ARRAYI_1:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
 ; CHECK-NEXT:    [[LOAD_GEP_VLA:%.*]] = load ptr, ptr [[GEP_VLA]], align 8

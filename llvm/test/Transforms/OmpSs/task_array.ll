@@ -438,17 +438,17 @@ attributes #5 = { argmemonly nofree nounwind willreturn }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region__Z9pod_arrayv
-; CHECK-SAME: (ptr [[ARRAY:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG30:![0-9]+]] {
+; CHECK-SAME: (ptr [[ARRAY:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR0]] !dbg [[DBG30:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
 ; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG31:![0-9]+]]
 ; CHECK:       0:
-; CHECK-NEXT:    br label [[DOTEXITSTUB:%.*]], !dbg [[DBG32:![0-9]+]]
-; CHECK:       .exitStub:
+; CHECK-NEXT:    br label [[FINAL_END_EXITSTUB:%.*]], !dbg [[DBG32:![0-9]+]]
+; CHECK:       final.end.exitStub:
 ; CHECK-NEXT:    ret void
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region__Z9pod_arrayv
-; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) {
+; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR6:[0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[GEP_ARRAY:%.*]] = getelementptr [[NANOS6_TASK_ARGS__Z9POD_ARRAYV:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
@@ -472,17 +472,17 @@ attributes #5 = { argmemonly nofree nounwind willreturn }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region__Z9pod_arrayv.4
-; CHECK-SAME: (ptr [[ARRAY:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG33:![0-9]+]] {
+; CHECK-SAME: (ptr [[ARRAY:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR0]] !dbg [[DBG33:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
 ; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG34:![0-9]+]]
 ; CHECK:       0:
-; CHECK-NEXT:    br label [[DOTEXITSTUB:%.*]], !dbg [[DBG35:![0-9]+]]
-; CHECK:       .exitStub:
+; CHECK-NEXT:    br label [[FINAL_END1_EXITSTUB:%.*]], !dbg [[DBG35:![0-9]+]]
+; CHECK:       final.end1.exitStub:
 ; CHECK-NEXT:    ret void
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region__Z9pod_arrayv.5
-; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) {
+; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR6]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[GEP_ARRAY:%.*]] = getelementptr [[NANOS6_TASK_ARGS__Z9POD_ARRAYV_0:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
@@ -524,17 +524,17 @@ attributes #5 = { argmemonly nofree nounwind willreturn }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region__Z13non_pod_arrayv
-; CHECK-SAME: (ptr [[ARRAY:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG36:![0-9]+]] {
+; CHECK-SAME: (ptr [[ARRAY:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR0]] !dbg [[DBG36:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
 ; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG37:![0-9]+]]
 ; CHECK:       0:
-; CHECK-NEXT:    br label [[DOTEXITSTUB:%.*]], !dbg [[DBG38:![0-9]+]]
-; CHECK:       .exitStub:
+; CHECK-NEXT:    br label [[FINAL_END_EXITSTUB:%.*]], !dbg [[DBG38:![0-9]+]]
+; CHECK:       final.end.exitStub:
 ; CHECK-NEXT:    ret void
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region__Z13non_pod_arrayv
-; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) {
+; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR6]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[GEP_ARRAY:%.*]] = getelementptr [[NANOS6_TASK_ARGS__Z13NON_POD_ARRAYV:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
@@ -577,17 +577,17 @@ attributes #5 = { argmemonly nofree nounwind willreturn }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region__Z13non_pod_arrayv.17
-; CHECK-SAME: (ptr [[ARRAY:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG39:![0-9]+]] {
+; CHECK-SAME: (ptr [[ARRAY:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR0]] !dbg [[DBG39:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
 ; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG40:![0-9]+]]
 ; CHECK:       0:
-; CHECK-NEXT:    br label [[DOTEXITSTUB:%.*]], !dbg [[DBG41:![0-9]+]]
-; CHECK:       .exitStub:
+; CHECK-NEXT:    br label [[FINAL_END1_EXITSTUB:%.*]], !dbg [[DBG41:![0-9]+]]
+; CHECK:       final.end1.exitStub:
 ; CHECK-NEXT:    ret void
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region__Z13non_pod_arrayv.18
-; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) {
+; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR6]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[GEP_ARRAY:%.*]] = getelementptr [[NANOS6_TASK_ARGS__Z13NON_POD_ARRAYV_1:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null

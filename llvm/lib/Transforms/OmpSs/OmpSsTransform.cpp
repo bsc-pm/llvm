@@ -16,7 +16,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
-#include "llvm/Transforms/Utils/OldCodeExtractor.h"
+#include "llvm/Transforms/Utils/CodeExtractor.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
@@ -1098,8 +1098,7 @@ struct OmpSsDirective {
                                  ArrayRef<Type *> TypeList,
                                  ArrayRef<StringRef> NameList,
                                  ArrayRef<Type *> ExtraTypeList,
-                                 ArrayRef<StringRef> ExtraNameList,
-                                 bool IsTask = false) {
+                                 ArrayRef<StringRef> ExtraNameList) {
     Type *RetTy = Type::getVoidTy(Ctx);
 
     SmallVector<Type *, 4> AggTypeList;
@@ -1116,27 +1115,6 @@ struct OmpSsDirective {
     Function *FuncVar = Function::Create(
         FuncType, GlobalValue::InternalLinkage, F.getAddressSpace(),
         Name, &M);
-
-    // Build debug info in task unpack
-    if (IsTask) {
-      DICompileUnit *CU = nullptr;
-      DIFile *File = nullptr;
-      DISubprogram *OldSP = F.getSubprogram();
-      if (OldSP) {
-        CU = OldSP->getUnit();
-        File = OldSP->getFile();
-      }
-      DIBuilder DIB(M, /*AllowUnresolved=*/false, CU);
-      auto SPType = DIB.createSubroutineType(DIB.getOrCreateTypeArray(std::nullopt));
-      DISubprogram::DISPFlags SPFlags = DISubprogram::SPFlagDefinition |
-                                        DISubprogram::SPFlagOptimized |
-                                        DISubprogram::SPFlagLocalToUnit;
-      DISubprogram *NewSP = DIB.createFunction(
-          CU, FuncVar->getName(), FuncVar->getName(), File,
-          /*LineNo=*/0, SPType, /*ScopeLine=*/0, DINode::FlagZero, SPFlags);
-      FuncVar->setSubprogram(NewSP);
-      DIB.finalizeSubprogram(NewSP);
-    }
 
     // Set names for arguments.
     Function::arg_iterator AI = FuncVar->arg_begin();
@@ -1948,7 +1926,7 @@ struct OmpSsDirective {
       const MapVector<Value *, size_t> &TaskArgsToStructIdxMap,
       StructType *TaskArgsTy,
       ArrayRef<Type *> TaskTypeList, ArrayRef<StringRef> TaskNameList,
-      bool IsLoop, Function *&OlFunc, Function *&UnpackFunc) {
+      bool IsLoop, Function *&OlFunc, Function *UnpackFunc) {
 
     SmallVector<Type *, 4> TaskExtraTypeList;
     SmallVector<StringRef, 4> TaskExtraNameList;
@@ -1963,11 +1941,6 @@ struct OmpSsDirective {
     }
     TaskExtraTypeList.push_back(PtrTy);
     TaskExtraNameList.push_back("address_translation_table");
-
-    // CodeExtractor will create a entry block for us
-    UnpackFunc = createUnpackOlFunction(
-      ("nanos6_unpacked_task_region_" + F.getName()).str(),
-      TaskTypeList, TaskNameList, TaskExtraTypeList, TaskExtraNameList, /*IsTask=*/true);
 
     OlFunc = createUnpackOlFunction(
       ("nanos6_ol_task_region_" + F.getName()).str(),
@@ -2341,19 +2314,65 @@ struct OmpSsDirective {
     // unpacked_task_region loops are always SLT
     NewLoopInfo.LoopType[0] = DirectiveLoopInfo::LT;
     buildLoopForTaskImpl(IndVarTy, DirInfo.Entry, DirInfo.Exit, NewLoopInfo, NewEntryI, NewExitI, CollapseIterBB);
+
+    // Recover iterators in case of collapse
+    Type *OrigIndVarTy = DirEnv.getDSAType(LoopInfo.IndVar[0]);
+    Type *NewIndVarTy = OrigIndVarTy;
+    // Collapsed loops build a loop using size_t type to avoid overflows
+    if (LoopInfo.LBound.size() > 1)
+      NewIndVarTy = Int64Ty;
+
+    // Now we can set
+    // TMP = LoopIndVar/ProductUBs(i+1..n)
+    // LoopIndVar = LoopIndVar - TMP*PProductUBs(i+1..n)
+    // BodyIndVar(i) = (TMP * Step) + OrigLBound
+    Value *NormVal = nullptr;
+    for (size_t i = 0; i < LoopInfo.LBound.size(); ++i) {
+      Instruction *TmpEntry = CollapseIterBB[i];
+
+      IRBuilder<> LoopBodyIRB(TmpEntry);
+      if (!i)
+        NormVal = LoopBodyIRB.CreateLoad(
+            NewIndVarTy,
+            NewLoopInfo.IndVar[0]);
+
+      NormVal = recoverTaskloopIterator(LoopBodyIRB, NormalizedUBs, i, NormVal, OrigIndVarTy, LoopInfo.IndVar[i]);
+
+      if (isLoopIteratorDepenent(i)) {
+        // Create a check to skip unwanted iterations due to collapse guess
+        Instruction *UBoundResult = LoopBodyIRB.CreateCall(LoopInfo.UBound[i].Fun, LoopInfo.UBound[i].Args);
+
+        Instruction *IndVarVal = LoopBodyIRB.CreateLoad(
+            DirEnv.getDSAType(LoopInfo.IndVar[i]),
+            LoopInfo.IndVar[i]);
+        Value *LoopCmp = nullptr;
+        LoopCmp = buildCmpSignDependent(
+          LoopInfo.LoopType[i], LoopBodyIRB, IndVarVal,
+          UBoundResult, LoopInfo.IndVarSigned[i], LoopInfo.UBoundSigned[i]).first;
+
+        // The IncrBB is the successor of BodyBB
+        BasicBlock *BodyBB = DirInfo.Exit->getParent();
+        Instruction *IncrBBI = &BodyBB->getUniqueSuccessor()->front();
+
+        // Next iterator computation or BodyBB
+        BasicBlock *NextBB = CollapseIterBB[i]->getParent()->getUniqueSuccessor();
+
+        // Replace the branch
+        Instruction *Terminator = TmpEntry->getParent()->getTerminator();
+        LoopBodyIRB.SetInsertPoint(Terminator);
+        LoopBodyIRB.CreateCondBr(LoopCmp, NextBB, IncrBBI->getParent());
+        Terminator->eraseFromParent();
+      }
+    }
   }
 
-  Function *rewriteUsesBrAndGetOmpSsUnpackFunc(
+  Function *fixUnpackLoopBoundsToRTAndBodyUsers(
     const DirectiveLoopInfo &NewLoopInfo,
-    SmallVectorImpl<Value *> &NormalizedUBs,
-    SmallVectorImpl<Instruction *> &CollapseIterBB,
     Function *UnpackTaskFuncVar,
     const MapVector<Value *, size_t> &TaskArgsToStructIdxMap,
-    Instruction *Exit,
-    // Placeholders
-    BasicBlock *header, BasicBlock *newRootNode, BasicBlock *newHeader,
-    Function *oldFunction, const SetVector<BasicBlock *> &Blocks) {
-    UnpackTaskFuncVar->insert(UnpackTaskFuncVar->end(), newRootNode);
+    BasicBlock *header,
+    const SmallVectorImpl<Instruction *> &CollapseIterBB,
+    const SetVector<BasicBlock *> &Blocks) {
 
     if (DirEnv.isOmpSsLoopDirective()) {
       Type *OrigIndVarTy = DirEnv.getDSAType(LoopInfo.IndVar[0]);
@@ -2385,57 +2404,28 @@ struct OmpSsDirective {
 
       // Replace loop bounds of the indvar, loop cond. and loop incr.
       // NOTE: incr. does not need to be replaced because all loops have step 1.
+      // NOTE: Recovered iterator references to bounds must point to compute_{lb|ub}.
+      // Ignore these BasicBlocks.
+      auto RTBoundsReplPred = [&Blocks, &CollapseIterBB](Instruction *I) {
+        if (!Blocks.count(I->getParent()))
+          return false;
+        const auto *It = find_if(
+            CollapseIterBB, [&](Instruction *CollapseIterI) {
+              return I->getParent() == CollapseIterI->getParent();
+            });
+        if (It != CollapseIterBB.end())
+          return false;
+        return true;
+      };
       rewriteUsesInBlocksWithPred(
-        NewLoopInfo.LBound[0].Result, LBoundField,
-        [&Blocks](Instruction *I) { return Blocks.count(I->getParent()); });
+        NewLoopInfo.LBound[0].Result, LBoundField, RTBoundsReplPred);
       rewriteUsesInBlocksWithPred(
-        NewLoopInfo.UBound[0].Result, UBoundField,
-        [&Blocks](Instruction *I) { return Blocks.count(I->getParent()); });
-
-      // Now we can set
-      // TMP = LoopIndVar/ProductUBs(i+1..n)
-      // LoopIndVar = LoopIndVar - TMP*PProductUBs(i+1..n)
-      // BodyIndVar(i) = (TMP * Step) + OrigLBound
-      Value *NormVal = nullptr;
-      for (size_t i = 0; i < LoopInfo.LBound.size(); ++i) {
-        Instruction *TmpEntry = CollapseIterBB[i];
-
-        IRBuilder<> LoopBodyIRB(TmpEntry);
-        if (!i)
-          NormVal = LoopBodyIRB.CreateLoad(
-              NewIndVarTy,
-              NewLoopInfo.IndVar[0]);
-
-        NormVal = recoverTaskloopIterator(LoopBodyIRB, NormalizedUBs, i, NormVal, OrigIndVarTy, LoopInfo.IndVar[i]);
-
-        if (isLoopIteratorDepenent(i)) {
-          // Create a check to skip unwanted iterations due to collapse guess
-          Instruction *UBoundResult = LoopBodyIRB.CreateCall(LoopInfo.UBound[i].Fun, LoopInfo.UBound[i].Args);
-
-          Instruction *IndVarVal = LoopBodyIRB.CreateLoad(
-              DirEnv.getDSAType(LoopInfo.IndVar[i]),
-              LoopInfo.IndVar[i]);
-          Value *LoopCmp = nullptr;
-          LoopCmp = buildCmpSignDependent(
-            LoopInfo.LoopType[i], LoopBodyIRB, IndVarVal,
-            UBoundResult, LoopInfo.IndVarSigned[i], LoopInfo.UBoundSigned[i]).first;
-
-          // The IncrBB is the successor of BodyBB
-          BasicBlock *BodyBB = Exit->getParent();
-          Instruction *IncrBBI = &BodyBB->getUniqueSuccessor()->front();
-
-          // Next iterator computation or BodyBB
-          BasicBlock *NextBB = CollapseIterBB[i]->getParent()->getUniqueSuccessor();
-
-          // Replace the branch
-          Instruction *Terminator = TmpEntry->getParent()->getTerminator();
-          LoopBodyIRB.SetInsertPoint(Terminator);
-          LoopBodyIRB.CreateCondBr(LoopCmp, NextBB, IncrBBI->getParent());
-          Terminator->eraseFromParent();
-        }
-      }
+        NewLoopInfo.UBound[0].Result, UBoundField, RTBoundsReplPred);
     }
 
+    // CodeExtractor already does this but it crashes with constants (which
+    // are not really necessary to pass as parameters... but we already
+    // dit it this way. Do this part ourselves.
     // Create an iterator to name all of the arguments we inserted.
     Function::arg_iterator AI = UnpackTaskFuncVar->arg_begin();
     // Rewrite all users of the TaskArgsToStructIdxMap in the extracted region to use the
@@ -2457,16 +2447,6 @@ struct OmpSsDirective {
       }
     }
 
-    // Rewrite branches from basic blocks outside of the task region to blocks
-    // inside the region to use the new label (newHeader) since the task region
-    // will be outlined
-    rewriteUsesInBlocksWithPred(
-      header, newHeader,
-      [&Blocks, &oldFunction](Instruction *I) {
-        return (I->isTerminator() && !Blocks.count(I->getParent()) &&
-                I->getParent()->getParent() == oldFunction);
-      });
-
     return UnpackTaskFuncVar;
   };
 
@@ -2481,37 +2461,10 @@ struct OmpSsDirective {
       MapVector<Value *, size_t> &TaskArgsToStructIdxMap,
       Value *TaskInfoVar, Value *TaskInvInfoVar,
       // Placeholders
-      Function *newFunction, BasicBlock *codeReplacer,
-      const SetVector<BasicBlock *> &Blocks) {
-    IRBuilder<> IRB(codeReplacer);
+      Function *newFunction, BasicBlock *codeReplacer) {
+    IRBuilder<> IRB(codeReplacer->getTerminator());
     // Set debug info from the task entry to all instructions
     IRB.SetCurrentDebugLocation(DLoc);
-
-    // Add a branch to the next basic block after the task region
-    // and replace the terminator that exits the task region
-    // Since this is a single entry single exit region this should
-    // be done once.
-    BasicBlock *NewRetBB = nullptr;
-    for (BasicBlock *Block : Blocks) {
-      Instruction *DirInfo = Block->getTerminator();
-      for (unsigned i = 0, e = DirInfo->getNumSuccessors(); i != e; ++i)
-        if (!Blocks.count(DirInfo->getSuccessor(i))) {
-          assert(!NewRetBB && "More than one exit in task code");
-
-          BasicBlock *OldTarget = DirInfo->getSuccessor(i);
-          // Create branch to next BB after the task region
-          IRB.CreateBr(OldTarget);
-
-          NewRetBB = BasicBlock::Create(Ctx, ".exitStub", newFunction);
-          IRBuilder<> (NewRetBB).CreateRetVoid();
-
-          // rewrite the original branch instruction with this new target
-          DirInfo->setSuccessor(i, NewRetBB);
-        }
-    }
-
-    // Here we have a valid codeReplacer BasicBlock with its terminator
-    IRB.SetInsertPoint(codeReplacer->getTerminator());
 
     AllocaInst *TaskArgsVar = IRB.CreateAlloca(PtrTy);
     PostMoveInstructions.push_back(TaskArgsVar);
@@ -2899,12 +2852,6 @@ struct OmpSsDirective {
     Function *OlDuplicateArgsFuncVar =
       createDuplicateArgsOlFunc(TaskArgsToStructIdxMap, TaskArgsTy, TaskTypeList, TaskNameList);
 
-    Function *OlTaskFuncVar = nullptr;
-    Function *UnpackTaskFuncVar = nullptr;
-      createTaskFuncOl(
-        TaskArgsToStructIdxMap, TaskArgsTy,
-        TaskTypeList, TaskNameList, DirEnv.isOmpSsLoopDirective(), OlTaskFuncVar, UnpackTaskFuncVar);
-
     Function *OlDepsFuncVar =
       createDepsOlFunc(TaskArgsToStructIdxMap, TaskArgsTy, TaskTypeList, TaskNameList);
 
@@ -2936,8 +2883,95 @@ struct OmpSsDirective {
       IRB.CreateStore(createZSExtOrTrunc(IRB, p.first, OrigIndVarTy, p.second), LoopInfo.IndVar[0]);
     }
 
+    SmallVector<Instruction *, 4> ToBeDeleted;
     SetVector<Instruction *> TaskBBs;
+    // Fill the CodeExtractor input params in the
+    // order we want.
+    SetVector<Value *> Inputs;
+    for (const auto &p : TaskArgsToStructIdxMap) {
+        Inputs.insert(p.first);
+    }
+
+    {
+      // Create temporals so CodeExtractor adds
+      // them to the outlined function
+      IRBuilder<> IRBAlloca(&F.getEntryBlock());
+
+      Instruction *TempBoundsDevEnvI = IRBAlloca.CreateAlloca(
+        PtrTy, nullptr,
+        DirEnv.isOmpSsLoopDirective() ? "loop_bounds" : "device_env");
+      ToBeDeleted.push_back(TempBoundsDevEnvI);
+      Inputs.insert(TempBoundsDevEnvI);
+
+      Instruction *TempAddrTranslateI = IRBAlloca.CreateAlloca(
+        PtrTy, nullptr, "address_translation_table");
+      ToBeDeleted.push_back(TempAddrTranslateI);
+      Inputs.insert(TempAddrTranslateI);
+    }
+
     computeBBsBetweenEntryExit(TaskBBs, NewEntryI, NewExitI);
+
+    // 4. Extract region the way we want
+    CodeExtractorAnalysisCache CEAC(F);
+    SetVector<BasicBlock *> TaskBBs1;
+    for (auto *I : TaskBBs)
+      TaskBBs1.insert(I->getParent());
+
+    CodeExtractor Extractor(TaskBBs1.getArrayRef(), /* DominatorTree */ nullptr,
+                            /* AggregateArgs */ false,
+                            /* BlockFrequencyInfo */ nullptr,
+                            /* BranchProbabilityInfo */ nullptr,
+                            /* AssumptionCache */ nullptr,
+                            /* AllowVarArgs */ false,
+                            /* AllowAlloca */ true,
+                            /* AllocaBlock*/ nullptr,
+                            /* Suffix */ ".temp.name",
+                            /* ArgsInZeroAddressSpace */ false);
+
+    Extractor.setBlocks(TaskBBs1.getArrayRef());
+    assert(Extractor.isEligible() &&
+               "Expected OmpSs-2 outlining to be possible!");
+    Extractor.setFullName(("nanos6_unpacked_task_region_" + F.getName()).str());
+
+    SetVector<Value *> Outputs;
+    Function *UnpackTaskFuncVar = Extractor.extractCodeRegion(CEAC, Inputs, Outputs);
+    assert(Outputs.empty() &&
+           "OmpSs-2 outlining should not produce live-out values!");
+
+    CallInst *CI = cast<CallInst>(UnpackTaskFuncVar->user_back());
+    BasicBlock *CIBB = CI->getParent();
+    // For some reason CodeExtractor do not insert debug info in the
+    // branch after the call to the extracted code. Do it manually
+    CIBB->getTerminator()->setDebugLoc(CI->getDebugLoc());
+
+    Function *OlTaskFuncVar = nullptr;
+      createTaskFuncOl(
+        TaskArgsToStructIdxMap, TaskArgsTy,
+        TaskTypeList, TaskNameList, DirEnv.isOmpSsLoopDirective(), OlTaskFuncVar, UnpackTaskFuncVar);
+
+    // Forward target-cpu, target-features attributes to the outlined/unpacked function.
+    auto TargetCpuAttr = F.getFnAttribute("target-cpu");
+    if (TargetCpuAttr.isStringAttribute()) {
+      UnpackTaskFuncVar->addFnAttr(TargetCpuAttr);
+      OlTaskFuncVar->addFnAttr(TargetCpuAttr);
+    }
+
+    auto PreferVectorWidthAttr = F.getFnAttribute("prefer-vector-width");
+    if (PreferVectorWidthAttr.isStringAttribute()) {
+      UnpackTaskFuncVar->addFnAttr(PreferVectorWidthAttr);
+      OlTaskFuncVar->addFnAttr(PreferVectorWidthAttr);
+    }
+
+    auto TargetFeaturesAttr = F.getFnAttribute("target-features");
+    if (TargetFeaturesAttr.isStringAttribute()) {
+      UnpackTaskFuncVar->addFnAttr(TargetFeaturesAttr);
+      OlTaskFuncVar->addFnAttr(TargetFeaturesAttr);
+    }
+
+    CI->eraseFromParent();
+    for (Instruction *I : ToBeDeleted) {
+      I->eraseFromParent();
+    }
 
     // 3. Create Nanos6 task data structures info
     GlobalVariable *TaskInvInfoVar =
@@ -3016,32 +3050,16 @@ struct OmpSsDirective {
 
     registerTaskInfo(TaskInfoVar);
 
-    // FIXME: duplicated from analysis valueInDSABundles,
-    // but needed in CodeExtractor
-    auto valueInUnpackParams = [&TaskArgsToStructIdxMap](Value *const V) {
-      int ret = -1;
-      if (TaskArgsToStructIdxMap.count(V))
-        ret = TaskArgsToStructIdxMap.lookup(V);
-      return ret;
-    };
-
-    // 4. Extract region the way we want
-    OldCodeExtractorAnalysisCache CEAC(F);
-    SmallVector<BasicBlock *> TaskBBs1;
-    for (auto *I : TaskBBs)
-      TaskBBs1.push_back(I->getParent());
-
-    auto fwdRewriteUsesBrAndGetOmpSsUnpackFunc = std::bind(
-      &OmpSsDirective::rewriteUsesBrAndGetOmpSsUnpackFunc, this, NewLoopInfo, NormalizedUBs,
-      CollapseIterBB, UnpackTaskFuncVar, TaskArgsToStructIdxMap, DirInfo.Exit,
-      std::placeholders::_1, std::placeholders::_2, std::placeholders::_3,
-      std::placeholders::_4, std::placeholders::_5);
-    auto fwdEmitOmpSsCaptureAndSubmitTask = std::bind(
-      &OmpSsDirective::emitOmpSsCaptureAndSubmitTask, this, DLoc, TaskArgsTy,
+    emitOmpSsCaptureAndSubmitTask(
+      DLoc, TaskArgsTy,
       TaskArgsToStructIdxMap, TaskInfoVar, TaskInvInfoVar,
-      std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
-    OldCodeExtractor CE(TaskBBs1, fwdRewriteUsesBrAndGetOmpSsUnpackFunc, fwdEmitOmpSsCaptureAndSubmitTask, valueInUnpackParams);
-    CE.extractCodeRegion(CEAC);
+      UnpackTaskFuncVar, CIBB);
+
+    fixUnpackLoopBoundsToRTAndBodyUsers(
+      NewLoopInfo, UnpackTaskFuncVar, TaskArgsToStructIdxMap,
+      &UnpackTaskFuncVar->getEntryBlock(),
+      CollapseIterBB, TaskBBs1);
+
   }
 
   void lowerTask() {

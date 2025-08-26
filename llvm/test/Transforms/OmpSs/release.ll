@@ -648,8 +648,44 @@ attributes #2 = { nounwind }
 ; CHECK-NEXT:    ret void
 ;
 ;
+; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_deps_main
+; CHECK-SAME: (ptr [[X:%.*]], ptr [[ARRAY:%.*]], ptr [[LOOP_BOUNDS:%.*]], ptr [[HANDLER:%.*]]) {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[TMP0:%.*]] = call [[STRUCT__DEPEND_UNPACK_T_1:%.*]] @[[COMPUTE_DEP_2:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[X]])
+; CHECK-NEXT:    [[TMP1:%.*]] = call [[STRUCT__DEPEND_UNPACK_T_1]] @[[COMPUTE_DEP_2]](ptr [[X]])
+; CHECK-NEXT:    [[TMP2:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_1]] [[TMP0]], 0
+; CHECK-NEXT:    [[TMP3:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_1]] [[TMP0]], 1
+; CHECK-NEXT:    [[TMP4:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_1]] [[TMP0]], 2
+; CHECK-NEXT:    [[TMP5:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_1]] [[TMP1]], 3
+; CHECK-NEXT:    call void @nanos6_register_region_read_depinfo1(ptr [[HANDLER]], i32 0, ptr @[[GLOB2:[0-9]+]], ptr [[TMP2]], i64 [[TMP3]], i64 [[TMP4]], i64 [[TMP5]])
+; CHECK-NEXT:    [[TMP6:%.*]] = call [[STRUCT__DEPEND_UNPACK_T_2:%.*]] @[[COMPUTE_DEP_3:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[ARRAY]])
+; CHECK-NEXT:    [[TMP7:%.*]] = call [[STRUCT__DEPEND_UNPACK_T_2]] @[[COMPUTE_DEP_3]](ptr [[ARRAY]])
+; CHECK-NEXT:    [[TMP8:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_2]] [[TMP6]], 0
+; CHECK-NEXT:    [[TMP9:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_2]] [[TMP6]], 1
+; CHECK-NEXT:    [[TMP10:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_2]] [[TMP6]], 2
+; CHECK-NEXT:    [[TMP11:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_2]] [[TMP7]], 3
+; CHECK-NEXT:    [[TMP12:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_2]] [[TMP6]], 4
+; CHECK-NEXT:    [[TMP13:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_2]] [[TMP6]], 5
+; CHECK-NEXT:    [[TMP14:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_2]] [[TMP7]], 6
+; CHECK-NEXT:    call void @nanos6_register_region_read_depinfo2(ptr [[HANDLER]], i32 1, ptr @[[GLOB3:[0-9]+]], ptr [[TMP8]], i64 [[TMP9]], i64 [[TMP10]], i64 [[TMP11]], i64 [[TMP12]], i64 [[TMP13]], i64 [[TMP14]])
+; CHECK-NEXT:    ret void
+;
+;
+; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_deps_main
+; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[LOOP_BOUNDS:%.*]], ptr [[HANDLER:%.*]]) {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[GEP_X:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
+; CHECK-NEXT:    [[LOAD_GEP_X:%.*]] = load ptr, ptr [[GEP_X]], align 8
+; CHECK-NEXT:    [[GEP_ARRAY:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN]], ptr [[TASK_ARGS]], i32 0, i32 1
+; CHECK-NEXT:    [[LOAD_GEP_ARRAY:%.*]] = load ptr, ptr [[GEP_ARRAY]], align 8
+; CHECK-NEXT:    br label [[END:%.*]]
+; CHECK:       end:
+; CHECK-NEXT:    call void @nanos6_unpacked_deps_main(ptr [[LOAD_GEP_X]], ptr [[LOAD_GEP_ARRAY]], ptr [[LOOP_BOUNDS]], ptr [[HANDLER]])
+; CHECK-NEXT:    ret void
+;
+;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_main
-; CHECK-SAME: (ptr [[X:%.*]], ptr [[ARRAY:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG25:![0-9]+]] {
+; CHECK-SAME: (ptr [[X:%.*]], ptr [[ARRAY:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR0]] !dbg [[DBG25:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
 ; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG26:![0-9]+]]
 ; CHECK:       0:
@@ -713,13 +749,13 @@ attributes #2 = { nounwind }
 ; CHECK-NEXT:    [[TMP51:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_10]] [[TMP45]], 5, !dbg [[DBG30]]
 ; CHECK-NEXT:    [[TMP52:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_10]] [[TMP45]], 6, !dbg [[DBG30]]
 ; CHECK-NEXT:    call void @nanos6_release_commutative_2(ptr [[TMP46]], i64 [[TMP47]], i64 [[TMP48]], i64 [[TMP49]], i64 [[TMP50]], i64 [[TMP51]], i64 [[TMP52]]), !dbg [[DBG30]]
-; CHECK-NEXT:    br label [[DOTEXITSTUB:%.*]], !dbg [[DBG31:![0-9]+]]
-; CHECK:       .exitStub:
+; CHECK-NEXT:    br label [[FINAL_END_EXITSTUB:%.*]], !dbg [[DBG31:![0-9]+]]
+; CHECK:       final.end.exitStub:
 ; CHECK-NEXT:    ret void
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_main
-; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) {
+; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR3:[0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[GEP_X:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
 ; CHECK-NEXT:    [[LOAD_GEP_X:%.*]] = load ptr, ptr [[GEP_X]], align 8
@@ -758,42 +794,6 @@ attributes #2 = { nounwind }
 ; CHECK-NEXT:    [[TMP13]] = load ptr, ptr [[TLATE_LOAD_GEP_X]], align 8
 ; CHECK-NEXT:    [[TMP14]] = load ptr, ptr [[TLATE_LOAD_GEP_ARRAY]], align 8
 ; CHECK-NEXT:    br label [[END:%.*]]
-;
-;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_deps_main
-; CHECK-SAME: (ptr [[X:%.*]], ptr [[ARRAY:%.*]], ptr [[LOOP_BOUNDS:%.*]], ptr [[HANDLER:%.*]]) {
-; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[TMP0:%.*]] = call [[STRUCT__DEPEND_UNPACK_T_1:%.*]] @[[COMPUTE_DEP_2:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[X]])
-; CHECK-NEXT:    [[TMP1:%.*]] = call [[STRUCT__DEPEND_UNPACK_T_1]] @[[COMPUTE_DEP_2]](ptr [[X]])
-; CHECK-NEXT:    [[TMP2:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_1]] [[TMP0]], 0
-; CHECK-NEXT:    [[TMP3:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_1]] [[TMP0]], 1
-; CHECK-NEXT:    [[TMP4:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_1]] [[TMP0]], 2
-; CHECK-NEXT:    [[TMP5:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_1]] [[TMP1]], 3
-; CHECK-NEXT:    call void @nanos6_register_region_read_depinfo1(ptr [[HANDLER]], i32 0, ptr @[[GLOB2:[0-9]+]], ptr [[TMP2]], i64 [[TMP3]], i64 [[TMP4]], i64 [[TMP5]])
-; CHECK-NEXT:    [[TMP6:%.*]] = call [[STRUCT__DEPEND_UNPACK_T_2:%.*]] @[[COMPUTE_DEP_3:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[ARRAY]])
-; CHECK-NEXT:    [[TMP7:%.*]] = call [[STRUCT__DEPEND_UNPACK_T_2]] @[[COMPUTE_DEP_3]](ptr [[ARRAY]])
-; CHECK-NEXT:    [[TMP8:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_2]] [[TMP6]], 0
-; CHECK-NEXT:    [[TMP9:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_2]] [[TMP6]], 1
-; CHECK-NEXT:    [[TMP10:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_2]] [[TMP6]], 2
-; CHECK-NEXT:    [[TMP11:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_2]] [[TMP7]], 3
-; CHECK-NEXT:    [[TMP12:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_2]] [[TMP6]], 4
-; CHECK-NEXT:    [[TMP13:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_2]] [[TMP6]], 5
-; CHECK-NEXT:    [[TMP14:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_2]] [[TMP7]], 6
-; CHECK-NEXT:    call void @nanos6_register_region_read_depinfo2(ptr [[HANDLER]], i32 1, ptr @[[GLOB3:[0-9]+]], ptr [[TMP8]], i64 [[TMP9]], i64 [[TMP10]], i64 [[TMP11]], i64 [[TMP12]], i64 [[TMP13]], i64 [[TMP14]])
-; CHECK-NEXT:    ret void
-;
-;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_deps_main
-; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[LOOP_BOUNDS:%.*]], ptr [[HANDLER:%.*]]) {
-; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[GEP_X:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
-; CHECK-NEXT:    [[LOAD_GEP_X:%.*]] = load ptr, ptr [[GEP_X]], align 8
-; CHECK-NEXT:    [[GEP_ARRAY:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN]], ptr [[TASK_ARGS]], i32 0, i32 1
-; CHECK-NEXT:    [[LOAD_GEP_ARRAY:%.*]] = load ptr, ptr [[GEP_ARRAY]], align 8
-; CHECK-NEXT:    br label [[END:%.*]]
-; CHECK:       end:
-; CHECK-NEXT:    call void @nanos6_unpacked_deps_main(ptr [[LOAD_GEP_X]], ptr [[LOAD_GEP_ARRAY]], ptr [[LOOP_BOUNDS]], ptr [[HANDLER]])
-; CHECK-NEXT:    ret void
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_register_task_info() {

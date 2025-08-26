@@ -190,7 +190,7 @@ attributes #1 = { nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_fold_if
-; CHECK-SAME: (ptr [[A_ADDR:%.*]], ptr [[B_ADDR:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG24:![0-9]+]] {
+; CHECK-SAME: (ptr [[A_ADDR:%.*]], ptr [[B_ADDR:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR0]] !dbg [[DBG24:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
 ; CHECK-NEXT:    [[L:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG25:![0-9]+]]
@@ -220,13 +220,13 @@ attributes #1 = { nounwind }
 ; CHECK-NEXT:    store i32 [[DEC]], ptr [[L]], align 4, !dbg [[DBG34]]
 ; CHECK-NEXT:    br label [[IF_END]]
 ; CHECK:       if.end:
-; CHECK-NEXT:    br label [[DOTEXITSTUB:%.*]], !dbg [[DBG35:![0-9]+]]
-; CHECK:       .exitStub:
+; CHECK-NEXT:    br label [[FINAL_END_EXITSTUB:%.*]], !dbg [[DBG35:![0-9]+]]
+; CHECK:       final.end.exitStub:
 ; CHECK-NEXT:    ret void
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_fold_if
-; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) {
+; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR2:[0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[GEP_A_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOLD_IF:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
 ; CHECK-NEXT:    [[GEP_B_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOLD_IF]], ptr [[TASK_ARGS]], i32 0, i32 1

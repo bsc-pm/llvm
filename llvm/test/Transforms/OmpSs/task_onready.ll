@@ -143,32 +143,6 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK-NEXT:    ret void
 ;
 ;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_main
-; CHECK-SAME: (ptr [[X:%.*]], ptr [[Y:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG18:![0-9]+]] {
-; CHECK-NEXT:  newFuncRoot:
-; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG19:![0-9]+]]
-; CHECK:       0:
-; CHECK-NEXT:    br label [[DOTEXITSTUB:%.*]], !dbg [[DBG20:![0-9]+]]
-; CHECK:       .exitStub:
-; CHECK-NEXT:    ret void
-;
-;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_main
-; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) {
-; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[GEP_X:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
-; CHECK-NEXT:    [[GEP_Y:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN]], ptr [[TASK_ARGS]], i32 0, i32 1
-; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
-; CHECK-NEXT:    br i1 [[TMP0]], label [[TLATE_IF:%.*]], label [[TLATE_END:%.*]]
-; CHECK:       end:
-; CHECK-NEXT:    call void @nanos6_unpacked_task_region_main(ptr [[GEP_X]], ptr [[GEP_Y]], ptr [[DEVICE_ENV]], ptr [[ADDRESS_TRANSLATION_TABLE]])
-; CHECK-NEXT:    ret void
-; CHECK:       tlate.if:
-; CHECK-NEXT:    br label [[TLATE_END]]
-; CHECK:       tlate.end:
-; CHECK-NEXT:    br label [[END:%.*]]
-;
-;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_onready_main
 ; CHECK-SAME: (ptr [[X:%.*]], ptr [[Y:%.*]]) {
 ; CHECK-NEXT:  entry:
@@ -185,6 +159,32 @@ attributes #2 = { "min-legal-vector-width"="0" }
 ; CHECK:       end:
 ; CHECK-NEXT:    call void @nanos6_unpacked_onready_main(ptr [[GEP_X]], ptr [[GEP_Y]])
 ; CHECK-NEXT:    ret void
+;
+;
+; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_main
+; CHECK-SAME: (ptr [[X:%.*]], ptr [[Y:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR0]] !dbg [[DBG18:![0-9]+]] {
+; CHECK-NEXT:  newFuncRoot:
+; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG19:![0-9]+]]
+; CHECK:       0:
+; CHECK-NEXT:    br label [[FINAL_END_EXITSTUB:%.*]], !dbg [[DBG20:![0-9]+]]
+; CHECK:       final.end.exitStub:
+; CHECK-NEXT:    ret void
+;
+;
+; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_main
+; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR3:[0-9]+]] {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[GEP_X:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
+; CHECK-NEXT:    [[GEP_Y:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN]], ptr [[TASK_ARGS]], i32 0, i32 1
+; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
+; CHECK-NEXT:    br i1 [[TMP0]], label [[TLATE_IF:%.*]], label [[TLATE_END:%.*]]
+; CHECK:       end:
+; CHECK-NEXT:    call void @nanos6_unpacked_task_region_main(ptr [[GEP_X]], ptr [[GEP_Y]], ptr [[DEVICE_ENV]], ptr [[ADDRESS_TRANSLATION_TABLE]])
+; CHECK-NEXT:    ret void
+; CHECK:       tlate.if:
+; CHECK-NEXT:    br label [[TLATE_END]]
+; CHECK:       tlate.end:
+; CHECK-NEXT:    br label [[END:%.*]]
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_register_task_info() {

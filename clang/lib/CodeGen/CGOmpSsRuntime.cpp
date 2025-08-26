@@ -2864,43 +2864,6 @@ void CGOmpSsRuntime::EmitDirectiveData(
           convertDeviceTypeToInt(Data.Devices.DvKind)));
 }
 
-static void EmitDbgInfo(CodeGenFunction &CGF, CGDebugInfo *DI, const Expr *E) {
-  if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
-    const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
-    if (VD->getType()->isReferenceType()) {
-      const VarDecl *ImplVD = createImplicitVarDecl(
-        CGF, VD->getName(), E->getType(), VD->getLocation(), VD->getDeclContext(), SC_Auto);
-      (void)DI->EmitDeclareOfAutoVariable(
-        ImplVD, CGF.EmitLValue(DRE).emitRawPointer(CGF), CGF.Builder, /*UsePointerValue=*/false);
-    } else {
-      (void)DI->EmitDeclareOfAutoVariable(
-        VD, CGF.EmitLValue(DRE).emitRawPointer(CGF), CGF.Builder, /*UsePointerValue=*/false);
-    }
-  } else if (isa<CXXThisExpr>(E)) {
-    const VarDecl *ImplVD = createImplicitVarDecl(
-      CGF, "this", E->getType()->getPointeeType(), E->getExprLoc(), cast<DeclContext>(CGF.CurCodeDecl), SC_Auto);
-
-    (void)DI->EmitDeclareOfAutoVariable(
-      ImplVD, CGF.EmitScalarExpr(E), CGF.Builder, /*UsePointerValue=*/false);
-  } else {
-    llvm_unreachable("Unsupported debug info in OmpSs-2 directive");
-  }
-}
-
-void CGOmpSsRuntime::EmitDirectiveDbgInfo(
-    CodeGenFunction &CGF, const OSSTaskDataTy &Data) {
-  auto *DI = CGF.getDebugInfo();
-  for (const Expr *E : Data.DSAs.Shareds) {
-    EmitDbgInfo(CGF, DI, E);
-  }
-  for (const OSSDSAPrivateDataTy &PDataTy : Data.DSAs.Privates) {
-    EmitDbgInfo(CGF, DI, PDataTy.Ref);
-  }
-  for (const OSSDSAFirstprivateDataTy &FpDataTy : Data.DSAs.Firstprivates) {
-    EmitDbgInfo(CGF, DI, FpDataTy.Ref);
-  }
-}
-
 llvm::AllocaInst *CGOmpSsRuntime::createTaskAwareAlloca(
     CodeGenFunction &CGF, llvm::Type *Ty, const Twine &Name, llvm::Value *ArraySize) {
   if (InDirectiveEmission && TaskStack.size() > 1)
@@ -3486,9 +3449,6 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   llvm::Instruction *TaskAllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "taskallocapt", Result->getParent());
   setTaskInsertPt(TaskAllocaInsertPt);
 
-  // TODO:
-  // EmitDirectiveDbgInfo
-
   // The point of exit cannot be a branch out of the structured block.
   // longjmp() and throw() must not violate the entry/exit criteria.
   CGF.EHStack.pushTerminate();
@@ -3562,9 +3522,6 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
   llvm::Instruction *TaskAllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "taskallocapt", Result->getParent());
   setTaskInsertPt(TaskAllocaInsertPt);
-
-  if (CGM.getCodeGenOpts().hasReducedDebugInfo())
-    EmitDirectiveDbgInfo(CGF, Data);
 
   // The point of exit cannot be a branch out of the structured block.
   // longjmp() and throw() must not violate the entry/exit criteria.
@@ -3676,9 +3633,6 @@ void CGOmpSsRuntime::emitLoopCall(CodeGenFunction &CGF,
     llvm::Instruction *TaskAllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "taskallocapt", Result->getParent());
     setTaskInsertPt(TaskAllocaInsertPt);
 
-    if (CGM.getCodeGenOpts().hasReducedDebugInfo())
-      EmitDirectiveDbgInfo(CGF, Data);
-
     // The point of exit cannot be a branch out of the structured block.
     // longjmp() and throw() must not violate the entry/exit criteria.
     CGF.EHStack.pushTerminate();
@@ -3726,8 +3680,6 @@ void CGOmpSsRuntime::emitLoopCall(CodeGenFunction &CGF,
     llvm::Instruction *TaskAllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "taskallocapt", Result->getParent());
     setTaskInsertPt(TaskAllocaInsertPt);
 
-    if (CGM.getCodeGenOpts().hasReducedDebugInfo())
-      EmitDirectiveDbgInfo(CGF, Data);
 
     // The point of exit cannot be a branch out of the structured block.
     // longjmp() and throw() must not violate the entry/exit criteria.

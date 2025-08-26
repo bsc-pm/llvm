@@ -125,7 +125,7 @@ attributes #1 = { nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_main
-; CHECK-SAME: (ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG18:![0-9]+]] {
+; CHECK-SAME: (ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR0]] !dbg [[DBG18:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
 ; CHECK-NEXT:    [[I:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG19:![0-9]+]]
@@ -139,18 +139,18 @@ attributes #1 = { nounwind }
 ; CHECK:       for.body:
 ; CHECK-NEXT:    br label [[FOR_INC:%.*]], !dbg [[DBG25:![0-9]+]]
 ; CHECK:       for.end:
-; CHECK-NEXT:    br label [[DOTEXITSTUB:%.*]], !dbg [[DBG26:![0-9]+]]
+; CHECK-NEXT:    br label [[FINAL_END_EXITSTUB:%.*]], !dbg [[DBG26:![0-9]+]]
 ; CHECK:       for.inc:
 ; CHECK-NEXT:    [[TMP2:%.*]] = load i32, ptr [[I]], align 4, !dbg [[DBG27:![0-9]+]]
 ; CHECK-NEXT:    [[INC:%.*]] = add nsw i32 [[TMP2]], 1, !dbg [[DBG27]]
 ; CHECK-NEXT:    store i32 [[INC]], ptr [[I]], align 4, !dbg [[DBG27]]
 ; CHECK-NEXT:    br label [[FOR_COND]], !dbg [[DBG24]], !llvm.loop [[LOOP28:![0-9]+]]
-; CHECK:       .exitStub:
+; CHECK:       final.end.exitStub:
 ; CHECK-NEXT:    ret void
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_main
-; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) {
+; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR2:[0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
 ; CHECK-NEXT:    br i1 [[TMP0]], label [[TLATE_IF:%.*]], label [[TLATE_END:%.*]]

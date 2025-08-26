@@ -3568,18 +3568,6 @@ llvm::DIType *CGDebugInfo::CreateType(const ArrayType *Ty, llvm::DIFile *Unit) {
     //     int x[0];
     //   };
     int64_t Count = -1; // Count == -1 is an unbounded array.
-    if (CGM.getLangOpts().OmpSs
-        && CGM.getOmpSsRuntime().inTaskBody() && Ty->isVariableArrayType()) {
-      // OmpSs-2: Behave like unbounded array for variable arrays
-      auto *CountNode =
-          llvm::ConstantAsMetadata::get(llvm::ConstantInt::getSigned(
-              llvm::Type::getInt64Ty(CGM.getLLVMContext()), Count));
-      Subscripts.push_back(DBuilder.getOrCreateSubrange(
-          CountNode /*count*/, nullptr /*lowerBound*/, nullptr /*upperBound*/,
-          nullptr /*stride*/));
-      EltTy = Ty->getElementType();
-      continue;
-    }
 
     if (const auto *CAT = dyn_cast<ConstantArrayType>(Ty))
       Count = CAT->getZExtSize();
@@ -3929,19 +3917,14 @@ llvm::DIType *CGDebugInfo::getOrCreateType(QualType Ty, llvm::DIFile *Unit) {
   Ty = UnwrapTypeForDebugInfo(Ty, CGM.getContext());
 
   // Do not cache variable array types inside OmpSs-2 directive
-  if (!(CGM.getLangOpts().OmpSs
-        && CGM.getOmpSsRuntime().inTaskBody() && Ty->isVariableArrayType()))
-    if (auto *T = getTypeOrNull(Ty))
-      return T;
+  if (auto *T = getTypeOrNull(Ty))
+    return T;
 
   llvm::DIType *Res = CreateTypeNode(Ty, Unit);
   void *TyPtr = Ty.getAsOpaquePtr();
 
-  // Do not cache variable array types inside OmpSs-2 directive
-  if (!(CGM.getLangOpts().OmpSs
-        && CGM.getOmpSsRuntime().inTaskBody() && Ty->isVariableArrayType()))
-    // And update the type cache.
-    TypeCache[TyPtr].reset(Res);
+  // And update the type cache.
+  TypeCache[TyPtr].reset(Res);
 
   return Res;
 }

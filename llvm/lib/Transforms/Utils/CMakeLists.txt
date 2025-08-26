@@ -13,7 +13,6 @@ add_llvm_component_library(LLVMTransformUtils
   CanonicalizeFreezeInLoops.cpp
   CloneFunction.cpp
   CloneModule.cpp
-  OldCodeExtractor.cpp
   CodeExtractor.cpp
   CodeLayout.cpp
   CodeMoverUtils.cpp

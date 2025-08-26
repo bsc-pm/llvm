@@ -303,45 +303,6 @@ attributes #3 = { noinline norecurse nounwind "frame-pointer"="none" "min-legal-
 ; CHECK-NEXT:    ret void
 ;
 ;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region__Z3fooiRi
-; CHECK-SAME: (ptr [[TMP0:%.*]], ptr [[X_ADDR:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) !dbg [[DBG25:![0-9]+]] {
-; CHECK-NEXT:  newFuncRoot:
-; CHECK-NEXT:    br label [[TMP1:%.*]], !dbg [[DBG26:![0-9]+]]
-; CHECK:       1:
-; CHECK-NEXT:    br label [[DOTEXITSTUB:%.*]], !dbg [[DBG27:![0-9]+]]
-; CHECK:       .exitStub:
-; CHECK-NEXT:    ret void
-;
-;
-; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region__Z3fooiRi
-; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) {
-; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[GEP_:%.*]] = getelementptr [[NANOS6_TASK_ARGS__Z3FOOIRI:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
-; CHECK-NEXT:    [[LOAD_GEP_:%.*]] = load ptr, ptr [[GEP_]], align 8
-; CHECK-NEXT:    [[GEP_X_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS__Z3FOOIRI]], ptr [[TASK_ARGS]], i32 0, i32 1
-; CHECK-NEXT:    [[TLATE_LOAD_GEP_:%.*]] = alloca ptr, align 8
-; CHECK-NEXT:    store ptr [[LOAD_GEP_]], ptr [[TLATE_LOAD_GEP_]], align 8
-; CHECK-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[TLATE_LOAD_GEP_]], align 8
-; CHECK-NEXT:    [[TMP1:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
-; CHECK-NEXT:    br i1 [[TMP1]], label [[TLATE_IF:%.*]], label [[TLATE_END:%.*]]
-; CHECK:       end:
-; CHECK-NEXT:    call void @nanos6_unpacked_task_region__Z3fooiRi(ptr [[TMP7:%.*]], ptr [[GEP_X_ADDR]], ptr [[DEVICE_ENV]], ptr [[ADDRESS_TRANSLATION_TABLE]])
-; CHECK-NEXT:    ret void
-; CHECK:       tlate.if:
-; CHECK-NEXT:    [[LOCAL_LOOKUP_:%.*]] = getelementptr [[NANOS6_ADDRESS_TRANSLATION_ENTRY_T:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE]], i32 0, i32 0
-; CHECK-NEXT:    [[TMP2:%.*]] = load i64, ptr [[LOCAL_LOOKUP_]], align 8
-; CHECK-NEXT:    [[DEVICE_LOOKUP_:%.*]] = getelementptr [[NANOS6_ADDRESS_TRANSLATION_ENTRY_T]], ptr [[ADDRESS_TRANSLATION_TABLE]], i32 0, i32 1
-; CHECK-NEXT:    [[TMP3:%.*]] = load i64, ptr [[DEVICE_LOOKUP_]], align 8
-; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 0, [[TMP2]]
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr [[TMP0]], i64 [[TMP4]]
-; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr [[TMP5]], i64 [[TMP3]]
-; CHECK-NEXT:    store ptr [[TMP6]], ptr [[TLATE_LOAD_GEP_]], align 8
-; CHECK-NEXT:    br label [[TLATE_END]]
-; CHECK:       tlate.end:
-; CHECK-NEXT:    [[TMP7]] = load ptr, ptr [[TLATE_LOAD_GEP_]], align 8
-; CHECK-NEXT:    br label [[END:%.*]]
-;
-;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_deps__Z3fooiRi
 ; CHECK-SAME: (ptr [[TMP0:%.*]], ptr [[X_ADDR:%.*]], ptr [[LOOP_BOUNDS:%.*]], ptr [[HANDLER:%.*]]) {
 ; CHECK-NEXT:  entry:
@@ -408,6 +369,45 @@ attributes #3 = { noinline norecurse nounwind "frame-pointer"="none" "min-legal-
 ; CHECK:       end:
 ; CHECK-NEXT:    call void @nanos6_unpacked_priority__Z3fooiRi(ptr [[LOAD_GEP_]], ptr [[GEP_X_ADDR]], ptr [[PRIORITY]])
 ; CHECK-NEXT:    ret void
+;
+;
+; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region__Z3fooiRi
+; CHECK-SAME: (ptr [[TMP0:%.*]], ptr [[X_ADDR:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR0]] !dbg [[DBG25:![0-9]+]] {
+; CHECK-NEXT:  newFuncRoot:
+; CHECK-NEXT:    br label [[TMP1:%.*]], !dbg [[DBG26:![0-9]+]]
+; CHECK:       1:
+; CHECK-NEXT:    br label [[FINAL_END_EXITSTUB:%.*]], !dbg [[DBG27:![0-9]+]]
+; CHECK:       final.end.exitStub:
+; CHECK-NEXT:    ret void
+;
+;
+; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region__Z3fooiRi
+; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR4:[0-9]+]] {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[GEP_:%.*]] = getelementptr [[NANOS6_TASK_ARGS__Z3FOOIRI:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
+; CHECK-NEXT:    [[LOAD_GEP_:%.*]] = load ptr, ptr [[GEP_]], align 8
+; CHECK-NEXT:    [[GEP_X_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS__Z3FOOIRI]], ptr [[TASK_ARGS]], i32 0, i32 1
+; CHECK-NEXT:    [[TLATE_LOAD_GEP_:%.*]] = alloca ptr, align 8
+; CHECK-NEXT:    store ptr [[LOAD_GEP_]], ptr [[TLATE_LOAD_GEP_]], align 8
+; CHECK-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[TLATE_LOAD_GEP_]], align 8
+; CHECK-NEXT:    [[TMP1:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null
+; CHECK-NEXT:    br i1 [[TMP1]], label [[TLATE_IF:%.*]], label [[TLATE_END:%.*]]
+; CHECK:       end:
+; CHECK-NEXT:    call void @nanos6_unpacked_task_region__Z3fooiRi(ptr [[TMP7:%.*]], ptr [[GEP_X_ADDR]], ptr [[DEVICE_ENV]], ptr [[ADDRESS_TRANSLATION_TABLE]])
+; CHECK-NEXT:    ret void
+; CHECK:       tlate.if:
+; CHECK-NEXT:    [[LOCAL_LOOKUP_:%.*]] = getelementptr [[NANOS6_ADDRESS_TRANSLATION_ENTRY_T:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE]], i32 0, i32 0
+; CHECK-NEXT:    [[TMP2:%.*]] = load i64, ptr [[LOCAL_LOOKUP_]], align 8
+; CHECK-NEXT:    [[DEVICE_LOOKUP_:%.*]] = getelementptr [[NANOS6_ADDRESS_TRANSLATION_ENTRY_T]], ptr [[ADDRESS_TRANSLATION_TABLE]], i32 0, i32 1
+; CHECK-NEXT:    [[TMP3:%.*]] = load i64, ptr [[DEVICE_LOOKUP_]], align 8
+; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 0, [[TMP2]]
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr [[TMP0]], i64 [[TMP4]]
+; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr [[TMP5]], i64 [[TMP3]]
+; CHECK-NEXT:    store ptr [[TMP6]], ptr [[TLATE_LOAD_GEP_]], align 8
+; CHECK-NEXT:    br label [[TLATE_END]]
+; CHECK:       tlate.end:
+; CHECK-NEXT:    [[TMP7]] = load ptr, ptr [[TLATE_LOAD_GEP_]], align 8
+; CHECK-NEXT:    br label [[END:%.*]]
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_register_task_info() {

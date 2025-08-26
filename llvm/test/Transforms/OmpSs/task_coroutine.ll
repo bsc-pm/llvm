@@ -613,7 +613,7 @@ attributes #17 = { noreturn nounwind }
 ; CHECK:       coro.alloc:
 ; CHECK-NEXT:    [[TMP3:%.*]] = call i64 @llvm.coro.size.i64(), !dbg [[DBG11:![0-9]+]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = call i64 @llvm.coro.size.storage.i64.i64(i64 [[TMP3]], ptr @[[GLOB0:[0-9]+]]), !dbg [[DBG11]]
-; CHECK-NEXT:    [[CALL:%.*]] = call noalias noundef nonnull ptr @_Znwm(i64 noundef [[TMP3]]) #[[ATTR17:[0-9]+]], !dbg [[DBG11]]
+; CHECK-NEXT:    [[CALL:%.*]] = call noalias noundef nonnull ptr @_Znwm(i64 noundef [[TMP3]]) #[[ATTR18:[0-9]+]], !dbg [[DBG11]]
 ; CHECK-NEXT:    br label [[CORO_INIT]], !dbg [[DBG10]]
 ; CHECK:       coro.init:
 ; CHECK-NEXT:    [[TMP5:%.*]] = phi ptr [ null, [[ENTRY:%.*]] ], [ [[CALL]], [[CORO_ALLOC]] ], !dbg [[DBG10]]
@@ -782,7 +782,7 @@ attributes #17 = { noreturn nounwind }
 ; CHECK-NEXT:    [[TMP37:%.*]] = landingpad { ptr, i32 }
 ; CHECK-NEXT:            catch ptr null, !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP38:%.*]] = extractvalue { ptr, i32 } [[TMP37]], 0, !dbg [[DBG11]]
-; CHECK-NEXT:    call void @__clang_call_terminate(ptr [[TMP38]]) #[[ATTR18:[0-9]+]], !dbg [[DBG11]]
+; CHECK-NEXT:    call void @__clang_call_terminate(ptr [[TMP38]]) #[[ATTR19:[0-9]+]], !dbg [[DBG11]]
 ; CHECK-NEXT:    unreachable, !dbg [[DBG11]]
 ; CHECK:       unreachable:
 ; CHECK-NEXT:    unreachable
@@ -878,7 +878,7 @@ attributes #17 = { noreturn nounwind }
 ; CHECK-LABEL: define {{[^@]+}}@__clang_call_terminate
 ; CHECK-SAME: (ptr noundef [[TMP0:%.*]]) #[[ATTR11:[0-9]+]] comdat {
 ; CHECK-NEXT:    [[TMP2:%.*]] = call ptr @__cxa_begin_catch(ptr [[TMP0]]) #[[ATTR2]]
-; CHECK-NEXT:    call void @_ZSt9terminatev() #[[ATTR18]]
+; CHECK-NEXT:    call void @_ZSt9terminatev() #[[ATTR19]]
 ; CHECK-NEXT:    unreachable
 ;
 ;
@@ -975,7 +975,7 @@ attributes #17 = { noreturn nounwind }
 ; CHECK-NEXT:    [[TMP7:%.*]] = landingpad { ptr, i32 }
 ; CHECK-NEXT:            catch ptr null, !dbg [[DBG43]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = extractvalue { ptr, i32 } [[TMP7]], 0, !dbg [[DBG43]]
-; CHECK-NEXT:    call void @__clang_call_terminate(ptr [[TMP8]]) #[[ATTR18]], !dbg [[DBG43]]
+; CHECK-NEXT:    call void @__clang_call_terminate(ptr [[TMP8]]) #[[ATTR19]], !dbg [[DBG43]]
 ; CHECK-NEXT:    unreachable, !dbg [[DBG43]]
 ; CHECK:       final.cond:
 ; CHECK-NEXT:    [[TMP9:%.*]] = call i32 @nanos6_in_final(), !dbg [[DBG43]]
@@ -990,7 +990,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_main
-; CHECK-SAME: (ptr [[HANDLE:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) personality ptr @__gxx_personality_v0 !dbg [[DBG45:![0-9]+]] {
+; CHECK-SAME: (ptr [[HANDLE:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR14]] personality ptr @__gxx_personality_v0 !dbg [[DBG45:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
 ; CHECK-NEXT:    [[UNDEF_AGG_TMP:%.*]] = alloca [[STRUCT_OSS_COROUTINE:%.*]], align 1
 ; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG46:![0-9]+]]
@@ -998,19 +998,19 @@ attributes #17 = { noreturn nounwind }
 ; CHECK-NEXT:    invoke void @_Z3kk2v()
 ; CHECK-NEXT:            to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG46]]
 ; CHECK:       invoke.cont:
-; CHECK-NEXT:    br label [[DOTEXITSTUB:%.*]], !dbg [[DBG47:![0-9]+]]
+; CHECK-NEXT:    br label [[FINAL_END_EXITSTUB:%.*]], !dbg [[DBG47:![0-9]+]]
 ; CHECK:       terminate.lpad:
 ; CHECK-NEXT:    [[TMP1:%.*]] = landingpad { ptr, i32 }
 ; CHECK-NEXT:            catch ptr null, !dbg [[DBG46]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = extractvalue { ptr, i32 } [[TMP1]], 0, !dbg [[DBG46]]
-; CHECK-NEXT:    call void @__clang_call_terminate(ptr [[TMP2]]) #[[ATTR18]], !dbg [[DBG46]]
+; CHECK-NEXT:    call void @__clang_call_terminate(ptr [[TMP2]]) #[[ATTR19]], !dbg [[DBG46]]
 ; CHECK-NEXT:    unreachable, !dbg [[DBG46]]
-; CHECK:       .exitStub:
+; CHECK:       final.end.exitStub:
 ; CHECK-NEXT:    ret void
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_ol_task_region_main
-; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) {
+; CHECK-SAME: (ptr [[TASK_ARGS:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR16:[0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[GEP_HANDLE:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN:%.*]], ptr [[TASK_ARGS]], i32 0, i32 0
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne ptr [[ADDRESS_TRANSLATION_TABLE]], null

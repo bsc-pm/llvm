@@ -129,6 +129,9 @@ public:
     // label, if non-empty, otherwise "extracted".
     std::string Suffix;
 
+    // Full Name of the extracted function. Has priority oves Suffix
+    std::string FullName;
+
     // If true, the outlined function has aggregate argument in zero address
     // space.
     bool ArgsInZeroAddressSpace;
@@ -158,6 +161,14 @@ public:
                   bool AllowAlloca = false,
                   BasicBlock *AllocationBlock = nullptr,
                   std::string Suffix = "", bool ArgsInZeroAddressSpace = false);
+
+    // Sets FullName before extraction
+    LLVM_ABI
+    void setFullName(std::string FullName);
+
+    // https://github.com/llvm/llvm-project/issues/38893
+    LLVM_ABI
+    void setBlocks(ArrayRef<BasicBlock *> Blocks);
 
     /// Perform the extraction, returning the new function.
     ///

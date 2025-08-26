@@ -270,7 +270,16 @@ CodeExtractor::CodeExtractor(ArrayRef<BasicBlock *> BBs, DominatorTree *DT,
       BPI(BPI), AC(AC), AllocationBlock(AllocationBlock),
       AllowVarArgs(AllowVarArgs),
       Blocks(buildExtractionBlockSet(BBs, DT, AllowVarArgs, AllowAlloca)),
-      Suffix(Suffix), ArgsInZeroAddressSpace(ArgsInZeroAddressSpace) {}
+      Suffix(Suffix), FullName(""), ArgsInZeroAddressSpace(ArgsInZeroAddressSpace) {}
+
+void CodeExtractor::setFullName(std::string FullName) {
+  this->FullName = FullName;
+}
+
+void CodeExtractor::setBlocks(ArrayRef<BasicBlock *> Blocks) {
+  this->Blocks.clear();
+  this->Blocks.insert(Blocks.begin(), Blocks.end());
+}
 
 /// definedInRegion - Return true if the specified value is defined in the
 /// extracted region.
@@ -664,13 +673,16 @@ bool CodeExtractor::isEligible() const {
 void CodeExtractor::findInputsOutputs(ValueSet &Inputs, ValueSet &Outputs,
                                       const ValueSet &SinkCands,
                                       bool CollectGlobalInputs) const {
+  // For our OmpSs-2 transform we want CodeExtractor
+  // to trust our input parameters
+  const bool InputsEmpty = Inputs.empty();
   for (BasicBlock *BB : Blocks) {
     // If a used value is defined outside the region, it's an input.  If an
     // instruction is used outside the region, it's an output.
     for (Instruction &II : *BB) {
       for (auto &OI : II.operands()) {
         Value *V = OI;
-        if (!SinkCands.count(V) &&
+        if (InputsEmpty && !SinkCands.count(V) &&
             (definedInCaller(Blocks, V) ||
              (CollectGlobalInputs && llvm::isa<llvm::GlobalVariable>(V))))
           Inputs.insert(V);
@@ -1510,7 +1522,8 @@ CodeExtractor::extractCodeRegion(const CodeExtractorAnalysisCache &CEAC,
   ValueSet StructValues;
   StructType *StructTy = nullptr;
   Function *newFunction = constructFunctionDeclaration(
-      inputs, outputs, EntryFreq, oldFunction->getName() + "." + SuffixToUse,
+      inputs, outputs, EntryFreq,
+      FullName.empty() ? oldFunction->getName() + "." + SuffixToUse : FullName,
       StructValues, StructTy);
   SmallVector<Value *> NewValues;
 
@@ -1676,6 +1689,7 @@ void CodeExtractor::emitFunctionBody(
 
   moveCodeToFunction(newFunction);
 
+  if (FullName.empty())
   for (unsigned i = 0, e = inputs.size(); i != e; ++i) {
     Value *RewriteVal = NewValues[i];
 
