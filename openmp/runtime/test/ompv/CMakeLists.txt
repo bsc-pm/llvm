@@ -2,6 +2,12 @@ include(../cmake/RuntimeTargetTemplate.cmake)
 add_library(ompvt-print-callback INTERFACE)
 target_include_directories(ompvt-print-callback INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/../ompt)
 
+# add_custom_target(libompv-test-depends)
+# add_dependencies(libompv-test-depends ompv)
+# if (LLVM_RUNTIMES_BUILD AND OPENMP_TEST_Fortran_COMPILER AND "flang-rt" IN_LIST LLVM_ENABLE_RUNTIMES)
+#   add_dependencies(libompv-test-depends flang-rt)
+# endif ()
+
 add_openmp_testsuite(check-libompv "Running libompv tests" ${CMAKE_CURRENT_BINARY_DIR} DEPENDS ompv)
 # Add target check-ompt, but make sure to not add the tests twice to check-openmp.
 add_openmp_testsuite(check-ompvt "Running OMPVT tests" ${CMAKE_CURRENT_BINARY_DIR} EXCLUDE_FROM_CHECK_ALL DEPENDS ompv)

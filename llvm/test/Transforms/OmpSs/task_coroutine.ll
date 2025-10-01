@@ -71,228 +71,229 @@ entry:
   %ref.tmp12 = alloca %"struct.std::suspend_always", align 1
   %undef.agg.tmp13 = alloca %"struct.std::suspend_always", align 1
   %0 = bitcast ptr %__promise to ptr
-  %1 = call token @llvm.coro.id(i32 16, ptr %0, ptr null, ptr null), !dbg !11
-  %2 = call i1 @llvm.coro.alloc(token %1), !dbg !11
-  br i1 %2, label %coro.alloc, label %coro.init, !dbg !11
+  %1 = call token @llvm.coro.id(i32 16, ptr %0, ptr null, ptr null), !dbg !10
+  %2 = call i1 @llvm.coro.alloc(token %1), !dbg !10
+  br i1 %2, label %coro.alloc, label %coro.init, !dbg !10
 
 coro.alloc:                                       ; preds = %entry
-  %3 = call i64 @llvm.coro.size.i64(), !dbg !12
-  %4 = call i64 @llvm.coro.size.storage.i64.i64(i64 %3, ptr @0), !dbg !12
-  %call = call noalias noundef nonnull ptr @_Znwm(i64 noundef %3) #16, !dbg !12
-  br label %coro.init, !dbg !11
+  %3 = call i64 @llvm.coro.size.i64(), !dbg !11
+  %4 = call i64 @llvm.coro.size.storage.i64.i64(i64 %3, ptr @0), !dbg !11
+  %call = call noalias noundef nonnull ptr @_Znwm(i64 noundef %3) #16, !dbg !11
+  br label %coro.init, !dbg !10
 
 coro.init:                                        ; preds = %coro.alloc, %entry
-  %5 = phi ptr [ null, %entry ], [ %call, %coro.alloc ], !dbg !11
-  %6 = call ptr @llvm.coro.begin(token %1, ptr %5), !dbg !11
-  call void @llvm.lifetime.start.p0(i64 1, ptr %__promise) #2, !dbg !12
+  %5 = phi ptr [ null, %entry ], [ %call, %coro.alloc ], !dbg !10
+  %6 = call ptr @llvm.coro.begin(token %1, ptr %5), !dbg !10
+  call void @llvm.lifetime.start.p0(ptr %__promise) #2, !dbg !11
   invoke void @_ZN13oss_coroutine12promise_type17get_return_objectEv(ptr noundef nonnull align 1 dereferenceable(1) %__promise)
-  to label %invoke.cont unwind label %lpad, !dbg !12
+          to label %invoke.cont unwind label %lpad, !dbg !11
 
 invoke.cont:                                      ; preds = %coro.init
-  call void @llvm.lifetime.start.p0(i64 1, ptr %ref.tmp) #2, !dbg !12
+  call void @llvm.lifetime.start.p0(ptr %ref.tmp) #2, !dbg !11
   invoke void @_ZN13oss_coroutine12promise_type15initial_suspendEv(ptr noundef nonnull align 1 dereferenceable(1) %__promise)
-  to label %invoke.cont2 unwind label %lpad1, !dbg !12
+          to label %invoke.cont2 unwind label %lpad1, !dbg !11
 
 invoke.cont2:                                     ; preds = %invoke.cont
-  %call4 = call noundef zeroext i1 @_ZNSt13suspend_never11await_readyEv(ptr noundef nonnull align 1 dereferenceable(1) %ref.tmp) #2, !dbg !12
-  br i1 %call4, label %init.ready, label %init.suspend, !dbg !12
+  %call4 = call noundef zeroext i1 @_ZNSt13suspend_never11await_readyEv(ptr noundef nonnull align 1 dereferenceable(1) %ref.tmp) #2, !dbg !11
+  br i1 %call4, label %init.ready, label %init.suspend, !dbg !11
 
 init.suspend:                                     ; preds = %invoke.cont2
-  %7 = call token @llvm.coro.save(ptr null), !dbg !12
-  call void @llvm.coro.await.suspend.void(ptr %ref.tmp, ptr %6, ptr @_Z3kk2v.__await_suspend_wrapper__init) #2, !dbg !12
-  %8 = call i8 @llvm.coro.suspend(token %7, i1 false), !dbg !12
+  %7 = call token @llvm.coro.save(ptr null), !dbg !11
+  call void @llvm.coro.await.suspend.void(ptr %ref.tmp, ptr %6, ptr @_Z3kk2v.__await_suspend_wrapper__init) #2, !dbg !11
+  %8 = call i8 @llvm.coro.suspend(token %7, i1 false), !dbg !11
   switch i8 %8, label %coro.ret [
-  i8 0, label %init.ready
-  i8 1, label %init.cleanup
-  ], !dbg !12
+    i8 0, label %init.ready
+    i8 1, label %init.cleanup
+  ], !dbg !11
 
 init.cleanup:                                     ; preds = %init.suspend
-  br label %cleanup, !dbg !12
+  br label %cleanup, !dbg !11
 
 lpad:                                             ; preds = %coro.init
   %9 = landingpad { ptr, i32 }
-  cleanup, !dbg !13
-  %10 = extractvalue { ptr, i32 } %9, 0, !dbg !13
-  store ptr %10, ptr %exn.slot, align 8, !dbg !13
-  %11 = extractvalue { ptr, i32 } %9, 1, !dbg !13
-  store i32 %11, ptr %ehselector.slot, align 4, !dbg !13
-  br label %ehcleanup20, !dbg !13
+          cleanup, !dbg !12
+  %10 = extractvalue { ptr, i32 } %9, 0, !dbg !12
+  store ptr %10, ptr %exn.slot, align 8, !dbg !12
+  %11 = extractvalue { ptr, i32 } %9, 1, !dbg !12
+  store i32 %11, ptr %ehselector.slot, align 4, !dbg !12
+  br label %ehcleanup20, !dbg !12
 
 lpad1:                                            ; preds = %invoke.cont
   %12 = landingpad { ptr, i32 }
-  cleanup, !dbg !13
-  %13 = extractvalue { ptr, i32 } %12, 0, !dbg !13
-  store ptr %13, ptr %exn.slot, align 8, !dbg !13
-  %14 = extractvalue { ptr, i32 } %12, 1, !dbg !13
-  store i32 %14, ptr %ehselector.slot, align 4, !dbg !13
-  call void @llvm.lifetime.end.p0(i64 1, ptr %ref.tmp) #2, !dbg !12
-  br label %ehcleanup, !dbg !12
+          cleanup, !dbg !12
+  %13 = extractvalue { ptr, i32 } %12, 0, !dbg !12
+  store ptr %13, ptr %exn.slot, align 8, !dbg !12
+  %14 = extractvalue { ptr, i32 } %12, 1, !dbg !12
+  store i32 %14, ptr %ehselector.slot, align 4, !dbg !12
+  call void @llvm.lifetime.end.p0(ptr %ref.tmp) #2, !dbg !11
+  br label %ehcleanup, !dbg !11
 
 init.ready:                                       ; preds = %init.suspend, %invoke.cont2
-  call void @_ZNSt13suspend_never12await_resumeEv(ptr noundef nonnull align 1 dereferenceable(1) %ref.tmp) #2, !dbg !12
-  br label %cleanup, !dbg !12
+  call void @_ZNSt13suspend_never12await_resumeEv(ptr noundef nonnull align 1 dereferenceable(1) %ref.tmp) #2, !dbg !11
+  br label %cleanup, !dbg !11
 
 cleanup:                                          ; preds = %init.ready, %init.cleanup
   %cleanup.dest.slot.0 = phi i32 [ 0, %init.ready ], [ 2, %init.cleanup ]
-  call void @llvm.lifetime.end.p0(i64 1, ptr %ref.tmp) #2, !dbg !12
+  call void @llvm.lifetime.end.p0(ptr %ref.tmp) #2, !dbg !11
   switch i32 %cleanup.dest.slot.0, label %cleanup19 [
-  i32 0, label %cleanup.cont
+    i32 0, label %cleanup.cont
   ]
 
 cleanup.cont:                                     ; preds = %cleanup
   invoke void @_ZN13oss_coroutine12promise_type11return_voidEv(ptr noundef nonnull align 1 dereferenceable(1) %__promise)
-  to label %invoke.cont6 unwind label %lpad5, !dbg !14
+          to label %invoke.cont6 unwind label %lpad5, !dbg !13
 
 invoke.cont6:                                     ; preds = %cleanup.cont
-  br label %coro.final, !dbg !14
+  br label %coro.final, !dbg !13
 
 lpad5:                                            ; preds = %cleanup.cont
   %15 = landingpad { ptr, i32 }
-  catch ptr null, !dbg !13
-  %16 = extractvalue { ptr, i32 } %15, 0, !dbg !13
-  store ptr %16, ptr %exn.slot, align 8, !dbg !13
-  %17 = extractvalue { ptr, i32 } %15, 1, !dbg !13
-  store i32 %17, ptr %ehselector.slot, align 4, !dbg !13
-  br label %catch, !dbg !13
+          catch ptr null, !dbg !12
+  %16 = extractvalue { ptr, i32 } %15, 0, !dbg !12
+  store ptr %16, ptr %exn.slot, align 8, !dbg !12
+  %17 = extractvalue { ptr, i32 } %15, 1, !dbg !12
+  store i32 %17, ptr %ehselector.slot, align 4, !dbg !12
+  br label %catch, !dbg !12
 
 catch:                                            ; preds = %lpad5
-  %exn = load ptr, ptr %exn.slot, align 8, !dbg !13
-  %18 = call ptr @__cxa_begin_catch(ptr %exn) #2, !dbg !13
+  %exn = load ptr, ptr %exn.slot, align 8, !dbg !12
+  %18 = call ptr @__cxa_begin_catch(ptr %exn) #2, !dbg !12
   invoke void @_ZN13oss_coroutine12promise_type19unhandled_exceptionEv(ptr noundef nonnull align 1 dereferenceable(1) %__promise)
-  to label %invoke.cont8 unwind label %lpad7, !dbg !12
+          to label %invoke.cont8 unwind label %lpad7, !dbg !11
 
 invoke.cont8:                                     ; preds = %catch
   invoke void @__cxa_end_catch()
-  to label %invoke.cont10 unwind label %lpad9, !dbg !12
+          to label %invoke.cont10 unwind label %lpad9, !dbg !11
 
 invoke.cont10:                                    ; preds = %invoke.cont8
-  br label %try.cont, !dbg !12
+  br label %try.cont, !dbg !11
 
 try.cont:                                         ; preds = %invoke.cont10
-  br label %coro.final, !dbg !12
+  br label %coro.final, !dbg !11
 
 coro.final:                                       ; preds = %try.cont, %invoke.cont6
-  call void @llvm.lifetime.start.p0(i64 1, ptr %ref.tmp12) #2, !dbg !12
-  call void @_ZN13oss_coroutine12promise_type13final_suspendEv(ptr noundef nonnull align 1 dereferenceable(1) %__promise) #2, !dbg !12
-  %call14 = call noundef zeroext i1 @_ZNSt14suspend_always11await_readyEv(ptr noundef nonnull align 1 dereferenceable(1) %ref.tmp12) #2, !dbg !12
-  br i1 %call14, label %final.ready, label %final.suspend, !dbg !12
+  call void @llvm.lifetime.start.p0(ptr %ref.tmp12) #2, !dbg !11
+  call void @_ZN13oss_coroutine12promise_type13final_suspendEv(ptr noundef nonnull align 1 dereferenceable(1) %__promise) #2, !dbg !11
+  %call14 = call noundef zeroext i1 @_ZNSt14suspend_always11await_readyEv(ptr noundef nonnull align 1 dereferenceable(1) %ref.tmp12) #2, !dbg !11
+  br i1 %call14, label %final.ready, label %final.suspend, !dbg !11
 
 final.suspend:                                    ; preds = %coro.final
-  %19 = call token @llvm.coro.save(ptr null), !dbg !12
-  call void @llvm.coro.await.suspend.void(ptr %ref.tmp12, ptr %6, ptr @_Z3kk2v.__await_suspend_wrapper__final) #2, !dbg !12
-  %20 = call i8 @llvm.coro.suspend(token %19, i1 true), !dbg !12
+  %19 = call token @llvm.coro.save(ptr null), !dbg !11
+  call void @llvm.coro.await.suspend.void(ptr %ref.tmp12, ptr %6, ptr @_Z3kk2v.__await_suspend_wrapper__final) #2, !dbg !11
+  %20 = call i8 @llvm.coro.suspend(token %19, i1 true), !dbg !11
   switch i8 %20, label %coro.ret [
-  i8 0, label %final.ready
-  i8 1, label %final.cleanup
-  ], !dbg !12
+    i8 0, label %final.ready
+    i8 1, label %final.cleanup
+  ], !dbg !11
 
 final.cleanup:                                    ; preds = %final.suspend
-  br label %cleanup15, !dbg !12
+  br label %cleanup15, !dbg !11
 
 lpad7:                                            ; preds = %catch
   %21 = landingpad { ptr, i32 }
-  cleanup, !dbg !13
-  %22 = extractvalue { ptr, i32 } %21, 0, !dbg !13
-  store ptr %22, ptr %exn.slot, align 8, !dbg !13
-  %23 = extractvalue { ptr, i32 } %21, 1, !dbg !13
-  store i32 %23, ptr %ehselector.slot, align 4, !dbg !13
+          cleanup, !dbg !12
+  %22 = extractvalue { ptr, i32 } %21, 0, !dbg !12
+  store ptr %22, ptr %exn.slot, align 8, !dbg !12
+  %23 = extractvalue { ptr, i32 } %21, 1, !dbg !12
+  store i32 %23, ptr %ehselector.slot, align 4, !dbg !12
   invoke void @__cxa_end_catch()
-  to label %invoke.cont11 unwind label %terminate.lpad, !dbg !12
+          to label %invoke.cont11 unwind label %terminate.lpad, !dbg !11
 
 lpad9:                                            ; preds = %invoke.cont8
   %24 = landingpad { ptr, i32 }
-  cleanup, !dbg !13
-  %25 = extractvalue { ptr, i32 } %24, 0, !dbg !13
-  store ptr %25, ptr %exn.slot, align 8, !dbg !13
-  %26 = extractvalue { ptr, i32 } %24, 1, !dbg !13
-  store i32 %26, ptr %ehselector.slot, align 4, !dbg !13
-  br label %ehcleanup, !dbg !13
-
-invoke.cont11:                                    ; preds = %lpad7
+          cleanup, !dbg !12
+  %25 = extractvalue { ptr, i32 } %24, 0, !dbg !12
+  store ptr %25, ptr %exn.slot, align 8, !dbg !12
+  %26 = extractvalue { ptr, i32 } %24, 1, !dbg !12
+  store i32 %26, ptr %ehselector.slot, align 4, !dbg !12
   br label %ehcleanup, !dbg !12
 
+invoke.cont11:                                    ; preds = %lpad7
+  br label %ehcleanup, !dbg !11
+
 final.ready:                                      ; preds = %final.suspend, %coro.final
-  call void @_ZNSt14suspend_always12await_resumeEv(ptr noundef nonnull align 1 dereferenceable(1) %ref.tmp12) #2, !dbg !12
-  br label %cleanup15, !dbg !12
+  call void @_ZNSt14suspend_always12await_resumeEv(ptr noundef nonnull align 1 dereferenceable(1) %ref.tmp12) #2, !dbg !11
+  br label %cleanup15, !dbg !11
 
 cleanup15:                                        ; preds = %final.ready, %final.cleanup
   %cleanup.dest.slot.1 = phi i32 [ 0, %final.ready ], [ 2, %final.cleanup ]
-  call void @llvm.lifetime.end.p0(i64 1, ptr %ref.tmp12) #2, !dbg !12
+  call void @llvm.lifetime.end.p0(ptr %ref.tmp12) #2, !dbg !11
   switch i32 %cleanup.dest.slot.1, label %cleanup19 [
-  i32 0, label %cleanup.cont17
+    i32 0, label %cleanup.cont17
   ]
 
 cleanup.cont17:                                   ; preds = %cleanup15
-  br label %cleanup19, !dbg !12
+  br label %cleanup19, !dbg !11
 
 cleanup19:                                        ; preds = %cleanup.cont17, %cleanup15, %cleanup
-  %cleanup.dest.slot.2 = phi i32 [ %cleanup.dest.slot.0, %cleanup ], [ %cleanup.dest.slot.1, %cleanup15 ], [ 0, %cleanup.cont17 ], !dbg !12
-  call void @llvm.lifetime.end.p0(i64 1, ptr %__promise) #2, !dbg !12
-  %27 = call ptr @llvm.coro.free(token %1, ptr %6), !dbg !12
-  %28 = icmp ne ptr %27, null, !dbg !12
-  br i1 %28, label %coro.free, label %after.coro.free, !dbg !12
+  %cleanup.dest.slot.2 = phi i32 [ %cleanup.dest.slot.0, %cleanup ], [ %cleanup.dest.slot.1, %cleanup15 ], [ 0, %cleanup.cont17 ], !dbg !11
+  call void @llvm.lifetime.end.p0(ptr %__promise) #2, !dbg !11
+  %27 = call ptr @llvm.coro.free(token %1, ptr %6), !dbg !11
+  %28 = icmp ne ptr %27, null, !dbg !11
+  br i1 %28, label %coro.free, label %after.coro.free, !dbg !11
 
 coro.free:                                        ; preds = %cleanup19
-  %29 = call i64 @llvm.coro.size.i64(), !dbg !12
-  %30 = call i64 @llvm.coro.size.storage.i64.i64(i64 %29, ptr @1), !dbg !12
-  call void @_ZdlPvm(ptr noundef %27, i64 noundef %29) #2, !dbg !12
-  br label %after.coro.free, !dbg !12
+  %29 = call i64 @llvm.coro.size.i64(), !dbg !11
+  %30 = call i64 @llvm.coro.size.storage.i64.i64(i64 %29, ptr @1), !dbg !11
+  call void @_ZdlPvm(ptr noundef %27, i64 noundef %29) #2, !dbg !11
+  br label %after.coro.free, !dbg !11
 
 after.coro.free:                                  ; preds = %cleanup19, %coro.free
   switch i32 %cleanup.dest.slot.2, label %unreachable [
-  i32 0, label %cleanup.cont23
-  i32 2, label %coro.ret
+    i32 0, label %cleanup.cont23
+    i32 2, label %coro.ret
   ]
 
 cleanup.cont23:                                   ; preds = %after.coro.free
-  br label %coro.ret, !dbg !12
+  br label %coro.ret, !dbg !11
 
 coro.ret:                                         ; preds = %cleanup.cont23, %after.coro.free, %final.suspend, %init.suspend
-  %31 = call i1 @llvm.coro.end(ptr null, i1 false, token none), !dbg !12
-  ret void, !dbg !12
+  call void @llvm.coro.end(ptr null, i1 false, token none), !dbg !11
+  ret void, !dbg !11
 
 ehcleanup:                                        ; preds = %invoke.cont11, %lpad9, %lpad1
-  %32 = call i1 @llvm.coro.end(ptr null, i1 true, token none), !dbg !12
-  br i1 %32, label %eh.resume, label %cleanup.cont18, !dbg !12
+  call void @llvm.coro.end(ptr null, i1 true, token none), !dbg !11
+  %31 = call i1 @llvm.coro.is_in_ramp(), !dbg !11
+  br i1 %31, label %cleanup.cont18, label %eh.resume, !dbg !11
 
 cleanup.cont18:                                   ; preds = %ehcleanup
-  br label %ehcleanup20, !dbg !12
+  br label %ehcleanup20, !dbg !11
 
 ehcleanup20:                                      ; preds = %cleanup.cont18, %lpad
-  call void @llvm.lifetime.end.p0(i64 1, ptr %__promise) #2, !dbg !12
-  %33 = call ptr @llvm.coro.free(token %1, ptr %6), !dbg !12
-  %34 = icmp ne ptr %33, null, !dbg !12
-  br i1 %34, label %coro.free25, label %after.coro.free26, !dbg !12
+  call void @llvm.lifetime.end.p0(ptr %__promise) #2, !dbg !11
+  %32 = call ptr @llvm.coro.free(token %1, ptr %6), !dbg !11
+  %33 = icmp ne ptr %32, null, !dbg !11
+  br i1 %33, label %coro.free25, label %after.coro.free26, !dbg !11
 
 coro.free25:                                      ; preds = %ehcleanup20
-  %35 = call i64 @llvm.coro.size.i64(), !dbg !12
-  %36 = call i64 @llvm.coro.size.storage.i64.i64(i64 %35, ptr @2), !dbg !12
-  call void @_ZdlPvm(ptr noundef %33, i64 noundef %35) #2, !dbg !12
-  br label %after.coro.free26, !dbg !12
+  %34 = call i64 @llvm.coro.size.i64(), !dbg !11
+  %35 = call i64 @llvm.coro.size.storage.i64.i64(i64 %34, ptr @2), !dbg !11
+  call void @_ZdlPvm(ptr noundef %32, i64 noundef %34) #2, !dbg !11
+  br label %after.coro.free26, !dbg !11
 
 after.coro.free26:                                ; preds = %ehcleanup20, %coro.free25
-  br label %eh.resume, !dbg !12
+  br label %eh.resume, !dbg !11
 
 eh.resume:                                        ; preds = %after.coro.free26, %ehcleanup
-  %exn27 = load ptr, ptr %exn.slot, align 8, !dbg !12
-  %sel = load i32, ptr %ehselector.slot, align 4, !dbg !12
-  %lpad.val = insertvalue { ptr, i32 } poison, ptr %exn27, 0, !dbg !12
-  %lpad.val28 = insertvalue { ptr, i32 } %lpad.val, i32 %sel, 1, !dbg !12
-  resume { ptr, i32 } %lpad.val28, !dbg !12
+  %exn27 = load ptr, ptr %exn.slot, align 8, !dbg !11
+  %sel = load i32, ptr %ehselector.slot, align 4, !dbg !11
+  %lpad.val = insertvalue { ptr, i32 } poison, ptr %exn27, 0, !dbg !11
+  %lpad.val28 = insertvalue { ptr, i32 } %lpad.val, i32 %sel, 1, !dbg !11
+  resume { ptr, i32 } %lpad.val28, !dbg !11
 
 terminate.lpad:                                   ; preds = %lpad7
-  %37 = landingpad { ptr, i32 }
-  catch ptr null, !dbg !12
-  %38 = extractvalue { ptr, i32 } %37, 0, !dbg !12
-  call void @__clang_call_terminate(ptr %38) #17, !dbg !12
-  unreachable, !dbg !12
+  %36 = landingpad { ptr, i32 }
+          catch ptr null, !dbg !11
+  %37 = extractvalue { ptr, i32 } %36, 0, !dbg !11
+  call void @__clang_call_terminate(ptr %37) #17, !dbg !11
+  unreachable, !dbg !11
 
 unreachable:                                      ; preds = %after.coro.free
   unreachable
 }
 
 ; Function Attrs: nocallback nofree nosync nounwind willreturn memory(argmem: read)
-declare token @llvm.coro.id(i32, ptr readnone, ptr nocapture readonly, ptr) #1
+declare token @llvm.coro.id(i32, ptr readnone, ptr readonly captures(none), ptr) #1
 
 ; Function Attrs: nounwind
 declare i1 @llvm.coro.alloc(token) #2
@@ -310,10 +311,10 @@ declare i64 @llvm.coro.size.storage.i64.i64(i64, ptr) #4
 declare ptr @llvm.coro.begin(token, ptr writeonly) #2
 
 ; Function Attrs: nocallback nofree nosync nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.lifetime.start.p0(i64 immarg, ptr nocapture) #5
+declare void @llvm.lifetime.start.p0(ptr captures(none)) #5
 
 ; Function Attrs: mustprogress noinline optnone uwtable
-define linkonce_odr dso_local void @_ZN13oss_coroutine12promise_type17get_return_objectEv(ptr noundef nonnull align 1 dereferenceable(1) %this) #6 comdat align 2 !dbg !15 {
+define linkonce_odr dso_local void @_ZN13oss_coroutine12promise_type17get_return_objectEv(ptr noundef nonnull align 1 dereferenceable(1) %this) #6 comdat align 2 !dbg !14 {
 entry:
   %retval = alloca %struct.oss_coroutine, align 1
   %this.addr = alloca ptr, align 8
@@ -321,36 +322,36 @@ entry:
   %undef.agg.tmp = alloca %"struct.std::coroutine_handle.0", align 1
   store ptr %this, ptr %this.addr, align 8
   %this1 = load ptr, ptr %this.addr, align 8
-  call void @_ZNSt16coroutine_handleIN13oss_coroutine12promise_typeEE12from_promiseERS1_(ptr noundef nonnull align 1 dereferenceable(1) %this1), !dbg !16
-  call void @_ZNSt16coroutine_handleIvEC1IN13oss_coroutine12promise_typeEEES_IT_E(ptr noundef nonnull align 1 dereferenceable(1) %retval) #2, !dbg !16
-  ret void, !dbg !17
+  call void @_ZNSt16coroutine_handleIN13oss_coroutine12promise_typeEE12from_promiseERS1_(ptr noundef nonnull align 1 dereferenceable(1) %this1), !dbg !15
+  call void @_ZNSt16coroutine_handleIvEC1IN13oss_coroutine12promise_typeEEES_IT_E(ptr noundef nonnull align 1 dereferenceable(1) %retval) #2, !dbg !15
+  ret void, !dbg !16
 }
 
 declare dso_local i32 @__gxx_personality_v0(...)
 
 ; Function Attrs: mustprogress noinline nounwind optnone uwtable
-define linkonce_odr dso_local void @_ZN13oss_coroutine12promise_type15initial_suspendEv(ptr noundef nonnull align 1 dereferenceable(1) %this) #7 comdat align 2 !dbg !18 {
+define linkonce_odr dso_local void @_ZN13oss_coroutine12promise_type15initial_suspendEv(ptr noundef nonnull align 1 dereferenceable(1) %this) #7 comdat align 2 !dbg !17 {
 entry:
   %this.addr = alloca ptr, align 8
   store ptr %this, ptr %this.addr, align 8
   %this1 = load ptr, ptr %this.addr, align 8
-  ret void, !dbg !19
+  ret void, !dbg !18
 }
 
 ; Function Attrs: mustprogress noinline nounwind optnone uwtable
-define linkonce_odr dso_local noundef zeroext i1 @_ZNSt13suspend_never11await_readyEv(ptr noundef nonnull align 1 dereferenceable(1) %this) #7 comdat align 2 !dbg !20 {
+define linkonce_odr dso_local noundef zeroext i1 @_ZNSt13suspend_never11await_readyEv(ptr noundef nonnull align 1 dereferenceable(1) %this) #7 comdat align 2 !dbg !19 {
 entry:
   %this.addr = alloca ptr, align 8
   store ptr %this, ptr %this.addr, align 8
   %this1 = load ptr, ptr %this.addr, align 8
-  ret i1 true, !dbg !22
+  ret i1 true, !dbg !21
 }
 
 ; Function Attrs: nomerge nounwind
 declare token @llvm.coro.save(ptr) #8
 
 ; Function Attrs: alwaysinline mustprogress
-define private void @_Z3kk2v.__await_suspend_wrapper__init(ptr noundef nonnull %0, ptr noundef %1) #9 !dbg !23 {
+define internal void @_Z3kk2v.__await_suspend_wrapper__init(ptr noundef nonnull %0, ptr noundef %1) #9 !dbg !22 {
 entry:
   %.addr = alloca ptr, align 8
   %.addr1 = alloca ptr, align 8
@@ -361,20 +362,20 @@ entry:
   store ptr %1, ptr %.addr1, align 8
   %2 = load ptr, ptr %.addr, align 8
   %3 = load ptr, ptr %.addr1, align 8
-  call void @_ZNSt16coroutine_handleIN13oss_coroutine12promise_typeEE12from_addressEPv(ptr noundef %3) #2, !dbg !24
-  call void @_ZNSt16coroutine_handleIvEC1IN13oss_coroutine12promise_typeEEES_IT_E(ptr noundef nonnull align 1 dereferenceable(1) %agg.tmp) #2, !dbg !24
-  call void @_ZNSt13suspend_never13await_suspendESt16coroutine_handleIvE(ptr noundef nonnull align 1 dereferenceable(1) %2) #2, !dbg !24
-  ret void, !dbg !24
+  call void @_ZNSt16coroutine_handleIN13oss_coroutine12promise_typeEE12from_addressEPv(ptr noundef %3) #2, !dbg !23
+  call void @_ZNSt16coroutine_handleIvEC1IN13oss_coroutine12promise_typeEEES_IT_E(ptr noundef nonnull align 1 dereferenceable(1) %agg.tmp) #2, !dbg !23
+  call void @_ZNSt13suspend_never13await_suspendESt16coroutine_handleIvE(ptr noundef nonnull align 1 dereferenceable(1) %2) #2, !dbg !23
+  ret void, !dbg !23
 }
 
 ; Function Attrs: mustprogress noinline nounwind optnone uwtable
-define linkonce_odr dso_local void @_ZNSt13suspend_never13await_suspendESt16coroutine_handleIvE(ptr noundef nonnull align 1 dereferenceable(1) %this) #7 comdat align 2 !dbg !25 {
+define linkonce_odr dso_local void @_ZNSt13suspend_never13await_suspendESt16coroutine_handleIvE(ptr noundef nonnull align 1 dereferenceable(1) %this) #7 comdat align 2 !dbg !24 {
 entry:
   %0 = alloca %"struct.std::coroutine_handle", align 1
   %this.addr = alloca ptr, align 8
   store ptr %this, ptr %this.addr, align 8
   %this1 = load ptr, ptr %this.addr, align 8
-  ret void, !dbg !26
+  ret void, !dbg !25
 }
 
 ; Function Attrs: nounwind
@@ -389,35 +390,35 @@ declare void @llvm.coro.await.suspend.void(ptr, ptr, ptr)
 declare i8 @llvm.coro.suspend(token, i1) #2
 
 ; Function Attrs: mustprogress noinline nounwind optnone uwtable
-define linkonce_odr dso_local void @_ZNSt13suspend_never12await_resumeEv(ptr noundef nonnull align 1 dereferenceable(1) %this) #7 comdat align 2 !dbg !27 {
+define linkonce_odr dso_local void @_ZNSt13suspend_never12await_resumeEv(ptr noundef nonnull align 1 dereferenceable(1) %this) #7 comdat align 2 !dbg !26 {
 entry:
   %this.addr = alloca ptr, align 8
   store ptr %this, ptr %this.addr, align 8
   %this1 = load ptr, ptr %this.addr, align 8
-  ret void, !dbg !28
+  ret void, !dbg !27
 }
 
 ; Function Attrs: nocallback nofree nosync nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.lifetime.end.p0(i64 immarg, ptr nocapture) #5
+declare void @llvm.lifetime.end.p0(ptr captures(none)) #5
 
 ; Function Attrs: mustprogress noinline nounwind optnone uwtable
-define linkonce_odr dso_local void @_ZN13oss_coroutine12promise_type11return_voidEv(ptr noundef nonnull align 1 dereferenceable(1) %this) #7 comdat align 2 !dbg !29 {
+define linkonce_odr dso_local void @_ZN13oss_coroutine12promise_type11return_voidEv(ptr noundef nonnull align 1 dereferenceable(1) %this) #7 comdat align 2 !dbg !28 {
 entry:
   %this.addr = alloca ptr, align 8
   store ptr %this, ptr %this.addr, align 8
   %this1 = load ptr, ptr %this.addr, align 8
-  ret void, !dbg !30
+  ret void, !dbg !29
 }
 
 declare dso_local ptr @__cxa_begin_catch(ptr)
 
 ; Function Attrs: mustprogress noinline nounwind optnone uwtable
-define linkonce_odr dso_local void @_ZN13oss_coroutine12promise_type19unhandled_exceptionEv(ptr noundef nonnull align 1 dereferenceable(1) %this) #7 comdat align 2 !dbg !31 {
+define linkonce_odr dso_local void @_ZN13oss_coroutine12promise_type19unhandled_exceptionEv(ptr noundef nonnull align 1 dereferenceable(1) %this) #7 comdat align 2 !dbg !30 {
 entry:
   %this.addr = alloca ptr, align 8
   store ptr %this, ptr %this.addr, align 8
   %this1 = load ptr, ptr %this.addr, align 8
-  ret void, !dbg !32
+  ret void, !dbg !31
 }
 
 declare dso_local void @__cxa_end_catch()
@@ -432,25 +433,25 @@ define linkonce_odr hidden void @__clang_call_terminate(ptr noundef %0) #11 comd
 declare dso_local void @_ZSt9terminatev()
 
 ; Function Attrs: mustprogress noinline nounwind optnone uwtable
-define linkonce_odr dso_local void @_ZN13oss_coroutine12promise_type13final_suspendEv(ptr noundef nonnull align 1 dereferenceable(1) %this) #7 comdat align 2 !dbg !33 {
+define linkonce_odr dso_local void @_ZN13oss_coroutine12promise_type13final_suspendEv(ptr noundef nonnull align 1 dereferenceable(1) %this) #7 comdat align 2 !dbg !32 {
 entry:
   %this.addr = alloca ptr, align 8
   store ptr %this, ptr %this.addr, align 8
   %this1 = load ptr, ptr %this.addr, align 8
-  ret void, !dbg !34
+  ret void, !dbg !33
 }
 
 ; Function Attrs: mustprogress noinline nounwind optnone uwtable
-define linkonce_odr dso_local noundef zeroext i1 @_ZNSt14suspend_always11await_readyEv(ptr noundef nonnull align 1 dereferenceable(1) %this) #7 comdat align 2 !dbg !35 {
+define linkonce_odr dso_local noundef zeroext i1 @_ZNSt14suspend_always11await_readyEv(ptr noundef nonnull align 1 dereferenceable(1) %this) #7 comdat align 2 !dbg !34 {
 entry:
   %this.addr = alloca ptr, align 8
   store ptr %this, ptr %this.addr, align 8
   %this1 = load ptr, ptr %this.addr, align 8
-  ret i1 false, !dbg !36
+  ret i1 false, !dbg !35
 }
 
 ; Function Attrs: alwaysinline mustprogress
-define private void @_Z3kk2v.__await_suspend_wrapper__final(ptr noundef nonnull %0, ptr noundef %1) #9 !dbg !37 {
+define internal void @_Z3kk2v.__await_suspend_wrapper__final(ptr noundef nonnull %0, ptr noundef %1) #9 !dbg !36 {
 entry:
   %.addr = alloca ptr, align 8
   %.addr1 = alloca ptr, align 8
@@ -461,60 +462,63 @@ entry:
   store ptr %1, ptr %.addr1, align 8
   %2 = load ptr, ptr %.addr, align 8
   %3 = load ptr, ptr %.addr1, align 8
-  call void @_ZNSt16coroutine_handleIN13oss_coroutine12promise_typeEE12from_addressEPv(ptr noundef %3) #2, !dbg !38
-  call void @_ZNSt16coroutine_handleIvEC1IN13oss_coroutine12promise_typeEEES_IT_E(ptr noundef nonnull align 1 dereferenceable(1) %agg.tmp) #2, !dbg !38
-  call void @_ZNSt14suspend_always13await_suspendESt16coroutine_handleIvE(ptr noundef nonnull align 1 dereferenceable(1) %2) #2, !dbg !38
-  ret void, !dbg !38
+  call void @_ZNSt16coroutine_handleIN13oss_coroutine12promise_typeEE12from_addressEPv(ptr noundef %3) #2, !dbg !37
+  call void @_ZNSt16coroutine_handleIvEC1IN13oss_coroutine12promise_typeEEES_IT_E(ptr noundef nonnull align 1 dereferenceable(1) %agg.tmp) #2, !dbg !37
+  call void @_ZNSt14suspend_always13await_suspendESt16coroutine_handleIvE(ptr noundef nonnull align 1 dereferenceable(1) %2) #2, !dbg !37
+  ret void, !dbg !37
 }
 
 ; Function Attrs: mustprogress noinline nounwind optnone uwtable
-define linkonce_odr dso_local void @_ZNSt14suspend_always13await_suspendESt16coroutine_handleIvE(ptr noundef nonnull align 1 dereferenceable(1) %this) #7 comdat align 2 !dbg !39 {
+define linkonce_odr dso_local void @_ZNSt14suspend_always13await_suspendESt16coroutine_handleIvE(ptr noundef nonnull align 1 dereferenceable(1) %this) #7 comdat align 2 !dbg !38 {
 entry:
   %0 = alloca %"struct.std::coroutine_handle", align 1
   %this.addr = alloca ptr, align 8
   store ptr %this, ptr %this.addr, align 8
   %this1 = load ptr, ptr %this.addr, align 8
-  ret void, !dbg !40
+  ret void, !dbg !39
 }
 
 ; Function Attrs: mustprogress noinline nounwind optnone uwtable
-define linkonce_odr dso_local void @_ZNSt14suspend_always12await_resumeEv(ptr noundef nonnull align 1 dereferenceable(1) %this) #7 comdat align 2 !dbg !41 {
+define linkonce_odr dso_local void @_ZNSt14suspend_always12await_resumeEv(ptr noundef nonnull align 1 dereferenceable(1) %this) #7 comdat align 2 !dbg !40 {
 entry:
   %this.addr = alloca ptr, align 8
   store ptr %this, ptr %this.addr, align 8
   %this1 = load ptr, ptr %this.addr, align 8
-  ret void, !dbg !42
+  ret void, !dbg !41
 }
 
 ; Function Attrs: nounwind
-declare i1 @llvm.coro.end(ptr, i1, token) #2
+declare void @llvm.coro.end(ptr, i1, token) #2
+
+; Function Attrs: nounwind memory(none)
+declare i1 @llvm.coro.is_in_ramp() #4
 
 ; Function Attrs: nobuiltin nounwind
 declare dso_local void @_ZdlPvm(ptr noundef, i64 noundef) #12
 
 ; Function Attrs: nounwind memory(argmem: read)
-declare ptr @llvm.coro.free(token, ptr nocapture readonly) #13
+declare ptr @llvm.coro.free(token, ptr readonly captures(none)) #13
 
 ; Function Attrs: mustprogress noinline norecurse nounwind optnone uwtable
-define dso_local noundef i32 @main() #14 personality ptr @__gxx_personality_v0 !dbg !43 {
+define dso_local noundef i32 @main() #14 personality ptr @__gxx_personality_v0 !dbg !42 {
 entry:
   %handle = alloca %struct.oss_coroutine, align 1
-  store ptr null, ptr %handle, align 1, !dbg !44
-  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE.DEVFUNC"([8 x i8] c"_Z3kk2v\00"), "QUAL.OSS.DECL.SOURCE"([23 x i8] c"task_coroutine.ll:17:1\00"), "QUAL.OSS.CORO.HANDLE"(ptr %handle), "QUAL.OSS.CORO.SIZE.STORE"(ptr @2), "QUAL.OSS.FIRSTPRIVATE"(ptr %handle, %struct.oss_coroutine undef) ], !dbg !44
+  store ptr null, ptr %handle, align 1, !dbg !43
+  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.DEVICE.DEVFUNC"([8 x i8] c"_Z3kk2v\00"), "QUAL.OSS.DECL.SOURCE"([14 x i8] c"coro.cpp:12:1\00"), "QUAL.OSS.CORO.HANDLE"(ptr %handle), "QUAL.OSS.CORO.SIZE.STORE"(ptr @2), "QUAL.OSS.FIRSTPRIVATE"(ptr %handle, %struct.oss_coroutine undef) ], !dbg !43
   %undef.agg.tmp = alloca %struct.oss_coroutine, align 1
   invoke void @_Z3kk2v()
-  to label %invoke.cont unwind label %terminate.lpad, !dbg !44
+          to label %invoke.cont unwind label %terminate.lpad, !dbg !43
 
 invoke.cont:                                      ; preds = %entry
-  call void @llvm.directive.region.exit(token %0), !dbg !44
-  ret i32 0, !dbg !45
+  call void @llvm.directive.region.exit(token %0), !dbg !43
+  ret i32 0, !dbg !44
 
 terminate.lpad:                                   ; preds = %entry
   %1 = landingpad { ptr, i32 }
-  catch ptr null, !dbg !44
-  %2 = extractvalue { ptr, i32 } %1, 0, !dbg !44
-  call void @__clang_call_terminate(ptr %2) #17, !dbg !44
-  unreachable, !dbg !44
+          catch ptr null, !dbg !43
+  %2 = extractvalue { ptr, i32 } %1, 0, !dbg !43
+  call void @__clang_call_terminate(ptr %2) #17, !dbg !43
+  unreachable, !dbg !43
 }
 
 ; Function Attrs: nounwind
@@ -545,56 +549,54 @@ attributes #16 = { allocsize(0) }
 attributes #17 = { noreturn nounwind }
 
 !llvm.dbg.cu = !{!0}
-!llvm.linker.options = !{}
 !llvm.module.flags = !{!2, !3, !4, !5}
 !llvm.ident = !{!6}
 
 !0 = distinct !DICompileUnit(language: DW_LANG_C_plus_plus_14, file: !1, producer: "", isOptimized: false, runtimeVersion: 0, emissionKind: NoDebug, splitDebugInlining: false, nameTableKind: None)
-!1 = !DIFile(filename: "task_coroutine.ll", directory: "/home/rpenacob/llvm-mono-1/clang/test/OmpSs/IR")
+!1 = !DIFile(filename: "coro.cpp", directory: "")
 !2 = !{i32 2, !"Debug Info Version", i32 3}
 !3 = !{i32 1, !"wchar_size", i32 4}
 !4 = !{i32 7, !"uwtable", i32 2}
 !5 = !{i32 7, !"frame-pointer", i32 2}
-!6 = !{!""}
-!7 = distinct !DISubprogram(name: "kk2", scope: !8, file: !8, line: 18, type: !9, scopeLine: 18, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
-!8 = !DIFile(filename: "task_coroutine.ll", directory: "/home/rpenacob/llvm-mono-1/clang/test/OmpSs/IR")
-!9 = !DISubroutineType(types: !10)
-!10 = !{}
-!11 = !DILocation(line: 18, column: 21, scope: !7)
-!12 = !DILocation(line: 18, column: 15, scope: !7)
-!13 = !DILocation(line: 20, column: 1, scope: !7)
-!14 = !DILocation(line: 19, column: 3, scope: !7)
-!15 = distinct !DISubprogram(name: "get_return_object", scope: !8, file: !8, line: 8, type: !9, scopeLine: 8, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
-!16 = !DILocation(line: 8, column: 68, scope: !15)
-!17 = !DILocation(line: 8, column: 47, scope: !15)
-!18 = distinct !DISubprogram(name: "initial_suspend", scope: !8, file: !8, line: 9, type: !9, scopeLine: 9, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
-!19 = !DILocation(line: 9, column: 50, scope: !18)
-!20 = distinct !DISubprogram(name: "await_ready", scope: !21, file: !21, line: 41, type: !9, scopeLine: 41, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
-!21 = !DIFile(filename: "Inputs/std-coroutine.h", directory: "/home/rpenacob/llvm-mono-1/clang/test/OmpSs/IR")
-!22 = !DILocation(line: 41, column: 33, scope: !20)
-!23 = distinct !DISubprogram(linkageName: "_Z3kk2v.__await_suspend_wrapper__init", scope: !8, file: !8, type: !9, flags: DIFlagArtificial, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !0)
-!24 = !DILocation(line: 18, column: 15, scope: !23)
-!25 = distinct !DISubprogram(name: "await_suspend", scope: !21, file: !21, line: 42, type: !9, scopeLine: 42, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
-!26 = !DILocation(line: 42, column: 52, scope: !25)
-!27 = distinct !DISubprogram(name: "await_resume", scope: !21, file: !21, line: 43, type: !9, scopeLine: 43, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
-!28 = !DILocation(line: 43, column: 33, scope: !27)
-!29 = distinct !DISubprogram(name: "return_void", scope: !8, file: !8, line: 11, type: !9, scopeLine: 11, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
-!30 = !DILocation(line: 11, column: 31, scope: !29)
-!31 = distinct !DISubprogram(name: "unhandled_exception", scope: !8, file: !8, line: 12, type: !9, scopeLine: 12, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
-!32 = !DILocation(line: 12, column: 39, scope: !31)
-!33 = distinct !DISubprogram(name: "final_suspend", scope: !8, file: !8, line: 10, type: !9, scopeLine: 10, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
-!34 = !DILocation(line: 10, column: 58, scope: !33)
-!35 = distinct !DISubprogram(name: "await_ready", scope: !21, file: !21, line: 35, type: !9, scopeLine: 35, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
-!36 = !DILocation(line: 35, column: 33, scope: !35)
-!37 = distinct !DISubprogram(linkageName: "_Z3kk2v.__await_suspend_wrapper__final", scope: !8, file: !8, type: !9, flags: DIFlagArtificial, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !0)
-!38 = !DILocation(line: 18, column: 15, scope: !37)
-!39 = distinct !DISubprogram(name: "await_suspend", scope: !21, file: !21, line: 36, type: !9, scopeLine: 36, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
-!40 = !DILocation(line: 36, column: 52, scope: !39)
-!41 = distinct !DISubprogram(name: "await_resume", scope: !21, file: !21, line: 37, type: !9, scopeLine: 37, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
-!42 = !DILocation(line: 37, column: 33, scope: !41)
-!43 = distinct !DISubprogram(name: "main", scope: !8, file: !8, line: 22, type: !9, scopeLine: 22, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
-!44 = !DILocation(line: 23, column: 3, scope: !43)
-!45 = !DILocation(line: 24, column: 1, scope: !43)
+!6 = !{!"clang version 22.0.0git (git@bscpm04.bsc.es:llvm-ompss/llvm-mono.git a9262c30a3d09a5db1daa48e3cffed62d4dba145)"}
+!7 = distinct !DISubprogram(name: "kk2", scope: !1, file: !1, line: 13, type: !8, scopeLine: 13, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
+!8 = !DISubroutineType(types: !9)
+!9 = !{}
+!10 = !DILocation(line: 13, column: 21, scope: !7)
+!11 = !DILocation(line: 13, column: 15, scope: !7)
+!12 = !DILocation(line: 15, column: 1, scope: !7)
+!13 = !DILocation(line: 14, column: 3, scope: !7)
+!14 = distinct !DISubprogram(name: "get_return_object", scope: !1, file: !1, line: 4, type: !8, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
+!15 = !DILocation(line: 4, column: 68, scope: !14)
+!16 = !DILocation(line: 4, column: 47, scope: !14)
+!17 = distinct !DISubprogram(name: "initial_suspend", scope: !1, file: !1, line: 5, type: !8, scopeLine: 5, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
+!18 = !DILocation(line: 5, column: 50, scope: !17)
+!19 = distinct !DISubprogram(name: "await_ready", scope: !20, file: !20, line: 41, type: !8, scopeLine: 41, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
+!20 = !DIFile(filename: "llvm-mono/clang/test/OmpSs/IR/Inputs/std-coroutine.h", directory: "")
+!21 = !DILocation(line: 41, column: 33, scope: !19)
+!22 = distinct !DISubprogram(linkageName: "_Z3kk2v.__await_suspend_wrapper__init", scope: !1, file: !1, type: !8, flags: DIFlagArtificial, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !0)
+!23 = !DILocation(line: 13, column: 15, scope: !22)
+!24 = distinct !DISubprogram(name: "await_suspend", scope: !20, file: !20, line: 42, type: !8, scopeLine: 42, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
+!25 = !DILocation(line: 42, column: 52, scope: !24)
+!26 = distinct !DISubprogram(name: "await_resume", scope: !20, file: !20, line: 43, type: !8, scopeLine: 43, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
+!27 = !DILocation(line: 43, column: 33, scope: !26)
+!28 = distinct !DISubprogram(name: "return_void", scope: !1, file: !1, line: 7, type: !8, scopeLine: 7, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
+!29 = !DILocation(line: 7, column: 31, scope: !28)
+!30 = distinct !DISubprogram(name: "unhandled_exception", scope: !1, file: !1, line: 8, type: !8, scopeLine: 8, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
+!31 = !DILocation(line: 8, column: 39, scope: !30)
+!32 = distinct !DISubprogram(name: "final_suspend", scope: !1, file: !1, line: 6, type: !8, scopeLine: 6, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
+!33 = !DILocation(line: 6, column: 58, scope: !32)
+!34 = distinct !DISubprogram(name: "await_ready", scope: !20, file: !20, line: 35, type: !8, scopeLine: 35, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
+!35 = !DILocation(line: 35, column: 33, scope: !34)
+!36 = distinct !DISubprogram(linkageName: "_Z3kk2v.__await_suspend_wrapper__final", scope: !1, file: !1, type: !8, flags: DIFlagArtificial, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !0)
+!37 = !DILocation(line: 13, column: 15, scope: !36)
+!38 = distinct !DISubprogram(name: "await_suspend", scope: !20, file: !20, line: 36, type: !8, scopeLine: 36, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
+!39 = !DILocation(line: 36, column: 52, scope: !38)
+!40 = distinct !DISubprogram(name: "await_resume", scope: !20, file: !20, line: 37, type: !8, scopeLine: 37, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
+!41 = !DILocation(line: 37, column: 33, scope: !40)
+!42 = distinct !DISubprogram(name: "main", scope: !1, file: !1, line: 16, type: !8, scopeLine: 16, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0)
+!43 = !DILocation(line: 17, column: 3, scope: !42)
+!44 = !DILocation(line: 18, column: 1, scope: !42)
 ; CHECK-LABEL: define {{[^@]+}}@_Z3kk2v
 ; CHECK-SAME: () #[[ATTR0:[0-9]+]] personality ptr @__gxx_personality_v0 !dbg [[DBG7:![0-9]+]] {
 ; CHECK-NEXT:  entry:
@@ -618,15 +620,15 @@ attributes #17 = { noreturn nounwind }
 ; CHECK:       coro.init:
 ; CHECK-NEXT:    [[TMP5:%.*]] = phi ptr [ null, [[ENTRY:%.*]] ], [ [[CALL]], [[CORO_ALLOC]] ], !dbg [[DBG10]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = call ptr @llvm.coro.begin(token [[TMP1]], ptr [[TMP5]]), !dbg [[DBG10]]
-; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[__PROMISE]]), !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[__PROMISE]]) #[[ATTR2:[0-9]+]], !dbg [[DBG11]]
 ; CHECK-NEXT:    invoke void @_ZN13oss_coroutine12promise_type17get_return_objectEv(ptr noundef nonnull align 1 dereferenceable(1) [[__PROMISE]])
 ; CHECK-NEXT:            to label [[INVOKE_CONT:%.*]] unwind label [[LPAD:%.*]], !dbg [[DBG11]]
 ; CHECK:       invoke.cont:
-; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[REF_TMP]]), !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[REF_TMP]]) #[[ATTR2]], !dbg [[DBG11]]
 ; CHECK-NEXT:    invoke void @_ZN13oss_coroutine12promise_type15initial_suspendEv(ptr noundef nonnull align 1 dereferenceable(1) [[__PROMISE]])
 ; CHECK-NEXT:            to label [[INVOKE_CONT2:%.*]] unwind label [[LPAD1:%.*]], !dbg [[DBG11]]
 ; CHECK:       invoke.cont2:
-; CHECK-NEXT:    [[CALL4:%.*]] = call noundef zeroext i1 @_ZNSt13suspend_never11await_readyEv(ptr noundef nonnull align 1 dereferenceable(1) [[REF_TMP]]) #[[ATTR2:[0-9]+]], !dbg [[DBG11]]
+; CHECK-NEXT:    [[CALL4:%.*]] = call noundef zeroext i1 @_ZNSt13suspend_never11await_readyEv(ptr noundef nonnull align 1 dereferenceable(1) [[REF_TMP]]) #[[ATTR2]], !dbg [[DBG11]]
 ; CHECK-NEXT:    br i1 [[CALL4]], label [[INIT_READY:%.*]], label [[INIT_SUSPEND:%.*]], !dbg [[DBG11]]
 ; CHECK:       init.suspend:
 ; CHECK-NEXT:    [[TMP7:%.*]] = call token @llvm.coro.save(ptr null), !dbg [[DBG11]]
@@ -653,14 +655,14 @@ attributes #17 = { noreturn nounwind }
 ; CHECK-NEXT:    store ptr [[TMP13]], ptr [[EXN_SLOT]], align 8, !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = extractvalue { ptr, i32 } [[TMP12]], 1, !dbg [[DBG12]]
 ; CHECK-NEXT:    store i32 [[TMP14]], ptr [[EHSELECTOR_SLOT]], align 4, !dbg [[DBG12]]
-; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[REF_TMP]]), !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[REF_TMP]]) #[[ATTR2]], !dbg [[DBG11]]
 ; CHECK-NEXT:    br label [[EHCLEANUP:%.*]], !dbg [[DBG11]]
 ; CHECK:       init.ready:
 ; CHECK-NEXT:    call void @_ZNSt13suspend_never12await_resumeEv(ptr noundef nonnull align 1 dereferenceable(1) [[REF_TMP]]) #[[ATTR2]], !dbg [[DBG11]]
 ; CHECK-NEXT:    br label [[CLEANUP]], !dbg [[DBG11]]
 ; CHECK:       cleanup:
 ; CHECK-NEXT:    [[CLEANUP_DEST_SLOT_0:%.*]] = phi i32 [ 0, [[INIT_READY]] ], [ 2, [[INIT_CLEANUP]] ]
-; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[REF_TMP]]), !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[REF_TMP]]) #[[ATTR2]], !dbg [[DBG11]]
 ; CHECK-NEXT:    switch i32 [[CLEANUP_DEST_SLOT_0]], label [[CLEANUP19:%.*]] [
 ; CHECK-NEXT:      i32 0, label [[CLEANUP_CONT:%.*]]
 ; CHECK-NEXT:    ]
@@ -690,7 +692,7 @@ attributes #17 = { noreturn nounwind }
 ; CHECK:       try.cont:
 ; CHECK-NEXT:    br label [[CORO_FINAL]], !dbg [[DBG11]]
 ; CHECK:       coro.final:
-; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[REF_TMP12]]), !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[REF_TMP12]]) #[[ATTR2]], !dbg [[DBG11]]
 ; CHECK-NEXT:    call void @_ZN13oss_coroutine12promise_type13final_suspendEv(ptr noundef nonnull align 1 dereferenceable(1) [[__PROMISE]]) #[[ATTR2]], !dbg [[DBG11]]
 ; CHECK-NEXT:    [[CALL14:%.*]] = call noundef zeroext i1 @_ZNSt14suspend_always11await_readyEv(ptr noundef nonnull align 1 dereferenceable(1) [[REF_TMP12]]) #[[ATTR2]], !dbg [[DBG11]]
 ; CHECK-NEXT:    br i1 [[CALL14]], label [[FINAL_READY:%.*]], label [[FINAL_SUSPEND:%.*]], !dbg [[DBG11]]
@@ -728,7 +730,7 @@ attributes #17 = { noreturn nounwind }
 ; CHECK-NEXT:    br label [[CLEANUP15]], !dbg [[DBG11]]
 ; CHECK:       cleanup15:
 ; CHECK-NEXT:    [[CLEANUP_DEST_SLOT_1:%.*]] = phi i32 [ 0, [[FINAL_READY]] ], [ 2, [[FINAL_CLEANUP]] ]
-; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[REF_TMP12]]), !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[REF_TMP12]]) #[[ATTR2]], !dbg [[DBG11]]
 ; CHECK-NEXT:    switch i32 [[CLEANUP_DEST_SLOT_1]], label [[CLEANUP19]] [
 ; CHECK-NEXT:      i32 0, label [[CLEANUP_CONT17:%.*]]
 ; CHECK-NEXT:    ]
@@ -736,7 +738,7 @@ attributes #17 = { noreturn nounwind }
 ; CHECK-NEXT:    br label [[CLEANUP19]], !dbg [[DBG11]]
 ; CHECK:       cleanup19:
 ; CHECK-NEXT:    [[CLEANUP_DEST_SLOT_2:%.*]] = phi i32 [ [[CLEANUP_DEST_SLOT_0]], [[CLEANUP]] ], [ [[CLEANUP_DEST_SLOT_1]], [[CLEANUP15]] ], [ 0, [[CLEANUP_CONT17]] ], !dbg [[DBG11]]
-; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[__PROMISE]]), !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[__PROMISE]]) #[[ATTR2]], !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP27:%.*]] = call ptr @llvm.coro.free(token [[TMP1]], ptr [[TMP6]]), !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP28:%.*]] = icmp ne ptr [[TMP27]], null, !dbg [[DBG11]]
 ; CHECK-NEXT:    br i1 [[TMP28]], label [[CORO_FREE:%.*]], label [[AFTER_CORO_FREE:%.*]], !dbg [[DBG11]]
@@ -753,22 +755,23 @@ attributes #17 = { noreturn nounwind }
 ; CHECK:       cleanup.cont23:
 ; CHECK-NEXT:    br label [[CORO_RET]], !dbg [[DBG11]]
 ; CHECK:       coro.ret:
-; CHECK-NEXT:    [[TMP31:%.*]] = call i1 @llvm.coro.end(ptr null, i1 false, token none), !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.coro.end(ptr null, i1 false, token none), !dbg [[DBG11]]
 ; CHECK-NEXT:    ret void, !dbg [[DBG11]]
 ; CHECK:       ehcleanup:
-; CHECK-NEXT:    [[TMP32:%.*]] = call i1 @llvm.coro.end(ptr null, i1 true, token none), !dbg [[DBG11]]
-; CHECK-NEXT:    br i1 [[TMP32]], label [[EH_RESUME:%.*]], label [[CLEANUP_CONT18:%.*]], !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.coro.end(ptr null, i1 true, token none), !dbg [[DBG11]]
+; CHECK-NEXT:    [[TMP31:%.*]] = call i1 @llvm.coro.is_in_ramp(), !dbg [[DBG11]]
+; CHECK-NEXT:    br i1 [[TMP31]], label [[CLEANUP_CONT18:%.*]], label [[EH_RESUME:%.*]], !dbg [[DBG11]]
 ; CHECK:       cleanup.cont18:
 ; CHECK-NEXT:    br label [[EHCLEANUP20]], !dbg [[DBG11]]
 ; CHECK:       ehcleanup20:
-; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[__PROMISE]]), !dbg [[DBG11]]
-; CHECK-NEXT:    [[TMP33:%.*]] = call ptr @llvm.coro.free(token [[TMP1]], ptr [[TMP6]]), !dbg [[DBG11]]
-; CHECK-NEXT:    [[TMP34:%.*]] = icmp ne ptr [[TMP33]], null, !dbg [[DBG11]]
-; CHECK-NEXT:    br i1 [[TMP34]], label [[CORO_FREE25:%.*]], label [[AFTER_CORO_FREE26:%.*]], !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[__PROMISE]]) #[[ATTR2]], !dbg [[DBG11]]
+; CHECK-NEXT:    [[TMP32:%.*]] = call ptr @llvm.coro.free(token [[TMP1]], ptr [[TMP6]]), !dbg [[DBG11]]
+; CHECK-NEXT:    [[TMP33:%.*]] = icmp ne ptr [[TMP32]], null, !dbg [[DBG11]]
+; CHECK-NEXT:    br i1 [[TMP33]], label [[CORO_FREE25:%.*]], label [[AFTER_CORO_FREE26:%.*]], !dbg [[DBG11]]
 ; CHECK:       coro.free25:
-; CHECK-NEXT:    [[TMP35:%.*]] = call i64 @llvm.coro.size.i64(), !dbg [[DBG11]]
-; CHECK-NEXT:    [[TMP36:%.*]] = call i64 @llvm.coro.size.storage.i64.i64(i64 [[TMP35]], ptr @[[GLOB2:[0-9]+]]), !dbg [[DBG11]]
-; CHECK-NEXT:    call void @_ZdlPvm(ptr noundef [[TMP33]], i64 noundef [[TMP35]]) #[[ATTR2]], !dbg [[DBG11]]
+; CHECK-NEXT:    [[TMP34:%.*]] = call i64 @llvm.coro.size.i64(), !dbg [[DBG11]]
+; CHECK-NEXT:    [[TMP35:%.*]] = call i64 @llvm.coro.size.storage.i64.i64(i64 [[TMP34]], ptr @[[GLOB2:[0-9]+]]), !dbg [[DBG11]]
+; CHECK-NEXT:    call void @_ZdlPvm(ptr noundef [[TMP32]], i64 noundef [[TMP34]]) #[[ATTR2]], !dbg [[DBG11]]
 ; CHECK-NEXT:    br label [[AFTER_CORO_FREE26]], !dbg [[DBG11]]
 ; CHECK:       after.coro.free26:
 ; CHECK-NEXT:    br label [[EH_RESUME]], !dbg [[DBG11]]
@@ -779,17 +782,17 @@ attributes #17 = { noreturn nounwind }
 ; CHECK-NEXT:    [[LPAD_VAL28:%.*]] = insertvalue { ptr, i32 } [[LPAD_VAL]], i32 [[SEL]], 1, !dbg [[DBG11]]
 ; CHECK-NEXT:    resume { ptr, i32 } [[LPAD_VAL28]], !dbg [[DBG11]]
 ; CHECK:       terminate.lpad:
-; CHECK-NEXT:    [[TMP37:%.*]] = landingpad { ptr, i32 }
+; CHECK-NEXT:    [[TMP36:%.*]] = landingpad { ptr, i32 }
 ; CHECK-NEXT:            catch ptr null, !dbg [[DBG11]]
-; CHECK-NEXT:    [[TMP38:%.*]] = extractvalue { ptr, i32 } [[TMP37]], 0, !dbg [[DBG11]]
-; CHECK-NEXT:    call void @__clang_call_terminate(ptr [[TMP38]]) #[[ATTR19:[0-9]+]], !dbg [[DBG11]]
+; CHECK-NEXT:    [[TMP37:%.*]] = extractvalue { ptr, i32 } [[TMP36]], 0, !dbg [[DBG11]]
+; CHECK-NEXT:    call void @__clang_call_terminate(ptr [[TMP37]]) #[[ATTR19:[0-9]+]], !dbg [[DBG11]]
 ; CHECK-NEXT:    unreachable, !dbg [[DBG11]]
 ; CHECK:       unreachable:
 ; CHECK-NEXT:    unreachable
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZN13oss_coroutine12promise_type17get_return_objectEv
-; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR5:[0-9]+]] comdat align 2 !dbg [[DBG14:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR6:[0-9]+]] comdat align 2 !dbg [[DBG14:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT_OSS_COROUTINE:%.*]], align 1
 ; CHECK-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
@@ -803,7 +806,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZN13oss_coroutine12promise_type15initial_suspendEv
-; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR6:[0-9]+]] comdat align 2 !dbg [[DBG17:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR7:[0-9]+]] comdat align 2 !dbg [[DBG17:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
@@ -812,7 +815,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZNSt13suspend_never11await_readyEv
-; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR6]] comdat align 2 !dbg [[DBG19:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR7]] comdat align 2 !dbg [[DBG19:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
@@ -821,7 +824,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_Z3kk2v.__await_suspend_wrapper__init
-; CHECK-SAME: (ptr noundef nonnull [[TMP0:%.*]], ptr noundef [[TMP1:%.*]]) #[[ATTR8:[0-9]+]] !dbg [[DBG22:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull [[TMP0:%.*]], ptr noundef [[TMP1:%.*]]) #[[ATTR9:[0-9]+]] !dbg [[DBG22:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[DOTADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    [[DOTADDR1:%.*]] = alloca ptr, align 8
@@ -839,7 +842,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZNSt13suspend_never13await_suspendESt16coroutine_handleIvE
-; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR6]] comdat align 2 !dbg [[DBG24:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR7]] comdat align 2 !dbg [[DBG24:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[TMP0:%.*]] = alloca %"struct.std::coroutine_handle", align 1
 ; CHECK-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
@@ -849,7 +852,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZNSt13suspend_never12await_resumeEv
-; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR6]] comdat align 2 !dbg [[DBG26:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR7]] comdat align 2 !dbg [[DBG26:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
@@ -858,7 +861,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZN13oss_coroutine12promise_type11return_voidEv
-; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR6]] comdat align 2 !dbg [[DBG28:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR7]] comdat align 2 !dbg [[DBG28:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
@@ -867,7 +870,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZN13oss_coroutine12promise_type19unhandled_exceptionEv
-; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR6]] comdat align 2 !dbg [[DBG30:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR7]] comdat align 2 !dbg [[DBG30:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
@@ -876,14 +879,14 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@__clang_call_terminate
-; CHECK-SAME: (ptr noundef [[TMP0:%.*]]) #[[ATTR10:[0-9]+]] comdat {
+; CHECK-SAME: (ptr noundef [[TMP0:%.*]]) #[[ATTR11:[0-9]+]] comdat {
 ; CHECK-NEXT:    [[TMP2:%.*]] = call ptr @__cxa_begin_catch(ptr [[TMP0]]) #[[ATTR2]]
 ; CHECK-NEXT:    call void @_ZSt9terminatev() #[[ATTR19]]
 ; CHECK-NEXT:    unreachable
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZN13oss_coroutine12promise_type13final_suspendEv
-; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR6]] comdat align 2 !dbg [[DBG32:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR7]] comdat align 2 !dbg [[DBG32:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
@@ -892,7 +895,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZNSt14suspend_always11await_readyEv
-; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR6]] comdat align 2 !dbg [[DBG34:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR7]] comdat align 2 !dbg [[DBG34:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
@@ -901,7 +904,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_Z3kk2v.__await_suspend_wrapper__final
-; CHECK-SAME: (ptr noundef nonnull [[TMP0:%.*]], ptr noundef [[TMP1:%.*]]) #[[ATTR8]] !dbg [[DBG36:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull [[TMP0:%.*]], ptr noundef [[TMP1:%.*]]) #[[ATTR9]] !dbg [[DBG36:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[DOTADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    [[DOTADDR1:%.*]] = alloca ptr, align 8
@@ -919,7 +922,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZNSt14suspend_always13await_suspendESt16coroutine_handleIvE
-; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR6]] comdat align 2 !dbg [[DBG38:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR7]] comdat align 2 !dbg [[DBG38:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[TMP0:%.*]] = alloca %"struct.std::coroutine_handle", align 1
 ; CHECK-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
@@ -929,7 +932,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZNSt14suspend_always12await_resumeEv
-; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR6]] comdat align 2 !dbg [[DBG40:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR7]] comdat align 2 !dbg [[DBG40:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
@@ -938,7 +941,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@main
-; CHECK-SAME: () #[[ATTR13:[0-9]+]] personality ptr @__gxx_personality_v0 !dbg [[DBG42:![0-9]+]] {
+; CHECK-SAME: () #[[ATTR14:[0-9]+]] personality ptr @__gxx_personality_v0 !dbg [[DBG42:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[HANDLE:%.*]] = alloca [[STRUCT_OSS_COROUTINE:%.*]], align 1
 ; CHECK-NEXT:    store ptr null, ptr [[HANDLE]], align 1, !dbg [[DBG43:![0-9]+]]
@@ -990,7 +993,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_main
-; CHECK-SAME: (ptr [[HANDLE:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR13]] personality ptr @__gxx_personality_v0 !dbg [[DBG45:![0-9]+]] {
+; CHECK-SAME: (ptr [[HANDLE:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR14]] personality ptr @__gxx_personality_v0 !dbg [[DBG45:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
 ; CHECK-NEXT:    [[UNDEF_AGG_TMP:%.*]] = alloca [[STRUCT_OSS_COROUTINE:%.*]], align 1
 ; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG46:![0-9]+]]

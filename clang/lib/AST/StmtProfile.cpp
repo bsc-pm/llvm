@@ -511,6 +511,13 @@ void OMPClauseProfiler::VisitOMPPartialClause(const OMPPartialClause *C) {
     Profiler->VisitExpr(Factor);
 }
 
+void OMPClauseProfiler::VisitOMPLoopRangeClause(const OMPLoopRangeClause *C) {
+  if (const Expr *First = C->getFirst())
+    Profiler->VisitExpr(First);
+  if (const Expr *Count = C->getCount())
+    Profiler->VisitExpr(Count);
+}
+
 void OMPClauseProfiler::VisitOMPLabelClause(const OMPLabelClause *C) {
   llvm_unreachable("TODO");
 }
@@ -1030,6 +1037,15 @@ void StmtProfiler::VisitOMPInterchangeDirective(
   VisitOMPCanonicalLoopNestTransformationDirective(S);
 }
 
+void StmtProfiler::VisitOMPCanonicalLoopSequenceTransformationDirective(
+    const OMPCanonicalLoopSequenceTransformationDirective *S) {
+  VisitOMPExecutableDirective(S);
+}
+
+void StmtProfiler::VisitOMPFuseDirective(const OMPFuseDirective *S) {
+  VisitOMPCanonicalLoopSequenceTransformationDirective(S);
+}
+
 void StmtProfiler::VisitOMPForDirective(const OMPForDirective *S) {
   VisitOMPLoopDirective(S);
 }
@@ -1405,7 +1421,8 @@ void StmtProfiler::VisitExpr(const Expr *S) {
 }
 
 void StmtProfiler::VisitConstantExpr(const ConstantExpr *S) {
-  VisitExpr(S);
+  // Profile exactly as the sub-expression.
+  Visit(S->getSubExpr());
 }
 
 void StmtProfiler::VisitDeclRefExpr(const DeclRefExpr *S) {

@@ -13,7 +13,7 @@ void bar() {
     #pragma oss task label("L1")
     {}
     const int *pint = 0;
-    #pragma oss task label(pint) // expected-warning {{incompatible pointer types initializing 'const char *' with an expression of type 'const int *'}} expected-error {{C-style string literal, global 'const char *const' initialized variable or a constant ConditionalOperator expression resulting in  a C-style string literal or a global 'const char *const' initialized variable}}
+    #pragma oss task label(pint) // expected-error {{incompatible pointer types initializing 'const char *' with an expression of type 'const int *'}} expected-error {{C-style string literal, global 'const char *const' initialized variable or a constant ConditionalOperator expression resulting in  a C-style string literal or a global 'const char *const' initialized variable}}
     {}
     #pragma oss task label(0 ? "a" : "b") // constant evaluated ConditionalOperator condition are valid
     {}

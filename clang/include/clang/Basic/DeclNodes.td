@@ -108,6 +108,7 @@ def Captured : DeclNode<Decl>, DeclContext;
 def Import : DeclNode<Decl>;
 def OSSAssert : DeclNode<Decl>;
 def OMPThreadPrivate : DeclNode<Decl>;
+def OMPGroupPrivate : DeclNode<Decl>;
 def OMPAllocate : DeclNode<Decl>;
 def OMPRequires : DeclNode<Decl>;
 def Empty : DeclNode<Decl>;

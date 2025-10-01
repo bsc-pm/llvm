@@ -991,6 +991,7 @@ unsigned Decl::getIdentifierNamespaceForKind(Kind DeclKind) {
     case Import:
     case OSSAssert:
     case OMPThreadPrivate:
+    case OMPGroupPrivate:
     case OMPAllocate:
     case OMPRequires:
     case OMPCapturedExpr:

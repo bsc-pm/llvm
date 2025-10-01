@@ -50,11 +50,11 @@ void potrf_tile(int NB, double (*A)[NB*NB])
 int main(int argc, char* argv[]){
     int ts = 2;
     int nt = 8;
-    double ** Ah;
+    double (*Ah)[ts*ts];
 
-    Ah = (double **) malloc(nt * nt * sizeof(float *));
+    Ah = malloc(nt * nt * sizeof(float *));
 
-    potrf_tile(ts, Ah[4]);
+    potrf_tile(ts, Ah);
 
     return 0;
 }

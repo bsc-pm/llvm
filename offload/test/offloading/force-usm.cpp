@@ -48,7 +48,7 @@ int main(void) {
 
 // clang-format off
 // NO-USM: omp{{v?}}target device 0 info: Copying data from host to device, HstPtr={{.*}}, TgtPtr={{.*}}, Size=4
-// NO-USM-NEXT: omp{{v?}}target device 0 info: Copying data from host to device, HstPtr={{.*}}, TgtPtr={{.*}}, Size=12
+// NO-USM: omp{{v?}}target device 0 info: Copying data from host to device, HstPtr={{.*}}, TgtPtr={{.*}}, Size=12
 // NO-USM-NEXT: omp{{v?}}target device 0 info: Copying data from host to device, HstPtr={{.*}}, TgtPtr={{.*}}, Size=4
 // NO-USM-NEXT: omp{{v?}}target device 0 info: Copying data from host to device, HstPtr={{.*}}, TgtPtr={{.*}}, Size=8, Name=pGI
 // NO-USM-NEXT: omp{{v?}}target device 0 info: Copying data from device to host, TgtPtr={{.*}}, HstPtr={{.*}}, Size=4
