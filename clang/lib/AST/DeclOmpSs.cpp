@@ -84,5 +84,5 @@ OSSAssertDecl *OSSAssertDecl::CreateDeserialized(
 void OSSAssertDecl::setVars(ArrayRef<Expr *> VL) {
   assert(VL.size() == NumVars &&
          "Number of variables is not the same as the preallocated buffer");
-  std::uninitialized_copy(VL.begin(), VL.end(), getTrailingObjects<Expr *>());
+  std::uninitialized_copy(VL.begin(), VL.end(), getTrailingObjectsNonStrict<Expr *>());
 }

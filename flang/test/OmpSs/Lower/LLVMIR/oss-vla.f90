@@ -50,7 +50,7 @@ subroutine task(X)
 
 end subroutine
 
-!LLVMIR-LABEL: define void @task_(ptr %0)
+!LLVMIR-LABEL: define void @task_(ptr noalias %0)
 
 
 !LLVMIR: %{{.*}} = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00")

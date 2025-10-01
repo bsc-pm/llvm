@@ -35,7 +35,7 @@ END PROGRAM MAIN
 ! FIRDialect:           return
 ! FIRDialect:         }
 
-! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "main"} {
+! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "MAIN"} {
 ! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
 ! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.dummy_scope : !fir.dscope
 ! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "x", uniq_name = "_QFEx"}

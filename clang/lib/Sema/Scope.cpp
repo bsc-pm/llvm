@@ -17,7 +17,7 @@
 
 using namespace clang;
 
-void Scope::setFlags(Scope *parent, unsigned flags) {
+void Scope::setFlags(Scope *parent, uint64_t flags) {
   AnyParent = parent;
   Flags = flags;
 
@@ -92,7 +92,7 @@ void Scope::setFlags(Scope *parent, unsigned flags) {
   }
 }
 
-void Scope::Init(Scope *parent, unsigned flags) {
+void Scope::Init(Scope *parent, uint64_t flags) {
   setFlags(parent, flags);
 
   // TODO: OmpSs-2 workaround for OmpSsLoopDirectiveScope
@@ -103,6 +103,7 @@ void Scope::Init(Scope *parent, unsigned flags) {
   UsingDirectives.clear();
   Entity = nullptr;
   ErrorTrap.reset();
+  PrecedingLabel = nullptr;
   NRVO = std::nullopt;
 }
 
@@ -116,7 +117,7 @@ bool Scope::containedInPrototypeScope() const {
   return false;
 }
 
-void Scope::AddFlags(unsigned FlagsToSet) {
+void Scope::AddFlags(uint64_t FlagsToSet) {
   assert((FlagsToSet & ~(BreakScope | ContinueScope)) == 0 &&
          "Unsupported scope flags");
   if (FlagsToSet & BreakScope) {
@@ -200,13 +201,13 @@ void Scope::applyNRVO() {
 LLVM_DUMP_METHOD void Scope::dump() const { dumpImpl(llvm::errs()); }
 
 void Scope::dumpImpl(raw_ostream &OS) const {
-  unsigned Flags = getFlags();
+  uint64_t Flags = getFlags();
   bool HasFlags = Flags != 0;
 
   if (HasFlags)
     OS << "Flags: ";
 
-  std::pair<unsigned, const char *> FlagInfo[] = {
+  std::pair<uint64_t, const char *> FlagInfo[] = {
       {FnScope, "FnScope"},
       {BreakScope, "BreakScope"},
       {ContinueScope, "ContinueScope"},
@@ -240,7 +241,8 @@ void Scope::dumpImpl(raw_ostream &OS) const {
       {OpenACCComputeConstructScope, "OpenACCComputeConstructScope"},
       {TypeAliasScope, "TypeAliasScope"},
       {FriendScope, "FriendScope"},
-  };
+      {OpenACCComputeConstructScope, "OpenACCComputeConstructScope"},
+      {OpenACCLoopConstructScope, "OpenACCLoopConstructScope"}};
 
   for (auto Info : FlagInfo) {
     if (Flags & Info.first) {

@@ -112,21 +112,21 @@ end program
 !LLVMIR-SAME: "QUAL.OSS.SHARED"(ptr @_QFEarray, [10 x i32] undef)
 !LLVMIR-SAME: "QUAL.OSS.DEP.OUT"(ptr @_QFEarray, [11 x i8] c"dep string\00", ptr @compute.dep7, ptr @_QFEarray), "QUAL.OSS.CAPTURED"(i64 10, i32 1, i32 10, i32 1) ]
 
-!LLVMIR-LABEL: define { ptr, i64, i64, i64 } @compute.dep0(ptr %0)
+!LLVMIR-LABEL: define { ptr, i64, i64, i64 } @compute.dep0(ptr noalias %0)
 !LLVMIR:   %2 = insertvalue { ptr, i64, i64, i64 } poison, ptr %0, 0
 !LLVMIR-NEXT:   %3 = insertvalue { ptr, i64, i64, i64 } %2, i64 4, 1
 !LLVMIR-NEXT:   %4 = insertvalue { ptr, i64, i64, i64 } %3, i64 0, 2
 !LLVMIR-NEXT:   %5 = insertvalue { ptr, i64, i64, i64 } %4, i64 4, 3
 !LLVMIR-NEXT:   ret { ptr, i64, i64, i64 } %5
 
-!LLVMIR-LABEL: define { ptr, i64, i64, i64 } @compute.dep1(ptr %0)
+!LLVMIR-LABEL: define { ptr, i64, i64, i64 } @compute.dep1(ptr noalias %0)
 !LLVMIR:   %2 = insertvalue { ptr, i64, i64, i64 } poison, ptr %0, 0
 !LLVMIR-NEXT:   %3 = insertvalue { ptr, i64, i64, i64 } %2, i64 40, 1
 !LLVMIR-NEXT:   %4 = insertvalue { ptr, i64, i64, i64 } %3, i64 0, 2
 !LLVMIR-NEXT:   %5 = insertvalue { ptr, i64, i64, i64 } %4, i64 40, 3
 !LLVMIR-NEXT:   ret { ptr, i64, i64, i64 } %5
 
-!LLVMIR-LABEL: define { ptr, i64, i64, i64 } @compute.dep2(ptr %0, ptr %1)
+!LLVMIR-LABEL: define { ptr, i64, i64, i64 } @compute.dep2(ptr noalias %0, ptr noalias %1)
 !LLVMIR:   %3 = load i32, ptr %1, align 4
 !LLVMIR-NEXT:   %4 = sext i32 %3 to i64
 !LLVMIR-NEXT:   %5 = sub i64 %4, 1
@@ -138,7 +138,7 @@ end program
 !LLVMIR-NEXT:   %11 = insertvalue { ptr, i64, i64, i64 } %10, i64 %7, 3
 !LLVMIR-NEXT:   ret { ptr, i64, i64, i64 } %11
 
-!LLVMIR-LABEL: define { ptr, i64, i64, i64 } @compute.dep3(ptr %0)
+!LLVMIR-LABEL: define { ptr, i64, i64, i64 } @compute.dep3(ptr noalias %0)
 !LLVMIR:   %2 = getelementptr %_QFTty, ptr %0, i32 0, i32 0
 !LLVMIR-NEXT:   %3 = insertvalue { ptr, i64, i64, i64 } poison, ptr %2, 0
 !LLVMIR-NEXT:   %4 = insertvalue { ptr, i64, i64, i64 } %3, i64 4, 1
@@ -146,7 +146,7 @@ end program
 !LLVMIR-NEXT:   %6 = insertvalue { ptr, i64, i64, i64 } %5, i64 4, 3
 !LLVMIR-NEXT:   ret { ptr, i64, i64, i64 } %6
 
-!LLVMIR-LABEL: define { ptr, i64, i64, i64 } @compute.dep4(ptr %0)
+!LLVMIR-LABEL: define { ptr, i64, i64, i64 } @compute.dep4(ptr noalias %0)
 !LLVMIR:   %2 = getelementptr %_QFTty, ptr %0, i32 0, i32 1
 !LLVMIR-NEXT:   %3 = insertvalue { ptr, i64, i64, i64 } poison, ptr %2, 0
 !LLVMIR-NEXT:   %4 = insertvalue { ptr, i64, i64, i64 } %3, i64 40, 1
@@ -154,14 +154,14 @@ end program
 !LLVMIR-NEXT:   %6 = insertvalue { ptr, i64, i64, i64 } %5, i64 40, 3
 !LLVMIR-NEXT:   ret { ptr, i64, i64, i64 } %6
 
-!LLVMIR-LABEL: define { ptr, i64, i64, i64 } @compute.dep5(ptr %0)
+!LLVMIR-LABEL: define { ptr, i64, i64, i64 } @compute.dep5(ptr noalias %0)
 !LLVMIR:   %2 = insertvalue { ptr, i64, i64, i64 } poison, ptr %0, 0
 !LLVMIR-NEXT:   %3 = insertvalue { ptr, i64, i64, i64 } %2, i64 24, 1
 !LLVMIR-NEXT:   %4 = insertvalue { ptr, i64, i64, i64 } %3, i64 0, 2
 !LLVMIR-NEXT:   %5 = insertvalue { ptr, i64, i64, i64 } %4, i64 24, 3
 !LLVMIR-NEXT:   ret { ptr, i64, i64, i64 } %5
 
-!LLVMIR-LABEL: define { ptr, i64, i64, i64 } @compute.dep6(ptr %0, ptr %1)
+!LLVMIR-LABEL: define { ptr, i64, i64, i64 } @compute.dep6(ptr noalias %0, ptr noalias %1)
 !LLVMIR:   %3 = load i32, ptr %1, align 4
 !LLVMIR-NEXT:   %4 = sext i32 %3 to i64
 !LLVMIR-NEXT:   %5 = add i32 %3, 10
@@ -175,7 +175,7 @@ end program
 !LLVMIR-NEXT:   %13 = insertvalue { ptr, i64, i64, i64 } %12, i64 %9, 3
 !LLVMIR-NEXT:   ret { ptr, i64, i64, i64 } %13
 
-!LLVMIR-LABEL: define { ptr, i64, i64, i64 } @compute.dep7(ptr %0)
+!LLVMIR-LABEL: define { ptr, i64, i64, i64 } @compute.dep7(ptr noalias %0)
 !LLVMIR:   %2 = insertvalue { ptr, i64, i64, i64 } poison, ptr %0, 0
 !LLVMIR-NEXT:   %3 = insertvalue { ptr, i64, i64, i64 } %2, i64 40, 1
 !LLVMIR-NEXT:   %4 = insertvalue { ptr, i64, i64, i64 } %3, i64 0, 2

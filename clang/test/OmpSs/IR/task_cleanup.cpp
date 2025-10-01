@@ -132,7 +132,7 @@ l:      n++; // to put something in the label
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00") ], !dbg [[DBG9:![0-9]+]]
 // AARCH64-NEXT:    [[N:%.*]] = alloca i32, align 4
-// AARCH64-NEXT:    [[TMP:%.*]] = alloca i1, align 1
+// AARCH64-NEXT:    [[TMP:%.*]] = alloca i1, align 4
 // AARCH64-NEXT:    [[F:%.*]] = alloca [[STRUCT_FOO:%.*]], align 1
 // AARCH64-NEXT:    [[CLEANUP_DEST_SLOT:%.*]] = alloca i32, align 4
 // AARCH64-NEXT:    br label [[WHILE_COND:%.*]], !dbg [[DBG10:![0-9]+]]

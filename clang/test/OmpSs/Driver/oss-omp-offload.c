@@ -5,7 +5,6 @@
 // CHECK-OMPSS2: "{{[^"]*}}clang{{[^"]*}}"
 // CHECK-OMPSS2-SAME: "-fompss-2"
 // CHECK-OMPSS2-SAME: "-disable-llvm-passes"
-// CHECK-OMPSS2-SAME: "-fopenmp-targets=x86_64-pc-linux-gnu"
 // CHECK-OMPSS2-SAME: "-fompss-2-target"
 
 

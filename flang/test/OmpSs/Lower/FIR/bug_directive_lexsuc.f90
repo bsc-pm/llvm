@@ -24,7 +24,7 @@ PROGRAM P
 END PROGRAM P
 
 
-! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "p"} {
+! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "P"} {
 ! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = arith.constant false
 ! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
 ! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.dummy_scope : !fir.dscope

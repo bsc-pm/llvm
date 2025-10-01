@@ -16,7 +16,7 @@ program call_by_value
   call omp_set_nested(do_nested)
 end program call_by_value
 
-! CHECK-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "call_by_value"} {
+! CHECK-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "CALL_BY_VALUE"} {
 ! CHECK:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.alloca !fir.logical<4> {bindc_name = "do_nested", uniq_name = "_QFEdo_nested"}
 ! CHECK:           %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant false
 ! CHECK:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_1]] : (i1) -> !fir.logical<4>

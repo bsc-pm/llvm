@@ -2472,8 +2472,8 @@ struct OmpSsDirective {
     AllocaInst *TaskPtrVar = IRB.CreateAlloca(PtrTy);
     PostMoveInstructions.push_back(TaskPtrVar);
 
-    IRB.CreateLifetimeStart(TaskArgsVar, IRB.getInt64(DL.getTypeAllocSize(PtrTy)));
-    IRB.CreateLifetimeStart(TaskPtrVar, IRB.getInt64(DL.getTypeAllocSize(PtrTy)));
+    IRB.CreateLifetimeStart(TaskArgsVar);
+    IRB.CreateLifetimeStart(TaskPtrVar);
 
     Value *TaskArgsStructSizeOf = IRB.getInt64(DL.getTypeAllocSize(TaskArgsTy));
 
@@ -2786,8 +2786,8 @@ struct OmpSsDirective {
 
     CallInst *TaskSubmitFuncCall = IRB.CreateCall(nanos6Api::taskSubmitFuncCallee(M), TaskPtrVarL);
 
-    IRB.CreateLifetimeEnd(TaskArgsVar, IRB.getInt64(DL.getTypeAllocSize(PtrTy)));
-    IRB.CreateLifetimeEnd(TaskPtrVar, IRB.getInt64(DL.getTypeAllocSize(PtrTy)));
+    IRB.CreateLifetimeEnd(TaskArgsVar);
+    IRB.CreateLifetimeEnd(TaskPtrVar);
 
     return TaskSubmitFuncCall;
   };

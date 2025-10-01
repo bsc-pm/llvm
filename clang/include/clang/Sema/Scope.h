@@ -42,7 +42,7 @@ class Scope {
 public:
   /// ScopeFlags - These are bitfields that are or'd together when creating a
   /// scope, which defines the sorts of things the scope contains.
-  enum ScopeFlags {
+  enum ScopeFlags : uint64_t {
     // A bitfield value representing no scopes.
     NoScope = 0,
 
@@ -160,17 +160,21 @@ public:
     /// constructs, since they have the same behavior.
     OpenACCComputeConstructScope = 0x10000000,
 
+    /// This is the scope of an OpenACC Loop/Combined construct, which is used
+    /// to determine whether a 'cache' construct variable reference is legal.
+    OpenACCLoopConstructScope = 0x20000000,
+
     /// This is a scope of type alias declaration.
-    TypeAliasScope = 0x20000000,
+    TypeAliasScope = 0x40000000,
 
     /// This is a scope of friend declaration.
-    FriendScope = 0x40000000,
+    FriendScope = 0x80000000,
 
     /// This is the scope of OmpSs executable directive.
-    OmpSsDirectiveScope = 0x80000000,
+    OmpSsDirectiveScope = 0x100000000,
 
     /// This is the scope of some OmpSs loop directive.
-    OmpSsLoopDirectiveScope = 0x100000000,
+    OmpSsLoopDirectiveScope = 0x200000000,
   };
 
 private:
@@ -180,7 +184,7 @@ private:
 
   /// Flags - This contains a set of ScopeFlags, which indicates how the scope
   /// interrelates with other control flow statements.
-  unsigned Flags;
+  uint64_t Flags;
 
   // TODO: OmpSs-2 workaround for OmpSsLoopDirectiveScope
   // since the enum underlying type is full
@@ -263,18 +267,30 @@ private:
   /// available for this variable in the current scope.
   llvm::SmallPtrSet<VarDecl *, 8> ReturnSlots;
 
-  void setFlags(Scope *Parent, unsigned F);
+  /// If this scope belongs to a loop or switch statement, the label that
+  /// directly precedes it, if any.
+  LabelDecl *PrecedingLabel;
+
+  void setFlags(Scope *Parent, uint64_t F);
 
 public:
-  Scope(Scope *Parent, unsigned ScopeFlags, DiagnosticsEngine &Diag)
+  Scope(Scope *Parent, uint64_t ScopeFlags, DiagnosticsEngine &Diag)
       : ErrorTrap(Diag) {
     Init(Parent, ScopeFlags);
   }
 
   /// getFlags - Return the flags for this scope.
-  unsigned getFlags() const { return Flags; }
+  uint64_t getFlags() const { return Flags; }
 
-  void setFlags(unsigned F) { setFlags(getParent(), F); }
+  void setFlags(uint64_t F) { setFlags(getParent(), F); }
+
+  /// Get the label that precedes this scope.
+  LabelDecl *getPrecedingLabel() const { return PrecedingLabel; }
+  void setPrecedingLabel(LabelDecl *LD) {
+    assert((Flags & BreakScope || Flags & ContinueScope) &&
+           "not a loop or switch");
+    PrecedingLabel = LD;
+  }
 
   /// isBlockScope - Return true if this scope correspond to a closure.
   bool isBlockScope() const { return Flags & BlockScope; }
@@ -306,7 +322,7 @@ public:
   // is disallowed despite being a continue scope.
   void setIsConditionVarScope(bool InConditionVarScope) {
     Flags = (Flags & ~ConditionVarScope) |
-            (InConditionVarScope ? ConditionVarScope : 0);
+            (InConditionVarScope ? ConditionVarScope : NoScope);
   }
 
   bool isConditionVarScope() const {
@@ -578,6 +594,10 @@ public:
     return getFlags() & Scope::OpenACCComputeConstructScope;
   }
 
+  bool isOpenACCLoopConstructScope() const {
+    return getFlags() & Scope::OpenACCLoopConstructScope;
+  }
+
   /// Determine if this scope (or its parents) are a compute construct. If the
   /// argument is provided, the search will stop at any of the specified scopes.
   /// Otherwise, it will stop only at the normal 'no longer search' scopes.
@@ -602,6 +622,12 @@ public:
   /// continue statements embedded into it.
   bool isContinueScope() const {
     return getFlags() & ScopeFlags::ContinueScope;
+  }
+
+  /// Determine whether this is a scope which can have 'break' or 'continue'
+  /// statements embedded into it.
+  bool isBreakOrContinueScope() const {
+    return getFlags() & (ContinueScope | BreakScope);
   }
 
   // TODO: OmpSs-2 workaround for OmpSsLoopDirectiveScope
@@ -673,11 +699,11 @@ public:
   void applyNRVO();
 
   /// Init - This is used by the parser to implement scope caching.
-  void Init(Scope *parent, unsigned flags);
+  void Init(Scope *parent, uint64_t flags);
 
   /// Sets up the specified scope flags and adjusts the scope state
   /// variables accordingly.
-  void AddFlags(unsigned Flags);
+  void AddFlags(uint64_t Flags);
 
   void dumpImpl(raw_ostream &OS) const;
   void dump() const;

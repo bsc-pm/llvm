@@ -895,7 +895,7 @@ namespace {
       // Ensure the block is well-formed.
       firOpBuilder.create<mlir::func::ReturnOp>(currentLocation, returnList);
 
-      converter.getLocalSymbols().popScope();
+      converter.getLocalSymbols().symbolMapStack.pop_back();
 
       firOpBuilder.restoreInsertionPoint(insertPt);
 
@@ -1028,7 +1028,7 @@ namespace {
       // // Ensure the block is well-formed.
       firOpBuilder.create<mlir::func::ReturnOp>(currentLocation, returnList);
 
-      converter.getLocalSymbols().popScope();
+      converter.getLocalSymbols().symbolMapStack.pop_back();
 
       firOpBuilder.restoreInsertionPoint(insertPt);
 
@@ -1131,7 +1131,7 @@ namespace {
       // // Ensure the block is well-formed.
       firOpBuilder.create<mlir::func::ReturnOp>(currentLocation, returnList);
 
-      converter.getLocalSymbols().popScope();
+      converter.getLocalSymbols().symbolMapStack.pop_back();
 
       firOpBuilder.restoreInsertionPoint(insertPt);
 
@@ -1243,7 +1243,7 @@ namespace {
       // // Ensure the block is well-formed.
       firOpBuilder.create<mlir::func::ReturnOp>(currentLocation, returnList);
 
-      converter.getLocalSymbols().popScope();
+      converter.getLocalSymbols().symbolMapStack.pop_back();
 
       firOpBuilder.restoreInsertionPoint(insertPt);
 
@@ -2097,7 +2097,7 @@ void Fortran::lower::genOmpSsTaskSubroutine(
     for (auto val : val_firstprivate_set)
       val_type_firstprivate.push_back(firOpBuilder.create<fir::UndefOp>(loc, getLLVMIRLowerableType(val.getType())));
 
-    converter.getLocalSymbols().popScope();
+    converter.getLocalSymbols().symbolMapStack.pop_back();
 
     auto taskOp = firOpBuilder.create<mlir::oss::TaskOp>(
       loc, argTy,

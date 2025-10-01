@@ -22,7 +22,7 @@ END
 END
 
 
-! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "p"} {
+! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "P"} {
 ! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.alloca i32 {adapt.valuebyref}
 ! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.address_of(@_QFEarray) : !fir.ref<!fir.array<9xi32>>
 ! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant 2 : index

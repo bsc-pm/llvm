@@ -1,8 +1,10 @@
+// clang-format off
 // RUN: %libomp-compile-and-run | FileCheck %s
 // RUN: %libomp-compile-and-run | %sort-threads \
 // RUN:                         | FileCheck --check-prefix=THREADS %s
 // REQUIRES: ompt
 // UNSUPPORTED: ompv-passive
+// clang-format on
 #include "callback.h"
 
 int main() {
@@ -13,6 +15,7 @@ int main() {
   }
   print_fuzzy_address(1);
 
+  // clang-format off
   // Check if libomp supports the callbacks for this test.
   // CHECK-NOT: {{^}}0: Could not register callback
 
@@ -47,19 +50,19 @@ int main() {
   // THREADS: {{^}}[[MASTER_ID:[0-9]+]]: ompt_event_thread_begin
   // THREADS-SAME: thread_type=ompt_thread_initial=1, thread_id=[[MASTER_ID]]
   // THREADS: {{^}}[[MASTER_ID]]: ompt_event_parallel_begin
-  // THREADS-SAME: parent_task_id=[[PARENT_TASK_ID:[0-9]+]]
+  // THREADS-SAME: parent_task_id=[[PARENT_TASK_ID:[0-f]+]]
   // THREADS-SAME: parent_task_frame.exit=[[NULL]]
   // THREADS-SAME: parent_task_frame.reenter={{(0x)?[0-f]+}}
-  // THREADS-SAME: parallel_id=[[PARALLEL_ID:[0-9]+]], requested_team_size=4
+  // THREADS-SAME: parallel_id=[[PARALLEL_ID:[0-f]+]], requested_team_size=4
   // THREADS-SAME: codeptr_ra=[[RETURN_ADDRESS:(0x)?[0-f]+]]{{[0-f][0-f]}}
 
   // THREADS: {{^}}[[MASTER_ID]]: ompt_event_implicit_task_begin
   // THREADS-SAME: parallel_id=[[PARALLEL_ID]]
-  // THREADS-SAME: task_id=[[IMPLICIT_TASK_ID:[0-9]+]]
+  // THREADS-SAME: task_id=[[IMPLICIT_TASK_ID:[0-f]+]]
   // THREADS: {{^}}[[MASTER_ID]]: task level 0
   // THREADS-SAME: parallel_id=[[PARALLEL_ID]], task_id=[[IMPLICIT_TASK_ID]]
   // THREADS: {{^}}[[MASTER_ID]]: task level 1
-  // THREADS-SAME: parallel_id=[[IMPLICIT_PARALLEL_ID:[0-9]+]]
+  // THREADS-SAME: parallel_id=[[IMPLICIT_PARALLEL_ID:[0-f]+]]
   // THREADS-SAME: task_id=[[PARENT_TASK_ID]]
   // THREADS-NOT: ompt_event_implicit_task_end
   // THREADS: {{^}}[[MASTER_ID]]: ompt_event_barrier_implicit_parallel_begin
@@ -79,7 +82,7 @@ int main() {
   // THREADS-SAME: thread_type=ompt_thread_worker=2, thread_id=[[THREAD_ID]]
   // THREADS: {{^}}[[THREAD_ID]]: ompt_event_implicit_task_begin
   // THREADS-SAME: parallel_id=[[PARALLEL_ID]]
-  // THREADS-SAME: task_id=[[IMPLICIT_TASK_ID:[0-9]+]]
+  // THREADS-SAME: task_id=[[IMPLICIT_TASK_ID:[0-f]+]]
   // THREADS: {{^}}[[THREAD_ID]]: task level 0
   // THREADS-SAME: parallel_id=[[PARALLEL_ID]], task_id=[[IMPLICIT_TASK_ID]]
   // THREADS: {{^}}[[THREAD_ID]]: task level 1
@@ -98,7 +101,7 @@ int main() {
   // THREADS-SAME: thread_type=ompt_thread_worker=2, thread_id=[[THREAD_ID]]
   // THREADS: {{^}}[[THREAD_ID]]: ompt_event_implicit_task_begin
   // THREADS-SAME: parallel_id=[[PARALLEL_ID]]
-  // THREADS-SAME: task_id=[[IMPLICIT_TASK_ID:[0-9]+]]
+  // THREADS-SAME: task_id=[[IMPLICIT_TASK_ID:[0-f]+]]
   // THREADS: {{^}}[[THREAD_ID]]: task level 0
   // THREADS-SAME: parallel_id=[[PARALLEL_ID]], task_id=[[IMPLICIT_TASK_ID]]
   // THREADS: {{^}}[[THREAD_ID]]: task level 1
@@ -117,7 +120,7 @@ int main() {
   // THREADS-SAME: thread_type=ompt_thread_worker=2, thread_id=[[THREAD_ID]]
   // THREADS: {{^}}[[THREAD_ID]]: ompt_event_implicit_task_begin
   // THREADS-SAME: parallel_id=[[PARALLEL_ID]]
-  // THREADS-SAME: task_id=[[IMPLICIT_TASK_ID:[0-9]+]]
+  // THREADS-SAME: task_id=[[IMPLICIT_TASK_ID:[0-f]+]]
   // THREADS: {{^}}[[THREAD_ID]]: task level 0
   // THREADS-SAME: parallel_id=[[PARALLEL_ID]], task_id=[[IMPLICIT_TASK_ID]]
   // THREADS: {{^}}[[THREAD_ID]]: task level 1
@@ -131,6 +134,7 @@ int main() {
   // THREADS-SAME: parallel_id=0, task_id=[[IMPLICIT_TASK_ID]]
   // THREADS: {{^}}[[THREAD_ID]]: ompt_event_implicit_task_end
   // THREADS-SAME: parallel_id=0, task_id=[[IMPLICIT_TASK_ID]]
+  // clang-format on
 
   return 0;
 }

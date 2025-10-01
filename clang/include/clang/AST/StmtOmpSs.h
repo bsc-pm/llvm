@@ -42,7 +42,7 @@ class OSSExecutableDirective : public Stmt {
   /// Get the clauses storage.
   MutableArrayRef<OSSClause *> getClauses() {
     if (!Data)
-      return std::nullopt;
+      return {};
     return Data->getClauses();
   }
 protected:
@@ -247,7 +247,7 @@ public:
 
   ArrayRef<OSSClause *> clauses() const {
     if (!Data)
-      return std::nullopt;
+      return {};
     return Data->getClauses();
   }
 };

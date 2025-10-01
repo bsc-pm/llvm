@@ -788,7 +788,7 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
   assert(Tok.is(tok::annot_pragma_ompss) && "Not an OmpSs directive!");
   ParsingOmpSsDirectiveRAII DirScope(*this);
   ParenBraceBracketBalancer BalancerRAIIObj(*this);
-  unsigned ScopeFlags = Scope::FnScope | Scope::DeclScope |
+  uint64_t ScopeFlags = Scope::FnScope | Scope::DeclScope |
                         Scope::CompoundStmtScope | Scope::OmpSsDirectiveScope;
   SourceLocation Loc = ConsumeAnnotationToken(), EndLoc;
 
@@ -1720,7 +1720,7 @@ ExprResult Parser::ParseOmpSsParensExpr(StringRef ClauseName,
   SourceLocation ELoc = Tok.getLocation();
 
   ExprResult LHS(ParseCastExpression(
-      CastParseKind::AnyCastExpr, /*isAddressOfOperand=*/false, TypeCastState::NotTypeCast));
+      CastParseKind::AnyCastExpr, /*isAddressOfOperand=*/false, TypoCorrectionTypeBehavior::AllowNonTypes));
   ExprResult Val(ParseRHSOfBinaryExpression(LHS, prec::Conditional));
   Val = Actions.ActOnFinishFullExpr(Val.get(), ELoc, /*DiscardedValue*/ false);
 

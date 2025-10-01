@@ -121,7 +121,7 @@ protected:
   /// Fetches list of variables associated with this clause.
   MutableArrayRef<Expr *> getVarRefs() {
     return MutableArrayRef<Expr *>(
-        static_cast<T *>(this)->template getTrailingObjects<Expr *>(), NumVars);
+        static_cast<T *>(this)->template getTrailingObjectsNonStrict<Expr *>(), NumVars);
   }
 
   /// Sets the list of variables for this clause.
@@ -129,7 +129,7 @@ protected:
     assert(VL.size() == NumVars &&
            "Number of variables is not the same as the preallocated buffer");
     std::copy(VL.begin(), VL.end(),
-              static_cast<T *>(this)->template getTrailingObjects<Expr *>());
+              static_cast<T *>(this)->template getTrailingObjectsNonStrict<Expr *>());
   }
 
 public:
@@ -162,7 +162,7 @@ public:
   /// Fetches list of all variables in the clause.
   ArrayRef<const Expr *> getVarRefs() const {
     return llvm::ArrayRef(
-        static_cast<const T *>(this)->template getTrailingObjects<Expr *>(),
+        static_cast<const T *>(this)->template getTrailingObjectsNonStrict<Expr *>(),
         NumVars);
   }
 };

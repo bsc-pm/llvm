@@ -618,15 +618,15 @@ attributes #17 = { noreturn nounwind }
 ; CHECK:       coro.init:
 ; CHECK-NEXT:    [[TMP5:%.*]] = phi ptr [ null, [[ENTRY:%.*]] ], [ [[CALL]], [[CORO_ALLOC]] ], !dbg [[DBG10]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = call ptr @llvm.coro.begin(token [[TMP1]], ptr [[TMP5]]), !dbg [[DBG10]]
-; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 1, ptr [[__PROMISE]]) #[[ATTR2:[0-9]+]], !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[__PROMISE]]), !dbg [[DBG11]]
 ; CHECK-NEXT:    invoke void @_ZN13oss_coroutine12promise_type17get_return_objectEv(ptr noundef nonnull align 1 dereferenceable(1) [[__PROMISE]])
 ; CHECK-NEXT:            to label [[INVOKE_CONT:%.*]] unwind label [[LPAD:%.*]], !dbg [[DBG11]]
 ; CHECK:       invoke.cont:
-; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 1, ptr [[REF_TMP]]) #[[ATTR2]], !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[REF_TMP]]), !dbg [[DBG11]]
 ; CHECK-NEXT:    invoke void @_ZN13oss_coroutine12promise_type15initial_suspendEv(ptr noundef nonnull align 1 dereferenceable(1) [[__PROMISE]])
 ; CHECK-NEXT:            to label [[INVOKE_CONT2:%.*]] unwind label [[LPAD1:%.*]], !dbg [[DBG11]]
 ; CHECK:       invoke.cont2:
-; CHECK-NEXT:    [[CALL4:%.*]] = call noundef zeroext i1 @_ZNSt13suspend_never11await_readyEv(ptr noundef nonnull align 1 dereferenceable(1) [[REF_TMP]]) #[[ATTR2]], !dbg [[DBG11]]
+; CHECK-NEXT:    [[CALL4:%.*]] = call noundef zeroext i1 @_ZNSt13suspend_never11await_readyEv(ptr noundef nonnull align 1 dereferenceable(1) [[REF_TMP]]) #[[ATTR2:[0-9]+]], !dbg [[DBG11]]
 ; CHECK-NEXT:    br i1 [[CALL4]], label [[INIT_READY:%.*]], label [[INIT_SUSPEND:%.*]], !dbg [[DBG11]]
 ; CHECK:       init.suspend:
 ; CHECK-NEXT:    [[TMP7:%.*]] = call token @llvm.coro.save(ptr null), !dbg [[DBG11]]
@@ -653,14 +653,14 @@ attributes #17 = { noreturn nounwind }
 ; CHECK-NEXT:    store ptr [[TMP13]], ptr [[EXN_SLOT]], align 8, !dbg [[DBG12]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = extractvalue { ptr, i32 } [[TMP12]], 1, !dbg [[DBG12]]
 ; CHECK-NEXT:    store i32 [[TMP14]], ptr [[EHSELECTOR_SLOT]], align 4, !dbg [[DBG12]]
-; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 1, ptr [[REF_TMP]]) #[[ATTR2]], !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[REF_TMP]]), !dbg [[DBG11]]
 ; CHECK-NEXT:    br label [[EHCLEANUP:%.*]], !dbg [[DBG11]]
 ; CHECK:       init.ready:
 ; CHECK-NEXT:    call void @_ZNSt13suspend_never12await_resumeEv(ptr noundef nonnull align 1 dereferenceable(1) [[REF_TMP]]) #[[ATTR2]], !dbg [[DBG11]]
 ; CHECK-NEXT:    br label [[CLEANUP]], !dbg [[DBG11]]
 ; CHECK:       cleanup:
 ; CHECK-NEXT:    [[CLEANUP_DEST_SLOT_0:%.*]] = phi i32 [ 0, [[INIT_READY]] ], [ 2, [[INIT_CLEANUP]] ]
-; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 1, ptr [[REF_TMP]]) #[[ATTR2]], !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[REF_TMP]]), !dbg [[DBG11]]
 ; CHECK-NEXT:    switch i32 [[CLEANUP_DEST_SLOT_0]], label [[CLEANUP19:%.*]] [
 ; CHECK-NEXT:      i32 0, label [[CLEANUP_CONT:%.*]]
 ; CHECK-NEXT:    ]
@@ -690,7 +690,7 @@ attributes #17 = { noreturn nounwind }
 ; CHECK:       try.cont:
 ; CHECK-NEXT:    br label [[CORO_FINAL]], !dbg [[DBG11]]
 ; CHECK:       coro.final:
-; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 1, ptr [[REF_TMP12]]) #[[ATTR2]], !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[REF_TMP12]]), !dbg [[DBG11]]
 ; CHECK-NEXT:    call void @_ZN13oss_coroutine12promise_type13final_suspendEv(ptr noundef nonnull align 1 dereferenceable(1) [[__PROMISE]]) #[[ATTR2]], !dbg [[DBG11]]
 ; CHECK-NEXT:    [[CALL14:%.*]] = call noundef zeroext i1 @_ZNSt14suspend_always11await_readyEv(ptr noundef nonnull align 1 dereferenceable(1) [[REF_TMP12]]) #[[ATTR2]], !dbg [[DBG11]]
 ; CHECK-NEXT:    br i1 [[CALL14]], label [[FINAL_READY:%.*]], label [[FINAL_SUSPEND:%.*]], !dbg [[DBG11]]
@@ -728,7 +728,7 @@ attributes #17 = { noreturn nounwind }
 ; CHECK-NEXT:    br label [[CLEANUP15]], !dbg [[DBG11]]
 ; CHECK:       cleanup15:
 ; CHECK-NEXT:    [[CLEANUP_DEST_SLOT_1:%.*]] = phi i32 [ 0, [[FINAL_READY]] ], [ 2, [[FINAL_CLEANUP]] ]
-; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 1, ptr [[REF_TMP12]]) #[[ATTR2]], !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[REF_TMP12]]), !dbg [[DBG11]]
 ; CHECK-NEXT:    switch i32 [[CLEANUP_DEST_SLOT_1]], label [[CLEANUP19]] [
 ; CHECK-NEXT:      i32 0, label [[CLEANUP_CONT17:%.*]]
 ; CHECK-NEXT:    ]
@@ -736,7 +736,7 @@ attributes #17 = { noreturn nounwind }
 ; CHECK-NEXT:    br label [[CLEANUP19]], !dbg [[DBG11]]
 ; CHECK:       cleanup19:
 ; CHECK-NEXT:    [[CLEANUP_DEST_SLOT_2:%.*]] = phi i32 [ [[CLEANUP_DEST_SLOT_0]], [[CLEANUP]] ], [ [[CLEANUP_DEST_SLOT_1]], [[CLEANUP15]] ], [ 0, [[CLEANUP_CONT17]] ], !dbg [[DBG11]]
-; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 1, ptr [[__PROMISE]]) #[[ATTR2]], !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[__PROMISE]]), !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP27:%.*]] = call ptr @llvm.coro.free(token [[TMP1]], ptr [[TMP6]]), !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP28:%.*]] = icmp ne ptr [[TMP27]], null, !dbg [[DBG11]]
 ; CHECK-NEXT:    br i1 [[TMP28]], label [[CORO_FREE:%.*]], label [[AFTER_CORO_FREE:%.*]], !dbg [[DBG11]]
@@ -761,7 +761,7 @@ attributes #17 = { noreturn nounwind }
 ; CHECK:       cleanup.cont18:
 ; CHECK-NEXT:    br label [[EHCLEANUP20]], !dbg [[DBG11]]
 ; CHECK:       ehcleanup20:
-; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 1, ptr [[__PROMISE]]) #[[ATTR2]], !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[__PROMISE]]), !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP33:%.*]] = call ptr @llvm.coro.free(token [[TMP1]], ptr [[TMP6]]), !dbg [[DBG11]]
 ; CHECK-NEXT:    [[TMP34:%.*]] = icmp ne ptr [[TMP33]], null, !dbg [[DBG11]]
 ; CHECK-NEXT:    br i1 [[TMP34]], label [[CORO_FREE25:%.*]], label [[AFTER_CORO_FREE26:%.*]], !dbg [[DBG11]]
@@ -789,7 +789,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZN13oss_coroutine12promise_type17get_return_objectEv
-; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR6:[0-9]+]] comdat align 2 !dbg [[DBG14:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR5:[0-9]+]] comdat align 2 !dbg [[DBG14:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[RETVAL:%.*]] = alloca [[STRUCT_OSS_COROUTINE:%.*]], align 1
 ; CHECK-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
@@ -803,7 +803,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZN13oss_coroutine12promise_type15initial_suspendEv
-; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR7:[0-9]+]] comdat align 2 !dbg [[DBG17:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR6:[0-9]+]] comdat align 2 !dbg [[DBG17:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
@@ -812,7 +812,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZNSt13suspend_never11await_readyEv
-; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR7]] comdat align 2 !dbg [[DBG19:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR6]] comdat align 2 !dbg [[DBG19:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
@@ -821,7 +821,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_Z3kk2v.__await_suspend_wrapper__init
-; CHECK-SAME: (ptr noundef nonnull [[TMP0:%.*]], ptr noundef [[TMP1:%.*]]) #[[ATTR9:[0-9]+]] !dbg [[DBG22:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull [[TMP0:%.*]], ptr noundef [[TMP1:%.*]]) #[[ATTR8:[0-9]+]] !dbg [[DBG22:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[DOTADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    [[DOTADDR1:%.*]] = alloca ptr, align 8
@@ -839,7 +839,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZNSt13suspend_never13await_suspendESt16coroutine_handleIvE
-; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR7]] comdat align 2 !dbg [[DBG24:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR6]] comdat align 2 !dbg [[DBG24:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[TMP0:%.*]] = alloca %"struct.std::coroutine_handle", align 1
 ; CHECK-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
@@ -849,7 +849,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZNSt13suspend_never12await_resumeEv
-; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR7]] comdat align 2 !dbg [[DBG26:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR6]] comdat align 2 !dbg [[DBG26:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
@@ -858,7 +858,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZN13oss_coroutine12promise_type11return_voidEv
-; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR7]] comdat align 2 !dbg [[DBG28:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR6]] comdat align 2 !dbg [[DBG28:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
@@ -867,7 +867,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZN13oss_coroutine12promise_type19unhandled_exceptionEv
-; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR7]] comdat align 2 !dbg [[DBG30:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR6]] comdat align 2 !dbg [[DBG30:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
@@ -876,14 +876,14 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@__clang_call_terminate
-; CHECK-SAME: (ptr noundef [[TMP0:%.*]]) #[[ATTR11:[0-9]+]] comdat {
+; CHECK-SAME: (ptr noundef [[TMP0:%.*]]) #[[ATTR10:[0-9]+]] comdat {
 ; CHECK-NEXT:    [[TMP2:%.*]] = call ptr @__cxa_begin_catch(ptr [[TMP0]]) #[[ATTR2]]
 ; CHECK-NEXT:    call void @_ZSt9terminatev() #[[ATTR19]]
 ; CHECK-NEXT:    unreachable
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZN13oss_coroutine12promise_type13final_suspendEv
-; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR7]] comdat align 2 !dbg [[DBG32:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR6]] comdat align 2 !dbg [[DBG32:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
@@ -892,7 +892,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZNSt14suspend_always11await_readyEv
-; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR7]] comdat align 2 !dbg [[DBG34:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR6]] comdat align 2 !dbg [[DBG34:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
@@ -901,7 +901,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_Z3kk2v.__await_suspend_wrapper__final
-; CHECK-SAME: (ptr noundef nonnull [[TMP0:%.*]], ptr noundef [[TMP1:%.*]]) #[[ATTR9]] !dbg [[DBG36:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull [[TMP0:%.*]], ptr noundef [[TMP1:%.*]]) #[[ATTR8]] !dbg [[DBG36:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[DOTADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    [[DOTADDR1:%.*]] = alloca ptr, align 8
@@ -919,7 +919,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZNSt14suspend_always13await_suspendESt16coroutine_handleIvE
-; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR7]] comdat align 2 !dbg [[DBG38:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR6]] comdat align 2 !dbg [[DBG38:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[TMP0:%.*]] = alloca %"struct.std::coroutine_handle", align 1
 ; CHECK-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
@@ -929,7 +929,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZNSt14suspend_always12await_resumeEv
-; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR7]] comdat align 2 !dbg [[DBG40:![0-9]+]] {
+; CHECK-SAME: (ptr noundef nonnull align 1 dereferenceable(1) [[THIS:%.*]]) #[[ATTR6]] comdat align 2 !dbg [[DBG40:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
@@ -938,7 +938,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@main
-; CHECK-SAME: () #[[ATTR14:[0-9]+]] personality ptr @__gxx_personality_v0 !dbg [[DBG42:![0-9]+]] {
+; CHECK-SAME: () #[[ATTR13:[0-9]+]] personality ptr @__gxx_personality_v0 !dbg [[DBG42:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[HANDLE:%.*]] = alloca [[STRUCT_OSS_COROUTINE:%.*]], align 1
 ; CHECK-NEXT:    store ptr null, ptr [[HANDLE]], align 1, !dbg [[DBG43:![0-9]+]]
@@ -948,8 +948,8 @@ attributes #17 = { noreturn nounwind }
 ; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG43]]
 ; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg [[DBG43]]
 ; CHECK:       codeRepl:
-; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP0]]), !dbg [[DBG43]]
-; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP1]]), !dbg [[DBG43]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[TMP0]]), !dbg [[DBG43]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[TMP1]]), !dbg [[DBG43]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = load i64, ptr @[[GLOB2]], align 8, !dbg [[DBG43]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = add nuw i64 16, [[TMP2]], !dbg [[DBG43]]
 ; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS]], align 8, !dbg [[DBG43]]
@@ -961,8 +961,8 @@ attributes #17 = { noreturn nounwind }
 ; CHECK-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 8 [[GEP_HANDLE]], ptr align 8 [[HANDLE]], i64 1, i1 false), !dbg [[DBG43]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = load ptr, ptr [[TMP1]], align 8, !dbg [[DBG43]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP6]]), !dbg [[DBG43]]
-; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP0]]), !dbg [[DBG43]]
-; CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP1]]), !dbg [[DBG43]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[TMP0]]), !dbg [[DBG43]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[TMP1]]), !dbg [[DBG43]]
 ; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG43]]
 ; CHECK:       final.end:
 ; CHECK-NEXT:    ret i32 0, !dbg [[DBG44:![0-9]+]]
@@ -990,7 +990,7 @@ attributes #17 = { noreturn nounwind }
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_unpacked_task_region_main
-; CHECK-SAME: (ptr [[HANDLE:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR14]] personality ptr @__gxx_personality_v0 !dbg [[DBG45:![0-9]+]] {
+; CHECK-SAME: (ptr [[HANDLE:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR13]] personality ptr @__gxx_personality_v0 !dbg [[DBG45:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
 ; CHECK-NEXT:    [[UNDEF_AGG_TMP:%.*]] = alloca [[STRUCT_OSS_COROUTINE:%.*]], align 1
 ; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG46:![0-9]+]]

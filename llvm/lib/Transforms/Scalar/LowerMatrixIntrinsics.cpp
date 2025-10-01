@@ -21,7 +21,6 @@
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/AliasAnalysis.h"
@@ -263,6 +262,7 @@ static bool isUniformShape(Value *V) {
     case llvm::Instruction::FPExt:
       return true;
     case llvm::Instruction::AddrSpaceCast:
+    case CastInst::PtrToAddr:
     case CastInst::PtrToInt:
     case CastInst::IntToPtr:
       return false;
@@ -1208,7 +1208,7 @@ public:
     //
     // For verification, we keep track of where we changed uses to poison in
     // PoisonedInsts and then check that we in fact remove them.
-    SmallSet<Instruction *, 16> PoisonedInsts;
+    SmallPtrSet<Instruction *, 16> PoisonedInsts;
     for (auto *Inst : reverse(ToRemove)) {
       for (Use &U : llvm::make_early_inc_range(Inst->uses())) {
         if (auto *Poisoned = dyn_cast<Instruction>(U.getUser()))
@@ -1560,9 +1560,9 @@ public:
         InstructionCost EmbedCost(0);
         // Roughly estimate the cost for embedding the columns into a vector.
         for (unsigned I = 1; I < N; ++I)
-          EmbedCost +=
-              TTI.getShuffleCost(TTI::SK_Splice, FixedVectorType::get(EltTy, 1),
-                                 {}, TTI::TCK_RecipThroughput);
+          EmbedCost += TTI.getShuffleCost(
+              TTI::SK_Splice, FixedVectorType::get(EltTy, 1),
+              FixedVectorType::get(EltTy, 1), {}, TTI::TCK_RecipThroughput);
         return EmbedCost;
       }
 
@@ -1582,9 +1582,9 @@ public:
         // vector.
         InstructionCost EmbedCost(0);
         for (unsigned I = 1; I < N; ++I)
-          EmbedCost -=
-              TTI.getShuffleCost(TTI::SK_Splice, FixedVectorType::get(EltTy, 1),
-                                 {}, TTI::TCK_RecipThroughput);
+          EmbedCost -= TTI.getShuffleCost(
+              TTI::SK_Splice, FixedVectorType::get(EltTy, 1),
+              FixedVectorType::get(EltTy, 1), {}, TTI::TCK_RecipThroughput);
         return EmbedCost;
       }
 
@@ -2166,7 +2166,7 @@ public:
 
         // If the loads don't alias the lifetime.end, it won't interfere with
         // fusion.
-        MemoryLocation EndLoc = MemoryLocation::getForArgument(End, 1, nullptr);
+        MemoryLocation EndLoc = MemoryLocation::getForArgument(End, 0, nullptr);
         if (!EndLoc.Ptr)
           continue;
         if (AA->isNoAlias(Load0Loc, EndLoc) && AA->isNoAlias(Load1Loc, EndLoc))
@@ -2382,7 +2382,7 @@ public:
       llvm::copy(C.vectors(), std::back_inserter(CondV));
     } else {
       CondV.resize(A.getNumVectors());
-      std::fill(CondV.begin(), CondV.end(), Cond);
+      llvm::fill(CondV, Cond);
     }
 
     for (auto [CV, AV, BV] : llvm::zip_equal(CondV, A.vectors(), B.vectors()))

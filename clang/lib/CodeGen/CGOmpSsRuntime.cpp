@@ -1103,7 +1103,7 @@ void CGOmpSsRuntime::EmitDtorFunc(
   QualType Q = CopyD->getType();
 
   const RecordType *RT = Q->getAs<RecordType>();
-  const CXXRecordDecl *RD = cast<CXXRecordDecl>(RT->getDecl());
+  const CXXRecordDecl *RD = cast<CXXRecordDecl>(RT->getOriginalDecl());
 
   if (RD->hasTrivialDestructor())
     return;
@@ -1440,7 +1440,7 @@ llvm::Function *CGOmpSsRuntime::createCallWrapperFunc(
                                     ICIS_NoInit));
     }
     RD->completeDefinition();
-    RetQ = C.getTagDeclType(RD);
+    RetQ = C.getCanonicalTagType(RD);
   } else {
     RetQ = RetTypes[0];
   }

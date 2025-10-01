@@ -14,7 +14,7 @@ program taskwait
 end program
 
 
-! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "taskwait"} {
+! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "TASKWAIT"} {
 ! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "i", uniq_name = "_QFEi"}
 ! FIRDialect:           oss.taskwait
 ! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>

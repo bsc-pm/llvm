@@ -2,7 +2,7 @@
 
 ! Test Pre-FIR Tree captures OmpSs-2 related constructs
 
-! CHECK: Program test_oss
+! CHECK: Program TEST_OSS
 program test_oss
   integer :: i
   ! CHECK: PrintStmt

@@ -250,7 +250,7 @@ public:
       ArrayRef<Expr *> Ndranges, SourceLocation NdrangeLoc,
       ArrayRef<Expr *> Grids, SourceLocation GridLoc,
       SourceRange SR,
-      ArrayRef<Expr *> UnresolvedReductions = std::nullopt);
+      ArrayRef<Expr *> UnresolvedReductions = {});
 
   OSSClause *ActOnOmpSsVarListClause(
       OmpSsClauseKind Kind, ArrayRef<Expr *> Vars,
@@ -342,7 +342,7 @@ public:
                          SourceLocation EndLoc,
                          CXXScopeSpec &ReductionIdScopeSpec,
                          const DeclarationNameInfo &ReductionId,
-                         ArrayRef<Expr *> UnresolvedReductions = std::nullopt);
+                         ArrayRef<Expr *> UnresolvedReductions = {});
 
   OSSClause *ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind,
                                         Expr *Expr,

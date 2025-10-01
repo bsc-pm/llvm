@@ -24,7 +24,7 @@ END
 
 
 
-! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "p"} {
+! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "P"} {
 ! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.alloca i32 {adapt.valuebyref}
 ! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant 2 : i32
 ! FIRDialect:           fir.store %[[VAL_1]] to %[[VAL_0]] : !fir.ref<i32>

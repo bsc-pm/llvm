@@ -9,7 +9,7 @@ PROGRAM P
 END
 
 
-! HLFIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "p"} {
+! HLFIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "P"} {
 ! HLFIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.dummy_scope : !fir.dscope
 ! HLFIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "x", uniq_name = "_QFEx"}
 ! HLFIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]]:2 = hlfir.declare %[[VAL_1]] {uniq_name = "_QFEx"} : (!fir.ref<i32>) -> (!fir.ref<i32>, !fir.ref<i32>)

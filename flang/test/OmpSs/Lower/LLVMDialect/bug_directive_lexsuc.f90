@@ -20,7 +20,7 @@ PROGRAM P
 END PROGRAM P
 
 
-! LLVMIRDialect-LABEL:   llvm.func @_QQmain() attributes {fir.bindc_name = "p"} {
+! LLVMIRDialect-LABEL:   llvm.func @_QQmain() attributes {fir.bindc_name = "P"} {
 ! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
 ! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_0]] x i32 {bindc_name = "x"} : (i64) -> !llvm.ptr
 ! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.constant(false) : i1

@@ -12,7 +12,7 @@ program task
     !$OSS END TASK
 end
 
-! LLVMIRDialect-LABEL:   llvm.func @_QQmain() attributes {fir.bindc_name = "task"} {
+! LLVMIRDialect-LABEL:   llvm.func @_QQmain() attributes {fir.bindc_name = "TASK"} {
 ! LLVMIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
 ! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.alloca %[[VAL_0]] x i32 {bindc_name = "i"} : (i64) -> !llvm.ptr
 ! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.undef : i32
@@ -24,7 +24,7 @@ end
 ! LLVMIRDialect:         }
 
 ! LLVMIRDialect-LABEL:   llvm.func @compute.dep0(
-! LLVMIRDialect-SAME:                            %[[VAL_0:[-0-9A-Za-z._]+]]: !llvm.ptr) -> !llvm.struct<(ptr, i64, i64, i64)> {
+! LLVMIRDialect-SAME:                            %[[VAL_0:[-0-9A-Za-z._]+]]: !llvm.ptr {llvm.noalias}) -> !llvm.struct<(ptr, i64, i64, i64)> {
 ! LLVMIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = llvm.mlir.constant(4 : i64) : i64
 ! LLVMIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = llvm.mlir.constant(0 : i64) : i64
 ! LLVMIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = llvm.mlir.poison : !llvm.struct<(ptr, i64, i64, i64)>

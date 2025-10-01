@@ -8,7 +8,7 @@ PROGRAM P
   !$OSS END TASK
 END
 
-! HLFIRToFIR-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "p"} {
+! HLFIRToFIR-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "P"} {
 ! HLFIRToFIR:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "x", uniq_name = "_QFEx"}
 ! HLFIRToFIR:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_0]] {uniq_name = "_QFEx"} : (!fir.ref<i32>) -> !fir.ref<i32>
 ! HLFIRToFIR:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>

@@ -36,7 +36,7 @@ END PROGRAM MAIN
 ! FIRDialect:           return
 ! FIRDialect:         }
 
-! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "main"} {
+! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "MAIN"} {
 ! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.address_of(@_QFEx) : !fir.ref<!fir.array<10xi32>>
 ! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_0]] : !fir.ref<!fir.array<10xi32>>) function(@compute.dep0) arguments(%[[VAL_0]] : !fir.ref<!fir.array<10xi32>>) -> i32
 ! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<!fir.array<10xi32>>

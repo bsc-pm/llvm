@@ -77,7 +77,7 @@ END SUBROUTINE
 END PROGRAM
 
 
-! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "p"} {
+! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "P"} {
 ! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.address_of(@_QFEarray) : !fir.ref<!fir.array<10xi32>>
 ! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant 10 : index
 ! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.address_of(@_QFEglob_alloc) : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>

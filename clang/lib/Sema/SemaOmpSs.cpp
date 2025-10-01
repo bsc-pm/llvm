@@ -923,7 +923,7 @@ void SemaOmpSs::EndOmpSsDSABlock(Stmt *CurDirective) {
 
 static std::string
 getListOfPossibleValues(OmpSsClauseKind K, unsigned First, unsigned Last,
-                        ArrayRef<unsigned> Exclude = std::nullopt) {
+                        ArrayRef<unsigned> Exclude = {}) {
   SmallString<256> Buffer;
   llvm::raw_svector_ostream Out(Buffer);
   unsigned Skipped = Exclude.size();
@@ -4736,7 +4736,7 @@ SemaOmpSs::DeclGroupPtrTy SemaOmpSs::ActOnOmpSsDeclareTaskDirective(
     if (UnresolvedReductions.empty()) {
       actOnOSSReductionKindClause(
         SemaRef, DSAStack, CKind, TmpList, ScopeSpec, ReductionIds[i],
-        std::nullopt, RD, /*Outline=*/true);
+        {}, RD, /*Outline=*/true);
     } else {
       actOnOSSReductionKindClause(
         SemaRef, DSAStack, CKind, TmpList, ScopeSpec, ReductionIds[i],
@@ -5231,13 +5231,14 @@ buildDeclareReductionRef(Sema &SemaRef, SourceLocation Loc, SourceRange Range,
   // NOTE: OpenMP does this but we are not able to trigger an
   // unexpected diagnostic disabling it
   // Lookup.suppressDiagnostics();
-  if (const auto *TyRec = Ty->getAs<RecordType>()) {
+  if (Ty->isRecordType()) {
     // Complete the type if it can be completed.
     // If the type is neither complete nor being defined, bail out now.
-    if (SemaRef.isCompleteType(Loc, Ty) || TyRec->isBeingDefined() ||
-        TyRec->getDecl()->getDefinition()) {
+    bool IsComplete = SemaRef.isCompleteType(Loc, Ty);
+    auto *RD = Ty->castAsRecordDecl();
+    if (IsComplete || RD->isBeingDefined()) {
       Lookup.clear();
-      SemaRef.LookupQualifiedName(Lookup, TyRec->getDecl());
+      SemaRef.LookupQualifiedName(Lookup, RD);
       if (Lookup.empty()) {
         Lookups.emplace_back();
         Lookups.back().append(Lookup.begin(), Lookup.end());

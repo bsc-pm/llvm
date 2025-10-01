@@ -28,7 +28,7 @@ end program
 
 
 
-! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "task"} {
+! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "TASK"} {
 ! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = arith.constant 1 : i64
 ! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant 10 : i32
 ! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant 1 : i32

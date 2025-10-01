@@ -189,24 +189,24 @@ public:
   }
 
   /// Get base of the array section.
-  Expr *getBase() { return getTrailingObjects<Expr *>()[0]; }
-  const Expr *getBase() const { return getTrailingObjects<Expr *>()[0]; }
+  Expr *getBase() { return getTrailingObjectsNonStrict<Expr *>()[0]; }
+  const Expr *getBase() const { return getTrailingObjectsNonStrict<Expr *>()[0]; }
   /// Set base of the array section.
-  void setBase(Expr *E) { getTrailingObjects<Expr *>()[0] = E; }
+  void setBase(Expr *E) { getTrailingObjectsNonStrict<Expr *>()[0] = E; }
 
   /// Get the shape of array shaping.
   MutableArrayRef<Expr *> getShapes() {
     return MutableArrayRef<Expr *>(
-        getTrailingObjects<Expr *>() + 1, NumShapes);
+        getTrailingObjectsNonStrict<Expr *>() + 1, NumShapes);
   }
   ArrayRef<const Expr *> getShapes() const {
     return ArrayRef<Expr *>(
-        getTrailingObjects<Expr *>() + 1, NumShapes);
+        getTrailingObjectsNonStrict<Expr *>() + 1, NumShapes);
   }
   /// Set the shape of the array shaping.
   void setShapes(ArrayRef<Expr *> VL) {
     std::copy(VL.begin(), VL.end(),
-              getTrailingObjects<Expr *>() + 1);
+              getTrailingObjectsNonStrict<Expr *>() + 1);
   }
 
   SourceLocation getBeginLoc() const LLVM_READONLY { return BeginLoc; }
@@ -222,13 +222,13 @@ public:
   }
 
   child_range children() {
-    Stmt **Begin = reinterpret_cast<Stmt **>(getTrailingObjects<Expr *>());
+    Stmt **Begin = reinterpret_cast<Stmt **>(getTrailingObjectsNonStrict<Expr *>());
     return child_range(Begin, Begin + NumShapes + 1);
   }
 
   const_child_range children() const {
     Stmt *const *Begin =
-        reinterpret_cast<Stmt *const *>(getTrailingObjects<Expr *>());
+        reinterpret_cast<Stmt *const *>(getTrailingObjectsNonStrict<Expr *>());
     return const_child_range(Begin, Begin + NumShapes + 1);
   }
 };

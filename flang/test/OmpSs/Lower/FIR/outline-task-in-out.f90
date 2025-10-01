@@ -36,7 +36,7 @@ END PROGRAM MAIN
 ! FIRDialect:           return
 ! FIRDialect:         }
 
-! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "main"} {
+! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "MAIN"} {
 ! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "y", uniq_name = "_QFEy"}
 ! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = oss.dependency base(%[[VAL_0]] : !fir.ref<i32>) function(@compute.dep0) arguments(%[[VAL_0]] : !fir.ref<i32>) -> i32
 ! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>

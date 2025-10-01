@@ -58,6 +58,7 @@ end
 
 
 
+
 ! FIRDialect-LABEL:   func.func @_QPtask() {
 ! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.dummy_scope : !fir.dscope
 ! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "i", uniq_name = "_QFtaskEi"}
@@ -72,34 +73,30 @@ end
 ! FIRDialect:             %[[VAL_9:[-0-9A-Za-z._]+]] = arith.constant 1 : index
 ! FIRDialect:             %[[VAL_10:[-0-9A-Za-z._]+]] = arith.constant 10 : i32
 ! FIRDialect:             %[[VAL_11:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:             %[[VAL_12:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "j", pinned}
-! FIRDialect:             %[[VAL_13:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_12]] {uniq_name = "_QFtaskEj"} : (!fir.ref<i32>) -> !fir.ref<i32>
-! FIRDialect:             %[[VAL_14:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "i", pinned}
-! FIRDialect:             %[[VAL_15:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_14]] {uniq_name = "_QFtaskEi"} : (!fir.ref<i32>) -> !fir.ref<i32>
-! FIRDialect:             %[[VAL_16:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_11]] : (i32) -> index
-! FIRDialect:             %[[VAL_17:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_10]] : (i32) -> index
-! FIRDialect:             %[[VAL_18:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_16]] : (index) -> i32
-! FIRDialect:             %[[VAL_19:[-0-9A-Za-z._]+]]:2 = fir.do_loop %[[VAL_20:[-0-9A-Za-z._]+]] = %[[VAL_16]] to %[[VAL_17]] step %[[VAL_9]] iter_args(%[[VAL_21:[-0-9A-Za-z._]+]] = %[[VAL_18]]) -> (index, i32) {
-! FIRDialect:               fir.store %[[VAL_21]] to %[[VAL_15]] : !fir.ref<i32>
-! FIRDialect:               %[[VAL_22:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_11]] : (i32) -> index
-! FIRDialect:               %[[VAL_23:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_10]] : (i32) -> index
-! FIRDialect:               %[[VAL_24:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_22]] : (index) -> i32
-! FIRDialect:               %[[VAL_25:[-0-9A-Za-z._]+]]:2 = fir.do_loop %[[VAL_26:[-0-9A-Za-z._]+]] = %[[VAL_22]] to %[[VAL_23]] step %[[VAL_9]] iter_args(%[[VAL_27:[-0-9A-Za-z._]+]] = %[[VAL_24]]) -> (index, i32) {
-! FIRDialect:                 fir.store %[[VAL_27]] to %[[VAL_13]] : !fir.ref<i32>
-! FIRDialect:                 %[[VAL_28:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_26]], %[[VAL_9]] overflow<nsw> : index
-! FIRDialect:                 %[[VAL_29:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_9]] : (index) -> i32
-! FIRDialect:                 %[[VAL_30:[-0-9A-Za-z._]+]] = fir.load %[[VAL_13]] : !fir.ref<i32>
-! FIRDialect:                 %[[VAL_31:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_30]], %[[VAL_29]] overflow<nsw> : i32
-! FIRDialect:                 fir.result %[[VAL_28]], %[[VAL_31]] : index, i32
+! FIRDialect:             %[[VAL_12:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_11]] : (i32) -> index
+! FIRDialect:             %[[VAL_13:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_10]] : (i32) -> index
+! FIRDialect:             %[[VAL_14:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_12]] : (index) -> i32
+! FIRDialect:             %[[VAL_15:[-0-9A-Za-z._]+]]:2 = fir.do_loop %[[VAL_16:[-0-9A-Za-z._]+]] = %[[VAL_12]] to %[[VAL_13]] step %[[VAL_9]] iter_args(%[[VAL_17:[-0-9A-Za-z._]+]] = %[[VAL_14]]) -> (index, i32) {
+! FIRDialect:               fir.store %[[VAL_17]] to %[[VAL_2]] : !fir.ref<i32>
+! FIRDialect:               %[[VAL_18:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_11]] : (i32) -> index
+! FIRDialect:               %[[VAL_19:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_10]] : (i32) -> index
+! FIRDialect:               %[[VAL_20:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_18]] : (index) -> i32
+! FIRDialect:               %[[VAL_21:[-0-9A-Za-z._]+]]:2 = fir.do_loop %[[VAL_22:[-0-9A-Za-z._]+]] = %[[VAL_18]] to %[[VAL_19]] step %[[VAL_9]] iter_args(%[[VAL_23:[-0-9A-Za-z._]+]] = %[[VAL_20]]) -> (index, i32) {
+! FIRDialect:                 fir.store %[[VAL_23]] to %[[VAL_4]] : !fir.ref<i32>
+! FIRDialect:                 %[[VAL_24:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_22]], %[[VAL_9]] overflow<nsw> : index
+! FIRDialect:                 %[[VAL_25:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_9]] : (index) -> i32
+! FIRDialect:                 %[[VAL_26:[-0-9A-Za-z._]+]] = fir.load %[[VAL_4]] : !fir.ref<i32>
+! FIRDialect:                 %[[VAL_27:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_26]], %[[VAL_25]] overflow<nsw> : i32
+! FIRDialect:                 fir.result %[[VAL_24]], %[[VAL_27]] : index, i32
 ! FIRDialect:               }
-! FIRDialect:               fir.store %[[VAL_32:[-0-9A-Za-z._]+]]#1 to %[[VAL_13]] : !fir.ref<i32>
-! FIRDialect:               %[[VAL_33:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_20]], %[[VAL_9]] overflow<nsw> : index
-! FIRDialect:               %[[VAL_34:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_9]] : (index) -> i32
-! FIRDialect:               %[[VAL_35:[-0-9A-Za-z._]+]] = fir.load %[[VAL_15]] : !fir.ref<i32>
-! FIRDialect:               %[[VAL_36:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_35]], %[[VAL_34]] overflow<nsw> : i32
-! FIRDialect:               fir.result %[[VAL_33]], %[[VAL_36]] : index, i32
+! FIRDialect:               fir.store %[[VAL_28:[-0-9A-Za-z._]+]]#1 to %[[VAL_4]] : !fir.ref<i32>
+! FIRDialect:               %[[VAL_29:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_16]], %[[VAL_9]] overflow<nsw> : index
+! FIRDialect:               %[[VAL_30:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_9]] : (index) -> i32
+! FIRDialect:               %[[VAL_31:[-0-9A-Za-z._]+]] = fir.load %[[VAL_2]] : !fir.ref<i32>
+! FIRDialect:               %[[VAL_32:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_31]], %[[VAL_30]] overflow<nsw> : i32
+! FIRDialect:               fir.result %[[VAL_29]], %[[VAL_32]] : index, i32
 ! FIRDialect:             }
-! FIRDialect:             fir.store %[[VAL_37:[-0-9A-Za-z._]+]]#1 to %[[VAL_15]] : !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_33:[-0-9A-Za-z._]+]]#1 to %[[VAL_2]] : !fir.ref<i32>
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
 ! FIRDialect:           return
@@ -122,20 +119,18 @@ end
 ! FIRDialect:             %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : index
 ! FIRDialect:             %[[VAL_13:[-0-9A-Za-z._]+]] = arith.constant 10 : i32
 ! FIRDialect:             %[[VAL_14:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:             %[[VAL_15:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "j", pinned}
-! FIRDialect:             %[[VAL_16:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_15]] {uniq_name = "_QFtaskforEj"} : (!fir.ref<i32>) -> !fir.ref<i32>
-! FIRDialect:             %[[VAL_17:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_14]] : (i32) -> index
-! FIRDialect:             %[[VAL_18:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_13]] : (i32) -> index
-! FIRDialect:             %[[VAL_19:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_17]] : (index) -> i32
-! FIRDialect:             %[[VAL_20:[-0-9A-Za-z._]+]]:2 = fir.do_loop %[[VAL_21:[-0-9A-Za-z._]+]] = %[[VAL_17]] to %[[VAL_18]] step %[[VAL_12]] iter_args(%[[VAL_22:[-0-9A-Za-z._]+]] = %[[VAL_19]]) -> (index, i32) {
-! FIRDialect:               fir.store %[[VAL_22]] to %[[VAL_16]] : !fir.ref<i32>
-! FIRDialect:               %[[VAL_23:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_21]], %[[VAL_12]] overflow<nsw> : index
-! FIRDialect:               %[[VAL_24:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_12]] : (index) -> i32
-! FIRDialect:               %[[VAL_25:[-0-9A-Za-z._]+]] = fir.load %[[VAL_16]] : !fir.ref<i32>
-! FIRDialect:               %[[VAL_26:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_25]], %[[VAL_24]] overflow<nsw> : i32
-! FIRDialect:               fir.result %[[VAL_23]], %[[VAL_26]] : index, i32
+! FIRDialect:             %[[VAL_15:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_14]] : (i32) -> index
+! FIRDialect:             %[[VAL_16:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_13]] : (i32) -> index
+! FIRDialect:             %[[VAL_17:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_15]] : (index) -> i32
+! FIRDialect:             %[[VAL_18:[-0-9A-Za-z._]+]]:2 = fir.do_loop %[[VAL_19:[-0-9A-Za-z._]+]] = %[[VAL_15]] to %[[VAL_16]] step %[[VAL_12]] iter_args(%[[VAL_20:[-0-9A-Za-z._]+]] = %[[VAL_17]]) -> (index, i32) {
+! FIRDialect:               fir.store %[[VAL_20]] to %[[VAL_7]] : !fir.ref<i32>
+! FIRDialect:               %[[VAL_21:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_19]], %[[VAL_12]] overflow<nsw> : index
+! FIRDialect:               %[[VAL_22:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_12]] : (index) -> i32
+! FIRDialect:               %[[VAL_23:[-0-9A-Za-z._]+]] = fir.load %[[VAL_7]] : !fir.ref<i32>
+! FIRDialect:               %[[VAL_24:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_23]], %[[VAL_22]] overflow<nsw> : i32
+! FIRDialect:               fir.result %[[VAL_21]], %[[VAL_24]] : index, i32
 ! FIRDialect:             }
-! FIRDialect:             fir.store %[[VAL_27:[-0-9A-Za-z._]+]]#1 to %[[VAL_16]] : !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_25:[-0-9A-Za-z._]+]]#1 to %[[VAL_7]] : !fir.ref<i32>
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
 ! FIRDialect:           return
@@ -158,20 +153,18 @@ end
 ! FIRDialect:             %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : index
 ! FIRDialect:             %[[VAL_13:[-0-9A-Za-z._]+]] = arith.constant 10 : i32
 ! FIRDialect:             %[[VAL_14:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:             %[[VAL_15:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "j", pinned}
-! FIRDialect:             %[[VAL_16:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_15]] {uniq_name = "_QFtaskloopEj"} : (!fir.ref<i32>) -> !fir.ref<i32>
-! FIRDialect:             %[[VAL_17:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_14]] : (i32) -> index
-! FIRDialect:             %[[VAL_18:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_13]] : (i32) -> index
-! FIRDialect:             %[[VAL_19:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_17]] : (index) -> i32
-! FIRDialect:             %[[VAL_20:[-0-9A-Za-z._]+]]:2 = fir.do_loop %[[VAL_21:[-0-9A-Za-z._]+]] = %[[VAL_17]] to %[[VAL_18]] step %[[VAL_12]] iter_args(%[[VAL_22:[-0-9A-Za-z._]+]] = %[[VAL_19]]) -> (index, i32) {
-! FIRDialect:               fir.store %[[VAL_22]] to %[[VAL_16]] : !fir.ref<i32>
-! FIRDialect:               %[[VAL_23:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_21]], %[[VAL_12]] overflow<nsw> : index
-! FIRDialect:               %[[VAL_24:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_12]] : (index) -> i32
-! FIRDialect:               %[[VAL_25:[-0-9A-Za-z._]+]] = fir.load %[[VAL_16]] : !fir.ref<i32>
-! FIRDialect:               %[[VAL_26:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_25]], %[[VAL_24]] overflow<nsw> : i32
-! FIRDialect:               fir.result %[[VAL_23]], %[[VAL_26]] : index, i32
+! FIRDialect:             %[[VAL_15:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_14]] : (i32) -> index
+! FIRDialect:             %[[VAL_16:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_13]] : (i32) -> index
+! FIRDialect:             %[[VAL_17:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_15]] : (index) -> i32
+! FIRDialect:             %[[VAL_18:[-0-9A-Za-z._]+]]:2 = fir.do_loop %[[VAL_19:[-0-9A-Za-z._]+]] = %[[VAL_15]] to %[[VAL_16]] step %[[VAL_12]] iter_args(%[[VAL_20:[-0-9A-Za-z._]+]] = %[[VAL_17]]) -> (index, i32) {
+! FIRDialect:               fir.store %[[VAL_20]] to %[[VAL_7]] : !fir.ref<i32>
+! FIRDialect:               %[[VAL_21:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_19]], %[[VAL_12]] overflow<nsw> : index
+! FIRDialect:               %[[VAL_22:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_12]] : (index) -> i32
+! FIRDialect:               %[[VAL_23:[-0-9A-Za-z._]+]] = fir.load %[[VAL_7]] : !fir.ref<i32>
+! FIRDialect:               %[[VAL_24:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_23]], %[[VAL_22]] overflow<nsw> : i32
+! FIRDialect:               fir.result %[[VAL_21]], %[[VAL_24]] : index, i32
 ! FIRDialect:             }
-! FIRDialect:             fir.store %[[VAL_27:[-0-9A-Za-z._]+]]#1 to %[[VAL_16]] : !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_25:[-0-9A-Za-z._]+]]#1 to %[[VAL_7]] : !fir.ref<i32>
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
 ! FIRDialect:           return
@@ -194,20 +187,18 @@ end
 ! FIRDialect:             %[[VAL_12:[-0-9A-Za-z._]+]] = arith.constant 1 : index
 ! FIRDialect:             %[[VAL_13:[-0-9A-Za-z._]+]] = arith.constant 10 : i32
 ! FIRDialect:             %[[VAL_14:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:             %[[VAL_15:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "j", pinned}
-! FIRDialect:             %[[VAL_16:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_15]] {uniq_name = "_QFtaskloopforEj"} : (!fir.ref<i32>) -> !fir.ref<i32>
-! FIRDialect:             %[[VAL_17:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_14]] : (i32) -> index
-! FIRDialect:             %[[VAL_18:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_13]] : (i32) -> index
-! FIRDialect:             %[[VAL_19:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_17]] : (index) -> i32
-! FIRDialect:             %[[VAL_20:[-0-9A-Za-z._]+]]:2 = fir.do_loop %[[VAL_21:[-0-9A-Za-z._]+]] = %[[VAL_17]] to %[[VAL_18]] step %[[VAL_12]] iter_args(%[[VAL_22:[-0-9A-Za-z._]+]] = %[[VAL_19]]) -> (index, i32) {
-! FIRDialect:               fir.store %[[VAL_22]] to %[[VAL_16]] : !fir.ref<i32>
-! FIRDialect:               %[[VAL_23:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_21]], %[[VAL_12]] overflow<nsw> : index
-! FIRDialect:               %[[VAL_24:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_12]] : (index) -> i32
-! FIRDialect:               %[[VAL_25:[-0-9A-Za-z._]+]] = fir.load %[[VAL_16]] : !fir.ref<i32>
-! FIRDialect:               %[[VAL_26:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_25]], %[[VAL_24]] overflow<nsw> : i32
-! FIRDialect:               fir.result %[[VAL_23]], %[[VAL_26]] : index, i32
+! FIRDialect:             %[[VAL_15:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_14]] : (i32) -> index
+! FIRDialect:             %[[VAL_16:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_13]] : (i32) -> index
+! FIRDialect:             %[[VAL_17:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_15]] : (index) -> i32
+! FIRDialect:             %[[VAL_18:[-0-9A-Za-z._]+]]:2 = fir.do_loop %[[VAL_19:[-0-9A-Za-z._]+]] = %[[VAL_15]] to %[[VAL_16]] step %[[VAL_12]] iter_args(%[[VAL_20:[-0-9A-Za-z._]+]] = %[[VAL_17]]) -> (index, i32) {
+! FIRDialect:               fir.store %[[VAL_20]] to %[[VAL_7]] : !fir.ref<i32>
+! FIRDialect:               %[[VAL_21:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_19]], %[[VAL_12]] overflow<nsw> : index
+! FIRDialect:               %[[VAL_22:[-0-9A-Za-z._]+]] = fir.convert %[[VAL_12]] : (index) -> i32
+! FIRDialect:               %[[VAL_23:[-0-9A-Za-z._]+]] = fir.load %[[VAL_7]] : !fir.ref<i32>
+! FIRDialect:               %[[VAL_24:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_23]], %[[VAL_22]] overflow<nsw> : i32
+! FIRDialect:               fir.result %[[VAL_21]], %[[VAL_24]] : index, i32
 ! FIRDialect:             }
-! FIRDialect:             fir.store %[[VAL_27:[-0-9A-Za-z._]+]]#1 to %[[VAL_16]] : !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_25:[-0-9A-Za-z._]+]]#1 to %[[VAL_7]] : !fir.ref<i32>
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
 ! FIRDialect:           return

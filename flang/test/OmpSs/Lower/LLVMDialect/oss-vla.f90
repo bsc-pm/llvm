@@ -50,7 +50,7 @@ subroutine task(X)
 
 end subroutine
 
-!LLVMIRDialect-LABEL: llvm.func @task_(%arg0: !llvm.ptr {fir.bindc_name = "x"}) attributes {fir.internal_name = "_QPtask"} {
+!LLVMIRDialect-LABEL: llvm.func @task_(%arg0: !llvm.ptr {fir.bindc_name = "x", llvm.noalias}) attributes {fir.internal_name = "_QPtask"} {
 !LLVMIRDialect: %[[VAR_J:.*]] = llvm.alloca
 !LLVMIRDialect: %[[VAR_I:.*]] = llvm.alloca
 !LLVMIRDialect: %[[CONS_4:.*]] = llvm.mlir.constant(4 : index) : i64
