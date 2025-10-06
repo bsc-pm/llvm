@@ -1226,7 +1226,14 @@ void CGOmpSsRuntime::EmitDSAShared(
       QualType BaseElementTy = CGF.getContext().getBaseElementType(DRE->getType());
       DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(BaseElementTy)));
     } else {
-      DSABundleList.push_back(llvm::UndefValue::get(CGF.ConvertType(DRE->getType())));
+      llvm::Type *Ty = CGF.ConvertType(DRE->getType());
+      // shared extern struct S s;
+      if (auto *ST = llvm::dyn_cast<llvm::StructType>(Ty)) {
+        if (ST->isOpaque()) {
+          Ty = CGF.Int8PtrTy;
+        }
+      }
+      DSABundleList.push_back(llvm::UndefValue::get(Ty));
     }
 
     TaskInfo.emplace_back(getBundleStr(OSSB_shared), DSABundleList);
