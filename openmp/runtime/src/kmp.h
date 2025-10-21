@@ -266,6 +266,7 @@ extern "C" {
 #if defined(KMP_OMPV_ENABLED)
 
 #include <nosv.h>
+#include <nosv/compat.h>
 #include "nosv/affinity.h"
 #include "nosv/hwinfo.h"
 #include "hsearch.h"

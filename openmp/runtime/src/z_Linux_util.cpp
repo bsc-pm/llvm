@@ -1524,7 +1524,7 @@ void __kmp_suspend_initialize_thread(kmp_info_t *th) {
     int status;
 #if defined(KMP_OMPV_ENABLED)
     status = nosv_cond_init(&th->th.th_suspend_cv.c_cond,
-                               NOSV_COND_NONE);
+                               NULL);
 #else
     status = pthread_cond_init(&th->th.th_suspend_cv.c_cond,
                                &__kmp_suspend_cond_attr);
@@ -1544,7 +1544,7 @@ void __kmp_suspend_uninitialize_thread(kmp_info_t *th) {
     int status;
 
 #if defined(KMP_OMPV_ENABLED)
-    status = nosv_cond_destroy(th->th.th_suspend_cv.c_cond);
+    status = nosv_cond_destroy(&th->th.th_suspend_cv.c_cond);
 #else
     status = pthread_cond_destroy(&th->th.th_suspend_cv.c_cond);
 #endif // KMP_OMPV_ENABLED
@@ -1671,7 +1671,7 @@ static inline void __kmp_suspend_template(int th_gtid, C *flag) {
                     " pthread_cond_wait\n",
                     th_gtid));
 #if defined(KMP_OMPV_ENABLED)
-      status = nosv_cond_wait_pthread(th->th.th_suspend_cv.c_cond,
+      status = nosv_cond_wait_pthread(&th->th.th_suspend_cv.c_cond,
                                       &th->th.th_suspend_mx.m_mutex);
 #else
       status = pthread_cond_wait(&th->th.th_suspend_cv.c_cond,
@@ -1842,7 +1842,7 @@ static inline void __kmp_resume_template(int target_gtid, C *flag
       th->th.th_sleep_loc_type = flag_unset;
 
       th->th.passive_awakened = true;
-      status = nosv_cond_signal(th->th.th_suspend_cv.c_cond);
+      status = nosv_cond_signal(&th->th.th_suspend_cv.c_cond);
       KMP_CHECK_SYSFAIL("pthread_cond_signal", status);
     } else {
       kmp_int32 count = -1 + KMP_ATOMIC_DEC(&task_team->tt.tt_unfinished_passives);
@@ -1872,7 +1872,7 @@ static inline void __kmp_resume_template(int target_gtid, C *flag
 #endif
 #if defined(KMP_OMPV_ENABLED)
   th->th.passive_awakened = false;
-  status = nosv_cond_signal(th->th.th_suspend_cv.c_cond);
+  status = nosv_cond_signal(&th->th.th_suspend_cv.c_cond);
 #else
   status = pthread_cond_signal(&th->th.th_suspend_cv.c_cond);
 #endif // KMP_OMPV_ENABLED
@@ -2201,7 +2201,7 @@ void __kmp_runtime_initialize(void) {
   status = pthread_condattr_init(&cond_attr);
   KMP_CHECK_SYSFAIL("pthread_condattr_init", status);
 #if defined(KMP_OMPV_ENABLED)
-  status = nosv_cond_init(&__kmp_wait_cv.c_cond, NOSV_COND_NONE);
+  status = nosv_cond_init(&__kmp_wait_cv.c_cond, NULL);
 #else
   status = pthread_cond_init(&__kmp_wait_cv.c_cond, &cond_attr);
 #endif // KMP_OMPV_ENABLED
@@ -2234,7 +2234,7 @@ void __kmp_runtime_destroy(void) {
     KMP_SYSFAIL("pthread_mutex_destroy", status);
   }
 #if defined(KMP_OMPV_ENABLED)
-  status = nosv_cond_destroy(__kmp_wait_cv.c_cond);
+  status = nosv_cond_destroy(&__kmp_wait_cv.c_cond);
 #else
   status = pthread_cond_destroy(&__kmp_wait_cv.c_cond);
 #endif // KMP_OMPV_ENABLED

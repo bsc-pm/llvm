@@ -33,7 +33,7 @@ void __kmp_init_target_task() {
 void free_agents_wait_barrier(kmp_info_t *this_thr, int tid) {
   if (__kmp_enable_free_agents) {
     // First barrier
-    int res = nosv_barrier_wait(this_thr->th.th_team->t.nosv_bar);
+    int res = nosv_barrier_wait(&this_thr->th.th_team->t.nosv_bar);
     KMP_ASSERT(res == 0);
     // Now we know if there are tasks or not
     kmp_task_team_t *task_team = this_thr->th.th_task_team;
@@ -44,7 +44,7 @@ void free_agents_wait_barrier(kmp_info_t *this_thr, int tid) {
       if (!KMP_MASTER_TID(tid)) {
         // Pause workers here until master gets the signal all tasks
         // have been executed
-        int res = nosv_barrier_wait(this_thr->th.th_team->t.nosv_bar);
+        int res = nosv_barrier_wait(&this_thr->th.th_team->t.nosv_bar);
         KMP_ASSERT(res == 0);
       }
     }
@@ -5213,7 +5213,7 @@ void __kmp_task_team_wait(
       flag_unfinished.wait(this_thr, FALSE USE_ITT_BUILD_ARG(itt_sync_obj));
 
       if (__kmp_enable_free_agents) {
-        int res = nosv_barrier_wait(this_thr->th.th_team->t.nosv_bar);
+        int res = nosv_barrier_wait(&this_thr->th.th_team->t.nosv_bar);
         KMP_ASSERT(res == 0);
       }
 
