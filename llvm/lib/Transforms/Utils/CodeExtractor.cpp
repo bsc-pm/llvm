@@ -1292,6 +1292,13 @@ static void fixupDebugInfoPostExtraction(Function &OldFunc, Function &NewFunc,
         NewFunc.getEntryBlock().getTerminator()->getIterator());
   };
   for (auto [Input, NewVal] : zip_equal(Inputs, NewValues)) {
+    // From e512e9229373b9647594f3278d75daec5ec7cbe0
+    // CodeExtractor does not like constants, and in OmpSs-2
+    // we use them.
+    // FIXME: We may refactor constants capture in order to
+    // avoid these fixes.
+    if (isa<Constant>(Input))
+      continue;
     SmallVector<DbgVariableRecord *, 1> DPUsers;
     findDbgUsers(Input, DPUsers);
     DIExpression *Expr = DIB.createExpression();
