@@ -523,7 +523,7 @@ fi
 # LLVM projects built
 ################################################################################
 
-LLVM_ENABLE_PROJECTS="-DLLVM_ENABLE_PROJECTS=clang;lld"
+LLVM_ENABLE_PROJECTS="-DLLVM_ENABLE_PROJECTS=clang;lld;clang-tools-extra"
 if [ "$DISABLE_FORTRAN" != 1 ];
 then
   LLVM_ENABLE_PROJECTS+=";flang"
