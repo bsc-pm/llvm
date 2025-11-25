@@ -1,5 +1,5 @@
 // RUN: %libomp-compile-and-run
-// UNSUPPORTED: ompv, ompv-passive, ompv-free-agents
+// UNSUPPORTED: ompv, ompv-passive, ompv-free-agents, ompv-gomp
 #include <stdio.h>
 #include "omp_testsuite.h"
 

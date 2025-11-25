@@ -1,5 +1,7 @@
 // RUN: %libomp-compile-and-run
 // XFAIL: true
+// Depending on the gcc version this test passes...
+// UNSUPPORTED: ompv-gomp
 
 // Non-rectangular loop collapsing.
 //

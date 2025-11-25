@@ -3353,10 +3353,13 @@ void __kmp_aux_dispatch_init_4(ident_t *loc, kmp_int32 gtid,
                                enum sched_type schedule, kmp_int32 lb,
                                kmp_int32 ub, kmp_int32 st, kmp_int32 chunk,
                                int push_ws) {
+#if defined(KMP_OMPV_ENABLED)
+  omp_task_type_t *omp_task_type = __nosv_compat_register_task_info((char *)gomp_ws_default_str);
+#endif
   __kmp_dispatch_init<kmp_int32>(loc, gtid, schedule, lb, ub, st, chunk,
                                  push_ws
 #if defined(KMP_OMPV_ENABLED)
-                                 , /*omp_task_type=*/nullptr
+                                 , /*omp_task_type=*/omp_task_type
 #endif // KMP_OMPV_ENABLED
                                  );
 }
@@ -3365,10 +3368,13 @@ void __kmp_aux_dispatch_init_4u(ident_t *loc, kmp_int32 gtid,
                                 enum sched_type schedule, kmp_uint32 lb,
                                 kmp_uint32 ub, kmp_int32 st, kmp_int32 chunk,
                                 int push_ws) {
+#if defined(KMP_OMPV_ENABLED)
+  omp_task_type_t *omp_task_type = __nosv_compat_register_task_info((char *)gomp_ws_default_str);
+#endif
   __kmp_dispatch_init<kmp_uint32>(loc, gtid, schedule, lb, ub, st, chunk,
                                   push_ws
 #if defined(KMP_OMPV_ENABLED)
-                                  , /*omp_task_type=*/nullptr
+                                  , /*omp_task_type=*/omp_task_type
 #endif // KMP_OMPV_ENABLED
                                   );
 }
@@ -3377,10 +3383,13 @@ void __kmp_aux_dispatch_init_8(ident_t *loc, kmp_int32 gtid,
                                enum sched_type schedule, kmp_int64 lb,
                                kmp_int64 ub, kmp_int64 st, kmp_int64 chunk,
                                int push_ws) {
+#if defined(KMP_OMPV_ENABLED)
+  omp_task_type_t *omp_task_type = __nosv_compat_register_task_info((char *)gomp_ws_default_str);
+#endif
   __kmp_dispatch_init<kmp_int64>(loc, gtid, schedule, lb, ub, st, chunk,
                                  push_ws
 #if defined(KMP_OMPV_ENABLED)
-                                 , /*omp_task_type=*/nullptr
+                                 , /*omp_task_type=*/omp_task_type
 #endif // KMP_OMPV_ENABLED
                                  );
 }
@@ -3389,10 +3398,13 @@ void __kmp_aux_dispatch_init_8u(ident_t *loc, kmp_int32 gtid,
                                 enum sched_type schedule, kmp_uint64 lb,
                                 kmp_uint64 ub, kmp_int64 st, kmp_int64 chunk,
                                 int push_ws) {
+#if defined(KMP_OMPV_ENABLED)
+  omp_task_type_t *omp_task_type = __nosv_compat_register_task_info((char *)gomp_ws_default_str);
+#endif
   __kmp_dispatch_init<kmp_uint64>(loc, gtid, schedule, lb, ub, st, chunk,
                                   push_ws
 #if defined(KMP_OMPV_ENABLED)
-                                  , /*omp_task_type=*/nullptr
+                                  , /*omp_task_type=*/omp_task_type
 #endif // KMP_OMPV_ENABLED
                                   );
 }

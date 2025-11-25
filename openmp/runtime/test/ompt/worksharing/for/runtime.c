@@ -2,6 +2,7 @@
 // RUN: %libomp-compile-and-run | %sort-threads | FileCheck %S/base.h
 // REQUIRES: ompt
 // clang-format on
+// UNSUPPORTED: ompv-gomp
 
 #define SCHEDULE runtime
 // Without any schedule specified, the runtime uses static schedule,

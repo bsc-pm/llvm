@@ -1,4 +1,6 @@
 // RUN: %libomp-cxx-compile-and-run | FileCheck %s --match-full-lines
+// Only works on gcc-15
+// UNSUPPORTED: ompv-gomp
 
 #ifndef HEADER
 #define HEADER

@@ -9,7 +9,7 @@
 // KMP_TASKING=1 (explicit tasking barrier before regular barrier)
 
 // ompv does not allow immediate exec
-// UNSUPPORTED: ompv, ompv-free-agents, ompv-passive
+// UNSUPPORTED: ompv, ompv-free-agents, ompv-passive, ompv-gomp
 #include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>

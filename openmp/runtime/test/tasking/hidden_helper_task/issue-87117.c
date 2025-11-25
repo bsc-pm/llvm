@@ -6,6 +6,8 @@
 //   involving non-hot team
 // KMP_HOT_TEAMS_MAX_LEVEL=1 means only the initial outer team
 //   is a hot team.
+// GOMP_target_ext not supported
+// UNSUPPORTED: ompv-gomp
 
 #include <stdio.h>
 #include <stdlib.h>

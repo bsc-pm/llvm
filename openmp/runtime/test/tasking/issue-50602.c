@@ -3,6 +3,8 @@
 // RUN: %libomp-compile -DUSE_HIDDEN_HELPERS=1
 // RUN: %libomp-run
 // RUN: env OMP_NUM_THREADS=1 %libomp-run
+// There is no support for detached tasks with gcc
+// UNSUPPORTED: ompv-gomp
 #include <omp.h>
 
 int main(int argc, char *argv[]) {

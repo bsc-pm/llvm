@@ -1,6 +1,8 @@
 // XFAIL: msvc
 // Fails on windows due to issue #129023
 // RUN: %libomp-cxx20-compile-and-run | FileCheck %s --match-full-lines
+// output differente related to dtors in gcc
+// UNSUPPORTED: ompv-gomp
 
 #ifndef HEADER
 #define HEADER

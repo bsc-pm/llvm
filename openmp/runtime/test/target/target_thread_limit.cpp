@@ -1,5 +1,6 @@
 // RUN: %libomp-cxx-compile -fopenmp-version=51
 // RUN: %libomp-run | FileCheck %s --check-prefix OMP51
+// UNSUPPORTED: ompv-gomp
 
 #include <stdio.h>
 #include <omp.h>

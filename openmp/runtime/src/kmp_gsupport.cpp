@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !defined(KMP_OMPV_ENABLED)
+//#if !defined(KMP_OMPV_ENABLED)
 
 #include "kmp.h"
 #include "kmp_atomic.h"
@@ -221,7 +221,12 @@ int KMP_EXPAND_NAME(KMP_API_NAME_GOMP_SINGLE_START)(void) {
   // 3rd parameter == FALSE prevents kmp_enter_single from pushing a
   // workshare when USE_CHECKS is defined.  We need to avoid the push,
   // as there is no corresponding GOMP_single_end() call.
+#if defined(KMP_OMPV_ENABLED)
+  omp_task_type_t *omp_task_type = __nosv_compat_register_task_info((char *)gomp_ws_default_str);
+  kmp_int32 rc = __kmp_enter_single(gtid, &loc, FALSE, omp_task_type);
+#else
   kmp_int32 rc = __kmp_enter_single(gtid, &loc, FALSE);
+#endif
 
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   kmp_info_t *this_thr = __kmp_threads[gtid];
@@ -270,7 +275,12 @@ void *KMP_EXPAND_NAME(KMP_API_NAME_GOMP_SINGLE_COPY_START)(void) {
   // If this is the first thread to enter, return NULL.  The generated code will
   // then call GOMP_single_copy_end() for this thread only, with the
   // copyprivate data pointer as an argument.
+#if defined(KMP_OMPV_ENABLED)
+  omp_task_type_t *omp_task_type = __nosv_compat_register_task_info((char *)gomp_ws_default_str);
+  if (__kmp_enter_single(gtid, &loc, FALSE, omp_task_type))
+#else
   if (__kmp_enter_single(gtid, &loc, FALSE))
+#endif
     return NULL;
 
     // Wait for the first thread to set the copyprivate data pointer,
@@ -1251,9 +1261,16 @@ void KMP_EXPAND_NAME(KMP_API_NAME_GOMP_TASK)(void (*func)(void *), void *data,
     arg_size = 0;
   }
 
+#if defined(KMP_OMPV_ENABLED)
+  omp_task_type_t *omp_task_type = __nosv_compat_register_task_info((char *)gomp_task_default_str);
+  kmp_task_t *task = __kmp_task_alloc(
+      &loc, gtid, input_flags, sizeof(kmp_task_t),
+      arg_size ? arg_size + arg_align - 1 : 0, (kmp_routine_entry_t)func, omp_task_type);
+#else
   kmp_task_t *task = __kmp_task_alloc(
       &loc, gtid, input_flags, sizeof(kmp_task_t),
       arg_size ? arg_size + arg_align - 1 : 0, (kmp_routine_entry_t)func);
+#endif
 
   if (arg_size > 0) {
     if (arg_align > 0) {
@@ -1832,9 +1849,16 @@ void __GOMP_taskloop(void (*func)(void *), void *data,
   }
 
   // __kmp_task_alloc() sets up all other flags
+#if defined(KMP_OMPV_ENABLED)
+  omp_task_type_t *omp_task_type = __nosv_compat_register_task_info((char *)gomp_task_default_str);
+  kmp_task_t *task =
+      __kmp_task_alloc(&loc, gtid, input_flags, sizeof(kmp_task_t),
+                       arg_size + arg_align - 1, (kmp_routine_entry_t)func, omp_task_type);
+#else
   kmp_task_t *task =
       __kmp_task_alloc(&loc, gtid, input_flags, sizeof(kmp_task_t),
                        arg_size + arg_align - 1, (kmp_routine_entry_t)func);
+#endif
   kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(task);
   taskdata->td_copy_func = copy_func;
   taskdata->td_size_loop_bounds = sizeof(T);
@@ -2707,4 +2731,4 @@ KMP_VERSION_SYMBOL(KMP_API_NAME_GOMP_FREE, 501, "GOMP_5.0.1");
 } // extern "C"
 #endif // __cplusplus
 
-#endif // KMP_OMPV_ENABLED
+//#endif // KMP_OMPV_ENABLED

@@ -21,6 +21,10 @@
 // The test covers nested serial teams and mixing serial teams with
 // normal active teams.
 
+// There is no support for detached tasks with gcc
+// Also GOMP_target_ext is not supported
+// UNSUPPORTED: ompv-gomp
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>

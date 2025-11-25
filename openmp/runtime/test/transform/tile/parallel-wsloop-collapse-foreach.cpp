@@ -1,4 +1,6 @@
 // RUN: %libomp-cxx20-compile-and-run | FileCheck %s --match-full-lines
+// range loops with initializers are not supported in gcc
+// UNSUPPORTED: ompv-gomp
 
 #ifndef HEADER
 #define HEADER

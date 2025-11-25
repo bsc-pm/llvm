@@ -1,5 +1,8 @@
 // RUN: %libomp-compile && env OMP_NUM_THREADS='3' %libomp-run
 // RUN: %libomp-compile && env OMP_NUM_THREADS='1' %libomp-run
+// We do not have _OPENMPV define and rt fails because of NULL label
+// Also there is no support for detached tasks with gcc
+// UNSUPPORTED: ompv-gomp
 
 #include <stdio.h>
 #include <omp.h>

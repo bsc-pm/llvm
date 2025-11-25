@@ -1,4 +1,6 @@
 // RUN: %libomp-cxx20-compile-and-run | FileCheck %s --match-full-lines
+// gcc does not support transform constructs
+// UNSUPPORTED: ompv-gomp
 
 #ifndef HEADER
 #define HEADER

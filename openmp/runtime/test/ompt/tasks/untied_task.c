@@ -1,7 +1,7 @@
 // clang-format off
 // RUN: %libomp-compile-and-run | %sort-threads | FileCheck %s
 // REQUIRES: ompt
-// UNSUPPORTED: ompv-free-agents
+// UNSUPPORTED: ompv-free-agents, ompv-gomp
 // clang-format on
 #define TEST_NEED_PRINT_FRAME_FROM_OUTLINED_FN
 #include "callback.h"

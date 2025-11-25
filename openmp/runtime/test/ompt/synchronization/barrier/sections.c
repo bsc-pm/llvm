@@ -1,7 +1,7 @@
 // clang-format off
 // RUN: %libomp-compile-and-run | %sort-threads  | FileCheck %s
 // REQUIRES: ompt
-// UNSUPPORTED: ompv-passive
+// UNSUPPORTED: ompv-passive, ompv-gomp
 // clang-format on
 #include "callback.h"
 #include <omp.h>

@@ -284,6 +284,8 @@ extern int nosv_default_yield_type;
 extern uint64_t nosv_default_waitfor_time;
 extern struct htab *label_to_task_type_map;
 extern kmp_bootstrap_lock_t label_to_task_type_lock;
+extern const char *gomp_task_default_str;
+extern const char *gomp_ws_default_str;
 
 void __kmp_nosv_attach(nosv_task_t *nosv_impl_task, void *thr);
 typedef union kmp_info kmp_info_t;

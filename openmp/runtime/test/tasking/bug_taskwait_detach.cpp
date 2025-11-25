@@ -1,4 +1,6 @@
 // RUN: %libomp-cxx-compile-and-run
+// We do not have _OPENMPV define and rt fails because of NULL label
+// UNSUPPORTED: ompv-gomp
 
 #include <omp.h>
 

@@ -1,4 +1,6 @@
 // RUN: %libomp-compile-and-run | FileCheck %s --match-full-lines
+// on gcc omp tile 'sizes' argument needs positive integral constant
+// UNSUPPORTED: ompv-gomp
 
 #ifndef HEADER
 #define HEADER

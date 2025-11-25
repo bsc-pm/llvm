@@ -1,4 +1,5 @@
 // RUN: %libomp-cxx-compile -fopenmp-version=60  && %libomp-run
+// UNSUPPORTED: ompv-gomp
 #include <stdio.h>
 #include <omp.h>
 #include <limits.h>

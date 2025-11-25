@@ -1,6 +1,8 @@
 // XFAIL: msvc
 // Fails on windows due to issue #129023
 // RUN: %libomp-compile-and-run
+// On gcc triangular collapsed loops are unsupported
+// UNSUPPORTED: ompv-gomp
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

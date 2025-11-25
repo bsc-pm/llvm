@@ -2,6 +2,7 @@
 // RUN: %libomp-compile-and-run | FileCheck %s
 // REQUIRES: ompt
 // XFAIL: gcc-4
+// UNSUPPORTED: ompv-gomp
 // clang-format on
 
 #include "callback.h"

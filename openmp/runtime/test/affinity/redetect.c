@@ -2,7 +2,7 @@
 // RUN: %libomp-run
 // RUN: env KMP_AFFINITY=none %libomp-run
 // REQUIRES: linux
-// UNSUPPORTED: ompv, ompv-free-agents, ompv-passive
+// UNSUPPORTED: ompv, ompv-free-agents, ompv-passive, ompv-gomp
 
 // Check if forked child process resets affinity properly by restricting
 // child's affinity to a subset of the parent and then checking it after

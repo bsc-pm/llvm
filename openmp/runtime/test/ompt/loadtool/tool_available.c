@@ -1,3 +1,4 @@
+// UNSUPPORTED: ompv, ompv-passive, ompv-free-agents, ompv-gomp
 // clang-format off
 // The OpenMP standard defines 3 ways of providing ompt_start_tool:
 

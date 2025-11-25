@@ -250,7 +250,8 @@ int nosv_default_yield_type = 0;
 uint64_t nosv_default_waitfor_time;
 struct htab *label_to_task_type_map = nullptr;
 kmp_bootstrap_lock_t label_to_task_type_lock;
-
+const char *gomp_task_default_str = ";GOMP_task;GOMP_task;0;0;;";
+const char *gomp_ws_default_str = ";GOMP_worksharing;GOMP_worksharing;0;0;;";
 
 #endif // KMP_OMPV_ENABLED
 

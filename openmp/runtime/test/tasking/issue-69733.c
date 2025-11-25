@@ -1,5 +1,7 @@
 // RUN: %libomp-compile-and-run
-
+// There is no support for detached tasks with gcc
+// Also GOMP_target_ext is not supported
+// UNSUPPORTED: ompv-gomp
 #include <stdio.h>
 #include <stdlib.h>
 #include <omp.h>

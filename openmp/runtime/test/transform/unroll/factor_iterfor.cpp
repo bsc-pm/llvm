@@ -1,4 +1,6 @@
 // RUN: %libomp-cxx20-compile-and-run | FileCheck %s --match-full-lines
+// output difference in gcc due to dtors order
+// UNSUPPORTED: ompv-gomp
 
 #ifndef HEADER
 #define HEADER

@@ -1,6 +1,8 @@
 // RUN: %libomp-compile
 // RUN: env OMP_NUM_THREADS=1 LIBOMP_USE_HIDDEN_HELPER_TASK=1 \
 // RUN:     LIBOMP_NUM_HIDDEN_HELPER_THREADS=8 %libomp-run
+// GOMP_target_ext not implemented
+// UNSUPPORTED: ompv-gomp
 
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,5 +1,5 @@
 // RUN: %libomp-cxx-compile-and-run
-// UNSUPPORTED: ompv, ompv-free-agents, ompv-passive
+// UNSUPPORTED: ompv, ompv-free-agents, ompv-passive, ompv-gomp
 
 /*
  * This test aims to check whether hidden helper task can work with regular task

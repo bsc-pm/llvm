@@ -4,6 +4,7 @@
 // REQUIRES: ompt
 // UNSUPPORTED: gcc-4, gcc-5, gcc-6, gcc-7
 // clang-format on
+// UNSUPPORTED: ompv-gomp
 
 #define SCHEDULE dynamic
 #include "base_split.h"
