@@ -28,7 +28,7 @@ END PROGRAM MAIN
 ! FIRDialect-SAME:      %[[ARG0:[-0-9A-Za-z._]+]]: !fir.ref<i32> {fir.bindc_name = "x"}) {
 ! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
 ! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.dummy_scope : !fir.dscope
-! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.declare %[[ARG0]] dummy_scope %[[VAL_1]] {uniq_name = "_QMmooFs1Ex"} : (!fir.ref<i32>, !fir.dscope) -> !fir.ref<i32>
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.declare %[[ARG0]] dummy_scope %[[VAL_1]] arg 1 {uniq_name = "_QMmooFs1Ex"} : (!fir.ref<i32>, !fir.dscope) -> !fir.ref<i32>
 ! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.load %[[VAL_2]] : !fir.ref<i32>
 ! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = arith.addi %[[VAL_3]], %[[VAL_0]] : i32
 ! FIRDialect:           fir.store %[[VAL_4]] to %[[VAL_2]] : !fir.ref<i32>

@@ -48,11 +48,11 @@ void parallel_atomic() {
 }
 
 // LIN64-LABEL: define {{[^@]+}}@_Z19parallel_atomic_ewcv
-// LIN64-SAME: () #[[ATTR0:[0-9]+]] personality ptr @__gxx_personality_v0 !dbg [[DBG5:![0-9]+]] {
+// LIN64-SAME: () #[[ATTR0:[0-9]+]] personality ptr @__gxx_personality_v0 !dbg [[DBG4:![0-9]+]] {
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    [[S:%.*]] = alloca [[STRUCT_ST:%.*]], align 8
-// LIN64-NEXT:    call void @_ZN2StC1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[S]]), !dbg [[DBG9:![0-9]+]]
-// LIN64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[S]], [[STRUCT_ST]] undef), "QUAL.OSS.SHARED"(ptr @b, i32 undef), "QUAL.OSS.SHARED"(ptr @a, i32 undef) ], !dbg [[DBG10:![0-9]+]]
+// LIN64-NEXT:    call void @_ZN2StC1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[S]]), !dbg [[DBG8:![0-9]+]]
+// LIN64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[S]], [[STRUCT_ST]] undef), "QUAL.OSS.SHARED"(ptr @b, i32 undef), "QUAL.OSS.SHARED"(ptr @a, i32 undef) ], !dbg [[DBG9:![0-9]+]]
 // LIN64-NEXT:    [[REF_TMP:%.*]] = alloca [[STRUCT_ST]], align 8
 // LIN64-NEXT:    [[REF_TMP2:%.*]] = alloca [[STRUCT_ST]], align 8
 // LIN64-NEXT:    [[REF_TMP6:%.*]] = alloca [[STRUCT_ST]], align 8
@@ -60,85 +60,85 @@ void parallel_atomic() {
 // LIN64-NEXT:    [[REF_TMP11:%.*]] = alloca [[STRUCT_ST]], align 8
 // LIN64-NEXT:    [[ATOMIC_TEMP17:%.*]] = alloca i32, align 4
 // LIN64-NEXT:    invoke void @_ZN2StC1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP]])
-// LIN64-NEXT:            to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG11:![0-9]+]]
+// LIN64-NEXT:            to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG10:![0-9]+]]
 // LIN64:       invoke.cont:
 // LIN64-NEXT:    [[CALL:%.*]] = invoke noundef nonnull align 4 dereferenceable(4) ptr @_ZN2St3getEv(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP]])
-// LIN64-NEXT:            to label [[INVOKE_CONT1:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG12:![0-9]+]]
+// LIN64-NEXT:            to label [[INVOKE_CONT1:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG11:![0-9]+]]
 // LIN64:       invoke.cont1:
-// LIN64-NEXT:    [[ATOMIC_LOAD:%.*]] = load atomic i32, ptr [[CALL]] monotonic, align 4, !dbg [[DBG13:![0-9]+]]
-// LIN64-NEXT:    store i32 [[ATOMIC_LOAD]], ptr @b, align 4, !dbg [[DBG13]]
-// LIN64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP]]) #[[ATTR1:[0-9]+]], !dbg [[DBG14:![0-9]+]]
+// LIN64-NEXT:    [[ATOMIC_LOAD:%.*]] = load atomic i32, ptr [[CALL]] monotonic, align 4, !dbg [[DBG12:![0-9]+]]
+// LIN64-NEXT:    store i32 [[ATOMIC_LOAD]], ptr @b, align 4, !dbg [[DBG12]]
+// LIN64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dead_on_return(8) dereferenceable(8) [[REF_TMP]]) #[[ATTR1:[0-9]+]], !dbg [[DBG13:![0-9]+]]
 // LIN64-NEXT:    invoke void @_ZN2StC1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP2]])
-// LIN64-NEXT:            to label [[INVOKE_CONT3:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG15:![0-9]+]]
+// LIN64-NEXT:            to label [[INVOKE_CONT3:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG14:![0-9]+]]
 // LIN64:       invoke.cont3:
 // LIN64-NEXT:    [[CALL5:%.*]] = invoke noundef nonnull align 4 dereferenceable(4) ptr @_ZN2St3getEv(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP2]])
-// LIN64-NEXT:            to label [[INVOKE_CONT4:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG16:![0-9]+]]
+// LIN64-NEXT:            to label [[INVOKE_CONT4:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG15:![0-9]+]]
 // LIN64:       invoke.cont4:
-// LIN64-NEXT:    [[TMP1:%.*]] = load i32, ptr @b, align 4, !dbg [[DBG17:![0-9]+]]
-// LIN64-NEXT:    store atomic i32 [[TMP1]], ptr [[CALL5]] monotonic, align 4, !dbg [[DBG15]]
-// LIN64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP2]]) #[[ATTR1]], !dbg [[DBG18:![0-9]+]]
+// LIN64-NEXT:    [[TMP1:%.*]] = load i32, ptr @b, align 4, !dbg [[DBG16:![0-9]+]]
+// LIN64-NEXT:    store atomic i32 [[TMP1]], ptr [[CALL5]] monotonic, align 4, !dbg [[DBG14]]
+// LIN64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dead_on_return(8) dereferenceable(8) [[REF_TMP2]]) #[[ATTR1]], !dbg [[DBG17:![0-9]+]]
 // LIN64-NEXT:    invoke void @_ZN2StC1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP6]])
-// LIN64-NEXT:            to label [[INVOKE_CONT7:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG19:![0-9]+]]
+// LIN64-NEXT:            to label [[INVOKE_CONT7:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG18:![0-9]+]]
 // LIN64:       invoke.cont7:
 // LIN64-NEXT:    [[CALL9:%.*]] = invoke noundef nonnull align 4 dereferenceable(4) ptr @_ZN2St3getEv(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP6]])
-// LIN64-NEXT:            to label [[INVOKE_CONT8:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG20:![0-9]+]]
+// LIN64-NEXT:            to label [[INVOKE_CONT8:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG19:![0-9]+]]
 // LIN64:       invoke.cont8:
-// LIN64-NEXT:    [[TMP2:%.*]] = load i32, ptr @b, align 4, !dbg [[DBG21:![0-9]+]]
-// LIN64-NEXT:    [[ATOMIC_LOAD10:%.*]] = load atomic i32, ptr [[CALL9]] monotonic, align 4, !dbg [[DBG19]]
-// LIN64-NEXT:    br label [[ATOMIC_CONT:%.*]], !dbg [[DBG19]]
+// LIN64-NEXT:    [[TMP2:%.*]] = load i32, ptr @b, align 4, !dbg [[DBG20:![0-9]+]]
+// LIN64-NEXT:    [[ATOMIC_LOAD10:%.*]] = load atomic i32, ptr [[CALL9]] monotonic, align 4, !dbg [[DBG18]]
+// LIN64-NEXT:    br label [[ATOMIC_CONT:%.*]], !dbg [[DBG18]]
 // LIN64:       atomic_cont:
-// LIN64-NEXT:    [[TMP3:%.*]] = phi i32 [ [[ATOMIC_LOAD10]], [[INVOKE_CONT8]] ], [ [[TMP6:%.*]], [[ATOMIC_CONT]] ], !dbg [[DBG19]]
-// LIN64-NEXT:    [[REM:%.*]] = srem i32 [[TMP3]], [[TMP2]], !dbg [[DBG22:![0-9]+]]
-// LIN64-NEXT:    store i32 [[REM]], ptr [[ATOMIC_TEMP]], align 4, !dbg [[DBG19]]
-// LIN64-NEXT:    [[TMP4:%.*]] = load i32, ptr [[ATOMIC_TEMP]], align 4, !dbg [[DBG19]]
-// LIN64-NEXT:    [[TMP5:%.*]] = cmpxchg ptr [[CALL9]], i32 [[TMP3]], i32 [[TMP4]] monotonic monotonic, align 4, !dbg [[DBG19]]
-// LIN64-NEXT:    [[TMP6]] = extractvalue { i32, i1 } [[TMP5]], 0, !dbg [[DBG19]]
-// LIN64-NEXT:    [[TMP7:%.*]] = extractvalue { i32, i1 } [[TMP5]], 1, !dbg [[DBG19]]
-// LIN64-NEXT:    br i1 [[TMP7]], label [[ATOMIC_EXIT:%.*]], label [[ATOMIC_CONT]], !dbg [[DBG19]]
+// LIN64-NEXT:    [[TMP3:%.*]] = phi i32 [ [[ATOMIC_LOAD10]], [[INVOKE_CONT8]] ], [ [[TMP6:%.*]], [[ATOMIC_CONT]] ], !dbg [[DBG18]]
+// LIN64-NEXT:    [[REM:%.*]] = srem i32 [[TMP3]], [[TMP2]], !dbg [[DBG21:![0-9]+]]
+// LIN64-NEXT:    store i32 [[REM]], ptr [[ATOMIC_TEMP]], align 4, !dbg [[DBG18]]
+// LIN64-NEXT:    [[TMP4:%.*]] = load i32, ptr [[ATOMIC_TEMP]], align 4, !dbg [[DBG18]]
+// LIN64-NEXT:    [[TMP5:%.*]] = cmpxchg ptr [[CALL9]], i32 [[TMP3]], i32 [[TMP4]] monotonic monotonic, align 4, !dbg [[DBG18]]
+// LIN64-NEXT:    [[TMP6]] = extractvalue { i32, i1 } [[TMP5]], 0, !dbg [[DBG18]]
+// LIN64-NEXT:    [[TMP7:%.*]] = extractvalue { i32, i1 } [[TMP5]], 1, !dbg [[DBG18]]
+// LIN64-NEXT:    br i1 [[TMP7]], label [[ATOMIC_EXIT:%.*]], label [[ATOMIC_CONT]], !dbg [[DBG18]]
 // LIN64:       atomic_exit:
-// LIN64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP6]]) #[[ATTR1]], !dbg [[DBG23:![0-9]+]]
-// LIN64-NEXT:    [[FIELD:%.*]] = getelementptr inbounds nuw [[STRUCT_ST]], ptr [[S]], i32 0, i32 0, !dbg [[DBG24:![0-9]+]]
-// LIN64-NEXT:    [[TMP8:%.*]] = atomicrmw add ptr [[FIELD]], i64 1 monotonic, align 8, !dbg [[DBG25:![0-9]+]]
+// LIN64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dead_on_return(8) dereferenceable(8) [[REF_TMP6]]) #[[ATTR1]], !dbg [[DBG22:![0-9]+]]
+// LIN64-NEXT:    [[FIELD:%.*]] = getelementptr inbounds nuw [[STRUCT_ST]], ptr [[S]], i32 0, i32 0, !dbg [[DBG23:![0-9]+]]
+// LIN64-NEXT:    [[TMP8:%.*]] = atomicrmw add ptr [[FIELD]], i64 1 monotonic, align 8, !dbg [[DBG24:![0-9]+]]
 // LIN64-NEXT:    invoke void @_ZN2StC1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP11]])
-// LIN64-NEXT:            to label [[INVOKE_CONT12:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG26:![0-9]+]]
+// LIN64-NEXT:            to label [[INVOKE_CONT12:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG25:![0-9]+]]
 // LIN64:       invoke.cont12:
 // LIN64-NEXT:    [[CALL14:%.*]] = invoke noundef nonnull align 4 dereferenceable(4) ptr @_ZN2St3getEv(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP11]])
-// LIN64-NEXT:            to label [[INVOKE_CONT13:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG27:![0-9]+]]
+// LIN64-NEXT:            to label [[INVOKE_CONT13:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG26:![0-9]+]]
 // LIN64:       invoke.cont13:
-// LIN64-NEXT:    [[TMP9:%.*]] = load i32, ptr @b, align 4, !dbg [[DBG28:![0-9]+]]
-// LIN64-NEXT:    [[ATOMIC_LOAD15:%.*]] = load atomic i32, ptr [[CALL14]] monotonic, align 4, !dbg [[DBG29:![0-9]+]]
-// LIN64-NEXT:    br label [[ATOMIC_CONT16:%.*]], !dbg [[DBG29]]
+// LIN64-NEXT:    [[TMP9:%.*]] = load i32, ptr @b, align 4, !dbg [[DBG27:![0-9]+]]
+// LIN64-NEXT:    [[ATOMIC_LOAD15:%.*]] = load atomic i32, ptr [[CALL14]] monotonic, align 4, !dbg [[DBG28:![0-9]+]]
+// LIN64-NEXT:    br label [[ATOMIC_CONT16:%.*]], !dbg [[DBG28]]
 // LIN64:       atomic_cont16:
-// LIN64-NEXT:    [[TMP10:%.*]] = phi i32 [ [[ATOMIC_LOAD15]], [[INVOKE_CONT13]] ], [ [[TMP13:%.*]], [[ATOMIC_CONT16]] ], !dbg [[DBG29]]
-// LIN64-NEXT:    [[REM18:%.*]] = srem i32 [[TMP10]], [[TMP9]], !dbg [[DBG30:![0-9]+]]
-// LIN64-NEXT:    store i32 [[REM18]], ptr [[ATOMIC_TEMP17]], align 4, !dbg [[DBG29]]
-// LIN64-NEXT:    [[TMP11:%.*]] = load i32, ptr [[ATOMIC_TEMP17]], align 4, !dbg [[DBG29]]
-// LIN64-NEXT:    [[TMP12:%.*]] = cmpxchg ptr [[CALL14]], i32 [[TMP10]], i32 [[TMP11]] monotonic monotonic, align 4, !dbg [[DBG29]]
-// LIN64-NEXT:    [[TMP13]] = extractvalue { i32, i1 } [[TMP12]], 0, !dbg [[DBG29]]
-// LIN64-NEXT:    [[TMP14:%.*]] = extractvalue { i32, i1 } [[TMP12]], 1, !dbg [[DBG29]]
-// LIN64-NEXT:    br i1 [[TMP14]], label [[ATOMIC_EXIT19:%.*]], label [[ATOMIC_CONT16]], !dbg [[DBG29]]
+// LIN64-NEXT:    [[TMP10:%.*]] = phi i32 [ [[ATOMIC_LOAD15]], [[INVOKE_CONT13]] ], [ [[TMP13:%.*]], [[ATOMIC_CONT16]] ], !dbg [[DBG28]]
+// LIN64-NEXT:    [[REM18:%.*]] = srem i32 [[TMP10]], [[TMP9]], !dbg [[DBG29:![0-9]+]]
+// LIN64-NEXT:    store i32 [[REM18]], ptr [[ATOMIC_TEMP17]], align 4, !dbg [[DBG28]]
+// LIN64-NEXT:    [[TMP11:%.*]] = load i32, ptr [[ATOMIC_TEMP17]], align 4, !dbg [[DBG28]]
+// LIN64-NEXT:    [[TMP12:%.*]] = cmpxchg ptr [[CALL14]], i32 [[TMP10]], i32 [[TMP11]] monotonic monotonic, align 4, !dbg [[DBG28]]
+// LIN64-NEXT:    [[TMP13]] = extractvalue { i32, i1 } [[TMP12]], 0, !dbg [[DBG28]]
+// LIN64-NEXT:    [[TMP14:%.*]] = extractvalue { i32, i1 } [[TMP12]], 1, !dbg [[DBG28]]
+// LIN64-NEXT:    br i1 [[TMP14]], label [[ATOMIC_EXIT19:%.*]], label [[ATOMIC_CONT16]], !dbg [[DBG28]]
 // LIN64:       atomic_exit19:
-// LIN64-NEXT:    store i32 [[REM18]], ptr @a, align 4, !dbg [[DBG29]]
-// LIN64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP11]]) #[[ATTR1]], !dbg [[DBG31:![0-9]+]]
-// LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG32:![0-9]+]]
-// LIN64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[S]]) #[[ATTR1]], !dbg [[DBG33:![0-9]+]]
-// LIN64-NEXT:    ret void, !dbg [[DBG33]]
+// LIN64-NEXT:    store i32 [[REM18]], ptr @a, align 4, !dbg [[DBG28]]
+// LIN64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dead_on_return(8) dereferenceable(8) [[REF_TMP11]]) #[[ATTR1]], !dbg [[DBG30:![0-9]+]]
+// LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG31:![0-9]+]]
+// LIN64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dead_on_return(8) dereferenceable(8) [[S]]) #[[ATTR1]], !dbg [[DBG32:![0-9]+]]
+// LIN64-NEXT:    ret void, !dbg [[DBG32]]
 // LIN64:       terminate.lpad:
 // LIN64-NEXT:    [[TMP15:%.*]] = landingpad { ptr, i32 }
-// LIN64-NEXT:            catch ptr null, !dbg [[DBG11]]
-// LIN64-NEXT:    [[TMP16:%.*]] = extractvalue { ptr, i32 } [[TMP15]], 0, !dbg [[DBG11]]
-// LIN64-NEXT:    call void @__clang_call_terminate(ptr [[TMP16]]) #[[ATTR5:[0-9]+]], !dbg [[DBG11]]
-// LIN64-NEXT:    unreachable, !dbg [[DBG11]]
+// LIN64-NEXT:            catch ptr null, !dbg [[DBG10]]
+// LIN64-NEXT:    [[TMP16:%.*]] = extractvalue { ptr, i32 } [[TMP15]], 0, !dbg [[DBG10]]
+// LIN64-NEXT:    call void @__clang_call_terminate(ptr [[TMP16]]) #[[ATTR5:[0-9]+]], !dbg [[DBG10]]
+// LIN64-NEXT:    unreachable, !dbg [[DBG10]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@_ZN2StC1Ev
-// LIN64-SAME: (ptr noundef nonnull align 8 dereferenceable(8) [[THIS:%.*]]) unnamed_addr #[[ATTR0]] comdat align 2 !dbg [[DBG34:![0-9]+]] {
+// LIN64-SAME: (ptr noundef nonnull align 8 dereferenceable(8) [[THIS:%.*]]) unnamed_addr #[[ATTR0]] comdat align 2 !dbg [[DBG33:![0-9]+]] {
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
 // LIN64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// LIN64-NEXT:    call void @_ZN2StC2Ev(ptr noundef nonnull align 8 dereferenceable(8) [[THIS1]]), !dbg [[DBG35:![0-9]+]]
-// LIN64-NEXT:    ret void, !dbg [[DBG36:![0-9]+]]
+// LIN64-NEXT:    call void @_ZN2StC2Ev(ptr noundef nonnull align 8 dereferenceable(8) [[THIS1]]), !dbg [[DBG34:![0-9]+]]
+// LIN64-NEXT:    ret void, !dbg [[DBG35:![0-9]+]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@__clang_call_terminate
@@ -149,90 +149,90 @@ void parallel_atomic() {
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@_ZN2St3getEv
-// LIN64-SAME: (ptr noundef nonnull align 8 dereferenceable(8) [[THIS:%.*]]) #[[ATTR3:[0-9]+]] comdat align 2 !dbg [[DBG37:![0-9]+]] {
+// LIN64-SAME: (ptr noundef nonnull align 8 dereferenceable(8) [[THIS:%.*]]) #[[ATTR3:[0-9]+]] comdat align 2 !dbg [[DBG36:![0-9]+]] {
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
 // LIN64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// LIN64-NEXT:    ret ptr @a, !dbg [[DBG38:![0-9]+]]
+// LIN64-NEXT:    ret ptr @a, !dbg [[DBG37:![0-9]+]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@_ZN2StD1Ev
-// LIN64-SAME: (ptr noundef nonnull align 8 dereferenceable(8) [[THIS:%.*]]) unnamed_addr #[[ATTR3]] comdat align 2 !dbg [[DBG39:![0-9]+]] {
+// LIN64-SAME: (ptr noundef nonnull align 8 dead_on_return(8) dereferenceable(8) [[THIS:%.*]]) unnamed_addr #[[ATTR3]] comdat align 2 !dbg [[DBG38:![0-9]+]] {
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
 // LIN64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// LIN64-NEXT:    call void @_ZN2StD2Ev(ptr noundef nonnull align 8 dereferenceable(8) [[THIS1]]) #[[ATTR1]], !dbg [[DBG40:![0-9]+]]
-// LIN64-NEXT:    ret void, !dbg [[DBG41:![0-9]+]]
+// LIN64-NEXT:    call void @_ZN2StD2Ev(ptr noundef nonnull align 8 dead_on_return(8) dereferenceable(8) [[THIS1]]) #[[ATTR1]], !dbg [[DBG39:![0-9]+]]
+// LIN64-NEXT:    ret void, !dbg [[DBG40:![0-9]+]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@_Z3foov
-// LIN64-SAME: () #[[ATTR0]] !dbg [[DBG42:![0-9]+]] {
+// LIN64-SAME: () #[[ATTR0]] !dbg [[DBG41:![0-9]+]] {
 // LIN64-NEXT:  entry:
-// LIN64-NEXT:    call void @_Z8mayThrowv(), !dbg [[DBG43:![0-9]+]]
-// LIN64-NEXT:    ret ptr @a, !dbg [[DBG44:![0-9]+]]
+// LIN64-NEXT:    call void @_Z8mayThrowv(), !dbg [[DBG42:![0-9]+]]
+// LIN64-NEXT:    ret ptr @a, !dbg [[DBG43:![0-9]+]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@_Z15parallel_atomicv
-// LIN64-SAME: () #[[ATTR3]] personality ptr @__gxx_personality_v0 !dbg [[DBG45:![0-9]+]] {
+// LIN64-SAME: () #[[ATTR3]] personality ptr @__gxx_personality_v0 !dbg [[DBG44:![0-9]+]] {
 // LIN64-NEXT:  entry:
-// LIN64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr @a, i32 undef), "QUAL.OSS.SHARED"(ptr @b, i32 undef) ], !dbg [[DBG46:![0-9]+]]
+// LIN64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr @a, i32 undef), "QUAL.OSS.SHARED"(ptr @b, i32 undef) ], !dbg [[DBG45:![0-9]+]]
 // LIN64-NEXT:    [[CALL:%.*]] = invoke noundef nonnull align 4 dereferenceable(4) ptr @_Z3foov()
-// LIN64-NEXT:            to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG47:![0-9]+]]
+// LIN64-NEXT:            to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG46:![0-9]+]]
 // LIN64:       invoke.cont:
-// LIN64-NEXT:    [[ATOMIC_LOAD:%.*]] = load atomic i32, ptr @a monotonic, align 4, !dbg [[DBG47]]
-// LIN64-NEXT:    store i32 [[ATOMIC_LOAD]], ptr [[CALL]], align 4, !dbg [[DBG47]]
+// LIN64-NEXT:    [[ATOMIC_LOAD:%.*]] = load atomic i32, ptr @a monotonic, align 4, !dbg [[DBG46]]
+// LIN64-NEXT:    store i32 [[ATOMIC_LOAD]], ptr [[CALL]], align 4, !dbg [[DBG46]]
 // LIN64-NEXT:    [[CALL2:%.*]] = invoke noundef nonnull align 4 dereferenceable(4) ptr @_Z3foov()
-// LIN64-NEXT:            to label [[INVOKE_CONT1:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG48:![0-9]+]]
+// LIN64-NEXT:            to label [[INVOKE_CONT1:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG47:![0-9]+]]
 // LIN64:       invoke.cont1:
-// LIN64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[CALL2]], align 4, !dbg [[DBG48]]
-// LIN64-NEXT:    store atomic i32 [[TMP1]], ptr @a monotonic, align 4, !dbg [[DBG49:![0-9]+]]
+// LIN64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[CALL2]], align 4, !dbg [[DBG47]]
+// LIN64-NEXT:    store atomic i32 [[TMP1]], ptr @a monotonic, align 4, !dbg [[DBG48:![0-9]+]]
 // LIN64-NEXT:    [[CALL4:%.*]] = invoke noundef nonnull align 4 dereferenceable(4) ptr @_Z3foov()
-// LIN64-NEXT:            to label [[INVOKE_CONT3:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG50:![0-9]+]]
+// LIN64-NEXT:            to label [[INVOKE_CONT3:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG49:![0-9]+]]
 // LIN64:       invoke.cont3:
-// LIN64-NEXT:    [[TMP2:%.*]] = load i32, ptr [[CALL4]], align 4, !dbg [[DBG50]]
-// LIN64-NEXT:    [[TMP3:%.*]] = atomicrmw add ptr @a, i32 [[TMP2]] monotonic, align 4, !dbg [[DBG51:![0-9]+]]
+// LIN64-NEXT:    [[TMP2:%.*]] = load i32, ptr [[CALL4]], align 4, !dbg [[DBG49]]
+// LIN64-NEXT:    [[TMP3:%.*]] = atomicrmw add ptr @a, i32 [[TMP2]] monotonic, align 4, !dbg [[DBG50:![0-9]+]]
 // LIN64-NEXT:    [[CALL6:%.*]] = invoke noundef nonnull align 4 dereferenceable(4) ptr @_Z3foov()
-// LIN64-NEXT:            to label [[INVOKE_CONT5:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG52:![0-9]+]]
+// LIN64-NEXT:            to label [[INVOKE_CONT5:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG51:![0-9]+]]
 // LIN64:       invoke.cont5:
-// LIN64-NEXT:    [[TMP4:%.*]] = load i32, ptr [[CALL6]], align 4, !dbg [[DBG52]]
-// LIN64-NEXT:    [[TMP5:%.*]] = atomicrmw add ptr @a, i32 [[TMP4]] monotonic, align 4, !dbg [[DBG53:![0-9]+]]
-// LIN64-NEXT:    store i32 [[TMP5]], ptr @b, align 4, !dbg [[DBG53]]
-// LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG54:![0-9]+]]
-// LIN64-NEXT:    ret void, !dbg [[DBG55:![0-9]+]]
+// LIN64-NEXT:    [[TMP4:%.*]] = load i32, ptr [[CALL6]], align 4, !dbg [[DBG51]]
+// LIN64-NEXT:    [[TMP5:%.*]] = atomicrmw add ptr @a, i32 [[TMP4]] monotonic, align 4, !dbg [[DBG52:![0-9]+]]
+// LIN64-NEXT:    store i32 [[TMP5]], ptr @b, align 4, !dbg [[DBG52]]
+// LIN64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG53:![0-9]+]]
+// LIN64-NEXT:    ret void, !dbg [[DBG54:![0-9]+]]
 // LIN64:       terminate.lpad:
 // LIN64-NEXT:    [[TMP6:%.*]] = landingpad { ptr, i32 }
-// LIN64-NEXT:            catch ptr null, !dbg [[DBG47]]
-// LIN64-NEXT:    [[TMP7:%.*]] = extractvalue { ptr, i32 } [[TMP6]], 0, !dbg [[DBG47]]
-// LIN64-NEXT:    call void @__clang_call_terminate(ptr [[TMP7]]) #[[ATTR5]], !dbg [[DBG47]]
-// LIN64-NEXT:    unreachable, !dbg [[DBG47]]
+// LIN64-NEXT:            catch ptr null, !dbg [[DBG46]]
+// LIN64-NEXT:    [[TMP7:%.*]] = extractvalue { ptr, i32 } [[TMP6]], 0, !dbg [[DBG46]]
+// LIN64-NEXT:    call void @__clang_call_terminate(ptr [[TMP7]]) #[[ATTR5]], !dbg [[DBG46]]
+// LIN64-NEXT:    unreachable, !dbg [[DBG46]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@_ZN2StC2Ev
-// LIN64-SAME: (ptr noundef nonnull align 8 dereferenceable(8) [[THIS:%.*]]) unnamed_addr #[[ATTR3]] comdat align 2 !dbg [[DBG56:![0-9]+]] {
+// LIN64-SAME: (ptr noundef nonnull align 8 dereferenceable(8) [[THIS:%.*]]) unnamed_addr #[[ATTR3]] comdat align 2 !dbg [[DBG55:![0-9]+]] {
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
 // LIN64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// LIN64-NEXT:    ret void, !dbg [[DBG57:![0-9]+]]
+// LIN64-NEXT:    ret void, !dbg [[DBG56:![0-9]+]]
 //
 //
 // LIN64-LABEL: define {{[^@]+}}@_ZN2StD2Ev
-// LIN64-SAME: (ptr noundef nonnull align 8 dereferenceable(8) [[THIS:%.*]]) unnamed_addr #[[ATTR3]] comdat align 2 !dbg [[DBG58:![0-9]+]] {
+// LIN64-SAME: (ptr noundef nonnull align 8 dead_on_return(8) dereferenceable(8) [[THIS:%.*]]) unnamed_addr #[[ATTR3]] comdat align 2 !dbg [[DBG57:![0-9]+]] {
 // LIN64-NEXT:  entry:
 // LIN64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // LIN64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
 // LIN64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// LIN64-NEXT:    ret void, !dbg [[DBG59:![0-9]+]]
+// LIN64-NEXT:    ret void, !dbg [[DBG58:![0-9]+]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@_Z19parallel_atomic_ewcv
-// PPC64-SAME: () #[[ATTR0:[0-9]+]] personality ptr @__gxx_personality_v0 !dbg [[DBG5:![0-9]+]] {
+// PPC64-SAME: () #[[ATTR0:[0-9]+]] personality ptr @__gxx_personality_v0 !dbg [[DBG4:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[S:%.*]] = alloca [[STRUCT_ST:%.*]], align 8
-// PPC64-NEXT:    call void @_ZN2StC1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[S]]), !dbg [[DBG9:![0-9]+]]
-// PPC64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[S]], [[STRUCT_ST]] undef), "QUAL.OSS.SHARED"(ptr @b, i32 undef), "QUAL.OSS.SHARED"(ptr @a, i32 undef) ], !dbg [[DBG10:![0-9]+]]
+// PPC64-NEXT:    call void @_ZN2StC1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[S]]), !dbg [[DBG8:![0-9]+]]
+// PPC64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[S]], [[STRUCT_ST]] undef), "QUAL.OSS.SHARED"(ptr @b, i32 undef), "QUAL.OSS.SHARED"(ptr @a, i32 undef) ], !dbg [[DBG9:![0-9]+]]
 // PPC64-NEXT:    [[REF_TMP:%.*]] = alloca [[STRUCT_ST]], align 8
 // PPC64-NEXT:    [[REF_TMP2:%.*]] = alloca [[STRUCT_ST]], align 8
 // PPC64-NEXT:    [[REF_TMP6:%.*]] = alloca [[STRUCT_ST]], align 8
@@ -240,85 +240,85 @@ void parallel_atomic() {
 // PPC64-NEXT:    [[REF_TMP11:%.*]] = alloca [[STRUCT_ST]], align 8
 // PPC64-NEXT:    [[ATOMIC_TEMP17:%.*]] = alloca i32, align 4
 // PPC64-NEXT:    invoke void @_ZN2StC1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP]])
-// PPC64-NEXT:            to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG11:![0-9]+]]
+// PPC64-NEXT:            to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG10:![0-9]+]]
 // PPC64:       invoke.cont:
 // PPC64-NEXT:    [[CALL:%.*]] = invoke noundef nonnull align 4 dereferenceable(4) ptr @_ZN2St3getEv(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP]])
-// PPC64-NEXT:            to label [[INVOKE_CONT1:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG12:![0-9]+]]
+// PPC64-NEXT:            to label [[INVOKE_CONT1:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG11:![0-9]+]]
 // PPC64:       invoke.cont1:
-// PPC64-NEXT:    [[ATOMIC_LOAD:%.*]] = load atomic i32, ptr [[CALL]] monotonic, align 4, !dbg [[DBG13:![0-9]+]]
-// PPC64-NEXT:    store i32 [[ATOMIC_LOAD]], ptr @b, align 4, !dbg [[DBG13]]
-// PPC64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP]]) #[[ATTR1:[0-9]+]], !dbg [[DBG14:![0-9]+]]
+// PPC64-NEXT:    [[ATOMIC_LOAD:%.*]] = load atomic i32, ptr [[CALL]] monotonic, align 4, !dbg [[DBG12:![0-9]+]]
+// PPC64-NEXT:    store i32 [[ATOMIC_LOAD]], ptr @b, align 4, !dbg [[DBG12]]
+// PPC64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dead_on_return(8) dereferenceable(8) [[REF_TMP]]) #[[ATTR1:[0-9]+]], !dbg [[DBG13:![0-9]+]]
 // PPC64-NEXT:    invoke void @_ZN2StC1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP2]])
-// PPC64-NEXT:            to label [[INVOKE_CONT3:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG15:![0-9]+]]
+// PPC64-NEXT:            to label [[INVOKE_CONT3:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG14:![0-9]+]]
 // PPC64:       invoke.cont3:
 // PPC64-NEXT:    [[CALL5:%.*]] = invoke noundef nonnull align 4 dereferenceable(4) ptr @_ZN2St3getEv(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP2]])
-// PPC64-NEXT:            to label [[INVOKE_CONT4:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG16:![0-9]+]]
+// PPC64-NEXT:            to label [[INVOKE_CONT4:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG15:![0-9]+]]
 // PPC64:       invoke.cont4:
-// PPC64-NEXT:    [[TMP1:%.*]] = load i32, ptr @b, align 4, !dbg [[DBG17:![0-9]+]]
-// PPC64-NEXT:    store atomic i32 [[TMP1]], ptr [[CALL5]] monotonic, align 4, !dbg [[DBG15]]
-// PPC64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP2]]) #[[ATTR1]], !dbg [[DBG18:![0-9]+]]
+// PPC64-NEXT:    [[TMP1:%.*]] = load i32, ptr @b, align 4, !dbg [[DBG16:![0-9]+]]
+// PPC64-NEXT:    store atomic i32 [[TMP1]], ptr [[CALL5]] monotonic, align 4, !dbg [[DBG14]]
+// PPC64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dead_on_return(8) dereferenceable(8) [[REF_TMP2]]) #[[ATTR1]], !dbg [[DBG17:![0-9]+]]
 // PPC64-NEXT:    invoke void @_ZN2StC1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP6]])
-// PPC64-NEXT:            to label [[INVOKE_CONT7:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG19:![0-9]+]]
+// PPC64-NEXT:            to label [[INVOKE_CONT7:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG18:![0-9]+]]
 // PPC64:       invoke.cont7:
 // PPC64-NEXT:    [[CALL9:%.*]] = invoke noundef nonnull align 4 dereferenceable(4) ptr @_ZN2St3getEv(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP6]])
-// PPC64-NEXT:            to label [[INVOKE_CONT8:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG20:![0-9]+]]
+// PPC64-NEXT:            to label [[INVOKE_CONT8:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG19:![0-9]+]]
 // PPC64:       invoke.cont8:
-// PPC64-NEXT:    [[TMP2:%.*]] = load i32, ptr @b, align 4, !dbg [[DBG21:![0-9]+]]
-// PPC64-NEXT:    [[ATOMIC_LOAD10:%.*]] = load atomic i32, ptr [[CALL9]] monotonic, align 4, !dbg [[DBG19]]
-// PPC64-NEXT:    br label [[ATOMIC_CONT:%.*]], !dbg [[DBG19]]
+// PPC64-NEXT:    [[TMP2:%.*]] = load i32, ptr @b, align 4, !dbg [[DBG20:![0-9]+]]
+// PPC64-NEXT:    [[ATOMIC_LOAD10:%.*]] = load atomic i32, ptr [[CALL9]] monotonic, align 4, !dbg [[DBG18]]
+// PPC64-NEXT:    br label [[ATOMIC_CONT:%.*]], !dbg [[DBG18]]
 // PPC64:       atomic_cont:
-// PPC64-NEXT:    [[TMP3:%.*]] = phi i32 [ [[ATOMIC_LOAD10]], [[INVOKE_CONT8]] ], [ [[TMP6:%.*]], [[ATOMIC_CONT]] ], !dbg [[DBG19]]
-// PPC64-NEXT:    [[REM:%.*]] = srem i32 [[TMP3]], [[TMP2]], !dbg [[DBG22:![0-9]+]]
-// PPC64-NEXT:    store i32 [[REM]], ptr [[ATOMIC_TEMP]], align 4, !dbg [[DBG19]]
-// PPC64-NEXT:    [[TMP4:%.*]] = load i32, ptr [[ATOMIC_TEMP]], align 4, !dbg [[DBG19]]
-// PPC64-NEXT:    [[TMP5:%.*]] = cmpxchg ptr [[CALL9]], i32 [[TMP3]], i32 [[TMP4]] monotonic monotonic, align 4, !dbg [[DBG19]]
-// PPC64-NEXT:    [[TMP6]] = extractvalue { i32, i1 } [[TMP5]], 0, !dbg [[DBG19]]
-// PPC64-NEXT:    [[TMP7:%.*]] = extractvalue { i32, i1 } [[TMP5]], 1, !dbg [[DBG19]]
-// PPC64-NEXT:    br i1 [[TMP7]], label [[ATOMIC_EXIT:%.*]], label [[ATOMIC_CONT]], !dbg [[DBG19]]
+// PPC64-NEXT:    [[TMP3:%.*]] = phi i32 [ [[ATOMIC_LOAD10]], [[INVOKE_CONT8]] ], [ [[TMP6:%.*]], [[ATOMIC_CONT]] ], !dbg [[DBG18]]
+// PPC64-NEXT:    [[REM:%.*]] = srem i32 [[TMP3]], [[TMP2]], !dbg [[DBG21:![0-9]+]]
+// PPC64-NEXT:    store i32 [[REM]], ptr [[ATOMIC_TEMP]], align 4, !dbg [[DBG18]]
+// PPC64-NEXT:    [[TMP4:%.*]] = load i32, ptr [[ATOMIC_TEMP]], align 4, !dbg [[DBG18]]
+// PPC64-NEXT:    [[TMP5:%.*]] = cmpxchg ptr [[CALL9]], i32 [[TMP3]], i32 [[TMP4]] monotonic monotonic, align 4, !dbg [[DBG18]]
+// PPC64-NEXT:    [[TMP6]] = extractvalue { i32, i1 } [[TMP5]], 0, !dbg [[DBG18]]
+// PPC64-NEXT:    [[TMP7:%.*]] = extractvalue { i32, i1 } [[TMP5]], 1, !dbg [[DBG18]]
+// PPC64-NEXT:    br i1 [[TMP7]], label [[ATOMIC_EXIT:%.*]], label [[ATOMIC_CONT]], !dbg [[DBG18]]
 // PPC64:       atomic_exit:
-// PPC64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP6]]) #[[ATTR1]], !dbg [[DBG23:![0-9]+]]
-// PPC64-NEXT:    [[FIELD:%.*]] = getelementptr inbounds nuw [[STRUCT_ST]], ptr [[S]], i32 0, i32 0, !dbg [[DBG24:![0-9]+]]
-// PPC64-NEXT:    [[TMP8:%.*]] = atomicrmw add ptr [[FIELD]], i64 1 monotonic, align 8, !dbg [[DBG25:![0-9]+]]
+// PPC64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dead_on_return(8) dereferenceable(8) [[REF_TMP6]]) #[[ATTR1]], !dbg [[DBG22:![0-9]+]]
+// PPC64-NEXT:    [[FIELD:%.*]] = getelementptr inbounds nuw [[STRUCT_ST]], ptr [[S]], i32 0, i32 0, !dbg [[DBG23:![0-9]+]]
+// PPC64-NEXT:    [[TMP8:%.*]] = atomicrmw add ptr [[FIELD]], i64 1 monotonic, align 8, !dbg [[DBG24:![0-9]+]]
 // PPC64-NEXT:    invoke void @_ZN2StC1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP11]])
-// PPC64-NEXT:            to label [[INVOKE_CONT12:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG26:![0-9]+]]
+// PPC64-NEXT:            to label [[INVOKE_CONT12:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG25:![0-9]+]]
 // PPC64:       invoke.cont12:
 // PPC64-NEXT:    [[CALL14:%.*]] = invoke noundef nonnull align 4 dereferenceable(4) ptr @_ZN2St3getEv(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP11]])
-// PPC64-NEXT:            to label [[INVOKE_CONT13:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG27:![0-9]+]]
+// PPC64-NEXT:            to label [[INVOKE_CONT13:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG26:![0-9]+]]
 // PPC64:       invoke.cont13:
-// PPC64-NEXT:    [[TMP9:%.*]] = load i32, ptr @b, align 4, !dbg [[DBG28:![0-9]+]]
-// PPC64-NEXT:    [[ATOMIC_LOAD15:%.*]] = load atomic i32, ptr [[CALL14]] monotonic, align 4, !dbg [[DBG29:![0-9]+]]
-// PPC64-NEXT:    br label [[ATOMIC_CONT16:%.*]], !dbg [[DBG29]]
+// PPC64-NEXT:    [[TMP9:%.*]] = load i32, ptr @b, align 4, !dbg [[DBG27:![0-9]+]]
+// PPC64-NEXT:    [[ATOMIC_LOAD15:%.*]] = load atomic i32, ptr [[CALL14]] monotonic, align 4, !dbg [[DBG28:![0-9]+]]
+// PPC64-NEXT:    br label [[ATOMIC_CONT16:%.*]], !dbg [[DBG28]]
 // PPC64:       atomic_cont16:
-// PPC64-NEXT:    [[TMP10:%.*]] = phi i32 [ [[ATOMIC_LOAD15]], [[INVOKE_CONT13]] ], [ [[TMP13:%.*]], [[ATOMIC_CONT16]] ], !dbg [[DBG29]]
-// PPC64-NEXT:    [[REM18:%.*]] = srem i32 [[TMP10]], [[TMP9]], !dbg [[DBG30:![0-9]+]]
-// PPC64-NEXT:    store i32 [[REM18]], ptr [[ATOMIC_TEMP17]], align 4, !dbg [[DBG29]]
-// PPC64-NEXT:    [[TMP11:%.*]] = load i32, ptr [[ATOMIC_TEMP17]], align 4, !dbg [[DBG29]]
-// PPC64-NEXT:    [[TMP12:%.*]] = cmpxchg ptr [[CALL14]], i32 [[TMP10]], i32 [[TMP11]] monotonic monotonic, align 4, !dbg [[DBG29]]
-// PPC64-NEXT:    [[TMP13]] = extractvalue { i32, i1 } [[TMP12]], 0, !dbg [[DBG29]]
-// PPC64-NEXT:    [[TMP14:%.*]] = extractvalue { i32, i1 } [[TMP12]], 1, !dbg [[DBG29]]
-// PPC64-NEXT:    br i1 [[TMP14]], label [[ATOMIC_EXIT19:%.*]], label [[ATOMIC_CONT16]], !dbg [[DBG29]]
+// PPC64-NEXT:    [[TMP10:%.*]] = phi i32 [ [[ATOMIC_LOAD15]], [[INVOKE_CONT13]] ], [ [[TMP13:%.*]], [[ATOMIC_CONT16]] ], !dbg [[DBG28]]
+// PPC64-NEXT:    [[REM18:%.*]] = srem i32 [[TMP10]], [[TMP9]], !dbg [[DBG29:![0-9]+]]
+// PPC64-NEXT:    store i32 [[REM18]], ptr [[ATOMIC_TEMP17]], align 4, !dbg [[DBG28]]
+// PPC64-NEXT:    [[TMP11:%.*]] = load i32, ptr [[ATOMIC_TEMP17]], align 4, !dbg [[DBG28]]
+// PPC64-NEXT:    [[TMP12:%.*]] = cmpxchg ptr [[CALL14]], i32 [[TMP10]], i32 [[TMP11]] monotonic monotonic, align 4, !dbg [[DBG28]]
+// PPC64-NEXT:    [[TMP13]] = extractvalue { i32, i1 } [[TMP12]], 0, !dbg [[DBG28]]
+// PPC64-NEXT:    [[TMP14:%.*]] = extractvalue { i32, i1 } [[TMP12]], 1, !dbg [[DBG28]]
+// PPC64-NEXT:    br i1 [[TMP14]], label [[ATOMIC_EXIT19:%.*]], label [[ATOMIC_CONT16]], !dbg [[DBG28]]
 // PPC64:       atomic_exit19:
-// PPC64-NEXT:    store i32 [[REM18]], ptr @a, align 4, !dbg [[DBG29]]
-// PPC64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP11]]) #[[ATTR1]], !dbg [[DBG31:![0-9]+]]
-// PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG32:![0-9]+]]
-// PPC64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[S]]) #[[ATTR1]], !dbg [[DBG33:![0-9]+]]
-// PPC64-NEXT:    ret void, !dbg [[DBG33]]
+// PPC64-NEXT:    store i32 [[REM18]], ptr @a, align 4, !dbg [[DBG28]]
+// PPC64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dead_on_return(8) dereferenceable(8) [[REF_TMP11]]) #[[ATTR1]], !dbg [[DBG30:![0-9]+]]
+// PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG31:![0-9]+]]
+// PPC64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dead_on_return(8) dereferenceable(8) [[S]]) #[[ATTR1]], !dbg [[DBG32:![0-9]+]]
+// PPC64-NEXT:    ret void, !dbg [[DBG32]]
 // PPC64:       terminate.lpad:
 // PPC64-NEXT:    [[TMP15:%.*]] = landingpad { ptr, i32 }
-// PPC64-NEXT:            catch ptr null, !dbg [[DBG11]]
-// PPC64-NEXT:    [[TMP16:%.*]] = extractvalue { ptr, i32 } [[TMP15]], 0, !dbg [[DBG11]]
-// PPC64-NEXT:    call void @__clang_call_terminate(ptr [[TMP16]]) #[[ATTR5:[0-9]+]], !dbg [[DBG11]]
-// PPC64-NEXT:    unreachable, !dbg [[DBG11]]
+// PPC64-NEXT:            catch ptr null, !dbg [[DBG10]]
+// PPC64-NEXT:    [[TMP16:%.*]] = extractvalue { ptr, i32 } [[TMP15]], 0, !dbg [[DBG10]]
+// PPC64-NEXT:    call void @__clang_call_terminate(ptr [[TMP16]]) #[[ATTR5:[0-9]+]], !dbg [[DBG10]]
+// PPC64-NEXT:    unreachable, !dbg [[DBG10]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@_ZN2StC1Ev
-// PPC64-SAME: (ptr noundef nonnull align 8 dereferenceable(8) [[THIS:%.*]]) unnamed_addr #[[ATTR0]] comdat !dbg [[DBG34:![0-9]+]] {
+// PPC64-SAME: (ptr noundef nonnull align 8 dereferenceable(8) [[THIS:%.*]]) unnamed_addr #[[ATTR0]] comdat !dbg [[DBG33:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
 // PPC64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// PPC64-NEXT:    call void @_ZN2StC2Ev(ptr noundef nonnull align 8 dereferenceable(8) [[THIS1]]), !dbg [[DBG35:![0-9]+]]
-// PPC64-NEXT:    ret void, !dbg [[DBG36:![0-9]+]]
+// PPC64-NEXT:    call void @_ZN2StC2Ev(ptr noundef nonnull align 8 dereferenceable(8) [[THIS1]]), !dbg [[DBG34:![0-9]+]]
+// PPC64-NEXT:    ret void, !dbg [[DBG35:![0-9]+]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@__clang_call_terminate
@@ -329,90 +329,90 @@ void parallel_atomic() {
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@_ZN2St3getEv
-// PPC64-SAME: (ptr noundef nonnull align 8 dereferenceable(8) [[THIS:%.*]]) #[[ATTR3:[0-9]+]] comdat !dbg [[DBG37:![0-9]+]] {
+// PPC64-SAME: (ptr noundef nonnull align 8 dereferenceable(8) [[THIS:%.*]]) #[[ATTR3:[0-9]+]] comdat !dbg [[DBG36:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
 // PPC64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// PPC64-NEXT:    ret ptr @a, !dbg [[DBG38:![0-9]+]]
+// PPC64-NEXT:    ret ptr @a, !dbg [[DBG37:![0-9]+]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@_ZN2StD1Ev
-// PPC64-SAME: (ptr noundef nonnull align 8 dereferenceable(8) [[THIS:%.*]]) unnamed_addr #[[ATTR3]] comdat !dbg [[DBG39:![0-9]+]] {
+// PPC64-SAME: (ptr noundef nonnull align 8 dead_on_return(8) dereferenceable(8) [[THIS:%.*]]) unnamed_addr #[[ATTR3]] comdat !dbg [[DBG38:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
 // PPC64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// PPC64-NEXT:    call void @_ZN2StD2Ev(ptr noundef nonnull align 8 dereferenceable(8) [[THIS1]]) #[[ATTR1]], !dbg [[DBG40:![0-9]+]]
-// PPC64-NEXT:    ret void, !dbg [[DBG41:![0-9]+]]
+// PPC64-NEXT:    call void @_ZN2StD2Ev(ptr noundef nonnull align 8 dead_on_return(8) dereferenceable(8) [[THIS1]]) #[[ATTR1]], !dbg [[DBG39:![0-9]+]]
+// PPC64-NEXT:    ret void, !dbg [[DBG40:![0-9]+]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@_Z3foov
-// PPC64-SAME: () #[[ATTR0]] !dbg [[DBG42:![0-9]+]] {
+// PPC64-SAME: () #[[ATTR0]] !dbg [[DBG41:![0-9]+]] {
 // PPC64-NEXT:  entry:
-// PPC64-NEXT:    call void @_Z8mayThrowv(), !dbg [[DBG43:![0-9]+]]
-// PPC64-NEXT:    ret ptr @a, !dbg [[DBG44:![0-9]+]]
+// PPC64-NEXT:    call void @_Z8mayThrowv(), !dbg [[DBG42:![0-9]+]]
+// PPC64-NEXT:    ret ptr @a, !dbg [[DBG43:![0-9]+]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@_Z15parallel_atomicv
-// PPC64-SAME: () #[[ATTR3]] personality ptr @__gxx_personality_v0 !dbg [[DBG45:![0-9]+]] {
+// PPC64-SAME: () #[[ATTR3]] personality ptr @__gxx_personality_v0 !dbg [[DBG44:![0-9]+]] {
 // PPC64-NEXT:  entry:
-// PPC64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr @a, i32 undef), "QUAL.OSS.SHARED"(ptr @b, i32 undef) ], !dbg [[DBG46:![0-9]+]]
+// PPC64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr @a, i32 undef), "QUAL.OSS.SHARED"(ptr @b, i32 undef) ], !dbg [[DBG45:![0-9]+]]
 // PPC64-NEXT:    [[CALL:%.*]] = invoke noundef nonnull align 4 dereferenceable(4) ptr @_Z3foov()
-// PPC64-NEXT:            to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG47:![0-9]+]]
+// PPC64-NEXT:            to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG46:![0-9]+]]
 // PPC64:       invoke.cont:
-// PPC64-NEXT:    [[ATOMIC_LOAD:%.*]] = load atomic i32, ptr @a monotonic, align 4, !dbg [[DBG47]]
-// PPC64-NEXT:    store i32 [[ATOMIC_LOAD]], ptr [[CALL]], align 4, !dbg [[DBG47]]
+// PPC64-NEXT:    [[ATOMIC_LOAD:%.*]] = load atomic i32, ptr @a monotonic, align 4, !dbg [[DBG46]]
+// PPC64-NEXT:    store i32 [[ATOMIC_LOAD]], ptr [[CALL]], align 4, !dbg [[DBG46]]
 // PPC64-NEXT:    [[CALL2:%.*]] = invoke noundef nonnull align 4 dereferenceable(4) ptr @_Z3foov()
-// PPC64-NEXT:            to label [[INVOKE_CONT1:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG48:![0-9]+]]
+// PPC64-NEXT:            to label [[INVOKE_CONT1:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG47:![0-9]+]]
 // PPC64:       invoke.cont1:
-// PPC64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[CALL2]], align 4, !dbg [[DBG48]]
-// PPC64-NEXT:    store atomic i32 [[TMP1]], ptr @a monotonic, align 4, !dbg [[DBG49:![0-9]+]]
+// PPC64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[CALL2]], align 4, !dbg [[DBG47]]
+// PPC64-NEXT:    store atomic i32 [[TMP1]], ptr @a monotonic, align 4, !dbg [[DBG48:![0-9]+]]
 // PPC64-NEXT:    [[CALL4:%.*]] = invoke noundef nonnull align 4 dereferenceable(4) ptr @_Z3foov()
-// PPC64-NEXT:            to label [[INVOKE_CONT3:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG50:![0-9]+]]
+// PPC64-NEXT:            to label [[INVOKE_CONT3:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG49:![0-9]+]]
 // PPC64:       invoke.cont3:
-// PPC64-NEXT:    [[TMP2:%.*]] = load i32, ptr [[CALL4]], align 4, !dbg [[DBG50]]
-// PPC64-NEXT:    [[TMP3:%.*]] = atomicrmw add ptr @a, i32 [[TMP2]] monotonic, align 4, !dbg [[DBG51:![0-9]+]]
+// PPC64-NEXT:    [[TMP2:%.*]] = load i32, ptr [[CALL4]], align 4, !dbg [[DBG49]]
+// PPC64-NEXT:    [[TMP3:%.*]] = atomicrmw add ptr @a, i32 [[TMP2]] monotonic, align 4, !dbg [[DBG50:![0-9]+]]
 // PPC64-NEXT:    [[CALL6:%.*]] = invoke noundef nonnull align 4 dereferenceable(4) ptr @_Z3foov()
-// PPC64-NEXT:            to label [[INVOKE_CONT5:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG52:![0-9]+]]
+// PPC64-NEXT:            to label [[INVOKE_CONT5:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG51:![0-9]+]]
 // PPC64:       invoke.cont5:
-// PPC64-NEXT:    [[TMP4:%.*]] = load i32, ptr [[CALL6]], align 4, !dbg [[DBG52]]
-// PPC64-NEXT:    [[TMP5:%.*]] = atomicrmw add ptr @a, i32 [[TMP4]] monotonic, align 4, !dbg [[DBG53:![0-9]+]]
-// PPC64-NEXT:    store i32 [[TMP5]], ptr @b, align 4, !dbg [[DBG53]]
-// PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG54:![0-9]+]]
-// PPC64-NEXT:    ret void, !dbg [[DBG55:![0-9]+]]
+// PPC64-NEXT:    [[TMP4:%.*]] = load i32, ptr [[CALL6]], align 4, !dbg [[DBG51]]
+// PPC64-NEXT:    [[TMP5:%.*]] = atomicrmw add ptr @a, i32 [[TMP4]] monotonic, align 4, !dbg [[DBG52:![0-9]+]]
+// PPC64-NEXT:    store i32 [[TMP5]], ptr @b, align 4, !dbg [[DBG52]]
+// PPC64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG53:![0-9]+]]
+// PPC64-NEXT:    ret void, !dbg [[DBG54:![0-9]+]]
 // PPC64:       terminate.lpad:
 // PPC64-NEXT:    [[TMP6:%.*]] = landingpad { ptr, i32 }
-// PPC64-NEXT:            catch ptr null, !dbg [[DBG47]]
-// PPC64-NEXT:    [[TMP7:%.*]] = extractvalue { ptr, i32 } [[TMP6]], 0, !dbg [[DBG47]]
-// PPC64-NEXT:    call void @__clang_call_terminate(ptr [[TMP7]]) #[[ATTR5]], !dbg [[DBG47]]
-// PPC64-NEXT:    unreachable, !dbg [[DBG47]]
+// PPC64-NEXT:            catch ptr null, !dbg [[DBG46]]
+// PPC64-NEXT:    [[TMP7:%.*]] = extractvalue { ptr, i32 } [[TMP6]], 0, !dbg [[DBG46]]
+// PPC64-NEXT:    call void @__clang_call_terminate(ptr [[TMP7]]) #[[ATTR5]], !dbg [[DBG46]]
+// PPC64-NEXT:    unreachable, !dbg [[DBG46]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@_ZN2StC2Ev
-// PPC64-SAME: (ptr noundef nonnull align 8 dereferenceable(8) [[THIS:%.*]]) unnamed_addr #[[ATTR3]] comdat !dbg [[DBG56:![0-9]+]] {
+// PPC64-SAME: (ptr noundef nonnull align 8 dereferenceable(8) [[THIS:%.*]]) unnamed_addr #[[ATTR3]] comdat !dbg [[DBG55:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
 // PPC64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// PPC64-NEXT:    ret void, !dbg [[DBG57:![0-9]+]]
+// PPC64-NEXT:    ret void, !dbg [[DBG56:![0-9]+]]
 //
 //
 // PPC64-LABEL: define {{[^@]+}}@_ZN2StD2Ev
-// PPC64-SAME: (ptr noundef nonnull align 8 dereferenceable(8) [[THIS:%.*]]) unnamed_addr #[[ATTR3]] comdat !dbg [[DBG58:![0-9]+]] {
+// PPC64-SAME: (ptr noundef nonnull align 8 dead_on_return(8) dereferenceable(8) [[THIS:%.*]]) unnamed_addr #[[ATTR3]] comdat !dbg [[DBG57:![0-9]+]] {
 // PPC64-NEXT:  entry:
 // PPC64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // PPC64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
 // PPC64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// PPC64-NEXT:    ret void, !dbg [[DBG59:![0-9]+]]
+// PPC64-NEXT:    ret void, !dbg [[DBG58:![0-9]+]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@_Z19parallel_atomic_ewcv
-// AARCH64-SAME: () #[[ATTR0:[0-9]+]] personality ptr @__gxx_personality_v0 !dbg [[DBG5:![0-9]+]] {
+// AARCH64-SAME: () #[[ATTR0:[0-9]+]] personality ptr @__gxx_personality_v0 !dbg [[DBG4:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[S:%.*]] = alloca [[STRUCT_ST:%.*]], align 8
-// AARCH64-NEXT:    call void @_ZN2StC1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[S]]), !dbg [[DBG9:![0-9]+]]
-// AARCH64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[S]], [[STRUCT_ST]] undef), "QUAL.OSS.SHARED"(ptr @b, i32 undef), "QUAL.OSS.SHARED"(ptr @a, i32 undef) ], !dbg [[DBG10:![0-9]+]]
+// AARCH64-NEXT:    call void @_ZN2StC1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[S]]), !dbg [[DBG8:![0-9]+]]
+// AARCH64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr [[S]], [[STRUCT_ST]] undef), "QUAL.OSS.SHARED"(ptr @b, i32 undef), "QUAL.OSS.SHARED"(ptr @a, i32 undef) ], !dbg [[DBG9:![0-9]+]]
 // AARCH64-NEXT:    [[REF_TMP:%.*]] = alloca [[STRUCT_ST]], align 8
 // AARCH64-NEXT:    [[REF_TMP2:%.*]] = alloca [[STRUCT_ST]], align 8
 // AARCH64-NEXT:    [[REF_TMP6:%.*]] = alloca [[STRUCT_ST]], align 8
@@ -420,85 +420,85 @@ void parallel_atomic() {
 // AARCH64-NEXT:    [[REF_TMP11:%.*]] = alloca [[STRUCT_ST]], align 8
 // AARCH64-NEXT:    [[ATOMIC_TEMP17:%.*]] = alloca i32, align 4
 // AARCH64-NEXT:    invoke void @_ZN2StC1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP]])
-// AARCH64-NEXT:            to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG11:![0-9]+]]
+// AARCH64-NEXT:            to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG10:![0-9]+]]
 // AARCH64:       invoke.cont:
 // AARCH64-NEXT:    [[CALL:%.*]] = invoke noundef nonnull align 4 dereferenceable(4) ptr @_ZN2St3getEv(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP]])
-// AARCH64-NEXT:            to label [[INVOKE_CONT1:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG12:![0-9]+]]
+// AARCH64-NEXT:            to label [[INVOKE_CONT1:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG11:![0-9]+]]
 // AARCH64:       invoke.cont1:
-// AARCH64-NEXT:    [[ATOMIC_LOAD:%.*]] = load atomic i32, ptr [[CALL]] monotonic, align 4, !dbg [[DBG13:![0-9]+]]
-// AARCH64-NEXT:    store i32 [[ATOMIC_LOAD]], ptr @b, align 4, !dbg [[DBG13]]
-// AARCH64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP]]) #[[ATTR1:[0-9]+]], !dbg [[DBG14:![0-9]+]]
+// AARCH64-NEXT:    [[ATOMIC_LOAD:%.*]] = load atomic i32, ptr [[CALL]] monotonic, align 4, !dbg [[DBG12:![0-9]+]]
+// AARCH64-NEXT:    store i32 [[ATOMIC_LOAD]], ptr @b, align 4, !dbg [[DBG12]]
+// AARCH64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dead_on_return(8) dereferenceable(8) [[REF_TMP]]) #[[ATTR1:[0-9]+]], !dbg [[DBG13:![0-9]+]]
 // AARCH64-NEXT:    invoke void @_ZN2StC1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP2]])
-// AARCH64-NEXT:            to label [[INVOKE_CONT3:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG15:![0-9]+]]
+// AARCH64-NEXT:            to label [[INVOKE_CONT3:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG14:![0-9]+]]
 // AARCH64:       invoke.cont3:
 // AARCH64-NEXT:    [[CALL5:%.*]] = invoke noundef nonnull align 4 dereferenceable(4) ptr @_ZN2St3getEv(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP2]])
-// AARCH64-NEXT:            to label [[INVOKE_CONT4:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG16:![0-9]+]]
+// AARCH64-NEXT:            to label [[INVOKE_CONT4:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG15:![0-9]+]]
 // AARCH64:       invoke.cont4:
-// AARCH64-NEXT:    [[TMP1:%.*]] = load i32, ptr @b, align 4, !dbg [[DBG17:![0-9]+]]
-// AARCH64-NEXT:    store atomic i32 [[TMP1]], ptr [[CALL5]] monotonic, align 4, !dbg [[DBG15]]
-// AARCH64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP2]]) #[[ATTR1]], !dbg [[DBG18:![0-9]+]]
+// AARCH64-NEXT:    [[TMP1:%.*]] = load i32, ptr @b, align 4, !dbg [[DBG16:![0-9]+]]
+// AARCH64-NEXT:    store atomic i32 [[TMP1]], ptr [[CALL5]] monotonic, align 4, !dbg [[DBG14]]
+// AARCH64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dead_on_return(8) dereferenceable(8) [[REF_TMP2]]) #[[ATTR1]], !dbg [[DBG17:![0-9]+]]
 // AARCH64-NEXT:    invoke void @_ZN2StC1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP6]])
-// AARCH64-NEXT:            to label [[INVOKE_CONT7:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG19:![0-9]+]]
+// AARCH64-NEXT:            to label [[INVOKE_CONT7:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG18:![0-9]+]]
 // AARCH64:       invoke.cont7:
 // AARCH64-NEXT:    [[CALL9:%.*]] = invoke noundef nonnull align 4 dereferenceable(4) ptr @_ZN2St3getEv(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP6]])
-// AARCH64-NEXT:            to label [[INVOKE_CONT8:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG20:![0-9]+]]
+// AARCH64-NEXT:            to label [[INVOKE_CONT8:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG19:![0-9]+]]
 // AARCH64:       invoke.cont8:
-// AARCH64-NEXT:    [[TMP2:%.*]] = load i32, ptr @b, align 4, !dbg [[DBG21:![0-9]+]]
-// AARCH64-NEXT:    [[ATOMIC_LOAD10:%.*]] = load atomic i32, ptr [[CALL9]] monotonic, align 4, !dbg [[DBG19]]
-// AARCH64-NEXT:    br label [[ATOMIC_CONT:%.*]], !dbg [[DBG19]]
+// AARCH64-NEXT:    [[TMP2:%.*]] = load i32, ptr @b, align 4, !dbg [[DBG20:![0-9]+]]
+// AARCH64-NEXT:    [[ATOMIC_LOAD10:%.*]] = load atomic i32, ptr [[CALL9]] monotonic, align 4, !dbg [[DBG18]]
+// AARCH64-NEXT:    br label [[ATOMIC_CONT:%.*]], !dbg [[DBG18]]
 // AARCH64:       atomic_cont:
-// AARCH64-NEXT:    [[TMP3:%.*]] = phi i32 [ [[ATOMIC_LOAD10]], [[INVOKE_CONT8]] ], [ [[TMP6:%.*]], [[ATOMIC_CONT]] ], !dbg [[DBG19]]
-// AARCH64-NEXT:    [[REM:%.*]] = srem i32 [[TMP3]], [[TMP2]], !dbg [[DBG22:![0-9]+]]
-// AARCH64-NEXT:    store i32 [[REM]], ptr [[ATOMIC_TEMP]], align 4, !dbg [[DBG19]]
-// AARCH64-NEXT:    [[TMP4:%.*]] = load i32, ptr [[ATOMIC_TEMP]], align 4, !dbg [[DBG19]]
-// AARCH64-NEXT:    [[TMP5:%.*]] = cmpxchg ptr [[CALL9]], i32 [[TMP3]], i32 [[TMP4]] monotonic monotonic, align 4, !dbg [[DBG19]]
-// AARCH64-NEXT:    [[TMP6]] = extractvalue { i32, i1 } [[TMP5]], 0, !dbg [[DBG19]]
-// AARCH64-NEXT:    [[TMP7:%.*]] = extractvalue { i32, i1 } [[TMP5]], 1, !dbg [[DBG19]]
-// AARCH64-NEXT:    br i1 [[TMP7]], label [[ATOMIC_EXIT:%.*]], label [[ATOMIC_CONT]], !dbg [[DBG19]]
+// AARCH64-NEXT:    [[TMP3:%.*]] = phi i32 [ [[ATOMIC_LOAD10]], [[INVOKE_CONT8]] ], [ [[TMP6:%.*]], [[ATOMIC_CONT]] ], !dbg [[DBG18]]
+// AARCH64-NEXT:    [[REM:%.*]] = srem i32 [[TMP3]], [[TMP2]], !dbg [[DBG21:![0-9]+]]
+// AARCH64-NEXT:    store i32 [[REM]], ptr [[ATOMIC_TEMP]], align 4, !dbg [[DBG18]]
+// AARCH64-NEXT:    [[TMP4:%.*]] = load i32, ptr [[ATOMIC_TEMP]], align 4, !dbg [[DBG18]]
+// AARCH64-NEXT:    [[TMP5:%.*]] = cmpxchg ptr [[CALL9]], i32 [[TMP3]], i32 [[TMP4]] monotonic monotonic, align 4, !dbg [[DBG18]]
+// AARCH64-NEXT:    [[TMP6]] = extractvalue { i32, i1 } [[TMP5]], 0, !dbg [[DBG18]]
+// AARCH64-NEXT:    [[TMP7:%.*]] = extractvalue { i32, i1 } [[TMP5]], 1, !dbg [[DBG18]]
+// AARCH64-NEXT:    br i1 [[TMP7]], label [[ATOMIC_EXIT:%.*]], label [[ATOMIC_CONT]], !dbg [[DBG18]]
 // AARCH64:       atomic_exit:
-// AARCH64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP6]]) #[[ATTR1]], !dbg [[DBG23:![0-9]+]]
-// AARCH64-NEXT:    [[FIELD:%.*]] = getelementptr inbounds nuw [[STRUCT_ST]], ptr [[S]], i32 0, i32 0, !dbg [[DBG24:![0-9]+]]
-// AARCH64-NEXT:    [[TMP8:%.*]] = atomicrmw add ptr [[FIELD]], i64 1 monotonic, align 8, !dbg [[DBG25:![0-9]+]]
+// AARCH64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dead_on_return(8) dereferenceable(8) [[REF_TMP6]]) #[[ATTR1]], !dbg [[DBG22:![0-9]+]]
+// AARCH64-NEXT:    [[FIELD:%.*]] = getelementptr inbounds nuw [[STRUCT_ST]], ptr [[S]], i32 0, i32 0, !dbg [[DBG23:![0-9]+]]
+// AARCH64-NEXT:    [[TMP8:%.*]] = atomicrmw add ptr [[FIELD]], i64 1 monotonic, align 8, !dbg [[DBG24:![0-9]+]]
 // AARCH64-NEXT:    invoke void @_ZN2StC1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP11]])
-// AARCH64-NEXT:            to label [[INVOKE_CONT12:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG26:![0-9]+]]
+// AARCH64-NEXT:            to label [[INVOKE_CONT12:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG25:![0-9]+]]
 // AARCH64:       invoke.cont12:
 // AARCH64-NEXT:    [[CALL14:%.*]] = invoke noundef nonnull align 4 dereferenceable(4) ptr @_ZN2St3getEv(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP11]])
-// AARCH64-NEXT:            to label [[INVOKE_CONT13:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG27:![0-9]+]]
+// AARCH64-NEXT:            to label [[INVOKE_CONT13:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG26:![0-9]+]]
 // AARCH64:       invoke.cont13:
-// AARCH64-NEXT:    [[TMP9:%.*]] = load i32, ptr @b, align 4, !dbg [[DBG28:![0-9]+]]
-// AARCH64-NEXT:    [[ATOMIC_LOAD15:%.*]] = load atomic i32, ptr [[CALL14]] monotonic, align 4, !dbg [[DBG29:![0-9]+]]
-// AARCH64-NEXT:    br label [[ATOMIC_CONT16:%.*]], !dbg [[DBG29]]
+// AARCH64-NEXT:    [[TMP9:%.*]] = load i32, ptr @b, align 4, !dbg [[DBG27:![0-9]+]]
+// AARCH64-NEXT:    [[ATOMIC_LOAD15:%.*]] = load atomic i32, ptr [[CALL14]] monotonic, align 4, !dbg [[DBG28:![0-9]+]]
+// AARCH64-NEXT:    br label [[ATOMIC_CONT16:%.*]], !dbg [[DBG28]]
 // AARCH64:       atomic_cont16:
-// AARCH64-NEXT:    [[TMP10:%.*]] = phi i32 [ [[ATOMIC_LOAD15]], [[INVOKE_CONT13]] ], [ [[TMP13:%.*]], [[ATOMIC_CONT16]] ], !dbg [[DBG29]]
-// AARCH64-NEXT:    [[REM18:%.*]] = srem i32 [[TMP10]], [[TMP9]], !dbg [[DBG30:![0-9]+]]
-// AARCH64-NEXT:    store i32 [[REM18]], ptr [[ATOMIC_TEMP17]], align 4, !dbg [[DBG29]]
-// AARCH64-NEXT:    [[TMP11:%.*]] = load i32, ptr [[ATOMIC_TEMP17]], align 4, !dbg [[DBG29]]
-// AARCH64-NEXT:    [[TMP12:%.*]] = cmpxchg ptr [[CALL14]], i32 [[TMP10]], i32 [[TMP11]] monotonic monotonic, align 4, !dbg [[DBG29]]
-// AARCH64-NEXT:    [[TMP13]] = extractvalue { i32, i1 } [[TMP12]], 0, !dbg [[DBG29]]
-// AARCH64-NEXT:    [[TMP14:%.*]] = extractvalue { i32, i1 } [[TMP12]], 1, !dbg [[DBG29]]
-// AARCH64-NEXT:    br i1 [[TMP14]], label [[ATOMIC_EXIT19:%.*]], label [[ATOMIC_CONT16]], !dbg [[DBG29]]
+// AARCH64-NEXT:    [[TMP10:%.*]] = phi i32 [ [[ATOMIC_LOAD15]], [[INVOKE_CONT13]] ], [ [[TMP13:%.*]], [[ATOMIC_CONT16]] ], !dbg [[DBG28]]
+// AARCH64-NEXT:    [[REM18:%.*]] = srem i32 [[TMP10]], [[TMP9]], !dbg [[DBG29:![0-9]+]]
+// AARCH64-NEXT:    store i32 [[REM18]], ptr [[ATOMIC_TEMP17]], align 4, !dbg [[DBG28]]
+// AARCH64-NEXT:    [[TMP11:%.*]] = load i32, ptr [[ATOMIC_TEMP17]], align 4, !dbg [[DBG28]]
+// AARCH64-NEXT:    [[TMP12:%.*]] = cmpxchg ptr [[CALL14]], i32 [[TMP10]], i32 [[TMP11]] monotonic monotonic, align 4, !dbg [[DBG28]]
+// AARCH64-NEXT:    [[TMP13]] = extractvalue { i32, i1 } [[TMP12]], 0, !dbg [[DBG28]]
+// AARCH64-NEXT:    [[TMP14:%.*]] = extractvalue { i32, i1 } [[TMP12]], 1, !dbg [[DBG28]]
+// AARCH64-NEXT:    br i1 [[TMP14]], label [[ATOMIC_EXIT19:%.*]], label [[ATOMIC_CONT16]], !dbg [[DBG28]]
 // AARCH64:       atomic_exit19:
-// AARCH64-NEXT:    store i32 [[REM18]], ptr @a, align 4, !dbg [[DBG29]]
-// AARCH64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[REF_TMP11]]) #[[ATTR1]], !dbg [[DBG31:![0-9]+]]
-// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG32:![0-9]+]]
-// AARCH64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dereferenceable(8) [[S]]) #[[ATTR1]], !dbg [[DBG33:![0-9]+]]
-// AARCH64-NEXT:    ret void, !dbg [[DBG33]]
+// AARCH64-NEXT:    store i32 [[REM18]], ptr @a, align 4, !dbg [[DBG28]]
+// AARCH64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dead_on_return(8) dereferenceable(8) [[REF_TMP11]]) #[[ATTR1]], !dbg [[DBG30:![0-9]+]]
+// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG31:![0-9]+]]
+// AARCH64-NEXT:    call void @_ZN2StD1Ev(ptr noundef nonnull align 8 dead_on_return(8) dereferenceable(8) [[S]]) #[[ATTR1]], !dbg [[DBG32:![0-9]+]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG32]]
 // AARCH64:       terminate.lpad:
 // AARCH64-NEXT:    [[TMP15:%.*]] = landingpad { ptr, i32 }
-// AARCH64-NEXT:            catch ptr null, !dbg [[DBG11]]
-// AARCH64-NEXT:    [[TMP16:%.*]] = extractvalue { ptr, i32 } [[TMP15]], 0, !dbg [[DBG11]]
-// AARCH64-NEXT:    call void @__clang_call_terminate(ptr [[TMP16]]) #[[ATTR5:[0-9]+]], !dbg [[DBG11]]
-// AARCH64-NEXT:    unreachable, !dbg [[DBG11]]
+// AARCH64-NEXT:            catch ptr null, !dbg [[DBG10]]
+// AARCH64-NEXT:    [[TMP16:%.*]] = extractvalue { ptr, i32 } [[TMP15]], 0, !dbg [[DBG10]]
+// AARCH64-NEXT:    call void @__clang_call_terminate(ptr [[TMP16]]) #[[ATTR5:[0-9]+]], !dbg [[DBG10]]
+// AARCH64-NEXT:    unreachable, !dbg [[DBG10]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@_ZN2StC1Ev
-// AARCH64-SAME: (ptr noundef nonnull align 8 dereferenceable(8) [[THIS:%.*]]) unnamed_addr #[[ATTR0]] comdat !dbg [[DBG34:![0-9]+]] {
+// AARCH64-SAME: (ptr noundef nonnull align 8 dereferenceable(8) [[THIS:%.*]]) unnamed_addr #[[ATTR0]] comdat !dbg [[DBG33:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
 // AARCH64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// AARCH64-NEXT:    call void @_ZN2StC2Ev(ptr noundef nonnull align 8 dereferenceable(8) [[THIS1]]), !dbg [[DBG35:![0-9]+]]
-// AARCH64-NEXT:    ret void, !dbg [[DBG36:![0-9]+]]
+// AARCH64-NEXT:    call void @_ZN2StC2Ev(ptr noundef nonnull align 8 dereferenceable(8) [[THIS1]]), !dbg [[DBG34:![0-9]+]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG35:![0-9]+]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@__clang_call_terminate
@@ -509,80 +509,80 @@ void parallel_atomic() {
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@_ZN2St3getEv
-// AARCH64-SAME: (ptr noundef nonnull align 8 dereferenceable(8) [[THIS:%.*]]) #[[ATTR3:[0-9]+]] comdat !dbg [[DBG37:![0-9]+]] {
+// AARCH64-SAME: (ptr noundef nonnull align 8 dereferenceable(8) [[THIS:%.*]]) #[[ATTR3:[0-9]+]] comdat !dbg [[DBG36:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
 // AARCH64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// AARCH64-NEXT:    ret ptr @a, !dbg [[DBG38:![0-9]+]]
+// AARCH64-NEXT:    ret ptr @a, !dbg [[DBG37:![0-9]+]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@_ZN2StD1Ev
-// AARCH64-SAME: (ptr noundef nonnull align 8 dereferenceable(8) [[THIS:%.*]]) unnamed_addr #[[ATTR3]] comdat !dbg [[DBG39:![0-9]+]] {
+// AARCH64-SAME: (ptr noundef nonnull align 8 dead_on_return(8) dereferenceable(8) [[THIS:%.*]]) unnamed_addr #[[ATTR3]] comdat !dbg [[DBG38:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
 // AARCH64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// AARCH64-NEXT:    call void @_ZN2StD2Ev(ptr noundef nonnull align 8 dereferenceable(8) [[THIS1]]) #[[ATTR1]], !dbg [[DBG40:![0-9]+]]
-// AARCH64-NEXT:    ret void, !dbg [[DBG41:![0-9]+]]
+// AARCH64-NEXT:    call void @_ZN2StD2Ev(ptr noundef nonnull align 8 dead_on_return(8) dereferenceable(8) [[THIS1]]) #[[ATTR1]], !dbg [[DBG39:![0-9]+]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG40:![0-9]+]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@_Z3foov
-// AARCH64-SAME: () #[[ATTR0]] !dbg [[DBG42:![0-9]+]] {
+// AARCH64-SAME: () #[[ATTR0]] !dbg [[DBG41:![0-9]+]] {
 // AARCH64-NEXT:  entry:
-// AARCH64-NEXT:    call void @_Z8mayThrowv(), !dbg [[DBG43:![0-9]+]]
-// AARCH64-NEXT:    ret ptr @a, !dbg [[DBG44:![0-9]+]]
+// AARCH64-NEXT:    call void @_Z8mayThrowv(), !dbg [[DBG42:![0-9]+]]
+// AARCH64-NEXT:    ret ptr @a, !dbg [[DBG43:![0-9]+]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@_Z15parallel_atomicv
-// AARCH64-SAME: () #[[ATTR3]] personality ptr @__gxx_personality_v0 !dbg [[DBG45:![0-9]+]] {
+// AARCH64-SAME: () #[[ATTR3]] personality ptr @__gxx_personality_v0 !dbg [[DBG44:![0-9]+]] {
 // AARCH64-NEXT:  entry:
-// AARCH64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr @a, i32 undef), "QUAL.OSS.SHARED"(ptr @b, i32 undef) ], !dbg [[DBG46:![0-9]+]]
+// AARCH64-NEXT:    [[TMP0:%.*]] = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(ptr @a, i32 undef), "QUAL.OSS.SHARED"(ptr @b, i32 undef) ], !dbg [[DBG45:![0-9]+]]
 // AARCH64-NEXT:    [[CALL:%.*]] = invoke noundef nonnull align 4 dereferenceable(4) ptr @_Z3foov()
-// AARCH64-NEXT:            to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG47:![0-9]+]]
+// AARCH64-NEXT:            to label [[INVOKE_CONT:%.*]] unwind label [[TERMINATE_LPAD:%.*]], !dbg [[DBG46:![0-9]+]]
 // AARCH64:       invoke.cont:
-// AARCH64-NEXT:    [[ATOMIC_LOAD:%.*]] = load atomic i32, ptr @a monotonic, align 4, !dbg [[DBG47]]
-// AARCH64-NEXT:    store i32 [[ATOMIC_LOAD]], ptr [[CALL]], align 4, !dbg [[DBG47]]
+// AARCH64-NEXT:    [[ATOMIC_LOAD:%.*]] = load atomic i32, ptr @a monotonic, align 4, !dbg [[DBG46]]
+// AARCH64-NEXT:    store i32 [[ATOMIC_LOAD]], ptr [[CALL]], align 4, !dbg [[DBG46]]
 // AARCH64-NEXT:    [[CALL2:%.*]] = invoke noundef nonnull align 4 dereferenceable(4) ptr @_Z3foov()
-// AARCH64-NEXT:            to label [[INVOKE_CONT1:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG48:![0-9]+]]
+// AARCH64-NEXT:            to label [[INVOKE_CONT1:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG47:![0-9]+]]
 // AARCH64:       invoke.cont1:
-// AARCH64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[CALL2]], align 4, !dbg [[DBG48]]
-// AARCH64-NEXT:    store atomic i32 [[TMP1]], ptr @a monotonic, align 4, !dbg [[DBG49:![0-9]+]]
+// AARCH64-NEXT:    [[TMP1:%.*]] = load i32, ptr [[CALL2]], align 4, !dbg [[DBG47]]
+// AARCH64-NEXT:    store atomic i32 [[TMP1]], ptr @a monotonic, align 4, !dbg [[DBG48:![0-9]+]]
 // AARCH64-NEXT:    [[CALL4:%.*]] = invoke noundef nonnull align 4 dereferenceable(4) ptr @_Z3foov()
-// AARCH64-NEXT:            to label [[INVOKE_CONT3:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG50:![0-9]+]]
+// AARCH64-NEXT:            to label [[INVOKE_CONT3:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG49:![0-9]+]]
 // AARCH64:       invoke.cont3:
-// AARCH64-NEXT:    [[TMP2:%.*]] = load i32, ptr [[CALL4]], align 4, !dbg [[DBG50]]
-// AARCH64-NEXT:    [[TMP3:%.*]] = atomicrmw add ptr @a, i32 [[TMP2]] monotonic, align 4, !dbg [[DBG51:![0-9]+]]
+// AARCH64-NEXT:    [[TMP2:%.*]] = load i32, ptr [[CALL4]], align 4, !dbg [[DBG49]]
+// AARCH64-NEXT:    [[TMP3:%.*]] = atomicrmw add ptr @a, i32 [[TMP2]] monotonic, align 4, !dbg [[DBG50:![0-9]+]]
 // AARCH64-NEXT:    [[CALL6:%.*]] = invoke noundef nonnull align 4 dereferenceable(4) ptr @_Z3foov()
-// AARCH64-NEXT:            to label [[INVOKE_CONT5:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG52:![0-9]+]]
+// AARCH64-NEXT:            to label [[INVOKE_CONT5:%.*]] unwind label [[TERMINATE_LPAD]], !dbg [[DBG51:![0-9]+]]
 // AARCH64:       invoke.cont5:
-// AARCH64-NEXT:    [[TMP4:%.*]] = load i32, ptr [[CALL6]], align 4, !dbg [[DBG52]]
-// AARCH64-NEXT:    [[TMP5:%.*]] = atomicrmw add ptr @a, i32 [[TMP4]] monotonic, align 4, !dbg [[DBG53:![0-9]+]]
-// AARCH64-NEXT:    store i32 [[TMP5]], ptr @b, align 4, !dbg [[DBG53]]
-// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG54:![0-9]+]]
-// AARCH64-NEXT:    ret void, !dbg [[DBG55:![0-9]+]]
+// AARCH64-NEXT:    [[TMP4:%.*]] = load i32, ptr [[CALL6]], align 4, !dbg [[DBG51]]
+// AARCH64-NEXT:    [[TMP5:%.*]] = atomicrmw add ptr @a, i32 [[TMP4]] monotonic, align 4, !dbg [[DBG52:![0-9]+]]
+// AARCH64-NEXT:    store i32 [[TMP5]], ptr @b, align 4, !dbg [[DBG52]]
+// AARCH64-NEXT:    call void @llvm.directive.region.exit(token [[TMP0]]), !dbg [[DBG53:![0-9]+]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG54:![0-9]+]]
 // AARCH64:       terminate.lpad:
 // AARCH64-NEXT:    [[TMP6:%.*]] = landingpad { ptr, i32 }
-// AARCH64-NEXT:            catch ptr null, !dbg [[DBG47]]
-// AARCH64-NEXT:    [[TMP7:%.*]] = extractvalue { ptr, i32 } [[TMP6]], 0, !dbg [[DBG47]]
-// AARCH64-NEXT:    call void @__clang_call_terminate(ptr [[TMP7]]) #[[ATTR5]], !dbg [[DBG47]]
-// AARCH64-NEXT:    unreachable, !dbg [[DBG47]]
+// AARCH64-NEXT:            catch ptr null, !dbg [[DBG46]]
+// AARCH64-NEXT:    [[TMP7:%.*]] = extractvalue { ptr, i32 } [[TMP6]], 0, !dbg [[DBG46]]
+// AARCH64-NEXT:    call void @__clang_call_terminate(ptr [[TMP7]]) #[[ATTR5]], !dbg [[DBG46]]
+// AARCH64-NEXT:    unreachable, !dbg [[DBG46]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@_ZN2StC2Ev
-// AARCH64-SAME: (ptr noundef nonnull align 8 dereferenceable(8) [[THIS:%.*]]) unnamed_addr #[[ATTR3]] comdat !dbg [[DBG56:![0-9]+]] {
+// AARCH64-SAME: (ptr noundef nonnull align 8 dereferenceable(8) [[THIS:%.*]]) unnamed_addr #[[ATTR3]] comdat !dbg [[DBG55:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
 // AARCH64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// AARCH64-NEXT:    ret void, !dbg [[DBG57:![0-9]+]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG56:![0-9]+]]
 //
 //
 // AARCH64-LABEL: define {{[^@]+}}@_ZN2StD2Ev
-// AARCH64-SAME: (ptr noundef nonnull align 8 dereferenceable(8) [[THIS:%.*]]) unnamed_addr #[[ATTR3]] comdat !dbg [[DBG58:![0-9]+]] {
+// AARCH64-SAME: (ptr noundef nonnull align 8 dead_on_return(8) dereferenceable(8) [[THIS:%.*]]) unnamed_addr #[[ATTR3]] comdat !dbg [[DBG57:![0-9]+]] {
 // AARCH64-NEXT:  entry:
 // AARCH64-NEXT:    [[THIS_ADDR:%.*]] = alloca ptr, align 8
 // AARCH64-NEXT:    store ptr [[THIS]], ptr [[THIS_ADDR]], align 8
 // AARCH64-NEXT:    [[THIS1:%.*]] = load ptr, ptr [[THIS_ADDR]], align 8
-// AARCH64-NEXT:    ret void, !dbg [[DBG59:![0-9]+]]
+// AARCH64-NEXT:    ret void, !dbg [[DBG58:![0-9]+]]
 //

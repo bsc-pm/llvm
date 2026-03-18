@@ -86,7 +86,7 @@ end program
 ! LLVMIRDialect:           oss.task priority(%[[VAL_2]] : i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           oss.task default( defshared) {
+! LLVMIRDialect:           oss.task default(defshared) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
 ! LLVMIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = llvm.mlir.undef : i32

@@ -318,7 +318,7 @@ def OSS_TaskLoop : Directive<[Spelling<"taskloop">]> {
     VersionedClause<OSSC_GrainSize>,
     VersionedClause<OSSC_Collapse>,
   ];
-  let association = AS_Loop;
+  let association = AS_LoopNest;
   let category = CA_Executable;
 }
 def OSS_TaskFor : Directive<[Spelling<"task for">]> {
@@ -350,7 +350,7 @@ def OSS_TaskFor : Directive<[Spelling<"task for">]> {
     VersionedClause<OSSC_ChunkSize>,
     VersionedClause<OSSC_Collapse>,
   ];
-  let association = AS_Loop;
+  let association = AS_LoopNest;
   let category = CA_Executable;
 }
 def OSS_TaskLoopFor : Directive<[Spelling<"taskloop for">]> {
@@ -383,7 +383,7 @@ def OSS_TaskLoopFor : Directive<[Spelling<"taskloop for">]> {
     VersionedClause<OSSC_GrainSize>,
     VersionedClause<OSSC_Collapse>,
   ];
-  let association = AS_Loop;
+  let association = AS_LoopNest;
   let category = CA_Executable;
 }
 
@@ -421,7 +421,7 @@ def OSS_TaskIter : Directive<[Spelling<"taskiter">]> {
     VersionedClause<OSSC_Update>,
     VersionedClause<OSSC_Unroll>,
   ];
-  let association = AS_Loop;
+  let association = AS_LoopNest;
   let category = CA_Executable;
 }
 def OSS_Critical : Directive<[Spelling<"critical">]> {

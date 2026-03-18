@@ -26,6 +26,14 @@ add_flang_library(FortranParser
   unparse.cpp
   user-state.cpp
 
+  DISABLE_PCH_REUSE
+  PRECOMPILE_HEADERS
+  [["flang/Parser/parsing.h"]]
+  [["flang/Parser/parse-tree.h"]]
+  [["flang/Parser/provenance.h"]]
+  [["flang/Parser/message.h"]]
+  [["flang/Parser/parse-tree-visitor.h"]]
+
   LINK_LIBS
   FortranSupport
 
@@ -38,12 +46,4 @@ add_flang_library(FortranParser
   omp_gen
   acc_gen
   oss_gen
-)
-
-target_precompile_headers(FortranParser PRIVATE
-  [["flang/Parser/parsing.h"]]
-  [["flang/Parser/parse-tree.h"]]
-  [["flang/Parser/provenance.h"]]
-  [["flang/Parser/message.h"]]
-  [["flang/Parser/parse-tree-visitor.h"]]
 )

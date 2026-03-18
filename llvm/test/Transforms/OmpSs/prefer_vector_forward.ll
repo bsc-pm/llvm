@@ -14,57 +14,57 @@ target triple = "x86_64-unknown-linux-gnu"
 ; }
 
 ; Function Attrs: nounwind uwtable
-define dso_local void @foo(ptr noalias noundef %a, ptr noalias noundef %b, ptr noalias noundef %c) #0 !dbg !6 {
+define dso_local void @foo(ptr noalias noundef %a, ptr noalias noundef %b, ptr noalias noundef %c) #0 !dbg !9 {
 entry:
   %a.addr = alloca ptr, align 8
   %b.addr = alloca ptr, align 8
   %c.addr = alloca ptr, align 8
-  store ptr %a, ptr %a.addr, align 8, !tbaa !9
-  store ptr %b, ptr %b.addr, align 8, !tbaa !9
-  store ptr %c, ptr %c.addr, align 8, !tbaa !9
-  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr %c.addr, ptr undef), "QUAL.OSS.FIRSTPRIVATE"(ptr %a.addr, ptr undef), "QUAL.OSS.FIRSTPRIVATE"(ptr %b.addr, ptr undef) ], !dbg !14
+  store ptr %a, ptr %a.addr, align 8, !tbaa !12
+  store ptr %b, ptr %b.addr, align 8, !tbaa !12
+  store ptr %c, ptr %c.addr, align 8, !tbaa !12
+  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(ptr %c.addr, ptr undef), "QUAL.OSS.FIRSTPRIVATE"(ptr %a.addr, ptr undef), "QUAL.OSS.FIRSTPRIVATE"(ptr %b.addr, ptr undef) ], !dbg !15
   %i = alloca i32, align 4
-  call void @llvm.lifetime.start.p0(i64 4, ptr %i) #1, !dbg !15
-  store i32 0, ptr %i, align 4, !dbg !16, !tbaa !17
-  br label %for.cond, !dbg !15
+  call void @llvm.lifetime.start.p0(ptr %i) #1, !dbg !16
+  store i32 0, ptr %i, align 4, !dbg !17, !tbaa !5
+  br label %for.cond, !dbg !16
 
 for.cond:                                         ; preds = %for.inc, %entry
-  %1 = load i32, ptr %i, align 4, !dbg !19, !tbaa !17
-  %cmp = icmp slt i32 %1, 10000000, !dbg !20
-  br i1 %cmp, label %for.body, label %for.cond.cleanup, !dbg !21
+  %1 = load i32, ptr %i, align 4, !dbg !18, !tbaa !5
+  %cmp = icmp slt i32 %1, 10000000, !dbg !19
+  br i1 %cmp, label %for.body, label %for.cond.cleanup, !dbg !20
 
 for.cond.cleanup:                                 ; preds = %for.cond
-  call void @llvm.lifetime.end.p0(i64 4, ptr %i) #1, !dbg !21
+  call void @llvm.lifetime.end.p0(ptr %i) #1, !dbg !20
   br label %for.end
 
 for.body:                                         ; preds = %for.cond
-  %2 = load ptr, ptr %a.addr, align 8, !dbg !22, !tbaa !9
-  %3 = load i32, ptr %i, align 4, !dbg !23, !tbaa !17
-  %idxprom = sext i32 %3 to i64, !dbg !22
-  %arrayidx = getelementptr inbounds i32, ptr %2, i64 %idxprom, !dbg !22
-  %4 = load i32, ptr %arrayidx, align 4, !dbg !22, !tbaa !17
-  %5 = load ptr, ptr %b.addr, align 8, !dbg !24, !tbaa !9
-  %6 = load i32, ptr %i, align 4, !dbg !25, !tbaa !17
-  %idxprom1 = sext i32 %6 to i64, !dbg !24
-  %arrayidx2 = getelementptr inbounds i32, ptr %5, i64 %idxprom1, !dbg !24
-  %7 = load i32, ptr %arrayidx2, align 4, !dbg !24, !tbaa !17
-  %add = add nsw i32 %4, %7, !dbg !26
-  %8 = load ptr, ptr %c.addr, align 8, !dbg !27, !tbaa !9
-  %9 = load i32, ptr %i, align 4, !dbg !28, !tbaa !17
-  %idxprom3 = sext i32 %9 to i64, !dbg !27
-  %arrayidx4 = getelementptr inbounds i32, ptr %8, i64 %idxprom3, !dbg !27
-  store i32 %add, ptr %arrayidx4, align 4, !dbg !29, !tbaa !17
-  br label %for.inc, !dbg !30
+  %2 = load ptr, ptr %a.addr, align 8, !dbg !21, !tbaa !12
+  %3 = load i32, ptr %i, align 4, !dbg !22, !tbaa !5
+  %idxprom = sext i32 %3 to i64, !dbg !21
+  %arrayidx = getelementptr inbounds i32, ptr %2, i64 %idxprom, !dbg !21
+  %4 = load i32, ptr %arrayidx, align 4, !dbg !21, !tbaa !5
+  %5 = load ptr, ptr %b.addr, align 8, !dbg !23, !tbaa !12
+  %6 = load i32, ptr %i, align 4, !dbg !24, !tbaa !5
+  %idxprom1 = sext i32 %6 to i64, !dbg !23
+  %arrayidx2 = getelementptr inbounds i32, ptr %5, i64 %idxprom1, !dbg !23
+  %7 = load i32, ptr %arrayidx2, align 4, !dbg !23, !tbaa !5
+  %add = add nsw i32 %4, %7, !dbg !25
+  %8 = load ptr, ptr %c.addr, align 8, !dbg !26, !tbaa !12
+  %9 = load i32, ptr %i, align 4, !dbg !27, !tbaa !5
+  %idxprom3 = sext i32 %9 to i64, !dbg !26
+  %arrayidx4 = getelementptr inbounds i32, ptr %8, i64 %idxprom3, !dbg !26
+  store i32 %add, ptr %arrayidx4, align 4, !dbg !28, !tbaa !5
+  br label %for.inc, !dbg !29
 
 for.inc:                                          ; preds = %for.body
-  %10 = load i32, ptr %i, align 4, !dbg !31, !tbaa !17
-  %inc = add nsw i32 %10, 1, !dbg !31
-  store i32 %inc, ptr %i, align 4, !dbg !31, !tbaa !17
-  br label %for.cond, !dbg !21, !llvm.loop !32
+  %10 = load i32, ptr %i, align 4, !dbg !30, !tbaa !5
+  %inc = add nsw i32 %10, 1, !dbg !30
+  store i32 %inc, ptr %i, align 4, !dbg !30, !tbaa !5
+  br label %for.cond, !dbg !20, !llvm.loop !31
 
 for.end:                                          ; preds = %for.cond.cleanup
-  call void @llvm.directive.region.exit(token %0), !dbg !30
-  ret void, !dbg !34
+  call void @llvm.directive.region.exit(token %0), !dbg !29
+  ret void, !dbg !33
 }
 
 ; Function Attrs: nounwind
@@ -74,237 +74,237 @@ declare token @llvm.directive.region.entry() #1
 declare void @llvm.directive.region.exit(token) #1
 
 ; Function Attrs: nocallback nofree nosync nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.lifetime.start.p0(i64 immarg, ptr captures(none)) #2
+declare void @llvm.lifetime.start.p0(ptr captures(none)) #2
 
 ; Function Attrs: nocallback nofree nosync nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.lifetime.end.p0(i64 immarg, ptr captures(none)) #2
+declare void @llvm.lifetime.end.p0(ptr captures(none)) #2
 
-attributes #0 = { nounwind uwtable "min-legal-vector-width"="0" "no-trapping-math"="true" "prefer-vector-width"="128" "stack-protector-buffer-size"="8" "target-cpu"="icelake-server" "target-features"="+64bit,+adx,+aes,+avx,+avx2,+avx512bitalg,+avx512bw,+avx512cd,+avx512dq,+avx512f,+avx512ifma,+avx512vbmi,+avx512vbmi2,+avx512vl,+avx512vnni,+avx512vpopcntdq,+bmi,+bmi2,+clflushopt,+clwb,+cmov,+crc32,+cx16,+cx8,+evex512,+f16c,+fma,+fsgsbase,+fxsr,+gfni,+invpcid,+lzcnt,+mmx,+movbe,+pclmul,+pconfig,+pku,+popcnt,+prfchw,+rdpid,+rdrnd,+rdseed,+sahf,+sgx,+sha,+sse,+sse2,+sse3,+sse4.1,+sse4.2,+ssse3,+vaes,+vpclmulqdq,+wbnoinvd,+x87,+xsave,+xsavec,+xsaveopt,+xsaves,-amx-avx512,-amx-bf16,-amx-complex,-amx-fp16,-amx-fp8,-amx-int8,-amx-movrs,-amx-tf32,-amx-tile,-amx-transpose,-avx10.1-256,-avx10.1-512,-avx10.2-256,-avx10.2-512,-avx512bf16,-avx512fp16,-avx512vp2intersect,-avxifma,-avxneconvert,-avxvnni,-avxvnniint16,-avxvnniint8,-ccmp,-cf,-cldemote,-clzero,-cmpccxadd,-egpr,-enqcmd,-fma4,-hreset,-kl,-lwp,-movdir64b,-movdiri,-movrs,-mwaitx,-ndd,-nf,-ppx,-prefetchi,-ptwrite,-push2pop2,-raoint,-rdpru,-rtm,-serialize,-sha512,-shstk,-sm3,-sm4,-sse4a,-tbm,-tsxldtrk,-uintr,-usermsr,-waitpkg,-widekl,-xop,-zu" }
+attributes #0 = { nounwind uwtable "min-legal-vector-width"="0" "no-trapping-math"="true" "prefer-vector-width"="128" "stack-protector-buffer-size"="8" "target-cpu"="icelake-server" "target-features"="+64bit,+adx,+aes,+avx,+avx2,+avx512bitalg,+avx512bw,+avx512cd,+avx512dq,+avx512f,+avx512ifma,+avx512vbmi,+avx512vbmi2,+avx512vl,+avx512vnni,+avx512vpopcntdq,+bmi,+bmi2,+clflushopt,+clwb,+cmov,+crc32,+cx16,+cx8,+f16c,+fma,+fsgsbase,+fxsr,+gfni,+invpcid,+lzcnt,+mmx,+movbe,+pclmul,+pconfig,+pku,+popcnt,+prfchw,+rdpid,+rdrnd,+rdseed,+sahf,+sgx,+sha,+sse,+sse2,+sse3,+sse4.1,+sse4.2,+ssse3,+vaes,+vpclmulqdq,+wbnoinvd,+x87,+xsave,+xsavec,+xsaveopt,+xsaves,-amx-avx512,-amx-bf16,-amx-complex,-amx-fp16,-amx-fp8,-amx-int8,-amx-movrs,-amx-tf32,-amx-tile,-avx10.1,-avx10.2,-avx512bf16,-avx512fp16,-avx512vp2intersect,-avxifma,-avxneconvert,-avxvnni,-avxvnniint16,-avxvnniint8,-ccmp,-cf,-cldemote,-clzero,-cmpccxadd,-egpr,-enqcmd,-fma4,-hreset,-kl,-lwp,-movdir64b,-movdiri,-movrs,-mwaitx,-ndd,-nf,-ppx,-prefetchi,-ptwrite,-push2pop2,-raoint,-rdpru,-rtm,-serialize,-sha512,-shstk,-sm3,-sm4,-sse4a,-tbm,-tsxldtrk,-uintr,-usermsr,-waitpkg,-widekl,-xop,-zu" }
 attributes #1 = { nounwind }
 attributes #2 = { nocallback nofree nosync nounwind willreturn memory(argmem: readwrite) }
 
 !llvm.dbg.cu = !{!0}
-!llvm.module.flags = !{!2, !3, !4}
-!llvm.ident = !{!5}
+!llvm.module.flags = !{!2, !3}
+!llvm.ident = !{!4}
+!llvm.errno.tbaa = !{!5}
 
-!0 = distinct !DICompileUnit(language: DW_LANG_C11, file: !1, producer: "clang version 21.0.0git (git@bscpm04.bsc.es:llvm-ompss/llvm-mono.git e482556a80a52b54ca562602ba8eb05ce9bf2f6d)", isOptimized: true, runtimeVersion: 0, emissionKind: NoDebug, splitDebugInlining: false, nameTableKind: None)
-!1 = !DIFile(filename: "prefer_vector_forward.ll", directory: "/home/rpenacob/llvm-mono-bld1/bin")
+!0 = distinct !DICompileUnit(language: DW_LANG_C11, file: !1, producer: "", isOptimized: true, runtimeVersion: 0, emissionKind: NoDebug, splitDebugInlining: false, nameTableKind: None)
+!1 = !DIFile(filename: "prefer_vector_forward.ll", directory: "")
 !2 = !{i32 2, !"Debug Info Version", i32 3}
-!3 = !{i32 1, !"wchar_size", i32 4}
-!4 = !{i32 7, !"uwtable", i32 2}
-!5 = !{!"clang version 21.0.0git (git@bscpm04.bsc.es:llvm-ompss/llvm-mono.git e482556a80a52b54ca562602ba8eb05ce9bf2f6d)"}
-!6 = distinct !DISubprogram(name: "foo", scope: !1, file: !1, line: 1, type: !7, scopeLine: 1, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition | DISPFlagOptimized, unit: !0)
-!7 = !DISubroutineType(types: !8)
-!8 = !{}
-!9 = !{!10, !10, i64 0}
-!10 = !{!"p1 int", !11, i64 0}
-!11 = !{!"any pointer", !12, i64 0}
-!12 = !{!"omnipotent char", !13, i64 0}
-!13 = !{!"Simple C/C++ TBAA"}
-!14 = !DILocation(line: 2, column: 3, scope: !6)
-!15 = !DILocation(line: 3, column: 8, scope: !6)
-!16 = !DILocation(line: 3, column: 12, scope: !6)
-!17 = !{!18, !18, i64 0}
-!18 = !{!"int", !12, i64 0}
-!19 = !DILocation(line: 3, column: 19, scope: !6)
-!20 = !DILocation(line: 3, column: 21, scope: !6)
-!21 = !DILocation(line: 3, column: 3, scope: !6)
-!22 = !DILocation(line: 4, column: 12, scope: !6)
-!23 = !DILocation(line: 4, column: 14, scope: !6)
-!24 = !DILocation(line: 4, column: 19, scope: !6)
-!25 = !DILocation(line: 4, column: 21, scope: !6)
-!26 = !DILocation(line: 4, column: 17, scope: !6)
-!27 = !DILocation(line: 4, column: 5, scope: !6)
-!28 = !DILocation(line: 4, column: 7, scope: !6)
-!29 = !DILocation(line: 4, column: 10, scope: !6)
-!30 = !DILocation(line: 5, column: 3, scope: !6)
-!31 = !DILocation(line: 3, column: 33, scope: !6)
-!32 = distinct !{!32, !21, !30, !33}
-!33 = !{!"llvm.loop.mustprogress"}
-!34 = !DILocation(line: 6, column: 1, scope: !6)
+!3 = !{i32 7, !"uwtable", i32 2}
+!4 = !{!""}
+!5 = !{!6, !6, i64 0}
+!6 = !{!"int", !7, i64 0}
+!7 = !{!"omnipotent char", !8, i64 0}
+!8 = !{!"Simple C/C++ TBAA"}
+!9 = distinct !DISubprogram(name: "foo", scope: !1, file: !1, line: 2, type: !10, scopeLine: 2, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition | DISPFlagOptimized, unit: !0)
+!10 = !DISubroutineType(types: !11)
+!11 = !{}
+!12 = !{!13, !13, i64 0}
+!13 = !{!"p1 int", !14, i64 0}
+!14 = !{!"any pointer", !7, i64 0}
+!15 = !DILocation(line: 3, column: 3, scope: !9)
+!16 = !DILocation(line: 4, column: 8, scope: !9)
+!17 = !DILocation(line: 4, column: 12, scope: !9)
+!18 = !DILocation(line: 4, column: 19, scope: !9)
+!19 = !DILocation(line: 4, column: 21, scope: !9)
+!20 = !DILocation(line: 4, column: 3, scope: !9)
+!21 = !DILocation(line: 5, column: 12, scope: !9)
+!22 = !DILocation(line: 5, column: 14, scope: !9)
+!23 = !DILocation(line: 5, column: 19, scope: !9)
+!24 = !DILocation(line: 5, column: 21, scope: !9)
+!25 = !DILocation(line: 5, column: 17, scope: !9)
+!26 = !DILocation(line: 5, column: 5, scope: !9)
+!27 = !DILocation(line: 5, column: 7, scope: !9)
+!28 = !DILocation(line: 5, column: 10, scope: !9)
+!29 = !DILocation(line: 6, column: 3, scope: !9)
+!30 = !DILocation(line: 4, column: 33, scope: !9)
+!31 = distinct !{!31, !20, !29, !32}
+!32 = !{!"llvm.loop.mustprogress"}
+!33 = !DILocation(line: 7, column: 1, scope: !9)
 ; CHECK-LABEL: define dso_local void @foo
-; CHECK-SAME: (ptr noalias noundef [[A:%.*]], ptr noalias noundef [[B:%.*]], ptr noalias noundef [[C:%.*]]) local_unnamed_addr #[[ATTR0:[0-9]+]] !dbg [[DBG6:![0-9]+]] {
+; CHECK-SAME: (ptr noalias noundef [[A:%.*]], ptr noalias noundef [[B:%.*]], ptr noalias noundef [[C:%.*]]) local_unnamed_addr #[[ATTR0:[0-9]+]] !dbg [[DBG9:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[A_ADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    [[B_ADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    [[C_ADDR:%.*]] = alloca ptr, align 8
-; CHECK-NEXT:    store ptr [[A]], ptr [[A_ADDR]], align 8, !tbaa [[TBAA9:![0-9]+]]
-; CHECK-NEXT:    store ptr [[B]], ptr [[B_ADDR]], align 8, !tbaa [[TBAA9]]
-; CHECK-NEXT:    store ptr [[C]], ptr [[C_ADDR]], align 8, !tbaa [[TBAA9]]
-; CHECK-NEXT:    [[TMP0:%.*]] = alloca ptr, align 8, !dbg [[DBG14:![0-9]+]]
-; CHECK-NEXT:    [[TMP1:%.*]] = alloca ptr, align 8, !dbg [[DBG14]]
-; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG14]]
-; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg [[DBG14]]
+; CHECK-NEXT:    store ptr [[A]], ptr [[A_ADDR]], align 8, !tbaa [[TBAA12:![0-9]+]]
+; CHECK-NEXT:    store ptr [[B]], ptr [[B_ADDR]], align 8, !tbaa [[TBAA12]]
+; CHECK-NEXT:    store ptr [[C]], ptr [[C_ADDR]], align 8, !tbaa [[TBAA12]]
+; CHECK-NEXT:    [[TMP0:%.*]] = alloca ptr, align 8, !dbg [[DBG15:![0-9]+]]
+; CHECK-NEXT:    [[TMP1:%.*]] = alloca ptr, align 8, !dbg [[DBG15]]
+; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG15]]
+; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg [[DBG15]]
 ; CHECK:       codeRepl:
-; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[TMP0]]), !dbg [[DBG14]]
-; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[TMP1]]), !dbg [[DBG14]]
-; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS]], align 8, !dbg [[DBG14]]
-; CHECK-NEXT:    [[TMP2:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG14]]
-; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_foo, ptr @task_invocation_info_foo, ptr null, i64 32, ptr [[TMP0]], ptr [[TMP1]], i64 0, i64 [[TMP2]]), !dbg [[DBG14]]
-; CHECK-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[TMP0]], align 8, !dbg [[DBG14]]
-; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP3]], i64 32, !dbg [[DBG14]]
-; CHECK-NEXT:    [[GEP_C_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO:%.*]], ptr [[TMP3]], i32 0, i32 0, !dbg [[DBG14]]
-; CHECK-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 8 [[GEP_C_ADDR]], ptr align 8 [[C_ADDR]], i64 8, i1 false), !dbg [[DBG14]]
-; CHECK-NEXT:    [[GEP_A_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO]], ptr [[TMP3]], i32 0, i32 1, !dbg [[DBG14]]
-; CHECK-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 8 [[GEP_A_ADDR]], ptr align 8 [[A_ADDR]], i64 8, i1 false), !dbg [[DBG14]]
-; CHECK-NEXT:    [[GEP_B_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO]], ptr [[TMP3]], i32 0, i32 2, !dbg [[DBG14]]
-; CHECK-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 8 [[GEP_B_ADDR]], ptr align 8 [[B_ADDR]], i64 8, i1 false), !dbg [[DBG14]]
-; CHECK-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[TMP1]], align 8, !dbg [[DBG14]]
-; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP4]]), !dbg [[DBG14]]
-; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[TMP0]]), !dbg [[DBG14]]
-; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[TMP1]]), !dbg [[DBG14]]
-; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG14]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[TMP0]]), !dbg [[DBG15]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[TMP1]]), !dbg [[DBG15]]
+; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS]], align 8, !dbg [[DBG15]]
+; CHECK-NEXT:    [[TMP2:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG15]]
+; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_foo, ptr @task_invocation_info_foo, ptr null, i64 32, ptr [[TMP0]], ptr [[TMP1]], i64 0, i64 [[TMP2]]), !dbg [[DBG15]]
+; CHECK-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[TMP0]], align 8, !dbg [[DBG15]]
+; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP3]], i64 32, !dbg [[DBG15]]
+; CHECK-NEXT:    [[GEP_C_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO:%.*]], ptr [[TMP3]], i32 0, i32 0, !dbg [[DBG15]]
+; CHECK-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 8 [[GEP_C_ADDR]], ptr align 8 [[C_ADDR]], i64 8, i1 false), !dbg [[DBG15]]
+; CHECK-NEXT:    [[GEP_A_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO]], ptr [[TMP3]], i32 0, i32 1, !dbg [[DBG15]]
+; CHECK-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 8 [[GEP_A_ADDR]], ptr align 8 [[A_ADDR]], i64 8, i1 false), !dbg [[DBG15]]
+; CHECK-NEXT:    [[GEP_B_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO]], ptr [[TMP3]], i32 0, i32 2, !dbg [[DBG15]]
+; CHECK-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 8 [[GEP_B_ADDR]], ptr align 8 [[B_ADDR]], i64 8, i1 false), !dbg [[DBG15]]
+; CHECK-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[TMP1]], align 8, !dbg [[DBG15]]
+; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP4]]), !dbg [[DBG15]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[TMP0]]), !dbg [[DBG15]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[TMP1]]), !dbg [[DBG15]]
+; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG15]]
 ; CHECK:       final.end:
-; CHECK-NEXT:    ret void, !dbg [[DBG15:![0-9]+]]
+; CHECK-NEXT:    ret void, !dbg [[DBG16:![0-9]+]]
 ; CHECK:       final.then:
-; CHECK-NEXT:    [[TMP5:%.*]] = load ptr, ptr [[A_ADDR]], align 8, !tbaa [[TBAA9]]
-; CHECK-NEXT:    [[TMP6:%.*]] = load ptr, ptr [[B_ADDR]], align 8, !tbaa [[TBAA9]]
-; CHECK-NEXT:    [[TMP7:%.*]] = load ptr, ptr [[C_ADDR]], align 8, !tbaa [[TBAA9]]
-; CHECK-NEXT:    [[TMP8:%.*]] = ptrtoint ptr [[TMP7]] to i64, !dbg [[DBG16:![0-9]+]]
-; CHECK-NEXT:    [[TMP9:%.*]] = ptrtoint ptr [[TMP6]] to i64
-; CHECK-NEXT:    [[TMP10:%.*]] = ptrtoint ptr [[TMP5]] to i64
-; CHECK-NEXT:    [[TMP11:%.*]] = sub i64 [[TMP8]], [[TMP10]], !dbg [[DBG16]]
-; CHECK-NEXT:    [[DIFF_CHECK_CLONE:%.*]] = icmp ult i64 [[TMP11]], 64, !dbg [[DBG16]]
-; CHECK-NEXT:    [[TMP12:%.*]] = sub i64 [[TMP8]], [[TMP9]], !dbg [[DBG16]]
-; CHECK-NEXT:    [[DIFF_CHECK7_CLONE:%.*]] = icmp ult i64 [[TMP12]], 64, !dbg [[DBG16]]
-; CHECK-NEXT:    [[CONFLICT_RDX_CLONE:%.*]] = or i1 [[DIFF_CHECK_CLONE]], [[DIFF_CHECK7_CLONE]], !dbg [[DBG16]]
-; CHECK-NEXT:    br i1 [[CONFLICT_RDX_CLONE]], label [[FOR_BODY_CLONE:%.*]], label [[VECTOR_BODY_CLONE:%.*]], !dbg [[DBG17:![0-9]+]]
+; CHECK-NEXT:    [[TMP5:%.*]] = load ptr, ptr [[A_ADDR]], align 8, !tbaa [[TBAA12]]
+; CHECK-NEXT:    [[TMP6:%.*]] = load ptr, ptr [[B_ADDR]], align 8, !tbaa [[TBAA12]]
+; CHECK-NEXT:    [[TMP7:%.*]] = load ptr, ptr [[C_ADDR]], align 8, !tbaa [[TBAA12]]
+; CHECK-NEXT:    [[TMP8:%.*]] = ptrtoaddr ptr [[TMP7]] to i64, !dbg [[DBG17:![0-9]+]]
+; CHECK-NEXT:    [[TMP9:%.*]] = ptrtoaddr ptr [[TMP6]] to i64
+; CHECK-NEXT:    [[TMP10:%.*]] = ptrtoaddr ptr [[TMP5]] to i64
+; CHECK-NEXT:    [[TMP11:%.*]] = sub i64 [[TMP8]], [[TMP10]], !dbg [[DBG17]]
+; CHECK-NEXT:    [[DIFF_CHECK_CLONE:%.*]] = icmp ult i64 [[TMP11]], 64, !dbg [[DBG17]]
+; CHECK-NEXT:    [[TMP12:%.*]] = sub i64 [[TMP8]], [[TMP9]], !dbg [[DBG17]]
+; CHECK-NEXT:    [[DIFF_CHECK7_CLONE:%.*]] = icmp ult i64 [[TMP12]], 64, !dbg [[DBG17]]
+; CHECK-NEXT:    [[CONFLICT_RDX_CLONE:%.*]] = or i1 [[DIFF_CHECK_CLONE]], [[DIFF_CHECK7_CLONE]], !dbg [[DBG17]]
+; CHECK-NEXT:    br i1 [[CONFLICT_RDX_CLONE]], label [[FOR_BODY_CLONE:%.*]], label [[VECTOR_BODY_CLONE:%.*]], !dbg [[DBG18:![0-9]+]]
 ; CHECK:       for.body.clone:
 ; CHECK-NEXT:    [[INDVARS_IV_CLONE:%.*]] = phi i64 [ [[INDVARS_IV_NEXT_7_CLONE:%.*]], [[FOR_BODY_CLONE]] ], [ 0, [[FINAL_THEN:%.*]] ]
-; CHECK-NEXT:    [[ARRAYIDX_CLONE:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP5]], i64 [[INDVARS_IV_CLONE]], !dbg [[DBG18:![0-9]+]]
-; CHECK-NEXT:    [[TMP13:%.*]] = load i32, ptr [[ARRAYIDX_CLONE]], align 4, !dbg [[DBG18]], !tbaa [[TBAA19:![0-9]+]]
-; CHECK-NEXT:    [[ARRAYIDX2_CLONE:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP6]], i64 [[INDVARS_IV_CLONE]], !dbg [[DBG21:![0-9]+]]
-; CHECK-NEXT:    [[TMP14:%.*]] = load i32, ptr [[ARRAYIDX2_CLONE]], align 4, !dbg [[DBG21]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ADD_CLONE:%.*]] = add nsw i32 [[TMP14]], [[TMP13]], !dbg [[DBG22:![0-9]+]]
-; CHECK-NEXT:    [[ARRAYIDX4_CLONE:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP7]], i64 [[INDVARS_IV_CLONE]], !dbg [[DBG23:![0-9]+]]
-; CHECK-NEXT:    store i32 [[ADD_CLONE]], ptr [[ARRAYIDX4_CLONE]], align 4, !dbg [[DBG24:![0-9]+]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT_CLONE:%.*]] = or disjoint i64 [[INDVARS_IV_CLONE]], 1, !dbg [[DBG17]]
-; CHECK-NEXT:    [[ARRAYIDX_1_CLONE:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP5]], i64 [[INDVARS_IV_NEXT_CLONE]], !dbg [[DBG18]]
-; CHECK-NEXT:    [[TMP15:%.*]] = load i32, ptr [[ARRAYIDX_1_CLONE]], align 4, !dbg [[DBG18]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ARRAYIDX2_1_CLONE:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP6]], i64 [[INDVARS_IV_NEXT_CLONE]], !dbg [[DBG21]]
-; CHECK-NEXT:    [[TMP16:%.*]] = load i32, ptr [[ARRAYIDX2_1_CLONE]], align 4, !dbg [[DBG21]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ADD_1_CLONE:%.*]] = add nsw i32 [[TMP16]], [[TMP15]], !dbg [[DBG22]]
-; CHECK-NEXT:    [[ARRAYIDX4_1_CLONE:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP7]], i64 [[INDVARS_IV_NEXT_CLONE]], !dbg [[DBG23]]
-; CHECK-NEXT:    store i32 [[ADD_1_CLONE]], ptr [[ARRAYIDX4_1_CLONE]], align 4, !dbg [[DBG24]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT_1_CLONE:%.*]] = or disjoint i64 [[INDVARS_IV_CLONE]], 2, !dbg [[DBG17]]
-; CHECK-NEXT:    [[ARRAYIDX_2_CLONE:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP5]], i64 [[INDVARS_IV_NEXT_1_CLONE]], !dbg [[DBG18]]
-; CHECK-NEXT:    [[TMP17:%.*]] = load i32, ptr [[ARRAYIDX_2_CLONE]], align 4, !dbg [[DBG18]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ARRAYIDX2_2_CLONE:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP6]], i64 [[INDVARS_IV_NEXT_1_CLONE]], !dbg [[DBG21]]
-; CHECK-NEXT:    [[TMP18:%.*]] = load i32, ptr [[ARRAYIDX2_2_CLONE]], align 4, !dbg [[DBG21]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ADD_2_CLONE:%.*]] = add nsw i32 [[TMP18]], [[TMP17]], !dbg [[DBG22]]
-; CHECK-NEXT:    [[ARRAYIDX4_2_CLONE:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP7]], i64 [[INDVARS_IV_NEXT_1_CLONE]], !dbg [[DBG23]]
-; CHECK-NEXT:    store i32 [[ADD_2_CLONE]], ptr [[ARRAYIDX4_2_CLONE]], align 4, !dbg [[DBG24]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT_2_CLONE:%.*]] = or disjoint i64 [[INDVARS_IV_CLONE]], 3, !dbg [[DBG17]]
-; CHECK-NEXT:    [[ARRAYIDX_3_CLONE:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP5]], i64 [[INDVARS_IV_NEXT_2_CLONE]], !dbg [[DBG18]]
-; CHECK-NEXT:    [[TMP19:%.*]] = load i32, ptr [[ARRAYIDX_3_CLONE]], align 4, !dbg [[DBG18]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ARRAYIDX2_3_CLONE:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP6]], i64 [[INDVARS_IV_NEXT_2_CLONE]], !dbg [[DBG21]]
-; CHECK-NEXT:    [[TMP20:%.*]] = load i32, ptr [[ARRAYIDX2_3_CLONE]], align 4, !dbg [[DBG21]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ADD_3_CLONE:%.*]] = add nsw i32 [[TMP20]], [[TMP19]], !dbg [[DBG22]]
-; CHECK-NEXT:    [[ARRAYIDX4_3_CLONE:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP7]], i64 [[INDVARS_IV_NEXT_2_CLONE]], !dbg [[DBG23]]
-; CHECK-NEXT:    store i32 [[ADD_3_CLONE]], ptr [[ARRAYIDX4_3_CLONE]], align 4, !dbg [[DBG24]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT_3_CLONE:%.*]] = or disjoint i64 [[INDVARS_IV_CLONE]], 4, !dbg [[DBG17]]
-; CHECK-NEXT:    [[ARRAYIDX_4_CLONE:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP5]], i64 [[INDVARS_IV_NEXT_3_CLONE]], !dbg [[DBG18]]
-; CHECK-NEXT:    [[TMP21:%.*]] = load i32, ptr [[ARRAYIDX_4_CLONE]], align 4, !dbg [[DBG18]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ARRAYIDX2_4_CLONE:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP6]], i64 [[INDVARS_IV_NEXT_3_CLONE]], !dbg [[DBG21]]
-; CHECK-NEXT:    [[TMP22:%.*]] = load i32, ptr [[ARRAYIDX2_4_CLONE]], align 4, !dbg [[DBG21]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ADD_4_CLONE:%.*]] = add nsw i32 [[TMP22]], [[TMP21]], !dbg [[DBG22]]
-; CHECK-NEXT:    [[ARRAYIDX4_4_CLONE:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP7]], i64 [[INDVARS_IV_NEXT_3_CLONE]], !dbg [[DBG23]]
-; CHECK-NEXT:    store i32 [[ADD_4_CLONE]], ptr [[ARRAYIDX4_4_CLONE]], align 4, !dbg [[DBG24]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT_4_CLONE:%.*]] = or disjoint i64 [[INDVARS_IV_CLONE]], 5, !dbg [[DBG17]]
-; CHECK-NEXT:    [[ARRAYIDX_5_CLONE:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP5]], i64 [[INDVARS_IV_NEXT_4_CLONE]], !dbg [[DBG18]]
-; CHECK-NEXT:    [[TMP23:%.*]] = load i32, ptr [[ARRAYIDX_5_CLONE]], align 4, !dbg [[DBG18]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ARRAYIDX2_5_CLONE:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP6]], i64 [[INDVARS_IV_NEXT_4_CLONE]], !dbg [[DBG21]]
-; CHECK-NEXT:    [[TMP24:%.*]] = load i32, ptr [[ARRAYIDX2_5_CLONE]], align 4, !dbg [[DBG21]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ADD_5_CLONE:%.*]] = add nsw i32 [[TMP24]], [[TMP23]], !dbg [[DBG22]]
-; CHECK-NEXT:    [[ARRAYIDX4_5_CLONE:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP7]], i64 [[INDVARS_IV_NEXT_4_CLONE]], !dbg [[DBG23]]
-; CHECK-NEXT:    store i32 [[ADD_5_CLONE]], ptr [[ARRAYIDX4_5_CLONE]], align 4, !dbg [[DBG24]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT_5_CLONE:%.*]] = or disjoint i64 [[INDVARS_IV_CLONE]], 6, !dbg [[DBG17]]
-; CHECK-NEXT:    [[ARRAYIDX_6_CLONE:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP5]], i64 [[INDVARS_IV_NEXT_5_CLONE]], !dbg [[DBG18]]
-; CHECK-NEXT:    [[TMP25:%.*]] = load i32, ptr [[ARRAYIDX_6_CLONE]], align 4, !dbg [[DBG18]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ARRAYIDX2_6_CLONE:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP6]], i64 [[INDVARS_IV_NEXT_5_CLONE]], !dbg [[DBG21]]
-; CHECK-NEXT:    [[TMP26:%.*]] = load i32, ptr [[ARRAYIDX2_6_CLONE]], align 4, !dbg [[DBG21]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ADD_6_CLONE:%.*]] = add nsw i32 [[TMP26]], [[TMP25]], !dbg [[DBG22]]
-; CHECK-NEXT:    [[ARRAYIDX4_6_CLONE:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP7]], i64 [[INDVARS_IV_NEXT_5_CLONE]], !dbg [[DBG23]]
-; CHECK-NEXT:    store i32 [[ADD_6_CLONE]], ptr [[ARRAYIDX4_6_CLONE]], align 4, !dbg [[DBG24]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT_6_CLONE:%.*]] = or disjoint i64 [[INDVARS_IV_CLONE]], 7, !dbg [[DBG17]]
-; CHECK-NEXT:    [[ARRAYIDX_7_CLONE:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP5]], i64 [[INDVARS_IV_NEXT_6_CLONE]], !dbg [[DBG18]]
-; CHECK-NEXT:    [[TMP27:%.*]] = load i32, ptr [[ARRAYIDX_7_CLONE]], align 4, !dbg [[DBG18]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ARRAYIDX2_7_CLONE:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP6]], i64 [[INDVARS_IV_NEXT_6_CLONE]], !dbg [[DBG21]]
-; CHECK-NEXT:    [[TMP28:%.*]] = load i32, ptr [[ARRAYIDX2_7_CLONE]], align 4, !dbg [[DBG21]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ADD_7_CLONE:%.*]] = add nsw i32 [[TMP28]], [[TMP27]], !dbg [[DBG22]]
-; CHECK-NEXT:    [[ARRAYIDX4_7_CLONE:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP7]], i64 [[INDVARS_IV_NEXT_6_CLONE]], !dbg [[DBG23]]
-; CHECK-NEXT:    store i32 [[ADD_7_CLONE]], ptr [[ARRAYIDX4_7_CLONE]], align 4, !dbg [[DBG24]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT_7_CLONE]] = add nuw nsw i64 [[INDVARS_IV_CLONE]], 8, !dbg [[DBG17]]
-; CHECK-NEXT:    [[EXITCOND_NOT_7_CLONE:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT_7_CLONE]], 10000000, !dbg [[DBG25:![0-9]+]]
-; CHECK-NEXT:    br i1 [[EXITCOND_NOT_7_CLONE]], label [[FOR_COND_CLEANUP_CLONE:%.*]], label [[FOR_BODY_CLONE]], !dbg [[DBG16]], !llvm.loop [[LOOP26:![0-9]+]]
+; CHECK-NEXT:    [[ARRAYIDX_CLONE:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP5]], i64 [[INDVARS_IV_CLONE]], !dbg [[DBG19:![0-9]+]]
+; CHECK-NEXT:    [[TMP13:%.*]] = load i32, ptr [[ARRAYIDX_CLONE]], align 4, !dbg [[DBG19]], !tbaa [[TBAA5:![0-9]+]]
+; CHECK-NEXT:    [[ARRAYIDX2_CLONE:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP6]], i64 [[INDVARS_IV_CLONE]], !dbg [[DBG20:![0-9]+]]
+; CHECK-NEXT:    [[TMP14:%.*]] = load i32, ptr [[ARRAYIDX2_CLONE]], align 4, !dbg [[DBG20]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ADD_CLONE:%.*]] = add nsw i32 [[TMP14]], [[TMP13]], !dbg [[DBG21:![0-9]+]]
+; CHECK-NEXT:    [[ARRAYIDX4_CLONE:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP7]], i64 [[INDVARS_IV_CLONE]], !dbg [[DBG22:![0-9]+]]
+; CHECK-NEXT:    store i32 [[ADD_CLONE]], ptr [[ARRAYIDX4_CLONE]], align 4, !dbg [[DBG23:![0-9]+]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT_CLONE:%.*]] = or disjoint i64 [[INDVARS_IV_CLONE]], 1, !dbg [[DBG18]]
+; CHECK-NEXT:    [[ARRAYIDX_1_CLONE:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP5]], i64 [[INDVARS_IV_NEXT_CLONE]], !dbg [[DBG19]]
+; CHECK-NEXT:    [[TMP15:%.*]] = load i32, ptr [[ARRAYIDX_1_CLONE]], align 4, !dbg [[DBG19]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ARRAYIDX2_1_CLONE:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP6]], i64 [[INDVARS_IV_NEXT_CLONE]], !dbg [[DBG20]]
+; CHECK-NEXT:    [[TMP16:%.*]] = load i32, ptr [[ARRAYIDX2_1_CLONE]], align 4, !dbg [[DBG20]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ADD_1_CLONE:%.*]] = add nsw i32 [[TMP16]], [[TMP15]], !dbg [[DBG21]]
+; CHECK-NEXT:    [[ARRAYIDX4_1_CLONE:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP7]], i64 [[INDVARS_IV_NEXT_CLONE]], !dbg [[DBG22]]
+; CHECK-NEXT:    store i32 [[ADD_1_CLONE]], ptr [[ARRAYIDX4_1_CLONE]], align 4, !dbg [[DBG23]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT_1_CLONE:%.*]] = or disjoint i64 [[INDVARS_IV_CLONE]], 2, !dbg [[DBG18]]
+; CHECK-NEXT:    [[ARRAYIDX_2_CLONE:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP5]], i64 [[INDVARS_IV_NEXT_1_CLONE]], !dbg [[DBG19]]
+; CHECK-NEXT:    [[TMP17:%.*]] = load i32, ptr [[ARRAYIDX_2_CLONE]], align 4, !dbg [[DBG19]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ARRAYIDX2_2_CLONE:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP6]], i64 [[INDVARS_IV_NEXT_1_CLONE]], !dbg [[DBG20]]
+; CHECK-NEXT:    [[TMP18:%.*]] = load i32, ptr [[ARRAYIDX2_2_CLONE]], align 4, !dbg [[DBG20]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ADD_2_CLONE:%.*]] = add nsw i32 [[TMP18]], [[TMP17]], !dbg [[DBG21]]
+; CHECK-NEXT:    [[ARRAYIDX4_2_CLONE:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP7]], i64 [[INDVARS_IV_NEXT_1_CLONE]], !dbg [[DBG22]]
+; CHECK-NEXT:    store i32 [[ADD_2_CLONE]], ptr [[ARRAYIDX4_2_CLONE]], align 4, !dbg [[DBG23]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT_2_CLONE:%.*]] = or disjoint i64 [[INDVARS_IV_CLONE]], 3, !dbg [[DBG18]]
+; CHECK-NEXT:    [[ARRAYIDX_3_CLONE:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP5]], i64 [[INDVARS_IV_NEXT_2_CLONE]], !dbg [[DBG19]]
+; CHECK-NEXT:    [[TMP19:%.*]] = load i32, ptr [[ARRAYIDX_3_CLONE]], align 4, !dbg [[DBG19]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ARRAYIDX2_3_CLONE:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP6]], i64 [[INDVARS_IV_NEXT_2_CLONE]], !dbg [[DBG20]]
+; CHECK-NEXT:    [[TMP20:%.*]] = load i32, ptr [[ARRAYIDX2_3_CLONE]], align 4, !dbg [[DBG20]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ADD_3_CLONE:%.*]] = add nsw i32 [[TMP20]], [[TMP19]], !dbg [[DBG21]]
+; CHECK-NEXT:    [[ARRAYIDX4_3_CLONE:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP7]], i64 [[INDVARS_IV_NEXT_2_CLONE]], !dbg [[DBG22]]
+; CHECK-NEXT:    store i32 [[ADD_3_CLONE]], ptr [[ARRAYIDX4_3_CLONE]], align 4, !dbg [[DBG23]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT_3_CLONE:%.*]] = or disjoint i64 [[INDVARS_IV_CLONE]], 4, !dbg [[DBG18]]
+; CHECK-NEXT:    [[ARRAYIDX_4_CLONE:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP5]], i64 [[INDVARS_IV_NEXT_3_CLONE]], !dbg [[DBG19]]
+; CHECK-NEXT:    [[TMP21:%.*]] = load i32, ptr [[ARRAYIDX_4_CLONE]], align 4, !dbg [[DBG19]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ARRAYIDX2_4_CLONE:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP6]], i64 [[INDVARS_IV_NEXT_3_CLONE]], !dbg [[DBG20]]
+; CHECK-NEXT:    [[TMP22:%.*]] = load i32, ptr [[ARRAYIDX2_4_CLONE]], align 4, !dbg [[DBG20]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ADD_4_CLONE:%.*]] = add nsw i32 [[TMP22]], [[TMP21]], !dbg [[DBG21]]
+; CHECK-NEXT:    [[ARRAYIDX4_4_CLONE:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP7]], i64 [[INDVARS_IV_NEXT_3_CLONE]], !dbg [[DBG22]]
+; CHECK-NEXT:    store i32 [[ADD_4_CLONE]], ptr [[ARRAYIDX4_4_CLONE]], align 4, !dbg [[DBG23]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT_4_CLONE:%.*]] = or disjoint i64 [[INDVARS_IV_CLONE]], 5, !dbg [[DBG18]]
+; CHECK-NEXT:    [[ARRAYIDX_5_CLONE:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP5]], i64 [[INDVARS_IV_NEXT_4_CLONE]], !dbg [[DBG19]]
+; CHECK-NEXT:    [[TMP23:%.*]] = load i32, ptr [[ARRAYIDX_5_CLONE]], align 4, !dbg [[DBG19]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ARRAYIDX2_5_CLONE:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP6]], i64 [[INDVARS_IV_NEXT_4_CLONE]], !dbg [[DBG20]]
+; CHECK-NEXT:    [[TMP24:%.*]] = load i32, ptr [[ARRAYIDX2_5_CLONE]], align 4, !dbg [[DBG20]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ADD_5_CLONE:%.*]] = add nsw i32 [[TMP24]], [[TMP23]], !dbg [[DBG21]]
+; CHECK-NEXT:    [[ARRAYIDX4_5_CLONE:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP7]], i64 [[INDVARS_IV_NEXT_4_CLONE]], !dbg [[DBG22]]
+; CHECK-NEXT:    store i32 [[ADD_5_CLONE]], ptr [[ARRAYIDX4_5_CLONE]], align 4, !dbg [[DBG23]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT_5_CLONE:%.*]] = or disjoint i64 [[INDVARS_IV_CLONE]], 6, !dbg [[DBG18]]
+; CHECK-NEXT:    [[ARRAYIDX_6_CLONE:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP5]], i64 [[INDVARS_IV_NEXT_5_CLONE]], !dbg [[DBG19]]
+; CHECK-NEXT:    [[TMP25:%.*]] = load i32, ptr [[ARRAYIDX_6_CLONE]], align 4, !dbg [[DBG19]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ARRAYIDX2_6_CLONE:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP6]], i64 [[INDVARS_IV_NEXT_5_CLONE]], !dbg [[DBG20]]
+; CHECK-NEXT:    [[TMP26:%.*]] = load i32, ptr [[ARRAYIDX2_6_CLONE]], align 4, !dbg [[DBG20]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ADD_6_CLONE:%.*]] = add nsw i32 [[TMP26]], [[TMP25]], !dbg [[DBG21]]
+; CHECK-NEXT:    [[ARRAYIDX4_6_CLONE:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP7]], i64 [[INDVARS_IV_NEXT_5_CLONE]], !dbg [[DBG22]]
+; CHECK-NEXT:    store i32 [[ADD_6_CLONE]], ptr [[ARRAYIDX4_6_CLONE]], align 4, !dbg [[DBG23]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT_6_CLONE:%.*]] = or disjoint i64 [[INDVARS_IV_CLONE]], 7, !dbg [[DBG18]]
+; CHECK-NEXT:    [[ARRAYIDX_7_CLONE:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP5]], i64 [[INDVARS_IV_NEXT_6_CLONE]], !dbg [[DBG19]]
+; CHECK-NEXT:    [[TMP27:%.*]] = load i32, ptr [[ARRAYIDX_7_CLONE]], align 4, !dbg [[DBG19]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ARRAYIDX2_7_CLONE:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP6]], i64 [[INDVARS_IV_NEXT_6_CLONE]], !dbg [[DBG20]]
+; CHECK-NEXT:    [[TMP28:%.*]] = load i32, ptr [[ARRAYIDX2_7_CLONE]], align 4, !dbg [[DBG20]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ADD_7_CLONE:%.*]] = add nsw i32 [[TMP28]], [[TMP27]], !dbg [[DBG21]]
+; CHECK-NEXT:    [[ARRAYIDX4_7_CLONE:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP7]], i64 [[INDVARS_IV_NEXT_6_CLONE]], !dbg [[DBG22]]
+; CHECK-NEXT:    store i32 [[ADD_7_CLONE]], ptr [[ARRAYIDX4_7_CLONE]], align 4, !dbg [[DBG23]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT_7_CLONE]] = add nuw nsw i64 [[INDVARS_IV_CLONE]], 8, !dbg [[DBG18]]
+; CHECK-NEXT:    [[EXITCOND_NOT_7_CLONE:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT_7_CLONE]], 10000000, !dbg [[DBG24:![0-9]+]]
+; CHECK-NEXT:    br i1 [[EXITCOND_NOT_7_CLONE]], label [[FOR_COND_CLEANUP_CLONE:%.*]], label [[FOR_BODY_CLONE]], !dbg [[DBG17]], !llvm.loop [[LOOP25:![0-9]+]]
 ; CHECK:       vector.body.clone:
-; CHECK-NEXT:    [[INDEX_CLONE:%.*]] = phi i64 [ [[INDEX_NEXT_1_CLONE:%.*]], [[VECTOR_BODY_CLONE]] ], [ 0, [[FINAL_THEN]] ], !dbg [[DBG17]]
-; CHECK-NEXT:    [[TMP29:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP5]], i64 [[INDEX_CLONE]], !dbg [[DBG18]]
-; CHECK-NEXT:    [[TMP30:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP29]], i64 16, !dbg [[DBG18]]
-; CHECK-NEXT:    [[TMP31:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP29]], i64 32, !dbg [[DBG18]]
-; CHECK-NEXT:    [[TMP32:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP29]], i64 48, !dbg [[DBG18]]
-; CHECK-NEXT:    [[WIDE_LOAD_CLONE:%.*]] = load <4 x i32>, ptr [[TMP29]], align 4, !dbg [[DBG18]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[WIDE_LOAD8_CLONE:%.*]] = load <4 x i32>, ptr [[TMP30]], align 4, !dbg [[DBG18]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[WIDE_LOAD9_CLONE:%.*]] = load <4 x i32>, ptr [[TMP31]], align 4, !dbg [[DBG18]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[WIDE_LOAD10_CLONE:%.*]] = load <4 x i32>, ptr [[TMP32]], align 4, !dbg [[DBG18]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[TMP33:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP6]], i64 [[INDEX_CLONE]], !dbg [[DBG21]]
-; CHECK-NEXT:    [[TMP34:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP33]], i64 16, !dbg [[DBG21]]
-; CHECK-NEXT:    [[TMP35:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP33]], i64 32, !dbg [[DBG21]]
-; CHECK-NEXT:    [[TMP36:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP33]], i64 48, !dbg [[DBG21]]
-; CHECK-NEXT:    [[WIDE_LOAD11_CLONE:%.*]] = load <4 x i32>, ptr [[TMP33]], align 4, !dbg [[DBG21]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[WIDE_LOAD12_CLONE:%.*]] = load <4 x i32>, ptr [[TMP34]], align 4, !dbg [[DBG21]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[WIDE_LOAD13_CLONE:%.*]] = load <4 x i32>, ptr [[TMP35]], align 4, !dbg [[DBG21]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[WIDE_LOAD14_CLONE:%.*]] = load <4 x i32>, ptr [[TMP36]], align 4, !dbg [[DBG21]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[TMP37:%.*]] = add nsw <4 x i32> [[WIDE_LOAD11_CLONE]], [[WIDE_LOAD_CLONE]], !dbg [[DBG22]]
-; CHECK-NEXT:    [[TMP38:%.*]] = add nsw <4 x i32> [[WIDE_LOAD12_CLONE]], [[WIDE_LOAD8_CLONE]], !dbg [[DBG22]]
-; CHECK-NEXT:    [[TMP39:%.*]] = add nsw <4 x i32> [[WIDE_LOAD13_CLONE]], [[WIDE_LOAD9_CLONE]], !dbg [[DBG22]]
-; CHECK-NEXT:    [[TMP40:%.*]] = add nsw <4 x i32> [[WIDE_LOAD14_CLONE]], [[WIDE_LOAD10_CLONE]], !dbg [[DBG22]]
-; CHECK-NEXT:    [[TMP41:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP7]], i64 [[INDEX_CLONE]], !dbg [[DBG23]]
-; CHECK-NEXT:    [[TMP42:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP41]], i64 16, !dbg [[DBG24]]
-; CHECK-NEXT:    [[TMP43:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP41]], i64 32, !dbg [[DBG24]]
-; CHECK-NEXT:    [[TMP44:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP41]], i64 48, !dbg [[DBG24]]
-; CHECK-NEXT:    store <4 x i32> [[TMP37]], ptr [[TMP41]], align 4, !dbg [[DBG24]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    store <4 x i32> [[TMP38]], ptr [[TMP42]], align 4, !dbg [[DBG24]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    store <4 x i32> [[TMP39]], ptr [[TMP43]], align 4, !dbg [[DBG24]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    store <4 x i32> [[TMP40]], ptr [[TMP44]], align 4, !dbg [[DBG24]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[INDEX_NEXT_CLONE:%.*]] = or disjoint i64 [[INDEX_CLONE]], 16, !dbg [[DBG17]]
-; CHECK-NEXT:    [[TMP45:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP5]], i64 [[INDEX_NEXT_CLONE]], !dbg [[DBG18]]
-; CHECK-NEXT:    [[TMP46:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i64 16, !dbg [[DBG18]]
-; CHECK-NEXT:    [[TMP47:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i64 32, !dbg [[DBG18]]
-; CHECK-NEXT:    [[TMP48:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i64 48, !dbg [[DBG18]]
-; CHECK-NEXT:    [[WIDE_LOAD_1_CLONE:%.*]] = load <4 x i32>, ptr [[TMP45]], align 4, !dbg [[DBG18]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[WIDE_LOAD8_1_CLONE:%.*]] = load <4 x i32>, ptr [[TMP46]], align 4, !dbg [[DBG18]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[WIDE_LOAD9_1_CLONE:%.*]] = load <4 x i32>, ptr [[TMP47]], align 4, !dbg [[DBG18]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[WIDE_LOAD10_1_CLONE:%.*]] = load <4 x i32>, ptr [[TMP48]], align 4, !dbg [[DBG18]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[TMP49:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP6]], i64 [[INDEX_NEXT_CLONE]], !dbg [[DBG21]]
-; CHECK-NEXT:    [[TMP50:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP49]], i64 16, !dbg [[DBG21]]
-; CHECK-NEXT:    [[TMP51:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP49]], i64 32, !dbg [[DBG21]]
-; CHECK-NEXT:    [[TMP52:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP49]], i64 48, !dbg [[DBG21]]
-; CHECK-NEXT:    [[WIDE_LOAD11_1_CLONE:%.*]] = load <4 x i32>, ptr [[TMP49]], align 4, !dbg [[DBG21]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[WIDE_LOAD12_1_CLONE:%.*]] = load <4 x i32>, ptr [[TMP50]], align 4, !dbg [[DBG21]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[WIDE_LOAD13_1_CLONE:%.*]] = load <4 x i32>, ptr [[TMP51]], align 4, !dbg [[DBG21]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[WIDE_LOAD14_1_CLONE:%.*]] = load <4 x i32>, ptr [[TMP52]], align 4, !dbg [[DBG21]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[TMP53:%.*]] = add nsw <4 x i32> [[WIDE_LOAD11_1_CLONE]], [[WIDE_LOAD_1_CLONE]], !dbg [[DBG22]]
-; CHECK-NEXT:    [[TMP54:%.*]] = add nsw <4 x i32> [[WIDE_LOAD12_1_CLONE]], [[WIDE_LOAD8_1_CLONE]], !dbg [[DBG22]]
-; CHECK-NEXT:    [[TMP55:%.*]] = add nsw <4 x i32> [[WIDE_LOAD13_1_CLONE]], [[WIDE_LOAD9_1_CLONE]], !dbg [[DBG22]]
-; CHECK-NEXT:    [[TMP56:%.*]] = add nsw <4 x i32> [[WIDE_LOAD14_1_CLONE]], [[WIDE_LOAD10_1_CLONE]], !dbg [[DBG22]]
-; CHECK-NEXT:    [[TMP57:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP7]], i64 [[INDEX_NEXT_CLONE]], !dbg [[DBG23]]
-; CHECK-NEXT:    [[TMP58:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP57]], i64 16, !dbg [[DBG24]]
-; CHECK-NEXT:    [[TMP59:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP57]], i64 32, !dbg [[DBG24]]
-; CHECK-NEXT:    [[TMP60:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP57]], i64 48, !dbg [[DBG24]]
-; CHECK-NEXT:    store <4 x i32> [[TMP53]], ptr [[TMP57]], align 4, !dbg [[DBG24]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    store <4 x i32> [[TMP54]], ptr [[TMP58]], align 4, !dbg [[DBG24]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    store <4 x i32> [[TMP55]], ptr [[TMP59]], align 4, !dbg [[DBG24]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    store <4 x i32> [[TMP56]], ptr [[TMP60]], align 4, !dbg [[DBG24]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[INDEX_NEXT_1_CLONE]] = add nuw nsw i64 [[INDEX_CLONE]], 32, !dbg [[DBG17]]
-; CHECK-NEXT:    [[TMP61:%.*]] = icmp eq i64 [[INDEX_NEXT_1_CLONE]], 10000000, !dbg [[DBG16]]
-; CHECK-NEXT:    br i1 [[TMP61]], label [[FOR_COND_CLEANUP_CLONE]], label [[VECTOR_BODY_CLONE]], !dbg [[DBG16]], !llvm.loop [[LOOP30:![0-9]+]]
+; CHECK-NEXT:    [[INDEX_CLONE:%.*]] = phi i64 [ [[INDEX_NEXT_1_CLONE:%.*]], [[VECTOR_BODY_CLONE]] ], [ 0, [[FINAL_THEN]] ], !dbg [[DBG18]]
+; CHECK-NEXT:    [[TMP29:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP5]], i64 [[INDEX_CLONE]], !dbg [[DBG19]]
+; CHECK-NEXT:    [[TMP30:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP29]], i64 16, !dbg [[DBG19]]
+; CHECK-NEXT:    [[TMP31:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP29]], i64 32, !dbg [[DBG19]]
+; CHECK-NEXT:    [[TMP32:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP29]], i64 48, !dbg [[DBG19]]
+; CHECK-NEXT:    [[WIDE_LOAD_CLONE:%.*]] = load <4 x i32>, ptr [[TMP29]], align 4, !dbg [[DBG19]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[WIDE_LOAD8_CLONE:%.*]] = load <4 x i32>, ptr [[TMP30]], align 4, !dbg [[DBG19]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[WIDE_LOAD9_CLONE:%.*]] = load <4 x i32>, ptr [[TMP31]], align 4, !dbg [[DBG19]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[WIDE_LOAD10_CLONE:%.*]] = load <4 x i32>, ptr [[TMP32]], align 4, !dbg [[DBG19]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[TMP33:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP6]], i64 [[INDEX_CLONE]], !dbg [[DBG20]]
+; CHECK-NEXT:    [[TMP34:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP33]], i64 16, !dbg [[DBG20]]
+; CHECK-NEXT:    [[TMP35:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP33]], i64 32, !dbg [[DBG20]]
+; CHECK-NEXT:    [[TMP36:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP33]], i64 48, !dbg [[DBG20]]
+; CHECK-NEXT:    [[WIDE_LOAD11_CLONE:%.*]] = load <4 x i32>, ptr [[TMP33]], align 4, !dbg [[DBG20]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[WIDE_LOAD12_CLONE:%.*]] = load <4 x i32>, ptr [[TMP34]], align 4, !dbg [[DBG20]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[WIDE_LOAD13_CLONE:%.*]] = load <4 x i32>, ptr [[TMP35]], align 4, !dbg [[DBG20]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[WIDE_LOAD14_CLONE:%.*]] = load <4 x i32>, ptr [[TMP36]], align 4, !dbg [[DBG20]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[TMP37:%.*]] = add nsw <4 x i32> [[WIDE_LOAD11_CLONE]], [[WIDE_LOAD_CLONE]], !dbg [[DBG21]]
+; CHECK-NEXT:    [[TMP38:%.*]] = add nsw <4 x i32> [[WIDE_LOAD12_CLONE]], [[WIDE_LOAD8_CLONE]], !dbg [[DBG21]]
+; CHECK-NEXT:    [[TMP39:%.*]] = add nsw <4 x i32> [[WIDE_LOAD13_CLONE]], [[WIDE_LOAD9_CLONE]], !dbg [[DBG21]]
+; CHECK-NEXT:    [[TMP40:%.*]] = add nsw <4 x i32> [[WIDE_LOAD14_CLONE]], [[WIDE_LOAD10_CLONE]], !dbg [[DBG21]]
+; CHECK-NEXT:    [[TMP41:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP7]], i64 [[INDEX_CLONE]], !dbg [[DBG22]]
+; CHECK-NEXT:    [[TMP42:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP41]], i64 16, !dbg [[DBG23]]
+; CHECK-NEXT:    [[TMP43:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP41]], i64 32, !dbg [[DBG23]]
+; CHECK-NEXT:    [[TMP44:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP41]], i64 48, !dbg [[DBG23]]
+; CHECK-NEXT:    store <4 x i32> [[TMP37]], ptr [[TMP41]], align 4, !dbg [[DBG23]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    store <4 x i32> [[TMP38]], ptr [[TMP42]], align 4, !dbg [[DBG23]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    store <4 x i32> [[TMP39]], ptr [[TMP43]], align 4, !dbg [[DBG23]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    store <4 x i32> [[TMP40]], ptr [[TMP44]], align 4, !dbg [[DBG23]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[INDEX_NEXT_CLONE:%.*]] = or disjoint i64 [[INDEX_CLONE]], 16, !dbg [[DBG18]]
+; CHECK-NEXT:    [[TMP45:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP5]], i64 [[INDEX_NEXT_CLONE]], !dbg [[DBG19]]
+; CHECK-NEXT:    [[TMP46:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i64 16, !dbg [[DBG19]]
+; CHECK-NEXT:    [[TMP47:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i64 32, !dbg [[DBG19]]
+; CHECK-NEXT:    [[TMP48:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i64 48, !dbg [[DBG19]]
+; CHECK-NEXT:    [[WIDE_LOAD_1_CLONE:%.*]] = load <4 x i32>, ptr [[TMP45]], align 4, !dbg [[DBG19]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[WIDE_LOAD8_1_CLONE:%.*]] = load <4 x i32>, ptr [[TMP46]], align 4, !dbg [[DBG19]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[WIDE_LOAD9_1_CLONE:%.*]] = load <4 x i32>, ptr [[TMP47]], align 4, !dbg [[DBG19]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[WIDE_LOAD10_1_CLONE:%.*]] = load <4 x i32>, ptr [[TMP48]], align 4, !dbg [[DBG19]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[TMP49:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP6]], i64 [[INDEX_NEXT_CLONE]], !dbg [[DBG20]]
+; CHECK-NEXT:    [[TMP50:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP49]], i64 16, !dbg [[DBG20]]
+; CHECK-NEXT:    [[TMP51:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP49]], i64 32, !dbg [[DBG20]]
+; CHECK-NEXT:    [[TMP52:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP49]], i64 48, !dbg [[DBG20]]
+; CHECK-NEXT:    [[WIDE_LOAD11_1_CLONE:%.*]] = load <4 x i32>, ptr [[TMP49]], align 4, !dbg [[DBG20]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[WIDE_LOAD12_1_CLONE:%.*]] = load <4 x i32>, ptr [[TMP50]], align 4, !dbg [[DBG20]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[WIDE_LOAD13_1_CLONE:%.*]] = load <4 x i32>, ptr [[TMP51]], align 4, !dbg [[DBG20]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[WIDE_LOAD14_1_CLONE:%.*]] = load <4 x i32>, ptr [[TMP52]], align 4, !dbg [[DBG20]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[TMP53:%.*]] = add nsw <4 x i32> [[WIDE_LOAD11_1_CLONE]], [[WIDE_LOAD_1_CLONE]], !dbg [[DBG21]]
+; CHECK-NEXT:    [[TMP54:%.*]] = add nsw <4 x i32> [[WIDE_LOAD12_1_CLONE]], [[WIDE_LOAD8_1_CLONE]], !dbg [[DBG21]]
+; CHECK-NEXT:    [[TMP55:%.*]] = add nsw <4 x i32> [[WIDE_LOAD13_1_CLONE]], [[WIDE_LOAD9_1_CLONE]], !dbg [[DBG21]]
+; CHECK-NEXT:    [[TMP56:%.*]] = add nsw <4 x i32> [[WIDE_LOAD14_1_CLONE]], [[WIDE_LOAD10_1_CLONE]], !dbg [[DBG21]]
+; CHECK-NEXT:    [[TMP57:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP7]], i64 [[INDEX_NEXT_CLONE]], !dbg [[DBG22]]
+; CHECK-NEXT:    [[TMP58:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP57]], i64 16, !dbg [[DBG23]]
+; CHECK-NEXT:    [[TMP59:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP57]], i64 32, !dbg [[DBG23]]
+; CHECK-NEXT:    [[TMP60:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP57]], i64 48, !dbg [[DBG23]]
+; CHECK-NEXT:    store <4 x i32> [[TMP53]], ptr [[TMP57]], align 4, !dbg [[DBG23]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    store <4 x i32> [[TMP54]], ptr [[TMP58]], align 4, !dbg [[DBG23]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    store <4 x i32> [[TMP55]], ptr [[TMP59]], align 4, !dbg [[DBG23]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    store <4 x i32> [[TMP56]], ptr [[TMP60]], align 4, !dbg [[DBG23]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[INDEX_NEXT_1_CLONE]] = add nuw nsw i64 [[INDEX_CLONE]], 32, !dbg [[DBG18]]
+; CHECK-NEXT:    [[TMP61:%.*]] = icmp eq i64 [[INDEX_NEXT_1_CLONE]], 10000000, !dbg [[DBG17]]
+; CHECK-NEXT:    br i1 [[TMP61]], label [[FOR_COND_CLEANUP_CLONE]], label [[VECTOR_BODY_CLONE]], !dbg [[DBG17]], !llvm.loop [[LOOP29:![0-9]+]]
 ; CHECK:       for.cond.cleanup.clone:
-; CHECK-NEXT:    br label [[FINAL_END]], !dbg [[DBG15]]
+; CHECK-NEXT:    br label [[FINAL_END]], !dbg [[DBG16]]
 ; CHECK:       final.cond:
-; CHECK-NEXT:    [[TMP62:%.*]] = call i32 @nanos6_in_final(), !dbg [[DBG14]]
-; CHECK-NEXT:    [[TMP63:%.*]] = icmp ne i32 [[TMP62]], 0, !dbg [[DBG14]]
-; CHECK-NEXT:    br i1 [[TMP63]], label [[FINAL_THEN]], label [[CODEREPL:%.*]], !dbg [[DBG14]]
+; CHECK-NEXT:    [[TMP62:%.*]] = call i32 @nanos6_in_final(), !dbg [[DBG15]]
+; CHECK-NEXT:    [[TMP63:%.*]] = icmp ne i32 [[TMP62]], 0, !dbg [[DBG15]]
+; CHECK-NEXT:    br i1 [[TMP63]], label [[FINAL_THEN]], label [[CODEREPL:%.*]], !dbg [[DBG15]]
 ;
 ;
 ; CHECK-LABEL: define internal void @nanos6_constructor_check_version() {
@@ -314,154 +314,154 @@ attributes #2 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; CHECK-LABEL: define internal void @nanos6_unpacked_task_region_foo
-; CHECK-SAME: (ptr [[C_ADDR:%.*]], ptr [[A_ADDR:%.*]], ptr [[B_ADDR:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR0]] !dbg [[DBG32:![0-9]+]] {
+; CHECK-SAME: (ptr [[C_ADDR:%.*]], ptr [[A_ADDR:%.*]], ptr [[B_ADDR:%.*]], ptr [[DEVICE_ENV:%.*]], ptr [[ADDRESS_TRANSLATION_TABLE:%.*]]) #[[ATTR0]] !dbg [[DBG31:![0-9]+]] {
 ; CHECK-NEXT:  newFuncRoot:
-; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG33:![0-9]+]]
+; CHECK-NEXT:    br label [[TMP0:%.*]], !dbg [[DBG32:![0-9]+]]
 ; CHECK:       0:
-; CHECK-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[A_ADDR]], align 8, !tbaa [[TBAA9]]
-; CHECK-NEXT:    [[TMP2:%.*]] = load ptr, ptr [[B_ADDR]], align 8, !tbaa [[TBAA9]]
-; CHECK-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[C_ADDR]], align 8, !tbaa [[TBAA9]]
-; CHECK-NEXT:    [[TMP4:%.*]] = ptrtoint ptr [[TMP3]] to i64, !dbg [[DBG34:![0-9]+]]
-; CHECK-NEXT:    [[TMP5:%.*]] = ptrtoint ptr [[TMP2]] to i64
-; CHECK-NEXT:    [[TMP6:%.*]] = ptrtoint ptr [[TMP1]] to i64
-; CHECK-NEXT:    [[TMP7:%.*]] = sub i64 [[TMP4]], [[TMP6]], !dbg [[DBG34]]
-; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP7]], 64, !dbg [[DBG34]]
-; CHECK-NEXT:    [[TMP8:%.*]] = sub i64 [[TMP4]], [[TMP5]], !dbg [[DBG34]]
-; CHECK-NEXT:    [[DIFF_CHECK7:%.*]] = icmp ult i64 [[TMP8]], 64, !dbg [[DBG34]]
-; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[DIFF_CHECK]], [[DIFF_CHECK7]], !dbg [[DBG34]]
-; CHECK-NEXT:    br i1 [[CONFLICT_RDX]], label [[FOR_BODY:%.*]], label [[VECTOR_BODY:%.*]], !dbg [[DBG35:![0-9]+]]
+; CHECK-NEXT:    [[TMP1:%.*]] = load ptr, ptr [[A_ADDR]], align 8, !tbaa [[TBAA12]]
+; CHECK-NEXT:    [[TMP2:%.*]] = load ptr, ptr [[B_ADDR]], align 8, !tbaa [[TBAA12]]
+; CHECK-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[C_ADDR]], align 8, !tbaa [[TBAA12]]
+; CHECK-NEXT:    [[TMP4:%.*]] = ptrtoaddr ptr [[TMP3]] to i64, !dbg [[DBG33:![0-9]+]]
+; CHECK-NEXT:    [[TMP5:%.*]] = ptrtoaddr ptr [[TMP2]] to i64
+; CHECK-NEXT:    [[TMP6:%.*]] = ptrtoaddr ptr [[TMP1]] to i64
+; CHECK-NEXT:    [[TMP7:%.*]] = sub i64 [[TMP4]], [[TMP6]], !dbg [[DBG33]]
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP7]], 64, !dbg [[DBG33]]
+; CHECK-NEXT:    [[TMP8:%.*]] = sub i64 [[TMP4]], [[TMP5]], !dbg [[DBG33]]
+; CHECK-NEXT:    [[DIFF_CHECK7:%.*]] = icmp ult i64 [[TMP8]], 64, !dbg [[DBG33]]
+; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[DIFF_CHECK]], [[DIFF_CHECK7]], !dbg [[DBG33]]
+; CHECK-NEXT:    br i1 [[CONFLICT_RDX]], label [[FOR_BODY:%.*]], label [[VECTOR_BODY:%.*]], !dbg [[DBG34:![0-9]+]]
 ; CHECK:       for.body:
 ; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ [[INDVARS_IV_NEXT_7:%.*]], [[FOR_BODY]] ], [ 0, [[TMP0]] ]
-; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP1]], i64 [[INDVARS_IV]], !dbg [[DBG36:![0-9]+]]
-; CHECK-NEXT:    [[TMP9:%.*]] = load i32, ptr [[ARRAYIDX]], align 4, !dbg [[DBG36]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ARRAYIDX2:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP2]], i64 [[INDVARS_IV]], !dbg [[DBG37:![0-9]+]]
-; CHECK-NEXT:    [[TMP10:%.*]] = load i32, ptr [[ARRAYIDX2]], align 4, !dbg [[DBG37]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ADD:%.*]] = add nsw i32 [[TMP10]], [[TMP9]], !dbg [[DBG38:![0-9]+]]
-; CHECK-NEXT:    [[ARRAYIDX4:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP3]], i64 [[INDVARS_IV]], !dbg [[DBG39:![0-9]+]]
-; CHECK-NEXT:    store i32 [[ADD]], ptr [[ARRAYIDX4]], align 4, !dbg [[DBG40:![0-9]+]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT:%.*]] = or disjoint i64 [[INDVARS_IV]], 1, !dbg [[DBG35]]
-; CHECK-NEXT:    [[ARRAYIDX_1:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP1]], i64 [[INDVARS_IV_NEXT]], !dbg [[DBG36]]
-; CHECK-NEXT:    [[TMP11:%.*]] = load i32, ptr [[ARRAYIDX_1]], align 4, !dbg [[DBG36]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ARRAYIDX2_1:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP2]], i64 [[INDVARS_IV_NEXT]], !dbg [[DBG37]]
-; CHECK-NEXT:    [[TMP12:%.*]] = load i32, ptr [[ARRAYIDX2_1]], align 4, !dbg [[DBG37]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ADD_1:%.*]] = add nsw i32 [[TMP12]], [[TMP11]], !dbg [[DBG38]]
-; CHECK-NEXT:    [[ARRAYIDX4_1:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP3]], i64 [[INDVARS_IV_NEXT]], !dbg [[DBG39]]
-; CHECK-NEXT:    store i32 [[ADD_1]], ptr [[ARRAYIDX4_1]], align 4, !dbg [[DBG40]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT_1:%.*]] = or disjoint i64 [[INDVARS_IV]], 2, !dbg [[DBG35]]
-; CHECK-NEXT:    [[ARRAYIDX_2:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP1]], i64 [[INDVARS_IV_NEXT_1]], !dbg [[DBG36]]
-; CHECK-NEXT:    [[TMP13:%.*]] = load i32, ptr [[ARRAYIDX_2]], align 4, !dbg [[DBG36]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ARRAYIDX2_2:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP2]], i64 [[INDVARS_IV_NEXT_1]], !dbg [[DBG37]]
-; CHECK-NEXT:    [[TMP14:%.*]] = load i32, ptr [[ARRAYIDX2_2]], align 4, !dbg [[DBG37]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ADD_2:%.*]] = add nsw i32 [[TMP14]], [[TMP13]], !dbg [[DBG38]]
-; CHECK-NEXT:    [[ARRAYIDX4_2:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP3]], i64 [[INDVARS_IV_NEXT_1]], !dbg [[DBG39]]
-; CHECK-NEXT:    store i32 [[ADD_2]], ptr [[ARRAYIDX4_2]], align 4, !dbg [[DBG40]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT_2:%.*]] = or disjoint i64 [[INDVARS_IV]], 3, !dbg [[DBG35]]
-; CHECK-NEXT:    [[ARRAYIDX_3:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP1]], i64 [[INDVARS_IV_NEXT_2]], !dbg [[DBG36]]
-; CHECK-NEXT:    [[TMP15:%.*]] = load i32, ptr [[ARRAYIDX_3]], align 4, !dbg [[DBG36]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ARRAYIDX2_3:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP2]], i64 [[INDVARS_IV_NEXT_2]], !dbg [[DBG37]]
-; CHECK-NEXT:    [[TMP16:%.*]] = load i32, ptr [[ARRAYIDX2_3]], align 4, !dbg [[DBG37]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ADD_3:%.*]] = add nsw i32 [[TMP16]], [[TMP15]], !dbg [[DBG38]]
-; CHECK-NEXT:    [[ARRAYIDX4_3:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP3]], i64 [[INDVARS_IV_NEXT_2]], !dbg [[DBG39]]
-; CHECK-NEXT:    store i32 [[ADD_3]], ptr [[ARRAYIDX4_3]], align 4, !dbg [[DBG40]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT_3:%.*]] = or disjoint i64 [[INDVARS_IV]], 4, !dbg [[DBG35]]
-; CHECK-NEXT:    [[ARRAYIDX_4:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP1]], i64 [[INDVARS_IV_NEXT_3]], !dbg [[DBG36]]
-; CHECK-NEXT:    [[TMP17:%.*]] = load i32, ptr [[ARRAYIDX_4]], align 4, !dbg [[DBG36]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ARRAYIDX2_4:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP2]], i64 [[INDVARS_IV_NEXT_3]], !dbg [[DBG37]]
-; CHECK-NEXT:    [[TMP18:%.*]] = load i32, ptr [[ARRAYIDX2_4]], align 4, !dbg [[DBG37]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ADD_4:%.*]] = add nsw i32 [[TMP18]], [[TMP17]], !dbg [[DBG38]]
-; CHECK-NEXT:    [[ARRAYIDX4_4:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP3]], i64 [[INDVARS_IV_NEXT_3]], !dbg [[DBG39]]
-; CHECK-NEXT:    store i32 [[ADD_4]], ptr [[ARRAYIDX4_4]], align 4, !dbg [[DBG40]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT_4:%.*]] = or disjoint i64 [[INDVARS_IV]], 5, !dbg [[DBG35]]
-; CHECK-NEXT:    [[ARRAYIDX_5:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP1]], i64 [[INDVARS_IV_NEXT_4]], !dbg [[DBG36]]
-; CHECK-NEXT:    [[TMP19:%.*]] = load i32, ptr [[ARRAYIDX_5]], align 4, !dbg [[DBG36]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ARRAYIDX2_5:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP2]], i64 [[INDVARS_IV_NEXT_4]], !dbg [[DBG37]]
-; CHECK-NEXT:    [[TMP20:%.*]] = load i32, ptr [[ARRAYIDX2_5]], align 4, !dbg [[DBG37]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ADD_5:%.*]] = add nsw i32 [[TMP20]], [[TMP19]], !dbg [[DBG38]]
-; CHECK-NEXT:    [[ARRAYIDX4_5:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP3]], i64 [[INDVARS_IV_NEXT_4]], !dbg [[DBG39]]
-; CHECK-NEXT:    store i32 [[ADD_5]], ptr [[ARRAYIDX4_5]], align 4, !dbg [[DBG40]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT_5:%.*]] = or disjoint i64 [[INDVARS_IV]], 6, !dbg [[DBG35]]
-; CHECK-NEXT:    [[ARRAYIDX_6:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP1]], i64 [[INDVARS_IV_NEXT_5]], !dbg [[DBG36]]
-; CHECK-NEXT:    [[TMP21:%.*]] = load i32, ptr [[ARRAYIDX_6]], align 4, !dbg [[DBG36]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ARRAYIDX2_6:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP2]], i64 [[INDVARS_IV_NEXT_5]], !dbg [[DBG37]]
-; CHECK-NEXT:    [[TMP22:%.*]] = load i32, ptr [[ARRAYIDX2_6]], align 4, !dbg [[DBG37]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ADD_6:%.*]] = add nsw i32 [[TMP22]], [[TMP21]], !dbg [[DBG38]]
-; CHECK-NEXT:    [[ARRAYIDX4_6:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP3]], i64 [[INDVARS_IV_NEXT_5]], !dbg [[DBG39]]
-; CHECK-NEXT:    store i32 [[ADD_6]], ptr [[ARRAYIDX4_6]], align 4, !dbg [[DBG40]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT_6:%.*]] = or disjoint i64 [[INDVARS_IV]], 7, !dbg [[DBG35]]
-; CHECK-NEXT:    [[ARRAYIDX_7:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP1]], i64 [[INDVARS_IV_NEXT_6]], !dbg [[DBG36]]
-; CHECK-NEXT:    [[TMP23:%.*]] = load i32, ptr [[ARRAYIDX_7]], align 4, !dbg [[DBG36]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ARRAYIDX2_7:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP2]], i64 [[INDVARS_IV_NEXT_6]], !dbg [[DBG37]]
-; CHECK-NEXT:    [[TMP24:%.*]] = load i32, ptr [[ARRAYIDX2_7]], align 4, !dbg [[DBG37]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[ADD_7:%.*]] = add nsw i32 [[TMP24]], [[TMP23]], !dbg [[DBG38]]
-; CHECK-NEXT:    [[ARRAYIDX4_7:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP3]], i64 [[INDVARS_IV_NEXT_6]], !dbg [[DBG39]]
-; CHECK-NEXT:    store i32 [[ADD_7]], ptr [[ARRAYIDX4_7]], align 4, !dbg [[DBG40]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT_7]] = add nuw nsw i64 [[INDVARS_IV]], 8, !dbg [[DBG35]]
-; CHECK-NEXT:    [[EXITCOND_NOT_7:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT_7]], 10000000, !dbg [[DBG41:![0-9]+]]
-; CHECK-NEXT:    br i1 [[EXITCOND_NOT_7]], label [[FOR_COND_CLEANUP:%.*]], label [[FOR_BODY]], !dbg [[DBG34]], !llvm.loop [[LOOP42:![0-9]+]]
+; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP1]], i64 [[INDVARS_IV]], !dbg [[DBG35:![0-9]+]]
+; CHECK-NEXT:    [[TMP9:%.*]] = load i32, ptr [[ARRAYIDX]], align 4, !dbg [[DBG35]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ARRAYIDX2:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP2]], i64 [[INDVARS_IV]], !dbg [[DBG36:![0-9]+]]
+; CHECK-NEXT:    [[TMP10:%.*]] = load i32, ptr [[ARRAYIDX2]], align 4, !dbg [[DBG36]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ADD:%.*]] = add nsw i32 [[TMP10]], [[TMP9]], !dbg [[DBG37:![0-9]+]]
+; CHECK-NEXT:    [[ARRAYIDX4:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP3]], i64 [[INDVARS_IV]], !dbg [[DBG38:![0-9]+]]
+; CHECK-NEXT:    store i32 [[ADD]], ptr [[ARRAYIDX4]], align 4, !dbg [[DBG39:![0-9]+]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT:%.*]] = or disjoint i64 [[INDVARS_IV]], 1, !dbg [[DBG34]]
+; CHECK-NEXT:    [[ARRAYIDX_1:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP1]], i64 [[INDVARS_IV_NEXT]], !dbg [[DBG35]]
+; CHECK-NEXT:    [[TMP11:%.*]] = load i32, ptr [[ARRAYIDX_1]], align 4, !dbg [[DBG35]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ARRAYIDX2_1:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP2]], i64 [[INDVARS_IV_NEXT]], !dbg [[DBG36]]
+; CHECK-NEXT:    [[TMP12:%.*]] = load i32, ptr [[ARRAYIDX2_1]], align 4, !dbg [[DBG36]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ADD_1:%.*]] = add nsw i32 [[TMP12]], [[TMP11]], !dbg [[DBG37]]
+; CHECK-NEXT:    [[ARRAYIDX4_1:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP3]], i64 [[INDVARS_IV_NEXT]], !dbg [[DBG38]]
+; CHECK-NEXT:    store i32 [[ADD_1]], ptr [[ARRAYIDX4_1]], align 4, !dbg [[DBG39]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT_1:%.*]] = or disjoint i64 [[INDVARS_IV]], 2, !dbg [[DBG34]]
+; CHECK-NEXT:    [[ARRAYIDX_2:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP1]], i64 [[INDVARS_IV_NEXT_1]], !dbg [[DBG35]]
+; CHECK-NEXT:    [[TMP13:%.*]] = load i32, ptr [[ARRAYIDX_2]], align 4, !dbg [[DBG35]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ARRAYIDX2_2:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP2]], i64 [[INDVARS_IV_NEXT_1]], !dbg [[DBG36]]
+; CHECK-NEXT:    [[TMP14:%.*]] = load i32, ptr [[ARRAYIDX2_2]], align 4, !dbg [[DBG36]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ADD_2:%.*]] = add nsw i32 [[TMP14]], [[TMP13]], !dbg [[DBG37]]
+; CHECK-NEXT:    [[ARRAYIDX4_2:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP3]], i64 [[INDVARS_IV_NEXT_1]], !dbg [[DBG38]]
+; CHECK-NEXT:    store i32 [[ADD_2]], ptr [[ARRAYIDX4_2]], align 4, !dbg [[DBG39]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT_2:%.*]] = or disjoint i64 [[INDVARS_IV]], 3, !dbg [[DBG34]]
+; CHECK-NEXT:    [[ARRAYIDX_3:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP1]], i64 [[INDVARS_IV_NEXT_2]], !dbg [[DBG35]]
+; CHECK-NEXT:    [[TMP15:%.*]] = load i32, ptr [[ARRAYIDX_3]], align 4, !dbg [[DBG35]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ARRAYIDX2_3:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP2]], i64 [[INDVARS_IV_NEXT_2]], !dbg [[DBG36]]
+; CHECK-NEXT:    [[TMP16:%.*]] = load i32, ptr [[ARRAYIDX2_3]], align 4, !dbg [[DBG36]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ADD_3:%.*]] = add nsw i32 [[TMP16]], [[TMP15]], !dbg [[DBG37]]
+; CHECK-NEXT:    [[ARRAYIDX4_3:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP3]], i64 [[INDVARS_IV_NEXT_2]], !dbg [[DBG38]]
+; CHECK-NEXT:    store i32 [[ADD_3]], ptr [[ARRAYIDX4_3]], align 4, !dbg [[DBG39]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT_3:%.*]] = or disjoint i64 [[INDVARS_IV]], 4, !dbg [[DBG34]]
+; CHECK-NEXT:    [[ARRAYIDX_4:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP1]], i64 [[INDVARS_IV_NEXT_3]], !dbg [[DBG35]]
+; CHECK-NEXT:    [[TMP17:%.*]] = load i32, ptr [[ARRAYIDX_4]], align 4, !dbg [[DBG35]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ARRAYIDX2_4:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP2]], i64 [[INDVARS_IV_NEXT_3]], !dbg [[DBG36]]
+; CHECK-NEXT:    [[TMP18:%.*]] = load i32, ptr [[ARRAYIDX2_4]], align 4, !dbg [[DBG36]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ADD_4:%.*]] = add nsw i32 [[TMP18]], [[TMP17]], !dbg [[DBG37]]
+; CHECK-NEXT:    [[ARRAYIDX4_4:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP3]], i64 [[INDVARS_IV_NEXT_3]], !dbg [[DBG38]]
+; CHECK-NEXT:    store i32 [[ADD_4]], ptr [[ARRAYIDX4_4]], align 4, !dbg [[DBG39]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT_4:%.*]] = or disjoint i64 [[INDVARS_IV]], 5, !dbg [[DBG34]]
+; CHECK-NEXT:    [[ARRAYIDX_5:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP1]], i64 [[INDVARS_IV_NEXT_4]], !dbg [[DBG35]]
+; CHECK-NEXT:    [[TMP19:%.*]] = load i32, ptr [[ARRAYIDX_5]], align 4, !dbg [[DBG35]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ARRAYIDX2_5:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP2]], i64 [[INDVARS_IV_NEXT_4]], !dbg [[DBG36]]
+; CHECK-NEXT:    [[TMP20:%.*]] = load i32, ptr [[ARRAYIDX2_5]], align 4, !dbg [[DBG36]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ADD_5:%.*]] = add nsw i32 [[TMP20]], [[TMP19]], !dbg [[DBG37]]
+; CHECK-NEXT:    [[ARRAYIDX4_5:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP3]], i64 [[INDVARS_IV_NEXT_4]], !dbg [[DBG38]]
+; CHECK-NEXT:    store i32 [[ADD_5]], ptr [[ARRAYIDX4_5]], align 4, !dbg [[DBG39]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT_5:%.*]] = or disjoint i64 [[INDVARS_IV]], 6, !dbg [[DBG34]]
+; CHECK-NEXT:    [[ARRAYIDX_6:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP1]], i64 [[INDVARS_IV_NEXT_5]], !dbg [[DBG35]]
+; CHECK-NEXT:    [[TMP21:%.*]] = load i32, ptr [[ARRAYIDX_6]], align 4, !dbg [[DBG35]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ARRAYIDX2_6:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP2]], i64 [[INDVARS_IV_NEXT_5]], !dbg [[DBG36]]
+; CHECK-NEXT:    [[TMP22:%.*]] = load i32, ptr [[ARRAYIDX2_6]], align 4, !dbg [[DBG36]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ADD_6:%.*]] = add nsw i32 [[TMP22]], [[TMP21]], !dbg [[DBG37]]
+; CHECK-NEXT:    [[ARRAYIDX4_6:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP3]], i64 [[INDVARS_IV_NEXT_5]], !dbg [[DBG38]]
+; CHECK-NEXT:    store i32 [[ADD_6]], ptr [[ARRAYIDX4_6]], align 4, !dbg [[DBG39]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT_6:%.*]] = or disjoint i64 [[INDVARS_IV]], 7, !dbg [[DBG34]]
+; CHECK-NEXT:    [[ARRAYIDX_7:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP1]], i64 [[INDVARS_IV_NEXT_6]], !dbg [[DBG35]]
+; CHECK-NEXT:    [[TMP23:%.*]] = load i32, ptr [[ARRAYIDX_7]], align 4, !dbg [[DBG35]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ARRAYIDX2_7:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP2]], i64 [[INDVARS_IV_NEXT_6]], !dbg [[DBG36]]
+; CHECK-NEXT:    [[TMP24:%.*]] = load i32, ptr [[ARRAYIDX2_7]], align 4, !dbg [[DBG36]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[ADD_7:%.*]] = add nsw i32 [[TMP24]], [[TMP23]], !dbg [[DBG37]]
+; CHECK-NEXT:    [[ARRAYIDX4_7:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP3]], i64 [[INDVARS_IV_NEXT_6]], !dbg [[DBG38]]
+; CHECK-NEXT:    store i32 [[ADD_7]], ptr [[ARRAYIDX4_7]], align 4, !dbg [[DBG39]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT_7]] = add nuw nsw i64 [[INDVARS_IV]], 8, !dbg [[DBG34]]
+; CHECK-NEXT:    [[EXITCOND_NOT_7:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT_7]], 10000000, !dbg [[DBG40:![0-9]+]]
+; CHECK-NEXT:    br i1 [[EXITCOND_NOT_7]], label [[FOR_COND_CLEANUP:%.*]], label [[FOR_BODY]], !dbg [[DBG33]], !llvm.loop [[LOOP41:![0-9]+]]
 ; CHECK:       vector.body:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ [[INDEX_NEXT_1:%.*]], [[VECTOR_BODY]] ], [ 0, [[TMP0]] ], !dbg [[DBG35]]
-; CHECK-NEXT:    [[TMP25:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP1]], i64 [[INDEX]], !dbg [[DBG36]]
-; CHECK-NEXT:    [[TMP26:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP25]], i64 16, !dbg [[DBG36]]
-; CHECK-NEXT:    [[TMP27:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP25]], i64 32, !dbg [[DBG36]]
-; CHECK-NEXT:    [[TMP28:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP25]], i64 48, !dbg [[DBG36]]
-; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP25]], align 4, !dbg [[DBG36]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[WIDE_LOAD8:%.*]] = load <4 x i32>, ptr [[TMP26]], align 4, !dbg [[DBG36]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[WIDE_LOAD9:%.*]] = load <4 x i32>, ptr [[TMP27]], align 4, !dbg [[DBG36]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[WIDE_LOAD10:%.*]] = load <4 x i32>, ptr [[TMP28]], align 4, !dbg [[DBG36]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[TMP29:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP2]], i64 [[INDEX]], !dbg [[DBG37]]
-; CHECK-NEXT:    [[TMP30:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP29]], i64 16, !dbg [[DBG37]]
-; CHECK-NEXT:    [[TMP31:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP29]], i64 32, !dbg [[DBG37]]
-; CHECK-NEXT:    [[TMP32:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP29]], i64 48, !dbg [[DBG37]]
-; CHECK-NEXT:    [[WIDE_LOAD11:%.*]] = load <4 x i32>, ptr [[TMP29]], align 4, !dbg [[DBG37]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[WIDE_LOAD12:%.*]] = load <4 x i32>, ptr [[TMP30]], align 4, !dbg [[DBG37]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[WIDE_LOAD13:%.*]] = load <4 x i32>, ptr [[TMP31]], align 4, !dbg [[DBG37]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[WIDE_LOAD14:%.*]] = load <4 x i32>, ptr [[TMP32]], align 4, !dbg [[DBG37]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[TMP33:%.*]] = add nsw <4 x i32> [[WIDE_LOAD11]], [[WIDE_LOAD]], !dbg [[DBG38]]
-; CHECK-NEXT:    [[TMP34:%.*]] = add nsw <4 x i32> [[WIDE_LOAD12]], [[WIDE_LOAD8]], !dbg [[DBG38]]
-; CHECK-NEXT:    [[TMP35:%.*]] = add nsw <4 x i32> [[WIDE_LOAD13]], [[WIDE_LOAD9]], !dbg [[DBG38]]
-; CHECK-NEXT:    [[TMP36:%.*]] = add nsw <4 x i32> [[WIDE_LOAD14]], [[WIDE_LOAD10]], !dbg [[DBG38]]
-; CHECK-NEXT:    [[TMP37:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP3]], i64 [[INDEX]], !dbg [[DBG39]]
-; CHECK-NEXT:    [[TMP38:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP37]], i64 16, !dbg [[DBG40]]
-; CHECK-NEXT:    [[TMP39:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP37]], i64 32, !dbg [[DBG40]]
-; CHECK-NEXT:    [[TMP40:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP37]], i64 48, !dbg [[DBG40]]
-; CHECK-NEXT:    store <4 x i32> [[TMP33]], ptr [[TMP37]], align 4, !dbg [[DBG40]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    store <4 x i32> [[TMP34]], ptr [[TMP38]], align 4, !dbg [[DBG40]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    store <4 x i32> [[TMP35]], ptr [[TMP39]], align 4, !dbg [[DBG40]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    store <4 x i32> [[TMP36]], ptr [[TMP40]], align 4, !dbg [[DBG40]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[INDEX_NEXT:%.*]] = or disjoint i64 [[INDEX]], 16, !dbg [[DBG35]]
-; CHECK-NEXT:    [[TMP41:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP1]], i64 [[INDEX_NEXT]], !dbg [[DBG36]]
-; CHECK-NEXT:    [[TMP42:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP41]], i64 16, !dbg [[DBG36]]
-; CHECK-NEXT:    [[TMP43:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP41]], i64 32, !dbg [[DBG36]]
-; CHECK-NEXT:    [[TMP44:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP41]], i64 48, !dbg [[DBG36]]
-; CHECK-NEXT:    [[WIDE_LOAD_1:%.*]] = load <4 x i32>, ptr [[TMP41]], align 4, !dbg [[DBG36]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[WIDE_LOAD8_1:%.*]] = load <4 x i32>, ptr [[TMP42]], align 4, !dbg [[DBG36]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[WIDE_LOAD9_1:%.*]] = load <4 x i32>, ptr [[TMP43]], align 4, !dbg [[DBG36]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[WIDE_LOAD10_1:%.*]] = load <4 x i32>, ptr [[TMP44]], align 4, !dbg [[DBG36]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[TMP45:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP2]], i64 [[INDEX_NEXT]], !dbg [[DBG37]]
-; CHECK-NEXT:    [[TMP46:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i64 16, !dbg [[DBG37]]
-; CHECK-NEXT:    [[TMP47:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i64 32, !dbg [[DBG37]]
-; CHECK-NEXT:    [[TMP48:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i64 48, !dbg [[DBG37]]
-; CHECK-NEXT:    [[WIDE_LOAD11_1:%.*]] = load <4 x i32>, ptr [[TMP45]], align 4, !dbg [[DBG37]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[WIDE_LOAD12_1:%.*]] = load <4 x i32>, ptr [[TMP46]], align 4, !dbg [[DBG37]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[WIDE_LOAD13_1:%.*]] = load <4 x i32>, ptr [[TMP47]], align 4, !dbg [[DBG37]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[WIDE_LOAD14_1:%.*]] = load <4 x i32>, ptr [[TMP48]], align 4, !dbg [[DBG37]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[TMP49:%.*]] = add nsw <4 x i32> [[WIDE_LOAD11_1]], [[WIDE_LOAD_1]], !dbg [[DBG38]]
-; CHECK-NEXT:    [[TMP50:%.*]] = add nsw <4 x i32> [[WIDE_LOAD12_1]], [[WIDE_LOAD8_1]], !dbg [[DBG38]]
-; CHECK-NEXT:    [[TMP51:%.*]] = add nsw <4 x i32> [[WIDE_LOAD13_1]], [[WIDE_LOAD9_1]], !dbg [[DBG38]]
-; CHECK-NEXT:    [[TMP52:%.*]] = add nsw <4 x i32> [[WIDE_LOAD14_1]], [[WIDE_LOAD10_1]], !dbg [[DBG38]]
-; CHECK-NEXT:    [[TMP53:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP3]], i64 [[INDEX_NEXT]], !dbg [[DBG39]]
-; CHECK-NEXT:    [[TMP54:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP53]], i64 16, !dbg [[DBG40]]
-; CHECK-NEXT:    [[TMP55:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP53]], i64 32, !dbg [[DBG40]]
-; CHECK-NEXT:    [[TMP56:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP53]], i64 48, !dbg [[DBG40]]
-; CHECK-NEXT:    store <4 x i32> [[TMP49]], ptr [[TMP53]], align 4, !dbg [[DBG40]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    store <4 x i32> [[TMP50]], ptr [[TMP54]], align 4, !dbg [[DBG40]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    store <4 x i32> [[TMP51]], ptr [[TMP55]], align 4, !dbg [[DBG40]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    store <4 x i32> [[TMP52]], ptr [[TMP56]], align 4, !dbg [[DBG40]], !tbaa [[TBAA19]]
-; CHECK-NEXT:    [[INDEX_NEXT_1]] = add nuw nsw i64 [[INDEX]], 32, !dbg [[DBG35]]
-; CHECK-NEXT:    [[TMP57:%.*]] = icmp eq i64 [[INDEX_NEXT_1]], 10000000, !dbg [[DBG34]]
-; CHECK-NEXT:    br i1 [[TMP57]], label [[FOR_COND_CLEANUP]], label [[VECTOR_BODY]], !dbg [[DBG34]], !llvm.loop [[LOOP44:![0-9]+]]
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ [[INDEX_NEXT_1:%.*]], [[VECTOR_BODY]] ], [ 0, [[TMP0]] ], !dbg [[DBG34]]
+; CHECK-NEXT:    [[TMP25:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP1]], i64 [[INDEX]], !dbg [[DBG35]]
+; CHECK-NEXT:    [[TMP26:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP25]], i64 16, !dbg [[DBG35]]
+; CHECK-NEXT:    [[TMP27:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP25]], i64 32, !dbg [[DBG35]]
+; CHECK-NEXT:    [[TMP28:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP25]], i64 48, !dbg [[DBG35]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP25]], align 4, !dbg [[DBG35]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[WIDE_LOAD8:%.*]] = load <4 x i32>, ptr [[TMP26]], align 4, !dbg [[DBG35]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[WIDE_LOAD9:%.*]] = load <4 x i32>, ptr [[TMP27]], align 4, !dbg [[DBG35]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[WIDE_LOAD10:%.*]] = load <4 x i32>, ptr [[TMP28]], align 4, !dbg [[DBG35]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[TMP29:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP2]], i64 [[INDEX]], !dbg [[DBG36]]
+; CHECK-NEXT:    [[TMP30:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP29]], i64 16, !dbg [[DBG36]]
+; CHECK-NEXT:    [[TMP31:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP29]], i64 32, !dbg [[DBG36]]
+; CHECK-NEXT:    [[TMP32:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP29]], i64 48, !dbg [[DBG36]]
+; CHECK-NEXT:    [[WIDE_LOAD11:%.*]] = load <4 x i32>, ptr [[TMP29]], align 4, !dbg [[DBG36]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[WIDE_LOAD12:%.*]] = load <4 x i32>, ptr [[TMP30]], align 4, !dbg [[DBG36]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[WIDE_LOAD13:%.*]] = load <4 x i32>, ptr [[TMP31]], align 4, !dbg [[DBG36]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[WIDE_LOAD14:%.*]] = load <4 x i32>, ptr [[TMP32]], align 4, !dbg [[DBG36]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[TMP33:%.*]] = add nsw <4 x i32> [[WIDE_LOAD11]], [[WIDE_LOAD]], !dbg [[DBG37]]
+; CHECK-NEXT:    [[TMP34:%.*]] = add nsw <4 x i32> [[WIDE_LOAD12]], [[WIDE_LOAD8]], !dbg [[DBG37]]
+; CHECK-NEXT:    [[TMP35:%.*]] = add nsw <4 x i32> [[WIDE_LOAD13]], [[WIDE_LOAD9]], !dbg [[DBG37]]
+; CHECK-NEXT:    [[TMP36:%.*]] = add nsw <4 x i32> [[WIDE_LOAD14]], [[WIDE_LOAD10]], !dbg [[DBG37]]
+; CHECK-NEXT:    [[TMP37:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP3]], i64 [[INDEX]], !dbg [[DBG38]]
+; CHECK-NEXT:    [[TMP38:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP37]], i64 16, !dbg [[DBG39]]
+; CHECK-NEXT:    [[TMP39:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP37]], i64 32, !dbg [[DBG39]]
+; CHECK-NEXT:    [[TMP40:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP37]], i64 48, !dbg [[DBG39]]
+; CHECK-NEXT:    store <4 x i32> [[TMP33]], ptr [[TMP37]], align 4, !dbg [[DBG39]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    store <4 x i32> [[TMP34]], ptr [[TMP38]], align 4, !dbg [[DBG39]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    store <4 x i32> [[TMP35]], ptr [[TMP39]], align 4, !dbg [[DBG39]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    store <4 x i32> [[TMP36]], ptr [[TMP40]], align 4, !dbg [[DBG39]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[INDEX_NEXT:%.*]] = or disjoint i64 [[INDEX]], 16, !dbg [[DBG34]]
+; CHECK-NEXT:    [[TMP41:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP1]], i64 [[INDEX_NEXT]], !dbg [[DBG35]]
+; CHECK-NEXT:    [[TMP42:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP41]], i64 16, !dbg [[DBG35]]
+; CHECK-NEXT:    [[TMP43:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP41]], i64 32, !dbg [[DBG35]]
+; CHECK-NEXT:    [[TMP44:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP41]], i64 48, !dbg [[DBG35]]
+; CHECK-NEXT:    [[WIDE_LOAD_1:%.*]] = load <4 x i32>, ptr [[TMP41]], align 4, !dbg [[DBG35]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[WIDE_LOAD8_1:%.*]] = load <4 x i32>, ptr [[TMP42]], align 4, !dbg [[DBG35]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[WIDE_LOAD9_1:%.*]] = load <4 x i32>, ptr [[TMP43]], align 4, !dbg [[DBG35]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[WIDE_LOAD10_1:%.*]] = load <4 x i32>, ptr [[TMP44]], align 4, !dbg [[DBG35]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[TMP45:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP2]], i64 [[INDEX_NEXT]], !dbg [[DBG36]]
+; CHECK-NEXT:    [[TMP46:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i64 16, !dbg [[DBG36]]
+; CHECK-NEXT:    [[TMP47:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i64 32, !dbg [[DBG36]]
+; CHECK-NEXT:    [[TMP48:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i64 48, !dbg [[DBG36]]
+; CHECK-NEXT:    [[WIDE_LOAD11_1:%.*]] = load <4 x i32>, ptr [[TMP45]], align 4, !dbg [[DBG36]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[WIDE_LOAD12_1:%.*]] = load <4 x i32>, ptr [[TMP46]], align 4, !dbg [[DBG36]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[WIDE_LOAD13_1:%.*]] = load <4 x i32>, ptr [[TMP47]], align 4, !dbg [[DBG36]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[WIDE_LOAD14_1:%.*]] = load <4 x i32>, ptr [[TMP48]], align 4, !dbg [[DBG36]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[TMP49:%.*]] = add nsw <4 x i32> [[WIDE_LOAD11_1]], [[WIDE_LOAD_1]], !dbg [[DBG37]]
+; CHECK-NEXT:    [[TMP50:%.*]] = add nsw <4 x i32> [[WIDE_LOAD12_1]], [[WIDE_LOAD8_1]], !dbg [[DBG37]]
+; CHECK-NEXT:    [[TMP51:%.*]] = add nsw <4 x i32> [[WIDE_LOAD13_1]], [[WIDE_LOAD9_1]], !dbg [[DBG37]]
+; CHECK-NEXT:    [[TMP52:%.*]] = add nsw <4 x i32> [[WIDE_LOAD14_1]], [[WIDE_LOAD10_1]], !dbg [[DBG37]]
+; CHECK-NEXT:    [[TMP53:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[TMP3]], i64 [[INDEX_NEXT]], !dbg [[DBG38]]
+; CHECK-NEXT:    [[TMP54:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP53]], i64 16, !dbg [[DBG39]]
+; CHECK-NEXT:    [[TMP55:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP53]], i64 32, !dbg [[DBG39]]
+; CHECK-NEXT:    [[TMP56:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP53]], i64 48, !dbg [[DBG39]]
+; CHECK-NEXT:    store <4 x i32> [[TMP49]], ptr [[TMP53]], align 4, !dbg [[DBG39]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    store <4 x i32> [[TMP50]], ptr [[TMP54]], align 4, !dbg [[DBG39]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    store <4 x i32> [[TMP51]], ptr [[TMP55]], align 4, !dbg [[DBG39]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    store <4 x i32> [[TMP52]], ptr [[TMP56]], align 4, !dbg [[DBG39]], !tbaa [[TBAA5]]
+; CHECK-NEXT:    [[INDEX_NEXT_1]] = add nuw nsw i64 [[INDEX]], 32, !dbg [[DBG34]]
+; CHECK-NEXT:    [[TMP57:%.*]] = icmp eq i64 [[INDEX_NEXT_1]], 10000000, !dbg [[DBG33]]
+; CHECK-NEXT:    br i1 [[TMP57]], label [[FOR_COND_CLEANUP]], label [[VECTOR_BODY]], !dbg [[DBG33]], !llvm.loop [[LOOP43:![0-9]+]]
 ; CHECK:       for.cond.cleanup:
-; CHECK-NEXT:    br label [[FINAL_END_EXITSTUB:%.*]], !dbg [[DBG45:![0-9]+]]
+; CHECK-NEXT:    br label [[FINAL_END_EXITSTUB:%.*]], !dbg [[DBG44:![0-9]+]]
 ; CHECK:       final.end.exitStub:
 ; CHECK-NEXT:    ret void
 ;

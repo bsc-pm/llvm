@@ -24,8 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: %oss-compile && NANOS6_CONFIG_OVERRIDE="version.instrument=verbose,$NANOS6_CONFIG_OVERRIDE" %oss-run 2>&1 | FileCheck %s
-// RUN: %oss-O2-compile && NANOS6_CONFIG_OVERRIDE="version.instrument=verbose,$NANOS6_CONFIG_OVERRIDE" %oss-run 2>&1 | FileCheck %s
+// RUN: %oss-compile && env NANOS6_CONFIG_OVERRIDE="version.instrument=verbose" %oss-run 2>&1 | FileCheck %s
+// RUN: %oss-O2-compile && env NANOS6_CONFIG_OVERRIDE="version.instrument=verbose" %oss-run 2>&1 | FileCheck %s
 
 int main() {
     #pragma oss task label("I'm the best task of the world!")

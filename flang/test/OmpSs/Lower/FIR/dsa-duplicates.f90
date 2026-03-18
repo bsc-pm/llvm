@@ -13,24 +13,28 @@ program task
 end program
 
 
+
 ! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "TASK"} {
-! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.dummy_scope : !fir.dscope
-! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "i", uniq_name = "_QFEi"}
-! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_1]] {uniq_name = "_QFEi"} : (!fir.ref<i32>) -> !fir.ref<i32>
-! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "j", uniq_name = "_QFEj"}
-! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_3]] {uniq_name = "_QFEj"} : (!fir.ref<i32>) -> !fir.ref<i32>
-! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "k", uniq_name = "_QFEk"}
-! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_5]] {uniq_name = "_QFEk"} : (!fir.ref<i32>) -> !fir.ref<i32>
-! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           oss.task private(%[[VAL_4]], %[[VAL_4]] : !fir.ref<i32>, !fir.ref<i32>) private_type(%[[VAL_7]], %[[VAL_8]] : !fir.oss<i32>, !fir.oss<i32>) firstprivate(%[[VAL_2]], %[[VAL_2]], %[[VAL_6]], %[[VAL_6]] : !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>) firstprivate_type(%[[VAL_9]], %[[VAL_10]], %[[VAL_11]], %[[VAL_12]] : !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>) default( deffirstprivate) {
-! FIRDialect:             %[[VAL_13:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:             fir.store %[[VAL_13]] to %[[VAL_2]] : !fir.ref<i32>
+! FIRDialect:           %[[DUMMY_SCOPE_0:[-0-9A-Za-z._]+]] = fir.dummy_scope : !fir.dscope
+! FIRDialect:           %[[ALLOCA_0:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "i", uniq_name = "_QFEi"}
+! FIRDialect:           %[[DECLARE_0:[-0-9A-Za-z._]+]] = fir.declare %[[ALLOCA_0]] {uniq_name = "_QFEi"} : (!fir.ref<i32>) -> !fir.ref<i32>
+! FIRDialect:           %[[ALLOCA_1:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "j", uniq_name = "_QFEj"}
+! FIRDialect:           %[[DECLARE_1:[-0-9A-Za-z._]+]] = fir.declare %[[ALLOCA_1]] {uniq_name = "_QFEj"} : (!fir.ref<i32>) -> !fir.ref<i32>
+! FIRDialect:           %[[ALLOCA_2:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "k", uniq_name = "_QFEk"}
+! FIRDialect:           %[[DECLARE_2:[-0-9A-Za-z._]+]] = fir.declare %[[ALLOCA_2]] {uniq_name = "_QFEk"} : (!fir.ref<i32>) -> !fir.ref<i32>
+! FIRDialect:           %[[UNDEFINED_0:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_1:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_2:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_3:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_4:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_5:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           oss.task private(%[[DECLARE_1]], %[[DECLARE_1]] : !fir.ref<i32>, !fir.ref<i32>) private_type(%[[UNDEFINED_0]], %[[UNDEFINED_1]] : !fir.oss<i32>, !fir.oss<i32>) firstprivate(%[[DECLARE_0]], %[[DECLARE_0]], %[[DECLARE_2]], %[[DECLARE_2]] : !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>) firstprivate_type(%[[UNDEFINED_2]], %[[UNDEFINED_3]], %[[UNDEFINED_4]], %[[UNDEFINED_5]] : !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>) default(deffirstprivate) {
+! FIRDialect:             %[[CONSTANT_0:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:             fir.store %[[CONSTANT_0]] to %[[DECLARE_0]] : !fir.ref<i32>
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
 ! FIRDialect:           return
 ! FIRDialect:         }
+! FIRDialect:         func.func private @_FortranAProgramStart(i32, !llvm.ptr, !llvm.ptr, !llvm.ptr)
+! FIRDialect:         func.func private @_FortranAProgramEndStatement()
+

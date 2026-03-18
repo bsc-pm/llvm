@@ -1,7 +1,8 @@
+// clang-format off
 // RUN: %libomptarget-compile-generic -DSHARED -fPIC -shared -o %t.so && %clang %flags %s -o %t -ldl && %libomptarget-run-generic %t.so 2>&1 | %fcheck-generic
+// clang-format on
 // UNSUPPORTED: true
 // dlopen is not supported in libompv
-
 #ifdef SHARED
 #include <stdio.h>
 int foo() {

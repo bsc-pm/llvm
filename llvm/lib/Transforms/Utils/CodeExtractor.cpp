@@ -63,7 +63,6 @@
 #include <cstdint>
 #include <iterator>
 #include <map>
-#include <utility>
 #include <vector>
 
 using namespace llvm;
@@ -270,7 +269,7 @@ CodeExtractor::CodeExtractor(ArrayRef<BasicBlock *> BBs, DominatorTree *DT,
       BPI(BPI), AC(AC), AllocationBlock(AllocationBlock),
       AllowVarArgs(AllowVarArgs),
       Blocks(buildExtractionBlockSet(BBs, DT, AllowVarArgs, AllowAlloca)),
-      Suffix(Suffix), FullName(""), ArgsInZeroAddressSpace(ArgsInZeroAddressSpace) {}
+      Suffix(Suffix), ArgsInZeroAddressSpace(ArgsInZeroAddressSpace), FullName("") {}
 
 void CodeExtractor::setFullName(std::string FullName) {
   this->FullName = FullName;
@@ -675,14 +674,14 @@ void CodeExtractor::findInputsOutputs(ValueSet &Inputs, ValueSet &Outputs,
                                       bool CollectGlobalInputs) const {
   // For our OmpSs-2 transform we want CodeExtractor
   // to trust our input parameters
-  const bool InputsEmpty = Inputs.empty();
+  const bool FullNameEmpty = FullName.empty();
   for (BasicBlock *BB : Blocks) {
     // If a used value is defined outside the region, it's an input.  If an
     // instruction is used outside the region, it's an output.
     for (Instruction &II : *BB) {
       for (auto &OI : II.operands()) {
         Value *V = OI;
-        if (InputsEmpty && !SinkCands.count(V) &&
+        if (FullNameEmpty && !SinkCands.count(V) &&
             (definedInCaller(Blocks, V) ||
              (CollectGlobalInputs && llvm::isa<llvm::GlobalVariable>(V))))
           Inputs.insert(V);
@@ -762,13 +761,13 @@ void CodeExtractor::severSplitPHINodesOfEntry(BasicBlock *&Header) {
 
       // Loop over all of the incoming value in PN, moving them to NewPN if they
       // are from the extracted region.
-      for (unsigned i = 0; i != PN->getNumIncomingValues(); ++i) {
+      PN->removeIncomingValueIf([&](unsigned i) {
         if (Blocks.count(PN->getIncomingBlock(i))) {
           NewPN->addIncoming(PN->getIncomingValue(i), PN->getIncomingBlock(i));
-          PN->removeIncomingValue(i);
-          --i;
+          return true;
         }
-      }
+        return false;
+      });
     }
   }
 }
@@ -945,6 +944,7 @@ Function *CodeExtractor::constructFunctionDeclaration(
       case Attribute::CoroDestroyOnlyWhenComplete:
       case Attribute::CoroElideSafe:
       case Attribute::NoDivergenceSource:
+      case Attribute::NoCreateUndefOrPoison:
         continue;
       // Those attributes should be safe to propagate to the extracted function.
       case Attribute::AlwaysInline:
@@ -961,6 +961,7 @@ Function *CodeExtractor::constructFunctionDeclaration(
       case Attribute::NoFree:
       case Attribute::NoImplicitFloat:
       case Attribute::NoInline:
+      case Attribute::NoOutline:
       case Attribute::NonLazyBind:
       case Attribute::NoRedZone:
       case Attribute::NoUnwind:
@@ -982,6 +983,7 @@ Function *CodeExtractor::constructFunctionDeclaration(
       case Attribute::SanitizeMemTag:
       case Attribute::SanitizeRealtime:
       case Attribute::SanitizeRealtimeBlocking:
+      case Attribute::SanitizeAllocToken:
       case Attribute::SpeculativeLoadHardening:
       case Attribute::StackProtect:
       case Attribute::StackProtectReq:
@@ -993,6 +995,7 @@ Function *CodeExtractor::constructFunctionDeclaration(
       case Attribute::MustProgress:
       case Attribute::NoProfile:
       case Attribute::SkipProfile:
+      case Attribute::DenormalFPEnv:
         break;
       // These attributes cannot be applied to functions.
       case Attribute::Alignment:

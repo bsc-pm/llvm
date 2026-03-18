@@ -29,6 +29,7 @@
 #include "clang/AST/Mangle.h"
 #include "clang/AST/TypeLoc.h"
 #include "clang/Basic/ABI.h"
+#include "clang/Basic/DiagnosticAST.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Basic/Thunk.h"
@@ -39,6 +40,8 @@
 #include <optional>
 
 using namespace clang;
+namespace UnsupportedItaniumManglingKind =
+    clang::diag::UnsupportedItaniumManglingKind;
 
 namespace {
 
@@ -424,7 +427,8 @@ public:
       : Context(C), Out(Out_), NormalizeIntegers(NormalizeIntegers_),
         NullOut(false), Structor(nullptr), AbiTagsRoot(AbiTags) {}
   CXXNameMangler(CXXNameMangler &Outer, raw_ostream &Out_)
-      : Context(Outer.Context), Out(Out_), Structor(Outer.Structor),
+      : Context(Outer.Context), Out(Out_),
+        NormalizeIntegers(Outer.NormalizeIntegers), Structor(Outer.Structor),
         StructorType(Outer.StructorType), SeqID(Outer.SeqID),
         FunctionTypeDepth(Outer.FunctionTypeDepth), AbiTagsRoot(AbiTags),
         Substitutions(Outer.Substitutions),
@@ -634,6 +638,19 @@ NamespaceDecl *ItaniumMangleContextImpl::getStdNamespace() {
   return StdNamespace;
 }
 
+/// Retrieve the lambda associated with an init-capture variable.
+static const CXXRecordDecl *getLambdaForInitCapture(const VarDecl *VD) {
+  if (!VD || !VD->isInitCapture())
+    return nullptr;
+
+  const auto *Method = cast<CXXMethodDecl>(VD->getDeclContext());
+  const auto *Lambda = dyn_cast<CXXRecordDecl>(Method->getParent());
+  if (!Lambda || !Lambda->isLambda())
+    return nullptr;
+
+  return Lambda;
+}
+
 /// Retrieve the declaration context that should be used when mangling the given
 /// declaration.
 const DeclContext *
@@ -675,9 +692,18 @@ ItaniumMangleContextImpl::getEffectiveDeclContext(const Decl *D) {
     return getEffectiveDeclContext(cast<Decl>(DC));
   }
 
-  if (const auto *VD = dyn_cast<VarDecl>(D))
+  if (const auto *VD = dyn_cast<VarDecl>(D)) {
+    if (const CXXRecordDecl *Lambda = getLambdaForInitCapture(VD)) {
+      const DeclContext *ParentDC = getEffectiveParentContext(Lambda);
+      // Init-captures in local lambdas are mangled relative to the enclosing
+      // local context rather than operator() to avoid recursive local-name
+      // encoding through the call operator type.
+      if (isLocalContainerContext(ParentDC))
+        return ParentDC;
+    }
     if (VD->isExternC())
       return getASTContext().getTranslationUnitDecl();
+  }
 
   if (const auto *FD = getASTContext().getLangOpts().getClangABICompat() >
                                LangOptions::ClangABI::Ver19
@@ -1250,9 +1276,8 @@ void CXXNameMangler::mangleFloatLiteral(QualType T, const llvm::APFloat &V) {
 
 void CXXNameMangler::mangleFixedPointLiteral() {
   DiagnosticsEngine &Diags = Context.getDiags();
-  unsigned DiagID = Diags.getCustomDiagID(
-      DiagnosticsEngine::Error, "cannot mangle fixed point literals yet");
-  Diags.Report(DiagID);
+  Diags.Report(diag::err_unsupported_itanium_mangling)
+      << UnsupportedItaniumManglingKind::FixedPointLiteral;
 }
 
 void CXXNameMangler::mangleNullPointer(QualType T) {
@@ -1874,12 +1899,13 @@ void CXXNameMangler::mangleLocalName(GlobalDecl GD,
   {
     AbiTagState LocalAbiTags(AbiTags);
 
-    if (const ObjCMethodDecl *MD = dyn_cast<ObjCMethodDecl>(DC))
+    if (const ObjCMethodDecl *MD = dyn_cast<ObjCMethodDecl>(DC)) {
       mangleObjCMethodName(MD);
-    else if (const BlockDecl *BD = dyn_cast<BlockDecl>(DC))
+    } else if (const BlockDecl *BD = dyn_cast<BlockDecl>(DC)) {
       mangleBlockForPrefix(BD);
-    else
+    } else {
       mangleFunctionEncoding(getParentOfLocalEntity(DC));
+    }
 
     // Implicit ABI tags (from namespace) are not available in the following
     // entity; reset to actually emitted tags, which are available.
@@ -2278,6 +2304,9 @@ const NamedDecl *CXXNameMangler::getClosurePrefix(const Decl *ND) {
   const NamedDecl *Context = nullptr;
   if (auto *Block = dyn_cast<BlockDecl>(ND)) {
     Context = dyn_cast_or_null<NamedDecl>(Block->getBlockManglingContextDecl());
+  } else if (auto *VD = dyn_cast<VarDecl>(ND)) {
+    if (const CXXRecordDecl *Lambda = getLambdaForInitCapture(VD))
+      Context = dyn_cast_or_null<NamedDecl>(Lambda->getLambdaContextDecl());
   } else if (auto *RD = dyn_cast<CXXRecordDecl>(ND)) {
     if (RD->isLambda())
       Context = dyn_cast_or_null<NamedDecl>(RD->getLambdaContextDecl());
@@ -2285,8 +2314,8 @@ const NamedDecl *CXXNameMangler::getClosurePrefix(const Decl *ND) {
   if (!Context)
     return nullptr;
 
-  // Only lambdas within the initializer of a non-local variable or non-static
-  // data member get a <closure-prefix>.
+  // Only entities associated with lambdas within the initializer of a
+  // non-local variable or non-static data member get a <closure-prefix>.
   if ((isa<VarDecl>(Context) && cast<VarDecl>(Context)->hasGlobalStorage()) ||
       isa<FieldDecl>(Context))
     return Context;
@@ -2412,6 +2441,7 @@ bool CXXNameMangler::mangleUnresolvedTypeOrSimpleId(QualType Ty,
   case Type::Paren:
   case Type::Attributed:
   case Type::BTFTagAttributed:
+  case Type::OverflowBehavior:
   case Type::HLSLAttributedResource:
   case Type::HLSLInlineSpirv:
   case Type::Auto:
@@ -2492,7 +2522,7 @@ bool CXXNameMangler::mangleUnresolvedTypeOrSimpleId(QualType Ty,
   case Type::Enum:
   case Type::Record:
     mangleSourceNameWithAbiTags(
-        cast<TagType>(Ty)->getOriginalDecl()->getDefinitionOrSelf());
+        cast<TagType>(Ty)->getDecl()->getDefinitionOrSelf());
     break;
 
   case Type::TemplateSpecialization: {
@@ -2557,9 +2587,8 @@ bool CXXNameMangler::mangleUnresolvedTypeOrSimpleId(QualType Ty,
   }
 
   case Type::InjectedClassName:
-    mangleSourceNameWithAbiTags(cast<InjectedClassNameType>(Ty)
-                                    ->getOriginalDecl()
-                                    ->getDefinitionOrSelf());
+    mangleSourceNameWithAbiTags(
+        cast<InjectedClassNameType>(Ty)->getDecl()->getDefinitionOrSelf());
     break;
 
   case Type::DependentName:
@@ -3798,7 +3827,7 @@ void CXXNameMangler::mangleType(const RecordType *T) {
   mangleType(static_cast<const TagType*>(T));
 }
 void CXXNameMangler::mangleType(const TagType *T) {
-  mangleName(T->getOriginalDecl()->getDefinitionOrSelf());
+  mangleName(T->getDecl()->getDefinitionOrSelf());
 }
 
 // <type>       ::= <array-type>
@@ -3973,10 +4002,8 @@ void CXXNameMangler::mangleNeonVectorType(const VectorType *T) {
 
 void CXXNameMangler::mangleNeonVectorType(const DependentVectorType *T) {
   DiagnosticsEngine &Diags = Context.getDiags();
-  unsigned DiagID = Diags.getCustomDiagID(
-      DiagnosticsEngine::Error,
-      "cannot mangle this dependent neon vector type yet");
-  Diags.Report(T->getAttributeLoc(), DiagID);
+  Diags.Report(T->getAttributeLoc(), diag::err_unsupported_itanium_mangling)
+      << UnsupportedItaniumManglingKind::DependentNeonVector;
 }
 
 static StringRef mangleAArch64VectorBase(const BuiltinType *EltType) {
@@ -4052,10 +4079,8 @@ void CXXNameMangler::mangleAArch64NeonVectorType(const VectorType *T) {
 }
 void CXXNameMangler::mangleAArch64NeonVectorType(const DependentVectorType *T) {
   DiagnosticsEngine &Diags = Context.getDiags();
-  unsigned DiagID = Diags.getCustomDiagID(
-      DiagnosticsEngine::Error,
-      "cannot mangle this dependent neon vector type yet");
-  Diags.Report(T->getAttributeLoc(), DiagID);
+  Diags.Report(T->getAttributeLoc(), diag::err_unsupported_itanium_mangling)
+      << UnsupportedItaniumManglingKind::DependentNeonVector;
 }
 
 // The AArch64 ACLE specifies that fixed-length SVE vector and predicate types
@@ -4150,10 +4175,8 @@ void CXXNameMangler::mangleAArch64FixedSveVectorType(const VectorType *T) {
 void CXXNameMangler::mangleAArch64FixedSveVectorType(
     const DependentVectorType *T) {
   DiagnosticsEngine &Diags = Context.getDiags();
-  unsigned DiagID = Diags.getCustomDiagID(
-      DiagnosticsEngine::Error,
-      "cannot mangle this dependent fixed-length SVE vector type yet");
-  Diags.Report(T->getAttributeLoc(), DiagID);
+  Diags.Report(T->getAttributeLoc(), diag::err_unsupported_itanium_mangling)
+      << UnsupportedItaniumManglingKind::DependentFixedLengthSVEVector;
 }
 
 void CXXNameMangler::mangleRISCVFixedRVVVectorType(const VectorType *T) {
@@ -4194,9 +4217,11 @@ void CXXNameMangler::mangleRISCVFixedRVVVectorType(const VectorType *T) {
     TypeNameOS << "uint32";
     break;
   case BuiltinType::Long:
+  case BuiltinType::LongLong:
     TypeNameOS << "int64";
     break;
   case BuiltinType::ULong:
+  case BuiltinType::ULongLong:
     TypeNameOS << "uint64";
     break;
   case BuiltinType::Float16:
@@ -4207,6 +4232,9 @@ void CXXNameMangler::mangleRISCVFixedRVVVectorType(const VectorType *T) {
     break;
   case BuiltinType::Double:
     TypeNameOS << "float64";
+    break;
+  case BuiltinType::BFloat16:
+    TypeNameOS << "bfloat16";
     break;
   default:
     llvm_unreachable("unexpected element type for fixed-length RVV vector!");
@@ -4253,10 +4281,8 @@ void CXXNameMangler::mangleRISCVFixedRVVVectorType(const VectorType *T) {
 void CXXNameMangler::mangleRISCVFixedRVVVectorType(
     const DependentVectorType *T) {
   DiagnosticsEngine &Diags = Context.getDiags();
-  unsigned DiagID = Diags.getCustomDiagID(
-      DiagnosticsEngine::Error,
-      "cannot mangle this dependent fixed-length RVV vector type yet");
-  Diags.Report(T->getAttributeLoc(), DiagID);
+  Diags.Report(T->getAttributeLoc(), diag::err_unsupported_itanium_mangling)
+      << UnsupportedItaniumManglingKind::DependentFixedLengthRVVVectorType;
 }
 
 // GNU extension: vector types
@@ -4433,8 +4459,8 @@ void CXXNameMangler::mangleType(const InjectedClassNameType *T) {
   // Mangle injected class name types as if the user had written the
   // specialization out fully.  It may not actually be possible to see
   // this mangling, though.
-  mangleType(T->getOriginalDecl()->getCanonicalTemplateSpecializationType(
-      getASTContext()));
+  mangleType(
+      T->getDecl()->getCanonicalTemplateSpecializationType(getASTContext()));
 }
 
 void CXXNameMangler::mangleType(const TemplateSpecializationType *T) {
@@ -4585,6 +4611,17 @@ void CXXNameMangler::mangleType(const PipeType *T) {
   Out << "8ocl_pipe";
 }
 
+void CXXNameMangler::mangleType(const OverflowBehaviorType *T) {
+  // Vender-extended type mangling for OverflowBehaviorType
+  // <type> ::= U <behavior> <underlying_type>
+  if (T->isWrapKind()) {
+    Out << "U8ObtWrap_";
+  } else {
+    Out << "U8ObtTrap_";
+  }
+  mangleType(T->getUnderlyingType());
+}
+
 void CXXNameMangler::mangleType(const BitIntType *T) {
   // 5.1.5.2 Builtin types
   // <type> ::= DB <number | instantiation-dependent expression> _
@@ -4627,6 +4664,8 @@ void CXXNameMangler::mangleType(const HLSLAttributedResourceType *T) {
     Str += "_ROV";
   if (Attrs.RawBuffer)
     Str += "_Raw";
+  if (Attrs.IsCounter)
+    Str += "_Counter";
   if (T->hasContainedType())
     Str += "_CT";
   mangleVendorQualifier(Str);
@@ -4693,7 +4732,7 @@ void CXXNameMangler::mangleIntegerLiteral(QualType T,
 void CXXNameMangler::mangleMemberExprBase(const Expr *Base, bool IsArrow) {
   // Ignore member expressions involving anonymous unions.
   while (const auto *RT = Base->getType()->getAsCanonical<RecordType>()) {
-    if (!RT->getOriginalDecl()->isAnonymousStructOrUnion())
+    if (!RT->getDecl()->isAnonymousStructOrUnion())
       break;
     const auto *ME = dyn_cast<MemberExpr>(Base);
     if (!ME)
@@ -4783,10 +4822,9 @@ void CXXNameMangler::mangleRequirement(SourceLocation RequiresExprLoc,
   auto HandleSubstitutionFailure =
       [&](SourceLocation Loc) {
         DiagnosticsEngine &Diags = Context.getDiags();
-        unsigned DiagID = Diags.getCustomDiagID(
-            DiagnosticsEngine::Error, "cannot mangle this requires-expression "
-                                      "containing a substitution failure");
-        Diags.Report(Loc, DiagID);
+        Diags.Report(Loc, diag::err_unsupported_itanium_mangling)
+            << UnsupportedItaniumManglingKind::
+                   RequiresExprWithSubstitutionFailure;
         Out << 'F';
       };
 
@@ -4952,11 +4990,18 @@ recurse:
     E = cast<ConstantExpr>(E)->getSubExpr();
     goto recurse;
 
+  case Expr::CXXReflectExprClass: {
+    // TODO(Reflection): implement this after introducing std::meta::info
+    assert(false && "unimplemented");
+    break;
+  }
+
   // FIXME: invent manglings for all these.
   case Expr::BlockExprClass:
   case Expr::ChooseExprClass:
   case Expr::CompoundLiteralExprClass:
   case Expr::ExtVectorElementExprClass:
+  case Expr::MatrixElementExprClass:
   case Expr::GenericSelectionExprClass:
   case Expr::ObjCEncodeExprClass:
   case Expr::ObjCIsaExprClass:
@@ -4991,10 +5036,8 @@ recurse:
     if (!NullOut) {
       // As bad as this diagnostic is, it's better than crashing.
       DiagnosticsEngine &Diags = Context.getDiags();
-      unsigned DiagID = Diags.getCustomDiagID(DiagnosticsEngine::Error,
-                                       "cannot yet mangle expression type %0");
-      Diags.Report(E->getExprLoc(), DiagID)
-        << E->getStmtClassName() << E->getSourceRange();
+      Diags.Report(E->getExprLoc(), diag::err_unsupported_itanium_expr_mangling)
+          << E->getStmtClassName() << E->getSourceRange();
       return;
     }
     break;
@@ -5030,11 +5073,9 @@ recurse:
   case Expr::BinaryConditionalOperatorClass: {
     NotPrimaryExpr();
     DiagnosticsEngine &Diags = Context.getDiags();
-    unsigned DiagID =
-      Diags.getCustomDiagID(DiagnosticsEngine::Error,
-                "?: operator with omitted middle operand cannot be mangled");
-    Diags.Report(E->getExprLoc(), DiagID)
-      << E->getStmtClassName() << E->getSourceRange();
+    Diags.Report(E->getExprLoc(), diag::err_unsupported_itanium_mangling)
+        << UnsupportedItaniumManglingKind::TernaryWithOmittedMiddleOperand
+        << E->getSourceRange();
     return;
   }
 
@@ -5405,9 +5446,8 @@ recurse:
     case UETT_PtrAuthTypeDiscriminator:
     case UETT_DataSizeOf: {
       DiagnosticsEngine &Diags = Context.getDiags();
-      unsigned DiagID = Diags.getCustomDiagID(
-          DiagnosticsEngine::Error, "cannot yet mangle %0 expression");
-      Diags.Report(E->getExprLoc(), DiagID) << getTraitSpelling(SAE->getKind());
+      Diags.Report(E->getExprLoc(), diag::err_unsupported_itanium_expr_mangling)
+          << getTraitSpelling(SAE->getKind());
       return;
     }
     }
@@ -5485,6 +5525,15 @@ recurse:
     Out << "ix";
     mangleExpression(AE->getLHS());
     mangleExpression(AE->getRHS());
+    break;
+  }
+
+  case Expr::MatrixSingleSubscriptExprClass: {
+    NotPrimaryExpr();
+    const MatrixSingleSubscriptExpr *ME = cast<MatrixSingleSubscriptExpr>(E);
+    Out << "ix";
+    mangleExpression(ME->getBase());
+    mangleExpression(ME->getRowIdx());
     break;
   }
 
@@ -5909,10 +5958,8 @@ recurse:
   case Expr::OpenACCAsteriskSizeExprClass: {
     // We shouldn't ever be able to get here, but diagnose anyway.
     DiagnosticsEngine &Diags = Context.getDiags();
-    unsigned DiagID = Diags.getCustomDiagID(
-        DiagnosticsEngine::Error,
-        "cannot yet mangle OpenACC Asterisk Size expression");
-    Diags.Report(DiagID);
+    Diags.Report(diag::err_unsupported_itanium_mangling)
+        << UnsupportedItaniumManglingKind::OpenACCAsteriskSizeExpr;
     return;
   }
   }
@@ -6046,6 +6093,8 @@ void CXXNameMangler::mangleCXXDtorType(CXXDtorType T) {
   case Dtor_Comdat:
     Out << "D5";
     break;
+  case Dtor_VectorDeleting:
+    llvm_unreachable("Itanium ABI does not use vector deleting dtors");
   }
 }
 
@@ -6453,6 +6502,9 @@ static bool isZeroInitialized(QualType T, const APValue &V) {
     return true;
   }
 
+  case APValue::Matrix:
+    llvm_unreachable("Matrix APValues not yet supported");
+
   case APValue::Int:
     return !V.getInt();
 
@@ -6528,9 +6580,8 @@ static IdentifierInfo *getUnionInitName(SourceLocation UnionLoc,
   // of the data members in the union are unnamed), then there is no way for a
   // program to refer to the anonymous union, and there is therefore no need to
   // mangle its name. However, we should diagnose this anyway.
-  unsigned DiagID = Diags.getCustomDiagID(
-      DiagnosticsEngine::Error, "cannot mangle this unnamed union NTTP yet");
-  Diags.Report(UnionLoc, DiagID);
+  Diags.Report(UnionLoc, diag::err_unsupported_itanium_mangling)
+      << UnsupportedItaniumManglingKind::UnnamedUnionNTTP;
 
   return nullptr;
 }
@@ -6666,6 +6717,9 @@ void CXXNameMangler::mangleValueInTemplateArg(QualType T, const APValue &V,
     Out << 'E';
     break;
   }
+
+  case APValue::Matrix:
+    llvm_unreachable("Matrix template argument mangling not yet supported");
 
   case APValue::Int:
     mangleIntegerLiteral(T, V.getInt());
@@ -7015,8 +7069,7 @@ bool CXXNameMangler::isSpecializedAs(QualType S, llvm::StringRef Name,
   if (!RT)
     return false;
 
-  const ClassTemplateSpecializationDecl *SD =
-      dyn_cast<ClassTemplateSpecializationDecl>(RT->getOriginalDecl());
+  const auto *SD = dyn_cast<ClassTemplateSpecializationDecl>(RT->getDecl());
   if (!SD || !SD->getIdentifier()->isStr(Name))
     return false;
 

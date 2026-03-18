@@ -18,11 +18,22 @@ from lit.llvm.subst import FindTool
 # name: The name of this test suite.
 config.name = "Clang"
 
+# TODO: Consolidate the logic for turning on the internal shell by default for all LLVM test suites.
+# See https://github.com/llvm/llvm-project/issues/106636 for more details.
+#
+# We prefer the lit internal shell which provides a better user experience on failures
+# and is faster unless the user explicitly disables it with LIT_USE_INTERNAL_SHELL=0
+# env var.
+use_lit_shell = True
+lit_shell_env = os.environ.get("LIT_USE_INTERNAL_SHELL")
+if lit_shell_env:
+    use_lit_shell = lit.util.pythonize_bool(lit_shell_env)
+
 # testFormat: The test format to use to interpret tests.
 #
 # For now we require '&&' between commands, until they get globally killed and
 # the test runner updated.
-config.test_format = lit.formats.ShTest(not llvm_config.use_lit_shell)
+config.test_format = lit.formats.ShTest(execute_external=not use_lit_shell)
 
 # suffixes: A list of file extensions to treat as test files.
 config.suffixes = [
@@ -78,7 +89,26 @@ config.substitutions.append(("%target_triple", config.target_triple))
 
 config.substitutions.append(("%PATH%", config.environment["PATH"]))
 
+sed_cmd = (
+    "/opt/freeware/bin/sed" if "system-aix" in config.available_features else "sed"
+)
 
+# Filtering command for testing SARIF output against reference output.
+config.substitutions.append(
+    (
+        "%normalize_sarif",
+        f"{sed_cmd} -r '%s;%s;%s;%s'"
+        % (
+            # Replace version strings that are likely to change.
+            r's/"version": "2.1.0"/"version": "[SARIF version]"/',
+            r's/"version": ".*[0-9]+\.[0-9]+\.[0-9]+.*"/"version": "[clang version]"/',
+            # Strip directories from file URIs
+            r's/"file:(\/+)([^"\/]+\/)*([^"]+)"/"file:\1[...]\/\3"/',
+            # Set "length" to -1
+            r's/"length": [[:digit:]]+/"length": -1/',
+        ),
+    )
+)
 # For each occurrence of a clang tool name, replace it with the full path to
 # the build directory holding that tool.  We explicitly specify the directories
 # to search to ensure that we get the tools just built and not some random
@@ -92,7 +122,8 @@ tools = [
     "clang-diff",
     "clang-format",
     "clang-repl",
-    "clang-offload-packager",
+    "llvm-objdump",
+    "llvm-offload-binary",
     "clang-tblgen",
     "clang-scan-deps",
     "clang-installapi",
@@ -111,10 +142,13 @@ tools = [
         command=FindTool("clang-extdef-mapping"),
         unresolved="ignore",
     ),
+    "ssaf-linker",
 ]
 
 if config.clang_examples:
     config.available_features.add("examples")
+if config.llvm_examples:
+    config.available_features.add("llvm-examples")
 
 
 def have_host_out_of_process_jit_feature_support():
@@ -210,8 +244,6 @@ if config.clang_staticanalyzer:
         config.available_features.add("z3")
         if config.clang_staticanalyzer_z3_mock:
             config.available_features.add("z3-mock")
-    else:
-        config.available_features.add("no-z3")
 
     check_analyzer_fixit_path = os.path.join(
         config.test_source_root, "Analysis", "check-analyzer-fixit.py"
@@ -393,6 +425,8 @@ if config.clang_vendor_uti:
 if config.have_llvm_driver:
     config.available_features.add("llvm-driver")
 
+if config.clang_enable_cir:
+    config.available_features.add("cir-enabled")
 
 # Some tests perform deep recursion, which requires a larger pthread stack size
 # than the relatively low default of 192 KiB for 64-bit processes on AIX. The

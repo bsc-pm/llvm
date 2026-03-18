@@ -3044,7 +3044,7 @@ struct OmpSsDirective {
           SizeofTableVar,
           OffsetTableVar,
           ArgIdxTableVar,
-          ConstantInt::get(nanos6Api::Nanos6TaskInfo::getInstance(M).getCoroHandleIdxDataType(), CoroHandleIdx)),
+          ConstantInt::get(nanos6Api::Nanos6TaskInfo::getInstance(M).getCoroHandleIdxDataType(), CoroHandleIdx, /*IsSigned=*/false, /*ImplicitTrunc=*/true)),
         ("task_info_var_" + F.getName()).str());
     TaskInfoVar->setAlignment(Align(64));
 

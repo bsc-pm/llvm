@@ -28,57 +28,61 @@ end program
 
 
 
+
 ! FIRDialect-LABEL:   func.func @_QQmain() attributes {fir.bindc_name = "TASK"} {
-! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = arith.constant 1 : i64
-! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = arith.constant 10 : i32
-! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.dummy_scope : !fir.dscope
-! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "i", uniq_name = "_QFEi"}
-! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_4]] {uniq_name = "_QFEi"} : (!fir.ref<i32>) -> !fir.ref<i32>
-! FIRDialect:           %[[VAL_6:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "j", uniq_name = "_QFEj"}
-! FIRDialect:           %[[VAL_7:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_6]] {uniq_name = "_QFEj"} : (!fir.ref<i32>) -> !fir.ref<i32>
-! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "k", uniq_name = "_QFEk"}
-! FIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_8]] {uniq_name = "_QFEk"} : (!fir.ref<i32>) -> !fir.ref<i32>
-! FIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "u", uniq_name = "_QFEu"}
-! FIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_10]] {uniq_name = "_QFEu"} : (!fir.ref<i32>) -> !fir.ref<i32>
-! FIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_13:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_14:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_15:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_16:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_17:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_18:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_19:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           oss.task_for lower_bound(%[[VAL_2]] : i32) upper_bound(%[[VAL_1]] : i32) step(%[[VAL_2]] : i32) loop_type(%[[VAL_0]] : i64) ind_var(%[[VAL_5]] : !fir.ref<i32>) private(%[[VAL_5]], %[[VAL_5]], %[[VAL_7]], %[[VAL_7]] : !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>) private_type(%[[VAL_12]], %[[VAL_13]], %[[VAL_14]], %[[VAL_15]] : !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>) firstprivate(%[[VAL_9]], %[[VAL_9]], %[[VAL_11]], %[[VAL_11]] : !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>) firstprivate_type(%[[VAL_16]], %[[VAL_17]], %[[VAL_18]], %[[VAL_19]] : !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>) default( deffirstprivate) {
-! FIRDialect:             %[[VAL_20:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:             fir.store %[[VAL_20]] to %[[VAL_11]] : !fir.ref<i32>
+! FIRDialect:           %[[CONSTANT_0:[-0-9A-Za-z._]+]] = arith.constant 1 : i64
+! FIRDialect:           %[[CONSTANT_1:[-0-9A-Za-z._]+]] = arith.constant 10 : i32
+! FIRDialect:           %[[CONSTANT_2:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:           %[[DUMMY_SCOPE_0:[-0-9A-Za-z._]+]] = fir.dummy_scope : !fir.dscope
+! FIRDialect:           %[[ALLOCA_0:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "i", uniq_name = "_QFEi"}
+! FIRDialect:           %[[DECLARE_0:[-0-9A-Za-z._]+]] = fir.declare %[[ALLOCA_0]] {uniq_name = "_QFEi"} : (!fir.ref<i32>) -> !fir.ref<i32>
+! FIRDialect:           %[[ALLOCA_1:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "j", uniq_name = "_QFEj"}
+! FIRDialect:           %[[DECLARE_1:[-0-9A-Za-z._]+]] = fir.declare %[[ALLOCA_1]] {uniq_name = "_QFEj"} : (!fir.ref<i32>) -> !fir.ref<i32>
+! FIRDialect:           %[[ALLOCA_2:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "k", uniq_name = "_QFEk"}
+! FIRDialect:           %[[DECLARE_2:[-0-9A-Za-z._]+]] = fir.declare %[[ALLOCA_2]] {uniq_name = "_QFEk"} : (!fir.ref<i32>) -> !fir.ref<i32>
+! FIRDialect:           %[[ALLOCA_3:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "u", uniq_name = "_QFEu"}
+! FIRDialect:           %[[DECLARE_3:[-0-9A-Za-z._]+]] = fir.declare %[[ALLOCA_3]] {uniq_name = "_QFEu"} : (!fir.ref<i32>) -> !fir.ref<i32>
+! FIRDialect:           %[[UNDEFINED_0:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_1:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_2:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_3:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_4:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_5:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_6:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_7:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           oss.task_for lower_bound(%[[CONSTANT_2]] : i32) upper_bound(%[[CONSTANT_1]] : i32) step(%[[CONSTANT_2]] : i32) loop_type(%[[CONSTANT_0]] : i64) ind_var(%[[DECLARE_0]] : !fir.ref<i32>) private(%[[DECLARE_0]], %[[DECLARE_0]], %[[DECLARE_1]], %[[DECLARE_1]] : !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>) private_type(%[[UNDEFINED_0]], %[[UNDEFINED_1]], %[[UNDEFINED_2]], %[[UNDEFINED_3]] : !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>) firstprivate(%[[DECLARE_2]], %[[DECLARE_2]], %[[DECLARE_3]], %[[DECLARE_3]] : !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>) firstprivate_type(%[[UNDEFINED_4]], %[[UNDEFINED_5]], %[[UNDEFINED_6]], %[[UNDEFINED_7]] : !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>) default(deffirstprivate) {
+! FIRDialect:             %[[CONSTANT_3:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:             fir.store %[[CONSTANT_3]] to %[[DECLARE_3]] : !fir.ref<i32>
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
-! FIRDialect:           %[[VAL_21:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_22:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_23:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_24:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_25:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_26:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_27:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_28:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           oss.taskloop lower_bound(%[[VAL_2]] : i32) upper_bound(%[[VAL_1]] : i32) step(%[[VAL_2]] : i32) loop_type(%[[VAL_0]] : i64) ind_var(%[[VAL_5]] : !fir.ref<i32>) private(%[[VAL_5]], %[[VAL_5]], %[[VAL_7]], %[[VAL_7]] : !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>) private_type(%[[VAL_21]], %[[VAL_22]], %[[VAL_23]], %[[VAL_24]] : !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>) firstprivate(%[[VAL_9]], %[[VAL_9]], %[[VAL_11]], %[[VAL_11]] : !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>) firstprivate_type(%[[VAL_25]], %[[VAL_26]], %[[VAL_27]], %[[VAL_28]] : !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>) default( deffirstprivate) {
-! FIRDialect:             %[[VAL_29:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:             fir.store %[[VAL_29]] to %[[VAL_11]] : !fir.ref<i32>
+! FIRDialect:           %[[UNDEFINED_8:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_9:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_10:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_11:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_12:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_13:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_14:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_15:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           oss.taskloop lower_bound(%[[CONSTANT_2]] : i32) upper_bound(%[[CONSTANT_1]] : i32) step(%[[CONSTANT_2]] : i32) loop_type(%[[CONSTANT_0]] : i64) ind_var(%[[DECLARE_0]] : !fir.ref<i32>) private(%[[DECLARE_0]], %[[DECLARE_0]], %[[DECLARE_1]], %[[DECLARE_1]] : !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>) private_type(%[[UNDEFINED_8]], %[[UNDEFINED_9]], %[[UNDEFINED_10]], %[[UNDEFINED_11]] : !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>) firstprivate(%[[DECLARE_2]], %[[DECLARE_2]], %[[DECLARE_3]], %[[DECLARE_3]] : !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>) firstprivate_type(%[[UNDEFINED_12]], %[[UNDEFINED_13]], %[[UNDEFINED_14]], %[[UNDEFINED_15]] : !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>) default(deffirstprivate) {
+! FIRDialect:             %[[CONSTANT_4:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:             fir.store %[[CONSTANT_4]] to %[[DECLARE_3]] : !fir.ref<i32>
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
-! FIRDialect:           %[[VAL_30:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_31:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_32:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_33:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_34:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_35:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_36:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           %[[VAL_37:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           oss.taskloop_for lower_bound(%[[VAL_2]] : i32) upper_bound(%[[VAL_1]] : i32) step(%[[VAL_2]] : i32) loop_type(%[[VAL_0]] : i64) ind_var(%[[VAL_5]] : !fir.ref<i32>) private(%[[VAL_5]], %[[VAL_5]], %[[VAL_7]], %[[VAL_7]] : !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>) private_type(%[[VAL_30]], %[[VAL_31]], %[[VAL_32]], %[[VAL_33]] : !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>) firstprivate(%[[VAL_9]], %[[VAL_9]], %[[VAL_11]], %[[VAL_11]] : !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>) firstprivate_type(%[[VAL_34]], %[[VAL_35]], %[[VAL_36]], %[[VAL_37]] : !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>) default( deffirstprivate) {
-! FIRDialect:             %[[VAL_38:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
-! FIRDialect:             fir.store %[[VAL_38]] to %[[VAL_11]] : !fir.ref<i32>
+! FIRDialect:           %[[UNDEFINED_16:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_17:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_18:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_19:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_20:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_21:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_22:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           %[[UNDEFINED_23:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
+! FIRDialect:           oss.taskloop_for lower_bound(%[[CONSTANT_2]] : i32) upper_bound(%[[CONSTANT_1]] : i32) step(%[[CONSTANT_2]] : i32) loop_type(%[[CONSTANT_0]] : i64) ind_var(%[[DECLARE_0]] : !fir.ref<i32>) private(%[[DECLARE_0]], %[[DECLARE_0]], %[[DECLARE_1]], %[[DECLARE_1]] : !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>) private_type(%[[UNDEFINED_16]], %[[UNDEFINED_17]], %[[UNDEFINED_18]], %[[UNDEFINED_19]] : !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>) firstprivate(%[[DECLARE_2]], %[[DECLARE_2]], %[[DECLARE_3]], %[[DECLARE_3]] : !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>, !fir.ref<i32>) firstprivate_type(%[[UNDEFINED_20]], %[[UNDEFINED_21]], %[[UNDEFINED_22]], %[[UNDEFINED_23]] : !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>, !fir.oss<i32>) default(deffirstprivate) {
+! FIRDialect:             %[[CONSTANT_5:[-0-9A-Za-z._]+]] = arith.constant 1 : i32
+! FIRDialect:             fir.store %[[CONSTANT_5]] to %[[DECLARE_3]] : !fir.ref<i32>
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
 ! FIRDialect:           return
 ! FIRDialect:         }
+! FIRDialect:         func.func private @_FortranAProgramStart(i32, !llvm.ptr, !llvm.ptr, !llvm.ptr)
+! FIRDialect:         func.func private @_FortranAProgramEndStatement()
+

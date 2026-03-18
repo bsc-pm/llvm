@@ -33,8 +33,8 @@ END SUBROUTINE FOO
 ! FIRDialect-SAME:                      %[[ARG0:[-0-9A-Za-z._]+]]: !fir.ref<i32> {fir.bindc_name = "n"},
 ! FIRDialect-SAME:                      %[[ARG1:[-0-9A-Za-z._]+]]: !fir.ref<i32> {fir.bindc_name = "m"}) {
 ! FIRDialect:           %[[VAL_0:[-0-9A-Za-z._]+]] = fir.dummy_scope : !fir.dscope
-! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.declare %[[ARG1]] dummy_scope %[[VAL_0]] {uniq_name = "_QFfooEm"} : (!fir.ref<i32>, !fir.dscope) -> !fir.ref<i32>
-! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.declare %[[ARG0]] dummy_scope %[[VAL_0]] {uniq_name = "_QFfooEn"} : (!fir.ref<i32>, !fir.dscope) -> !fir.ref<i32>
+! FIRDialect:           %[[VAL_1:[-0-9A-Za-z._]+]] = fir.declare %[[ARG1]] dummy_scope %[[VAL_0]] arg 2 {uniq_name = "_QFfooEm"} : (!fir.ref<i32>, !fir.dscope) -> !fir.ref<i32>
+! FIRDialect:           %[[VAL_2:[-0-9A-Za-z._]+]] = fir.declare %[[ARG0]] dummy_scope %[[VAL_0]] arg 1 {uniq_name = "_QFfooEn"} : (!fir.ref<i32>, !fir.dscope) -> !fir.ref<i32>
 ! FIRDialect:           %[[VAL_3:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "res", uniq_name = "_QFfooEres"}
 ! FIRDialect:           %[[VAL_4:[-0-9A-Za-z._]+]] = fir.declare %[[VAL_3]] {uniq_name = "_QFfooEres"} : (!fir.ref<i32>) -> !fir.ref<i32>
 ! FIRDialect:           %[[VAL_5:[-0-9A-Za-z._]+]] = fir.alloca i32 {bindc_name = "x", uniq_name = "_QFfooEx"}

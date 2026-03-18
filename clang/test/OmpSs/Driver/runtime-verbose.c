@@ -1,5 +1,5 @@
-// RUN: NANOS6_HOME=ASDF %clang -fompss-2=libnanos6 %s -### 2>&1 | FileCheck %s --check-prefix=CHECK-NANOS6
-// RUN: NODES_HOME=FDSA %clang -fompss-2=libnodes %s -### 2>&1 | FileCheck %s --check-prefix=CHECK-NODES
+// RUN: env NANOS6_HOME=ASDF %clang -fompss-2=libnanos6 %s -### 2>&1 | FileCheck %s --check-prefix=CHECK-NANOS6
+// RUN: env NODES_HOME=FDSA %clang -fompss-2=libnodes %s -### 2>&1 | FileCheck %s --check-prefix=CHECK-NODES
 
 // CHECK-NANOS6: clang version{{.*}}
 // CHECK-NANOS6: "{{[^"]*}}clang{{[^"]*}}"

@@ -24,8 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: %oss-compile && NANOS6_CONFIG_OVERRIDE="version.dependencies=regions,$NANOS6_CONFIG_OVERRIDE" %oss-run
-// RUN: %oss-O2-compile && NANOS6_CONFIG_OVERRIDE="version.dependencies=regions,$NANOS6_CONFIG_OVERRIDE" %oss-run
+// RUN: %oss-compile && env NANOS6_CONFIG_OVERRIDE="version.dependencies=regions" %oss-run
+// RUN: %oss-O2-compile && env NANOS6_CONFIG_OVERRIDE="version.dependencies=regions" %oss-run
 
 // This test checks that we're generating code properly for the compute_dep
 // function. the shape expr type of task A is int [c], but we need b to compute

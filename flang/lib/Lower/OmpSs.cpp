@@ -139,7 +139,7 @@ static void createEmptyRegionBlocks(
         // if (?) {
         //   auto insertPt = firOpBuilder.saveInsertionPoint();
         //   firOpBuilder.setInsertionPointAfter(region->getParentOp());
-        //   firOpBuilder.create<mlir::BranchOp>(
+        //   mlir::BranchOp::create(firOpBuilder,
         //       terminatorOp.getLoc(), eval.block);
         //   firOpBuilder.restoreInsertionPoint(insertPt);
         // }
@@ -161,7 +161,7 @@ static void createBodyOfOp(Op &op, fir::FirOpBuilder &firOpBuilder,
   if (eval.lowerAsUnstructured())
     createEmptyRegionBlocks(firOpBuilder, eval.getNestedEvaluations());
   // Ensure the block is well-formed.
-  firOpBuilder.create<mlir::oss::TerminatorOp>(loc);
+  mlir::oss::TerminatorOp::create(firOpBuilder, loc);
   // Reset the insertion point to the start of the first block.
   firOpBuilder.setInsertionPointToStart(&block);
 }
@@ -180,7 +180,7 @@ static void createBodyOfOpWithPreface(Op &op, Fortran::lower::AbstractConverter 
     createEmptyRegionBlocks(firOpBuilder, eval.getNestedEvaluations());
 
   // Ensure the block is well-formed.
-  firOpBuilder.create<mlir::oss::TerminatorOp>(loc);
+  mlir::oss::TerminatorOp::create(firOpBuilder,loc);
   // Reset the insertion point to the start of the first block.
   firOpBuilder.setInsertionPointToStart(&block);
 }
@@ -213,12 +213,12 @@ namespace {
           AddDimStartEnd();
       }
 
-      Walk(x.base);
+      Walk(x.Base());
       return false;
     }
     bool Pre(const Fortran::parser::ArrayElement &x) {
-      Walk(x.base);
-      Walk(x.subscripts);
+      Walk(x.Base());
+      Walk(x.Subscripts());
       return false;
     }
     void Post(const Fortran::parser::Name &name) {
@@ -425,9 +425,9 @@ namespace {
     static mlir::Value computeExtent(fir::FirOpBuilder &builder, mlir::Location loc,
                                      mlir::Type type, mlir::Value lb, mlir::Value ub) {
       // Let the folder deal with the common `ub - <const> + 1` case.
-      auto diff = builder.create<mlir::arith::SubIOp>(loc, type, ub, lb);
+      auto diff = mlir::arith::SubIOp::create(builder, loc, type, ub, lb);
       mlir::Value one = builder.createIntegerConstant(loc, type, 1);
-      auto rawExtent = builder.create<mlir::arith::AddIOp>(loc, type, diff, one);
+      auto rawExtent = mlir::arith::AddIOp::create(builder, loc, type, diff, one);
       return fir::factory::genMaxWithZero(builder, loc, rawExtent);
     }
 
@@ -436,7 +436,7 @@ namespace {
       auto loc = converter.genUnknownLocation();
       auto &firOpBuilder = converter.getFirOpBuilder();
 
-      auto baseExpr = Fortran::semantics::AnalyzeExpr(context, x.base);
+      auto baseExpr = Fortran::semantics::AnalyzeExpr(context, x.Base());
       fir::ExtendedValue exv = converter.genExprAddr(*baseExpr, stmtCtx, &loc);
       auto baseValue = fir::getBase(exv);
       // Pointers and assumed-share are BoxValues that need special handling
@@ -456,8 +456,8 @@ namespace {
       llvm::SmallVector<mlir::Value, 2> sizes;
       llvm::SmallVector<mlir::Value, 2> lBounds;
       llvm::SmallVector<std::pair<mlir::Value, mlir::Value>, 2> subscripts;
-      auto subscriptIt = x.subscripts.begin();
-      for (size_t i = 0; i < x.subscripts.size(); ++i) {
+      auto subscriptIt = x.Subscripts().begin();
+      for (size_t i = 0; i < x.Subscripts().size(); ++i) {
         mlir::Value lbDecl;
         mlir::Value ubDecl;
         mlir::Value assumedSizeSize;
@@ -483,8 +483,8 @@ namespace {
           lbDecl = convertToOSSType(lb);
           mlir::Value extent = fir::factory::readExtent(firOpBuilder, loc, exv, i);
           extent = convertToOSSType(extent);
-          ubDecl = firOpBuilder.create<mlir::arith::AddIOp>(loc, extent, lbDecl);
-          ubDecl = firOpBuilder.create<mlir::arith::SubIOp>(loc, ubDecl, one);
+          ubDecl = mlir::arith::AddIOp::create(firOpBuilder,loc, extent, lbDecl);
+          ubDecl = mlir::arith::SubIOp::create(firOpBuilder,loc, ubDecl, one);
           sizes.push_back(extent);
         } else {
           llvm_unreachable("unexpected array type");
@@ -638,13 +638,13 @@ namespace {
               } else if (spec->ubound().isColon()) {
                 mlir::Value extent = fir::factory::readExtent(firOpBuilder, loc, exv, i);
                 extent = convertToOSSType(extent);
-                ubVal = firOpBuilder.create<mlir::arith::AddIOp>(loc, extent, lbVal);
-                ubVal = firOpBuilder.create<mlir::arith::SubIOp>(loc, ubVal, one);
+                ubVal = mlir::arith::AddIOp::create(firOpBuilder,loc, extent, lbVal);
+                ubVal = mlir::arith::SubIOp::create(firOpBuilder,loc, ubVal, one);
               }
 
               mlir::Value size = one;
-              size = firOpBuilder.create<mlir::arith::AddIOp>(loc, size, ubVal);
-              size = firOpBuilder.create<mlir::arith::SubIOp>(loc, size, lbVal);
+              size = mlir::arith::AddIOp::create(firOpBuilder,loc, size, ubVal);
+              size = mlir::arith::SubIOp::create(firOpBuilder,loc, size, lbVal);
               sizes.push_back(size);
 
               lBounds.push_back(lbVal);
@@ -684,18 +684,18 @@ namespace {
           returnList_.push_back(sizes[i]);
 
           mlir::Value depLB = subscripts[i].first;
-          depLB = firOpBuilder.create<mlir::arith::SubIOp>(loc, depLB, lBounds[i]);
+          depLB = mlir::arith::SubIOp::create(firOpBuilder,loc, depLB, lBounds[i]);
           returnList_.push_back(depLB);
 
           mlir::Value depUB = subscripts[i].second;
-          depUB = firOpBuilder.create<mlir::arith::SubIOp>(loc, depUB, lBounds[i]);
-          depUB = firOpBuilder.create<mlir::arith::AddIOp>(loc, depUB, c1);
+          depUB = mlir::arith::SubIOp::create(firOpBuilder,loc, depUB, lBounds[i]);
+          depUB = mlir::arith::AddIOp::create(firOpBuilder,loc, depUB, c1);
           returnList_.push_back(depUB);
         }
         // Convert the first size/start/end to bytes
-        returnList_[1] = firOpBuilder.create<mlir::arith::MulIOp>(loc, returnList_[1], elemSizeBytes);
-        returnList_[2] = firOpBuilder.create<mlir::arith::MulIOp>(loc, returnList_[2], elemSizeBytes);
-        returnList_[3] = firOpBuilder.create<mlir::arith::MulIOp>(loc, returnList_[3], elemSizeBytes);
+        returnList_[1] = mlir::arith::MulIOp::create(firOpBuilder,loc, returnList_[1], elemSizeBytes);
+        returnList_[2] = mlir::arith::MulIOp::create(firOpBuilder,loc, returnList_[2], elemSizeBytes);
+        returnList_[3] = mlir::arith::MulIOp::create(firOpBuilder,loc, returnList_[3], elemSizeBytes);
       }
 
       Fortran::lower::AbstractConverter &converter;
@@ -722,20 +722,20 @@ namespace {
     bool Pre(const Fortran::parser::DoConstruct &x) {
       const auto &control{x.GetLoopControl()};
       const auto &bounds{std::get<Fortran::parser::LoopControl::Bounds>(control->u)};
-      const Fortran::semantics::Symbol *symbol{bounds.name.thing.symbol};
+      const Fortran::semantics::Symbol *symbol{bounds.Name().thing.symbol};
       indVarOperand_ = addOperands(converter, *symbol);
       lowerBoundOperand_ =
         fir::getBase(
-          converter.genExprValue(*Fortran::semantics::GetExpr(bounds.lower), stmtCtx));
+          converter.genExprValue(*Fortran::semantics::GetExpr(bounds.Lower()), stmtCtx));
       upperBoundOperand_ =
         fir::getBase(
-          converter.genExprValue(*Fortran::semantics::GetExpr(bounds.upper), stmtCtx));
+          converter.genExprValue(*Fortran::semantics::GetExpr(bounds.Upper()), stmtCtx));
       auto &firOpBuilder = converter.getFirOpBuilder();
       auto currentLocation = converter.getCurrentLocation();
-      if (bounds.step) {
+      if (bounds.Step()) {
         stepOperand_ =
           fir::getBase(
-            converter.genExprValue(*Fortran::semantics::GetExpr(bounds.step), stmtCtx));
+            converter.genExprValue(*Fortran::semantics::GetExpr(bounds.Step()), stmtCtx));
       } else {
         stepOperand_ =
           firOpBuilder.createIntegerConstant(currentLocation, converter.genType(*symbol), 1);
@@ -807,17 +807,17 @@ namespace {
       // NOTE: This must happen after all DSA processing to match the correct parallel lists
       for (const mlir::Value val : sharedClauseOperands_) {
         mlir::Type ty = getLLVMIRLowerableType(val.getType());
-        auto a = firOpBuilder.create<fir::UndefOp>(loc, ty);
+        auto a = fir::UndefOp::create(firOpBuilder,loc, ty);
         sharedTypeClauseOperands_.push_back(a);
       }
       for (const mlir::Value val : privateClauseOperands_) {
         mlir::Type ty = getLLVMIRLowerableType(val.getType());
-        auto a = firOpBuilder.create<fir::UndefOp>(loc, ty);
+        auto a = fir::UndefOp::create(firOpBuilder,loc, ty);
         privateTypeClauseOperands_.push_back(a);
       }
       for (const mlir::Value val : firstprivateClauseOperands_) {
         mlir::Type ty = getLLVMIRLowerableType(val.getType());
-        auto a = firOpBuilder.create<fir::UndefOp>(loc, ty);
+        auto a = fir::UndefOp::create(firOpBuilder,loc, ty);
         firstprivateTypeClauseOperands_.push_back(a);
       }
       assert(firstprivateTypeClauseOperands_.size() == firstprivateClauseOperands_.size());
@@ -893,13 +893,13 @@ namespace {
       llvm::ArrayRef<mlir::Value> returnList = dependVisitor.returnList();
 
       // Ensure the block is well-formed.
-      firOpBuilder.create<mlir::func::ReturnOp>(currentLocation, returnList);
+      mlir::func::ReturnOp::create(firOpBuilder,currentLocation, returnList);
 
       converter.getLocalSymbols().symbolMapStack.pop_back();
 
       firOpBuilder.restoreInsertionPoint(insertPt);
 
-      auto op = firOpBuilder.create<mlir::oss::DepOp>(
+      auto op = mlir::oss::DepOp::create(firOpBuilder,
         currentLocation, firOpBuilder.getI32Type(), baseOperand,
         func.getSymName(), paramValues).getResult();
       return op;
@@ -936,12 +936,12 @@ namespace {
               Fortran::evaluate::Expr rhs{Fortran::evaluate::AsGenericExpr(*sym).value()};
               Fortran::evaluate::Expr lhs{Fortran::evaluate::AsGenericExpr(*sym->getOssAdditionalSym()).value()};
               const Fortran::evaluate::Assignment assign(std::move(lhs), std::move(rhs));
-              converter.genAssignment(assign, DoNotInitialize);
+              converter.genAssignment(assign, {}, DoNotInitialize);
             })
             .end();
       } else {
         fir::ExtendedValue newBoxSrcLoad = fir::factory::genMutableBoxRead(firOpBuilder, loc, newBoxSrc);
-        fir::factory::associateMutableBox(firOpBuilder, loc, newBoxDst, newBoxSrcLoad, std::nullopt);
+        fir::factory::associateMutableBox(firOpBuilder, loc, newBoxDst, newBoxSrcLoad, {});
       }
     }
 
@@ -1026,13 +1026,13 @@ namespace {
       llvm::SmallVector<mlir::Value, 4> returnList;
       returnList.push_back(firOpBuilder.createIntegerConstant(currentLocation, firOpBuilder.getI32Type(), 1));
       // // Ensure the block is well-formed.
-      firOpBuilder.create<mlir::func::ReturnOp>(currentLocation, returnList);
+      mlir::func::ReturnOp::create(firOpBuilder,currentLocation, returnList);
 
       converter.getLocalSymbols().symbolMapStack.pop_back();
 
       firOpBuilder.restoreInsertionPoint(insertPt);
 
-      auto op = firOpBuilder.create<mlir::oss::CopyOp>(
+      auto op = mlir::oss::CopyOp::create(firOpBuilder,
         currentLocation, firOpBuilder.getI32Type(), base,
         func.getSymName()).getResult();
       return op;
@@ -1129,13 +1129,13 @@ namespace {
       llvm::SmallVector<mlir::Value, 4> returnList;
       returnList.push_back(firOpBuilder.createIntegerConstant(currentLocation, firOpBuilder.getI32Type(), 1));
       // // Ensure the block is well-formed.
-      firOpBuilder.create<mlir::func::ReturnOp>(currentLocation, returnList);
+      mlir::func::ReturnOp::create(firOpBuilder,currentLocation, returnList);
 
       converter.getLocalSymbols().symbolMapStack.pop_back();
 
       firOpBuilder.restoreInsertionPoint(insertPt);
 
-      auto op = firOpBuilder.create<mlir::oss::CopyOp>(
+      auto op = mlir::oss::CopyOp::create(firOpBuilder,
         currentLocation, firOpBuilder.getI32Type(), base,
         func.getSymName()).getResult();
       return op;
@@ -1241,13 +1241,13 @@ namespace {
       llvm::SmallVector<mlir::Value, 4> returnList;
       returnList.push_back(firOpBuilder.createIntegerConstant(currentLocation, firOpBuilder.getI32Type(), 1));
       // // Ensure the block is well-formed.
-      firOpBuilder.create<mlir::func::ReturnOp>(currentLocation, returnList);
+      mlir::func::ReturnOp::create(firOpBuilder,currentLocation, returnList);
 
       converter.getLocalSymbols().symbolMapStack.pop_back();
 
       firOpBuilder.restoreInsertionPoint(insertPt);
 
-      auto op = firOpBuilder.create<mlir::oss::CopyOp>(
+      auto op = mlir::oss::CopyOp::create(firOpBuilder,
         currentLocation, firOpBuilder.getI32Type(), base,
         func.getSymName()).getResult();
       return op;
@@ -1308,8 +1308,7 @@ namespace {
           }
           // Only emit the vlaOp if has relevant information
           if (!(extents.empty() && lBounds.empty())) {
-            auto vlaDim = firOpBuilder
-                              .create<mlir::oss::VlaDimOp>(
+            auto vlaDim = mlir::oss::VlaDimOp::create(firOpBuilder,
                                   currentLocation, firOpBuilder.getI32Type(),
                                   addOperands(converter, ultimate),
                                   extents, lBounds)
@@ -1703,10 +1702,10 @@ static void genOSS(Fortran::lower::AbstractConverter &converter,
     break;
   case llvm::oss::Directive::OSSD_taskwait:
     if (clausesVisitor.empty()) {
-      firOpBuilder.create<mlir::oss::TaskwaitOp>(
+      mlir::oss::TaskwaitOp::create(firOpBuilder,
           currentLocation);
     } else {
-      auto taskOp = firOpBuilder.create<mlir::oss::TaskOp>(
+      auto taskOp = mlir::oss::TaskOp::create(firOpBuilder,
           currentLocation, argTy,
           firOpBuilder.createIntegerConstant(currentLocation, firOpBuilder.getI1Type(), 0),
           clausesVisitor.finalClauseOperand(),
@@ -1738,13 +1737,13 @@ static void genOSS(Fortran::lower::AbstractConverter &converter,
       auto &block = taskOp.getRegion().back();
       firOpBuilder.setInsertionPointToStart(&block);
       // Ensure the block is well-formed.
-      firOpBuilder.create<mlir::oss::TerminatorOp>(currentLocation);
+      mlir::oss::TerminatorOp::create(firOpBuilder,currentLocation);
       // Reset the insertion point to the start of the first block.
       firOpBuilder.setInsertionPointToStart(&block);
     }
     break;
   case llvm::oss::Directive::OSSD_release:
-    firOpBuilder.create<mlir::oss::ReleaseOp>(
+    mlir::oss::ReleaseOp::create(firOpBuilder,
         currentLocation, argTy,
         clausesVisitor.inClauseOperands(),
         clausesVisitor.outClauseOperands(),
@@ -1802,7 +1801,7 @@ genOSS(Fortran::lower::AbstractConverter &converter,
   llvm::ArrayRef<mlir::Type> argTy;
   if (blockDirective.v == llvm::oss::OSSD_task) {
     // Create and insert the operation.
-    auto taskOp = firOpBuilder.create<mlir::oss::TaskOp>(
+    auto taskOp = mlir::oss::TaskOp::create(firOpBuilder,
         currentLocation, argTy,
         clausesVisitor.ifClauseOperand(),
         clausesVisitor.finalClauseOperand(),
@@ -1863,7 +1862,7 @@ genOSS(Fortran::lower::AbstractConverter &converter,
 
   // Create and insert the operation.
   if (loopDir.v == llvm::oss::OSSD_taskloop) {
-    auto taskloopOp = firOpBuilder.create<mlir::oss::TaskloopOp>(
+    auto taskloopOp = mlir::oss::TaskloopOp::create(firOpBuilder,
         currentLocation, argTy,
         loopBoundsVisitor.lowerBoundOperand(),
         loopBoundsVisitor.upperBoundOperand(),
@@ -1899,7 +1898,7 @@ genOSS(Fortran::lower::AbstractConverter &converter,
         clausesVisitor.grainsizeClauseOperand());
     createBodyOfOp<mlir::oss::TaskloopOp>(taskloopOp, firOpBuilder, currentLocation, eval);
   } else if (loopDir.v == llvm::oss::OSSD_task_for) {
-    auto taskForOp = firOpBuilder.create<mlir::oss::TaskForOp>(
+    auto taskForOp = mlir::oss::TaskForOp::create(firOpBuilder,
         currentLocation, argTy,
         loopBoundsVisitor.lowerBoundOperand(),
         loopBoundsVisitor.upperBoundOperand(),
@@ -1935,7 +1934,7 @@ genOSS(Fortran::lower::AbstractConverter &converter,
         clausesVisitor.chunksizeClauseOperand());
     createBodyOfOp<mlir::oss::TaskForOp>(taskForOp, firOpBuilder, currentLocation, eval);
   } else if (loopDir.v == llvm::oss::OSSD_taskloop_for) {
-    auto taskloopForOp = firOpBuilder.create<mlir::oss::TaskloopForOp>(
+    auto taskloopForOp = mlir::oss::TaskloopForOp::create(firOpBuilder,
         currentLocation, argTy,
         loopBoundsVisitor.lowerBoundOperand(),
         loopBoundsVisitor.upperBoundOperand(),
@@ -2093,13 +2092,13 @@ void Fortran::lower::genOmpSsTaskSubroutine(
     fillCallAdditionalCaptures(copyOutTmps, val_shared_set, val_firstprivate_set, val_capture_set);
 
     for (auto val : val_shared_set)
-      val_type_shared.push_back(firOpBuilder.create<fir::UndefOp>(loc, getLLVMIRLowerableType(val.getType())));
+      val_type_shared.push_back(fir::UndefOp::create(firOpBuilder,loc, getLLVMIRLowerableType(val.getType())));
     for (auto val : val_firstprivate_set)
-      val_type_firstprivate.push_back(firOpBuilder.create<fir::UndefOp>(loc, getLLVMIRLowerableType(val.getType())));
+      val_type_firstprivate.push_back(fir::UndefOp::create(firOpBuilder,loc, getLLVMIRLowerableType(val.getType())));
 
     converter.getLocalSymbols().symbolMapStack.pop_back();
 
-    auto taskOp = firOpBuilder.create<mlir::oss::TaskOp>(
+    auto taskOp = mlir::oss::TaskOp::create(firOpBuilder,
       loc, argTy,
       clausesVisitor.ifClauseOperand(),
       clausesVisitor.finalClauseOperand(),
@@ -2132,7 +2131,7 @@ void Fortran::lower::genOmpSsTaskSubroutine(
     auto &block = taskOp.getRegion().back();
     firOpBuilder.setInsertionPointToStart(&block);
     // Ensure the block is well-formed.
-    firOpBuilder.create<mlir::oss::TerminatorOp>(loc);
+    mlir::oss::TerminatorOp::create(firOpBuilder,loc);
     // Reset the insertion point to the start of the first block.
     firOpBuilder.setInsertionPointToStart(&block);
   };

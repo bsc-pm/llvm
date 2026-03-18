@@ -5,7 +5,6 @@ add_flang_library(FortranLower
   Allocatable.cpp
   Bridge.cpp
   CallInterface.cpp
-  Coarray.cpp
   ComponentPath.cpp
   ConvertArrayConstructor.cpp
   ConvertCall.cpp
@@ -23,6 +22,7 @@ add_flang_library(FortranLower
   IterationSpace.cpp
   LoweringOptions.cpp
   Mangler.cpp
+  MultiImageFortran.cpp
   OmpSs.cpp
   OpenACC.cpp
   OpenMP/Atomic.cpp
@@ -39,6 +39,17 @@ add_flang_library(FortranLower
   Support/Utils.cpp
   SymbolMap.cpp
   VectorSubscripts.cpp
+
+  DISABLE_PCH_REUSE
+  PRECOMPILE_HEADERS
+  [["flang/Lower/ConvertExpr.h"]]
+  [["flang/Lower/SymbolMap.h"]]
+  [["flang/Lower/AbstractConverter.h"]]
+  [["flang/Lower/IterationSpace.h"]]
+  [["flang/Lower/CallInterface.h"]]
+  [["flang/Lower/BoxAnalyzer.h"]]
+  [["flang/Lower/PFTBuilder.h"]]
+  [["flang/Lower/DirectivesCommon.h"]]
   
   DEPENDS
   CUFAttrs
@@ -46,6 +57,7 @@ add_flang_library(FortranLower
   FIRDialect
   FIRTransforms
   HLFIRDialect
+  MIFDialect
 
   LINK_LIBS
   CUFAttrs
@@ -62,6 +74,7 @@ add_flang_library(FortranLower
   FortranEvaluate
   FortranSemantics
   FortranUtils
+  MIFDialect
 
   LINK_COMPONENTS
   Support
@@ -77,15 +90,4 @@ add_flang_library(FortranLower
   MLIRFuncDialect
   MLIRLLVMDialect
   MLIRSCFToControlFlow
-)
-
-target_precompile_headers(FortranLower PRIVATE
-  [["flang/Lower/ConvertExpr.h"]]
-  [["flang/Lower/SymbolMap.h"]]
-  [["flang/Lower/AbstractConverter.h"]]
-  [["flang/Lower/IterationSpace.h"]]
-  [["flang/Lower/CallInterface.h"]]
-  [["flang/Lower/BoxAnalyzer.h"]]
-  [["flang/Lower/PFTBuilder.h"]]
-  [["flang/Lower/DirectivesCommon.h"]]
 )

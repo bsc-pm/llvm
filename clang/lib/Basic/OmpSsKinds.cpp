@@ -226,7 +226,7 @@ bool clang::isOmpSsTaskingDirective(OmpSsDirectiveKind Kind) {
 }
 
 bool clang::isOmpSsLoopDirective(OmpSsDirectiveKind Kind) {
-  return getDirectiveAssociation(Kind) == Association::Loop;
+  return getDirectiveAssociation(Kind) == Association::LoopNest;
 }
 
 bool clang::isOmpSsTaskLoopDirective(OmpSsDirectiveKind Kind) {

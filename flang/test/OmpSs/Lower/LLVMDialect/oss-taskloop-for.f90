@@ -133,7 +133,7 @@ end program
 ! LLVMIRDialect:           oss.taskloop_for lower_bound(%[[VAL_8]] : i32) upper_bound(%[[VAL_7]] : i32) step(%[[VAL_8]] : i32) loop_type(%[[VAL_6]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) priority(%[[VAL_4]] : i32) private(%[[VAL_1]], %[[VAL_1]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_10]], %[[VAL_10]] : i32, i32) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
-! LLVMIRDialect:           oss.taskloop_for lower_bound(%[[VAL_8]] : i32) upper_bound(%[[VAL_7]] : i32) step(%[[VAL_8]] : i32) loop_type(%[[VAL_6]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) private(%[[VAL_1]], %[[VAL_1]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_10]], %[[VAL_10]] : i32, i32) default( defshared) {
+! LLVMIRDialect:           oss.taskloop_for lower_bound(%[[VAL_8]] : i32) upper_bound(%[[VAL_7]] : i32) step(%[[VAL_8]] : i32) loop_type(%[[VAL_6]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) private(%[[VAL_1]], %[[VAL_1]] : !llvm.ptr, !llvm.ptr) private_type(%[[VAL_10]], %[[VAL_10]] : i32, i32) default(defshared) {
 ! LLVMIRDialect:             oss.terminator
 ! LLVMIRDialect:           }
 ! LLVMIRDialect:           oss.taskloop_for lower_bound(%[[VAL_8]] : i32) upper_bound(%[[VAL_7]] : i32) step(%[[VAL_8]] : i32) loop_type(%[[VAL_6]] : i64) ind_var(%[[VAL_1]] : !llvm.ptr) private(%[[VAL_3]], %[[VAL_3]], %[[VAL_1]], %[[VAL_1]] : !llvm.ptr, !llvm.ptr, !llvm.ptr, !llvm.ptr) private_type(%[[VAL_10]], %[[VAL_10]], %[[VAL_10]], %[[VAL_10]] : i32, i32, i32, i32) {

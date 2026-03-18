@@ -82,7 +82,7 @@ end subroutine
 ! LLVMIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i32) : i32
 ! LLVMIRDialect:           %[[VAL_9:[-0-9A-Za-z._]+]] = llvm.mlir.constant(0 : index) : i64
 ! LLVMIRDialect:           %[[VAL_10:[-0-9A-Za-z._]+]] = llvm.mlir.constant(6 : i32) : i32
-! LLVMIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = llvm.mlir.constant(-1 : index) : i64
+! LLVMIRDialect:           %[[VAL_11:[-0-9A-Za-z._]+]] = llvm.mlir.constant(-1 : i64) : i64
 ! LLVMIRDialect:           %[[VAL_12:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
 ! LLVMIRDialect:           %[[VAL_13:[-0-9A-Za-z._]+]] = llvm.mlir.constant(1 : i64) : i64
 ! LLVMIRDialect:           %[[VAL_14:[-0-9A-Za-z._]+]] = llvm.load %[[ARG0]] : !llvm.ptr -> i32

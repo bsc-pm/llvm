@@ -112,7 +112,7 @@ end program
 ! FIRDialect:           }
 ! FIRDialect:           %[[VAL_23:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
 ! FIRDialect:           %[[VAL_24:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>
-! FIRDialect:           oss.task_for lower_bound(%[[VAL_3]] : i32) upper_bound(%[[VAL_2]] : i32) step(%[[VAL_3]] : i32) loop_type(%[[VAL_1]] : i64) ind_var(%[[VAL_8]] : !fir.ref<i32>) private(%[[VAL_8]], %[[VAL_8]] : !fir.ref<i32>, !fir.ref<i32>) private_type(%[[VAL_23]], %[[VAL_24]] : !fir.oss<i32>, !fir.oss<i32>) default( defshared) {
+! FIRDialect:           oss.task_for lower_bound(%[[VAL_3]] : i32) upper_bound(%[[VAL_2]] : i32) step(%[[VAL_3]] : i32) loop_type(%[[VAL_1]] : i64) ind_var(%[[VAL_8]] : !fir.ref<i32>) private(%[[VAL_8]], %[[VAL_8]] : !fir.ref<i32>, !fir.ref<i32>) private_type(%[[VAL_23]], %[[VAL_24]] : !fir.oss<i32>, !fir.oss<i32>) default(defshared) {
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
 ! FIRDialect:           %[[VAL_25:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>

@@ -24,8 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: %oss-cxx-compile && NANOS6_CONFIG=%S/../../nanos6.toml %oss-run 2>&1 | FileCheck %s
-// RUN: %oss-cxx-O2-compile && NANOS6_CONFIG=%S/../../nanos6.toml %oss-run 2>&1 | FileCheck %s
+// RUN: %oss-cxx-compile && env NANOS6_CONFIG=%S/../../nanos6.toml %oss-run 2>&1 | FileCheck %s
+// RUN: %oss-cxx-O2-compile && env NANOS6_CONFIG=%S/../../nanos6.toml %oss-run 2>&1 | FileCheck %s
 
 /*
 <testinfo>

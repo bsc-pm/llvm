@@ -15,8 +15,11 @@
 
 #include "flang/Lower/LoweringOptions.h"
 #include "flang/Lower/PFTDefs.h"
+#include "flang/Lower/StatementContext.h"
 #include "flang/Lower/Support/Utils.h"
+#include "flang/Lower/SymbolMap.h"
 #include "flang/Optimizer/Builder/BoxValue.h"
+#include "flang/Optimizer/Builder/FIRBuilder.h"
 #include "flang/Optimizer/Dialect/FIRAttr.h"
 #include "flang/Semantics/symbol.h"
 #include "flang/Support/Fortran.h"
@@ -33,7 +36,6 @@ class StateStack;
 
 namespace fir {
 class KindMapping;
-class FirOpBuilder;
 } // namespace fir
 
 namespace Fortran {
@@ -124,6 +126,10 @@ public:
   /// nullptr base address.
   virtual Fortran::lower::SymMap::StorageDesc
   getSymbolStorage(SymbolRef sym) = 0;
+
+  /// Return the Symbol Map used to map semantics::Symbol to their SSA
+  /// values in the generated MLIR.
+  virtual Fortran::lower::SymMap &getSymbolMap() = 0;
 
   /// Override lowering of expression with pre-lowered values.
   /// Associate mlir::Value to evaluate::Expr. All subsequent call to
@@ -269,6 +275,12 @@ public:
   virtual bool
   isRegisteredDummySymbol(Fortran::semantics::SymbolRef symRef) const = 0;
 
+  /// Get the source-level argument position (1-based) for a dummy symbol.
+  /// Returns 0 if the symbol is not a registered dummy or position is unknown.
+  /// Can only be used reliably during the instantiation of variables.
+  virtual unsigned
+  getDummyArgPosition(const Fortran::semantics::Symbol &sym) const = 0;
+
   /// Returns the FunctionLikeUnit being lowered, if any.
   virtual const Fortran::lower::pft::FunctionLikeUnit *
   getCurrentFunctionUnit() const = 0;
@@ -302,7 +314,9 @@ public:
                    const Fortran::semantics::DerivedTypeSpec &typeSpec,
                    fir::RecordType type) = 0;
 
-  virtual void genAssignment(const Fortran::evaluate::Assignment &assign, bool DoNotInitialize = false) = 0;
+  virtual void genAssignment(const Fortran::evaluate::Assignment &assign,
+                const llvm::ArrayRef<const Fortran::parser::CompilerDirective *>
+                    &dirs = {}, bool DoNotInitialize = false) = 0;
 
   /// Get stack of derived type in construction. This is an internal entry point
   /// for the type conversion utility to allow lowering recursive derived types.
@@ -350,6 +364,11 @@ public:
   virtual const fir::KindMapping &getKindMap() = 0;
 
   virtual Fortran::lower::StatementContext &getFctCtx() = 0;
+
+  /// Generate STAT and ERRMSG from a list of StatOrErrmsg
+  virtual std::pair<mlir::Value, mlir::Value>
+  genStatAndErrmsg(mlir::Location loc,
+                   const std::list<Fortran::parser::StatOrErrmsg> &) = 0;
 
   AbstractConverter(const Fortran::lower::LoweringOptions &loweringOptions)
       : loweringOptions(loweringOptions) {}

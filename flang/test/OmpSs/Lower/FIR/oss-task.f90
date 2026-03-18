@@ -70,7 +70,7 @@ end program
 ! FIRDialect:           oss.task priority(%[[VAL_0]] : i32) {
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
-! FIRDialect:           oss.task default( defshared) {
+! FIRDialect:           oss.task default(defshared) {
 ! FIRDialect:             oss.terminator
 ! FIRDialect:           }
 ! FIRDialect:           %[[VAL_8:[-0-9A-Za-z._]+]] = fir.undefined !fir.oss<i32>

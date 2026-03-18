@@ -29,9 +29,6 @@ Non-comprehensive list of changes in this release
 ELF Improvements
 ----------------
 
-* ``--print-gc-sections=<file>`` prints garbage collection section listing to a file.
-  (`#159706 <https://github.com/llvm/llvm-project/pull/159706>`_)
-
 Breaking changes
 ----------------
 
@@ -43,9 +40,6 @@ MinGW Improvements
 
 MachO Improvements
 ------------------
-
-* ``--separate-cstring-literal-sections`` emits cstring literal sections into sections defined by their section name.
-  (`#158720 <https://github.com/llvm/llvm-project/pull/158720>`_)
 
 WebAssembly Improvements
 ------------------------

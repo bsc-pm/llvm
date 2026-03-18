@@ -66,6 +66,7 @@ config.suffixes = [
     ".ll",
     ".fir",
     ".mlir",
+    ".s",
 ]
 
 config.substitutions.append(("%PATH%", config.environment["PATH"]))
