@@ -324,6 +324,9 @@ set(LIBOMPTARGET_OPENMP_HOST_RTL_FOLDER "${LIBOMP_LIBRARY_DIR}" CACHE STRING
 add_custom_target(libomp-needed-headers DEPENDS kmp_i18n_id.inc kmp_i18n_default.inc)
 set_target_properties(libomp-needed-headers PROPERTIES FOLDER "OpenMP/Sourcegenning")
 add_dependencies(obj.omp libomp-needed-headers)
+if (NOSV_PKG_FOUND)
+add_dependencies(ompv libomp-needed-headers)
+endif()
 
 # Windows specific build rules
 if(WIN32)
