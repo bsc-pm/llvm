@@ -3257,8 +3257,8 @@ struct OmpSsFunction {
   void relocateInstrs() {
     for (auto *I : PostMoveInstructions) {
       Function *DstF = cast<Function>(I->getParent()->getParent());
-      Instruction *TI = DstF->getEntryBlock().getTerminator();
-      I->moveBefore(TI->getIterator());
+      BasicBlock &EntryBB = DstF->getEntryBlock();
+      I->moveBefore(EntryBB.getFirstInsertionPt());
     }
   }
 
