@@ -59,34 +59,34 @@ attributes #2 = { nounwind }
 ; CHECK-LABEL: define {{[^@]+}}@foo
 ; CHECK-SAME: () #[[ATTR0:[0-9]+]] !dbg [[DBG5:![0-9]+]] {
 ; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG9:![0-9]+]]
+; CHECK-NEXT:    [[TMP0:%.*]] = alloca ptr, align 8, !dbg [[DBG9]]
+; CHECK-NEXT:    [[TMP1:%.*]] = alloca ptr, align 8, !dbg [[DBG9]]
 ; CHECK-NEXT:    [[TEXT1:%.*]] = alloca [3 x i8], align 1
-; CHECK-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 1 [[TEXT1]], ptr align 1 @__const.foo.text1, i64 3, i1 false), !dbg [[DBG9:![0-9]+]]
-; CHECK-NEXT:    [[ARRAYDECAY:%.*]] = getelementptr inbounds [3 x i8], ptr [[TEXT1]], i64 0, i64 0, !dbg [[DBG10:![0-9]+]]
-; CHECK-NEXT:    [[TMP0:%.*]] = alloca ptr, align 8, !dbg [[DBG11:![0-9]+]]
-; CHECK-NEXT:    [[TMP1:%.*]] = alloca ptr, align 8, !dbg [[DBG11]]
-; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG11]]
-; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 1 [[TEXT1]], ptr align 1 @__const.foo.text1, i64 3, i1 false), !dbg [[DBG10:![0-9]+]]
+; CHECK-NEXT:    [[ARRAYDECAY:%.*]] = getelementptr inbounds [3 x i8], ptr [[TEXT1]], i64 0, i64 0, !dbg [[DBG11:![0-9]+]]
+; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg [[DBG9]]
 ; CHECK:       codeRepl:
-; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[TMP0]]), !dbg [[DBG11]]
-; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[TMP1]]), !dbg [[DBG11]]
-; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS]], align 8, !dbg [[DBG11]]
-; CHECK-NEXT:    [[TMP2:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG11]]
-; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_foo, ptr @task_invocation_info_foo, ptr [[ARRAYDECAY]], i64 0, ptr [[TMP0]], ptr [[TMP1]], i64 0, i64 [[TMP2]]), !dbg [[DBG11]]
-; CHECK-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[TMP0]], align 8, !dbg [[DBG11]]
-; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP3]], i64 0, !dbg [[DBG11]]
-; CHECK-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[TMP1]], align 8, !dbg [[DBG11]]
-; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP4]]), !dbg [[DBG11]]
-; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[TMP0]]), !dbg [[DBG11]]
-; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[TMP1]]), !dbg [[DBG11]]
-; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[TMP1]]), !dbg [[DBG9]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[TMP0]]), !dbg [[DBG9]]
+; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS]], align 8, !dbg [[DBG9]]
+; CHECK-NEXT:    [[TMP2:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG9]]
+; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_foo, ptr @task_invocation_info_foo, ptr [[ARRAYDECAY]], i64 0, ptr [[TMP1]], ptr [[TMP0]], i64 0, i64 [[TMP2]]), !dbg [[DBG9]]
+; CHECK-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[TMP1]], align 8, !dbg [[DBG9]]
+; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP3]], i64 0, !dbg [[DBG9]]
+; CHECK-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[TMP0]], align 8, !dbg [[DBG9]]
+; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP4]]), !dbg [[DBG9]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[TMP1]]), !dbg [[DBG9]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[TMP0]]), !dbg [[DBG9]]
+; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG9]]
 ; CHECK:       final.end:
 ; CHECK-NEXT:    ret void, !dbg [[DBG12:![0-9]+]]
 ; CHECK:       final.then:
 ; CHECK-NEXT:    br label [[FINAL_END]], !dbg [[DBG12]]
 ; CHECK:       final.cond:
-; CHECK-NEXT:    [[TMP5:%.*]] = call i32 @nanos6_in_final(), !dbg [[DBG11]]
-; CHECK-NEXT:    [[TMP6:%.*]] = icmp ne i32 [[TMP5]], 0, !dbg [[DBG11]]
-; CHECK-NEXT:    br i1 [[TMP6]], label [[FINAL_THEN:%.*]], label [[CODEREPL:%.*]], !dbg [[DBG11]]
+; CHECK-NEXT:    [[TMP5:%.*]] = call i32 @nanos6_in_final(), !dbg [[DBG9]]
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp ne i32 [[TMP5]], 0, !dbg [[DBG9]]
+; CHECK-NEXT:    br i1 [[TMP6]], label [[FINAL_THEN:%.*]], label [[CODEREPL:%.*]], !dbg [[DBG9]]
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@nanos6_constructor_check_version() {

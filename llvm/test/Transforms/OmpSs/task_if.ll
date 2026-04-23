@@ -32,22 +32,22 @@ declare void @llvm.directive.region.exit(token)
 ; CHECK-LABEL: define {{[^@]+}}@foo
 ; CHECK-SAME: () !dbg [[DBG2:![0-9]+]] {
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[TMP0:%.*]] = alloca ptr, align 8, !dbg [[DBG7:![0-9]+]]
+; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG7:![0-9]+]]
+; CHECK-NEXT:    [[TMP0:%.*]] = alloca ptr, align 8, !dbg [[DBG7]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = alloca ptr, align 8, !dbg [[DBG7]]
-; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG7]]
 ; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg [[DBG7]]
 ; CHECK:       codeRepl:
-; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[TMP0]]), !dbg [[DBG7]]
 ; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[TMP1]]), !dbg [[DBG7]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[TMP0]]), !dbg [[DBG7]]
 ; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS]], align 8, !dbg [[DBG7]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG7]]
-; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_foo, ptr @task_invocation_info_foo, ptr null, i64 0, ptr [[TMP0]], ptr [[TMP1]], i64 2, i64 [[TMP2]]), !dbg [[DBG7]]
-; CHECK-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[TMP0]], align 8, !dbg [[DBG7]]
+; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_foo, ptr @task_invocation_info_foo, ptr null, i64 0, ptr [[TMP1]], ptr [[TMP0]], i64 2, i64 [[TMP2]]), !dbg [[DBG7]]
+; CHECK-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[TMP1]], align 8, !dbg [[DBG7]]
 ; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP3]], i64 0, !dbg [[DBG7]]
-; CHECK-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[TMP1]], align 8, !dbg [[DBG7]]
+; CHECK-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[TMP0]], align 8, !dbg [[DBG7]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP4]]), !dbg [[DBG7]]
-; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[TMP0]]), !dbg [[DBG7]]
 ; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[TMP1]]), !dbg [[DBG7]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[TMP0]]), !dbg [[DBG7]]
 ; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG7]]
 ; CHECK:       final.end:
 ; CHECK-NEXT:    ret void, !dbg [[DBG8:![0-9]+]]

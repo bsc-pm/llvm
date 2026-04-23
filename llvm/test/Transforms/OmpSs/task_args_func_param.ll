@@ -165,34 +165,34 @@ attributes #3 = { noinline norecurse nounwind "frame-pointer"="none" "min-legal-
 ; CHECK-LABEL: define {{[^@]+}}@_Z3fooiRi
 ; CHECK-SAME: (i32 noundef [[X:%.*]], ptr noundef nonnull align 4 dereferenceable(4) [[Y:%.*]]) #[[ATTR0:[0-9]+]] !dbg [[DBG5:![0-9]+]] {
 ; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG9:![0-9]+]]
+; CHECK-NEXT:    [[TMP0:%.*]] = alloca ptr, align 8, !dbg [[DBG9]]
+; CHECK-NEXT:    [[TMP1:%.*]] = alloca ptr, align 8, !dbg [[DBG9]]
 ; CHECK-NEXT:    [[X_ADDR:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    [[Y_ADDR:%.*]] = alloca ptr, align 8
 ; CHECK-NEXT:    store i32 [[X]], ptr [[X_ADDR]], align 4
 ; CHECK-NEXT:    store ptr [[Y]], ptr [[Y_ADDR]], align 8
-; CHECK-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[Y_ADDR]], align 8, !dbg [[DBG9:![0-9]+]]
-; CHECK-NEXT:    [[TMP1:%.*]] = alloca ptr, align 8, !dbg [[DBG9]]
-; CHECK-NEXT:    [[TMP2:%.*]] = alloca ptr, align 8, !dbg [[DBG9]]
-; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG9]]
+; CHECK-NEXT:    [[TMP2:%.*]] = load ptr, ptr [[Y_ADDR]], align 8, !dbg [[DBG9]]
 ; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg [[DBG9]]
 ; CHECK:       codeRepl:
 ; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[TMP1]]), !dbg [[DBG9]]
-; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[TMP2]]), !dbg [[DBG9]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[TMP0]]), !dbg [[DBG9]]
 ; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS]], align 8, !dbg [[DBG9]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG9]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[TMP3]], 1, !dbg [[DBG9]]
 ; CHECK-NEXT:    store i64 [[TMP4]], ptr [[NUM_DEPS]], align 8, !dbg [[DBG9]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG9]]
-; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var__Z3fooiRi, ptr @task_invocation_info__Z3fooiRi, ptr null, i64 16, ptr [[TMP1]], ptr [[TMP2]], i64 0, i64 [[TMP5]]), !dbg [[DBG9]]
+; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var__Z3fooiRi, ptr @task_invocation_info__Z3fooiRi, ptr null, i64 16, ptr [[TMP1]], ptr [[TMP0]], i64 0, i64 [[TMP5]]), !dbg [[DBG9]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = load ptr, ptr [[TMP1]], align 8, !dbg [[DBG9]]
 ; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP6]], i64 16, !dbg [[DBG9]]
 ; CHECK-NEXT:    [[GEP_:%.*]] = getelementptr [[NANOS6_TASK_ARGS__Z3FOOIRI:%.*]], ptr [[TMP6]], i32 0, i32 0, !dbg [[DBG9]]
-; CHECK-NEXT:    store ptr [[TMP0]], ptr [[GEP_]], align 8, !dbg [[DBG9]]
+; CHECK-NEXT:    store ptr [[TMP2]], ptr [[GEP_]], align 8, !dbg [[DBG9]]
 ; CHECK-NEXT:    [[GEP_X_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS__Z3FOOIRI]], ptr [[TMP6]], i32 0, i32 1, !dbg [[DBG9]]
 ; CHECK-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr align 4 [[GEP_X_ADDR]], ptr align 4 [[X_ADDR]], i64 4, i1 false), !dbg [[DBG9]]
-; CHECK-NEXT:    [[TMP7:%.*]] = load ptr, ptr [[TMP2]], align 8, !dbg [[DBG9]]
+; CHECK-NEXT:    [[TMP7:%.*]] = load ptr, ptr [[TMP0]], align 8, !dbg [[DBG9]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP7]]), !dbg [[DBG9]]
 ; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[TMP1]]), !dbg [[DBG9]]
-; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[TMP2]]), !dbg [[DBG9]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[TMP0]]), !dbg [[DBG9]]
 ; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG9]]
 ; CHECK:       final.end:
 ; CHECK-NEXT:    ret void, !dbg [[DBG10:![0-9]+]]

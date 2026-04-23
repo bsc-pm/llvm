@@ -228,27 +228,27 @@ attributes #4 = { noinline norecurse nounwind "frame-pointer"="none" "min-legal-
 ; CHECK-LABEL: define {{[^@]+}}@main
 ; CHECK-SAME: () #[[ATTR1:[0-9]+]] !dbg [[DBG10:![0-9]+]] {
 ; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG11:![0-9]+]]
+; CHECK-NEXT:    [[TMP0:%.*]] = alloca ptr, align 8, !dbg [[DBG11]]
+; CHECK-NEXT:    [[TMP1:%.*]] = alloca ptr, align 8, !dbg [[DBG11]]
 ; CHECK-NEXT:    [[S:%.*]] = alloca [[STRUCT_S:%.*]], align 4
-; CHECK-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[S]]), !dbg [[DBG11:![0-9]+]]
-; CHECK-NEXT:    [[TMP0:%.*]] = alloca ptr, align 8, !dbg [[DBG12:![0-9]+]]
-; CHECK-NEXT:    [[TMP1:%.*]] = alloca ptr, align 8, !dbg [[DBG12]]
-; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, !dbg [[DBG12]]
-; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg [[DBG12]]
+; CHECK-NEXT:    call void @_ZN1SC1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[S]]), !dbg [[DBG12:![0-9]+]]
+; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg [[DBG11]]
 ; CHECK:       codeRepl:
-; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[TMP0]]), !dbg [[DBG12]]
-; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[TMP1]]), !dbg [[DBG12]]
-; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS]], align 8, !dbg [[DBG12]]
-; CHECK-NEXT:    [[TMP2:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG12]]
-; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_main, ptr @task_invocation_info_main, ptr null, i64 16, ptr [[TMP0]], ptr [[TMP1]], i64 0, i64 [[TMP2]]), !dbg [[DBG12]]
-; CHECK-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[TMP0]], align 8, !dbg [[DBG12]]
-; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP3]], i64 16, !dbg [[DBG12]]
-; CHECK-NEXT:    [[GEP_S:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN:%.*]], ptr [[TMP3]], i32 0, i32 0, !dbg [[DBG12]]
-; CHECK-NEXT:    call void @oss_copy_ctor_ZN1SC1ERKS_(ptr [[S]], ptr [[GEP_S]], i64 1), !dbg [[DBG12]]
-; CHECK-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[TMP1]], align 8, !dbg [[DBG12]]
-; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP4]]), !dbg [[DBG12]]
-; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[TMP0]]), !dbg [[DBG12]]
-; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[TMP1]]), !dbg [[DBG12]]
-; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG12]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[TMP1]]), !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[TMP0]]), !dbg [[DBG11]]
+; CHECK-NEXT:    store i64 0, ptr [[NUM_DEPS]], align 8, !dbg [[DBG11]]
+; CHECK-NEXT:    [[TMP2:%.*]] = load i64, ptr [[NUM_DEPS]], align 8, !dbg [[DBG11]]
+; CHECK-NEXT:    call void @nanos6_create_task(ptr @task_info_var_main, ptr @task_invocation_info_main, ptr null, i64 16, ptr [[TMP1]], ptr [[TMP0]], i64 0, i64 [[TMP2]]), !dbg [[DBG11]]
+; CHECK-NEXT:    [[TMP3:%.*]] = load ptr, ptr [[TMP1]], align 8, !dbg [[DBG11]]
+; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, ptr [[TMP3]], i64 16, !dbg [[DBG11]]
+; CHECK-NEXT:    [[GEP_S:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN:%.*]], ptr [[TMP3]], i32 0, i32 0, !dbg [[DBG11]]
+; CHECK-NEXT:    call void @oss_copy_ctor_ZN1SC1ERKS_(ptr [[S]], ptr [[GEP_S]], i64 1), !dbg [[DBG11]]
+; CHECK-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[TMP0]], align 8, !dbg [[DBG11]]
+; CHECK-NEXT:    call void @nanos6_submit_task(ptr [[TMP4]]), !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[TMP1]]), !dbg [[DBG11]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[TMP0]]), !dbg [[DBG11]]
+; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg [[DBG11]]
 ; CHECK:       final.end:
 ; CHECK-NEXT:    call void @_ZN1SD1Ev(ptr noundef nonnull align 4 dereferenceable(4) [[S]]) #[[ATTR3:[0-9]+]], !dbg [[DBG13:![0-9]+]]
 ; CHECK-NEXT:    ret i32 0, !dbg [[DBG13]]
@@ -256,9 +256,9 @@ attributes #4 = { noinline norecurse nounwind "frame-pointer"="none" "min-legal-
 ; CHECK-NEXT:    call void @_Z3fooRK1S(ptr noundef nonnull align 4 dereferenceable(4) [[S]]), !dbg [[DBG14:![0-9]+]]
 ; CHECK-NEXT:    br label [[FINAL_END]], !dbg [[DBG13]]
 ; CHECK:       final.cond:
-; CHECK-NEXT:    [[TMP5:%.*]] = call i32 @nanos6_in_final(), !dbg [[DBG12]]
-; CHECK-NEXT:    [[TMP6:%.*]] = icmp ne i32 [[TMP5]], 0, !dbg [[DBG12]]
-; CHECK-NEXT:    br i1 [[TMP6]], label [[FINAL_THEN:%.*]], label [[CODEREPL:%.*]], !dbg [[DBG12]]
+; CHECK-NEXT:    [[TMP5:%.*]] = call i32 @nanos6_in_final(), !dbg [[DBG11]]
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp ne i32 [[TMP5]], 0, !dbg [[DBG11]]
+; CHECK-NEXT:    br i1 [[TMP6]], label [[FINAL_THEN:%.*]], label [[CODEREPL:%.*]], !dbg [[DBG11]]
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_ZN1SC1Ev
