@@ -3493,6 +3493,9 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   EmitIfUsed(CGF, TaskStack.back().TerminateHandler);
   EmitIfUsed(CGF, TaskStack.back().UnreachableBlock);
 
+  // Body may end with no insert point (noreturn / infinite loop); keep
+  // the entry/exit pair by emitting the exit in an unreachable block.
+  CGF.EnsureInsertPoint();
   CGF.Builder.CreateCall(ExitCallee, Result);
 
   // Pop Task Stack
@@ -3542,6 +3545,9 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   EmitIfUsed(CGF, TaskStack.back().TerminateHandler);
   EmitIfUsed(CGF, TaskStack.back().UnreachableBlock);
 
+  // Body may end with no insert point (noreturn / infinite loop); keep
+  // the entry/exit pair by emitting the exit in an unreachable block.
+  CGF.EnsureInsertPoint();
   CGF.Builder.CreateCall(ExitCallee, Result);
 
   // Pop Task Stack
@@ -3652,6 +3658,9 @@ void CGOmpSsRuntime::emitLoopCall(CodeGenFunction &CGF,
     EmitIfUsed(CGF, TaskStack.back().TerminateHandler);
     EmitIfUsed(CGF, TaskStack.back().UnreachableBlock);
 
+    // Body may end with no insert point (noreturn / infinite loop); keep
+    // the entry/exit pair by emitting the exit in an unreachable block.
+    CGF.EnsureInsertPoint();
     CGF.Builder.CreateCall(ExitCallee, Result);
 
     // Pop Task Stack
@@ -3700,6 +3709,9 @@ void CGOmpSsRuntime::emitLoopCall(CodeGenFunction &CGF,
     EmitIfUsed(CGF, TaskStack.back().TerminateHandler);
     EmitIfUsed(CGF, TaskStack.back().UnreachableBlock);
 
+    // Body may end with no insert point (noreturn / infinite loop); keep
+    // the entry/exit pair by emitting the exit in an unreachable block.
+    CGF.EnsureInsertPoint();
     CGF.Builder.CreateCall(ExitCallee, Result);
 
     // Pop Task Stack
