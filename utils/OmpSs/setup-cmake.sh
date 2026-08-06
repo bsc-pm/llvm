@@ -505,6 +505,13 @@ then
   else
     CMAKE_INVOCATION_EXTRA_FLAGS+=("-DOFFLOAD_INCLUDE_TESTS=OFF")
   fi
+
+  # 'offload' above builds the host side (libomptarget.so and its plugins). The
+  # device side, 'libomptarget-nvptx.bc', comes from openmp/device and is only
+  # built when the runtimes are configured for a GPU triple. Only 'openmp' is
+  # listed for that triple because offload skips itself on GPU targets.
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_RUNTIME_TARGETS=default;nvptx64-nvidia-cuda")
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DRUNTIMES_nvptx64-nvidia-cuda_LLVM_ENABLE_RUNTIMES=openmp")
 fi
 
 ################################################################################
