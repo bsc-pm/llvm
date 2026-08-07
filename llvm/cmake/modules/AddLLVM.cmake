@@ -1550,6 +1550,9 @@ if(NOT LLVM_TOOLCHAIN_TOOLS)
     llvm-nm
     llvm-objcopy
     llvm-objdump
+    llvm-offload-binary
+    # Legacy alias; add_llvm_tool_symlink needs both names listed to install it.
+    clang-offload-packager
     llvm-pdbutil
     llvm-rc
     llvm-readobj
