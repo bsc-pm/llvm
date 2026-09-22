@@ -17,6 +17,10 @@
 #include "kmp_wait_release.h"
 #include "kmp_taskdeps.h"
 
+#if defined(KMP_OMPV_ENABLED)
+#include <pthread.h> // PTHREAD_BARRIER_SERIAL_THREAD
+#endif
+
 #if OMPT_SUPPORT
 #include "ompt-specific.h"
 #endif
@@ -34,7 +38,7 @@ void free_agents_wait_barrier(kmp_info_t *this_thr, int tid) {
   if (__kmp_enable_free_agents) {
     // First barrier
     int res = nosv_barrier_wait(&this_thr->th.th_team->t.nosv_bar);
-    KMP_ASSERT(res == 0);
+    KMP_ASSERT(res == 0 || res == PTHREAD_BARRIER_SERIAL_THREAD);
     // Now we know if there are tasks or not
     kmp_task_team_t *task_team = this_thr->th.th_task_team;
 
@@ -45,7 +49,7 @@ void free_agents_wait_barrier(kmp_info_t *this_thr, int tid) {
         // Pause workers here until master gets the signal all tasks
         // have been executed
         int res = nosv_barrier_wait(&this_thr->th.th_team->t.nosv_bar);
-        KMP_ASSERT(res == 0);
+        KMP_ASSERT(res == 0 || res == PTHREAD_BARRIER_SERIAL_THREAD);
       }
     }
   }
@@ -5214,7 +5218,7 @@ void __kmp_task_team_wait(
 
       if (__kmp_enable_free_agents) {
         int res = nosv_barrier_wait(&this_thr->th.th_team->t.nosv_bar);
-        KMP_ASSERT(res == 0);
+        KMP_ASSERT(res == 0 || res == PTHREAD_BARRIER_SERIAL_THREAD);
       }
 
       if (KMP_PASSIVE_ENABLED()) {
