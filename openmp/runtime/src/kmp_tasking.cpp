@@ -86,6 +86,7 @@ void free_agents_release_task(kmp_taskdata_t *taskdata) {
 }
 void free_agents_wait_childs(kmp_taskdata_t *taskdata) {
   if (__kmp_enable_free_agents) {
+    taskdata->td_wait_nosv_task = nosv_self();
     kmp_int32 children_free_agent = -1 + KMP_ATOMIC_DEC(&taskdata->td_incomplete_child_tasks_free_agent);
     if (children_free_agent != 0)
       nosv_pause(0);
@@ -102,7 +103,7 @@ void free_agents_wakeup_childs(kmp_taskdata_t *taskdata) {
     if (children_free_agent == 0 &&
         !taskdata->td_parent->td_flags.complete) {
       // Parent task can continue running
-      int res = nosv_submit(taskdata->td_parent->td_nosv_task, NOSV_SUBMIT_UNLOCKED);
+      int res = nosv_submit(taskdata->td_parent->td_wait_nosv_task, NOSV_SUBMIT_UNLOCKED);
       KMP_ASSERT(res == 0);
     }
   }
@@ -1197,8 +1198,10 @@ static void __kmp_task_finish(kmp_int32 gtid, kmp_task_t *task,
           KMP_EVENT_ALLOW_COMPLETION) {
 #if defined(KMP_OMPV_ENABLED)
         // increase nosv event counter so the task will not execute nosv_complete_task
-        // until the event has been fulfilled
-        nosv_increase_event_counter(1);
+        // until the event has been fulfilled. if0 tasks are not run by nosv, the
+        // fulfill completes their nosv task
+        if (in_nosv_task)
+          nosv_increase_event_counter(1);
         taskdata->td_allow_completion_event.type = KMP_EVENT_FINISHED;
 #endif // KMP_OMPV_ENABLED
 

@@ -1051,7 +1051,8 @@ void __kmpc_omp_taskwait_deps_51(ident_t *loc_ref, kmp_int32 gtid,
   kmp_depnode_t node = {0};
   __kmp_init_node(&node, /*on_stack=*/true);
 #if defined(KMP_OMPV_ENABLED)
-  node.dn.nosv_task = current_task->td_nosv_task;
+  // The one paused in free_agents_wait_deps, not td_nosv_task for if0 tasks
+  node.dn.nosv_task = nosv_self();
 #endif // KMP_OMPV_ENABLED
 
   if (!__kmp_check_deps(gtid, &node, NULL, &current_task->td_dephash,

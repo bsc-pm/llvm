@@ -2890,6 +2890,8 @@ struct kmp_taskdata { /* aligned during dynamic allocation       */
 #if defined(KMP_OMPV_ENABLED)
   omp_task_type_t *td_omp_task_type;
   nosv_task_t td_nosv_task;
+  // Paused in free_agents_wait_childs. Not td_nosv_task for if0 tasks
+  nosv_task_t td_wait_nosv_task;
   // NOTE: used to pass the current_task from nosv_exec_task
   // to nosv_complete_task
   kmp_taskdata_t *td_resume_task;
