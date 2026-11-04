@@ -1442,7 +1442,12 @@ static void __kmp_stg_parse_tasking(char const *name, char const *value,
   __kmp_stg_parse_int(name, value, 0, (int)tskm_max,
                       (int *)&__kmp_tasking_mode);
   // KMP_TASKING=1 (task barrier) doesn't work anymore, change to task_teams (2)
-  if (__kmp_tasking_mode == tskm_extra_barrier) {
+  if (__kmp_tasking_mode == tskm_extra_barrier
+#if defined(KMP_OMPV_ENABLED)
+      // Neither does 0 (immediate exec): tasks run in nOS-V
+      || __kmp_tasking_mode == tskm_immediate_exec
+#endif // KMP_OMPV_ENABLED
+  ) {
     KMP_WARNING(StgInvalidValue, name, value);
     __kmp_tasking_mode = tskm_task_teams;
   }

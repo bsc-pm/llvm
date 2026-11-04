@@ -7,9 +7,8 @@
 // Can use KMP_TASKING=0 (immediate exec) or 2 (defer to task queue
 // and steal during regular barrier) but cannot use
 // KMP_TASKING=1 (explicit tasking barrier before regular barrier)
+// libompv cannot use KMP_TASKING=0 either and uses 2 instead
 
-// ompv does not allow immediate exec
-// UNSUPPORTED: ompv, ompv-free-agents, ompv-passive, ompv-gomp
 #include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
