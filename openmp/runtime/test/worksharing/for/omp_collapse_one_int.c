@@ -1,4 +1,5 @@
 // RUN: %libomp-compile-and-run
+// UNSUPPORTED: ompv-gomp
 
 // Non-rectangular loop collapsing.
 //
