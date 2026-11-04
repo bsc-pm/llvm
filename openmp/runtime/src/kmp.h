@@ -3121,10 +3121,6 @@ typedef struct KMP_ALIGN_CACHE kmp_base_info {
   // NOTE: used to pass the current_task from nosv_exec_task
   // to nosv_complete_task
   ompt_thread_info_t ompt_old_thread_info;
-  // NOTE: Used to restore original team and task team
-  // of the free agent
-  kmp_team_t *th_free_agent_team;
-  kmp_task_team_t *th_free_agent_task_team;
   // Used to identify a free agent
   int th_is_free_agent;
 #endif // KMP_OMPV_ENABLED

@@ -4827,8 +4827,6 @@ kmp_info_t *__kmp_allocate_thread(kmp_root_t *root, kmp_team_t *team,
   new_thr->th.th_set_nested_nth_sz = 0;
 
 #if defined(KMP_OMPV_ENABLED)
-  new_thr->th.th_free_agent_team = NULL;
-  new_thr->th.th_free_agent_task_team = NULL;
   new_thr->th.th_is_free_agent = 0;
 #endif // KMP_OMPV_ENABLED
 

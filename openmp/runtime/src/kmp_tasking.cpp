@@ -2306,8 +2306,6 @@ static int __kmp_get_regular_or_free_agent_gtid(bool entry, kmp_taskdata_t *task
       if (!thread->th.th_is_free_agent) {
         // Init some data
         thread->th.th_is_free_agent = 1;
-        thread->th.th_free_agent_team = thread->th.th_team;
-        thread->th.th_free_agent_task_team = thread->th.th_task_team;
         if (__kmp_free_agent_tid_emu) {
           thread->th.th_info.ds.ds_tid =
             gtid % taskdata->td_team->t.t_nproc;
@@ -2322,9 +2320,22 @@ static int __kmp_get_regular_or_free_agent_gtid(bool entry, kmp_taskdata_t *task
   return gtid;
 }
 
-static void free_agent_set_team(int gtid, kmp_taskdata_t *taskdata) {
+// Team borrowed by a free agent, restored afterwards as callbacks may nest
+// (e.g. included tasks run inline)
+struct free_agent_team_t {
+  bool saved;
+  kmp_team_t *team;
+  kmp_task_team_t *task_team;
+  kmp_uint8 task_state;
+};
+
+static void free_agent_set_team(int gtid, kmp_taskdata_t *taskdata,
+                                free_agent_team_t *prev) {
+  prev->saved = false;
   if (__kmp_enable_free_agents && gtid != KMP_GTID_DNE && __kmp_threads[gtid]->th.th_is_free_agent) {
     kmp_info_t *thread = __kmp_threads[gtid];
+    *prev = {true, thread->th.th_team, thread->th.th_task_team,
+             thread->th.th_task_state};
     thread->th.th_team = taskdata->td_team;
     thread->th.th_task_team = taskdata->td_task_team;
     // Not from td_alloc_thread, its state may have changed since it allocated
@@ -2332,19 +2343,23 @@ static void free_agent_set_team(int gtid, kmp_taskdata_t *taskdata) {
     thread->th.th_task_state =
         taskdata->td_team->t.t_task_team[1] == taskdata->td_task_team ? 1 : 0;
   }
+}
+
+static void free_agent_restore_team(int gtid, const free_agent_team_t *prev) {
+  if (prev->saved) {
+    kmp_info_t *thread = __kmp_threads[gtid];
+    thread->th.th_team = prev->team;
+    thread->th.th_task_team = prev->task_team;
+    thread->th.th_task_state = prev->task_state;
+  }
+}
+
+// The thread running a task is in its team. Others may complete it
+static void check_task_team(int gtid, kmp_taskdata_t *taskdata) {
   if (gtid != KMP_GTID_DNE) {
     kmp_info_t *thread = __kmp_threads[gtid];
     KMP_ASSERT(thread->th.th_team == taskdata->td_team);
     KMP_ASSERT(thread->th.th_task_team == taskdata->td_task_team);
-  }
-}
-
-static void free_agent_restore_team(int gtid) {
-  if (__kmp_enable_free_agents && gtid != KMP_GTID_DNE && __kmp_threads[gtid]->th.th_is_free_agent) {
-    kmp_info_t *thread = __kmp_threads[gtid];
-    // Restore original info
-    thread->th.th_team = thread->th.th_free_agent_team;
-    thread->th.th_task_team = thread->th.th_free_agent_task_team;
   }
 }
 
@@ -2354,7 +2369,9 @@ void nosv_exec_task(nosv_task_t task) {
   kmp_task_t *omp_task = KMP_TASKDATA_TO_TASK(taskdata);
 
   int gtid = __kmp_get_regular_or_free_agent_gtid(/*entry*/true, taskdata);
-  free_agent_set_team(gtid, taskdata);
+  free_agent_team_t prev;
+  free_agent_set_team(gtid, taskdata, &prev);
+  check_task_team(gtid, taskdata);
 
   kmp_info_t *thread = __kmp_threads[gtid];
   // In mutexinoutset tasks wait until task is able to execute
@@ -2377,7 +2394,7 @@ void nosv_exec_task(nosv_task_t task) {
 
   instr_task_end(td_instrum_task_id);
 
-  free_agent_restore_team(gtid);
+  free_agent_restore_team(gtid, &prev);
 }
 
 void nosv_complete_task(nosv_task_t task) {
@@ -2387,7 +2404,8 @@ void nosv_complete_task(nosv_task_t task) {
 
   // With free agents we assume every nosv worker has to be a free agent
   int gtid = __kmp_get_regular_or_free_agent_gtid(/*entry*/true, taskdata);
-  free_agent_set_team(gtid, taskdata);
+  free_agent_team_t prev;
+  free_agent_set_team(gtid, taskdata, &prev);
 
   if (taskdata->td_flags.tiedness == TASK_UNTIED &&
       taskdata->td_should_resubmit) {
@@ -2398,7 +2416,7 @@ void nosv_complete_task(nosv_task_t task) {
     if (KMP_PASSIVE_ENABLED())
       KMP_ATOMIC_DEC(&__kmp_threads[gtid]->th.th_task_team->tt.tt_unfinished_ready);
     __kmp_omp_task(gtid, ptask, false, NOSV_SUBMIT_UNLOCKED);
-    free_agent_restore_team(gtid);
+    free_agent_restore_team(gtid, &prev);
     return;
   }
 
@@ -2421,7 +2439,7 @@ void nosv_complete_task(nosv_task_t task) {
                   "proxy task %p, resuming task %p\n",
                   gtid, taskdata, current_task));
 
-    free_agent_restore_team(gtid);
+    free_agent_restore_team(gtid, &prev);
     return;
   }
 
@@ -2440,7 +2458,7 @@ void nosv_complete_task(nosv_task_t task) {
       if (thread->th.th_team == team) {
         __kmpc_proxy_task_completed(gtid, ptask);
 
-        free_agent_restore_team(gtid);
+        free_agent_restore_team(gtid, &prev);
         return;
       }
     }
@@ -2448,7 +2466,7 @@ void nosv_complete_task(nosv_task_t task) {
     // fallback
     __kmpc_proxy_task_completed_ooo(ptask);
 
-    free_agent_restore_team(gtid);
+    free_agent_restore_team(gtid, &prev);
     return;
   }
 
@@ -2464,7 +2482,7 @@ void nosv_complete_task(nosv_task_t task) {
     taskdata->td_flags.proxy = TASK_PROXY;
     __kmpc_proxy_task_completed_ooo(ptask);
 
-    free_agent_restore_team(gtid);
+    free_agent_restore_team(gtid, &prev);
     return;
   }
 
@@ -2473,7 +2491,7 @@ void nosv_complete_task(nosv_task_t task) {
   if (counter == 0)
     __kmp_task_finish_complete(gtid, ptask);
 
-  free_agent_restore_team(gtid);
+  free_agent_restore_team(gtid, &prev);
 }
 
 void nosv_end_task(nosv_task_t task) {
@@ -2481,7 +2499,9 @@ void nosv_end_task(nosv_task_t task) {
   kmp_task_t *omp_task = KMP_TASKDATA_TO_TASK(taskdata);
 
   int gtid = __kmp_get_regular_or_free_agent_gtid(/*entry*/false, taskdata);
-  free_agent_set_team(gtid, taskdata);
+  free_agent_team_t prev;
+  free_agent_set_team(gtid, taskdata, &prev);
+  check_task_team(gtid, taskdata);
 
   kmp_taskdata_t *current_task = taskdata->td_resume_task;
 
@@ -2491,6 +2511,7 @@ void nosv_end_task(nosv_task_t task) {
     // This is a proxy task that was already completed but it needs to run
     // its bottom-half finish
     // NOSV: the bottom-half must be done in the complete callback
+    free_agent_restore_team(gtid, &prev);
     return;
   }
 
@@ -2519,7 +2540,7 @@ void nosv_end_task(nosv_task_t task) {
       ("__kmp_invoke_task(exit): T#%d completed task %p, resuming task %p\n",
        gtid, taskdata, current_task));
 
-  free_agent_restore_team(gtid);
+  free_agent_restore_team(gtid, &prev);
 }
 
 #else
