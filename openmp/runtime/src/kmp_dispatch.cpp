@@ -3000,13 +3000,16 @@ void __kmpc_dist_dispatch_init_4(ident_t *loc, kmp_int32 gtid,
                                  kmp_int32 lb, kmp_int32 ub, kmp_int32 st,
                                  kmp_int32 chunk) {
   KMP_DEBUG_ASSERT(__kmp_init_serial);
+#if defined(KMP_OMPV_ENABLED)
+  omp_task_type_t *omp_task_type = __nosv_compat_register_task_info((char *)loc->psource);
+#endif // KMP_OMPV_ENABLED
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   OMPT_STORE_RETURN_ADDRESS(gtid);
 #endif
   __kmp_dist_get_bounds<kmp_int32>(loc, gtid, p_last, &lb, &ub, st);
   __kmp_dispatch_init<kmp_int32>(loc, gtid, schedule, lb, ub, st, chunk, true
 #if defined (KMP_OMPV_ENABLED)
-                                 , /*omp_task_type=*/nullptr
+                                 , omp_task_type
 #endif //KMP_OMPV_ENABLED
                                  );
 }
@@ -3016,13 +3019,16 @@ void __kmpc_dist_dispatch_init_4u(ident_t *loc, kmp_int32 gtid,
                                   kmp_uint32 lb, kmp_uint32 ub, kmp_int32 st,
                                   kmp_int32 chunk) {
   KMP_DEBUG_ASSERT(__kmp_init_serial);
+#if defined(KMP_OMPV_ENABLED)
+  omp_task_type_t *omp_task_type = __nosv_compat_register_task_info((char *)loc->psource);
+#endif // KMP_OMPV_ENABLED
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   OMPT_STORE_RETURN_ADDRESS(gtid);
 #endif
   __kmp_dist_get_bounds<kmp_uint32>(loc, gtid, p_last, &lb, &ub, st);
   __kmp_dispatch_init<kmp_uint32>(loc, gtid, schedule, lb, ub, st, chunk, true
 #if defined (KMP_OMPV_ENABLED)
-                                  , /*omp_task_type=*/nullptr
+                                  , omp_task_type
 #endif //KMP_OMPV_ENABLED
                                   );
 }
@@ -3032,13 +3038,16 @@ void __kmpc_dist_dispatch_init_8(ident_t *loc, kmp_int32 gtid,
                                  kmp_int64 lb, kmp_int64 ub, kmp_int64 st,
                                  kmp_int64 chunk) {
   KMP_DEBUG_ASSERT(__kmp_init_serial);
+#if defined(KMP_OMPV_ENABLED)
+  omp_task_type_t *omp_task_type = __nosv_compat_register_task_info((char *)loc->psource);
+#endif // KMP_OMPV_ENABLED
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   OMPT_STORE_RETURN_ADDRESS(gtid);
 #endif
   __kmp_dist_get_bounds<kmp_int64>(loc, gtid, p_last, &lb, &ub, st);
   __kmp_dispatch_init<kmp_int64>(loc, gtid, schedule, lb, ub, st, chunk, true
 #if defined (KMP_OMPV_ENABLED)
-                                 , /*omp_task_type=*/nullptr
+                                 , omp_task_type
 #endif //KMP_OMPV_ENABLED
                                  );
 }
@@ -3048,13 +3057,16 @@ void __kmpc_dist_dispatch_init_8u(ident_t *loc, kmp_int32 gtid,
                                   kmp_uint64 lb, kmp_uint64 ub, kmp_int64 st,
                                   kmp_int64 chunk) {
   KMP_DEBUG_ASSERT(__kmp_init_serial);
+#if defined(KMP_OMPV_ENABLED)
+  omp_task_type_t *omp_task_type = __nosv_compat_register_task_info((char *)loc->psource);
+#endif // KMP_OMPV_ENABLED
 #if OMPT_SUPPORT && OMPT_OPTIONAL
   OMPT_STORE_RETURN_ADDRESS(gtid);
 #endif
   __kmp_dist_get_bounds<kmp_uint64>(loc, gtid, p_last, &lb, &ub, st);
   __kmp_dispatch_init<kmp_uint64>(loc, gtid, schedule, lb, ub, st, chunk, true
 #if defined (KMP_OMPV_ENABLED)
-                                  , /*omp_task_type=*/nullptr
+                                  , omp_task_type
 #endif //KMP_OMPV_ENABLED
                                   );
 }
