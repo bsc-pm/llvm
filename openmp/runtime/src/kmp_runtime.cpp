@@ -2753,6 +2753,12 @@ void __kmp_join_call(ident_t *loc, int gtid
       int new_num = master_th->th.th_teams_size.nth;
       kmp_info_t **other_threads = team->t.t_threads;
       team->t.t_nproc = new_num;
+#if defined(KMP_OMPV_ENABLED)
+      int res = nosv_barrier_destroy(&team->t.nosv_bar);
+      KMP_ASSERT(res == 0);
+      res = nosv_barrier_init(&team->t.nosv_bar, NULL, new_num);
+      KMP_ASSERT(res == 0);
+#endif // KMP_OMPV_ENABLED
       for (int i = 0; i < old_num; ++i) {
         other_threads[i]->th.th_team_nproc = new_num;
       }
