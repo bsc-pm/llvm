@@ -1115,6 +1115,11 @@ static void __kmp_stg_parse_enable_free_agents(char const *name,
                                                char const *value,
                                                void *data) {
 #if defined(KMP_OMPV_ENABLED)
+  // Free agent counters depend on it
+  if (TCR_4(__kmp_init_serial)) {
+    KMP_WARNING(EnvSerialWarn, name);
+    return;
+  } // read value before serial initialization only
   __kmp_stg_parse_bool(name, value, &__kmp_enable_free_agents);
 #else
   KMP_WARNING(FreeAgentsSupport);

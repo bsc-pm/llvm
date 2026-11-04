@@ -295,13 +295,17 @@ typedef union kmp_info kmp_info_t;
 void free_agents_wait_barrier(kmp_info_t *this_thr, int tid);
 void free_agents_wait_unfinished(kmp_int32 counter);
 void free_agents_wakeup_unfinished(kmp_int32 counter);
+void free_agents_add_child(kmp_taskdata_t *parent);
+void free_agents_release_task(kmp_taskdata_t *taskdata);
 void free_agents_wait_childs(kmp_taskdata_t *taskdata);
 void free_agents_wakeup_childs(kmp_taskdata_t *taskdata);
 // forward declarations
 typedef union kmp_depnode kmp_depnode_t;
 typedef struct kmp_taskgroup kmp_taskgroup_t;
+void free_agents_add_predecessors(kmp_depnode_t *node, kmp_int32 npredecessors);
 void free_agents_wait_deps(kmp_depnode_t *node);
 void free_agents_wakeup_deps(kmp_depnode_t *successor);
+void free_agents_add_taskgroup_child(kmp_taskgroup_t *taskgroup);
 void free_agents_wait_taskgroup(kmp_taskgroup_t *taskgroup);
 void free_agents_wakeup_taskgroup(kmp_taskdata_t *taskdata);
 void numaid_to_nosv_affinity(uint32_t id, nosv_affinity_t *nosv_affinity, nosv_affinity_type_t type);

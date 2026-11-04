@@ -656,8 +656,7 @@ static bool __kmp_check_deps(kmp_int32 gtid, kmp_depnode_t *node,
   npredecessors++;
 
 #if defined(KMP_OMPV_ENABLED)
-  int npredecessors_free_agent = node->dn.npredecessors_free_agent.fetch_add(npredecessors - 1) + npredecessors;
-  KMP_ASSERT(npredecessors_free_agent >= 0);
+  free_agents_add_predecessors(node, npredecessors);
 #endif // KMP_OMPV_ENABLED
 
   // Update predecessors and obtain current value to check if there are still

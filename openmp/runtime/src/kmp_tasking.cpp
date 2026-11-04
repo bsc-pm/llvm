@@ -70,6 +70,20 @@ void free_agents_wakeup_unfinished(kmp_int32 counter) {
     }
   }
 }
+// *_free_agent counters are only updated with free agents enabled: otherwise
+// nobody waits on them and the object may be freed once the primary counter
+// reaches 0.
+void free_agents_add_child(kmp_taskdata_t *parent) {
+  if (__kmp_enable_free_agents)
+    KMP_ATOMIC_INC(&parent->td_incomplete_child_tasks_free_agent);
+}
+void free_agents_release_task(kmp_taskdata_t *taskdata) {
+  if (__kmp_enable_free_agents) {
+    kmp_int32 children_free_agent = -1 +
+        KMP_ATOMIC_DEC(&taskdata->td_incomplete_child_tasks_free_agent);
+    KMP_ASSERT(children_free_agent >= 0);
+  }
+}
 void free_agents_wait_childs(kmp_taskdata_t *taskdata) {
   if (__kmp_enable_free_agents) {
     kmp_int32 children_free_agent = -1 + KMP_ATOMIC_DEC(&taskdata->td_incomplete_child_tasks_free_agent);
@@ -81,16 +95,26 @@ void free_agents_wait_childs(kmp_taskdata_t *taskdata) {
   }
 }
 void free_agents_wakeup_childs(kmp_taskdata_t *taskdata) {
-  kmp_int32 children_free_agent = -1 +
-      KMP_ATOMIC_DEC(&taskdata->td_parent->td_incomplete_child_tasks_free_agent);
-  KMP_ASSERT(children_free_agent >= 0);
   if (__kmp_enable_free_agents) {
+    kmp_int32 children_free_agent = -1 +
+        KMP_ATOMIC_DEC(&taskdata->td_parent->td_incomplete_child_tasks_free_agent);
+    KMP_ASSERT(children_free_agent >= 0);
     if (children_free_agent == 0 &&
         !taskdata->td_parent->td_flags.complete) {
       // Parent task can continue running
       int res = nosv_submit(taskdata->td_parent->td_nosv_task, NOSV_SUBMIT_UNLOCKED);
       KMP_ASSERT(res == 0);
     }
+  }
+}
+// npredecessors includes the initial fake predecessor
+void free_agents_add_predecessors(kmp_depnode_t *node,
+                                  kmp_int32 npredecessors) {
+  if (__kmp_enable_free_agents) {
+    kmp_int32 npredecessors_free_agent =
+        node->dn.npredecessors_free_agent.fetch_add(npredecessors - 1) +
+        npredecessors;
+    KMP_ASSERT(npredecessors_free_agent >= 0);
   }
 }
 void free_agents_wait_deps(kmp_depnode_t *node) {
@@ -104,9 +128,10 @@ void free_agents_wait_deps(kmp_depnode_t *node) {
   }
 }
 void free_agents_wakeup_deps(kmp_depnode_t *successor) {
-  kmp_int32 npredecessors_free_agent = -1 +
-    KMP_ATOMIC_DEC(&successor->dn.npredecessors_free_agent);
   if (__kmp_enable_free_agents) {
+    kmp_int32 npredecessors_free_agent = -1 +
+      KMP_ATOMIC_DEC(&successor->dn.npredecessors_free_agent);
+    KMP_ASSERT(npredecessors_free_agent >= 0);
     if (npredecessors_free_agent == 0 &&
         successor->dn.nosv_task) {
       // NOTE: We only want to resume in tasks if0
@@ -114,6 +139,13 @@ void free_agents_wakeup_deps(kmp_depnode_t *successor) {
       int res = nosv_submit(successor->dn.nosv_task, NOSV_SUBMIT_UNLOCKED);
       KMP_ASSERT(res == 0);
     }
+  }
+}
+void free_agents_add_taskgroup_child(kmp_taskgroup_t *taskgroup) {
+  if (__kmp_enable_free_agents) {
+    kmp_int32 count_free_agent = 1 +
+      KMP_ATOMIC_INC(&taskgroup->count_free_agent);
+    KMP_ASSERT(count_free_agent >= 0);
   }
 }
 void free_agents_wait_taskgroup(kmp_taskgroup_t *taskgroup) {
@@ -128,10 +160,10 @@ void free_agents_wait_taskgroup(kmp_taskgroup_t *taskgroup) {
   }
 }
 void free_agents_wakeup_taskgroup(kmp_taskdata_t *taskdata) {
-  kmp_int32 count_free_agent = -1 +
-    KMP_ATOMIC_DEC(&taskdata->td_taskgroup->count_free_agent);
-  KMP_ASSERT(count_free_agent >= 0);
   if (__kmp_enable_free_agents) {
+    kmp_int32 count_free_agent = -1 +
+      KMP_ATOMIC_DEC(&taskdata->td_taskgroup->count_free_agent);
+    KMP_ASSERT(count_free_agent >= 0);
     if (count_free_agent == 0) {
       // Parent task can continue running
       int res = nosv_submit(taskdata->td_taskgroup->nosv_task, NOSV_SUBMIT_UNLOCKED);
@@ -843,7 +875,9 @@ static void __kmp_free_task(kmp_int32 gtid, kmp_taskdata_t *taskdata,
                    taskdata->td_flags.task_serial == 1);
   KMP_DEBUG_ASSERT(taskdata->td_incomplete_child_tasks == 0);
 #if defined(KMP_OMPV_ENABLED)
-  KMP_DEBUG_ASSERT(taskdata->td_incomplete_child_tasks_free_agent == 0);
+  // Initialized to 1, untouched without free agents
+  KMP_DEBUG_ASSERT(KMP_ATOMIC_LD_RLX(&taskdata->td_incomplete_child_tasks_free_agent) ==
+                   (__kmp_enable_free_agents ? 0 : 1));
 #endif // KMP_OMPV_ENABLED
   kmp_task_t *task = KMP_TASKDATA_TO_TASK(taskdata);
   // Clear data to not be re-used later by mistake.
@@ -878,7 +912,7 @@ static void __kmp_free_task(kmp_int32 gtid, kmp_taskdata_t *taskdata,
     KMP_ATOMIC_ST_RLX(&taskdata->td_untied_count, 0);
     KMP_ATOMIC_ST_RLX(&taskdata->td_incomplete_child_tasks, 0);
 #if defined(KMP_OMPV_ENABLED)
-    KMP_ATOMIC_ST_RLX(&taskdata->td_incomplete_child_tasks_free_agent, 0);
+    KMP_ATOMIC_ST_RLX(&taskdata->td_incomplete_child_tasks_free_agent, 1);
 #endif // KMP_OMPV_ENABLED
     // start at one because counts current task and children
     KMP_ATOMIC_ST_RLX(&taskdata->td_allocated_child_tasks, 1);
@@ -1024,8 +1058,7 @@ static void __kmp_task_finish_complete(kmp_int32 gtid, kmp_task_t *task) {
     __kmp_release_deps(gtid, taskdata);
   }
 
-  kmp_int32 children_free_agent = -1 + KMP_ATOMIC_DEC(&taskdata->td_incomplete_child_tasks_free_agent);
-  KMP_ASSERT(children_free_agent >= 0);
+  free_agents_release_task(taskdata);
 
   // td_flags.executing must be marked as 0 after __kmp_release_deps has been
   // called. Othertwise, if a task is executed immediately from the
@@ -1859,7 +1892,7 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
 #endif // KMP_OMPV_ENABLED
     KMP_ATOMIC_INC(&parent_task->td_incomplete_child_tasks);
 #if defined(KMP_OMPV_ENABLED)
-    KMP_ATOMIC_INC(&parent_task->td_incomplete_child_tasks_free_agent);
+    free_agents_add_child(parent_task);
 #endif // KMP_OMPV_ENABLED
     if (parent_task->td_taskgroup) {
 #if KMP_DEBUG
@@ -1868,9 +1901,7 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
         KMP_ATOMIC_INC(&parent_task->td_taskgroup->count);
       KMP_DEBUG_ASSERT(count >= 0);
 #if defined(KMP_OMPV_ENABLED)
-      kmp_int32 count_free_agent = 1 +
-        KMP_ATOMIC_INC(&parent_task->td_taskgroup->count_free_agent);
-      KMP_ASSERT(count_free_agent >= 0);
+      free_agents_add_taskgroup_child(parent_task->td_taskgroup);
 #endif // KMP_OMPV_ENABLED
     }
     // Only need to keep track of allocated child tasks for explicit tasks since
@@ -3837,6 +3868,9 @@ void __kmpc_end_taskgroup(ident_t *loc, int gtid) {
 #endif /* USE_ITT_BUILD */
   }
   KMP_DEBUG_ASSERT(taskgroup->count == 0);
+#if defined(KMP_OMPV_ENABLED)
+  KMP_DEBUG_ASSERT(KMP_ATOMIC_LD_RLX(&taskgroup->count_free_agent) == 1);
+#endif // KMP_OMPV_ENABLED
 
   if (taskgroup->reduce_data != NULL &&
       !taskgroup->gomp_data) { // need to reduce?
@@ -5420,7 +5454,7 @@ static void __kmp_first_top_half_finish_proxy(kmp_taskdata_t *taskdata) {
 #endif
       KMP_ATOMIC_DEC(&taskdata->td_taskgroup->count);
     KMP_DEBUG_ASSERT(count >= 0);
-#if defined(KMP_OMP_VERSION)
+#if defined(KMP_OMPV_ENABLED)
     free_agents_wakeup_taskgroup(taskdata);
 #endif // KMP_OMPV_ENABLED
   }
@@ -5465,8 +5499,7 @@ static void __kmp_bottom_half_finish_proxy(kmp_int32 gtid, kmp_task_t *ptask) {
   __kmp_release_deps(gtid, taskdata);
 
 #if defined(KMP_OMPV_ENABLED)
-  kmp_int32 children_free_agent = -1 + KMP_ATOMIC_DEC(&taskdata->td_incomplete_child_tasks_free_agent);
-  KMP_ASSERT(children_free_agent >= 0);
+  free_agents_release_task(taskdata);
 #endif // KMP_OMPV_ENABLED
 
   __kmp_free_task_and_ancestors(gtid, taskdata, thread);
@@ -5777,7 +5810,7 @@ kmp_task_t *__kmp_task_dup_alloc(kmp_info_t *thread, kmp_task_t *task_src
 #endif // KMP_OMPV_ENABLED
     KMP_ATOMIC_INC(&parent_task->td_incomplete_child_tasks);
 #if defined(KMP_OMPV_ENABLED)
-    KMP_ATOMIC_INC(&parent_task->td_incomplete_child_tasks_free_agent);
+    free_agents_add_child(parent_task);
 #endif // KMP_OMPV_ENABLED
     if (parent_task->td_taskgroup) {
 #if KMP_DEBUG
@@ -5786,9 +5819,7 @@ kmp_task_t *__kmp_task_dup_alloc(kmp_info_t *thread, kmp_task_t *task_src
         KMP_ATOMIC_INC(&parent_task->td_taskgroup->count);
       KMP_DEBUG_ASSERT(count >= 0);
 #if defined(KMP_OMPV_ENABLED)
-      kmp_int32 count_free_agent = 1 +
-        KMP_ATOMIC_INC(&parent_task->td_taskgroup->count_free_agent);
-      KMP_ASSERT(count_free_agent >= 0);
+      free_agents_add_taskgroup_child(parent_task->td_taskgroup);
 #endif // KMP_OMPV_ENABLED
     }
     // Only need to keep track of allocated child tasks for explicit tasks since
@@ -6666,11 +6697,14 @@ void __kmp_exec_tdg(kmp_int32 gtid, kmp_tdg_info_t *tdg) {
                       this_record_map[j].npredecessors);
     KMP_ATOMIC_INC(&this_record_map[j].parent_task->td_incomplete_child_tasks);
 #if defined(KMP_OMPV_ENABLED)
-    KMP_ATOMIC_INC(&this_record_map[j].parent_task->td_incomplete_child_tasks_free_agent);
+    free_agents_add_child(this_record_map[j].parent_task);
 #endif // KMP_OMPV_ENABLED
 
     if (parent_taskgroup) {
       KMP_ATOMIC_INC(&parent_taskgroup->count);
+#if defined(KMP_OMPV_ENABLED)
+      free_agents_add_taskgroup_child(parent_taskgroup);
+#endif // KMP_OMPV_ENABLED
       // The taskgroup is different so we must update it
       td->td_taskgroup = parent_taskgroup;
     } else if (td->td_taskgroup != nullptr) {
