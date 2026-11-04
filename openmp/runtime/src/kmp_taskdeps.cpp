@@ -635,6 +635,10 @@ static bool __kmp_check_deps(kmp_int32 gtid, kmp_depnode_t *node,
   // npredecessors is set -1 to ensure that none of the releasing tasks queues
   // this task before we have finished processing all the dependences
   node->dn.npredecessors = -1;
+#if defined(KMP_OMPV_ENABLED)
+  // Same for free agents
+  KMP_ATOMIC_ST_RLX(&node->dn.npredecessors_free_agent, -1);
+#endif // KMP_OMPV_ENABLED
 
   // used to pack all npredecessors additions into a single atomic operation at
   // the end
@@ -847,7 +851,6 @@ kmp_int32 __kmpc_omp_task_with_deps(ident_t *loc_ref, kmp_int32 gtid,
     __kmp_init_node(node, /*on_stack=*/false);
     new_taskdata->td_depnode = node;
 #if defined(KMP_OMPV_ENABLED)
-    KMP_ATOMIC_ST_RLX(&node->dn.npredecessors_free_agent, 1);
     node->dn.nosv_task = NULL; // Regular tasks do not use the pause mechanism
 #endif // KMP_OMPV_ENABLED
 
@@ -1048,7 +1051,6 @@ void __kmpc_omp_taskwait_deps_51(ident_t *loc_ref, kmp_int32 gtid,
   kmp_depnode_t node = {0};
   __kmp_init_node(&node, /*on_stack=*/true);
 #if defined(KMP_OMPV_ENABLED)
-  KMP_ATOMIC_ST_RLX(&node.dn.npredecessors_free_agent, 1);
   node.dn.nosv_task = current_task->td_nosv_task;
 #endif // KMP_OMPV_ENABLED
 

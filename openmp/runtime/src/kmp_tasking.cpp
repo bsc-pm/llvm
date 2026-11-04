@@ -107,14 +107,14 @@ void free_agents_wakeup_childs(kmp_taskdata_t *taskdata) {
     }
   }
 }
-// npredecessors includes the initial fake predecessor
+// npredecessors includes the initial fake predecessor. Add also the waiter unit
 void free_agents_add_predecessors(kmp_depnode_t *node,
                                   kmp_int32 npredecessors) {
   if (__kmp_enable_free_agents) {
     kmp_int32 npredecessors_free_agent =
-        node->dn.npredecessors_free_agent.fetch_add(npredecessors - 1) +
-        npredecessors;
-    KMP_ASSERT(npredecessors_free_agent >= 0);
+        node->dn.npredecessors_free_agent.fetch_add(npredecessors + 1) +
+        npredecessors + 1;
+    KMP_ASSERT(npredecessors_free_agent >= 1);
   }
 }
 void free_agents_wait_deps(kmp_depnode_t *node) {
@@ -129,9 +129,9 @@ void free_agents_wait_deps(kmp_depnode_t *node) {
 }
 void free_agents_wakeup_deps(kmp_depnode_t *successor) {
   if (__kmp_enable_free_agents) {
+    // May be negative while __kmp_check_deps is running
     kmp_int32 npredecessors_free_agent = -1 +
       KMP_ATOMIC_DEC(&successor->dn.npredecessors_free_agent);
-    KMP_ASSERT(npredecessors_free_agent >= 0);
     if (npredecessors_free_agent == 0 &&
         successor->dn.nosv_task) {
       // NOTE: We only want to resume in tasks if0
