@@ -2301,8 +2301,10 @@ static void free_agent_set_team(int gtid, kmp_taskdata_t *taskdata) {
     kmp_info_t *thread = __kmp_threads[gtid];
     thread->th.th_team = taskdata->td_team;
     thread->th.th_task_team = taskdata->td_task_team;
-    // Fix for target_depend_nowait.cpp
-    thread->th.th_task_state = taskdata->td_alloc_thread->th.th_task_state;
+    // Not from td_alloc_thread, its state may have changed since it allocated
+    // the task (e.g. in a serialized parallel)
+    thread->th.th_task_state =
+        taskdata->td_team->t.t_task_team[1] == taskdata->td_task_team ? 1 : 0;
   }
   if (gtid != KMP_GTID_DNE) {
     kmp_info_t *thread = __kmp_threads[gtid];
