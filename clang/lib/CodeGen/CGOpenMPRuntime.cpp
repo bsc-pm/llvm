@@ -3882,7 +3882,9 @@ CGOpenMPRuntime::emitNosvTaskTypeRegister(CodeGenFunction &CGF, SourceLocation L
       llvm::Instruction *RetInst = llvm::ReturnInst::Create(Ctx);
       RetInst->insertInto(EntryBB, EntryBB->end());
 
-      CGM.AddGlobalCtor(CtorRegister);
+      // Before user global constructors (priorities from 101) that may
+      // use OpenMP
+      CGM.AddGlobalCtor(CtorRegister, /*Priority=*/100);
     }
     {
       FunctionArgList Args;
