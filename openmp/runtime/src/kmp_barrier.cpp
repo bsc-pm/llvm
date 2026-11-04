@@ -1955,13 +1955,21 @@ static int __kmp_barrier_template(enum barrier_type bt, int gtid, int is_split,
     KMP_MB();
 
 #if defined(KMP_OMPV_ENABLED)
-    free_agents_wait_barrier(this_thr, tid);
+    // Threads that cancel do not reach cancellable barriers, so these cannot
+    // use the nosv barrier of the team
+    if (!cancellable)
+      free_agents_wait_barrier(this_thr, tid);
 #endif // KMP_OMPV_ENABLED
 
     if (KMP_MASTER_TID(tid)) {
       status = 0;
       if (__kmp_tasking_mode != tskm_immediate_exec && !cancelled) {
+#if defined(KMP_OMPV_ENABLED)
+        __kmp_task_team_wait(this_thr, team USE_ITT_BUILD_ARG(itt_sync_obj), 1,
+                             /*nosv_bar=*/!cancellable);
+#else
         __kmp_task_team_wait(this_thr, team USE_ITT_BUILD_ARG(itt_sync_obj));
+#endif // KMP_OMPV_ENABLED
       }
 #if USE_DEBUGGER
       // Let the debugger know: All threads are arrived and starting leaving the

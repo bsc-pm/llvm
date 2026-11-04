@@ -5277,7 +5277,11 @@ void __kmp_task_team_sync(kmp_info_t *this_thr, kmp_team_t *team) {
 // thread does not wait for unfinished_threads to reach 0.
 void __kmp_task_team_wait(
     kmp_info_t *this_thr,
-    kmp_team_t *team USE_ITT_BUILD_ARG(void *itt_sync_obj), int wait) {
+    kmp_team_t *team USE_ITT_BUILD_ARG(void *itt_sync_obj), int wait
+#if defined(KMP_OMPV_ENABLED)
+    , bool nosv_bar
+#endif // KMP_OMPV_ENABLED
+    ) {
   kmp_task_team_t *task_team = team->t.t_task_team[this_thr->th.th_task_state];
 
   KMP_DEBUG_ASSERT(__kmp_tasking_mode != tskm_immediate_exec);
@@ -5305,7 +5309,8 @@ void __kmp_task_team_wait(
           0U);
       flag_unfinished.wait(this_thr, FALSE USE_ITT_BUILD_ARG(itt_sync_obj));
 
-      if (__kmp_enable_free_agents) {
+      // Second wait of free_agents_wait_barrier
+      if (__kmp_enable_free_agents && nosv_bar) {
         int res = nosv_barrier_wait(&this_thr->th.th_team->t.nosv_bar);
         KMP_ASSERT(res == 0 || res == PTHREAD_BARRIER_SERIAL_THREAD);
       }

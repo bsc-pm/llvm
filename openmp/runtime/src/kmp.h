@@ -4328,7 +4328,12 @@ extern void __kmp_task_team_wait(kmp_info_t *this_thr, kmp_team_t *team
                                  void *itt_sync_obj
 #endif /* USE_ITT_BUILD */
                                  ,
-                                 int wait = 1);
+                                 int wait = 1
+#if defined(KMP_OMPV_ENABLED)
+                                 ,
+                                 bool nosv_bar = true
+#endif // KMP_OMPV_ENABLED
+                                 );
 extern void __kmp_tasking_barrier(kmp_team_t *team, kmp_info_t *thread,
                                   int gtid);
 #if KMP_DEBUG
