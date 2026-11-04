@@ -757,6 +757,8 @@ static void __kmpc_omp_task_begin_if0_template(ident_t *loc_ref, kmp_int32 gtid,
     KA_TRACE(20, ("__kmpc_omp_task_begin_if0: T#%d untied_count (%d) "
                   "incremented for task %p\n",
                   gtid, counter, taskdata));
+    // Its continuations run inline and need it
+    taskdata->td_last_tied = current_task->td_last_tied;
   }
 
 #if defined(KMP_OMPV_ENABLED)
@@ -1132,7 +1134,12 @@ static void __kmp_task_finish(kmp_int32 gtid, kmp_task_t *task,
         20,
         ("__kmp_task_finish: T#%d untied_count (%d) decremented for task %p\n",
          gtid, counter, taskdata));
+#if defined(KMP_OMPV_ENABLED)
+    // The continuation is resubmitted in nosv_complete_task
+    if (counter > 0 || taskdata->td_should_resubmit) {
+#else
     if (counter > 0) {
+#endif // KMP_OMPV_ENABLED
       // untied task is not done, to be continued possibly by other thread, do
       // not free it now
       if (resumed_task == NULL) {
@@ -2268,6 +2275,22 @@ static void __kmp_invoke_task(kmp_int32 gtid, kmp_task_t *task,
   instr_invoke_task_exit();
 }
 
+// Continuation of a serialized untied task: run it now, as nobody else will
+static void __kmp_invoke_untied_continuation(kmp_int32 gtid, kmp_task_t *task) {
+  kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(task);
+  kmp_taskdata_t *current_task = __kmp_threads[gtid]->th.th_current_task;
+  KMP_ATOMIC_INC(&taskdata->td_untied_count);
+  __kmp_invoke_task_impl(gtid, task, current_task);
+#if OMPT_SUPPORT
+  if (UNLIKELY(ompt_enabled.enabled)) {
+    kmp_info_t *thread = __kmp_threads[gtid];
+    thread->th.ompt_thread_info = thread->th.ompt_old_thread_info;
+    __kmp_task_finish<true>(gtid, task, current_task);
+  } else
+#endif
+    __kmp_task_finish<false>(gtid, task, current_task);
+}
+
 static int __kmp_get_regular_or_free_agent_gtid(bool entry, kmp_taskdata_t *taskdata) {
   int gtid;
   if (entry && __kmp_enable_free_agents && nosv_self()) {
@@ -2368,6 +2391,9 @@ void nosv_complete_task(nosv_task_t task) {
       taskdata->td_should_resubmit = 0;
     // We got a __kmp_omp_task in untied, schedule
     // now the task since it is safe.
+    // The push counts it as ready again
+    if (KMP_PASSIVE_ENABLED())
+      KMP_ATOMIC_DEC(&__kmp_threads[gtid]->th.th_task_team->tt.tt_unfinished_ready);
     __kmp_omp_task(gtid, ptask, false, NOSV_SUBMIT_UNLOCKED);
     free_agent_restore_team(gtid);
     return;
@@ -2935,11 +2961,14 @@ kmp_int32 __kmpc_omp_task(ident_t *loc_ref, kmp_int32 gtid,
 
 #if defined(KMP_OMPV_ENABLED)
   kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(new_task);
-  if (taskdata->td_flags.tiedness == TASK_UNTIED) {
-    // Default path
-    kmp_int32 counter = KMP_ATOMIC_LD_ACQ(&taskdata->td_untied_count);
-    if (counter != 0)
-      taskdata->td_should_resubmit = 1;
+  if (taskdata->td_flags.tiedness == TASK_UNTIED &&
+      KMP_ATOMIC_LD_ACQ(&taskdata->td_untied_count) != 0) {
+    // Continuation of the running untied task
+    if (taskdata->td_flags.task_serial) {
+      __kmp_invoke_untied_continuation(gtid, new_task);
+      return TASK_CURRENT_NOT_QUEUED;
+    }
+    taskdata->td_should_resubmit = 1;
   }
 
   res = __kmp_omp_task(gtid, new_task, true, NOSV_SUBMIT_NONE);
