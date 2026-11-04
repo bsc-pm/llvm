@@ -6761,10 +6761,6 @@ static inline void __kmp_start_record(kmp_int32 gtid,
     this_record_map[i].successors = successorsList;
     this_record_map[i].nsuccessors = 0;
     this_record_map[i].npredecessors = 0;
-#if defined(KMP_OMPV_ENABLED)
-    this_record_map[i].npredecessors_free_agent = 1;
-    this_record_map[i].nosv_task = NULL;
-#endif // KMP_OMPV_ENABLED
     this_record_map[i].successors_size = __kmp_successors_size;
     KMP_ATOMIC_ST_RLX(&this_record_map[i].npredecessors_counter, 0);
   }

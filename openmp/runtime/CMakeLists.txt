@@ -377,6 +377,9 @@ endif()
 # OMPX Taskgraph support
 # Whether to build with OMPX Taskgraph (e.g. task record & replay)
 set(LIBOMP_OMPX_TASKGRAPH FALSE CACHE BOOL "OMPX-taskgraph (task record & replay)?")
+if(LIBOMP_OMPX_TASKGRAPH AND NOSV_PKG_FOUND)
+  message(WARNING "OMPX-taskgraph is not supported by libompv, building libompv without it")
+endif()
 
 # Error check hwloc support after config-ix has run
 if(LIBOMP_USE_HWLOC AND (NOT LIBOMP_HAVE_HWLOC))
