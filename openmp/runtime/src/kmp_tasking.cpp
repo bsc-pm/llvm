@@ -854,8 +854,20 @@ void __kmpc_omp_task_begin(ident_t *loc_ref, kmp_int32 gtid, kmp_task_t *task) {
 #endif // TASK_UNUSED
 
 #if defined(KMP_OMPV_ENABLED)
+// The nosv task metadata holds a pointer to the taskdata, which follows it
+// unless it does not fit in NOSV_MAX_METADATA_SIZE
+static const int nosv_metadata_align = 64;
+static kmp_taskdata_t *__kmp_nosv_inline_taskdata(void *metadata) {
+  intptr_t mask = nosv_metadata_align - 1;
+  return (kmp_taskdata_t *)(((intptr_t)metadata + sizeof(kmp_taskdata_t *) +
+                             mask) & ~mask);
+}
+
 static void __kmp_nosv_finish(kmp_taskdata_t *taskdata) {
-  nosv_destroy(taskdata->td_nosv_task, NOSV_DESTROY_NONE);
+  nosv_task_t nosv_task = taskdata->td_nosv_task;
+  if (taskdata != __kmp_nosv_inline_taskdata(nosv_get_task_metadata(nosv_task)))
+    __kmp_free(taskdata);
+  nosv_destroy(nosv_task, NOSV_DESTROY_NONE);
 }
 #endif // KMP_OMPV_ENABLED
 
@@ -1629,22 +1641,24 @@ void __kmp_enable_tasking_in_serial_mode(
 }
 
 static kmp_taskdata_t *nosv_get_aligned_task_metadata(nosv_task_t nosv_task) {
-  kmp_taskdata_t *taskdata = (kmp_taskdata_t*)nosv_get_task_metadata(nosv_task);
-  const int align = 64;
-  intptr_t mask = align - 1;
-  taskdata = (kmp_taskdata_t *)(((intptr_t)taskdata + mask) & ~mask);
-  return taskdata;
+  return *(kmp_taskdata_t **)nosv_get_task_metadata(nosv_task);
 }
 
 static kmp_taskdata_t *__kmp_nosv_create(omp_task_type_t *omp_task_type, size_t size) {
   int res;
   nosv_task_t nosv_task;
   // Create nosv task descriptor
-  const int align = 64;
-  res = nosv_create(&nosv_task, omp_task_type->nosv_task_type, size + align, NOSV_CREATE_NONE);
+  size_t inline_size = sizeof(kmp_taskdata_t *) + nosv_metadata_align + size;
+  bool fits = inline_size <= NOSV_MAX_METADATA_SIZE;
+  res = nosv_create(&nosv_task, omp_task_type->nosv_task_type,
+                    fits ? inline_size : sizeof(kmp_taskdata_t *),
+                    NOSV_CREATE_NONE);
   KMP_ASSERT(res == 0);
   // Store omp task in nosv task metadata
-  kmp_taskdata_t *taskdata = nosv_get_aligned_task_metadata(nosv_task);
+  void *metadata = nosv_get_task_metadata(nosv_task);
+  kmp_taskdata_t *taskdata = fits ? __kmp_nosv_inline_taskdata(metadata)
+                                  : (kmp_taskdata_t *)__kmp_allocate(size);
+  *(kmp_taskdata_t **)metadata = taskdata;
 
   // Store nosv task metadata in omp task
   taskdata->td_nosv_task = nosv_task;
