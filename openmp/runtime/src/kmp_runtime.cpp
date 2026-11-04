@@ -418,6 +418,9 @@ int __kmp_get_global_thread_id_reg() {
   if (!nosv_self()) {
     fprintf(stderr, "WARNING: %d thread is not the main thread nor a worker thread. "
                     "May you consider adding a nosv_detach at the end of the thread code?\n", gtid);
+    // As workers do in __kmp_launch_worker
+    instr_thread_init();
+    instr_thread_execute(-1, -1, 0);
     nosv_task_t nosv_impl_task;
     __kmp_nosv_attach(&nosv_impl_task, NULL);
 

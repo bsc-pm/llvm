@@ -309,10 +309,11 @@ construct
 Do the actual fork and call the microtask in the relevant number of threads.
 */
 void __kmpc_fork_call(ident_t *loc, kmp_int32 argc, kmpc_micro microtask, ...) {
+  // Attaches a new thread to nOS-V, before any instrumentation event
+  int gtid = __kmp_entry_gtid();
 #if defined(KMP_OMPV_ENABLED)
   instr_fork_enter();
 #endif
-  int gtid = __kmp_entry_gtid();
 
 #if (KMP_STATS_ENABLED)
   // If we were in a serial region, then stop the serial timer, record
