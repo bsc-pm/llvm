@@ -6447,6 +6447,9 @@ static void __kmp_taskloop(ident_t *loc, int gtid, kmp_task_t *task, int if_val,
     __kmp_task_start(gtid, task, current_task);
     // do not execute anything for zero-trip loop
 #if defined(KMP_OMPV_ENABLED)
+    // As in __kmp_taskloop_linear
+    if (KMP_PASSIVE_ENABLED())
+      KMP_ATOMIC_INC(&__kmp_threads[gtid]->th.th_task_team->tt.tt_unfinished_ready);
     __kmp_task_finish<false, false>(gtid, task, current_task);
 #else
     __kmp_task_finish<false>(gtid, task, current_task);
