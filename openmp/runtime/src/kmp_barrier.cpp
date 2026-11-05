@@ -2482,6 +2482,45 @@ void __kmp_join_barrier(int gtid) {
            ("__kmp_join_barrier: T#%d(%d:%d) leaving\n", gtid, team_id, tid));
 
 }
+#if OMPT_SUPPORT
+// End the implicit barrier (and worker implicit task) left by the join barrier
+void __kmp_ompt_join_barrier_end(kmp_info_t *this_thr, kmp_team_t *team) {
+  ompt_state_t ompt_state = this_thr->th.ompt_thread_info.state;
+  if (ompt_enabled.enabled &&
+      (ompt_state == ompt_state_wait_barrier_teams ||
+       ompt_state == ompt_state_wait_barrier_implicit_parallel)) {
+    int ds_tid = this_thr->th.th_info.ds.ds_tid;
+    ompt_data_t *task_data = (team)
+                                 ? OMPT_CUR_TASK_DATA(this_thr)
+                                 : &(this_thr->th.ompt_thread_info.task_data);
+    this_thr->th.ompt_thread_info.state = ompt_state_overhead;
+#if OMPT_OPTIONAL
+    void *codeptr = NULL;
+    if (KMP_MASTER_TID(ds_tid) &&
+        (ompt_callbacks.ompt_callback(ompt_callback_sync_region_wait) ||
+         ompt_callbacks.ompt_callback(ompt_callback_sync_region)))
+      codeptr = team ? team->t.ompt_team_info.master_return_address : NULL;
+    ompt_sync_region_t sync_kind = ompt_sync_region_barrier_implicit_parallel;
+    if (this_thr->th.ompt_thread_info.parallel_flags & ompt_parallel_league)
+      sync_kind = ompt_sync_region_barrier_teams;
+    if (ompt_enabled.ompt_callback_sync_region_wait) {
+      ompt_callbacks.ompt_callback(ompt_callback_sync_region_wait)(
+          sync_kind, ompt_scope_end, NULL, task_data, codeptr);
+    }
+    if (ompt_enabled.ompt_callback_sync_region) {
+      ompt_callbacks.ompt_callback(ompt_callback_sync_region)(
+          sync_kind, ompt_scope_end, NULL, task_data, codeptr);
+    }
+#endif
+    if (!KMP_MASTER_TID(ds_tid) && ompt_enabled.ompt_callback_implicit_task) {
+      ompt_callbacks.ompt_callback(ompt_callback_implicit_task)(
+          ompt_scope_end, NULL, task_data, 0, ds_tid,
+          ompt_task_implicit); // TODO: Can this be ompt_task_initial?
+    }
+  }
+}
+#endif
+
 // TODO release worker threads' fork barriers as we are ready instead of all at
 // once
 void __kmp_fork_barrier(int gtid, int tid) {
@@ -2587,39 +2626,7 @@ void __kmp_fork_barrier(int gtid, int tid) {
   }
 
 #if OMPT_SUPPORT
-  ompt_state_t ompt_state = this_thr->th.ompt_thread_info.state;
-  if (ompt_enabled.enabled &&
-      (ompt_state == ompt_state_wait_barrier_teams ||
-       ompt_state == ompt_state_wait_barrier_implicit_parallel)) {
-    int ds_tid = this_thr->th.th_info.ds.ds_tid;
-    ompt_data_t *task_data = (team)
-                                 ? OMPT_CUR_TASK_DATA(this_thr)
-                                 : &(this_thr->th.ompt_thread_info.task_data);
-    this_thr->th.ompt_thread_info.state = ompt_state_overhead;
-#if OMPT_OPTIONAL
-    void *codeptr = NULL;
-    if (KMP_MASTER_TID(ds_tid) &&
-        (ompt_callbacks.ompt_callback(ompt_callback_sync_region_wait) ||
-         ompt_callbacks.ompt_callback(ompt_callback_sync_region)))
-      codeptr = team ? team->t.ompt_team_info.master_return_address : NULL;
-    ompt_sync_region_t sync_kind = ompt_sync_region_barrier_implicit_parallel;
-    if (this_thr->th.ompt_thread_info.parallel_flags & ompt_parallel_league)
-      sync_kind = ompt_sync_region_barrier_teams;
-    if (ompt_enabled.ompt_callback_sync_region_wait) {
-      ompt_callbacks.ompt_callback(ompt_callback_sync_region_wait)(
-          sync_kind, ompt_scope_end, NULL, task_data, codeptr);
-    }
-    if (ompt_enabled.ompt_callback_sync_region) {
-      ompt_callbacks.ompt_callback(ompt_callback_sync_region)(
-          sync_kind, ompt_scope_end, NULL, task_data, codeptr);
-    }
-#endif
-    if (!KMP_MASTER_TID(ds_tid) && ompt_enabled.ompt_callback_implicit_task) {
-      ompt_callbacks.ompt_callback(ompt_callback_implicit_task)(
-          ompt_scope_end, NULL, task_data, 0, ds_tid,
-          ompt_task_implicit); // TODO: Can this be ompt_task_initial?
-    }
-  }
+  __kmp_ompt_join_barrier_end(this_thr, team);
 #endif
 
   // Early exit for reaping threads releasing forkjoin barrier

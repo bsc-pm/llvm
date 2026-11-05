@@ -102,6 +102,9 @@ static void __kmp_target_init(void);
 #endif // ENABLE_LIBOMPTARGET
 void __kmp_fork_barrier(int gtid, int tid);
 void __kmp_join_barrier(int gtid);
+#if OMPT_SUPPORT
+void __kmp_ompt_join_barrier_end(kmp_info_t *this_thr, kmp_team_t *team);
+#endif
 void __kmp_setup_icv_copy(kmp_team_t *team, int new_nproc,
                           kmp_internal_control_t *new_icvs, ident_t *loc);
 
@@ -6274,6 +6277,11 @@ void *__kmp_launch_thread(kmp_info_t *this_thr) {
       __kmp_join_barrier(gtid);
     }
   }
+
+#if OMPT_SUPPORT
+  // Not done by the fork barrier if g_done was set after the join barrier
+  __kmp_ompt_join_barrier_end(this_thr, NULL);
+#endif
 
 #if OMPD_SUPPORT
   if (ompd_state & OMPD_ENABLE_BP)
