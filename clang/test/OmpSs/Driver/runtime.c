@@ -38,3 +38,11 @@
 // CHECK8: clang: error: unsupported argument 'libkaka' to option '-fompss-2='
 // CHECK9: clang: error: unsupported argument 'libasdf' to option '-fompss-2='
 // CHECK9: clang: error: unsupported argument 'libasdf' to option '-fompss-2='
+
+// cc1 gets the runtime selected by OMPSS2_RUNTIME too
+// RUN: env OMPSS2_RUNTIME=libnodes %clang -fompss-2 %s -c -### 2>&1 | FileCheck %s --check-prefix=CHECK10
+// RUN: env OMPSS2_RUNTIME=libnanos6 %clang -fompss-2 %s -c -### 2>&1 | FileCheck %s --check-prefix=CHECK11
+// RUN: env OMPSS2_RUNTIME=libnanos6 %clang -fompss-2=libnodes %s -c -### 2>&1 | FileCheck %s --check-prefix=CHECK10
+
+// CHECK10: "-cc1"{{.*}} "-fompss-2=libnodes"
+// CHECK11: "-cc1"{{.*}} "-fompss-2=libnanos6"

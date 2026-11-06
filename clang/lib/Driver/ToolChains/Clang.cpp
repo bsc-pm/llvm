@@ -6718,12 +6718,15 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
 
   // Forward flags for OmpSs
   if (Args.hasFlag(options::OPT_fompss, options::OPT_fompss_EQ, options::OPT_fno_ompss, false) && !IsCuda) {
-    switch (D.getOmpSsRuntime(Args)) {
+    Driver::OmpSsRuntimeKind RTKind = D.getOmpSsRuntime(Args);
+    switch (RTKind) {
     case Driver::OSSRT_NANOS6:
     case Driver::OSSRT_NODES:
       CmdArgs.push_back("-fompss-2");
       CmdArgs.push_back("-Wsource-uses-openmp");
-      Args.AddAllArgs(CmdArgs, options::OPT_fompss_EQ);
+      // Also when it comes from OMPSS2_RUNTIME, cc1 only sees the default.
+      CmdArgs.push_back(RTKind == Driver::OSSRT_NODES ? "-fompss-2=libnodes"
+                                                      : "-fompss-2=libnanos6");
       break;
     default:
       break;
