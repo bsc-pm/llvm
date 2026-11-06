@@ -395,9 +395,19 @@ fi
 # OMPSS2_RUNTIME
 ################################################################################
 
-if [ -n "${OMPSS2_RUNTIME}" ];
+OMPSS2_RUNTIME=${OMPSS2_RUNTIME:-libnodes}
+info "Using ${OMPSS2_RUNTIME} as the default OmpSs-2 runtime"
+CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCLANG_DEFAULT_OMPSS2_RUNTIME=${OMPSS2_RUNTIME}")
+
+if [ "${OMPSS2_RUNTIME}" = libnodes ];
 then
-  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCLANG_DEFAULT_OMPSS2_RUNTIME=${OMPSS2_RUNTIME}")
+  if [ -z "${NODES_HOME}" ] || [ -z "${NOSV_HOME}" ];
+  then
+    warning "NODES_HOME or NOSV_HOME not set, -fompss-2 will look for NODES and nOS-V in the compiler lib directory"
+  fi
+elif [ "${OMPSS2_RUNTIME}" = libnanos6 ] && [ -z "${NANOS6_HOME}" ];
+then
+  warning "NANOS6_HOME not set, -fompss-2 will look for Nanos6 in the compiler lib directory"
 fi
 
 ################################################################################
@@ -544,7 +554,6 @@ info "Running cmake..."
 run cmake -G "${BUILD_SYSTEM}" ${SRCDIR}/llvm \
    -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} \
    -DCLANG_DEFAULT_PIE_ON_LINUX=OFF \
-   -DCLANG_DEFAULT_OMPSS2_RUNTIME="libnanos6" \
    ${LLVM_ENABLE_PROJECTS} \
    -DLLVM_TARGETS_TO_BUILD="${TARGETS}" \
    -DLLVM_ENABLE_RUNTIMES="${EXTRA_RUNTIMES}" \
