@@ -1,5 +1,7 @@
 // REQUIRES: linux
 // RUN: %libomp-compile && env OMP_NUM_THREADS='2' %libomp-run
+// UNSUPPORTED: ompv-free-agents
+// Free agents may run the tasks before their successors are checked
 
 #include <assert.h>
 #include <omp.h>
