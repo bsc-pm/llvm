@@ -24,17 +24,20 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: %oss-compile && env NANOS6_CONFIG_OVERRIDE="version.instrument=verbose" %oss-run 2>&1 | FileCheck %s
-// RUN: %oss-O2-compile && env NANOS6_CONFIG_OVERRIDE="version.instrument=verbose" %oss-run 2>&1 | FileCheck %s
+// REQUIRES: default-ompss-2-runtime=libnodes
+// RUN: %oss-compile && %oss-run 2>&1 | FileCheck %s
+// RUN: %oss-O2-compile && %oss-run 2>&1 | FileCheck %s
+
+#include "../Inputs/print-label.h"
 
 const char text[] = "CoronaTask";
 
 #pragma oss task label(text)
-void foo(const char *str) {}
+void foo(const char *str) { print_task_label(); }
 
 int main() {
     #pragma oss task label(text)
-    {}
+    print_task_label();
     foo(text);
     #pragma oss taskwait
 }

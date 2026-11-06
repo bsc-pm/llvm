@@ -23,6 +23,7 @@ config.have_zstd = @LLVM_ENABLE_ZSTD@
 config.clang_objc_rewriter = @CLANG_ENABLE_OBJC_REWRITER@
 config.clang_default_pie_on_linux = @CLANG_DEFAULT_PIE_ON_LINUX@
 config.clang_default_cxx_stdlib = "@CLANG_DEFAULT_CXX_STDLIB@"
+config.clang_default_ompss2_runtime = "@CLANG_DEFAULT_OMPSS2_RUNTIME@"
 config.clang_staticanalyzer = @CLANG_ENABLE_STATIC_ANALYZER@
 config.clang_staticanalyzer_z3 = @LLVM_WITH_Z3@
 config.clang_staticanalyzer_z3_mock = @TEST_WITH_Z3_MOCK@

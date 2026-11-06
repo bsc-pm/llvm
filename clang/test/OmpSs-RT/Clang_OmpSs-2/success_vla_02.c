@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// Partially overlapping accesses need region dependencies.
+// REQUIRES: default-ompss-2-runtime=libnanos6
 // RUN: %oss-compile && env NANOS6_CONFIG_OVERRIDE="version.dependencies=regions" %oss-run
 // RUN: %oss-O2-compile && env NANOS6_CONFIG_OVERRIDE="version.dependencies=regions" %oss-run
 

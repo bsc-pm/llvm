@@ -24,8 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: %oss-cxx-compile && env NANOS6_CONFIG=%S/../../nanos6.toml %oss-run 2>&1 | FileCheck %s
-// RUN: %oss-cxx-O2-compile && env NANOS6_CONFIG=%S/../../nanos6.toml %oss-run 2>&1 | FileCheck %s
+// RUN: %oss-cxx-compile && %oss-run 2>&1 | FileCheck %s
+// RUN: %oss-cxx-O2-compile && %oss-run 2>&1 | FileCheck %s
 
 
 /*
@@ -35,6 +35,7 @@ test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatib
 */
 
 
+#include "../../Inputs/print-deps.h"
 #include<assert.h>
 #include<stdio.h>
 

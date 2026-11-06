@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -fompss-2 -verify -DFOMPSS_2 -o - %s
+// RUN: %clang_cc1 -fompss-2 -fompss-2=libnanos6 -verify -DFOMPSS_2 -o - %s
 // RUN: %clang_cc1 -verify -o - %s
 
 // expected-no-diagnostics

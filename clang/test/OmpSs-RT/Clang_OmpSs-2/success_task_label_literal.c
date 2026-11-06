@@ -24,12 +24,15 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: %oss-compile && env NANOS6_CONFIG_OVERRIDE="version.instrument=verbose" %oss-run 2>&1 | FileCheck %s
-// RUN: %oss-O2-compile && env NANOS6_CONFIG_OVERRIDE="version.instrument=verbose" %oss-run 2>&1 | FileCheck %s
+// REQUIRES: default-ompss-2-runtime=libnodes
+// RUN: %oss-compile && %oss-run 2>&1 | FileCheck %s
+// RUN: %oss-O2-compile && %oss-run 2>&1 | FileCheck %s
+
+#include "../Inputs/print-label.h"
 
 int main() {
     #pragma oss task label("I'm the best task of the world!")
-    {}
+    print_task_label();
     #pragma oss taskwait
 }
 
