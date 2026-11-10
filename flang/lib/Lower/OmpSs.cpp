@@ -2034,6 +2034,12 @@ static void fillCallDSAs(
     const Fortran::semantics::Symbol *sym = dummies[arg.firArgument];
 
     auto value = symMap.lookupSymbol(*sym).getAddr();
+    // Temporaries of non-variable actual arguments die with the caller frame.
+    auto alloca = value.getDefiningOp<fir::AllocaOp>();
+    if (alloca && alloca->hasAttr(fir::getAdaptToByRefAttrName())) {
+      val_firstprivate.insert(value);
+      continue;
+    }
     resolveDSA(value, val_shared, val_firstprivate, val_capture);
   }
   // Internal subprograms support
